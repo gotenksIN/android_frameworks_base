@@ -40,7 +40,6 @@ import android.os.SystemProperties
 import android.util.Size
 import android.view.DragEvent
 import android.window.DesktopExperienceFlags
-import android.window.DesktopModeFlags
 import android.window.SplashScreen.SPLASH_SCREEN_STYLE_ICON
 import com.android.internal.policy.DesktopModeCompatUtils
 import com.android.wm.shell.ShellTaskOrganizer
@@ -320,7 +319,6 @@ fun getInheritedExistingTaskBounds(
     task: TaskInfo,
     deskId: Int,
 ): Rect? {
-    if (!DesktopModeFlags.INHERIT_TASK_BOUNDS_FOR_TRAMPOLINE_TASK_LAUNCHES.isTrue) return null
     val activeTask = taskRepository.getExpandedTasksIdsInDeskOrdered(deskId).firstOrNull()
     if (activeTask == null) return null
     val lastTask = shellTaskOrganizer.getRunningTaskInfo(activeTask)
@@ -400,16 +398,19 @@ fun decideDesktopTaskPlacementBounds(
         if (displayLayout != null) {
             val stableBounds = Rect().also { displayLayout.getStableBounds(it) }
             val initialBounds = Rect(task.configuration.windowConfiguration.bounds)
-            cascadeWindow(
-                context,
-                recentTasksController,
-                taskRepository,
-                shellTaskOrganizer,
-                initialBounds,
-                displayLayout,
-                deskId,
-                stableBounds,
-            )
+            // If bounds are set from activity options, respect existing position.
+            if (!task.leafTaskBoundsFromOptions) {
+                cascadeWindow(
+                    context,
+                    recentTasksController,
+                    taskRepository,
+                    shellTaskOrganizer,
+                    initialBounds,
+                    displayLayout,
+                    deskId,
+                    stableBounds,
+                )
+            }
             return initialBounds
         }
     }

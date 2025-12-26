@@ -19,6 +19,8 @@ package com.android.server.wm;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN;
 import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
 import static android.app.WindowConfiguration.WINDOWING_MODE_UNDEFINED;
+import static android.os.UserHandle.USER_SYSTEM;
+import static android.view.Display.TYPE_OVERLAY;
 import static android.view.Display.TYPE_VIRTUAL;
 import static android.view.WindowManager.DISPLAY_IME_POLICY_LOCAL;
 
@@ -35,6 +37,9 @@ import static org.testng.Assert.assertFalse;
 import android.annotation.Nullable;
 import android.app.backup.BackupManager;
 import android.platform.test.annotations.Presubmit;
+import android.platform.test.annotations.RequiresFlagsDisabled;
+import android.platform.test.annotations.RequiresFlagsEnabled;
+import android.util.AtomicFile;
 import android.util.Xml;
 import android.view.Display;
 import android.view.DisplayAddress;
@@ -45,6 +50,7 @@ import androidx.test.filters.SmallTest;
 import com.android.modules.utils.TypedXmlPullParser;
 import com.android.server.wm.DisplayWindowSettings.SettingsProvider.SettingsEntry;
 import com.android.server.wm.TestDisplayWindowSettingsProvider.TestStorage;
+import com.android.window.flags.Flags;
 
 import org.junit.After;
 import org.junit.Before;
@@ -255,7 +261,17 @@ public class DisplayWindowSettingsProviderTests extends WindowTestsBase {
     public void testDoNotWriteVirtualDisplaySettingsToStorage() throws Exception {
         final DisplayInfo secondaryDisplayInfo = mSecondaryDisplay.getDisplayInfo();
         secondaryDisplayInfo.type = TYPE_VIRTUAL;
+        verifyDoNotWriteDisplaySettingsToStorage(secondaryDisplayInfo);
+    }
 
+    @Test
+    public void testDoNotWriteOverlayDisplaySettingsToStorage() throws Exception {
+        final DisplayInfo secondaryDisplayInfo = mSecondaryDisplay.getDisplayInfo();
+        secondaryDisplayInfo.type = TYPE_OVERLAY;
+        verifyDoNotWriteDisplaySettingsToStorage(secondaryDisplayInfo);
+    }
+
+    private void verifyDoNotWriteDisplaySettingsToStorage(DisplayInfo secondaryDisplayInfo) {
         // No write to storage on virtual display change.
         updateOverrideSettings(mProvider, secondaryDisplayInfo, virtualSettings -> {
             virtualSettings.mShouldShowSystemDecors = true;
@@ -316,10 +332,20 @@ public class DisplayWindowSettingsProviderTests extends WindowTestsBase {
 
     @Test
     public void testCleanUpVirtualDisplaySettingsOnDisplayRemoved() {
-        final int initialSize = 0;
         final DisplayInfo secondaryDisplayInfo = mSecondaryDisplay.getDisplayInfo();
         secondaryDisplayInfo.type = TYPE_VIRTUAL;
+        verifyCleanUpDisplaySettingsOnDisplayRemoved(secondaryDisplayInfo);
+    }
 
+    @Test
+    public void testCleanUpOverlayDisplaySettingsOnDisplayRemoved() {
+        final DisplayInfo secondaryDisplayInfo = mSecondaryDisplay.getDisplayInfo();
+        secondaryDisplayInfo.type = TYPE_OVERLAY;
+        verifyCleanUpDisplaySettingsOnDisplayRemoved(secondaryDisplayInfo);
+    }
+
+    private void verifyCleanUpDisplaySettingsOnDisplayRemoved(DisplayInfo secondaryDisplayInfo) {
+        final int initialSize = 0;
         updateOverrideSettings(mProvider, secondaryDisplayInfo, overrideSettings -> {
             // Size + 1 when query for a new display.
             assertEquals(initialSize + 1, mProvider.getOverrideSettingsSize());
@@ -377,6 +403,30 @@ public class DisplayWindowSettingsProviderTests extends WindowTestsBase {
 
         assertEquals("Settings should be created even with a null display name.", 123,
                 mProvider.getSettings(displayInfoWithNullName).mForcedDensity);
+    }
+
+    @Test
+    public void testGetOverrideSettingsFileForUser_systemUser_underSystemDataDirectory() {
+        final File expected = new File("/data/system/display_settings.xml");
+        final AtomicFile actual =
+                DisplayWindowSettingsProvider.getOverrideSettingsFileForUser(USER_SYSTEM);
+        assertEquals(expected, actual.getBaseFile());
+    }
+
+    @Test
+    @RequiresFlagsEnabled(Flags.FLAG_MOVE_USER_DISPLAY_SETTINGS_TO_DE_STORAGE)
+    public void testGetOverrideSettingsFileForUser_nonSystemUser_underSystemDeDirectory() {
+        final File expected = new File("/data/system_de/10/display_settings.xml");
+        final AtomicFile actual = DisplayWindowSettingsProvider.getOverrideSettingsFileForUser(10);
+        assertEquals(expected, actual.getBaseFile());
+    }
+
+    @Test
+    @RequiresFlagsDisabled(Flags.FLAG_MOVE_USER_DISPLAY_SETTINGS_TO_DE_STORAGE)
+    public void testGetOverrideSettingsFileForUser_nonSystemUser_underSystemCeDirectory() {
+        final File expected = new File("/data/system_ce/10/system/display_settings.xml");
+        final AtomicFile actual = DisplayWindowSettingsProvider.getOverrideSettingsFileForUser(10);
+        assertEquals(expected, actual.getBaseFile());
     }
 
     /** Helper method to create a DisplayInfo object with specific identifiers. */

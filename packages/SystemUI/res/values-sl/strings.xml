@@ -88,11 +88,9 @@
     <string name="screenshot_failed_to_capture_text" msgid="7818288545874407451">"Aplikacija ali vaša organizacija ne dovoljuje posnetkov zaslona"</string>
     <string name="screenshot_blocked_by_admin" msgid="5486757604822795797">"Skrbnik za IT je onemogočil zajemanje posnetkov zaslona."</string>
     <string name="screenshot_edit_label" msgid="8754981973544133050">"Uredi"</string>
-    <!-- no translation found for screenshot_edit_description (7802378587672433507) -->
-    <skip />
+    <string name="screenshot_edit_description" msgid="7802378587672433507">"Gumb za urejanje posnetka zaslona"</string>
     <string name="screenshot_share_label" msgid="1653061117238861559">"Deli"</string>
-    <!-- no translation found for screenshot_share_description (2654362001720033972) -->
-    <skip />
+    <string name="screenshot_share_description" msgid="2654362001720033972">"Gumb za deljenje posnetka zaslona"</string>
     <string name="screenshot_scroll_label" msgid="2930198809899329367">"Zajemi več"</string>
     <string name="screenshot_dismiss_description" msgid="4702341245899508786">"Opusti posnetek zaslona"</string>
     <string name="screenshot_dismiss_work_profile" msgid="3101530842987697045">"Opustitev sporočila o delovnem profilu"</string>
@@ -172,7 +170,13 @@
     <string name="screen_share_no_select_app_thumbnail" msgid="1630012401570567430">"Izberite aplikacijo, ki jo želite deliti"</string>
     <string name="screen_share_audio_sharing_text" msgid="7829391478284315787">"Deljenje zvoka"</string>
     <string name="screen_share_app_window_sharing_title" msgid="2063554880747318383">"Deljenje okna aplikacije"</string>
-    <string name="screen_share_disclaimer" msgid="3953761426122528262">"Pri deljenju je vsebina zaslona vidna"</string>
+    <string name="screen_share_tab_sharing_title" msgid="1178046793832072728">"Deljenje zavihka"</string>
+    <!-- no translation found for screen_share_entire_screen_sharing_title (9093580141248337998) -->
+    <skip />
+    <!-- no translation found for screen_share_disclaimer_app_sharing (4191319837838590771) -->
+    <skip />
+    <!-- no translation found for screen_share_disclaimer_full_screen_sharing (6445373139864031364) -->
+    <skip />
     <string name="screen_capture_toolbar_app_window_button_screenshot_a11y" msgid="1357560392667941303">"Ustvarjanje posnetka zaslona okna"</string>
     <string name="screen_capture_toolbar_app_window_button_record_a11y" msgid="8984966592912823394">"Okno za snemanje"</string>
     <string name="screen_capture_toolbar_region_button_screenshot_a11y" msgid="2102262602357521192">"Ustvarjanje posnetka izbranega območja zaslona"</string>
@@ -369,6 +373,7 @@
     <string name="accessibility_sensors_off_active" msgid="2619725434618911551">"Izklop za tipala je aktiven"</string>
     <string name="accessibility_clear_all" msgid="970525598287244592">"Izbriši vsa obvestila."</string>
     <string name="accessibility_notification_bell" msgid="7149451526721220526">"Obvestila"</string>
+    <string name="accessibility_status_bar_assistant_icon" msgid="1174898709836451013">"Pomočnik"</string>
     <string name="notification_group_overflow_indicator" msgid="7605120293801012648">"in <xliff:g id="NUMBER">%s</xliff:g>"</string>
     <string name="notification_group_overflow_description" msgid="7176322877233433278">"{count,plural, =1{Notri je še # obvestilo.}one{Notri je še # obvestilo.}two{Notri sta še # obvestili.}few{Notri so še # obvestila.}other{Notri je še # obvestil.}}"</string>
     <string name="accessibility_rotation_lock_on_landscape" msgid="936972553861524360">"Zaslon je zaklenjen v ležeči usmerjenosti."</string>
@@ -427,15 +432,13 @@
     <string name="quick_settings_casting" msgid="1435880708719268055">"Predvajanje"</string>
     <string name="quick_settings_cast_device_default_name" msgid="6988469571141331700">"Neimenovana naprava"</string>
     <string name="quick_settings_cast_detail_empty_text" msgid="2846282280014617785">"Na voljo ni nobene naprave"</string>
-    <!-- no translation found for quick_settings_cast_detail_title (8212426967651562547) -->
-    <skip />
-    <!-- no translation found for quick_settings_cast_detail_subtitle (6406833630052788623) -->
-    <skip />
+    <string name="quick_settings_cast_detail_title" msgid="8212426967651562547">"Predvajanje zaslona v napravo"</string>
+    <string name="quick_settings_cast_detail_subtitle" msgid="6406833630052788623">"Iskanje naprav …"</string>
     <string name="quick_settings_cast_no_network" msgid="3863016850468559522">"Ni povezave Wi‑Fi ali ethernetne povezave"</string>
     <string name="quick_settings_cast_disconnect" msgid="4836025217838730930">"Prekini povezavo"</string>
     <string name="quick_settings_audio_current_input" msgid="8219735427828862612">"Trenutni mikrofon je"</string>
-    <string name="quick_settings_audio_output_section_title" msgid="3448300919285193209">"Izhodni tok"</string>
-    <string name="quick_settings_audio_input_section_title" msgid="9203723659866975215">"Vhodni tok"</string>
+    <string name="quick_settings_audio_output_section_title" msgid="3448300919285193209">"Izhod"</string>
+    <string name="quick_settings_audio_input_section_title" msgid="9203723659866975215">"Vhod"</string>
     <string name="quick_settings_audio_input_disclaimer_text" msgid="442891508001590727">"Glasnost mikrofona bo samodejno prilagojena."</string>
     <string name="quick_settings_audio_effects_section_title" msgid="6770520531879816578">"Učinki"</string>
     <string name="quick_settings_brightness_dialog_title" msgid="4980669966716685588">"Svetlost"</string>
@@ -712,6 +715,7 @@
     <string name="notification_section_header_gentle" msgid="6804099527336337197">"Tiho"</string>
     <string name="notification_section_header_alerting" msgid="5581175033680477651">"Obvestila"</string>
     <string name="notification_section_header_conversations" msgid="821834744538345661">"Pogovori"</string>
+    <string name="notification_section_header_highlights" msgid="1671475076192152483">"Izpostavljeno"</string>
     <string name="accessibility_notification_section_header_gentle_clear_all" msgid="6490207897764933919">"Brisanje vseh tihih obvestil"</string>
     <string name="accessibility_notification_section_header_open_settings" msgid="6235202417954844004">"Odpiranje nastavitev obvestil"</string>
     <string name="modes_suppressing_shade_text" msgid="6037581130837903239">"{count,plural,offset:1 =0{Ni obvestil}=1{Prikazovanje obvestil je začasno zaustavljeno z načinom {mode}}=2{Prikazovanje obvestil je začasno zaustavljeno z načinom {mode} in še enim drugim načinom}one{Prikazovanje obvestil je začasno zaustavljeno z načinom {mode} in še # drugim načinom}two{Prikazovanje obvestil je začasno zaustavljeno z načinom {mode} in še # drugima načinoma}few{Prikazovanje obvestil je začasno zaustavljeno z načinom {mode} in še # drugimi načini}other{Prikazovanje obvestil je začasno zaustavljeno z načinom {mode} in še # drugimi načini}}"</string>
@@ -946,6 +950,8 @@
     <string name="notification_unblockable_call_desc" msgid="5907328164696532169">"Obvestil o klicih ni mogoče spreminjati."</string>
     <string name="notification_multichannel_desc" msgid="7414593090056236179">"Te skupine obvestil ni mogoče konfigurirati tukaj"</string>
     <string name="notification_delegate_header" msgid="1264510071031479920">"Posredovano obvestilo"</string>
+    <!-- no translation found for notification_summarization_header (511445254923268688) -->
+    <skip />
     <string name="notification_channel_dialog_title" msgid="6856514143093200019">"Vsa obvestila aplikacije <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="see_more_title" msgid="7409317011708185729">"Pokaži več"</string>
     <string name="feedback_alerted" msgid="5192459808484271208">"Sistem je to obvestilo samodejno &lt;b&gt;uvrstil višje – med privzeta obvestila&lt;/b&gt;."</string>
@@ -1026,8 +1032,7 @@
     <string name="group_system_access_all_apps_search" msgid="1553588630154197469">"Odpiranje seznama aplikacij"</string>
     <string name="group_system_access_system_settings" msgid="8731721963449070017">"Odpiranje nastavitev"</string>
     <string name="group_system_access_google_assistant" msgid="3769929488906534254">"Odpiranje digitalnega pomočnika"</string>
-    <!-- no translation found for group_system_access_contextual_search (525635757621336007) -->
-    <skip />
+    <string name="group_system_access_contextual_search" msgid="525635757621336007">"Kontekstualno iskanje"</string>
     <string name="group_system_lock_screen" msgid="7391191300363416543">"Zaklepanje zaslona"</string>
     <string name="group_system_quick_memo" msgid="3764560265935722903">"Ustvarjanje zapiska"</string>
     <string name="keyboard_shortcut_group_system_multitasking" msgid="6967816258924795558">"Večopravilnost"</string>
@@ -1152,17 +1157,25 @@
     <string name="accessibility_quick_settings_power_menu" msgid="6820426108301758412">"Meni za vklop/izklop"</string>
     <string name="accessibility_quick_settings_page" msgid="7506322631645550961">"<xliff:g id="ID_1">%1$d</xliff:g>. stran od <xliff:g id="ID_2">%2$d</xliff:g>"</string>
     <string name="accessibility_key_gesture_dialog_title" msgid="7614965716626605518">"Želite vklopiti funkcijo <xliff:g id="ID_1">%1$s</xliff:g>?"</string>
-    <string name="accessibility_key_gesture_dialog_content" msgid="4519838108423437794">"Dejanje "<annotation id="action_key_icon">"Ikona"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> je bližnjična tipka za uporabo funkcije <xliff:g id="ID_3">^3</xliff:g>. <xliff:g id="ID_4">^4</xliff:g>"</string>
-    <string name="accessibility_key_gesture_dialog_screen_reader_tts" msgid="1298171063228024716">"Če želite omogočiti »<xliff:g id="ID_3">%3$s</xliff:g>«, znova pritisnite Dejanje + <xliff:g id="ID_1">%1$s</xliff:g> + <xliff:g id="ID_2">%2$s</xliff:g>."</string>
+    <string name="accessibility_key_gesture_dialog_content" msgid="2409946187069273612"><annotation id="action_key_icon">"Ikona"</annotation>" <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> + <xliff:g id="ID_3">^3</xliff:g> so bližnjične tipke za uporabo funkcije <xliff:g id="ID_4">^4</xliff:g>. <xliff:g id="ID_5">^5</xliff:g>"</string>
+    <string name="accessibility_key_gesture_dialog_screen_reader_tts" msgid="6466269887128043486">"Če želite omogočiti »<xliff:g id="ID_4">%4$s</xliff:g>«, znova pritisnite <xliff:g id="ID_1">%1$s</xliff:g> + <xliff:g id="ID_2">%2$s</xliff:g> + <xliff:g id="ID_3">%3$s</xliff:g>."</string>
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_dialog_title" msgid="5331043821287212071">"Želite vklopiti bližnjične tipke za funkcijo <xliff:g id="ID_1">%1$s</xliff:g>?"</string>
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_negative_button_text" msgid="6711239406914231612">"Ne vklopi"</string>
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_positive_button_text" msgid="7748487028569821131">"Vklopi bližnjico"</string>
     <string name="accessibility_key_gesture_magnification_dialog_title" msgid="5770691510738701250">"Bližnjična tipka za funkcijo <xliff:g id="ID_1">%1$s</xliff:g> je vklopljena"</string>
-    <string name="accessibility_key_gesture_magnification_dialog_content" msgid="582920726242272572">"Dejanje "<annotation id="action_key_icon">"ikona"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> so bližnjične tipke za uporabo funkcije dostopnosti <xliff:g id="ID_3">^3</xliff:g>. Tako lahko hitro povečate zaslon za povečavo vsebine. Ko je povečava vklopljena, pritisnite Dejanje "<annotation id="action_key_icon">"ikona"</annotation>" + <xliff:g id="ID_4">^1</xliff:g> in »+« ali »–«, če želite prilagoditi povečavo."</string>
+    <string name="accessibility_key_gesture_magnification_dialog_content" msgid="1647246652170256645">"Ikone <xliff:g id="ID_1">^1</xliff:g> "<annotation id="action_key_icon"></annotation>" + <xliff:g id="ID_2">^2</xliff:g> + <xliff:g id="ID_3">^3</xliff:g> so bližnjične tipke za uporabo funkcije dostopnosti <xliff:g id="ID_4">^4</xliff:g>. Tako lahko hitro povečate zaslon za povečavo vsebine. Ko je povečava vklopljena, pritisnite "<annotation id="action_key_icon">"ikono"</annotation>" <xliff:g id="ID_5">^1</xliff:g> + <xliff:g id="ID_6">^2</xliff:g> in »+« ali »–«, če želite prilagoditi povečavo."</string>
     <string name="accessibility_key_gesture_magnification_dialog_negative_button_text" msgid="8393469413785600834">"Izklopi bližnjico"</string>
     <string name="accessibility_key_gesture_magnification_dialog_positive_button_text" msgid="895076240681888057">"Pusti vklopljeno"</string>
-    <string name="accessibility_key_gesture_screen_reader_dialog_content" msgid="389338862762665003"><annotation id="action_key_icon">"Ikona"</annotation>" dejanja + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> so bližnjične tipke za uporabo funkcije <xliff:g id="ID_3">^3</xliff:g>. <xliff:g id="ID_4">^3</xliff:g> je bralnik zaslona, ki vam omogoča, da so elementi na zaslonu izgovorjeni. To je lahko uporabno za osebe s težavami pri razločevanju vsebine zaslona. To morda spremeni način delovanja naprave."</string>
-    <string name="accessibility_key_gesture_voice_access_dialog_content" msgid="7934170819801013870">"Če pritisnete "<annotation id="action_key_icon">"ikono"</annotation>" za dejanje + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g>, vklopite funkcijo dostopnosti <xliff:g id="ID_3">^3</xliff:g>. Tako lahko prostoročno upravljate napravo."</string>
+    <string name="accessibility_key_gesture_screen_reader_dialog_content" msgid="2322728522389883751"><annotation id="action_key_icon">"Ikona"</annotation>" <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> + <xliff:g id="ID_3">^3</xliff:g> so bližnjične tipke za uporabo funkcije <xliff:g id="ID_4">^4</xliff:g>. <xliff:g id="ID_5">^4</xliff:g> je bralnik zaslona, ki vam omogoča, da so elementi na zaslonu izgovorjeni. To je lahko uporabno za osebe s težavami pri razločevanju vsebine zaslona. To morda spremeni način delovanja naprave."</string>
+    <string name="accessibility_key_gesture_screen_reader_dialog_warning_heading" msgid="5958960812509429136">"Če vklopite bližnjične tipke, boste funkciji TalkBack omogočili popoln nadzor nad napravo."</string>
+    <string name="accessibility_key_gesture_screen_reader_dialog_warning_message" msgid="2026368922103788492">"Popoln nadzor je ustrezen za aplikacije, ki vam pomagajo pri funkcijah dostopnosti, vendar ne za večino aplikacij."</string>
+    <string name="accessibility_key_gesture_screen_reader_dialog_warning_view_control_screen_heading" msgid="5346128898440400425">"Ogledovanje in upravljanje zaslona"</string>
+    <string name="accessibility_key_gesture_screen_reader_dialog_warning_view_control_screen_message" msgid="5810348116536082139">"Bere lahko vso vsebino na zaslonu ter prikaže vsebino prek drugih aplikacij."</string>
+    <string name="accessibility_key_gesture_screen_reader_dialog_warning_perform_actions_heading" msgid="6032379987970298008">"Ogledovanje in izvajanje dejanj"</string>
+    <string name="accessibility_key_gesture_screen_reader_dialog_warning_perform_actions_message" msgid="4565304881759944542">"Spremlja lahko vaše interakcije z aplikacijo ali tipali v napravi ter komunicira z aplikacijami v vašem imenu."</string>
+    <string name="accessibility_key_gesture_voice_access_dialog_content" msgid="8539054865187379687">"Če pritisnete "<annotation id="action_key_icon">"ikono"</annotation>" <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> + <xliff:g id="ID_3">^3</xliff:g>, vklopite funkcijo dostopnosti <xliff:g id="ID_4">^4</xliff:g>. Tako lahko prostoročno upravljate napravo."</string>
+    <string name="accessibility_quick_access_dialog_title" msgid="8792322423145117379">"Dostopnost"</string>
+    <string name="accessibility_quick_access_dialog_done_button_text" msgid="8013849920696848138">"Končano"</string>
     <string name="tuner_lock_screen" msgid="2267383813241144544">"Zaklenjen zaslon"</string>
     <string name="shutdown_progress" msgid="5464239146561542178">"Zaustavljanje …"</string>
     <string name="thermal_shutdown_dialog_help_text" msgid="6413474593462902901">"Oglejte si navodila za ukrepanje"</string>
@@ -1475,8 +1488,12 @@
     <string name="wifi_scan_notify_message" msgid="3753839537448621794">"Za izboljšano izkušnjo pri uporabi naprave lahko aplikacije in storitve kadar koli iščejo omrežja Wi‑Fi, tudi ko je Wi‑Fi izklopljen. To lahko spremenite v nastavitvah iskanja omrežij Wi-Fi. "<annotation id="link">"Spremeni"</annotation></string>
     <string name="turn_off_airplane_mode" msgid="8425587763226548579">"Izklopi način za letalo"</string>
     <string name="qs_tile_request_dialog_text" msgid="3501359944139877694">"Aplikacija <xliff:g id="APPNAME">%1$s</xliff:g> želi dodati to ploščico v hitre nastavitve."</string>
+    <string name="qs_tile_request_dialog_text_with_size" msgid="732578771040573291">"Aplikacija <xliff:g id="APPNAME">%1$s</xliff:g> želi dodati ploščico v hitre nastavitve. Če želite nadaljevati, izberite velikost ploščice."</string>
     <string name="qs_tile_request_dialog_add" msgid="4888460910694986304">"Dodaj ploščico"</string>
-    <string name="qs_tile_request_dialog_not_add" msgid="4168716573114067296">"Ne dodaj ploščice"</string>
+    <string name="qs_tile_request_dialog_not_add" msgid="8375425041428574394">"Ne dodaj ploščice"</string>
+    <string name="qs_tile_request_dialog_title" msgid="5654666862347548966">"Dodajanje ploščice v hitre nastavitve"</string>
+    <string name="qs_tile_request_dialog_small_format_content_description" msgid="5429197059724172135">"Majhen format"</string>
+    <string name="qs_tile_request_dialog_large_format_content_description" msgid="67983044110405787">"Velik format"</string>
     <string name="qs_user_switch_dialog_title" msgid="3045189293587781366">"Izberite uporabnika"</string>
     <string name="fgs_manager_footer_label" msgid="8276763570622288231">"{count,plural, =1{# aplikacija je aktivna.}one{# aplikacija je aktivna.}two{# aplikaciji sta aktivni.}few{# aplikacije so aktivne.}other{# aplikacij je aktivnih.}}"</string>
     <string name="fgs_dot_content_description" msgid="2865071539464777240">"Nove informacije"</string>
@@ -1719,6 +1736,8 @@
     <string name="dual_shade_educational_tooltip_notifs" msgid="7666159428113013319">"Povlecite iz zgornjega levega kota, da odprete obvestila."</string>
     <string name="dual_shade_educational_tooltip_qs" msgid="3842355853737057332">"Povlecite iz zgornjega desnega kota, da odprete hitre nastavitve"</string>
     <string name="back_button_on_bouncer" msgid="809134628434396761">"Nazaj"</string>
+    <!-- no translation found for sign_in_button_on_bouncer (3595960142516902559) -->
+    <skip />
     <string name="accessibility_button_on_bouncer_description" msgid="9186344135931507168">"Dostopnost"</string>
     <string name="pager_dots_previous_content_description" msgid="26963508904918908">"Nazaj"</string>
     <string name="pager_dots_next_content_description" msgid="613943992626163120">"Naprej"</string>

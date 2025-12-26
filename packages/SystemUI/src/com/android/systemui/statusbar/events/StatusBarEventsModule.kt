@@ -16,12 +16,16 @@
 
 package com.android.systemui.statusbar.events
 
+import android.content.Context
+import android.view.Display
 import com.android.systemui.dagger.SysUISingleton
+import com.android.systemui.dagger.qualifiers.Application
+import com.android.systemui.dagger.qualifiers.Default
 import com.android.systemui.log.LogBuffer
 import com.android.systemui.log.LogBufferFactory
-import dagger.Binds
 import dagger.Module
 import dagger.Provides
+import kotlinx.coroutines.CoroutineScope
 
 @Module(includes = [SystemEventChipAnimationControllerModule::class])
 interface StatusBarEventsModule {
@@ -41,11 +45,33 @@ interface StatusBarEventsModule {
         fun provideSystemEventCoordinatorLogBuffer(factory: LogBufferFactory): LogBuffer {
             return factory.create("SystemEventCoordinatorLog", 60)
         }
-    }
 
-    @Binds
-    @SysUISingleton
-    fun bindSystemStatusAnimationScheduler(
-        systemStatusAnimationSchedulerImpl: SystemStatusAnimationSchedulerImpl
-    ): SystemStatusAnimationScheduler
+        @Provides
+        @Default
+        @SysUISingleton
+        fun provideSystemStatusAnimationScheduler(
+            factory: SystemStatusAnimationSchedulerImpl.Factory,
+            @Default systemEventCoordinator: SystemEventCoordinator,
+            chipAnimationController: SystemEventChipAnimationController,
+            @Application coroutineScope: CoroutineScope,
+        ): SystemStatusAnimationScheduler {
+            return factory.create(
+                systemEventCoordinator,
+                chipAnimationController,
+                Display.DEFAULT_DISPLAY,
+                coroutineScope,
+            )
+        }
+
+        @Provides
+        @Default
+        @SysUISingleton
+        fun providesSystemEventCoordinator(
+            context: Context,
+            @Application applicationScope: CoroutineScope,
+            factory: SystemEventCoordinator.Factory,
+        ): SystemEventCoordinator {
+            return factory.create(context, applicationScope)
+        }
+    }
 }

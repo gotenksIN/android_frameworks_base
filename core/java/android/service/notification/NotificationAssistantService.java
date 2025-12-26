@@ -20,11 +20,16 @@ import static java.lang.annotation.RetentionPolicy.SOURCE;
 
 import android.annotation.FlaggedApi;
 import android.annotation.IntDef;
+import android.annotation.IntRange;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SdkConstant;
 import android.annotation.SuppressLint;
 import android.annotation.SystemApi;
+import android.annotation.TestApi;
+import android.app.ActivityManager;
+import android.app.Flags;
+import android.app.INotificationManager;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -41,7 +46,9 @@ import android.os.RemoteException;
 import android.util.Log;
 import com.android.internal.os.SomeArgs;
 import java.lang.annotation.Retention;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * A service that helps the user manage notifications.
@@ -356,9 +363,8 @@ public abstract class NotificationAssistantService extends NotificationListenerS
 
     /**
      * Implement this method to receive suggested adjustments from the system, merge them with any
-     * other internal adjustments, and notify the system of the merged adjustments via {@link
-     * #adjustNotifications(List)} or {@link #adjustNotification(Adjustment)}. By default, system
-     * adjustments are ignored.
+     * other internal adjustments, and notify the system of the merged adjustments via
+     * {@link #adjustNotification(Adjustment)}. By default, system adjustments are ignored.
      *
      * @param adjustments the adjustments suggested by the system
      */
@@ -381,6 +387,56 @@ public abstract class NotificationAssistantService extends NotificationListenerS
         } catch (android.os.RemoteException ex) {
             Log.v(TAG, "Unable to contact notification manager", ex);
             throw ex.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Creates a dynamic bundle type that notifications can later be classified to via a
+     * {@link Adjustment#KEY_TYPE} adjustment. If a dynamic bundle with this type already exists,
+     * this request will be ignored.
+     */
+    @FlaggedApi(Flags.FLAG_NM_CONTEXTUAL_DISPLAY)
+    public final void createDynamicBundle(@IntRange(from=DynamicBundle.DYNAMIC_RANGE_START,
+                    to=DynamicBundle.DYNAMIC_RANGE_END) int dynamicBundleType,
+            @NonNull CharSequence bundleName) {
+        if (!isBound()) return;
+        try {
+            getNotificationInterface().createDynamicBundle(
+                    mWrapper, dynamicBundleType, bundleName.toString());
+        } catch (android.os.RemoteException ex) {
+            Log.v(TAG, "Unable to contact notification manager", ex);
+            throw ex.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Deletes a dynamic bundle previously created by
+     * {@link #createDynamicBundle(int, CharSequence)}.
+     */
+    @FlaggedApi(Flags.FLAG_NM_CONTEXTUAL_DISPLAY)
+    public final void deleteDynamicBundle(@IntRange(from=DynamicBundle.DYNAMIC_RANGE_START,
+            to=DynamicBundle.DYNAMIC_RANGE_END) int dynamicBundleType) {
+        if (!isBound()) return;
+        try {
+            getNotificationInterface().deleteDynamicBundle(mWrapper, dynamicBundleType);
+        } catch (android.os.RemoteException ex) {
+            Log.v(TAG, "Unable to contact notification manager", ex);
+            throw ex.rethrowFromSystemServer();
+        }
+    }
+
+
+    /**
+     * Returns the list of {@link android.service.notification.NotificationAssistantService} created
+     * dynamic bundles.
+     */
+    @FlaggedApi(Flags.FLAG_NM_CONTEXTUAL_DISPLAY)
+    public @NonNull final Set<DynamicBundle> getDynamicBundles() {
+        try {
+            return new HashSet<>(getNotificationInterface().getDynamicBundles(mWrapper,
+                    getContext() != null ? getContext().getUser() : mSystemContext.getUser()));
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
         }
     }
 

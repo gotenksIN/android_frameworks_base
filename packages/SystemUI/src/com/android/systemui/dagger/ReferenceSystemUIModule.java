@@ -32,7 +32,7 @@ import com.android.systemui.accessibility.data.repository.AccessibilityRepositor
 import com.android.systemui.actioncorner.ActionCornerModule;
 import com.android.systemui.battery.BatterySaverModule;
 import com.android.systemui.clipboardoverlay.dagger.ClipboardOverlayOverrideModule;
-import com.android.systemui.communal.posturing.dagger.NoopPosturingModule;
+import com.android.systemui.communal.posturing.dagger.PosturingModule;
 import com.android.systemui.display.dagger.ReferenceSysUIDisplaySubcomponent;
 import com.android.systemui.display.dagger.SystemUIDisplaySubcomponent;
 import com.android.systemui.display.data.repository.DisplayPhoneModule;
@@ -68,6 +68,7 @@ import com.android.systemui.recents.RecentsModule;
 import com.android.systemui.rotationlock.RotationLockModule;
 import com.android.systemui.rotationlock.RotationLockNewModule;
 import com.android.systemui.scene.SceneContainerFrameworkModule;
+import com.android.systemui.screencapture.common.ScreenCaptureModule;
 import com.android.systemui.screenshot.ReferenceScreenshotModule;
 import com.android.systemui.settings.MultiUserUtilsModule;
 import com.android.systemui.settings.UserTracker;
@@ -87,7 +88,6 @@ import com.android.systemui.statusbar.phone.CentralSurfaces;
 import com.android.systemui.statusbar.phone.DozeServiceHost;
 import com.android.systemui.statusbar.phone.StatusBarKeyguardViewManager;
 import com.android.systemui.statusbar.phone.dagger.StatusBarPhoneModule;
-import com.android.systemui.statusbar.phone.fragment.CollapsedStatusBarFragmentStartableModule;
 import com.android.systemui.statusbar.policy.AospPolicyModule;
 import com.android.systemui.statusbar.policy.DeviceProvisionedController;
 import com.android.systemui.statusbar.policy.DeviceProvisionedControllerImpl;
@@ -138,7 +138,6 @@ import javax.inject.Provider;
         BatterySaverModule.class,
         CentralSurfacesModule.class,
         ClipboardOverlayOverrideModule.class,
-        CollapsedStatusBarFragmentStartableModule.class,
         ConnectingDisplayViewModel.StartableModule.class,
         DisplayPhoneModule.class,
         EmergencyGestureModule.class,
@@ -160,11 +159,12 @@ import javax.inject.Provider;
         RearDisplayModule.class,
         RecentsModule.class,
         ReferenceNotificationsModule.class,
-        NoopPosturingModule.class,
+        PosturingModule.class,
         NoopAmbientLightModeMonitorModule.class,
         ReferenceScreenshotModule.class,
         RotationLockModule.class,
         RotationLockNewModule.class,
+        ScreenCaptureModule.class,
         ScreenDecorationsModule.class,
         StatusBarPhoneModule.class,
         SystemActionsModule.class,
@@ -221,7 +221,7 @@ public abstract class ReferenceSystemUIModule {
         return spC;
     }
 
-    /** */
+    /**  */
     @Binds
     @SysUISingleton
     public abstract QSFactory bindQSFactory(QSFactoryImpl qsFactoryImpl);
@@ -231,12 +231,13 @@ public abstract class ReferenceSystemUIModule {
 
     @Provides
     @SysUISingleton
-    static Optional<MinModeManager> bindMinModeManager(Provider<MinModeManagerImpl> minModeManager) {
-      if (Flags.enableMinmode()) {
-        return Optional.of(minModeManager.get());
-      } else {
-        return Optional.empty();
-      }
+    static Optional<MinModeManager> bindMinModeManager(
+            Provider<MinModeManagerImpl> minModeManager) {
+        if (Flags.enableMinmode()) {
+            return Optional.of(minModeManager.get());
+        } else {
+            return Optional.empty();
+        }
     }
 
     @SysUISingleton
@@ -272,7 +273,7 @@ public abstract class ReferenceSystemUIModule {
     @Binds
     abstract DozeHost provideDozeHost(DozeServiceHost dozeServiceHost);
 
-    /** */
+    /**  */
     @Provides
     @IntoMap
     @Dependencies

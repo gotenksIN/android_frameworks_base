@@ -41,13 +41,14 @@ import com.android.systemui.statusbar.data.repository.StatusBarConfigurationCont
 import com.android.systemui.statusbar.disableflags.domain.interactor.DisableFlagsInteractor
 import com.android.systemui.statusbar.disableflags.domain.interactor.disableFlagsInteractor
 import com.android.systemui.statusbar.domain.interactor.StatusBarIconRefreshInteractor
+import com.android.systemui.statusbar.events.SystemStatusAnimationScheduler
+import com.android.systemui.statusbar.events.systemStatusAnimationScheduler
 import com.android.systemui.statusbar.gesture.SwipeStatusBarAwayGestureHandler
 import com.android.systemui.statusbar.gesture.swipeStatusBarAwayGestureHandler
 import com.android.systemui.statusbar.layout.StatusBarContentInsetsProvider
 import com.android.systemui.statusbar.layout.mockStatusBarContentInsetsProvider
 import com.android.systemui.statusbar.mockCommandQueue
 import com.android.systemui.statusbar.phone.SysuiDarkIconDispatcher
-import com.android.systemui.statusbar.phone.fragment.CollapsedStatusBarFragment
 import com.android.systemui.statusbar.phone.fragment.dagger.HomeStatusBarComponent
 import com.android.systemui.statusbar.pipeline.shared.ui.binder.HomeStatusBarViewBinder
 import com.android.systemui.statusbar.pipeline.shared.ui.composable.StatusBarRootFactory
@@ -61,8 +62,8 @@ import com.android.systemui.statusbar.ui.SystemBarUtilsState
 import com.android.systemui.statusbar.ui.systemBarUtilsState
 import com.android.systemui.statusbar.window.StatusBarWindowStateController
 import com.android.systemui.util.mockito.mock
-import javax.inject.Provider
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 
 val Kosmos.displayRepository by Fixture { FakeDisplayRepository() }
@@ -87,6 +88,9 @@ fun Kosmos.createFakeDisplaySubcomponent(
     },
     statusBarContentInsetsProvider: () -> StatusBarContentInsetsProvider = {
         this.mockStatusBarContentInsetsProvider
+    },
+    systemStatusAnimationScheduler: () -> SystemStatusAnimationScheduler = {
+        this.systemStatusAnimationScheduler
     },
     darkIconDispatcher: () -> DarkIconDispatcher = { this.fakeDarkIconDispatcher },
     sysUiDarkIconDispatcher: () -> SysuiDarkIconDispatcher = { this.fakeDarkIconDispatcher },
@@ -122,6 +126,9 @@ fun Kosmos.createFakeDisplaySubcomponent(
         override val statusBarContentInsetsProvider: StatusBarContentInsetsProvider
             get() = statusBarContentInsetsProvider()
 
+        override val systemStatusAnimationScheduler: SystemStatusAnimationScheduler
+            get() = systemStatusAnimationScheduler()
+
         override val systemBarUtilsState: SystemBarUtilsState
             get() = systemBarUtilsState()
 
@@ -142,9 +149,6 @@ fun Kosmos.createFakeDisplaySubcomponent(
 
         override val homeStatusBarComponentFactory: HomeStatusBarComponent.Factory
             get() = mock<HomeStatusBarComponent.Factory>()
-
-        override val statusBarFragmentProvider: Provider<CollapsedStatusBarFragment>
-            get() = Provider<CollapsedStatusBarFragment> { mock<CollapsedStatusBarFragment>() }
 
         override val statusBarWindowStateController: StatusBarWindowStateController
             get() = mock<StatusBarWindowStateController>()
@@ -233,4 +237,12 @@ val Kosmos.displaysWithDecorationsRepositoryCompat by Fixture {
         testScope.backgroundScope,
         displaysWithDecorationsRepositoryFromDisplayLib,
     )
+}
+
+fun Kosmos.setDisplayType(displayId: Int, type: Int) {
+    runBlocking {
+        displayRepository.removeDisplay(displayId)
+        displayRepository.addDisplay(displayId, type = type)
+        displayRepository.emitDisplayChangeEvent(displayId)
+    }
 }

@@ -101,9 +101,6 @@ public class ProcessedPerfettoProtoLogImplTest {
 
     private static int sOriginalMaxInternedStringsSize;
 
-
-    public ProcessedPerfettoProtoLogImplTest() throws IOException { }
-
     @BeforeClass
     public static void setUp() throws Exception {
         sViewerConfigBuilder = Protolog.ProtoLogViewerConfig.newBuilder()
@@ -165,15 +162,6 @@ public class ProcessedPerfettoProtoLogImplTest {
         sCacheUpdater = (instance) -> {};
         sReader = Mockito.spy(new ProtoLogViewerConfigReader(viewerConfigInputStreamProvider));
         sTestDataSource = new ProtoLogDataSource(TEST_PROTOLOG_DATASOURCE_NAME);
-        DataSourceParams params =
-                new DataSourceParams.Builder()
-                        .setBufferExhaustedPolicy(
-                                DataSourceParams
-                                        .PERFETTO_DS_BUFFER_EXHAUSTED_POLICY_DROP)
-                        .build();
-        sTestDataSource.register(params);
-        busyWaitForDataSourceRegistration(TEST_PROTOLOG_DATASOURCE_NAME);
-
         final ViewerConfigFileTracer tracer = (dataSource, viewerConfigFilePath) -> {
             Utils.dumpViewerConfig(dataSource, () -> {
                 if (!viewerConfigFilePath.equals(MOCK_VIEWER_CONFIG_FILE)) {
@@ -185,12 +173,20 @@ public class ProcessedPerfettoProtoLogImplTest {
         };
         sProtoLogConfigurationService =
                 new ProtoLogConfigurationServiceImpl(sTestDataSource, tracer);
+        DataSourceParams params =
+                new DataSourceParams.Builder()
+                        .setBufferExhaustedPolicy(
+                                DataSourceParams
+                                        .PERFETTO_DS_BUFFER_EXHAUSTED_POLICY_DROP)
+                        .build();
+        sTestDataSource.register(params);
 
         sProtoLog = new ProcessedPerfettoProtoLogImpl(sTestDataSource,
                 MOCK_VIEWER_CONFIG_FILE, viewerConfigInputStreamProvider, sReader,
-                (instance) -> sCacheUpdater.update(instance), TestProtoLogGroup.values(),
-                sProtoLogConfigurationService);
-        sProtoLog.enable();
+                (instance) -> sCacheUpdater.update(instance), TestProtoLogGroup.values());
+
+        sProtoLog.enable(false, sProtoLogConfigurationService);
+        busyWaitForDataSourceRegistration(TEST_PROTOLOG_DATASOURCE_NAME);
 
         sOriginalMaxInternedStringsSize =
                 PerfettoProtoLogImpl.MAX_INTERNED_STRINGS_SIZE_BYTES_BEFORE_RESET;
@@ -320,7 +316,7 @@ public class ProcessedPerfettoProtoLogImplTest {
                         List.of(new PerfettoTraceMonitor.Builder.ProtoLogGroupOverride(
                                 TestProtoLogGroup.TEST_GROUP.toString(), LogLevel.WARN, false)),
                         TEST_PROTOLOG_DATASOURCE_NAME
-                    ).build();
+                ).build();
 
         final var writer = createTempWriter(mTracingDirectory);
         try {
@@ -393,7 +389,7 @@ public class ProcessedPerfettoProtoLogImplTest {
                 new Object[]{true, 10000, 30000, "test", 0.000003});
 
         verify(implSpy).passToLogcat(eq(TestProtoLogGroup.TEST_GROUP.getTag()), eq(
-                LogLevel.INFO),
+                        LogLevel.INFO),
                 eq("test true 10000 % 0x7530 test 3.0E-6"));
         verify(sReader).getViewerString(eq(1234L));
     }
@@ -409,7 +405,7 @@ public class ProcessedPerfettoProtoLogImplTest {
                 new Object[]{true, 10000, 0.0001, 0.00002, "test"});
 
         verify(implSpy).passToLogcat(eq(TestProtoLogGroup.TEST_GROUP.getTag()), eq(
-                LogLevel.INFO),
+                        LogLevel.INFO),
                 eq("FORMAT_ERROR \"test %b %d %% %x %s %f\", "
                         + "args=(true, 10000, 1.0E-4, 2.0E-5, test)"));
         verify(sReader).getViewerString(eq(1234L));
@@ -423,7 +419,7 @@ public class ProcessedPerfettoProtoLogImplTest {
 
         var assertion = assertThrows(RuntimeException.class, () ->
                 implSpy.log(LogLevel.INFO, TestProtoLogGroup.TEST_GROUP, 1234, 4321,
-                    new Object[]{5}));
+                        new Object[]{5}));
         Truth.assertThat(assertion).hasMessageThat()
                 .contains("Failed to decode message for logcat");
     }
@@ -519,7 +515,7 @@ public class ProcessedPerfettoProtoLogImplTest {
     }
 
     @Test
-    public  void supportsLocationInformation() throws IOException {
+    public void supportsLocationInformation() throws IOException {
         PerfettoTraceMonitor traceMonitor = PerfettoTraceMonitor.newBuilder()
                 .enableProtoLog(true, List.of(), TEST_PROTOLOG_DATASOURCE_NAME)
                 .build();
@@ -951,7 +947,8 @@ public class ProcessedPerfettoProtoLogImplTest {
     @Test
     public void enablesLogGroupAfterLoadingConfig() {
         sProtoLog.stopLoggingToLogcat(
-                new String[] { TestProtoLogGroup.TEST_GROUP.name() }, (msg) -> {});
+                new String[]{TestProtoLogGroup.TEST_GROUP.name()}, (msg) -> {
+                });
         Truth.assertThat(TestProtoLogGroup.TEST_GROUP.isLogToLogcat()).isFalse();
 
         doAnswer((Answer<Void>) invocation -> {
@@ -961,14 +958,16 @@ public class ProcessedPerfettoProtoLogImplTest {
         }).when(sReader).unloadViewerConfig(any(), any());
 
         sProtoLog.startLoggingToLogcat(
-                new String[] { TestProtoLogGroup.TEST_GROUP.name() }, (msg) -> {});
+                new String[]{TestProtoLogGroup.TEST_GROUP.name()}, (msg) -> {
+                });
         Truth.assertThat(TestProtoLogGroup.TEST_GROUP.isLogToLogcat()).isTrue();
     }
 
     @Test
     public void disablesLogGroupBeforeUnloadingConfig() {
         sProtoLog.startLoggingToLogcat(
-                new String[] { TestProtoLogGroup.TEST_GROUP.name() }, (msg) -> {});
+                new String[]{TestProtoLogGroup.TEST_GROUP.name()}, (msg) -> {
+                });
         Truth.assertThat(TestProtoLogGroup.TEST_GROUP.isLogToLogcat()).isTrue();
 
         doAnswer((Answer<Void>) invocation -> {
@@ -977,7 +976,8 @@ public class ProcessedPerfettoProtoLogImplTest {
             return null;
         }).when(sReader).unloadViewerConfig(any(), any());
         sProtoLog.stopLoggingToLogcat(
-                new String[] { TestProtoLogGroup.TEST_GROUP.name() }, (msg) -> {});
+                new String[]{TestProtoLogGroup.TEST_GROUP.name()}, (msg) -> {
+                });
         Truth.assertThat(TestProtoLogGroup.TEST_GROUP.isLogToLogcat()).isFalse();
     }
 
@@ -1015,6 +1015,93 @@ public class ProcessedPerfettoProtoLogImplTest {
                 .isEqualTo("My Test Debug Log Message true"); // Only the "true" message
     }
 
+    @Test
+    public void messagesLoggedDuringAsyncInitAreTraced() throws Exception {
+        final String dataSourceName = "test.async.init.protolog." + new Random().nextInt();
+        ProtoLogDataSource dataSource = new ProtoLogDataSource(dataSourceName);
+        // The data source is NOT registered at this point. This will be done asynchronously
+        // by the ProtoLog implementation itself.
+
+        ViewerConfigInputStreamProvider viewerConfigInputStreamProvider = Mockito.mock(
+                ViewerConfigInputStreamProvider.class);
+        Mockito.when(viewerConfigInputStreamProvider.getInputStream())
+                .thenAnswer(it -> new AutoClosableProtoInputStream(
+                        sViewerConfigBuilder.build().toByteArray()));
+
+        final ViewerConfigFileTracer tracer = (ds, viewerConfigFilePath) -> {
+            Utils.dumpViewerConfig(ds, () -> {
+                if (!viewerConfigFilePath.equals(MOCK_VIEWER_CONFIG_FILE)) {
+                    throw new RuntimeException(
+                            "Unexpected viewer config file path provided");
+                }
+                return new AutoClosableProtoInputStream(sViewerConfigBuilder.build().toByteArray());
+            });
+        };
+        final var protoLogConfigurationService =
+                new ProtoLogConfigurationServiceImpl(dataSource, tracer);
+
+
+        // Start a Perfetto trace.
+        PerfettoTraceMonitor traceMonitor = PerfettoTraceMonitor.newBuilder()
+                .enableProtoLog(true, List.of(), dataSourceName)
+                .build();
+        final var writer = createTempWriter(mTracingDirectory);
+
+        ProcessedPerfettoProtoLogImpl protoLog = new ProcessedPerfettoProtoLogImpl(dataSource,
+                MOCK_VIEWER_CONFIG_FILE, viewerConfigInputStreamProvider, sReader,
+                (instance) -> sCacheUpdater.update(instance), TestProtoLogGroup.values());
+
+        try {
+            traceMonitor.start();
+
+            // Block the internal executor to simulate a delay in initialization and ensure we
+            // can log the logs below and start the trace while the initialization is happening.
+            final CountDownLatch releaseExecutor = new CountDownLatch(1);
+            final CountDownLatch executorBlocked = new CountDownLatch(1);
+            protoLog.mSingleThreadedExecutor.execute(() -> {
+                executorBlocked.countDown();
+                try {
+                    // This task will sit at the head of the queue and block it.
+                    releaseExecutor.await(10, TimeUnit.SECONDS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            });
+            assertTrue("Executor did not block in time",
+                    executorBlocked.await(5, TimeUnit.SECONDS));
+
+            // This will set initialize the datasource asynchronously.
+            protoLog.enable(true, protoLogConfigurationService);
+            assertTrue(protoLog.isEnabled(TestProtoLogGroup.TEST_GROUP, LogLevel.DEBUG));
+
+            // Log messages while initialization is pending. These should be buffered.
+            protoLog.log(LogLevel.DEBUG, TestProtoLogGroup.TEST_GROUP,
+                    1, LogDataType.BOOLEAN, new Object[]{true});
+            protoLog.log(LogLevel.DEBUG, TestProtoLogGroup.TEST_GROUP,
+                    "Some string message with an arg: %b", true);
+
+            releaseExecutor.countDown();
+        } finally {
+            var countDownLatch = new CountDownLatch(1);
+            protoLog.mSingleThreadedExecutor.execute(countDownLatch::countDown);
+
+            var success = countDownLatch.await(5, TimeUnit.SECONDS);
+            Truth.assertWithMessage("Background thread did not clear in time")
+                    .that(success).isTrue();
+
+            traceMonitor.stop(writer);
+
+            protoLog.disable();
+        }
+
+        final ResultReader reader = new ResultReader(writer.write());
+        final ProtoLogTrace protologTrace = reader.readProtoLogTrace();
+        Truth.assertThat(protologTrace.messages).hasSize(2);
+        Truth.assertThat(protologTrace.messages.get(0).getMessage())
+                .isEqualTo("My Test Debug Log Message true");
+        Truth.assertThat(protologTrace.messages.get(1).getMessage())
+                .isEqualTo("Some string message with an arg: true");
+    }
 
     @Test
     public void messagesInQueueBeforeNewSessionActivationAreNotTracedInNewSession()
@@ -1133,7 +1220,7 @@ public class ProcessedPerfettoProtoLogImplTest {
                     if (!allowProcessingToContinueLatch.await(60, TimeUnit.SECONDS)) {
                         // Fail fast if timeout occurs, to avoid test hanging indefinitely
                         Truth.assertWithMessage(
-                                "Timeout waiting for allowProcessingToContinueLatch")
+                                        "Timeout waiting for allowProcessingToContinueLatch")
                                 .fail();
                     }
                 } catch (InterruptedException e) {
@@ -1158,7 +1245,7 @@ public class ProcessedPerfettoProtoLogImplTest {
             assertTrue("Blocking task should have started execution.",
                     blockingTaskStartedExecution.get());
             Truth.assertWithMessage(
-                    "allowProcessingToContinueLatch should not have been counted down yet.")
+                            "allowProcessingToContinueLatch should not have been counted down yet.")
                     .that(allowProcessingToContinueLatch.getCount())
                     .isEqualTo(1L);
 
@@ -1215,7 +1302,7 @@ public class ProcessedPerfettoProtoLogImplTest {
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 Truth.assertWithMessage(
-                        "Background thread interrupted while waiting on pause latch.")
+                                "Background thread interrupted while waiting on pause latch.")
                         .fail();
             }
         });

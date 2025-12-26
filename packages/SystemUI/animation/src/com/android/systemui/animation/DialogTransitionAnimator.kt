@@ -20,6 +20,7 @@ import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import android.app.Dialog
+import android.content.DialogInterface
 import android.graphics.Color
 import android.graphics.Rect
 import android.os.Looper
@@ -237,13 +238,17 @@ constructor(
      *
      * Caveats: When calling this function and [dialog] is not a fullscreen dialog, then it will be
      * made fullscreen and 2 views will be inserted between the dialog DecorView and its children.
+     *
+     * @return [Boolean] `true` if the dialog was successfully shown, `false` otherwise. The dialog
+     *   will not be shown if another instance with the same sourceIdentity is already in the
+     *   process of dismissing.
      */
     @JvmOverloads
     fun show(
         dialog: Dialog,
         controller: Controller,
         animateBackgroundBoundsChange: Boolean = false,
-    ) {
+    ): Boolean {
         if (Looper.myLooper() != Looper.getMainLooper()) {
             throw IllegalStateException(
                 "showFromView must be called from the main thread and dialog must be created in " +
@@ -262,15 +267,22 @@ constructor(
                 Controller.fromView(it, controller.cuj)
             } ?: controller
 
+        val openedDialog =
+            openedDialogs.firstOrNull { it.controller.sourceIdentity == controller.sourceIdentity }
         // Make sure we don't run the launch animation from the same source twice at the same time.
-        if (openedDialogs.any { it.controller.sourceIdentity == controller.sourceIdentity }) {
+        if (openedDialog != null) {
             Log.e(
                 TAG,
                 "Not running dialog launch animation from source as it is already expanded into a" +
                     " dialog",
             )
-            dialog.show()
-            return
+
+            if (!(Flags.fixDialogAnimCollapseFlicker() && openedDialog.isDialogDismissing())) {
+                dialog.show()
+                return true
+            } else {
+                return false
+            }
         }
 
         val animatedDialog =
@@ -288,6 +300,7 @@ constructor(
 
         openedDialogs.add(animatedDialog)
         animatedDialog.start()
+        return true
     }
 
     /**
@@ -464,7 +477,7 @@ constructor(
      * Dismiss [dialog]. If it was launched from another dialog using this animator, also dismiss
      * the stack of dialogs and simply fade out [dialog].
      */
-    fun dismissStack(dialog: Dialog) {
+    fun dismissStack(dialog: DialogInterface) {
         openedDialogs.firstOrNull { it.dialog == dialog }?.prepareForStackDismiss()
         dialog.dismiss()
     }
@@ -809,6 +822,10 @@ private class AnimatedDialog(
                 dialogTouchInterceptorView?.visibility = View.GONE
             },
         )
+    }
+
+    fun isDialogDismissing(): Boolean {
+        return isDismissing
     }
 
     fun onDialogDismissed() {

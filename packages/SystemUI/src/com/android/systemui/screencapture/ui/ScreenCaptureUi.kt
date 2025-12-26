@@ -17,6 +17,7 @@
 package com.android.systemui.screencapture.ui
 
 import android.app.Dialog
+import android.content.Context
 import android.view.Display
 import android.view.Window
 import android.view.WindowManager
@@ -46,6 +47,7 @@ import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.android.compose.modifiers.thenIf
+import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.lifecycle.rememberViewModel
 import com.android.systemui.res.R
 import com.android.systemui.screencapture.common.ScreenCaptureUiComponent
@@ -56,7 +58,6 @@ import com.android.systemui.screencapture.ui.viewmodel.ScreenCaptureUiViewModel
 import com.android.systemui.statusbar.phone.EdgeToEdgeDialogDelegate
 import com.android.systemui.statusbar.phone.SystemUIDialogFactory
 import com.android.systemui.statusbar.phone.create
-import dagger.Lazy
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -68,6 +69,7 @@ private val scaleTransformOrigin = TransformOrigin(pivotFractionX = 0.5f, pivotF
 class ScreenCaptureUi
 @AssistedInject
 constructor(
+    @Application private val appContext: Context,
     @Assisted private val display: Display,
     @Assisted private val type: ScreenCaptureType,
     private val viewModelFactory: ScreenCaptureUiViewModel.Factory,
@@ -78,13 +80,18 @@ constructor(
             @JvmSuppressWildcards
             ScreenCaptureUiComponent.Builder,
         >,
-    private val defaultBuilder: Lazy<ScreenCaptureUiComponent.Builder>,
     dialogFactory: SystemUIDialogFactory,
 ) {
-
     private val dialog =
         dialogFactory
             .create(
+                context =
+                    appContext.createWindowContext(
+                        display,
+                        // TODO(b/427481098) Change to TYPE_SCREENSHOT
+                        WindowManager.LayoutParams.TYPE_NAVIGATION_BAR_PANEL,
+                        /* options */ null,
+                    ),
                 theme = R.style.Theme_SystemUI_Dialog_ScreenCapture,
                 dialogDelegate = EdgeToEdgeDialogDelegate(),
                 dismissOnDeviceLock = true,
@@ -165,7 +172,7 @@ constructor(
                 },
         ) {
             val builder: ScreenCaptureUiComponent.Builder =
-                componentBuilders[parameters.screenCaptureType] ?: defaultBuilder.get()
+                componentBuilders.getValue(parameters.screenCaptureType)
             val coroutineScope = rememberCoroutineScope()
             val component =
                 remember(parameters, coroutineScope) {

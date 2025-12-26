@@ -45,12 +45,10 @@ import com.android.wm.shell.ShellTaskOrganizer
 import com.android.wm.shell.common.LaunchAdjacentController
 import com.android.wm.shell.desktopmode.createActivityOptionsForStartTask
 import com.android.wm.shell.desktopmode.multidesks.DesksOrganizer.OnCreateCallback
-import com.android.wm.shell.freeform.TaskChangeListener
 import com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_DESKTOP_MODE
 import com.android.wm.shell.sysui.ShellCommandHandler
 import com.android.wm.shell.sysui.ShellInit
 import java.io.PrintWriter
-import java.util.Optional
 
 /**
  * A [DesksOrganizer] that uses root tasks as the container of each desk.
@@ -65,7 +63,6 @@ class RootTaskDesksOrganizer(
     private val shellTaskOrganizer: ShellTaskOrganizer,
     private val launchAdjacentController: LaunchAdjacentController,
     private val rootTaskDisplayAreaOrganizer: RootTaskDisplayAreaOrganizer,
-    private val taskChangeListener: Optional<TaskChangeListener>,
 ) : DesksOrganizer, ShellTaskOrganizer.TaskListener {
 
     private val createDeskRootRequests = mutableListOf<CreateDeskRequest>()
@@ -94,6 +91,7 @@ class RootTaskDesksOrganizer(
         deskRootsByDeskId.forEach { deskId, root ->
             if (root.taskInfo.displayId == displayId && deskId !in removeDeskRootRequests) {
                 // A desk already exists.
+                logV("warmUpDefaultDesk found existing desk root: %d, ignoring", deskId)
                 return
             }
         }
@@ -101,6 +99,7 @@ class RootTaskDesksOrganizer(
             createDeskRootRequests.any { request -> request.displayId == displayId }
         if (requestInProgress) {
             // There isn't one ready yet, but a request for one is already in progress.
+            logV("warmUpDefaultDesk found existing request in progress, ignoring")
             return
         }
         // Request a new one, but do not associate to the user.
@@ -697,10 +696,6 @@ class RootTaskDesksOrganizer(
 
     private fun cleanUpChildTask(taskInfo: RunningTaskInfo) {
         childLeashes.remove(taskInfo.taskId)
-
-        // Notify task close events to the [TaskChangeListener] since [TransitionsObserver]
-        // does not trigger them when invisible tasks are removed.
-        taskChangeListener.ifPresent { listener -> listener.onNonTransitionTaskClosing(taskInfo) }
     }
 
     private fun createDeskMinimizationRoot(

@@ -327,6 +327,8 @@
     <string name="notification_channel_accessibility_hearing_device" msgid="7816963856388758952">"Appareil auditif"</string>
     <string name="notification_channel_accessibility_security_policy" msgid="1727787021725251912">"Usage des fonctionnalités d\'accessibilité"</string>
     <string name="notification_channel_display" msgid="6905032605735615090">"Écran"</string>
+    <!-- no translation found for notification_channel_parental_controls (2963963315750128538) -->
+    <skip />
     <string name="foreground_service_app_in_background" msgid="1439289699671273555">"<xliff:g id="APP_NAME">%1$s</xliff:g> sollicite la pile"</string>
     <string name="foreground_service_apps_in_background" msgid="7340037176412387863">"<xliff:g id="NUMBER">%1$d</xliff:g> applis sollicitent la pile"</string>
     <string name="foreground_service_tap_for_details" msgid="9078123626015586751">"Touchez pour afficher des détails sur l\'utilisation de la pile et des données"</string>
@@ -642,6 +644,8 @@
     <string name="permdesc_nearby_wifi_devices" msgid="3054307728646332906">"Permet à l\'appli de diffuser des annonces, de se connecter et de déterminer la position relative des appareils Wi-Fi à proximité"</string>
     <string name="permlab_access_local_network" msgid="3420360767259066877">"accéder aux appareils du réseau local"</string>
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"Permet à l\'appli d\'accéder aux appareils du réseau local"</string>
+    <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"utiliser l\'interface de bouclage"</string>
+    <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"Permet à l\'appli d\'interagir avec d\'autres applis sur l\'interface de bouclage"</string>
     <string name="permlab_ranging" msgid="2854543350668593390">"Dét. position relative entre appareils à proximité"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"Autorisez l\'appli à déterminer la position relative entre des appareils à proximité"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"Information sur le service préféré de paiement CCP"</string>
@@ -1044,7 +1048,6 @@
     <string name="keyguard_password_enter_pin_password_code" msgid="7792964196473964340">"Saisissez le NIP pour déverrouiller le clavier."</string>
     <string name="keyguard_password_wrong_pin_code" msgid="8583732939138432793">"NIP erroné."</string>
     <string name="keyguard_label_text" msgid="3841953694564168384">"Pour déverrouiller le téléphone, appuyez sur \"Menu\", puis sur 0."</string>
-    <string name="emergency_call_dialog_number_for_display" msgid="2978165477085612673">"Numéro d\'urgence"</string>
     <string name="lockscreen_carrier_default" msgid="6192313772955399160">"Aucun service"</string>
     <string name="lockscreen_screen_locked" msgid="7364905540516041817">"Écran verrouillé"</string>
     <string name="lockscreen_instructions_when_pattern_enabled" msgid="7982445492532123308">"Appuyez sur \"Menu\" pour débloquer le téléphone ou appeler un numéro d\'urgence."</string>
@@ -1278,6 +1281,7 @@
     <string name="whichApplicationLabel" msgid="7852182961472531728">"Terminer l\'action"</string>
     <string name="whichViewApplication" msgid="5733194231473132945">"Ouvrir avec"</string>
     <string name="whichViewApplicationNamed" msgid="415164730629690105">"Ouvrir avec %1$s"</string>
+    <string name="open_app_name" msgid="6114096770130122912">"Ouvrir <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="whichViewApplicationLabel" msgid="7367556735684742409">"Ouvrir"</string>
     <string name="whichOpenHostLinksWith" msgid="7645631470199397485">"Ouvrir les liens <xliff:g id="HOST">%1$s</xliff:g> avec"</string>
     <string name="whichOpenLinksWith" msgid="1120936181362907258">"Ouvrir les liens avec"</string>
@@ -1799,10 +1803,8 @@
     <string name="accessibility_shortcut_single_service_warning" msgid="6363127705112844257">"Si vous maintenez enfoncées les deux touches de volume pendant quelques secondes, vous activez la fonctionnalité d\'accessibilité <xliff:g id="SERVICE">%1$s</xliff:g>. Cela peut modifier le fonctionnement de votre appareil.\n\nPour attribuer ce raccourci à une autre fonctionnalité, sélectionnez Paramètres &gt; Accessibilité."</string>
     <string name="accessibility_shortcut_on" msgid="5463618449556111344">"Activer"</string>
     <string name="accessibility_shortcut_off" msgid="3651336255403648739">"Ne pas activer"</string>
-    <!-- no translation found for accessibility_shortcut_menu_item_status_on (6162756705754654002) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_menu_item_status_off (6274512913017713543) -->
-    <skip />
+    <string name="accessibility_shortcut_menu_item_status_on" msgid="6162756705754654002">"Activé"</string>
+    <string name="accessibility_shortcut_menu_item_status_off" msgid="6274512913017713543">"Désactivé"</string>
     <string name="accessibility_enable_service_title" msgid="3931558336268541484">"Permettre à <xliff:g id="SERVICE">%1$s</xliff:g> de contrôler complètement votre appareil?"</string>
     <string name="accessibility_service_warning_description" msgid="291674995220940133">"Le contrôle total convient aux applis qui répondent à vos besoins d\'accessibilité. Il ne convient pas à la plupart des applis."</string>
     <string name="accessibility_service_screen_control_title" msgid="190017412626919776">"Afficher et contrôler l\'écran"</string>
@@ -1816,16 +1818,11 @@
     <string name="accessibility_select_shortcut_menu_title" msgid="6002726538854613272">"Toucher une fonctionnalité pour commencer à l\'utiliser :"</string>
     <string name="accessibility_edit_shortcut_menu_button_title" msgid="239446795930436325">"Choisir les fonctionnalités à utiliser à l\'aide du bouton d\'accessibilité"</string>
     <string name="accessibility_edit_shortcut_menu_volume_title" msgid="2245540598834891500">"Choisir les fonctionnalités à utiliser avec le raccourci des touches de volume"</string>
-    <!-- no translation found for accessibility_shortcut_label_button (6473341300585254821) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_volume_keys (5642990791242136231) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_gesture (7987298674836890931) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_quick_settings (6851280333772213611) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_triple_tap (9058975959054454796) -->
-    <skip />
+    <string name="accessibility_shortcut_label_button" msgid="6473341300585254821">"bouton d\'accessibilité"</string>
+    <string name="accessibility_shortcut_label_volume_keys" msgid="5642990791242136231">"touches de volume"</string>
+    <string name="accessibility_shortcut_label_gesture" msgid="7987298674836890931">"geste"</string>
+    <string name="accessibility_shortcut_label_quick_settings" msgid="6851280333772213611">"paramètres rapides"</string>
+    <string name="accessibility_shortcut_label_triple_tap" msgid="9058975959054454796">"toucher trois fois"</string>
     <string name="accessibility_uncheck_legacy_item_warning" msgid="8047830891064817447">"<xliff:g id="SERVICE_NAME">%s</xliff:g> a été désactivé"</string>
     <string name="edit_accessibility_shortcut_menu_button" msgid="8885752738733772935">"Modifier les raccourcis"</string>
     <string name="done_accessibility_shortcut_menu_button" msgid="3668407723770815708">"OK"</string>
@@ -2615,4 +2612,10 @@
     <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"Alertes relatives aux ressources système"</string>
     <string name="tv_watchdog_notification_title" msgid="195239206215922517">"Utilisation excessive des ressources"</string>
     <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"L\'appli « <xliff:g id="APP_NAME">%1$s</xliff:g> utilise trop de ressources »."</string>
+    <!-- no translation found for supervision_blocked_app_title (5546803865875383588) -->
+    <skip />
+    <!-- no translation found for supervision_blocked_app_content (4125452996088641559) -->
+    <skip />
+    <!-- no translation found for supervision_unblocked_app_content (8282985265957852278) -->
+    <skip />
 </resources>

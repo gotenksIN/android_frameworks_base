@@ -150,8 +150,10 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
 
     private final Map<Callback, Executor> mCallbackExecutorMap = new ConcurrentHashMap<>();
 
+// QTI_BEGIN: 2019-06-18: Bluetooth: TWSP: Support Battery Status information display
     public int mTwspBatteryState;
     public int mTwspBatteryLevel;
+// QTI_END: 2019-06-18: Bluetooth: TWSP: Support Battery Status information display
     /**
      * Last time a bt profile auto-connect was attempted.
      * If an ACTION_UUID intent comes in within
@@ -193,7 +195,7 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
 
     private int mQGroupId;
 // QTI_END: 2022-04-23: Bluetooth: Csip: Add below enhancements
-// QTI_BEGIN: 2020-12-18: Audio: Group-UI: UI frameworks changes
+// QTI_BEGIN: 2020-12-18: Bluetooth: Group-UI: UI frameworks changes
 
     private boolean mIsGroupDevice = false;
 
@@ -203,7 +205,7 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
     private int mType = UNKNOWN;
     static final int PRIVATE_ADDR = 101;
 
-// QTI_END: 2020-12-18: Audio: Group-UI: UI frameworks changes
+// QTI_END: 2020-12-18: Bluetooth: Group-UI: UI frameworks changes
 // QTI_BEGIN: 2022-10-07: Bluetooth: CSIP: Use Updated API for csip ICON.
     private boolean mIsLeAudioEnabled = false;
 
@@ -272,8 +274,10 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
         mQGroupId = BluetoothCsipSetCoordinator.GROUP_ID_INVALID;
 // QTI_END: 2022-04-23: Bluetooth: Csip: Add below enhancements
         initDrawableCache();
+// QTI_BEGIN: 2019-06-18: Bluetooth: TWSP: Support Battery Status information display
         mTwspBatteryState = -1;
         mTwspBatteryLevel = -1;
+// QTI_END: 2019-06-18: Bluetooth: TWSP: Support Battery Status information display
         mUnpairing = false;
         mInputDevice = BluetoothUtils.getInputDevice(mContext, getAddress());
         mIsDeviceStylus = BluetoothUtils.isDeviceStylus(mInputDevice, this);
@@ -430,7 +434,12 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
         if (Flags.enableBluetoothDiagnosis() && !isBusy()) {
             if (isProfileConnectedFail()) {
                 mConnectionFailureTimeMillis = SystemClock.elapsedRealtime();
-                Log.d(TAG, "Detect connection failure at " + mConnectionFailureTimeMillis);
+                Log.d(
+                        TAG,
+                        "Detect connection failure for device "
+                                + getAddress()
+                                + " at "
+                                + mConnectionFailureTimeMillis);
                 dispatchAttributesChanged();
                 cancelFailureScheduledFutureIfNeeded();
                 mBluetoothFailureFuture =
@@ -439,7 +448,7 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
                                 BluetoothUtils.CAN_NOT_CONNECT_TIME_OUT_MILLS,
                                 TimeUnit.MILLISECONDS);
             } else if (mConnectionFailureTimeMillis > -1) {
-                Log.d(TAG, "Connection failure timestamp cleared");
+                Log.d(TAG, "Connection failure timestamp cleared for device " + getAddress());
                 mConnectionFailureTimeMillis = -1;
                 dispatchAttributesChanged();
                 cancelFailureScheduledFutureIfNeeded();
@@ -1223,7 +1232,12 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
             if (Flags.enableBluetoothDiagnosis()) {
                 if (prevBondState == BluetoothDevice.BOND_BONDING) {
                     mBondFailureTimeMillis = SystemClock.elapsedRealtime();
-                    Log.d(TAG, "Detect bonding failure at " + mBondFailureTimeMillis);
+                    Log.d(
+                            TAG,
+                            "Detect bonding failure for device "
+                                    + getAddress()
+                                    + " at "
+                                    + mBondFailureTimeMillis);
                     cancelFailureScheduledFutureIfNeeded();
                     mBluetoothFailureFuture =
                             mBluetoothFailureTimerScheduler.schedule(
@@ -1244,7 +1258,9 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
             boolean mIsBondingInitiatedLocally = mDevice.isBondingInitiatedLocally();
             Log.w(TAG, "mIsBondingInitiatedLocally" + mIsBondingInitiatedLocally);
 // QTI_END: 2019-06-26: Bluetooth: GAP: Reset bondingInitiatedLocally flag(1/3)
+// QTI_BEGIN: 2023-10-19: Bluetooth: Enable AOSP BT APEX
             if (mIsBondingInitiatedLocally) {
+// QTI_END: 2023-10-19: Bluetooth: Enable AOSP BT APEX
                  connect();
             }
 
@@ -1254,7 +1270,7 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
 
             if (Flags.enableBluetoothDiagnosis()) {
                 mBondFailureTimeMillis = -1;
-                Log.d(TAG, "Bond success");
+                Log.d(TAG, "Bond success for device " + getAddress());
                 cancelFailureScheduledFutureIfNeeded();
             }
         }

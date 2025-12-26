@@ -124,10 +124,12 @@ internal constructor(
     private var userSwitchingJob: Job? = null
     private var afterUserSwitchingJob: Job? = null
 
-    open fun initialize(startingUser: Int) {
+    open fun initialize(getStartingUser: () -> Int) {
         if (initialized) {
             return
         }
+        registerUserSwitchObserver()
+        val startingUser = getStartingUser()
         Log.i(TAG, "Starting user: $startingUser")
         initialized = true
         setUserIdInternal(startingUser)
@@ -148,8 +150,6 @@ internal constructor(
                 addAction(Intent.ACTION_MANAGED_PROFILE_UNLOCKED)
             }
         context.registerReceiverForAllUsers(this, filter, null, backgroundHandler)
-
-        registerUserSwitchObserver()
 
         dumpManager.registerNormalDumpable(TAG, this)
     }
@@ -293,10 +293,7 @@ internal constructor(
         Assert.isNotMainThread()
 
         try {
-            val profiles = userManager.getProfiles(userId)
-            synchronized(mutex) {
-                userProfiles = profiles.map { UserInfo(it) } // save a "deep" copy
-            }
+            val (_, profiles) = setUserIdInternal(userId)
             notifySubscribers { callback, _ -> callback.onProfilesChanged(profiles) }
         } catch (e: SecurityException) {
             Log.e(TAG, "Unable to process profile change", e)

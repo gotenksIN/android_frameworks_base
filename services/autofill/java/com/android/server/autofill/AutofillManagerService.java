@@ -17,7 +17,7 @@
 package com.android.server.autofill;
 
 import static android.Manifest.permission.MANAGE_AUTO_FILL;
-import static android.content.Context.AUTOFILL_MANAGER_SERVICE;
+import static android.content.Context.AUTOFILL_SERVICE;
 import static android.os.UserManager.isVisibleBackgroundUsersEnabled;
 import static android.view.autofill.AutofillManager.MAX_TEMP_AUGMENTED_SERVICE_DURATION_MS;
 import static android.view.autofill.AutofillManager.getSmartSuggestionModeToString;
@@ -149,7 +149,7 @@ public final class AutofillManagerService
     @GuardedBy("sLock")
     private static int sVisibleDatasetsMaxCount = 0;
 
-    static boolean sSupportMultiUserMultiDisplay = Flags.supportMultiUserMultiDisplay()
+    public static boolean sSupportMultiUserMultiDisplay = Flags.supportMultiUserMultiDisplay()
             && isVisibleBackgroundUsersEnabled();
 
     /**
@@ -515,7 +515,7 @@ public final class AutofillManagerService
 
     @Override // from SystemService
     public void onStart() {
-        publishBinderService(AUTOFILL_MANAGER_SERVICE, new AutoFillManagerServiceStub());
+        publishBinderService(AUTOFILL_SERVICE, new AutoFillManagerServiceStub());
         publishLocalService(AutofillManagerInternal.class, mLocalService);
     }
 

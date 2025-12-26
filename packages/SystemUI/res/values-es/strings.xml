@@ -88,11 +88,9 @@
     <string name="screenshot_failed_to_capture_text" msgid="7818288545874407451">"La aplicación o tu organización no permiten realizar capturas de pantalla"</string>
     <string name="screenshot_blocked_by_admin" msgid="5486757604822795797">"Tu administrador de TI ha bloqueado las capturas de pantalla"</string>
     <string name="screenshot_edit_label" msgid="8754981973544133050">"Editar"</string>
-    <!-- no translation found for screenshot_edit_description (7802378587672433507) -->
-    <skip />
+    <string name="screenshot_edit_description" msgid="7802378587672433507">"Botón Editar captura de pantalla"</string>
     <string name="screenshot_share_label" msgid="1653061117238861559">"Compartir"</string>
-    <!-- no translation found for screenshot_share_description (2654362001720033972) -->
-    <skip />
+    <string name="screenshot_share_description" msgid="2654362001720033972">"Botón Compartir captura de pantalla"</string>
     <string name="screenshot_scroll_label" msgid="2930198809899329367">"Capturar más"</string>
     <string name="screenshot_dismiss_description" msgid="4702341245899508786">"Cerrar captura de pantalla"</string>
     <string name="screenshot_dismiss_work_profile" msgid="3101530842987697045">"Cerrar mensaje del perfil de trabajo"</string>
@@ -161,8 +159,7 @@
     <string name="screen_record_pause" msgid="1715012292444967776">"Pausar"</string>
     <string name="screen_record_mute" msgid="8111682249858638168">"Silenciar"</string>
     <string name="screen_record_unmute" msgid="2207912659365156472">"Activar sonido"</string>
-    <!-- no translation found for screen_capture_blocked_by_admin (1751756953683506644) -->
-    <skip />
+    <string name="screen_capture_blocked_by_admin" msgid="1751756953683506644">"Tu administrador de TI ha bloqueado las capturas de pantalla"</string>
     <string name="screen_capture_fullscreen_screenshot_button" msgid="3173749413928507877">"Hacer captura de toda la pantalla"</string>
     <string name="screen_capture_fullscreen_record_button" msgid="5697594296042198690">"Grabar toda la pantalla"</string>
     <string name="screen_capture_region_selection_button" msgid="515608875142444130">"Hacer captura de pantalla del área seleccionada"</string>
@@ -173,7 +170,13 @@
     <string name="screen_share_no_select_app_thumbnail" msgid="1630012401570567430">"Selecciona qué app quieres compartir"</string>
     <string name="screen_share_audio_sharing_text" msgid="7829391478284315787">"Compartir audio"</string>
     <string name="screen_share_app_window_sharing_title" msgid="2063554880747318383">"Compartir ventana de la app"</string>
-    <string name="screen_share_disclaimer" msgid="3953761426122528262">"Al compartir, se ve el contenido de tu pantalla"</string>
+    <string name="screen_share_tab_sharing_title" msgid="1178046793832072728">"Compartir pestaña"</string>
+    <!-- no translation found for screen_share_entire_screen_sharing_title (9093580141248337998) -->
+    <skip />
+    <!-- no translation found for screen_share_disclaimer_app_sharing (4191319837838590771) -->
+    <skip />
+    <!-- no translation found for screen_share_disclaimer_full_screen_sharing (6445373139864031364) -->
+    <skip />
     <string name="screen_capture_toolbar_app_window_button_screenshot_a11y" msgid="1357560392667941303">"Hacer captura de pantalla de la ventana"</string>
     <string name="screen_capture_toolbar_app_window_button_record_a11y" msgid="8984966592912823394">"Grabar ventana"</string>
     <string name="screen_capture_toolbar_region_button_screenshot_a11y" msgid="2102262602357521192">"Hacer captura de pantalla del área seleccionada"</string>
@@ -370,6 +373,7 @@
     <string name="accessibility_sensors_off_active" msgid="2619725434618911551">"Sensores desactivados"</string>
     <string name="accessibility_clear_all" msgid="970525598287244592">"Borrar todas las notificaciones"</string>
     <string name="accessibility_notification_bell" msgid="7149451526721220526">"Notificaciones"</string>
+    <string name="accessibility_status_bar_assistant_icon" msgid="1174898709836451013">"Asistente"</string>
     <string name="notification_group_overflow_indicator" msgid="7605120293801012648">"<xliff:g id="NUMBER">%s</xliff:g> más"</string>
     <string name="notification_group_overflow_description" msgid="7176322877233433278">"{count,plural, =1{# notificación más en el grupo.}many{# notificaciones más en el grupo.}other{# notificaciones más en el grupo.}}"</string>
     <string name="accessibility_rotation_lock_on_landscape" msgid="936972553861524360">"La pantalla está bloqueada en modo horizontal."</string>
@@ -428,10 +432,8 @@
     <string name="quick_settings_casting" msgid="1435880708719268055">"Enviando"</string>
     <string name="quick_settings_cast_device_default_name" msgid="6988469571141331700">"Dispositivo sin nombre"</string>
     <string name="quick_settings_cast_detail_empty_text" msgid="2846282280014617785">"No hay dispositivos disponibles"</string>
-    <!-- no translation found for quick_settings_cast_detail_title (8212426967651562547) -->
-    <skip />
-    <!-- no translation found for quick_settings_cast_detail_subtitle (6406833630052788623) -->
-    <skip />
+    <string name="quick_settings_cast_detail_title" msgid="8212426967651562547">"Enviar pantalla a dispositivo"</string>
+    <string name="quick_settings_cast_detail_subtitle" msgid="6406833630052788623">"Buscando dispositivos..."</string>
     <string name="quick_settings_cast_no_network" msgid="3863016850468559522">"Sin conexión Wi-Fi ni Ethernet"</string>
     <string name="quick_settings_cast_disconnect" msgid="4836025217838730930">"Desconectar"</string>
     <string name="quick_settings_audio_current_input" msgid="8219735427828862612">"El micrófono actual es"</string>
@@ -713,6 +715,7 @@
     <string name="notification_section_header_gentle" msgid="6804099527336337197">"Silenciadas"</string>
     <string name="notification_section_header_alerting" msgid="5581175033680477651">"Notificaciones"</string>
     <string name="notification_section_header_conversations" msgid="821834744538345661">"Conversaciones"</string>
+    <string name="notification_section_header_highlights" msgid="1671475076192152483">"Destacadas"</string>
     <string name="accessibility_notification_section_header_gentle_clear_all" msgid="6490207897764933919">"Borrar todas las notificaciones silenciosas"</string>
     <string name="accessibility_notification_section_header_open_settings" msgid="6235202417954844004">"Abrir los ajustes de notificaciones"</string>
     <string name="modes_suppressing_shade_text" msgid="6037581130837903239">"{count,plural,offset:1 =0{No hay notificaciones}=1{Notificaciones pausadas por {mode}}=2{Notificaciones pausadas por {mode} y un modo más}many{Notificaciones pausadas por {mode} y # modos más}other{Notificaciones pausadas por {mode} y # modos más}}"</string>
@@ -947,6 +950,8 @@
     <string name="notification_unblockable_call_desc" msgid="5907328164696532169">"Las notificaciones de llamada no se pueden modificar."</string>
     <string name="notification_multichannel_desc" msgid="7414593090056236179">"Este grupo de notificaciones no se puede configurar aquí"</string>
     <string name="notification_delegate_header" msgid="1264510071031479920">"Notificación mediante proxy"</string>
+    <!-- no translation found for notification_summarization_header (511445254923268688) -->
+    <skip />
     <string name="notification_channel_dialog_title" msgid="6856514143093200019">"Todas las notificaciones de <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="see_more_title" msgid="7409317011708185729">"Ver más"</string>
     <string name="feedback_alerted" msgid="5192459808484271208">"El sistema ha &lt;b&gt;aumentado automáticamente a Predeterminado&lt;/b&gt; la importancia de esta notificación."</string>
@@ -1027,8 +1032,7 @@
     <string name="group_system_access_all_apps_search" msgid="1553588630154197469">"Abrir lista de apps"</string>
     <string name="group_system_access_system_settings" msgid="8731721963449070017">"Abrir ajustes"</string>
     <string name="group_system_access_google_assistant" msgid="3769929488906534254">"Abrir asistente digital"</string>
-    <!-- no translation found for group_system_access_contextual_search (525635757621336007) -->
-    <skip />
+    <string name="group_system_access_contextual_search" msgid="525635757621336007">"Búsqueda contextual"</string>
     <string name="group_system_lock_screen" msgid="7391191300363416543">"Pantalla de bloqueo"</string>
     <string name="group_system_quick_memo" msgid="3764560265935722903">"Escribir una nota"</string>
     <string name="keyboard_shortcut_group_system_multitasking" msgid="6967816258924795558">"Multitarea"</string>
@@ -1153,17 +1157,25 @@
     <string name="accessibility_quick_settings_power_menu" msgid="6820426108301758412">"Menú de encendido"</string>
     <string name="accessibility_quick_settings_page" msgid="7506322631645550961">"Página <xliff:g id="ID_1">%1$d</xliff:g> de <xliff:g id="ID_2">%2$d</xliff:g>"</string>
     <string name="accessibility_key_gesture_dialog_title" msgid="7614965716626605518">"¿Activar <xliff:g id="ID_1">%1$s</xliff:g>?"</string>
-    <string name="accessibility_key_gesture_dialog_content" msgid="4519838108423437794">"La combinación de teclas para usar <xliff:g id="ID_3">^3</xliff:g> es "<annotation id="action_key_icon">"icono de acción"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g>. <xliff:g id="ID_4">^4</xliff:g>"</string>
-    <string name="accessibility_key_gesture_dialog_screen_reader_tts" msgid="1298171063228024716">"Vuelve a pulsar Acción + <xliff:g id="ID_1">%1$s</xliff:g> + <xliff:g id="ID_2">%2$s</xliff:g> para habilitar <xliff:g id="ID_3">%3$s</xliff:g>"</string>
+    <string name="accessibility_key_gesture_dialog_content" msgid="2409946187069273612">"La combinación de teclas para usar <xliff:g id="ID_4">^4</xliff:g> es "<annotation id="action_key_icon">"icono"</annotation>" <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> + <xliff:g id="ID_3">^3</xliff:g>. <xliff:g id="ID_5">^5</xliff:g>"</string>
+    <string name="accessibility_key_gesture_dialog_screen_reader_tts" msgid="6466269887128043486">"Vuelve a pulsar <xliff:g id="ID_1">%1$s</xliff:g> + <xliff:g id="ID_2">%2$s</xliff:g> + <xliff:g id="ID_3">%3$s</xliff:g> para habilitar <xliff:g id="ID_4">%4$s</xliff:g>"</string>
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_dialog_title" msgid="5331043821287212071">"¿Activar combinación de teclas de <xliff:g id="ID_1">%1$s</xliff:g>?"</string>
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_negative_button_text" msgid="6711239406914231612">"No activar"</string>
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_positive_button_text" msgid="7748487028569821131">"Activar"</string>
     <string name="accessibility_key_gesture_magnification_dialog_title" msgid="5770691510738701250">"Combinación de teclas de <xliff:g id="ID_1">%1$s</xliff:g> activada"</string>
-    <string name="accessibility_key_gesture_magnification_dialog_content" msgid="582920726242272572">"La combinación de teclas para usar <xliff:g id="ID_3">^3</xliff:g>, una función de accesibilidad, es "<annotation id="action_key_icon">"icono"</annotation>" de acción + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g>. Esto te permite ampliar rápidamente la pantalla para que el contenido se vea más grande. Una vez que la ampliación esté activada, pulsa el "<annotation id="action_key_icon">"icono"</annotation>" de acción + <xliff:g id="ID_4">^1</xliff:g> y \"+\" o \"-\" para ajustar el zoom."</string>
-    <string name="accessibility_key_gesture_magnification_dialog_negative_button_text" msgid="8393469413785600834">"Desactivar combinación de teclas"</string>
+    <string name="accessibility_key_gesture_magnification_dialog_content" msgid="1647246652170256645">"La combinación de teclas para usar <xliff:g id="ID_4">^4</xliff:g>, una función de accesibilidad, es "<annotation id="action_key_icon">"icono"</annotation>" <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> + <xliff:g id="ID_3">^3</xliff:g>. Esto te permite ampliar rápidamente la pantalla para que el contenido se vea más grande. Una vez que la ampliación esté activada, pulsa "<annotation id="action_key_icon">"icono"</annotation>" <xliff:g id="ID_5">^1</xliff:g> + <xliff:g id="ID_6">^2</xliff:g> y \"+\" o \"-\" para ajustar el zoom."</string>
+    <string name="accessibility_key_gesture_magnification_dialog_negative_button_text" msgid="8393469413785600834">"Desactivar combinación"</string>
     <string name="accessibility_key_gesture_magnification_dialog_positive_button_text" msgid="895076240681888057">"Mantener activada"</string>
-    <string name="accessibility_key_gesture_screen_reader_dialog_content" msgid="389338862762665003">"La combinación de teclas para usar <xliff:g id="ID_3">^3</xliff:g> es "<annotation id="action_key_icon">"icono"</annotation>" de acción + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g>. <xliff:g id="ID_4">^3</xliff:g> es un lector de pantalla que te permite oír los elementos en voz alta. Puede ser útil para las personas que tienen dificultades para ver la pantalla. Esta función puede modificar el funcionamiento del dispositivo."</string>
-    <string name="accessibility_key_gesture_voice_access_dialog_content" msgid="7934170819801013870">"Si pulsas Acción "<annotation id="action_key_icon">"icon"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g>, se activa <xliff:g id="ID_3">^3</xliff:g>, una función de accesibilidad. Esto te permite controlar tu dispositivo sin usar las manos."</string>
+    <string name="accessibility_key_gesture_screen_reader_dialog_content" msgid="2322728522389883751">"La combinación de teclas para usar <xliff:g id="ID_4">^4</xliff:g> es "<annotation id="action_key_icon">"icono"</annotation>" <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> + <xliff:g id="ID_3">^3</xliff:g>. <xliff:g id="ID_5">^4</xliff:g> es un lector de pantalla que te permite oír los elementos en voz alta. Puede ser útil para las personas que tienen dificultades para ver la pantalla. Esta función puede modificar el funcionamiento del dispositivo."</string>
+    <string name="accessibility_key_gesture_screen_reader_dialog_warning_heading" msgid="5958960812509429136">"Al activar la combinación de teclas, permitirás que TalkBack tenga control total sobre tu dispositivo."</string>
+    <string name="accessibility_key_gesture_screen_reader_dialog_warning_message" msgid="2026368922103788492">"El control total es adecuado para las aplicaciones de accesibilidad, pero no para la mayoría de las aplicaciones."</string>
+    <string name="accessibility_key_gesture_screen_reader_dialog_warning_view_control_screen_heading" msgid="5346128898440400425">"Ver y controlar la pantalla"</string>
+    <string name="accessibility_key_gesture_screen_reader_dialog_warning_view_control_screen_message" msgid="5810348116536082139">"Puede leer todo el contenido de la pantalla y mostrar contenido sobre otras aplicaciones."</string>
+    <string name="accessibility_key_gesture_screen_reader_dialog_warning_perform_actions_heading" msgid="6032379987970298008">"Ver y realizar acciones"</string>
+    <string name="accessibility_key_gesture_screen_reader_dialog_warning_perform_actions_message" msgid="4565304881759944542">"Puede registrar tus interacciones con una aplicación o un sensor de hardware, así como interactuar con las aplicaciones en tu nombre."</string>
+    <string name="accessibility_key_gesture_voice_access_dialog_content" msgid="8539054865187379687">"Si pulsas el "<annotation id="action_key_icon">"icono"</annotation>" <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> + <xliff:g id="ID_3">^3</xliff:g>, se activa <xliff:g id="ID_4">^4</xliff:g>, una función de accesibilidad. Esto te permite controlar tu dispositivo sin usar las manos."</string>
+    <string name="accessibility_quick_access_dialog_title" msgid="8792322423145117379">"Accesibilidad"</string>
+    <string name="accessibility_quick_access_dialog_done_button_text" msgid="8013849920696848138">"Hecho"</string>
     <string name="tuner_lock_screen" msgid="2267383813241144544">"Pantalla de bloqueo"</string>
     <string name="shutdown_progress" msgid="5464239146561542178">"Apagando…"</string>
     <string name="thermal_shutdown_dialog_help_text" msgid="6413474593462902901">"Ver pasos de mantenimiento"</string>
@@ -1476,8 +1488,12 @@
     <string name="wifi_scan_notify_message" msgid="3753839537448621794">"Para mejorar la experiencia con el dispositivo, las aplicaciones y los servicios podrán buscar redes Wi-Fi en cualquier momento aunque la conexión Wi-Fi esté desactivada. Puedes cambiar esto en los ajustes de búsqueda de redes Wi-Fi. "<annotation id="link">"Cambiar"</annotation></string>
     <string name="turn_off_airplane_mode" msgid="8425587763226548579">"Desactivar modo Avión"</string>
     <string name="qs_tile_request_dialog_text" msgid="3501359944139877694">"<xliff:g id="APPNAME">%1$s</xliff:g> quiere añadir el siguiente recuadro a ajustes rápidos"</string>
+    <string name="qs_tile_request_dialog_text_with_size" msgid="732578771040573291">"<xliff:g id="APPNAME">%1$s</xliff:g> quiere añadir un recuadro a ajustes rápidos. Selecciona un tamaño de recuadro para continuar."</string>
     <string name="qs_tile_request_dialog_add" msgid="4888460910694986304">"Añadir recuadro"</string>
-    <string name="qs_tile_request_dialog_not_add" msgid="4168716573114067296">"No añadir recuadro"</string>
+    <string name="qs_tile_request_dialog_not_add" msgid="8375425041428574394">"No añadir recuadro"</string>
+    <string name="qs_tile_request_dialog_title" msgid="5654666862347548966">"Añadir a ajustes rápidos"</string>
+    <string name="qs_tile_request_dialog_small_format_content_description" msgid="5429197059724172135">"Formato pequeño"</string>
+    <string name="qs_tile_request_dialog_large_format_content_description" msgid="67983044110405787">"Formato grande"</string>
     <string name="qs_user_switch_dialog_title" msgid="3045189293587781366">"Seleccionar usuario"</string>
     <string name="fgs_manager_footer_label" msgid="8276763570622288231">"{count,plural, =1{# aplicación activa}many{# aplicaciones activas}other{# aplicaciones activas}}"</string>
     <string name="fgs_dot_content_description" msgid="2865071539464777240">"Información nueva"</string>
@@ -1574,7 +1590,7 @@
     <string name="connected_display_icon_desc" msgid="6373560639989971997">"Pantalla conectada"</string>
     <string name="connected_display_extended_mode_text" msgid="2457269692913653696">"Conectado a una pantalla externa"</string>
     <string name="privacy_dialog_title" msgid="5201413527644766025">"Micrófono, cámara y ubicación"</string>
-    <string name="privacy_dialog_summary" msgid="2458769652125995409">"Uso reciente en apps"</string>
+    <string name="privacy_dialog_summary" msgid="2458769652125995409">"Uso reciente en aplicaciones"</string>
     <string name="privacy_dialog_more_button" msgid="7610604080293562345">"Ver acceso reciente"</string>
     <string name="privacy_dialog_done_button" msgid="4504330708531434263">"Hecho"</string>
     <string name="privacy_dialog_expand_action" msgid="9129262348628331377">"Desplegar y mostrar opciones"</string>
@@ -1593,7 +1609,7 @@
     <string name="privacy_dialog_recent_app_usage_2" msgid="2874689735085367167">"Usado recientemente por <xliff:g id="APP_NAME">%1$s</xliff:g> (<xliff:g id="ATTRIBUTION_LABEL">%2$s</xliff:g> • <xliff:g id="PROXY_LABEL">%3$s</xliff:g>)"</string>
     <string name="shortcut_helper_category_system" msgid="462110876978937359">"Sistema"</string>
     <string name="shortcut_helper_category_system_controls" msgid="3153344561395751020">"Controles del sistema"</string>
-    <string name="shortcut_helper_category_system_apps" msgid="6001757545472556810">"Apps del sistema"</string>
+    <string name="shortcut_helper_category_system_apps" msgid="6001757545472556810">"Aplicaciones del sistema"</string>
     <string name="shortcut_helper_category_multitasking" msgid="7413381961404090136">"Multitarea"</string>
     <string name="shortcutHelper_category_split_screen" msgid="1159669813444812244">"Pantalla dividida"</string>
     <string name="shortcutHelper_category_accessibility" msgid="8068337792277570938">"Accesibilidad"</string>
@@ -1720,8 +1736,9 @@
     <string name="dual_shade_educational_tooltip_notifs" msgid="7666159428113013319">"Desliza desde la parte superior izquierda para abrir las notificaciones"</string>
     <string name="dual_shade_educational_tooltip_qs" msgid="3842355853737057332">"Desliza desde la parte superior derecha para abrir los ajustes rápidos"</string>
     <string name="back_button_on_bouncer" msgid="809134628434396761">"Atrás"</string>
-    <!-- no translation found for accessibility_button_on_bouncer_description (9186344135931507168) -->
+    <!-- no translation found for sign_in_button_on_bouncer (3595960142516902559) -->
     <skip />
+    <string name="accessibility_button_on_bouncer_description" msgid="9186344135931507168">"Accesibilidad"</string>
     <string name="pager_dots_previous_content_description" msgid="26963508904918908">"Anterior"</string>
     <string name="pager_dots_next_content_description" msgid="613943992626163120">"Siguiente"</string>
     <string name="accessibility_pager_dots_navigate_to_next_page_action" msgid="7662720613169169465">"ir a la página siguiente"</string>

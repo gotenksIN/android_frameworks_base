@@ -36,7 +36,6 @@ import android.content.pm.PackageManager;
 import android.content.pm.PathPermission;
 import android.content.pm.PermissionGroupInfo;
 import android.content.pm.PermissionInfo;
-import android.content.pm.UsesPermissionPurposeInfo;
 import android.content.pm.ProcessInfo;
 import android.content.pm.ProviderInfo;
 import android.content.pm.ServiceInfo;
@@ -44,6 +43,7 @@ import android.content.pm.SharedLibraryInfo;
 import android.content.pm.Signature;
 import android.content.pm.SigningDetails;
 import android.content.pm.SigningInfo;
+import android.content.pm.UsesPermissionPurposeInfo;
 import android.content.pm.ValidGeneralPurposeInfo;
 import android.content.pm.ValidPurposeInfo;
 import android.content.pm.overlay.OverlayPaths;
@@ -78,6 +78,7 @@ import com.android.internal.pm.pkg.parsing.ParsingUtils;
 import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.CollectionUtils;
 import com.android.server.SystemConfig;
+import com.android.server.pm.AppLockPackageHelper;
 import com.android.server.pm.PackageArchiver;
 import com.android.server.pm.parsing.pkg.AndroidPackageUtils;
 import com.android.server.pm.pkg.AndroidPackage;
@@ -227,12 +228,16 @@ public class PackageInfoUtils {
                                 PackageInfo.REQUESTED_PERMISSION_IMPLICIT;
                     }
                     if (android.permission.flags.Flags.ppdManifestEnabled()) {
+                        Set<String> generalPurposes = Set.of();
+                        int purposeStringResource = usesPermission.getPurposeStringResource();
                         if (!usesPermission.getGeneralPurposes().isEmpty()) {
-                            UsesPermissionPurposeInfo ppi =
-                                    new UsesPermissionPurposeInfo(usesPermission.getName(),
-                                            usesPermission.getGeneralPurposes());
-                            info.requestedPermissionsPurposes.put(usesPermission.getName(), ppi);
+                            generalPurposes = usesPermission.getGeneralPurposes();
                         }
+                        UsesPermissionPurposeInfo ppi =
+                                new UsesPermissionPurposeInfo(usesPermission.getName(),
+                                        generalPurposes,
+                                        purposeStringResource);
+                        info.requestedPermissionsPurposes.put(usesPermission.getName(), ppi);
                     }
                     index++;
                 }
@@ -397,7 +402,7 @@ public class PackageInfoUtils {
     }
 
     private static void updateApplicationInfo(ApplicationInfo ai, long flags,
-            PackageUserState state) {
+            PackageUserState state, AndroidPackage pkg, int userId) {
         if ((flags & PackageManager.GET_META_DATA) == 0) {
             ai.metaData = null;
         }
@@ -447,6 +452,15 @@ public class PackageInfoUtils {
             // The data dir has been deleted
             ai.dataDir = null;
         }
+        if ((flags & PackageManager.GET_APP_LOCK_INFO) != 0) {
+            if (pkg != null) {
+                ai.isAppLockSupported = AppLockPackageHelper.isAppLockSupported(
+                        pkg.getPackageName(),
+                        userId,
+                        pkg.getActivities());
+            }
+            ai.isAppLockEnabled = state.isAppLockEnabled();
+        }
     }
 
     @Nullable
@@ -461,7 +475,7 @@ public class PackageInfoUtils {
         ai.initForUser(userId);
         ai.icon = (ParsingPackageUtils.sUseRoundIcon && ai.roundIconRes != 0) ? ai.roundIconRes
                 : ai.iconRes;
-        updateApplicationInfo(ai, flags, state);
+        updateApplicationInfo(ai, flags, state, /* pkg= */ null, userId);
         return ai;
     }
 
@@ -486,7 +500,7 @@ public class PackageInfoUtils {
         // Make shallow copy so we can store the metadata/libraries safely
         ApplicationInfo info = AndroidPackageUtils.generateAppInfoWithoutState(pkg);
 
-        updateApplicationInfo(info, flags, state);
+        updateApplicationInfo(info, flags, state, pkg, userId);
 
         initForUser(info, pkg, pkgSetting, userId, state);
 
@@ -802,6 +816,7 @@ public class PackageInfoUtils {
         pi.knownCerts = p.getKnownCerts();
         pi.requiresPurpose = p.isPurposeRequired();
         pi.requiresPurposeTargetSdkVersion = p.getRequiresPurposeTargetSdkVersion();
+        pi.requiresPurposeStringTargetSdkVersion = p.getRequiresPurposeStringTargetSdkVersion();
         pi.requiresGeneralPurposeTargetSdkVersion = p.getRequiresGeneralPurposeTargetSdkVersion();
         for (ParsedValidPurpose validPurpose : p.getValidPurposes()) {
             if (validPurpose != null) {

@@ -102,6 +102,7 @@ import static android.view.WindowManager.TRANSIT_OPEN;
 import static android.view.WindowManager.TRANSIT_TO_FRONT;
 import static android.view.WindowManager.fixScale;
 import static android.view.WindowManagerGlobal.ADD_OKAY;
+import static android.view.WindowManagerGlobal.RELAYOUT_RES_BUFFER_SYNC;
 import static android.view.WindowManagerGlobal.RELAYOUT_RES_CANCEL_AND_REDRAW;
 import static android.view.WindowManagerGlobal.RELAYOUT_RES_SURFACE_CHANGED;
 import static android.view.WindowManagerPolicyConstants.TYPE_LAYER_MULTIPLIER;
@@ -303,6 +304,7 @@ import android.view.WindowInsets;
 import android.view.WindowInsets.Type.InsetsType;
 import android.view.WindowManager;
 import android.view.WindowManager.DisplayImePolicy;
+import android.view.WindowManager.EngagementModeFlags;
 import android.view.WindowManager.LayoutParams;
 import android.view.WindowManager.RemoveContentMode;
 import android.view.WindowManagerGlobal;
@@ -318,6 +320,7 @@ import android.window.ClientWindowFrames;
 import android.window.ConfigurationChangeSetting;
 import android.window.DesktopExperienceFlags;
 import android.window.DesktopModeFlags;
+import android.window.IDisplayEngagementModeCallback;
 import android.window.IGlobalDragListener;
 import android.window.IScreenCaptureCallback;
 import android.window.IScreenRecordingCallback;
@@ -495,6 +498,9 @@ public class WindowManagerService extends IWindowManager.Stub
 
     private final RemoteCallbackList<IKeyguardLockedStateListener> mKeyguardLockedStateListeners =
             new RemoteCallbackList<>();
+
+    private final RemoteCallbackList<IDisplayEngagementModeCallback>
+            mDisplayEngagementModeCallbacks = new RemoteCallbackList<>();
 
     private final List<OnWindowRemovedListener> mOnWindowRemovedListeners = new ArrayList<>();
 
@@ -1989,7 +1995,7 @@ public class WindowManagerService extends IWindowManager.Stub
                 // IME window is always touchable.
                 // Ignore non-touchable windows e.g. Stylus InkWindow.java.
                 && (win.mAttrs.flags & FLAG_NOT_TOUCHABLE) == 0) {
-            displayContent.setInputMethodWindowLocked(win);
+            displayContent.setImeWindow(win);
             imMayMove = false;
         } else if (type == TYPE_INPUT_METHOD_DIALOG) {
             displayContent.computeImeLayeringTarget(true /* update */);
@@ -2254,8 +2260,8 @@ public class WindowManagerService extends IWindowManager.Stub
         ProtoLog.v(WM_DEBUG_WINDOW_MOVEMENT, "Final remove of window: %s", win);
 
         final DisplayContent displayContent = win.getDisplayContent();
-        if (displayContent.mInputMethodWindow == win) {
-            displayContent.setInputMethodWindowLocked(null);
+        if (displayContent.getImeWindow() == win) {
+            displayContent.setImeWindow(null /* win */);
         }
 
         final WindowToken token = win.mToken;
@@ -2611,7 +2617,8 @@ public class WindowManagerService extends IWindowManager.Stub
                 Slog.v(TAG_WM, "Relayout " + win + ": viewVisibility=" + viewVisibility
                         + " req=" + requestedWidth + "x" + requestedHeight + " " + win.mAttrs);
             }
-            if ((attrChanges & WindowManager.LayoutParams.ALPHA_CHANGED) != 0) {
+            if (!WindowManager.useClientSurface()
+                    && (attrChanges & WindowManager.LayoutParams.ALPHA_CHANGED) != 0) {
                 winAnimator.mAlpha = attrs.alpha;
             }
             if ((attrChanges & WindowManager.LayoutParams.TITLE_CHANGED) != 0) {
@@ -2620,10 +2627,11 @@ public class WindowManagerService extends IWindowManager.Stub
             }
             win.setWindowScale(win.mRequestedWidth, win.mRequestedHeight);
 
-            if (win.mAttrs.surfaceInsets.left != 0
+            if (!WindowManager.useClientSurface()
+                    && (win.mAttrs.surfaceInsets.left != 0
                     || win.mAttrs.surfaceInsets.top != 0
                     || win.mAttrs.surfaceInsets.right != 0
-                    || win.mAttrs.surfaceInsets.bottom != 0) {
+                    || win.mAttrs.surfaceInsets.bottom != 0)) {
                 winAnimator.setOpaqueLocked(false);
             }
 
@@ -2657,6 +2665,10 @@ public class WindowManagerService extends IWindowManager.Stub
                     viewVisibility);
             if (becameVisible) {
                 onWindowVisible(win);
+            }
+            if (WindowManager.useClientSurface() && viewVisibility == View.VISIBLE
+                    && outSurfaceControl != null) {
+                win.setClientSurface(outSurfaceControl);
             }
 
             win.setDisplayLayoutNeeded();
@@ -2693,7 +2705,7 @@ public class WindowManagerService extends IWindowManager.Stub
 
             // Create surfaceControl before surface placement otherwise layout will be skipped
             // (because WS.isGoneForLayout() is true when there is no surface.
-            if (shouldRelayout && outSurfaceControl != null) {
+            if (shouldRelayout && outSurfaceControl != null && !WindowManager.useClientSurface()) {
                 try {
                     result = createSurfaceControl(outSurfaceControl, result, win, winAnimator);
                 } catch (Exception e) {
@@ -2728,8 +2740,8 @@ public class WindowManagerService extends IWindowManager.Stub
                     focusMayChange = true;
                 }
                 if (win.mAttrs.type == TYPE_INPUT_METHOD
-                        && displayContent.mInputMethodWindow == null) {
-                    displayContent.setInputMethodWindowLocked(win);
+                        && displayContent.getImeWindow() == null) {
+                    displayContent.setImeWindow(win);
                     imMayMove = true;
                 }
                 win.adjustStartingWindowFlags();
@@ -2740,7 +2752,7 @@ public class WindowManagerService extends IWindowManager.Stub
                 winAnimator.mEnterAnimationPending = false;
                 winAnimator.mEnteringAnimation = false;
 
-                if (outSurfaceControl != null) {
+                if (outSurfaceControl != null && !WindowManager.useClientSurface()) {
                     if (viewVisibility == View.VISIBLE && winAnimator.hasSurface()) {
                         // We already told the client to go invisible, but the message may not be
                         // handled yet, or it might want to draw a last frame. If we already have a
@@ -2862,14 +2874,16 @@ public class WindowManagerService extends IWindowManager.Stub
                             && !displayContent.mWaitingForConfig) {
                         // Surface-placement has resulted in a new configuration or a new sync.
                         // This means the layout is technically invalid; however, it's very unlikely
-                        // that this will matter and we can often save a frame of latency by
-                        // returning the config/seqId here.
-                        // Returning a seqId indicates, to the client, that it can use this
-                        // result even though it called relayout with out-of-date config.
-                        outRelayoutResult.syncSeqId = win.mSyncSeqId;
+                        // that this will matter since we've always ignored this fact. So, we can
+                        // often save a frame of latency by returning the config/seqId here.
+                        outRelayoutResult.syncSeqId = Math.max(win.mBufferSeqId, win.mSyncSeqId);
+                        if (win.mBufferSeqId >= win.mSyncSeqId) {
+                            result = result | RELAYOUT_RES_BUFFER_SYNC;
+                        }
                         if (Trace.isTagEnabled(TRACE_TAG_WINDOW_MANAGER)) {
                             Trace.instant(TRACE_TAG_WINDOW_MANAGER, "ignoreCancelDraw seqId="
-                                    + win.mSyncSeqId);
+                                    + win.mSyncSeqId + " buffer="
+                                    + ((result & RELAYOUT_RES_BUFFER_SYNC) != 0));
                         }
                     }
                 }
@@ -3688,6 +3702,21 @@ public class WindowManagerService extends IWindowManager.Stub
         });
     }
 
+    @VisibleForTesting
+    void dispatchDisplayEngagementModeChanged(
+            int displayId, @EngagementModeFlags int engagementMode) {
+        final int n = mDisplayEngagementModeCallbacks.beginBroadcast();
+        for (int i = 0; i < n; i++) {
+            try {
+                mDisplayEngagementModeCallbacks.getBroadcastItem(i).onEngagementModeChanged(
+                        displayId, engagementMode);
+            } catch (RemoteException e) {
+                // Handled by the RemoteCallbackList.
+            }
+        }
+        mDisplayEngagementModeCallbacks.finishBroadcast();
+    }
+
     void dispatchImeOverlayLayeringTargetVisibilityChanged(@Nullable IBinder token,
             @WindowManager.LayoutParams.WindowType int windowType, boolean visible,
             boolean removed, int displayId) {
@@ -3811,11 +3840,6 @@ public class WindowManagerService extends IWindowManager.Stub
 
     @VisibleForTesting
     void setAnimationsDisabledForDisplay(int displayId, boolean disabled) {
-        if (!android.companion.virtualdevice.flags.Flags.enableAnimationsPerDisplay()) {
-            Slog.e(TAG, "Required feature flag is disabled");
-            return;
-        }
-
         synchronized (mGlobalLock) {
             DisplayContent displayContent = mRoot.getDisplayContentOrCreate(displayId);
             displayContent.setAnimationsDisabledLocked(disabled);
@@ -3956,23 +3980,6 @@ public class WindowManagerService extends IWindowManager.Stub
                 confirm);
     }
 
-    /** Update the current user. */
-    public void setCurrentUser(@UserIdInt int newUserId) {
-        if (DesktopExperienceFlags.ENABLE_APPLY_DESK_ACTIVATION_ON_USER_SWITCH.isTrue()) return;
-        synchronized (mGlobalLock) {
-            final TransitionController controller = mAtmService.getTransitionController();
-            final ActionChain chain = mAtmService.mChainTracker.startTransit("setUser");
-            if (!chain.isCollecting() && controller.isShellTransitionsEnabled()) {
-                chain.attachTransition(controller.createTransition(TRANSIT_OPEN));
-                controller.requestStartTransition(chain.getTransition(),
-                        null /* trigger */, null /* remote */, null /* disp */);
-            }
-            prepareUserStart(newUserId);
-            switchUserInternal(newUserId);
-            mAtmService.mChainTracker.end();
-        }
-    }
-
     /**
      * Called when a new user is about to start.
      */
@@ -4035,16 +4042,19 @@ public class WindowManagerService extends IWindowManager.Stub
                         ? forcedDensity : displayContent.getInitialDisplayDensity();
                 displayContent.setForcedDensity(targetDensity, UserHandle.USER_CURRENT);
 
-                // Because DisplayWindowSettingsProvider.mOverrideSettings has been reset for
-                // the new user, we need to update DisplayWindowSettings.mShouldShowSystemDecors
-                // to ensure it reflects the latest value.
-                if (DesktopExperienceFlags.ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT.isTrue()) {
-                    final int displayCount = mRoot.mChildren.size();
-                    for (int i = 0; i < displayCount; ++i) {
-                        final DisplayContent dc = mRoot.mChildren.get(i);
-                        dc.updateShouldShowSystemDecorations();
+                mRoot.forAllDisplays(display -> {
+                    if (Flags.moveUserDisplaySettingsToDeStorage()) {
+                        mDisplayWindowSettings.applySettingsToDisplayLocked(display);
+                        display.reconfigureDisplayLocked();
                     }
-                }
+
+                    // Because DisplayWindowSettingsProvider.mOverrideSettings has been reset for
+                    // the new user, we need to update DisplayWindowSettings.mShouldShowSystemDecors
+                    // to ensure it reflects the latest value.
+                    if (DesktopExperienceFlags.ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT.isTrue()) {
+                        display.updateShouldShowSystemDecorations();
+                    }
+                });
             }
         }
     }
@@ -6052,11 +6062,6 @@ public class WindowManagerService extends IWindowManager.Stub
         public static final int REPARENT_TASK_TO_DEFAULT_DISPLAY = 65;
         public static final int INSETS_CHANGED = 66;
 
-        /**
-         * Used to denote that an integer field in a message will not be used.
-         */
-        public static final int UNUSED = 0;
-
         @Override
         public void handleMessage(Message msg) {
             if (DEBUG_WINDOW_TRACE) {
@@ -6979,8 +6984,8 @@ public class WindowManagerService extends IWindowManager.Stub
             // get the right IME touch region.
             for (int i = mRoot.mChildren.size() - 1; i >= 0; --i) {
                 final DisplayContent displayContent = mRoot.mChildren.get(i);
-                if (displayContent.mInputMethodWindow != null) {
-                    displayContent.mInputMethodWindow.getTouchableRegion(r);
+                if (displayContent.getImeWindow() != null) {
+                    displayContent.getImeWindow().getTouchableRegion(r);
                     return r;
                 }
             }
@@ -7119,7 +7124,7 @@ public class WindowManagerService extends IWindowManager.Stub
             if (topFocusedDisplayContent.mFocusedApp != null) {
                 topFocusedDisplayContent.mFocusedApp.writeNameToProto(proto, FOCUSED_APP);
             }
-            final WindowState imeWindow = mRoot.getCurrentInputMethodWindow();
+            final WindowState imeWindow = mRoot.getCurrentImeWindow();
             if (imeWindow != null) {
                 imeWindow.writeIdentifierToProto(proto, INPUT_METHOD_WINDOW);
             }
@@ -7238,7 +7243,7 @@ public class WindowManagerService extends IWindowManager.Stub
         dumpAccessibilityController(pw, /* force= */ false);
 
         if (dumpAll) {
-            final WindowState imeWindow = mRoot.getCurrentInputMethodWindow();
+            final WindowState imeWindow = mRoot.getCurrentImeWindow();
             if (imeWindow != null) {
                 pw.print("  mInputMethodWindow="); pw.println(imeWindow);
             }
@@ -7711,7 +7716,7 @@ public class WindowManagerService extends IWindowManager.Stub
     public void requestImeKeyboardShortcuts(IResultReceiver receiver, int deviceId) {
         enforceRegisterWindowManagerListenersPermission("requestImeKeyboardShortcuts");
 
-        WindowState imeWindow = mRoot.getCurrentInputMethodWindow();
+        final WindowState imeWindow = mRoot.getCurrentImeWindow();
         if (imeWindow == null || imeWindow.mClient == null) {
             notifyReceiverWithEmptyBundle(receiver);
             return;
@@ -10732,6 +10737,102 @@ public class WindowManagerService extends IWindowManager.Stub
                     true /* traverseTopToBottom */);
             return List.copyOf(notifiedApps);
         }
+    }
+
+    @EnforcePermission(android.Manifest.permission.MANAGE_DISPLAYS)
+    @Override
+    public void setDisplayEngagementMode(int displayId,
+            @EngagementModeFlags int engagementModeFlags) {
+        setDisplayEngagementMode_enforcePermission();
+        if (!Flags.deviceEngagementMode()) {
+            return;
+        }
+
+        synchronized (mGlobalLock) {
+            final DisplayContent dc = mRoot.getDisplayContent(displayId);
+            if (dc == null) {
+                Slog.w(TAG, "Attempted to set engagement mode for non-existent display: "
+                        + displayId);
+                return;
+            }
+            if (dc.getEngagementMode() == engagementModeFlags) {
+                return;
+            }
+            dc.setEngagementMode(engagementModeFlags);
+            mH.post(() -> dispatchDisplayEngagementModeChanged(displayId, engagementModeFlags));
+        }
+    }
+
+    @Override
+    @EngagementModeFlags
+    public int getDisplayEngagementMode(int displayId) {
+        if (!Flags.deviceEngagementMode()) {
+            return DisplayContent.DEFAULT_ENGAGEMENT_MODE;
+        }
+
+        synchronized (mGlobalLock) {
+            final DisplayContent dc = mRoot.getDisplayContent(displayId);
+            if (dc == null) {
+                Slog.w(TAG, "Attempted to get engagement mode for non-existent display: "
+                        + displayId);
+                return DisplayContent.DEFAULT_ENGAGEMENT_MODE;
+            }
+            return dc.getEngagementMode();
+        }
+    }
+
+    @Override
+    public void registerDisplayEngagementModeCallback(IDisplayEngagementModeCallback callback) {
+        mDisplayEngagementModeCallbacks.register(callback);
+
+        // Post the initial state dispatch to avoid a synchronous callback while holding the
+        // global lock, which can lead to deadlocks.
+        mH.post(() -> {
+            // Create a copy of the data to be sent outside the lock.
+            final ArrayMap<Integer, Integer> displayModes = new ArrayMap<>();
+            boolean isRegistered = false;
+
+            synchronized (mGlobalLock) {
+                // See if the callback is still registered before sending the initial state by
+                // checking the snapshot provided by beginBroadcast.
+                final int callbackCount = mDisplayEngagementModeCallbacks.beginBroadcast();
+                try {
+                    for (int i = 0; i < callbackCount; i++) {
+                        if (mDisplayEngagementModeCallbacks.getBroadcastItem(i).equals(callback)) {
+                            isRegistered = true;
+                            break;
+                        }
+                    }
+                } finally {
+                    mDisplayEngagementModeCallbacks.finishBroadcast();
+                }
+
+                if (!isRegistered) {
+                    return;
+                }
+
+                // Call back with the current state for all displays.
+                for (int i = mRoot.getChildCount() - 1; i >= 0; i--) {
+                    final DisplayContent dc = mRoot.getChildAt(i);
+                    displayModes.put(dc.getDisplayId(), dc.getEngagementMode());
+                }
+            }
+
+            // Call back with the current state for all displays.
+            for (int i = 0; i < displayModes.size(); i++) {
+                try {
+                    callback.onEngagementModeChanged(
+                            displayModes.keyAt(i), displayModes.valueAt(i));
+                } catch (RemoteException e) {
+                    // The process is gone, no need to call it.
+                }
+            }
+        });
+    }
+
+    @Override
+    public void unregisterDisplayEngagementModeCallback(IDisplayEngagementModeCallback callback) {
+        mDisplayEngagementModeCallbacks.unregister(callback);
     }
 
     /**

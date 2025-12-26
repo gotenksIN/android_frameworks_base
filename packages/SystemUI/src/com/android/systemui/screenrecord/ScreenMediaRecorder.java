@@ -54,6 +54,8 @@ import android.util.Size;
 import android.view.Display;
 import android.view.Surface;
 
+import androidx.annotation.NonNull;
+
 import com.android.internal.R;
 import com.android.systemui.mediaprojection.MediaProjectionCaptureTarget;
 
@@ -66,6 +68,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Recording screen and mic/internal audio
@@ -93,6 +96,7 @@ public class ScreenMediaRecorder extends MediaProjection.Callback {
     private final MediaProjectionCaptureTarget mCaptureRegion;
     private final Handler mHandler;
     private final int mDisplayId;
+    private final AtomicBoolean mIsStarted = new AtomicBoolean();
 
     private Context mContext;
     ScreenMediaRecorderListener mListener;
@@ -216,22 +220,26 @@ public class ScreenMediaRecorder extends MediaProjection.Callback {
      * If possible this will return the same values as given, but values may be smaller on some
      * devices.
      *
-     * @param screenWidth Actual pixel width of screen
+     * @param screenWidth  Actual pixel width of screen
      * @param screenHeight Actual pixel height of screen
-     * @param refreshRate Desired refresh rate
+     * @param refreshRate  Desired refresh rate
      * @return array with supported width, height, and refresh rate
      */
     private int[] getSupportedSize(final int screenWidth, final int screenHeight, int refreshRate)
             throws IOException {
         String videoType = MediaFormat.MIMETYPE_VIDEO_AVC;
 
+// QTI_BEGIN: 2023-09-06: Video: Use encoder capabilities for determining screen recording size
         // Get max size from the encoder,
         // implicitly decoder supports this size and
         // ensure recordings will be playable on device
         MediaCodec encoder = MediaCodec.createEncoderByType(videoType);
         MediaCodecInfo.VideoCapabilities vc = encoder.getCodecInfo()
+// QTI_END: 2023-09-06: Video: Use encoder capabilities for determining screen recording size
                 .getCapabilitiesForType(videoType).getVideoCapabilities();
+// QTI_BEGIN: 2023-09-06: Video: Use encoder capabilities for determining screen recording size
         encoder.release();
+// QTI_END: 2023-09-06: Video: Use encoder capabilities for determining screen recording size
 
         // Check if we can support screen size as-is
         int width = vc.getSupportedWidths().getUpper();
@@ -285,8 +293,8 @@ public class ScreenMediaRecorder extends MediaProjection.Callback {
     }
 
     /**
-    * Start screen recording
-    */
+     * Start screen recording
+     */
     public void start() throws IOException, RemoteException, RuntimeException {
         Log.d(TAG, "start recording");
         prepare();
@@ -294,39 +302,46 @@ public class ScreenMediaRecorder extends MediaProjection.Callback {
         mStartTimeMillis = System.currentTimeMillis();
         mListener.onStarted();
         recordInternalAudio();
+        mIsStarted.set(true);
     }
 
     /**
      * End screen recording, throws an exception if stopping recording failed
      */
     public void end(@StopReason int stopReason) throws IOException {
-        Closer closer = new Closer();
+        if (mIsStarted.compareAndSet(true, false)) {
+            Closer closer = new Closer();
 
-        // MediaRecorder might throw RuntimeException if stopped immediately after starting
-        // We should remove the recording in this case as it will be invalid
-        closer.register(mMediaRecorder::stop);
-        closer.register(mMediaRecorder::release);
-        closer.register(mInputSurface::release);
-        closer.register(mVirtualDisplay::release);
-        closer.register(() -> {
-            if (stopReason == StopReason.STOP_UNKNOWN) {
-                // Attempt to call MediaProjection#stop() even if it might have already been called.
-                // If projection has already been stopped, then nothing will happen. Else, stop
-                // will be logged as a manually requested stop from host app.
-                mMediaProjection.stop();
-            } else {
-                // In any other case, the stop reason is related to the recorder, so pass it on here
-                mMediaProjection.stop(stopReason);
-            }
-        });
-        closer.register(this::stopInternalAudioRecording);
+            // MediaRecorder might throw RuntimeException if stopped immediately after starting
+            // We should remove the recording in this case as it will be invalid
+            closer.register(mMediaRecorder::stop);
+            closer.register(mMediaRecorder::release);
+            closer.register(mInputSurface::release);
+            closer.register(mVirtualDisplay::release);
+            closer.register(() -> {
+                if (stopReason == StopReason.STOP_UNKNOWN) {
+                    // Attempt to call MediaProjection#stop() even if it might have already been
+                    // called.
+                    // If projection has already been stopped, then nothing will happen. Else, stop
+                    // will be logged as a manually requested stop from host app.
+                    mMediaProjection.stop();
+                } else {
+                    // In any other case, the stop reason is related to the recorder, so pass it
+                    // on here
+                    mMediaProjection.stop(stopReason);
+                }
+            });
+            closer.register(this::stopInternalAudioRecording);
 
-        closer.close();
+            closer.close();
 
-        mMediaRecorder = null;
-        mMediaProjection = null;
+            mMediaRecorder = null;
+            mMediaProjection = null;
 
-        Log.d(TAG, "end recording");
+            Log.d(TAG, "end recording");
+        } else {
+            Log.d(TAG, "recording hasn't been started. Nothing to end");
+        }
     }
 
     @Override
@@ -342,16 +357,21 @@ public class ScreenMediaRecorder extends MediaProjection.Callback {
         }
     }
 
-    private  void recordInternalAudio() throws IllegalStateException {
+    private void recordInternalAudio() throws IllegalStateException {
         if (mAudioSource == INTERNAL || mAudioSource == MIC_AND_INTERNAL) {
             mAudio.start();
         }
     }
 
+    public SavedRecording save() throws IOException, IllegalStateException {
+        return save(null);
+    }
+
     /**
      * Store recorded video
      */
-    public SavedRecording save() throws IOException, IllegalStateException {
+    public SavedRecording save(@Nullable UriReadyCallback onUriReady)
+            throws IOException, IllegalStateException {
         String saveDate = new SimpleDateFormat("yyyyMMdd-HHmmss").format(new Date());
         String fileName = mStartTimeMillis > 0L
                 ? String.format("screen-%s-%d.mp4", saveDate, mStartTimeMillis)
@@ -367,6 +387,9 @@ public class ScreenMediaRecorder extends MediaProjection.Callback {
         Uri collectionUri = MediaStore.Video.Media.getContentUri(
                 MediaStore.VOLUME_EXTERNAL_PRIMARY);
         Uri itemUri = resolver.insert(collectionUri, values);
+        if (onUriReady != null) {
+            onUriReady.onUriReady(itemUri);
+        }
 
         Log.d(TAG, itemUri.toString());
         if (mAudioSource == MIC_AND_INTERNAL || mAudioSource == INTERNAL) {
@@ -425,25 +448,35 @@ public class ScreenMediaRecorder extends MediaProjection.Callback {
         }
     }
 
+    public interface UriReadyCallback {
+
+        void onUriReady(Uri uri);
+    }
+
     /**
-    * Object representing the recording
-    */
+     * Object representing the recording
+     */
     public class SavedRecording {
 
-        private Uri mUri;
-        private Icon mThumbnailIcon;
+        @NonNull
+        private final Uri mUri;
+        @Nullable
+        private final Icon mThumbnailIcon;
 
-        public SavedRecording(Uri uri, File file, Size thumbnailSize) {
+        public SavedRecording(@NonNull Uri uri, File file, Size thumbnailSize) {
             mUri = uri;
+            Icon thumbnailIcon = null;
             try {
                 Bitmap thumbnailBitmap = ThumbnailUtils.createVideoThumbnail(
                         file, thumbnailSize, null);
-                mThumbnailIcon = Icon.createWithBitmap(thumbnailBitmap);
+                thumbnailIcon = Icon.createWithBitmap(thumbnailBitmap);
             } catch (IOException e) {
                 Log.e(TAG, "Error creating thumbnail", e);
             }
+            mThumbnailIcon = thumbnailIcon;
         }
 
+        @NonNull
         public Uri getUri() {
             return mUri;
         }

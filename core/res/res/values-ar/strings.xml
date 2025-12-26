@@ -330,6 +330,8 @@
     <string name="notification_channel_accessibility_hearing_device" msgid="7816963856388758952">"سماعة الأذن الطبية"</string>
     <string name="notification_channel_accessibility_security_policy" msgid="1727787021725251912">"استخدام \"أدوات تسهيل الاستخدام\""</string>
     <string name="notification_channel_display" msgid="6905032605735615090">"الشاشة"</string>
+    <!-- no translation found for notification_channel_parental_controls (2963963315750128538) -->
+    <skip />
     <string name="foreground_service_app_in_background" msgid="1439289699671273555">"يستخدم تطبيق <xliff:g id="APP_NAME">%1$s</xliff:g> البطارية"</string>
     <string name="foreground_service_apps_in_background" msgid="7340037176412387863">"تستخدم <xliff:g id="NUMBER">%1$d</xliff:g> من التطبيقات البطارية"</string>
     <string name="foreground_service_tap_for_details" msgid="9078123626015586751">"انقر للحصول على تفاصيل حول البطارية واستخدام البيانات"</string>
@@ -645,6 +647,8 @@
     <string name="permdesc_nearby_wifi_devices" msgid="3054307728646332906">"‏للسماح للتطبيق بعرض الإعلانات والاتصال بالأجهزة الأخرى وتحديد الموقع النسبي لأجهزة Wi-Fi المجاورة."</string>
     <string name="permlab_access_local_network" msgid="3420360767259066877">"الوصول إلى الأجهزة المتصلة بالشبكة المحلية"</string>
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"يسمح هذا الإذن للتطبيق بالوصول إلى الأجهزة المتصلة بالشبكة المحلية"</string>
+    <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"استخدام واجهة الاسترجاع"</string>
+    <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"يسمح هذا الإذن للتطبيق بالتفاعل مع تطبيقات أخرى عبر واجهة الاسترجاع"</string>
     <string name="permlab_ranging" msgid="2854543350668593390">"تحديد الموضع النسبي بين الأجهزة المجاورة"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"يسمح هذا الإذن للتطبيق بتحديد الموضع النسبي بين الأجهزة المجاورة"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"‏معلومات الخدمات المدفوعة باستخدام الاتصال قصير المدى NFC المفضّل"</string>
@@ -979,7 +983,7 @@
     <string name="phoneTypeCar" msgid="4604775148963129195">"هاتف سيارة"</string>
     <string name="phoneTypeCompanyMain" msgid="4482773154536455441">"هاتف الشركة الرئيسي"</string>
     <string name="phoneTypeIsdn" msgid="2496238954533998512">"ISDN"</string>
-    <string name="phoneTypeMain" msgid="5199722006991000111">"رئيسي"</string>
+    <string name="phoneTypeMain" msgid="5199722006991000111">"الأساسي"</string>
     <string name="phoneTypeOtherFax" msgid="3037145630364770357">"فاكس آخر"</string>
     <string name="phoneTypeRadio" msgid="2637819130239264771">"لاسلكي"</string>
     <string name="phoneTypeTelex" msgid="2558783611711876562">"تلكس"</string>
@@ -1047,7 +1051,6 @@
     <string name="keyguard_password_enter_pin_password_code" msgid="7792964196473964340">"‏اكتب رمز PIN لإلغاء التأمين"</string>
     <string name="keyguard_password_wrong_pin_code" msgid="8583732939138432793">"‏رمز PIN غير صحيح."</string>
     <string name="keyguard_label_text" msgid="3841953694564168384">"لإلغاء التأمين، اضغط على \"القائمة\" ثم على 0."</string>
-    <string name="emergency_call_dialog_number_for_display" msgid="2978165477085612673">"رقم الطوارئ"</string>
     <string name="lockscreen_carrier_default" msgid="6192313772955399160">"لا خدمة"</string>
     <string name="lockscreen_screen_locked" msgid="7364905540516041817">"الشاشة مؤمّنة."</string>
     <string name="lockscreen_instructions_when_pattern_enabled" msgid="7982445492532123308">"اضغط على \"القائمة\" لإلغاء التأمين أو إجراء اتصال بالطوارئ."</string>
@@ -1247,7 +1250,7 @@
     <string name="redo" msgid="7231448494008532233">"إعادة"</string>
     <string name="autofill" msgid="511224882647795296">"الملء التلقائي"</string>
     <string name="textSelectionCABTitle" msgid="5151441579532476940">"تحديد النص"</string>
-    <string name="addToDictionary" msgid="8041821113480950096">"إضافة إلى القاموس"</string>
+    <string name="addToDictionary" msgid="8041821113480950096">"الإضافة إلى القاموس"</string>
     <string name="deleteText" msgid="4200807474529938112">"حذف"</string>
     <string name="inputMethod" msgid="1784759500516314751">"طريقة الإرسال"</string>
     <string name="editTextMenuTitle" msgid="857666911134482176">"إجراءات النص"</string>
@@ -1281,6 +1284,7 @@
     <string name="whichApplicationLabel" msgid="7852182961472531728">"إكمال الإجراء"</string>
     <string name="whichViewApplication" msgid="5733194231473132945">"فتح باستخدام"</string>
     <string name="whichViewApplicationNamed" msgid="415164730629690105">"‏فتح باستخدام %1$s"</string>
+    <string name="open_app_name" msgid="6114096770130122912">"فتح \"<xliff:g id="APP_NAME">%1$s</xliff:g>\""</string>
     <string name="whichViewApplicationLabel" msgid="7367556735684742409">"فتح"</string>
     <string name="whichOpenHostLinksWith" msgid="7645631470199397485">"فتح روابط <xliff:g id="HOST">%1$s</xliff:g> باستخدام"</string>
     <string name="whichOpenLinksWith" msgid="1120936181362907258">"فتح الروابط باستخدام"</string>
@@ -1802,10 +1806,8 @@
     <string name="accessibility_shortcut_single_service_warning" msgid="6363127705112844257">"‏يؤدي الضغط مع الاستمرار لبضع ثوانٍ على كلا مفتاحَي التحكّم في مستوى الصوت إلى تفعيل <xliff:g id="SERVICE">%1$s</xliff:g> وهي إحدى ميزات إمكانية الوصول. يمكن أن يؤدي هذا الإجراء إلى تغيير كيفية عمل جهازك.\n\nيمكنك تغيير هذا الاختصار لاستخدامه مع ميزة أخرى في الإعدادات &gt; أدوات تمكين الوصول."</string>
     <string name="accessibility_shortcut_on" msgid="5463618449556111344">"تفعيل"</string>
     <string name="accessibility_shortcut_off" msgid="3651336255403648739">"عدم التفعيل"</string>
-    <!-- no translation found for accessibility_shortcut_menu_item_status_on (6162756705754654002) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_menu_item_status_off (6274512913017713543) -->
-    <skip />
+    <string name="accessibility_shortcut_menu_item_status_on" msgid="6162756705754654002">"مُفعّلة"</string>
+    <string name="accessibility_shortcut_menu_item_status_off" msgid="6274512913017713543">"غير مفعّلة"</string>
     <string name="accessibility_enable_service_title" msgid="3931558336268541484">"هل تريد السماح لـ \"<xliff:g id="SERVICE">%1$s</xliff:g>\" بالتحكّم الكامل في جهازك؟"</string>
     <string name="accessibility_service_warning_description" msgid="291674995220940133">"إنّ التحكّم الكامل ليس ملائمًا لمعظم التطبيقات، باستثناء التطبيقات المعنية بتسهيل الاستخدام."</string>
     <string name="accessibility_service_screen_control_title" msgid="190017412626919776">"قراءة محتوى الشاشة والتحكم به"</string>
@@ -1819,16 +1821,11 @@
     <string name="accessibility_select_shortcut_menu_title" msgid="6002726538854613272">"انقر على ميزة لبدء استخدامها:"</string>
     <string name="accessibility_edit_shortcut_menu_button_title" msgid="239446795930436325">"اختيار الميزات التي تريد استخدامها مع زر أدوات تمكين الوصول"</string>
     <string name="accessibility_edit_shortcut_menu_volume_title" msgid="2245540598834891500">"اختيار الميزات التي تريد استخدامها مع اختصار مفتاحَي مستوى الصوت"</string>
-    <!-- no translation found for accessibility_shortcut_label_button (6473341300585254821) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_volume_keys (5642990791242136231) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_gesture (7987298674836890931) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_quick_settings (6851280333772213611) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_triple_tap (9058975959054454796) -->
-    <skip />
+    <string name="accessibility_shortcut_label_button" msgid="6473341300585254821">"زر أدوات تسهيل الاستخدام"</string>
+    <string name="accessibility_shortcut_label_volume_keys" msgid="5642990791242136231">"مفتاحا مستوى الصوت"</string>
+    <string name="accessibility_shortcut_label_gesture" msgid="7987298674836890931">"إيماءة"</string>
+    <string name="accessibility_shortcut_label_quick_settings" msgid="6851280333772213611">"الإعدادات السريعة"</string>
+    <string name="accessibility_shortcut_label_triple_tap" msgid="9058975959054454796">"النقر ثلاث مرّات"</string>
     <string name="accessibility_uncheck_legacy_item_warning" msgid="8047830891064817447">"تم إيقاف <xliff:g id="SERVICE_NAME">%s</xliff:g>."</string>
     <string name="edit_accessibility_shortcut_menu_button" msgid="8885752738733772935">"تعديل الاختصارات"</string>
     <string name="done_accessibility_shortcut_menu_button" msgid="3668407723770815708">"تم"</string>
@@ -2618,4 +2615,10 @@
     <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"تنبيهات بشأن موارد النظام"</string>
     <string name="tv_watchdog_notification_title" msgid="195239206215922517">"فرط استخدام الموارد"</string>
     <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"يستخدم التطبيق \"<xliff:g id="APP_NAME">%1$s</xliff:g>\" الكثير من الموارد."</string>
+    <!-- no translation found for supervision_blocked_app_title (5546803865875383588) -->
+    <skip />
+    <!-- no translation found for supervision_blocked_app_content (4125452996088641559) -->
+    <skip />
+    <!-- no translation found for supervision_unblocked_app_content (8282985265957852278) -->
+    <skip />
 </resources>

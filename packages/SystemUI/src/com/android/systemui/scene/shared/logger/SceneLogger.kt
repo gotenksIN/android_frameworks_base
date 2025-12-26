@@ -20,13 +20,21 @@ import com.android.compose.animation.scene.ContentKey
 import com.android.compose.animation.scene.ObservableTransitionState
 import com.android.compose.animation.scene.OverlayKey
 import com.android.compose.animation.scene.SceneKey
+import com.android.internal.logging.UiEvent
+import com.android.internal.logging.UiEventLogger
+import com.android.internal.logging.UiEventLogger.UiEventEnum
 import com.android.systemui.log.LogBuffer
 import com.android.systemui.log.core.LogLevel
 import com.android.systemui.log.dagger.SceneFrameworkLog
 import com.android.systemui.scene.data.model.SceneStack
 import javax.inject.Inject
 
-class SceneLogger @Inject constructor(@SceneFrameworkLog private val logBuffer: LogBuffer) {
+class SceneLogger
+@Inject
+constructor(
+    @SceneFrameworkLog private val logBuffer: LogBuffer,
+    private val uiEventLogger: UiEventLogger,
+) {
 
     fun logFrameworkEnabled(isEnabled: Boolean) {
         fun asWord(isEnabled: Boolean): String {
@@ -38,6 +46,14 @@ class SceneLogger @Inject constructor(@SceneFrameworkLog private val logBuffer: 
             level = if (isEnabled) LogLevel.INFO else LogLevel.WARNING,
             messageInitializer = { bool1 = isEnabled },
             messagePrinter = { "Scene framework is ${asWord(bool1)}" },
+        )
+
+        uiEventLogger.log(
+            if (isEnabled) {
+                SceneContainerFrameworkEvent.SCENE_FRAMEWORK_ENABLED
+            } else {
+                SceneContainerFrameworkEvent.SCENE_FRAMEWORK_DISABLED
+            }
         )
     }
 
@@ -82,7 +98,7 @@ class SceneLogger @Inject constructor(@SceneFrameworkLog private val logBuffer: 
         )
     }
 
-    fun logSceneChangeRejection(
+    fun logContentChangeRejection(
         from: ContentKey?,
         to: ContentKey?,
         originalChangeReason: String?,
@@ -213,13 +229,31 @@ class SceneLogger @Inject constructor(@SceneFrameworkLog private val logBuffer: 
         )
     }
 
-    fun logUserInputFinished() {
-        logBuffer.log(
-            tag = TAG,
-            level = LogLevel.INFO,
-            messageInitializer = {},
-            messagePrinter = { "user interaction finished" },
-        )
+    fun logUserInputFinished(transitionState: ObservableTransitionState) {
+        when (transitionState) {
+            is ObservableTransitionState.Transition -> {
+                logBuffer.log(
+                    tag = TAG,
+                    level = LogLevel.INFO,
+                    messageInitializer = {
+                        str1 = transitionState.fromContent.toString()
+                        str2 = transitionState.toContent.toString()
+                    },
+                    messagePrinter = { "User interaction finished during: $str1 → $str2" },
+                )
+            }
+            is ObservableTransitionState.Idle -> {
+                logBuffer.log(
+                    tag = TAG,
+                    level = LogLevel.INFO,
+                    messageInitializer = {
+                        str1 = transitionState.currentScene.toString()
+                        str2 = transitionState.currentOverlays.joinToString()
+                    },
+                    messagePrinter = { "User interaction finished on: $str1, overlays: $str2" },
+                )
+            }
+        }
     }
 
     fun logSceneBackStack(backStack: SceneStack) {
@@ -233,5 +267,14 @@ class SceneLogger @Inject constructor(@SceneFrameworkLog private val logBuffer: 
 
     companion object {
         private const val TAG = "SceneFramework"
+    }
+
+    private enum class SceneContainerFrameworkEvent(private val id: Int) : UiEventEnum {
+        @UiEvent(doc = "The scene framework is enabled") SCENE_FRAMEWORK_ENABLED(2520),
+        @UiEvent(doc = "The scene framework is not enabled") SCENE_FRAMEWORK_DISABLED(2521);
+
+        override fun getId(): Int {
+            return id
+        }
     }
 }

@@ -21,15 +21,20 @@ import android.annotation.IntDef;
 import android.annotation.TestApi;
 import android.os.Bundle;
 import android.service.personalcontext.Flags;
+import android.service.personalcontext.RenderToken;
 import android.service.personalcontext.hint.ContextHint;
-import android.service.personalcontext.hint.ContextHintWrapper;
+import android.service.personalcontext.hint.ContextHintWithSignature;
+import android.text.TextUtils;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import com.android.internal.annotations.VisibleForTesting;
+
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -39,6 +44,8 @@ import java.util.UUID;
  * Abstract base class for insights. Subclasses will provide concrete implementations. The context
  * engine flow will produce these insights, which will ultimately make their way to insight
  * renderers, where they will be rendered as UI to the user.
+ *
+ * Users of this class can use instanceof to determine the type of the insight.
  */
 @FlaggedApi(Flags.FLAG_ENABLE_PERSONAL_CONTEXT_SERVICE)
 public abstract class ContextInsight {
@@ -56,25 +63,35 @@ public abstract class ContextInsight {
 
     /**
      * Enumeration of insight types.
+     *
      * @hide
      */
-    @IntDef(prefix = {"INSIGHT_TYPE_"}, value = {INSIGHT_TYPE_ERROR, INSIGHT_TYPE_BUNDLE})
+    @IntDef(
+            prefix = {"INSIGHT_TYPE_"},
+            value = {INSIGHT_TYPE_ERROR, INSIGHT_TYPE_BUNDLE, INSIGHT_TYPE_ACTIONABLE})
     @Retention(RetentionPolicy.SOURCE)
-    public @interface InsightType {
-    }
+    public @interface InsightType {}
 
     /** Type identifier for an error insight (to return when there is an unparceling error). */
-    public static final int INSIGHT_TYPE_ERROR = -1;
+    static final int INSIGHT_TYPE_ERROR = -1;
 
-    /** Type identifier for {@link BundleInsight}. */
+    /**
+     * Type identifier for {@link BundleInsight}.
+     *
+     * @hide
+     */
+    @VisibleForTesting
     public static final int INSIGHT_TYPE_BUNDLE = 1;
+
+    /** Type identifier for {@link ActionableInsight}. */
+    static final int INSIGHT_TYPE_ACTIONABLE = 2;
 
     /**
      * Object returned when there is an unparcelling error.
      * @hide
      */
     @NonNull
-    private static final ContextInsight ERROR_INSIGHT = new ContextInsight(List.of()) {
+    private static final ContextInsight ERROR_INSIGHT = new ContextInsight() {
         @Override
         @InsightType public int getInsightType() {
             return INSIGHT_TYPE_ERROR;
@@ -88,7 +105,7 @@ public abstract class ContextInsight {
     };
 
     private final UUID mId;
-    private final List<ContextHint> mOriginHints;
+    private final List<ContextHintWithSignature> mOriginHints;
 
     /**
      * Internal constructor only for use by {@link #createInsightFromBundle(Bundle)}. This should be
@@ -98,11 +115,10 @@ public abstract class ContextInsight {
      * @hide
      */
     ContextInsight(@NonNull Bundle b) {
-        mId = UUID.fromString(b.getString(KEY_INSIGHT_ID));
+        mId = UUID.fromString(Objects.requireNonNull(b.getString(KEY_INSIGHT_ID)));
         mOriginHints = Collections.unmodifiableList(
-                ContextHintWrapper.unwrapList(
-                        Objects.requireNonNull(b.getParcelableArrayList(
-                                KEY_ORIGIN_HINTS, ContextHintWrapper.class))));
+                Objects.requireNonNull(b.getParcelableArrayList(
+                        KEY_ORIGIN_HINTS, ContextHintWithSignature.class)));
     }
 
     /**
@@ -111,13 +127,21 @@ public abstract class ContextInsight {
      *
      * @hide
      */
-    ContextInsight(List<ContextHint> originHints) {
+    ContextInsight(@NonNull List<ContextHintWithSignature> originHints) {
         mId = UUID.randomUUID();
-        mOriginHints = Collections.unmodifiableList(originHints);
+        mOriginHints = Collections.unmodifiableList(Objects.requireNonNull(originHints));
+    }
+
+    /** Internal constructor for error insights. */
+    private ContextInsight() {
+        mId = UUID.randomUUID();
+        mOriginHints = Collections.emptyList();
     }
 
     /**
      * Returns the {@link InsightType} of this hint.
+     *
+     * @hide
      */
     @InsightType
     public abstract int getInsightType();
@@ -134,8 +158,32 @@ public abstract class ContextInsight {
      * Returns the list of {@link ContextHint}s that were used to generate this insight.
      */
     @NonNull
-    public final List<ContextHint> getOriginHints() {
+    public final List<ContextHintWithSignature> getOriginHints() {
         return mOriginHints;
+    }
+
+    /**
+     * Gets the {@link RenderToken} from the insight's {@link ContextHint}s. Throws an
+     * {@link IllegalStateException} if hints have conflicting {@link RenderToken}s.
+     * @hide
+     */
+    @Nullable
+    public RenderToken getRenderToken() {
+        ContextHintWithSignature renderTokenHint = null;
+        for (ContextHintWithSignature hint : getOriginHints()) {
+            if (hint.getRenderToken() != null) {
+                if (renderTokenHint == null) {
+                    renderTokenHint = hint;
+                } else if (!renderTokenHint.getRenderToken().equals(hint.getRenderToken())) {
+                    throw new IllegalStateException(TextUtils.formatSimple(
+                            "Hints %s and %s have conflicting RenderTokens",
+                            renderTokenHint,
+                            hint));
+                }
+            }
+        }
+
+        return renderTokenHint != null ? renderTokenHint.getRenderToken() : null;
     }
 
     @NonNull abstract Bundle toBundleImpl();
@@ -150,13 +198,28 @@ public abstract class ContextInsight {
         final Bundle b = new Bundle();
         b.putInt(KEY_INSIGHT_TYPE, getInsightType());
         b.putString(KEY_INSIGHT_ID, mId.toString());
-        b.putParcelableList(KEY_ORIGIN_HINTS, ContextHintWrapper.wrapList(mOriginHints));
+        b.putParcelableArrayList(KEY_ORIGIN_HINTS, new ArrayList<>(mOriginHints));
         b.putBundle(KEY_INSIGHT_DATA, toBundleImpl());
         return b;
     }
 
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) return true;
+        if (!(o instanceof ContextInsight)) return false;
+
+        final ContextInsight other = (ContextInsight) o;
+        return Objects.equals(mId, other.mId);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(mId);
+    }
+
     /**
      * Unbundles an insight into the correct subclass of insight based on the insight type.
+     *
      * @hide
      */
     @TestApi
@@ -165,10 +228,11 @@ public abstract class ContextInsight {
         if (bundle == null) {
             return ERROR_INSIGHT;
         }
-        int type = bundle.getInt(KEY_INSIGHT_TYPE, INSIGHT_TYPE_ERROR);
+        final int type = bundle.getInt(KEY_INSIGHT_TYPE, INSIGHT_TYPE_ERROR);
         try {
             return switch (type) {
                 case INSIGHT_TYPE_BUNDLE -> new BundleInsight(bundle);
+                case INSIGHT_TYPE_ACTIONABLE -> new ActionableInsight(bundle);
                 default -> ERROR_INSIGHT;
             };
         } catch (Exception e) {

@@ -215,7 +215,6 @@ import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -224,6 +223,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -524,6 +524,24 @@ public class UserManagerService extends IUserManager.Stub {
      * Should not be modified after UserManagerService constructor finishes.
      */
     private final ArrayMap<String, UserTypeDetails> mUserTypes;
+
+    // TODO(b/412177078): make it non-nullable once flag is gone.
+    /**
+     * Map of {@link UserActivitiesAllowlist} per user type.
+     *
+     * <p>It can be {@code null} because it's guarded by the
+     * {@code android.multiuser.hsu_allowlist_activities} flag.
+     */
+    private final @Nullable ArrayMap<String, UserActivitiesAllowlist>
+            mPerUserTypeActivitiesAllowlist;
+
+    // TODO(b/412177078): make it non-nullable once flag is gone.
+    /**
+     * Cache of {@link UserActivitiesAllowlist} per user - it's updated when users are started and
+     * stopped.
+     */
+    private final @Nullable ConcurrentHashMap<Integer, UserActivitiesAllowlist>
+            mPerUserActivitiesAllowlist;
 
     /**
      * User restrictions set via UserManager.  This doesn't include restrictions set by
@@ -1008,9 +1026,6 @@ public class UserManagerService extends IUserManager.Stub {
 
     private final UserVisibilityMediator mUserVisibilityMediator;
 
-    @Nullable // only set on HSUM devices
-    private final HsuAllowlistsMediator mHam;
-
     @GuardedBy("mUsersLock")
     private @CanBeNULL @UserIdInt int mBootUser = UserHandle.USER_NULL;
 
@@ -1071,6 +1086,22 @@ public class UserManagerService extends IUserManager.Stub {
                         // the boot user (e.g., setBootUser could be called later).
                         mUms.setLastEnteredForegroundTimeToNow(user);
                     }
+                    if (mUms.mPerUserActivitiesAllowlist != null) {
+                        final String userType = user.info.userType;
+                        final UserActivitiesAllowlist allowlist =
+                                mUms.getActivitiesAllowlist(userType);
+                        if (allowlist != null) {
+                            final int userId = user.info.id;
+                            final UserActivitiesAllowlist existing =
+                                    mUms.mPerUserActivitiesAllowlist.putIfAbsent(userId, allowlist);
+                            if (existing != null) {
+                                Slogf.w(LOG_TAG,
+                                        "onUserStarting(%d): not adding UserActivitiesAllowlist "
+                                        + "%s because there was one already set for that user (%s)",
+                                        userId, allowlist, existing);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1106,6 +1137,9 @@ public class UserManagerService extends IUserManager.Stub {
                 if (user != null) {
                     user.startRealtime = 0;
                     user.unlockRealtime = 0;
+                    if (mUms.mPerUserActivitiesAllowlist != null) {
+                        mUms.mPerUserActivitiesAllowlist.remove(user.info.id);
+                    }
                 }
             }
         }
@@ -1133,6 +1167,7 @@ public class UserManagerService extends IUserManager.Stub {
                 Environment.getDataDirectory(), /* users= */ null);
     }
 
+    @SuppressWarnings("AndroidFrameworkEfficientCollections") // mPerUserActivitiesAllowlist
     @VisibleForTesting
     UserManagerService(Context context, PackageManagerService pm, UserDataPreparer userDataPreparer,
             UserJourneyLogger userJourneyLogger,  Object packagesLock, File dataDir,
@@ -1166,19 +1201,19 @@ public class UserManagerService extends IUserManager.Stub {
             sInstance = this;
         }
         mSystemPackageInstaller = new UserSystemPackageInstaller(this, mUserTypes);
+        mPerUserTypeActivitiesAllowlist =
+                buildActivitiesAllowlist(context.getResources(), mUserTypes);
+        // Most common sizes would be 1-3 (HSU, full user, profile), so setting to 4 as it's the
+        // closed multiple of 2.
+        mPerUserActivitiesAllowlist = Flags.hsuAllowlistActivities()
+                ? new ConcurrentHashMap<>(4)
+                : null;
         LocalServices.addService(UserManagerInternal.class, mLocalService);
         mLockPatternUtils = new LockPatternUtils(mContext);
         mUserStates.put(UserHandle.USER_SYSTEM, UserState.STATE_BOOTING);
         mUser0Allocations = DBG_ALLOCATION ? new AtomicInteger() : null;
         mPrivateSpaceAutoLockSettingsObserver = new SettingsObserver(mHandler);
         emulateSystemUserModeIfNeeded();
-        // TODO(b/412177078): change emulateSystemUserModeIfNeeded() to return isHsum and remove
-        // comment below
-        // Must be set after emulateSystemUserModeIfNeeded()
-        // TODO(b/412176703): flag-check for (hsuAllowlistActivities()||hsuAllowlistNotifications())
-        mHam = Flags.hsuAllowlistActivities() && isDefaultHeadlessSystemUserMode()
-                ? new HsuAllowlistsMediator(context)
-                : null;
         initPropertyInvalidatedCaches();
     }
 
@@ -1492,7 +1527,7 @@ public class UserManagerService extends IUserManager.Stub {
         synchronized (mUsersLock) {
             if (mBootUser != UserHandle.USER_NULL) {
                 final UserData userData = mUsers.get(mBootUser);
-                if (userData != null && userData.info.supportsSwitchToByUser()) {
+                if (userData != null && userData.info.supportsSwitchTo()) {
                     Slogf.i(LOG_TAG, "Using provided boot user: %d", mBootUser);
                     return mBootUser;
                 } else {
@@ -3413,8 +3448,8 @@ public class UserManagerService extends IUserManager.Stub {
 
     @Override
     public boolean canAddPrivateProfile(@UserIdInt int userId) {
-        checkQueryOrCreateUsersPermission("canAddPrivateProfile");
         if (!android.multiuser.Flags.consistentMaxUsers()) {
+            checkQueryOrCreateUsersPermission("canAddPrivateProfile");
             UserInfo parentUserInfo = getUserInfo(userId);
             return isUserTypeEnabled(USER_TYPE_PROFILE_PRIVATE)
                     && canAddMoreProfilesToUser(USER_TYPE_PROFILE_PRIVATE,
@@ -3423,10 +3458,8 @@ public class UserManagerService extends IUserManager.Stub {
                     && doSystemFeaturesSupportUserType(USER_TYPE_PROFILE_PRIVATE)
                     && !hasUserRestriction(UserManager.DISALLOW_ADD_PRIVATE_PROFILE, userId);
         }
-        // TODO(b/413464199): Ideally, this should be performed client-side and this method removed
-        //  entirely. Unfortunately, Tradefed currently needs it too, so we cannot.
-        return canAddMoreProfilesToUser(USER_TYPE_PROFILE_PRIVATE, userId, false)
-                && !hasUserRestriction(UserManager.DISALLOW_ADD_PRIVATE_PROFILE, userId);
+        // Remove this method entirely when cleaning up consistentMaxUsers.
+        throw new UnsupportedOperationException("This method is no longer necessary");
     }
 
     @Override
@@ -3931,7 +3964,7 @@ public class UserManagerService extends IUserManager.Stub {
             throw new SecurityException("Non-system caller");
         }
         return UserRestrictionsUtils.isSettingRestrictedForUser(mContext, setting, userId,
-                value, callingUid);
+                value, callingUid, mDeviceOwnerUserId);
     }
 
     @Override
@@ -4117,7 +4150,8 @@ public class UserManagerService extends IUserManager.Stub {
             @Override
             public void run() {
                 UserRestrictionsUtils.applyUserRestrictions(
-                        mContext, userId, newRestrictionsFinal, prevRestrictionsFinal);
+                        mContext, userId, newRestrictionsFinal, prevRestrictionsFinal,
+                        mDeviceOwnerUserId);
 
                 final UserRestrictionsListener[] listeners;
                 synchronized (mUserRestrictionsListeners) {
@@ -4813,14 +4847,16 @@ public class UserManagerService extends IUserManager.Stub {
      * @param message used as message if SecurityException is thrown
      * @throws SecurityException if the caller lacks the required permissions.
      */
-    private static void checkManageHsuAllowlistsPermission(String message) {
-        // TODO(b/412177078): for now it's only checking for MANAGE_USERS, but it should call
-        // hasManageUsersOrPermission() with a new permission (like
-        // MANAGE_HEADLESS_SYSTEM_USER_ALLOWLISTS) instead.
-        // TODO(b/412177078): replace TBD with the new name of the new permission :-)
-        if (!hasManageUsersPermission()) {
-            throw new SecurityException("You need MANAGE_USERS or TBD permission to: "
+    private static void checkManageHsuAllowlistsPermission(String userType, String message) {
+        if (!hasManageUsersOrPermission(
+                android.Manifest.permission.MANAGE_HEADLESS_SYSTEM_USER_ALLOWLISTS)) {
+            throw new SecurityException("You need MANAGE_USERS or "
+                    + "MANAGE_HEADLESS_SYSTEM_USER_ALLOWLISTS permission to: "
                     + message);
+        }
+        if (!UserManager.USER_TYPE_SYSTEM_HEADLESS.equals(userType)) {
+            throw new SecurityException("Only modifying the allowlists of the type "
+                    + "USER_TYPE_SYSTEM_HEADLESS is currently supported");
         }
     }
 
@@ -5158,26 +5194,65 @@ public class UserManagerService extends IUserManager.Stub {
                 null, SystemMessage.NOTE_WRONG_HSUM_STATUS, notification, UserHandle.ALL);
     }
 
-    // NOTE: currently only called by shell cmd
-    void setTemporaryHsuActivitiesAllowlist(@Nullable Collection<ComponentName> componentNames) {
-        checkManageHsuAllowlistsPermission("set temporary HSU activities allowlist");
-        checkHasHam();
-        mHam.setTemporaryActivitiesAllowlist(componentNames);
+    @Override
+    @SuppressWarnings("AndroidFrameworkRequiresPermission")
+    public void setTemporaryActivitiesAllowlist(String userType,
+            List<ComponentName> componentNames) {
+        checkManageHsuAllowlistsPermission(userType, "set temporary HSU activities allowlist");
+        Objects.requireNonNull(userType, "userType cannot be null");
+        final UserActivitiesAllowlist allowlist = getActivitiesAllowlist(userType);
+        Preconditions.checkState(allowlist != null,
+                "activities allowlist not supported for type %s", userType);
+
+        Slogf.i(LOG_TAG, "Setting temporary activities allowlist for %s to %s", userType,
+                componentNames);
+        allowlist.setTemporaryAllowlist(componentNames);
     }
 
-    boolean hasHam() {
-        return mHam != null;
+    @Nullable UserActivitiesAllowlist getActivitiesAllowlist(@NonNull String userType) {
+        return mPerUserTypeActivitiesAllowlist == null
+                ? null
+                : mPerUserTypeActivitiesAllowlist.get(userType);
     }
 
-    // Used by shell cmd
-    Set<ComponentName> getEffectiveHsuActivitiesAllowlist() {
-        checkManageHsuAllowlistsPermission("get effective HSU activities allowlist");
-        checkHasHam();
-        return mHam.getEffectiveActivitiesAllowlist();
+    private @Nullable UserActivitiesAllowlist getActivitiesAllowlist(@UserIdInt int userId) {
+        return mPerUserActivitiesAllowlist == null
+                ? null
+                : mPerUserActivitiesAllowlist.get(userId);
     }
 
-    private void checkHasHam() {
-        Preconditions.checkState(hasHam(), "not supported - HsuActivitiesMediator is disabled");
+    /** This method is called in the constructor once (hence it's static) */
+    private static @Nullable ArrayMap<String, UserActivitiesAllowlist> buildActivitiesAllowlist(
+            Resources resources, ArrayMap<String, UserTypeDetails> userTypes) {
+        if (!android.multiuser.Flags.hsuAllowlistActivities()) {
+            return null;
+        }
+
+        // Most likely only enabled for the Headless System User (at most), hence initial size is 1
+        final ArrayMap<String, UserActivitiesAllowlist> userActivitiesAllowlist = new ArrayMap<>(1);
+
+        for (int i = 0; i < userTypes.size(); i++) {
+            final UserTypeDetails utd = userTypes.valueAt(i);
+            final int allowlistResId = utd.getActivitiesAllowlist();
+            if (allowlistResId == Resources.ID_NULL) {
+                continue;
+            }
+            final String[] allowlistedActivities =  resources.getStringArray(allowlistResId);
+            final String userType = userTypes.keyAt(i);
+            if (DBG) {
+                Slogf.i(LOG_TAG, "Setting %d activities allowlist for type %s: %s",
+                        allowlistedActivities.length, userType,
+                        Arrays.toString(allowlistedActivities));
+
+            } else {
+                Slogf.i(LOG_TAG, "Setting %d activities allowlisted for type %s",
+                        allowlistedActivities.length, userType);
+
+            }
+            userActivitiesAllowlist.put(userType,
+                    new UserActivitiesAllowlist(allowlistedActivities));
+        }
+        return userActivitiesAllowlist;
     }
 
     private ResilientAtomicFile getUserListFile() {
@@ -5272,6 +5347,7 @@ public class UserManagerService extends IUserManager.Stub {
                 updateUserIds();
                 upgradeIfNecessaryLP();
                 updateUsersWithFeatureFlags(guestRestrictionsArePresentOnUserListXml);
+                ensurePerfettoUserListExistsLP();
             } catch (Exception e) {
                 // Remove corrupted file and retry.
                 file.failRead(fin, e);
@@ -5700,6 +5776,33 @@ public class UserManagerService extends IUserManager.Stub {
         userInfo.profileBadge = getFreeProfileBadgeLU(userInfo.profileGroupId, userInfo.userType);
     }
 
+    /**
+     * Ensures the Perfetto user list file ({@code mPerfUserListFile}) exists.
+     *
+     * <p>If the file does not exist, this method creates it by calling
+     * {@link #writePerfettoUserListLP()}. This is necessary so Perfetto can read user types,
+     * for example, after a system upgrade when the file might not have been
+     * otherwise generated.
+     *
+     * <p>This method must be called while holding the {@code mPackagesLock}.
+     */
+    @GuardedBy({"mPackagesLock"})
+    private void ensurePerfettoUserListExistsLP() {
+        // force update if file does not exist and perfettoMultiuserTable Flag is on
+        // delete existing file if Flag is off
+        if (!mPerfUserListFile.exists()) {
+            writePerfettoUserListLP();
+        } else if (!android.multiuser.Flags.perfettoMultiuserTable()) {
+            try {
+                if (!mPerfUserListFile.delete()) {
+                    Slog.e(LOG_TAG, "Deleting the perfetto user list was unsuccessful");
+                }
+            } catch (SecurityException se) {
+                Slog.e(LOG_TAG, "Error deleting the perfetto user list", se);
+            }
+        }
+    }
+
     /** Returns the oldest Full Admin user, or null is if there none. */
     private @Nullable UserInfo getEarliestCreatedFullUser() {
         List<UserInfo> users;
@@ -6051,7 +6154,20 @@ public class UserManagerService extends IUserManager.Stub {
                 file.failWrite(fos);
             }
         }
+        writePerfettoUserListLP();
+    }
 
+    /*
+     * Writes the perfetto user list file in this format:
+     *
+     * user_type user_id
+     * android.os.usertype.system.HEADLESS 0
+     * android.os.usertype.full.SECONDARY 10
+     * android.os.usertype.full.GUEST 11
+     *
+     */
+    @GuardedBy({"mPackagesLock"})
+    private void writePerfettoUserListLP() {
         if (android.multiuser.Flags.perfettoMultiuserTable()) {
             try (ResilientAtomicFile file = getUserListFile(mPerfUserListFile)) {
                 FileOutputStream fos = null;
@@ -8324,20 +8440,22 @@ public class UserManagerService extends IUserManager.Stub {
         final long now = System.currentTimeMillis();
         final long nowRealtime = SystemClock.elapsedRealtime();
         final StringBuilder sb = new StringBuilder();
+        boolean dumpAll = false;
 
         if (args != null && args.length > 0) {
             switch (args[0]) {
+                case "-a":
+                    dumpAll = true;
+                    break;
                 case "--user":
                     dumpUser(pw, UserHandle.parseUserArg(args[1]), sb, now, nowRealtime);
                     return;
                 case "--visibility-mediator":
                     mUserVisibilityMediator.dump(pw, args);
                     return;
-                case "--ham": // Hmmmm, ham!
-                    if (hasHam()) {
-                        mHam.dump(pw, args);
-                    } else {
-                        pw.println("Sorry, no ham on this device!");
+                case "--activities-allowlist":
+                    try (IndentingPrintWriter ipw = new IndentingPrintWriter(pw)) {
+                        dumpActivitiesAllowlists(ipw);
                     }
                     return;
                 case "--non-compliance":
@@ -8465,13 +8583,10 @@ public class UserManagerService extends IUserManager.Stub {
         mUserVisibilityMediator.dump(pw, args);
         pw.println();
 
-        if (hasHam()) {
-            mHam.dump(pw, args);
-            pw.println();
+        if (!android.multiuser.Flags.consistentMaxUsers()) {
+            // Before the flag, this confusing line used to be required by Tradefed.
+            pw.println("Can add private profile: "+ canAddPrivateProfile(currentUserId));
         }
-
-        // TODO(b/413464199): This confusing line is, regrettably, currently required by Tradefed.
-        pw.println("Can add private profile: "+ canAddPrivateProfile(currentUserId));
 
         pw.println();
         pw.println("Number of listeners for");
@@ -8497,6 +8612,12 @@ public class UserManagerService extends IUserManager.Stub {
         // proper indentation methods instead of explicit printing "  "; that would also solve the
         // pw closure as well.
         try (IndentingPrintWriter ipw = new IndentingPrintWriter(pw)) {
+            // TODO(b/453850625): should always dump, but currently it would break  bedstead's
+            // parser, so it's checking for dumpAll (which is passed on bugreport calls)
+            if (dumpAll) {
+                dumpActivitiesAllowlists(ipw);
+            }
+
             // Dump SystemPackageInstaller info
             ipw.println();
             mSystemPackageInstaller.dump(ipw);
@@ -8646,6 +8767,50 @@ public class UserManagerService extends IUserManager.Stub {
 
         pw.println("    Ignore errors preparing storage: "
                 + userData.getIgnorePrepareStorageErrors());
+    }
+
+    private void dumpActivitiesAllowlists(IndentingPrintWriter ipw) {
+        dumpActivitiesPerUserTypeAllowlist(ipw);
+        dumpActivitiesPerUserAllowlist(ipw);
+    }
+
+    private void dumpActivitiesPerUserTypeAllowlist(IndentingPrintWriter ipw) {
+        ipw.print("Activities per user type allowlist:");
+        if (mPerUserTypeActivitiesAllowlist == null) {
+            ipw.println(" not set");
+            return;
+        }
+        int size = mPerUserTypeActivitiesAllowlist.size();
+        if (size == 0) {
+            ipw.println(" none");
+            return;
+        }
+        ipw.println();
+
+        for (int i = 0; i < size; i++) {
+            String userType = mPerUserTypeActivitiesAllowlist.keyAt(i);
+            UserActivitiesAllowlist allowlist = mPerUserTypeActivitiesAllowlist.valueAt(i);
+            ipw.increaseIndent();
+            allowlist.dump(ipw, userType);
+            ipw.decreaseIndent();
+        }
+    }
+
+    private void dumpActivitiesPerUserAllowlist(IndentingPrintWriter ipw) {
+        ipw.print("Activities per user allowlist:");
+        if (mPerUserActivitiesAllowlist == null) {
+            ipw.println(" not set");
+            return;
+        }
+        ipw.println();
+
+        ipw.increaseIndent();
+        for (var entry : mPerUserActivitiesAllowlist.entrySet()) {
+            int userId = entry.getKey();
+            UserActivitiesAllowlist allowlist = entry.getValue();
+            ipw.printf("user %d: %s\n", userId, allowlist);
+        }
+        ipw.decreaseIndent();
     }
 
     private static void dumpTimeAgo(PrintWriter pw, StringBuilder sb, long nowTime, long time) {
@@ -9203,10 +9368,8 @@ public class UserManagerService extends IUserManager.Stub {
         }
 
         @Override
-        public boolean isActivityAllowlistedForHsu(ComponentName activity) {
-            Preconditions.checkState(mHam != null, "Called when flag is disabled or device is not "
-                    + "HSUM");
-            return mHam.isActivityAllowed(activity);
+        public UserActivitiesAllowlist getActivitiesAllowlist(int userId) {
+            return UserManagerService.this.getActivitiesAllowlist(userId);
         }
 
         @Override
@@ -9239,8 +9402,8 @@ public class UserManagerService extends IUserManager.Stub {
      * @param restriction restrictions to check
      * @param userId id of the user
      *
-     * @throws android.os.UserManager.CheckedUserOperationException if user has any of the
-     *      specified restrictions
+     * @throws UserManager.CheckedUserOperationException if user has any of the specified
+     * restrictions
      */
     private void enforceUserRestriction(String restriction, @UserIdInt int userId, String message)
             throws UserManager.CheckedUserOperationException {
@@ -9421,14 +9584,13 @@ public class UserManagerService extends IUserManager.Stub {
         }
         return android.multiuser.Flags.disallowRemovingLastAdminUser()
                 && getContextResources().getBoolean(R.bool.config_disallowRemovingLastAdminUser)
-                // For HSUM, the headless system user is currently flagged as an admin user now.
-                // Thus we must exclude it when checking for the last admin user, and only consider
-                // full admin users.
-                // TODO(b/419105275): Investigate not making HSU an admin.
                 && isLastFullAdminUserLU(userInfo);
     }
 
-    /** Returns if the user is the last admin user that is a full user. */
+    /**
+     * Returns if the user is the last admin user that is a full user.
+     * (Only full users can be admins, but we demand that it be full too, just in case.)
+     */
     @GuardedBy("mUsersLock")
     @VisibleForTesting
     boolean isLastFullAdminUserLU(UserInfo userInfo) {

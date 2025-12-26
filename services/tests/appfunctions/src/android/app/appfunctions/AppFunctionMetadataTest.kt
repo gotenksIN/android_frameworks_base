@@ -19,14 +19,23 @@ import android.app.appfunctions.AppFunctionMetadata.PROPERTY_SCHEMA_CATEGORY
 import android.app.appfunctions.AppFunctionMetadata.PROPERTY_SCHEMA_NAME
 import android.app.appfunctions.AppFunctionMetadata.PROPERTY_SCHEMA_VERSION
 import android.app.appfunctions.AppFunctionRuntimeMetadata.PROPERTY_PACKAGE_NAME
+import android.app.appfunctions.flags.Flags
 import android.app.appsearch.GenericDocument
+import android.os.Parcel
+import android.platform.test.annotations.RequiresFlagsEnabled
+import android.platform.test.flag.junit.CheckFlagsRule
+import android.platform.test.flag.junit.DeviceFlagsValueProvider
 import com.google.common.truth.Truth.assertThat
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.junit.runners.JUnit4
 
+@RequiresFlagsEnabled(Flags.FLAG_ENABLE_DYNAMIC_APP_FUNCTIONS)
 @RunWith(JUnit4::class)
 class AppFunctionMetadataTest {
+    @get:Rule val checkFlagsRule: CheckFlagsRule = DeviceFlagsValueProvider.createCheckFlagsRule()
+
 
     @Test
     fun testEqualsAndHashcode() {
@@ -86,6 +95,42 @@ class AppFunctionMetadataTest {
         assertThat(appFunctionMetadata.isEnabled).isTrue()
     }
 
+    @Test
+    fun testParcelAndUnparcel_allFieldsSet() {
+        val originalMetadata =
+            AppFunctionMetadata.create(
+                TEST_AF_STATIC_METADATA_GD_BUILDER.build(),
+                TEST_AF_RUNTIME_METADATA_GD_BUILDER.build(),
+                TEST_PACKAGE_METADATA
+            )
+
+        val restoredMetadata = parcelAndUnparcel(originalMetadata)
+
+        assertThat(restoredMetadata.name).isEqualTo(originalMetadata.name)
+        assertThat(restoredMetadata.schemaMetadata).isEqualTo(originalMetadata.schemaMetadata)
+        assertThat(restoredMetadata.isEnabled).isEqualTo(originalMetadata.isEnabled)
+        assertThat(restoredMetadata.metadataDocument).isEqualTo(originalMetadata.metadataDocument)
+        assertThat(restoredMetadata.packageMetadata).isEqualTo(originalMetadata.packageMetadata)
+    }
+
+    @Test
+    fun testParcelAndUnparcel_nullSchema() {
+        val originalMetadata =
+            AppFunctionMetadata.create(
+                TEST_AF_STATIC_METADATA_GD_BUILDER_NO_SCHEMA.build(),
+                TEST_AF_RUNTIME_METADATA_GD_BUILDER.build(),
+                TEST_PACKAGE_METADATA
+            )
+
+        val restoredMetadata = parcelAndUnparcel(originalMetadata)
+
+        assertThat(restoredMetadata.name).isEqualTo(originalMetadata.name)
+        assertThat(restoredMetadata.schemaMetadata).isEqualTo(originalMetadata.schemaMetadata)
+        assertThat(restoredMetadata.isEnabled).isEqualTo(originalMetadata.isEnabled)
+        assertThat(restoredMetadata.metadataDocument).isEqualTo(originalMetadata.metadataDocument)
+        assertThat(restoredMetadata.packageMetadata).isEqualTo(originalMetadata.packageMetadata)
+    }
+
     private companion object {
         val TEST_AF_STATIC_METADATA_GD_BUILDER =
             GenericDocument.Builder<GenericDocument.Builder<*>>(
@@ -116,5 +161,26 @@ class AppFunctionMetadataTest {
                         .build()
                 )
             )
+
+        val TEST_AF_STATIC_METADATA_GD_BUILDER_NO_SCHEMA =
+            GenericDocument.Builder<GenericDocument.Builder<*>>(
+                "",
+                "testPackage/testFunctionId",
+                ""
+            ).setPropertyBoolean(
+                AppFunctionStaticMetadataHelper.STATIC_PROPERTY_ENABLED_BY_DEFAULT,
+                true
+            )
+    }
+
+    private fun parcelAndUnparcel(original: AppFunctionMetadata): AppFunctionMetadata {
+        val parcel = Parcel.obtain()
+        try {
+            original.writeToParcel(parcel, 0)
+            parcel.setDataPosition(0)
+            return AppFunctionMetadata.CREATOR.createFromParcel(parcel)
+        } finally {
+            parcel.recycle()
+        }
     }
 }

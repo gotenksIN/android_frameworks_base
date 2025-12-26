@@ -33,6 +33,7 @@ import androidx.annotation.NonNull;
 
 import com.android.app.animation.Interpolators;
 import com.android.app.tracing.coroutines.TrackTracer;
+import com.android.compose.animation.scene.ObservableTransitionState;
 import com.android.compose.animation.scene.OverlayKey;
 import com.android.compose.animation.scene.SceneKey;
 import com.android.internal.annotations.GuardedBy;
@@ -209,11 +210,6 @@ public class StatusBarStateControllerImpl implements
                     }
                 });
 
-        // Use getAnyExpansion instead of isAnyExpanded, as the latter will trigger when
-        // opening/closing the bouncer
-        mJavaAdapter.alwaysCollectFlow(mShadeInteractorLazy.get().getAnyExpansion(),
-                this::onShadeOrQsExpanded);
-
         if (SceneContainerFlag.isEnabled()) {
             mJavaAdapter.alwaysCollectFlow(
                     combineFlows(
@@ -222,12 +218,21 @@ public class StatusBarStateControllerImpl implements
                         mSceneInteractorLazy.get().getCurrentOverlays(),
                         mSceneBackInteractorLazy.get().getBackStack(),
                         mAlternateBouncerInteractorLazy.get().isVisible(),
+                        mSceneInteractorLazy.get().getTransitionState(),
                         this::calculateStateFromSceneFramework),
                     this::onStatusBarStateChanged);
 
             mJavaAdapter.alwaysCollectFlow(
                     mKeyguardInteractorLazy.get().getDozeAmount(),
                     this::setDozeAmountInternal);
+
+            mJavaAdapter.alwaysCollectFlow(mShadeInteractorLazy.get().isAnyExpanded(),
+                    this::onShadeOrQsExpanded);
+        } else {
+            // Use getAnyExpansion instead of isAnyExpanded, as the latter will trigger when
+            // opening/closing the bouncer
+            mJavaAdapter.alwaysCollectFlow(mShadeInteractorLazy.get().getAnyExpansion(),
+                    this::onShadeOrQsExpanded);
         }
     }
 
@@ -420,7 +425,10 @@ public class StatusBarStateControllerImpl implements
     }
 
     private void onShadeOrQsExpanded(float expansion) {
-        boolean isExpanded = expansion > 0f;
+        onShadeOrQsExpanded(expansion > 0f);
+    }
+
+    private void onShadeOrQsExpanded(boolean isExpanded) {
         if (mIsExpanded != isExpanded) {
             mIsExpanded = isExpanded;
             String tag = getClass().getSimpleName() + "#setIsExpanded";
@@ -621,7 +629,8 @@ public class StatusBarStateControllerImpl implements
             SceneKey currentScene,
             Set<OverlayKey> currentOverlays,
             SceneStack backStack,
-            boolean alternateBouncerIsVisible) {
+            boolean alternateBouncerIsVisible,
+            ObservableTransitionState transitionState) {
         SceneContainerFlag.isUnexpectedlyInLegacyMode();
 
         final boolean onCommunal = currentScene.equals(Scenes.Communal);
@@ -641,11 +650,15 @@ public class StatusBarStateControllerImpl implements
         final boolean overlaidQuickSettings = currentOverlays.contains(Overlays.QuickSettingsShade);
 
         final boolean isUnlocked = deviceUnlockStatus.isUnlocked();
+        final boolean isTransitioningFromLockscreen = transitionState.isTransitioningSets(
+                Set.of(Scenes.Lockscreen),
+                Set.of(Scenes.Dream, Scenes.Gone, Scenes.Occluded));
 
         final String inputLogString = "currentScene=" + currentScene.getTestTag()
                 + " currentOverlays=" + currentOverlays + " backStack=" + backStack
                 + " isUnlocked=" + isUnlocked + " occluded=" + (onOccluded || overOccluded)
-                + " alternateBouncerIsVisible=" + alternateBouncerIsVisible;
+                + " alternateBouncerIsVisible=" + alternateBouncerIsVisible
+                + " isTransitioningFromLockscreen=" + isTransitioningFromLockscreen;
 
         int newState;
 
@@ -666,12 +679,16 @@ public class StatusBarStateControllerImpl implements
         // 2. currentScene is a keyguardish scene (Lockscreen, Bouncer, or Communal).
         // 3. backStack contains a keyguardish scene (Lockscreen or Communal).
         // 4. the alternate bouncer is visible.
+        // 5. the transition from Lockscreen to Gone/Occluded/Dream is ongoing and not yet complete.
 
-        final boolean onKeyguardish = onLockscreen || overlaidBouncer || onCommunal;
+        final boolean onKeyguardish =
+                onLockscreen || overlaidBouncer || onCommunal || isTransitioningFromLockscreen;
 
-        if (onOccluded || overOccluded) {
+        if ((onOccluded || overOccluded) && !isTransitioningFromLockscreen) {
             // Occlusion is special; even though the device is still technically on the lockscreen,
             // the UI behaves as if it is unlocked.
+            // However, in the case that the device is still mid-transition from lockscreen, wait
+            // until the transition to occluded is complete before settling on the new state.
             newState = StatusBarState.SHADE;
         } else if (onKeyguardish || overCommunal || alternateBouncerIsVisible) {
             // We get here if we are on or over a keyguardish scene, even if isUnlocked is true; we

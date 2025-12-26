@@ -19,12 +19,14 @@ package com.android.systemui.volume.ui.navigation
 import android.app.Dialog
 import android.content.Intent
 import android.provider.Settings
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.android.internal.logging.UiEventLogger
+import com.android.systemui.Flags
 import com.android.systemui.compose.modifiers.sysUiResTagContainer
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
@@ -33,7 +35,7 @@ import com.android.systemui.plugins.ActivityStarter
 import com.android.systemui.statusbar.phone.SystemUIDialogFactory
 import com.android.systemui.statusbar.phone.createBottomSheet
 import com.android.systemui.utils.coroutines.flow.conflatedCallbackFlow
-import com.android.systemui.volume.VolumePanelFactory
+import com.android.systemui.volume.VolumePanelDialogManager
 import com.android.systemui.volume.domain.model.VolumePanelRoute
 import com.android.systemui.volume.panel.domain.interactor.VolumePanelGlobalStateInteractor
 import com.android.systemui.volume.panel.ui.VolumePanelUiEvent
@@ -56,7 +58,7 @@ class VolumeNavigator
 constructor(
     @Application private val applicationScope: CoroutineScope,
     @Main private val mainContext: CoroutineContext,
-    private val volumePanelFactory: VolumePanelFactory,
+    private val volumePanelDialogManager: VolumePanelDialogManager,
     private val activityStarter: ActivityStarter,
     private val viewModelFactory: VolumePanelViewModel.Factory,
     private val dialogFactory: SystemUIDialogFactory,
@@ -93,7 +95,7 @@ constructor(
                     /* dismissShade= */ true,
                 )
             VolumePanelRoute.SYSTEM_UI_VOLUME_PANEL ->
-                volumePanelFactory.create(aboveStatusBar = true, view = null)
+                volumePanelDialogManager.create(aboveStatusBar = true, view = null)
         }
     }
 
@@ -127,6 +129,13 @@ constructor(
             isDraggable = false,
             // TODO(b/337205027) change maxWidth
             maxWidth = 800.dp,
+            containerColorProvider = {
+                if (Flags.volumeRedesign()) {
+                    MaterialTheme.colorScheme.surface
+                } else {
+                    MaterialTheme.colorScheme.surfaceContainer
+                }
+            },
         )
     }
 }

@@ -1130,11 +1130,11 @@ class SettingsProtoDumpUtil {
         dumpSetting(s, p,
                 Settings.Global.NTP_TIMEOUT,
                 GlobalSettingsProto.Ntp.TIMEOUT_MS);
-// QTI_BEGIN: 2018-08-11: Core: base: Secondary NTP Server Settings
+// QTI_BEGIN: 2018-08-11: Frameworks: base: Secondary NTP Server Settings
         dumpSetting(s, p,
                 Settings.Global.NTP_SERVER_2,
                 GlobalSettingsProto.Ntp.SERVER_2);
-// QTI_END: 2018-08-11: Core: base: Secondary NTP Server Settings
+// QTI_END: 2018-08-11: Frameworks: base: Secondary NTP Server Settings
         p.end(ntpToken);
 
         final long uasbToken = p.start(GlobalSettingsProto.USER_ABSENT_SMALL_BATTERY);
@@ -1848,6 +1848,9 @@ class SettingsProtoDumpUtil {
         dumpSetting(s, p,
                 Settings.Secure.ACCESSIBILITY_TOP_ROW_KEY_TARGETS,
                 SecureSettingsProto.Accessibility.ACCESSIBILITY_TOP_ROW_KEY_TARGETS);
+        dumpSetting(s, p,
+                Settings.Secure.ACCESSIBILITY_QUICK_ACCESS_TARGETS,
+                SecureSettingsProto.Accessibility.ACCESSIBILITY_QUICK_ACCESS_TARGETS);
         dumpSetting(s, p,
                 Settings.Secure.ACCESSIBILITY_MAGNIFICATION_CAPABILITY,
                 SecureSettingsProto.Accessibility.ACCESSIBILITY_MAGNIFICATION_CAPABILITY);

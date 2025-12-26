@@ -66,9 +66,9 @@ flag {
 }
 
 flag {
-    name: "enable_task_continuity"
+    name: "task_continuity"
     is_exported: true
-    namespace: "desktop_better_together"
+    namespace: "companion"
     description: "Enable task continuity API"
     bug: "400970610"
 }
@@ -140,4 +140,11 @@ flag {
     namespace: "companion"
     description: "Enable APIs to support trusted devices"
     bug: "437224522"
+}
+
+flag {
+    name: "expand_app_streaming_role_permissions"
+    namespace: "companion"
+    description: "Enable storage and notification permissions for the APP_STREAMING role."
+    bug: "450063948"
 }

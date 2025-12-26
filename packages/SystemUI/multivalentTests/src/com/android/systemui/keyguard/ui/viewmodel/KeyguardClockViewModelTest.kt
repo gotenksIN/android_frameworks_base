@@ -18,12 +18,11 @@ package com.android.systemui.keyguard.ui.viewmodel
 
 import android.content.res.Configuration
 import android.platform.test.annotations.DisableFlags
-import android.platform.test.annotations.EnableFlags
 import android.platform.test.flag.junit.FlagsParameterization
 import androidx.test.filters.SmallTest
+import com.android.systemui.Flags.FLAG_DUAL_SHADE
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.common.ui.data.repository.fakeConfigurationRepository
-import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.flags.DisableSceneContainer
 import com.android.systemui.flags.EnableSceneContainer
 import com.android.systemui.flags.andSceneContainer
@@ -46,12 +45,12 @@ import com.android.systemui.shade.domain.interactor.enableSingleShade
 import com.android.systemui.shade.domain.interactor.enableSplitShade
 import com.android.systemui.statusbar.notification.data.repository.activeNotificationListRepository
 import com.android.systemui.statusbar.notification.data.repository.setActiveNotifs
+import com.android.systemui.statusbar.policy.data.repository.zenModeRepository
 import com.android.systemui.statusbar.ui.fakeSystemBarUtilsProxy
 import com.android.systemui.testKosmos
 import com.android.systemui.util.mockito.whenever
 import com.google.common.truth.Truth.assertThat
 import kotlin.test.Test
-import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.runner.RunWith
 import org.mockito.Mock
@@ -92,6 +91,7 @@ class KeyguardClockViewModelTest(flags: FlagsParameterization) : SysuiTestCase()
     }
 
     @Test
+    @DisableFlags(FLAG_DUAL_SHADE)
     fun currentClockLayout_splitShadeOn_clockCentered_largeClock() =
         kosmos.runTest {
             val currentClockLayout by collectLastValue(underTest.currentClockLayout)
@@ -109,6 +109,7 @@ class KeyguardClockViewModelTest(flags: FlagsParameterization) : SysuiTestCase()
 
     @Test
     @EnableSceneContainer
+    @DisableFlags(FLAG_DUAL_SHADE)
     fun currentClockLayout_splitShadeOn_clockNotCentered_largeClock_splitShadeLargeClock() =
         kosmos.runTest {
             val currentClockLayout by collectLastValue(underTest.currentClockLayout)
@@ -126,6 +127,7 @@ class KeyguardClockViewModelTest(flags: FlagsParameterization) : SysuiTestCase()
 
     @Test
     @EnableSceneContainer
+    @DisableFlags(FLAG_DUAL_SHADE)
     fun currentClockLayout_splitShadeOn_clockNotCentered_forceSmallClock_splitShadeSmallClock() =
         kosmos.runTest {
             val currentClockLayout by collectLastValue(underTest.currentClockLayout)
@@ -209,6 +211,7 @@ class KeyguardClockViewModelTest(flags: FlagsParameterization) : SysuiTestCase()
 
     @Test
     @EnableSceneContainer
+    @DisableFlags(FLAG_DUAL_SHADE)
     fun testSmallClockTop_splitShade_sceneContainerOn() =
         kosmos.runTest {
             enableSplitShade()
@@ -363,6 +366,7 @@ class KeyguardClockViewModelTest(flags: FlagsParameterization) : SysuiTestCase()
         }
 
     @Test
+    @DisableFlags(FLAG_DUAL_SHADE)
     fun dateWeatherBelowSmallClock_variousFontAndDisplaySize_shadeLayoutWide_false() =
         kosmos.runTest {
             enableSplitShade()
@@ -403,6 +407,21 @@ class KeyguardClockViewModelTest(flags: FlagsParameterization) : SysuiTestCase()
         }
 
     @Test
+    fun dateWeatherBelowSmallClock_hasNextAlarm_false() =
+        kosmos.runTest {
+            enableSplitShade()
+            mockConfiguration.fontScale = 1.0f
+            mockConfiguration.screenWidthDp = 694
+            val result by collectLastValue(underTest.shouldDateWeatherBeBelowSmallClock)
+            assertThat(result).isFalse()
+
+            kosmos.zenModeRepository.hasNextAlarm.value = true
+
+            assertThat(result).isTrue()
+        }
+
+    @Test
+    @DisableFlags(FLAG_DUAL_SHADE)
     fun dateWeatherBelowSmallClock_variousFontAndDisplaySize_shadeLayoutWide_true() =
         kosmos.runTest {
             enableSplitShade()

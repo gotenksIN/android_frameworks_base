@@ -420,6 +420,17 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
                 mCameraAccessController.blockCameraAccessIfNeeded(runningUids);
             }
         }
+
+        @Override
+        public void onActivityLaunchRequested(int displayId, @NonNull ComponentName componentName,
+                @UserIdInt int userId) {
+            try {
+                mActivityListener.onActivityLaunchRequested(displayId, componentName, userId);
+            } catch (RemoteException e) {
+                Slog.w(TAG, "Unable to call mActivityListener for activity launch request: "
+                        + componentName, e);
+            }
+        }
     }
 
     VirtualDeviceImpl(
@@ -519,6 +530,11 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
             flags |= DisplayManager.VIRTUAL_DISPLAY_FLAG_ALWAYS_UNLOCKED;
         }
         mBaseVirtualDisplayFlags = flags;
+
+        if (mParams.isLocalDeviceOnly() && Binder.getCallingUid() != Process.SYSTEM_UID) {
+            throw new SecurityException("Only system_server can create a local-only "
+                    + "virtual device.");
+        }
 
         if (inputController == null) {
             mInputController = new InputController(mContext, mAttributionSource);
@@ -1371,7 +1387,8 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
                     mActivityListenerAdapter,
                     displayCategories,
                     showTasksInHostDeviceRecents,
-                    mParams.getHomeComponent());
+                    mParams.getHomeComponent(),
+                    mParams.isLocalDeviceOnly());
         }
     }
 
@@ -1488,8 +1505,7 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
 
     /** Returns whether the user is allowed based on {@link VirtualDeviceParams#getAllowedUsers}. */
     private boolean isInAllowedUsers(UserHandle profile) {
-        return !Flags.computerControlUserRestriction()
-                || mParams.getAllowedUsers().isEmpty()
+        return mParams.getAllowedUsers().isEmpty()
                 || mParams.getAllowedUsers().contains(profile);
     }
 

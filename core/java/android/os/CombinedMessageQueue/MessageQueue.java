@@ -32,7 +32,8 @@ import android.compat.annotation.EnabledAfter;
 import android.compat.annotation.Overridable;
 import android.compat.annotation.UnsupportedAppUsage;
 import android.ravenwood.annotation.RavenwoodKeepWholeClass;
-import android.ravenwood.annotation.RavenwoodThrow;
+import android.ravenwood.annotation.RavenwoodRedirect;
+import android.ravenwood.annotation.RavenwoodRedirectionClass;
 import android.util.Log;
 import android.util.Printer;
 import android.util.SparseArray;
@@ -64,6 +65,7 @@ import java.util.concurrent.locks.ReentrantLock;
  * {@link Looper#myQueue() Looper.myQueue()}.
  */
 @RavenwoodKeepWholeClass
+@RavenwoodRedirectionClass("MessageQueue_ravenwood")
 public final class MessageQueue {
     private static final String TAG = "MessageQueue";
     private static final String TAG_L = "LegacyMessageQueue";
@@ -75,9 +77,12 @@ public final class MessageQueue {
      *
      * @hide
      */
+    // Make sure MessageQueue_ravenwood's check matches this definition.
+    // LINT.IfChange
     @ChangeId
     @EnabledAfter(targetSdkVersion = android.os.Build.VERSION_CODES.BAKLAVA)
     public static final long USE_NEW_MESSAGEQUEUE = 421623328L;
+    // LINT.ThenChange(//frameworks/base/core/java/android/os/MessageQueue_ravenwood.java)
 
     // True if the message queue can be quit.
     @UnsupportedAppUsage
@@ -177,17 +182,19 @@ public final class MessageQueue {
         return sUseConcurrent;
     }
 
+    /**
+     * @return human-readable string that identifies the implementation.
+     * @hide
+     */
+    public static String getImplName() {
+        return "combined:" + getUseConcurrent();
+    }
+
+    @RavenwoodRedirect(bug = 454028089, reason = "change IDs are not initialized when we call it")
     private static boolean computeUseConcurrent() {
         if (CompatChanges.isChangeEnabled(USE_NEW_MESSAGEQUEUE)
                 || Flags.useConcurrentMessageQueueInApps()) {
-            // b/447778739: Some Robolectric tests still use legacy LooperMode.
-            try {
-                Class.forName("org.robolectric.Robolectric");
-                // This is a Robolectric test. Concurrent MessageQueue is not supported yet.
-                return false;
-            } catch (ClassNotFoundException e) {
-                return true;
-            }
+            return true;
         }
 
         final String processName = Process.myProcessName();
@@ -212,7 +219,9 @@ public final class MessageQueue {
         if (sSkipEpollWaitForZeroTimeoutInitialized) {
             return;
         }
-        nativeSetSkipEpollWaitForZeroTimeout(ptr);
+        if (Flags.nativeLooperSkipEpollWaitForZeroTimeout()) {
+            nativeSetSkipEpollWaitForZeroTimeout(ptr);
+        }
         sSkipEpollWaitForZeroTimeoutInitialized = true;
     }
 
@@ -487,7 +496,6 @@ public final class MessageQueue {
      * @see OnFileDescriptorEventListener
      * @see #removeOnFileDescriptorEventListener
      */
-    @RavenwoodThrow(blockedBy = android.os.ParcelFileDescriptor.class)
     public void addOnFileDescriptorEventListener(@NonNull FileDescriptor fd,
             @OnFileDescriptorEventListener.Events int events,
             @NonNull OnFileDescriptorEventListener listener) {
@@ -529,7 +537,6 @@ public final class MessageQueue {
      * @see OnFileDescriptorEventListener
      * @see #addOnFileDescriptorEventListener
      */
-    @RavenwoodThrow(blockedBy = android.os.ParcelFileDescriptor.class)
     public void removeOnFileDescriptorEventListener(@NonNull FileDescriptor fd) {
         if (fd == null) {
             throw new IllegalArgumentException("fd must not be null");
@@ -541,7 +548,6 @@ public final class MessageQueue {
         }
     }
 
-    @RavenwoodThrow(blockedBy = android.os.ParcelFileDescriptor.class)
     private void updateOnFileDescriptorEventListenerLocked(FileDescriptor fd, int events,
             OnFileDescriptorEventListener listener) {
         final int fdNum = fd.getInt$();
@@ -1114,7 +1120,7 @@ public final class MessageQueue {
         @Override
         public boolean compareMessage(Message m, Handler h, int what, Object object, Runnable r,
                 long when) {
-            if (m.target != null && (lastMsg == null || lastMsg.when <= m.when)) {
+            if (m.target != null && (lastMsg == null || Message.compareMessages(lastMsg, m) < 0)) {
                 lastMsg = m;
             }
             return false;
@@ -2684,7 +2690,7 @@ public final class MessageQueue {
                 // If we're quitting then we're not allowed to increment the ref count.
                 return false;
             }
-            if (sMptrRefCount.compareAndSet(this, oldVal, oldVal + 1)) {
+            if (sMptrRefCount.compareAndSet(this, oldVal, oldVal + 1L)) {
                 // Successfully incremented the ref count without quitting.
                 return true;
             }
@@ -2697,7 +2703,7 @@ public final class MessageQueue {
      * Call after {@link #incrementMptrRefs()} to release the ref on mPtr.
      */
     private void decrementMptrRefs() {
-        long oldVal = (long) sMptrRefCount.getAndAdd(this, -1);
+        long oldVal = (long) sMptrRefCount.getAndAdd(this, -1L);
         // If quitting and we were the last ref, wake up looper thread
         if (oldVal - 1 == MPTR_TEARDOWN_MASK) {
             LockSupport.unpark(mLooperThread);

@@ -108,12 +108,30 @@ public class PolicyHandler<T> {
                     @Override
                     protected void storePolicyValue(
                             CallerIdentity caller, int scope, Integer value) {
-                        if (value == null || value == PolicyIdentifier.SCREEN_CAPTURE_ALLOWED) {
+                        if (value == null) {
                             clearPolicy(caller, PolicyDefinition.SCREEN_CAPTURE_DISABLED, scope);
                         } else {
-                            storePolicy(caller, PolicyDefinition.SCREEN_CAPTURE_DISABLED,
+                            boolean isDisabled =
+                                    value == PolicyIdentifier.SCREEN_CAPTURE_DISALLOWED;
+                            storePolicy(
+                                    caller,
+                                    PolicyDefinition.SCREEN_CAPTURE_DISABLED,
                                     scope,
-                                    /*isScreenCaptureDisabled=*/new BooleanPolicyValue(true));
+                                    new BooleanPolicyValue(isDisabled));
+                        }
+                    }
+
+                    @Override
+                    protected Integer getPolicyValue(CallerIdentity caller, int scope) {
+                        Boolean isDisabled =
+                                getPolicySetByAdmin(
+                                        caller, PolicyDefinition.SCREEN_CAPTURE_DISABLED, scope);
+                        if (isDisabled == null) {
+                            return null;
+                        } else if (isDisabled) {
+                            return PolicyIdentifier.SCREEN_CAPTURE_DISALLOWED;
+                        } else {
+                            return PolicyIdentifier.SCREEN_CAPTURE_ALLOWED;
                         }
                     }
                 });
@@ -212,6 +230,18 @@ public class PolicyHandler<T> {
         storePolicyValue(caller, scope, value);
     }
 
+    /** Performs every step required to retrieve the policy. */
+    public @Nullable PolicyValueTransport getPolicy(
+            @NonNull CallerIdentity caller, @PolicyScope int scope) {
+        validateScope(scope);
+
+        checkPermissions(caller, scope);
+
+        T value = getPolicyValue(caller, scope);
+
+        return convertValue(caller, value);
+    }
+
     /**
      * Validates if the {@link PolicyScope} can be used for this policy.
      *
@@ -242,6 +272,15 @@ public class PolicyHandler<T> {
         return getTransportValueConvertor().fromTransport(transportValue);
     }
 
+    /** Converts the given value to the corresponding {@link PolicyValueTransport}. */
+    @Nullable
+    protected PolicyValueTransport convertValue(@NonNull CallerIdentity caller, @Nullable T value) {
+        if (value == null) {
+            return null;
+        }
+        return getTransportValueConvertor().toTransport(value);
+    }
+
     /**
      * Performs permission checks, based on the information in the {@link PolicyDefinition}
      * information provided on the {@link PolicyIdentifier}.
@@ -256,7 +295,9 @@ public class PolicyHandler<T> {
     protected void checkPermissions(CallerIdentity caller, @PolicyScope int scope) {
         var permissionChecker = getPermissionChecker();
 
-        permissionChecker.enforce(getPolicyMetadata().getRequiredPermission(), caller);
+        if (!isPolicyAllowedForDpc(mDelegate.getDpcType(caller))) {
+            permissionChecker.enforce(getPolicyMetadata().getRequiredPermission(), caller);
+        }
 
         if (scope != POLICY_SCOPE_USER) {
             permissionChecker.enforce(getPolicyMetadata().getRequiredCrossUserPermission(), caller);
@@ -291,6 +332,15 @@ public class PolicyHandler<T> {
         } else {
             clearPolicy(caller, key, scope);
         }
+    }
+
+    /**
+     * Retrieves the policy value from the {@code DevicePolicyEngine}.
+     *
+     * <p>Can be overridden to retrieve the value from somewhere else instead.
+     */
+    protected @Nullable T getPolicyValue(@NonNull CallerIdentity caller, @PolicyScope int scope) {
+        return getPolicySetByAdmin(caller, getPolicyDefinition(), scope);
     }
 
     /******************************************************************************************
@@ -340,6 +390,14 @@ public class PolicyHandler<T> {
         return getDelegate().getPermissionChecker();
     }
 
+    // Returns if the policy is automatically allowed by a DPC of the given type.
+    // If this is the case, then the DPC does not need the permission.
+    // Note that the DPC would still need the cross-user permission if the policy is set on
+    // a scope other than USER.
+    protected final boolean isPolicyAllowedForDpc(@DpcType int dpcType) {
+        return getPolicyMetadata().getAllowedDpcTypes().contains(dpcType);
+    }
+
     protected final <StoredType> void storePolicy(
             @NonNull CallerIdentity caller,
             @NonNull PolicyDefinition<StoredType> key,
@@ -353,6 +411,13 @@ public class PolicyHandler<T> {
             @NonNull PolicyDefinition<StoredType> key,
             @PolicyScope int scope) {
         getDelegate().clearPolicy(caller, key, scope);
+    }
+
+    protected final <StoredType> @Nullable StoredType getPolicySetByAdmin(
+            @NonNull CallerIdentity caller,
+            @NonNull PolicyDefinition<StoredType> key,
+            @PolicyScope int scope) {
+        return getDelegate().getPolicySetByAdmin(caller, key, scope);
     }
 
     /** Helper class that provides access to helper methods used while processing policies. */
@@ -385,6 +450,23 @@ public class PolicyHandler<T> {
          * local on parent of the user).
          */
         <StoredType> void clearPolicy(
+                @NonNull CallerIdentity caller,
+                @NonNull PolicyDefinition<StoredType> key,
+                @PolicyScope int scope);
+
+        /**
+         * Helper method to retrieve the policy value stored by the caller in the {@code
+         * DevicePolicyEngine}, or null if no value is stored. Invoked from {@link
+         * PolicyHandler.getPolicyValue}.
+         *
+         * <p>Will use {@link scope} to decide on the correct storage (global vs local on user vs
+         * local on parent of the user).
+         *
+         * <p>Note this does not return the resolved policy value, but the value stored by the
+         * caller.
+         */
+        @Nullable
+        <StoredType> StoredType getPolicySetByAdmin(
                 @NonNull CallerIdentity caller,
                 @NonNull PolicyDefinition<StoredType> key,
                 @PolicyScope int scope);

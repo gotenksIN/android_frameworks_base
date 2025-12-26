@@ -224,7 +224,7 @@ public final class CompanionDeviceManager {
      * Used by {@link #enableSystemDataSyncForTypes(int, int)}}.
      * Synchronize task continuity data like open tasks, and enable this transport for Handoff.
      */
-    @FlaggedApi(Flags.FLAG_ENABLE_TASK_CONTINUITY)
+    @FlaggedApi(Flags.FLAG_TASK_CONTINUITY)
     public static final int FLAG_TASK_CONTINUITY = 1 << 1;
 
     /**
@@ -255,24 +255,16 @@ public final class CompanionDeviceManager {
     public static final String FEATURE_TASK_CONTINUITY = "task_continuity_manager";
 
     /**
-     * The feature name for the mode Sync.
+     * The feature name for the CrossDeviceSync.
      * @hide
      */
     @FlaggedApi(Flags.FLAG_ENABLE_DATA_SYNC)
-    public static final String FEATURE_MODE_SYNC = "mode_sync";
-
-    /**
-     * The feature name for airplane mode sync.
-     * @hide
-     */
-    @FlaggedApi(Flags.FLAG_ENABLE_DATA_SYNC)
-    public static final String FEATURE_AIRPLANE_MODE_SYNC = "airplane_mode_sync";
+    public static final String FEATURE_CROSS_DEVICE_SYNC = "cross_device_sync";
 
     /** @hide */
     @StringDef(prefix = { "FEATURE_" }, value = {
             FEATURE_TASK_CONTINUITY,
-            FEATURE_MODE_SYNC,
-            FEATURE_AIRPLANE_MODE_SYNC,
+            FEATURE_CROSS_DEVICE_SYNC,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface FeatureName {}
@@ -391,6 +383,7 @@ public final class CompanionDeviceManager {
      *
      * @hide
      */
+    @RequiresPermission(USE_COMPANION_TRANSPORTS)
     public static final int MESSAGE_ONEWAY_CROSS_DEVICE_SYNC = 0x43676883; // +CDS
 
     /**
@@ -2002,14 +1995,18 @@ public final class CompanionDeviceManager {
      * <p>
      * This API should be called after the app has received a request via
      * {@link CompanionDeviceService#onActionRequested(AssociationInfo, ActionRequest)}.
-     * This API is only available for companion apps that manage their own connectivity.
      *
+     * For example:
+     * <ul>
+     *   <li>After receiving {@link ActionRequest#OP_ACTIVATE}, the app should call this method
+     *   with {@link ActionResult#RESULT_ACTIVATED} upon success or
+     *   {@link ActionResult#RESULT_FAILED_TO_ACTIVATE} upon failure.</li>
+     *
+     *   <li>If a previously activated feature later fails or stops for any reason, the app should
+     *   proactively call this method with {@link ActionResult#RESULT_DEACTIVATED}.</li>
+     * </ul>
      * @param result The {@link ActionResult} to report to the system.
-     *
-     * @hide
      */
-    @SystemApi
-    @RequiresPermission(android.Manifest.permission.REQUEST_COMPANION_SELF_MANAGED)
     @FlaggedApi(Flags.FLAG_ENABLE_DATA_SYNC)
     public void notifyActionResult(int associationId, @NonNull ActionResult result) {
         if (mService == null) {
@@ -2347,10 +2344,39 @@ public final class CompanionDeviceManager {
      * deliver the action request via a
      * {@link CompanionDeviceService#onActionRequested(AssociationInfo, ActionRequest)}.
      *
-     * <p>This method allows multiple system services to safely share a resource, such as
-     * scanning or advertising. An action is only started for the first service that requests it
-     * (using {@link ActionRequest#OP_ACTIVATE}) and is only stopped when the very last
-     * service releases its request (using {@link ActionRequest#OP_DEACTIVATE}).
+     * <p>This method allows multiple system services to safely request an action, such as
+     * scanning, advertising and transport attachment.
+     *
+     * <ul>
+     *   <li><b>Activation ({@link ActionRequest#OP_ACTIVATE}):</b>
+     *     <ul>
+     *       <li>If this is the <b>first</b> service to request the action, the request is
+     *       forwarded to the companion app. The caller must wait for the result
+     *       to be delivered to its {@link IOnActionResultListener}.</li>
+     *
+     *       <li>If other services request the action while the initial activation request is still
+     *       in flight, they will not trigger a new activation request to the app. Instead, they
+     *       will receive the same {@link ActionResult} via {@link IOnActionResultListener} as the
+     *       first caller once it arrives.</li>
+     *
+     *       <li>If a service requests an action that has already been successfully activated, its
+     *       {@link IOnActionResultListener} is immediately invoked with
+     *       {@link ActionResult#RESULT_ACTIVATED}.</li>
+     *     </ul>
+     *   </li>
+     *
+     *   <li><b>Deactivation ({@link ActionRequest#OP_DEACTIVATE}):</b>
+     *     <ul>
+     *       <li>If this is the <b>last</b> active service to request deactivation, the request is
+     *       forwarded to the companion app.</li>
+     *
+     *       <li>If a service requests deactivation while other services still require the action,
+     *       it will receive {@link IOnActionResultListener} callback once the companion confirms
+     *       the action is deactivated by calling
+     *       {@link #notifyActionResult(int, ActionResult)}.</li>
+     *     </ul>
+     *   </li>
+     * </ul>
      *
      * @param request The {@link ActionRequest} to perform. Use
      *                {@link ActionRequest.Builder} to construct this object.
@@ -2358,6 +2384,8 @@ public final class CompanionDeviceManager {
      *                     "task_continuity_manager"). This name is used by the system to
      *                     differentiate requests from different callers.
      * @param associationIds The array of association IDs to target with this action.
+     *
+     * @see #setOnActionResultListener(int[], String, Executor, BiConsumer)
      * @hide
      */
     @FlaggedApi(Flags.FLAG_ENABLE_DATA_SYNC)
@@ -2378,6 +2406,42 @@ public final class CompanionDeviceManager {
             throw e.rethrowFromSystemServer();
         }
     }
+
+    /**
+     * Checks if a transport is currently attached for a given association id.
+     *
+     * <p>A transport is considered attached if
+     * {@link #attachSystemDataTransport(int, InputStream, OutputStream)} has been successfully
+     * called for the given {@code associationId}, and
+     * {@link #detachSystemDataTransport(int)} has not yet been called.
+     *
+     * <p>This is useful for determining if the system is ready to handle data transfers
+     * before calling {@link #startSystemDataTransfer(int, Executor, OutcomeReceiver)}.
+     *
+     * @param associationId The unique {@link AssociationInfo#getId() id} of the device association
+     *
+     * @return {@code true} if a system data transport is attached for the given association id,
+     *         {@code false} otherwise.
+     *
+     * @see #attachSystemDataTransport(int, InputStream, OutputStream)
+     * @see #detachSystemDataTransport(int)
+     * @see #startSystemDataTransfer(int, Executor, OutcomeReceiver)
+     */
+    @FlaggedApi(Flags.FLAG_ENABLE_DATA_SYNC)
+    public boolean isSystemDataTransportAttached(int associationId) {
+        if (mService == null) {
+            Log.w(TAG, "CompanionDeviceManager service is not available.");
+            return false;
+        }
+
+        try {
+            return mService.isSystemDataTransportAttached(associationId);
+        }  catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+
 
     private static class AssociationRequestCallbackProxy extends IAssociationRequestCallback.Stub {
         private final Handler mHandler;

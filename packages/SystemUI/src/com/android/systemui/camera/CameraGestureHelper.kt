@@ -32,6 +32,7 @@ import com.android.systemui.ActivityIntentHelper
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.plugins.ActivityStarter
+import com.android.systemui.settings.DisplayTracker
 import com.android.systemui.shared.system.ActivityManagerKt.isInForeground
 import com.android.systemui.statusbar.NotificationLockscreenUserManager
 import com.android.systemui.statusbar.StatusBarState
@@ -63,10 +64,19 @@ constructor(
     private val selectedUserInteractor: SelectedUserInteractor,
     private val devicePolicyManager: DevicePolicyManager,
     private val lockscreenUserManager: NotificationLockscreenUserManager,
+    private val displayTracker: DisplayTracker,
 ) {
+
+    private val TAG = "CameraGestureHelper"
+
     /** Whether the camera application can be launched for the camera launch gesture. */
     fun canCameraGestureBeLaunched(statusBarState: Int): Boolean {
         if (!isCameraAllowedByAdmin()) {
+            return false
+        }
+
+        if (statusBarKeyguardViewManager.needsFullscreenBouncer()) {
+            Log.i(TAG, "Cannot launch camera when SIM bouncer is needed")
             return false
         }
 
@@ -105,6 +115,7 @@ constructor(
                 // orientation change happens to occur during the launch.
                 val activityOptions = ActivityOptions.makeBasic()
                 activityOptions.setDisallowEnterPictureInPictureWhileLaunching(true)
+                activityOptions.setLaunchDisplayId(displayTracker.defaultDisplayId)
                 activityOptions.rotationAnimationHint =
                     WindowManager.LayoutParams.ROTATION_ANIMATION_SEAMLESS
                 intent.collectExtraIntentKeys()

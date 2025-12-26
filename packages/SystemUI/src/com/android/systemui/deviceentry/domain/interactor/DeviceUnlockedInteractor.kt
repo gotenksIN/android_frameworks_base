@@ -31,8 +31,10 @@ import com.android.systemui.deviceentry.shared.model.DeviceUnlockSource
 import com.android.systemui.deviceentry.shared.model.DeviceUnlockStatus
 import com.android.systemui.flags.SystemPropertiesHelper
 import com.android.systemui.keyguard.KeyguardViewMediator
+import com.android.systemui.keyguard.domain.interactor.BiometricUnlockInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
 import com.android.systemui.keyguard.domain.interactor.TrustInteractor
+import com.android.systemui.keyguard.shared.model.toDeviceUnlockSource
 import com.android.systemui.lifecycle.ExclusiveActivatable
 import com.android.systemui.log.table.TableLogBuffer
 import com.android.systemui.log.table.logDiffsForTable
@@ -61,6 +63,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.distinctUntilChangedBy
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -84,7 +87,7 @@ constructor(
     private val secureSettingsRepository: SecureSettingsRepository,
     private val keyguardInteractor: KeyguardInteractor,
     @SceneFrameworkTableLog private val tableLogBuffer: TableLogBuffer,
-    deviceEntryBypassInteractor: DeviceEntryBypassInteractor,
+    biometricUnlockInteractor: BiometricUnlockInteractor,
 ) : ExclusiveActivatable() {
     private val faceEnrolledAndEnabled = biometricSettingsInteractor.isFaceAuthEnrolledAndEnabled
     private val fingerprintEnrolledAndEnabled =
@@ -204,18 +207,11 @@ constructor(
                     .map { DeviceUnlockSource.SecureLockDeviceTwoFactorAuth }
             } else {
                 merge(
-                    fingerprintAuthInteractor.fingerprintSuccess.map {
-                        DeviceUnlockSource.Fingerprint
-                    },
-                    faceAuthInteractor.isAuthenticated
-                        .filter { it }
-                        .map {
-                            if (deviceEntryBypassInteractor.isBypassEnabled.value) {
-                                DeviceUnlockSource.FaceWithBypass
-                            } else {
-                                DeviceUnlockSource.FaceWithoutBypass
-                            }
-                        },
+                    biometricUnlockInteractor.unlockState
+                        .map { biometricUnlockModel ->
+                            return@map biometricUnlockModel.toDeviceUnlockSource()
+                        }
+                        .filterNotNull(),
                     trustInteractor.isTrusted.filter { it }.map { DeviceUnlockSource.TrustAgent },
                     onUnlockFromBouncer.map { DeviceUnlockSource.BouncerInput },
                     unlockForPowerButtonGestureRequests.receiveAsFlow().map {
@@ -362,6 +358,8 @@ constructor(
                                             lastSleepReason == WakeSleepReason.SLEEP_BUTTON
                                         ) {
                                             LockImmediately("locked instantly from sleep button")
+                                        } else if (lastSleepReason == WakeSleepReason.FOLD) {
+                                            LockImmediately("locked instantly from fold")
                                         } else {
                                             LockWithDelay("entering sleep")
                                         }

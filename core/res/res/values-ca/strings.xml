@@ -327,6 +327,8 @@
     <string name="notification_channel_accessibility_hearing_device" msgid="7816963856388758952">"Audiòfon"</string>
     <string name="notification_channel_accessibility_security_policy" msgid="1727787021725251912">"Ús de les funcions d\'accessibilitat"</string>
     <string name="notification_channel_display" msgid="6905032605735615090">"Pantalla"</string>
+    <!-- no translation found for notification_channel_parental_controls (2963963315750128538) -->
+    <skip />
     <string name="foreground_service_app_in_background" msgid="1439289699671273555">"<xliff:g id="APP_NAME">%1$s</xliff:g> està consumint bateria"</string>
     <string name="foreground_service_apps_in_background" msgid="7340037176412387863">"<xliff:g id="NUMBER">%1$d</xliff:g> aplicacions estan consumint bateria"</string>
     <string name="foreground_service_tap_for_details" msgid="9078123626015586751">"Toca per obtenir informació sobre l\'ús de dades i de bateria"</string>
@@ -642,6 +644,8 @@
     <string name="permdesc_nearby_wifi_devices" msgid="3054307728646332906">"Permet que l\'aplicació s\'anunciï i es connecti als dispositius Wi‑Fi propers, i en determini la posició relativa"</string>
     <string name="permlab_access_local_network" msgid="3420360767259066877">"accedir als dispositius de la xarxa local"</string>
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"Permet que l\'aplicació accedeixi als dispositius de la xarxa local"</string>
+    <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"utilitza la interfície de bucle invertit"</string>
+    <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"Permet que l\'aplicació interaccioni amb altres aplicacions a través de la interfície de bucle invertit"</string>
     <string name="permlab_ranging" msgid="2854543350668593390">"determin. posició relativa entre dispositius propers"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"Permet que l\'aplicació determini la posició relativa entre els dispositius propers"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"Informació preferent sobre el servei de pagament per NFC"</string>
@@ -1044,7 +1048,6 @@
     <string name="keyguard_password_enter_pin_password_code" msgid="7792964196473964340">"Introdueix la contrasenya per desbloquejar"</string>
     <string name="keyguard_password_wrong_pin_code" msgid="8583732939138432793">"Codi PIN incorrecte."</string>
     <string name="keyguard_label_text" msgid="3841953694564168384">"Per desbloquejar-lo, premeu Menú i després 0."</string>
-    <string name="emergency_call_dialog_number_for_display" msgid="2978165477085612673">"Número d\'emergència"</string>
     <string name="lockscreen_carrier_default" msgid="6192313772955399160">"Sense servei"</string>
     <string name="lockscreen_screen_locked" msgid="7364905540516041817">"Pantalla bloquejada."</string>
     <string name="lockscreen_instructions_when_pattern_enabled" msgid="7982445492532123308">"Premeu Menú per desbloquejar-lo o per fer una trucada d\'emergència."</string>
@@ -1055,10 +1058,8 @@
     <string name="lockscreen_pattern_correct" msgid="8050630103651508582">"Correcte!"</string>
     <string name="lockscreen_pattern_wrong" msgid="2940138714468358458">"Torna-ho a provar"</string>
     <string name="lockscreen_password_wrong" msgid="8605355913868947490">"Torna-ho a provar"</string>
-    <!-- no translation found for lockscreen_click_to_unlock_hint (6056691847669178119) -->
-    <skip />
-    <!-- no translation found for lockscreen_key_to_unlock_hint (9042402393653798264) -->
-    <skip />
+    <string name="lockscreen_click_to_unlock_hint" msgid="6056691847669178119">"Fes clic per desbloquejar"</string>
+    <string name="lockscreen_key_to_unlock_hint" msgid="9042402393653798264">"Prem qualsevol tecla per desbloquejar"</string>
     <string name="lockscreen_storage_locked" msgid="634993789186443380">"Desbloqueja per accedir a les funcions i dades"</string>
     <string name="faceunlock_multiple_failures" msgid="681991538434031708">"S\'ha superat el nombre màxim d\'intents de Desbloqueig facial"</string>
     <string name="lockscreen_missing_sim_message_short" msgid="1229301273156907613">"No hi ha cap SIM"</string>
@@ -1280,6 +1281,7 @@
     <string name="whichApplicationLabel" msgid="7852182961472531728">"Completa l\'acció"</string>
     <string name="whichViewApplication" msgid="5733194231473132945">"Obre amb"</string>
     <string name="whichViewApplicationNamed" msgid="415164730629690105">"Obre amb %1$s"</string>
+    <string name="open_app_name" msgid="6114096770130122912">"Obre <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="whichViewApplicationLabel" msgid="7367556735684742409">"Obre"</string>
     <string name="whichOpenHostLinksWith" msgid="7645631470199397485">"Obre els enllaços de <xliff:g id="HOST">%1$s</xliff:g> amb"</string>
     <string name="whichOpenLinksWith" msgid="1120936181362907258">"Obre els enllaços amb"</string>
@@ -1801,10 +1803,8 @@
     <string name="accessibility_shortcut_single_service_warning" msgid="6363127705112844257">"Si mantens premudes les dues tecles de volum durant uns segons, la funció d\'accessibilitat <xliff:g id="SERVICE">%1$s</xliff:g> s\'activarà. Això podria canviar el funcionament del teu dispositiu.\n\nPots canviar la funció d\'aquesta drecera a Configuració &gt; Accessibilitat."</string>
     <string name="accessibility_shortcut_on" msgid="5463618449556111344">"Activa"</string>
     <string name="accessibility_shortcut_off" msgid="3651336255403648739">"No activis"</string>
-    <!-- no translation found for accessibility_shortcut_menu_item_status_on (6162756705754654002) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_menu_item_status_off (6274512913017713543) -->
-    <skip />
+    <string name="accessibility_shortcut_menu_item_status_on" msgid="6162756705754654002">"Activat"</string>
+    <string name="accessibility_shortcut_menu_item_status_off" msgid="6274512913017713543">"Desactivat"</string>
     <string name="accessibility_enable_service_title" msgid="3931558336268541484">"Vols permetre que <xliff:g id="SERVICE">%1$s</xliff:g> controli el teu dispositiu per complet?"</string>
     <string name="accessibility_service_warning_description" msgid="291674995220940133">"El control total és adequat per a les aplicacions que t\'ajuden amb l\'accessibilitat, però no per a la majoria de les aplicacions."</string>
     <string name="accessibility_service_screen_control_title" msgid="190017412626919776">"Veure i controlar la pantalla"</string>
@@ -1818,16 +1818,11 @@
     <string name="accessibility_select_shortcut_menu_title" msgid="6002726538854613272">"Toca una funció per començar a utilitzar-la:"</string>
     <string name="accessibility_edit_shortcut_menu_button_title" msgid="239446795930436325">"Tria les funcions que vols utilitzar amb el botó d\'accessibilitat"</string>
     <string name="accessibility_edit_shortcut_menu_volume_title" msgid="2245540598834891500">"Tria les funcions que vols utilitzar amb la drecera de les tecles de volum"</string>
-    <!-- no translation found for accessibility_shortcut_label_button (6473341300585254821) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_volume_keys (5642990791242136231) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_gesture (7987298674836890931) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_quick_settings (6851280333772213611) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_triple_tap (9058975959054454796) -->
-    <skip />
+    <string name="accessibility_shortcut_label_button" msgid="6473341300585254821">"botó d\'accessibilitat"</string>
+    <string name="accessibility_shortcut_label_volume_keys" msgid="5642990791242136231">"tecles de volum"</string>
+    <string name="accessibility_shortcut_label_gesture" msgid="7987298674836890931">"gest"</string>
+    <string name="accessibility_shortcut_label_quick_settings" msgid="6851280333772213611">"configuració ràpida"</string>
+    <string name="accessibility_shortcut_label_triple_tap" msgid="9058975959054454796">"triple toc"</string>
     <string name="accessibility_uncheck_legacy_item_warning" msgid="8047830891064817447">"<xliff:g id="SERVICE_NAME">%s</xliff:g> s\'ha desactivat"</string>
     <string name="edit_accessibility_shortcut_menu_button" msgid="8885752738733772935">"Edita les dreceres"</string>
     <string name="done_accessibility_shortcut_menu_button" msgid="3668407723770815708">"Fet"</string>
@@ -2617,4 +2612,10 @@
     <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"Alertes de recursos del sistema"</string>
     <string name="tv_watchdog_notification_title" msgid="195239206215922517">"Ús excessiu de recursos"</string>
     <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"L\'aplicació <xliff:g id="APP_NAME">%1$s</xliff:g> està utilitzant massa recursos."</string>
+    <!-- no translation found for supervision_blocked_app_title (5546803865875383588) -->
+    <skip />
+    <!-- no translation found for supervision_blocked_app_content (4125452996088641559) -->
+    <skip />
+    <!-- no translation found for supervision_unblocked_app_content (8282985265957852278) -->
+    <skip />
 </resources>

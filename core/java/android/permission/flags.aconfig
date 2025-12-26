@@ -629,21 +629,28 @@ flag {
 }
 
 flag {
-    name: "watch_face_role_enabled"
-    is_exported: true
-    namespace: "wear_watchfaces"
-    description: "This flag enables watchface roles support and API"
-    bug: "399850691"
-    is_fixed_read_only: true
-}
-
-flag {
     name: "access_local_network_permission_enabled"
     is_exported: true
     is_fixed_read_only: true
     namespace: "android_core_networking"
     description: "This flag is used to enable the new ACCESS_LOCAL_NETWORK runtime permission. When enabled, this permission will be used for local network protection, replacing NEARBY_WIFI_DEVICES for this purpose."
     bug: "388774939"
+}
+
+flag {
+    name: "use_loopback_interface_permission_enabled"
+    is_exported: true
+    namespace: "android_core_networking"
+    description: "This flag is used to enable the new USE_LOOPBACK_INTERFACE install permission. When enabled, this permission will guard IP traffic on the loopback interface."
+    bug: "430058614"
+}
+
+flag {
+    name: "interact_cellbroadcast_permission_enabled"
+    is_exported: true
+    namespace: "telephony"
+    description: "This flag is used to enable the INTERACT_CELL_BROADCAST permission. When enabled, this permission will guard to interact with cellbroadcast module"
+    bug: "410738387"
 }
 
 flag {
@@ -669,3 +676,35 @@ flag {
     bug: "416236349"
     is_exported: true
 }
+
+flag {
+    name: "extend_send_safety_center_update_permission_to_signature"
+    namespace: "android_exploits_research"
+    description: "This flag controls whether the SEND_SAFETY_CENTER_UPDATE permission is extended to signature level"
+    bug: "403623944"
+}
+
+flag {
+    name: "assist_settings_privacy_improvements_enabled"
+    is_exported: true
+    namespace: "permissions"
+    description: "enable assistant settings privacy improvements"
+    bug: "437416500"
+}
+
+flag {
+    name: "active_watch_face_role_enabled"
+    is_exported: true
+    namespace: "wear_watchfaces"
+    description: "This flag enables watchface roles support and API"
+    bug: "396431730"
+}
+
+flag {
+    name: "restrict_assist_structure_screen_content_enabled"
+    is_exported: true
+    namespace: "permissions"
+    description: "enable restricted usage of assist_structure screen content via the new permission"
+    bug: "437416500"
+}
+

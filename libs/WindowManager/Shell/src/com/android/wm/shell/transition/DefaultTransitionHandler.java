@@ -386,11 +386,9 @@ public class DefaultTransitionHandler implements Transitions.TransitionHandler {
         // This is to avoid incorrectly occluding other layers when a transition only contains a
         // single "close" change, for example. With only one change, there are no other layers
         // within the transition to interact with, so a background is unnecessary.
-        final boolean allowBackground =
-                !com.android.window.flags.Flags.polishCloseWallpaperIncludesOpenChange()
-                        || (info.getChanges().size() > 1
+        final boolean allowBackground = info.getChanges().size() > 1
                         && (wallpaperTransit != WALLPAPER_TRANSITION_INTRA_OPEN
-                        && wallpaperTransit != WALLPAPER_TRANSITION_INTRA_CLOSE));
+                        && wallpaperTransit != WALLPAPER_TRANSITION_INTRA_CLOSE);
 
         for (int i = info.getChanges().size() - 1; i >= 0; --i) {
             final TransitionInfo.Change change = info.getChanges().get(i);
@@ -614,7 +612,7 @@ public class DefaultTransitionHandler implements Transitions.TransitionHandler {
                     // transition. This means that an activity transition got erroneously combined
                     // with another ongoing transition. This then means that the animation root may
                     // not tightly fit the activities, so we have to put them in a separate crop.
-                    final int layer = Transitions.calculateAnimLayer(change, i,
+                    final int layer = TransitionUtil.calculateAnimLayer(change, i,
                             info.getChanges().size(), info.getType());
                     final SurfaceControl leash = new SurfaceControl.Builder()
                             .setName("Transition ActivityWrap: "

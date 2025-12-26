@@ -326,6 +326,8 @@
     <string name="notification_channel_accessibility_hearing_device" msgid="7816963856388758952">"เครื่องช่วยฟัง"</string>
     <string name="notification_channel_accessibility_security_policy" msgid="1727787021725251912">"การใช้งานการช่วยเหลือพิเศษ"</string>
     <string name="notification_channel_display" msgid="6905032605735615090">"จอแสดงผล"</string>
+    <!-- no translation found for notification_channel_parental_controls (2963963315750128538) -->
+    <skip />
     <string name="foreground_service_app_in_background" msgid="1439289699671273555">"<xliff:g id="APP_NAME">%1$s</xliff:g> กำลังใช้แบตเตอรี่"</string>
     <string name="foreground_service_apps_in_background" msgid="7340037176412387863">"แอป <xliff:g id="NUMBER">%1$d</xliff:g> แอปกำลังใช้แบตเตอรี่"</string>
     <string name="foreground_service_tap_for_details" msgid="9078123626015586751">"แตะเพื่อดูรายละเอียดเกี่ยวกับแบตเตอรี่และปริมาณการใช้อินเทอร์เน็ต"</string>
@@ -641,6 +643,8 @@
     <string name="permdesc_nearby_wifi_devices" msgid="3054307728646332906">"อนุญาตให้แอปแสดงข้อมูล เชื่อมต่อ และระบุตำแหน่งซึ่งสัมพันธ์กับอุปกรณ์ Wi-Fi ที่อยู่ใกล้เคียง"</string>
     <string name="permlab_access_local_network" msgid="3420360767259066877">"เข้าถึงอุปกรณ์ในเครือข่ายในพื้นที่"</string>
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"อนุญาตให้แอปเข้าถึงอุปกรณ์ในเครือข่ายในพื้นที่"</string>
+    <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"ใช้อินเทอร์เฟซ Loopbackd"</string>
+    <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"อนุญาตให้แอปโต้ตอบกับแอปอื่นๆ ผ่านอินเทอร์เฟซ Loopback"</string>
     <string name="permlab_ranging" msgid="2854543350668593390">"ระบุตำแหน่งสัมพันธ์ระหว่างอุปกรณ์ที่อยู่ใกล้เคียง"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"อนุญาตให้แอประบุตำแหน่งสัมพันธ์ระหว่างอุปกรณ์ที่อยู่ใกล้เคียง"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"ข้อมูลบริการชำระเงิน NFC ที่ต้องการ"</string>
@@ -1043,7 +1047,6 @@
     <string name="keyguard_password_enter_pin_password_code" msgid="7792964196473964340">"พิมพ์ PIN เพื่อปลดล็อก"</string>
     <string name="keyguard_password_wrong_pin_code" msgid="8583732939138432793">"รหัส PIN ไม่ถูกต้อง"</string>
     <string name="keyguard_label_text" msgid="3841953694564168384">"หากต้องการปลดล็อก กด เมนู ตามด้วย 0"</string>
-    <string name="emergency_call_dialog_number_for_display" msgid="2978165477085612673">"หมายเลขฉุกเฉิน"</string>
     <string name="lockscreen_carrier_default" msgid="6192313772955399160">"ไม่มีบริการ"</string>
     <string name="lockscreen_screen_locked" msgid="7364905540516041817">"หน้าจอถูกล็อก"</string>
     <string name="lockscreen_instructions_when_pattern_enabled" msgid="7982445492532123308">"กด เมนู เพื่อปลดล็อกหรือโทรฉุกเฉิน"</string>
@@ -1277,6 +1280,7 @@
     <string name="whichApplicationLabel" msgid="7852182961472531728">"ทำงานให้เสร็จสิ้น"</string>
     <string name="whichViewApplication" msgid="5733194231473132945">"เปิดด้วย"</string>
     <string name="whichViewApplicationNamed" msgid="415164730629690105">"เปิดด้วย %1$s"</string>
+    <string name="open_app_name" msgid="6114096770130122912">"เปิด <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="whichViewApplicationLabel" msgid="7367556735684742409">"เปิด"</string>
     <string name="whichOpenHostLinksWith" msgid="7645631470199397485">"เปิดลิงก์ <xliff:g id="HOST">%1$s</xliff:g> ด้วย"</string>
     <string name="whichOpenLinksWith" msgid="1120936181362907258">"เปิดลิงก์ด้วย"</string>
@@ -1798,10 +1802,8 @@
     <string name="accessibility_shortcut_single_service_warning" msgid="6363127705112844257">"การกดปุ่มปรับระดับเสียงทั้ง 2 ปุ่มค้างไว้ 2-3 วินาทีจะเปิด <xliff:g id="SERVICE">%1$s</xliff:g> ซึ่งเป็นฟีเจอร์การช่วยเหลือพิเศษ การดำเนินการนี้อาจเปลี่ยนแปลงลักษณะการทำงานของอุปกรณ์\n\nคุณแก้ไขทางลัดนี้ให้เปิดฟีเจอร์อื่นได้ในการตั้งค่า &gt; การช่วยเหลือพิเศษ"</string>
     <string name="accessibility_shortcut_on" msgid="5463618449556111344">"เปิด"</string>
     <string name="accessibility_shortcut_off" msgid="3651336255403648739">"ไม่ต้องเปิด"</string>
-    <!-- no translation found for accessibility_shortcut_menu_item_status_on (6162756705754654002) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_menu_item_status_off (6274512913017713543) -->
-    <skip />
+    <string name="accessibility_shortcut_menu_item_status_on" msgid="6162756705754654002">"เปิด"</string>
+    <string name="accessibility_shortcut_menu_item_status_off" msgid="6274512913017713543">"ปิด"</string>
     <string name="accessibility_enable_service_title" msgid="3931558336268541484">"อนุญาตให้ <xliff:g id="SERVICE">%1$s</xliff:g> ควบคุมอุปกรณ์อย่างเต็มที่ไหม"</string>
     <string name="accessibility_service_warning_description" msgid="291674995220940133">"การควบคุมอย่างเต็มรูปแบบเหมาะสำหรับแอปเกี่ยวกับความช่วยเหลือพิเศษ แต่ไม่เหมาะสำหรับ​แอปส่วนใหญ่"</string>
     <string name="accessibility_service_screen_control_title" msgid="190017412626919776">"ดูและควบคุมหน้าจอ"</string>
@@ -1815,16 +1817,11 @@
     <string name="accessibility_select_shortcut_menu_title" msgid="6002726538854613272">"แตะฟีเจอร์เพื่อเริ่มใช้"</string>
     <string name="accessibility_edit_shortcut_menu_button_title" msgid="239446795930436325">"เลือกฟีเจอร์ที่จะใช้กับปุ่มการช่วยเหลือพิเศษ"</string>
     <string name="accessibility_edit_shortcut_menu_volume_title" msgid="2245540598834891500">"เลือกฟีเจอร์ที่จะใช้กับทางลัดปุ่มปรับระดับเสียง"</string>
-    <!-- no translation found for accessibility_shortcut_label_button (6473341300585254821) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_volume_keys (5642990791242136231) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_gesture (7987298674836890931) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_quick_settings (6851280333772213611) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_triple_tap (9058975959054454796) -->
-    <skip />
+    <string name="accessibility_shortcut_label_button" msgid="6473341300585254821">"ปุ่มการช่วยเหลือพิเศษ"</string>
+    <string name="accessibility_shortcut_label_volume_keys" msgid="5642990791242136231">"ปุ่มปรับระดับเสียง"</string>
+    <string name="accessibility_shortcut_label_gesture" msgid="7987298674836890931">"ท่าทางสัมผัส"</string>
+    <string name="accessibility_shortcut_label_quick_settings" msgid="6851280333772213611">"การตั้งค่าด่วน"</string>
+    <string name="accessibility_shortcut_label_triple_tap" msgid="9058975959054454796">"แตะสามครั้ง"</string>
     <string name="accessibility_uncheck_legacy_item_warning" msgid="8047830891064817447">"ปิด <xliff:g id="SERVICE_NAME">%s</xliff:g> แล้ว"</string>
     <string name="edit_accessibility_shortcut_menu_button" msgid="8885752738733772935">"แก้ไขทางลัด"</string>
     <string name="done_accessibility_shortcut_menu_button" msgid="3668407723770815708">"เสร็จ"</string>
@@ -2614,4 +2611,7 @@
     <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"การแจ้งเตือนทรัพยากรระบบ"</string>
     <string name="tv_watchdog_notification_title" msgid="195239206215922517">"การใช้ทรัพยากรมากเกินไป"</string>
     <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"แอป <xliff:g id="APP_NAME">%1$s</xliff:g> ใช้ทรัพยากรมากเกินไป"</string>
+    <string name="supervision_blocked_app_title" msgid="5546803865875383588">"อัปเดตจากผู้ปกครองของคุณ"</string>
+    <string name="supervision_blocked_app_content" msgid="4125452996088641559">"<xliff:g id="APP_NAME">%1$s</xliff:g> ถูกลบออกแล้วในตอนนี้"</string>
+    <string name="supervision_unblocked_app_content" msgid="8282985265957852278">"<xliff:g id="APP_NAME">%1$s</xliff:g> พร้อมใช้งานแล้ว"</string>
 </resources>

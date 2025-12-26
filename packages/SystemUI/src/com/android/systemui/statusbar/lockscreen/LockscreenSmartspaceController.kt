@@ -256,6 +256,9 @@ constructor(
         object : ContentObserver(handler) {
             override fun onChange(selfChange: Boolean, uri: Uri?) {
                 execution.assertIsMainThread()
+                if (session == null) {
+                    return
+                }
                 reloadSmartspace()
             }
         }
@@ -313,8 +316,6 @@ constructor(
 
     val isEnabled: Boolean = plugin != null
 
-    val isDateWeatherDecoupled: Boolean = datePlugin != null && weatherPlugin != null
-
     val isWeatherEnabled: Boolean
         get() {
             val showWeather =
@@ -335,9 +336,6 @@ constructor(
         if (!isEnabled) {
             throw RuntimeException("Cannot build view when not enabled")
         }
-        if (!isDateWeatherDecoupled) {
-            throw RuntimeException("Cannot build date view when not decoupled")
-        }
 
         val view =
             buildView(
@@ -357,9 +355,6 @@ constructor(
 
         if (!isEnabled) {
             throw RuntimeException("Cannot build view when not enabled")
-        }
-        if (!isDateWeatherDecoupled) {
-            throw RuntimeException("Cannot build weather view when not decoupled")
         }
 
         val view =
@@ -503,13 +498,13 @@ constructor(
 
         deviceProvisionedController.removeCallback(deviceProvisionedListener)
         userTracker.addCallback(userTrackerCallback, uiExecutor)
-        contentResolver.registerContentObserver(
+        secureSettings.registerContentObserverForUserAsync(
             secureSettings.getUriFor(LOCK_SCREEN_ALLOW_PRIVATE_NOTIFICATIONS),
             true,
             settingsObserver,
             UserHandle.USER_ALL,
         )
-        contentResolver.registerContentObserver(
+        secureSettings.registerContentObserverForUserAsync(
             secureSettings.getUriFor(LOCK_SCREEN_SHOW_NOTIFICATIONS),
             true,
             settingsObserver,
@@ -555,7 +550,7 @@ constructor(
             it.close()
         }
         userTracker.removeCallback(userTrackerCallback)
-        contentResolver.unregisterContentObserver(settingsObserver)
+        secureSettings.unregisterContentObserverAsync(settingsObserver)
         sysuiColorExtractor.removeOnColorsChangedListener(onColorsChangedListener)
         configurationController.removeCallback(configChangeListener)
         statusBarStateController.removeCallback(statusBarStateListener)
@@ -598,7 +593,7 @@ constructor(
     }
 
     private fun filterSmartspaceTarget(t: SmartspaceTarget): Boolean {
-        if (isDateWeatherDecoupled && t.featureType == SmartspaceTarget.FEATURE_WEATHER) {
+        if (t.featureType == SmartspaceTarget.FEATURE_WEATHER) {
             return false
         }
         if (!showNotifications) {

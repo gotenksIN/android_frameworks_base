@@ -199,7 +199,7 @@ public class PipTransition extends PipTransitionController implements
                 pipTransitionState, pipDisplayLayoutState, pipDesktopState, pipInteractionHandler,
                 pipScheduler, splitScreenControllerOptional, displayController);
         mRemoveHandler = new PipRemoveHandler(mContext, mPipSurfaceTransactionHelper,
-                pipBoundsState, pipTransitionState);
+                pipBoundsState, pipTransitionState, pipInteractionHandler);
         mContentPipHandler = new ContentPipHandler(mContext, mPipSurfaceTransactionHelper,
                 pipTransitionState);
         mPipDisplayChangeObserver = new PipDisplayChangeObserver(pipTransitionState,
@@ -231,15 +231,16 @@ public class PipTransition extends PipTransitionController implements
     //
 
     @Override
-    public void startExpandTransition(
+    public IBinder startExpandTransition(
             WindowContainerTransaction wct, boolean toSplit, boolean hasFirstHandler) {
-        if (wct == null) return;
+        if (wct == null) return null;
         mPipTransitionState.setState(PipTransitionState.EXITING_PIP);
         // If PiP wasn't visible, we don't necessarily want to animate using this handler, so we
         // only force it if it was visible.
         Transitions.TransitionHandler handler = hasFirstHandler ? this : null;
         mExitViaExpandTransition = mTransitions.startTransition(toSplit ? TRANSIT_EXIT_PIP_TO_SPLIT
                 : TRANSIT_EXIT_PIP, wct, handler);
+        return mExitViaExpandTransition;
     }
 
     @Override
@@ -763,6 +764,9 @@ public class PipTransition extends PipTransitionController implements
         }
 
         // This is used by display change listeners to respond properly to fixed rotation.
+        ProtoLog.d(WM_SHELL_PICTURE_IN_PICTURE,
+                "Set fixed rotation with startRotation=%d endRotation=%d fixedRotationChange=%s",
+                startRotation, endRotation, fixedRotationChange);
         mPipTransitionState.setInFixedRotation(true);
 
         // If we are running a fixed rotation bounds enter PiP animation,
@@ -1207,5 +1211,10 @@ public class PipTransition extends PipTransitionController implements
         final TaskInfo inPipTask = mPipTransitionState.getPipTaskInfo();
         return inPipTask != null && mPipTransitionState.isInPip()
                 && taskId == inPipTask.getTaskId();
+    }
+
+    @Override
+    public boolean isInPip() {
+        return mPipTransitionState.isInPip();
     }
 }

@@ -17,20 +17,20 @@
 package com.android.server.companion.virtual.computercontrol;
 
 import static android.companion.virtual.VirtualDeviceParams.DEVICE_POLICY_CUSTOM;
-import static android.companion.virtual.VirtualDeviceParams.DEVICE_POLICY_DEFAULT;
-import static android.companion.virtual.VirtualDeviceParams.POLICY_TYPE_ACTIVITY;
 import static android.companion.virtual.VirtualDeviceParams.POLICY_TYPE_AUDIO;
 import static android.companion.virtual.VirtualDeviceParams.POLICY_TYPE_BLOCKED_ACTIVITY;
 import static android.companion.virtual.VirtualDeviceParams.POLICY_TYPE_DEFAULT_DEVICE_CAMERA_ACCESS;
 import static android.companion.virtual.computercontrol.ComputerControlSession.CLOSE_REASON_CALLER_INITIATED;
+import static android.companion.virtual.computercontrol.ComputerControlSession.CLOSE_REASON_SESSION_EMPTY;
 import static android.companion.virtual.computercontrol.ComputerControlSession.CLOSE_REASON_SESSION_TIMED_OUT;
 
 import android.annotation.IntRange;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SuppressLint;
+import android.annotation.UserIdInt;
 import android.app.ActivityOptions;
-import android.companion.virtual.ActivityPolicyExemption;
+import android.app.PendingIntent;
 import android.companion.virtual.VirtualDeviceManager;
 import android.companion.virtual.VirtualDeviceManager.VirtualDevice;
 import android.companion.virtual.VirtualDeviceParams;
@@ -40,9 +40,7 @@ import android.companion.virtual.computercontrol.ComputerControlSessionParams;
 import android.companion.virtual.computercontrol.IComputerControlLifecycleCallback;
 import android.companion.virtual.computercontrol.IComputerControlSession;
 import android.companion.virtual.computercontrol.IInteractiveMirror;
-import android.companion.virtual.computercontrol.InteractiveMirror;
 import android.companion.virtual.computercontrol.LifecycleState;
-import android.companion.virtualdevice.flags.Flags;
 import android.content.AttributionSource;
 import android.content.ComponentName;
 import android.content.Context;
@@ -59,8 +57,6 @@ import android.hardware.display.VirtualDisplayConfig;
 import android.hardware.input.VirtualDpad;
 import android.hardware.input.VirtualDpadConfig;
 import android.hardware.input.VirtualKeyEvent;
-import android.hardware.input.VirtualKeyboard;
-import android.hardware.input.VirtualKeyboardConfig;
 import android.hardware.input.VirtualTouchEvent;
 import android.hardware.input.VirtualTouchscreen;
 import android.hardware.input.VirtualTouchscreenConfig;
@@ -72,7 +68,6 @@ import android.os.UserHandle;
 import android.util.ArraySet;
 import android.util.Slog;
 import android.view.DisplayInfo;
-import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
 import android.view.Surface;
 import android.view.SurfaceControl;
@@ -102,8 +97,8 @@ import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 /**
- * A computer control session that encapsulates a {@link IVirtualDevice}. The device is created and
- * managed by the system, but it is still owned by the caller.
+ * A computer control session that encapsulates a {@link android.companion.virtual.IVirtualDevice}.
+ * The device is created and managed by the system, but it is still owned by the caller.
  */
 final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         implements IBinder.DeathRecipient {
@@ -135,6 +130,12 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     static final float LONG_PRESS_TIMEOUT_MULTIPLIER = 1.5f;
     @VisibleForTesting
     static final long KEY_EVENT_DELAY_MS = 10L;
+    // The session will be closed whenever the display remains empty for this timeout period.
+    // This timeout is used to avoid closing the session immediately upon the display being empty
+    // to allow for transient cases of emptiness, like when an Activity is launched in a new task
+    // while the current task is finished.
+    @VisibleForTesting
+    static final long CLOSE_ON_DISPLAY_EMPTY_TIMEOUT_MS = 100L;
 
     // Vendor and Product IDs for Computer Control virtual input devices.
     // These values are likely unique within the VIRTUAL bus type, but they are not
@@ -166,11 +167,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     private final int mMainDisplayId;
     private final VirtualTouchscreen mVirtualTouchscreen;
     private final VirtualDpad mVirtualDpad;
-    @Nullable
-    private final VirtualKeyboard mVirtualKeyboard;
-    @Nullable // only until the Flags.computerControlInterceptAudio() is removed
     private final ComputerControlAudioCapture mAudioCapture;
-    @Nullable // only until the Flags.computerControlInterceptAudio() is removed
     private final ComputerControlAudioInjector mAudioInjector;
     private final ScheduledExecutorService mScheduler =
             Executors.newSingleThreadScheduledExecutor();
@@ -185,6 +182,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     private final long mGlobalSessionTimeoutDurationMs;
     private final Supplier<SurfaceControl.Transaction> mTransactionSupplier;
     private final ImageReader mBlockedStateImageReader;
+    private final ComputerControlAllowlistController mAllowlistController;
 
     @GuardedBy("mAllowlistedPackages")
     private final Set<String> mAllowlistedPackages = new ArraySet<>();
@@ -195,23 +193,17 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             new ComputerControlSession.LifecycleCallback() {
                 @Override
                 public void onActive() {
-                    reconfigureActivityPolicy(/* unlockPolicy= */ false);
-
                     mVirtualDisplay.setSurface(mClientSurface);
                 }
 
                 @Override
-                public void onBlocked(@ComputerControlSession.SessionCloseReason int reason) {
+                public void onBlocked(@ComputerControlSession.SessionCloseReason int reason,
+                        @Nullable String blockingPackage) {
                     cancelOngoingKeyGestures();
                     cancelOngoingTouchGestures();
-
-                    if (Flags.computerControlBlockInputAndScreenshots()) {
-                        // Prevent the client from being able to see the display by disconnecting
-                        // the client surface from the display.
-                        mVirtualDisplay.setSurface(mBlockedStateImageReader.getSurface());
-
-                        reconfigureActivityPolicy(/* unlockPolicy= */ true);
-                    }
+                    // Prevent the client from being able to see the display by disconnecting
+                    // the client surface from the display.
+                    mVirtualDisplay.setSurface(mBlockedStateImageReader.getSurface());
                 }
 
                 @Override
@@ -226,24 +218,34 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     private final Object mNotificationLock = new Object();
     @GuardedBy("mNotificationLock")
     private NotificationInfo mNotificationInfo = null;
+    private final Object mPreviewIntentLock = new Object();
+    @GuardedBy("mPreviewIntentLock")
+    private PendingIntent mPreviewIntent = null;
+
+    @GuardedBy("mInteractiveMirrors")
+    private final List<InteractiveMirrorImpl> mInteractiveMirrors = new ArrayList<>();
 
     private ScheduledFuture<?> mSwipeFuture;
     private ScheduledFuture<?> mInsertTextFuture;
     private ScheduledFuture<?> mCloseSessionFuture;
+    private ScheduledFuture<?> mDisplayEmptyScheduledAction;
     @Nullable
     private Surface mClientSurface;
 
-    ComputerControlSessionImpl(Context context, IBinder appToken,
+    ComputerControlSessionImpl(Context context,
+            ComputerControlAllowlistController allowlistController, IBinder appToken,
             ComputerControlSessionParams params, AttributionSource attributionSource,
             ComputerControlSessionProcessor.VirtualDeviceFactory virtualDeviceFactory,
             Consumer<ComputerControlSessionImpl> onClosedListener) {
-        this(context, DisplayManagerGlobal.getInstance(), ViewConfiguration.get(context),
-                DEFAULT_GLOBAL_SESSION_TIMEOUT_DURATION_MS, SurfaceControl.Transaction::new,
-                appToken, params, attributionSource, virtualDeviceFactory, onClosedListener);
+        this(context, DisplayManagerGlobal.getInstance(), allowlistController,
+                ViewConfiguration.get(context), DEFAULT_GLOBAL_SESSION_TIMEOUT_DURATION_MS,
+                SurfaceControl.Transaction::new, appToken, params, attributionSource,
+                virtualDeviceFactory, onClosedListener);
     }
 
     @VisibleForTesting
     ComputerControlSessionImpl(Context context, DisplayManagerGlobal displayManagerGlobal,
+            ComputerControlAllowlistController allowlistController,
             ViewConfiguration viewConfiguration, long globalSessionTimeoutDurationMs,
             Supplier<SurfaceControl.Transaction> transactionSupplier, IBinder appToken,
             ComputerControlSessionParams params, AttributionSource attributionSource,
@@ -255,6 +257,8 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         mTransactionSupplier = transactionSupplier;
         mAppToken = appToken;
         mParams = params;
+        mAllowlistController = allowlistController;
+        mPreviewIntent = params.getPreviewIntent();
 
         mOwnerUser = UserHandle.getUserHandleForUid(attributionSource.getUid());
         mOwnerContext = context.createContextAsUser(mOwnerUser, /* flags = */ 0);
@@ -284,37 +288,26 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         final VirtualDeviceParams.Builder virtualDeviceParamsBuilder =
                 new VirtualDeviceParams.Builder()
                     .setName(mParams.getName())
+                    .setLocalDeviceOnly(true)
                     .setDevicePolicy(POLICY_TYPE_BLOCKED_ACTIVITY, DEVICE_POLICY_CUSTOM)
                     .setDevicePolicy(POLICY_TYPE_DEFAULT_DEVICE_CAMERA_ACCESS,
-                            DEVICE_POLICY_CUSTOM);
-        if (Flags.computerControlUserRestriction()) {
-            // TODO: b/451568055 - Support cross-user sessions.
-            virtualDeviceParamsBuilder.setAllowedUsers(Set.of(mOwnerUser));
-        }
-        if (Flags.computerControlInterceptAudio()) {
-            virtualDeviceParamsBuilder.setDevicePolicy(POLICY_TYPE_AUDIO, DEVICE_POLICY_CUSTOM);
-        }
+                            DEVICE_POLICY_CUSTOM)
+                    .setDevicePolicy(POLICY_TYPE_AUDIO, DEVICE_POLICY_CUSTOM);
         final VirtualDeviceParams virtualDeviceParams = virtualDeviceParamsBuilder.build();
 
-        int displayFlags = DisplayManager.VIRTUAL_DISPLAY_FLAG_TRUSTED
-                | DisplayManager.VIRTUAL_DISPLAY_FLAG_ALWAYS_UNLOCKED
-                | DisplayManager.VIRTUAL_DISPLAY_FLAG_STEAL_TOP_FOCUS_DISABLED;
-
-        final DisplayInfo mainDisplayInfo = mDisplayManagerGlobal.getDisplayInfo(mMainDisplayId);
-        final int displayWidth = mainDisplayInfo.logicalWidth;
-        final int displayHeight = mainDisplayInfo.logicalHeight;
-        final VirtualDisplayConfig virtualDisplayConfig = new VirtualDisplayConfig.Builder(
-                mParams.getName() + "-display", displayWidth, displayHeight,
-                mainDisplayInfo.logicalDensityDpi)
-                .setFlags(displayFlags)
-                .build();
+        final VirtualDisplayConfig virtualDisplayConfig = createSessionDisplayConfig(
+                mParams.getName() + "-display",
+                mDisplayManagerGlobal.getDisplayInfo(mMainDisplayId));
+        final int displayWidth = virtualDisplayConfig.getWidth();
+        final int displayHeight = virtualDisplayConfig.getHeight();
 
         mBlockedStateImageReader = ImageReader.newInstance(displayWidth, displayHeight,
                 PixelFormat.RGBA_8888, /* maxImages= */ 1);
 
         try {
-            mVirtualDevice = virtualDeviceFactory.createVirtualDevice(mAppToken, attributionSource,
-                    virtualDeviceParams);
+            mVirtualDevice = Binder.withCleanCallingIdentity(
+                    () -> virtualDeviceFactory.createVirtualDevice(mAppToken, attributionSource,
+                            virtualDeviceParams));
             mVirtualDeviceId = mVirtualDevice.getDeviceId();
             mVirtualDevice.addActivityListener(mScheduler, new ComputerControlActivityListener());
 
@@ -329,10 +322,8 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             });
             mVirtualDisplayId = mVirtualDisplay.getDisplay().getDisplayId();
 
-            if (Flags.computerControlShowTouches()) {
-                mInputManagerInternal.setForceShowTouchesOnDisplay(mVirtualDisplayId,
-                        true /* enabled */);
-            }
+            mInputManagerInternal.setForceShowTouchesOnDisplay(mVirtualDisplayId,
+                    true /* enabled */);
 
             mVirtualDevice.setDisplayImePolicy(
                     mVirtualDisplayId, WindowManager.DISPLAY_IME_POLICY_HIDE);
@@ -350,20 +341,6 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
                             .build();
             mVirtualDpad = mVirtualDevice.createVirtualDpad(virtualDpadConfig);
 
-            if (!android.companion.virtualdevice.flags.Flags.computerControlTyping()) {
-                final String keyboardName = inputDeviceNamePrefix + "-kbrd";
-                final VirtualKeyboardConfig virtualKeyboardConfig =
-                        new VirtualKeyboardConfig.Builder()
-                                .setAssociatedDisplayId(mVirtualDisplayId)
-                                .setInputDeviceName(keyboardName)
-                                .setVendorId(VENDOR_ID)
-                                .setProductId(PRODUCT_ID_KEYBOARD)
-                                .build();
-                mVirtualKeyboard = mVirtualDevice.createVirtualKeyboard(virtualKeyboardConfig);
-            } else {
-                mVirtualKeyboard = null;
-            }
-
             final String touchscreenName = inputDeviceNamePrefix + "-tscr";
             final VirtualTouchscreenConfig virtualTouchscreenConfig =
                     new VirtualTouchscreenConfig.Builder(displayWidth, displayHeight)
@@ -374,24 +351,47 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
                             .build();
             mVirtualTouchscreen = mVirtualDevice.createVirtualTouchscreen(virtualTouchscreenConfig);
 
-            if (Flags.computerControlInterceptAudio()) {
-                // Take control of the audio streams
-                VirtualAudioDevice virtualAudioDevice = mVirtualDevice.createVirtualAudioDevice(
-                        mVirtualDisplay, null, null);
-                mAudioInjector = new ComputerControlAudioInjector(virtualAudioDevice);
-                mAudioInjector.startAudioInjection();
-                mAudioCapture = new ComputerControlAudioCapture(virtualAudioDevice);
-                mAudioCapture.startAudioCapture();
-            } else {
-                mAudioInjector = null;
-                mAudioCapture = null;
-            }
+            // Take control of the audio streams
+            VirtualAudioDevice virtualAudioDevice = mVirtualDevice.createVirtualAudioDevice(
+                    mVirtualDisplay, null, null);
+            mAudioInjector = new ComputerControlAudioInjector(virtualAudioDevice);
+            mAudioInjector.startAudioInjection();
+            mAudioCapture = new ComputerControlAudioCapture(virtualAudioDevice);
+            mAudioCapture.startAudioCapture();
 
             mAppToken.linkToDeath(this, 0);
             startSessionCloseGlobalTimeout();
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
+    }
+
+    /**
+     * Create the session's display to have the same size and density as that of the main display
+     * when it is in its natural orientation.
+     */
+    private static VirtualDisplayConfig createSessionDisplayConfig(String name,
+            DisplayInfo mainDisplayInfo) {
+        final int displayFlags = DisplayManager.VIRTUAL_DISPLAY_FLAG_TRUSTED
+                | DisplayManager.VIRTUAL_DISPLAY_FLAG_ALWAYS_UNLOCKED
+                | DisplayManager.VIRTUAL_DISPLAY_FLAG_STEAL_TOP_FOCUS_DISABLED;
+
+        final int displayWidth;
+        final int displayHeight;
+        if (mainDisplayInfo.rotation == Surface.ROTATION_90
+                || mainDisplayInfo.rotation == Surface.ROTATION_270) {
+            displayWidth = mainDisplayInfo.logicalHeight;
+            displayHeight = mainDisplayInfo.logicalWidth;
+        } else {
+            displayWidth = mainDisplayInfo.logicalWidth;
+            displayHeight = mainDisplayInfo.logicalHeight;
+        }
+
+        return new VirtualDisplayConfig.Builder(
+                name, displayWidth, displayHeight,
+                mainDisplayInfo.logicalDensityDpi)
+                .setFlags(displayFlags)
+                .build();
     }
 
     int getVirtualDisplayId() {
@@ -435,19 +435,23 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             throw new IllegalArgumentException(
                     "Could not find launcher activity for " + packageName + "/" + className);
         }
-        if (Flags.computerControlActivityPolicyStrict()) {
-            // TODO(b/444600407): Remove this once the consent model is per-target app. While the
-            // consent is general, the caller can extend the list of target packages dynamically.
-            if (!(mLifecycle.getCurrentState() instanceof LifecycleState.Active)) {
-                Slog.e(TAG, "Cannot launch application: Agent interaction is not available");
-                return;
-            }
-            synchronized (mAllowlistedPackages) {
-                mAllowlistedPackages.add(packageName);
-            }
-            mVirtualDevice.addActivityPolicyExemption(
-                    new ActivityPolicyExemption.Builder().setPackageName(packageName).build());
+        if (!mAllowlistController.isPackageAutomatable(packageName)) {
+            throw new IllegalArgumentException(
+                    "Trying to launch " + packageName + " which is not allowlisted");
         }
+
+        // TODO(b/444600407): Remove this once the consent model is per-target app. While the
+        // consent is general, the caller can extend the list of target packages dynamically.
+        if (!(mLifecycle.getCurrentState() instanceof LifecycleState.Active)) {
+            Slog.e(TAG, "Cannot launch application: Agent interaction is not available");
+            return;
+        }
+        synchronized (mAllowlistedPackages) {
+            mAllowlistedPackages.add(packageName);
+        }
+        // If we block input and screenshots in the blocked state, we simply allow all
+        // activities to launch. We detect blocked state automatically when an activity
+        // launch request comes in for a package that's not allowed to launch.
         Binder.withCleanCallingIdentity(() ->
                 mContext.startActivityAsUser(intent,
                         ActivityOptions.makeBasic()
@@ -458,6 +462,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     public void handOverApplications() {
         Binder.withCleanCallingIdentity(
                 () -> moveAllTasks(mVirtualDisplayId, mMainDisplayId));
+        close(CLOSE_REASON_SESSION_EMPTY);
     }
 
     @Override
@@ -517,19 +522,36 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
 
     @Override
     @Nullable
-    public IInteractiveMirror createInteractiveMirror(SurfaceControl outMirrorSurface)
-            throws RemoteException {
+    public IInteractiveMirror createInteractiveMirror(SurfaceControl outMirrorSurface) {
+        final var mirror = createInteractiveMirrorImpl();
+        if (mirror == null) {
+            return null;
+        }
+        synchronized (mInteractiveMirrors) {
+            mInteractiveMirrors.add(mirror);
+        }
+        outMirrorSurface.copyFrom(mirror.getMirrorLeash(),
+                "ComputerControlSessionImpl#createInteractiveMirrorDisplay");
+        return mirror;
+    }
+
+    @Nullable
+    private InteractiveMirrorImpl createInteractiveMirrorImpl() {
+        // NOTE: The mirror surface must not be leaked to the client app!
         final var mirrorSurface =
                 mWindowManagerInternal.createMirrorForDisplayContent(mVirtualDisplayId);
         if (mirrorSurface == null) {
             return null;
         }
-        outMirrorSurface.copyFrom(mirrorSurface,
-                "ComputerControlSessionImpl#createInteractiveMirrorDisplay");
-        final var mirror = new InteractiveMirrorImpl(mirrorSurface, mTransactionSupplier,
-                mDisplayManagerGlobal.getDisplayInfo(mVirtualDisplayId), mInputManagerInternal);
-        mirror.setInteractive(InteractiveMirror.DEFAULT_INTERACTIVE);
-        return mirror;
+        return new InteractiveMirrorImpl(mirrorSurface, mTransactionSupplier,
+                mDisplayManagerGlobal.getDisplayInfo(mVirtualDisplayId), mInputManagerInternal,
+                this::onInteractiveMirrorClosed);
+    }
+
+    private void onInteractiveMirrorClosed(InteractiveMirrorImpl interactiveMirror) {
+        synchronized (mInteractiveMirrors) {
+            mInteractiveMirrors.remove(interactiveMirror);
+        }
     }
 
     @SuppressLint("WrongConstant")
@@ -539,64 +561,34 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             return;
         }
         cancelOngoingKeyGestures();
-        if (android.companion.virtualdevice.flags.Flags.computerControlTyping()) {
-            IRemoteComputerControlInputConnection ic = getInputConnection(mVirtualDisplayId);
-            if (ic == null) {
-                Slog.e(TAG, "Unable to insert text: No input connection found!");
-                return;
-            }
-            // TODO(b/422134565): Implement client invoker logic to pass the correct session id when
-            //  "client text view" invalidates input while view remains focused.
-            //  Currently, if we set text using A11y nodes or the application sets text into the
-            //  text field outside of input connection (while text view is focused), CC session will
-            //  no longer be able to insert text until the text view restarts the input connection.
-            try {
-                if (replaceExisting) {
-                    ic.replaceText(new InputConnectionCommandHeader(0), 0 /* start */,
-                            Integer.MAX_VALUE /* end */, text, 1 /* newCursorPosition */);
-                } else {
-                    ic.commitText(new InputConnectionCommandHeader(0), text,
-                            1 /* newCursorPosition */);
-                }
-                // TODO(b/422134565): Use right editor action to commit text instead key enter
-                if (commit) {
-                    ic.sendKeyEvent(new InputConnectionCommandHeader(0),
-                            new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER));
-                    ic.sendKeyEvent(new InputConnectionCommandHeader(0),
-                            new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER));
-                }
-            } catch (RemoteException e) {
-                Slog.e(TAG, "Unable to insert text through InputConnection", e);
-            }
-        } else {
-            KeyCharacterMap kcm = KeyCharacterMap.load(KeyCharacterMap.VIRTUAL_KEYBOARD);
-            KeyEvent[] events = kcm.getEvents(text.toCharArray());
 
-            if (events == null) {
-                Slog.e(TAG, "Couldn't generate key events from the provided text");
-                return;
-            }
-            List<VirtualKeyEvent> keysToSend = new ArrayList<>();
+        IRemoteComputerControlInputConnection ic = getInputConnection(mVirtualDisplayId);
+        if (ic == null) {
+            Slog.e(TAG, "Unable to insert text: No input connection found!");
+            return;
+        }
+        // TODO(b/422134565): Implement client invoker logic to pass the correct session id when
+        //  "client text view" invalidates input while view remains focused.
+        //  Currently, if we set text using A11y nodes or the application sets text into the
+        //  text field outside of input connection (while text view is focused), CC session will
+        //  no longer be able to insert text until the text view restarts the input connection.
+        try {
             if (replaceExisting) {
-                keysToSend.add(
-                        createKeyEvent(KeyEvent.KEYCODE_CTRL_LEFT, VirtualKeyEvent.ACTION_DOWN));
-                keysToSend.add(createKeyEvent(KeyEvent.KEYCODE_A, VirtualKeyEvent.ACTION_DOWN));
-                keysToSend.add(createKeyEvent(KeyEvent.KEYCODE_A, VirtualKeyEvent.ACTION_UP));
-                keysToSend.add(
-                        createKeyEvent(KeyEvent.KEYCODE_CTRL_LEFT, VirtualKeyEvent.ACTION_UP));
-                keysToSend.add(createKeyEvent(KeyEvent.KEYCODE_DEL, VirtualKeyEvent.ACTION_DOWN));
-                keysToSend.add(createKeyEvent(KeyEvent.KEYCODE_DEL, VirtualKeyEvent.ACTION_UP));
+                ic.replaceText(new InputConnectionCommandHeader(0), 0 /* start */,
+                        Integer.MAX_VALUE /* end */, text, 1 /* newCursorPosition */);
+            } else {
+                ic.commitText(new InputConnectionCommandHeader(0), text,
+                        1 /* newCursorPosition */);
             }
-
-            for (KeyEvent event : events) {
-                keysToSend.add(createKeyEvent(event.getKeyCode(), event.getAction()));
-            }
-
+            // TODO(b/422134565): Use right editor action to commit text instead key enter
             if (commit) {
-                keysToSend.add(createKeyEvent(KeyEvent.KEYCODE_ENTER, VirtualKeyEvent.ACTION_DOWN));
-                keysToSend.add(createKeyEvent(KeyEvent.KEYCODE_ENTER, VirtualKeyEvent.ACTION_UP));
+                ic.sendKeyEvent(new InputConnectionCommandHeader(0),
+                        new KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_ENTER));
+                ic.sendKeyEvent(new InputConnectionCommandHeader(0),
+                        new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_ENTER));
             }
-            performKeyStep(keysToSend, 0);
+        } catch (RemoteException e) {
+            Slog.e(TAG, "Unable to insert text through InputConnection", e);
         }
     }
 
@@ -607,6 +599,13 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
                 throw new IllegalStateException("Notification info already set");
             }
             mNotificationInfo = new NotificationInfo(notificationId, notificationTag);
+        }
+    }
+
+    @Override
+    public void setPreviewIntent(@Nullable PendingIntent previewIntent) {
+        synchronized (mPreviewIntentLock) {
+            mPreviewIntent = previewIntent;
         }
     }
 
@@ -637,38 +636,24 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         cancelOngoingKeyGestures();
         cancelOngoingTouchGestures();
         cancelPendingCloseSession();
-        if (mAudioInjector != null) {
-            mAudioInjector.stopAudioInjection();
-        }
-        if (mAudioCapture != null) {
-            mAudioCapture.stopAudioCapture();
-        }
+        mAudioInjector.stopAudioInjection();
+        mAudioCapture.stopAudioCapture();
         mVirtualDevice.close(); // closes also the VirtualAudioDevice
         mAppToken.unlinkToDeath(this, 0);
+        closeInteractiveMirrors();
         mOnClosedListener.accept(this);
     }
 
-    private void reconfigureActivityPolicy(boolean unlockPolicy) {
-        List<String> exemptedPackageNames = new ArrayList<>();
-        if (Flags.computerControlActivityPolicyStrict()) {
-            if (unlockPolicy) {
-                mVirtualDevice.setDevicePolicy(POLICY_TYPE_ACTIVITY, DEVICE_POLICY_DEFAULT);
-            } else {
-                mVirtualDevice.setDevicePolicy(POLICY_TYPE_ACTIVITY, DEVICE_POLICY_CUSTOM);
-                exemptedPackageNames.addAll(mAllowlistedPackages);
+    private void closeInteractiveMirrors() {
+        synchronized (mInteractiveMirrors) {
+            try (var transaction = mTransactionSupplier.get()) {
+                // Closing a mirror modifies mInteractiveMirrors, so make a copy of the list.
+                final var mirrorsCopy = new ArrayList<>(mInteractiveMirrors);
+                for (int i = 0; i < mirrorsCopy.size(); i++) {
+                    mirrorsCopy.get(i).closeWithTransaction(transaction);
+                }
+                transaction.apply();
             }
-        } else {
-            // This legacy policy allows all apps other than PermissionController to be automated.
-            String permissionControllerPackage =
-                    mContext.getPackageManager().getPermissionControllerPackageName();
-            exemptedPackageNames.add(permissionControllerPackage);
-        }
-        for (int i = 0; i < exemptedPackageNames.size(); i++) {
-            String exemptedPackageName = exemptedPackageNames.get(i);
-            mVirtualDevice.addActivityPolicyExemption(
-                    new ActivityPolicyExemption.Builder()
-                            .setPackageName(exemptedPackageName)
-                            .build());
         }
     }
 
@@ -693,22 +678,6 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         mSwipeFuture = mScheduler.schedule(
                 () -> performSwipeStep(fromX, fromY, toX, toY, nextStep, stepCount),
                 TOUCH_EVENT_DELAY_MS, TimeUnit.MILLISECONDS);
-    }
-
-    private void performKeyStep(List<VirtualKeyEvent> keysToSend, int currStep) {
-        if (mVirtualKeyboard == null) {
-            return;
-        }
-        final int nextStep = currStep + 1;
-        mVirtualKeyboard.sendKeyEvent(keysToSend.get(currStep));
-        if (nextStep >= keysToSend.size()) {
-            mInsertTextFuture = null;
-            return;
-        }
-
-        mInsertTextFuture = mScheduler.schedule(
-                () -> performKeyStep(keysToSend, nextStep), KEY_EVENT_DELAY_MS,
-                TimeUnit.MILLISECONDS);
     }
 
     private void startSessionCloseGlobalTimeout() {
@@ -744,6 +713,18 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
                 : prefix;
     }
 
+    private boolean isActivityLaunchAllowed(@NonNull ComponentName componentName,
+            @UserIdInt int userId) {
+        synchronized (mAllowlistedPackages) {
+            if (!mAllowlistedPackages.contains(componentName.getPackageName())) {
+                return false;
+            }
+        }
+
+        // TODO: b/451568055 - Support cross-user sessions.
+        return userId == UserHandle.USER_SYSTEM || userId == mOwnerUser.getIdentifier();
+    }
+
     private Intent getLaunchIntent(String packageName, String className) {
         if (className == null) {
             return mOwnerContext.getPackageManager().getLaunchIntentForPackage(packageName);
@@ -771,6 +752,16 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         mActivityTaskManagerInternal.moveAllTasks(fromDisplayId, toDisplayId);
     }
 
+    private boolean shouldDisallowInteractions(String callSite) {
+        // TODO: b/452428736 - Find a long term solution for blocking agent interactions.
+        if (!(mLifecycle.getCurrentState() instanceof LifecycleState.Active)) {
+            Slog.w(TAG, "Computer control interaction blocked since session is not active: "
+                    + callSite);
+            return true;
+        }
+        return false;
+    }
+
     private static VirtualTouchEvent createTouchEvent(int x, int y,
             @VirtualTouchEvent.Action int action) {
         return new VirtualTouchEvent.Builder()
@@ -794,27 +785,32 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
                 .build();
     }
 
+    private void cancelDisplayEmptyScheduledAction() {
+        final var action = mDisplayEmptyScheduledAction;
+        if (action != null) {
+            action.cancel(false);
+        }
+    }
+
     private class ComputerControlActivityListener implements VirtualDeviceManager.ActivityListener {
         @Override
-        public void onTopActivityChanged(int displayId, @NonNull ComponentName topActivity) {
-            Slog.v(TAG, "Top activity changed to " + topActivity);
-            synchronized (mAllowlistedPackages) {
+        public void onTopActivityChanged(int displayId, @NonNull ComponentName topActivity) {}
+
+        @Override
+        public void onTopActivityChanged(int displayId, @NonNull ComponentName topActivity,
+                @UserIdInt int userId) {
+            Slog.v(TAG, "Top activity changed to " + topActivity + " for user " + userId);
+            cancelDisplayEmptyScheduledAction();
+
+            if (topActivity.getPackageName().equals(CUSTOM_BLOCKED_APP_PACKAGE)) {
+                return;
+            }
+
+            // If we have a new top activity which is allowed, then attempt a transition to the
+            // active state.
+            if (isActivityLaunchAllowed(topActivity, userId)) {
                 mLifecycle.updateLifecycleState((config) -> {
-                    if (config.mBlockedActivityVisible && mAllowlistedPackages.contains(
-                            topActivity.getPackageName())) {
-                        // In the short term, stay in the blocked state as long as content from the
-                        // custom blocked dialog package is visible.
-                        // TODO: b/441475896 - Remove this condition when we stop showing the
-                        //  custom blocked dialog activity.
-                        if (topActivity.getPackageName().equals(CUSTOM_BLOCKED_APP_PACKAGE)) {
-                            return;
-                        }
-                        // The top activity is now no longer a blocked activity so unblock the
-                        // session.
-                        // TODO: b/441475896 - Do not rely only on the top activity, but took a
-                        //  all running activities on the display.
-                        config.mBlockedActivityVisible = false;
-                    }
+                    config.mBlockingActivityPackage = null;
                 });
             }
         }
@@ -823,58 +819,51 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         public void onDisplayEmpty(int displayId) {
             Slog.v(TAG, "Display empty");
             mLifecycle.updateLifecycleState((config) -> {
-                config.mBlockedActivityVisible = false;
-                // We cannot currently assume all secure windows are gone when the display is empty.
-                // Therefore mSecureWindowVisible cannot be update here for now.
-                // TODO: b/449765707 - Investigate and update mSecureWindowVisible.
+                config.mBlockingActivityPackage = null;
+                config.mSecureWindowPackage = null;
             });
+            cancelDisplayEmptyScheduledAction();
+            // Close the session if the display remains empty after the timeout.
+            mDisplayEmptyScheduledAction = mScheduler.schedule(
+                    () -> close(CLOSE_REASON_SESSION_EMPTY),
+                    CLOSE_ON_DISPLAY_EMPTY_TIMEOUT_MS,
+                    TimeUnit.MILLISECONDS);
         }
 
         @Override
         @SuppressLint("AndroidFrameworkRequiresPermission")
         public void onActivityLaunchBlocked(int displayId, @NonNull ComponentName componentName,
                 @NonNull UserHandle user, IntentSender intentSender) {
-            Slog.v(TAG, "Blocked activity launch for " + componentName + " on session "
-                    + mParams.getName());
-            final var changedState = mLifecycle.updateLifecycleState(
-                    (config) -> config.mBlockedActivityVisible = true);
-            if (Flags.computerControlBlockedState()) {
-                if (!(changedState instanceof LifecycleState.Blocked)) {
-                    return;
-                }
-                if (Flags.computerControlBlockInputAndScreenshots()) {
-                    try {
-                        intentSender.sendIntent(mContext, 0, null, null, null);
-                    } catch (IntentSender.SendIntentException e) {
-                        Slog.e(TAG, "Failed to start blocked activity's intent, closing session.",
-                                e);
-                        close(CLOSE_REASON_CALLER_INITIATED);
-                    }
-                    // Early return to avoid showing the blocked activity dialog.
-                    return;
-                }
-            }
-            Intent intent = new Intent()
-                    .setComponent(CUSTOM_BLOCKED_APP_ACTIVITY)
-                    .putExtra(Intent.EXTRA_COMPONENT_NAME, componentName);
-            mContext.startActivityAsUser(
-                    intent.addFlags(
-                            Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK),
-                    ActivityOptions.makeBasic().setLaunchDisplayId(displayId).toBundle(),
-                    UserHandle.SYSTEM);
+            Slog.w(TAG, "Unexpectedly blocked activity launch for " + componentName
+                    + " on session " + mParams.getName());
         }
 
         @Override
         public void onSecureWindowShown(int displayId, @NonNull ComponentName componentName,
                 @NonNull UserHandle user) {
             Slog.v(TAG, "Secure window shown for " + componentName);
-            mLifecycle.updateLifecycleState((config) -> config.mSecureWindowVisible = true);
+            mLifecycle.updateLifecycleState((config) -> config.mSecureWindowPackage =
+                    Objects.requireNonNull(componentName.getPackageName()));
         }
 
         @Override
         public void onSecureWindowHidden(int displayId) {
             Slog.v(TAG, "Secure window hidden");
-            mLifecycle.updateLifecycleState((config) -> config.mSecureWindowVisible = false);
+            mLifecycle.updateLifecycleState((config) -> config.mSecureWindowPackage = null);
+        }
+
+        @Override
+        public void onActivityLaunchRequested(int displayId, @NonNull ComponentName componentName,
+                @UserIdInt int userId) {
+            Slog.v(TAG, "Activity launch requested for " + componentName + " for user "
+                    + userId);
+            // If we have an activity launch request which is not allowed, then transition to
+            // blocked state.
+            if (!isActivityLaunchAllowed(componentName, userId)) {
+                mLifecycle.updateLifecycleState(
+                        (config) -> config.mBlockingActivityPackage =
+                                Objects.requireNonNull(componentName.getPackageName()));
+            }
         }
     }
 
@@ -901,16 +890,5 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         public int hashCode() {
             return Objects.hash(mNotificationId, mNotificationTag);
         }
-    }
-
-    private boolean shouldDisallowInteractions(String callsite) {
-        // TODO: b/452428736 - Find a long term solution for blocking agent interactions.
-        if (Flags.computerControlBlockedState() && Flags.computerControlBlockInputAndScreenshots()
-                && !(mLifecycle.getCurrentState() instanceof LifecycleState.Active)) {
-            Slog.w(TAG, "Computer control interaction blocked since session is not active: "
-                    + callsite);
-            return true;
-        }
-        return false;
     }
 }

@@ -48,6 +48,7 @@ import com.android.systemui.SysuiTestCase;
 import com.android.systemui.animation.DialogTransitionAnimator;
 import com.android.systemui.kosmos.KosmosJavaAdapter;
 import com.android.systemui.res.R;
+import com.android.systemui.retail.domain.interactor.RetailModeInteractor;
 import com.android.systemui.shade.domain.interactor.FakeShadeDialogContextInteractor;
 import com.android.systemui.statusbar.phone.SystemUIDialog;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
@@ -103,6 +104,8 @@ public class InternetDialogDelegateLegacyTest extends SysuiTestCase {
     private SystemUIDialog mSystemUIDialog;
     @Mock
     private Window mWindow;
+    @Mock
+    private RetailModeInteractor mRetailModeInteractor;
 
     private FakeExecutor mBgExecutor = new FakeExecutor(new FakeSystemClock());
     private InternetDialogDelegateLegacy mInternetDialogDelegateLegacy;
@@ -128,6 +131,7 @@ public class InternetDialogDelegateLegacyTest extends SysuiTestCase {
     @Before
     public void setUp() {
         MockitoAnnotations.initMocks(this);
+        when(mRetailModeInteractor.isInRetailMode()).thenReturn(false);
         doReturn(mTelephonyManager).when(mTelephonyManager).createForSubscriptionId(anyInt());
         when(mInternetWifiEntry.getTitle()).thenReturn(WIFI_TITLE);
         when(mInternetWifiEntry.getSummary(false)).thenReturn(WIFI_SUMMARY);
@@ -171,7 +175,8 @@ public class InternetDialogDelegateLegacyTest extends SysuiTestCase {
                 mKeyguard,
                 mSystemUIDialogFactory,
                 new FakeShadeDialogContextInteractor(mContext),
-                mKosmos.getShadeModeInteractor());
+                mKosmos.getShadeModeInteractor(),
+                mRetailModeInteractor);
         mInternetDialogDelegateLegacy.createDialog();
         mInternetDialogDelegateLegacy.onCreate(mSystemUIDialog, null);
         mInternetDialogDelegateLegacy.mAdapter = mInternetAdapter;

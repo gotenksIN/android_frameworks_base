@@ -34,6 +34,7 @@ import static android.internal.perfetto.protos.Windowmanagerservice.IdentifierPr
 import static android.internal.perfetto.protos.Windowmanagerservice.IdentifierProto.USER_ID;
 import static android.internal.perfetto.protos.Windowmanagerservice.WindowContainerChildProto.WINDOW;
 import static android.internal.perfetto.protos.Windowmanagerservice.WindowStateProto.ANIMATING_EXIT;
+import static android.internal.perfetto.protos.Windowmanagerservice.WindowStateProto.ANIMATING_TYPES;
 import static android.internal.perfetto.protos.Windowmanagerservice.WindowStateProto.ANIMATOR;
 import static android.internal.perfetto.protos.Windowmanagerservice.WindowStateProto.ATTRIBUTES;
 import static android.internal.perfetto.protos.Windowmanagerservice.WindowStateProto.BUFFER_SEQ_ID;
@@ -643,7 +644,6 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
      */
     private PowerManager.WakeLock mDrawLock;
 
-    private final Rect mTmpRect = new Rect();
     private final Point mTmpPoint = new Point();
     private final Region mTmpRegion = new Region();
 
@@ -1162,6 +1162,13 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         getPendingTransaction().setCanOccludePresentation(mSurfaceControl, canOccludePresentation);
     }
 
+    @Override
+    boolean showSurfaceOnCreation() {
+        // The visibility of WindowState's surface will be set by WindowStateAnimator if the client
+        // owns its surface.
+        return !WindowManager.useClientSurface();
+    }
+
     void updateTrustedOverlay() {
         mInputWindowHandle.setTrustedOverlay(getPendingTransaction(), mSurfaceControl,
                 isWindowTrustedOverlay());
@@ -1177,7 +1184,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             return true;
         }
         if (((mAttrs.privateFlags & PRIVATE_FLAG_SYSTEM_APPLICATION_OVERLAY) != 0
-                && mSession.canCreateSystemApplicationOverlay())) {
+                && mSession.canCreateSystemApplicationOverlay(this))) {
             return true;
         }
         return false;
@@ -3108,7 +3115,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         }
 
         if (baseType == TYPE_APPLICATION_OVERLAY && mAttrs.isSystemApplicationOverlay()
-                && mSession.canCreateSystemApplicationOverlay()) {
+                && mSession.canCreateSystemApplicationOverlay(this)) {
             return;
         }
 
@@ -3251,7 +3258,9 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         try {
             if (DEBUG_VISIBILITY) Slog.v(TAG,
                     "Setting visibility of " + this + ": " + clientVisible);
-            final int seqId = clientVisible ? incrementSeqForRelayout() : -1;
+            final int seqId = clientVisible
+                    && (!mLastConfigReportedToClient || !WindowManager.useClientSurface())
+                    ? incrementSeqForRelayout() : -1;
             if (Trace.isTagEnabled(TRACE_TAG_WINDOW_MANAGER)) {
                 Trace.instant(TRACE_TAG_WINDOW_MANAGER, "wm.sendAppVis_" + getWindowTag()
                         + " id=" + seqId + " vis=" + clientVisible + " surf=" + mHasSurface);
@@ -3278,6 +3287,33 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             // Make sure the app can report drawn if it becomes visible again.
             forceReportingResized();
         }
+    }
+
+    void setClientSurface(@NonNull SurfaceControl surface) {
+        if (mWinAnimator.mSurfaceControl == surface) {
+            return;
+        }
+        if (mWinAnimator.mSurfaceControl != null
+                && mWinAnimator.mSurfaceControl.isSameSurface(surface)) {
+            if (!isClientLocal()) {
+                // Release the instance of the same surface from parcel.
+                surface.release();
+            }
+            return;
+        }
+        Slog.d(TAG, "setClientSurface " + surface + " for " + mName);
+        if (!surface.isValid()) {
+            return;
+        }
+        if (mWinAnimator.mSurfaceControl != null) {
+            getPendingTransaction().remove(mWinAnimator.mSurfaceControl);
+        }
+        mWinAnimator.mSurfaceControl = isClientLocal()
+                ? new SurfaceControl(surface, "setClientSurface") : surface;
+        getPendingTransaction().reparent(surface, mSurfaceControl);
+        mWinAnimator.resetDrawState();
+        setHasSurface(true);
+        mInputWindowHandle.forceChange();
     }
 
     boolean destroySurface(boolean cleanupOnResume, boolean appStopped) {
@@ -3373,7 +3409,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         return isPublicPresentation() || mAttrs.type == TYPE_PRIVATE_PRESENTATION;
     }
 
-    private boolean isOnVirtualDisplay() {
+    boolean isOnVirtualDisplay() {
         return getDisplayContent().mDisplay.getType() == Display.TYPE_VIRTUAL;
     }
 
@@ -4081,6 +4117,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         proto.write(HAS_COMPAT_SCALE, hasCompatScale());
         proto.write(GLOBAL_SCALE, mGlobalScale);
         proto.write(REQUESTED_VISIBLE_TYPES, mRequestedVisibleTypes);
+        proto.write(ANIMATING_TYPES, mAnimatingTypes);
         for (Rect r : mKeepClearAreas) {
             r.dumpDebug(proto, KEEP_CLEAR_AREAS);
         }

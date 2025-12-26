@@ -34,5 +34,9 @@ object ScreenCaptureRecordFeaturesInteractor {
     val shouldShowNewToolbar: Boolean
         get() = isNewScreenRecordToolbarEnabled || isLargeScreenRecordingEnabled
 
-    val isMarkupAvailable: Boolean = true
+    val isMarkupAvailable: Boolean
+        get() = Flags.newScreenRecordToolbarMarkup()
+
+    val isSelfieAvailable: Boolean
+        get() = Flags.newScreenRecordToolbarSelfie()
 }

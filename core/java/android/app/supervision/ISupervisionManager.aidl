@@ -21,6 +21,7 @@ import android.app.supervision.ISupervisionListener;
 import android.app.supervision.SupervisionRecoveryInfo;
 import android.app.supervision.Policy;
 import android.content.pm.ResolveInfo;
+import android.content.pm.UserInfo;
 import android.os.Bundle;
 
 /**
@@ -41,5 +42,8 @@ interface ISupervisionManager {
     oneway void unregisterSupervisionListener(in ISupervisionListener listener);
     List<Policy> getPolicies(int userId);
     void setPolicy(int userId, in Policy policy);
+    boolean canLaunchPinRecovery(int userId);
     List<ResolveInfo> querySupervisionApprovalActivities(int userId);
+    boolean hasValidRecoveryMethod(int userId);
+    List<UserInfo> getUsersThatRequirePlatformCredential();
 }

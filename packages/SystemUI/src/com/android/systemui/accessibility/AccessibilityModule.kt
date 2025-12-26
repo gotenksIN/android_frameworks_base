@@ -29,6 +29,8 @@ import com.android.systemui.accessibility.data.repository.OneHandedModeRepositor
 import com.android.systemui.accessibility.data.repository.OneHandedModeRepositoryImpl
 import com.android.systemui.accessibility.keygesture.ui.KeyGestureDialogStartable
 import com.android.systemui.accessibility.qs.QSAccessibilityModule
+import com.android.systemui.accessibility.shortcutchooser.ui.startable.ShortcutChooserDialogStartable
+import com.android.systemui.accessibility.shortcutchooser.ui.startable.QuickAccessDialogStartable
 import dagger.Binds
 import dagger.Module
 import dagger.multibindings.ClassKey
@@ -61,4 +63,15 @@ interface AccessibilityModule {
     @IntoMap
     @ClassKey(KeyGestureDialogStartable::class)
     fun bindKeyGestureDialogStartable(startable: KeyGestureDialogStartable): CoreStartable
+
+    /** Inject into ShortcutChooserDialogStartable Startable. */
+    @Binds
+    @IntoMap
+    @ClassKey(ShortcutChooserDialogStartable::class)
+    fun bindShortcutChooserDialogStartable(startable: ShortcutChooserDialogStartable): CoreStartable
+
+    @Binds
+    @IntoMap
+    @ClassKey(QuickAccessDialogStartable::class)
+    fun bindQuickAccessDialogStartable(startable: QuickAccessDialogStartable): CoreStartable
 }

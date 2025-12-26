@@ -41,8 +41,8 @@ import com.android.window.flags.Flags
 import com.android.wm.shell.R
 import com.android.wm.shell.ShellTaskOrganizer
 import com.android.wm.shell.apptoweb.AppToWebRepository
+import com.android.wm.shell.apptoweb.DialogLifecycleListener
 import com.android.wm.shell.apptoweb.OpenByDefaultDialog
-import com.android.wm.shell.apptoweb.OpenByDefaultDialog.DialogLifecycleListener
 import com.android.wm.shell.apptoweb.canShowAppLinks
 import com.android.wm.shell.apptoweb.isBrowserApp
 import com.android.wm.shell.common.DisplayController
@@ -79,6 +79,7 @@ import com.android.wm.shell.windowdecor.viewholder.AppHandleViewHolder
 import com.android.wm.shell.windowdecor.viewholder.AppHandleViewHolder.HandleData
 import com.android.wm.shell.windowdecor.viewholder.WindowDecorationViewHolder
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainCoroutineDispatcher
 import kotlinx.coroutines.launch
 
@@ -136,13 +137,14 @@ class AppHandleController(
     override val captionType = CaptionType.APP_HANDLE
     private lateinit var viewHolder: AppHandleViewHolder
 
-    private var handleMenu: HandleMenu? = null
+    var handleMenu: HandleMenu? = null
     private var openByDefaultDialog: OpenByDefaultDialog? = null
     private var manageWindowsMenu: DesktopHandleManageWindowsMenu? = null
 
     override val handleMenuController = this
     override val manageWindowsMenuController = this
 
+    private var handleMenuCreationJob: Job? = null
     override val isHandleMenuActive: Boolean
         get() = handleMenu != null
 
@@ -162,12 +164,6 @@ class AppHandleController(
             DesktopExperienceFlags.ENABLE_APP_HANDLE_POSITION_REPORTING.isTrue
     private val display
         get() = displayController.getDisplay(taskInfo.displayId)
-
-    private val inFullImmersive
-        get() =
-            desktopUserRepositories
-                .getProfile(taskInfo.userId)
-                .isTaskInFullImmersiveState(taskInfo.taskId)
 
     override fun relayout(
         params: RelayoutParams,
@@ -359,7 +355,6 @@ class AppHandleController(
                 displayController,
                 taskResourceLoader,
                 surfaceControlTransactionSupplier,
-                mainDispatcher,
                 mainScope,
                 object : DialogLifecycleListener {
                     override fun onDialogDismissed() {
@@ -372,23 +367,25 @@ class AppHandleController(
 
     /** Updates app info and creates and displays handle menu window. */
     override fun createHandleMenu(minimumInstancesFound: Boolean) {
-        if (isHandleMenuActive) return
-        mainScope.launch {
-            val isBrowserApp = isBrowserApp()
-            val appToWebIntent =
-                if (canShowAppLinks(display, desktopState)) {
-                    appToWebRepository.getAppToWebIntent(taskInfo, isBrowserApp)
-                } else {
-                    // Skip request for assist content as it is only used for links, which are not
-                    // supported
-                    null
-                }
-            createHandleMenu(
-                openInAppOrBrowserIntent = appToWebIntent,
-                isBrowserApp = isBrowserApp,
-                minimumInstancesFound = minimumInstancesFound,
-            )
-        }
+        if (isHandleMenuActive || handleMenuCreationJob?.isActive == true) return
+
+        handleMenuCreationJob =
+            mainScope.launch {
+                val isBrowserApp = isBrowserApp()
+                val appToWebIntent =
+                    if (canShowAppLinks(display, desktopState)) {
+                        appToWebRepository.getAppToWebIntent(taskInfo, isBrowserApp)
+                    } else {
+                        // Skip request for assist content as it is only used for links, which are
+                        // not supported
+                        null
+                    }
+                createHandleMenu(
+                    openInAppOrBrowserIntent = appToWebIntent,
+                    isBrowserApp = isBrowserApp,
+                    minimumInstancesFound = minimumInstancesFound,
+                )
+            }
     }
 
     /** Creates and shows the handle menu. */
@@ -454,7 +451,7 @@ class AppHandleController(
                         onCloseMenuClickListener = { closeHandleMenu() },
                         onOutsideTouchListener = { closeHandleMenu() },
                         onHandleMenuClicked = { closeHandleMenu() },
-                        forceShowSystemBars = inFullImmersive,
+                        forceShowSystemBars = true,
                     )
                 }
         notifyCaptionStateChanged(captionLayoutResult)

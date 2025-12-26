@@ -86,7 +86,8 @@ public class MediaOutputDialog extends SystemUIDialog
     private TextView mHeaderTitle;
     private TextView mHeaderSubtitle;
     private ImageView mHeaderIcon;
-    private ImageView mAppResourceIcon;
+    private ImageView mAppResourceIconNormal;
+    private ImageView mAppResourceIconSmall;
     private RecyclerView mDevicesRecyclerView;
     private ViewGroup mDeviceListLayout;
     private ViewGroup mQuickAccessShelf;
@@ -168,6 +169,9 @@ public class MediaOutputDialog extends SystemUIDialog
         mHeaderTitle = mDialogView.requireViewById(R.id.header_title);
         mHeaderSubtitle = mDialogView.requireViewById(R.id.header_subtitle);
         mHeaderIcon = mDialogView.requireViewById(R.id.header_icon);
+        mAppResourceIconNormal = mDialogView.requireViewById(R.id.app_source_icon);
+        mAppResourceIconSmall =
+                mDialogView.requireViewById(R.id.app_source_icon_small_screen_height);
         mQuickAccessShelf = mDialogView.requireViewById(R.id.quick_access_shelf);
         mConnectDeviceButton = mDialogView.requireViewById(R.id.connect_device);
         mAudioSharingButton = mDialogView.requireViewById(R.id.audio_sharing);
@@ -178,13 +182,8 @@ public class MediaOutputDialog extends SystemUIDialog
         mDoneButton = mDialogView.requireViewById(R.id.done);
         mStopButton = mDialogView.requireViewById(R.id.stop);
 
-        boolean isSmallScreenHeight =
-                mContext.getResources().getConfiguration().screenHeightDp <= SMALL_SCREEN_HEIGHT_DP;
-        mAppResourceIcon = mDialogView.requireViewById(
-                isSmallScreenHeight ? R.id.app_source_icon_small_screen_height
-                        : R.id.app_source_icon);
-        mAppResourceIcon.setVisibility(View.VISIBLE);
-        mMediaMetadataSectionLayout.setVisibility(isSmallScreenHeight ? View.GONE : View.VISIBLE);
+        updateAppResourceIcon();
+        mMediaMetadataSectionLayout.setVisibility(isSmallScreenHeight() ? View.GONE : View.VISIBLE);
 
         // Init device list
         mLayoutManager.setAutoMeasureEnabled(true);
@@ -226,9 +225,11 @@ public class MediaOutputDialog extends SystemUIDialog
     @Override
     public void onConfigurationChanged(Configuration configuration) {
         super.onConfigurationChanged(configuration);
-        if (mOnDialogEventListener != null) {
-            mOnDialogEventListener.onConfigurationChanged(this, configuration);
-        }
+        mMainThreadHandler.post(() -> {
+            updateAppResourceIcon();
+            mMediaMetadataSectionLayout.
+                    setVisibility(isSmallScreenHeight() ? View.GONE : View.VISIBLE);
+        });
     }
 
     @Override
@@ -249,6 +250,9 @@ public class MediaOutputDialog extends SystemUIDialog
     @Override
     public void stop() {
         mMediaSwitchingController.stop();
+        if (mOnDialogEventListener != null) {
+            mOnDialogEventListener.onStop(this);
+        }
     }
 
     @VisibleForTesting
@@ -265,7 +269,6 @@ public class MediaOutputDialog extends SystemUIDialog
         mMediaSwitchingController.setRefreshing(true);
         // Update header icon
         final IconCompat headerIcon = mMediaSwitchingController.getHeaderIcon();
-        final IconCompat appSourceIcon = mMediaSwitchingController.getNotificationSmallIcon();
         boolean colorSetUpdated = false;
         if (headerIcon != null) {
             Icon icon = headerIcon.toIcon(mContext);
@@ -294,21 +297,7 @@ public class MediaOutputDialog extends SystemUIDialog
             mHeaderIcon.setVisibility(View.GONE);
         }
 
-        if (!mIncludePlaybackAndAppMetadata) {
-            mAppResourceIcon.setVisibility(View.GONE);
-        } else if (appSourceIcon != null) {
-            Icon appIcon = appSourceIcon.toIcon(mContext);
-            mAppResourceIcon.setColorFilter(
-                    mMediaSwitchingController.getColorScheme().getSecondary());
-            mAppResourceIcon.setImageIcon(appIcon);
-        } else {
-            Drawable appIconDrawable = mMediaSwitchingController.getAppSourceIconFromPackage();
-            if (appIconDrawable != null) {
-                mAppResourceIcon.setImageDrawable(appIconDrawable);
-            } else {
-                mAppResourceIcon.setVisibility(View.GONE);
-            }
-        }
+        updateAppResourceIcon();
 
         if (!mIncludePlaybackAndAppMetadata) {
             mHeaderTitle.setVisibility(View.GONE);
@@ -438,6 +427,25 @@ public class MediaOutputDialog extends SystemUIDialog
         mQuickAccessShelf.setVisibility(showQuickAccessShelf ? View.VISIBLE : View.GONE);
     }
 
+    private void updateAppResourceIcon() {
+        mAppResourceIconNormal.setVisibility(View.GONE);
+        mAppResourceIconSmall.setVisibility(View.GONE);
+
+        Drawable appIcon = mMediaSwitchingController.getAppIcon();
+        ImageView mAppResourceIcon =
+                isSmallScreenHeight() ? mAppResourceIconSmall : mAppResourceIconNormal;
+        if (mIncludePlaybackAndAppMetadata && appIcon != null) {
+            mAppResourceIcon.setColorFilter(
+                    mMediaSwitchingController.getColorScheme().getSecondary());
+            mAppResourceIcon.setImageDrawable(appIcon);
+            mAppResourceIcon.setVisibility(View.VISIBLE);
+        }
+    }
+
+    private boolean isSmallScreenHeight() {
+        return mContext.getResources().getConfiguration().screenHeightDp <= SMALL_SCREEN_HEIGHT_DP;
+    }
+
     @VisibleForTesting
     void onStopButtonClick() {
         mMediaSwitchingController.releaseSession();
@@ -469,6 +477,11 @@ public class MediaOutputDialog extends SystemUIDialog
 
     @Override
     public void dismissDialog() {
+        // Explicitly use dismiss() to dismiss the dialog, as relying on closeSystemDialogs() for
+        // dismissal is unstable on desktop.
+        // TODO(b/457526674): Remove the dismiss() call once the issue with closeSystemDialogs() is
+        // fixed on desktop.
+        dismiss();
         mBroadcastSender.closeSystemDialogs();
     }
 
@@ -498,12 +511,12 @@ public class MediaOutputDialog extends SystemUIDialog
         }
     }
 
-    /** Callback for configuration changes. */
+    /** Callback for dialog events. */
     public interface OnDialogEventListener {
-        /** Will be called inside onConfigurationChanged. */
-        void onConfigurationChanged(@NonNull Dialog dialog, @NonNull Configuration newConfig);
-
         /** Will be called when the dialog is created. */
         void onCreate(@NonNull Dialog dialog);
+
+        /** Will be called when the dialog is stopping. */
+        void onStop(@NonNull Dialog dialog);
     }
 }

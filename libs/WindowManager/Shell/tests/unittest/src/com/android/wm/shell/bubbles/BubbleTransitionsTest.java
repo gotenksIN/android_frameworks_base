@@ -23,8 +23,8 @@ import static android.view.WindowManager.TRANSIT_OPEN;
 import static android.view.WindowManager.TRANSIT_TO_BACK;
 import static android.view.WindowManager.TRANSIT_TO_FRONT;
 
+import static com.android.window.flags.Flags.FLAG_ENABLE_BUBBLE_ROOT_TASK;
 import static com.android.window.flags.Flags.FLAG_FIX_BUBBLE_TRAMPOLINE_LAUNCH_TWICE;
-import static com.android.window.flags.Flags.FLAG_ROOT_TASK_FOR_BUBBLE;
 import static com.android.wm.shell.Flags.FLAG_ENABLE_BUBBLE_BAR;
 import static com.android.wm.shell.Flags.FLAG_ENABLE_CREATE_ANY_BUBBLE;
 import static com.android.wm.shell.bubbles.util.BubbleTestUtils.verifyEnterBubbleTransaction;
@@ -32,6 +32,7 @@ import static com.android.wm.shell.transition.Transitions.TRANSIT_BUBBLE_CONVERT
 import static com.android.wm.shell.transition.Transitions.TRANSIT_CONVERT_TO_BUBBLE;
 
 import static com.google.common.truth.Truth.assertThat;
+import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -52,6 +53,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import android.app.ActivityManager;
+import android.app.PendingIntent;
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.Point;
 import android.graphics.PointF;
@@ -63,8 +66,10 @@ import android.platform.test.annotations.EnableFlags;
 import android.view.SurfaceControl;
 import android.view.ViewRootImpl;
 import android.window.TransitionInfo;
+import android.window.WindowContainerToken;
 import android.window.WindowContainerTransaction;
 
+import androidx.annotation.Nullable;
 import androidx.core.animation.AnimatorTestRule;
 import androidx.test.filters.SmallTest;
 import androidx.test.platform.app.InstrumentationRegistry;
@@ -78,10 +83,15 @@ import com.android.wm.shell.bubbles.BubbleTransitions.DraggedBubbleIconToFullscr
 import com.android.wm.shell.bubbles.appinfo.PackageManagerBubbleAppInfoProvider;
 import com.android.wm.shell.bubbles.bar.BubbleBarExpandedView;
 import com.android.wm.shell.bubbles.bar.BubbleBarLayerView;
+import com.android.wm.shell.bubbles.user.data.BubbleUserResolver;
+import com.android.wm.shell.bubbles.user.model.BubbleUserInfo;
 import com.android.wm.shell.common.HomeIntentProvider;
 import com.android.wm.shell.common.ShellExecutor;
 import com.android.wm.shell.common.SyncTransactionQueue;
+import com.android.wm.shell.shared.bubbles.BubbleAnythingFlagHelper;
 import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
+import com.android.wm.shell.shared.bubbles.UserType;
+import com.android.wm.shell.splitscreen.SplitScreenController;
 import com.android.wm.shell.taskview.TaskView;
 import com.android.wm.shell.taskview.TaskViewRepository;
 import com.android.wm.shell.taskview.TaskViewTaskController;
@@ -96,6 +106,7 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Consumer;
 
 /**
@@ -140,24 +151,52 @@ public class BubbleTransitionsTest extends ShellTestCase {
     private ShellTaskOrganizer mTaskOrganizer;
     @Mock
     private BubbleController mBubbleController;
+    @Mock
+    private IBinder mRootTaskBinder;
+    @Mock
+    private WindowContainerToken mRootTaskToken;
+    @Mock
+    private PendingIntent mPendingIntent;
+    @Mock
+    private SplitScreenController mSplitScreenController;
+    @Mock
+    private BubbleRootTask mBubbleRootTask;
 
     private TaskViewTransitions mTaskViewTransitions;
     private TaskViewRepository mRepository;
     private BubbleTransitions mBubbleTransitions;
     private BubbleTaskViewFactory mTaskViewFactory;
+    private BubbleHelper mBubbleHelper;
 
     @Before
     public void setUp() {
         MockitoAnnotations.initMocks(this);
         mRepository = new TaskViewRepository();
+        mBubbleHelper = spy(new BubbleHelperImpl(
+                () -> mBubbleRootTask, () -> Optional.of(mSplitScreenController)));
         final ShellExecutor syncExecutor = new TestSyncExecutor();
+
+        BubbleUserResolver bubbleUserResolver = userId -> new BubbleUserInfo(userId, UserType.MAIN);
+        BubbleViewInfoTask.Factory bubbleViewInfoTaskFactory = new BubbleViewInfoTask.Factory() {
+            @Override
+            public BubbleViewInfoTask create(Bubble b, Context context,
+                    BubbleExpandedViewManager expandedViewManager,
+                    BubbleTaskViewFactory taskViewFactory, @Nullable BubbleStackView stackView,
+                    @Nullable BubbleBarLayerView layerView, BubbleIconFactory factory,
+                    boolean skipInflation, BubbleViewInfoTask.Callback c) {
+                return new BubbleViewInfoTask(b, context, expandedViewManager, taskViewFactory,
+                        stackView, layerView, factory, skipInflation, c, mBubblePositioner,
+                        new PackageManagerBubbleAppInfoProvider(), directExecutor(),
+                        directExecutor(), bubbleUserResolver);
+            }
+        };
 
         when(mTransitions.getMainExecutor()).thenReturn(syncExecutor);
         mTaskViewTransitions = new TaskViewTransitions(mTransitions, mRepository, mTaskOrganizer,
-                mSyncQueue);
+                mSyncQueue, Optional.of(mBubbleHelper));
         mBubbleTransitions = new BubbleTransitions(mContext, mTransitions, mTaskOrganizer,
-                mRepository, mBubbleData, mTaskViewTransitions,
-                new PackageManagerBubbleAppInfoProvider());
+                mRepository, mBubbleData, mTaskViewTransitions, bubbleViewInfoTaskFactory,
+                mBubbleHelper);
         mBubbleTransitions.setBubbleController(mBubbleController);
         mTaskViewFactory = () -> {
             TaskViewTaskController taskViewTaskController = new TaskViewTaskController(
@@ -198,6 +237,11 @@ public class BubbleTransitionsTest extends ShellTestCase {
         final ActivityManager.RunningTaskInfo taskInfo = setupBubble(
                 bubble, taskView, taskViewTaskController);
         doReturn(true).when(mBubbleController).shouldBeAppBubble(taskInfo);
+        doReturn(true).when(mBubbleHelper).isAppBubbleTask(taskInfo);
+        if (BubbleAnythingFlagHelper.enableRootTaskForBubble()) {
+            doReturn(mRootTaskBinder).when(mRootTaskToken).asBinder();
+            doReturn(mRootTaskToken).when(mBubbleController).getAppBubbleRootTaskToken();
+        }
         return taskInfo;
     }
 
@@ -307,7 +351,7 @@ public class BubbleTransitionsTest extends ShellTestCase {
 
     @Test
     public void testConvertToBubble_excludesTaskFromRecents() {
-        final ActivityManager.RunningTaskInfo taskInfo = setupBubble();
+        final ActivityManager.RunningTaskInfo taskInfo = setupAppBubble();
         final BubbleTransitions.BubbleTransition bt = mBubbleTransitions.startConvertToBubble(
                 mBubble, taskInfo, mExpandedViewManager, mTaskViewFactory, mBubblePositioner,
                 mStackView, mLayerView, mIconFactory, mHomeIntentProvider, null /* dragData */,
@@ -321,16 +365,14 @@ public class BubbleTransitionsTest extends ShellTestCase {
 
         // Verify that the WCT has the task force exclude from recents.
         final WindowContainerTransaction wct = wctCaptor.getValue();
-        final Map<IBinder, WindowContainerTransaction.Change> chgs = wct.getChanges();
-        final boolean hasForceExcludedFromRecents = chgs.entrySet().stream()
-                .filter((entry) -> entry.getKey().equals(taskInfo.token.asBinder()))
-                .anyMatch((entry) -> entry.getValue().getForceExcludedFromRecents());
-        assertThat(hasForceExcludedFromRecents).isTrue();
+        verifyEnterBubbleTransaction(wct, taskInfo.token.asBinder(), true /* isAppBubble */,
+                false /* reparentToTda */,
+                BubbleAnythingFlagHelper.enableRootTaskForBubble() ? mRootTaskBinder : null);
     }
 
     @Test
     public void testConvertToBubble_disallowFlagLaunchAdjacent() {
-        final ActivityManager.RunningTaskInfo taskInfo = setupBubble();
+        final ActivityManager.RunningTaskInfo taskInfo = setupAppBubble();
         final BubbleTransitions.BubbleTransition bt = mBubbleTransitions.startConvertToBubble(
                 mBubble, taskInfo, mExpandedViewManager, mTaskViewFactory, mBubblePositioner,
                 mStackView, mLayerView, mIconFactory, mHomeIntentProvider, null /* dragData */,
@@ -344,7 +386,9 @@ public class BubbleTransitionsTest extends ShellTestCase {
 
         // Verify that the WCT has the disallow-launch-adjacent hierarchy op
         final WindowContainerTransaction wct = wctCaptor.getValue();
-        verifyEnterBubbleTransaction(wct, taskInfo.token.asBinder(), true /* isAppBubble */);
+        verifyEnterBubbleTransaction(wct, taskInfo.token.asBinder(), true /* isAppBubble */,
+                false /* reparentToTda */,
+                BubbleAnythingFlagHelper.enableRootTaskForBubble() ? mRootTaskBinder : null);
     }
 
     @Test
@@ -787,6 +831,7 @@ public class BubbleTransitionsTest extends ShellTestCase {
         final ActivityManager.RunningTaskInfo taskInfo = setupAppBubble();
 
         when(mLayerView.canExpandView(mBubble)).thenReturn(true);
+        doReturn(mPendingIntent).when(mBubble).getPendingIntent();
 
         final BubbleTransitions.LaunchOrConvertToBubble bt =
                 (BubbleTransitions.LaunchOrConvertToBubble) mBubbleTransitions
@@ -877,6 +922,7 @@ public class BubbleTransitionsTest extends ShellTestCase {
         final ActivityManager.RunningTaskInfo taskInfo = setupAppBubble();
 
         when(mLayerView.canExpandView(mBubble)).thenReturn(true);
+        doReturn(mPendingIntent).when(mBubble).getPendingIntent();
 
         final BubbleTransitions.LaunchOrConvertToBubble bt =
                 (BubbleTransitions.LaunchOrConvertToBubble) mBubbleTransitions
@@ -964,6 +1010,7 @@ public class BubbleTransitionsTest extends ShellTestCase {
         final ActivityManager.RunningTaskInfo taskInfo = setupAppBubble();
 
         when(mLayerView.canExpandView(mBubble)).thenReturn(true);
+        doReturn(mPendingIntent).when(mBubble).getPendingIntent();
 
         final BubbleTransitions.LaunchOrConvertToBubble bt =
                 (BubbleTransitions.LaunchOrConvertToBubble) mBubbleTransitions
@@ -1037,6 +1084,7 @@ public class BubbleTransitionsTest extends ShellTestCase {
         setupAppBubble(newBubble, newTaskView, mTaskViewTaskController);
         final String bubbleKey = "testingKey";
         doReturn(bubbleKey).when(newBubble).getKey();
+        doReturn(mPendingIntent).when(newBubble).getPendingIntent();
         final BubbleTransitions.LaunchOrConvertToBubble bt =
                 (BubbleTransitions.LaunchOrConvertToBubble) mBubbleTransitions
                         .startLaunchIntoOrConvertToBubble(
@@ -1058,6 +1106,36 @@ public class BubbleTransitionsTest extends ShellTestCase {
 
         verify(mBubbleData).dismissBubbleWithKey(bubbleKey, Bubbles.DISMISS_REPLACE_BY_EXISTING);
         verify(newBubble).setCurrentTransition(isNull());
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_BUBBLE_ROOT_TASK)
+    public void testLaunchOrConvert_withRootTaskForBubble_setsAlphaToZero() {
+        final ActivityManager.RunningTaskInfo taskInfo = setupAppBubble();
+        doReturn(mPendingIntent).when(mBubble).getPendingIntent();
+        final BubbleTransitions.LaunchOrConvertToBubble bt =
+                (BubbleTransitions.LaunchOrConvertToBubble) mBubbleTransitions
+                        .startLaunchIntoOrConvertToBubble(
+                                mBubble, mExpandedViewManager, mTaskViewFactory, mBubblePositioner,
+                                mStackView, mLayerView, mIconFactory, false /* inflateSync */,
+                                BubbleBarLocation.RIGHT);
+        bt.onInflated(mBubble);
+        assertThat(bt.mLaunchCookie).isNotNull();
+
+        // Prepare for startAnimation call
+        final SurfaceControl taskLeash = new SurfaceControl.Builder().setName("taskLeash").build();
+        final TransitionInfo info = setupConvertTransition(taskInfo, taskLeash,
+                null /* snapshot */, bt.mLaunchCookie.binder);
+        final IBinder transitionToken = mock(IBinder.class);
+        bt.mPlayingTransition = transitionToken;
+        final SurfaceControl.Transaction startT = mock(SurfaceControl.Transaction.class);
+
+        // Start playing the transition
+        bt.startAnimation(transitionToken, info, startT,
+                mock(SurfaceControl.Transaction.class), wct -> {});
+
+        // Verify that the alpha is set to 0 for the launched task's leash
+        verify(startT).setAlpha(taskLeash, 0f);
     }
 
     @Test
@@ -1327,73 +1405,7 @@ public class BubbleTransitionsTest extends ShellTestCase {
     }
 
     @Test
-    public void testGetEnterBubbleTask() {
-        final SurfaceControl leash = new SurfaceControl.Builder().setName("testLeash").build();
-        final ActivityManager.RunningTaskInfo taskInfo0 = setupAppBubble();
-        final ActivityManager.RunningTaskInfo taskInfo1 = setupAppBubble();
-
-        final TransitionInfo info = new TransitionInfo(TRANSIT_OPEN, 0);
-        final TransitionInfo.Change openingBubble = new TransitionInfo.Change(
-                taskInfo0.token, leash);
-        openingBubble.setTaskInfo(taskInfo0);
-        openingBubble.setMode(TRANSIT_OPEN);
-        final TransitionInfo.Change closingBubble = new TransitionInfo.Change(
-                taskInfo1.token, leash);
-        closingBubble.setTaskInfo(taskInfo1);
-        closingBubble.setMode(TRANSIT_CLOSE);
-        info.addChange(closingBubble);
-        info.addChange(openingBubble);
-        info.addRoot(new TransitionInfo.Root(0, mock(SurfaceControl.class), 0, 0));
-
-        assertThat(mBubbleTransitions.getEnterBubbleTask(info)).isEqualTo(openingBubble);
-    }
-
-    @Test
-    public void testGetClosingBubbleTask() {
-        final SurfaceControl leash = new SurfaceControl.Builder().setName("testLeash").build();
-        final ActivityManager.RunningTaskInfo taskInfo0 = setupAppBubble();
-        final ActivityManager.RunningTaskInfo taskInfo1 = setupAppBubble();
-
-        final TransitionInfo info = new TransitionInfo(TRANSIT_OPEN, 0);
-        final TransitionInfo.Change openingBubble = new TransitionInfo.Change(
-                taskInfo0.token, leash);
-        openingBubble.setTaskInfo(taskInfo0);
-        openingBubble.setMode(TRANSIT_OPEN);
-        final TransitionInfo.Change closingBubble = new TransitionInfo.Change(
-                taskInfo1.token, leash);
-        closingBubble.setTaskInfo(taskInfo1);
-        closingBubble.setMode(TRANSIT_CLOSE);
-        info.addChange(openingBubble);
-        info.addChange(closingBubble);
-        info.addRoot(new TransitionInfo.Root(0, mock(SurfaceControl.class), 0, 0));
-
-        assertThat(mBubbleTransitions.getClosingBubbleTask(info)).isEqualTo(closingBubble);
-    }
-
-    @Test
-    public void testGetClosingBubbleTask_excludeChangeAndToBack() {
-        final SurfaceControl leash = new SurfaceControl.Builder().setName("testLeash").build();
-        final ActivityManager.RunningTaskInfo taskInfo0 = setupAppBubble();
-        final ActivityManager.RunningTaskInfo taskInfo1 = setupAppBubble();
-
-        final TransitionInfo info = new TransitionInfo(TRANSIT_OPEN, 0);
-        final TransitionInfo.Change openingBubble = new TransitionInfo.Change(
-                taskInfo0.token, leash);
-        openingBubble.setTaskInfo(taskInfo0);
-        openingBubble.setMode(TRANSIT_CHANGE);
-        final TransitionInfo.Change closingBubble = new TransitionInfo.Change(
-                taskInfo1.token, leash);
-        closingBubble.setTaskInfo(taskInfo1);
-        closingBubble.setMode(TRANSIT_TO_BACK);
-        info.addChange(openingBubble);
-        info.addChange(closingBubble);
-        info.addRoot(new TransitionInfo.Root(0, mock(SurfaceControl.class), 0, 0));
-
-        assertThat(mBubbleTransitions.getClosingBubbleTask(info)).isNull();
-    }
-
-    @Test
-    @EnableFlags({FLAG_ENABLE_CREATE_ANY_BUBBLE, FLAG_ROOT_TASK_FOR_BUBBLE})
+    @EnableFlags({FLAG_ENABLE_CREATE_ANY_BUBBLE, FLAG_ENABLE_BUBBLE_ROOT_TASK})
     public void testStartNewBubbleTaskFromExistingBubble() {
         // Setup a Bubble that's currently expanded
         final Bubble expandedBubble = mock(Bubble.class);

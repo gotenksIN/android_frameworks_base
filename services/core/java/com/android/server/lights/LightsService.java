@@ -21,9 +21,12 @@ import android.content.Context;
 import android.hardware.light.HwLight;
 import android.hardware.light.HwLightState;
 import android.hardware.light.ILights;
+import android.hardware.light.LightType;
+import android.hardware.lights.ColorSequence;
 import android.hardware.lights.ILightsManager;
 import android.hardware.lights.Light;
 import android.hardware.lights.LightState;
+import android.hardware.lights.MultiLightEffect;
 import android.os.Binder;
 import android.os.Handler;
 import android.os.IBinder;
@@ -103,7 +106,10 @@ public class LightsService extends SystemService {
                 for (int i = 0; i < mLightsById.size(); i++) {
                     if (!mLightsById.valueAt(i).isSystemLight()) {
                         HwLight hwLight = mLightsById.valueAt(i).mHwLight;
-                        lights.add(new Light(hwLight.id, hwLight.ordinal, hwLight.type));
+                        Light.Builder lightBuilder =
+                                new Light.Builder(hwLight.id, hwLight.ordinal, hwLight.type);
+
+                        lights.add(lightBuilder.build());
                     }
                 }
                 return lights;
@@ -148,6 +154,27 @@ public class LightsService extends SystemService {
                 }
                 return new LightState(light.getColor());
             }
+        }
+
+        @android.annotation.EnforcePermission(android.Manifest.permission.CONTROL_DEVICE_LIGHTS)
+        @Override
+        public void setLightEffect(IBinder token, MultiLightEffect effect) {
+            setLightEffect_enforcePermission();
+        }
+
+        @android.annotation.EnforcePermission(android.Manifest.permission.CONTROL_DEVICE_LIGHTS)
+        @Override
+        public ColorSequence getLightSequence(int lightId)
+                throws RemoteException {
+            getLightSequence_enforcePermission();
+
+            return null;
+        }
+
+        @android.annotation.EnforcePermission(android.Manifest.permission.CONTROL_DEVICE_LIGHTS)
+        @Override
+        public void setEnabledState(boolean enabled) {
+            setEnabledState_enforcePermission();
         }
 
         @android.annotation.EnforcePermission(android.Manifest.permission.CONTROL_DEVICE_LIGHTS)
@@ -233,10 +260,11 @@ public class LightsService extends SystemService {
          */
         private void invalidateLightStatesLocked() {
             final Map<Integer, LightState> states = new HashMap<>();
-            for (int i = mSessions.size() - 1; i >= 0; i--) {
+            for (int i = 0; i < mSessions.size(); i++) {
                 SparseArray<LightState> requests = mSessions.get(i).mRequests;
                 for (int j = 0; j < requests.size(); j++) {
-                    states.put(requests.keyAt(j), requests.valueAt(j));
+                    // Add the light state if a higher priority session is not using the light.
+                    states.putIfAbsent(requests.keyAt(j), requests.valueAt(j));
                 }
             }
             for (int i = 0; i < mLightsById.size(); i++) {
@@ -438,9 +466,24 @@ public class LightsService extends SystemService {
          * applications using the {@link android.hardware.lights.LightsManager} API.
          */
         private boolean isSystemLight() {
-            // LIGHT_ID_COUNT comes from the 2.0 HIDL HAL and only contains system lights.
-            // Newly-added lights are made available via the public LightsManager API.
-            return (0 <= mHwLight.type && mHwLight.type < LightsManager.LIGHT_ID_COUNT);
+            // This list of lights is based on the list of lights from the 2.0 HIDL HAL, which only
+            // contains system lights.
+            //
+            // Newly-added public lights are made available via the public LightsManager API and
+            // new system-only lights are filtered here, through constants from the latest HAL API.
+            switch(mHwLight.type) {
+                case  LightType.BACKLIGHT:
+                case  LightType.KEYBOARD:
+                case  LightType.BUTTONS:
+                case  LightType.BATTERY:
+                case  LightType.NOTIFICATIONS:
+                case  LightType.ATTENTION:
+                case  LightType.BLUETOOTH:
+                case  LightType.WIFI:
+                    return true;
+                default:
+                    return false;
+            }
         }
 
         private int getColor() {

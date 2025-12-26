@@ -32,16 +32,12 @@ import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.statusbar.CommandQueue
 import com.android.systemui.statusbar.StatusBarAlwaysUseRegionSampling
 import com.android.systemui.statusbar.core.StatusBarInitializer.StatusBarViewLifecycleListener
-import com.android.systemui.statusbar.core.StatusBarRootModernization
 import com.android.systemui.statusbar.data.model.StatusBarAppearance
 import com.android.systemui.statusbar.data.model.StatusBarMode
 import com.android.systemui.statusbar.layout.BoundsPair
 import com.android.systemui.statusbar.layout.LetterboxAppearanceCalculator
 import com.android.systemui.statusbar.layout.StatusBarBoundsProvider
 import com.android.systemui.statusbar.phone.fragment.dagger.HomeStatusBarComponent
-import com.android.systemui.statusbar.phone.ongoingcall.StatusBarChipsModernization
-import com.android.systemui.statusbar.phone.ongoingcall.data.repository.OngoingCallRepository
-import com.android.systemui.statusbar.phone.ongoingcall.shared.model.OngoingCallModel
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -129,7 +125,6 @@ constructor(
     @Assisted("displayId") thisDisplayId: Int,
     private val commandQueue: CommandQueue,
     private val letterboxAppearanceCalculator: LetterboxAppearanceCalculator,
-    ongoingCallRepository: OngoingCallRepository,
 ) : StatusBarModePerDisplayRepository {
 
     private val commandQueueCallback =
@@ -184,17 +179,13 @@ constructor(
 
     override fun start() {
         isStarted = true
-        if (StatusBarRootModernization.isEnabled) {
-            statusBarBoundsProvider?.start()
-        }
+        statusBarBoundsProvider?.start()
         commandQueue.addCallback(commandQueueCallback)
     }
 
     override fun stop() {
         isStarted = false
-        if (StatusBarRootModernization.isEnabled) {
-            statusBarBoundsProvider?.stop()
-        }
+        statusBarBoundsProvider?.stop()
         commandQueue.removeCallback(commandQueueCallback)
     }
 
@@ -214,7 +205,7 @@ constructor(
                 }
             }
         statusBarBoundsProvider?.addChangeListener(listener)
-        if (StatusBarRootModernization.isEnabled && isStarted) {
+        if (isStarted) {
             statusBarBoundsProvider?.start()
         }
     }
@@ -282,24 +273,11 @@ constructor(
                 modifiedStatusBarAttributes,
                 isTransientShown,
                 isInFullscreenMode,
-                ongoingCallRepository.ongoingCallState,
                 _ongoingProcessRequiresStatusBarVisible,
-            ) {
-                modifiedAttributes,
-                isTransientShown,
-                isInFullscreenMode,
-                ongoingCallStateLegacy,
-                ongoingProcessRequiresStatusBarVisible ->
+            ) { modifiedAttributes, isTransientShown, isInFullscreenMode, hasOngoingCall ->
                 if (modifiedAttributes == null) {
                     null
                 } else {
-                    val hasOngoingCall =
-                        if (StatusBarChipsModernization.isEnabled) {
-                            ongoingProcessRequiresStatusBarVisible
-                        } else {
-                            ongoingCallStateLegacy is OngoingCallModel.InCall &&
-                                !ongoingCallStateLegacy.isAppVisible
-                        }
                     val statusBarMode =
                         toBarMode(
                             modifiedAttributes.appearance,

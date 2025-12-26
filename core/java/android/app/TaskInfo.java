@@ -368,6 +368,12 @@ public class TaskInfo {
     public Rect lastNonFullscreenBounds;
 
     /**
+     * Whether the tasks bounds of a leaf task have been set from the activity options.
+     * @hide
+     */
+    public boolean leafTaskBoundsFromOptions;
+
+    /**
      * The URI of the intent that generated the top-most activity opened using a URL.
      * @hide
      */
@@ -403,10 +409,13 @@ public class TaskInfo {
      * Whether the Task should be an App Bubble.
      * Please use this with caution. This is just a short-term solution which should be migrated
      * to a more generic model vs. implying the Task is an App Bubble here.
+     *
+     * @deprecated use {@link com.android.wm.shell.bubbles.BubbleHelper#isAppBubbleTask}
      * @hide
      *
      * TODO(b/407669465): remove it once migrated to the new approach
      */
+    @Deprecated
     public boolean isAppBubble;
 
     /**
@@ -558,6 +567,7 @@ public class TaskInfo {
                 && isTopActivityTransparent == that.isTopActivityTransparent
                 && isActivityStackTransparent == that.isActivityStackTransparent
                 && Objects.equals(lastNonFullscreenBounds, that.lastNonFullscreenBounds)
+                && leafTaskBoundsFromOptions == that.leafTaskBoundsFromOptions
                 && Objects.equals(capturedLink, that.capturedLink)
                 && capturedLinkTimestamp == that.capturedLinkTimestamp
                 && requestedVisibleTypes == that.requestedVisibleTypes
@@ -639,6 +649,7 @@ public class TaskInfo {
         isTopActivityTransparent = source.readBoolean();
         isActivityStackTransparent = source.readBoolean();
         lastNonFullscreenBounds = source.readTypedObject(Rect.CREATOR);
+        leafTaskBoundsFromOptions = source.readBoolean();
         capturedLink = source.readTypedObject(Uri.CREATOR);
         capturedLinkTimestamp = source.readLong();
         requestedVisibleTypes = source.readInt();
@@ -697,6 +708,7 @@ public class TaskInfo {
         dest.writeBoolean(isTopActivityTransparent);
         dest.writeBoolean(isActivityStackTransparent);
         dest.writeTypedObject(lastNonFullscreenBounds, flags);
+        dest.writeBoolean(leafTaskBoundsFromOptions);
         dest.writeTypedObject(capturedLink, flags);
         dest.writeLong(capturedLinkTimestamp);
         dest.writeInt(requestedVisibleTypes);
@@ -746,6 +758,7 @@ public class TaskInfo {
                 + " isTopActivityTransparent=" + isTopActivityTransparent
                 + " isActivityStackTransparent=" + isActivityStackTransparent
                 + " lastNonFullscreenBounds=" + lastNonFullscreenBounds
+                + " leafTaskBoundsFromOptions= " + leafTaskBoundsFromOptions
                 + " capturedLink=" + capturedLink
                 + " capturedLinkTimestamp=" + capturedLinkTimestamp
                 + " requestedVisibleTypes=" + requestedVisibleTypes

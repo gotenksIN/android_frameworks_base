@@ -19,16 +19,16 @@ package com.android.wm.shell.flicker.fundamentals
 import android.platform.test.annotations.Postsubmit
 import android.platform.test.annotations.RequiresDesktopDevice
 import android.tools.NavBar
-import android.tools.flicker.assertions.FlickerChecker
-import android.tools.flicker.junit.FlickerParametersRunnerFactory
 import android.tools.flicker.FlickerBuilder
 import android.tools.flicker.FlickerTest
 import android.tools.flicker.FlickerTestFactory
+import android.tools.flicker.assertions.FlickerChecker
+import android.tools.flicker.junit.FlickerParametersRunnerFactory
 import com.android.wm.shell.Utils
 import com.android.wm.shell.flicker.DesktopModeBaseTest
 import com.android.wm.shell.flicker.utils.appWindowOnTopAtEnd
 import com.android.wm.shell.flicker.utils.appWindowOnTopAtStart
-import com.android.wm.shell.scenarios.SwitchBetweenDesktopAndFullScreen
+import com.android.wm.shell.scenarios.SwitchBetweenDesktopAndFullScreenViaQuickSwitch
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -37,19 +37,16 @@ import org.junit.runners.Parameterized
 /**
  * Test quick switching out of desktop to a fullscreen app.
  *
- * To run this test: atest QuickSwitchBetweenDesktopAndFullscreenTest
+ * To run this test: atest QuickSwitchBetweenDesktopAndFullscreenFlickerTest
  */
 @RequiresDesktopDevice
 @RunWith(Parameterized::class)
 @Parameterized.UseParametersRunnerFactory(FlickerParametersRunnerFactory::class)
 @Postsubmit
-class QuickSwitchBetweenDesktopAndFullscreenFlickerTest(flicker: FlickerTest) : DesktopModeBaseTest(
-    flicker
-) {
+class QuickSwitchBetweenDesktopAndFullscreenFlickerTest(flicker: FlickerTest) :
+    DesktopModeBaseTest(flicker) {
     inner class QuickSwitchBetweenDesktopAndFullscreenScenario :
-        SwitchBetweenDesktopAndFullScreen(
-            rotation = flicker.scenario.startRotation
-        )
+        SwitchBetweenDesktopAndFullScreenViaQuickSwitch(rotation = flicker.scenario.startRotation)
 
     @Rule
     @JvmField
@@ -60,22 +57,14 @@ class QuickSwitchBetweenDesktopAndFullscreenFlickerTest(flicker: FlickerTest) : 
 
     override val transition: FlickerBuilder.() -> Unit
         get() = {
-            setup {
-                scenario.setup()
-            }
-            transitions {
-                scenario.triggerViaQuickSwitch()
-            }
-            teardown {
-                scenario.teardown()
-            }
+            setup { scenario.setup() }
+            transitions { scenario.triggerViaQuickSwitch() }
+            teardown { scenario.teardown() }
         }
 
-    @Test
-    fun appWindowOnTopAtStart() = flicker.appWindowOnTopAtStart(testApp)
+    @Test fun appWindowOnTopAtStart() = flicker.appWindowOnTopAtStart(testApp)
 
-    @Test
-    fun appWindowOnTopAtEnd() = flicker.appWindowOnTopAtEnd(mailApp)
+    @Test fun appWindowOnTopAtEnd() = flicker.appWindowOnTopAtEnd(mailApp)
 
     companion object {
         @Parameterized.Parameters(name = "{0}")

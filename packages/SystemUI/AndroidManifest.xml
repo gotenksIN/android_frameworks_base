@@ -274,6 +274,14 @@
     <uses-permission android:name="android.permission.MANAGE_ACCESSIBILITY" />
     <uses-permission android:name="android.permission.ACT_AS_PACKAGE_FOR_ACCESSIBILITY" />
 
+    <permission
+            android:name="com.android.systemui.permission.LAUNCH_ACCESSIBILITY_QUICK_ACCESS_DIALOG"
+            android:protectionLevel="signature"
+            android:featureFlag="com.android.systemui.launch_accessibility_quick_access_dialog_permission" />
+    <uses-permission
+            android:name="com.android.systemui.permission.LAUNCH_ACCESSIBILITY_QUICK_ACCESS_DIALOG"
+            android:featureFlag="com.android.systemui.launch_accessibility_quick_access_dialog_permission" />
+
     <!-- to control accessibility volume -->
     <uses-permission android:name="android.permission.CHANGE_ACCESSIBILITY_VOLUME" />
 
@@ -1212,12 +1220,32 @@
                 <action android:name="android.service.dreams.DreamService" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
+            <meta-data
+                android:name="android.service.dream"
+                android:resource="@xml/low_light_clock_dream_metadata" />
         </service>
 
         <service android:name=".selectiontoolbar.app.service.SysUiSelectionToolbarRenderService"
             android:permission="android.permission.BIND_SELECTION_TOOLBAR_RENDER_SERVICE"
             android:exported="true"
             />
+
+        <service android:name="com.android.systemui.personalcontext.SysuiVisualizerService"
+            android:exported="true"
+            android:singleUser="true"
+            android:permission="android.permission.BIND_INSIGHT_SURFACE_VISUALIZER_SERVICE">
+            <intent-filter>
+                <action
+                    android:name="android.service.personalcontext.embedded.InsightSurfaceVisualizerService"
+                    />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name="com.android.systemui.locationbutton.LocationButtonRenderService"
+            android:permission="android.permission.USE_LOCATION_BUTTON"
+            android:exported="true"
+           />
 
     </application>
 </manifest>

@@ -19,6 +19,7 @@ package com.android.server.am;
 import static android.app.ActivityManager.PROCESS_CAPABILITY_ALL;
 import static android.app.ActivityManager.PROCESS_CAPABILITY_BFSL;
 import static android.app.ActivityManager.PROCESS_CAPABILITY_CPU_TIME;
+import static android.app.ActivityManager.PROCESS_CAPABILITY_FOREGROUND_AUDIO_CONTROL;
 import static android.app.ActivityManager.PROCESS_CAPABILITY_IMPLICIT_CPU_TIME;
 import static android.app.ActivityManager.PROCESS_STATE_BOUND_FOREGROUND_SERVICE;
 import static android.app.ActivityManager.PROCESS_STATE_BOUND_TOP;
@@ -137,6 +138,7 @@ import android.util.SparseIntArray;
 
 import com.android.server.LocalServices;
 import com.android.server.am.ProcessStateController.ProcessLruUpdater;
+import com.android.server.am.psc.ActiveUidsInternal;
 import com.android.server.am.psc.ProcessRecordInternal;
 import com.android.server.tests.assertutils.FlagAssert;
 import com.android.server.wm.ActivityServiceConnectionsHolder;
@@ -203,7 +205,7 @@ public class MockingOomAdjusterTests {
     private OomAdjuster.Constants mOomConstants;
     private ProcessStateController mProcessStateController;
     private ProcessStateController.ActivityStateAsyncUpdater mActivityStateAsyncUpdater;
-    private ActiveUids mActiveUids;
+    private ActiveUidsInternal mActiveUids;
     private PackageManagerInternal mPackageManagerInternal;
     private ActivityManagerService mService;
     private TestCachedAppOptimizer mTestCachedAppOptimizer;
@@ -277,7 +279,7 @@ public class MockingOomAdjusterTests {
                 anyInt());
         doNothing().when(pr).enqueueProcessChangeItemLocked(anyInt(), anyInt(), anyInt(),
                 anyBoolean());
-        mActiveUids = new ActiveUids(null);
+        mActiveUids = new ActiveUidsInternal();
         mActivityStateHandlerThread = new HandlerThread("ActivityStateThread");
         mActivityStateHandlerThread.start();
         mActivityStateHandler = new Handler(mActivityStateHandlerThread.getLooper());
@@ -303,9 +305,10 @@ public class MockingOomAdjusterTests {
         mService.setCachedAppOptimizer(mTestCachedAppOptimizer);
 
         mCallback = spy(mService.new OomAdjusterCallback());
+        final OomAdjuster.StateGetter stateGetter = mock(OomAdjuster.StateGetter.class);
         mProcessStateController = new ProcessStateController.Builder(mService,
                 mService.mProcessList, mActiveUids, mService.mConstants.createOomConstants(),
-                mCallback)
+                mCallback, stateGetter)
                 .setProcessLruUpdater(lruUpdater)
                 .setOomAdjusterInjector(mInjector)
                 .build();
@@ -796,7 +799,7 @@ public class MockingOomAdjusterTests {
     @SuppressWarnings("GuardedBy")
     @Test
     public void testUpdateOomAdj_DoOne_FgService_ShortFgs() {
-        mService.mConstants.TOP_TO_FGS_GRACE_DURATION = 100_000;
+        mOomConstants.mTopToFgsGraceDuration = 100_000;
         mOomConstants.mShortFgsProcStateExtraWaitDuration = 200_000;
 
         ServiceRecord s = ServiceRecord.newEmptyInstanceForTest(mService);
@@ -831,8 +834,7 @@ public class MockingOomAdjusterTests {
             mProcessStateController.setHasForegroundServices(app.mServices, true,
                     FOREGROUND_SERVICE_TYPE_SHORT_SERVICE, /* hasNoneType=*/false);
             mProcessStateController.startService(app.mServices, s);
-            app.setLastTopTime(SystemClock.uptimeMillis()
-                    - mService.mConstants.TOP_TO_FGS_GRACE_DURATION);
+            app.setLastTopTime(SystemClock.uptimeMillis() - mOomConstants.mTopToFgsGraceDuration);
             mService.mWakefulness.set(PowerManagerInternal.WAKEFULNESS_AWAKE);
 
             updateOomAdj(app);
@@ -859,8 +861,7 @@ public class MockingOomAdjusterTests {
             mProcessStateController.setHasForegroundServices(app.mServices, true,
                     FOREGROUND_SERVICE_TYPE_SHORT_SERVICE, /* hasNoneType=*/false);
             mProcessStateController.startService(app.mServices, s);
-            app.setLastTopTime(SystemClock.uptimeMillis()
-                    - mService.mConstants.TOP_TO_FGS_GRACE_DURATION);
+            app.setLastTopTime(SystemClock.uptimeMillis() - mOomConstants.mTopToFgsGraceDuration);
             setWakefulness(PowerManagerInternal.WAKEFULNESS_AWAKE);
 
             updateOomAdj(app);
@@ -1290,7 +1291,7 @@ public class MockingOomAdjusterTests {
             ServiceRecord s = bindService(app, system,
                     null, null, Context.BIND_ALMOST_PERCEPTIBLE + 2, mock(IBinder.class));
             mProcessStateController.setLastTopAlmostPerceptibleBindRequest(s,
-                    nowUptime - 2 * mService.mConstants.mServiceBindAlmostPerceptibleTimeoutMs);
+                    nowUptime - 2 * mOomConstants.mServiceBindAlmostPerceptibleTimeoutMs);
             mProcessStateController.updateHasTopStartedAlmostPerceptibleServices(app.mServices);
             setWakefulness(PowerManagerInternal.WAKEFULNESS_AWAKE);
             updateOomAdj(app);
@@ -1312,7 +1313,7 @@ public class MockingOomAdjusterTests {
             ServiceRecord s = bindService(app, system,
                     null, null, Context.BIND_ALMOST_PERCEPTIBLE, mock(IBinder.class));
             mProcessStateController.setLastTopAlmostPerceptibleBindRequest(s,
-                    nowUptime - 2 * mService.mConstants.mServiceBindAlmostPerceptibleTimeoutMs);
+                    nowUptime - 2 * mOomConstants.mServiceBindAlmostPerceptibleTimeoutMs);
             s.getConnections().clear();
             mProcessStateController.updateHasTopStartedAlmostPerceptibleServices(app.mServices);
             setWakefulness(PowerManagerInternal.WAKEFULNESS_AWAKE);
@@ -1831,6 +1832,7 @@ public class MockingOomAdjusterTests {
         assertThatProcess(app).hasImplicitCpuTimeCapability().withExactReasons(
                 IMPLICIT_CPU_TIME_REASON_TRANSMITTED);
         assertThatProcess(app).hasCapability(PROCESS_CAPABILITY_BFSL);
+        assertThatProcess(app).hasCapability(PROCESS_CAPABILITY_FOREGROUND_AUDIO_CONTROL);
     }
 
     @SuppressWarnings("GuardedBy")
@@ -1866,6 +1868,7 @@ public class MockingOomAdjusterTests {
         assertProcStates(app, PROCESS_STATE_BOUND_TOP, VISIBLE_APP_ADJ, SCHED_GROUP_DEFAULT);
         assertThatProcess(app).hasImplicitCpuTimeCapability().withExactReasons(
                 IMPLICIT_CPU_TIME_REASON_TRANSMITTED);
+        assertThatProcess(app).hasCapability(PROCESS_CAPABILITY_FOREGROUND_AUDIO_CONTROL);
     }
 
     @SuppressWarnings("GuardedBy")
@@ -3637,7 +3640,7 @@ public class MockingOomAdjusterTests {
         doReturn(new ArrayMap<IBinder, ArrayList<ConnectionRecord>>()).when(s2).getConnections();
         mProcessStateController.setStartRequested(s2, true);
         mProcessStateController.setServiceLastActivityTime(s2,
-                now - mService.mConstants.MAX_SERVICE_INACTIVITY - 1);
+                now - mOomConstants.mMaxServiceInactivity - 1);
 
         mProcessStateController.startService(app2.mServices, s2);
         mProcessStateController.setHasShownUi(app2, false);
@@ -3666,7 +3669,7 @@ public class MockingOomAdjusterTests {
         app.setAdjType(null);
         app.setSetAdj(UNKNOWN_ADJ);
         mProcessStateController.setServiceLastActivityTime(s,
-                now - mService.mConstants.MAX_SERVICE_INACTIVITY - 1);
+                now - mOomConstants.mMaxServiceInactivity - 1);
         updateOomAdj();
 
         assertProcStates(app, PROCESS_STATE_SERVICE, cachedAdj1,
@@ -3701,7 +3704,7 @@ public class MockingOomAdjusterTests {
         app.setSetAdj(UNKNOWN_ADJ);
         mProcessStateController.setHasShownUi(app, false);
         mProcessStateController.setServiceLastActivityTime(s,
-                now - mService.mConstants.MAX_SERVICE_INACTIVITY - 1);
+                now - mOomConstants.mMaxServiceInactivity - 1);
         updateOomAdj();
 
         assertProcStates(app, PROCESS_STATE_SERVICE, SERVICE_ADJ, SCHED_GROUP_BACKGROUND,
@@ -4950,7 +4953,7 @@ public class MockingOomAdjusterTests {
             }
             providers.setLastProviderTime(mLastProviderTime);
 
-            UidRecord uidRec = mActiveUids.get(mUid);
+            UidRecord uidRec = (UidRecord) mActiveUids.get(mUid);
             if (uidRec == null) {
                 uidRec = new UidRecord(mUid, mService);
                 mActiveUids.put(mUid, uidRec);

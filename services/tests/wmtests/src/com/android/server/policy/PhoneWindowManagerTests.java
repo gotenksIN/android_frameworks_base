@@ -28,8 +28,6 @@ import static android.view.WindowManagerGlobal.ADD_OKAY;
 
 import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
 
-import static com.android.internal.policy.IKeyguardService.SCREEN_TURNING_ON_REASON_UNKNOWN;
-import static com.android.internal.policy.IKeyguardService.SCREEN_TURNING_ON_REASON_DISPLAY_SWITCH;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doAnswer;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doNothing;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doReturn;
@@ -607,7 +605,12 @@ public class PhoneWindowManagerTests {
 
         final int expectedDisplayId = expectEventDisplayIdForWakeup ? displayId : DEFAULT_DISPLAY;
         verify(mWindowWakeUpPolicy)
-                .wakeUpFromKey(expectedDisplayId, time, keyCode, /* isDown= */ true);
+                .wakeUpFromKey(
+                        expectedDisplayId,
+                        time,
+                        keyCode,
+                        /* isDown= */ true,
+                        /* keyEventFlags= */ 0);
     }
 
     @Test
@@ -636,7 +639,12 @@ public class PhoneWindowManagerTests {
 
         final int expectedDisplayId = expectEventDisplayIdForWakeup ? displayId : DEFAULT_DISPLAY;
         verify(mWindowWakeUpPolicy)
-                .wakeUpFromKey(expectedDisplayId, time, KEYCODE_POWER, /* isDown= */ false);
+                .wakeUpFromKey(
+                        expectedDisplayId,
+                        time,
+                        KEYCODE_POWER,
+                        /* isDown= */ false,
+                        /* keyEventFlags= */ 0);
     }
 
     @Test
@@ -781,7 +789,6 @@ public class PhoneWindowManagerTests {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_LAUNCHER_HANDLE_GO_HOME_KEYBOARD_SHORTCUT)
     public void startDockOrHome_externalDisplay_flagEnabled_shouldHandleKeyGesture()
             throws Exception {
         mockStartDockOrHome(Display.TYPE_EXTERNAL);
@@ -798,47 +805,12 @@ public class PhoneWindowManagerTests {
     }
 
     @Test
-    @DisableFlags(Flags.FLAG_ENABLE_LAUNCHER_HANDLE_GO_HOME_KEYBOARD_SHORTCUT)
-    public void startDockOrHome_externalDisplay_flagDisabled_shouldStartHome() throws Exception {
-        mockStartDockOrHome(Display.TYPE_EXTERNAL);
-        doReturn(true).when(mPhoneWindowManager).isUserSetupComplete();
-
-        mPhoneWindowManager.startDockOrHome(
-                /* displayId= */ DEFAULT_DISPLAY, /* fromHomeKey= */ true, /* awakenFromDreams= */
-                false);
-
-        verify(mInputManagerInternal, never()).handleKeyGestureInKeyGestureController(
-                any(KeyGestureEvent.class));
-        verify(mAtmInternal).startHomeOnDisplay(/* userId= */ anyInt(), /* reason= */
-                anyString(), /* displayId= */ eq(DEFAULT_DISPLAY), /* allowInstrumenting= */
-                eq(true), /* fromHomeKey= */ eq(true));
-    }
-
-    @Test
-    @EnableFlags(Flags.FLAG_ENABLE_LAUNCHER_HANDLE_GO_HOME_KEYBOARD_SHORTCUT)
     public void startDockOrHome_internalDisplay_flagEnabled_shouldStartHome() throws Exception {
         mockStartDockOrHome(Display.TYPE_INTERNAL);
         doReturn(true).when(mPhoneWindowManager).isUserSetupComplete();
 
         mPhoneWindowManager.startDockOrHome(
                 /* displayId= */DEFAULT_DISPLAY, /* fromHomeKey= */ true, /* awakenFromDreams= */
-                false);
-
-        verify(mInputManagerInternal, never()).handleKeyGestureInKeyGestureController(
-                any(KeyGestureEvent.class));
-        verify(mAtmInternal).startHomeOnDisplay(/* userId= */ anyInt(), /* reason= */
-                anyString(), /* displayId= */ eq(DEFAULT_DISPLAY), /* allowInstrumenting= */
-                eq(true), /* fromHomeKey= */ eq(true));
-    }
-
-    @Test
-    @DisableFlags(Flags.FLAG_ENABLE_LAUNCHER_HANDLE_GO_HOME_KEYBOARD_SHORTCUT)
-    public void startDockOrHome_internalDisplay_flagDisabled_shouldStartHome() throws Exception {
-        mockStartDockOrHome(Display.TYPE_INTERNAL);
-        doReturn(true).when(mPhoneWindowManager).isUserSetupComplete();
-
-        mPhoneWindowManager.startDockOrHome(
-                /* displayId= */ DEFAULT_DISPLAY, /* fromHomeKey= */ true, /* awakenFromDreams= */
                 false);
 
         verify(mInputManagerInternal, never()).handleKeyGestureInKeyGestureController(

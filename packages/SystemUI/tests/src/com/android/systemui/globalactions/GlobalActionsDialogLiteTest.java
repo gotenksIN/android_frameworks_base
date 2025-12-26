@@ -68,7 +68,10 @@ import com.android.systemui.broadcast.BroadcastDispatcher;
 import com.android.systemui.colorextraction.SysuiColorExtractor;
 import com.android.systemui.common.domain.interactor.SysUIStateDisplaysInteractor;
 import com.android.systemui.display.data.repository.FakeDisplayWindowPropertiesRepository;
+import com.android.systemui.globalactions.data.repository.FakeGlobalActionsRepository;
 import com.android.systemui.globalactions.domain.interactor.GlobalActionsInteractor;
+import com.android.systemui.globalactions.shared.model.GlobalActionType;
+import com.android.systemui.globalactions.shared.model.GlobalActionsEvent;
 import com.android.systemui.kosmos.KosmosJavaAdapter;
 import com.android.systemui.plugins.ActivityStarter;
 import com.android.systemui.plugins.GlobalActions;
@@ -155,6 +158,7 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
     private TestableLooper mTestableLooper;
     private KosmosJavaAdapter mKosmos = new KosmosJavaAdapter(this);
     private GlobalActionsInteractor mInteractor;
+    private FakeGlobalActionsRepository mRepository;
     private Handler mHandler;
 
     @Before
@@ -174,6 +178,7 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         mGlobalSettings = new FakeGlobalSettings();
         mSecureSettings = new FakeSettings();
         mInteractor = mKosmos.getGlobalActionsInteractor();
+        mRepository = mKosmos.getGlobalActionsRepository();
         mHandler = new Handler(mTestableLooper.getLooper());
 
         mGlobalActionsDialogLite = new GlobalActionsDialogLite(mContext,
@@ -231,24 +236,24 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
     public void testShouldLogShow() {
         mGlobalActionsDialogLite.onShow(null);
         mTestableLooper.processAllMessages();
-        verifyLogPosted(GlobalActionsDialogLite.GlobalActionsEvent.GA_POWER_MENU_OPEN);
+        verifyLogPosted(GlobalActionsEvent.GA_POWER_MENU_OPEN);
     }
 
     @Test
     public void testShouldLogDismiss() {
         mGlobalActionsDialogLite.onDismiss(mGlobalActionsDialogLite.mDialog);
         mTestableLooper.processAllMessages();
-        verifyLogPosted(GlobalActionsDialogLite.GlobalActionsEvent.GA_POWER_MENU_CLOSE);
+        verifyLogPosted(GlobalActionsEvent.GA_POWER_MENU_CLOSE);
     }
 
     @Test
     public void testShouldLogTimeout() {
         mGlobalActionsDialogLite.onShow(null);
-        verifyLogPosted(GlobalActionsDialogLite.GlobalActionsEvent.GA_POWER_MENU_OPEN);
+        verifyLogPosted(GlobalActionsEvent.GA_POWER_MENU_OPEN);
         mGlobalActionsDialogLite.rescheduleBurninTimeout(20); // ms
         mTestableLooper.moveTimeForward(30);
         mTestableLooper.processAllMessages();
-        verifyLogPosted(GlobalActionsDialogLite.GlobalActionsEvent.GA_CLOSE_TIMEOUT);
+        verifyLogPosted(GlobalActionsEvent.GA_CLOSE_TIMEOUT);
     }
 
     @Test
@@ -257,17 +262,16 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         doReturn(4).when(mGlobalActionsDialogLite).getMaxShownPowerItems();
         doReturn(true).when(mGlobalActionsDialogLite).shouldDisplayLockdown(any());
         doReturn(true).when(mGlobalActionsDialogLite).shouldShowAction(any());
-        String[] actions = {
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_EMERGENCY,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_LOCKDOWN,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_POWER,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_RESTART,
-        };
-        doReturn(actions).when(mGlobalActionsDialogLite).getDefaultActions();
+        mRepository.setPossibleGlobalActions(List.of(
+                GlobalActionType.EMERGENCY,
+                GlobalActionType.LOCKDOWN,
+                GlobalActionType.POWER,
+                GlobalActionType.RESTART
+        ));
         GlobalActionsDialogLite.ActionsDialogLite dialog = mGlobalActionsDialogLite.createDialog();
         dialog.onBackPressed();
         mTestableLooper.processAllMessages();
-        verifyLogPosted(GlobalActionsDialogLite.GlobalActionsEvent.GA_CLOSE_BACK);
+        verifyLogPosted(GlobalActionsEvent.GA_CLOSE_BACK);
     }
 
     @Test
@@ -276,13 +280,12 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         doReturn(4).when(mGlobalActionsDialogLite).getMaxShownPowerItems();
         doReturn(true).when(mGlobalActionsDialogLite).shouldDisplayLockdown(any());
         doReturn(true).when(mGlobalActionsDialogLite).shouldShowAction(any());
-        String[] actions = {
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_EMERGENCY,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_LOCKDOWN,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_POWER,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_RESTART,
-        };
-        doReturn(actions).when(mGlobalActionsDialogLite).getDefaultActions();
+        mRepository.setPossibleGlobalActions(List.of(
+                GlobalActionType.EMERGENCY,
+                GlobalActionType.LOCKDOWN,
+                GlobalActionType.POWER,
+                GlobalActionType.RESTART
+        ));
 
         GlobalActionsDialogLite.ActionsDialogLite dialog = mGlobalActionsDialogLite.createDialog();
         dialog.setBackDispatcherOverride(mOnBackInvokedDispatcher);
@@ -306,13 +309,12 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         doReturn(4).when(mGlobalActionsDialogLite).getMaxShownPowerItems();
         doReturn(true).when(mGlobalActionsDialogLite).shouldDisplayLockdown(any());
         doReturn(true).when(mGlobalActionsDialogLite).shouldShowAction(any());
-        String[] actions = {
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_EMERGENCY,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_LOCKDOWN,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_POWER,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_RESTART,
-        };
-        doReturn(actions).when(mGlobalActionsDialogLite).getDefaultActions();
+        mRepository.setPossibleGlobalActions(List.of(
+                GlobalActionType.EMERGENCY,
+                GlobalActionType.LOCKDOWN,
+                GlobalActionType.POWER,
+                GlobalActionType.RESTART
+        ));
 
         GlobalActionsDialogLite.ActionsDialogLite dialog = mGlobalActionsDialogLite.createDialog();
         dialog.create();
@@ -323,7 +325,7 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         dialog.getWindow().injectInputEvent(
                 new KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_BACK));
         mTestableLooper.processAllMessages();
-        verifyLogPosted(GlobalActionsDialogLite.GlobalActionsEvent.GA_CLOSE_BACK);
+        verifyLogPosted(GlobalActionsEvent.GA_CLOSE_BACK);
         assertThat(dialog.isShowing()).isFalse();
     }
 
@@ -333,18 +335,17 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         doReturn(4).when(mGlobalActionsDialogLite).getMaxShownPowerItems();
         doReturn(true).when(mGlobalActionsDialogLite).shouldDisplayLockdown(any());
         doReturn(true).when(mGlobalActionsDialogLite).shouldShowAction(any());
-        String[] actions = {
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_EMERGENCY,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_LOCKDOWN,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_POWER,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_RESTART,
-        };
-        doReturn(actions).when(mGlobalActionsDialogLite).getDefaultActions();
+        mRepository.setPossibleGlobalActions(List.of(
+                GlobalActionType.EMERGENCY,
+                GlobalActionType.LOCKDOWN,
+                GlobalActionType.POWER,
+                GlobalActionType.RESTART
+        ));
         GlobalActionsDialogLite.ActionsDialogLite dialog = mGlobalActionsDialogLite.createDialog();
 
         GestureDetector.SimpleOnGestureListener gestureListener = spy(dialog.mGestureListener);
         gestureListener.onSingleTapUp(null);
-        verifyLogPosted(GlobalActionsDialogLite.GlobalActionsEvent.GA_CLOSE_TAP_OUTSIDE);
+        verifyLogPosted(GlobalActionsEvent.GA_CLOSE_TAP_OUTSIDE);
     }
 
     @Test
@@ -354,20 +355,19 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         doReturn(true).when(mGlobalActionsDialogLite).shouldDisplayLockdown(any());
         doReturn(true).when(mGlobalActionsDialogLite).shouldShowAction(any());
         doReturn(true).when(mKeyguardStateController).isShowing();
-        String[] actions = {
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_EMERGENCY,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_LOCKDOWN,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_POWER,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_RESTART,
-        };
-        doReturn(actions).when(mGlobalActionsDialogLite).getDefaultActions();
+        mRepository.setPossibleGlobalActions(List.of(
+                GlobalActionType.EMERGENCY,
+                GlobalActionType.LOCKDOWN,
+                GlobalActionType.POWER,
+                GlobalActionType.RESTART
+        ));
         GlobalActionsDialogLite.ActionsDialogLite dialog = mGlobalActionsDialogLite.createDialog();
 
         GestureDetector.SimpleOnGestureListener gestureListener = spy(dialog.mGestureListener);
         MotionEvent start = MotionEvent.obtain(0, 0, MotionEvent.ACTION_DOWN, 0, 0, 0);
         MotionEvent end = MotionEvent.obtain(0, 0, MotionEvent.ACTION_DOWN, 0, 500, 0);
         gestureListener.onFling(start, end, 0, 1000);
-        verifyLogPosted(GlobalActionsDialogLite.GlobalActionsEvent.GA_CLOSE_TAP_OUTSIDE);
+        verifyLogPosted(GlobalActionsEvent.GA_CLOSE_TAP_OUTSIDE);
         verify(mShadeController).animateExpandQs();
     }
 
@@ -378,20 +378,19 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         doReturn(true).when(mGlobalActionsDialogLite).shouldDisplayLockdown(any());
         doReturn(true).when(mGlobalActionsDialogLite).shouldShowAction(any());
         doReturn(false).when(mKeyguardStateController).isShowing();
-        String[] actions = {
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_EMERGENCY,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_LOCKDOWN,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_POWER,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_RESTART,
-        };
-        doReturn(actions).when(mGlobalActionsDialogLite).getDefaultActions();
+        mRepository.setPossibleGlobalActions(List.of(
+                GlobalActionType.EMERGENCY,
+                GlobalActionType.LOCKDOWN,
+                GlobalActionType.POWER,
+                GlobalActionType.RESTART
+        ));
         GlobalActionsDialogLite.ActionsDialogLite dialog = mGlobalActionsDialogLite.createDialog();
 
         GestureDetector.SimpleOnGestureListener gestureListener = spy(dialog.mGestureListener);
         MotionEvent start = MotionEvent.obtain(0, 0, MotionEvent.ACTION_DOWN, 0, 0, 0);
         MotionEvent end = MotionEvent.obtain(0, 0, MotionEvent.ACTION_DOWN, 0, 500, 0);
         gestureListener.onFling(start, end, 0, 1000);
-        verifyLogPosted(GlobalActionsDialogLite.GlobalActionsEvent.GA_CLOSE_TAP_OUTSIDE);
+        verifyLogPosted(GlobalActionsEvent.GA_CLOSE_TAP_OUTSIDE);
         verify(mShadeController).animateExpandShade();
     }
 
@@ -402,13 +401,12 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         doReturn(true).when(mGlobalActionsDialogLite).shouldDisplayLockdown(any());
         doReturn(true).when(mGlobalActionsDialogLite).shouldShowAction(any());
         doReturn(false).when(mKeyguardStateController).isShowing();
-        String[] actions = {
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_EMERGENCY,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_LOCKDOWN,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_POWER,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_RESTART,
-        };
-        doReturn(actions).when(mGlobalActionsDialogLite).getDefaultActions();
+        mRepository.setPossibleGlobalActions(List.of(
+                GlobalActionType.EMERGENCY,
+                GlobalActionType.LOCKDOWN,
+                GlobalActionType.POWER,
+                GlobalActionType.RESTART
+        ));
         GlobalActionsDialogLite.ActionsDialogLite dialog = mGlobalActionsDialogLite.createDialog();
 
         doReturn(100).when(mStatusBarWindowController).getStatusBarHeight();
@@ -428,7 +426,7 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         GlobalActionsDialogLite.BugReportAction bugReportAction =
                 mGlobalActionsDialogLite.makeBugReportActionForTesting();
         bugReportAction.onPress();
-        verifyLogPosted(GlobalActionsDialogLite.GlobalActionsEvent.GA_BUGREPORT_PRESS);
+        verifyLogPosted(GlobalActionsEvent.GA_BUGREPORT_PRESS);
     }
 
     @Test
@@ -436,7 +434,7 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         GlobalActionsDialogLite.BugReportAction bugReportAction =
                 mGlobalActionsDialogLite.makeBugReportActionForTesting();
         bugReportAction.onLongPress();
-        verifyLogPosted(GlobalActionsDialogLite.GlobalActionsEvent.GA_BUGREPORT_LONG_PRESS);
+        verifyLogPosted(GlobalActionsEvent.GA_BUGREPORT_LONG_PRESS);
     }
 
     @Test
@@ -444,7 +442,7 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         GlobalActionsDialogLite.EmergencyDialerAction emergencyDialerAction =
                 mGlobalActionsDialogLite.makeEmergencyDialerActionForTesting();
         emergencyDialerAction.onPress();
-        verifyLogPosted(GlobalActionsDialogLite.GlobalActionsEvent.GA_EMERGENCY_DIALER_PRESS);
+        verifyLogPosted(GlobalActionsEvent.GA_EMERGENCY_DIALER_PRESS);
     }
 
     @Test
@@ -452,7 +450,7 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         GlobalActionsDialogLite.ScreenshotAction screenshotAction =
                 mGlobalActionsDialogLite.makeScreenshotActionForTesting();
         screenshotAction.onPress();
-        verifyLogPosted(GlobalActionsDialogLite.GlobalActionsEvent.GA_SCREENSHOT_PRESS);
+        verifyLogPosted(GlobalActionsEvent.GA_SCREENSHOT_PRESS);
     }
 
     @Test
@@ -477,7 +475,7 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         assertThat(screenshotAction.shouldShow()).isFalse();
     }
 
-    private void verifyLogPosted(GlobalActionsDialogLite.GlobalActionsEvent event) {
+    private void verifyLogPosted(GlobalActionsEvent event) {
         mTestableLooper.processAllMessages();
         verify(mUiEventLogger, times(1))
                 .log(event);
@@ -510,13 +508,12 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         doReturn(true).when(mGlobalActionsDialogLite).shouldDisplayEmergency();
         doReturn(true).when(mGlobalActionsDialogLite).shouldDisplayLockdown(any());
         doReturn(true).when(mGlobalActionsDialogLite).shouldShowAction(any());
-        String[] actions = {
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_EMERGENCY,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_LOCKDOWN,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_POWER,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_RESTART,
-        };
-        doReturn(actions).when(mGlobalActionsDialogLite).getDefaultActions();
+        mRepository.setPossibleGlobalActions(List.of(
+                GlobalActionType.EMERGENCY,
+                GlobalActionType.LOCKDOWN,
+                GlobalActionType.POWER,
+                GlobalActionType.RESTART
+        ));
         mGlobalActionsDialogLite.createActionItems();
 
         assertItemsOfType(mGlobalActionsDialogLite.mItems,
@@ -536,14 +533,12 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         // make sure lockdown action will NOT be shown
         doReturn(false).when(mGlobalActionsDialogLite).shouldDisplayLockdown(any());
         doReturn(true).when(mGlobalActionsDialogLite).shouldShowAction(any());
-        String[] actions = {
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_EMERGENCY,
-                // lockdown action not allowed
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_LOCKDOWN,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_POWER,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_RESTART,
-        };
-        doReturn(actions).when(mGlobalActionsDialogLite).getDefaultActions();
+        mRepository.setPossibleGlobalActions(List.of(
+                GlobalActionType.EMERGENCY,
+                GlobalActionType.LOCKDOWN,
+                GlobalActionType.POWER,
+                GlobalActionType.RESTART
+        ));
         mGlobalActionsDialogLite.createActionItems();
 
         assertItemsOfType(mGlobalActionsDialogLite.mItems,
@@ -562,14 +557,12 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         doReturn(false).when(mGlobalActionsDialogLite).shouldDisplayEmergency();
         doReturn(true).when(mGlobalActionsDialogLite).shouldDisplayLockdown(any());
         doReturn(true).when(mGlobalActionsDialogLite).shouldShowAction(any());
-        String[] actions = {
-                // emergency action not allowed
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_EMERGENCY,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_LOCKDOWN,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_POWER,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_RESTART,
-        };
-        doReturn(actions).when(mGlobalActionsDialogLite).getDefaultActions();
+        mRepository.setPossibleGlobalActions(List.of(
+                GlobalActionType.EMERGENCY,
+                GlobalActionType.LOCKDOWN,
+                GlobalActionType.POWER,
+                GlobalActionType.RESTART
+        ));
         mGlobalActionsDialogLite.createActionItems();
 
         assertItemsOfType(mGlobalActionsDialogLite.mItems,
@@ -585,7 +578,7 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         GlobalActionsDialogLite.LockDownAction lockDownAction =
                 mGlobalActionsDialogLite.new LockDownAction();
         lockDownAction.onPress();
-        verifyLogPosted(GlobalActionsDialogLite.GlobalActionsEvent.GA_LOCKDOWN_PRESS);
+        verifyLogPosted(GlobalActionsEvent.GA_LOCKDOWN_PRESS);
     }
 
     @Test
@@ -593,7 +586,7 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         GlobalActionsDialogLite.ShutDownAction shutDownAction =
                 mGlobalActionsDialogLite.new ShutDownAction();
         shutDownAction.onPress();
-        verifyLogPosted(GlobalActionsDialogLite.GlobalActionsEvent.GA_SHUTDOWN_PRESS);
+        verifyLogPosted(GlobalActionsEvent.GA_SHUTDOWN_PRESS);
     }
 
     @Test
@@ -601,7 +594,7 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         GlobalActionsDialogLite.ShutDownAction shutDownAction =
                 mGlobalActionsDialogLite.new ShutDownAction();
         shutDownAction.onLongPress();
-        verifyLogPosted(GlobalActionsDialogLite.GlobalActionsEvent.GA_SHUTDOWN_LONG_PRESS);
+        verifyLogPosted(GlobalActionsEvent.GA_SHUTDOWN_LONG_PRESS);
     }
 
     @Test
@@ -609,7 +602,7 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         GlobalActionsDialogLite.RestartAction restartAction =
                 mGlobalActionsDialogLite.new RestartAction();
         restartAction.onPress();
-        verifyLogPosted(GlobalActionsDialogLite.GlobalActionsEvent.GA_REBOOT_PRESS);
+        verifyLogPosted(GlobalActionsEvent.GA_REBOOT_PRESS);
     }
 
     @Test
@@ -617,7 +610,7 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         GlobalActionsDialogLite.RestartAction restartAction =
                 mGlobalActionsDialogLite.new RestartAction();
         restartAction.onLongPress();
-        verifyLogPosted(GlobalActionsDialogLite.GlobalActionsEvent.GA_REBOOT_LONG_PRESS);
+        verifyLogPosted(GlobalActionsEvent.GA_REBOOT_LONG_PRESS);
     }
 
     @Test
@@ -628,14 +621,12 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         doReturn(4).when(mGlobalActionsDialogLite).getMaxShownPowerItems();
         doReturn(true).when(mGlobalActionsDialogLite).shouldDisplayLockdown(any());
         doReturn(true).when(mGlobalActionsDialogLite).shouldShowAction(any());
-        doReturn(false).when(mKeyguardStateController).isShowing();
-        String[] actions = {
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_EMERGENCY,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_LOCKDOWN,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_POWER,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_RESTART,
-        };
-        doReturn(actions).when(mGlobalActionsDialogLite).getDefaultActions();
+        mRepository.setPossibleGlobalActions(List.of(
+                GlobalActionType.EMERGENCY,
+                GlobalActionType.LOCKDOWN,
+                GlobalActionType.POWER,
+                GlobalActionType.RESTART
+        ));
 
         // When entering power menu from lockscreen, with smart lock enabled
         when(mKeyguardUpdateMonitor.getUserHasTrust(anyInt())).thenReturn(true);
@@ -695,7 +686,7 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         GlobalActionsDialogLite.SystemUpdateAction systemUpdateAction =
                 mGlobalActionsDialogLite.new SystemUpdateAction();
         systemUpdateAction.onPress();
-        verifyLogPosted(GlobalActionsDialogLite.GlobalActionsEvent.GA_SYSTEM_UPDATE_PRESS);
+        verifyLogPosted(GlobalActionsEvent.GA_SYSTEM_UPDATE_PRESS);
     }
 
     @Test
@@ -705,14 +696,13 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         doReturn(true).when(mGlobalActionsDialogLite).shouldDisplayEmergency();
         doReturn(true).when(mGlobalActionsDialogLite).shouldDisplayLockdown(any());
         doReturn(true).when(mGlobalActionsDialogLite).shouldShowAction(any());
-        String[] actions = {
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_EMERGENCY,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_LOCKDOWN,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_POWER,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_RESTART,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_SYSTEM_UPDATE
-        };
-        doReturn(actions).when(mGlobalActionsDialogLite).getDefaultActions();
+        mRepository.setPossibleGlobalActions(List.of(
+                GlobalActionType.EMERGENCY,
+                GlobalActionType.LOCKDOWN,
+                GlobalActionType.POWER,
+                GlobalActionType.RESTART,
+                GlobalActionType.SYSTEM_UPDATE
+        ));
         mGlobalActionsDialogLite.createActionItems();
 
         assertItemsOfType(mGlobalActionsDialogLite.mItems,
@@ -732,13 +722,12 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         doReturn(true).when(mGlobalActionsDialogLite).shouldDisplayEmergency();
         doReturn(true).when(mGlobalActionsDialogLite).shouldDisplayLockdown(any());
         doReturn(true).when(mGlobalActionsDialogLite).shouldShowAction(any());
-        String[] actions = {
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_EMERGENCY,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_LOCKDOWN,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_POWER,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_RESTART
-        };
-        doReturn(actions).when(mGlobalActionsDialogLite).getDefaultActions();
+        mRepository.setPossibleGlobalActions(List.of(
+                GlobalActionType.EMERGENCY,
+                GlobalActionType.LOCKDOWN,
+                GlobalActionType.POWER,
+                GlobalActionType.RESTART
+        ));
         mGlobalActionsDialogLite.createActionItems();
 
         assertNoItemsOfType(mGlobalActionsDialogLite.mItems,
@@ -753,14 +742,13 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         doReturn(5).when(mGlobalActionsDialogLite).getMaxShownPowerItems();
         doReturn(true).when(mGlobalActionsDialogLite).shouldDisplayEmergency();
         doReturn(true).when(mGlobalActionsDialogLite).shouldDisplayLockdown(any());
-        String[] actions = {
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_EMERGENCY,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_LOCKDOWN,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_POWER,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_RESTART,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_SYSTEM_UPDATE
-        };
-        doReturn(actions).when(mGlobalActionsDialogLite).getDefaultActions();
+        mRepository.setPossibleGlobalActions(List.of(
+                GlobalActionType.EMERGENCY,
+                GlobalActionType.LOCKDOWN,
+                GlobalActionType.POWER,
+                GlobalActionType.RESTART,
+                GlobalActionType.SYSTEM_UPDATE
+        ));
 
         // Show dialog with keyguard showing
         mGlobalActionsDialogLite.showOrHideDialog(true, true, null, Display.DEFAULT_DISPLAY);
@@ -780,17 +768,20 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         doReturn(5).when(mGlobalActionsDialogLite).getMaxShownPowerItems();
         doReturn(true).when(mGlobalActionsDialogLite).shouldDisplayEmergency();
         doReturn(true).when(mGlobalActionsDialogLite).shouldDisplayLockdown(any());
-        String[] actions = {
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_EMERGENCY,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_LOCKDOWN,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_POWER,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_RESTART,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_SYSTEM_UPDATE
-        };
-        doReturn(actions).when(mGlobalActionsDialogLite).getDefaultActions();
+        mRepository.setPossibleGlobalActions(List.of(
+                GlobalActionType.EMERGENCY,
+                GlobalActionType.LOCKDOWN,
+                GlobalActionType.POWER,
+                GlobalActionType.RESTART,
+                GlobalActionType.SYSTEM_UPDATE
+        ));
 
         // Show dialog with keyguard showing
-        mGlobalActionsDialogLite.showOrHideDialog(false, false, null, Display.DEFAULT_DISPLAY);
+        mGlobalActionsDialogLite.showOrHideDialog(
+                false,
+                false,
+                null,
+                Display.DEFAULT_DISPLAY);
         // Clear the dismiss override so we don't have behavior after dismissing the dialog
         mGlobalActionsDialogLite.mDialog.setDismissOverride(null);
 
@@ -804,12 +795,8 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
 
     @Test
     public void userSwitching_dismissDialog() {
-        String[] actions = {
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_POWER,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_RESTART,
-        };
-        doReturn(actions).when(mResources)
-                .getStringArray(com.android.internal.R.array.config_globalActionsList);
+        mRepository.setPossibleGlobalActions(
+                List.of(GlobalActionType.POWER, GlobalActionType.RESTART));
 
         mGlobalActionsDialogLite.showOrHideDialog(false, true, null, Display.DEFAULT_DISPLAY);
         mTestableLooper.processAllMessages();
@@ -834,7 +821,7 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         GlobalActionsDialogLite.StandbyAction standbyAction =
                 mGlobalActionsDialogLite.new StandbyAction();
         standbyAction.onPress();
-        verifyLogPosted(GlobalActionsDialogLite.GlobalActionsEvent.GA_STANDBY_PRESS);
+        verifyLogPosted(GlobalActionsEvent.GA_STANDBY_PRESS);
     }
 
     @Test
@@ -842,11 +829,8 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         // Test like a TV, which only has standby and shut down
         mGlobalActionsDialogLite = spy(mGlobalActionsDialogLite);
         doReturn(2).when(mGlobalActionsDialogLite).getMaxShownPowerItems();
-        String[] actions = {
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_STANDBY,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_POWER
-        };
-        doReturn(actions).when(mGlobalActionsDialogLite).getDefaultActions();
+        mRepository.setPossibleGlobalActions(
+                List.of(GlobalActionType.STANDBY, GlobalActionType.POWER));
         mGlobalActionsDialogLite.createActionItems();
 
         assertItemsOfType(mGlobalActionsDialogLite.mItems,
@@ -863,13 +847,12 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         doReturn(true).when(mGlobalActionsDialogLite).shouldDisplayEmergency();
         doReturn(true).when(mGlobalActionsDialogLite).shouldDisplayLockdown(any());
         doReturn(true).when(mGlobalActionsDialogLite).shouldShowAction(any());
-        String[] actions = {
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_EMERGENCY,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_LOCKDOWN,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_POWER,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_RESTART
-        };
-        doReturn(actions).when(mGlobalActionsDialogLite).getDefaultActions();
+        mRepository.setPossibleGlobalActions(List.of(
+                GlobalActionType.EMERGENCY,
+                GlobalActionType.LOCKDOWN,
+                GlobalActionType.POWER,
+                GlobalActionType.RESTART
+        ));
         mGlobalActionsDialogLite.createActionItems();
 
         assertNoItemsOfType(mGlobalActionsDialogLite.mItems,
@@ -883,14 +866,15 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         // Test like a TV, which only has standby and shut down
         mGlobalActionsDialogLite = spy(mGlobalActionsDialogLite);
         doReturn(2).when(mGlobalActionsDialogLite).getMaxShownPowerItems();
-        String[] actions = {
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_STANDBY,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_POWER
-        };
-        doReturn(actions).when(mGlobalActionsDialogLite).getDefaultActions();
+        mRepository.setPossibleGlobalActions(
+                List.of(GlobalActionType.STANDBY, GlobalActionType.POWER));
 
         // Show dialog with keyguard showing and provisioned
-        mGlobalActionsDialogLite.showOrHideDialog(true, true, null, Display.DEFAULT_DISPLAY);
+        mGlobalActionsDialogLite.showOrHideDialog(
+                true,
+                true,
+                null,
+                Display.DEFAULT_DISPLAY);
         // Clear the dismiss override so we don't have behavior after dismissing the dialog
         mGlobalActionsDialogLite.mDialog.setDismissOverride(null);
 
@@ -898,7 +882,8 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
                 GlobalActionsDialogLite.StandbyAction.class);
 
         // Hide dialog
-        mGlobalActionsDialogLite.showOrHideDialog(true, true, null, Display.DEFAULT_DISPLAY);
+        mGlobalActionsDialogLite.showOrHideDialog(
+                true, true, null, Display.DEFAULT_DISPLAY);
     }
 
     @Test
@@ -906,14 +891,12 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         // Test like a TV, which only has standby and shut down.
         mGlobalActionsDialogLite = spy(mGlobalActionsDialogLite);
         doReturn(2).when(mGlobalActionsDialogLite).getMaxShownPowerItems();
-        String[] actions = {
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_STANDBY,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_POWER
-        };
-        doReturn(actions).when(mGlobalActionsDialogLite).getDefaultActions();
+        mRepository.setPossibleGlobalActions(
+                List.of(GlobalActionType.STANDBY, GlobalActionType.POWER));
 
         // Show dialog without keyguard showing and not provisioned
-        mGlobalActionsDialogLite.showOrHideDialog(false, false, null, Display.DEFAULT_DISPLAY);
+        mGlobalActionsDialogLite.showOrHideDialog(
+                false, false, null, Display.DEFAULT_DISPLAY);
         // Clear the dismiss override so we don't have behavior after dismissing the dialog
         mGlobalActionsDialogLite.mDialog.setDismissOverride(null);
 
@@ -921,7 +904,8 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
                 GlobalActionsDialogLite.StandbyAction.class);
 
         // Hide dialog
-        mGlobalActionsDialogLite.showOrHideDialog(false, false, null, Display.DEFAULT_DISPLAY);
+        mGlobalActionsDialogLite.showOrHideDialog(
+                false, false, null, Display.DEFAULT_DISPLAY);
     }
 
     @Test
@@ -930,10 +914,8 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         mGlobalActionsDialogLite = spy(mGlobalActionsDialogLite);
         doReturn(2).when(mGlobalActionsDialogLite).getMaxShownPowerItems();
         doReturn(false).when(mGlobalActionsDialogLite).isTv();
-        String[] actions = {
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_STANDBY,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_POWER};
-        doReturn(actions).when(mGlobalActionsDialogLite).getDefaultActions();
+        mRepository.setPossibleGlobalActions(
+                List.of(GlobalActionType.STANDBY, GlobalActionType.POWER));
 
         GlobalActionsDialogLite.ActionsDialogLite dialog = mGlobalActionsDialogLite.createDialog();
         dialog.create();
@@ -964,10 +946,8 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         mGlobalActionsDialogLite = spy(mGlobalActionsDialogLite);
         doReturn(2).when(mGlobalActionsDialogLite).getMaxShownPowerItems();
         doReturn(true).when(mGlobalActionsDialogLite).isTv();
-        String[] actions = {
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_STANDBY,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_POWER};
-        doReturn(actions).when(mGlobalActionsDialogLite).getDefaultActions();
+        mRepository.setPossibleGlobalActions(
+                List.of(GlobalActionType.STANDBY, GlobalActionType.POWER));
 
         GlobalActionsDialogLite.ActionsDialogLite dialog = mGlobalActionsDialogLite.createDialog();
         dialog.create();
@@ -986,7 +966,7 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         assertThat(action1.mIconView.isFocusable()).isTrue();
 
         assertThat(action.mIconView.performClick()).isTrue();
-        verifyLogPosted(GlobalActionsDialogLite.GlobalActionsEvent.GA_STANDBY_PRESS);
+        verifyLogPosted(GlobalActionsEvent.GA_STANDBY_PRESS);
 
         dialog.dismiss();
     }
@@ -996,7 +976,7 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         GlobalActionsDialogLite.LockAction lockAction =
                 mGlobalActionsDialogLite.new LockAction();
         lockAction.onPress();
-        verifyLogPosted(GlobalActionsDialogLite.GlobalActionsEvent.GA_LOCK_PRESS);
+        verifyLogPosted(GlobalActionsEvent.GA_LOCK_PRESS);
     }
 
     @Test
@@ -1009,13 +989,12 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         doCallRealMethod()
                 .when(mGlobalActionsDialogLite)
                 .shouldShowAction(any(GlobalActionsDialogLite.LockAction.class));
-        String[] actions = {
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_EMERGENCY,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_LOCK,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_POWER,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_RESTART,
-        };
-        doReturn(actions).when(mGlobalActionsDialogLite).getDefaultActions();
+        mRepository.setPossibleGlobalActions(List.of(
+                GlobalActionType.EMERGENCY,
+                GlobalActionType.LOCK,
+                GlobalActionType.POWER,
+                GlobalActionType.RESTART
+        ));
 
         mGlobalActionsDialogLite.showOrHideDialog(
             /* keyguardShowing= */ false,
@@ -1040,13 +1019,12 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         doCallRealMethod()
                 .when(mGlobalActionsDialogLite)
                 .shouldShowAction(any(GlobalActionsDialogLite.LockAction.class));
-        String[] actions = {
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_EMERGENCY,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_LOCK,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_POWER,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_RESTART,
-        };
-        doReturn(actions).when(mGlobalActionsDialogLite).getDefaultActions();
+        mRepository.setPossibleGlobalActions(List.of(
+                GlobalActionType.EMERGENCY,
+                GlobalActionType.LOCK,
+                GlobalActionType.POWER,
+                GlobalActionType.RESTART
+        ));
 
         mGlobalActionsDialogLite.showOrHideDialog(
             /* keyguardShowing= */ true,
@@ -1068,13 +1046,12 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         doCallRealMethod()
                 .when(mGlobalActionsDialogLite)
                 .shouldShowAction(any(GlobalActionsDialogLite.LockAction.class));
-        String[] actions = {
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_EMERGENCY,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_LOCK,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_POWER,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_RESTART,
-        };
-        doReturn(actions).when(mGlobalActionsDialogLite).getDefaultActions();
+        mRepository.setPossibleGlobalActions(List.of(
+                GlobalActionType.EMERGENCY,
+                GlobalActionType.LOCK,
+                GlobalActionType.POWER,
+                GlobalActionType.RESTART
+        ));
 
         mGlobalActionsDialogLite.showOrHideDialog(
             /* keyguardShowing= */ false,
@@ -1096,13 +1073,12 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         doCallRealMethod()
                 .when(mGlobalActionsDialogLite)
                 .shouldShowAction(any(GlobalActionsDialogLite.LockAction.class));
-        String[] actions = {
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_EMERGENCY,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_LOCK,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_POWER,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_RESTART,
-        };
-        doReturn(actions).when(mGlobalActionsDialogLite).getDefaultActions();
+        mRepository.setPossibleGlobalActions(List.of(
+                GlobalActionType.EMERGENCY,
+                GlobalActionType.LOCK,
+                GlobalActionType.POWER,
+                GlobalActionType.RESTART
+        ));
 
         mGlobalActionsDialogLite.showOrHideDialog(
             /* keyguardShowing= */ false,
@@ -1124,13 +1100,12 @@ public class GlobalActionsDialogLiteTest extends SysuiTestCase {
         doCallRealMethod()
                 .when(mGlobalActionsDialogLite)
                 .shouldShowAction(any(GlobalActionsDialogLite.LockAction.class));
-        String[] actions = {
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_EMERGENCY,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_LOCK,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_POWER,
-                GlobalActionsDialogLite.GLOBAL_ACTION_KEY_RESTART,
-        };
-        doReturn(actions).when(mGlobalActionsDialogLite).getDefaultActions();
+        mRepository.setPossibleGlobalActions(List.of(
+                GlobalActionType.EMERGENCY,
+                GlobalActionType.LOCK,
+                GlobalActionType.POWER,
+                GlobalActionType.RESTART
+        ));
 
         mGlobalActionsDialogLite.showOrHideDialog(
                 /* keyguardShowing= */ false,

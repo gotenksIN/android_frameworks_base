@@ -15,7 +15,6 @@
 package android.telecom;
 
 import static android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE;
-import static android.content.Intent.LOCAL_FLAG_FROM_SYSTEM;
 
 import android.Manifest;
 import android.annotation.CallbackExecutor;
@@ -229,6 +228,11 @@ public class TelecomManager {
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_CALL_BACK = "android.telecom.action.CALL_BACK";
 
+    private static final String ACTION_MANAGE_BLOCKED_NUMBERS =
+            "android.telecom.action.MANAGE_BLOCKED_NUMBERS";
+
+    private static final String TELECOM_PACKAGE = "com.android.server.telecom";
+
     /**
      * Extra value used to provide the package name for {@link #ACTION_CHANGE_DEFAULT_DIALER}.
      */
@@ -266,7 +270,7 @@ public class TelecomManager {
      * @hide
      */
     @SystemApi
-    @FlaggedApi(Flags.FLAG_PROMOTE_EXTRA_DO_NOT_LOG_CALL_TO_SYSTEM_API)
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_PROMOTE_EXTRA_DO_NOT_LOG_CALL_TO_SYSTEM_API)
     @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE)
     public static final String EXTRA_DO_NOT_LOG_CALL =
             "android.telecom.extra.DO_NOT_LOG_CALL";
@@ -347,6 +351,24 @@ public class TelecomManager {
      */
     @FlaggedApi(Flags.FLAG_INTEGRATED_CALL_LOGS)
     public static final String EXTRA_UUID = "android.telecom.extra.UUID";
+
+    /**
+     * An optional {@link Intent} extra used with {@link #ACTION_CALL_BACK} to specify
+     * the desired call type for the callback.
+     *
+     * <p>The value must be one of {@link android.telecom.CallAttributes#AUDIO_CALL},
+     * {@link android.telecom.CallAttributes#VIDEO_CALL}, or
+     * {@link android.telecom.CallAttributes#MESSAGING}.</p>
+     *
+     * <p>Type: int</p>
+     *
+     * <p>When an application receives an {@link #ACTION_CALL_BACK} intent, it should check
+     * for this extra. If present, the application should attempt to initiate the callback
+     * using the specified call type. If this extra is not provided, the application should
+     * default to using the original call type associated with the call.</p>
+     */
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_INTEGRATED_CALL_LOGS_STAGE2)
+    public static final String EXTRA_CALL_TYPE = "android.telecom.extra.CALL_TYPE";
 
     // Values for EXTRA_PRIORITY
     /**
@@ -1192,12 +1214,12 @@ public class TelecomManager {
      * {@link android.telecom.Call#STATE_ACTIVE}, the system should not generate any call connected
      * indication.
      * <p>
-     * Used with {@link #setCallConnectedIndicatorPreference and
+     * Used with {@link #setCallConnectedIndicatorPreference} and
      * {@link #getCallConnectedIndicatorPreference()}.
      * @hide
      */
     @SystemApi
-    @FlaggedApi(Flags.FLAG_CALL_CONNECTED_INDICATOR_PREFERENCE)
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_CALL_CONNECTED_INDICATOR_PREFERENCE)
     public static final int CALL_CONNECTED_INDICATOR_NONE = 0;
 
     /**
@@ -1205,12 +1227,12 @@ public class TelecomManager {
      * {@link android.telecom.Call#STATE_ACTIVE}, the system should play a tone which indicates that
      * the call has connected.
      * <p>
-     * Used with {@link #setCallConnectedIndicatorPreference and
+     * Used with {@link #setCallConnectedIndicatorPreference} and
      * {@link #getCallConnectedIndicatorPreference()}.
      * @hide
      */
     @SystemApi
-    @FlaggedApi(Flags.FLAG_CALL_CONNECTED_INDICATOR_PREFERENCE)
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_CALL_CONNECTED_INDICATOR_PREFERENCE)
     public static final int CALL_CONNECTED_INDICATOR_TONE = (1 << 0);
 
     /**
@@ -1218,17 +1240,17 @@ public class TelecomManager {
      * {@link android.telecom.Call#STATE_ACTIVE}, the system should make a haptic vibration which
      * indicates that the call has connected.
      * <p>
-     * Used with {@link #setCallConnectedIndicatorPreference and
+     * Used with {@link #setCallConnectedIndicatorPreference} and
      * {@link #getCallConnectedIndicatorPreference()}.
      * @hide
      */
     @SystemApi
-    @FlaggedApi(Flags.FLAG_CALL_CONNECTED_INDICATOR_PREFERENCE)
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_CALL_CONNECTED_INDICATOR_PREFERENCE)
     public static final int CALL_CONNECTED_INDICATOR_VIBRATION = (1 << 1);
 
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
-    @FlaggedApi(Flags.FLAG_CALL_CONNECTED_INDICATOR_PREFERENCE)
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_CALL_CONNECTED_INDICATOR_PREFERENCE)
     @IntDef(
             prefix = {"CALL_CONNECTED_INDICATOR_"},
             flag = true,
@@ -1280,6 +1302,9 @@ public class TelecomManager {
      * </ul>
      * <p>
      * If no {@link PhoneAccount} fits the criteria above, this method will return {@code null}.
+     * <p>
+     * For callers only interested in finding the default SIM for voice calls, it is recommended
+     * to use {@link SubscriptionManager#getDefaultVoiceSubscriptionId()} instead.
      *
      * @param uriScheme The URI scheme.
      * @return The {@link PhoneAccountHandle} corresponding to the account to be used.
@@ -1463,6 +1488,9 @@ public class TelecomManager {
      * Returns a list of {@link PhoneAccountHandle}s which can be used to make and receive phone
      * calls. The returned list includes only those accounts which have been explicitly enabled
      * by the user.
+     * <p>
+     * For callers only interested in finding all SIMs for voice calls, it is recommended
+     * to use {@link SubscriptionManager#getActiveSubscriptionInfoList()} instead.
      *
      * @see #EXTRA_PHONE_ACCOUNT_HANDLE
      * @return A list of {@code PhoneAccountHandle} objects.
@@ -2649,6 +2677,7 @@ public class TelecomManager {
      *   <li>{@link #EXTRA_PHONE_ACCOUNT_HANDLE}</li>
      *   <li>{@link #EXTRA_START_CALL_WITH_SPEAKERPHONE}</li>
      *   <li>{@link #EXTRA_START_CALL_WITH_VIDEO_STATE}</li>
+     *   <li>{@link #EXTRA_CALL_TYPE}</li>
      * </ul>
      * <p>
      * An app which implements the self-managed {@link ConnectionService} API uses
@@ -2786,19 +2815,8 @@ public class TelecomManager {
      * {@code true} for the current user.
      */
     public Intent createManageBlockedNumbersIntent() {
-        ITelecomService service = getTelecomService();
-        Intent result = null;
-        if (service != null) {
-            try {
-                result = service.createManageBlockedNumbersIntent(mContext.getPackageName());
-                if (result != null) {
-                    result.prepareToEnterProcess(LOCAL_FLAG_FROM_SYSTEM,
-                            mContext.getAttributionSource());
-                }
-            } catch (RemoteException e) {
-                Log.e(TAG, "Error calling ITelecomService#createManageBlockedNumbersIntent", e);
-            }
-        }
+        Intent result = new Intent(ACTION_MANAGE_BLOCKED_NUMBERS);
+        result.setPackage(TELECOM_PACKAGE);
         return result;
     }
 
@@ -2814,24 +2832,21 @@ public class TelecomManager {
     @NonNull
     public Intent createLaunchEmergencyDialerIntent(@Nullable String number) {
         ITelecomService service = getTelecomService();
+        Intent intent = new Intent(Intent.ACTION_DIAL_EMERGENCY);
         if (service != null) {
             try {
-                Intent result = service.createLaunchEmergencyDialerIntent(number);
-                if (result != null) {
-                    result.prepareToEnterProcess(LOCAL_FLAG_FROM_SYSTEM,
-                            mContext.getAttributionSource());
+                String packageName = service.getPackageForCreateLaunchEmergencyDialerIntent();
+                // Telecom service knows the package name of the expected emergency dialer package;
+                // if it is not available, then fallback to not targeting a specific package.
+                if (!TextUtils.isEmpty(packageName)) {
+                    intent.setPackage(packageName);
                 }
-                return result;
             } catch (RemoteException e) {
                 Log.e(TAG, "Error createLaunchEmergencyDialerIntent", e);
             }
         } else {
             Log.w(TAG, "createLaunchEmergencyDialerIntent - Telecom service not available.");
         }
-
-        // Telecom service knows the package name of the expected emergency dialer package; if it
-        // is not available, then fallback to not targeting a specific package.
-        Intent intent = new Intent(Intent.ACTION_DIAL_EMERGENCY);
         if (!TextUtils.isEmpty(number) && TextUtils.isDigitsOnly(number)) {
             intent.setData(Uri.fromParts(PhoneAccount.SCHEME_TEL, number, null));
         }
@@ -3155,7 +3170,7 @@ public class TelecomManager {
      * @hide
      */
     @SystemApi
-    @FlaggedApi(Flags.FLAG_CALL_CONNECTED_INDICATOR_PREFERENCE)
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_CALL_CONNECTED_INDICATOR_PREFERENCE)
     @RequiresPermission(Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
     public @CallConnectedIndicator int getCallConnectedIndicatorPreference() {
         ITelecomService service = getTelecomService();
@@ -3181,7 +3196,7 @@ public class TelecomManager {
      * @hide
      */
     @SystemApi
-    @FlaggedApi(Flags.FLAG_CALL_CONNECTED_INDICATOR_PREFERENCE)
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_CALL_CONNECTED_INDICATOR_PREFERENCE)
     @RequiresPermission(Manifest.permission.MODIFY_PHONE_STATE)
     public void setCallConnectedIndicatorPreference(@CallConnectedIndicator int preference) {
         ITelecomService service = getTelecomService();
@@ -3209,7 +3224,7 @@ public class TelecomManager {
      * @hide
      */
     @SystemApi
-    @FlaggedApi(Flags.FLAG_INTEGRATED_CALL_LOGS_STAGE2)
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_INTEGRATED_CALL_LOGS_STAGE2)
     @RequiresPermission(READ_PRIVILEGED_PHONE_STATE)
     public @NonNull Map<String, Boolean> getVoipCallLogIntegrationStatus() {
         ITelecomService service = getTelecomService();
@@ -3236,7 +3251,7 @@ public class TelecomManager {
      * @hide
      */
     @SystemApi
-    @FlaggedApi(Flags.FLAG_INTEGRATED_CALL_LOGS_STAGE2)
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_INTEGRATED_CALL_LOGS_STAGE2)
     @RequiresPermission(Manifest.permission.MODIFY_PHONE_STATE)
     public void setVoipCallLogIntegrationEnabled(@NonNull String packageName, boolean enabled) {
         ITelecomService service = getTelecomService();
@@ -3266,7 +3281,7 @@ public class TelecomManager {
      * @hide
      */
     @SystemApi
-    @FlaggedApi(Flags.FLAG_LOCAL_VOICEMAIL)
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_LOCAL_VOICEMAIL)
     @RequiresPermission(Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
     public boolean isLocalVoicemailSupported() {
         ITelecomService service = getTelecomService();
@@ -3306,7 +3321,7 @@ public class TelecomManager {
      * @hide
      */
     @SystemApi
-    @FlaggedApi(Flags.FLAG_LOCAL_VOICEMAIL)
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_LOCAL_VOICEMAIL)
     @RequiresPermission(Manifest.permission.MODIFY_PHONE_STATE)
     public void enableLocalVoicemail(@NonNull PhoneAccountHandle phoneAccountHandle,
             @NonNull Duration timeout) {
@@ -3342,7 +3357,7 @@ public class TelecomManager {
      * @hide
      */
     @SystemApi
-    @FlaggedApi(Flags.FLAG_LOCAL_VOICEMAIL)
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_LOCAL_VOICEMAIL)
     @RequiresPermission(Manifest.permission.MODIFY_PHONE_STATE)
     public void disableLocalVoicemail(@NonNull PhoneAccountHandle phoneAccountHandle) {
         if (phoneAccountHandle == null) {
@@ -3374,7 +3389,7 @@ public class TelecomManager {
      * @hide
      */
     @SystemApi
-    @FlaggedApi(Flags.FLAG_LOCAL_VOICEMAIL)
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_LOCAL_VOICEMAIL)
     @RequiresPermission(Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
     public boolean isLocalVoicemailEnabled(@NonNull PhoneAccountHandle phoneAccountHandle) {
         ITelecomService service = getTelecomService();
@@ -3416,7 +3431,7 @@ public class TelecomManager {
      * @hide
      */
     @SystemApi
-    @FlaggedApi(Flags.FLAG_LOCAL_VOICEMAIL)
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_LOCAL_VOICEMAIL)
     @RequiresPermission(Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
     public @NonNull Duration getLocalVoicemailTimeout(
             @NonNull PhoneAccountHandle phoneAccountHandle) {
@@ -3443,8 +3458,9 @@ public class TelecomManager {
             return mTelecomServiceOverride;
         }
         if (sTelecomService == null) {
-            ITelecomService temp = ITelecomService.Stub.asInterface(
-                    ServiceManager.getService(Context.TELECOM_SERVICE));
+            ITelecomService temp =
+                    ITelecomService.Stub.asInterface(
+                            ServiceManager.getService(Context.TELECOM_SERVICE));
             synchronized (CACHE_LOCK) {
                 if (sTelecomService == null && temp != null) {
                     try {

@@ -17,6 +17,7 @@
 package android.provider;
 
 import static android.app.Flags.systemTermsOfAddressEnabled;
+import static android.app.supervision.flags.Flags.FLAG_ENABLE_SUPERVISION_SETTINGS_UI_UPDATES;
 
 import android.Manifest;
 import android.annotation.CallbackExecutor;
@@ -88,6 +89,8 @@ import android.os.RemoteException;
 import android.os.ResultReceiver;
 import android.os.ServiceManager;
 import android.os.UserHandle;
+import android.ravenwood.annotation.RavenwoodKeepPartialClass;
+import android.ravenwood.annotation.RavenwoodKeepWholeClass;
 import android.service.voice.VisualQueryDetectedResult;
 import android.speech.tts.TextToSpeech;
 import android.telephony.TelephonyManager;
@@ -129,6 +132,11 @@ import java.util.function.Consumer;
 /**
  * The Settings provider contains global system-level device preferences.
  */
+@RavenwoodKeepWholeClass(comment = """
+With the default ContentResolver instance, all the get methods will just return the default values.
+All the put methods will throw an exception. If you want to simulate writing to the settings
+provider, consider using TestableSettingsProvider, which is configured by TestableContext.
+        """, conditional = true, bug = 457840588)
 public final class Settings {
     /** @hide */
     public static final boolean DEFAULT_OVERRIDEABLE_BY_RESTORE = false;
@@ -1437,6 +1445,22 @@ public final class Settings {
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_HARD_KEYBOARD_SETTINGS =
             "android.settings.HARD_KEYBOARD_SETTINGS";
+
+    /**
+     * Activity Action: Show settings to configure the game controllers.
+     * <p>
+     * In some cases, a matching Activity may not exist, so ensure you
+     * safeguard against this.
+     * <p>
+     * Input: Nothing.
+     * <p>
+     * Output: Nothing.
+     *
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_GAME_CONTROLLER_SETTINGS =
+            "android.settings.GAME_CONTROLLER_SETTINGS";
 
     /**
      * Activity Action: Adds a word to the user dictionary.
@@ -2947,6 +2971,20 @@ public final class Settings {
             "com.android.settings.WIFI_TETHER_SETTINGS";
 
     /**
+     * Activity Action: Show settings to manage a supervision app.
+     * <p>
+     * Input: Nothing.
+     * <p>
+     * Output: Nothing.
+     *
+     * @hide
+     */
+    @FlaggedApi(FLAG_ENABLE_SUPERVISION_SETTINGS_UI_UPDATES)
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String MANAGE_SUPERVISION_APP_SETTINGS =
+            "android.settings.MANAGE_SUPERVISION_APP_SETTINGS";
+
+    /**
      * Broadcast to trigger notification of asking user to enable MMS.
      * Need to specify {@link #EXTRA_ENABLE_MMS_DATA_REQUEST_REASON} and {@link #EXTRA_SUB_ID}.
      *
@@ -3044,6 +3082,18 @@ public final class Settings {
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_APP_PERMISSIONS_SETTINGS =
             "android.settings.APP_PERMISSIONS_SETTINGS";
+
+    /**
+     * Activity Action: Show screen to manage supervision settings.
+     * <p>
+     * Input: Nothing.
+     * <p>
+     * Output: Nothing.
+     */
+    @FlaggedApi(android.app.supervision.flags.Flags.FLAG_ENABLE_SUPERVISION_SETTINGS_UI_UPDATES)
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_SUPERVISION_SETTINGS =
+            "android.settings.SUPERVISION_SETTINGS";
 
     // End of Intent actions for Settings
 
@@ -3433,6 +3483,7 @@ public final class Settings {
         }
     }
 
+    @RavenwoodKeepPartialClass(comment = "GenerationTracker not used on Ravenwood")
     private static final class GenerationTracker {
         @NonNull private final Key mKey;
         @NonNull private final MemoryIntArray mArray;
@@ -3488,6 +3539,7 @@ public final class Settings {
             }
         }
 
+        @RavenwoodKeepWholeClass(comment = "GenerationTracker not used, but we still generate keys")
         private static final class Key {
             private final String mName;
             private final int mDeviceId;
@@ -8015,6 +8067,12 @@ public final class Settings {
                 "bluetooth_le_broadcast_fallback_active_device_address";
 
         /**
+         * User preference for enabling contextual mode sync.
+         * @hide
+         */
+        public static final String CONTEXTUAL_MODE_SYNC_ENABLED = "contextual_mode_sync_enabled";
+
+        /**
          * Ringtone routing value for hearing aid. It routes ringtone to hearing aid or device
          * speaker.
          * <ul>
@@ -9173,6 +9231,19 @@ public final class Settings {
          */
         public static final String ACCESSIBILITY_TOP_ROW_KEY_TARGETS =
                 "accessibility_top_row_key_targets";
+
+        /**
+         * Setting specifying the accessibility services, accessibility shortcut targets,
+         * or features to be toggled via the accessibility quick access dialog.
+         *
+         * <p> This is a colon-separated string list which contains the flattened
+         * {@link ComponentName} and the class name of a system class implementing a supported
+         * accessibility feature.
+         *
+         * @hide
+         */
+        public static final String ACCESSIBILITY_QUICK_ACCESS_TARGETS =
+                "accessibility_quick_access_targets";
 
         /**
          * The system class name of magnification controller which is a target to be toggled via
@@ -13890,12 +13961,45 @@ public final class Settings {
                 "identity_check_promo_card_shown";
 
         /**
+         * Tracks if the user has seen the promo card for Identity Check x MTL.
+         * The promo card should only appear once per user via Safety Center.
+         *
+         * @hide
+         */
+        public static final String IDENTITY_CHECK_WATCH_PROMO_CARD_SHOWN =
+                "identity_check_watch_promo_card_shown";
+
+        /**
          * Tracks if the user has interacted with the Identity Check promo notification.
          * The notification should only appear once per user via Safety Center.
          * @hide
          */
         public static final String IDENTITY_CHECK_NOTIFICATION_VIEW_DETAILS_CLICKED =
                 "identity_check_notification_view_details_clicked";
+
+        /**
+         * Tracks if the user has interacted with the Identity Check x MTL promo notification.
+         * The notification should only appear once per user via Safety Center.
+         * @hide
+         */
+        public static final String IDENTITY_CHECK_WATCH_NOTIFICATION_VIEW_DETAILS_CLICKED =
+                "identity_check_watch_notification_view_details_clicked";
+
+        /**
+         * Setting to showing password characters from touch inputs in text editors.
+         * 1 = On, 0 = Off
+         * @hide
+         */
+        @FlaggedApi("com.android.systemui.split_show_passwords_to_touch_and_physical")
+        public static final String TEXT_SHOW_PASSWORD_TOUCH = "show_passwords_touch";
+
+        /**
+         * Setting to showing password characters from physical inputs in text editors.
+         * 1 = On, 0 = Off
+         * @hide
+         */
+        @FlaggedApi("com.android.systemui.split_show_passwords_to_touch_and_physical")
+        public static final String TEXT_SHOW_PASSWORD_PHYSICAL = "show_passwords_physical";
     }
 
     /**
@@ -21484,6 +21588,22 @@ public final class Settings {
              * @hide
              */
             public static final int STATUS_TRAY_CONFIGURATION_SYSTEM_HIDDEN = 1;
+
+            /**
+             * Indicates that all elements of the system status tray should be rendered by the home
+             * application.
+             *
+             * @hide
+             */
+            public static final int STATUS_TRAY_CONFIGURATION_HOME_HOSTED = 2;
+
+            /**
+             * Indicates that all elements of the system status tray should be shown within system
+             * UI.
+             *
+             * @hide
+             */
+            public static final int STATUS_TRAY_CONFIGURATION_SYSTEM_UI_HOSTED = 3;
 
             /**
              * Configuration of system status tray in wear.

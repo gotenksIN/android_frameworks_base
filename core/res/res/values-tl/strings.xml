@@ -326,6 +326,8 @@
     <string name="notification_channel_accessibility_hearing_device" msgid="7816963856388758952">"Hearing device"</string>
     <string name="notification_channel_accessibility_security_policy" msgid="1727787021725251912">"Paggamit sa pagiging accessible"</string>
     <string name="notification_channel_display" msgid="6905032605735615090">"Display"</string>
+    <!-- no translation found for notification_channel_parental_controls (2963963315750128538) -->
+    <skip />
     <string name="foreground_service_app_in_background" msgid="1439289699671273555">"Gumagamit ng baterya ang <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="foreground_service_apps_in_background" msgid="7340037176412387863">"Gumagamit ng baterya ang <xliff:g id="NUMBER">%1$d</xliff:g> (na) app"</string>
     <string name="foreground_service_tap_for_details" msgid="9078123626015586751">"I-tap para sa mga detalye tungkol sa paggamit ng baterya at data"</string>
@@ -641,6 +643,8 @@
     <string name="permdesc_nearby_wifi_devices" msgid="3054307728646332906">"Nagbibigay-daan sa app na i-advertise ang, kumonekta sa, at tukuyin ang nauugnay na posisyon ng mga kalapit na Wi‑Fi device"</string>
     <string name="permlab_access_local_network" msgid="3420360767259066877">"i-access ang mga local network device"</string>
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"Pinapayagan ang app na i-access ang mga local network device"</string>
+    <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"gamitin ang loopback interface"</string>
+    <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"Nagbibigay-daan sa app na makipag-interact sa iba pang app sa pamamagitan ng loopback interface"</string>
     <string name="permlab_ranging" msgid="2854543350668593390">"alamin ang relative position sa kalapit na device"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"Payagan ang app na alamin ang relatibong posisyon sa pagitan ng mga kalapit na device"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"Impormasyon sa Gustong NFC na Serbisyo sa Pagbabayad"</string>
@@ -1043,7 +1047,6 @@
     <string name="keyguard_password_enter_pin_password_code" msgid="7792964196473964340">"I-type ang PIN upang i-unlock"</string>
     <string name="keyguard_password_wrong_pin_code" msgid="8583732939138432793">"Maling PIN code."</string>
     <string name="keyguard_label_text" msgid="3841953694564168384">"Upang i-unlock, pindutin ang Menu pagkatapos ay 0."</string>
-    <string name="emergency_call_dialog_number_for_display" msgid="2978165477085612673">"Pang-emergency na numero"</string>
     <string name="lockscreen_carrier_default" msgid="6192313772955399160">"Walang serbisyo"</string>
     <string name="lockscreen_screen_locked" msgid="7364905540516041817">"Naka-lock ang screen."</string>
     <string name="lockscreen_instructions_when_pattern_enabled" msgid="7982445492532123308">"Pindutin ang Menu upang i-unlock o magsagawa ng pang-emergency na tawag."</string>
@@ -1277,6 +1280,7 @@
     <string name="whichApplicationLabel" msgid="7852182961472531728">"Gawin ang pagkilos"</string>
     <string name="whichViewApplication" msgid="5733194231473132945">"Buksan gamit ang"</string>
     <string name="whichViewApplicationNamed" msgid="415164730629690105">"Buksan gamit ang %1$s"</string>
+    <string name="open_app_name" msgid="6114096770130122912">"Buksan ang <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="whichViewApplicationLabel" msgid="7367556735684742409">"Buksan"</string>
     <string name="whichOpenHostLinksWith" msgid="7645631470199397485">"Buksan ang mga link ng <xliff:g id="HOST">%1$s</xliff:g> gamit ang"</string>
     <string name="whichOpenLinksWith" msgid="1120936181362907258">"Buksan ang mga link gamit ang"</string>
@@ -1798,10 +1802,8 @@
     <string name="accessibility_shortcut_single_service_warning" msgid="6363127705112844257">"Mao-on ang feature ng accessibility na <xliff:g id="SERVICE">%1$s</xliff:g> kapag pinindot nang matagal ang parehong volume key nang ilang segundo. Posibleng mabago nito ang paggana ng iyong device.\n\nPuwede mong palitan ng ibang feature ang shortcut na ito sa Mga Setting &gt; Accessibility."</string>
     <string name="accessibility_shortcut_on" msgid="5463618449556111344">"I-on"</string>
     <string name="accessibility_shortcut_off" msgid="3651336255403648739">"Huwag i-on"</string>
-    <!-- no translation found for accessibility_shortcut_menu_item_status_on (6162756705754654002) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_menu_item_status_off (6274512913017713543) -->
-    <skip />
+    <string name="accessibility_shortcut_menu_item_status_on" msgid="6162756705754654002">"Naka-on"</string>
+    <string name="accessibility_shortcut_menu_item_status_off" msgid="6274512913017713543">"Naka-off"</string>
     <string name="accessibility_enable_service_title" msgid="3931558336268541484">"Bigyan ang <xliff:g id="SERVICE">%1$s</xliff:g> ng ganap na kontrol sa iyong device?"</string>
     <string name="accessibility_service_warning_description" msgid="291674995220940133">"Naaangkop ang ganap na kontrol sa mga app na tumutulong sa mga pangangailangan mo sa accessibility, pero hindi sa karamihan ng mga app."</string>
     <string name="accessibility_service_screen_control_title" msgid="190017412626919776">"Tingnan at kontrolin ang screen"</string>
@@ -1815,16 +1817,11 @@
     <string name="accessibility_select_shortcut_menu_title" msgid="6002726538854613272">"I-tap ang isang feature para simulan itong gamitin:"</string>
     <string name="accessibility_edit_shortcut_menu_button_title" msgid="239446795930436325">"Pumili ng mga feature na gagana sa pamamagitan ng button ng accessibility"</string>
     <string name="accessibility_edit_shortcut_menu_volume_title" msgid="2245540598834891500">"Pumili ng mga feature na gagana sa pamamagitan ng shortcut ng mga volume key"</string>
-    <!-- no translation found for accessibility_shortcut_label_button (6473341300585254821) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_volume_keys (5642990791242136231) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_gesture (7987298674836890931) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_quick_settings (6851280333772213611) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_triple_tap (9058975959054454796) -->
-    <skip />
+    <string name="accessibility_shortcut_label_button" msgid="6473341300585254821">"button ng accessibility"</string>
+    <string name="accessibility_shortcut_label_volume_keys" msgid="5642990791242136231">"mga volume key"</string>
+    <string name="accessibility_shortcut_label_gesture" msgid="7987298674836890931">"galaw"</string>
+    <string name="accessibility_shortcut_label_quick_settings" msgid="6851280333772213611">"mga mabilisang setting"</string>
+    <string name="accessibility_shortcut_label_triple_tap" msgid="9058975959054454796">"pag-triple tap"</string>
     <string name="accessibility_uncheck_legacy_item_warning" msgid="8047830891064817447">"Na-off ang <xliff:g id="SERVICE_NAME">%s</xliff:g>"</string>
     <string name="edit_accessibility_shortcut_menu_button" msgid="8885752738733772935">"I-edit ang mga shortcut"</string>
     <string name="done_accessibility_shortcut_menu_button" msgid="3668407723770815708">"Tapos na"</string>
@@ -2614,4 +2611,10 @@
     <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"Mga Alerto sa Resource ng System"</string>
     <string name="tv_watchdog_notification_title" msgid="195239206215922517">"Sobrang Paggamit ng Resource"</string>
     <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"Gumagamit ang app na <xliff:g id="APP_NAME">%1$s</xliff:g> ng masyadong maraming resource.\""</string>
+    <!-- no translation found for supervision_blocked_app_title (5546803865875383588) -->
+    <skip />
+    <!-- no translation found for supervision_blocked_app_content (4125452996088641559) -->
+    <skip />
+    <!-- no translation found for supervision_unblocked_app_content (8282985265957852278) -->
+    <skip />
 </resources>

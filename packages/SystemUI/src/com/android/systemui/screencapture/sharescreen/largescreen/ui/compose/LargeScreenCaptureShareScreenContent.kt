@@ -17,23 +17,34 @@
 package com.android.systemui.screencapture.sharescreen.largescreen.ui.compose
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
 import com.android.systemui.lifecycle.rememberViewModel
 import com.android.systemui.screencapture.common.ui.compose.ScreenCaptureContent
-import com.android.systemui.screencapture.sharescreen.largescreen.ui.viewmodel.PreShareToolbarViewModel
+import com.android.systemui.screencapture.sharescreen.ui.viewmodel.ScreenCaptureShareScreenViewModel
 import javax.inject.Inject
 
 class LargeScreenCaptureShareScreenContent
 @Inject
-constructor(private val preShareToolbarViewModelFactory: PreShareToolbarViewModel.Factory) :
-    ScreenCaptureContent {
+constructor(
+    private val screenCaptureShareScreenViewModelFactory: ScreenCaptureShareScreenViewModel.Factory
+) : ScreenCaptureContent {
 
     @Composable
     override fun Content() {
-        PreShareUI(
-            preShareToolbarViewModel =
-                rememberViewModel("PreShareToolbarViewModel") {
-                    preShareToolbarViewModelFactory.create()
-                }
-        )
+        val (thumbnailWidthPx, thumbnailHeightPx) =
+            with(LocalDensity.current) { 230.dp.toPx().toInt() to 140.dp.toPx().toInt() }
+
+        val screenCaptureShareScreenViewModel: ScreenCaptureShareScreenViewModel =
+            rememberViewModel("ScreenCaptureShareScreenViewModel") {
+                screenCaptureShareScreenViewModelFactory.create(thumbnailWidthPx, thumbnailHeightPx)
+            }
+
+        if (!screenCaptureShareScreenViewModel.isUiVisible) {
+            // Render nothing, the activity will finish itself when the async work is done.
+            return
+        }
+
+        PreShareUI(shareScreenViewModel = screenCaptureShareScreenViewModel)
     }
 }

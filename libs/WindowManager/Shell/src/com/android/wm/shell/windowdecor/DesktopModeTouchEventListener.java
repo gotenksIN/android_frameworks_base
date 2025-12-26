@@ -241,14 +241,16 @@ public class DesktopModeTouchEventListener
                         getInputMethod(mMotionEvent));
             }
         } else if (id == R.id.minimize_window) {
+            final ActivityManager.RunningTaskInfo taskInfo = decoration.getTaskInfo();
             final int nextFocusedTaskId =
-                    mDesktopTasksController.getNextFocusedTask(decoration.getTaskInfo());
+                    mDesktopTasksController.getTopTask(
+                        taskInfo.getDisplayId(),
+                        taskInfo.userId,
+                        taskInfo.getTaskId());
             final WindowDecorationWrapper nextFocusedWindow =
                     mWindowDecorationFinder.apply(nextFocusedTaskId);
             if (nextFocusedWindow != null) nextFocusedWindow.a11yAnnounceNewFocusedWindow();
-            mDesktopTasksController.minimizeTask(
-                    decoration.getTaskInfo(),
-                    MinimizeReason.MINIMIZE_BUTTON);
+            mDesktopTasksController.minimizeTask(taskInfo, MinimizeReason.MINIMIZE_BUTTON);
         }
     }
 
@@ -372,6 +374,10 @@ public class DesktopModeTouchEventListener
             return false;
         }
         moveTaskToFront(decoration.getTaskInfo());
+        if (decoration.getIsDragging()) {
+            logD("onLongClick(%s) but is dragging, skip creating maximize menu", viewName);
+            return true;
+        }
         if (decoration.getMaximizeMenuController() != null
                 && !decoration.getMaximizeMenuController().isMaximizeMenuActive()) {
             logD("onLongClick(%s) creating maximize menu", viewName);
@@ -652,7 +658,7 @@ public class DesktopModeTouchEventListener
                 final Rect validDragArea = decoration.getValidDragArea();
                 final boolean needDragIndicatorCleanup =
                         mDesktopTasksController.onDragPositioningEnd(
-                                taskInfo, decoration.getTaskSurface(), e.getDisplayId(),
+                                taskInfo, decoration.getTaskSurface(),
                                 new PointF(
                                         e.getRawX(dragPointerIdx), e.getRawY(dragPointerIdx)),
                                 newTaskBounds, validDragArea,

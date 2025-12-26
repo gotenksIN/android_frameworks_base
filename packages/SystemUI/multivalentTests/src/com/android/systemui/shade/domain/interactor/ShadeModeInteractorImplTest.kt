@@ -119,6 +119,7 @@ class ShadeModeInteractorImplTest : SysuiTestCase() {
     @EnableFlags(FLAG_DUAL_SHADE)
     fun defaultShadeMode_singleShadeOverridden_dualShade() =
         kosmos.runTest {
+            overrideResource(R.bool.config_dualShadeEnabledByDefault, true)
             enableSingleShade()
             val shadeMode by collectLastValue(underTest.shadeMode)
             assertThat(shadeMode).isEqualTo(ShadeMode.Single)
@@ -260,5 +261,19 @@ class ShadeModeInteractorImplTest : SysuiTestCase() {
             enableDualShade(wideLayout = true)
 
             assertThat(alignment).isEqualTo(Alignment.Start)
+        }
+
+    @Test
+    fun isQSInlinePowerMenuEnabled_matchesConfigFalse() =
+        kosmos.runTest {
+            overrideResource(R.bool.config_qsInlinePowerMenu, false)
+            assertThat(underTest.isQSInlinePowerMenuEnabled).isFalse()
+        }
+
+    @Test
+    fun isQSInlinePowerMenuEnabled_matchesConfigTrue() =
+        kosmos.runTest {
+            overrideResource(R.bool.config_qsInlinePowerMenu, true)
+            assertThat(underTest.isQSInlinePowerMenuEnabled).isTrue()
         }
 }

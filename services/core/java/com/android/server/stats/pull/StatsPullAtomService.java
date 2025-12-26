@@ -51,6 +51,7 @@ import static android.view.Display.HdrCapabilities.HDR_TYPE_INVALID;
 
 import static com.android.internal.os.MemcgProcMemoryUtil.readHighWaterMarkMemorySnapshot;
 import static com.android.internal.os.MemcgProcMemoryUtil.readMemcgMemorySnapshot;
+import static com.android.internal.os.MemcgProcMemoryUtil.readMemcgProcessStatSnapshot;
 import static com.android.internal.os.ProcfsMemoryUtil.DmaBufType;
 import static com.android.internal.os.ProcfsMemoryUtil.getProcessCmdlines;
 import static com.android.internal.os.ProcfsMemoryUtil.readDmabufFromProcfs;
@@ -137,6 +138,7 @@ import android.os.Binder;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.CoolingDevice;
+import android.os.Debug;
 import android.os.Environment;
 import android.os.IStoraged;
 import android.os.IThermalEventListener;
@@ -216,6 +218,7 @@ import com.android.internal.os.KernelCpuUidTimeReader.KernelCpuUidUserSysTimeRea
 import com.android.internal.os.LooperStats;
 import com.android.internal.os.MemcgProcMemoryUtil.MemcgHighWaterMarkMemorySnapshot;
 import com.android.internal.os.MemcgProcMemoryUtil.MemcgMemorySnapshot;
+import com.android.internal.os.MemcgProcMemoryUtil.MemcgMemoryStatSnapshot;
 import com.android.internal.os.PowerProfile;
 import com.android.internal.os.ProcessCpuTracker;
 import com.android.internal.os.ProcfsMemoryUtil;
@@ -659,6 +662,8 @@ public class StatsPullAtomService extends SystemService {
                         return pullProcessMemorySnapshot(atomTag, data);
                     case FrameworkStatsLog.PROCESS_DMABUF_MEMORY:
                         return pullProcessDmabufMemory(atomTag, data);
+                    case FrameworkStatsLog.DMABUF_STATS:
+                        return pullDmabufStats(atomTag, data);
                     case FrameworkStatsLog.SYSTEM_MEMORY:
                         return pullSystemMemory(atomTag, data);
                     case FrameworkStatsLog.VMSTAT:
@@ -857,6 +862,8 @@ public class StatsPullAtomService extends SystemService {
                         return pullMemcgProcessMemoryInformation(atomTag, data);
                     case FrameworkStatsLog.MEMCG_MEMORY_HIGH_WATER_MARK_SNAPSHOT:
                         return pullMemcgProcessHighMemoryHighWatermark(atomTag, data);
+                    case FrameworkStatsLog.MEMCG_MEMORY_STAT_SNAPSHOT:
+                        return pullMemcgProcessStatSnapshot(atomTag, data);
                     default:
                         throw new UnsupportedOperationException("Unknown tagId=" + atomTag);
                 }
@@ -996,6 +1003,7 @@ public class StatsPullAtomService extends SystemService {
         registerProcessMemorySnapshot();
         registerSystemMemory();
         registerProcessDmabufMemory();
+        registerDmabufStats();
         registerVmStat();
         registerTemperature();
         registerCoolingDevice();
@@ -1061,6 +1069,7 @@ public class StatsPullAtomService extends SystemService {
             registerMemcgInformation();
             registerMemcgMemoryHighWaterMark();
         }
+        registerMemcgMemoryStats();
     }
 
     private void initMobileDataStatsPuller() {
@@ -2717,6 +2726,28 @@ public class StatsPullAtomService extends SystemService {
                     procBuf.surfaceFlingerCount
             ));
         }
+        return StatsManager.PULL_SUCCESS;
+    }
+
+    private void registerDmabufStats() {
+        int tagId = FrameworkStatsLog.DMABUF_STATS;
+        mStatsManager.setPullAtomCallback(
+                tagId,
+                null, // use default PullAtomMetadata values
+                DIRECT_EXECUTOR,
+                mStatsCallbackImpl
+        );
+    }
+
+    int pullDmabufStats(int atomTag, List<StatsEvent> pulledData) {
+        int dmaBufTotalExportedKb = (int) Debug.getDmabufTotalExportedKb();
+        int dmaBufUserspaceKb = (int) Debug.getDmabufUserspaceKb();
+        pulledData.add(
+                FrameworkStatsLog.buildStatsEvent(
+                        atomTag,
+                        dmaBufTotalExportedKb,
+                        dmaBufUserspaceKb,
+                        dmaBufTotalExportedKb - dmaBufUserspaceKb));
         return StatsManager.PULL_SUCCESS;
     }
 
@@ -5265,6 +5296,18 @@ public class StatsPullAtomService extends SystemService {
         );
     }
 
+    private void registerMemcgMemoryStats() {
+        int tagId = FrameworkStatsLog.MEMCG_MEMORY_STAT_SNAPSHOT;
+        mStatsManager.setPullAtomCallback(
+                tagId,
+                new PullAtomMetadata.Builder()
+                        .setCoolDownMillis(MILLIS_PER_SEC)
+                        .build(),
+                DIRECT_EXECUTOR,
+                mStatsCallbackImpl
+        );
+    }
+
     int pullMemcgProcessMemoryInformation(int atomTag, List<StatsEvent> pulledData) {
         List<ProcessMemoryState> managedProcessList =
                 LocalServices.getService(ActivityManagerInternal.class)
@@ -5302,6 +5345,31 @@ public class StatsPullAtomService extends SystemService {
                     managedProcess.processName,
                     snapshot.memcgMemoryPeakInBytes / 1024,
                     snapshot.memcgSwapMemoryPeakInBytes / 1024
+            ));
+        }
+        return StatsManager.PULL_SUCCESS;
+    }
+
+    int pullMemcgProcessStatSnapshot(int atomTag, List<StatsEvent> pulledData) {
+        List<ProcessMemoryState> managedProcessList =
+                LocalServices.getService(ActivityManagerInternal.class)
+                        .getMemoryStateForProcesses();
+        for (ProcessMemoryState managedProcess : managedProcessList) {
+            final MemcgMemoryStatSnapshot snapshot =
+                    readMemcgProcessStatSnapshot(managedProcess.uid, managedProcess.pid);
+            if (snapshot == null) {
+                continue;
+            }
+            pulledData.add(FrameworkStatsLog.buildStatsEvent(
+                    atomTag,
+                    managedProcess.uid,
+                    managedProcess.processName,
+                    snapshot.anonInKiloBytes,
+                    snapshot.fileInKiloBytes,
+                    snapshot.totalKernelInKiloBytes,
+                    snapshot.shmemInKiloBytes,
+                    snapshot.fileMappedInKiloBytes,
+                    snapshot.memorySwapInKiloBytes
             ));
         }
         return StatsManager.PULL_SUCCESS;

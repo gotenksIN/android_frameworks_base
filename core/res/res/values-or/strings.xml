@@ -326,6 +326,8 @@
     <string name="notification_channel_accessibility_hearing_device" msgid="7816963856388758952">"ଶ୍ରବଣ ଡିଭାଇସ"</string>
     <string name="notification_channel_accessibility_security_policy" msgid="1727787021725251912">"ଆକ୍ସେସିବିଲିଟୀ ବ୍ୟବହାର"</string>
     <string name="notification_channel_display" msgid="6905032605735615090">"ଡିସପ୍ଲେ"</string>
+    <!-- no translation found for notification_channel_parental_controls (2963963315750128538) -->
+    <skip />
     <string name="foreground_service_app_in_background" msgid="1439289699671273555">"<xliff:g id="APP_NAME">%1$s</xliff:g> ବ୍ୟାଟେରୀ ବ୍ୟବହାର କରୁଛି"</string>
     <string name="foreground_service_apps_in_background" msgid="7340037176412387863">"<xliff:g id="NUMBER">%1$d</xliff:g>ଟି ଆପ୍‍ ବ୍ୟାଟେରୀ ବ୍ୟବହାର କରୁଛନ୍ତି"</string>
     <string name="foreground_service_tap_for_details" msgid="9078123626015586751">"ବ୍ୟାଟେରୀ ଏବଂ ଡାଟା ବ୍ୟବହାର ଉପରେ ବିବରଣୀ ପାଇଁ ଟାପ୍‍ କରନ୍ତୁ"</string>
@@ -641,6 +643,8 @@
     <string name="permdesc_nearby_wifi_devices" msgid="3054307728646332906">"ଆଖପାଖର ୱାଇ-ଫାଇ ଡିଭାଇସରେ ବିଜ୍ଞାପନ ଦେବା, ତା ସହ ସଂଯୋଗ କରିବା ଓ ତା’ର ଆପେକ୍ଷିକ ଅବସ୍ଥିତି ନିର୍ଦ୍ଧାରଣ କରିବା ପାଇଁ ଆପକୁ ଅନୁମତି ଦିଏ"</string>
     <string name="permlab_access_local_network" msgid="3420360767259066877">"ସ୍ଥାନୀୟ ନେଟୱାର୍କ ଡିଭାଇସଗୁଡ଼ିକୁ ଆକ୍ସେସ କରନ୍ତୁ"</string>
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"ସ୍ଥାନୀୟ ନେଟୱାର୍କ ଡିଭାଇସଗୁଡ଼ିକୁ ଆକ୍ସେସ କରିବାକୁ ଆପକୁ ଅନୁମତି ଦିଏ"</string>
+    <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"ଲୁପବେକ ଇଣ୍ଟରଫେସ ବ୍ୟବହାର କରନ୍ତୁ"</string>
+    <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"ଲୁପବେକ ଇଣ୍ଟରଫେସ ମାଧ୍ୟମରେ ଅନ୍ୟ ଆପ୍ସ ସହ ଇଣ୍ଟରାକ୍ଟ କରିବାକୁ ଆପକୁ ଅନୁମତି ଦିଏ"</string>
     <string name="permlab_ranging" msgid="2854543350668593390">"ଆଖପାଖର ଡିଭାଇସ ମଧ୍ୟରେ ଆପେକ୍ଷିକ ଅବସ୍ଥିତିକୁ ନିର୍ଦ୍ଧାରଣ କର"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"ଆଖପାଖର ଡିଭାଇସଗୁଡ଼ିକ ମଧ୍ୟରେ ଆପେକ୍ଷିକ ଅବସ୍ଥିତିକୁ ନିର୍ଦ୍ଧାରଣ କରିବା ପାଇଁ ଆପକୁ ଅନୁମତି ଦିଅନ୍ତୁ"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"ପସନ୍ଦର NFC ପେମେଣ୍ଟ ସେବା ସୂଚନା"</string>
@@ -1043,7 +1047,6 @@
     <string name="keyguard_password_enter_pin_password_code" msgid="7792964196473964340">"ଅନଲକ୍‍ କରିବାକୁ PIN ଟାଇପ୍‍ କରନ୍ତୁ"</string>
     <string name="keyguard_password_wrong_pin_code" msgid="8583732939138432793">"ଭୁଲ PIN କୋଡ୍।"</string>
     <string name="keyguard_label_text" msgid="3841953694564168384">"ଅନଲକ୍ କରିବା ପାଇଁ, ପ୍ରଥମେ ମେନୁ ଓ ତା’ପରେ 0 ଦବାନ୍ତୁ।"</string>
-    <string name="emergency_call_dialog_number_for_display" msgid="2978165477085612673">"ଜରୁରୀକାଳୀନ ନମ୍ବର୍‌"</string>
     <string name="lockscreen_carrier_default" msgid="6192313772955399160">"କୌଣସି ସେବା ନାହିଁ"</string>
     <string name="lockscreen_screen_locked" msgid="7364905540516041817">"ସ୍କ୍ରୀନ୍‌ ଲକ୍‌ ହୋଇଯାଇଛି।"</string>
     <string name="lockscreen_instructions_when_pattern_enabled" msgid="7982445492532123308">"ଅନଲକ୍‌ କରିବା ପାଇଁ ମେନୁକୁ ଦବାନ୍ତୁ କିମ୍ବା ଜରୁରୀକାଳୀନ କଲ୍‌ କରନ୍ତୁ।"</string>
@@ -1054,10 +1057,8 @@
     <string name="lockscreen_pattern_correct" msgid="8050630103651508582">"ଠିକ୍!"</string>
     <string name="lockscreen_pattern_wrong" msgid="2940138714468358458">"ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ"</string>
     <string name="lockscreen_password_wrong" msgid="8605355913868947490">"ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ"</string>
-    <!-- no translation found for lockscreen_click_to_unlock_hint (6056691847669178119) -->
-    <skip />
-    <!-- no translation found for lockscreen_key_to_unlock_hint (9042402393653798264) -->
-    <skip />
+    <string name="lockscreen_click_to_unlock_hint" msgid="6056691847669178119">"ଅନଲକ କରିବାକୁ କ୍ଲିକ କରନ୍ତୁ"</string>
+    <string name="lockscreen_key_to_unlock_hint" msgid="9042402393653798264">"ଅନଲକ କରିବାକୁ ଯେ କୌଣସି କୀ ଦବାନ୍ତୁ"</string>
     <string name="lockscreen_storage_locked" msgid="634993789186443380">"ସବୁ ଫିଚର ଓ ଡାଟା ପାଇଁ ଅନଲକ କରନ୍ତୁ"</string>
     <string name="faceunlock_multiple_failures" msgid="681991538434031708">"ସର୍ବାଧିକ ଫେସ୍ ଅନଲକ୍‍ ପ୍ରଚେଷ୍ଟା ଅତିକ୍ରମ କରିଛି"</string>
     <string name="lockscreen_missing_sim_message_short" msgid="1229301273156907613">"କୌଣସି SIM ନାହିଁ"</string>
@@ -1279,6 +1280,7 @@
     <string name="whichApplicationLabel" msgid="7852182961472531728">"କାର୍ଯ୍ୟ ସମ୍ପୂର୍ଣ୍ଣ କରନ୍ତୁ"</string>
     <string name="whichViewApplication" msgid="5733194231473132945">"ସହିତ ଖୋଲନ୍ତୁ"</string>
     <string name="whichViewApplicationNamed" msgid="415164730629690105">"%1$s ସହିତ ଖୋଲନ୍ତୁ"</string>
+    <string name="open_app_name" msgid="6114096770130122912">"<xliff:g id="APP_NAME">%1$s</xliff:g> ଖୋଲନ୍ତୁ"</string>
     <string name="whichViewApplicationLabel" msgid="7367556735684742409">"ଖୋଲନ୍ତୁ"</string>
     <string name="whichOpenHostLinksWith" msgid="7645631470199397485">"ଏଥିରେ <xliff:g id="HOST">%1$s</xliff:g> ଲିଙ୍କ୍‍ଗୁଡ଼ିକ ଖୋଲନ୍ତୁ"</string>
     <string name="whichOpenLinksWith" msgid="1120936181362907258">"ଏଥିରେ ଲିଙ୍କ୍‍ଗୁଡ଼ିକ ଖୋଲନ୍ତୁ"</string>
@@ -1800,10 +1802,8 @@
     <string name="accessibility_shortcut_single_service_warning" msgid="6363127705112844257">"କିଛି ସେକେଣ୍ଡ ପାଇଁ ଉଭୟ ଭଲ୍ୟୁମ୍ କୀ’କୁ ଧରି ରଖିବା ଫଳରେ ଏକ ଆକ୍ସେସିବିଲିଟୀ ଫିଚର୍ <xliff:g id="SERVICE">%1$s</xliff:g> ଚାଲୁ ହୁଏ। ଏହା ଆପଣଙ୍କ ଡିଭାଇସ୍ କିପରି କାମ କରେ ତାହା ପରିବର୍ତ୍ତନ କରିପାରେ।\n\nଆପଣ ସେଟିଂସ୍ &amp;gt ଆକ୍ସେସିବିଲିଟୀରେ ଏହି ସର୍ଚକଟକୁ ଅନ୍ୟ ଏକ ଫିଚରରେ ପରିବର୍ତ୍ତନ କରିପାରିବେ।"</string>
     <string name="accessibility_shortcut_on" msgid="5463618449556111344">"ଚାଲୁ କରନ୍ତୁ"</string>
     <string name="accessibility_shortcut_off" msgid="3651336255403648739">"ଚାଲୁ କରନ୍ତୁ ନାହିଁ"</string>
-    <!-- no translation found for accessibility_shortcut_menu_item_status_on (6162756705754654002) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_menu_item_status_off (6274512913017713543) -->
-    <skip />
+    <string name="accessibility_shortcut_menu_item_status_on" msgid="6162756705754654002">"ଚାଲୁ ଅଛି"</string>
+    <string name="accessibility_shortcut_menu_item_status_off" msgid="6274512913017713543">"ବନ୍ଦ ଅଛି"</string>
     <string name="accessibility_enable_service_title" msgid="3931558336268541484">"ଆପଣଙ୍କ ଡିଭାଇସର ସମ୍ପୂର୍ଣ୍ଣ ନିୟନ୍ତ୍ରଣ କରିବାକୁ <xliff:g id="SERVICE">%1$s</xliff:g>କୁ ଅନୁମତି ଦେବେ?"</string>
     <string name="accessibility_service_warning_description" msgid="291674995220940133">"ଯେଉଁ ଆପ୍ସ ଆପଣଙ୍କୁ ଆକ୍ସେସିବିଲିଟୀ ଆବଶ୍ୟକତାରେ ସହାୟତା କରେ, ସେହି ଆପ୍ସ ପାଇଁ ସମ୍ପୂର୍ଣ୍ଣ ନିୟନ୍ତ୍ରଣ ଉପଯୁକ୍ତ ଅଟେ, କିନ୍ତୁ ଅଧିକାଂଶ ଆପ୍ସ ପାଇଁ ଉପଯୁକ୍ତ ନୁହେଁ।"</string>
     <string name="accessibility_service_screen_control_title" msgid="190017412626919776">"ଭ୍ୟୁ ଏବଂ ସ୍କ୍ରିନ୍‍ ନିୟନ୍ତ୍ରଣ"</string>
@@ -1817,16 +1817,11 @@
     <string name="accessibility_select_shortcut_menu_title" msgid="6002726538854613272">"ଏକ ଫିଚର୍ ବ୍ୟବହାର କରିବା ଆରମ୍ଭ କରିବାକୁ ଏହାକୁ ଟାପ୍ କରନ୍ତୁ:"</string>
     <string name="accessibility_edit_shortcut_menu_button_title" msgid="239446795930436325">"ଆକ୍ସେସିବିଲିଟୀ ବଟନ୍ ସହିତ ବ୍ୟବହାର କରିବାକୁ ଫିଚରଗୁଡ଼ିକ ବାଛନ୍ତୁ"</string>
     <string name="accessibility_edit_shortcut_menu_volume_title" msgid="2245540598834891500">"ଭଲ୍ୟୁମ କୀ ସର୍ଟକଟ ସହିତ ବ୍ୟବହାର କରିବାକୁ ଫିଚରଗୁଡ଼ିକ ବାଛନ୍ତୁ"</string>
-    <!-- no translation found for accessibility_shortcut_label_button (6473341300585254821) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_volume_keys (5642990791242136231) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_gesture (7987298674836890931) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_quick_settings (6851280333772213611) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_triple_tap (9058975959054454796) -->
-    <skip />
+    <string name="accessibility_shortcut_label_button" msgid="6473341300585254821">"ଆକ୍ସେସିବିଲିଟୀ ବଟନ"</string>
+    <string name="accessibility_shortcut_label_volume_keys" msgid="5642990791242136231">"ଭଲ୍ୟୁମ କୀ"</string>
+    <string name="accessibility_shortcut_label_gesture" msgid="7987298674836890931">"ଜେଶ୍ଚର"</string>
+    <string name="accessibility_shortcut_label_quick_settings" msgid="6851280333772213611">"କ୍ୱିକ ସେଟିଂସ"</string>
+    <string name="accessibility_shortcut_label_triple_tap" msgid="9058975959054454796">"ତିନିଥର ଟାପ"</string>
     <string name="accessibility_uncheck_legacy_item_warning" msgid="8047830891064817447">"<xliff:g id="SERVICE_NAME">%s</xliff:g> ବନ୍ଦ ହୋଇଯାଇଛି"</string>
     <string name="edit_accessibility_shortcut_menu_button" msgid="8885752738733772935">"ସର୍ଟକଟଗୁଡ଼ିକୁ ଏଡିଟ କରନ୍ତୁ"</string>
     <string name="done_accessibility_shortcut_menu_button" msgid="3668407723770815708">"ହୋଇଗଲା"</string>
@@ -2616,4 +2611,10 @@
     <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"ସିଷ୍ଟମ ରିସୋର୍ସ ଆଲର୍ଟ"</string>
     <string name="tv_watchdog_notification_title" msgid="195239206215922517">"ରିସୋର୍ସର ଅତ୍ୟଧିକ ବ୍ୟବହାର"</string>
     <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"ଆପ \'<xliff:g id="APP_NAME">%1$s</xliff:g> ଅନେକ ରିସୋର୍ସ ବ୍ୟବହାର କରୁଛି।\""</string>
+    <!-- no translation found for supervision_blocked_app_title (5546803865875383588) -->
+    <skip />
+    <!-- no translation found for supervision_blocked_app_content (4125452996088641559) -->
+    <skip />
+    <!-- no translation found for supervision_unblocked_app_content (8282985265957852278) -->
+    <skip />
 </resources>

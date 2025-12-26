@@ -131,7 +131,8 @@ constructor(
                 icon = context.getDrawable(R.drawable.ic_supervision),
                 disclaimerText =
                     context.getString(R.string.monitoring_description_parental_controls_legacy),
-                footerText = context.getString(R.string.quick_settings_disclosure_parental_controls),
+                footerText =
+                    context.getString(R.string.quick_settings_disclosure_parental_controls_legacy),
             )
         }
     }
@@ -174,7 +175,7 @@ constructor(
                     refreshState()
 
                     val listener = SupervisionStateListener()
-                    supervisionManager.registerSupervisionListener(listener)
+                    supervisionManager.registerSupervisionListenerForUser(userInfo.id, listener)
 
                     awaitClose { supervisionManager.unregisterSupervisionListener(listener) }
                 }

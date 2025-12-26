@@ -1174,7 +1174,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                 android.Manifest.permission.INSTALL_DPC_PACKAGES, mInstallerUid)
                 == PackageManager.PERMISSION_GRANTED);
         boolean isInstallDependencyPackagesPermissionGranted = false;
-        if (Flags.sdkDependencyInstaller()) {
+        if (!Flags.sdkDependencyInstallerDeprecation()) {
             isInstallDependencyPackagesPermissionGranted = (snapshot.checkUidPermission(
                     android.Manifest.permission.INSTALL_DEPENDENCY_SHARED_LIBRARIES, mInstallerUid)
                     == PackageManager.PERMISSION_GRANTED);
@@ -1775,10 +1775,17 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     @GuardedBy("mLock")
     private void enableFsVerityToAddedApksWithIdsig() throws PackageManagerException {
         try {
+            long fsVerityEnabledApksSizeBytes = 0;
             List<File> files = getAddedApksLocked();
             for (var file : files) {
                 if (new File(file.getPath() + V4Signature.EXT).exists()) {
                     VerityUtils.setUpFsverity(file.getPath());
+                    fsVerityEnabledApksSizeBytes += file.length();
+                }
+            }
+            if (fsVerityEnabledApksSizeBytes > 0) {
+                synchronized (mMetrics) {
+                    mMetrics.onFsVerityEnabledApksSizeBytesCalculated(fsVerityEnabledApksSizeBytes);
                 }
             }
         } catch (IOException e) {
@@ -4178,7 +4185,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             return;
         }
 
-        if (Flags.sdkDependencyInstaller()
+        if (!Flags.sdkDependencyInstallerDeprecation()
                 && params.isAutoInstallDependenciesEnabled
                 && !isMultiPackage()) {
             mDependencyInstallerEnabled.set(true);

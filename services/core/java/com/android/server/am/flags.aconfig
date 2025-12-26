@@ -268,6 +268,9 @@ flag {
     namespace: "system_performance"
     description: "Use process name to lookup ProcessRecord."
     bug: "443136429"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -278,4 +281,35 @@ flag {
     metadata {
         purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+    name: "enable_zram_writeback"
+    namespace: "system_performance"
+    description: "Enable zram writeback after app compaction."
+    bug: "450670546"
+}
+
+flag {
+    name: "log_zram_writeback_events"
+    namespace: "system_performance"
+    description: "Whether to log zram writeback events, regardless of whether the writeback is enabled."
+    bug: "450670546"
+}
+
+flag {
+    name: "fgs_visibility_fix"
+    namespace: "backstage_power"
+    description: "Fix for foreground service visibility in Task Manager"
+    bug: "417784630"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "fgs_delegate_system_api"
+    namespace: "backstage_power"
+    description: "Whether to use new System APIs to start and stop FGS delegation."
+    bug: "303241170"
 }

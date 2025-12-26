@@ -43,7 +43,9 @@ import android.platform.test.annotations.DisableFlags
 import android.platform.test.annotations.EnableFlags
 import android.testing.AndroidTestingRunner
 import android.testing.TestableLooper.RunWithLooper
+import android.view.Display
 import android.view.Display.DEFAULT_DISPLAY
+import android.view.DisplayInfo
 import android.view.ISystemGestureExclusionListener
 import android.view.InputDevice
 import android.view.InsetsSource
@@ -133,6 +135,21 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
     }
 
     @Test
+    @EnableFlags(Flags.FLAG_ENABLE_ADD_WINDOW_DECORATION_TO_ALL_TASKS)
+    fun createWindowDecoration_displayRetrievedFromDisplayManagerWhenUnavailableInDisplayController() {
+        val task = createTask(windowingMode = WINDOWING_MODE_FREEFORM)
+        setUpMockDecorationForTask(task)
+        val display = Display(mock(), task.displayId, DisplayInfo(), context.resources)
+        whenever(mockDisplayController.getDisplayContext(task.displayId)).thenReturn(null)
+        whenever(mockDisplayController.getDisplay(task.displayId)).thenReturn(display)
+        val taskSurface = SurfaceControl()
+        onTaskOpening(task, taskSurface)
+        // Verify display was retrieved from the display manager
+        verify(spyContext).createDisplayContext(display)
+    }
+
+    @Test
+    @DisableFlags(Flags.FLAG_ENABLE_ADD_WINDOW_DECORATION_TO_ALL_TASKS)
     fun testDeleteCaptionOnChangeTransitionWhenNecessary() {
         val task = createTask(windowingMode = WINDOWING_MODE_FREEFORM)
         val taskSurface = SurfaceControl()
@@ -150,6 +167,7 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
     }
 
     @Test
+    @DisableFlags(Flags.FLAG_ENABLE_ADD_WINDOW_DECORATION_TO_ALL_TASKS)
     fun testCreateCaptionOnChangeTransitionWhenNecessary() {
         val task =
             createTask(
@@ -266,19 +284,36 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
                 windowingMode = WINDOWING_MODE_FREEFORM,
                 onCaptionButtonClickListener = onClickListenerCaptor,
             )
+        val taskInfo = decor.taskInfo
 
         val view = mock<View> { on { id } doReturn R.id.close_window }
-        whenever(mockDesktopTasksController.closeTask(decor.taskInfo))
+        whenever(mockDesktopTasksController.closeTask(taskInfo))
             .thenReturn(DesktopTasksController.CloseTaskResult.CLOSED_DESKTOP)
 
         onClickListenerCaptor.firstValue.onClick(view)
 
-        verify(mockDesktopTasksController).getNextFocusedTask(decor.taskInfo)
-        verify(mockDesktopTasksController).closeTask(decor.taskInfo)
+        verify(mockDesktopTasksController)
+            .getTopTask(taskInfo.displayId, taskInfo.userId, taskInfo.taskId)
+        verify(mockDesktopTasksController).closeTask(taskInfo)
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_MINIMIZE_BUTTON)
+    fun testCloseButtonInFreeformPinned_closePinnedWindow() {
+        val onClickListenerCaptor = argumentCaptor<View.OnClickListener>()
+        val decor =
+            createOpenTaskDecoration(
+                windowingMode = WINDOWING_MODE_FREEFORM,
+                onCaptionButtonClickListener = onClickListenerCaptor,
+            )
+        whenever(mockPinnedLayerController.isPinned(decor.taskInfo.taskId)).thenReturn(true)
+
+        val view = mock<View> { on { id } doReturn R.id.close_window }
+        onClickListenerCaptor.firstValue.onClick(view)
+
+        verify(mockPinnedLayerController).closeTask(decor.taskInfo)
+    }
+
+    @Test
     fun testMinimizeButtonInFreeform_withStateChangeAnnouncementFlag_minimizeWindow() {
         val onClickListenerCaptor = argumentCaptor<View.OnClickListener>()
         val decor =
@@ -286,17 +321,19 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
                 windowingMode = WINDOWING_MODE_FREEFORM,
                 onCaptionButtonClickListener = onClickListenerCaptor,
             )
+        val taskInfo = decor.taskInfo
 
         val view = mock<View> { on { id } doReturn R.id.minimize_window }
 
         onClickListenerCaptor.firstValue.onClick(view)
 
-        verify(mockDesktopTasksController).getNextFocusedTask(decor.taskInfo)
         verify(mockDesktopTasksController)
-            .minimizeTask(decor.taskInfo, MinimizeReason.MINIMIZE_BUTTON)
+            .getTopTask(taskInfo.displayId, taskInfo.userId, taskInfo.taskId)
+        verify(mockDesktopTasksController).minimizeTask(taskInfo, MinimizeReason.MINIMIZE_BUTTON)
     }
 
     @Test
+    @DisableFlags(Flags.FLAG_ENABLE_ADD_WINDOW_DECORATION_TO_ALL_TASKS)
     fun testDecorationIsNotCreatedForNoDisplayActivities() {
         val task =
             createTask(windowingMode = WINDOWING_MODE_FULLSCREEN).apply {
@@ -308,6 +345,7 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
     }
 
     @Test
+    @DisableFlags(Flags.FLAG_ENABLE_ADD_WINDOW_DECORATION_TO_ALL_TASKS)
     fun testDecorationIsNotCreatedForTopTranslucentActivities() {
         val task =
             createTask(windowingMode = WINDOWING_MODE_FULLSCREEN).apply {
@@ -320,6 +358,7 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
     }
 
     @Test
+    @DisableFlags(Flags.FLAG_ENABLE_ADD_WINDOW_DECORATION_TO_ALL_TASKS)
     fun testDecorationIsNotCreatedForSystemUIActivities() {
         // Set task as systemUI package
         val systemUIPackageName =
@@ -336,6 +375,7 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
     }
 
     @Test
+    @DisableFlags(Flags.FLAG_ENABLE_ADD_WINDOW_DECORATION_TO_ALL_TASKS)
     fun testDecorationIsNotCreatedForDefaultHomePackage() {
         val task =
             createTask(windowingMode = WINDOWING_MODE_FULLSCREEN).apply {
@@ -575,6 +615,7 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
                 eq(DesktopModeTransitionSource.APP_HANDLE_MENU_BUTTON),
                 anyOrNull(),
                 anyOrNull(),
+                anyOrNull(),
             )
     }
 
@@ -738,7 +779,14 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
         )
 
         verify(mockDesktopTasksController, times(1))
-            .moveTaskToDefaultDeskAndActivate(any(), any(), any(), anyOrNull(), anyOrNull())
+            .moveTaskToDefaultDeskAndActivate(
+                any(),
+                any(),
+                any(),
+                anyOrNull(),
+                anyOrNull(),
+                anyOrNull(),
+            )
     }
 
     @Test
@@ -1191,7 +1239,10 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
     }
 
     @Test
-    @DisableFlags(Flags.FLAG_ENABLE_BUG_FIXES_FOR_SECONDARY_DISPLAY)
+    @DisableFlags(
+        Flags.FLAG_ENABLE_BUG_FIXES_FOR_SECONDARY_DISPLAY,
+        Flags.FLAG_ENABLE_ADD_WINDOW_DECORATION_TO_ALL_TASKS,
+    )
     fun testGestureExclusionChanged_otherDisplay_skipsDecorationUpdate() {
         val captor = argumentCaptor<ISystemGestureExclusionListener>()
         verify(mockWindowManager)
@@ -1212,7 +1263,6 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_RECENTS_TRANSITIONS_CORNERS_BUGFIX)
     fun testRecentsTransitionStateListener_requestedState_setsTransitionRunning() {
         val task = createTask(windowingMode = WINDOWING_MODE_FREEFORM)
         val decoration = setUpMockDecorationForTask(task)
@@ -1226,7 +1276,6 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_RECENTS_TRANSITIONS_CORNERS_BUGFIX)
     fun testRecentsTransitionStateListener_nonRunningState_setsTransitionNotRunning() {
         val task = createTask(windowingMode = WINDOWING_MODE_FREEFORM)
         val decoration = setUpMockDecorationForTask(task)
@@ -1243,7 +1292,6 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_RECENTS_TRANSITIONS_CORNERS_BUGFIX)
     fun testRecentsTransitionStateListener_requestedAndAnimating_setsTransitionRunningOnce() {
         val task = createTask(windowingMode = WINDOWING_MODE_FREEFORM)
         val decoration = setUpMockDecorationForTask(task)
@@ -1260,8 +1308,12 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ROOT_TASK_FOR_BUBBLE)
+    @EnableFlags(Flags.FLAG_ENABLE_BUBBLE_ROOT_TASK)
+    @DisableFlags(Flags.FLAG_ENABLE_ADD_WINDOW_DECORATION_TO_ALL_TASKS)
     fun testOnTaskOpening_startingAppBubbleTask_skipsWindowDecorationCreation() {
+        assumeTrue(BubbleAnythingFlagHelper.enableCreateAnyBubble())
+        assumeTrue(BubbleAnythingFlagHelper.enableRootTaskForBubble())
+
         val taskInfo = createTask(windowingMode = WINDOWING_MODE_MULTI_WINDOW)
         mockBubbleController.stub { on { shouldBeAppBubble(taskInfo) } doReturn true }
 
@@ -1277,6 +1329,7 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
     }
 
     @Test
+    @DisableFlags(Flags.FLAG_ENABLE_ADD_WINDOW_DECORATION_TO_ALL_TASKS)
     fun testOnTaskOpening_expandedBubbleTask_skipsWindowDecorationCreation() {
         val taskInfo =
             createTask(windowingMode = WINDOWING_MODE_MULTI_WINDOW).apply {
@@ -1298,6 +1351,7 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
     }
 
     @Test
+    @DisableFlags(Flags.FLAG_ENABLE_ADD_WINDOW_DECORATION_TO_ALL_TASKS)
     fun testOnTaskChanging_collapsedBubbleTask_skipsWindowDecorationCreation() {
         assumeTrue(BubbleAnythingFlagHelper.enableCreateAnyBubble())
 
@@ -1315,6 +1369,7 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
     }
 
     @Test
+    @DisableFlags(Flags.FLAG_ENABLE_ADD_WINDOW_DECORATION_TO_ALL_TASKS)
     fun testOnTaskChanging_convertTaskToBubble_destroysWindowDecoration() {
         assumeTrue(BubbleAnythingFlagHelper.enableCreateAnyBubble())
 
@@ -1363,7 +1418,7 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
             }
             mockDesktopTasksController.stub {
                 on {
-                    onDragPositioningEnd(any(), any(), any(), any(), any(), any(), any(), any())
+                    onDragPositioningEnd(any(), any(), any(), any(), any(), any(), any())
                 } doReturn false
             }
 
@@ -1407,7 +1462,6 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
                 .onDragPositioningEnd(
                     eq(taskInfo),
                     any<SurfaceControl>(),
-                    eq(SECOND_DISPLAY),
                     eq(PointF(20f, 20f)),
                     eq(BOUNDS_ON_DRAG_END_DESKTOP_ACCEPTED),
                     any<Rect>(),
@@ -1494,7 +1548,7 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
             }
             mockDesktopTasksController.stub {
                 on {
-                    onDragPositioningEnd(any(), any(), any(), any(), any(), any(), any(), any())
+                    onDragPositioningEnd(any(), any(), any(), any(), any(), any(), any())
                 } doReturn true
             }
 
@@ -1572,7 +1626,6 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
                 .onDragPositioningEnd(
                     eq(taskInfo),
                     any<SurfaceControl>(),
-                    eq(SECOND_DISPLAY),
                     eq(PointF(30f, 30f)),
                     eq(BOUNDS_IGNORED_ON_NON_DESKTOP),
                     any<Rect>(),

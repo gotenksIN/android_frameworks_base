@@ -17,8 +17,8 @@
 package android.app;
 
 import static android.app.Notification.EXTRA_METRICS;
-import static android.view.View.GONE;
-import static android.view.View.VISIBLE;
+import static android.app.Notification.FLAG_PROMOTED_ONGOING;
+import static android.app.Notification.SEMANTIC_STYLE_CAUTION;
 
 import static com.google.common.truth.Truth.assertThat;
 
@@ -33,14 +33,13 @@ import android.app.Notification.Metric.TimeDifference;
 import android.app.Notification.MetricStyle;
 import android.content.ContentResolver;
 import android.content.Context;
+import android.content.res.Configuration;
 import android.os.Bundle;
 import android.os.SystemClock;
-import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.annotations.Presubmit;
 import android.platform.test.flag.junit.SetFlagsRule;
 import android.provider.Settings;
-import android.view.View;
 import android.widget.Chronometer;
 import android.widget.FrameLayout;
 import android.widget.RemoteViews;
@@ -101,9 +100,16 @@ public class NotificationMetricStyleTest {
     private TimeZone mPreviousTimeZone;
     private String mPrevious24HourSetting;
 
+    private Notification.Colors mDefaultColors;
+
     @Before
     public void setUp() {
         mContext = InstrumentationRegistry.getInstrumentation().getContext();
+
+        mDefaultColors = new Notification.Colors();
+        boolean nightMode = (mContext.getResources().getConfiguration().uiMode
+                & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+        mDefaultColors.resolvePalette(mContext, Notification.COLOR_DEFAULT, false, nightMode);
 
         // Force some values that can depend on device current settings to a known state.
         mPreviousLocale = Locale.getDefault();
@@ -554,6 +560,48 @@ public class NotificationMetricStyleTest {
             container.addView(compactHeadsUp.apply(mContext, container));
         }
         // No crashes.
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_API_NOTIFICATION_SEMANTIC_STYLE)
+    public void makeContentView_semanticStyleAndPromoted_appliesColor() {
+        Notification.Builder n = new Notification.Builder(mContext, "channel")
+                .setStyle(new MetricStyle()
+                        .addMetric(new Metric(
+                                TimeDifference.forPausedStopwatch(Duration.ofSeconds(10),
+                                        TimeDifference.FORMAT_CHRONOMETER),
+                                "Paused stopwatch",
+                                SEMANTIC_STYLE_CAUTION)))
+                .setFlag(FLAG_PROMOTED_ONGOING, true);
+
+        RemoteViews remoteViews = n.getStyle().makeExpandedContentView();
+        FrameLayout container = new FrameLayout(mContext);
+        container.addView(remoteViews.apply(mContext, container));
+        Chronometer chronometer = container.findViewById(R.id.metric_chronometer_0);
+
+        assertThat(chronometer.getTextColors().getColors()[0]).isEqualTo(
+                mDefaultColors.getSemanticColor(SEMANTIC_STYLE_CAUTION));
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_API_NOTIFICATION_SEMANTIC_STYLE)
+    public void makeContentView_semanticStyleButNotPromoted_doesNotApplyColor() {
+        Notification.Builder n = new Notification.Builder(mContext, "channel")
+                .setStyle(new MetricStyle()
+                        .addMetric(new Metric(
+                                TimeDifference.forPausedStopwatch(Duration.ofSeconds(10),
+                                        TimeDifference.FORMAT_CHRONOMETER),
+                                "Paused stopwatch",
+                                SEMANTIC_STYLE_CAUTION)))
+                .setFlag(FLAG_PROMOTED_ONGOING, false);
+
+        RemoteViews remoteViews = n.getStyle().makeExpandedContentView();
+        FrameLayout container = new FrameLayout(mContext);
+        container.addView(remoteViews.apply(mContext, container));
+        Chronometer chronometer = container.findViewById(R.id.metric_chronometer_0);
+
+        assertThat(chronometer.getTextColors().getColors()[0]).isNotEqualTo(
+                mDefaultColors.getSemanticColor(SEMANTIC_STYLE_CAUTION));
     }
 
     private void withLocale(Locale locale, Runnable r) {

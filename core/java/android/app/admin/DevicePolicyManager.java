@@ -875,6 +875,18 @@ public class DevicePolicyManager {
     public static final int RESULT_DEVICE_OWNER_SET = 123;
 
     /**
+     * Result code that can be returned by the {@link
+     * #ACTION_PROVISION_MANAGED_DEVICE_FROM_TRUSTED_SOURCE} or {@link
+     * #ACTION_ROLE_HOLDER_PROVISION_MANAGED_DEVICE_FROM_TRUSTED_SOURCE} intent handlers if the
+     * multi-user device was provisioned.
+     *
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_MULTI_USER_MANAGEMENT_DEVICE_PROVISIONING)
+    public static final int RESULT_MULTI_USER_DEVICE_PROVISIONED = 124;
+
+    /**
      * Activity action: starts the trusted source provisioning flow inside the device policy
      * management role holder.
      *
@@ -891,7 +903,8 @@ public class DevicePolicyManager {
      * which the role holder returns alongside {@link #RESULT_UPDATE_ROLE_HOLDER}.
      *
      * <p>The result codes can be either {@link #RESULT_WORK_PROFILE_CREATED}, {@link
-     * #RESULT_DEVICE_OWNER_SET} or {@link Activity#RESULT_CANCELED} if provisioning failed.
+     * #RESULT_DEVICE_OWNER_SET}, {@link #RESULT_MULTI_USER_DEVICE_PROVISIONED} or
+     * {@link Activity#RESULT_CANCELED} if provisioning failed.
      *
      * @see #ACTION_PROVISION_MANAGED_DEVICE_FROM_TRUSTED_SOURCE
      *
@@ -3023,6 +3036,19 @@ public class DevicePolicyManager {
     public static final int STATUS_HEADLESS_SYSTEM_USER_MODE_REQUIRED = 19;
 
     /**
+     * Result code for {@link #checkProvisioningPrecondition}.
+     *
+     * <p>A generic error that is returned by {@link #checkProvisioningPrecondition} if none of
+     * the more specific error code applies. Clients should always handle this error code for
+     * forward compatibility reasons.
+     *
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_INTRODUCE_GENERIC_PROVISIONING_ERROR)
+    public static final int STATUS_OTHER_PROVISIONING_ERROR = 20;
+
+    /**
      * Result codes for {@link #checkProvisioningPrecondition} indicating all the provisioning pre
      * conditions.
      *
@@ -3038,7 +3064,7 @@ public class DevicePolicyManager {
             STATUS_PROVISIONING_NOT_ALLOWED_FOR_NON_DEVELOPER_USERS,
             STATUS_HEADLESS_SYSTEM_USER_MODE_NOT_SUPPORTED, STATUS_HEADLESS_ONLY_SYSTEM_USER,
             STATUS_HEADLESS_SINGLE_USER_MODE_ONLY_SUPPORTED_ON_FIRST_FULL_USER,
-            STATUS_HEADLESS_SYSTEM_USER_MODE_REQUIRED
+            STATUS_HEADLESS_SYSTEM_USER_MODE_REQUIRED, STATUS_OTHER_PROVISIONING_ERROR,
     })
     public @interface ProvisioningPrecondition {}
 
@@ -18733,6 +18759,7 @@ public class DevicePolicyManager {
     @Retention(RetentionPolicy.SOURCE)
     public @interface ResourceType {}
 
+    // LINT.IfChange(dpc_type)
     /** @hide */
     public static final int NOT_A_DPC = -1;
     /** @hide */
@@ -18766,6 +18793,7 @@ public class DevicePolicyManager {
             AFFILIATED_PROFILE_OWNER_ON_USER
     })
     public @interface DpcType {}
+    // LINT.ThenChange(/tools/processors/devicepolicy/proto/policy_metadata.proto:dpc_type)
 
     /**
      * Sets the given policy.
@@ -18781,7 +18809,6 @@ public class DevicePolicyManager {
      * documentation of individual identifiers for more details.
      */
     @FlaggedApi(FLAG_POLICY_STREAMLINING)
-    @UserHandleAware
     public <T> void setPolicy(
             @NonNull PolicyIdentifier<T> id,
             @PolicyScope int scope,
@@ -18797,16 +18824,52 @@ public class DevicePolicyManager {
         }
     }
 
+    /**
+     * Gets the value of the given policy, as it was set by the caller.
+     *
+     * <p>This does not return the effective policy value used on the device. Instead, this returns
+     * the value set by the caller.
+     *
+     * @param id The policy identifier to retrieve. It must be one of the values inside {@link
+     *     DevicePolicyIdentifier}.
+     * @param scope The scope with which the policy was set.
+     * @throws SecurityException If the caller does not have sufficient permissions to get the
+     *     specified id. Check the documentation of individual identifiers for more details.
+     * @return The value of the policy, or null if the caller didn't set the policy for the given
+     *     scope.
+     */
+    @FlaggedApi(FLAG_POLICY_STREAMLINING)
+    public <T> @Nullable T getPolicy(@NonNull PolicyIdentifier<T> id, @PolicyScope int scope) {
+        throwIfParentInstance("getPolicy");
+        if (mService == null) {
+            return null;
+        }
+        try {
+            var value = mService.getPolicy(mContext.getPackageName(), id.getId(), scope);
+            return policyValueFromTransport(id, value);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
     @Nullable
     private static <T> PolicyValueTransport policyValueToTransport(
-            @NonNull PolicyIdentifier<T> id,
-            @Nullable T value
-    ) {
+            @NonNull PolicyIdentifier<T> id, @Nullable T value) {
         if (value == null) {
             return null;
         }
 
         return PolicyTransportValueConvertor.getInstance(id).toTransport(value);
+    }
+
+    @Nullable
+    private static <T> T policyValueFromTransport(
+            @NonNull PolicyIdentifier<T> id, @Nullable PolicyValueTransport value) {
+        if (value == null) {
+            return null;
+        }
+
+        return PolicyTransportValueConvertor.getInstance(id).fromTransport(value);
     }
 
     /**
@@ -18852,5 +18915,21 @@ public class DevicePolicyManager {
             int value) {
         // TODO(b/434920631): Remove this method and use {@link #setPolicy} in tests directly.
         setPolicy(new PolicyIdentifier<Integer>(key), scope, Integer.valueOf(value));
+    }
+
+    /**
+     * Template free version of getPolicy for integers.
+     * Returns '-1' if the policy is not set.
+     *
+     * @hide
+     */
+    @TestApi
+    @SuppressWarnings("UnflaggedApi") // @TestApi without associated feature.
+    public int getIntegerPolicy(
+            @NonNull String key,
+            @PolicyScope int scope) {
+        // TODO(b/434920631): Remove this method and use {@link #getPolicy} in tests directly.
+        var result = getPolicy(new PolicyIdentifier<Integer>(key), scope);
+        return result == null ? -1 : result;
     }
 }

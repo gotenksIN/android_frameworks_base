@@ -16,6 +16,8 @@
 
 package com.android.systemui.screencapture.domain.interactor
 
+import android.view.Choreographer
+import androidx.annotation.VisibleForTesting
 import com.android.systemui.coroutines.newTracingContext
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Main
@@ -23,8 +25,8 @@ import com.android.systemui.screencapture.common.ScreenCaptureComponent
 import com.android.systemui.screencapture.common.shared.model.ScreenCaptureType
 import com.android.systemui.screencapture.common.shared.model.ScreenCaptureUiState
 import com.android.systemui.screencapture.data.repository.ScreenCaptureComponentRepository
-import com.android.systemui.screenrecord.data.repository.ScreenRecordingServiceRepository
-import com.android.systemui.screenrecord.data.repository.Status
+import com.android.systemui.screenrecord.domain.interactor.ScreenRecordingServiceInteractor
+import com.android.systemui.screenrecord.shared.model.ScreenRecordingStatus
 import javax.inject.Inject
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineScope
@@ -33,6 +35,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
@@ -42,14 +45,31 @@ import kotlinx.coroutines.launch
 /** Manages the lifecycle of the [ScreenCaptureComponent]. */
 @SysUISingleton
 class ScreenCaptureComponentInteractor
-@Inject
+@VisibleForTesting
 constructor(
-    @Main private val dispatcherContext: CoroutineContext,
+    private val dispatcherContext: CoroutineContext,
     private val repository: ScreenCaptureComponentRepository,
     private val componentBuilder: ScreenCaptureComponent.Builder,
     private val screenCaptureUiInteractor: ScreenCaptureUiInteractor,
-    private val screenRecordingServiceRepository: ScreenRecordingServiceRepository,
+    private val screenRecordingServiceInteractor: ScreenRecordingServiceInteractor,
+    private val getFrameDelay: () -> Long,
 ) {
+
+    @Inject
+    constructor(
+        @Main dispatcherContext: CoroutineContext,
+        repository: ScreenCaptureComponentRepository,
+        componentBuilder: ScreenCaptureComponent.Builder,
+        screenCaptureUiInteractor: ScreenCaptureUiInteractor,
+        screenRecordingServiceInteractor: ScreenRecordingServiceInteractor,
+    ) : this(
+        dispatcherContext = dispatcherContext,
+        repository = repository,
+        componentBuilder = componentBuilder,
+        screenCaptureUiInteractor = screenCaptureUiInteractor,
+        screenRecordingServiceInteractor = screenRecordingServiceInteractor,
+        getFrameDelay = { Choreographer.getFrameDelay() },
+    )
 
     suspend fun initialize() {
         coroutineScope {
@@ -83,6 +103,7 @@ constructor(
             }
             .map { it.uiState is ScreenCaptureUiState.Visible || it.isCapturing }
             .distinctUntilChanged()
+            .debounce(getFrameDelay())
             .collect { shouldHoldComponent ->
                 if (shouldHoldComponent) return@collect
                 repository.update(type) { component: ScreenCaptureComponent? ->
@@ -103,7 +124,9 @@ constructor(
     private fun isCaptureInProgress(type: ScreenCaptureType): Flow<Boolean> {
         return when (type) {
             ScreenCaptureType.RECORD ->
-                screenRecordingServiceRepository.status.map { it is Status.Started }
+                screenRecordingServiceInteractor.status.map {
+                    it is ScreenRecordingStatus.Started || it is ScreenRecordingStatus.Starting
+                }
             ScreenCaptureType.SHARE_SCREEN -> flowOf(false)
             ScreenCaptureType.CAST -> flowOf(false)
         }

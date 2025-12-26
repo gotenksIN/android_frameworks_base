@@ -17,34 +17,47 @@
 package com.android.systemui.accessibility.keygesture.ui
 
 import android.annotation.StringRes
+import android.content.ComponentName
+import android.content.Context
 import android.hardware.input.KeyGestureEvent
 import android.text.Annotation
 import android.text.Spanned
+import android.util.Log
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.foundation.text.appendInlineContent
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.android.compose.PlatformButton
 import com.android.compose.PlatformOutlinedButton
 import com.android.compose.theme.PlatformTheme
 import com.android.hardware.input.Flags
+import com.android.internal.accessibility.util.AccessibilityUtils
 import com.android.internal.accessibility.util.TtsPrompt
 import com.android.internal.annotations.VisibleForTesting
 import com.android.systemui.CoreStartable
 import com.android.systemui.accessibility.keygesture.domain.KeyGestureDialogInteractor
+import com.android.systemui.accessibility.keygesture.shared.model.DialogContentSection
 import com.android.systemui.accessibility.keygesture.shared.model.KeyGestureConfirmInfo
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.dialog.ui.composable.AlertDialogContent
+import com.android.systemui.display.data.repository.DisplayRepository
 import com.android.systemui.res.R
 import com.android.systemui.statusbar.phone.ComponentSystemUIDialog
 import com.android.systemui.statusbar.phone.SystemUIDialogFactory
@@ -58,6 +71,8 @@ import kotlinx.coroutines.launch
 class KeyGestureDialogStartable
 @Inject
 constructor(
+    private val context: Context,
+    private val displayRepository: DisplayRepository,
     private val interactor: KeyGestureDialogInteractor,
     private val dialogFactory: SystemUIDialogFactory,
     @Application private val mainScope: CoroutineScope,
@@ -116,12 +131,22 @@ constructor(
      * Delegate for the screen reader shortcut, which extends the base behavior by adding a
      * Text-to-Speech prompt for accessibility.
      */
-    private class ScreenReaderDialogDelegate(interactor: KeyGestureDialogInteractor) :
-        BaseDialogDelegate(interactor) {
+    private class ScreenReaderDialogDelegate(
+        private val context: Context,
+        interactor: KeyGestureDialogInteractor,
+    ) : BaseDialogDelegate(interactor) {
         private var ttsPrompt: TtsPrompt? = null
 
         override fun onDialogCreated(info: KeyGestureConfirmInfo) {
-            info.ttsText?.let { text -> ttsPrompt = interactor.createTtsPromptForText(text) }
+            ComponentName.unflattenFromString(info.targetName)
+                ?.flattenToString()
+                ?.takeUnless { AccessibilityUtils.isAccessibilityServiceEnabled(context, it) }
+                ?.let {
+                    info.ttsText?.let { text ->
+                        ttsPrompt = interactor.createTtsPromptForText(text)
+                    }
+                }
+
             interactor.enableShortcutsForTargets(enable = true, info.targetName)
         }
 
@@ -163,7 +188,10 @@ constructor(
         }
     }
 
-    private fun getDialogDelegate(keyGestureType: Int): DialogBehaviorDelegate {
+    private fun getDialogDelegate(
+        dialogContext: Context,
+        keyGestureType: Int,
+    ): DialogBehaviorDelegate {
         return when (keyGestureType) {
             KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_MAGNIFICATION ->
                 if (Flags.enableMagnifyMagnificationKeyGestureDialog()) {
@@ -171,8 +199,10 @@ constructor(
                 } else {
                     DefaultDialogDelegate(interactor)
                 }
+
             KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_SCREEN_READER ->
-                ScreenReaderDialogDelegate(interactor)
+                ScreenReaderDialogDelegate(dialogContext, interactor)
+
             else -> DefaultDialogDelegate(interactor)
         }
     }
@@ -209,7 +239,8 @@ constructor(
         }
     }
 
-    private fun createDialog(keyGestureConfirmInfo: KeyGestureConfirmInfo?) {
+    @VisibleForTesting
+    fun createDialog(keyGestureConfirmInfo: KeyGestureConfirmInfo?) {
         // Ignore other type of first-time keyboard shortcuts while there is an existing dialog.
         // `currentDialog` will be reset when the dialog dismissal listener is called, which will be
         // executed asynchronously. Thus, to avoid race condition, we should check the nullable of
@@ -222,18 +253,47 @@ constructor(
             return
         }
 
-        val delegate = getDialogDelegate(keyGestureConfirmInfo.keyGestureType)
+        var dialogContext = context
+
+        if (context.displayId != keyGestureConfirmInfo.displayId) {
+            val displayToMagnifyId = keyGestureConfirmInfo.displayId
+            val displayToMagnify = displayRepository.getDisplay(displayToMagnifyId)
+            if (displayToMagnify == null) {
+                Log.w(
+                    TAG,
+                    "Unable to open dialog on display $displayToMagnifyId: display not found - " +
+                        "will fallback to default display",
+                )
+            } else {
+                // Use the display context here so that the dialog shows up on the correct display
+                dialogContext = context.createDisplayContext(displayToMagnify)
+            }
+        }
+        val delegate = getDialogDelegate(dialogContext, keyGestureConfirmInfo.keyGestureType)
 
         currentDialog =
-            dialogFactory.create { dialog ->
+            dialogFactory.create(context = dialogContext) { dialog ->
                 PlatformTheme {
                     AlertDialogContent(
                         title = { Text(text = keyGestureConfirmInfo.title) },
                         content = {
-                            TextWithIcon(
-                                keyGestureConfirmInfo.contentText,
-                                keyGestureConfirmInfo.actionKeyIconResId,
-                            )
+                            Column {
+                                TextWithIcon(
+                                    keyGestureConfirmInfo.contentText,
+                                    keyGestureConfirmInfo.actionKeyIconResId,
+                                    textAlign =
+                                        if (keyGestureConfirmInfo.contentSections.isNotEmpty()) {
+                                            TextAlign.Start
+                                        } else {
+                                            null
+                                        },
+                                )
+                                if (keyGestureConfirmInfo.contentSections.isNotEmpty()) {
+                                    FormattedDialogContent(
+                                        sections = keyGestureConfirmInfo.contentSections
+                                    )
+                                }
+                            }
                         },
                         negativeButton = {
                             PlatformOutlinedButton(
@@ -272,6 +332,26 @@ constructor(
         }
     }
 
+    @Composable
+    private fun FormattedDialogContent(sections: List<DialogContentSection>) {
+        Column {
+            sections.forEach { section ->
+                Spacer(modifier = Modifier.height(16.dp))
+                section.heading?.let {
+                    Text(
+                        text = it.toString(),
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.bodyLarge,
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
+                section.message?.let {
+                    Text(text = it.toString(), style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+        }
+    }
+
     private fun buildAnnotatedStringFromResource(resourceText: CharSequence): AnnotatedString {
         // `resourceText` is an instance of SpannableStringBuilder, so we can cast it to a Spanned.
         val spanned = resourceText as? Spanned ?: return AnnotatedString(resourceText.toString())
@@ -298,7 +378,11 @@ constructor(
     }
 
     @Composable
-    private fun TextWithIcon(text: CharSequence, modifierKeyIconResId: Int) {
+    private fun TextWithIcon(
+        text: CharSequence,
+        modifierKeyIconResId: Int,
+        textAlign: TextAlign? = null,
+    ) {
         // TODO: b/419026315 - Update the icon drawable based on keyboard device.
         val inlineContentMap =
             mapOf(
@@ -314,10 +398,15 @@ constructor(
                     }
             )
 
-        Text(buildAnnotatedStringFromResource(text), inlineContent = inlineContentMap)
+        Text(
+            buildAnnotatedStringFromResource(text),
+            inlineContent = inlineContentMap,
+            textAlign = textAlign,
+        )
     }
 
     companion object {
+        const val TAG = "KeyGestureDialogStartable"
         const val ICON_INLINE_CONTENT_ID = "iconInlineContentId"
     }
 }

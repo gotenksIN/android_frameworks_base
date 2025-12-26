@@ -39,7 +39,6 @@ import static android.platform.test.flag.junit.SetFlagsRule.DefaultInitValueType
 import static com.android.server.notification.Flags.FLAG_NOTIFICATION_FORCE_GROUP_CONVERSATIONS;
 import static com.android.server.notification.Flags.FLAG_NOTIFICATION_FORCE_GROUP_SINGLETONS;
 import static com.android.server.notification.GroupHelper.AGGREGATE_GROUP_KEY;
-import static com.android.server.notification.GroupHelper.AUTOGROUP_KEY;
 import static com.android.server.notification.GroupHelper.BASE_FLAGS;
 
 import static com.google.common.truth.Truth.assertThat;
@@ -2013,15 +2012,15 @@ public class GroupHelperTest extends UiServiceTestCase {
             childrenToRemove.add(child);
         }
 
+        mGroupHelper.onNotificationPostedWithDelay(summary, notificationList, summaryByGroup);
+        verifyNoMoreInteractions(mCallback);
+
         NotificationRecord childBundled = getNotificationRecord(pkg, numChildren + 42,
                 String.valueOf(numChildren + 42), UserHandle.SYSTEM, groupToRemove, false);
         final String expectedGroupKey = GroupHelper.getFullAggregateGroupKey(pkg,
                 AGGREGATE_GROUP_KEY + "AlertingSection", UserHandle.SYSTEM.getIdentifier());
         childBundled.setOverrideGroupKey(expectedGroupKey);
         notificationList.add(childBundled);
-
-        mGroupHelper.onNotificationPostedWithDelay(summary, notificationList, summaryByGroup);
-        verifyNoMoreInteractions(mCallback);
 
         // Remove all child notifications from the valid group => summary without children
         Mockito.reset(mCallback);
@@ -2045,6 +2044,44 @@ public class GroupHelperTest extends UiServiceTestCase {
 
         // Check that the summary delete intent was triggered
         verify(mCallback).sendAppProvidedSummaryDeleteIntent(eq(pkg), eq(summaryDeleteIntent));
+    }
+
+    @Test
+    public void testUpdateChild_missingFromAggregateMap_resetOverrideKey() {
+        // Check that posting child notifications with aggregate group key overrides, but with
+        // invalid GH state: will be reset to original group key
+        final List<NotificationRecord> notificationList = new ArrayList<>();
+        final ArrayMap<String, NotificationRecord> summaryByGroup = new ArrayMap<>();
+        final String pkg = "package";
+        // Post a valid (full) group
+        final int summaryId = 4242;
+        final int numChildren = AUTOGROUP_AT_COUNT - 1;
+        final String groupName = "testGrp";
+        NotificationRecord summary = getNotificationRecord(pkg, summaryId,
+                String.valueOf(summaryId), UserHandle.SYSTEM, groupName, true);
+        notificationList.add(summary);
+        summaryByGroup.put(summary.getGroupKey(), summary);
+        mGroupHelper.onNotificationPosted(summary, false);
+
+        final String expectedGroupKey = GroupHelper.getFullAggregateGroupKey(pkg,
+                AGGREGATE_GROUP_KEY + "AlertingSection", UserHandle.SYSTEM.getIdentifier());
+        for (int i = 0; i < numChildren; i++) {
+            // post child notifications with overridden group keys
+            NotificationRecord child = getNotificationRecord(pkg, i + 42,
+                    String.valueOf(i + 42), UserHandle.SYSTEM, groupName, false);
+            child.setOverrideGroupKey(expectedGroupKey);
+            notificationList.add(child);
+            mGroupHelper.onNotificationPosted(child, false);
+            // Check that the group keys were reset
+            assertThat(child.getGroupKey()).isEqualTo(summary.getGroupKey());
+        }
+
+        // Check that no grouping operations are triggered
+        for (int i = 0; i < numChildren + 1; i++) {
+            mGroupHelper.onNotificationPostedWithDelay(notificationList.get(i), notificationList,
+                    summaryByGroup);
+            verifyNoMoreInteractions(mCallback);
+        }
     }
 
     @Test
@@ -3014,8 +3051,7 @@ public class GroupHelperTest extends UiServiceTestCase {
         for (NotificationRecord record: notificationList) {
             if (record.getNotification().isGroupChild()
                     && record.getOriginalGroupKey().contains("testGrp")
-                    && NotificationChannel.SYSTEM_RESERVED_IDS.contains(
-                        record.getChannel().getId())) {
+                    && record.getChannel().isBundleChannel()) {
                 record.updateNotificationChannel(originalChannel);
                 mGroupHelper.onNotificationUnbundled(record, false);
             }
@@ -3108,8 +3144,7 @@ public class GroupHelperTest extends UiServiceTestCase {
         for (NotificationRecord record: notificationList) {
             if (record.getNotification().isGroupChild()
                     && record.getOriginalGroupKey().contains("testGrp")
-                    && NotificationChannel.SYSTEM_RESERVED_IDS.contains(
-                    record.getChannel().getId())) {
+                    && record.getChannel().isBundleChannel()) {
                 record.updateNotificationChannel(originalChannel);
                 mGroupHelper.onNotificationUnbundled(record, false);
             }
@@ -3193,8 +3228,7 @@ public class GroupHelperTest extends UiServiceTestCase {
             if (record.getNotification().isGroupSummary()) {
                 record.isCanceled = true;
             } else if (record.getOriginalGroupKey().contains("testGrp")
-                        && NotificationChannel.SYSTEM_RESERVED_IDS.contains(
-                        record.getChannel().getId())) {
+                        && record.getChannel().isBundleChannel()) {
                 record.setOverrideGroupKey(expectedGroupKey_social);
             }
         }
@@ -3215,8 +3249,7 @@ public class GroupHelperTest extends UiServiceTestCase {
         for (NotificationRecord record: notificationList) {
             if (record.getNotification().isGroupChild()
                     && record.getOriginalGroupKey().contains("testGrp")
-                    && NotificationChannel.SYSTEM_RESERVED_IDS.contains(
-                        record.getChannel().getId())) {
+                    && record.getChannel().isBundleChannel()) {
                 record.updateNotificationChannel(originalChannel);
                 mGroupHelper.onNotificationUnbundled(record, true);
             }
@@ -3303,8 +3336,7 @@ public class GroupHelperTest extends UiServiceTestCase {
         // Adjust group key for grouped notifications
         for (NotificationRecord record: notificationList) {
             if (record.getOriginalGroupKey().contains("testGrp")
-                    && NotificationChannel.SYSTEM_RESERVED_IDS.contains(
-                        record.getChannel().getId())) {
+                    && record.getChannel().isBundleChannel()) {
                 record.setOverrideGroupKey(expectedGroupKey_social);
             }
         }
@@ -3327,8 +3359,7 @@ public class GroupHelperTest extends UiServiceTestCase {
         for (NotificationRecord record: notificationList) {
             if (record.getNotification().isGroupChild()
                     && record.getOriginalGroupKey().contains("testGrp")
-                    && NotificationChannel.SYSTEM_RESERVED_IDS.contains(
-                        record.getChannel().getId())) {
+                    && record.getChannel().isBundleChannel()) {
                 record.updateNotificationChannel(socialChannel);
             }
         }
@@ -3415,8 +3446,7 @@ public class GroupHelperTest extends UiServiceTestCase {
         // Adjust group key
         for (NotificationRecord record: notificationList) {
             if (record.getOriginalGroupKey().contains("testGrp")
-                    && NotificationChannel.SYSTEM_RESERVED_IDS.contains(
-                        record.getChannel().getId())) {
+                    && record.getChannel().isBundleChannel()) {
                 record.setOverrideGroupKey(expectedGroupKey_social);
             }
         }
@@ -3443,8 +3473,7 @@ public class GroupHelperTest extends UiServiceTestCase {
         for (NotificationRecord record: notificationList) {
             if (record.getNotification().isGroupChild()
                     && record.getOriginalGroupKey().contains("testGrp")
-                    && NotificationChannel.SYSTEM_RESERVED_IDS.contains(
-                        record.getChannel().getId())) {
+                    && record.getChannel().isBundleChannel()) {
                 record.updateNotificationChannel(socialChannel);
             }
         }
@@ -3530,8 +3559,7 @@ public class GroupHelperTest extends UiServiceTestCase {
         for (NotificationRecord record: notificationList) {
             if (record.getNotification().isGroupChild()
                     && record.getOriginalGroupKey().contains("testGrp")
-                    && NotificationChannel.SYSTEM_RESERVED_IDS.contains(
-                    record.getChannel().getId())) {
+                    && record.getChannel().isBundleChannel()) {
                 record.updateNotificationChannel(socialChannel);
             }
         }

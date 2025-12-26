@@ -383,6 +383,9 @@ java_defaults {
         // TODO(b/120066492): remove default_television.xml when the build system
         // propagates "required" properly.
         "default_television.xml",
+        // TODO(b/120066492): remove advanced-protection-config.xml when the build system
+        // propagates "required" properly.
+        "advanced-protection-config.xml",
         // TODO(b/120066492): remove gps_debug and protolog.conf.json when the build
         // system propagates "required" properly.
         "gps_debug.conf",
@@ -412,6 +415,7 @@ java_defaults {
         // If MimeMap ever becomes its own APEX, then this dependency would need to be removed
         // in favor of an API stubs dependency in java_library "framework" below.
         "mimemap",
+        "libsensor_aidl-java",
         "av-types-aidl-java",
         "tv_tuner_resource_manager_aidl_interface-java",
         "media_quality_aidl_interface-java",

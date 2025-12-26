@@ -16,6 +16,9 @@
 
 package com.android.systemui.screencapture.record.largescreen.ui.viewmodel
 
+import android.app.ActivityManager
+import android.app.ActivityTaskManager
+import android.graphics.Point
 import android.graphics.Rect
 import android.view.WindowManager
 import com.android.internal.logging.UiEventLogger
@@ -30,7 +33,7 @@ import com.android.systemui.screencapture.record.largescreen.domain.interactor.S
 import com.android.systemui.screencapture.record.largescreen.shared.model.ScreenCaptureRegion
 import com.android.systemui.screencapture.record.largescreen.shared.model.ScreenCaptureType
 import com.android.systemui.screenrecord.ScreenRecordingAudioSource
-import com.android.systemui.screenrecord.data.repository.ScreenRecordingServiceRepository
+import com.android.systemui.screenrecord.domain.interactor.ScreenRecordingServiceInteractor
 import com.android.systemui.screenrecord.shared.model.ScreenRecordingParameters
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
@@ -51,10 +54,11 @@ constructor(
     private val screenshotInteractor: ScreenshotInteractor,
     private val drawableLoaderViewModel: DrawableLoaderViewModel,
     private val screenCaptureUiInteractor: ScreenCaptureUiInteractor,
-    private val screenRecordingServiceRepository: ScreenRecordingServiceRepository,
+    private val screenRecordingServiceInteractor: ScreenRecordingServiceInteractor,
     private val uiEventLogger: UiEventLogger,
     @ScreenCapture private val screenCaptureUiParams: ScreenCaptureUiParameters,
     toolbarViewModelFactory: PreCaptureToolbarViewModel.Factory,
+    private val activityTaskManager: ActivityTaskManager,
 ) : HydratedActivatable(), DrawableLoaderViewModel by drawableLoaderViewModel {
 
     private val recordingParameters = screenCaptureUiParams as ScreenCaptureUiParameters.Record
@@ -69,7 +73,9 @@ constructor(
             recordingParameters.largeScreenParameters?.defaultCaptureRegion
                 ?: ScreenCaptureRegion.FULLSCREEN
         )
+    private val topTaskSource = MutableStateFlow<ActivityManager.RunningTaskInfo?>(null)
     private val regionBoxSource = MutableStateFlow<Rect?>(null)
+    private var runningTasks: List<ActivityManager.RunningTaskInfo> = emptyList()
 
     val toolbarViewModel = toolbarViewModelFactory.create()
 
@@ -81,9 +87,19 @@ constructor(
     // TODO(b/423697394) Init default value to be user's previously selected option
     val captureRegion: ScreenCaptureRegion by captureRegionSource.hydratedStateOf()
 
+    val topTask: ActivityManager.RunningTaskInfo? by topTaskSource.hydratedStateOf()
+
     val regionBox: Rect? by regionBoxSource.hydratedStateOf()
 
     fun updateCaptureType(selectedType: ScreenCaptureType) {
+        // This fixes the crash when select partial capture region first and then click Record radio
+        // button (b/458133150). We need to remove this code once region recording is supported.
+        if (
+            selectedType == ScreenCaptureType.RECORDING &&
+                captureRegion == ScreenCaptureRegion.PARTIAL
+        ) {
+            captureRegionSource.value = ScreenCaptureRegion.FULLSCREEN
+        }
         captureTypeSource.value = selectedType
         uiEventLogger.log(
             ScreenCaptureEvent.fromRegionAndType(captureRegionSource.value, selectedType)
@@ -97,10 +113,24 @@ constructor(
                 regionBoxBounds = null,
             )
         }
+        if (selectedRegion == ScreenCaptureRegion.APP_WINDOW) {
+            runningTasks = activityTaskManager.getTasks(Integer.MAX_VALUE)
+        }
         captureRegionSource.value = selectedRegion
         uiEventLogger.log(
             ScreenCaptureEvent.fromRegionAndType(selectedRegion, captureTypeSource.value)
         )
+    }
+
+    fun updateTaskSelectionFromHover(pointerPosition: Point) {
+        val task =
+            runningTasks.firstOrNull {
+                it.configuration.windowConfiguration.bounds.contains(
+                    pointerPosition.x,
+                    pointerPosition.y,
+                )
+            }
+        topTaskSource.value = task
     }
 
     fun updateRegionBoxBounds(bounds: Rect) {
@@ -119,7 +149,7 @@ constructor(
         when (captureRegionSource.value) {
             ScreenCaptureRegion.FULLSCREEN -> beginFullscreenScreenshot()
             ScreenCaptureRegion.PARTIAL -> beginPartialScreenshot()
-            ScreenCaptureRegion.APP_WINDOW -> {}
+            ScreenCaptureRegion.APP_WINDOW -> topTask?.taskId?.let { beginAppWindowScreenshot(it) }
         }
     }
 
@@ -151,6 +181,31 @@ constructor(
         closeUi()
     }
 
+    fun captureTaskAtPosition(pointerPosition: Point) {
+        val task =
+            activityTaskManager
+                .getTasks(Integer.MAX_VALUE)
+                .filter { it.isVisible }
+                .firstOrNull {
+                    it.configuration.windowConfiguration.bounds.contains(
+                        pointerPosition.x,
+                        pointerPosition.y,
+                    )
+                }
+        if (task == null) {
+            return
+        }
+        beginAppWindowScreenshot(task.taskId)
+    }
+
+    private fun beginAppWindowScreenshot(taskId: Int) {
+        hideUi()
+        backgroundScope.launch {
+            screenshotInteractor.requestAppWindowScreenshot(taskId, displayId)
+        }
+        closeUi()
+    }
+
     private fun startRecording() {
         when (captureRegionSource.value) {
             ScreenCaptureRegion.FULLSCREEN -> startFullscreenRecording()
@@ -169,7 +224,7 @@ constructor(
         closeUi()
 
         backgroundScope.launch {
-            screenRecordingServiceRepository.startRecording(
+            screenRecordingServiceInteractor.startRecordingDelayed(
                 // TODO(b/437971334): Get options from the UI.
                 ScreenRecordingParameters(
                     captureTarget = null, // Fullscreen.
@@ -204,6 +259,7 @@ constructor(
         coroutineScope {
             launch { toolbarViewModel.activate() }
             launch { initializeRegionBox() }
+            launch { topTaskSource.value = activityTaskManager.getTasks(1).firstOrNull() }
         }
     }
 

@@ -63,6 +63,7 @@ public class DreamBackend {
         public Drawable previewImage;
         public boolean supportsComplications = false;
         public int dreamCategory;
+        public boolean userSelectable = true;
 
         @Override
         public String toString() {
@@ -218,21 +219,26 @@ public class DreamBackend {
                 continue;
             }
 
+            final DreamService.DreamMetadata dreamMetadata = DreamService.getDreamMetadata(
+                    mContext.getPackageManager(), resolveInfo.serviceInfo);
+            if (dreamMetadata != null && !dreamMetadata.userSelectable) {
+                continue;
+            }
+
             DreamInfo dreamInfo = new DreamInfo();
+            if (dreamMetadata != null) {
+                dreamInfo.settingsComponentName = dreamMetadata.settingsActivity;
+                dreamInfo.previewImage = dreamMetadata.previewImage;
+                dreamInfo.supportsComplications = dreamMetadata.showComplications;
+                dreamInfo.dreamCategory = dreamMetadata.dreamCategory;
+                dreamInfo.userSelectable = dreamMetadata.userSelectable;
+            }
             dreamInfo.caption = resolveInfo.loadLabel(pm);
             dreamInfo.icon = resolveInfo.loadIcon(pm);
             dreamInfo.description = getDescription(resolveInfo, pm);
             dreamInfo.componentName = componentName;
             dreamInfo.isActive = dreamInfo.componentName.equals(activeDream);
 
-            final DreamService.DreamMetadata dreamMetadata = DreamService.getDreamMetadata(
-                    mContext.getPackageManager(), resolveInfo.serviceInfo);
-            if (dreamMetadata != null) {
-                dreamInfo.settingsComponentName = dreamMetadata.settingsActivity;
-                dreamInfo.previewImage = dreamMetadata.previewImage;
-                dreamInfo.supportsComplications = dreamMetadata.showComplications;
-                dreamInfo.dreamCategory = dreamMetadata.dreamCategory;
-            }
             dreamInfos.add(dreamInfo);
         }
         dreamInfos.sort(mComparator);

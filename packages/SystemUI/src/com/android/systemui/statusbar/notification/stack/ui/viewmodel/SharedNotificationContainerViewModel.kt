@@ -58,6 +58,7 @@ import com.android.systemui.keyguard.ui.viewmodel.AodToLockscreenTransitionViewM
 import com.android.systemui.keyguard.ui.viewmodel.AodToOccludedTransitionViewModel
 import com.android.systemui.keyguard.ui.viewmodel.AodToPrimaryBouncerTransitionViewModel
 import com.android.systemui.keyguard.ui.viewmodel.DozingToGlanceableHubTransitionViewModel
+import com.android.systemui.keyguard.ui.viewmodel.DozingToGoneTransitionViewModel
 import com.android.systemui.keyguard.ui.viewmodel.DozingToLockscreenTransitionViewModel
 import com.android.systemui.keyguard.ui.viewmodel.DozingToOccludedTransitionViewModel
 import com.android.systemui.keyguard.ui.viewmodel.DozingToPrimaryBouncerTransitionViewModel
@@ -107,6 +108,7 @@ import com.android.systemui.util.kotlin.Utils.Companion.sample as sampleCombine
 import com.android.systemui.util.kotlin.sample
 import com.android.systemui.utils.coroutines.flow.conflatedCallbackFlow
 import com.android.systemui.utils.coroutines.flow.flatMapLatestConflated
+import com.android.systemui.utils.coroutines.flow.transformLatestConflated
 import dagger.Lazy
 import javax.inject.Inject
 import kotlin.math.round
@@ -120,6 +122,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.combineTransform
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
@@ -130,6 +133,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.transform
 import kotlinx.coroutines.flow.transformWhile
 import kotlinx.coroutines.isActive
 
@@ -150,7 +154,7 @@ constructor(
     private val keyguardTransitionInteractor: KeyguardTransitionInteractor,
     private val shadeInteractor: ShadeInteractor,
     private val sceneInteractor: SceneInteractor,
-    private val bouncerInteractor: BouncerInteractor,
+    bouncerInteractor: BouncerInteractor,
     shadeModeInteractor: ShadeModeInteractor,
     notificationStackAppearanceInteractor: NotificationStackAppearanceInteractor,
     private val alternateBouncerToGoneTransitionViewModel:
@@ -163,6 +167,7 @@ constructor(
     private val aodToGlanceableHubTransitionViewModel: AodToGlanceableHubTransitionViewModel,
     private val aodToPrimaryBouncerTransitionViewModel: AodToPrimaryBouncerTransitionViewModel,
     dozingToGlanceableHubTransitionViewModel: DozingToGlanceableHubTransitionViewModel,
+    private val dozingToGoneTransitionViewModel: DozingToGoneTransitionViewModel,
     private val dozingToLockscreenTransitionViewModel: DozingToLockscreenTransitionViewModel,
     private val dozingToOccludedTransitionViewModel: DozingToOccludedTransitionViewModel,
     private val dozingToPrimaryBouncerTransitionViewModel:
@@ -206,8 +211,8 @@ constructor(
      */
     private val isAnyExpanded =
         combine(
-                shadeInteractor.shadeExpansion.map { it > 0f },
-                shadeInteractor.qsExpansion.map { it > 0f },
+                shadeInteractor.shadeExpansion.map { it > 0f }.distinctUntilChanged(),
+                shadeInteractor.qsExpansion.map { it > 0f }.distinctUntilChanged(),
             ) { shadeExpansion, qsExpansion ->
                 shadeExpansion || qsExpansion
             }
@@ -292,6 +297,7 @@ constructor(
                                 when (horizontalAlignment) {
                                     Alignment.Start ->
                                         marginHorizontal.coerceAtLeast(insetStart) to 0
+
                                     Alignment.End -> 0 to marginHorizontal.coerceAtLeast(insetEnd)
                                     else -> 0 to 0
                                 }
@@ -561,55 +567,51 @@ constructor(
                     @Suppress("DEPRECATION") // to handle split shade
                     when (shadeMode) {
                         Single ->
-                            combineTransform(
-                                shadeInteractor.shadeExpansion,
-                                shadeInteractor.qsExpansion,
-                                bouncerInteractor.bouncerExpansion,
-                            ) { shadeExpansion, qsExpansion, bouncerExpansion ->
-                                if (bouncerExpansion > 0f) {
-                                    emit(alphaForBouncerExpansion(bouncerExpansion))
-                                } else if (qsExpansion == 1f) {
-                                    // Ensure HUNs will be visible in QS shade (at least while
-                                    // unlocked)
-                                    emit(1f)
-                                } else if (shadeExpansion > 0f || qsExpansion > 0f) {
-                                    // Fade as QS shade expands
-                                    emit(1f - qsExpansion)
+                            shadeInteractor.qsExpansion
+                                .map { it == 1f }
+                                .distinctUntilChanged()
+                                .flatMapLatestConflated { qsFullyExpanded ->
+                                    if (qsFullyExpanded) {
+                                        // Ensure HUNs will be visible in QS shade (at least
+                                        // while unlocked)
+                                        flowOf(1f)
+                                    } else {
+                                        combineTransform(
+                                                shadeInteractor.shadeExpansion,
+                                                shadeInteractor.qsExpansion,
+                                            ) { shadeExpansion, qsExpansion ->
+                                                // Fade as QS shade expands
+                                                if (shadeExpansion > 0 || qsExpansion > 0) {
+                                                    emit(1f - qsExpansion)
+                                                }
+                                            }
+                                            .distinctUntilChanged()
+                                    }
                                 }
-                            }
+
                         Split ->
-                            combineTransform(isAnyExpanded, bouncerInteractor.bouncerExpansion) {
-                                isAnyExpanded,
-                                bouncerExpansion ->
-                                if (bouncerExpansion > 0f) {
-                                    emit(alphaForBouncerExpansion(bouncerExpansion))
-                                } else if (isAnyExpanded) {
+                            isAnyExpanded.transform { isAnyExpanded ->
+                                if (isAnyExpanded) {
                                     emit(1f)
                                 }
                             }
+
                         Dual ->
-                            combineTransform(
-                                headsUpNotificationInteractor.get().isHeadsUpOrAnimatingAway,
-                                shadeInteractor.shadeExpansion,
-                                shadeInteractor.qsExpansion,
-                                bouncerInteractor.bouncerExpansion,
-                            ) {
-                                isHeadsUpOrAnimatingAway,
-                                shadeExpansion,
-                                qsExpansion,
-                                bouncerExpansion ->
-                                if (bouncerExpansion > 0f) {
-                                    emit(alphaForBouncerExpansion(bouncerExpansion))
-                                } else if (isHeadsUpOrAnimatingAway) {
-                                    // Ensure HUNs will be visible in QS shade (at least while
-                                    // unlocked)
-                                    emit(1f)
-                                } else if (shadeExpansion > 0f || qsExpansion > 0f) {
-                                    // On a narrow screen, the QS shade overlaps with lockscreen
-                                    // notifications. Fade them out as the QS shade expands.
-                                    emit(1f - qsExpansion)
+                            headsUpNotificationInteractor
+                                .get()
+                                .isHeadsUpOrAnimatingAway
+                                .transformLatestConflated { isHeadsUpOrAnimatingAway ->
+                                    if (isHeadsUpOrAnimatingAway) {
+                                        // Ensure HUNs will be visible in QS shade (at least
+                                        // while unlocked)
+                                        emit(1f)
+                                    } else {
+                                        // On a narrow screen, the QS shade overlaps with
+                                        // lockscreen notifications. Fade them out as the QS
+                                        // shade expands.
+                                        emitAll(shadeInteractor.qsExpansion.map { 1f - it })
+                                    }
                                 }
-                            }
                     }
                 }
             } else {
@@ -673,11 +675,24 @@ constructor(
             }
             .dumpWhileCollecting("bouncerToGoneNotificationAlpha")
 
+    private val bouncerOverlayNotificationAlpha: Flow<Float> =
+        if (SceneContainerFlag.isEnabled) {
+            bouncerInteractor.bouncerExpansion.map {
+                when {
+                    it > 0f -> alphaForBouncerExpansion(it)
+                    else -> 1f
+                }
+            }
+        } else {
+            flowOf(1f)
+        }
+
     private fun alphaForTransitions(viewState: ViewStateAccessor): Flow<Float> {
         return merge(
             keyguardInteractor.dismissAlpha.dumpWhileCollecting("keyguardInteractor.dismissAlpha"),
             // All transition view models are mutually exclusive, and safe to merge
             bouncerToGoneNotificationAlpha(viewState),
+            bouncerOverlayNotificationAlpha,
             aodToGoneTransitionViewModel.notificationAlpha(viewState),
             aodToLockscreenTransitionViewModel.notificationAlpha,
             aodToOccludedTransitionViewModel.lockscreenAlpha(viewState),
@@ -704,6 +719,11 @@ constructor(
             glanceableHubToLockscreenTransitionViewModel.keyguardAlpha,
             glanceableHubToAodTransitionViewModel.lockscreenAlpha,
             lockscreenToGlanceableHubTransitionViewModel.keyguardAlpha,
+            if (SceneContainerFlag.isEnabled) {
+                dozingToGoneTransitionViewModel.lockscreenAlpha(viewState)
+            } else {
+                emptyFlow()
+            },
         )
     }
 

@@ -26,7 +26,6 @@ import static android.view.RemoteAnimationTarget.MODE_OPENING;
 
 import static com.android.window.flags.Flags.enableDesktopFirstLaunchAdjacentBugfix;
 import static com.android.wm.shell.Flags.enableFlexibleSplit;
-import static com.android.wm.shell.Flags.fixExitSplitOnEnterBubble;
 import static com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_SPLIT_SCREEN;
 import static com.android.wm.shell.shared.split.SplitScreenConstants.CONTROLLED_ACTIVITY_TYPES;
 import static com.android.wm.shell.shared.split.SplitScreenConstants.CONTROLLED_WINDOWING_MODES;
@@ -40,6 +39,7 @@ import android.app.TaskInfo;
 import android.content.Context;
 import android.graphics.Rect;
 import android.os.IBinder;
+import android.util.ArraySet;
 import android.util.SparseArray;
 import android.view.RemoteAnimationTarget;
 import android.view.SurfaceControl;
@@ -124,6 +124,7 @@ public class StageTaskListener implements ShellTaskOrganizer.TaskListener {
     protected SurfaceControl mDimLayer;
     protected SparseArray<ActivityManager.RunningTaskInfo> mChildrenTaskInfo = new SparseArray<>();
     private final SparseArray<SurfaceControl> mChildrenLeashes = new SparseArray<>();
+    private final ArraySet<Integer> mChildrenToBeVanished = new ArraySet<>();
     // TODO(b/204308910): Extracts SplitDecorManager related code to common package.
     private SplitDecorManager mSplitDecorManager;
 
@@ -343,8 +344,8 @@ public class StageTaskListener implements ShellTaskOrganizer.TaskListener {
         } else if (mChildrenTaskInfo.contains(taskId)) {
             mChildrenTaskInfo.remove(taskId);
             mChildrenLeashes.remove(taskId);
-            if (fixExitSplitOnEnterBubble()
-                    && mBubbleController.map(c -> c.shouldBeAppBubble(taskInfo)).orElse(false)) {
+            mChildrenToBeVanished.remove(taskId);
+            if (mBubbleController.map(c -> c.shouldBeAppBubble(taskInfo)).orElse(false)) {
                 mCallbacks.onChildTaskMovedToBubble(this, taskId);
             } else {
                 mCallbacks.onChildTaskStatusChanged(this, taskId, false /* present */,
@@ -599,6 +600,27 @@ public class StageTaskListener implements ShellTaskOrganizer.TaskListener {
                 task != null);
         if (task == null) return false;
         wct.reparent(task.token, newParent, false /* onTop */);
+        return true;
+    }
+
+    /**
+     * Marks a task to be vanished.
+     *
+     * This method should be invoked when you request to close a task so that
+     * following checks with areAllTasksToBeVanished can correctly determine all the tasks in this
+     * stage will be closed and thus the split screen needs to be dismissed.
+     */
+    void markToBeVanished(int taskId) {
+        if (!mChildrenTaskInfo.contains(taskId)) return;
+        mChildrenToBeVanished.add(taskId);
+    }
+
+    boolean areAllTasksToBeVanished() {
+        for (int i = 0; i < mChildrenTaskInfo.size(); i++) {
+            if (!mChildrenToBeVanished.contains(mChildrenTaskInfo.valueAt(i).taskId)) {
+                return false;
+            }
+        }
         return true;
     }
 

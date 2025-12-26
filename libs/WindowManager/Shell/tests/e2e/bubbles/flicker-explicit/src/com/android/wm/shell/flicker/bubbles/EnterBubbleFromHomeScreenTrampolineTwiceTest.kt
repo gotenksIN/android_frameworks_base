@@ -63,7 +63,7 @@ import org.junit.runners.MethodSorters
     Flags.FLAG_ENABLE_CREATE_ANY_BUBBLE,
     com.android.window.flags.Flags.FLAG_FIX_BUBBLE_TRAMPOLINE_ANIMATION,
     com.android.window.flags.Flags.FLAG_FIX_BUBBLE_TRAMPOLINE_LAUNCH_TWICE,
-    com.android.window.flags.Flags.FLAG_ROOT_TASK_FOR_BUBBLE)
+    com.android.window.flags.Flags.FLAG_ENABLE_BUBBLE_ROOT_TASK)
 @RequiresDevice
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 @Presubmit
@@ -108,7 +108,8 @@ class EnterBubbleFromHomeScreenTrampolineTwiceTest : BubbleFlickerTrampolineTest
 
     @get:Rule(order = 1)
     val setUpRule = RunOncePerParameterRule(
-        wrappedRule = testSetupRule(navBar).around(recordTraceWithTransitionRule)
+        testClass = this::class,
+        wrappedRule = testSetupRule(navBar).around(recordTraceWithTransitionRule),
     )
 
     override val traceDataReader

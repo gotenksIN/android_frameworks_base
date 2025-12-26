@@ -18,7 +18,6 @@ package com.android.systemui.statusbar.notification.row;
 
 import static android.app.Flags.notificationsRedesignTemplates;
 import static android.app.Notification.EXTRA_BUILDER_APPLICATION_INFO;
-import static android.app.NotificationChannel.SYSTEM_RESERVED_IDS;
 import static android.app.NotificationManager.IMPORTANCE_DEFAULT;
 import static android.app.NotificationManager.IMPORTANCE_LOW;
 import static android.app.NotificationManager.IMPORTANCE_UNSPECIFIED;
@@ -46,6 +45,7 @@ import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.metrics.LogMaker;
 import android.os.Handler;
@@ -365,6 +365,7 @@ public class NotificationInfo extends LinearLayout implements NotificationGuts.G
         // Delegate
         bindDelegate();
 
+        bindSummarizer();
 
         if (Flags.notificationClassificationUi()) {
             bindFeedback();
@@ -389,6 +390,20 @@ public class NotificationInfo extends LinearLayout implements NotificationGuts.G
         final View settingsButton = findViewById(R.id.info);
         settingsButton.setOnClickListener(getSettingsOnClickListener());
         settingsButton.setVisibility(settingsButton.hasOnClickListeners() ? VISIBLE : GONE);
+    }
+
+    private void bindSummarizer() {
+        if (android.app.Flags.nmSummarizationAll()) {
+            TextView summarized = findViewById(R.id.summarized_by);
+            if (!TextUtils.isEmpty(mSbn.getNotification().getSummarizedContent())) {
+                summarized.setVisibility(VISIBLE);
+                summarized.setText(
+                        mContext.getString(R.string.notification_summarization_header, mAppName));
+                summarized.setTypeface(Typeface.create("variable-body-medium", Typeface.ITALIC));
+            } else {
+                summarized.setVisibility(GONE);
+            }
+        }
     }
 
     private void bindFeedback() {
@@ -445,8 +460,7 @@ public class NotificationInfo extends LinearLayout implements NotificationGuts.G
             intent.setClassName(activityInfo.packageName, activityInfo.name);
 
             intent.putExtra(NotificationAssistantService.EXTRA_NOTIFICATION_KEY, key);
-            if (ranking.getSummarization() != null ||
-                    SYSTEM_RESERVED_IDS.contains(ranking.getChannel().getId())) {
+            if (ranking.getSummarization() != null || ranking.getChannel().isBundleChannel()) {
                 intent.putExtra(NotificationAssistantService.EXTRA_NOTIFICATION_ADJUSTMENT,
                         ranking.getSummarization() != null
                         ? KEY_SUMMARIZATION
@@ -461,7 +475,7 @@ public class NotificationInfo extends LinearLayout implements NotificationGuts.G
             }
 
             // Check if it's a reserved system channel type
-            if (channel != null && SYSTEM_RESERVED_IDS.contains(channel.getId())) {
+            if (channel != null && channel.isBundleChannel()) {
                 keys.add(KEY_TYPE);
             }
 

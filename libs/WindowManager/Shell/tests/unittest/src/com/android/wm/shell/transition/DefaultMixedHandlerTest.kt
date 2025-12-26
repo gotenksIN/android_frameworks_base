@@ -32,15 +32,19 @@ import androidx.test.filters.SmallTest
 import com.android.dx.mockito.inline.extended.ExtendedMockito.spyOn
 import com.android.window.flags.Flags.FLAG_FIX_BUBBLE_TRAMPOLINE_ANIMATION
 import com.android.wm.shell.Flags.FLAG_ENABLE_CREATE_ANY_BUBBLE
+import com.android.wm.shell.MockToken
 import com.android.wm.shell.ShellTestCase
 import com.android.wm.shell.TestShellExecutor
 import com.android.wm.shell.activityembedding.ActivityEmbeddingController
 import com.android.wm.shell.bubbles.BubbleController
+import com.android.wm.shell.bubbles.BubbleHelperImpl
+import com.android.wm.shell.bubbles.BubbleRootTask
 import com.android.wm.shell.bubbles.BubbleTransitions
 import com.android.wm.shell.desktopmode.DesktopTasksController
 import com.android.wm.shell.keyguard.KeyguardTransitionHandler
-import com.android.wm.shell.pinnedlayer.phone.PinnedLayerController
+import com.android.wm.shell.pinnedlayer.phone.PinnedLayerHandler
 import com.android.wm.shell.pip.PipTransitionController
+import com.android.wm.shell.pip2.phone.PipScheduler
 import com.android.wm.shell.recents.RecentsTransitionHandler
 import com.android.wm.shell.splitscreen.SplitScreenController
 import com.android.wm.shell.splitscreen.StageCoordinator
@@ -78,6 +82,11 @@ class DefaultMixedHandlerTest : ShellTestCase() {
     private val unfoldTransitionHandler = mock<UnfoldTransitionHandler>()
     private val activityEmbeddingController = mock<ActivityEmbeddingController>()
     private val bubbleController = mock<BubbleController>()
+    private val bubbleRootTask = mock<BubbleRootTask>()
+    private val bubbleHelper = spy(BubbleHelperImpl(
+        bubbleRootTask = { bubbleRootTask },
+        splitScreenController = { Optional.of(splitScreenController) }
+    ))
     private val bubbleTransitions = spy(BubbleTransitions(
         mContext,
         transitions,
@@ -86,8 +95,10 @@ class DefaultMixedHandlerTest : ShellTestCase() {
         mock(),
         mock(),
         mock(),
+        bubbleHelper,
     ))
-    private val pinnedLayerController = mock<PinnedLayerController>()
+    private val pinnedLayerHandler = mock<PinnedLayerHandler>()
+    private val pipScheduler = mock<PipScheduler>()
 
     private val shellInit: ShellInit = ShellInit(TestShellExecutor())
     private val mixedHandler = DefaultMixedHandler(
@@ -95,13 +106,15 @@ class DefaultMixedHandlerTest : ShellTestCase() {
         transitions,
         Optional.of(splitScreenController),
         pipTransitionController,
-        pinnedLayerController,
+        Optional.of(pipScheduler),
+        pinnedLayerHandler,
         Optional.of(recentsTransitionHandler),
         keyguardTransitionHandler,
         Optional.of(desktopTasksController),
         Optional.of(unfoldTransitionHandler),
         Optional.of(activityEmbeddingController),
         bubbleTransitions,
+        bubbleHelper,
     )
 
     @Before
@@ -203,6 +216,7 @@ class DefaultMixedHandlerTest : ShellTestCase() {
         bubbleController.stub {
             on { shouldBeAppBubble(runningTask) } doReturn true
         }
+        doReturn(true).`when`(bubbleHelper).isAppBubbleTask(runningTask)
 
         assertThat(mixedHandler.requestHasBubbleEnterFromAppBubbleOrExistingBubble(request))
             .isTrue()
@@ -217,6 +231,7 @@ class DefaultMixedHandlerTest : ShellTestCase() {
         bubbleController.stub {
             on { shouldBeAppBubble(runningTask) } doReturn true
         }
+        doReturn(true).`when`(bubbleHelper).isAppBubbleTask(runningTask)
 
         assertThat(mixedHandler.requestHasBubbleEnterFromAppBubbleOrExistingBubble(request))
             .isTrue()
@@ -232,6 +247,7 @@ class DefaultMixedHandlerTest : ShellTestCase() {
         bubbleController.stub {
             on { shouldBeAppBubble(runningTask) } doReturn true
         }
+        doReturn(true).`when`(bubbleHelper).isAppBubbleTask(runningTask)
 
         mixedHandler.handleRequest(Binder(), request)
 
@@ -246,6 +262,7 @@ class DefaultMixedHandlerTest : ShellTestCase() {
         bubbleController.stub {
             on { shouldBeAppBubble(any()) } doReturn true
         }
+        doReturn(true).`when`(bubbleHelper).isAppBubbleTask(any())
 
         mixedHandler.startAnimation(Binder(), info, mock<SurfaceControl.Transaction>(),
             mock<SurfaceControl.Transaction>(), mock<Transitions.TransitionFinishCallback>())
@@ -266,6 +283,7 @@ class DefaultMixedHandlerTest : ShellTestCase() {
         bubbleController.stub {
             on { shouldBeAppBubble(any()) } doReturn true
         }
+        doReturn(true).`when`(bubbleHelper).isAppBubbleTask(any())
 
         mixedHandler.startAnimation(Binder(), info, mock<SurfaceControl.Transaction>(),
             mock<SurfaceControl.Transaction>(), mock<Transitions.TransitionFinishCallback>())
@@ -292,6 +310,7 @@ class DefaultMixedHandlerTest : ShellTestCase() {
         bubbleController.stub {
             on { shouldBeAppBubble(any()) } doReturn true
         }
+        doReturn(true).`when`(bubbleHelper).isAppBubbleTask(any())
 
         mixedHandler.startAnimation(Binder(), info, mock<SurfaceControl.Transaction>(),
             mock<SurfaceControl.Transaction>(), mock<Transitions.TransitionFinishCallback>())
@@ -308,7 +327,7 @@ class DefaultMixedHandlerTest : ShellTestCase() {
             TYPE_LAUNCH_OR_CONVERT_TO_BUBBLE, transition, transitions, mixedHandler,
             pipTransitionController, splitScreenController.getTransitionHandler(),
             keyguardTransitionHandler, unfoldTransitionHandler, activityEmbeddingController,
-            desktopTasksController, bubbleTransitions
+            desktopTasksController, bubbleTransitions, bubbleHelper, pinnedLayerHandler
         ))
         mixedHandler.mActiveTransitions.add(mixedTransition)
         val info = TransitionInfo(TRANSIT_OPEN, 0)
@@ -333,6 +352,7 @@ class DefaultMixedHandlerTest : ShellTestCase() {
     private fun createRunningTask(taskId: Int = 0): RunningTaskInfo {
         return RunningTaskInfo().apply {
             this.taskId = taskId
+            this.token = MockToken().token()
             this.configuration.windowConfiguration.activityType = ACTIVITY_TYPE_STANDARD
         }
     }

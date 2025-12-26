@@ -24,7 +24,6 @@ import android.graphics.PorterDuff
 import android.graphics.Rect
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
-import android.text.TextUtils
 import android.util.Log
 import android.util.Size
 import android.view.NotificationHeaderView
@@ -53,7 +52,11 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalDensity
@@ -91,10 +94,6 @@ fun AODPromotedNotification(
     viewModelFactory: AODPromotedNotificationViewModel.Factory,
     modifier: Modifier = Modifier,
 ) {
-    if (!PromotedNotificationUi.isEnabled) {
-        return
-    }
-
     val viewModel = rememberViewModel(traceName = "$TAG.viewModel") { viewModelFactory.create() }
 
     val content = viewModel.content ?: return
@@ -105,11 +104,20 @@ fun AODPromotedNotification(
         Log.w(TAG, "not displaying promoted notif with ineligible style on AOD")
         return
     }
+
+    var hasBindingError by remember(content.identity) { mutableStateOf(false) }
+
+    if (hasBindingError) {
+        Log.w(TAG, "Not rendering due to previous binding error for ${content.identity}")
+        return
+    }
+
     key(content.identity, notificationView.getTag(viewInflationIdentity)) {
         AODPromotedNotificationView(
             notificationViewFactory = { notificationView },
             content = content,
             audiblyAlertedIconVisible = audiblyAlertedIconVisible,
+            onBindingError = { hasBindingError = true },
             modifier = modifier,
         )
     }
@@ -120,6 +128,7 @@ fun AODPromotedNotificationView(
     notificationViewFactory: (Context) -> View,
     content: PromotedNotificationContentModel,
     audiblyAlertedIconVisible: Boolean,
+    onBindingError: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val sidePaddings = dimensionResource(systemuiR.dimen.notification_side_paddings)
@@ -147,23 +156,42 @@ fun AODPromotedNotificationView(
                 if (notificationView.parent != null) {
                     (notificationView.parent as ViewGroup).removeView(notificationView)
                 }
-
                 val updater =
-                    traceSection("$TAG.findViews") {
-                        AODPromotedNotificationViewUpdater(notificationView)
+                    try {
+                        traceSection("$TAG.findViews") {
+                            AODPromotedNotificationViewUpdater(notificationView)
+                        }
+                    } catch (tr: Throwable) {
+                        Log.wtf(TAG, "ViewUpdater creation failed", tr)
+                        onBindingError()
+                        null
                     }
 
-                val frame = FrameLayoutWithMaxHeight(maxHeight, context)
+                val frame =
+                    FrameLayoutWithMaxHeight(
+                        maxHeight = if (updater == null) 0 else maxHeight,
+                        context = context,
+                    )
                 frame.addView(notificationView)
                 frame.setTag(viewUpdaterTagId, updater)
-
                 frame
             },
             update = { frame ->
-                val updater = frame.getTag(viewUpdaterTagId) as AODPromotedNotificationViewUpdater
+                val updater = frame.getTag(viewUpdaterTagId) as? AODPromotedNotificationViewUpdater
+                if (updater == null) {
+                    return@AndroidView
+                }
 
-                traceSection("$TAG.update") { updater.update(content, audiblyAlertedIconVisible) }
-                frame.maxHeight = maxHeight
+                try {
+                    traceSection("$TAG.update") {
+                        updater.update(content, audiblyAlertedIconVisible)
+                    }
+                    frame.maxHeight = maxHeight
+                } catch (tr: Throwable) {
+                    Log.wtf(TAG, "ViewUpdater update failed", tr)
+                    onBindingError()
+                    frame.maxHeight = 0
+                }
             },
             modifier = viewModifier,
         )
@@ -283,22 +311,22 @@ private class AODPromotedNotificationViewUpdater(root: View) {
         } else {
             listOf(
                 MetricView(
-                    container = root.findViewById<View>(R.id.metric_view_0),
-                    label = root.findViewById<TextView>(R.id.metric_label_0),
-                    textValue = root.findViewById<TextView>(R.id.metric_value_0),
-                    chronometer = root.findViewById<Chronometer>(R.id.metric_chronometer_0),
+                    container = root.findViewById<View?>(R.id.metric_view_0),
+                    label = root.findViewById<TextView?>(R.id.metric_label_0),
+                    textValue = root.findViewById<TextView?>(R.id.metric_value_0),
+                    chronometer = root.findViewById<Chronometer?>(R.id.metric_chronometer_0),
                 ),
                 MetricView(
-                    container = root.findViewById<View>(R.id.metric_view_1),
-                    label = root.findViewById<TextView>(R.id.metric_label_1),
-                    textValue = root.findViewById<TextView>(R.id.metric_value_1),
-                    chronometer = root.findViewById<Chronometer>(R.id.metric_chronometer_1),
+                    container = root.findViewById<View?>(R.id.metric_view_1),
+                    label = root.findViewById<TextView?>(R.id.metric_label_1),
+                    textValue = root.findViewById<TextView?>(R.id.metric_value_1),
+                    chronometer = root.findViewById<Chronometer?>(R.id.metric_chronometer_1),
                 ),
                 MetricView(
-                    container = root.findViewById<View>(R.id.metric_view_2),
-                    label = root.findViewById<TextView>(R.id.metric_label_2),
-                    textValue = root.findViewById<TextView>(R.id.metric_value_2),
-                    chronometer = root.findViewById<Chronometer>(R.id.metric_chronometer_2),
+                    container = root.findViewById<View?>(R.id.metric_view_2),
+                    label = root.findViewById<TextView?>(R.id.metric_label_2),
+                    textValue = root.findViewById<TextView?>(R.id.metric_value_2),
+                    chronometer = root.findViewById<Chronometer?>(R.id.metric_chronometer_2),
                 ),
             )
         }
@@ -454,7 +482,7 @@ private class AODPromotedNotificationViewUpdater(root: View) {
         updateHeader(content, collapsed = false, null)
         updateNotifIcon(icon, content.skeletonNotifIcon, content.iconLevel)
 
-        val hasTitle = !TextUtils.isEmpty(content.title)
+        val hasTitle = !content.title.isNullOrEmpty()
         altTitle?.text = content.title
         altTitle?.isVisible = hasTitle
         appNameTextDivider?.isVisible = altTitle != null && hasTitle
@@ -493,7 +521,7 @@ private class AODPromotedNotificationViewUpdater(root: View) {
                 }
                 is Metric.Text -> {
                     metricView.textValue?.isVisible = true
-                    metricView.textValue?.let { it.text = metric.metricValue }
+                    metricView.textValue?.text = metric.metricValue
                 }
             }
         }
@@ -504,12 +532,13 @@ private class AODPromotedNotificationViewUpdater(root: View) {
         collapsed: Boolean,
         headerTitleView: TextView?,
     ) {
-        val hasTitleInHeader = headerTitleView != null && content.title != null
-        val hasSubText = content.subText != null
+        val hasTitleInHeader = headerTitleView != null && !content.title.isNullOrEmpty()
+        val hasSubText = !content.subText.isNullOrEmpty()
 
         // Determine if the notification has no content *below* the header/top line
-        val hasTextBelowHeader = content.text != null
-        val hasTitleBelowHeader = content.title != null && headerTitleView == null
+        val hasTextBelowHeader = !content.text.isNullOrEmpty()
+        val hasTitleBelowHeader = !content.title.isNullOrEmpty() && headerTitleView == null
+
         val isSingleLine = !hasTitleBelowHeader && !hasTextBelowHeader
 
         // the collapsed form doesn't show the app name unless there is no other text in the header
@@ -520,7 +549,10 @@ private class AODPromotedNotificationViewUpdater(root: View) {
         header?.centerTopLine(isSingleLine)
         // We normally use the (empty) actions container for the bottom padding of the notification,
         // but that's not necessary when single line
-        actionsContainer?.isVisible = !isSingleLine
+        // NOTE: Metric Style notifications show title in topline and
+        // they have only 1 line below topline for single metric
+        val isMetricStyleWithSingleMetric = content.metrics?.size == 1
+        actionsContainer?.isVisible = !(isSingleLine || isMetricStyleWithSingleMetric)
 
         updateAppName(content, forceHide = hideAppName)
         updateTextView(headerTextSecondary, content.subText)
@@ -536,9 +568,9 @@ private class AODPromotedNotificationViewUpdater(root: View) {
         hideAppName: Boolean,
         hideTitle: Boolean,
     ) {
-        val hasAppName = content.appName != null && !hideAppName
-        val hasSubText = content.subText != null
-        val hasHeader = content.title != null && !hideTitle
+        val hasAppName = !content.appName.isNullOrEmpty() && !hideAppName
+        val hasSubText = !content.subText.isNullOrEmpty()
+        val hasHeader = !content.title.isNullOrEmpty() && !hideTitle
         val hasTimeOrChronometer = content.time != null
 
         val hasTextBeforeSubText = hasAppName
@@ -576,8 +608,8 @@ private class AODPromotedNotificationViewUpdater(root: View) {
         hideTitle: Boolean,
         hideAppName: Boolean,
     ) {
-        val hasTitle = content.title != null && !hideTitle
-        val hasAppName = content.appName != null && !hideAppName
+        val hasTitle = !content.title.isNullOrEmpty() && !hideTitle
+        val hasAppName = !content.appName.isNullOrEmpty() && !hideAppName
         val hasTimeOrChronometer = content.time != null
         val hasVerification =
             !content.verificationIcon.isNullOrEmpty() || content.verificationText != null
@@ -612,9 +644,6 @@ private class AODPromotedNotificationViewUpdater(root: View) {
     }
 
     private fun updateTimeAndChronometer(content: PromotedNotificationContentModel) {
-        setTextViewColor(time, SecondaryText)
-        setTextViewColor(chronometer, SecondaryText)
-
         if (content.time is When.Time) {
             time?.setTime(content.time.currentTimeMillis)
         }
@@ -627,7 +656,8 @@ private class AODPromotedNotificationViewUpdater(root: View) {
         } else {
             chronometer?.stop()
         }
-
+        setTextViewColor(time, SecondaryText)
+        setTextViewColor(chronometer, SecondaryText)
         time?.isVisible = (content.time is When.Time)
         chronometer?.isVisible = (content.time is When.Chronometer)
     }

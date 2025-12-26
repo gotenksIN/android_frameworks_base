@@ -17,6 +17,7 @@
 package com.android.server.wm;
 
 import static android.Manifest.permission.ADD_TRUSTED_DISPLAY;
+import static android.Manifest.permission.MANAGE_DISPLAYS;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_HOME;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_STANDARD;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM;
@@ -120,6 +121,7 @@ import android.view.WindowRelayoutResult;
 import android.window.ActivityWindowInfo;
 import android.window.ClientWindowFrames;
 import android.window.ConfigurationChangeSetting;
+import android.window.IDisplayEngagementModeCallback;
 import android.window.InputTransferToken;
 import android.window.ScreenCaptureInternal;
 import android.window.WindowContainerToken;
@@ -169,7 +171,7 @@ public class WindowManagerServiceTests extends WindowTestsBase {
     @Rule
     public AdoptShellPermissionsRule mAdoptShellPermissionsRule = new AdoptShellPermissionsRule(
             InstrumentationRegistry.getInstrumentation().getUiAutomation(),
-            ADD_TRUSTED_DISPLAY);
+            ADD_TRUSTED_DISPLAY, MANAGE_DISPLAYS);
 
     @Rule
     public Expect mExpect = Expect.create();
@@ -203,7 +205,6 @@ public class WindowManagerServiceTests extends WindowTestsBase {
     }
 
     @Test
-    @EnableFlags(android.companion.virtualdevice.flags.Flags.FLAG_ENABLE_ANIMATIONS_PER_DISPLAY)
     public void testEnableDisableAnimationsForDisplay() {
         // Set non-zero default animation scales for window and transition animations.
         float defaultScale = 5f;
@@ -1504,7 +1505,7 @@ public class WindowManagerServiceTests extends WindowTestsBase {
     public void testRequestKeyboardShortcuts_noWindow() {
         doNothing().when(mWm.mContext).enforceCallingOrSelfPermission(anyString(), anyString());
         doReturn(null).when(mWm).getFocusedWindowLocked();
-        doReturn(null).when(mWm.mRoot).getCurrentInputMethodWindow();
+        doReturn(null).when(mWm.mRoot).getCurrentImeWindow();
 
         TestResultReceiver receiver = new TestResultReceiver();
         mWm.requestAppKeyboardShortcuts(receiver, 0);
@@ -1526,7 +1527,7 @@ public class WindowManagerServiceTests extends WindowTestsBase {
                 TYPE_BASE_APPLICATION).setDisplay(mDisplayContent).setClientWindow(window).build();
         doNothing().when(mWm.mContext).enforceCallingOrSelfPermission(anyString(), anyString());
         doReturn(windowState).when(mWm).getFocusedWindowLocked();
-        doReturn(windowState).when(mWm.mRoot).getCurrentInputMethodWindow();
+        doReturn(windowState).when(mWm.mRoot).getCurrentImeWindow();
 
         TestResultReceiver receiver = new TestResultReceiver();
         mWm.requestAppKeyboardShortcuts(receiver, 0);
@@ -1954,6 +1955,121 @@ public class WindowManagerServiceTests extends WindowTestsBase {
         assertEquals(mDisplayContent.mBaseDisplayDensity,
                 mDisplayContent.getInitialDisplayDensity());
         assertEquals(mDisplayContent.mForcedDisplayDensityRatio, 0.0f, 0.001);
+    }
+
+    @Test
+    @DisableFlags(Flags.FLAG_DEVICE_ENGAGEMENT_MODE)
+    public void testSetDisplayEngagementMode_flagDisabled() {
+        spyOn(mDefaultDisplay);
+
+        final int testMode = WindowManager.ENGAGEMENT_MODE_FLAG_VISUALS_ON;
+        mWm.setDisplayEngagementMode(mDefaultDisplay.getDisplayId(), testMode);
+
+        waitUntilHandlersIdle();
+        verify(mDefaultDisplay, never()).setEngagementMode(anyInt());
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_DEVICE_ENGAGEMENT_MODE)
+    public void testSetDisplayEngagementMode_success() {
+        spyOn(mDefaultDisplay);
+
+        final int testMode = WindowManager.ENGAGEMENT_MODE_FLAG_VISUALS_ON;
+        mWm.setDisplayEngagementMode(mDefaultDisplay.getDisplayId(), testMode);
+        when(mDefaultDisplay.getEngagementMode()).thenReturn(testMode);
+
+        waitUntilHandlersIdle();
+        verify(mDefaultDisplay).setEngagementMode(testMode);
+        final int result = mWm.getDisplayEngagementMode(mDefaultDisplay.getDisplayId());
+        assertEquals(testMode, result);
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_DEVICE_ENGAGEMENT_MODE)
+    public void testSetDisplayEngagementMode_dispatchesCallbackWhenModeChanges() {
+        spyOn(mWm);
+
+        final int initialMode = mWm.getDisplayEngagementMode(mDefaultDisplay.getDisplayId());
+        final int newMode = WindowManager.ENGAGEMENT_MODE_FLAG_AUDIO_ON;
+
+        assertThat(initialMode).isNotEqualTo(newMode);
+        mWm.setDisplayEngagementMode(mDefaultDisplay.getDisplayId(), newMode);
+
+        waitUntilHandlersIdle();
+        verify(mWm, times(1)).dispatchDisplayEngagementModeChanged(
+                mDefaultDisplay.getDisplayId(), newMode);
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_DEVICE_ENGAGEMENT_MODE)
+    public void testSetDisplayEngagementMode_invalidDisplay() {
+        spyOn(mDefaultDisplay);
+
+        final int testMode = WindowManager.ENGAGEMENT_MODE_FLAG_VISUALS_ON;
+        mWm.setDisplayEngagementMode(Display.INVALID_DISPLAY, testMode);
+
+        waitUntilHandlersIdle();
+        verify(mDefaultDisplay, never()).setEngagementMode(testMode);
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_DEVICE_ENGAGEMENT_MODE)
+    public void testDisplayEngagementModeCallback() throws RemoteException {
+        spyOn(mDefaultDisplay);
+
+        final int testMode = WindowManager.ENGAGEMENT_MODE_FLAG_VISUALS_ON;
+        IDisplayEngagementModeCallback callback = mock(IDisplayEngagementModeCallback.class);
+        when(callback.asBinder()).thenReturn(new Binder());
+        mWm.registerDisplayEngagementModeCallback(callback);
+
+        waitUntilHandlersIdle();
+        // The register callback should trigger a callback with the initial mode.
+        verify(callback).onEngagementModeChanged(mDefaultDisplay.getDisplayId(),
+                DisplayContent.DEFAULT_ENGAGEMENT_MODE);
+
+        mWm.setDisplayEngagementMode(mDefaultDisplay.getDisplayId(), testMode);
+
+        waitUntilHandlersIdle();
+        // Callback should be triggered with the new mode.
+        verify(callback).onEngagementModeChanged(mDefaultDisplay.getDisplayId(), testMode);
+
+        mWm.unregisterDisplayEngagementModeCallback(callback);
+        final int newMode = WindowManager.ENGAGEMENT_MODE_FLAG_AUDIO_ON;
+        mWm.setDisplayEngagementMode(mDefaultDisplay.getDisplayId(), newMode);
+
+        waitUntilHandlersIdle();
+        verify(callback, never()).onEngagementModeChanged(mDefaultDisplay.getDisplayId(), newMode);
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_DEVICE_ENGAGEMENT_MODE)
+    public void testGetDisplayEngagementMode_invalidDisplay_returnsDefault() {
+        final int result = mWm.getDisplayEngagementMode(Display.INVALID_DISPLAY);
+        assertEquals(DisplayContent.DEFAULT_ENGAGEMENT_MODE, result);
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_DEVICE_ENGAGEMENT_MODE)
+    public void testSetDisplayEngagementMode_multipleDisplays() {
+        final DisplayContent dc = createNewDisplay();
+        spyOn(mDefaultDisplay);
+        spyOn(dc);
+
+        final int defaultDisplayMode = WindowManager.ENGAGEMENT_MODE_FLAG_VISUALS_ON;
+        mWm.setDisplayEngagementMode(mDefaultDisplay.getDisplayId(), defaultDisplayMode);
+        when(mDefaultDisplay.getEngagementMode()).thenReturn(defaultDisplayMode);
+
+        final int secondaryDisplayMode = WindowManager.ENGAGEMENT_MODE_FLAG_AUDIO_ON;
+        mWm.setDisplayEngagementMode(dc.getDisplayId(), secondaryDisplayMode);
+        when(dc.getEngagementMode()).thenReturn(secondaryDisplayMode);
+
+        waitUntilHandlersIdle();
+        verify(mDefaultDisplay).setEngagementMode(defaultDisplayMode);
+        verify(dc).setEngagementMode(secondaryDisplayMode);
+
+        assertEquals(defaultDisplayMode,
+                mWm.getDisplayEngagementMode(mDefaultDisplay.getDisplayId()));
+        assertEquals(secondaryDisplayMode, mWm.getDisplayEngagementMode(dc.getDisplayId()));
     }
 
     /**

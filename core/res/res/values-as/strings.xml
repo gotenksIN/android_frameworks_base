@@ -326,6 +326,8 @@
     <string name="notification_channel_accessibility_hearing_device" msgid="7816963856388758952">"শুনাৰ ডিভাইচ"</string>
     <string name="notification_channel_accessibility_security_policy" msgid="1727787021725251912">"সাধ্য সুবিধাৰ ব্যৱহাৰ"</string>
     <string name="notification_channel_display" msgid="6905032605735615090">"ডিছপ্লে’"</string>
+    <!-- no translation found for notification_channel_parental_controls (2963963315750128538) -->
+    <skip />
     <string name="foreground_service_app_in_background" msgid="1439289699671273555">"<xliff:g id="APP_NAME">%1$s</xliff:g>এ বেটাৰী ব্যৱহাৰ কৰি আছে"</string>
     <string name="foreground_service_apps_in_background" msgid="7340037176412387863">"<xliff:g id="NUMBER">%1$d</xliff:g>টা এপে বেটাৰী ব্যৱহাৰ কৰি আছে"</string>
     <string name="foreground_service_tap_for_details" msgid="9078123626015586751">"বেটাৰী আৰু ডেটাৰ ব্যৱহাৰৰ বিষয়ে সবিশেষ জানিবলৈ টিপক"</string>
@@ -340,7 +342,7 @@
     <string name="permgroupdesc_contacts" msgid="2001771388402758264">"আপোনাৰ সম্পৰ্কসমূহ এক্সেছ কৰক আৰু এই ডিভাইচটোত সম্পৰ্ক ছেভ কৰিব পৰা আপোনাৰ একাউণ্টসমূহৰ সূচীখন চাওক"</string>
     <string name="permgrouplab_location" msgid="1858277002233964394">"অৱস্থান"</string>
     <string name="permgroupdesc_location" msgid="1995955142118450685">"এই ডিভাইচৰ অৱস্থান ব্যৱহাৰ কৰিব পাৰে"</string>
-    <string name="permgrouplab_calendar" msgid="6426860926123033230">"Calendar"</string>
+    <string name="permgrouplab_calendar" msgid="6426860926123033230">"কেলেণ্ডাৰ"</string>
     <string name="permgroupdesc_calendar" msgid="6762751063361489379">"আপোনাৰ কেলেণ্ডাৰ ব্যৱহাৰ কৰিব পাৰে"</string>
     <string name="permgrouplab_sms" msgid="795737735126084874">"এছএমএছ"</string>
     <string name="permgroupdesc_sms" msgid="5726462398070064542">"এছএমএছ বার্তা পঠিয়াব আৰু চাব পাৰে"</string>
@@ -641,6 +643,8 @@
     <string name="permdesc_nearby_wifi_devices" msgid="3054307728646332906">"এপ্‌টোক বিজ্ঞাপন প্ৰচাৰাভিযান কৰিবলৈ, সংযোগ কৰিবলৈ আৰু নিকটৱৰ্তী ৱাই-ফাই ডিভাইচৰ আপেক্ষিক স্থান নিৰ্ধাৰণ কৰিবলৈ অনুমতি দিয়ে"</string>
     <string name="permlab_access_local_network" msgid="3420360767259066877">"স্থানীয় নেটৱৰ্কৰ ডিভাইচ এক্সেছ কৰক"</string>
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"এপ্‌টোক স্থানীয় নেটৱৰ্কৰ ডিভাইচ এক্সেছ কৰিবলৈ অনুমতি দিয়ে"</string>
+    <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"লুপবেক ইণ্টাৰফে’চ ব্যৱহাৰ কৰক"</string>
+    <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"এপ্‌টোক লুপবেক ইণ্টাৰফে’চৰ জৰিয়তে অন্য এপ্‌সমূহৰ সৈতে ভাব-বিনিময় কৰিবলৈ অনুমতি দিয়ে"</string>
     <string name="permlab_ranging" msgid="2854543350668593390">"নিকটৱৰ্তী ডিভাইচৰ মাজৰ আপেক্ষিক স্থান নিৰ্ধাৰণ কৰক"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"এপ্‌টোক নিকটৱৰ্তী ডিভাইচসমূহৰ মাজৰ আপেক্ষিক স্থান নিৰ্ধাৰণ কৰিবলৈ অনুমতি দিয়ক"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"অগ্ৰাধিকাৰ দিয়া NFC পৰিশোধ সেৱাৰ তথ্য"</string>
@@ -1043,7 +1047,6 @@
     <string name="keyguard_password_enter_pin_password_code" msgid="7792964196473964340">"আনলক কৰিবলৈ পিন লিখক"</string>
     <string name="keyguard_password_wrong_pin_code" msgid="8583732939138432793">"ভুল পিন ক\'ড।"</string>
     <string name="keyguard_label_text" msgid="3841953694564168384">"আনলক কৰিবলৈ মেনু টিপাৰ পাছত ০ টিপক।"</string>
-    <string name="emergency_call_dialog_number_for_display" msgid="2978165477085612673">"জৰুৰীকালীন নম্বৰ"</string>
     <string name="lockscreen_carrier_default" msgid="6192313772955399160">"কোনো সেৱা নাই"</string>
     <string name="lockscreen_screen_locked" msgid="7364905540516041817">"স্ক্ৰীন লক কৰা হ’ল।"</string>
     <string name="lockscreen_instructions_when_pattern_enabled" msgid="7982445492532123308">"আনলক কৰিবলৈ বা জৰুৰীকালীন কল কৰিবলৈ মেনু টিপক।"</string>
@@ -1054,10 +1057,8 @@
     <string name="lockscreen_pattern_correct" msgid="8050630103651508582">"শুদ্ধ!"</string>
     <string name="lockscreen_pattern_wrong" msgid="2940138714468358458">"আকৌ চেষ্টা কৰক"</string>
     <string name="lockscreen_password_wrong" msgid="8605355913868947490">"আকৌ চেষ্টা কৰক"</string>
-    <!-- no translation found for lockscreen_click_to_unlock_hint (6056691847669178119) -->
-    <skip />
-    <!-- no translation found for lockscreen_key_to_unlock_hint (9042402393653798264) -->
-    <skip />
+    <string name="lockscreen_click_to_unlock_hint" msgid="6056691847669178119">"আনলক কৰিবলৈ ক্লিক কৰক"</string>
+    <string name="lockscreen_key_to_unlock_hint" msgid="9042402393653798264">"আনলক কৰিবলৈ যিকোনো কী টিপক"</string>
     <string name="lockscreen_storage_locked" msgid="634993789186443380">"আটাইবোৰ সুবিধা আৰু ডেটাৰ বাবে আনলক কৰক"</string>
     <string name="faceunlock_multiple_failures" msgid="681991538434031708">"গৰাকীৰ ফেচ আনলক কৰা সৰ্বাধিক সীমা অতিক্ৰম কৰা হ’ল"</string>
     <string name="lockscreen_missing_sim_message_short" msgid="1229301273156907613">"কোনো ছিম নাই"</string>
@@ -1279,6 +1280,7 @@
     <string name="whichApplicationLabel" msgid="7852182961472531728">"কাৰ্য সম্পূৰ্ণ কৰক"</string>
     <string name="whichViewApplication" msgid="5733194231473132945">"ইয়াৰ জৰিয়তে খোলক"</string>
     <string name="whichViewApplicationNamed" msgid="415164730629690105">"%1$sৰ জৰিয়তে খোলক"</string>
+    <string name="open_app_name" msgid="6114096770130122912">"<xliff:g id="APP_NAME">%1$s</xliff:g> খোলক"</string>
     <string name="whichViewApplicationLabel" msgid="7367556735684742409">"খোলক"</string>
     <string name="whichOpenHostLinksWith" msgid="7645631470199397485">"<xliff:g id="HOST">%1$s</xliff:g> লিংকসমূহ ইয়াৰ জৰিয়তে খোলক"</string>
     <string name="whichOpenLinksWith" msgid="1120936181362907258">"লিংকসমূহ ইয়াৰ জৰিয়তে খোলক"</string>
@@ -1800,10 +1802,8 @@
     <string name="accessibility_shortcut_single_service_warning" msgid="6363127705112844257">"দুয়োটা ভলিউম কী কিছুসময়ৰ বাবে ধৰি থাকিলে এটা সাধ্য- সুবিধা <xliff:g id="SERVICE">%1$s</xliff:g> অন কৰে। এইটোৱে আপোনাৰ ডিভাইচটোৱে কাম কৰাৰ ধৰণ সলনি কৰিব পাৰে।\n\nআপুনি ছেটিং &gt; সাধ্য-সুবিধাসমূহত এই শ্বৰ্টকাটটো অন্য এটা সুবিধালৈ সলনি কৰিব পাৰে।"</string>
     <string name="accessibility_shortcut_on" msgid="5463618449556111344">"অন কৰক"</string>
     <string name="accessibility_shortcut_off" msgid="3651336255403648739">"অন নকৰিব"</string>
-    <!-- no translation found for accessibility_shortcut_menu_item_status_on (6162756705754654002) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_menu_item_status_off (6274512913017713543) -->
-    <skip />
+    <string name="accessibility_shortcut_menu_item_status_on" msgid="6162756705754654002">"অন আছে"</string>
+    <string name="accessibility_shortcut_menu_item_status_off" msgid="6274512913017713543">"অফ আছে"</string>
     <string name="accessibility_enable_service_title" msgid="3931558336268541484">"<xliff:g id="SERVICE">%1$s</xliff:g>ক আপোনাৰ ডিভাইচটোৰ সম্পূর্ণ নিয়ন্ত্ৰণ দিবনে?"</string>
     <string name="accessibility_service_warning_description" msgid="291674995220940133">"আপোনাক সাধ্য সুবিধাৰ প্ৰয়োজনসমূহৰ জৰিয়তে সহায় কৰা এপ্‌সমূহৰ বাবে সম্পূর্ণ নিয়ন্ত্ৰণৰ সুবিধাটো সঠিক যদিও অধিকাংশ এপৰ বাবে এয়া সঠিক নহয়।"</string>
     <string name="accessibility_service_screen_control_title" msgid="190017412626919776">"চাওক আৰু স্ক্ৰীন নিয়ন্ত্ৰণ কৰক"</string>
@@ -1817,16 +1817,11 @@
     <string name="accessibility_select_shortcut_menu_title" msgid="6002726538854613272">"কোনো এটা সুবিধা ব্যৱহাৰ কৰিবলৈ সেইটোত টিপক:"</string>
     <string name="accessibility_edit_shortcut_menu_button_title" msgid="239446795930436325">"সাধ্য-সুবিধা বুটামটোৰ জৰিয়তে ব্যৱহাৰ কৰিবলৈ সুবিধাসমূহ বাছনি কৰক"</string>
     <string name="accessibility_edit_shortcut_menu_volume_title" msgid="2245540598834891500">"ভলিউম কীৰ শ্বৰ্টকাটটোৰ জৰিয়তে ব্যৱহাৰ কৰিবলৈ সুবিধাসমূহ বাছনি কৰক"</string>
-    <!-- no translation found for accessibility_shortcut_label_button (6473341300585254821) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_volume_keys (5642990791242136231) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_gesture (7987298674836890931) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_quick_settings (6851280333772213611) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_triple_tap (9058975959054454796) -->
-    <skip />
+    <string name="accessibility_shortcut_label_button" msgid="6473341300585254821">"সাধ্য-সুবিধা বুটাম"</string>
+    <string name="accessibility_shortcut_label_volume_keys" msgid="5642990791242136231">"ভলিউম কী"</string>
+    <string name="accessibility_shortcut_label_gesture" msgid="7987298674836890931">"নিৰ্দেশ"</string>
+    <string name="accessibility_shortcut_label_quick_settings" msgid="6851280333772213611">"ক্ষিপ্ৰ ছেটিং"</string>
+    <string name="accessibility_shortcut_label_triple_tap" msgid="9058975959054454796">"তিনিবাৰ টিপক"</string>
     <string name="accessibility_uncheck_legacy_item_warning" msgid="8047830891064817447">"<xliff:g id="SERVICE_NAME">%s</xliff:g> বন্ধ কৰা হৈছে"</string>
     <string name="edit_accessibility_shortcut_menu_button" msgid="8885752738733772935">"শ্বৰ্টকাটসমূহ সম্পাদনা কৰক"</string>
     <string name="done_accessibility_shortcut_menu_button" msgid="3668407723770815708">"কৰা হ’ল"</string>
@@ -2616,4 +2611,10 @@
     <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"ছিষ্টেমৰ সম্পদৰ সতৰ্কবাৰ্তা"</string>
     <string name="tv_watchdog_notification_title" msgid="195239206215922517">"সম্পদৰ অতি ব্যৱহাৰ"</string>
     <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"’<xliff:g id="APP_NAME">%1$s</xliff:g> এপে অতি বেছি সম্পদ ব্যৱহাৰ কৰি আছে।\""</string>
+    <!-- no translation found for supervision_blocked_app_title (5546803865875383588) -->
+    <skip />
+    <!-- no translation found for supervision_blocked_app_content (4125452996088641559) -->
+    <skip />
+    <!-- no translation found for supervision_unblocked_app_content (8282985265957852278) -->
+    <skip />
 </resources>

@@ -18,6 +18,7 @@ package android.view.inputmethod;
 
 import static android.os.Trace.TRACE_TAG_WINDOW_MANAGER;
 import static android.view.ViewProtoLogGroups.INPUT_METHOD_MANAGER_DEBUG;
+import static android.view.inputmethod.Flags.FLAG_GUARD_INPUT_METHOD_LIST_APIS;
 import static android.view.inputmethod.Flags.FLAG_HOME_SCREEN_HANDWRITING_DELEGATOR;
 import static android.view.ViewProtoLogGroups.INPUT_METHOD_MANAGER_WITH_LOGCAT;
 import static android.view.inputmethod.Flags.initiationWithoutInputConnection;
@@ -49,6 +50,8 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.RequiresFeature;
 import android.annotation.RequiresPermission;
+import android.annotation.SpecialUsers.CanBeCURRENT;
+import android.annotation.SpecialUsers.CanBeALL;
 import android.annotation.SuppressLint;
 import android.annotation.SystemApi;
 import android.annotation.SystemService;
@@ -128,6 +131,7 @@ import com.android.internal.inputmethod.StartInputReason;
 import com.android.internal.inputmethod.UnbindReason;
 import com.android.internal.os.SomeArgs;
 import com.android.internal.protolog.ProtoLog;
+import com.android.internal.protolog.common.LogLevel;
 import com.android.internal.view.IInputMethodManager;
 
 import java.io.FileDescriptor;
@@ -1774,9 +1778,14 @@ public final class InputMethodManager {
      *
      * <p>On multi user environment, this API returns a result for the calling process user.</p>
      *
+     * <p>Starting with targetSdkVersion 37, requires {@code android.permission.QUERY_INPUT_METHOD}
+     * to use this API.</p>
+     *
      * @return {@link List} of {@link InputMethodInfo}.
      */
     @NonNull
+    @FlaggedApi(FLAG_GUARD_INPUT_METHOD_LIST_APIS)
+    @RequiresPermission(value = Manifest.permission.QUERY_INPUT_METHOD, conditional = true)
     public List<InputMethodInfo> getInputMethodList() {
         // We intentionally do not use UserHandle.getCallingUserId() here because for system
         // services InputMethodManagerInternal.getInputMethodListAsUser() should be used
@@ -1933,9 +1942,14 @@ public final class InputMethodManager {
      *
      * <p>On multi user environment, this API returns a result for the calling process user.</p>
      *
+     * <p>Starting with targetSdkVersion 37, requires {@code android.permission.QUERY_INPUT_METHOD}
+     * to use this API.</p>
+     *
      * @return {@link List} of {@link InputMethodInfo}.
      */
     @NonNull
+    @FlaggedApi(FLAG_GUARD_INPUT_METHOD_LIST_APIS)
+    @RequiresPermission(value = Manifest.permission.QUERY_INPUT_METHOD, conditional = true)
     public List<InputMethodInfo> getEnabledInputMethodList() {
         // We intentionally do not use UserHandle.getCallingUserId() here because for system
         // services InputMethodManagerInternal.getEnabledInputMethodListAsUser() should be used
@@ -1967,6 +1981,9 @@ public final class InputMethodManager {
      *
      * <p>On multi user environment, this API returns a result for the calling process user.</p>
      *
+     * <p>Starting with targetSdkVersion 37, requires {@code android.permission.QUERY_INPUT_METHOD}
+     * to use this API.</p>
+     *
      * @param imi The {@link InputMethodInfo} whose subtypes list will be returned. If {@code null},
      * returns enabled subtypes for the currently selected {@link InputMethodInfo}.
      * @param allowsImplicitlyEnabledSubtypes A boolean flag to allow to return the implicitly
@@ -1974,6 +1991,8 @@ public final class InputMethodManager {
      * will implicitly enable subtypes according to the current system language.
      */
     @NonNull
+    @FlaggedApi(FLAG_GUARD_INPUT_METHOD_LIST_APIS)
+    @RequiresPermission(value = Manifest.permission.QUERY_INPUT_METHOD, conditional = true)
     public List<InputMethodSubtype> getEnabledInputMethodSubtypeList(@Nullable InputMethodInfo imi,
             boolean allowsImplicitlyEnabledSubtypes) {
         return IInputMethodManagerGlobalInvoker.getEnabledInputMethodSubtypeList(
@@ -2006,6 +2025,93 @@ public final class InputMethodManager {
                 Objects.requireNonNull(imeId), allowsImplicitlyEnabledSubtypes,
                 user.getIdentifier());
     }
+
+    /**
+     * A test API for CTS to enable the given IME for the given user.
+     *
+     * <p>This is the same as "adb shell ime enable --user <userId> <imeId>" command.</p>
+     *
+     * @param imeId the IME that should be enabled.
+     * @param userId the user that imeId should be enabled for.
+     *
+     * @hide
+     */
+    @TestApi
+    @RequiresPermission(allOf = {Manifest.permission.WRITE_SECURE_SETTINGS,
+            Manifest.permission.TEST_INPUT_METHOD,
+            Manifest.permission.INTERACT_ACROSS_USERS_FULL},
+            conditional = true)
+    @SuppressWarnings("UnflaggedApi")
+    public boolean enableInputMethodForTesting(@NonNull String imeId,
+            @CanBeALL @CanBeCURRENT @UserIdInt int userId) {
+        return IInputMethodManagerGlobalInvoker.enableInputMethodForTesting(imeId, userId);
+    }
+
+    /**
+     * A test API for CTS to disable the given IME for the given user.
+     *
+     * <p>This is the same as "adb shell ime disable --user <userId> <imeId>" command.</p>
+     *
+     * @param imeId the IME that should be disabled.
+     * @param userId the user that imeId should be disabled for.
+     *
+     * @hide
+     */
+    @TestApi
+    @RequiresPermission(allOf = {Manifest.permission.WRITE_SECURE_SETTINGS,
+            Manifest.permission.TEST_INPUT_METHOD,
+            Manifest.permission.INTERACT_ACROSS_USERS_FULL},
+            conditional = true)
+    @SuppressWarnings("UnflaggedApi")
+    public boolean disableInputMethodForTesting(@NonNull String imeId,
+            @CanBeALL @CanBeCURRENT @UserIdInt int userId) {
+        return IInputMethodManagerGlobalInvoker.disableInputMethodForTesting(imeId, userId);
+    }
+
+    /**
+     * A test API for CTS to set the currently selected and enabled IMEs to the default ones for
+     * a given user.
+     *
+     * <p>This is the same as "adb shell ime set --user <userId> <imeId>" command.</p>
+     *
+     * @param imeId the IME that should be disabled.
+     * @param userId the user that imeId should be disabled for.
+     *
+     * @hide
+     */
+    @TestApi
+    @RequiresPermission(allOf = {Manifest.permission.WRITE_SECURE_SETTINGS,
+            Manifest.permission.TEST_INPUT_METHOD,
+            Manifest.permission.INTERACT_ACROSS_USERS_FULL},
+            conditional = true)
+    @SuppressWarnings("UnflaggedApi")
+    public boolean setInputMethodForTesting(@NonNull String imeId,
+            @CanBeALL @CanBeCURRENT @UserIdInt int userId) {
+        return IInputMethodManagerGlobalInvoker.setInputMethodForTesting(imeId, userId);
+    }
+
+    /**
+     * A test API for CTS to reset the currently selected and enabled IMEs to the default ones for
+     * a given user.
+     *
+     * <p>This is the same as "adb shell ime reset --user <userId>" command.</p>
+     *
+     * This behavior can be triggered for all users using the UserHandle.USER_ALL constant.
+     *
+     * @param userId the user that IMEs should be reset for
+     *
+     * @hide
+     */
+    @TestApi
+    @RequiresPermission(allOf = {Manifest.permission.WRITE_SECURE_SETTINGS,
+            Manifest.permission.TEST_INPUT_METHOD,
+            Manifest.permission.INTERACT_ACROSS_USERS_FULL},
+            conditional = true)
+    @SuppressWarnings("UnflaggedApi")
+    public void resetInputMethodsForTesting(@CanBeALL @CanBeCURRENT @UserIdInt int userId) {
+        IInputMethodManagerGlobalInvoker.resetInputMethodsForTesting(userId);
+    }
+
 
     /**
      * @deprecated Use {@link InputMethodService#showStatusIcon(int)} instead. This method was
@@ -2235,7 +2341,8 @@ public final class InputMethodManager {
             }
         }
         if (clearedView != null) {
-            if (android.tracing.Flags.imetrackerProtolog()) {
+            if (android.tracing.Flags.imetrackerProtolog()
+                        && ProtoLog.isEnabled(INPUT_METHOD_MANAGER_DEBUG, LogLevel.VERBOSE)) {
                 ProtoLog.v(INPUT_METHOD_MANAGER_DEBUG, "FINISH INPUT: mServedView=%s",
                         InputMethodDebug.dumpViewInfo(clearedView));
             } else if (DEBUG) {
@@ -3465,7 +3572,8 @@ public final class InputMethodManager {
             view = getServedViewLocked();
 
             // Make sure we have a window token for the served view.
-            if (android.tracing.Flags.imetrackerProtolog()) {
+            if (android.tracing.Flags.imetrackerProtolog()
+                        && ProtoLog.isEnabled(INPUT_METHOD_MANAGER_DEBUG, LogLevel.VERBOSE)) {
                 ProtoLog.v(INPUT_METHOD_MANAGER_DEBUG, "Starting input: view=%s reason=%s",
                         InputMethodDebug.dumpViewInfo(view),
                         InputMethodDebug.startInputReasonToString(startInputReason));
@@ -3545,7 +3653,8 @@ public final class InputMethodManager {
             final View servedView = getServedViewLocked();
             if (servedView != view || !mServedConnecting) {
                 // Something else happened, so abort.
-                if (android.tracing.Flags.imetrackerProtolog()) {
+                if (android.tracing.Flags.imetrackerProtolog()
+                        && ProtoLog.isEnabled(INPUT_METHOD_MANAGER_DEBUG, LogLevel.VERBOSE)) {
                     ProtoLog.v(INPUT_METHOD_MANAGER_DEBUG,
                             "Starting input: finished by someone else. view=%s servedView=%s "
                                     + "mServedConnecting=%s",
@@ -3616,7 +3725,8 @@ public final class InputMethodManager {
 
             imeRequestedVisible = hasViewImeRequestedVisible(servedView);
 
-            if (android.tracing.Flags.imetrackerProtolog()) {
+            if (android.tracing.Flags.imetrackerProtolog()
+                        && ProtoLog.isEnabled(INPUT_METHOD_MANAGER_DEBUG, LogLevel.VERBOSE)) {
                 ProtoLog.v(INPUT_METHOD_MANAGER_DEBUG,
                         "START INPUT: view=%s ic=%s editorInfo=%s startInputFlags=%s "
                                 + "imeRequestedVisible=%s",
@@ -3656,8 +3766,7 @@ public final class InputMethodManager {
                     servedInputConnection == null ? null
                             : servedInputConnection.asIRemoteAccessibilityInputConnection();
             final IRemoteComputerControlInputConnection computerControlInputConnection =
-                    (!android.companion.virtualdevice.flags.Flags.computerControlTyping()
-                            || servedInputConnection == null) ? null
+                    servedInputConnection == null ? null
                             : servedInputConnection.asIRemoteComputerControlInputConnection();
             // async result delivered via MSG_START_INPUT_RESULT.
             final int startInputSeq =
@@ -3889,7 +3998,8 @@ public final class InputMethodManager {
             if (!view.hasImeFocus() || !view.hasWindowFocus()) {
                 return;
             }
-            if (android.tracing.Flags.imetrackerProtolog()) {
+            if (android.tracing.Flags.imetrackerProtolog()
+                        && ProtoLog.isEnabled(INPUT_METHOD_MANAGER_DEBUG, LogLevel.DEBUG)) {
                 ProtoLog.d(INPUT_METHOD_MANAGER_DEBUG, "onViewFocusChangedInternal, view=%s",
                         InputMethodDebug.dumpViewInfo(view));
             } else if (DEBUG) {

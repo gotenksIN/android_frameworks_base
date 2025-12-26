@@ -19,6 +19,9 @@ package com.android.server.supervision
 import android.Manifest.permission.BYPASS_ROLE_QUALIFICATION
 import android.app.Activity
 import android.app.KeyguardManager
+import android.app.Notification
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.admin.DevicePolicyManager
 import android.app.admin.DevicePolicyManagerInternal
 import android.app.role.OnRoleHoldersChangedListener
@@ -37,23 +40,29 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.ActivityInfo
+import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.content.pm.PackageManager.PERMISSION_DENIED
 import android.content.pm.PackageManager.PERMISSION_GRANTED
 import android.content.pm.PackageManagerInternal
+import android.content.pm.ResolveInfo
 import android.content.pm.UserInfo
 import android.content.pm.UserInfo.FLAG_FOR_TESTING
 import android.content.pm.UserInfo.FLAG_FULL
 import android.content.pm.UserInfo.FLAG_MAIN
 import android.content.pm.UserInfo.FLAG_SYSTEM
+import android.net.Uri
 import android.os.Handler
 import android.os.IBinder
 import android.os.PersistableBundle
+import android.os.Process
 import android.os.UserHandle
 import android.os.UserHandle.MIN_SECONDARY_USER_ID
 import android.os.UserHandle.USER_SYSTEM
 import android.os.UserManager
 import android.platform.test.annotations.EnableFlags
+import android.platform.test.annotations.RequiresFlagsDisabled
 import android.platform.test.annotations.RequiresFlagsEnabled
 import android.platform.test.flag.junit.DeviceFlagsValueProvider
 import android.platform.test.flag.junit.SetFlagsRule
@@ -66,11 +75,15 @@ import com.android.internal.R
 import com.android.server.LocalServices
 import com.android.server.ServiceThread
 import com.android.server.SystemService.TargetUser
+import com.android.server.appbinding.AppBindingConstants
 import com.android.server.appbinding.AppBindingService
 import com.android.server.appbinding.AppServiceConnection
 import com.android.server.appbinding.finders.SupervisionAppServiceFinder
+import com.android.server.pm.UserFilter
 import com.android.server.pm.UserManagerInternal
 import com.android.server.supervision.SupervisionService.ACTION_CONFIRM_SUPERVISION_CREDENTIALS
+import com.android.server.supervision.SupervisionService.SETTINGS_PACKAGE_NAME
+import com.android.server.supervision.SupervisionUserData.PolicyData
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
 import java.nio.file.Files
@@ -89,6 +102,7 @@ import org.mockito.junit.MockitoJUnit
 import org.mockito.junit.MockitoRule
 import org.mockito.kotlin.any
 import org.mockito.kotlin.argThat
+import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.clearInvocations
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
@@ -115,6 +129,7 @@ class SupervisionServiceTest {
     @Mock private lateinit var mockPackageManagerInternal: PackageManagerInternal
     @Mock private lateinit var mockUserManagerInternal: UserManagerInternal
     @Mock private lateinit var mockAppBindingService: AppBindingService
+    @Mock private lateinit var mockNotificationManager: NotificationManager
 
     private lateinit var context: SupervisionContextWrapper
     private lateinit var injector: TestInjector
@@ -128,6 +143,7 @@ class SupervisionServiceTest {
                 InstrumentationRegistry.getInstrumentation().context,
                 mockKeyguardManager,
                 mockPackageManager,
+                mockNotificationManager,
             )
 
         LocalServices.removeServiceForTest(DevicePolicyManagerInternal::class.java)
@@ -158,6 +174,12 @@ class SupervisionServiceTest {
 
         // TODO: b/427453821 Remove after converting SupervisionSettings from being a singleton.
         assertThat(service.isSupervisionEnabledForUser(USER_ID)).isFalse()
+        service.mPackageMonitor.register(
+            context,
+            serviceThreadRule.serviceThread.looper,
+            UserHandle.ALL,
+            false,
+        )
     }
 
     @Test
@@ -386,6 +408,7 @@ class SupervisionServiceTest {
     }
 
     @Test
+    @RequiresFlagsDisabled(Flags.FLAG_ENABLE_SUPERVISION_SETTINGS_UI_UPDATES)
     fun setSupervisionEnabledForUser_clearsContentFilters() {
         assertThat(service.isSupervisionEnabledForUser(USER_ID)).isFalse()
         putSecureSetting(BROWSER_CONTENT_FILTERS_ENABLED, 1)
@@ -401,7 +424,28 @@ class SupervisionServiceTest {
     }
 
     @Test
+    @RequiresFlagsEnabled(Flags.FLAG_ENABLE_SUPERVISION_SETTINGS_UI_UPDATES)
+    fun setSupervisionEnabledForUser_permanentlyClearsContentFilters() {
+        assertThat(service.isSupervisionEnabledForUser(USER_ID)).isFalse()
+        putSecureSetting(BROWSER_CONTENT_FILTERS_ENABLED, 1)
+        putSecureSetting(SEARCH_CONTENT_FILTERS_ENABLED, 1)
+
+        setSupervisionEnabledForUser(USER_ID, true)
+        assertThat(getSecureSetting(BROWSER_CONTENT_FILTERS_ENABLED)).isEqualTo(1)
+        assertThat(getSecureSetting(SEARCH_CONTENT_FILTERS_ENABLED)).isEqualTo(1)
+
+        setSupervisionEnabledForUser(USER_ID, false)
+        assertThat(getSecureSetting(BROWSER_CONTENT_FILTERS_ENABLED)).isEqualTo(0)
+        assertThat(getSecureSetting(SEARCH_CONTENT_FILTERS_ENABLED)).isEqualTo(0)
+
+        setSupervisionEnabledForUser(USER_ID, true)
+        assertThat(getSecureSetting(BROWSER_CONTENT_FILTERS_ENABLED)).isEqualTo(0)
+        assertThat(getSecureSetting(SEARCH_CONTENT_FILTERS_ENABLED)).isEqualTo(0)
+    }
+
+    @Test
     fun setSupervisionEnabledForUser_noPermission_throwsException() {
+        injector.setCallingUid(1234)
         context.permissions[BYPASS_ROLE_QUALIFICATION] = PERMISSION_DENIED
         assertFailsWith<SecurityException> { setSupervisionEnabledForUser(USER_ID, false) }
     }
@@ -501,6 +545,7 @@ class SupervisionServiceTest {
     }
 
     @Test
+    @RequiresFlagsDisabled(Flags.FLAG_ENABLE_SUPERVISION_SETTINGS_UI_UPDATES)
     fun setSupervisionEnabledForUser_internal_clearsContentFilters() {
         putSecureSetting(BROWSER_CONTENT_FILTERS_ENABLED, 1)
         putSecureSetting(SEARCH_CONTENT_FILTERS_ENABLED, 0)
@@ -514,6 +559,29 @@ class SupervisionServiceTest {
         setSupervisionEnabledForUserInternal(USER_ID, false)
         assertThat(service.isSupervisionEnabledForUser(USER_ID)).isFalse()
         assertThat(getSecureSetting(BROWSER_CONTENT_FILTERS_ENABLED)).isEqualTo(-1)
+        assertThat(getSecureSetting(SEARCH_CONTENT_FILTERS_ENABLED)).isEqualTo(0)
+    }
+
+    @Test
+    @RequiresFlagsEnabled(Flags.FLAG_ENABLE_SUPERVISION_SETTINGS_UI_UPDATES)
+    fun setSupervisionEnabledForUser_internal_permanentlyClearsContentFilters() {
+        putSecureSetting(BROWSER_CONTENT_FILTERS_ENABLED, 1)
+        putSecureSetting(SEARCH_CONTENT_FILTERS_ENABLED, 0)
+        assertThat(service.isSupervisionEnabledForUser(USER_ID)).isFalse()
+
+        setSupervisionEnabledForUserInternal(USER_ID, true)
+        assertThat(service.isSupervisionEnabledForUser(USER_ID)).isTrue()
+        assertThat(getSecureSetting(BROWSER_CONTENT_FILTERS_ENABLED)).isEqualTo(1)
+        assertThat(getSecureSetting(SEARCH_CONTENT_FILTERS_ENABLED)).isEqualTo(0)
+
+        setSupervisionEnabledForUserInternal(USER_ID, false)
+        assertThat(service.isSupervisionEnabledForUser(USER_ID)).isFalse()
+        assertThat(getSecureSetting(BROWSER_CONTENT_FILTERS_ENABLED)).isEqualTo(0)
+        assertThat(getSecureSetting(SEARCH_CONTENT_FILTERS_ENABLED)).isEqualTo(0)
+
+        setSupervisionEnabledForUserInternal(USER_ID, true)
+        assertThat(service.isSupervisionEnabledForUser(USER_ID)).isTrue()
+        assertThat(getSecureSetting(BROWSER_CONTENT_FILTERS_ENABLED)).isEqualTo(0)
         assertThat(getSecureSetting(SEARCH_CONTENT_FILTERS_ENABLED)).isEqualTo(0)
     }
 
@@ -542,8 +610,8 @@ class SupervisionServiceTest {
 
         val intent =
             checkNotNull(service.createConfirmSupervisionCredentialsIntent(context.getUserId()))
-        assertThat(intent.action).isEqualTo(ACTION_CONFIRM_SUPERVISION_CREDENTIALS)
-        assertThat(intent.getPackage()).isEqualTo("com.android.settings")
+        assertThat(intent.getAction()).isEqualTo(ACTION_CONFIRM_SUPERVISION_CREDENTIALS)
+        assertThat(intent.getPackage()).isEqualTo(SETTINGS_PACKAGE_NAME)
     }
 
     @Test
@@ -686,6 +754,20 @@ class SupervisionServiceTest {
                 /* enabled= */ false,
                 USER_ID,
             )
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_SUPERVISION_RECOVERY_IMPROVEMENTS)
+    fun setSupervisionRecoveryInfo_noPermission_throwsException() {
+        injector.setCallingUid(9876)
+        assertFailsWith<SecurityException> { service.setSupervisionRecoveryInfo(null) }
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_SUPERVISION_RECOVERY_IMPROVEMENTS)
+    fun getSupervisionRecoveryInfo_noPermission_throwsException() {
+        injector.setCallingUid(9876)
+        assertFailsWith<SecurityException> { service.getSupervisionRecoveryInfo() }
     }
 
     @Test
@@ -877,47 +959,452 @@ class SupervisionServiceTest {
     }
 
     @Test
+    fun canLaunchPinRecovery_noEmailAndAlternativeRecoveryMethods_returnsFalse() {
+        injector.setRoleHoldersAsUser(
+            RoleManager.ROLE_SUPERVISION,
+            UserHandle.of(USER_ID),
+            listOf(),
+        )
+        assertThat(service.canLaunchPinRecovery(USER_ID)).isFalse()
+    }
+
+    @Test
+    fun canLaunchPinRecovery_hasPendingEmailButNoAlternativeRecoveryMethods_returnsTrue() {
+        injector.setRoleHoldersAsUser(
+            RoleManager.ROLE_SUPERVISION,
+            UserHandle.of(USER_ID),
+            listOf(),
+        )
+        setSupervisionRecoveryInfo(state = STATE_PENDING)
+        assertThat(service.canLaunchPinRecovery(USER_ID)).isTrue()
+    }
+
+    @Test
+    fun canLaunchPinRecovery_hasVerifiedEmailButNoAlternativeRecoveryMethods_returnsTrue() {
+        injector.setRoleHoldersAsUser(
+            RoleManager.ROLE_SUPERVISION,
+            UserHandle.of(USER_ID),
+            listOf(),
+        )
+        setSupervisionRecoveryInfo(state = STATE_VERIFIED)
+        assertThat(service.canLaunchPinRecovery(USER_ID)).isTrue()
+    }
+
+    @Test
+    fun canLaunchPinRecovery_noEmailButHasAlternativeRecoveryMethods_returnsTrue() {
+        val supervisionPackage = "com.example.supervisionapp"
+        injector.setRoleHoldersAsUser(
+            RoleManager.ROLE_SUPERVISION,
+            UserHandle.of(USER_ID),
+            listOf(supervisionPackage),
+        )
+        val activityInfo =
+            ActivityInfo().apply {
+                packageName = supervisionPackage
+                name = "Activity"
+            }
+        val resolveInfo = ResolveInfo().apply { this.activityInfo = activityInfo }
+        whenever(
+                mockPackageManager.queryIntentActivities(
+                    argThat { intent: Intent ->
+                        intent.action == SupervisionManager.ACTION_CONFIRM_SUPERVISION_APPROVAL &&
+                            intent.`package` == supervisionPackage
+                    },
+                    any<Int>(),
+                )
+            )
+            .thenReturn(listOf(resolveInfo))
+        assertThat(service.canLaunchPinRecovery(USER_ID)).isTrue()
+    }
+
+    @Test
     fun setPolicy_packagePolicyTypeBlockedEnabled_callsSetApplicationHiddenForUserTrue() {
-        verifySetPackagePolicy(true)
+        setAndVerifyPackageBlockedPolicy(true)
     }
 
     @Test
     fun setPolicy_packagePolicyTypeBlockedDisabled_callsSetApplicationHiddenForUserFalse() {
-        verifySetPackagePolicy(false)
+        setAndVerifyPackageBlockedPolicy(false)
     }
 
-    private fun verifySetPackagePolicy(enabled: Boolean) {
-        val policy = PackagePolicy(
-            /*version=*/ 1,
-            /*packageName=*/ PACKAGE_NAME,
-            /*restrictionType=*/ PackagePolicy.RESTRICTION_TYPE_BLOCKED,
-            enabled
+    @Test
+    fun setPolicy_packagePolicyBlocked_sendsNotification() {
+        // The app will be hidden after the policy is set.
+        setApplicationHiddenSetting(PACKAGE_NAME, hidden = true)
+
+        // The policy is set to blocked.
+        setAndVerifyPackageBlockedPolicy(enabled = true)
+        // After the policy is set, the app is hidden.
+        simulatePackageDisappeared(PACKAGE_NAME, USER_ID)
+
+        // A notification is sent since the app is hidden.
+        verifyApplicationHiddenNotification(
+            PACKAGE_NAME,
+            hidden = true,
+            expectedIntent = getSupervisionSettingsIntent(),
         )
+    }
+
+    @Test
+    fun setPolicy_packagePolicyBlocked_noPendingNotification_doesNotSendNotification() {
+        // The app will be hidden after the policy is set.
+        setApplicationHiddenSetting(PACKAGE_NAME, hidden = true)
+
+        // The policy is set to blocked.
+        val policy = setAndVerifyPackageBlockedPolicy(enabled = true)
+        // Verify that hasPendingNotification is true, then manually set it to false.
+        val policyData = getPolicyData(policy)
+        assertThat(policyData?.hasPendingNotification).isTrue()
+        policyData?.hasPendingNotification = false
+        // After the policy is set, the app is hidden.
+        simulatePackageDisappeared(PACKAGE_NAME, USER_ID)
+
+        // No notification is sent.
+        verify(mockNotificationManager, never())
+            .notifyAsUser(any(), any<Int>(), any<Notification>(), eq(UserHandle.of(USER_ID)))
+    }
+
+    @Test
+    fun setPolicy_packagePolicyUnblocked_sendsNotification() {
+        // The app will not be hidden after the policy is set.
+        setApplicationHiddenSetting(PACKAGE_NAME, hidden = false)
+        val launchIntent = mockPackageLaunchIntent(PACKAGE_NAME)
+
+        // The policy is set to unblocked.
+        setAndVerifyPackageBlockedPolicy(enabled = false)
+        // After the policy is set, the app is unhidden.
+        simulatePackageAppeared(PACKAGE_NAME, USER_ID)
+
+        // A notification is sent since the app is unhidden.
+        verifyApplicationHiddenNotification(
+            PACKAGE_NAME,
+            hidden = false,
+            expectedIntent = launchIntent,
+        )
+    }
+
+    @Test
+    fun setPolicy_packagePolicyUnblocked_noAppIntent_notificationHasNoIntent() {
+        // The app will not be hidden after the policy is set.
+        setApplicationHiddenSetting(PACKAGE_NAME, hidden = false)
+        mockPackageLaunchIntent(PACKAGE_NAME, launchIntent = null)
+
+        // The policy is set to unblocked.
+        setAndVerifyPackageBlockedPolicy(enabled = false)
+        // After the policy is set, the app is unhidden.
+        simulatePackageAppeared(PACKAGE_NAME, USER_ID)
+
+        // A notification is sent since the app is unhidden.
+        verifyApplicationHiddenNotification(PACKAGE_NAME, hidden = false, expectedIntent = null)
+    }
+
+    @Test
+    fun setPolicy_packagePolicyBlocked_packageNotFound_doesNotSendNotification() {
+        // The app will be hidden after the policy is set.
+        setApplicationHiddenSetting(PACKAGE_NAME, hidden = true)
+        // But then, the app is not found.
+        whenever(
+                mockPackageManager.getApplicationInfoAsUser(
+                    PACKAGE_NAME,
+                    PackageManager.MATCH_UNINSTALLED_PACKAGES,
+                    UserHandle.of(USER_ID),
+                )
+            )
+            .thenThrow(PackageManager.NameNotFoundException())
+
+        // The policy is set to blocked.
+        setAndVerifyPackageBlockedPolicy(enabled = true)
+        // The package disappeared callback is received for some reason.
+        simulatePackageDisappeared(PACKAGE_NAME, USER_ID)
+
+        // No notification is sent since the app is not found.
+        verify(mockNotificationManager, never())
+            .notifyAsUser(any(), any<Int>(), any<Notification>(), eq(UserHandle.of(USER_ID)))
+    }
+
+    @Test
+    fun setPolicy_packagePolicyUnblocked_stillHidden_doesNotSendNotification() {
+        // Even after policy is set, the app will still be hidden
+        setApplicationHiddenSetting(PACKAGE_NAME, hidden = true)
+
+        // The policy is set to unblocked.
+        setAndVerifyPackageBlockedPolicy(enabled = false)
+        // The package disappeared callback is received for some reason.
+        simulatePackageDisappeared(PACKAGE_NAME, USER_ID)
+
+        // No notification is sent since the app is still hidden.
+        verify(mockNotificationManager, never())
+            .notifyAsUser(any(), any<Int>(), any<Notification>(), eq(UserHandle.of(USER_ID)))
+    }
+
+    @Test
+    fun hasValidRecoveryMethod_noVerifiedEmailAndAlternativeRecoveryMethods_returnsFalse() {
+        injector.setRoleHoldersAsUser(
+            RoleManager.ROLE_SUPERVISION,
+            UserHandle.of(USER_ID),
+            listOf(),
+        )
+        setSupervisionRecoveryInfo(state = STATE_PENDING)
+        assertThat(service.hasValidRecoveryMethod(USER_ID)).isFalse()
+    }
+
+    @Test
+    fun hasValidRecoveryMethod_hasVerifiedEmailButNoAlternativeRecoveryMethods_returnsTrue() {
+        injector.setRoleHoldersAsUser(
+            RoleManager.ROLE_SUPERVISION,
+            UserHandle.of(USER_ID),
+            listOf(),
+        )
+        setSupervisionRecoveryInfo(state = STATE_VERIFIED)
+        assertThat(service.hasValidRecoveryMethod(USER_ID)).isTrue()
+    }
+
+    @Test
+    fun hasValidRecoveryMethod_noVerifiedEmailButHasAlternativeRecoveryMethods_returnsTrue() {
+        val supervisionPackage = "com.example.supervisionapp"
+        injector.setRoleHoldersAsUser(
+            RoleManager.ROLE_SUPERVISION,
+            UserHandle.of(USER_ID),
+            listOf(supervisionPackage),
+        )
+        val activityInfo =
+            ActivityInfo().apply {
+                packageName = supervisionPackage
+                name = "Activity"
+                applicationInfo = ApplicationInfo()
+            }
+        val resolveInfo =
+            ResolveInfo().apply {
+                this.activityInfo = activityInfo
+                nonLocalizedLabel = "Use supervision app"
+            }
+        whenever(
+                mockPackageManager.queryIntentActivities(
+                    argThat { intent: Intent ->
+                        intent.action == SupervisionManager.ACTION_CONFIRM_SUPERVISION_APPROVAL &&
+                            intent.`package` == supervisionPackage
+                    },
+                    any<Int>(),
+                )
+            )
+            .thenReturn(listOf(resolveInfo))
+        whenever(mockPackageManager.getComponentEnabledSetting(any()))
+            .thenReturn(PackageManager.COMPONENT_ENABLED_STATE_ENABLED)
+        setSupervisionRecoveryInfo(state = STATE_PENDING)
+        assertThat(service.hasValidRecoveryMethod(USER_ID)).isTrue()
+    }
+
+    private fun setAndVerifyPackageBlockedPolicy(enabled: Boolean): PackagePolicy {
+        val policy =
+            PackagePolicy(
+                /*version=*/ 0,
+                /*packageName=*/ PACKAGE_NAME,
+                /*restrictionType=*/ PackagePolicy.RESTRICTION_TYPE_BLOCKED,
+                enabled,
+            )
 
         service.setPolicy(USER_ID, policy)
         injector.awaitServiceThreadIdle()
 
-        verify(mockDpmInternal).setApplicationHiddenBySystem(
-            eq(SupervisionManager.SUPERVISION_SYSTEM_ENTITY),
-            eq(PACKAGE_NAME),
-            eq(USER_ID),
-            eq(enabled)
-        )
-        verify(mockAppBindingService, times(1)).dispatchAppServiceEvent(
-            eq(SupervisionAppServiceFinder::class.java),
-            eq(USER_ID),
-            any()
-        )
+        verify(mockDpmInternal)
+            .setApplicationHiddenBySystem(
+                eq(SupervisionManager.SUPERVISION_SYSTEM_ENTITY),
+                eq(PACKAGE_NAME),
+                eq(USER_ID),
+                eq(enabled),
+            )
+        verifySupervisionAppServiceEvent(USER_ID) {
+            // Supervision apps are notified of the policy change.
+            verify(it).onPolicyChanged(eq(policy))
+        }
+        return policy
+    }
+
+    private fun verifyApplicationHiddenNotification(
+        packageName: String,
+        hidden: Boolean,
+        expectedIntent: Intent?,
+    ) {
+        val notificationCaptor = argumentCaptor<Notification>()
+        verify(mockNotificationManager)
+            .notifyAsUser(
+                any(),
+                any<Int>(),
+                notificationCaptor.capture(),
+                eq(UserHandle.of(USER_ID)),
+            )
+        val notification = notificationCaptor.firstValue
+        assertThat(notification.channelId)
+            .isEqualTo(
+                com.android.internal.notification.SystemNotificationChannels.PARENTAL_CONTROLS
+            )
+        assertThat(notification.extras.getString(Notification.EXTRA_TITLE))
+            .isEqualTo(context.getString(R.string.supervision_blocked_app_title))
+        val expectedText =
+            if (hidden) {
+                context.getString(R.string.supervision_blocked_app_content, "Test App")
+            } else {
+                context.getString(R.string.supervision_unblocked_app_content, "Test App")
+            }
+        assertThat(notification.extras.getString(Notification.EXTRA_TEXT)).isEqualTo(expectedText)
+        assertThat(notification.extras.getString(Notification.EXTRA_SUBSTITUTE_APP_NAME))
+            .isEqualTo(context.getString(R.string.notification_channel_parental_controls))
+
+        if (expectedIntent == null) {
+            assertThat(notification.contentIntent).isNull()
+        } else {
+            val expectedPendingIntent =
+                PendingIntent.getActivityAsUser(
+                    context,
+                    0,
+                    expectedIntent,
+                    PendingIntent.FLAG_IMMUTABLE,
+                    null,
+                    UserHandle.of(USER_ID),
+                )
+            assertThat(notification.contentIntent).isEqualTo(expectedPendingIntent)
+        }
+    }
+
+    private fun mockPackageLaunchIntent(
+        packageName: String,
+        launchIntent: Intent? = Intent("android.intent.action.MAIN").setPackage(packageName),
+    ): Intent? {
+        whenever(mockPackageManager.getLaunchIntentForPackage(packageName)).thenReturn(launchIntent)
+        return launchIntent
+    }
+
+    private fun getSupervisionSettingsIntent(): Intent {
+        return Intent(Settings.ACTION_SUPERVISION_SETTINGS).setPackage(SETTINGS_PACKAGE_NAME)
+    }
+
+    private fun simulatePackageAppeared(packageName: String, userId: Int) {
+        val intent =
+            Intent(Intent.ACTION_PACKAGE_ADDED).apply {
+                data = Uri.fromParts("package", packageName, null)
+                putExtra(Intent.EXTRA_USER_HANDLE, userId)
+            }
+        service.mPackageMonitor.onReceive(context, intent)
+        injector.awaitServiceThreadIdle()
+    }
+
+    private fun simulatePackageDisappeared(packageName: String, userId: Int) {
+        val intent =
+            Intent(Intent.ACTION_PACKAGE_REMOVED).apply {
+                data = Uri.fromParts("package", packageName, null)
+                putExtra(Intent.EXTRA_USER_HANDLE, userId)
+            }
+        service.mPackageMonitor.onReceive(context, intent)
+        injector.awaitServiceThreadIdle()
+    }
+
+    private fun setApplicationHiddenSetting(packageName: String, hidden: Boolean) {
+        val appInfo = mock<ApplicationInfo>()
+        whenever(
+                mockPackageManager.getApplicationInfoAsUser(
+                    packageName,
+                    PackageManager.MATCH_UNINSTALLED_PACKAGES,
+                    UserHandle.of(USER_ID),
+                )
+            )
+            .thenReturn(appInfo)
+        whenever(appInfo.loadLabel(mockPackageManager)).thenReturn("Test App")
+        whenever(
+                mockPackageManager.getApplicationHiddenSettingAsUser(
+                    packageName,
+                    UserHandle.of(USER_ID),
+                )
+            )
+            .thenReturn(hidden)
+    }
+
+    private fun verifySupervisionAppServiceEvent(
+        userId: Int,
+        verifyListener: (ISupervisionListener) -> Unit,
+    ) {
+        val mockAppServiceFinder = mock<SupervisionAppServiceFinder>()
+        val mockSupervisionListener = mock<ISupervisionListener>()
+        val mockBinder = mock<IBinder>()
+        // Associate the listener with the binder.
+        whenever(mockSupervisionListener.asBinder()).thenReturn(mockBinder)
+        // The finder returns the listener when asked for the interface.
+        whenever(mockAppServiceFinder.asInterface(mockBinder)).thenReturn(mockSupervisionListener)
+        val fakeComponentName = ComponentName(PACKAGE_NAME, "FooClass")
+        val fakeServiceConnection =
+            AppServiceConnection(
+                /* context= */ context,
+                /* userId= */ userId,
+                /* constants= */ AppBindingConstants.initializeFromString(""),
+                /* handler= */ serviceThreadRule.serviceThread.threadHandler,
+                /* finder= */ mockAppServiceFinder,
+                /* packageName= */ PACKAGE_NAME,
+                /* componentName= */ fakeComponentName,
+            )
+        // Simulate the service connection being bound.
+        fakeServiceConnection.bind()
+        // Simulate the service connection callback, making the listener available.
+        fakeServiceConnection
+            .getServiceConnectionForTest()
+            .onServiceConnected(fakeComponentName, mockBinder)
+
+        // Verify the app binding service was called correctly.
+        val consumerCaptor = argumentCaptor<Consumer<AppServiceConnection>>()
+        verify(mockAppBindingService)
+            .dispatchAppServiceEvent(
+                eq(SupervisionAppServiceFinder::class.java),
+                eq(userId),
+                consumerCaptor.capture(),
+            )
+        // Simulate the app binding service callback.
+        consumerCaptor.firstValue.accept(fakeServiceConnection)
+
+        // Verify the listener was called correctly.
+        verifyListener(mockSupervisionListener)
     }
 
     @Test
     @RequiresFlagsEnabled(Flags.FLAG_ENABLE_SUPERVISION_MANAGER_POLICY_APIS)
     fun onDisableSupervision_clearsPolicies() {
-        verifySetPackagePolicy(enabled = true)
+        setAndVerifyPackageBlockedPolicy(enabled = true)
 
         assertThat(service.getUserDataLocked(USER_ID).policies).isNotEmpty()
 
         setSupervisionEnabledForUser(USER_ID, false)
+    }
+
+    @Test
+    fun querySupervisionApprovalActivities_returnsSortedEnabledActivities() {
+        val supervisionPackage = "com.example.supervisionapp"
+        injector.setRoleHoldersAsUser(
+            RoleManager.ROLE_SUPERVISION,
+            UserHandle.of(USER_ID),
+            listOf(supervisionPackage),
+        )
+        val resolveInfo1 =
+            mockSupervisionApprovalActivity(supervisionPackage, "Activity1", "Use supervision app")
+        val resolveInfo2 =
+            mockSupervisionApprovalActivity(
+                supervisionPackage,
+                "Activity2",
+                "Use another supervision app",
+            )
+        whenever(
+                mockPackageManager.queryIntentActivities(
+                    argThat { intent: Intent ->
+                        intent.action == SupervisionManager.ACTION_CONFIRM_SUPERVISION_APPROVAL &&
+                            intent.`package` == supervisionPackage
+                    },
+                    any<Int>(),
+                )
+            )
+            .thenReturn(listOf(resolveInfo1, resolveInfo2))
+
+        val result = service.querySupervisionApprovalActivities(USER_ID)
+
+        assertThat(result).hasSize(2)
+        assertThat(result.map { it.loadLabel(mockPackageManager).toString() })
+            .containsExactly("Use another supervision app", "Use supervision app")
+            .inOrder()
     }
 
     private val systemSupervisionPackage: String
@@ -949,6 +1436,162 @@ class SupervisionServiceTest {
         whenever(mockUserManagerInternal.getUsers(any<Boolean>())).thenReturn(userInfos)
     }
 
+    @Test
+    fun getUsersThatRequirePlatformCredential_usersHaveNoSupervisionRoleHolders_returnsUsers() {
+        setSupervisionEnabledForUserInternal(USER_ID, true)
+        setSupervisionEnabledForUserInternal(USER_ID_SECONDARY, true)
+        injector.setRoleHoldersAsUser(
+            RoleManager.ROLE_SUPERVISION,
+            UserHandle.of(USER_ID),
+            emptyList(),
+        )
+        injector.setRoleHoldersAsUser(
+            RoleManager.ROLE_SUPERVISION,
+            UserHandle.of(USER_ID_SECONDARY),
+            emptyList(),
+        )
+        whenever(mockUserManagerInternal.getUsers(any<UserFilter>()))
+            .thenReturn(
+                listOf(
+                    UserInfo(USER_ID, "user0", USER_ICON, FLAG_FULL, USER_TYPE),
+                    UserInfo(USER_ID_SECONDARY, "user1", USER_ICON, FLAG_FULL, USER_TYPE),
+                )
+            )
+
+        val result = service.getUsersThatRequirePlatformCredential()
+
+        assertThat(result).hasSize(2)
+        assertThat(result.map { it.id }).containsExactly(USER_ID, USER_ID_SECONDARY)
+    }
+
+    @Test
+    fun getUsersThatRequirePlatformCredential_multipleRoleHolders_onlyOneRoleHolderHasSupervisionActivity_returnsUser() {
+        setSupervisionEnabledForUserInternal(USER_ID, true)
+
+        val supervisionPackage = "com.example.supervisionapp"
+        val supervisionPackage2 = "com.example.supervisionapp2"
+
+        injector.setRoleHoldersAsUser(
+            RoleManager.ROLE_SUPERVISION,
+            UserHandle.of(USER_ID),
+            listOf(supervisionPackage, supervisionPackage2),
+        )
+        whenever(mockUserManagerInternal.getUsers(any<UserFilter>()))
+            .thenReturn(listOf(UserInfo(USER_ID, "user0", USER_ICON, FLAG_FULL, USER_TYPE)))
+        whenever(
+                mockPackageManager.queryIntentActivities(
+                    argThat { intent: Intent ->
+                        intent.action == SupervisionManager.ACTION_CONFIRM_SUPERVISION_APPROVAL &&
+                            intent.`package` == supervisionPackage
+                    },
+                    any<Int>(),
+                )
+            )
+            .thenReturn(listOf(mockSupervisionApprovalActivity(supervisionPackage, null, null)))
+
+        val result = service.getUsersThatRequirePlatformCredential()
+
+        assertThat(result.map { it.id }).containsExactly(USER_ID)
+    }
+
+    @Test
+    fun getUsersThatRequirePlatformCredential_returnsUsersWithNoSupervisionActivities() {
+        val supervisionPackage = "com.example.supervisionapp"
+        val supervisionPackage2 = "com.example.supervisionapp2"
+
+        setSupervisionEnabledForUserInternal(USER_ID, true)
+        setSupervisionEnabledForUserInternal(USER_ID_SECONDARY, true)
+        injector.setRoleHoldersAsUser(
+            RoleManager.ROLE_SUPERVISION,
+            UserHandle.of(USER_ID),
+            listOf(supervisionPackage),
+        )
+        injector.setRoleHoldersAsUser(
+            RoleManager.ROLE_SUPERVISION,
+            UserHandle.of(USER_ID_SECONDARY),
+            listOf(supervisionPackage2),
+        )
+
+        whenever(mockUserManagerInternal.getUsers(any<UserFilter>()))
+            .thenReturn(
+                listOf(
+                    UserInfo(USER_ID, "user0", USER_ICON, FLAG_FULL, USER_TYPE),
+                    UserInfo(USER_ID_SECONDARY, "user1", USER_ICON, FLAG_FULL, USER_TYPE),
+                )
+            )
+        // Only return a supervision activity for one supervision  package
+        whenever(
+                mockPackageManager.queryIntentActivities(
+                    argThat { intent: Intent ->
+                        intent.action == SupervisionManager.ACTION_CONFIRM_SUPERVISION_APPROVAL &&
+                            intent.`package` == supervisionPackage
+                    },
+                    any<Int>(),
+                )
+            )
+            .thenReturn(listOf(mockSupervisionApprovalActivity(supervisionPackage, null, null)))
+
+        val result = service.getUsersThatRequirePlatformCredential()
+
+        assertThat(result).hasSize(1)
+        assertThat(result.map { it.id }).containsExactly(USER_ID_SECONDARY)
+    }
+
+    @Test
+    fun getUsersThatRequirePlatformCredential_filtersOutUnsupervisedUsers() {
+        val supervisionPackage = "com.example.supervisionapp"
+
+        setSupervisionEnabledForUserInternal(USER_ID, true)
+        setSupervisionEnabledForUserInternal(USER_ID_SECONDARY, false)
+        injector.setRoleHoldersAsUser(
+            RoleManager.ROLE_SUPERVISION,
+            UserHandle.of(USER_ID),
+            listOf(supervisionPackage),
+        )
+
+        // Set up 2 users on the device
+        whenever(mockUserManagerInternal.getUsers(any<UserFilter>()))
+            .thenReturn(
+                listOf(
+                    UserInfo(USER_ID, "user0", USER_ICON, FLAG_FULL, USER_TYPE),
+                    UserInfo(USER_ID_SECONDARY, "user1", USER_ICON, FLAG_FULL, USER_TYPE),
+                )
+            )
+        // Return no supervision approval activity for supervised user
+        whenever(
+                mockPackageManager.queryIntentActivities(
+                    argThat { intent: Intent ->
+                        intent.action == SupervisionManager.ACTION_CONFIRM_SUPERVISION_APPROVAL &&
+                            intent.`package` == supervisionPackage
+                    },
+                    any<Int>(),
+                )
+            )
+            .thenReturn(emptyList<ResolveInfo>())
+
+        val result = service.getUsersThatRequirePlatformCredential()
+
+        assertThat(result).hasSize(1)
+        assertThat(result.map { it.id }).containsExactly(USER_ID)
+    }
+
+    private fun mockSupervisionApprovalActivity(
+        supervisionPackageName: String,
+        activityName: String?,
+        label: String?,
+    ): ResolveInfo {
+        val activityInfo =
+            ActivityInfo().apply {
+                packageName = supervisionPackageName
+                name = activityName ?: "Activity"
+                applicationInfo = ApplicationInfo()
+            }
+        return ResolveInfo().apply {
+            this.activityInfo = activityInfo
+            nonLocalizedLabel = label ?: "Generic label"
+        }
+    }
+
     private fun addDefaultAndFullUsers() {
         val userInfos =
             userData.map { (userId, flags) ->
@@ -965,8 +1608,13 @@ class SupervisionServiceTest {
         return Settings.Secure.getIntForUser(context.contentResolver, name, USER_ID)
     }
 
+    private fun getPolicyData(policy: Policy): PolicyData? {
+        return service.getUserDataLocked(USER_ID).policies[policy.policyKey]
+    }
+
     private companion object {
         const val USER_ID = 0
+        const val USER_ID_SECONDARY = 1
         const val APP_UID = USER_ID * UserHandle.PER_USER_RANGE
         const val SUPERVISING_USER_ID = 10
         const val USER_ICON = "user_icon"
@@ -992,6 +1640,7 @@ private class TestInjector(val context: Context, private val serviceThread: Serv
     SupervisionService.Injector(context) {
     private val roleHolders = mutableMapOf<Pair<String, UserHandle>, List<String>>()
     private var roleHoldersChangedListener: OnRoleHoldersChangedListener? = null
+    private var callingUid = Process.SYSTEM_UID
 
     override fun addOnRoleHoldersChangedListenerAsUser(
         executor: Executor,
@@ -1012,6 +1661,14 @@ private class TestInjector(val context: Context, private val serviceThread: Serv
 
     override fun getServiceThread(): ServiceThread {
         return serviceThread
+    }
+
+    override fun getCallingUid(): Int {
+        return callingUid
+    }
+
+    fun setCallingUid(callingUid: Int) {
+        this.callingUid = callingUid
     }
 
     /**
@@ -1038,6 +1695,7 @@ private class SupervisionContextWrapper(
     val context: Context,
     val keyguardManager: KeyguardManager,
     val pkgManager: PackageManager,
+    val notificationManager: NotificationManager,
 ) : ContextWrapper(context) {
     val interceptors = mutableListOf<Pair<BroadcastReceiver, IntentFilter>>()
     val permissions = mutableMapOf<String, Int>()
@@ -1046,9 +1704,14 @@ private class SupervisionContextWrapper(
         var ret =
             when (name) {
                 Context.KEYGUARD_SERVICE -> keyguardManager
+                Context.NOTIFICATION_SERVICE -> notificationManager
                 else -> super.getSystemService(name)
             }
         return ret
+    }
+
+    override fun createContextAsUser(userHandle: UserHandle, flags: Int): Context {
+        return this
     }
 
     override fun getPackageManager() = pkgManager

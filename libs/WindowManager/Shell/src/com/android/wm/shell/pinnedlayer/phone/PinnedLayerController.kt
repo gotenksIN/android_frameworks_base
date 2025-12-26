@@ -20,32 +20,34 @@ import android.app.ActivityManager.AppTask.WINDOWING_LAYER_PINNED
 import android.app.TaskInfo
 import android.app.TaskWindowingLayerRequestHandler.REMOTE_CALLBACK_RESULT_KEY
 import android.app.TaskWindowingLayerRequestHandler.RESULT_APPROVED
-import android.app.TaskWindowingLayerRequestHandler.RESULT_FAILED_BAD_STATE
-import android.graphics.Rect
 import android.os.Bundle
 import android.os.IBinder
 import android.os.IRemoteCallback
 import android.os.RemoteException
-import android.util.Slog
 import android.view.SurfaceControl
 import android.view.WindowManager.TRANSIT_CLOSE
 import android.view.WindowManager.TRANSIT_TO_BACK
 import android.window.TransitionInfo
-import android.window.TransitionRequestInfo
-import android.window.TransitionRequestInfo.WindowingLayerChange
-import android.window.WindowContainerToken
 import android.window.WindowContainerTransaction
-import com.android.wm.shell.shared.TransitionUtil
+import com.android.wm.shell.pinnedlayer.phone.PinnedLayerLogs.logW
+import com.android.wm.shell.pinnedlayer.phone.PinnedLayerUtils.getLayerPinnedWct
+import com.android.wm.shell.pinnedlayer.phone.PinnedLayerUtils.getLayerUnpinnedWct
+import com.android.wm.shell.pinnedlayer.phone.PinnedLayerUtils.getRemovedFromLayerWct
 import com.android.wm.shell.sysui.ShellInit
 import com.android.wm.shell.transition.Transitions
 
 /**
- * A pinned layer [Transitions.TransitionHandler] that handles [Transitions] and can start new
- * [Transitions] on the Shell request. It's responsible for managing PINNED layer that has PiP
+ * A controller that is responsible for managing [WINDOWING_LAYER_PINNED] layer that has PiP
  * policies like single window and always-on-top.
+ *
+ * The controller is the main decider when the task is pinned and it's responsible for dispatching
+ * callbacks.
  */
-class PinnedLayerController(shellInit: ShellInit, private val transitions: Transitions) :
-    Transitions.TransitionHandler {
+class PinnedLayerController(
+    shellInit: ShellInit,
+    private val transitions: Transitions,
+    private val presentationController: PinnedLayerPresentationController,
+) : Transitions.TransitionObserver {
 
     // Stores ids of pinned TaskInfo.
     private val pinnedTasks = mutableSetOf<Int>()
@@ -60,107 +62,122 @@ class PinnedLayerController(shellInit: ShellInit, private val transitions: Trans
     }
 
     private fun onInit() {
-        transitions.addHandler(this)
+        transitions.registerObserver(this)
     }
 
-    override fun handleRequest(
-        transition: IBinder,
-        request: TransitionRequestInfo,
-    ): WindowContainerTransaction? {
-        val triggerTask = request.triggerTask ?: return null
-        val windowingLayerChange = request.windowingLayerChange
+    /**
+     * Provides transitions that are currently being processed by this controller.
+     *
+     * @param transition an [IBinder] token for the given transitions.
+     * @return a [Set] of [ActiveTransition], never returns `null`.
+     */
+    fun getActiveTransitions(transition: IBinder): Set<ActiveTransition> =
+        activeTransitions.getOrDefault(transition, emptySet())
 
-        if (isNotPinned(triggerTask.taskId) && !windowingLayerChange.isLayerPinningRequest()) {
-            return null
-        }
+    /**
+     * Checks whether a task with [taskId] is pinned.
+     *
+     * The task is considered to be pinned when the API call has triggered a transition and it
+     * reported to be ready, marking that the Core has applied changes to the task.
+     *
+     * @param taskId an id of task to check for pinned state.
+     * @return `true` when the task is pinned, `false` otherwise.
+     * @see Transitions.TransitionObserver.onTransitionReady
+     */
+    fun isPinned(taskId: Int): Boolean = pinnedTasks.contains(taskId)
 
-        // There's either a pin request or an already pinned task is brought to foreground.
-        val wct = WindowContainerTransaction()
-        if (windowingLayerChange.isLayerPinningRequest() || request.isOpeningPinnedRequest()) {
-            createPinTransition(transition, triggerTask, windowingLayerChange?.remoteCallback, wct)
-        }
-
-        // Unpinning can occur as a side-effect of another action, check if a task (not necessary
-        // the pinned one) is eligible to be unpinned.
-        val isUnpinningNeeded =
-            containsActivePinningTransition(transition) || request.isClosingPinnedRequest()
-        val candidateTaskForUnpin =
-            when {
-                triggerTask.token != currentPinnedTask?.token -> currentPinnedTask
-                request.isClosingPinnedRequest() -> triggerTask
-                else -> null
-            }
-        if (isUnpinningNeeded && candidateTaskForUnpin != null) {
-            createUnpinTransition(transition, candidateTaskForUnpin, wct,
-                isMinimizing = request.type != TRANSIT_CLOSE)
-        }
-
-        return wct.takeUnless { activeTransitions[transition].isNullOrEmpty() }
-    }
-
-    /** Pins a task and adds it to the active transitions for the given transition token. */
-    private fun createPinTransition(
+    /**
+     * Pins a task and adds it to the active transitions for the given transition token.
+     *
+     * @param transition a transition token.
+     * @param task a task to pin.
+     * @param remoteCallback a callback to notify about the result of the operation.
+     * @return a [WindowContainerTransaction] that contains pinned properties or `null` if the
+     *   pinning is not supported for given task.
+     */
+    fun pinTask(
         transition: IBinder,
         task: TaskInfo,
         remoteCallback: IRemoteCallback?,
-        wct: WindowContainerTransaction,
-    ) {
-        val transitions = activeTransitions.getOrPut(transition) { mutableSetOf() }
-        transitions += ActiveTransition.Pin(task, remoteCallback)
-        wct.merge(getLayerPinnedWct(task.token), /* transfer= */ true)
+    ): WindowContainerTransaction? {
+        if (!isPinningSupported(task)) {
+            return null
+        }
+        return WindowContainerTransaction().apply {
+            val transitions = activeTransitions.getOrPut(transition) { mutableSetOf() }
+            transitions += ActiveTransition.Pin(task, remoteCallback)
+            val bounds = presentationController.getPinEntryDestinationBounds(task)
+            merge(getLayerPinnedWct(task.token, bounds), /* transfer= */ true)
+
+            val pinnedTask = currentPinnedTask
+            if (pinnedTask != null && pinnedTask.token != task.token) {
+                merge(unpinTask(transition, pinnedTask, UnpinStrategy.CLOSE), /* transfer= */ true)
+            }
+        }
     }
 
     /**
      * Unpins a specific task and adds it to the active transitions for the given transition token.
+     *
+     * @param transition a transition token.
+     * @param task a task to unpin.
+     * @param unpinStrategy a strategy for unpinning.
+     * @return a [WindowContainerTransaction] that performs unpinning.
      */
-    private fun createUnpinTransition(
+    fun unpinTask(
         transition: IBinder,
         task: TaskInfo,
-        wct: WindowContainerTransaction,
-        isMinimizing: Boolean = false,
-    ) {
+        unpinStrategy: UnpinStrategy,
+    ): WindowContainerTransaction {
         val transitions = activeTransitions.getOrPut(transition) { mutableSetOf() }
         transitions += ActiveTransition.Unpin(task)
-        wct.merge(
-            getLayerUnpinnedWct(task.token, isMinimizing),
-            /* transfer= */ true,
-        )
+
+        return when (unpinStrategy) {
+            UnpinStrategy.HIDE,
+            UnpinStrategy.CLOSE ->
+                getLayerUnpinnedWct(task.token, isMinimizing = unpinStrategy == UnpinStrategy.HIDE)
+            UnpinStrategy.CLEAN -> getRemovedFromLayerWct(task.token)
+        }
     }
 
-    private fun WindowingLayerChange?.isLayerPinningRequest(): Boolean {
-        return this != null && windowingLayer == WINDOWING_LAYER_PINNED
+    /**
+     * Starts a transition to close a pinned task.
+     *
+     * @param task a [TaskInfo] of the task to close.
+     * @return `true` if the task closing transition has been started, `false` otherwise.
+     */
+    fun closeTask(task: TaskInfo): Boolean {
+        if (isNotPinned(task.taskId)) {
+            logW("closeTask: the task in question is not pinned")
+            return false
+        }
+
+        val wct = WindowContainerTransaction()
+        wct.removeTask(task.token)
+        transitions.startTransition(TRANSIT_CLOSE, wct, /* handler= */ null)
+        return true
     }
 
-    private fun TransitionRequestInfo.isOpeningPinnedRequest(): Boolean {
-        val task = triggerTask
-        return task != null && isPinned(task.taskId) && TransitionUtil.isOpeningType(type)
+    // TODO(b/449681882): Remove when Handler introduces its own state management for animations.
+    fun cleanup(transition: IBinder) {
+        activeTransitions.remove(transition)
     }
 
-    private fun TransitionRequestInfo.isClosingPinnedRequest(): Boolean {
-        val task = triggerTask
-        return task != null && isPinned(task.taskId) && TransitionUtil.isClosingType(type)
-    }
-
-    private fun containsActivePinningTransition(transition: IBinder): Boolean {
-        return activeTransitions
-            .getOrElse(transition) { emptySet() }
-            .any { it is ActiveTransition.Pin }
-    }
-
-    override fun startAnimation(
+    override fun onTransitionReady(
         transition: IBinder,
         info: TransitionInfo,
         startTransaction: SurfaceControl.Transaction,
         finishTransaction: SurfaceControl.Transaction,
-        finishCallback: Transitions.TransitionFinishCallback,
-    ): Boolean {
-        val transitions = activeTransitions.remove(transition) ?: return false
+    ) {
+        // TODO(b/449681882): Clean transitions here. Handler should track animation data
+        // separately.
+        val transitions = activeTransitions[transition] ?: return
         transitions.forEach { transition ->
             when (transition) {
                 is ActiveTransition.Pin -> {
                     pin(transition.taskInfo)
 
-                    // Only send result if this transition caused by API request.
+                    // Only send result if the transition caused by an API request.
                     if (transition.resultCallback != null) {
                         sendWindowingLayerResult(RESULT_APPROVED, transition.resultCallback)
                     }
@@ -175,9 +192,6 @@ class PinnedLayerController(shellInit: ShellInit, private val transitions: Trans
                 }
             }
         }
-
-        // This handler doesn't animate anything.
-        return false
     }
 
     private fun pin(taskInfo: TaskInfo) {
@@ -195,115 +209,35 @@ class PinnedLayerController(shellInit: ShellInit, private val transitions: Trans
         }
     }
 
-    override fun onTransitionConsumed(
-        transition: IBinder,
-        aborted: Boolean,
-        finishTransaction: SurfaceControl.Transaction?,
-    ) {
-        if (!aborted) return
-        val transitions = activeTransitions.remove(transition) ?: return
-        transitions.forEach { transition ->
-            if (transition is ActiveTransition.Pin && transition.resultCallback != null) {
-                // An already pinned task can re-request to be pinned again, since this that leads
-                // to a no-op the transition is aborted. In this case we want to send approved
-                // result.
-                val result =
-                    if (isPinned(transition.taskInfo.taskId)) RESULT_APPROVED
-                    else RESULT_FAILED_BAD_STATE
-                sendWindowingLayerResult(result, transition.resultCallback)
-            }
-        }
-    }
+    private fun isPinningSupported(task: TaskInfo): Boolean =
+        // check support only for tasks that are not pinned yet.
+        isPinned(task.taskId) || presentationController.isTaskSupportedForPinning(task)
 
-    private fun sendWindowingLayerResult(result: Int, callback: IRemoteCallback) {
+    fun sendWindowingLayerResult(result: Int, callback: IRemoteCallback) {
         val bundle = Bundle()
         bundle.putInt(REMOTE_CALLBACK_RESULT_KEY, result)
         try {
             callback.sendResult(bundle)
         } catch (e: RemoteException) {
-            Slog.w(TAG, "Failed to invoke callback", e)
+            logW("Failed to invoke callback, error=%s", e)
         }
     }
 
-    /**
-     * Checks whether a task with [taskId] is pinned.
-     *
-     * @param taskId an id of task to check for pinned state.
-     * @return `true` when the task is pinned, `false` otherwise.
-     */
-    fun isPinned(taskId: Int): Boolean = pinnedTasks.contains(taskId)
+    /** A set of strategies that changes how the task is unpinned. */
+    enum class UnpinStrategy {
+        /**
+         * The task should be unpinned visually and hidden from the display. The controller keeps
+         * the task as pinned.
+         */
+        HIDE,
 
-    private sealed class ActiveTransition {
+        /** The task should be unpinned and closed. The task is not kept as pinned. */
+        CLOSE,
 
         /**
-         * A transition that represents pin operation on a specific task. Pinning can happen via
-         * direct [ActivityManager.AppTask.requestWindowingLayer] call or when the window becomes
-         * visible again.
-         *
-         * @property taskInfo a [TaskInfo] that current transition going to pin.
-         * @property resultCallback a [IRemoteCallback] that should be invoked to notify the client
-         *   about pin request result. Can be `null` during re-pining.
-         * @see WINDOWING_LAYER_PINNED
-         * @see [ActivityManager.AppTask.requestWindowingLayer]
+         * The task should be unpinned and kept visible on the display. This is useful when another
+         * handler wants to decide where to put the task.
          */
-        data class Pin(val taskInfo: TaskInfo, val resultCallback: IRemoteCallback?) :
-            ActiveTransition()
-
-        /**
-         * A transition that represents unpin operation on a specific task. Unpinning can happen
-         * while switching to another layer or a window is simply closed or minimized.
-         *
-         * @property taskInfo a [TaskInfo] that current transition going to pin.
-         */
-        data class Unpin(val taskInfo: TaskInfo) : ActiveTransition()
-    }
-
-    companion object {
-        private const val TAG = "PinnedLayerController"
-
-        /**
-         * Populates a [WindowContainerTransaction] with pinning operations.
-         *
-         * @param windowContainerToken a token that represents a window on which hierarchy
-         *   operations should be applied.
-         * @param bounds a [Rect] that represents bounds which a window should have after pinning.
-         * @return [WindowContainerTransaction] that encapsulates enter hierarchy operations.
-         */
-        @JvmStatic
-        fun getLayerPinnedWct(
-            windowContainerToken: WindowContainerToken,
-            bounds: Rect? = null,
-        ): WindowContainerTransaction {
-            return WindowContainerTransaction()
-                .reparent(windowContainerToken, null, true)
-                .apply { if (bounds != null) setBounds(windowContainerToken, bounds) }
-                .setAlwaysOnTop(windowContainerToken, true)
-                .setDisablePip(windowContainerToken, true)
-        }
-
-        /**
-         * Populates a [WindowContainerTransaction] that unpins a window from display. Minimizes a
-         * [windowContainerToken] by default.
-         *
-         * @param windowContainerToken a window token that unpinning operation targets.
-         * @param isMinimizing whether a window should be minimized or closed.
-         * @return [WindowContainerTransaction] that holds unpinning hierarchy operations.
-         */
-        @JvmStatic
-        @JvmOverloads
-        fun getLayerUnpinnedWct(
-            windowContainerToken: WindowContainerToken,
-            isMinimizing: Boolean = true,
-        ): WindowContainerTransaction {
-            return WindowContainerTransaction()
-                .setAlwaysOnTop(windowContainerToken, /* alwaysOnTop= */ false)
-                .apply {
-                    if (isMinimizing) {
-                        reorder(windowContainerToken, /* onTop= */ false)
-                    } else {
-                        removeTask(windowContainerToken)
-                    }
-                }
-        }
+        CLEAN,
     }
 }

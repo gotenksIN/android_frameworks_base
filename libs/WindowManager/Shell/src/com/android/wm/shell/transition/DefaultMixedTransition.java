@@ -17,10 +17,11 @@
 package com.android.wm.shell.transition;
 
 import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
+import static android.view.WindowManager.TRANSIT_CLOSE;
+import static android.view.WindowManager.TRANSIT_OPEN;
 import static android.view.WindowManager.TRANSIT_PIP;
 import static android.view.WindowManager.TRANSIT_TO_BACK;
 
-import static com.android.wm.shell.shared.TransitionUtil.isOpeningType;
 import static com.android.wm.shell.splitscreen.SplitScreenController.EXIT_REASON_FULLSCREEN_REQUEST;
 import static com.android.wm.shell.transition.DefaultMixedHandler.subCopy;
 import static com.android.wm.shell.transition.MixedTransitionHelper.animateEnterPipFromSplit;
@@ -34,9 +35,11 @@ import android.window.TransitionInfo;
 
 import com.android.internal.protolog.ProtoLog;
 import com.android.wm.shell.activityembedding.ActivityEmbeddingController;
+import com.android.wm.shell.bubbles.BubbleHelper;
 import com.android.wm.shell.bubbles.BubbleTransitions;
 import com.android.wm.shell.desktopmode.DesktopTasksController;
 import com.android.wm.shell.keyguard.KeyguardTransitionHandler;
+import com.android.wm.shell.pinnedlayer.phone.PinnedLayerHandler;
 import com.android.wm.shell.pip.PipTransitionController;
 import com.android.wm.shell.pip2.phone.transition.PipTransitionUtils;
 import com.android.wm.shell.protolog.ShellProtoLogGroup;
@@ -54,19 +57,22 @@ class DefaultMixedTransition extends DefaultMixedHandler.MixedTransition {
     private final ActivityEmbeddingController mActivityEmbeddingController;
     @Nullable
     private final DesktopTasksController mDesktopTasksController;
+    private final BubbleHelper mBubbleHelper;
 
-    DefaultMixedTransition(int type, IBinder transition, Transitions player,
+    DefaultMixedTransition(@MixedTransitionType int type, IBinder transition, Transitions player,
             MixedTransitionHandler mixedHandler, PipTransitionController pipHandler,
             StageCoordinator splitHandler, KeyguardTransitionHandler keyguardHandler,
             UnfoldTransitionHandler unfoldHandler,
             ActivityEmbeddingController activityEmbeddingController,
             @Nullable DesktopTasksController desktopTasksController,
-            BubbleTransitions bubbleTransitions) {
+            BubbleTransitions bubbleTransitions, BubbleHelper bubbleHelper,
+            PinnedLayerHandler pinnedLayerHandler) {
         super(type, transition, player, mixedHandler, pipHandler, splitHandler, keyguardHandler,
-                bubbleTransitions);
+                bubbleTransitions, pinnedLayerHandler);
         mUnfoldHandler = unfoldHandler;
         mActivityEmbeddingController = activityEmbeddingController;
         mDesktopTasksController = desktopTasksController;
+        mBubbleHelper = bubbleHelper;
 
         switch (type) {
             case TYPE_UNFOLD:
@@ -91,20 +97,21 @@ class DefaultMixedTransition extends DefaultMixedHandler.MixedTransition {
             case TYPE_ENTER_PIP_FROM_SPLIT ->
                     animateEnterPipFromSplit(this, info, startTransaction, finishTransaction,
                             finishCallback, mPlayer, mMixedHandler, mPipHandler, mSplitHandler,
-                            /*replacingPip*/ false);
+                            mPinnedLayerHandler, /*replacingPip*/ false);
             case TYPE_ENTER_PIP_REPLACE_FROM_SPLIT ->
                     animateEnterPipFromSplit(this, info, startTransaction, finishTransaction,
                             finishCallback, mPlayer, mMixedHandler, mPipHandler, mSplitHandler,
-                            /*replacingPip*/ true);
+                            mPinnedLayerHandler, /*replacingPip*/ true);
             case TYPE_LAUNCH_OR_CONVERT_TO_BUBBLE ->
                     animateEnterBubbles(transition, info, startTransaction, finishTransaction,
                             finishCallback, mBubbleTransitions);
             case TYPE_LAUNCH_OR_CONVERT_SPLIT_TASK_TO_BUBBLE ->
                     animateEnterBubblesFromSplit(this, transition, info, startTransaction,
-                            finishTransaction, finishCallback, mSplitHandler, mBubbleTransitions);
+                            finishTransaction, finishCallback, mSplitHandler, mBubbleTransitions,
+                            mBubbleHelper);
             case TYPE_LAUNCH_OR_CONVERT_TO_BUBBLE_FROM_EXISTING_BUBBLE ->
                     animateEnterBubblesFromBubble(transition, info, startTransaction,
-                            finishTransaction, finishCallback, mBubbleTransitions);
+                            finishTransaction, finishCallback, mBubbleTransitions, mBubbleHelper);
             case TYPE_LAUNCH_OR_CONVERT_PIP_TASK_TO_BUBBLE ->
                     animateEnterBubblesFromPip(this, transition, info, startTransaction,
                             finishTransaction, finishCallback, mPipHandler, mBubbleTransitions);
@@ -122,6 +129,9 @@ class DefaultMixedTransition extends DefaultMixedHandler.MixedTransition {
                             finishCallback);
             case TYPE_OPEN_IN_DESKTOP ->
                     animateOpenInDesktop(
+                            transition, info, startTransaction, finishTransaction, finishCallback);
+            case TYPE_ENTER_PIP_WITH_PINNED_LAYER_DISMISS ->
+                    animateEnterPipWithPinnedDismiss(
                             transition, info, startTransaction, finishTransaction, finishCallback);
             default -> throw new IllegalStateException(
                     "Starting default mixed animation with unknown or illegal type: " + mType);
@@ -191,6 +201,18 @@ class DefaultMixedTransition extends DefaultMixedHandler.MixedTransition {
             mInFlightSubAnimations = 1;
         }
 
+        if (pipChange != null || pipActivityChange != null) {
+            // in case this was a pip change, we need to make sure the pinned layer is aware of it
+            if (mPinnedLayerHandler != null
+                    && mPinnedLayerHandler.observes(mTransition)) {
+                mInFlightSubAnimations++;
+                final TransitionInfo pinnedLayerInfo = removePinnedLayerTaskChangesFrom(info,
+                        mTransition);
+                mPinnedLayerHandler.startAnimation(mTransition, pinnedLayerInfo,
+                        startTransaction, finishTransaction, finishCB);
+            }
+        }
+
         mActivityEmbeddingController.startAnimation(
                 mTransition, everythingElse, startTransaction, finishTransaction, finishCB);
         return true;
@@ -201,7 +223,7 @@ class DefaultMixedTransition extends DefaultMixedHandler.MixedTransition {
             @NonNull SurfaceControl.Transaction startTransaction,
             @NonNull SurfaceControl.Transaction finishTransaction,
             @NonNull Transitions.TransitionFinishCallback finishCallback,
-            @NonNull StageCoordinator splitHandler) {
+            @Nullable StageCoordinator splitHandler) {
         ProtoLog.v(ShellProtoLogGroup.WM_SHELL_TRANSITIONS, "Mixed transition for opening an intent"
                 + " with a remote transition and PIP or Desktop #%d", info.getDebugId());
         boolean handledToPipOrDesktop = tryAnimateOpenIntentWithRemoteAndPipOrDesktop(
@@ -223,7 +245,7 @@ class DefaultMixedTransition extends DefaultMixedHandler.MixedTransition {
             @NonNull SurfaceControl.Transaction startTransaction,
             @NonNull SurfaceControl.Transaction finishTransaction,
             @NonNull Transitions.TransitionFinishCallback finishCallback,
-            @NonNull StageCoordinator splitHandler) {
+            @Nullable StageCoordinator splitHandler) {
         ProtoLog.v(ShellProtoLogGroup.WM_SHELL_TRANSITIONS,
                 "tryAnimateOpenIntentWithRemoteAndPipOrDesktop");
 
@@ -232,7 +254,7 @@ class DefaultMixedTransition extends DefaultMixedHandler.MixedTransition {
         // fullscreen, the StageCoordinator does not have enough info at transition-request time to
         // decide whether to handle the transition and never gets a chance to clean up the split
         // state. So we check here to see if that happened, and clean up if so.
-        if (splitHandler.transitionImpliesSplitToFullscreen(info)) {
+        if (splitHandler != null && splitHandler.transitionImpliesSplitToFullscreen(info)) {
             splitHandler.dismissSplitInBackground(EXIT_REASON_FULLSCREEN_REQUEST);
         }
 
@@ -266,8 +288,22 @@ class DefaultMixedTransition extends DefaultMixedHandler.MixedTransition {
             // TODO: b/? - split the transition into three pieces when there's both a PIP and a
             //  desktop change are present. For example, during remote intent open over a desktop
             //  with both a PIP capable task and an immersive task.
-            if (mLeftoversHandler != null) {
-                mInFlightSubAnimations = 1;
+            final boolean leftoverAnimation = mLeftoversHandler != null;
+            // in case it's a pip change, we need to make sure the pinned layer is aware of it
+            final boolean additionalPinnedLayerAnimation = hasPipChange
+                    && PipFlags.isPip2ExperimentEnabled()
+                    && mPinnedLayerHandler != null
+                    && mPinnedLayerHandler.observes(mTransition);
+
+            mInFlightSubAnimations = (leftoverAnimation ? 1 : 0)
+                    + (additionalPinnedLayerAnimation ? 1 : 0);
+            if (additionalPinnedLayerAnimation) {
+                final TransitionInfo pinnedLayerInfo = removePinnedLayerTaskChangesFrom(info,
+                        mTransition);
+                mPinnedLayerHandler.startAnimation(mTransition, pinnedLayerInfo,
+                        startTransaction, finishTransaction, finishCB);
+            }
+            if (leftoverAnimation) {
                 return mLeftoversHandler.startAnimation(
                         mTransition, info, startTransaction, finishTransaction, finishCB);
             }
@@ -282,6 +318,17 @@ class DefaultMixedTransition extends DefaultMixedHandler.MixedTransition {
             // we need a separate one to send over to launcher.
             SurfaceControl.Transaction otherStartT = new SurfaceControl.Transaction();
             if (PipFlags.isPip2ExperimentEnabled()) {
+                if (mPinnedLayerHandler != null && mPinnedLayerHandler.observes(mTransition)) {
+                    mInFlightSubAnimations++;
+                    final TransitionInfo pinnedLayerInfo = removePinnedLayerTaskChangesFrom(info,
+                            mTransition);
+                    mPinnedLayerHandler.startAnimation(
+                            mTransition,
+                            pinnedLayerInfo,
+                            startTransaction,
+                            finishTransaction,
+                            finishCB);
+                }
                 mPipHandler.startAnimation(mTransition, pipInfo, startTransaction,
                         finishTransaction, finishCB);
             } else if (enterPipChange != null) {
@@ -391,13 +438,14 @@ class DefaultMixedTransition extends DefaultMixedHandler.MixedTransition {
             @NonNull SurfaceControl.Transaction finishTransaction,
             @NonNull Transitions.TransitionFinishCallback finishCallback,
             @NonNull StageCoordinator splitHandler,
-            @NonNull BubbleTransitions bubbleTransitions) {
+            @NonNull BubbleTransitions bubbleTransitions,
+            @NonNull BubbleHelper bubbleHelper) {
         final Transitions.TransitionHandler handler = bubbleTransitions.getRunningEnterTransition(
                 transition);
         ProtoLog.v(ShellProtoLogGroup.WM_SHELL_TRANSITIONS, " Animating a mixed transition for "
                 + "entering Bubbles while Split-Screen is foreground by %s", handler);
 
-        final TransitionInfo.Change bubblingTask = bubbleTransitions.getEnterBubbleTask(info);
+        final TransitionInfo.Change bubblingTask = bubbleHelper.getEnterBubbleTask(info);
         // find previous split location for other task
         @SplitScreen.StageType int topSplitStageToKeep = SplitScreen.STAGE_TYPE_UNDEFINED;
         for (int i = info.getChanges().size() - 1; i >= 0; i--) {
@@ -517,9 +565,10 @@ class DefaultMixedTransition extends DefaultMixedHandler.MixedTransition {
             @NonNull SurfaceControl.Transaction startTransaction,
             @NonNull SurfaceControl.Transaction finishTransaction,
             @NonNull Transitions.TransitionFinishCallback finishCallback,
-            @NonNull BubbleTransitions bubbleTransitions) {
+            @NonNull BubbleTransitions bubbleTransitions,
+            @NonNull BubbleHelper bubbleHelper) {
         // Identify the task being launched into a bubble
-        final TransitionInfo.Change enterBubbleTask = bubbleTransitions.getEnterBubbleTask(info);
+        final TransitionInfo.Change enterBubbleTask = bubbleHelper.getEnterBubbleTask(info);
         if (enterBubbleTask == null) {
             // The trigger Task is no longer in Bubble (Case 1/2/4)
             ProtoLog.v(ShellProtoLogGroup.WM_SHELL_TRANSITIONS, " No bubbling task found");
@@ -532,7 +581,6 @@ class DefaultMixedTransition extends DefaultMixedHandler.MixedTransition {
 
             return false;
         }
-        final TransitionInfo.Change closingBubble = bubbleTransitions.getClosingBubbleTask(info);
 
         final Consumer<Transitions.TransitionHandler> onInflatedCallback = handler -> {
             final Transitions.TransitionHandler h = bubbleTransitions
@@ -543,21 +591,34 @@ class DefaultMixedTransition extends DefaultMixedHandler.MixedTransition {
                     transition, info, startTransaction, finishTransaction, finishCallback);
         };
 
-        if (com.android.window.flags.Flags.fixBubbleTrampolineAnimation()
-                && closingBubble != null && isOpeningType(enterBubbleTask.getMode())) {
-            ProtoLog.v(ShellProtoLogGroup.WM_SHELL_TRANSITIONS, " Animating a mixed transition for "
-                    + "opening bubble from another closing bubbled task");
-            // Task Trampoline (Case 5)
-            bubbleTransitions.startTaskTrampolineBubbleLaunch(
-                    transition, enterBubbleTask.getTaskInfo(),
-                    closingBubble.getTaskInfo(), onInflatedCallback);
-        } else {
-            // Opening a Bubble Task (Case 3/6)
-            ProtoLog.v(ShellProtoLogGroup.WM_SHELL_TRANSITIONS, " Animating a mixed transition for "
-                    + "entering bubble from another bubbled task or for an existing bubble");
-            bubbleTransitions.startBubbleToBubbleLaunchOrExistingBubbleConvert(
-                    transition, enterBubbleTask.getTaskInfo(), onInflatedCallback);
+        final TransitionInfo.Change closingBubble = bubbleHelper.getClosingBubbleTask(info);
+        if (closingBubble != null) {
+            if (com.android.window.flags.Flags.fixBubbleTrampolineAnimation()
+                    && closingBubble.getMode() == TRANSIT_CLOSE
+                    && enterBubbleTask.getMode() == TRANSIT_OPEN) {
+                ProtoLog.v(ShellProtoLogGroup.WM_SHELL_TRANSITIONS, " Animating a mixed transition"
+                        + " for opening bubble from another closing bubbled task");
+                // Task Trampoline (Case 5)
+                bubbleTransitions.startTaskTrampolineBubbleLaunch(
+                        transition, enterBubbleTask.getTaskInfo(),
+                        closingBubble.getTaskInfo(), onInflatedCallback);
+                return true;
+            } else if (com.android.window.flags.Flags.enableBubbleRootTask()) {
+                // Switch the expanded Bubble Task (Case 3/6)
+                ProtoLog.v(ShellProtoLogGroup.WM_SHELL_TRANSITIONS, " Animating a mixed transition"
+                        + " for switching the expanded bubble");
+                // TODO(b/407669465): Handle bubble switching
+                bubbleTransitions.startBubbleToBubbleLaunchOrExistingBubbleConvert(
+                        transition, enterBubbleTask.getTaskInfo(), onInflatedCallback);
+                return true;
+            }
         }
+
+        // Fallback, this can be (Case 3/6) when the closing Bubble comes in later.
+        ProtoLog.v(ShellProtoLogGroup.WM_SHELL_TRANSITIONS, " Animating a mixed transition for "
+                + "entering bubble from another bubbled task or for an existing bubble");
+        bubbleTransitions.startBubbleToBubbleLaunchOrExistingBubbleConvert(
+                transition, enterBubbleTask.getTaskInfo(), onInflatedCallback);
 
         return true;
     }
@@ -632,6 +693,36 @@ class DefaultMixedTransition extends DefaultMixedHandler.MixedTransition {
         return true;
     }
 
+    private boolean animateEnterPipWithPinnedDismiss(
+            @NonNull IBinder transition, @NonNull TransitionInfo info,
+            @NonNull SurfaceControl.Transaction startTransaction,
+            @NonNull SurfaceControl.Transaction finishTransaction,
+            @NonNull Transitions.TransitionFinishCallback finishCallback) {
+        ProtoLog.v(ShellProtoLogGroup.WM_SHELL_TRANSITIONS, "Mixed transition for entering PIP with"
+                + " pinned task #%d", info.getDebugId());
+        final Transitions.TransitionFinishCallback finishCB = (wct) -> {
+            --mInFlightSubAnimations;
+            if (mInFlightSubAnimations > 0) return;
+            finishCallback.onTransitionFinished(wct);
+        };
+        mInFlightSubAnimations = 2;
+
+        final TransitionInfo pinnedLayerInfo = removePinnedLayerTaskChangesFrom(info, transition);
+        mPipHandler.startAnimation(transition, info, startTransaction, finishTransaction, finishCB);
+        mPinnedLayerHandler.startAnimation(transition, pinnedLayerInfo, startTransaction,
+                finishTransaction, finishCB);
+
+        return true;
+    }
+
+    @NonNull
+    private TransitionInfo removePinnedLayerTaskChangesFrom(@NonNull TransitionInfo outInfo,
+            @NonNull IBinder transition) {
+        // just forwards to the helper, just to improve readability in this class's calls.
+        return MixedTransitionHelper.removePinnedLayerTaskChangesFrom(
+                mPinnedLayerHandler, outInfo, transition);
+    }
+
     @Override
     void mergeAnimation(
             @NonNull IBinder transition, @NonNull TransitionInfo info,
@@ -692,6 +783,11 @@ class DefaultMixedTransition extends DefaultMixedHandler.MixedTransition {
                             finishCallback);
                 }
                 return;
+            case TYPE_ENTER_PIP_WITH_PINNED_LAYER_DISMISS:
+                mPipHandler.end();
+                mPinnedLayerHandler.mergeAnimation(transition, info, startT, finishT,
+                        mergeTarget, finishCallback);
+                return;
             default:
                 throw new IllegalStateException("Playing a default mixed transition with unknown or"
                         + " illegal type: " + mType);
@@ -735,6 +831,9 @@ class DefaultMixedTransition extends DefaultMixedHandler.MixedTransition {
                             "Bubble transition consumed: aborted=%b", aborted);
                     handler.onTransitionConsumed(transition, aborted, finishT);
                 }
+                break;
+            case TYPE_ENTER_PIP_WITH_PINNED_LAYER_DISMISS:
+                mPipHandler.onTransitionConsumed(transition, aborted, finishT);
                 break;
             default:
                 break;

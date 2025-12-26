@@ -326,6 +326,8 @@
     <string name="notification_channel_accessibility_hearing_device" msgid="7816963856388758952">"Сонсголын төхөөрөмж"</string>
     <string name="notification_channel_accessibility_security_policy" msgid="1727787021725251912">"Хандалтын ашиглалт"</string>
     <string name="notification_channel_display" msgid="6905032605735615090">"Дэлгэц"</string>
+    <!-- no translation found for notification_channel_parental_controls (2963963315750128538) -->
+    <skip />
     <string name="foreground_service_app_in_background" msgid="1439289699671273555">"<xliff:g id="APP_NAME">%1$s</xliff:g> батарей ашиглаж байна"</string>
     <string name="foreground_service_apps_in_background" msgid="7340037176412387863">"<xliff:g id="NUMBER">%1$d</xliff:g> апп батарей ашиглаж байна"</string>
     <string name="foreground_service_tap_for_details" msgid="9078123626015586751">"Батарей, дата ашиглалтын талаар дэлгэрэнгүйг харахын тулд товшино уу"</string>
@@ -641,6 +643,8 @@
     <string name="permdesc_nearby_wifi_devices" msgid="3054307728646332906">"Аппад ойролцоох Wi-Fi төхөөрөмжүүдтэй холбоотой байрлалыг мэдэгдэх, холбох, тодорхойлохыг зөвшөөрнө"</string>
     <string name="permlab_access_local_network" msgid="3420360767259066877">"дотоод сүлжээний төхөөрөмжид хандах"</string>
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"Аппыг дотоод сүлжээний төхөөрөмжид хандахыг зөвшөөрнө"</string>
+    <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"loopback интерфейсийг ашиглах"</string>
+    <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"Аппад loopback интерфейсээр дамжуулан бусад апптай харилцан үйлдэл хийхийг зөвшөөрнө"</string>
     <string name="permlab_ranging" msgid="2854543350668593390">"ойр төхөөрөмжүүдийн хоорондох харьцангуй байрлалыг тодорхойл"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"Аппад ойролцоох төхөөрөмжүүдийн хоорондох харьцангуй байрлалыг тодорхойлохыг зөвшөөрнө үү"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"Сонгосон NFC төлбөрийн үйлчилгээний мэдээлэл"</string>
@@ -1043,7 +1047,6 @@
     <string name="keyguard_password_enter_pin_password_code" msgid="7792964196473964340">"Тайлах ПИН-г оруулна уу"</string>
     <string name="keyguard_password_wrong_pin_code" msgid="8583732939138432793">"Буруу ПИН код."</string>
     <string name="keyguard_label_text" msgid="3841953694564168384">"Тайлах бол Цэсийг дараад 0."</string>
-    <string name="emergency_call_dialog_number_for_display" msgid="2978165477085612673">"Яаралтай тусламжийн дугаар"</string>
     <string name="lockscreen_carrier_default" msgid="6192313772955399160">"Үйлчилгээ байхгүй"</string>
     <string name="lockscreen_screen_locked" msgid="7364905540516041817">"Дэлгэц түгжигдсэн."</string>
     <string name="lockscreen_instructions_when_pattern_enabled" msgid="7982445492532123308">"Яаралтай дуудлага хийх буюу эсвэл түгжээг тайлах бол цэсийг дарна уу."</string>
@@ -1054,10 +1057,8 @@
     <string name="lockscreen_pattern_correct" msgid="8050630103651508582">"Зөв"</string>
     <string name="lockscreen_pattern_wrong" msgid="2940138714468358458">"Дахин оролдох"</string>
     <string name="lockscreen_password_wrong" msgid="8605355913868947490">"Дахин оролдох"</string>
-    <!-- no translation found for lockscreen_click_to_unlock_hint (6056691847669178119) -->
-    <skip />
-    <!-- no translation found for lockscreen_key_to_unlock_hint (9042402393653798264) -->
-    <skip />
+    <string name="lockscreen_click_to_unlock_hint" msgid="6056691847669178119">"Түгжээг тайлахын тулд товшино уу"</string>
+    <string name="lockscreen_key_to_unlock_hint" msgid="9042402393653798264">"Түгжээг тайлахын тулд дурын товчийг дарна уу"</string>
     <string name="lockscreen_storage_locked" msgid="634993789186443380">"Бүх онцлог, өгөгдлийн түгжээг тайлах"</string>
     <string name="faceunlock_multiple_failures" msgid="681991538434031708">"Царайгаар түгжээ тайлах оролдлогын тоо дээд хэмжээнээс хэтэрсэн"</string>
     <string name="lockscreen_missing_sim_message_short" msgid="1229301273156907613">"SIM байхгүй"</string>
@@ -1279,6 +1280,7 @@
     <string name="whichApplicationLabel" msgid="7852182961472531728">"Үйлдлийг дуусгах"</string>
     <string name="whichViewApplication" msgid="5733194231473132945">"Нээх"</string>
     <string name="whichViewApplicationNamed" msgid="415164730629690105">"%1$s ашиглан нээх"</string>
+    <string name="open_app_name" msgid="6114096770130122912">"<xliff:g id="APP_NAME">%1$s</xliff:g>-г нээх"</string>
     <string name="whichViewApplicationLabel" msgid="7367556735684742409">"Нээх"</string>
     <string name="whichOpenHostLinksWith" msgid="7645631470199397485">"<xliff:g id="HOST">%1$s</xliff:g>-н холбоосуудыг дараахаар нээх"</string>
     <string name="whichOpenLinksWith" msgid="1120936181362907258">"Холбоосуудыг дараахаар нээх"</string>
@@ -1800,10 +1802,8 @@
     <string name="accessibility_shortcut_single_service_warning" msgid="6363127705112844257">"Дууны түвшний түлхүүрийг хэдэн секундийн турш зэрэг дарах нь хандалтын онцлог болох <xliff:g id="SERVICE">%1$s</xliff:g>-г асаадаг. Энэ нь таны төхөөрөмжийн ажиллах зарчмыг өөрчилж болзошгүй.\n\nТа Тохиргоо &gt; Хандалт хэсэгт энэ товчлолыг өөр онцлогт оноож өөрчлөх боломжтой."</string>
     <string name="accessibility_shortcut_on" msgid="5463618449556111344">"Асаах"</string>
     <string name="accessibility_shortcut_off" msgid="3651336255403648739">"Бүү асаа"</string>
-    <!-- no translation found for accessibility_shortcut_menu_item_status_on (6162756705754654002) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_menu_item_status_off (6274512913017713543) -->
-    <skip />
+    <string name="accessibility_shortcut_menu_item_status_on" msgid="6162756705754654002">"Асаалттай"</string>
+    <string name="accessibility_shortcut_menu_item_status_off" msgid="6274512913017713543">"Унтраалттай"</string>
     <string name="accessibility_enable_service_title" msgid="3931558336268541484">"<xliff:g id="SERVICE">%1$s</xliff:g>-д таны төхөөрөмжийг бүрэн хянахыг зөвшөөрөх үү?"</string>
     <string name="accessibility_service_warning_description" msgid="291674995220940133">"Бүрэн хянах нь таны хандалтын үйлчилгээний шаардлагад тусалдаг аппуудад тохиромжтой боловч ихэнх аппад тохиромжгүй байдаг."</string>
     <string name="accessibility_service_screen_control_title" msgid="190017412626919776">"Дэлгэцийг харах ба хянах"</string>
@@ -1817,16 +1817,11 @@
     <string name="accessibility_select_shortcut_menu_title" msgid="6002726538854613272">"Үүнийг ашиглаж эхлэхийн тулд онцлог дээр товшино уу:"</string>
     <string name="accessibility_edit_shortcut_menu_button_title" msgid="239446795930436325">"Хандалтын товчлуурын тусламжтай ашиглах онцлогуудыг сонгоно уу"</string>
     <string name="accessibility_edit_shortcut_menu_volume_title" msgid="2245540598834891500">"Дууны түвшний товчийн товчлолоор ашиглах онцлогуудыг сонгоно уу"</string>
-    <!-- no translation found for accessibility_shortcut_label_button (6473341300585254821) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_volume_keys (5642990791242136231) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_gesture (7987298674836890931) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_quick_settings (6851280333772213611) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_triple_tap (9058975959054454796) -->
-    <skip />
+    <string name="accessibility_shortcut_label_button" msgid="6473341300585254821">"хандалтын товч"</string>
+    <string name="accessibility_shortcut_label_volume_keys" msgid="5642990791242136231">"дууны түвшний товчнууд"</string>
+    <string name="accessibility_shortcut_label_gesture" msgid="7987298674836890931">"зангаа"</string>
+    <string name="accessibility_shortcut_label_quick_settings" msgid="6851280333772213611">"шуурхай тохиргоо"</string>
+    <string name="accessibility_shortcut_label_triple_tap" msgid="9058975959054454796">"гурав товших"</string>
     <string name="accessibility_uncheck_legacy_item_warning" msgid="8047830891064817447">"<xliff:g id="SERVICE_NAME">%s</xliff:g>-г унтраалаа"</string>
     <string name="edit_accessibility_shortcut_menu_button" msgid="8885752738733772935">"Товчлолуудыг засах"</string>
     <string name="done_accessibility_shortcut_menu_button" msgid="3668407723770815708">"Болсон"</string>
@@ -2616,4 +2611,10 @@
     <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"Системийн нөөцийн сэрэмжлүүлэг"</string>
     <string name="tv_watchdog_notification_title" msgid="195239206215922517">"Нөөцийг хэтрүүлэн ашиглах"</string>
     <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"Апп \'<xliff:g id="APP_NAME">%1$s</xliff:g> хэт их нөөц ашиглаж байна.\""</string>
+    <!-- no translation found for supervision_blocked_app_title (5546803865875383588) -->
+    <skip />
+    <!-- no translation found for supervision_blocked_app_content (4125452996088641559) -->
+    <skip />
+    <!-- no translation found for supervision_unblocked_app_content (8282985265957852278) -->
+    <skip />
 </resources>

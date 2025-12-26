@@ -1719,6 +1719,40 @@ public abstract class VibrationEffect implements Parcelable {
             return addSegment(primitive);
         }
 
+        /**
+         * Adds a waveform envelope to the end of this composition.
+         *
+         * <p>The envelope will be built by this method, which can throw an exception if it fails to
+         * build.
+         *
+         * @param builder The {@link WaveformEnvelopeBuilder} to add.
+         * @return This {@link Composition} object.
+         * @throws IllegalStateException if the builder fails to build the effect. See
+         * {@link WaveformEnvelopeBuilder#build()}.
+         */
+        @FlaggedApi(Flags.FLAG_COMPOSITION_PWLE_APIS)
+        @NonNull
+        public Composition addEnvelope(@NonNull WaveformEnvelopeBuilder builder) {
+             return addSegments(builder.build());
+        }
+
+        /**
+         * Adds a basic envelope to the end of this composition.
+         *
+         * <p>The envelope will be built by this method, which can throw an exception if it fails to
+         * build.
+         *
+         * @param builder The {@link BasicEnvelopeBuilder} to add.
+         * @return This {@link Composition} object.
+         * @throws IllegalStateException if the builder fails to build the effect. See
+         * {@link BasicEnvelopeBuilder#build()}.
+         */
+        @FlaggedApi(Flags.FLAG_COMPOSITION_PWLE_APIS)
+        @NonNull
+        public Composition addEnvelope(@NonNull BasicEnvelopeBuilder builder) {
+             return addSegments(builder.build());
+        }
+
         private Composition addSegment(VibrationEffectSegment segment) {
             if (mRepeatIndex >= 0) {
                 throw new IllegalStateException("Can't add effects after a repeating effect.");
@@ -1883,7 +1917,8 @@ public abstract class VibrationEffect implements Parcelable {
                         firstSegment.getEndAmplitude(),
                         initialFrequencyHz, // Update start frequency
                         firstSegment.getEndFrequencyHz(),
-                        firstSegment.getDuration()));
+                        firstSegment.getDuration(),
+                        firstSegment.isFirstSegmentOfEnvelope()));
             }
 
             return this;
@@ -1923,8 +1958,14 @@ public abstract class VibrationEffect implements Parcelable {
                 mLastFrequencyHz = frequencyHz;
             }
 
-            mSegments.add(new PwleSegment(mLastAmplitude, amplitude, mLastFrequencyHz, frequencyHz,
-                    durationMillis));
+            mSegments.add(
+                    new PwleSegment(
+                            mLastAmplitude,
+                            amplitude,
+                            mLastFrequencyHz,
+                            frequencyHz,
+                            durationMillis,
+                            /* isFirstSegment= */ mSegments.isEmpty()));
 
             mLastAmplitude = amplitude;
             mLastFrequencyHz = frequencyHz;
@@ -2042,7 +2083,8 @@ public abstract class VibrationEffect implements Parcelable {
                         firstSegment.getEndIntensity(),
                         initialSharpness, // Update start sharpness
                         firstSegment.getEndSharpness(),
-                        firstSegment.getDuration()));
+                        firstSegment.getDuration(),
+                        firstSegment.isFirstSegmentOfEnvelope()));
             }
 
             return this;
@@ -2081,7 +2123,7 @@ public abstract class VibrationEffect implements Parcelable {
             }
 
             mSegments.add(new BasicPwleSegment(mLastIntensity, intensity, mLastSharpness, sharpness,
-                    durationMillis));
+                    durationMillis, /* isFirstSegment= */ mSegments.isEmpty()));
 
             mLastIntensity = intensity;
             mLastSharpness = sharpness;
@@ -2159,7 +2201,7 @@ public abstract class VibrationEffect implements Parcelable {
      *     .addTransition(Duration.ofMillis(40), targetAmplitude(0.8f))
      *     .addSustain(Duration.ofMillis(50))
      *     .addTransition(Duration.ofMillis(60), targetAmplitude(0.2f))
-     *     .build();
+     *     .build();}</pre>
      *
      * <p>The amplitude step waveforms that can be created via
      * {@link VibrationEffect#createWaveform(long[], int[], int)} can also be created with

@@ -42,6 +42,7 @@ import android.util.SparseBooleanArray;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.server.ServiceThread;
+import com.android.server.am.psc.ActiveUidsInternal;
 import com.android.server.am.psc.AsyncBatchSession;
 import com.android.server.am.psc.ProcessListInternal;
 import com.android.server.am.psc.ProcessRecordInternal;
@@ -84,13 +85,14 @@ public class ProcessStateController {
     private final ConcurrentLinkedQueue<Runnable> mStagingQueue = new ConcurrentLinkedQueue<>();
 
     private ProcessStateController(ActivityManagerService ams, ProcessListInternal processList,
-            ActiveUids activeUids, ServiceThread handlerThread,
+            ActiveUidsInternal activeUids, ServiceThread handlerThread,
             Object lock, Object procLock, Consumer<ProcessRecord> topChangeCallback,
             ProcessLruUpdater lruUpdater, OomAdjuster.Injector oomAdjInjector,
-            OomAdjuster.Constants oomConstants, OomAdjuster.Callback callback) {
+            OomAdjuster.Constants oomConstants, OomAdjuster.Callback callback,
+            OomAdjuster.StateGetter stateGetter) {
         mOomConstants = oomConstants;
         mOomAdjuster = new OomAdjusterImpl(ams, processList, activeUids, handlerThread,
-                mOomConstants, mGlobalState, oomAdjInjector, callback);
+                mOomConstants, mGlobalState, oomAdjInjector, callback, stateGetter);
 
         mLock = lock;
         mProcLock = procLock;
@@ -137,6 +139,74 @@ public class ProcessStateController {
 
     public void setProcStateDebugUids(SparseBooleanArray value) {
         mOomConstants.mProcStateDebugUids = value;
+    }
+
+    public void setForceEnablePssProfiling(boolean value) {
+        mOomConstants.mForceEnablePssProfiling = value;
+    }
+
+    public void setPssToRssThresholdModifier(float value) {
+        mOomConstants.mPssToRssThresholdModifier = value;
+    }
+
+    public void setMaxEmptyTimeMillis(long value) {
+        mOomConstants.mMaxEmptyTimeMillis = value;
+    }
+
+    public void setTopToFgsGraceDuration(long value) {
+        mOomConstants.mTopToFgsGraceDuration = value;
+    }
+
+    public void setTopToAlmostPerceptibleGraceDuration(long value) {
+        mOomConstants.mTopToAlmostPerceptibleGraceDuration = value;
+    }
+
+    public void setMaxPreviousTime(long value) {
+        mOomConstants.mMaxPreviousTime = value;
+    }
+
+    public void setMaxServiceInactivity(long value) {
+        mOomConstants.mMaxServiceInactivity = value;
+    }
+
+    public void setContentProviderRetainTime(long value) {
+        mOomConstants.mContentProviderRetainTime = value;
+    }
+
+    public void setEnableProcStateStacktrace(boolean value) {
+        mOomConstants.mEnableProcStateStacktrace = value;
+    }
+
+    public void setProcStateDebugSetProcStateDelay(int value) {
+        mOomConstants.mProcStateDebugSetProcStateDelay = value;
+    }
+
+    public void setProcStateDebugSetUidStateDelay(int value) {
+        mOomConstants.mProcStateDebugSetUidStateDelay = value;
+    }
+
+    public void setOomadjUpdateQuick(boolean value) {
+        mOomConstants.mOomadjUpdateQuick = value;
+    }
+
+    public void setProactiveKillsEnabled(boolean value) {
+        mOomConstants.mProactiveKillsEnabled = value;
+    }
+
+    public void setLowSwapThresholdPercent(float value) {
+        mOomConstants.mLowSwapThresholdPercent = value;
+    }
+
+    public void setNoKillCachedProcessesUntilBootCompleted(boolean value) {
+        mOomConstants.mNoKillCachedProcessesUntilBootCompleted = value;
+    }
+
+    public void setNoKillCachedProcessesPostBootCompletedDurationMillis(long value) {
+        mOomConstants.mNoKillCachedProcessesPostBootCompletedDurationMillis = value;
+    }
+
+    public void setFreezerCutoffAdj(int value) {
+        mOomConstants.mFreezerCutoffAdj = value;
     }
 
     /**
@@ -319,6 +389,7 @@ public class ProcessStateController {
         private ProcessRecordInternal mPreviousProcess = null;
         private static final int NONE_DEBUG_UID = -1;
         private volatile int mDebugUid = NONE_DEBUG_UID;
+        private volatile long mLastUserUnlockingUptime = 0;
 
         private void commitStagedState() {
             mUnlocking = mUnlockingStaged;
@@ -376,6 +447,10 @@ public class ProcessStateController {
 
         public boolean isDebugEnabled(ProcessRecordInternal app) {
             return app.getApplicationUid() == mDebugUid;
+        }
+
+        public long getLastUserUnlockingUptime() {
+            return mLastUserUnlockingUptime;
         }
     }
 
@@ -483,6 +558,21 @@ public class ProcessStateController {
      */
     public int getDebugUid() {
         return mGlobalState.mDebugUid;
+    }
+
+    /**
+     * Sets the timestamp for the last user unlock event. This should be called when a user starts
+     * unlocking to record the uptime.
+     */
+    public void setLastUserUnlockingUptime(long time) {
+        mGlobalState.mLastUserUnlockingUptime = time;
+    }
+
+    /**
+     * Returns the timestamp for the last user unlock event.
+     */
+    public long getLastUserUnlockingUptime() {
+        return mGlobalState.mLastUserUnlockingUptime;
     }
 
     /***************************** UID State Events ****************************/
@@ -1153,9 +1243,10 @@ public class ProcessStateController {
     public static class Builder {
         private final ActivityManagerService mAms;
         private final ProcessListInternal mProcessList;
-        private final ActiveUids mActiveUids;
+        private final ActiveUidsInternal mActiveUids;
         private final OomAdjuster.Constants mOomConstants;
         private final OomAdjuster.Callback mOomAdjCallback;
+        private final OomAdjuster.StateGetter mOomAdjStateGetter;
 
         private ServiceThread mHandlerThread = null;
         private Object mLock = null;
@@ -1164,13 +1255,14 @@ public class ProcessStateController {
         private OomAdjuster.Injector mOomAdjInjector = null;
 
         public Builder(ActivityManagerService ams, ProcessListInternal processList,
-                ActiveUids activeUids, OomAdjuster.Constants oomConstants,
-                OomAdjuster.Callback oomAdjCallback) {
+                ActiveUidsInternal activeUids, OomAdjuster.Constants oomConstants,
+                OomAdjuster.Callback oomAdjCallback, OomAdjuster.StateGetter oomAdjStateGetter) {
             mAms = ams;
             mProcessList = processList;
             mActiveUids = activeUids;
             mOomConstants = oomConstants;
             mOomAdjCallback = oomAdjCallback;
+            mOomAdjStateGetter = oomAdjStateGetter;
         }
 
         /**
@@ -1199,7 +1291,7 @@ public class ProcessStateController {
             }
             return new ProcessStateController(mAms, mProcessList, mActiveUids, mHandlerThread,
                     mLock, mAms.mProcLock, mTopChangeCallback, mProcessLruUpdater, mOomAdjInjector,
-                    mOomConstants, mOomAdjCallback);
+                    mOomConstants, mOomAdjCallback, mOomAdjStateGetter);
         }
 
         /**

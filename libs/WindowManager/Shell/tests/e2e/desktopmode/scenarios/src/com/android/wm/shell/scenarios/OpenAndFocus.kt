@@ -18,6 +18,8 @@ package com.android.wm.shell.scenarios
 
 import android.platform.test.annotations.EnableFlags
 import android.tools.traces.parsers.WindowManagerStateHelper
+import android.tools.traces.ConditionsFactory
+import android.view.Display.DEFAULT_DISPLAY
 import android.view.KeyEvent.KEYCODE_MINUS
 import android.view.KeyEvent.META_META_ON
 import androidx.test.platform.app.InstrumentationRegistry.getInstrumentation
@@ -33,20 +35,14 @@ import org.junit.Rule
 import org.junit.Test
 import platform.test.desktop.SimulatedConnectedDisplayTestRule
 
-
-/**
- * Base scenario test to test if newly opened window gets focus.
- */
+/** Base scenario test to test if newly opened window gets focus. */
 @Ignore("Test Base Class")
-@EnableFlags(
-    Flags.FLAG_ENABLE_DISPLAY_FOCUS_IN_SHELL_TRANSITIONS,
-)
+@EnableFlags(Flags.FLAG_ENABLE_DISPLAY_FOCUS_IN_SHELL_TRANSITIONS)
 abstract class OpenAndFocus() : TestScenarioBase() {
     private val wmHelper = WindowManagerStateHelper(getInstrumentation())
 
     private val testAppInMainDisplay = DesktopModeAppHelper(SimpleAppHelper(getInstrumentation()))
-    private val testAppInExternalDisplay =
-            DesktopModeAppHelper(MailAppHelper(getInstrumentation()))
+    private val testAppInExternalDisplay = DesktopModeAppHelper(MailAppHelper(getInstrumentation()))
     private val keyEventHelper = KeyEventHelper(getInstrumentation())
 
     @get:Rule(order = 0) val connectedDisplayRule = SimulatedConnectedDisplayTestRule()
@@ -63,8 +59,19 @@ abstract class OpenAndFocus() : TestScenarioBase() {
         val displayId = connectedDisplayRule.addedDisplays.first()
         testAppInExternalDisplay.launchViaIntentOnDisplay(wmHelper, displayId)
 
+        wmHelper.StateSyncBuilder().withAppTransitionIdle()
+            .add(ConditionsFactory.isWindowVisible(testAppInMainDisplay, DEFAULT_DISPLAY))
+            .add(ConditionsFactory.isWindowVisible(testAppInExternalDisplay, displayId))
+            .waitForAndVerify()
+
         // Send minimize via keyboard and observe window to check display focus.
         keyEventHelper.press(KEYCODE_MINUS, META_META_ON)
+
+        wmHelper.StateSyncBuilder().withAppTransitionIdle()
+            .add(ConditionsFactory.isWindowVisible(testAppInMainDisplay, DEFAULT_DISPLAY))
+            .add(ConditionsFactory.isWindowVisible(testAppInExternalDisplay, displayId)
+                     .negate())
+            .waitForAndVerify()
     }
 
     @After

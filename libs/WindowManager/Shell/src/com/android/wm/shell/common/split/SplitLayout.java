@@ -24,8 +24,9 @@ import static android.view.WindowManager.DOCKED_TOP;
 
 import static com.android.internal.jank.InteractionJankMonitor.CUJ_SPLIT_SCREEN_DOUBLE_TAP_DIVIDER;
 import static com.android.internal.jank.InteractionJankMonitor.CUJ_SPLIT_SCREEN_RESIZE;
-import static com.android.window.flags.Flags.enableNonDefaultDisplaySplit;
+import static com.android.window.flags.Flags.enableNonDefaultDisplaySplitBugfix;
 import static com.android.wm.shell.common.split.DividerSnapAlgorithm.SNAP_FLEXIBLE_HYBRID;
+import static com.android.wm.shell.common.split.SplitScreenUtils.isFoldable;
 import static com.android.wm.shell.shared.animation.Interpolators.EMPHASIZED;
 import static com.android.wm.shell.shared.animation.Interpolators.FAST_OUT_SLOW_IN;
 import static com.android.wm.shell.shared.animation.Interpolators.LINEAR;
@@ -522,11 +523,11 @@ public final class SplitLayout implements DisplayInsetsController.OnInsetsChange
             return false;
         }
 
-        final Context displayContext = enableNonDefaultDisplaySplit()
+        final Context displayContext = enableNonDefaultDisplaySplitBugfix()
                 && mDisplayController.getDisplayContext(displayId) != null
                 ? mDisplayController.getDisplayContext(displayId) : mContext;
         mContext = displayContext.createConfigurationContext(configuration);
-        if ((enableNonDefaultDisplaySplit())) {
+        if ((enableNonDefaultDisplaySplitBugfix())) {
             mSplitWindowManager.updateDisplayContext(mContext);
         }
         mSplitWindowManager.setConfiguration(configuration);
@@ -536,15 +537,16 @@ public final class SplitLayout implements DisplayInsetsController.OnInsetsChange
         mRotation = rotation;
         mDensity = density;
         mUiMode = uiMode;
-        mIsLargeScreen = configuration.smallestScreenWidthDp >= 600;
+        mIsLargeScreen = SplitScreenUtils.isLargeScreen(configuration);
         mIsLeftRightSplit = SplitScreenUtils.isLeftRightSplit(mAllowLeftRightSplitInPortrait,
                 configuration, displayId);
         mStatusBarHider.onLeftRightSplitUpdated(mIsLeftRightSplit);
+        mStatusBarHider.onFoldStateChanged(isFoldable(mContext.getResources()) &&
+                !mIsLargeScreen);
         updateLayouts();
         updateDividerConfig(mContext);
         initDividerPosition(mTempRect, wasLeftRightSplit);
         updateInvisibleRect();
-
         return true;
     }
 
@@ -851,12 +853,12 @@ public final class SplitLayout implements DisplayInsetsController.OnInsetsChange
             case SNAP_TO_START_AND_DISMISS:
                 flingDividerPosition(currentPosition, snapTarget.position, duration, interpolator,
                         () -> mSplitLayoutHandler.onSnappedToDismiss(false /* bottomOrRight */,
-                                EXIT_REASON_DRAG_DIVIDER));
+                                EXIT_REASON_DRAG_DIVIDER, new WindowContainerTransaction()));
                 break;
             case SNAP_TO_END_AND_DISMISS:
                 flingDividerPosition(currentPosition, snapTarget.position, duration, interpolator,
                         () -> mSplitLayoutHandler.onSnappedToDismiss(true /* bottomOrRight */,
-                                EXIT_REASON_DRAG_DIVIDER));
+                                EXIT_REASON_DRAG_DIVIDER, new WindowContainerTransaction()));
                 break;
             default:
                 flingDividerPosition(currentPosition, snapTarget.position, duration, interpolator,
@@ -941,11 +943,11 @@ public final class SplitLayout implements DisplayInsetsController.OnInsetsChange
     }
 
     /** Fling divider from current position to end or start position then exit */
-    public void flingDividerToDismiss(boolean toEnd, int reason) {
+    public void flingDividerToDismiss(boolean toEnd, int reason, WindowContainerTransaction wct) {
         final int target = toEnd ? mDividerSnapAlgorithm.getDismissEndTarget().position
                 : mDividerSnapAlgorithm.getDismissStartTarget().position;
         flingDividerPosition(getDividerPosition(), target, FLING_EXIT_DURATION, FAST_OUT_SLOW_IN,
-                () -> mSplitLayoutHandler.onSnappedToDismiss(toEnd, reason));
+                () -> mSplitLayoutHandler.onSnappedToDismiss(toEnd, reason, wct));
     }
 
     /** Fling divider from current position to center position. */
@@ -1444,7 +1446,7 @@ public final class SplitLayout implements DisplayInsetsController.OnInsetsChange
     public interface SplitLayoutHandler {
 
         /** Calls when dismissing split. */
-        void onSnappedToDismiss(boolean snappedToEnd, int reason);
+        void onSnappedToDismiss(boolean snappedToEnd, int reason, WindowContainerTransaction wct);
 
         /**
          * Calls when resizing the split bounds.

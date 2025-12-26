@@ -27,11 +27,13 @@ import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.graphics.res.animatedVectorResource
 import androidx.compose.animation.graphics.res.rememberAnimatedVectorPainter
 import androidx.compose.animation.graphics.vector.AnimatedImageVector
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
@@ -164,6 +166,7 @@ import com.android.systemui.media.remedia.ui.viewmodel.MediaPlayPauseActionViewM
 import com.android.systemui.media.remedia.ui.viewmodel.MediaSecondaryActionViewModel
 import com.android.systemui.media.remedia.ui.viewmodel.MediaSettingsButtonViewModel
 import com.android.systemui.media.remedia.ui.viewmodel.MediaViewModel
+import com.android.systemui.res.R
 import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
@@ -182,6 +185,7 @@ fun Media(
     behavior: MediaUiBehavior,
     onDismissed: () -> Unit,
     modifier: Modifier = Modifier,
+    visible: () -> Boolean = { true },
 ) {
     val context = LocalContext.current
     val viewModel: MediaViewModel =
@@ -191,6 +195,8 @@ fun Media(
                 carouselVisibility = behavior.carouselVisibility,
             )
         }
+
+    LaunchedEffect(visible) { viewModel.setVisibility(visible) }
 
     CardCarousel(
         viewModel = viewModel,
@@ -217,7 +223,12 @@ private fun CardCarousel(
     onDismissed: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    AnimatedVisibility(visible = viewModel.isCarouselVisible, modifier = modifier) {
+    AnimatedVisibility(
+        visible = viewModel.isCarouselVisible,
+        modifier = modifier,
+        enter = expandVertically(expandFrom = Alignment.Top),
+        exit = shrinkVertically(shrinkTowards = Alignment.Top),
+    ) {
         CardCarouselContent(
             viewModel = viewModel,
             presentationStyle = presentationStyle,
@@ -614,11 +625,12 @@ private fun ContentScope.CardForegroundContent(
             // Second row.
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(start = 16.dp, end = 16.dp),
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp).heightIn(min = 48.dp),
             ) {
                 Metadata(
                     title = viewModel.title,
                     subtitle = viewModel.subtitle,
+                    isExplicit = viewModel.isExplicit,
                     color = Color.White,
                     modifier = Modifier.weight(1f).padding(end = 8.dp),
                 )
@@ -673,6 +685,7 @@ private fun ContentScope.CardForegroundContent(
                 Metadata(
                     title = viewModel.title,
                     subtitle = viewModel.subtitle,
+                    isExplicit = viewModel.isExplicit,
                     color = Color.White,
                     modifier = Modifier.weight(1f).padding(end = 8.dp),
                 )
@@ -750,6 +763,7 @@ private fun ContentScope.CompactCardForeground(
         Metadata(
             title = viewModel.title,
             subtitle = viewModel.subtitle,
+            isExplicit = viewModel.isExplicit,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f),
         )
@@ -850,11 +864,15 @@ private fun ContentScope.Navigation(
                 modifier = modifier,
             ) {
                 if (areActionsVisible) {
-                    SecondaryAction(
-                        viewModel = viewModel.left,
-                        modifier = Modifier.sysuiResTag(MediaRes.PREV_BTN),
-                        element = Media.Elements.PrevButton,
-                    )
+                    if (viewModel.left is MediaSecondaryActionViewModel.None) {
+                        Spacer(Modifier.size(width = 16.dp, height = 48.dp))
+                    } else {
+                        SecondaryAction(
+                            viewModel = viewModel.left,
+                            modifier = Modifier.sysuiResTag(MediaRes.PREV_BTN),
+                            element = Media.Elements.PrevButton,
+                        )
+                    }
                 }
 
                 val interactionSource = remember { MutableInteractionSource() }
@@ -936,16 +954,22 @@ private fun ContentScope.Navigation(
                 }
 
                 if (areActionsVisible) {
-                    SecondaryAction(
-                        viewModel = viewModel.right,
-                        modifier = Modifier.sysuiResTag(MediaRes.NEXT_BTN),
-                        element = Media.Elements.NextButton,
-                    )
+                    if (viewModel.right is MediaSecondaryActionViewModel.None) {
+                        Spacer(Modifier.size(width = 16.dp, height = 48.dp))
+                    } else {
+                        SecondaryAction(
+                            viewModel = viewModel.right,
+                            modifier = Modifier.sysuiResTag(MediaRes.NEXT_BTN),
+                            element = Media.Elements.NextButton,
+                        )
+                    }
                 }
             }
         }
 
-        is MediaNavigationViewModel.Hidden -> Unit
+        is MediaNavigationViewModel.Hidden -> {
+            Spacer(Modifier.size(48.dp))
+        }
     }
 }
 
@@ -1163,6 +1187,7 @@ private fun CardGuts(
 private fun ContentScope.Metadata(
     title: String,
     subtitle: String,
+    isExplicit: Boolean,
     color: Color,
     modifier: Modifier = Modifier,
 ) {
@@ -1181,14 +1206,31 @@ private fun ContentScope.Metadata(
                     overflow = TextOverflow.Ellipsis,
                 )
 
-                Text(
-                    text = subtitle,
-                    modifier = Modifier.sysuiResTag(MediaRes.ARTIST),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = color,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (isExplicit) {
+                        Icon(
+                            icon =
+                                Icon.Resource(
+                                    resId = R.drawable.ic_media_explicit_indicator,
+                                    contentDescription = null,
+                                ),
+                            modifier =
+                                Modifier.sysuiResTag(MediaRes.EXPLICIT_INDICATOR)
+                                    .padding(end = 8.dp)
+                                    .size(13.dp),
+                            tint = color,
+                        )
+                    }
+
+                    Text(
+                        text = subtitle,
+                        modifier = Modifier.sysuiResTag(MediaRes.ARTIST),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = color,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
     }
@@ -1426,7 +1468,11 @@ private fun RevealedContent(
             Icon(
                 icon = viewModel.icon,
                 modifier =
-                    Modifier.layoutId(Media.LayoutId.CardRevealedContent)
+                    Modifier.background(
+                            color = MaterialTheme.colorScheme.surface,
+                            shape = CircleShape,
+                        )
+                        .layoutId(Media.LayoutId.CardRevealedContent)
                         .size(48.dp)
                         .padding(12.dp)
                         .graphicsLayer {
@@ -1434,6 +1480,7 @@ private fun RevealedContent(
                             rotationZ = revealAmount() * 90
                         }
                         .clickable { viewModel.onClick() },
+                tint = MaterialTheme.colorScheme.onSurface,
             )
         },
         modifier = modifier,
@@ -1507,6 +1554,7 @@ private object MediaRes {
     const val SUGGESTED_DEVICE_CHIP = "device_suggestion_button"
     const val TITLE = "header_title"
     const val ARTIST = "header_artist"
+    const val EXPLICIT_INDICATOR = "media_explicit_indicator"
     const val HIDE_BTN = "dismiss"
 }
 

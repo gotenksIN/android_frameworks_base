@@ -562,10 +562,15 @@
 
     <!-- Declare that this application may use cleartext traffic, such as HTTP rather than HTTPS;
          WebSockets rather than WebSockets Secure; XMPP, IMAP, SMTP without STARTTLS or TLS.
-         Defaults to true. If set to false {@code false}, the application declares that it does not
-         intend to use cleartext network traffic, in which case platform components (e.g. HTTP
-         stacks, {@code DownloadManager}, {@code MediaPlayer}) will refuse applications's requests
+         Defaults to true before API level 27, to false afterwards. If set to
+         false {@code false}, the application declares that it does not intend to use cleartext
+         network traffic, in which case platform components (e.g. HTTP stacks,
+         {@code DownloadManager}, {@code MediaPlayer}) will refuse applications's requests
          to use cleartext traffic. Third-party libraries are encouraged to honor this flag as well.
+         @deprecated This API will be deprecated in the future and will have no effect.
+         Specify a <a href="{@docRoot}privacy-and-security/security-config#manifest">
+         Network Security Config file</a> in addition to this API to prevent future breakage.
+         @FlaggedApi(android.security.Flags.FLAG_DEPRECATE_USES_CLEARTEXT_TRAFFIC)
          -->
     <attr name="usesCleartextTraffic" format="boolean" />
 
@@ -1286,6 +1291,19 @@
          to your package name. The class must implement the {@link android.app.ZygotePreload}
          interface. -->
     <attr name="zygotePreloadName" format="string"/>
+
+     <!-- Name of the library to be preloaded by Native App Zygote. When a service with this
+          attribute sets {@link android.R.attr#nativeService}, {@link android.R.attr#useAppZygote},
+          and {@link android.R.attr#isolatedProcess} to <code>true</code>, the system launches a
+          Native App Zygote process. When both {@link android.R.attr#zygotePreloadName} and
+          {@link android.R.attr#zygotePreloadNativeLib} are specified, a service will fork a Native
+          App Zygote process if the aforementioned attributes are all set to <code>true</code>, and
+          a Managed App Zygote process otherwise. -->
+    <attr name="zygotePreloadNativeLib" format="string"/>
+
+    <!-- Optional function name to be called once the library by zygotePreloadNativeLib has been
+         preloaded. If not specified, no function is called after the library is loaded. -->
+    <attr name="zygotePreloadNativeFunc" format="string"/>
 
     <!-- If set to <code>true</code>, indicates to the platform that this APK is
          a 'feature' split and that it implicitly depends on the base APK. This distinguishes
@@ -2137,13 +2155,6 @@
         <attr name="requiredAccountType" format="string"/>
         <!-- @deprecated replaced by setting appCategory attribute to "game" -->
         <attr name="isGame" />
-        <!-- Declare that this application may use cleartext traffic, such as HTTP rather than
-             HTTPS; WebSockets rather than WebSockets Secure; XMPP, IMAP, SMTP without STARTTLS or
-             TLS). Defaults to true. If set to false {@code false}, the application declares that it
-             does not intend to use cleartext network traffic, in which case platform components
-             (e.g. HTTP stacks, {@code DownloadManager}, {@code MediaPlayer}) will refuse
-             applications's requests to use cleartext traffic. Third-party libraries are encouraged
-             to honor this flag as well. -->
         <attr name="usesCleartextTraffic" />
         <attr name="multiArch" />
         <attr name="useEmbeddedDex" />
@@ -2192,6 +2203,10 @@
         <attr name="hasFragileUserData" format="boolean"/>
 
         <attr name="zygotePreloadName" />
+
+        <attr name="zygotePreloadNativeLib" />
+
+        <attr name="zygotePreloadNativeFunc" />
 
         <!-- If {@code true} the system will clear app's data if a restore operation fails.
              This flag is turned on by default. <em>This attribute is usable only by system apps.
@@ -2465,6 +2480,10 @@
              be set to at least SDK version 37. -->
         <attr name="requiresGeneralPurposeTargetSdkVersion"  format="integer" />
 
+        <!-- Used to specify the app's minimum target SDK version for which a purpose string
+             should be provided. This must be set to at least SDK version 37. -->
+        <attr name="requiresPurposeStringTargetSdkVersion"  format="integer" />
+
     </declare-styleable>
 
      <!-- TODO(b/443057927): Rename for specific purpose.
@@ -2616,6 +2635,18 @@
                  ACCESS_COARSE_LOCATION permissions. -->
             <flag name="neverForLocation" value="0x00010000" />
         </attr>
+        <!-- Optional: The resource ID for the purpose string. Only required when stated so by the
+             {@link #AndroidManifestPermission permission} tag's <code>
+             requiresPurposeStringTargetSdkVersion</code> attribute. If required, a string resource
+             ID should be provided that has a brief explanation of what the permission will be used
+             for. The string should be present in all locales the app developer wants to support.
+
+             <p>The string is recommended to be around 150 characters in most locales with a
+             maximum length of 300 characters in all locales. This string may appear in the runtime
+             permission grant dialog that is presented to users to help inform them of the app's
+             intended usage of the permission.
+             @FlaggedApi(android.permission.flags.Flags.FLAG_PPD_MANIFEST_ENABLED)-->
+        <attr name="purposeString" format="reference" />
     </declare-styleable>
 
     <!-- Use <code>purpose</code> tag to specify purpose(s) for requesting a permission.
@@ -3351,6 +3382,23 @@
         <attr name="allowSharedIsolatedProcess" format="boolean" />
         <attr name="systemUserOnly" format="boolean" />
         <attr name="intentMatchingFlags"/>
+        <!-- If true, the system does not initialize the Android Runtime in the process that runs
+             the service. Instead the system loads a library named <code>libmain.so</code> into
+             the process and then starts the service from a function named
+             <code>ANativeService_onCreate</code> in the library. The library and function names
+             can be configured by setting the properties
+             {@link android.content.pm.PackageManager#PROPERTY_NATIVE_SERVICE_LIB_NAME} and
+             {@link android.content.pm.PackageManager#PROPERTY_NATIVE_SERVICE_FUNC_NAME}
+             respectively.
+             <p>
+             Attempts to start services that enable this attribute may fail in system running older
+             Android version than that this feature is introduced. Users must check the API level
+             before starting the services.
+             <p>
+             This flag is ignored if {@link android.R.attr#isolatedProcess} is false or isn't
+             specified.
+        -->
+        <attr name="nativeService" format="boolean" />
     </declare-styleable>
 
     <!-- @hide The <code>apex-system-service</code> tag declares an apex system service

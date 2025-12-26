@@ -2396,7 +2396,7 @@ public class UserManager {
      * @hide
      */
     @TestApi
-    @FlaggedApi(android.multiuser.Flags.FLAG_USER_REMOVAL_MINOR_APIS_2026)
+    @SuppressWarnings("UnflaggedApi") // @TestApi without associated feature.
     public static final int REMOVE_RESULT_USER_IS_REMOVABLE = 3;
 
     /**
@@ -2445,9 +2445,6 @@ public class UserManager {
     @SystemApi
     public static final int REMOVE_RESULT_ERROR_MAIN_USER_PERMANENT_ADMIN = -5;
 
-    // TODO(b/419105275): Currently, the headless system user is also an admin user. When we
-    // disallow the removal of last admin user, we mean the last admin user that's not the HSU.
-    // If/When b/419105275 removes the admin flag from HSU, this comment should be removed.
     /**
      * A response code from {@link #removeUserWhenPossible(UserHandle, boolean)} indicating that
      * user being removed cannot be removed because it is considered the last
@@ -2818,6 +2815,32 @@ public class UserManager {
             }
         }
         return sIsHeadlessSystemUser;
+    }
+
+    /**
+     * Sets a temporary list of activities that can be launched when the
+     * {@link ActivityManager#getCurrentUser() current user} is a user of the given {@code type}.
+     *
+     * <p>The allowlist is valid until the system is restarted, or this method is called with
+     * {@code null}.
+     *
+     * @param userType currently, only {@link #USER_TYPE_SYSTEM_HEADLESS} is supported.
+     * @param activities list of activities that are allowed, or empty to allow any activity, or
+     *        {@code null} to reset the temporary list (in which case the allowlist would be defined
+     *        by the device's config).
+     *
+     * @hide
+     */
+    @RequiresPermission(anyOf = {android.Manifest.permission.MANAGE_USERS,
+            android.Manifest.permission.MANAGE_HEADLESS_SYSTEM_USER_ALLOWLISTS})
+    public void setTemporaryActivitiesAllowlist(String userType,
+            @Nullable Set<ComponentName> activities) {
+        final List<ComponentName> list = activities == null ? null : new ArrayList<>(activities);
+        try {
+            mService.setTemporaryActivitiesAllowlist(userType, list);
+        } catch (RemoteException re) {
+            throw re.rethrowFromSystemServer();
+        }
     }
 
     /**
@@ -3460,11 +3483,10 @@ public class UserManager {
     public boolean canAddPrivateProfile() {
         if (!android.multiuser.Flags.enablePrivateSpaceFeatures()) return false;
         if (android.multiuser.Flags.blockPrivateSpaceCreation()) {
-            // TODO(b/413464199): Ideally, move this client-side, changing it to
-            // if (android.multiuser.Flags.consistentMaxUsers()) {
-            //  return canAddMoreProfilesToUser(USER_TYPE_PROFILE_PRIVATE, mUserId)
-            //          && !hasUserRestriction(UserManager.DISALLOW_ADD_PRIVATE_PROFILE);
-            // }
+            if (android.multiuser.Flags.consistentMaxUsers()) {
+                return canAddMoreProfilesToUser(USER_TYPE_PROFILE_PRIVATE, mUserId)
+                        && !hasUserRestriction(UserManager.DISALLOW_ADD_PRIVATE_PROFILE);
+            }
             try {
                 return mService.canAddPrivateProfile(mUserId);
             } catch (RemoteException re) {
@@ -6520,7 +6542,7 @@ public class UserManager {
      * @hide
      */
     @TestApi
-    @FlaggedApi(android.multiuser.Flags.FLAG_USER_REMOVAL_MINOR_APIS_2026)
+    @SuppressWarnings("UnflaggedApi") // @TestApi without associated feature.
     @RequiresPermission(anyOf = {
             Manifest.permission.CREATE_USERS,
             Manifest.permission.QUERY_USERS})

@@ -16,8 +16,6 @@
 
 package com.android.server.display.feature;
 
-import static com.android.window.flags.Flags.FLAG_ENABLE_UPDATED_DISPLAY_CONNECTION_DIALOG;
-
 import android.content.Context;
 import android.os.Build;
 import android.os.SystemProperties;
@@ -58,13 +56,6 @@ public class DisplayManagerFlags {
     private final FlagState mPowerThrottlingClamperFlagState = new FlagState(
             Flags.FLAG_ENABLE_POWER_THROTTLING_CLAMPER,
             Flags::enablePowerThrottlingClamper);
-
-    private final FlagState mEvenDimmerFlagState = new FlagState(
-            Flags.FLAG_EVEN_DIMMER,
-            Flags::evenDimmer);
-    private final FlagState mSmallAreaDetectionFlagState = new FlagState(
-            com.android.graphics.surfaceflinger.flags.Flags.FLAG_ENABLE_SMALL_AREA_DETECTION,
-            com.android.graphics.surfaceflinger.flags.Flags::enableSmallAreaDetection);
 
     private final FlagState mSyncedResolutionSwitch = new FlagState(
             com.android.graphics.surfaceflinger.flags.Flags.FLAG_SYNCED_RESOLUTION_SWITCH,
@@ -134,11 +125,6 @@ public class DisplayManagerFlags {
     private final FlagState mEnableDisplayContentModeManagementFlagState = new FlagState(
             Flags.FLAG_ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT,
             DesktopExperienceFlags.ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT::isTrue
-    );
-
-    private final FlagState mEnableUpdatedDisplayConnectionDialogFlagState = new FlagState(
-            FLAG_ENABLE_UPDATED_DISPLAY_CONNECTION_DIALOG,
-            DesktopExperienceFlags.ENABLE_UPDATED_DISPLAY_CONNECTION_DIALOG::isTrue
     );
 
     private final FlagState mSubscribeGranularDisplayEvents = new FlagState(
@@ -215,11 +201,6 @@ public class DisplayManagerFlags {
             Flags::enableSyntheticModesV2
     );
 
-    private final FlagState mIsSingleAppEventForModeAndFrameRateOverrideEnabled = new FlagState(
-            Flags.FLAG_ENABLE_SINGLE_APP_EVENT_FOR_MODE_AND_FRAME_RATE_OVERRIDE,
-            Flags::enableSingleAppEventForModeAndFrameRateOverride
-    );
-
     private final FlagState mIsDisplayMirrorInLockTaskModeEnabled = new FlagState(
             Flags.FLAG_ENABLE_DISPLAY_MIRROR_IN_LOCK_TASK_MODE,
             DesktopExperienceFlags.ENABLE_DISPLAY_MIRROR_IN_LOCK_TASK_MODE::isTrue
@@ -243,15 +224,6 @@ public class DisplayManagerFlags {
     /** Returns whether displayoffload is enabled on not */
     public boolean isDisplayOffloadEnabled() {
         return mDisplayOffloadFlagState.isEnabled();
-    }
-
-    /** Returns whether brightness range is allowed to extend below traditional range. */
-    public boolean isEvenDimmerEnabled() {
-        return mEvenDimmerFlagState.isEnabled();
-    }
-
-    public boolean isSmallAreaDetectionEnabled() {
-        return mSmallAreaDetectionFlagState.isEnabled();
     }
 
     public boolean isSyncedResolutionSwitchEnabled() {
@@ -342,10 +314,6 @@ public class DisplayManagerFlags {
         return mEnableDisplayContentModeManagementFlagState.isEnabled();
     }
 
-    public boolean isUpdatedDisplayConnectionDialogEnabled() {
-        return mEnableUpdatedDisplayConnectionDialogFlagState.isEnabled();
-    }
-
     /**
      * @return {@code true} if the flag for subscribing to granular display events is enabled
      */
@@ -430,10 +398,6 @@ public class DisplayManagerFlags {
         return mSyntheticModesV2.isEnabled();
     }
 
-    public boolean isSingleAppEventForModeAndFrameRateOverrideEnabled() {
-        return mIsSingleAppEventForModeAndFrameRateOverrideEnabled.isEnabled();
-    }
-
     public boolean isDisplayMirrorInLockTaskModeEnabled() {
         return mIsDisplayMirrorInLockTaskModeEnabled.isEnabled();
     }
@@ -453,8 +417,6 @@ public class DisplayManagerFlags {
         pw.println(" " + mDisplayTopology);
         pw.println(" " + mDisplayTopologyApi);
         pw.println(" " + mPowerThrottlingClamperFlagState);
-        pw.println(" " + mEvenDimmerFlagState);
-        pw.println(" " + mSmallAreaDetectionFlagState);
         pw.println(" " + mSyncedResolutionSwitch);
         pw.println(" " + mFastHdrTransitions);
         pw.println(" " + mSensorBasedBrightnessThrottling);
@@ -481,11 +443,9 @@ public class DisplayManagerFlags {
         pw.println(" " + mEnableDefaultDisplayInTopologySwitch);
         pw.println(" " + mModeSwitchWithoutSaving);
         pw.println(" " + mEnsureColorFadeWhenTurningOn);
-        pw.println(" " + mEnableUpdatedDisplayConnectionDialogFlagState);
         pw.println(" " + mIsLoggingForDisplayEventsEnabled);
         pw.println(" " + mIsMinmodeCapBrightnessEnabled);
         pw.println(" " + mSyntheticModesV2);
-        pw.println(" " + mIsSingleAppEventForModeAndFrameRateOverrideEnabled);
         pw.println(" " + mIsDisplayMirrorInLockTaskModeEnabled);
         pw.println(" " + mIsSizeOverrideForExternalDisplaysEnabled);
     }

@@ -41,7 +41,7 @@ import org.junit.Test
 abstract class MinimizeAppWindows
 constructor(
     private val rotation: Rotation = Rotation.ROTATION_0,
-    private val usingKeyboard: Boolean = false
+    private val usingKeyboard: Boolean = false,
 ) : TestScenarioBase(rotation) {
     private val instrumentation: Instrumentation = InstrumentationRegistry.getInstrumentation()
     private val wmHelper = WindowManagerStateHelper(instrumentation)
@@ -54,7 +54,6 @@ constructor(
 
     @Before
     fun setup() {
-        Assume.assumeTrue(Flags.enableMinimizeButton())
         Assume.assumeTrue(Flags.enableEmptyDeskOnMinimize())
         if (usingKeyboard) {
             Assume.assumeTrue(DesktopModeFlags.ENABLE_TASK_RESIZING_KEYBOARD_SHORTCUTS.isTrue)

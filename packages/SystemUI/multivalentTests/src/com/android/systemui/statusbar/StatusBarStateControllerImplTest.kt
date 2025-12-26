@@ -33,10 +33,10 @@ import com.android.systemui.deviceentry.domain.interactor.deviceUnlockedInteract
 import com.android.systemui.flags.DisableSceneContainer
 import com.android.systemui.flags.EnableSceneContainer
 import com.android.systemui.flags.parameterizeSceneContainerFlag
-import com.android.systemui.keyguard.data.repository.fakeDeviceEntryFingerprintAuthRepository
 import com.android.systemui.keyguard.data.repository.fakeKeyguardTransitionRepository
+import com.android.systemui.keyguard.domain.interactor.biometricUnlockInteractor
+import com.android.systemui.keyguard.shared.model.BiometricUnlockSource
 import com.android.systemui.keyguard.shared.model.KeyguardState
-import com.android.systemui.keyguard.shared.model.SuccessFingerprintAuthenticationStatus
 import com.android.systemui.keyguard.shared.model.TransitionStep
 import com.android.systemui.kosmos.collectLastValue
 import com.android.systemui.kosmos.runTest
@@ -45,6 +45,8 @@ import com.android.systemui.kosmos.useUnconfinedTestDispatcher
 import com.android.systemui.plugins.statusbar.StatusBarStateController
 import com.android.systemui.plugins.statusbar.statusBarStateController
 import com.android.systemui.scene.data.repository.Idle
+import com.android.systemui.scene.data.repository.Transition
+import com.android.systemui.scene.data.repository.setSceneTransition
 import com.android.systemui.scene.data.repository.setTransition
 import com.android.systemui.scene.domain.interactor.sceneInteractor
 import com.android.systemui.scene.domain.startable.sceneContainerStartable
@@ -53,6 +55,7 @@ import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.shade.domain.interactor.disableDualShade
 import com.android.systemui.shade.domain.interactor.enableDualShade
 import com.android.systemui.shade.domain.interactor.enableSingleShade
+import com.android.systemui.statusbar.phone.BiometricUnlockController
 import com.android.systemui.testKosmos
 import com.google.common.truth.Truth.assertThat
 import org.junit.Assert.assertEquals
@@ -278,8 +281,9 @@ class StatusBarStateControllerImplTest(flags: FlagsParameterization) : SysuiTest
             val alternateBouncerIsVisible by collectLastValue(alternateBouncerInteractor.isVisible)
 
             fakeAuthenticationRepository.setAuthenticationMethod(AuthenticationMethodModel.Password)
-            fakeDeviceEntryFingerprintAuthRepository.setAuthenticationStatus(
-                SuccessFingerprintAuthenticationStatus(0, true)
+            kosmos.biometricUnlockInteractor.setBiometricUnlockState(
+                unlockStateInt = BiometricUnlockController.MODE_UNLOCK_COLLAPSING,
+                biometricUnlockSource = BiometricUnlockSource.FINGERPRINT_SENSOR,
             )
             assertThat(deviceUnlockStatus!!.isUnlocked).isTrue()
 
@@ -373,8 +377,9 @@ class StatusBarStateControllerImplTest(flags: FlagsParameterization) : SysuiTest
             val currentScene by collectLastValue(sceneInteractor.currentScene)
             val deviceUnlockStatus by collectLastValue(deviceUnlockedInteractor.deviceUnlockStatus)
             fakeAuthenticationRepository.setAuthenticationMethod(AuthenticationMethodModel.Password)
-            fakeDeviceEntryFingerprintAuthRepository.setAuthenticationStatus(
-                SuccessFingerprintAuthenticationStatus(0, true)
+            kosmos.biometricUnlockInteractor.setBiometricUnlockState(
+                unlockStateInt = BiometricUnlockController.MODE_UNLOCK_COLLAPSING,
+                biometricUnlockSource = BiometricUnlockSource.FINGERPRINT_SENSOR,
             )
 
             assertThat(deviceUnlockStatus!!.isUnlocked).isTrue()
@@ -418,8 +423,9 @@ class StatusBarStateControllerImplTest(flags: FlagsParameterization) : SysuiTest
             val currentOverlays by collectLastValue(sceneInteractor.currentOverlays)
             val deviceUnlockStatus by collectLastValue(deviceUnlockedInteractor.deviceUnlockStatus)
             fakeAuthenticationRepository.setAuthenticationMethod(AuthenticationMethodModel.Password)
-            fakeDeviceEntryFingerprintAuthRepository.setAuthenticationStatus(
-                SuccessFingerprintAuthenticationStatus(0, true)
+            kosmos.biometricUnlockInteractor.setBiometricUnlockState(
+                unlockStateInt = BiometricUnlockController.MODE_UNLOCK_COLLAPSING,
+                biometricUnlockSource = BiometricUnlockSource.FINGERPRINT_SENSOR,
             )
 
             assertThat(deviceUnlockStatus!!.isUnlocked).isTrue()
@@ -515,6 +521,55 @@ class StatusBarStateControllerImplTest(flags: FlagsParameterization) : SysuiTest
                 loggingReason = "reason",
             )
             assertThat(currentOverlays).containsExactly(Overlays.QuickSettingsShade)
+            assertThat(statusBarState).isEqualTo(StatusBarState.SHADE)
+        }
+
+    @Test
+    @EnableSceneContainer
+    fun start_hydratesStatusBarState_duringTransitionFromLockscreenToGone() =
+        kosmos.runTest {
+            var statusBarState = underTest.state
+            val listener =
+                object : StatusBarStateController.StateListener {
+                    override fun onStateChanged(newState: Int) {
+                        statusBarState = newState
+                    }
+                }
+            underTest.addCallback(listener)
+
+            val currentScene by collectLastValue(sceneInteractor.currentScene)
+            val deviceUnlockStatus by collectLastValue(deviceUnlockedInteractor.deviceUnlockStatus)
+
+            // initial state: device is locked, on Lockscreen
+            fakeAuthenticationRepository.setAuthenticationMethod(AuthenticationMethodModel.Password)
+            assertThat(deviceUnlockStatus!!.isUnlocked).isFalse()
+
+            sceneInteractor.changeScene(toScene = Scenes.Lockscreen, loggingReason = "reason")
+            assertThat(currentScene).isEqualTo(Scenes.Lockscreen)
+
+            // Call start to begin hydrating based on the scene framework:
+            underTest.start()
+
+            assertThat(statusBarState).isEqualTo(StatusBarState.KEYGUARD)
+
+            // unlock device
+            kosmos.biometricUnlockInteractor.setBiometricUnlockState(
+                unlockStateInt = BiometricUnlockController.MODE_UNLOCK_COLLAPSING,
+                biometricUnlockSource = BiometricUnlockSource.FINGERPRINT_SENSOR,
+            )
+            assertThat(deviceUnlockStatus!!.isUnlocked).isTrue()
+
+            // device begins transition from lockscreen to gone
+            setSceneTransition(Transition(from = Scenes.Lockscreen, to = Scenes.Gone))
+            assertThat(currentScene).isEqualTo(Scenes.Gone)
+
+            // because we are still in transition, even though device is unlocked and current
+            // (destination) scene is Gone, status bar state should still be KEYGUARD until
+            // the transition finishes
+            assertThat(statusBarState).isEqualTo(StatusBarState.KEYGUARD)
+
+            // complete transition
+            setSceneTransition(Idle(Scenes.Gone))
             assertThat(statusBarState).isEqualTo(StatusBarState.SHADE)
         }
 

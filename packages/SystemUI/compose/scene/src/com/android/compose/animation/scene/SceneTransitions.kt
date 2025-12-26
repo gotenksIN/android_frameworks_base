@@ -29,6 +29,8 @@ import com.android.compose.animation.scene.transformation.TransformationMatcher
 import com.android.compose.animation.scene.transformation.TransformationWithRange
 import com.android.compose.animation.scene.transformation.TransformedElementPropertyTransformation
 import com.android.internal.jank.Cuj.CujType
+import com.android.mechanics.GestureContext
+import com.android.mechanics.spec.InputDirection
 
 /** The transitions configuration of a [SceneTransitionLayout]. */
 class SceneTransitions
@@ -116,6 +118,7 @@ internal constructor(
             from,
             to,
             cuj = null,
+            cujTag = null,
             previewTransformationSpec = defaultTransitionSpec?.previewTransformationSpec,
             reversePreviewTransformationSpec = null,
             transformationSpec =
@@ -152,6 +155,9 @@ internal interface TransitionSpec {
 
     /** The CUJ covered by this transition. */
     @CujType val cuj: Int?
+
+    /** The tag appended to the end of the CUJ for this transition. */
+    val cujTag: String?
 
     /**
      * Return a reversed version of this [TransitionSpec] for a transition going from [to] to
@@ -192,6 +198,14 @@ internal interface TransformationSpec {
      */
     val distance: UserActionDistance?
 
+    /**
+     * Hints at the intrinsic, "design intent" direction of the transition.
+     *
+     * Provides the direction for direction-dependent animations when they are triggered
+     * programmatically, rather than by a user's swipe.
+     */
+    val intrinsicDirection: SwipeDirection?
+
     /** The list of [TransformationMatcher] applied to elements during this transformation. */
     val transformationMatchers: List<TransformationMatcher>
 
@@ -200,6 +214,7 @@ internal interface TransformationSpec {
             TransformationSpecImpl(
                 progressSpec = snap(),
                 distance = null,
+                intrinsicDirection = null,
                 transformationMatchers = emptyList(),
             )
         internal val EmptyProvider = { _: TransitionState.Transition -> Empty }
@@ -211,6 +226,7 @@ internal class TransitionSpecImpl(
     override val from: ContentKey?,
     override val to: ContentKey?,
     override val cuj: Int?,
+    override val cujTag: String?,
     private val previewTransformationSpec:
         ((TransitionState.Transition) -> TransformationSpecImpl)? =
         null,
@@ -225,6 +241,7 @@ internal class TransitionSpecImpl(
             from = to,
             to = from,
             cuj = cuj,
+            cujTag = cujTag,
             previewTransformationSpec = reversePreviewTransformationSpec,
             reversePreviewTransformationSpec = previewTransformationSpec,
             transformationSpec = { transition ->
@@ -232,6 +249,7 @@ internal class TransitionSpecImpl(
                 TransformationSpecImpl(
                     progressSpec = reverse.progressSpec,
                     distance = reverse.distance,
+                    intrinsicDirection = reverse.intrinsicDirection?.reversed(),
                     transformationMatchers =
                         reverse.transformationMatchers.map {
                             TransformationMatcher(
@@ -266,9 +284,36 @@ internal class DefaultTransitionSpec(
 internal class TransformationSpecImpl(
     override val progressSpec: AnimationSpec<Float>?,
     override val distance: UserActionDistance?,
+    override val intrinsicDirection: SwipeDirection?,
     override val transformationMatchers: List<TransformationMatcher>,
 ) : TransformationSpec {
     private val cache = mutableMapOf<ElementKey, MutableMap<ContentKey, ElementTransformations?>>()
+
+    /**
+     * Provides a default [GestureContext] to fine-tune animations when they are triggered
+     * programmatically, rather than by a user gesture.
+     *
+     * This context is created if an [intrinsicDirection] is specified. The [intrinsicDirection]
+     * hints at the "design intent" direction of the transition, allowing direction-dependent
+     * animations to run correctly even without a swipe.
+     */
+    val defaultGestureContext: GestureContext? =
+        intrinsicDirection?.let { intrinsicDirection ->
+            object : GestureContext {
+                override val direction: InputDirection
+                    get() =
+                        when (intrinsicDirection) {
+                            SwipeDirection.Up,
+                            SwipeDirection.Left,
+                            SwipeDirection.Start -> InputDirection.Min
+                            SwipeDirection.Down,
+                            SwipeDirection.Right,
+                            SwipeDirection.End -> InputDirection.Max
+                        }
+
+                override val dragOffset: Float = 0f
+            }
+        }
 
     internal fun transformations(
         element: ElementKey,

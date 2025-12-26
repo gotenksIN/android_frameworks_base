@@ -393,7 +393,6 @@ public class DisplayPolicy {
     private final WindowLayout mWindowLayout = new WindowLayout();
 
     private WindowState mTopFullscreenOpaqueWindowState;
-    private boolean mTopIsFullscreen;
     private int mNavBarOpacityMode = NAV_BAR_OPAQUE_WHEN_FREEFORM_OR_DOCKED;
 
     /**
@@ -1705,10 +1704,6 @@ public class DisplayPolicy {
         return mTopFullscreenOpaqueWindowState;
     }
 
-    boolean isTopLayoutFullscreen() {
-        return mTopIsFullscreen;
-    }
-
     /**
      * Called following layout of all windows before each window has policy applied.
      */
@@ -1796,7 +1791,7 @@ public class DisplayPolicy {
 
         if (win.mImeInsetsConsumed != mImeInsetsConsumed) {
             win.mImeInsetsConsumed = mImeInsetsConsumed;
-            final WindowState imeWin = mDisplayContent.mInputMethodWindow;
+            final WindowState imeWin = mDisplayContent.getImeWindow();
             if (win.isReadyToDispatchInsetsState() && imeWin != null && imeWin.isVisible()) {
                 win.notifyInsetsChanged();
             }
@@ -2839,10 +2834,10 @@ public class DisplayPolicy {
             // the intermediate state to system UI. Otherwise, it might trigger redundant effects.
             return;
         }
+        final WindowState imeWin = mDisplayContent.getImeWindow();
         final WindowState navColorWin = chooseNavigationColorWindowLw(mNavBarColorWindowCandidate,
-                mDisplayContent.mInputMethodWindow, mHasBottomNavigationBar);
-        final boolean isNavbarColorManagedByIme =
-                navColorWin != null && navColorWin == mDisplayContent.mInputMethodWindow;
+                imeWin, mHasBottomNavigationBar);
+        final boolean isNavbarColorManagedByIme = navColorWin != null && navColorWin == imeWin;
         final int appearance = updateLightNavigationBarLw(win != null
                         ? win.mAttrs.insetsFlags.appearance
                         : 0, navColorWin)
@@ -2992,10 +2987,6 @@ public class DisplayPolicy {
             }
         }
 
-        // If the top app is not fullscreen, only the default rotation animation is allowed.
-        mTopIsFullscreen = topAppHidesStatusBar
-                && (mNotificationShade == null || !mNotificationShade.isVisible());
-
         int appearance = APPEARANCE_OPAQUE_NAVIGATION_BARS | APPEARANCE_OPAQUE_STATUS_BARS;
         appearance = configureStatusBarOpacity(appearance);
         appearance = configureNavBarOpacity(appearance, adjacentTasksVisible,
@@ -3141,7 +3132,7 @@ public class DisplayPolicy {
             boolean freeformRootTaskVisible) {
         final WindowState navBackgroundWin = chooseNavigationBackgroundWindow(
                 mNavBarBackgroundWindowCandidate,
-                mDisplayContent.mInputMethodWindow,
+                mDisplayContent.getImeWindow(),
                 mHasBottomNavigationBar);
         final boolean drawBackground = navBackgroundWin != null
                 // There is no app window showing underneath nav bar. (e.g., The screen is locked.)
@@ -3392,7 +3383,6 @@ public class DisplayPolicy {
                 pw.println(mSystemBarVisibilityOverrideMap.valueAt(i));
             }
         }
-        pw.print(prefix); pw.print("mTopIsFullscreen="); pw.println(mTopIsFullscreen);
         pw.print(prefix); pw.print("mImeInsetsConsumed="); pw.println(mImeInsetsConsumed);
         pw.print(prefix); pw.print("mForceShowNavigationBarEnabled=");
         pw.print(mForceShowNavigationBarEnabled);

@@ -326,6 +326,8 @@
     <string name="notification_channel_accessibility_hearing_device" msgid="7816963856388758952">"कान की मशीन"</string>
     <string name="notification_channel_accessibility_security_policy" msgid="1727787021725251912">"सुलभता सुविधाओं का इस्तेमाल"</string>
     <string name="notification_channel_display" msgid="6905032605735615090">"डिसप्ले"</string>
+    <!-- no translation found for notification_channel_parental_controls (2963963315750128538) -->
+    <skip />
     <string name="foreground_service_app_in_background" msgid="1439289699671273555">"<xliff:g id="APP_NAME">%1$s</xliff:g> बैटरी का इस्तेमाल कर रहा है"</string>
     <string name="foreground_service_apps_in_background" msgid="7340037176412387863">"<xliff:g id="NUMBER">%1$d</xliff:g> ऐप बैटरी का इस्तेमाल कर रहे हैं"</string>
     <string name="foreground_service_tap_for_details" msgid="9078123626015586751">"बैटरी और डेटा खर्च की जानकारी के लिए छूएं"</string>
@@ -641,6 +643,8 @@
     <string name="permdesc_nearby_wifi_devices" msgid="3054307728646332906">"इससे, ऐप्लिकेशन आस-पास मौजूद वाई-फ़ाई डिवाइसों की जानकारी दिखा पाएगा, उनसे कनेक्ट कर पाएगा, और उनकी दूरी पता लगा पाएगा"</string>
     <string name="permlab_access_local_network" msgid="3420360767259066877">"लोकल नेटवर्क से कनेक्ट किए गए डिवाइसों को ऐक्सेस करने की अनुमति दें"</string>
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"ऐप्लिकेशन को आपके लोकल नेटवर्क से कनेक्ट किए गए डिवाइसों का ऐक्सेस मिलता है"</string>
+    <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"लूपबैक इंटरफ़ेस का इस्तेमाल करें"</string>
+    <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"इससे ऐप्लिकेशन को लूपबैक इंटरफ़ेस के ज़रिए अन्य ऐप्लिकेशन के साथ इंटरैक्ट करने की अनुमति मिलती है"</string>
     <string name="permlab_ranging" msgid="2854543350668593390">"आस-पास मौजूद डिवाइसों के बीच की दूरी का पता लगाएं"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"ऐप्लिकेशन को, आस-पास मौजूद डिवाइसों के बीच की दूरी का पता लगाने की अनुमति दें"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"NFC का इस्तेमाल करने वाली पैसे चुकाने की पसंदीदा सेवा की जानकारी"</string>
@@ -1043,7 +1047,6 @@
     <string name="keyguard_password_enter_pin_password_code" msgid="7792964196473964340">"अनलॉक करने के लिए पिन लिखें"</string>
     <string name="keyguard_password_wrong_pin_code" msgid="8583732939138432793">"गलत पिन कोड."</string>
     <string name="keyguard_label_text" msgid="3841953694564168384">"लॉक खोलने के लिए, मेन्यू दबाएं और फिर 0 दबाएं."</string>
-    <string name="emergency_call_dialog_number_for_display" msgid="2978165477085612673">"आपातकालीन नंबर"</string>
     <string name="lockscreen_carrier_default" msgid="6192313772955399160">"कोई सेवा नहीं"</string>
     <string name="lockscreen_screen_locked" msgid="7364905540516041817">"स्‍क्रीन लॉक की गई है."</string>
     <string name="lockscreen_instructions_when_pattern_enabled" msgid="7982445492532123308">"लॉक खोलने के लिए मेन्यू दबाएं या आपातलकालीन कॉल करें."</string>
@@ -1054,10 +1057,8 @@
     <string name="lockscreen_pattern_correct" msgid="8050630103651508582">"सही!"</string>
     <string name="lockscreen_pattern_wrong" msgid="2940138714468358458">"फिर से कोशिश करें"</string>
     <string name="lockscreen_password_wrong" msgid="8605355913868947490">"फिर से कोशिश करें"</string>
-    <!-- no translation found for lockscreen_click_to_unlock_hint (6056691847669178119) -->
-    <skip />
-    <!-- no translation found for lockscreen_key_to_unlock_hint (9042402393653798264) -->
-    <skip />
+    <string name="lockscreen_click_to_unlock_hint" msgid="6056691847669178119">"डिवाइस अनलॉक करने के लिए क्लिक करें"</string>
+    <string name="lockscreen_key_to_unlock_hint" msgid="9042402393653798264">"डिवाइस अनलॉक करने के लिए कोई भी बटन दबाएं"</string>
     <string name="lockscreen_storage_locked" msgid="634993789186443380">"सभी सुविधाओं और डेटा के लिए अनलॉक करें"</string>
     <string name="faceunlock_multiple_failures" msgid="681991538434031708">"मालिक का चेहरा पहचानकर अनलॉक करने की तय सीमा खत्म हो गई"</string>
     <string name="lockscreen_missing_sim_message_short" msgid="1229301273156907613">"कोई सिम नहीं है"</string>
@@ -1279,6 +1280,7 @@
     <string name="whichApplicationLabel" msgid="7852182961472531728">"कार्रवाई पूरी करें"</string>
     <string name="whichViewApplication" msgid="5733194231473132945">"इसमें खोलें"</string>
     <string name="whichViewApplicationNamed" msgid="415164730629690105">"%1$s में खोलें"</string>
+    <string name="open_app_name" msgid="6114096770130122912">"<xliff:g id="APP_NAME">%1$s</xliff:g> खोलें"</string>
     <string name="whichViewApplicationLabel" msgid="7367556735684742409">"खोलें"</string>
     <string name="whichOpenHostLinksWith" msgid="7645631470199397485">"इसे इस्तेमाल करके <xliff:g id="HOST">%1$s</xliff:g> लिंक खोलें"</string>
     <string name="whichOpenLinksWith" msgid="1120936181362907258">"इसे इस्तेमाल करके लिंक खोलें"</string>
@@ -1800,10 +1802,8 @@
     <string name="accessibility_shortcut_single_service_warning" msgid="6363127705112844257">"आवाज़ कम और ज़्यादा करने वाले दोनों बटन को कुछ सेकंड तक दबाकर रखने से <xliff:g id="SERVICE">%1$s</xliff:g> चालू हो जाती है, जो एक सुलभता सुविधा है. ऐसा करने से आपके डिवाइस के काम करने के तरीके में बदलाव हो सकता है.\n\nआप सेटिंग और सुलभता में जाकर इस शॉर्टकट को किसी दूसरी सुविधा के लिए बदल सकते हैं."</string>
     <string name="accessibility_shortcut_on" msgid="5463618449556111344">"चालू करें"</string>
     <string name="accessibility_shortcut_off" msgid="3651336255403648739">"चालू न करें"</string>
-    <!-- no translation found for accessibility_shortcut_menu_item_status_on (6162756705754654002) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_menu_item_status_off (6274512913017713543) -->
-    <skip />
+    <string name="accessibility_shortcut_menu_item_status_on" msgid="6162756705754654002">"चालू है"</string>
+    <string name="accessibility_shortcut_menu_item_status_off" msgid="6274512913017713543">"बंद है"</string>
     <string name="accessibility_enable_service_title" msgid="3931558336268541484">"<xliff:g id="SERVICE">%1$s</xliff:g> को अपना डिवाइस पूरी तरह कंट्रोल करने की अनुमति देनी है?"</string>
     <string name="accessibility_service_warning_description" msgid="291674995220940133">"पूरी तरह कंट्रोल करने की अनुमति उन ऐप्लिकेशन के लिए ठीक है जो सुलभता से जुड़ी ज़रूरतों के लिए बने हैं, लेकिन ज़्यादातर ऐप्लिकेशन के लिए यह ठीक नहीं है."</string>
     <string name="accessibility_service_screen_control_title" msgid="190017412626919776">"स्क्रीन को देखें और कंट्रोल करें"</string>
@@ -1817,16 +1817,11 @@
     <string name="accessibility_select_shortcut_menu_title" msgid="6002726538854613272">"किसी सुविधा का इस्तेमाल करने के लिए, उस पर टैप करें:"</string>
     <string name="accessibility_edit_shortcut_menu_button_title" msgid="239446795930436325">"सुलभता बटन पर टैप करके, इस्तेमाल करने के लिए सुविधाएं चुनें"</string>
     <string name="accessibility_edit_shortcut_menu_volume_title" msgid="2245540598834891500">"वे सुविधाएं चुनें जिन्हें आवाज़ बटनों के शॉर्टकट के ज़रिए इस्तेमाल करना है"</string>
-    <!-- no translation found for accessibility_shortcut_label_button (6473341300585254821) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_volume_keys (5642990791242136231) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_gesture (7987298674836890931) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_quick_settings (6851280333772213611) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_triple_tap (9058975959054454796) -->
-    <skip />
+    <string name="accessibility_shortcut_label_button" msgid="6473341300585254821">"सुलभता बटन"</string>
+    <string name="accessibility_shortcut_label_volume_keys" msgid="5642990791242136231">"आवाज़ बटन"</string>
+    <string name="accessibility_shortcut_label_gesture" msgid="7987298674836890931">"हाथ के जेस्चर"</string>
+    <string name="accessibility_shortcut_label_quick_settings" msgid="6851280333772213611">"क्विक सेटिंग"</string>
+    <string name="accessibility_shortcut_label_triple_tap" msgid="9058975959054454796">"तीन बार टैप करें"</string>
     <string name="accessibility_uncheck_legacy_item_warning" msgid="8047830891064817447">"<xliff:g id="SERVICE_NAME">%s</xliff:g> को बंद कर दिया गया है"</string>
     <string name="edit_accessibility_shortcut_menu_button" msgid="8885752738733772935">"शॉर्टकट में बदलाव करें"</string>
     <string name="done_accessibility_shortcut_menu_button" msgid="3668407723770815708">"हो गया"</string>
@@ -2616,4 +2611,10 @@
     <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"सिस्टम के संसाधन से जुड़ी सूचनाएं"</string>
     <string name="tv_watchdog_notification_title" msgid="195239206215922517">"संसाधन का ज़्यादा इस्तेमाल"</string>
     <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"<xliff:g id="APP_NAME">%1$s</xliff:g> ऐप्लिकेशन बहुत ज़्यादा संसाधन इस्तेमाल कर रहा है."</string>
+    <!-- no translation found for supervision_blocked_app_title (5546803865875383588) -->
+    <skip />
+    <!-- no translation found for supervision_blocked_app_content (4125452996088641559) -->
+    <skip />
+    <!-- no translation found for supervision_unblocked_app_content (8282985265957852278) -->
+    <skip />
 </resources>

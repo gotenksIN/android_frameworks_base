@@ -76,6 +76,8 @@ public:
 
     void store(std::string path, std::vector<uint8_t> data);
 
+    size_t getLastSizeBytes() const;
+
 private:
     void runThread();
 
@@ -90,6 +92,8 @@ private:
     };
     std::optional<StoreRequest> mStoreRequest;
 
+    std::atomic_size_t mLastSizeBytes;
+
     std::atomic_bool mExit;
     std::thread mThread;
 };
@@ -102,10 +106,13 @@ public:
     bool canStore(const SkString& description) const;
     void store(const SkData& key, const SkData& data);
 
+    size_t getLastSizeBytes() const;
+
 private:
     std::string mStorePath;
     PipelineCacheStore mPipelineCacheStore;
 
+    bool mHasCache;
     sk_sp<SkData> mKey;
     sk_sp<SkData> mData;
 };

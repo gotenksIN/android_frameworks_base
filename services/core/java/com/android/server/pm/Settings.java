@@ -349,6 +349,7 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
     private static final String ATTR_SUSPENDED = "suspended";
     private static final String ATTR_SUSPENDING_PACKAGE = "suspending-package";
     private static final String ATTR_SUSPENDING_USER = "suspending-user";
+    private static final String ATTR_APP_LOCK_ENABLED = "app-lock-enabled";
 
     private static final String ATTR_OPTIONAL = "optional";
     /**
@@ -1193,7 +1194,8 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
                                 null /*splashscreenTheme*/,
                                 0 /*firstInstallTime*/,
                                 PackageManager.USER_MIN_ASPECT_RATIO_UNSET,
-                                null /*archiveState*/
+                                null /*archiveState*/,
+                                false /*appLockEnabled*/
                         );
                     }
                 }
@@ -1282,12 +1284,6 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
 
         if (!oldCodePath.equals(codePath)) {
             final boolean isSystem = pkgSetting.isSystem();
-            Slog.i(PackageManagerService.TAG,
-                    "Update" + (isSystem ? " system" : "")
-                    + " package " + pkgName
-                    + " code path from " + pkgSetting.getPathString()
-                    + " to " + codePath.toString()
-                    + "; Retain data and using new");
             if (!isSystem) {
                 // The package isn't considered as installed if the application was
                 // first installed by another user. Update the installed flag when the
@@ -1938,7 +1934,8 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
                                     null /* splashScreenTheme*/,
                                     0 /*firstInstallTime*/,
                                     PackageManager.USER_MIN_ASPECT_RATIO_UNSET,
-                                    null /*archiveState*/
+                                    null /*archiveState*/,
+                                    false /*appLockEnabled*/
                             );
                         }
                         return;
@@ -2011,6 +2008,8 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
                             oldSuspendingPackage = PLATFORM_PACKAGE_NAME;
                         }
 
+                        final boolean appLockEnabled = parser.getAttributeBoolean(null,
+                                ATTR_APP_LOCK_ENABLED, false);
                         final boolean blockUninstall =
                                 parser.getAttributeBoolean(null, ATTR_BLOCK_UNINSTALL, false);
                         final boolean instantApp =
@@ -2119,7 +2118,7 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
                                 harmfulAppWarning, splashScreenTheme,
                                 firstInstallTime != 0 ? firstInstallTime
                                         : origFirstInstallTimes.getOrDefault(name, 0L),
-                                minAspectRatio, archiveState);
+                                minAspectRatio, archiveState, appLockEnabled);
                         mDomainVerificationManager.setLegacyUserState(name, userId, verifState);
                     } else if (tagName.equals("preferred-activities")) {
                         readPreferredActivitiesLPw(parser, userId);
@@ -2500,6 +2499,9 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
                         }
                         if (ustate.isSuspended()) {
                             serializer.attributeBoolean(null, ATTR_SUSPENDED, true);
+                        }
+                        if (ustate.isAppLockEnabled()) {
+                            serializer.attributeBoolean(null, ATTR_APP_LOCK_ENABLED, true);
                         }
                         if (ustate.isInstantApp()) {
                             serializer.attributeBoolean(null, ATTR_INSTANT_APP, true);
@@ -5234,6 +5236,7 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
                 pw.print(userState.isInstalled() ? "I" : "i");
                 pw.print(userState.isHidden() ? "B" : "b");
                 pw.print(userState.isSuspended() ? "SU" : "su");
+                pw.print(userState.isAppLockEnabled() ? "ALE" : "ale");
                 pw.print(userState.isStopped() ? "S" : "s");
                 pw.print(userState.isNotLaunched() ? "l" : "L");
                 pw.print(userState.isInstantApp() ? "IA" : "ia");
@@ -5636,6 +5639,8 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
             pw.print(userState.isHidden());
             pw.print(" suspended=");
             pw.print(userState.isSuspended());
+            pw.print(" appLockEnabled=");
+            pw.print(userState.isAppLockEnabled());
             pw.print(" distractionFlags=");
             pw.print(userState.getDistractionFlags());
             pw.print(" stopped=");

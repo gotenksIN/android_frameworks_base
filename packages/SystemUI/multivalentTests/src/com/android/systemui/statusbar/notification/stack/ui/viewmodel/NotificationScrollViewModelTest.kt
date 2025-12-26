@@ -19,6 +19,8 @@ package com.android.systemui.statusbar.notification.stack.ui.viewmodel
 import android.platform.test.annotations.EnableFlags
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
+import com.android.compose.animation.scene.ObservableTransitionState
+import com.android.compose.animation.scene.ObservableTransitionState.Transition
 import com.android.systemui.Flags.FLAG_DUAL_SHADE
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.flags.EnableSceneContainer
@@ -29,10 +31,14 @@ import com.android.systemui.kosmos.runTest
 import com.android.systemui.kosmos.testScope
 import com.android.systemui.kosmos.useUnconfinedTestDispatcher
 import com.android.systemui.lifecycle.activateIn
+import com.android.systemui.scene.data.repository.sceneContainerRepository
 import com.android.systemui.scene.domain.startable.sceneContainerStartable
+import com.android.systemui.scene.shared.model.Overlays
+import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.settings.brightness.domain.interactor.brightnessMirrorShowingInteractor
 import com.android.systemui.shade.domain.interactor.disableDualShade
 import com.android.systemui.shade.domain.interactor.enableDualShade
+import com.android.systemui.shade.domain.interactor.enableSingleShade
 import com.android.systemui.shade.shadeTestUtil
 import com.android.systemui.statusbar.notification.data.repository.UnconfinedFakeHeadsUpRowRepository
 import com.android.systemui.statusbar.notification.headsup.PinnedStatus
@@ -45,6 +51,7 @@ import com.android.systemui.util.state.SynchronouslyObservableState
 import com.android.systemui.util.state.observableStateOf
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.flowOf
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -209,6 +216,318 @@ class NotificationScrollViewModelTest : SysuiTestCase() {
             // THEN the notification stack is interactive
             assertThat(interactive).isTrue()
         }
+
+    @Test
+    fun allowScrimClipping_toShadeScene_true() =
+        kosmos.runTest {
+            val allowScrimClipping by collectLastValue(underTest.allowScrimClipping)
+
+            // GIVEN a transition to Shade scene
+            sceneContainerRepository.setTransitionState(
+                flowOf(
+                    Transition(
+                        fromScene = Scenes.Gone,
+                        toScene = Scenes.Shade,
+                        currentScene = flowOf(Scenes.Gone),
+                        progress = MutableStateFlow(0.5f),
+                        isInitiatedByUserInput = true,
+                        isUserInputOngoing = flowOf(true),
+                    )
+                )
+            )
+            runCurrent()
+
+            // THEN allowScrimClipping is true
+            assertThat(allowScrimClipping).isTrue()
+        }
+
+    @Test
+    fun allowScrimClipping_toNotifOverlay_false() =
+        kosmos.runTest {
+            val allowScrimClipping by collectLastValue(underTest.allowScrimClipping)
+
+            // GIVEN a transition to NotificationsShade overlay
+            sceneContainerRepository.setTransitionState(
+                flowOf(
+                    Transition.ShowOrHideOverlay(
+                        overlay = Overlays.NotificationsShade,
+                        fromContent = Scenes.Gone,
+                        toContent = Overlays.NotificationsShade,
+                        currentScene = Scenes.Gone,
+                        currentOverlays = flowOf(emptySet()),
+                        progress = flowOf(0.5f),
+                        isInitiatedByUserInput = true,
+                        isUserInputOngoing = flowOf(true),
+                        previewProgress = flowOf(0f),
+                        isInPreviewStage = flowOf(false),
+                    )
+                )
+            )
+            runCurrent()
+
+            // THEN allowScrimClipping is false
+            assertThat(allowScrimClipping).isFalse()
+        }
+
+    @Test
+    fun expandOccluded_toNotifStack() =
+        kosmos.runTest {
+            val expectedFraction: Float = 0.5f
+            val expandFraction by collectLastValue(underTest.expandFraction)
+
+            enableSingleShade()
+            runCurrent()
+
+            // GIVEN a transition from Occluded to Shade scene
+            sceneContainerRepository.setTransitionState(
+                flowOf(
+                    Transition.ChangeScene(
+                        fromScene = Scenes.Occluded,
+                        toScene = Scenes.Shade,
+                        currentScene = flowOf(Scenes.Occluded),
+                        currentOverlays = emptySet(),
+                        progress = MutableStateFlow(expectedFraction),
+                        isInitiatedByUserInput = true,
+                        isUserInputOngoing = flowOf(true),
+                        previewProgress = flowOf(0f),
+                        isInPreviewStage = flowOf(false),
+                    )
+                )
+            )
+            runCurrent()
+
+            // THEN expandFraction is expectedFraction
+            assertThat(expandFraction).isEqualTo(expectedFraction)
+        }
+
+    @Test
+    fun expandNotifStack_toOccluded() =
+        kosmos.runTest {
+            val expectedFraction: Float = 0.5f
+            val expandFraction by collectLastValue(underTest.expandFraction)
+
+            enableSingleShade()
+            runCurrent()
+
+            // GIVEN a transition from Shade scene to Occluded
+            sceneContainerRepository.setTransitionState(
+                flowOf(
+                    Transition.ChangeScene(
+                        fromScene = Scenes.Shade,
+                        toScene = Scenes.Occluded,
+                        currentScene = flowOf(Scenes.Shade),
+                        currentOverlays = emptySet(),
+                        progress = MutableStateFlow(expectedFraction),
+                        isInitiatedByUserInput = true,
+                        isUserInputOngoing = flowOf(true),
+                        previewProgress = flowOf(0f),
+                        isInPreviewStage = flowOf(false),
+                    )
+                )
+            )
+            runCurrent()
+
+            // THEN expandFraction is expectedFraction
+            assertThat(expandFraction).isEqualTo(expectedFraction)
+        }
+
+    @Test
+    fun suppressHeightUpdates_idleQuickSettings_EndHeightOnly() {
+        kosmos.runTest {
+            val suppressHeightUpdates by collectLastValue(underTest.suppressHeightUpdates)
+
+            // GIVEN transition states shows idling on the QuickSettings scene
+            sceneContainerRepository.setTransitionState(
+                flowOf(ObservableTransitionState.Idle(currentScene = Scenes.QuickSettings))
+            )
+            runCurrent()
+
+            // THEN suppressHeightUpdates is EndHeightOnly
+            assertThat(suppressHeightUpdates)
+                .isEqualTo(NotificationScrollViewModel.HeightSuppressionState.EndHeightOnly)
+        }
+    }
+
+    @Test
+    fun suppressHeightUpdates_idleShade_None() {
+        kosmos.runTest {
+            val suppressHeightUpdates by collectLastValue(underTest.suppressHeightUpdates)
+
+            // GIVEN transition states shows idling on the Shade scene
+            sceneContainerRepository.setTransitionState(
+                flowOf(ObservableTransitionState.Idle(currentScene = Scenes.Shade))
+            )
+            runCurrent()
+
+            // THEN suppressHeightUpdates is None
+            assertThat(suppressHeightUpdates)
+                .isEqualTo(NotificationScrollViewModel.HeightSuppressionState.None)
+        }
+    }
+
+    @Test
+    fun suppressHeightUpdates_transitionShadeToQuickSettings_EndHeightOnly() {
+        kosmos.runTest {
+            val suppressHeightUpdates by collectLastValue(underTest.suppressHeightUpdates)
+
+            // GIVEN a transition from Shade to QuickSettings scene
+            sceneContainerRepository.setTransitionState(
+                flowOf(
+                    Transition(
+                        fromScene = Scenes.Shade,
+                        toScene = Scenes.QuickSettings,
+                        currentScene = flowOf(Scenes.Shade),
+                        progress = MutableStateFlow(0.5f),
+                        isInitiatedByUserInput = true,
+                        isUserInputOngoing = flowOf(true),
+                    )
+                )
+            )
+            runCurrent()
+
+            // THEN suppressHeightUpdates is EndHeightOnly
+            assertThat(suppressHeightUpdates)
+                .isEqualTo(NotificationScrollViewModel.HeightSuppressionState.EndHeightOnly)
+        }
+    }
+
+    @Test
+    fun suppressHeightUpdates_transitionQuickSettingsToShade_EndHeightOnly() {
+        kosmos.runTest {
+            val suppressHeightUpdates by collectLastValue(underTest.suppressHeightUpdates)
+
+            // GIVEN a transition from QuickSettings to Shade scene
+            sceneContainerRepository.setTransitionState(
+                flowOf(
+                    Transition(
+                        fromScene = Scenes.QuickSettings,
+                        toScene = Scenes.Shade,
+                        currentScene = flowOf(Scenes.QuickSettings),
+                        progress = MutableStateFlow(0.5f),
+                        isInitiatedByUserInput = true,
+                        isUserInputOngoing = flowOf(true),
+                    )
+                )
+            )
+            runCurrent()
+
+            // THEN suppressHeightUpdates is EndHeightOnly
+            assertThat(suppressHeightUpdates)
+                .isEqualTo(NotificationScrollViewModel.HeightSuppressionState.EndHeightOnly)
+        }
+    }
+
+    @Test
+    fun suppressHeightUpdates_transitionLockScreenToGone_All() {
+        kosmos.runTest {
+            val suppressHeightUpdates by collectLastValue(underTest.suppressHeightUpdates)
+
+            // GIVEN a transition from Lockscreen to Gone scene
+            sceneContainerRepository.setTransitionState(
+                flowOf(
+                    Transition(
+                        fromScene = Scenes.Lockscreen,
+                        toScene = Scenes.Gone,
+                        currentScene = flowOf(Scenes.Lockscreen),
+                        progress = MutableStateFlow(0.5f),
+                        isInitiatedByUserInput = true,
+                        isUserInputOngoing = flowOf(true),
+                    )
+                )
+            )
+            runCurrent()
+
+            // THEN suppressHeightUpdates is All
+            assertThat(suppressHeightUpdates)
+                .isEqualTo(NotificationScrollViewModel.HeightSuppressionState.All)
+        }
+    }
+
+    @Test
+    fun suppressHeightUpdates_transitionShadeToGone_None() {
+        kosmos.runTest {
+            val suppressHeightUpdates by collectLastValue(underTest.suppressHeightUpdates)
+
+            // GIVEN a transition from Shade to Gone scene
+            sceneContainerRepository.setTransitionState(
+                flowOf(
+                    Transition(
+                        fromScene = Scenes.Shade,
+                        toScene = Scenes.Gone,
+                        currentScene = flowOf(Scenes.Shade),
+                        progress = MutableStateFlow(0.5f),
+                        isInitiatedByUserInput = true,
+                        isUserInputOngoing = flowOf(true),
+                    )
+                )
+            )
+            runCurrent()
+
+            // THEN suppressHeightUpdates is None
+            assertThat(suppressHeightUpdates)
+                .isEqualTo(NotificationScrollViewModel.HeightSuppressionState.None)
+        }
+    }
+
+    @Test
+    fun suppressHeightUpdates_transitionLockScreenToBouncer_All() {
+        kosmos.runTest {
+            val suppressHeightUpdates by collectLastValue(underTest.suppressHeightUpdates)
+
+            // GIVEN a transition from Lockscreen to show Bouncer
+            sceneContainerRepository.setTransitionState(
+                flowOf(
+                    Transition.ShowOrHideOverlay(
+                        overlay = Overlays.Bouncer,
+                        fromContent = Scenes.Lockscreen,
+                        toContent = Overlays.Bouncer,
+                        currentScene = Scenes.Lockscreen,
+                        currentOverlays = flowOf(emptySet()),
+                        progress = flowOf(0.5f),
+                        isInitiatedByUserInput = true,
+                        isUserInputOngoing = flowOf(true),
+                        previewProgress = flowOf(0f),
+                        isInPreviewStage = flowOf(false),
+                    )
+                )
+            )
+            runCurrent()
+
+            // THEN suppressHeightUpdates is All
+            assertThat(suppressHeightUpdates)
+                .isEqualTo(NotificationScrollViewModel.HeightSuppressionState.All)
+        }
+    }
+
+    @Test
+    fun suppressHeightUpdates_transitionBouncerToLockScreen_None() {
+        kosmos.runTest {
+            val suppressHeightUpdates by collectLastValue(underTest.suppressHeightUpdates)
+
+            // GIVEN a transition from Bouncer to Lockscreen
+            sceneContainerRepository.setTransitionState(
+                flowOf(
+                    Transition.ShowOrHideOverlay(
+                        overlay = Overlays.Bouncer,
+                        fromContent = Overlays.Bouncer,
+                        toContent = Scenes.Lockscreen,
+                        currentScene = Scenes.Lockscreen,
+                        currentOverlays = flowOf(setOf(Overlays.Bouncer)),
+                        progress = flowOf(0.5f),
+                        isInitiatedByUserInput = true,
+                        isUserInputOngoing = flowOf(true),
+                        previewProgress = flowOf(0f),
+                        isInPreviewStage = flowOf(false),
+                    )
+                )
+            )
+            runCurrent()
+
+            // THEN suppressHeightUpdates is None
+            assertThat(suppressHeightUpdates)
+                .isEqualTo(NotificationScrollViewModel.HeightSuppressionState.None)
+        }
+    }
 
     private fun Kosmos.setBlur(isBlurred: Boolean) {
         val expansion = if (isBlurred) 1f else 0f

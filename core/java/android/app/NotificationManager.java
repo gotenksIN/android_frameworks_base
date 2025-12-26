@@ -68,6 +68,7 @@ import android.provider.Settings;
 import android.provider.Settings.Global;
 import android.service.notification.Adjustment;
 import android.service.notification.Condition;
+import android.service.notification.DynamicBundle;
 import android.service.notification.RateEstimator;
 import android.service.notification.StatusBarNotification;
 import android.service.notification.ZenDeviceEffects;
@@ -2279,17 +2280,19 @@ public class NotificationManager {
     }
 
     /**
+     * This can be an {@link Adjustment.Types} type or a {@link DynamicBundle} type.
      * @hide
      */
     @TestApi
-    public void setAssistantAdjustmentKeyTypeState(@Adjustment.Types int type, boolean enabled) {
+    public void setAssistantAdjustmentKeyTypeState(int type, boolean enabled) {
         setAssistantClassificationTypeState(type, enabled);
     }
 
     /**
+     * This can be an {@link Adjustment.Types} type or a {@link DynamicBundle} type.
      * @hide
      */
-    public void setAssistantClassificationTypeState(@Adjustment.Types int type, boolean enabled) {
+    public void setAssistantClassificationTypeState(int type, boolean enabled) {
         INotificationManager service = service();
         try {
             service.setAssistantClassificationTypeState(type, enabled);

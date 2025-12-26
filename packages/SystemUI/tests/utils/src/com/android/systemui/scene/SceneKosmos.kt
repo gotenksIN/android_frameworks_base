@@ -1,13 +1,16 @@
 package com.android.systemui.scene
 
 import android.content.res.mainResources
-import android.view.View
 import com.android.compose.animation.scene.ObservableTransitionState
 import com.android.systemui.classifier.domain.interactor.falsingInteractor
+import com.android.systemui.communal.domain.interactor.communalSettingsInteractor
 import com.android.systemui.desktop.domain.interactor.desktopInteractor
+import com.android.systemui.deviceentry.domain.interactor.deviceEntryInteractor
 import com.android.systemui.deviceentry.domain.interactor.deviceUnlockedInteractor
 import com.android.systemui.haptics.msdl.msdlPlayer
 import com.android.systemui.keyguard.domain.interactor.keyguardInteractor
+import com.android.systemui.keyguard.domain.interactor.keyguardTransitionInteractor
+import com.android.systemui.keyguard.ui.transitions.blurConfig
 import com.android.systemui.keyguard.ui.viewmodel.aodBurnInViewModel
 import com.android.systemui.keyguard.ui.viewmodel.keyguardClockViewModel
 import com.android.systemui.keyguard.ui.viewmodel.lightRevealScrimViewModel
@@ -23,15 +26,22 @@ import com.android.systemui.scene.shared.model.SceneContainerConfig
 import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.scene.ui.FakeOverlay
 import com.android.systemui.scene.ui.composable.ConstantSceneContainerTransitionsBuilder
+import com.android.systemui.scene.ui.composable.SceneContainerTransitions
 import com.android.systemui.scene.ui.composable.SceneNavigationDistances
 import com.android.systemui.scene.ui.viewmodel.SceneContainerHapticsViewModel
+import com.android.systemui.scene.ui.viewmodel.SceneContainerToastDisplayer
 import com.android.systemui.scene.ui.viewmodel.SceneContainerViewModel
+import com.android.systemui.scene.ui.viewmodel.SceneTransitionBlurViewModel
 import com.android.systemui.scene.ui.viewmodel.dualShadeEducationalTooltipsViewModelFactory
 import com.android.systemui.shade.domain.interactor.shadeInteractor
 import com.android.systemui.shade.domain.interactor.shadeModeInteractor
 import com.android.systemui.statusbar.domain.interactor.remoteInputInteractor
 import com.android.systemui.statusbar.notification.stack.domain.interactor.notificationContainerInteractor
+import com.android.systemui.wallpapers.domain.interactor.wallpaperInteractor
+import com.android.systemui.wallpapers.domain.interactor.wallpaperInteractorFaked
 import com.android.systemui.wallpapers.ui.viewmodel.wallpaperViewModel
+import com.android.systemui.window.domain.interactor.windowRootViewBlurInteractor
+import com.android.systemui.window.ui.FakeBlurChoreographer
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.mockito.kotlin.mock
 
@@ -60,6 +70,7 @@ val Kosmos.fakeOverlays by Fixture { fakeOverlaysByKeys.values.toSet() }
 val Kosmos.overlays by Fixture { fakeOverlays }
 
 val Kosmos.sceneTransitionsBuilder by Fixture { ConstantSceneContainerTransitionsBuilder() }
+val Kosmos.sceneContainerTransitions by Fixture { SceneContainerTransitions() }
 
 var Kosmos.sceneContainerConfig by Fixture {
     SceneContainerConfig(
@@ -78,16 +89,36 @@ val Kosmos.transitionState by Fixture {
 }
 
 val Kosmos.sceneContainerViewModel by Fixture {
-    sceneContainerViewModelFactory
-        .create(mock<View>()) {}
-        .apply { setTransitionState(transitionState) }
+    sceneContainerViewModelFactory.create {}.apply { setTransitionState(transitionState) }
+}
+
+val Kosmos.fakeBlurChoreographer by Fixture { FakeBlurChoreographer() }
+
+val Kosmos.sceneTransitionBlurViewModel by Fixture {
+    SceneTransitionBlurViewModel(
+        wallpaperInteractor = wallpaperInteractorFaked,
+        communalSettingsInteractor = communalSettingsInteractor,
+        windowRootViewBlurInteractor = windowRootViewBlurInteractor,
+        keyguardTransitionInteractor = keyguardTransitionInteractor,
+        blurConfig = blurConfig,
+        blurChoreographer = fakeBlurChoreographer,
+        shadeInteractor = shadeInteractor,
+        deviceEntryInteractor = deviceEntryInteractor,
+    )
+}
+
+val Kosmos.sceneTransitionBlurViewModelFactory by Fixture {
+    object : SceneTransitionBlurViewModel.Factory {
+        override fun create(): SceneTransitionBlurViewModel {
+            return sceneTransitionBlurViewModel
+        }
+    }
 }
 
 val Kosmos.sceneContainerViewModelFactory by Fixture {
     object : SceneContainerViewModel.Factory {
         override fun create(
-            view: View,
-            motionEventHandlerReceiver: (SceneContainerViewModel.MotionEventHandler?) -> Unit,
+            motionEventHandlerReceiver: (SceneContainerViewModel.MotionEventHandler?) -> Unit
         ): SceneContainerViewModel =
             SceneContainerViewModel(
                 resources = mainResources,
@@ -100,7 +131,6 @@ val Kosmos.sceneContainerViewModelFactory by Fixture {
                 remoteInputInteractor = remoteInputInteractor,
                 logger = sceneLogger,
                 hapticsViewModelFactory = sceneContainerHapticsViewModelFactory,
-                view = view,
                 motionEventHandlerReceiver = motionEventHandlerReceiver,
                 lightRevealScrim = lightRevealScrimViewModel,
                 wallpaperViewModel = wallpaperViewModel,
@@ -112,15 +142,16 @@ val Kosmos.sceneContainerViewModelFactory by Fixture {
                 dualShadeEducationalTooltipsViewModelFactory =
                     dualShadeEducationalTooltipsViewModelFactory,
                 animateQsTilesViewModelFactory = animateQsTilesViewModelFactory,
+                sceneTransitionBlurViewModelFactory = sceneTransitionBlurViewModelFactory,
+                toastDisplayer = { sceneContainerToastDisplayer },
             )
     }
 }
 
 val Kosmos.sceneContainerHapticsViewModelFactory by Fixture {
     object : SceneContainerHapticsViewModel.Factory {
-        override fun create(view: View): SceneContainerHapticsViewModel {
+        override fun create(): SceneContainerHapticsViewModel {
             return SceneContainerHapticsViewModel(
-                view = view,
                 sceneInteractor = sceneInteractor,
                 shadeInteractor = shadeInteractor,
                 msdlPlayer = msdlPlayer,
@@ -128,3 +159,5 @@ val Kosmos.sceneContainerHapticsViewModelFactory by Fixture {
         }
     }
 }
+
+private val Kosmos.sceneContainerToastDisplayer by Fixture { mock<SceneContainerToastDisplayer>() }

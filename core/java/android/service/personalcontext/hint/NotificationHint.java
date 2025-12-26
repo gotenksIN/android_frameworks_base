@@ -21,6 +21,8 @@ import static java.util.Objects.requireNonNull;
 import android.annotation.FlaggedApi;
 import android.annotation.NonNull;
 import android.os.Bundle;
+import android.os.Parcel;
+import android.service.notification.StatusBarNotification;
 import android.service.personalcontext.Flags;
 
 /**
@@ -52,6 +54,7 @@ public final class NotificationHint extends ContextHint {
         mNotificationEvent = NotificationEvent.fromBundle(hintData);
     }
 
+    /** @hide */
     @Override
     @HintType
     public int getHintType() {
@@ -72,18 +75,38 @@ public final class NotificationHint extends ContextHint {
         return mNotificationEvent.toBundle();
     }
 
+    /** @hide */
+    @Override
+    public void writeToSignatureParcel(@NonNull Parcel dest) {
+        final StatusBarNotification sbn;
+        if (mNotificationEvent instanceof NotificationEvent.NotificationEnqueuedEvent) {
+            sbn = ((NotificationEvent.NotificationEnqueuedEvent) mNotificationEvent)
+                    .getStatusBarNotification();
+        } else if (mNotificationEvent instanceof NotificationEvent.NotificationRemovedEvent) {
+            sbn = ((NotificationEvent.NotificationRemovedEvent) mNotificationEvent)
+                    .getStatusBarNotification();
+        } else {
+            throw new UnsupportedOperationException("Unexpected NotificationEvent type");
+        }
+
+        dest.writeString(sbn.getPackageName());
+        dest.writeString(sbn.getKey());
+        dest.writeParcelable(sbn.getUser(), 0);
+        dest.writeLong(sbn.getPostTime());
+    }
+
     /**
      * Builder used to create a {@link NotificationHint}.
      */
     @FlaggedApi(Flags.FLAG_ENABLE_PERSONAL_CONTEXT_SERVICE)
-    public static final class NotificationHintBuilder {
+    public static final class Builder {
         private NotificationEvent mNotificationEvent;
 
         /**
-         * Creates an instance of {@link NotificationHintBuilder} with the
-         * {@link NotificationEvent} contained in the hint.
+         * Creates an instance of {@link Builder} with the {@link NotificationEvent} contained in
+         * the hint.
          */
-        public NotificationHintBuilder(@NonNull NotificationEvent notificationEvent) {
+        public Builder(@NonNull NotificationEvent notificationEvent) {
             requireNonNull(notificationEvent, "NotificationEvent must be provided");
             mNotificationEvent = notificationEvent;
         }

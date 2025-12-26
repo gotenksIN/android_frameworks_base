@@ -30,9 +30,7 @@ import static android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS;
 import static androidx.lifecycle.Lifecycle.State.RESUMED;
 
 import static com.android.systemui.Dependency.TIME_TICK_HANDLER_NAME;
-import static com.android.systemui.Flags.keyboardShortcutHelperRewrite;
 import static com.android.systemui.charging.WirelessChargingAnimation.UNKNOWN_BATTERY_LEVEL;
-import static com.android.systemui.flags.Flags.SHORTCUT_LIST_SEARCH_LAYOUT;
 import static com.android.systemui.statusbar.StatusBarState.SHADE;
 
 import android.annotation.Nullable;
@@ -173,13 +171,10 @@ import com.android.systemui.shade.ShadeLogger;
 import com.android.systemui.shade.ShadeSurface;
 import com.android.systemui.shade.ShadeViewController;
 import com.android.systemui.shade.shared.flag.ShadeWindowGoesAround;
-import com.android.systemui.shared.recents.utilities.Utilities;
 import com.android.systemui.shared.statusbar.phone.BarTransitions;
 import com.android.systemui.statusbar.AutoHideUiElement;
 import com.android.systemui.statusbar.CommandQueue;
 import com.android.systemui.statusbar.GestureRecorder;
-import com.android.systemui.statusbar.KeyboardShortcutListSearch;
-import com.android.systemui.statusbar.KeyboardShortcuts;
 import com.android.systemui.statusbar.KeyguardIndicationController;
 import com.android.systemui.statusbar.LightRevealScrim;
 import com.android.systemui.statusbar.LockscreenShadeTransitionController;
@@ -194,7 +189,6 @@ import com.android.systemui.statusbar.StatusBarState;
 import com.android.systemui.statusbar.SysuiStatusBarStateController;
 import com.android.systemui.statusbar.core.StatusBarConnectedDisplays;
 import com.android.systemui.statusbar.core.StatusBarInitializer;
-import com.android.systemui.statusbar.core.StatusBarRootModernization;
 import com.android.systemui.statusbar.data.model.StatusBarMode;
 import com.android.systemui.statusbar.data.repository.StatusBarModeRepositoryStore;
 import com.android.systemui.statusbar.notification.NotificationActivityStarter;
@@ -824,13 +818,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         // TODO(b/190746471): Find a better home for this.
         DateTimeView.setReceiverHandler(timeTickHandler);
 
-        if (!keyboardShortcutHelperRewrite()) {
-            mMessageRouter.subscribeTo(
-                    KeyboardShortcutsMessage.class,
-                    data -> toggleKeyboardShortcuts(data.mDeviceId));
-            mMessageRouter.subscribeTo(
-                    MSG_DISMISS_KEYBOARD_SHORTCUTS_MENU, id -> dismissKeyboardShortcuts());
-        }
         mMessageRouter.subscribeTo(AnimateExpandSettingsPanelMessage.class,
                 data -> mCommandQueueCallbacks.animateExpandSettingsPanel(data.mSubpanel));
         mMessageRouter.subscribeTo(MSG_LAUNCH_TRANSITION_TIMEOUT,
@@ -1188,11 +1175,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
                         setBouncerShowingForStatusBarComponents(mBouncerShowing);
                         checkBarModes();
                     });
-        }
-        if (!StatusBarRootModernization.isEnabled() && !StatusBarConnectedDisplays.isEnabled()) {
-            // When the flag is on, we register the fragment as a core startable and this is not
-            // needed
-            mStatusBarInitializer.initializeStatusBar();
         }
 
         mShadeTouchableRegionManager.setup(getNotificationShadeWindowView());
@@ -1866,13 +1848,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
             String action = intent.getAction();
             String reason = intent.getStringExtra(SYSTEM_DIALOG_REASON_KEY);
             if (Intent.ACTION_CLOSE_SYSTEM_DIALOGS.equals(action)) {
-                if (!keyboardShortcutHelperRewrite()) {
-                    if (shouldUseTabletKeyboardShortcuts()) {
-                        KeyboardShortcutListSearch.dismiss();
-                    } else {
-                        KeyboardShortcuts.dismiss();
-                    }
-                }
                 mRemoteInputManager.closeRemoteInputs();
                 if (mLockscreenUserManager.isCurrentProfile(getSendingUserId())) {
                     mShadeLogger.d("ACTION_CLOSE_SYSTEM_DIALOGS intent: closing shade");
@@ -2638,12 +2613,11 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
 
     @Override
     public void notifyBiometricAuthModeChanged() {
-        if (Flags.updateKeyguardOnWakeAndUnlockEarlier()) {
-            if (mBiometricUnlockController.isWakeAndUnlock()) {
-                // If we're wake and unlocking we should hide the keyguard ASAP if necessary.
-                updateIsKeyguard();
-            }
+        if (mBiometricUnlockController.isWakeAndUnlock()) {
+            // If we're wake and unlocking we should hide the keyguard ASAP if necessary.
+            updateIsKeyguard();
         }
+
         mDozeServiceHost.updateDozing();
         if (mBiometricUnlockController.getMode()
                 == BiometricUnlockController.MODE_DISMISS_BOUNCER) {
@@ -2820,27 +2794,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         });
     }
 
-    protected void toggleKeyboardShortcuts(int deviceId) {
-        if (shouldUseTabletKeyboardShortcuts()) {
-            KeyboardShortcutListSearch.toggle(mContext, deviceId, mWindowManagerProvider);
-        } else {
-            KeyboardShortcuts.toggle(mContext, deviceId, mWindowManagerProvider);
-        }
-    }
-
-    protected void dismissKeyboardShortcuts() {
-        if (shouldUseTabletKeyboardShortcuts()) {
-            KeyboardShortcutListSearch.dismiss();
-        } else {
-            KeyboardShortcuts.dismiss();
-        }
-    }
-
-    private boolean shouldUseTabletKeyboardShortcuts() {
-        return mFeatureFlags.isEnabled(SHORTCUT_LIST_SEARCH_LAYOUT)
-                && Utilities.isLargeScreen(mWindowManager, mContext.getResources());
-    }
-
     private void clearNotificationEffects() {
         try {
             mBarService.clearNotificationEffects();
@@ -3014,14 +2967,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
                     updateDozingState();
                     mDozeServiceHost.updateDozing();
                     updateScrimController();
-
-                    if (!Flags.updateKeyguardOnWakeAndUnlockEarlier()) {
-                        if (mBiometricUnlockController.isWakeAndUnlock()) {
-                            // Usually doze changes are to/from lockscreen/AOD, but if we're wake
-                            // and unlocking we should hide the keyguard ASAP if necessary.
-                            updateIsKeyguard();
-                        }
-                    }
 
                     updateReportRejectedTouchVisibility();
                     Trace.endSection();

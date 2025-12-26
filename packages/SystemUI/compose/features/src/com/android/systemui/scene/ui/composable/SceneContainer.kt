@@ -29,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -38,13 +39,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.android.compose.animation.scene.Back
 import com.android.compose.animation.scene.ContentKey
 import com.android.compose.animation.scene.OverlayKey
+import com.android.compose.animation.scene.PassthroughSwipeDetector
 import com.android.compose.animation.scene.SceneKey
 import com.android.compose.animation.scene.SceneTransitionLayout
+import com.android.compose.animation.scene.SceneTransitionLayoutState
 import com.android.compose.animation.scene.UserAction
 import com.android.compose.animation.scene.UserActionResult
+import com.android.compose.animation.scene.content.state.TransitionState
 import com.android.compose.animation.scene.observableTransitionState
 import com.android.compose.animation.scene.rememberMutableSceneTransitionLayoutState
 import com.android.compose.gesture.effect.rememberOffsetOverscrollEffectFactory
@@ -57,6 +63,7 @@ import com.android.systemui.ribbon.ui.composable.BottomRightCornerRibbon
 import com.android.systemui.scene.shared.model.SceneDataSourceDelegator
 import com.android.systemui.scene.ui.view.SceneJankMonitor
 import com.android.systemui.scene.ui.viewmodel.SceneContainerViewModel
+import com.android.systemui.scene.ui.viewmodel.SceneTransitionBlurViewModel
 import com.android.systemui.shade.ui.composable.OverlayShade
 import com.android.systemui.shade.ui.composable.isFullWidthShade
 
@@ -92,6 +99,7 @@ fun SceneContainer(
     dataSourceDelegator: SceneDataSourceDelegator,
     sceneJankMonitorFactory: SceneJankMonitor.Factory,
     modifier: Modifier = Modifier,
+    swipeVelocityThreshold: Dp = SceneContainerDefaults.SwipeVelocityThreshold,
 ) {
     val coroutineScope = rememberCoroutineScope()
 
@@ -132,6 +140,7 @@ fun SceneContainer(
                     from = transition.fromContent,
                     to = transition.toContent,
                     cuj = transition.cuj,
+                    cujTag = transition.cujTag,
                 )
             },
             onTransitionEnd = { transition ->
@@ -156,6 +165,10 @@ fun SceneContainer(
         viewModel.setTransitionState(state.observableTransitionState())
         onDispose { viewModel.setTransitionState(null) }
     }
+
+    // Relying on compose to skip recomposing this method unless there is a change in
+    // [transitionState] or [transitionProgress]
+    WindowBackgroundBlur(viewModel.blurViewModel, state)
 
     val actionableContentKey =
         viewModel.getActionableContentKey(state.currentScene, state.currentOverlays, overlayByKey)
@@ -212,6 +225,8 @@ fun SceneContainer(
             state = state,
             modifier = Modifier.fillMaxSize(),
             swipeSourceDetector = viewModel.swipeSourceDetector,
+            swipeDetector =
+                remember { PassthroughSwipeDetector(velocityThreshold = swipeVelocityThreshold) },
         ) {
             sceneByKey.forEach { (sceneKey, scene) ->
                 scene(
@@ -260,4 +275,18 @@ fun SceneContainer(
             )
         }
     }
+}
+
+@Composable
+private fun WindowBackgroundBlur(
+    viewModel: SceneTransitionBlurViewModel,
+    state: SceneTransitionLayoutState,
+) {
+    val transitionState = state.transitionState
+    val progress = (state.transitionState as? TransitionState.Transition)?.progress ?: 1.0f
+    SideEffect { viewModel.requestWindowBackgroundBlur(transitionState, progress) }
+}
+
+object SceneContainerDefaults {
+    val SwipeVelocityThreshold = 250.dp
 }

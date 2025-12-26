@@ -22,8 +22,11 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.TestApi;
 import android.os.Bundle;
+import android.os.Parcel;
 import android.service.personalcontext.Flags;
 import android.util.Log;
+
+import com.android.internal.annotations.VisibleForTesting;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -33,8 +36,10 @@ import java.util.UUID;
 /**
  * A piece of input data into the personal context engine.
  *
- * Hints may describe some current state of the device or represent an event that may be of use for
- * kicking off an understanding flow.
+ * <p>Hints may describe some current state of the device or represent an event that may be of use
+ * for kicking off an understanding flow.
+ *
+ * <p>Users of this class can use instanceof to determine the type of the hint.
  */
 @FlaggedApi(Flags.FLAG_ENABLE_PERSONAL_CONTEXT_SERVICE)
 public abstract class ContextHint {
@@ -45,64 +50,69 @@ public abstract class ContextHint {
      *
      * @hide
      */
-    @IntDef(prefix = {"HINT_TYPE_"}, value = {HINT_TYPE_ERROR, HINT_TYPE_BUNDLE,
-            HINT_TYPE_NOTIFICATION})
+    @IntDef(
+            prefix = {"HINT_TYPE_"},
+            value = {
+                HINT_TYPE_ERROR,
+                HINT_TYPE_BUNDLE,
+                HINT_TYPE_NOTIFICATION,
+                HINT_TYPE_TEXT_CLASSIFICATION
+            })
     @Retention(RetentionPolicy.SOURCE)
-    public @interface HintType {
-    }
+    public @interface HintType {}
 
-    /**
-     * Hint type indicating an error when unparceling.
-     */
-    public static final int HINT_TYPE_ERROR = -1;
+    /** Hint type indicating an error when unparceling. */
+    static final int HINT_TYPE_ERROR = -1;
 
     /**
      * Hint type for {@link BundleHint}.
+     *
+     * @hide
      */
-    public static final int HINT_TYPE_BUNDLE = 1;
+    @VisibleForTesting public static final int HINT_TYPE_BUNDLE = 1;
 
-    /**
-     * Hint type for {@link NotificationHint}.
-     */
-    public static final int HINT_TYPE_NOTIFICATION = 2;
+    /** Hint type for {@link NotificationHint}. */
+    static final int HINT_TYPE_NOTIFICATION = 2;
+
+    /** Hint type for {@link TextClassificationHint}. */
+    static final int HINT_TYPE_TEXT_CLASSIFICATION = 3;
 
     /**
      * Object returned when there is an unparceling error.
      *
      * @hide
      */
-    private static final @NonNull ContextHint ERROR_HINT = new ContextHint() {
-        @Override
-        public int getHintType() {
-            return HINT_TYPE_ERROR;
-        }
+    private static final @NonNull ContextHint ERROR_HINT =
+            new ContextHint() {
+                @Override
+                public int getHintType() {
+                    return HINT_TYPE_ERROR;
+                }
 
-        @NonNull
-        @Override
-        Bundle toBundleImpl() {
-            return new Bundle();
-        }
-    };
+                @NonNull
+                @Override
+                Bundle toBundleImpl() {
+                    return new Bundle();
+                }
+            };
 
     // Bundle keys for data stored in the base ContextHint.
     private static final String KEY_HINT_TYPE = "key_hint_type";
     private static final String KEY_HINT_ID = "key_hint_id";
 
     /**
-     * Bundle key used to store the data from the hint implementation, retrieved through
-     * {@link #toBundleImpl()}.
+     * Bundle key used to store the data from the hint implementation, retrieved through {@link
+     * #toBundleImpl()}.
      */
     static final String KEY_HINT_DATA = "key_hint_data";
 
-    /**
-     * Unique identifier for this hint.
-     */
+    /** Unique identifier for this hint. */
     private final UUID mId;
 
     /**
      * Internal constructor only for use by {@link #createHintFromBundle(Bundle)}. This should be
-     * called by subclasses in their private constructors used for
-     * {@link #createHintFromBundle(Bundle)}.
+     * called by subclasses in their private constructors used for {@link
+     * #createHintFromBundle(Bundle)}.
      *
      * @hide
      */
@@ -122,13 +132,13 @@ public abstract class ContextHint {
 
     /**
      * Returns the {@link HintType} of this hint.
+     *
+     * @hide
      */
     @HintType
     public abstract int getHintType();
 
-    /**
-     * Returns the unique ID of this hint.
-     */
+    /** Returns the unique ID of this hint. */
     public final @NonNull UUID getHintId() {
         return mId;
     }
@@ -137,8 +147,19 @@ public abstract class ContextHint {
     abstract Bundle toBundleImpl();
 
     /**
-     * Return the {@link Bundle} representation of this hint's data for writing to a
-     * {@link ContextHintWrapper}.
+     * Writes data should be used to verify the hint has not been tampered with to a {@link Parcel}.
+     *
+     * If your hint stores binders or file descriptors, you must override this method
+     *
+     * @hide
+     */
+    public void writeToSignatureParcel(@NonNull Parcel dest) {
+        dest.writeBundle(toBundle());
+    }
+
+    /**
+     * Return the {@link Bundle} representation of this hint's data for writing to a {@link
+     * ContextHintWrapper}.
      *
      * @hide
      */
@@ -152,8 +173,14 @@ public abstract class ContextHint {
         return b;
     }
 
+    @Override
+    public String toString() {
+        return getClass().getSimpleName() + "{" + mId + "}";
+    }
+
     /**
      * Unbundles a hint into the correct subclass of hint based on the hint type.
+     *
      * @hide
      */
     @TestApi
@@ -166,6 +193,7 @@ public abstract class ContextHint {
             return switch (bundle.getInt(KEY_HINT_TYPE, HINT_TYPE_ERROR)) {
                 case HINT_TYPE_BUNDLE -> new BundleHint(bundle);
                 case HINT_TYPE_NOTIFICATION -> new NotificationHint(bundle);
+                case HINT_TYPE_TEXT_CLASSIFICATION -> new TextClassificationHint(bundle);
                 default -> ERROR_HINT;
             };
         } catch (Exception e) {

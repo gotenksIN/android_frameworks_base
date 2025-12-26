@@ -4,7 +4,14 @@ container: "system"
 flag {
      namespace: "communal"
      name: "enable_personal_context_service"
-     is_exported: false
+     is_exported: true
      description: "Personal Context Service"
+     bug: "445425545"
+}
+
+flag {
+     namespace: "communal"
+     name: "enable_text_classifier"
+     description: "Enable TextClassifier hint and insight for Personal Context Service"
      bug: "445425545"
 }

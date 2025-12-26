@@ -47,14 +47,16 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.android.systemui.res.R
-import com.android.systemui.screencapture.common.domain.model.TargetModel
 import com.android.systemui.screencapture.common.ui.compose.LoadingIcon
 import com.android.systemui.screencapture.common.ui.compose.loadIcon
+import com.android.systemui.screencapture.common.ui.viewmodel.AppContentsViewModel
+import com.android.systemui.screencapture.common.ui.viewmodel.DisplaysViewModel
+import com.android.systemui.screencapture.common.ui.viewmodel.RecentTasksViewModel
 import com.android.systemui.screencapture.common.ui.viewmodel.TargetViewModel
 import com.android.systemui.screencapture.common.ui.viewmodel.TargetsViewModel
 
 @Composable
-fun <T : TargetModel> ShareContentSelector(targetsViewModel: TargetsViewModel<T>) {
+fun ShareContentSelector(targetsViewModel: TargetsViewModel) {
     Surface(color = MaterialTheme.colorScheme.surfaceBright, shape = RoundedCornerShape(20.dp)) {
         Column(
             modifier =
@@ -64,7 +66,17 @@ fun <T : TargetModel> ShareContentSelector(targetsViewModel: TargetsViewModel<T>
         ) {
             val selectedItem by targetsViewModel.selectedTarget
             Text(
-                text = stringResource(R.string.screen_share_app_window_sharing_title),
+                text =
+                    stringResource(
+                        when (targetsViewModel) {
+                            is AppContentsViewModel -> R.string.screen_share_tab_sharing_title
+                            is RecentTasksViewModel ->
+                                R.string.screen_share_app_window_sharing_title
+                            is DisplaysViewModel ->
+                                R.string.screen_share_entire_screen_sharing_title
+                            else -> throw IllegalArgumentException("Unknown TargetsViewModel type")
+                        }
+                    ),
                 modifier = Modifier.padding(start = 8.dp, end = 8.dp).height(24.dp).fillMaxWidth(),
                 style = MaterialTheme.typography.titleMedium,
             )
@@ -80,7 +92,7 @@ fun <T : TargetModel> ShareContentSelector(targetsViewModel: TargetsViewModel<T>
                     itemSelected = selectedItem != null,
                 )
             }
-            DisclaimerText()
+            DisclaimerText(targetsViewModel)
             AudioSwitch(targetsViewModel, selectedItem)
         }
     }
@@ -119,25 +131,36 @@ private fun ItemPreview(
 }
 
 @Composable
-private fun DisclaimerText() {
+private fun DisclaimerText(targetsViewModel: TargetsViewModel) {
     Text(
-        text = stringResource(R.string.screen_share_disclaimer),
+        text =
+            stringResource(
+                when (targetsViewModel) {
+                    is DisplaysViewModel -> R.string.screen_share_disclaimer_full_screen_sharing
+                    // TODO(b/423708479) Fill the tab sharing legal text with potential text
+                    // refactoring.
+                    else -> R.string.screen_share_disclaimer_app_sharing
+                }
+            ),
         style = MaterialTheme.typography.labelMedium,
         modifier = Modifier.padding(start = 8.dp, end = 8.dp).fillMaxWidth(),
     )
 }
 
 @Composable
-private fun <T : TargetModel> AudioSwitch(
-    targetsViewModel: TargetsViewModel<T>,
-    selectedTargetViewModel: TargetViewModel<T>?,
+private fun AudioSwitch(
+    targetsViewModel: TargetsViewModel,
+    selectedTargetViewModel: TargetViewModel?,
 ) {
     val checked by targetsViewModel.captureAudio
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
-        modifier = Modifier.padding(4.dp, bottom = 12.dp).height(24.dp).fillMaxWidth(),
+        modifier =
+            Modifier.padding(start = 4.dp, top = 4.dp, end = 4.dp, bottom = 12.dp)
+                .height(24.dp)
+                .fillMaxWidth(),
     ) {
         LoadingIcon(
             icon =

@@ -179,6 +179,8 @@ public class SizeCompatTests extends WindowTestsBase {
 
     private ActivityRecord setUpApp(DisplayContent display, ActivityBuilder aBuilder,
             TaskBuilder tBuilder) {
+        // Skip WAKE transition when adding a task to the empty display.
+        display.setIsSleeping(false);
         // Use the real package name (com.android.frameworks.wmtests) so that
         // EnableCompatChanges/DisableCompatChanges can take effect.
         // Otherwise the fake WindowTestsBase.DEFAULT_COMPONENT_PACKAGE_NAME will make
@@ -4485,7 +4487,6 @@ public class SizeCompatTests extends WindowTestsBase {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_EXCLUDE_CAPTION_FROM_APP_BOUNDS)
     @DisableCompatChanges({ActivityInfo.INSETS_DECOUPLED_CONFIGURATION_ENFORCED})
     public void testInFreeform_boundsSandboxedToAppBounds() {
         allowDesktopMode();

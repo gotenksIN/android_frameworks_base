@@ -31,9 +31,11 @@ soong_config_module_type {
         "car_bootclasspath_fragment",
         "nfc_apex_bootclasspath_fragment",
         "release_crashrecovery_module",
+        "release_npumanager_module",
         "release_ondevice_intelligence_module",
         "release_package_profiling_module",
         "release_telephony_module",
+        "release_uprobestats_bridge_service",
     ],
     properties: [
         "fragments",
@@ -178,6 +180,14 @@ custom_platform_bootclasspath {
                 },
             ],
         },
+        release_npumanager_module: {
+            fragments: [
+                {
+                    apex: "com.android.npumanager",
+                    module: "com.android.npumanager-bootclasspath-fragment",
+                },
+            ],
+        },
         release_ondevice_intelligence_module: {
             fragments: [
                 // only used when ondeviceintelligence is moved to neuralnetworks module
@@ -202,6 +212,15 @@ custom_platform_bootclasspath {
                 {
                     apex: "com.android.telephonycore",
                     module: "com.android.telephony-bootclasspath-fragment",
+                },
+            ],
+        },
+        release_uprobestats_bridge_service: {
+            fragments: [
+                // only used if uprobestats is enabled.
+                {
+                    apex: "com.android.uprobestats",
+                    module: "com.android.uprobestats-bootclasspath-fragment",
                 },
             ],
         },

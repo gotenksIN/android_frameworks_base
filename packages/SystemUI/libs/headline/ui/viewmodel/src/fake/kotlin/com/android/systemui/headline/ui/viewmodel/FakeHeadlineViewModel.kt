@@ -16,5 +16,74 @@
 
 package com.android.systemui.headline.ui.viewmodel
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.MusicNote
+import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.Timer
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.android.compose.animation.scene.HoistedSceneTransitionLayoutState
+import com.android.compose.animation.scene.SceneKey
+
 /** A fake implementation of [HeadlineViewModel]. */
-class FakeHeadlineViewModel(override val text: String = "Hello, World") : HeadlineViewModel
+class FakeHeadlineViewModel(
+    override val items: List<HeadlineItem> = fakeHeadlineItems(),
+    override val state: HoistedSceneTransitionLayoutState =
+        HoistedSceneTransitionLayoutState(defaultInitialScene(items)),
+    private val onItemClicked: (HeadlineItem) -> Unit = {
+        // TODO(b/450236706): Call state.animateOrSnapTo(item.key.toSceneKey()) by default.
+    },
+) : HeadlineViewModel {
+    constructor(
+        items: List<HeadlineItem> = fakeHeadlineItems(),
+        currentItem: HeadlineItem? = items.first(),
+        onItemClicked: (HeadlineItem) -> Unit = {},
+    ) : this(
+        items = items,
+        state =
+            HoistedSceneTransitionLayoutState(
+                currentItem?.key?.toSceneKey() ?: HeadlineViewModel.GoneScene
+            ),
+        onItemClicked = onItemClicked,
+    )
+
+    override fun onItemClicked(item: HeadlineItem) {
+        onItemClicked.invoke(item)
+    }
+
+    companion object {
+        private fun defaultInitialScene(items: List<HeadlineItem>): SceneKey =
+            (items.firstOrNull()?.key ?: HeadlineItemKey.None).toSceneKey()
+    }
+}
+
+fun fakeHeadlineItems(): List<FakeHeadlineItem> {
+    return listOf(
+        FakeHeadlineItem("timer", Icons.Default.Timer, "4:42"),
+        FakeHeadlineItem("spotify", Icons.Default.MusicNote, "Espresso"),
+        FakeHeadlineItem("car", Icons.Default.DirectionsCar, "3 min"),
+        FakeHeadlineItem("phone", Icons.Default.Phone, "incoming call"),
+    )
+}
+
+class FakeHeadlineItem(
+    key: Any = "spotify",
+    override val startContents: List<HeadlineItemContent>,
+    override val endContents: List<HeadlineItemContent>,
+) : HeadlineItem {
+    constructor(
+        key: Any = "spotify",
+        icon: ImageVector = Icons.Default.MusicNote,
+        text: String = "Espresso",
+    ) : this(
+        key,
+        listOf(HeadlineItemContent.Icon(icon, null)),
+        listOf(HeadlineItemContent.Text(text)),
+    )
+
+    override val key: HeadlineItemKey = HeadlineItemKey(key)
+
+    override fun toString(): String {
+        return "FakeHeadlineItem(key=$key)"
+    }
+}

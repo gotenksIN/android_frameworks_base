@@ -266,10 +266,10 @@ public final class InputManager {
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
     @IntDef(prefix = {"CONTROLLER_BUTTON_"}, value = {
-            ControllerButton.CONTROLLER_BUTTON_SOUTH,
-            ControllerButton.CONTROLLER_BUTTON_EAST,
-            ControllerButton.CONTROLLER_BUTTON_NORTH,
-            ControllerButton.CONTROLLER_BUTTON_WEST,
+            ControllerButton.CONTROLLER_BUTTON_A,
+            ControllerButton.CONTROLLER_BUTTON_B,
+            ControllerButton.CONTROLLER_BUTTON_X,
+            ControllerButton.CONTROLLER_BUTTON_Y,
             ControllerButton.CONTROLLER_BUTTON_L1,
             ControllerButton.CONTROLLER_BUTTON_R1,
             ControllerButton.CONTROLLER_BUTTON_L2,
@@ -281,10 +281,10 @@ public final class InputManager {
             ControllerButton.CONTROLLER_BUTTON_THUMBSTICK_RIGHT,
     })
     public @interface ControllerButton {
-        int CONTROLLER_BUTTON_SOUTH = KeyEvent.KEYCODE_BUTTON_A;
-        int CONTROLLER_BUTTON_EAST = KeyEvent.KEYCODE_BUTTON_B;
-        int CONTROLLER_BUTTON_NORTH = KeyEvent.KEYCODE_BUTTON_X;
-        int CONTROLLER_BUTTON_WEST = KeyEvent.KEYCODE_BUTTON_Y;
+        int CONTROLLER_BUTTON_A = KeyEvent.KEYCODE_BUTTON_A;
+        int CONTROLLER_BUTTON_B = KeyEvent.KEYCODE_BUTTON_B;
+        int CONTROLLER_BUTTON_X = KeyEvent.KEYCODE_BUTTON_X;
+        int CONTROLLER_BUTTON_Y = KeyEvent.KEYCODE_BUTTON_Y;
         int CONTROLLER_BUTTON_L1 = KeyEvent.KEYCODE_BUTTON_L1;
         int CONTROLLER_BUTTON_R1 = KeyEvent.KEYCODE_BUTTON_R1;
         int CONTROLLER_BUTTON_L2 = KeyEvent.KEYCODE_BUTTON_L2;
@@ -795,7 +795,7 @@ public final class InputManager {
     }
 
     /**
-     * Clears all existing controller button remapping for a given device.
+     * Clears all existing controller button remappings for a given device.
      *
      * @param identifier The unique identifier for the device.
      *
@@ -804,17 +804,17 @@ public final class InputManager {
     @TestApi
     @FlaggedApi(com.android.hardware.input.Flags.FLAG_CONTROLLER_REMAPPING)
     @RequiresPermission(Manifest.permission.CONTROLLER_REMAPPING)
-    public void clearAllControllerButtonRemapping(@NonNull InputDeviceIdentifier identifier) {
+    public void clearAllControllerButtonRemappings(@NonNull InputDeviceIdentifier identifier) {
         Objects.requireNonNull(identifier, "Device identifier must not be null");
         try {
-            mIm.clearAllControllerButtonRemapping(mContext.getUserId(), identifier);
+            mIm.clearAllControllerButtonRemappings(mContext.getUserId(), identifier);
         } catch (RemoteException ex) {
             throw ex.rethrowFromSystemServer();
         }
     }
 
     /**
-     * Provides the current controller button remapping for a given device.
+     * Provides the current controller button remappings for a given device.
      *
      * @param identifier The unique identifier for the device.
      * @return a {fromButton, toKeycode} map that contains the existing controller button remapping.
@@ -826,11 +826,99 @@ public final class InputManager {
     @NonNull
     @SuppressWarnings("unchecked")
     @RequiresPermission(Manifest.permission.CONTROLLER_REMAPPING)
-    public Map<Integer, Integer> getControllerButtonRemapping(
+    public Map<Integer, Integer> getControllerButtonRemappings(
             @NonNull InputDeviceIdentifier identifier) {
         Objects.requireNonNull(identifier, "Device identifier must not be null");
         try {
-            return mIm.getControllerButtonRemapping(mContext.getUserId(), identifier);
+            return mIm.getControllerButtonRemappings(mContext.getUserId(), identifier);
+        } catch (RemoteException ex) {
+            throw ex.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Remaps a controller axis.
+     *
+     * @param identifier The unique identifier for the device.
+     * @param fromAxis The controller axis getting remapped.
+     * @param toAxis The controller axis that it is mapped to.
+     *
+     * @throws IllegalArgumentException if the provided fromAxis or toAxis is not a valid axis
+     * @hide
+     */
+    @TestApi
+    @FlaggedApi(com.android.hardware.input.Flags.FLAG_CONTROLLER_REMAPPING)
+    @RequiresPermission(Manifest.permission.CONTROLLER_REMAPPING)
+    public void remapControllerAxis(@NonNull InputDeviceIdentifier identifier,
+            @MotionEvent.Axis int fromAxis, @MotionEvent.Axis int toAxis) {
+        Objects.requireNonNull(identifier, "Device identifier must not be null");
+        try {
+            mIm.remapControllerAxis(mContext.getUserId(), identifier, fromAxis, toAxis);
+        } catch (RemoteException ex) {
+            throw ex.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Removes a controller axis remapping.
+     *
+     * @param identifier The unique identifier for the device.
+     * @param fromAxis The controller axis getting remapped.
+     *
+     * @throws IllegalArgumentException if the provided fromAxis is not a valid axis
+     * @hide
+     */
+    @TestApi
+    @FlaggedApi(com.android.hardware.input.Flags.FLAG_CONTROLLER_REMAPPING)
+    @RequiresPermission(Manifest.permission.CONTROLLER_REMAPPING)
+    public void removeControllerAxisRemapping(@NonNull InputDeviceIdentifier identifier,
+            @MotionEvent.Axis int fromAxis) {
+        Objects.requireNonNull(identifier, "Device identifier must not be null");
+        try {
+            mIm.removeControllerAxisRemapping(mContext.getUserId(), identifier, fromAxis);
+        } catch (RemoteException ex) {
+            throw ex.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Clears all existing controller axis remappings for a given device.
+     *
+     * @param identifier The unique identifier for the device.
+     *
+     * @hide
+     */
+    @TestApi
+    @FlaggedApi(com.android.hardware.input.Flags.FLAG_CONTROLLER_REMAPPING)
+    @RequiresPermission(Manifest.permission.CONTROLLER_REMAPPING)
+    public void clearAllControllerAxisRemappings(@NonNull InputDeviceIdentifier identifier) {
+        Objects.requireNonNull(identifier, "Device identifier must not be null");
+        try {
+            mIm.clearAllControllerAxisRemappings(mContext.getUserId(), identifier);
+        } catch (RemoteException ex) {
+            throw ex.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Provides the current controller axis remappings for a given device.
+     *
+     * @param identifier The unique identifier for the device.
+     * @return a {fromAxis, toAxis} map that contains the existing controller axis remappings, where
+     * fromAxis and toAxis are {@link MotionEvent.Axis}.
+     *
+     * @hide
+     */
+    @TestApi
+    @FlaggedApi(com.android.hardware.input.Flags.FLAG_CONTROLLER_REMAPPING)
+    @NonNull
+    @SuppressWarnings("unchecked")
+    @RequiresPermission(Manifest.permission.CONTROLLER_REMAPPING)
+    public Map<Integer, Integer> getControllerAxisRemappings(
+            @NonNull InputDeviceIdentifier identifier) {
+        Objects.requireNonNull(identifier, "Device identifier must not be null");
+        try {
+            return mIm.getControllerAxisRemappings(mContext.getUserId(), identifier);
         } catch (RemoteException ex) {
             throw ex.rethrowFromSystemServer();
         }

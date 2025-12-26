@@ -55,6 +55,7 @@ import com.android.wm.shell.back.BackAnimationBackground;
 import com.android.wm.shell.back.BackAnimationController;
 import com.android.wm.shell.back.ShellBackAnimationRegistry;
 import com.android.wm.shell.bubbles.BubbleController;
+import com.android.wm.shell.bubbles.BubbleHelper;
 import com.android.wm.shell.bubbles.Bubbles;
 import com.android.wm.shell.common.DevicePostureController;
 import com.android.wm.shell.common.DisplayController;
@@ -91,7 +92,8 @@ import com.android.wm.shell.compatui.api.CompatUIComponentIdGenerator;
 import com.android.wm.shell.compatui.api.CompatUIComponentRepository;
 import com.android.wm.shell.compatui.api.CompatUIHandler;
 import com.android.wm.shell.compatui.api.CompatUIRepository;
-import com.android.wm.shell.compatui.api.CompatUIState;
+import com.android.wm.shell.compatui.api.CompatUISharedRepositoryCleanUp;
+import com.android.wm.shell.compatui.api.CompatUISharedStateRepository;
 import com.android.wm.shell.compatui.components.RestartButtonSpecKt;
 import com.android.wm.shell.compatui.impl.DefaultCompatUIComponentFactory;
 import com.android.wm.shell.compatui.impl.DefaultCompatUIHandler;
@@ -141,6 +143,7 @@ import com.android.wm.shell.taskview.TaskViewTransitions;
 import com.android.wm.shell.transition.FocusTransitionObserver;
 import com.android.wm.shell.transition.HomeTransitionObserver;
 import com.android.wm.shell.transition.MixedTransitionHandler;
+import com.android.wm.shell.transition.TransitionLeashManager;
 import com.android.wm.shell.transition.Transitions;
 import com.android.wm.shell.unfold.ShellUnfoldProgressProvider;
 import com.android.wm.shell.unfold.UnfoldAnimationController;
@@ -324,7 +327,7 @@ public abstract class WMShellBaseModule {
             CompatUIRepository compatUIRepository,
             CompatUIComponentRepository compatUIComponentRepository,
             Optional<DesktopUserRepositories> desktopUserRepositories,
-            @NonNull CompatUIState compatUIState,
+            @NonNull CompatUISharedStateRepository sharedComponentRepository,
             @NonNull CompatUIComponentIdGenerator componentIdGenerator,
             @NonNull CompatUIComponentFactory compatUIComponentFactory,
             CompatUIStatusManager compatUIStatusManager,
@@ -337,8 +340,8 @@ public abstract class WMShellBaseModule {
         if (Flags.appCompatUiFramework()) {
             return Optional.of(
                     new DefaultCompatUIHandler(compatUIRepository, compatUIComponentRepository,
-                            compatUIState, componentIdGenerator, compatUIComponentFactory,
-                            mainExecutor));
+                            sharedComponentRepository, componentIdGenerator,
+                            compatUIComponentFactory, mainExecutor));
         }
         return Optional.of(
                 new CompatUIController(
@@ -374,19 +377,28 @@ public abstract class WMShellBaseModule {
 
     @WMSingleton
     @Provides
-    static CompatUIState provideCompatUIState() {
-        return new CompatUIState();
-    }
-
-    @WMSingleton
-    @Provides
     static CompatUIComponentFactory provideCompatUIComponentFactory(
             @NonNull Context context,
             @NonNull SyncTransactionQueue syncQueue,
             @NonNull CompatUIComponentRepository compatUIComponentRepository,
+            @NonNull CompatUISharedStateRepository sharedStateRepository,
             @NonNull DisplayController displayController) {
         return new DefaultCompatUIComponentFactory(context, syncQueue, displayController,
-                compatUIComponentRepository);
+                compatUIComponentRepository, sharedStateRepository);
+    }
+
+    @WMSingleton
+    @Provides
+    static Optional<CompatUISharedRepositoryCleanUp> provideCompatUISharedStateManager(
+            @NonNull ShellInit shellInit,
+            @NonNull ShellTaskOrganizer shellTaskOrganizer,
+            @NonNull CompatUISharedStateRepository sharedStateRepository
+    ) {
+        if (Flags.appCompatUiFramework()) {
+            return Optional.of(new CompatUISharedRepositoryCleanUp(shellInit, shellTaskOrganizer,
+                    sharedStateRepository));
+        }
+        return Optional.empty();
     }
 
     @WMSingleton
@@ -612,6 +624,9 @@ public abstract class WMShellBaseModule {
     @BindsOptionalOf
     abstract BubbleController optionalBubblesController();
 
+    @BindsOptionalOf
+    abstract BubbleHelper optionalBubbleHepler();
+
     //
     // Fullscreen
     //
@@ -774,13 +789,14 @@ public abstract class WMShellBaseModule {
             Optional<DesktopUserRepositories> desktopUserRepositories,
             TaskStackTransitionObserver taskStackTransitionObserver,
             @ShellMainThread ShellExecutor mainExecutor,
-            DesktopState desktopState
+            DesktopState desktopState,
+            DesktopModeCompatPolicy desktopModeCompatPolicy
     ) {
         return Optional.ofNullable(
                 RecentTasksController.create(context, shellInit, shellController,
                         shellCommandHandler, taskStackListener, activityTaskManager,
                         desktopUserRepositories, taskStackTransitionObserver, mainExecutor,
-                        desktopState));
+                        desktopState, desktopModeCompatPolicy));
     }
 
     @BindsOptionalOf
@@ -809,13 +825,20 @@ public abstract class WMShellBaseModule {
             @ShellMainThread ShellExecutor mainExecutor,
             @ShellMainThread Handler mainHandler,
             @ShellAnimationThread ShellExecutor animExecutor,
+            TransitionLeashManager transitionLeashManager,
             RootTaskDisplayAreaOrganizer rootTaskDisplayAreaOrganizer,
             HomeTransitionObserver homeTransitionObserver,
             FocusTransitionObserver focusTransitionObserver) {
         return new Transitions(context, shellInit, shellCommandHandler, shellController, organizer,
                 pool, displayController, displayInsetsController, mainExecutor, mainHandler,
-                animExecutor, rootTaskDisplayAreaOrganizer, homeTransitionObserver,
-                focusTransitionObserver);
+                animExecutor, transitionLeashManager, rootTaskDisplayAreaOrganizer,
+                homeTransitionObserver, focusTransitionObserver);
+    }
+
+    @WMSingleton
+    @Provides
+    static TransitionLeashManager provideTransitionsLeashManager() {
+        return new TransitionLeashManager();
     }
 
     @WMSingleton
@@ -840,8 +863,8 @@ public abstract class WMShellBaseModule {
     @Provides
     static TaskViewTransitions provideTaskViewTransitions(Transitions transitions,
             TaskViewRepository repository, ShellTaskOrganizer organizer,
-            SyncTransactionQueue syncQueue) {
-        return new TaskViewTransitions(transitions, repository, organizer, syncQueue);
+            SyncTransactionQueue syncQueue, Optional<BubbleHelper> bubbleHelper) {
+        return new TaskViewTransitions(transitions, repository, organizer, syncQueue, bubbleHelper);
     }
 
     @WMSingleton
@@ -1068,7 +1091,6 @@ public abstract class WMShellBaseModule {
             Optional<DesktopTasksController> desktopTasksController) {
         return desktopTasksController.map(DesktopTasksController::asDesktopMode);
     }
-
 
     @BindsOptionalOf
     @DynamicOverride

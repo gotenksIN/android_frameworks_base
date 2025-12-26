@@ -33,13 +33,23 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.graphics.ColorUtils;
 import com.android.launcher3.icons.BitmapInfo;
 import com.android.launcher3.icons.BubbleIconFactory;
+import com.android.launcher3.util.UserIconInfo;
 import com.android.wm.shell.R;
 import com.android.wm.shell.bubbles.appinfo.BubbleAppInfo;
 import com.android.wm.shell.bubbles.appinfo.BubbleAppInfoProvider;
 import com.android.wm.shell.bubbles.bar.BubbleBarExpandedView;
 import com.android.wm.shell.bubbles.bar.BubbleBarLayerView;
 import com.android.wm.shell.bubbles.model.BubbleIcon;
+import com.android.wm.shell.bubbles.user.data.BubbleUserResolver;
+import com.android.wm.shell.bubbles.user.model.BubbleUserInfo;
+import com.android.wm.shell.shared.annotations.ShellBackgroundThread;
+import com.android.wm.shell.shared.annotations.ShellMainThread;
+import com.android.wm.shell.shared.bubbles.UserType;
 import com.android.wm.shell.shared.bubbles.logging.BubbleLog;
+
+import dagger.assisted.Assisted;
+import dagger.assisted.AssistedFactory;
+import dagger.assisted.AssistedInject;
 
 import java.lang.ref.WeakReference;
 import java.util.concurrent.Executor;
@@ -74,28 +84,27 @@ public class BubbleViewInfoTask {
     private final Executor mMainExecutor;
     private final Executor mBgExecutor;
     private final BubbleAppInfoProvider mAppInfoProvider;
+    private final BubbleUserResolver mUserResolver;
 
     private final AtomicBoolean mStarted = new AtomicBoolean();
     private final AtomicBoolean mCancelled = new AtomicBoolean();
     private final AtomicBoolean mFinished = new AtomicBoolean();
 
-    /**
-     * Creates a task to load information for the provided {@link Bubble}. Once all info
-     * is loaded, {@link Callback} is notified.
-     */
-    BubbleViewInfoTask(Bubble b,
-            Context context,
-            BubbleExpandedViewManager expandedViewManager,
-            BubbleTaskViewFactory taskViewFactory,
+    @AssistedInject
+    public BubbleViewInfoTask(@Assisted Bubble b,
+            @Assisted Context context,
+            @Assisted BubbleExpandedViewManager expandedViewManager,
+            @Assisted BubbleTaskViewFactory taskViewFactory,
+            @Assisted @Nullable BubbleStackView stackView,
+            @Assisted @Nullable BubbleBarLayerView layerView,
+            @Assisted BubbleIconFactory factory,
+            @Assisted boolean skipInflation,
+            @Assisted Callback c,
             BubblePositioner positioner,
-            @Nullable BubbleStackView stackView,
-            @Nullable BubbleBarLayerView layerView,
-            BubbleIconFactory factory,
             BubbleAppInfoProvider appInfoProvider,
-            boolean skipInflation,
-            Callback c,
-            Executor mainExecutor,
-            Executor bgExecutor) {
+            @ShellMainThread Executor mainExecutor,
+            @ShellBackgroundThread Executor bgExecutor,
+            BubbleUserResolver userResolver) {
         mBubble = b;
         mContext = new WeakReference<>(context);
         mExpandedViewManager = new WeakReference<>(expandedViewManager);
@@ -109,6 +118,7 @@ public class BubbleViewInfoTask {
         mCallback = c;
         mMainExecutor = mainExecutor;
         mBgExecutor = bgExecutor;
+        mUserResolver = userResolver;
     }
 
     /**
@@ -195,11 +205,12 @@ public class BubbleViewInfoTask {
         BubbleLog.d("BubbleViewInfoTask.loadViewInfo() key=%s", mBubble.getKey());
         if (mLayerView.get() != null) {
             return BubbleViewInfo.populateForBubbleBar(mContext.get(), mTaskViewFactory.get(),
-                    mLayerView.get(), mIconFactory, mBubble, mAppInfoProvider, mSkipInflation);
+                    mLayerView.get(), mIconFactory, mBubble, mAppInfoProvider, mSkipInflation,
+                    mUserResolver);
         } else {
             return BubbleViewInfo.populate(mContext.get(), mTaskViewFactory.get(),
                     mPositioner.get(), mStackView.get(), mIconFactory, mBubble, mAppInfoProvider,
-                    mSkipInflation);
+                    mSkipInflation, mUserResolver);
         }
     }
 
@@ -243,7 +254,6 @@ public class BubbleViewInfoTask {
     /**
      * Info necessary to render a bubble.
      */
-    @VisibleForTesting
     public static class BubbleViewInfo {
         // TODO(b/273312602): for foldables it might make sense to populate all of the views
 
@@ -265,6 +275,7 @@ public class BubbleViewInfoTask {
         int dotColor;
         Bubble.FlyoutMessage flyoutMessage;
         BubbleIcon bubbleIcon;
+        UserType userType;
 
         @Nullable
         public static BubbleViewInfo populateForBubbleBar(Context c,
@@ -273,7 +284,8 @@ public class BubbleViewInfoTask {
                 BubbleIconFactory iconFactory,
                 Bubble b,
                 BubbleAppInfoProvider appInfoProvider,
-                boolean skipInflation) {
+                boolean skipInflation,
+                BubbleUserResolver userResolver) {
             BubbleViewInfo info = new BubbleViewInfo();
 
             if (!skipInflation && !b.isInflated()) {
@@ -285,17 +297,10 @@ public class BubbleViewInfoTask {
                         R.layout.bubble_bar_expanded_view, layerView, false /* attachToRoot */);
             }
 
-            if (!populateCommonInfo(info, c, b, iconFactory, appInfoProvider)) {
+            if (!populateCommonInfo(info, c, b, iconFactory, appInfoProvider, userResolver)) {
                 // if we failed to update common fields return null
                 return null;
             }
-
-            BubbleAppInfo appInfo = appInfoProvider.resolveAppInfo(c, b);
-            if (appInfo == null) {
-                return null;
-            }
-
-            info.bubbleIcon = getBubbleIcon(info, c, b, iconFactory, appInfo.getAppIcon());
 
             // set the flyout message but don't load the avatar because we can't pass it on the
             // binder to launcher
@@ -313,7 +318,8 @@ public class BubbleViewInfoTask {
                 BubbleIconFactory iconFactory,
                 Bubble b,
                 BubbleAppInfoProvider appInfoProvider,
-                boolean skipInflation) {
+                boolean skipInflation,
+                BubbleUserResolver userResolver) {
             BubbleViewInfo info = new BubbleViewInfo();
 
             // View inflation: only should do this once per bubble
@@ -330,7 +336,7 @@ public class BubbleViewInfoTask {
                         R.layout.bubble_expanded_view, stackView, false /* attachToRoot */);
             }
 
-            if (!populateCommonInfo(info, c, b, iconFactory, appInfoProvider)) {
+            if (!populateCommonInfo(info, c, b, iconFactory, appInfoProvider, userResolver)) {
                 // if we failed to update common fields return null
                 return null;
             }
@@ -353,7 +359,7 @@ public class BubbleViewInfoTask {
      */
     private static boolean populateCommonInfo(
             BubbleViewInfo info, Context c, Bubble b, BubbleIconFactory iconFactory,
-            BubbleAppInfoProvider appInfoProvider) {
+            BubbleAppInfoProvider appInfoProvider, BubbleUserResolver userResolver) {
         if (b.getShortcutInfo() != null) {
             info.shortcutInfo = b.getShortcutInfo();
         }
@@ -368,16 +374,20 @@ public class BubbleViewInfoTask {
             info.appName = appInfo.getAppName();
         }
 
-        info.bubbleIcon = getBubbleIcon(info, c, b, iconFactory, appIcon);
+        BubbleUserInfo bubbleUserInfo = userResolver.resolve(b.getUser().getIdentifier());
+        info.userType = bubbleUserInfo.getUserType();
+        UserIconInfo userIconInfo =
+                new UserIconInfo(b.getUser(), bubbleUserInfo.getUserIconInfoType());
+        info.bubbleIcon = getBubbleIcon(info, c, b, iconFactory, appIcon, userIconInfo);
 
         BitmapInfo badgeBitmapInfo = iconFactory.getBadgeBitmap(
                 appIcon,
-                appInfo.getUser(),
+                userIconInfo,
                 b.isImportantConversation());
         info.badgeBitmap = badgeBitmapInfo;
         // Raw badge bitmap never includes the important conversation ring
         info.rawBadgeBitmap = b.isImportantConversation()
-                ? iconFactory.getBadgeBitmap(appIcon, appInfo.getUser(), false)
+                ? iconFactory.getBadgeBitmap(appIcon, userIconInfo, false)
                 : badgeBitmapInfo;
 
         info.dotColor = ColorUtils.blendARGB(badgeBitmapInfo.color,
@@ -386,9 +396,10 @@ public class BubbleViewInfoTask {
     }
 
     private static BubbleIcon getBubbleIcon(BubbleViewInfo info, Context c, Bubble b,
-            BubbleIconFactory iconFactory, Drawable appIcon) {
+            BubbleIconFactory iconFactory, Drawable appIcon, UserIconInfo userIconInfo) {
         if (b.isApp()) {
-            return new BubbleIcon.AppIcon(iconFactory.getAppBubbleBitmapInfo(appIcon, b.getUser()));
+            return new BubbleIcon.AppIcon(
+                    iconFactory.getAppBubbleBitmapInfo(appIcon, userIconInfo));
         } else {
             Drawable bubbleDrawable = null;
             try {
@@ -406,5 +417,23 @@ public class BubbleViewInfoTask {
             }
             return new BubbleIcon.Custom(iconFactory.getBubbleBitmap(bubbleDrawable));
         }
+    }
+
+    @AssistedFactory
+    public interface Factory {
+
+        /**
+         * Creates a task to load information for the provided {@link Bubble}. Once all info
+         * is loaded, {@link Callback} is notified.
+         */
+        BubbleViewInfoTask create(Bubble b,
+                Context context,
+                BubbleExpandedViewManager expandedViewManager,
+                BubbleTaskViewFactory taskViewFactory,
+                @Nullable BubbleStackView stackView,
+                @Nullable BubbleBarLayerView layerView,
+                BubbleIconFactory factory,
+                boolean skipInflation,
+                Callback c);
     }
 }

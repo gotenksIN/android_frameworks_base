@@ -18,6 +18,7 @@ package com.android.systemui.topwindoweffects
 
 import android.os.Handler
 import android.view.Choreographer
+import android.view.animation.PathInterpolator
 import androidx.annotation.VisibleForTesting
 import androidx.core.animation.Animator
 import androidx.core.animation.AnimatorListenerAdapter
@@ -29,6 +30,9 @@ import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.topui.TopUiController
+import com.android.systemui.topwindoweffects.data.repository.SqueezeEffectRepository.GestureStatus.COMPLETED
+import com.android.systemui.topwindoweffects.data.repository.SqueezeEffectRepository.GestureStatus.HIDDEN
+import com.android.systemui.topwindoweffects.data.repository.SqueezeEffectRepository.GestureStatus.PARTIAL
 import com.android.systemui.topwindoweffects.domain.interactor.PowerButtonSemantics
 import com.android.systemui.topwindoweffects.domain.interactor.SqueezeEffectInteractor
 import com.android.systemui.topwindoweffects.ui.viewmodel.SqueezeEffectHapticPlayer
@@ -54,22 +58,27 @@ constructor(
     @Main private val mainHandler: Handler,
 ) : CoreStartable {
 
+    private val gestureInterpolator = PathInterpolator(0.1f, 0.1f, 0f, 1f)
+
     // The main animation is interruptible until power button long press has been detected. At this
     // point the default assistant is invoked, and since this invocation cannot be interrupted by
     // lifting the power button the animation shouldn't be interruptible either.
     private var isAnimationInterruptible = true
 
     private var squeezeProgress: Float = 0f
+        set(value) {
+            field = value
+            appZoomOutOptional.ifPresent {
+                it.setTopLevelProgress(field, Choreographer.getInstance().vsyncId, mainHandler)
+            }
+        }
+
+    private var isGestureOngoing: Boolean = false
 
     private var animator: ValueAnimator? = null
 
-    private val hapticPlayer: SqueezeEffectHapticPlayer? by lazy {
-        if (squeezeEffectInteractor.isSqueezeEffectHapticEnabled) {
-            squeezeEffectHapticPlayerFactory.create()
-        } else {
-            null
-        }
-    }
+    private val hapticPlayer: SqueezeEffectHapticPlayer by lazy {
+        squeezeEffectHapticPlayerFactory.create() }
 
     override fun start() {
         applicationScope.launch {
@@ -77,32 +86,78 @@ constructor(
                 when (semantics) {
                     PowerButtonSemantics.START_SQUEEZE_WITH_RUMBLE ->
                         startSqueeze(useHapticRumble = true)
+
                     PowerButtonSemantics.START_SQUEEZE_WITHOUT_RUMBLE ->
                         startSqueeze(useHapticRumble = false)
+
                     PowerButtonSemantics.CANCEL_SQUEEZE -> cancelSqueeze()
                     PowerButtonSemantics.PLAY_DEFAULT_ASSISTANT_HAPTICS ->
                         playDefaultAssistantHaptic()
                 }
             }
         }
+
+        applicationScope.launch {
+            squeezeEffectInteractor.gestureProgress.collectLatest { gestureProgress ->
+                when (gestureProgress.status) {
+                    PARTIAL ->
+                        // Ignore gesture updates if animation is running
+                        if (animator == null) {
+                            if (isGestureOngoing && gestureProgress.progress == 0f) {
+                                isGestureOngoing = false
+                                squeezeProgress = 0f
+                                setRequestTopUi(false)
+                            } else if (gestureProgress.progress > 0f) {
+                                if (!isGestureOngoing) {
+                                    isGestureOngoing = true
+                                    setRequestTopUi(true)
+                                }
+                                squeezeProgress =
+                                    gestureInterpolator.getInterpolation(gestureProgress.progress) *
+                                        GESTURE_MAX_EFFECT
+                            }
+                        }
+                    COMPLETED ->
+                        // Ignore gesture updates if animation is running
+                        if (animator == null) {
+                            isGestureOngoing = false
+                            startSqueeze(
+                                useHapticRumble = false,
+                                delayMs = 0L,
+                                inwardsAnimationDuration =
+                                    squeezeEffectInteractor
+                                        .getGestureInvocationEffectInAnimationDurationMillis(),
+                            )
+                        }
+                    HIDDEN -> {
+                        isGestureOngoing = false
+                        squeezeProgress = 0f
+                        finishAnimation()
+                    }
+                }
+            }
+        }
     }
 
-    private suspend fun startSqueeze(useHapticRumble: Boolean) {
-        delay(squeezeEffectInteractor.getInvocationEffectInitialDelayMillis())
+    private suspend fun startSqueeze(
+        useHapticRumble: Boolean,
+        delayMs: Long = squeezeEffectInteractor.getLppInvocationEffectInitialDelayMillis(),
+        inwardsAnimationDuration: Long =
+            squeezeEffectInteractor.getLppInvocationEffectInAnimationDurationMillis(),
+    ) {
+        delay(delayMs)
         setRequestTopUi(true)
-        val inwardsAnimationDuration =
-            squeezeEffectInteractor.getInvocationEffectInAnimationDurationMillis()
         val outwardsAnimationDuration =
             squeezeEffectInteractor.getInvocationEffectOutAnimationDurationMillis()
         if (useHapticRumble) {
-            hapticPlayer?.playRumble(inwardsAnimationDuration.toInt())
+            hapticPlayer.playRumble(inwardsAnimationDuration.toInt())
         }
         animateSqueezeProgressTo(
             targetProgress = 1f,
             duration = inwardsAnimationDuration,
             interpolator = InterpolatorsAndroidX.LEGACY,
         ) {
-            hapticPlayer?.startZoomOutEffect(
+            hapticPlayer.startZoomOutEffect(
                 durationMillis =
                     (HAPTIC_OUTWARD_EFFECT_DURATION_SCALE * outwardsAnimationDuration).toInt()
             )
@@ -117,14 +172,14 @@ constructor(
         squeezeEffectInteractor.isPowerButtonLongPressed.collectLatest { isLongPressed ->
             if (isLongPressed) {
                 isAnimationInterruptible = false
-                hapticPlayer?.playLppIndicator()
+                hapticPlayer.playLppIndicator()
             }
         }
     }
 
     private fun cancelSqueeze() {
         if (isAnimationInterruptible && animator != null) {
-            hapticPlayer?.cancel()
+            hapticPlayer.cancel()
             animateSqueezeProgressTo(
                 targetProgress = 0f,
                 duration = squeezeEffectInteractor.getInvocationEffectOutAnimationDurationMillis(),
@@ -146,22 +201,14 @@ constructor(
             ValueAnimator.ofFloat(squeezeProgress, targetProgress).apply {
                 this.duration = duration
                 this.interpolator = interpolator
-                addUpdateListener {
-                    squeezeProgress = animatedValue as Float
-                    appZoomOutOptional.ifPresent {
-                        it.setTopLevelProgress(
-                            squeezeProgress,
-                            Choreographer.getInstance().vsyncId,
-                            mainHandler,
-                        )
-                    }
-                }
+                addUpdateListener { squeezeProgress = animatedValue as Float }
                 setListenerForNaturalCompletion { doOnEnd() }
                 start()
             }
     }
 
     private fun finishAnimation() {
+        animator?.cancel()
         animator = null
         isAnimationInterruptible = true
         setRequestTopUi(false)
@@ -171,11 +218,12 @@ constructor(
         topUiController.setRequestTopUi(requestTopUi, TAG)
     }
 
-    private fun playDefaultAssistantHaptic() = hapticPlayer?.playDefaultAssistantEffect()
+    private fun playDefaultAssistantHaptic() = hapticPlayer.playDefaultAssistantEffect()
 
     override fun dump(pw: PrintWriter, args: Array<out String>) {
         pw.println("$TAG:")
         pw.println("  isAnimationInterruptible=$isAnimationInterruptible")
+        pw.println("  isGestureOngoing=$isGestureOngoing")
         pw.println("  squeezeProgress=$squeezeProgress")
         squeezeEffectInteractor.dump(pw, args)
     }
@@ -189,6 +237,12 @@ constructor(
          * animator interpolator well.
          */
         @VisibleForTesting const val HAPTIC_OUTWARD_EFFECT_DURATION_SCALE = 0.53
+
+        /**
+         * Maximum of the invocation effect that is applied during corner gesture, i.e. before the
+         * invocation has been committed.
+         */
+        @VisibleForTesting const val GESTURE_MAX_EFFECT = 0.25f
     }
 }
 

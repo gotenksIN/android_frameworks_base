@@ -21,7 +21,6 @@ import android.platform.test.annotations.EnableFlags
 import android.view.MotionEvent
 import android.view.MotionEvent.ACTION_DOWN
 import android.view.MotionEvent.ACTION_OUTSIDE
-import android.view.View
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.compose.animation.scene.DefaultEdgeDetector
@@ -31,8 +30,8 @@ import com.android.systemui.classifier.fakeFalsingManager
 import com.android.systemui.desktop.domain.interactor.enableUsingDesktopStatusBar
 import com.android.systemui.deviceentry.domain.interactor.deviceUnlockedInteractor
 import com.android.systemui.flags.EnableSceneContainer
-import com.android.systemui.keyguard.data.repository.fakeDeviceEntryFingerprintAuthRepository
-import com.android.systemui.keyguard.shared.model.SuccessFingerprintAuthenticationStatus
+import com.android.systemui.keyguard.domain.interactor.biometricUnlockInteractor
+import com.android.systemui.keyguard.shared.model.BiometricUnlockSource
 import com.android.systemui.kosmos.collectLastValue
 import com.android.systemui.kosmos.currentValue
 import com.android.systemui.kosmos.runTest
@@ -53,6 +52,7 @@ import com.android.systemui.shade.domain.interactor.enableSplitShade
 import com.android.systemui.shade.domain.interactor.shadeMode
 import com.android.systemui.shade.shared.model.ShadeMode
 import com.android.systemui.statusbar.data.repository.fakeRemoteInputRepository
+import com.android.systemui.statusbar.phone.BiometricUnlockController
 import com.android.systemui.testKosmos
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
@@ -69,7 +69,6 @@ import org.mockito.kotlin.mock
 class SceneContainerViewModelTest : SysuiTestCase() {
 
     private val kosmos = testKosmos().useUnconfinedTestDispatcher()
-    private val view = mock<View>()
 
     private lateinit var underTest: SceneContainerViewModel
 
@@ -79,7 +78,7 @@ class SceneContainerViewModelTest : SysuiTestCase() {
     @Before
     fun setUp() {
         underTest =
-            kosmos.sceneContainerViewModelFactory.create(view) { motionEventHandler ->
+            kosmos.sceneContainerViewModelFactory.create { motionEventHandler ->
                 this@SceneContainerViewModelTest.motionEventHandler = motionEventHandler
             }
         activationJob = Job()
@@ -226,8 +225,9 @@ class SceneContainerViewModelTest : SysuiTestCase() {
     @Test
     fun canChangeScene_toGone_whenUnlocked_returnsTrue() =
         kosmos.runTest {
-            fakeDeviceEntryFingerprintAuthRepository.setAuthenticationStatus(
-                SuccessFingerprintAuthenticationStatus(0, true)
+            kosmos.biometricUnlockInteractor.setBiometricUnlockState(
+                unlockStateInt = BiometricUnlockController.MODE_UNLOCK_COLLAPSING,
+                biometricUnlockSource = BiometricUnlockSource.FINGERPRINT_SENSOR,
             )
             assertThat(currentValue(deviceUnlockedInteractor.deviceUnlockStatus).isUnlocked)
                 .isTrue()

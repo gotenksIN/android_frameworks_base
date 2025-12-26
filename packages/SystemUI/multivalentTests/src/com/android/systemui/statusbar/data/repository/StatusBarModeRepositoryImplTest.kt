@@ -34,18 +34,12 @@ import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.statusbar.CommandQueue
 import com.android.systemui.statusbar.StatusBarAlwaysUseRegionSampling
 import com.android.systemui.statusbar.StatusBarRegionSampling
-import com.android.systemui.statusbar.core.StatusBarRootModernization
 import com.android.systemui.statusbar.data.model.StatusBarMode
 import com.android.systemui.statusbar.layout.BoundsPair
 import com.android.systemui.statusbar.layout.LetterboxAppearance
 import com.android.systemui.statusbar.layout.LetterboxAppearanceCalculator
 import com.android.systemui.statusbar.layout.StatusBarBoundsProvider
 import com.android.systemui.statusbar.phone.fragment.dagger.HomeStatusBarComponent
-import com.android.systemui.statusbar.phone.ongoingcall.DisableChipsModernization
-import com.android.systemui.statusbar.phone.ongoingcall.EnableChipsModernization
-import com.android.systemui.statusbar.phone.ongoingcall.data.repository.ongoingCallRepository
-import com.android.systemui.statusbar.phone.ongoingcall.shared.model.OngoingCallModel
-import com.android.systemui.statusbar.phone.ongoingcall.shared.model.inCallModel
 import com.android.systemui.testKosmos
 import com.android.systemui.util.mockito.any
 import com.android.systemui.util.mockito.argumentCaptor
@@ -59,7 +53,6 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 
 @SmallTest
@@ -74,7 +67,6 @@ class StatusBarModeRepositoryImplTest : SysuiTestCase() {
         mock<HomeStatusBarComponent>().also {
             whenever(it.boundsProvider).thenReturn(statusBarBoundsProvider)
         }
-    private val ongoingCallRepository = kosmos.ongoingCallRepository
 
     private val underTest by lazy {
         StatusBarModePerDisplayRepositoryImpl(
@@ -82,7 +74,6 @@ class StatusBarModeRepositoryImplTest : SysuiTestCase() {
             DISPLAY_ID,
             commandQueue,
             letterboxAppearanceCalculator,
-            ongoingCallRepository,
         )
     }
 
@@ -114,19 +105,10 @@ class StatusBarModeRepositoryImplTest : SysuiTestCase() {
     }
 
     @Test
-    @EnableFlags(StatusBarRootModernization.FLAG_NAME)
-    fun stop_flagOn_boundsProviderStopped() {
+    fun stop_boundsProviderStopped() {
         underTest.stop()
 
         verify(statusBarBoundsProvider).stop()
-    }
-
-    @Test
-    @DisableFlags(StatusBarRootModernization.FLAG_NAME)
-    fun stop_flagOff_boundsProviderNotStopped() {
-        underTest.stop()
-
-        verify(statusBarBoundsProvider, never()).stop()
     }
 
     @Test
@@ -486,19 +468,6 @@ class StatusBarModeRepositoryImplTest : SysuiTestCase() {
         }
 
     @Test
-    @DisableChipsModernization
-    fun statusBarMode_ongoingCallAndFullscreen_semiTransparent() =
-        testScope.runTest {
-            val latest by collectLastValue(underTest.statusBarAppearance)
-
-            ongoingCallRepository.setOngoingCallState(inCallModel(startTimeMs = 34))
-            onSystemBarAttributesChanged(requestedVisibleTypes = WindowInsets.Type.navigationBars())
-
-            assertThat(latest!!.mode).isEqualTo(StatusBarMode.SEMI_TRANSPARENT)
-        }
-
-    @Test
-    @EnableChipsModernization
     fun statusBarMode_ongoingProcessRequiresStatusBarVisible_andFullscreen_semiTransparent() =
         testScope.runTest {
             val latest by collectLastValue(underTest.statusBarAppearance)
@@ -510,23 +479,6 @@ class StatusBarModeRepositoryImplTest : SysuiTestCase() {
         }
 
     @Test
-    @DisableChipsModernization
-    fun statusBarMode_ongoingCallButNotFullscreen_matchesAppearance() =
-        testScope.runTest {
-            val latest by collectLastValue(underTest.statusBarAppearance)
-
-            ongoingCallRepository.setOngoingCallState(inCallModel(startTimeMs = 789))
-
-            onSystemBarAttributesChanged(
-                requestedVisibleTypes = WindowInsets.Type.statusBars(),
-                appearance = APPEARANCE_OPAQUE_STATUS_BARS,
-            )
-
-            assertThat(latest!!.mode).isEqualTo(StatusBarMode.OPAQUE)
-        }
-
-    @Test
-    @EnableChipsModernization
     fun statusBarMode_ongoingProcessRequiresStatusBarVisible_butNotFullscreen_matchesAppearance() =
         testScope.runTest {
             val latest by collectLastValue(underTest.statusBarAppearance)
@@ -542,22 +494,6 @@ class StatusBarModeRepositoryImplTest : SysuiTestCase() {
         }
 
     @Test
-    @DisableChipsModernization
-    fun statusBarMode_fullscreenButNotOngoingCall_matchesAppearance() =
-        testScope.runTest {
-            val latest by collectLastValue(underTest.statusBarAppearance)
-
-            ongoingCallRepository.setOngoingCallState(OngoingCallModel.NoCall)
-            onSystemBarAttributesChanged(
-                requestedVisibleTypes = WindowInsets.Type.navigationBars(),
-                appearance = APPEARANCE_OPAQUE_STATUS_BARS,
-            )
-
-            assertThat(latest!!.mode).isEqualTo(StatusBarMode.OPAQUE)
-        }
-
-    @Test
-    @EnableChipsModernization
     fun statusBarMode_fullscreen_butNotOngoingProcessRequiresStatusBarVisible_matchesAppearance() =
         testScope.runTest {
             val latest by collectLastValue(underTest.statusBarAppearance)

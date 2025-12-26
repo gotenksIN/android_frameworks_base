@@ -142,7 +142,7 @@ fun PinPad(viewModel: PinBouncerViewModel, verticalSpacing: Dp, modifier: Modifi
             onPointerDown = viewModel::onBackspaceButtonPressed,
             onLongPressed = viewModel::onBackspaceButtonLongPressed,
             onLongClickLabel =
-                stringResource(R.string.keyguard_accessibility_pin_delete_long_click_partial),
+                stringResource(R.string.keyguard_accessibility_pin_delete_long_click),
             appearance = backspaceButtonAppearance,
             scaling = buttonScaleAnimatables[9]::value,
             elementId = "delete_button",
@@ -166,6 +166,9 @@ fun PinPad(viewModel: PinBouncerViewModel, verticalSpacing: Dp, modifier: Modifi
                 ),
             isInputEnabled = isInputEnabled,
             onClicked = viewModel::onAuthenticateButtonClicked,
+            onPointerDown = {
+                viewModel.onDown()
+            },
             appearance = confirmButtonAppearance,
             scaling = buttonScaleAnimatables[11]::value,
             elementId = "key_enter",
@@ -213,8 +216,8 @@ private fun ActionButton(
     isInputEnabled: Boolean,
     onClicked: () -> Unit,
     elementId: String,
+    onPointerDown: ((View?) -> Unit),
     onLongPressed: (() -> Unit)? = null,
-    onPointerDown: ((View?) -> Unit)? = null,
     onLongClickLabel: String? = null,
     appearance: ActionButtonAppearance,
     scaling: () -> Float,
@@ -260,9 +263,9 @@ private fun PinPadButton(
     foregroundColor: Color,
     isAnimationEnabled: Boolean,
     modifier: Modifier = Modifier,
+    onPointerDown: ((View?) -> Unit),
     elementId: String? = null,
     onLongPressed: (() -> Unit)? = null,
-    onPointerDown: ((View?) -> Unit)? = null,
     onLongClickLabel: String? = null,
     content: @Composable (contentColor: () -> Color) -> Unit,
 ) {
@@ -336,7 +339,7 @@ private fun PinPadButton(
                         )
                         .pointerInteropFilter { motionEvent ->
                             if (motionEvent.action == MotionEvent.ACTION_DOWN) {
-                                onPointerDown?.let { it(view) }
+                                onPointerDown(view)
                             }
                             false
                         }
@@ -402,6 +405,5 @@ private const val pinButtonErrorRevertMs = 617
 // Pin button motion spec: http://shortn/_9TTIG6SoEa
 private val pinButtonPressedDuration = 100.milliseconds
 private val pinButtonPressedEasing = Easings.Linear
-private val pinButtonHoldTime = 33.milliseconds
 private val pinButtonReleasedDuration = 420.milliseconds
 private val pinButtonReleasedEasing = Easings.Standard

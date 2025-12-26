@@ -22,6 +22,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.kosmos.Kosmos
+import com.android.systemui.kosmos.advanceTimeBy
 import com.android.systemui.kosmos.backgroundScope
 import com.android.systemui.kosmos.collectLastValue
 import com.android.systemui.kosmos.runTest
@@ -32,6 +33,7 @@ import com.android.systemui.screenrecord.data.repository.screenRecordingServiceR
 import com.android.systemui.screenrecord.shared.model.ScreenRecordingParameters
 import com.android.systemui.testKosmosNew
 import com.google.common.truth.Truth.assertThat
+import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.launch
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -65,6 +67,30 @@ class ScreenCaptureComponentInteractorTest : SysuiTestCase() {
             )
         }
 
+    @Test
+    fun testDelayedRecordComponentLifecycle() =
+        kosmos.runTest {
+            testComponentLifecycle(
+                screenCaptureType = ScreenCaptureType.RECORD,
+                parameters = ScreenCaptureUiParameters.Record(),
+                startCapture = {
+                    screenRecordingServiceRepository.startRecordingDelayed(
+                        parameters =
+                            ScreenRecordingParameters(
+                                captureTarget = null,
+                                audioSource = ScreenRecordingAudioSource.NONE,
+                                displayId = Display.DEFAULT_DISPLAY,
+                                shouldShowTaps = false,
+                            ),
+                        delay = 3.seconds,
+                    )
+                },
+                stopCapture = {
+                    screenRecordingServiceRepository.stopRecording(StopReason.STOP_HOST_APP)
+                },
+            )
+        }
+
     private fun Kosmos.testComponentLifecycle(
         screenCaptureType: ScreenCaptureType,
         parameters: ScreenCaptureUiParameters,
@@ -79,19 +105,22 @@ class ScreenCaptureComponentInteractorTest : SysuiTestCase() {
         assertThat(component).isNotNull()
 
         screenCaptureUiInteractor.hide(screenCaptureType)
+        advanceTimeBy(16)
         assertThat(component).isNull()
 
         screenCaptureUiInteractor.show(parameters)
+        val capturingComponent = component
+        assertThat(component).isNotNull()
         startCapture()
         screenCaptureUiInteractor.hide(screenCaptureType)
-        val capturingComponent = component
-        assertThat(capturingComponent).isNotNull()
+        assertThat(component).isNotNull()
 
         screenCaptureUiInteractor.show(parameters)
         assertThat(component).isSameInstanceAs(capturingComponent)
 
         screenCaptureUiInteractor.hide(screenCaptureType)
         stopCapture()
+        advanceTimeBy(16)
         assertThat(component).isNull()
     }
 }

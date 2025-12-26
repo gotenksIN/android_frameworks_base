@@ -91,8 +91,19 @@ class LaunchParamsController {
             @LaunchParamsModifier.Phase int phase, LaunchParams result) {
         result.reset();
 
-        if (task != null || activity != null) {
-            mPersister.getLaunchParams(task, activity, result);
+        if (com.android.wm.shell.Flags.limitPersistedLaunchParamsFreeform()) {
+            if (task != null) {
+                if (task.supportsPersistedLaunchState()) {
+                    // If task exists, check if it supports loading persisted state.
+                    mPersister.getLaunchParams(task, activity, result);
+                }
+            } else if (activity != null) {
+                mPersister.getLaunchParams(null, activity, result);
+            }
+        } else {
+            if (task != null || activity != null) {
+                mPersister.getLaunchParams(task, activity, result);
+            }
         }
 
         // We start at the last registered {@link LaunchParamsModifier} as this represents
@@ -157,7 +168,7 @@ class LaunchParamsController {
                     task.getRequestedOverrideConfiguration().windowConfiguration.setAppBounds(
                             mTmpParams.mAppBounds);
                 }
-                task.setBounds(mTmpParams.mBounds);
+                task.setBoundsWithSource(mTmpParams.mBounds, mTmpParams.mBoundsSetFromOptions);
                 return true;
             }
 
@@ -191,6 +202,10 @@ class LaunchParamsController {
         final Rect mBounds = new Rect();
         /** Whether the bounds have been set. */
         boolean mBoundsSet = false;
+        /**
+         * Whether the current bounds are set from the activity options.
+         */
+        boolean mBoundsSetFromOptions;
         /** The bounds within the parent container respecting insets. Usually empty. */
         @NonNull
         final Rect mAppBounds = new Rect();
@@ -215,6 +230,7 @@ class LaunchParamsController {
         void reset() {
             mBounds.setEmpty();
             mBoundsSet = false;
+            mBoundsSetFromOptions = false;
             mAppBounds.setEmpty();
             mPreferredTaskDisplayArea = null;
             mPreferredRootTask = null;
@@ -226,6 +242,7 @@ class LaunchParamsController {
         void set(LaunchParams params) {
             mBounds.set(params.mBounds);
             mBoundsSet = params.mBoundsSet;
+            mBoundsSetFromOptions = params.mBoundsSetFromOptions;
             mAppBounds.set(params.mAppBounds);
             mPreferredTaskDisplayArea = params.mPreferredTaskDisplayArea;
             mPreferredRootTask = params.mPreferredRootTask;
@@ -237,6 +254,7 @@ class LaunchParamsController {
         void merge(LaunchParams params) {
             mBounds.set(params.mBounds);
             mBoundsSet = params.mBoundsSet;
+            mBoundsSetFromOptions = params.mBoundsSetFromOptions;
             mAppBounds.set(params.mAppBounds);
             mPreferredTaskDisplayArea = params.mPreferredTaskDisplayArea;
             mPreferredRootTask = params.mPreferredRootTask;
@@ -276,6 +294,7 @@ class LaunchParamsController {
             if (mWindowingMode != that.mWindowingMode) return false;
             if (!mAppBounds.equals(that.mAppBounds)) return false;
             if (!Objects.equals(mNeedsSafeRegionBounds, that.mNeedsSafeRegionBounds)) return false;
+            if (mBoundsSetFromOptions != that.mBoundsSetFromOptions) return false;
             if (mBoundsSet != that.mBoundsSet) return false;
             return !mBounds.isEmpty() ? mBounds.equals(that.mBounds) : that.mBounds.isEmpty();
         }
@@ -284,6 +303,7 @@ class LaunchParamsController {
         public int hashCode() {
             int result = !mBounds.isEmpty() ? mBounds.hashCode() : 0;
             result = 31 * result + Boolean.hashCode(mBoundsSet);
+            result = 31 * result + Boolean.hashCode(mBoundsSetFromOptions);
             result = 31 * result + mAppBounds.hashCode();
             result = 31 * result + (mPreferredTaskDisplayArea != null
                     ? mPreferredTaskDisplayArea.hashCode() : 0);

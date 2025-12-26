@@ -16,10 +16,11 @@
 
 package com.android.systemui.volume
 
-import android.content.applicationContext
 import android.content.packageManager
 import android.content.pm.ApplicationInfo
 import com.android.systemui.kosmos.Kosmos
+import com.android.systemui.kosmos.applicationCoroutineScope
+import com.android.systemui.kosmos.testDispatcher
 import com.android.systemui.kosmos.testScope
 import com.android.systemui.media.mediaOutputDialogManager
 import com.android.systemui.qs.panels.data.repository.qsPanelAppearanceRepository
@@ -43,7 +44,8 @@ val Kosmos.localMediaRepositoryFactory by
 val Kosmos.mediaOutputActionsInteractor by
     Kosmos.Fixture {
         MediaOutputActionsInteractor(
-            applicationContext,
+            applicationCoroutineScope,
+            testDispatcher,
             mediaOutputDialogManager,
             qsPanelAppearanceRepository,
             expandedAudioTileDetailsFeatureInteractor,

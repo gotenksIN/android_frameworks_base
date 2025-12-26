@@ -110,6 +110,11 @@ public final class WindowManagerGlobal {
     public static final int RELAYOUT_RES_CANCEL_AND_REDRAW = 1 << 3;
 
     /**
+     * The window manager has an ongoing buffer-sync that this relayout is part of.
+     */
+    public static final int RELAYOUT_RES_BUFFER_SYNC = 1 << 4;
+
+    /**
      * Flag for relayout: the client will be later giving
      * internal insets; as a result, the window will not impact other window
      * layouts until the insets are given.
@@ -465,6 +470,9 @@ public final class WindowManagerGlobal {
                             for (int i = mRoots.size() - 1; i >= 0; --i) {
                                 mRoots.get(i).loadSystemProperties();
                             }
+                            for (int i = mWindowlessRoots.size() - 1; i >= 0; --i) {
+                                mWindowlessRoots.get(i).loadSystemProperties();
+                            }
                         }
                     }
                 };
@@ -674,7 +682,7 @@ public final class WindowManagerGlobal {
             }
 
 // QTI_END: 2023-02-15: Core: perf: recover the pre-rendering feature in the U
-            allViewsRemoved = mRoots.isEmpty();
+            allViewsRemoved = mRoots.isEmpty() && mWindowlessRoots.isEmpty();
             mWindowViewsListenerGroup.accept(getWindowViews());
 
             // If we don't have any views anymore in our process, stop watching

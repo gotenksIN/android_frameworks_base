@@ -88,11 +88,9 @@
     <string name="screenshot_failed_to_capture_text" msgid="7818288545874407451">"Appen eller organisationen tillåter inte att du tar skärmbilder"</string>
     <string name="screenshot_blocked_by_admin" msgid="5486757604822795797">"Möjligheten att ta skärmbilder blockeras av IT-administratören"</string>
     <string name="screenshot_edit_label" msgid="8754981973544133050">"Redigera"</string>
-    <!-- no translation found for screenshot_edit_description (7802378587672433507) -->
-    <skip />
+    <string name="screenshot_edit_description" msgid="7802378587672433507">"Knappen Redigera skärmbild"</string>
     <string name="screenshot_share_label" msgid="1653061117238861559">"Dela"</string>
-    <!-- no translation found for screenshot_share_description (2654362001720033972) -->
-    <skip />
+    <string name="screenshot_share_description" msgid="2654362001720033972">"Knappen Dela skärmbild"</string>
     <string name="screenshot_scroll_label" msgid="2930198809899329367">"Fånga mer"</string>
     <string name="screenshot_dismiss_description" msgid="4702341245899508786">"Stäng skärmbild"</string>
     <string name="screenshot_dismiss_work_profile" msgid="3101530842987697045">"Stäng meddelandet om jobbprofilen"</string>
@@ -161,8 +159,7 @@
     <string name="screen_record_pause" msgid="1715012292444967776">"Pausa"</string>
     <string name="screen_record_mute" msgid="8111682249858638168">"Ljud av"</string>
     <string name="screen_record_unmute" msgid="2207912659365156472">"Ljud på"</string>
-    <!-- no translation found for screen_capture_blocked_by_admin (1751756953683506644) -->
-    <skip />
+    <string name="screen_capture_blocked_by_admin" msgid="1751756953683506644">"Skärmbild/skärminspelning blockeras av IT-administratören"</string>
     <string name="screen_capture_fullscreen_screenshot_button" msgid="3173749413928507877">"Ta en skärmbild av hela skärmen"</string>
     <string name="screen_capture_fullscreen_record_button" msgid="5697594296042198690">"Spela in hela skärmen"</string>
     <string name="screen_capture_region_selection_button" msgid="515608875142444130">"Ta en skärmbild av det markerade området"</string>
@@ -173,7 +170,13 @@
     <string name="screen_share_no_select_app_thumbnail" msgid="1630012401570567430">"Välj en app att dela"</string>
     <string name="screen_share_audio_sharing_text" msgid="7829391478284315787">"Dela ljud"</string>
     <string name="screen_share_app_window_sharing_title" msgid="2063554880747318383">"Dela appfönster"</string>
-    <string name="screen_share_disclaimer" msgid="3953761426122528262">"När du delar är innehållet på skärmen synligt"</string>
+    <string name="screen_share_tab_sharing_title" msgid="1178046793832072728">"Dela flik"</string>
+    <!-- no translation found for screen_share_entire_screen_sharing_title (9093580141248337998) -->
+    <skip />
+    <!-- no translation found for screen_share_disclaimer_app_sharing (4191319837838590771) -->
+    <skip />
+    <!-- no translation found for screen_share_disclaimer_full_screen_sharing (6445373139864031364) -->
+    <skip />
     <string name="screen_capture_toolbar_app_window_button_screenshot_a11y" msgid="1357560392667941303">"Ta en skärmbild av fönstret"</string>
     <string name="screen_capture_toolbar_app_window_button_record_a11y" msgid="8984966592912823394">"Spela in fönstret"</string>
     <string name="screen_capture_toolbar_region_button_screenshot_a11y" msgid="2102262602357521192">"Ta en skärmbild av det markerade området"</string>
@@ -370,6 +373,7 @@
     <string name="accessibility_sensors_off_active" msgid="2619725434618911551">"Sensorer har inaktiverats"</string>
     <string name="accessibility_clear_all" msgid="970525598287244592">"Ta bort alla meddelanden."</string>
     <string name="accessibility_notification_bell" msgid="7149451526721220526">"Aviseringar"</string>
+    <string name="accessibility_status_bar_assistant_icon" msgid="1174898709836451013">"Google Assistent"</string>
     <string name="notification_group_overflow_indicator" msgid="7605120293801012648">"<xliff:g id="NUMBER">%s</xliff:g> till"</string>
     <string name="notification_group_overflow_description" msgid="7176322877233433278">"{count,plural, =1{# till avisering i gruppen.}other{# till aviseringar i gruppen.}}"</string>
     <string name="accessibility_rotation_lock_on_landscape" msgid="936972553861524360">"Bildskärmens riktning är nu låst i liggande format."</string>
@@ -428,10 +432,8 @@
     <string name="quick_settings_casting" msgid="1435880708719268055">"Castar"</string>
     <string name="quick_settings_cast_device_default_name" msgid="6988469571141331700">"Namnlös enhet"</string>
     <string name="quick_settings_cast_detail_empty_text" msgid="2846282280014617785">"Inga tillgängliga enheter"</string>
-    <!-- no translation found for quick_settings_cast_detail_title (8212426967651562547) -->
-    <skip />
-    <!-- no translation found for quick_settings_cast_detail_subtitle (6406833630052788623) -->
-    <skip />
+    <string name="quick_settings_cast_detail_title" msgid="8212426967651562547">"Casta skärmen till enheten"</string>
+    <string name="quick_settings_cast_detail_subtitle" msgid="6406833630052788623">"Söker efter enheter …"</string>
     <string name="quick_settings_cast_no_network" msgid="3863016850468559522">"Ingen wifi- eller Ethernet-anslutning"</string>
     <string name="quick_settings_cast_disconnect" msgid="4836025217838730930">"Koppla från"</string>
     <string name="quick_settings_audio_current_input" msgid="8219735427828862612">"Nuvarande mikrofon är"</string>
@@ -713,6 +715,7 @@
     <string name="notification_section_header_gentle" msgid="6804099527336337197">"Ljudlöst"</string>
     <string name="notification_section_header_alerting" msgid="5581175033680477651">"Aviseringar"</string>
     <string name="notification_section_header_conversations" msgid="821834744538345661">"Konversationer"</string>
+    <string name="notification_section_header_highlights" msgid="1671475076192152483">"Höjdpunkter"</string>
     <string name="accessibility_notification_section_header_gentle_clear_all" msgid="6490207897764933919">"Rensa alla ljudlösa aviseringar"</string>
     <string name="accessibility_notification_section_header_open_settings" msgid="6235202417954844004">"Öppna aviseringsinställningarna"</string>
     <string name="modes_suppressing_shade_text" msgid="6037581130837903239">"{count,plural,offset:1 =0{Inga aviseringar}=1{Aviseringar har pausats av {mode}}=2{Aviseringar har pausats av {mode} och ett annat läge}other{Aviseringar har pausats av {mode} och # andra lägen}}"</string>
@@ -947,6 +950,8 @@
     <string name="notification_unblockable_call_desc" msgid="5907328164696532169">"Det går inte att ändra samtalsaviseringarna."</string>
     <string name="notification_multichannel_desc" msgid="7414593090056236179">"Den här aviseringsgruppen kan inte konfigureras här"</string>
     <string name="notification_delegate_header" msgid="1264510071031479920">"Avisering via proxy"</string>
+    <!-- no translation found for notification_summarization_header (511445254923268688) -->
+    <skip />
     <string name="notification_channel_dialog_title" msgid="6856514143093200019">"Alla aviseringar från <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="see_more_title" msgid="7409317011708185729">"Se mer"</string>
     <string name="feedback_alerted" msgid="5192459808484271208">"Aviseringens relevans &lt;b&gt;ändrades till Standard&lt;/b&gt; automatiskt av systemet."</string>
@@ -1027,8 +1032,7 @@
     <string name="group_system_access_all_apps_search" msgid="1553588630154197469">"Öppna applistan"</string>
     <string name="group_system_access_system_settings" msgid="8731721963449070017">"Öppna inställningarna"</string>
     <string name="group_system_access_google_assistant" msgid="3769929488906534254">"Öppna digital assistent"</string>
-    <!-- no translation found for group_system_access_contextual_search (525635757621336007) -->
-    <skip />
+    <string name="group_system_access_contextual_search" msgid="525635757621336007">"Kontextsökning"</string>
     <string name="group_system_lock_screen" msgid="7391191300363416543">"Lås skärmen"</string>
     <string name="group_system_quick_memo" msgid="3764560265935722903">"Anteckna"</string>
     <string name="keyboard_shortcut_group_system_multitasking" msgid="6967816258924795558">"Multikörning"</string>
@@ -1153,17 +1157,25 @@
     <string name="accessibility_quick_settings_power_menu" msgid="6820426108301758412">"Startmeny"</string>
     <string name="accessibility_quick_settings_page" msgid="7506322631645550961">"Sida <xliff:g id="ID_1">%1$d</xliff:g> av <xliff:g id="ID_2">%2$d</xliff:g>"</string>
     <string name="accessibility_key_gesture_dialog_title" msgid="7614965716626605518">"Vill du aktivera <xliff:g id="ID_1">%1$s</xliff:g>?"</string>
-    <string name="accessibility_key_gesture_dialog_content" msgid="4519838108423437794">"Åtgärden "<annotation id="action_key_icon">"ikon"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> är kortkommandot till <xliff:g id="ID_3">^3</xliff:g>. <xliff:g id="ID_4">^4</xliff:g>"</string>
-    <string name="accessibility_key_gesture_dialog_screen_reader_tts" msgid="1298171063228024716">"Tryck på Åtgärd + <xliff:g id="ID_1">%1$s</xliff:g> + <xliff:g id="ID_2">%2$s</xliff:g> igen för att aktivera <xliff:g id="ID_3">%3$s</xliff:g>"</string>
+    <string name="accessibility_key_gesture_dialog_content" msgid="2409946187069273612"><annotation id="action_key_icon">"Ikonen"</annotation>" <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> + <xliff:g id="ID_3">^3</xliff:g> är kortkommandot för att använda <xliff:g id="ID_4">^4</xliff:g>. <xliff:g id="ID_5">^5</xliff:g>"</string>
+    <string name="accessibility_key_gesture_dialog_screen_reader_tts" msgid="6466269887128043486">"Tryck på <xliff:g id="ID_1">%1$s</xliff:g> + <xliff:g id="ID_2">%2$s</xliff:g> + <xliff:g id="ID_3">%3$s</xliff:g> igen för att aktivera <xliff:g id="ID_4">%4$s</xliff:g>"</string>
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_dialog_title" msgid="5331043821287212071">"Vill du aktivera kortkommandot för <xliff:g id="ID_1">%1$s</xliff:g>?"</string>
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_negative_button_text" msgid="6711239406914231612">"Aktivera inte"</string>
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_positive_button_text" msgid="7748487028569821131">"Aktivera kortkommandot"</string>
     <string name="accessibility_key_gesture_magnification_dialog_title" msgid="5770691510738701250">"Kortkommandot <xliff:g id="ID_1">%1$s</xliff:g> har aktiverats"</string>
-    <string name="accessibility_key_gesture_magnification_dialog_content" msgid="582920726242272572"><annotation id="action_key_icon">"Åtgärdsikonen"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> är kortkommandot för att använda tillgänglighetsfunktionen <xliff:g id="ID_3">^3</xliff:g>. På så sätt kan du snabbt zooma in så att innehåll på skärmen förstoras. När förstoring är aktiverat trycker du på "<annotation id="action_key_icon">"åtgärdsikonen"</annotation>" + <xliff:g id="ID_4">^1</xliff:g> och + eller – för att justera zoomnivån."</string>
+    <string name="accessibility_key_gesture_magnification_dialog_content" msgid="1647246652170256645"><annotation id="action_key_icon">"Ikonen"</annotation>" <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> + <xliff:g id="ID_3">^3</xliff:g> är kortkommandot för att använda <xliff:g id="ID_4">^4</xliff:g>, en tillgänglighetsfunktion. Med åtgärden kan du snabbt zooma in så att innehåll på skärmen förstoras. När förstoring är aktiverat kan du trycka på "<annotation id="action_key_icon">"ikonen"</annotation>" <xliff:g id="ID_5">^1</xliff:g> + <xliff:g id="ID_6">^2</xliff:g> och + eller – för att justera zoomnivån."</string>
     <string name="accessibility_key_gesture_magnification_dialog_negative_button_text" msgid="8393469413785600834">"Inaktivera kortkommandot"</string>
     <string name="accessibility_key_gesture_magnification_dialog_positive_button_text" msgid="895076240681888057">"Behåll aktiverade"</string>
-    <string name="accessibility_key_gesture_screen_reader_dialog_content" msgid="389338862762665003">"Åtgärden "<annotation id="action_key_icon">"ikon"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> är kortkommandot för att använda <xliff:g id="ID_3">^3</xliff:g>. <xliff:g id="ID_4">^3</xliff:g> är en skärmläsare som gör att du kan få objekt upplästa. Det kan vara till hjälp för personer som har svårt att se skärmen. Det kan leda till att enheten fungerar annorlunda."</string>
-    <string name="accessibility_key_gesture_voice_access_dialog_content" msgid="7934170819801013870">"Om du trycker på "<annotation id="action_key_icon">"åtgärdsikonen"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> aktiveras tillgänglighetsfunktionen <xliff:g id="ID_3">^3</xliff:g>. Då kan du styra enheten med rösten."</string>
+    <string name="accessibility_key_gesture_screen_reader_dialog_content" msgid="2322728522389883751"><annotation id="action_key_icon">"Ikonen"</annotation>" <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> + <xliff:g id="ID_3">^3</xliff:g> är kortkommandot för att använda <xliff:g id="ID_4">^4</xliff:g>. <xliff:g id="ID_5">^4</xliff:g> är en skärmläsare som gör att du kan få objekt upplästa. Det kan vara till hjälp för personer som har svårt att se skärmen. Det kan leda till att enheten fungerar annorlunda."</string>
+    <string name="accessibility_key_gesture_screen_reader_dialog_warning_heading" msgid="5958960812509429136">"Genom att aktivera kortkommandot tillåter du att TalkBack får fullständig kontroll över enheten."</string>
+    <string name="accessibility_key_gesture_screen_reader_dialog_warning_message" msgid="2026368922103788492">"Fullständig kontroll lämpar sig för appar med tillgänglighetsfunktioner, men är inte lämplig för de flesta appar."</string>
+    <string name="accessibility_key_gesture_screen_reader_dialog_warning_view_control_screen_heading" msgid="5346128898440400425">"Visa och styra skärmen"</string>
+    <string name="accessibility_key_gesture_screen_reader_dialog_warning_view_control_screen_message" msgid="5810348116536082139">"Den kan läsa allt innehåll på skärmen och visa innehåll över andra appar."</string>
+    <string name="accessibility_key_gesture_screen_reader_dialog_warning_perform_actions_heading" msgid="6032379987970298008">"Visa och vidta åtgärder"</string>
+    <string name="accessibility_key_gesture_screen_reader_dialog_warning_perform_actions_message" msgid="4565304881759944542">"Den kan registrera din användning av en app eller hårdvarusensor och interagera med appar åt dig."</string>
+    <string name="accessibility_key_gesture_voice_access_dialog_content" msgid="8539054865187379687">"Om du trycker på "<annotation id="action_key_icon">"ikonen"</annotation>" <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> + <xliff:g id="ID_3">^3</xliff:g> aktiveras tillgänglighetsfunktionen <xliff:g id="ID_4">^4</xliff:g>. Då kan du styra enheten med rösten."</string>
+    <string name="accessibility_quick_access_dialog_title" msgid="8792322423145117379">"Tillgänglighet"</string>
+    <string name="accessibility_quick_access_dialog_done_button_text" msgid="8013849920696848138">"Klar"</string>
     <string name="tuner_lock_screen" msgid="2267383813241144544">"Låsskärm"</string>
     <string name="shutdown_progress" msgid="5464239146561542178">"Avslutar …"</string>
     <string name="thermal_shutdown_dialog_help_text" msgid="6413474593462902901">"Visa alla skötselråd"</string>
@@ -1476,8 +1488,12 @@
     <string name="wifi_scan_notify_message" msgid="3753839537448621794">"I syfte att förbättra upplevelsen med enheten kan appar och tjänster fortfarande söka efter wifi-nätverk när som helst, även om wifi har inaktiverats. Du kan ändra detta i inställningarna för wifi-sökning. "<annotation id="link">"Ändra"</annotation></string>
     <string name="turn_off_airplane_mode" msgid="8425587763226548579">"Inaktivera flygplansläge"</string>
     <string name="qs_tile_request_dialog_text" msgid="3501359944139877694">"<xliff:g id="APPNAME">%1$s</xliff:g> vill lägga till följande ruta i snabbinställningarna"</string>
+    <string name="qs_tile_request_dialog_text_with_size" msgid="732578771040573291">"<xliff:g id="APPNAME">%1$s</xliff:g> vill lägga till en ruta i snabbinställningarna. Välj en storlek för rutan för att fortsätta."</string>
     <string name="qs_tile_request_dialog_add" msgid="4888460910694986304">"Lägg till ruta"</string>
-    <string name="qs_tile_request_dialog_not_add" msgid="4168716573114067296">"Lägg inte till ruta"</string>
+    <string name="qs_tile_request_dialog_not_add" msgid="8375425041428574394">"Lägg inte till ruta"</string>
+    <string name="qs_tile_request_dialog_title" msgid="5654666862347548966">"Ny ruta i Snabbinställningar"</string>
+    <string name="qs_tile_request_dialog_small_format_content_description" msgid="5429197059724172135">"Litet format"</string>
+    <string name="qs_tile_request_dialog_large_format_content_description" msgid="67983044110405787">"Stort format"</string>
     <string name="qs_user_switch_dialog_title" msgid="3045189293587781366">"Välj användare"</string>
     <string name="fgs_manager_footer_label" msgid="8276763570622288231">"{count,plural, =1{# app är aktiv}other{# appar är aktiva}}"</string>
     <string name="fgs_dot_content_description" msgid="2865071539464777240">"Ny information"</string>
@@ -1720,8 +1736,9 @@
     <string name="dual_shade_educational_tooltip_notifs" msgid="7666159428113013319">"Svep från övre vänstra hörnet för att öppna aviseringar"</string>
     <string name="dual_shade_educational_tooltip_qs" msgid="3842355853737057332">"Svep nedåt från det övre högra hörnet för att öppna snabbinställningar"</string>
     <string name="back_button_on_bouncer" msgid="809134628434396761">"Tillbaka"</string>
-    <!-- no translation found for accessibility_button_on_bouncer_description (9186344135931507168) -->
+    <!-- no translation found for sign_in_button_on_bouncer (3595960142516902559) -->
     <skip />
+    <string name="accessibility_button_on_bouncer_description" msgid="9186344135931507168">"Tillgänglighet"</string>
     <string name="pager_dots_previous_content_description" msgid="26963508904918908">"Föregående"</string>
     <string name="pager_dots_next_content_description" msgid="613943992626163120">"Nästa"</string>
     <string name="accessibility_pager_dots_navigate_to_next_page_action" msgid="7662720613169169465">"navigera till nästa sida"</string>

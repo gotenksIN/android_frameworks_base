@@ -16,13 +16,10 @@
 
 package com.android.systemui.screencapture.ui
 
-import android.app.ActivityOptions
-import android.app.ActivityTaskManager
 import android.content.Intent
 import android.media.projection.IMediaProjection
 import android.media.projection.IMediaProjectionManager.EXTRA_USER_REVIEW_GRANTED_CONSENT
 import android.media.projection.MediaProjectionManager.EXTRA_MEDIA_PROJECTION
-import android.media.projection.ReviewGrantedConsentResult.RECORD_CONTENT_TASK
 import android.os.Bundle
 import android.os.UserHandle
 import android.util.Log
@@ -32,18 +29,21 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
 import com.android.compose.theme.PlatformTheme
 import com.android.systemui.mediaprojection.MediaProjectionMetricsLogger
-import com.android.systemui.mediaprojection.MediaProjectionServiceHelper
 import com.android.systemui.screencapture.common.ScreenCaptureComponent
 import com.android.systemui.screencapture.common.shared.model.ScreenCaptureType
 import com.android.systemui.screencapture.common.shared.model.ScreenCaptureUiParameters
-import com.android.systemui.util.AsyncActivityLauncher
+import com.android.systemui.screencapture.sharescreen.ScreenCaptureShareScreenUiComponent
+import com.android.systemui.screencapture.sharescreen.domain.interactor.ShareScreenUiInteractor
 import javax.inject.Inject
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 
 /**
  * An activity that hosts the pre screen share UI, started from MediaProjectionPermissionActivity.
@@ -53,7 +53,6 @@ class ShareScreenActivity
 constructor(
     private val builder: ScreenCaptureComponent.Builder,
     private val mediaProjectionMetricsLogger: MediaProjectionMetricsLogger,
-    private val asyncActivityLauncher: AsyncActivityLauncher,
 ) : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -76,28 +75,54 @@ constructor(
 
         mediaProjectionMetricsLogger.notifyPermissionRequestDisplayed(uid)
 
-        val parameters =
-            ScreenCaptureUiParameters.ShareScreen(
-                onApprovedCallback = { taskId ->
-                    onTaskSelected(taskId, reviewGrantedConsentRequired, hostUserHandle)
-                },
-                hostAppUserHandle = hostUserHandle,
-            )
+        val parameters = ScreenCaptureUiParameters.ShareScreen(hostAppUserHandle = hostUserHandle)
         val component = builder.setScope(lifecycleScope).setParameters(parameters).build()
 
         setContent {
             PlatformTheme {
                 val scope = rememberCoroutineScope()
-                val uiComponent =
+                val uiComponent: ScreenCaptureShareScreenUiComponent =
                     remember(scope, parameters) {
-                        component
-                            .uiComponentBuilders()[ScreenCaptureType.SHARE_SCREEN]
-                            ?.setScope(scope)
-                            ?.setDisplay(display)
-                            ?.setWindow(window)
-                            ?.build()
-                            ?: error("No UI builder for ${ScreenCaptureType.SHARE_SCREEN}")
+                        val ui =
+                            (component
+                                    .uiComponentBuilders()[ScreenCaptureType.SHARE_SCREEN]
+                                    ?.setScope(scope)
+                                    ?.setDisplay(display)
+                                    ?.setWindow(window)
+                                    ?.build() as ScreenCaptureShareScreenUiComponent)
+                                .apply {
+                                    shareScreenUiInteractor.initialize(
+                                        reviewGrantedConsentRequired,
+                                        hostUserHandle,
+                                        uid,
+                                        packageName,
+                                        display!!.displayId,
+                                    )
+                                }
+                        ui
                     }
+
+                val shareScreenUiInteractor = uiComponent.shareScreenUiInteractor
+                LaunchedEffect(shareScreenUiInteractor) {
+                    shareScreenUiInteractor.sharingState
+                        .onEach { state ->
+                            when (state) {
+                                is ShareScreenUiInteractor.SharingState.Approved -> {
+                                    setResult(RESULT_OK, createSuccessIntent(state.projection))
+                                    setForceSendResultForMediaProjection()
+                                    finish()
+                                }
+                                is ShareScreenUiInteractor.SharingState.Denied -> {
+                                    setResult(RESULT_CANCELED)
+                                    finish()
+                                }
+                                is ShareScreenUiInteractor.SharingState.NotStarted -> {
+                                    // Do nothing
+                                }
+                            }
+                        }
+                        .launchIn(this)
+                }
 
                 Box(modifier = Modifier.windowInsetsPadding(WindowInsets.safeDrawing)) {
                     uiComponent.screenCaptureContent.Content()
@@ -106,67 +131,12 @@ constructor(
         }
     }
 
-    private fun onTaskSelected(
-        taskId: Int,
-        reviewGrantedConsentRequired: Boolean,
-        hostUserHandle: UserHandle,
-    ) {
-        try {
-            // Get the task info for the selected task.
-            val recentTasks = ActivityTaskManager.getInstance().getTasks(RUNNING_TASKS_NUM_MAX)
-            val taskInfo = recentTasks.firstOrNull { it.taskId == taskId }
-
-            if (taskInfo == null) {
-                // The task is no longer running, so we can't share it.
-                Log.w(TAG, "Task info not found for taskId: $taskId")
-                finishAsCancelled()
-                return
-            }
-
-            // Create a new LaunchCookie and ActivityOptions to perform the security handshake.
-            val launchCookie = ActivityOptions.LaunchCookie(MEDIA_PROJECTION_LAUNCH_TOKEN)
-            val options = ActivityOptions.makeBasic()
-            options.launchCookie = launchCookie.binder
-
-            // Bring the task to be captured to the front using the new cookie, and finish this
-            // activity in the callback once the app is started.
-            asyncActivityLauncher.startActivityAsUser(
-                taskInfo.baseIntent,
-                hostUserHandle,
-                options.toBundle(),
-            ) {
-                try {
-                    val mediaProjectionBinder = intent.getIBinderExtra(EXTRA_MEDIA_PROJECTION)
-                    val projection = IMediaProjection.Stub.asInterface(mediaProjectionBinder)
-
-                    // Configure the projection to capture a specific task using the same
-                    // cookie.
-                    projection.setLaunchCookie(launchCookie)
-                    projection.taskId = taskId
-                    val intent = Intent()
-                    intent.putExtra(EXTRA_MEDIA_PROJECTION, projection.asBinder())
-                    setResult(RESULT_OK, intent)
-                    setForceSendResultForMediaProjection()
-                    MediaProjectionServiceHelper.setReviewedConsentIfNeeded(
-                        RECORD_CONTENT_TASK,
-                        reviewGrantedConsentRequired,
-                        projection,
-                    )
-                    finish()
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error granting projection permission for task", e)
-                    finishAsCancelled()
-                }
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error granting projection permission for task", e)
-            finishAsCancelled()
-        }
-    }
-
-    private fun finishAsCancelled() {
-        setResult(RESULT_CANCELED)
-        finish()
+    private fun createSuccessIntent(projection: IMediaProjection): Intent {
+        val extras = Bundle()
+        extras.putBinder(EXTRA_MEDIA_PROJECTION, projection.asBinder())
+        val intent = Intent()
+        intent.putExtras(extras)
+        return intent
     }
 
     companion object {
@@ -175,8 +145,5 @@ constructor(
         const val EXTRA_HOST_APP_USER_HANDLE = "launched_from_user_handle"
 
         private const val TAG = "ShareScreenActivity"
-
-        private const val RUNNING_TASKS_NUM_MAX = 100
-        private const val MEDIA_PROJECTION_LAUNCH_TOKEN = "media_projection_launch_token"
     }
 }

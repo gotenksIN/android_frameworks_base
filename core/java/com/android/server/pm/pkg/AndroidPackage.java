@@ -18,6 +18,7 @@ package com.android.server.pm.pkg;
 
 import android.annotation.Dimension;
 import android.annotation.DrawableRes;
+import android.annotation.FlaggedApi;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.StringRes;
@@ -365,6 +366,22 @@ public interface AndroidPackage {
     String getZygotePreloadName();
 
     /**
+     * @see ApplicationInfo#zygotePreloadNativeLib
+     * @see R.styleable#AndroidManifestApplication_zygotePreloadNativeLib
+     */
+    @Nullable
+    @FlaggedApi(android.os.Flags.FLAG_NATIVE_APP_ZYGOTE)
+    String getZygotePreloadNativeLib();
+
+    /**
+     * @see ApplicationInfo#zygotePreloadNativeFunc
+     * @see R.styleable#AndroidManifestApplication_zygotePreloadNativeFunc
+     */
+    @Nullable
+    @FlaggedApi(android.os.Flags.FLAG_NATIVE_APP_ZYGOTE)
+    String getZygotePreloadNativeFunc();
+
+    /**
      * @see ApplicationInfo#PRIVATE_FLAG_ALLOW_AUDIO_PLAYBACK_CAPTURE
      * @see R.styleable#AndroidManifestApplication_allowAudioPlaybackCapture
      */
@@ -655,7 +672,11 @@ public interface AndroidPackage {
     /**
      * @see ApplicationInfo#FLAG_USES_CLEARTEXT_TRAFFIC
      * @see R.styleable#AndroidManifestApplication_usesCleartextTraffic
+     * @deprecated Use a <a href="{@docRoot}privacy-and-security/security-config#manifest">Network
+     * Security Configuration file</a> instead.
      */
+    @Deprecated
+    @FlaggedApi("android.security.deprecate_uses_cleartext_traffic2")
     boolean isCleartextTrafficAllowed();
 
     /**

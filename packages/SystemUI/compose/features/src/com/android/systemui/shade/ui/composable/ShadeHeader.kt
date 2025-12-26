@@ -17,6 +17,7 @@
 
 package com.android.systemui.shade.ui.composable
 
+import android.content.res.Configuration.ORIENTATION_PORTRAIT
 import android.view.ContextThemeWrapper
 import android.view.Gravity
 import android.view.View
@@ -57,11 +58,11 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInWindow
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Constraints
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.LayoutDirection
@@ -72,11 +73,11 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.android.compose.animation.scene.ContentScope
 import com.android.compose.animation.scene.ElementKey
 import com.android.compose.animation.scene.LowestZIndexContentPicker
+import com.android.compose.animation.scene.SceneTransitionLayoutState
 import com.android.compose.animation.scene.ValueKey
 import com.android.compose.animation.scene.animateElementFloatAsState
 import com.android.compose.animation.scene.content.state.TransitionState
 import com.android.compose.modifiers.thenIf
-import com.android.internal.policy.SystemBarUtils
 import com.android.systemui.common.ui.compose.windowinsets.CutoutLocation
 import com.android.systemui.common.ui.compose.windowinsets.LocalDisplayCutout
 import com.android.systemui.common.ui.compose.windowinsets.LocalScreenCornerRadius
@@ -104,6 +105,7 @@ import com.android.systemui.statusbar.systemstatusicons.SystemStatusIconsInCompo
 import com.android.systemui.statusbar.systemstatusicons.ui.compose.SystemStatusIcons
 import com.android.systemui.statusbar.systemstatusicons.ui.compose.SystemStatusIconsLegacy
 import com.android.systemui.util.composable.kairos.ActivatedKairosSpec
+import com.android.systemui.util.kotlin.toDp
 import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlinx.coroutines.delay
@@ -125,20 +127,12 @@ object ShadeHeader {
     object Dimensions {
         @Deprecated(
             "Approximation of the collapsed shade header height, used in legacy shade transitions.",
-            replaceWith = ReplaceWith("StatusBarHeight"),
+            replaceWith = ReplaceWith("ShadeHeaderViewModel.statusBarHeightPx"),
         )
         val CollapsedHeightForTransitions = 48.dp
         val ExpandedHeight = 120.dp
         val ChipPaddingHorizontal = 6.dp
         val ChipPaddingVertical = 4.dp
-
-        val StatusBarHeight: Dp
-            @Composable
-            get() {
-                return with(LocalDensity.current) {
-                    SystemBarUtils.getStatusBarHeight(LocalContext.current).toDp()
-                }
-            }
     }
 
     object Colors {
@@ -156,7 +150,6 @@ object ShadeHeader {
     object TestTags {
         const val Root = "shade_header_root"
         const val BatteryTestTag = "battery_meter_composable_view"
-        const val BatteryTestTagLegacy = "battery_percentage_view"
     }
 }
 
@@ -174,8 +167,7 @@ fun ContentScope.CollapsedShadeHeader(
     val useExpandedTextFormat by
         remember(cutoutLocation) {
             derivedStateOf {
-                cutoutLocation != CutoutLocation.CENTER ||
-                    shouldUseExpandedFormat(layoutState.transitionState)
+                cutoutLocation != CutoutLocation.CENTER || shouldUseExpandedFormat(layoutState)
             }
         }
 
@@ -183,6 +175,7 @@ fun ContentScope.CollapsedShadeHeader(
 
     // This layout assumes it is globally positioned at (0, 0) and is the same size as the screen.
     CutoutAwareShadeHeader(
+        statusBarHeightPx = viewModel.statusBarHeightPx,
         modifier = modifier.sysuiResTag(ShadeHeader.TestTags.Root),
         startContent = {
             Row(
@@ -238,7 +231,10 @@ fun ContentScope.CollapsedShadeHeader(
                             viewModel = viewModel,
                             showIcon = true,
                             useExpandedFormat = useExpandedTextFormat,
-                            modifier = Modifier.padding(vertical = 8.dp),
+                            modifier =
+                                if (LocalConfiguration.current.equals(ORIENTATION_PORTRAIT))
+                                    Modifier.padding(vertical = 8.dp)
+                                else Modifier,
                             textColor = textColor,
                         )
                     }
@@ -254,15 +250,17 @@ fun ContentScope.ExpandedShadeHeader(
     viewModel: ShadeHeaderViewModel,
     modifier: Modifier = Modifier,
 ) {
-    val useExpandedFormat by remember {
-        derivedStateOf { shouldUseExpandedFormat(layoutState.transitionState) }
-    }
+    val useExpandedFormat by remember { derivedStateOf { shouldUseExpandedFormat(layoutState) } }
 
     val textColor = ShadeHeader.Colors.textColor
 
     Box(modifier = modifier.sysuiResTag(ShadeHeader.TestTags.Root)) {
         if (viewModel.isPrivacyChipVisible) {
-            Box(modifier = Modifier.height(ShadeHeader.Dimensions.StatusBarHeight).fillMaxWidth()) {
+            Box(
+                modifier =
+                    Modifier.height(viewModel.statusBarHeightPx.toDp(LocalContext.current).dp)
+                        .fillMaxWidth()
+            ) {
                 PrivacyChip(
                     privacyList = viewModel.privacyItems,
                     onClick = viewModel::onPrivacyChipClicked,
@@ -316,7 +314,7 @@ fun ContentScope.ExpandedShadeHeader(
                     BatteryInfo(
                         viewModel = viewModel,
                         showIcon = true,
-                        useExpandedFormat = useExpandedFormat,
+                        useExpandedFormat = true,
                         textColor = textColor,
                     )
                 }
@@ -342,6 +340,7 @@ fun ContentScope.OverlayShadeHeader(
 
     // This layout assumes it is globally positioned at (0, 0) and is the same size as the screen.
     CutoutAwareShadeHeader(
+        statusBarHeightPx = viewModel.statusBarHeightPx,
         modifier = modifier,
         startContent = {
             Box(modifier = Modifier.padding(horizontal = horizontalPadding)) {
@@ -442,12 +441,12 @@ fun QuickSettingsOverlayHeader(viewModel: ShadeHeaderViewModel, modifier: Modifi
  */
 @Composable
 private fun CutoutAwareShadeHeader(
+    statusBarHeightPx: Int,
     modifier: Modifier = Modifier,
     startContent: @Composable () -> Unit,
     endContent: @Composable () -> Unit,
 ) {
     val cutoutProvider = LocalDisplayCutout.current
-    val statusBarHeight = ShadeHeader.Dimensions.StatusBarHeight
     Layout(
         modifier = modifier.sysuiResTag(ShadeHeader.TestTags.Root),
         contents = listOf(startContent, endContent),
@@ -465,8 +464,9 @@ private fun CutoutAwareShadeHeader(
         check(measurables[1].size == 1)
 
         val screenWidth = constraints.maxWidth
-        val height = max(cutoutHeight + (cutoutTop * 2), statusBarHeight.roundToPx())
-        val childConstraints = Constraints.fixed((screenWidth - cutoutWidth) / 2, height)
+        val width = max((screenWidth - cutoutWidth) / 2, 0)
+        val height = max(cutoutHeight + (cutoutTop * 2), statusBarHeightPx)
+        val childConstraints = Constraints.fixed(width, height)
 
         val startMeasurable = measurables[0][0]
         val endMeasurable = measurables[1][0]
@@ -585,6 +585,8 @@ private fun ShadeCarrierGroup(viewModel: ShadeHeaderViewModel, modifier: Modifie
         return
     }
 
+    val textColor = ShadeHeader.Colors.textColor
+    val inverseTextColor = ShadeHeader.Colors.inverseTextColor
     Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
         for (subId in viewModel.mobileSubIds) {
             AndroidView(
@@ -600,7 +602,14 @@ private fun ShadeCarrierGroup(viewModel: ShadeHeaderViewModel, modifier: Modifie
                                 ) as ShadeCarrierGroupMobileIconViewModel),
                         )
                         .also { it.setOnClickListener { viewModel.onShadeCarrierGroupClicked() } }
-                }
+                },
+                update = { view ->
+                    view.setStyleAndTint(
+                        R.style.TextAppearance_QS_Status,
+                        textColor.toArgb(),
+                        inverseTextColor.toArgb(),
+                    )
+                },
             )
         }
     }
@@ -612,6 +621,8 @@ private fun ShadeCarrierGroupKairos(
     viewModel: ShadeHeaderViewModel,
     modifier: Modifier = Modifier,
 ) {
+    val textColor = ShadeHeader.Colors.textColor
+    val inverseTextColor = ShadeHeader.Colors.inverseTextColor
     Row(modifier = modifier) {
         ActivatedKairosSpec(
             buildSpec = viewModel.mobileIconsViewModelKairos.get().composeWrapper(),
@@ -641,7 +652,14 @@ private fun ShadeCarrierGroupKairos(
                             .also {
                                 it.setOnClickListener { viewModel.onShadeCarrierGroupClicked() }
                             }
-                    }
+                    },
+                    update = { view ->
+                        view.setStyleAndTint(
+                            R.style.TextAppearance_QS_Status,
+                            textColor.toArgb(),
+                            inverseTextColor.toArgb(),
+                        )
+                    },
                 )
             }
         }
@@ -778,12 +796,9 @@ private fun Modifier.bouncy(
     }
 }
 
-private fun shouldUseExpandedFormat(state: TransitionState): Boolean {
-    return when (state) {
-        is TransitionState.Idle -> state.currentScene == Scenes.QuickSettings
-        is TransitionState.Transition -> {
-            (state.isTransitioning(to = Scenes.QuickSettings) && state.progress >= 0.5) ||
-                (state.isTransitioning(from = Scenes.QuickSettings) && state.progress <= 0.5)
-        }
-    }
+private fun shouldUseExpandedFormat(state: SceneTransitionLayoutState): Boolean {
+    return state.isIdle(Scenes.QuickSettings) ||
+        (state is TransitionState.Transition &&
+            ((state.isTransitioning(to = Scenes.QuickSettings) && state.progress >= 0.5) ||
+                (state.isTransitioning(from = Scenes.QuickSettings) && state.progress <= 0.5)))
 }

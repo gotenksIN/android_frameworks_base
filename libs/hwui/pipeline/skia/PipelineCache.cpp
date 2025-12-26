@@ -29,6 +29,7 @@
 #include <unistd.h>
 #include <utils/Trace.h>
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
@@ -156,6 +157,7 @@ PipelineCacheStore::PipelineCacheStore(useconds_t writeThrottleInterval)
         , mMutex()
         , mConditionVariable()
         , mStoreRequest()
+        , mLastSizeBytes(0)
         , mExit(false)
         , mThread(&PipelineCacheStore::runThread, this) {}
 
@@ -211,6 +213,8 @@ void PipelineCacheStore::runThread() {
             }
 
             ATRACE_INT64("HWUI pipeline cache size", written);
+
+            mLastSizeBytes.store(static_cast<size_t>(written), std::memory_order_relaxed);
         }
     }
 }
@@ -229,11 +233,16 @@ void PipelineCacheStore::store(std::string path, std::vector<uint8_t> data) {
     mConditionVariable.notify_one();
 }
 
+size_t PipelineCacheStore::getLastSizeBytes() const {
+    return mLastSizeBytes.load(std::memory_order_relaxed);
+}
+
 PipelineCache::PipelineCache(std::string storePath, useconds_t writeThrottleInterval)
         : mStorePath(std::move(storePath))
         , mPipelineCacheStore(writeThrottleInterval)
+        , mHasCache(false)
         , mKey(SkData::MakeEmpty())
-        , mData(SkData::MakeEmpty()) {
+        , mData(nullptr) {
     PipelineCacheData cache;
     auto result = PipelineCacheData::load(mStorePath, cache);
     if (result.outcome != PipelineCacheData::LoadResult::Success) {
@@ -243,6 +252,7 @@ PipelineCache::PipelineCache(std::string storePath, useconds_t writeThrottleInte
         return;
     }
 
+    mHasCache = true;
     mKey = cache.key;
     mData = cache.data;
 }
@@ -251,6 +261,10 @@ sk_sp<SkData> PipelineCache::tryLoad(const SkData& key) {
     ATRACE_NAME("PipelineCache::tryLoad");
 
     if (!key.equals(mKey.get())) {
+        return nullptr;
+    }
+
+    if (!mHasCache) {
         return nullptr;
     }
 
@@ -296,4 +310,8 @@ void PipelineCache::store(const SkData& key, const SkData& data) {
     memcpy(ptr, data.data(), data.size());
 
     mPipelineCacheStore.store(mStorePath, std::move(pendingData));
+}
+
+size_t PipelineCache::getLastSizeBytes() const {
+    return mPipelineCacheStore.getLastSizeBytes();
 }

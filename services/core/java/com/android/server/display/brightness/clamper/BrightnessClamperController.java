@@ -17,6 +17,7 @@
 package com.android.server.display.brightness.clamper;
 
 import static android.service.notification.Flags.applyBrightnessClampingForModes;
+import static android.service.notification.Flags.enableBrightnessClampingForBedtime;
 import static android.view.Display.STATE_ON;
 
 import android.annotation.FloatRange;
@@ -309,7 +310,10 @@ public class BrightnessClamperController {
                 DisplayDeviceData data, float currentBrightness) {
             List<BrightnessStateModifier> modifiers = new ArrayList<>();
             modifiers.add(new BrightnessThermalModifier(handler, listener, data));
-            modifiers.add(new BrightnessWearBedtimeModeModifier(handler, context, listener, data));
+            if(!enableBrightnessClampingForBedtime()){
+                modifiers.add(
+                        new BrightnessWearBedtimeModeModifier(handler, context, listener, data));
+            }
             if (applyBrightnessClampingForModes()) {
                 modifiers.add(new ExternalBrightnessModifier(handler, listener));
             }
@@ -324,7 +328,7 @@ public class BrightnessClamperController {
 
             modifiers.add(new DisplayDimModifier(data.mDisplayId, context));
             modifiers.add(new BrightnessLowPowerModeModifier());
-            if (flags.isEvenDimmerEnabled() && data.mDisplayDeviceConfig.isEvenDimmerAvailable()) {
+            if (data.mDisplayDeviceConfig.isEvenDimmerAvailable()) {
                 modifiers.add(new BrightnessLowLuxModifier(handler, listener, context,
                         data.mDisplayDeviceConfig));
             }
@@ -436,7 +440,10 @@ public class BrightnessClamperController {
 
         @Override
         public float getBrightnessWearBedtimeModeCap() {
-            return mDisplayDeviceConfig.getBrightnessCapForWearBedtimeMode();
+            if(!enableBrightnessClampingForBedtime()){
+                return mDisplayDeviceConfig.getBrightnessCapForWearBedtimeMode();
+            }
+            return PowerManager.BRIGHTNESS_MAX;
         }
 
         @Override

@@ -96,6 +96,7 @@ import android.window.WindowContextInfo;
 import android.window.WindowTokenClientController;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
+import androidx.test.filters.FlakyTest;
 import androidx.test.filters.MediumTest;
 import androidx.test.platform.app.InstrumentationRegistry;
 import androidx.test.rule.ActivityTestRule;
@@ -767,6 +768,7 @@ public class ActivityThreadTest {
         });
     }
 
+    @FlakyTest(bugId = 428903046)
     @Test
     public void testHandleConfigurationChanged_DoesntOverrideActivityConfig() {
         final TestActivity activity = mActivityTestRule.launchActivity(new Intent());

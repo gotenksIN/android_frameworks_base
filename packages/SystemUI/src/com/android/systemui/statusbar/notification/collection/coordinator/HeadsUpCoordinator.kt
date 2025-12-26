@@ -17,7 +17,6 @@ package com.android.systemui.statusbar.notification.collection.coordinator
 
 import android.app.Notification
 import android.app.Notification.GROUP_ALERT_SUMMARY
-import android.app.NotificationChannel.SYSTEM_RESERVED_IDS
 import android.util.ArrayMap
 import android.util.ArraySet
 import com.android.internal.annotations.VisibleForTesting
@@ -53,9 +52,9 @@ import com.android.systemui.statusbar.notification.interruption.VisualInterrupti
 import com.android.systemui.statusbar.notification.interruption.VisualInterruptionDecisionProviderImpl.DecisionImpl
 import com.android.systemui.statusbar.notification.interruption.VisualInterruptionType
 import com.android.systemui.statusbar.notification.logKey
-import com.android.systemui.statusbar.notification.promoted.PromotedNotificationUi
 import com.android.systemui.statusbar.notification.row.NotificationActionClickManager
 import com.android.systemui.statusbar.notification.shared.GroupHunAnimationFix
+import com.android.systemui.statusbar.notification.shared.LaunchNewFsiOnUpdate
 import com.android.systemui.statusbar.notification.shared.NotificationBundleUi
 import com.android.systemui.statusbar.notification.stack.BUCKET_HEADS_UP
 import com.android.systemui.util.concurrency.DelayableExecutor
@@ -125,11 +124,9 @@ constructor(
             mRemoteInputManager.addActionPressListener(mActionPressListener)
         }
 
-        if (PromotedNotificationUi.isEnabled) {
-            applicationScope.launch {
-                statusBarNotificationChipsInteractor.promotedNotificationChipTapEvent.collect {
-                    onPromotedNotificationChipTapEvent(it)
-                }
+        applicationScope.launch {
+            statusBarNotificationChipsInteractor.promotedNotificationChipTapEvent.collect {
+                onPromotedNotificationChipTapEvent(it)
             }
         }
     }
@@ -141,8 +138,6 @@ constructor(
      * Must be run on the main thread.
      */
     private fun onPromotedNotificationChipTapEvent(key: String) {
-        PromotedNotificationUi.unsafeAssertInNewMode()
-
         val entry = notifCollection.getEntry(key)
         if (entry == null) {
             mLogger.logPromotedNotificationForHeadsUpNotFound(key)
@@ -417,7 +412,7 @@ constructor(
         if (entry.channel == null || entry.channel.id == null) {
             return false
         }
-        return entry.channel.id in SYSTEM_RESERVED_IDS
+        return entry.isBundled
     }
 
     /**
@@ -503,7 +498,7 @@ constructor(
                     if (posted.isHeadsUpEntry) {
                         val pinnedStatus =
                             if (posted.shouldHeadsUpAgain) {
-                                if (PromotedNotificationUi.isEnabled && posted.isPinnedByUser) {
+                                if (posted.isPinnedByUser) {
                                     PinnedStatus.PinnedByUser
                                 } else {
                                     PinnedStatus.PinnedBySystem
@@ -554,11 +549,27 @@ constructor(
     }
 
     private fun bindForAsyncHeadsUp(posted: PostedEntry) {
-        val isPinnedByUser = PromotedNotificationUi.isEnabled && posted.isPinnedByUser
+        val isPinnedByUser = posted.isPinnedByUser
         // TODO: Add a guarantee to bindHeadsUpView of some kind of callback if the bind is
         //  cancelled so that we don't need to have this sad timeout hack.
         mEntriesBindingUntil[posted.key] = mNow + BIND_TIMEOUT
         mHeadsUpViewBinder.bindHeadsUpView(posted.entry, isPinnedByUser, this::onHeadsUpViewBound)
+    }
+
+    private fun evaluateNewFullScreenIntent(entry: NotificationEntry) {
+        val fsiDecision =
+            mVisualInterruptionDecisionProvider.makeUnloggedFullScreenIntentDecision(entry)
+        mVisualInterruptionDecisionProvider.logFullScreenIntentDecision(fsiDecision)
+        if (fsiDecision.shouldInterrupt) {
+            mLaunchFullScreenIntentProvider.launchFullScreenIntent(entry)
+        } else if (fsiDecision.wouldInterruptWithoutDnd) {
+            // If DND was the only reason this entry was suppressed, note it for potential
+            // reconsideration on later ranking updates.
+            addForFSIReconsideration(entry, mSystemClock.currentTimeMillis())
+        }
+        if (LaunchNewFsiOnUpdate.isEnabled) {
+            entry.markFullScreenIntentEvaluated();
+        }
     }
 
     private val mNotifCollectionListener =
@@ -570,16 +581,7 @@ constructor(
             override fun onEntryAdded(entry: NotificationEntry) {
                 // First check whether this notification should launch a full screen intent, and
                 // launch it if needed.
-                val fsiDecision =
-                    mVisualInterruptionDecisionProvider.makeUnloggedFullScreenIntentDecision(entry)
-                mVisualInterruptionDecisionProvider.logFullScreenIntentDecision(fsiDecision)
-                if (fsiDecision.shouldInterrupt) {
-                    mLaunchFullScreenIntentProvider.launchFullScreenIntent(entry)
-                } else if (fsiDecision.wouldInterruptWithoutDnd) {
-                    // If DND was the only reason this entry was suppressed, note it for potential
-                    // reconsideration on later ranking updates.
-                    addForFSIReconsideration(entry, mSystemClock.currentTimeMillis())
-                }
+                evaluateNewFullScreenIntent(entry);
 
                 // makeAndLogHeadsUpDecision includes check for whether this notification should be
                 // filtered
@@ -608,6 +610,11 @@ constructor(
              * heads up again.
              */
             override fun onEntryUpdated(entry: NotificationEntry) {
+                // First check whether this notification should launch a full screen intent, and
+                // launch it if needed.
+                if (LaunchNewFsiOnUpdate.isEnabled && entry.isFullScreenIntentNewlyAdded()) {
+                    evaluateNewFullScreenIntent(entry);
+                }
                 val shouldHeadsUpEver =
                     mVisualInterruptionDecisionProvider
                         .makeAndLogHeadsUpDecision(entry)
@@ -639,9 +646,7 @@ constructor(
                 //  removing from HeadsUpManager and don't need to deal with re-entrant behavior
                 //  between HeadsUpCoordinator, HeadsUpManager, and VisualStabilityManager.
                 if (
-                    posted?.shouldHeadsUpEver == false &&
-                        !posted.isHeadsUpEntry &&
-                        posted.isBinding
+                    posted?.shouldHeadsUpEver == false && !posted.isHeadsUpEntry && posted.isBinding
                 ) {
                     // Don't let the bind finish
                     cancelHeadsUpBind(posted.entry)
@@ -806,7 +811,8 @@ constructor(
      * The time window is the same as for ranking update, but this doesn't allow a potential update
      * to an entry with full screen intent to count for timing purposes.
      */
-    private fun isCandidateForFSIReconsideration(entry: NotificationEntry): Boolean {
+    @VisibleForTesting
+    fun isCandidateForFSIReconsideration(entry: NotificationEntry): Boolean {
         val addedTime = mFSIUpdateCandidates[entry.key] ?: return false
         return (mSystemClock.currentTimeMillis() - addedTime) <= MAX_RANKING_UPDATE_DELAY_MS
     }

@@ -77,23 +77,6 @@ flag {
 }
 
 flag {
-  name: "evenly_divided_call_style_action_layout"
-  namespace: "systemui"
-  description: "Evenly divides horizontal space for action buttons in CallStyle notifications."
-  bug: "268733030"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
-  name: "clean_up_spans_and_new_lines"
-  namespace: "systemui"
-  description: "Cleans up spans and unnecessary new lines from standard notification templates"
-  bug: "313439845"
-}
-
-flag {
   name: "compact_heads_up_notification_reply"
   namespace: "systemui"
   description: "[Minimal HUN] Enables the compact heads up notification reply capability for Conversation Notifications"
@@ -293,14 +276,6 @@ flag {
 }
 
 flag {
-  name: "ui_rich_ongoing"
-  is_exported: true
-  namespace: "systemui"
-  description: "[RONs] Guards new promotion logic and UI, including AOD notification and Colorization"
-  bug: "367705002"
-}
-
-flag {
   name: "rich_ongoing_improvements"
   namespace: "systemui"
   description: "[RONs] Visual Improvements for Live Updates, for glanceability"
@@ -353,6 +328,14 @@ flag {
   bug: "438704204"
 }
 
+flag {
+   name: "bridged_notifications_api"
+   is_exported: true
+   namespace: "better_together"
+   description: "Adds support for specifying bridged notification metadata for displaying to the user."
+   bug: "438827600"
+}
+
 # End: exported flags that cannot be removed
 
 
@@ -384,6 +367,14 @@ flag {
   namespace: "systemui"
   description: "This flag controls new and updated DND UIs; dependent on flag modes_api"
   bug: "270703654"
+}
+
+flag {
+  name: "modes_ui_transit"
+  namespace: "systemui"
+  description: "This flag controls DND UI: transit mode"
+  is_exported: true
+  bug: "450159513"
 }
 
 # End: Flags that have been cleaned up in code but need to remain for CTS

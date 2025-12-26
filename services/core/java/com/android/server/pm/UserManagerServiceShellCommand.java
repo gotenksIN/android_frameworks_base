@@ -55,9 +55,9 @@ import com.google.errorprone.annotations.FormatString;
 
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -147,8 +147,9 @@ public class UserManagerServiceShellCommand extends ShellCommand {
         pw.println("  revoke-admin <USER_ID>");
         pw.println("    Revokes admin privileges from the given user (requires adb root)");
         pw.println();
-        if (isBuildDebuggable() && isCalledByRoot() && mService.hasHam()) {
-            showHsuActivitiesAllowlistHelp(pw);
+        if (android.multiuser.Flags.hsuAllowlistActivities()
+                && isBuildDebuggable() && isCalledByRoot()) {
+            showActivitiesAllowlistHelp(pw);
         }
     }
 
@@ -184,10 +185,9 @@ public class UserManagerServiceShellCommand extends ShellCommand {
                     return runGrantAdmin();
                 case "revoke-admin":
                     return runRevokeAdmin();
-                // TODO(b/412177078): remove Hsu from name, pass --user, and update methods
-                case "hsu-activities-allowlist":
-                    return mService.hasHam()
-                            ? runHsuActivitiesAllowlist()
+                case "activities-allowlist":
+                    return android.multiuser.Flags.hsuAllowlistActivities()
+                            ? runActivitiesAllowlist()
                             : handleDefaultCommands(cmd);
                 default:
                     return handleDefaultCommands(cmd);
@@ -632,35 +632,38 @@ public class UserManagerServiceShellCommand extends ShellCommand {
             success = mService.revokeUserAdminInternal(userId);
         }
         if (success) {
-            return printSuccess();
+            return printAndReturnSuccess();
         } else {
-            return printFailed();
+            return printAndReturnFailed();
         }
     }
 
-    // TODO(b/412177078): remove Hsu from name and add --user <USER_ID>
-    private int runHsuActivitiesAllowlist() {
+    private int runActivitiesAllowlist() {
         if (!confirmBuildIsDebuggable() || !confirmIsCalledByRoot()) {
             return RESULT_GENERIC_ERROR;
         }
         PrintWriter pw = getOutPrintWriter();
+        String userType = getNextArg();
+        if (userType == null || userType.equals("help")) {
+            return showActivitiesAllowlistHelp(pw);
+        }
         String action = getNextArgRequired();
         return switch (action) {
-            case "help" -> showHsuActivitiesAllowlistHelp(pw);
-            case "add" -> addToHsuActivitiesAllowlist();
-            case "remove" -> removeFromHsuActivitiesAllowlist();
-            case "set" -> setHsuActivitiesAllowlist();
-            case "check" -> checkHsuActivityAllowlisted();
-            case "reset" -> resetHsuActivitiesAllowlist();
-            case "disable" -> disableHsuActivitiesAllowlist();
-            default -> printFailed("invalid action - %s", action);
+            case "help" -> showActivitiesAllowlistHelp(pw);
+            case "add" -> addToActivitiesAllowlist(userType);
+            case "remove" -> removeFromActivitiesAllowlist(userType);
+            case "set" -> setActivitiesAllowlist(userType);
+            case "check" -> checkActivityAllowlisted(userType);
+            case "reset" -> resetActivitiesAllowlist(userType);
+            case "disable" -> disableActivitiesAllowlist(userType);
+            default -> printAndReturnFailed("invalid action - %s", action);
         };
     }
 
-    private int showHsuActivitiesAllowlistHelp(PrintWriter pw) {
-        pw.println("  hsu-activities-allowlist <ACTION> [ARGS]");
-        pw.println("    Manages the Headless System User activities allowlist (requires adb root)."
-        );
+    private int showActivitiesAllowlistHelp(PrintWriter pw) {
+        pw.println("  activities-allowlist <USER_TYPE> <ACTION> [ARGS]");
+        pw.println("    Manages the activities allowlist for the given user type (requires adb root"
+                + ").");
         pw.println("    Valid ACTIONS are:");
         pw.println("      help - show this help");
         pw.println("      add <ACTIVITY> - adds the specific activity to the existing allowlist");
@@ -671,78 +674,93 @@ public class UserManagerServiceShellCommand extends ShellCommand {
                 + "specific activities (removing the previous ones)");
         pw.println("      reset - reset the allowlist to the device's default");
         pw.println("      disable - disable allowlisting (so any activity can be launched)");
-        pw.println("    where ACTIVITY is the flattenened short representation of the activity's "
-                + "ComponentName");
-        pw.println("    (i.e, package/.Activity");
+        pw.println("    where ACTIVITY is the flattened representation of the activity's "
+                + "ComponentName (i.e., package/activity)");
         pw.println("    NOTE: changes made by this command are temporary - the allowlist is reset "
                 + "when the system restarts.");
         pw.println();
         return RESULT_SUCCESS;
     }
 
-    private int addToHsuActivitiesAllowlist() {
-        ComponentName activity = getRequiredComponentNameNextArg();
-        Slogf.i(LOG_TAG, "addToHsuActivitiesAllowlist(%s)", activity);
+    private List<ComponentName> getEffectiveAllowlist(String userType) {
+        UserActivitiesAllowlist allowlist = mService.getActivitiesAllowlist(userType);
+        if (allowlist == null) {
+            throw new IllegalStateException("unsupported userType: " + userType);
+        }
+        return allowlist.getEffectiveAllowlist();
+    }
 
-        Set<ComponentName> allowlist = mService.getEffectiveHsuActivitiesAllowlist();
+    private int addToActivitiesAllowlist(String userType) {
+        ComponentName activity = getRequiredComponentNameNextArg();
+        Slogf.i(LOG_TAG, "addToActivitiesAllowlist(%s, %s)", userType, activity);
+
+        List<ComponentName> allowlist = getEffectiveAllowlist(userType);
         if (allowlist.contains(activity)) {
-            return printFailed("activity %s already in the allowlist (%s)",
+            return printAndReturnFailed("activity %s already in the allowlist (%s)",
                     activity.flattenToShortString(), toShortString(allowlist));
         }
         allowlist.add(activity);
 
-        mService.setTemporaryHsuActivitiesAllowlist(allowlist);
-        return printSuccess();
+        setTemporaryActivitiesAllowlist(userType, allowlist);
+        return printAndReturnSuccess();
     }
 
-    private int removeFromHsuActivitiesAllowlist() {
+    private int removeFromActivitiesAllowlist(String userType) {
         ComponentName activity = getRequiredComponentNameNextArg();
-        Slogf.i(LOG_TAG, "removeFromHsuActivitiesAllowlist(%s)", activity);
+        Slogf.i(LOG_TAG, "removeFromActivitiesAllowlist(%s, %s)", userType, activity);
 
-        Set<ComponentName> allowlist = mService.getEffectiveHsuActivitiesAllowlist();
+        List<ComponentName> allowlist = getEffectiveAllowlist(userType);
         if (!allowlist.contains(activity)) {
-            return printFailed("activity %s not in the allowlist (%s)",
+            return printAndReturnFailed("activity %s not in the allowlist (%s)",
                     activity.flattenToShortString(), toShortString(allowlist));
         }
         allowlist.remove(activity);
 
-        mService.setTemporaryHsuActivitiesAllowlist(allowlist);
-        return printSuccess();
+        setTemporaryActivitiesAllowlist(userType, allowlist);
+        return printAndReturnSuccess();
     }
 
-    private int checkHsuActivityAllowlisted() {
+    private int checkActivityAllowlisted(String userType) {
         ComponentName activity = getRequiredComponentNameNextArg();
-        Slogf.i(LOG_TAG, "checkHsuActivityAllowlisted(%s)", activity);
-
-        Set<ComponentName> allowlist = mService.getEffectiveHsuActivitiesAllowlist();
-        boolean allowed = allowlist.contains(activity);
-
-        getOutPrintWriter().println(allowed);
-
-        return RESULT_SUCCESS;
+        Slogf.i(LOG_TAG, "checkActivityAllowlisted(%s, %s)", userType, activity);
+        boolean allowed = true;
+        final UserActivitiesAllowlist allowlist = mService.getActivitiesAllowlist(userType);
+        if (allowlist != null) {
+            allowed = allowlist.isAllowed(activity);
+        } else {
+            Slogf.d(LOG_TAG, "Returning %B because allowlist for type %s is not set", allowed,
+                    userType);
+        }
+        return printAndReturnSuccessfulMessage(Boolean.toString(allowed));
     }
 
-    private int setHsuActivitiesAllowlist() {
+    private int setActivitiesAllowlist(String userType) {
         ArrayList<ComponentName> activities = new ArrayList<>();
         ComponentName activity = null;
         while ((activity = getComponentNameNextArg()) != null) {
             activities.add(activity);
         }
-        Slogf.i(LOG_TAG, "setHsuActivitiesAllowlist(%s)", activities);
-        mService.setTemporaryHsuActivitiesAllowlist(activities);
-        return printSuccess();
+        Slogf.i(LOG_TAG, "setActivitiesAllowlist(%s, %s)", userType, activities);
+        setTemporaryActivitiesAllowlist(userType, activities);
+        return printAndReturnSuccess();
     }
 
-    private int resetHsuActivitiesAllowlist() {
-        Slogf.i(LOG_TAG, "resetHsuActivitiesAllowlist()");
-        mService.setTemporaryHsuActivitiesAllowlist(null);
-        return printSuccess();
+    private int resetActivitiesAllowlist(String userType) {
+        Slogf.i(LOG_TAG, "resetActivitiesAllowlist(%s)", userType);
+        setTemporaryActivitiesAllowlist(userType, null);
+        return printAndReturnSuccess();
     }
 
-    private int disableHsuActivitiesAllowlist() {
-        Slogf.i(LOG_TAG, "disableHsuActivitiesAllowlist()");
-        mService.setTemporaryHsuActivitiesAllowlist(Collections.emptyList());
-        return printSuccess();
+    private int disableActivitiesAllowlist(String userType) {
+        Slogf.i(LOG_TAG, "disableActivitiesAllowlist(%s)", userType);
+        setTemporaryActivitiesAllowlist(userType, Collections.emptyList());
+        return printAndReturnSuccess();
+    }
+
+    @SuppressWarnings("AndroidFrameworkRequiresPermission")
+    private void setTemporaryActivitiesAllowlist(String userType,
+            @Nullable List<ComponentName> componentNames) {
+        mService.setTemporaryActivitiesAllowlist(userType, componentNames);
     }
 
     /**
@@ -837,21 +855,26 @@ public class UserManagerServiceShellCommand extends ShellCommand {
         return componentName;
     }
 
-    private int printSuccess() {
-        getOutPrintWriter().println("Success");
+    private int printAndReturnSuccess() {
+        return printAndReturnSuccessfulMessage("Success");
+    }
+
+    private int printAndReturnSuccessfulMessage(String message) {
+        getOutPrintWriter().println(message);
         return RESULT_SUCCESS;
     }
 
-    private int printFailed() {
-        return printFailed(/* reason= */ null);
+    private int printAndReturnFailed() {
+        return printAndReturnFailed(/* reason= */ null);
     }
 
     @FormatMethod
-    private int printFailed(@FormatString String reasonFmt, @Nullable Object...reasonArgs) {
-        return printFailed(String.format(reasonFmt, reasonArgs));
+    private int printAndReturnFailed(@FormatString String reasonFmt,
+            @Nullable Object...reasonArgs) {
+        return printAndReturnFailed(String.format(reasonFmt, reasonArgs));
     }
 
-    private int printFailed(@Nullable String reason) {
+    private int printAndReturnFailed(@Nullable String reason) {
         PrintWriter pw = getOutPrintWriter();
         pw.print("Failed");
         if (reason != null) {
@@ -861,7 +884,7 @@ public class UserManagerServiceShellCommand extends ShellCommand {
         return RESULT_GENERIC_ERROR;
     }
 
-    private static String toShortString(Set<ComponentName> components) {
+    private static String toShortString(Collection<ComponentName> components) {
         return components.stream().map(c -> c.flattenToShortString()).collect(Collectors.toList())
                 .toString();
     }

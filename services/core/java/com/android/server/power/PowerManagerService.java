@@ -29,6 +29,7 @@ import static android.os.PowerManagerInternal.WAKEFULNESS_ASLEEP;
 import static android.os.PowerManagerInternal.WAKEFULNESS_AWAKE;
 import static android.os.PowerManagerInternal.WAKEFULNESS_DOZING;
 import static android.os.PowerManagerInternal.WAKEFULNESS_DREAMING;
+import static android.os.PowerManagerInternal.WakeUpDelegate;
 import static android.os.PowerManagerInternal.wakefulnessToString;
 import static android.service.dreams.Flags.allowDreamWhenPostured;
 import static android.service.dreams.Flags.dreamsV2;
@@ -391,6 +392,10 @@ public final class PowerManagerService extends SystemService
     // All active user activity listeners.
     @GuardedBy("mLock")
     final ArrayList<UserActivityListener> mUserActivityListeners = new ArrayList<>();
+
+    @Nullable
+    @GuardedBy("mLock")
+    WakeUpDelegate mWakeUpDelegate;
 
     // A bitfield that summarizes the state of all active wakelocks.
     private int mWakeLockSummary;
@@ -2332,6 +2337,17 @@ public final class PowerManagerService extends SystemService
                 || hasWakeLockKeepingGroupAsleep(powerGroup.getWakeLockSummaryLocked())) {
             return;
         }
+        if (powerGroup.getGroupId() == Display.DEFAULT_DISPLAY_GROUP
+                && mWakeUpDelegate != null
+                && mWakeUpDelegate.wakeUp(eventTime, reason, details, uid)) {
+            // Note that, in this case where the WakeUpDelegate handles the wake up, the wakefulness
+            // state will not necessarily change to an interactive wakefulness state. This is
+            // because the delegate may implement its own definition of "waking" based on the
+            // device's behaviors and needs, which means that the wakefulness may remain in dozing
+            // or sleeping state.
+            Slog.i(TAG, "Wake up handled by delegate");
+            return;
+        }
         powerGroup.wakeUpLocked(eventTime, reason, details, uid, opPackageName, opUid,
                 LatencyTracker.getInstance(mContext));
     }
@@ -2377,15 +2393,14 @@ public final class PowerManagerService extends SystemService
 
         if (com.android.server.display.feature.flags.Flags.separateTimeouts()) {
             // The group should sleep if
-            // 1. It is not a default display group (and is display adjacent)
-            // 2. It is a default display group, and at least one display adjacent groups is
-            // interactive
+            // 1. It is a default display group, and either:
+            // 2. at least one display adjacent group is interactive [no longer applicable with
+            // tap to wake connected displays flag].
             // 3. The group is asleep, and no adjacent group exist
-            boolean shouldSleep = (powerGroup.getGroupId() != Display.DEFAULT_DISPLAY_GROUP)
-                    || (isDefaultAdjacentGroupInteractiveLocked())
-                    || (powerGroup.getWakefulnessLocked() == WAKEFULNESS_ASLEEP
+            boolean shouldSleep = (isDefaultAdjacentGroupInteractiveLocked()
+                    && !com.android.server.power.feature.flags.Flags.tapToWakeCd()) || (
+                    powerGroup.getWakefulnessLocked() == WAKEFULNESS_ASLEEP
                             && !doAnyAdjacentGroupsExistLocked());
-
             if (shouldSleep && powerGroup.isDefaultOrAdjacentGroup()) {
                 return sleepPowerGroupLocked(powerGroup, eventTime, reason, uid);
             }
@@ -3877,9 +3892,11 @@ public final class PowerManagerService extends SystemService
      */
     @GuardedBy("mLock")
     private boolean canDozeLocked(PowerGroup powerGroup) {
+        // allow dozing if we have tap to wake flag connected displays compatibility enabled.
         boolean allDefaultAdjacentGroupsNonInteractive =
-                (com.android.server.display.feature.flags.Flags.separateTimeouts())
-                ? !isDefaultAdjacentGroupInteractiveLocked() : true;
+                (!com.android.server.display.feature.flags.Flags.separateTimeouts()
+                        || !isDefaultAdjacentGroupInteractiveLocked())
+                        || com.android.server.power.feature.flags.Flags.tapToWakeCd();
         return powerGroup.supportsSandmanLocked()
                 && powerGroup.getWakefulnessLocked() == WAKEFULNESS_DOZING
                 && allDefaultAdjacentGroupsNonInteractive;
@@ -4441,6 +4458,12 @@ public final class PowerManagerService extends SystemService
     void registerUserActivityListenerInternal(UserActivityListener listener) {
         synchronized (mLock) {
             mUserActivityListeners.add(listener);
+        }
+    }
+
+    void setWakeUpDelegateInternal(WakeUpDelegate delegate) {
+        synchronized (mLock) {
+            mWakeUpDelegate = delegate;
         }
     }
 
@@ -5139,6 +5162,7 @@ public final class PowerManagerService extends SystemService
             pw.println("  mDoubleTapWakeEnabled=" + mDoubleTapWakeEnabled);
             pw.println("  mForegroundProfile=" + mForegroundProfile);
             pw.println("  mUserId=" + mUserId);
+            pw.println("  mWakeUpDelegate=" + mWakeUpDelegate);
 
             final long attentiveTimeout = mScreenTimeoutConstants.getAttentiveTimeoutLocked();
             final long sleepTimeout = mScreenTimeoutConstants
@@ -6484,8 +6508,7 @@ public final class PowerManagerService extends SystemService
             try {
                 synchronized (mLock) {
                     IntArray groupIds = new IntArray();
-                    if (com.android.server.display.feature.flags.Flags.separateTimeouts()
-                            && mFeatureFlags.isWakeAdjacentDisplaysOnWakeupCallEnabled()) {
+                    if (com.android.server.display.feature.flags.Flags.separateTimeouts()) {
                         for (int idx = 0; idx < mPowerGroups.size(); idx++) {
                             PowerGroup powerGroup = mPowerGroups.valueAt(idx);
                             if (powerGroup.isDefaultOrAdjacentGroup()) {
@@ -7795,6 +7818,15 @@ public final class PowerManagerService extends SystemService
         @Override
         public void unregisterUserActivityListener(UserActivityListener listener) {
             unregisterUserActivityListenerInternal(listener);
+        }
+
+        @Override
+        public void setWakeUpDelegate(WakeUpDelegate delegate) {
+            if (interactiveDozeExperience()) {
+                setWakeUpDelegateInternal(delegate);
+            } else {
+                Slog.w(TAG, "Wake up delegation is not enabled");
+            }
         }
 
         @Override

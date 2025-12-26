@@ -56,4 +56,19 @@ interface AppToWebRepository {
      *
      */
     suspend fun getAppToWebIntent(taskInfo: RunningTaskInfo, isBrowserApp: Boolean): Intent?
+
+    /** Returns [true] if a first-run prompt should be shown on the given task. */
+    fun shouldShowFirstRunPrompt(taskInfo: RunningTaskInfo): Boolean
+
+    /** Returns [true] if a first-run prompt is/was shown on the given task. */
+    fun isFirstRunPromptShown(taskInfo: RunningTaskInfo): Boolean
+
+    /** Sets the first-run prompt as shown for the given task. */
+    fun onFirstRunPromptShown(taskInfo: RunningTaskInfo)
+
+    /**
+     * Sets the first-run prompt as acknowledged (i.e., a user does not dismiss the prompt) for the
+     * given task.
+     */
+    fun onFirstRunPromptAcked(taskInfo: RunningTaskInfo)
 }

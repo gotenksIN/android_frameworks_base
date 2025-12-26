@@ -1042,6 +1042,8 @@ public abstract class Context {
     public abstract PackageManager getPackageManager();
 
     /** Return a ContentResolver instance for your application's package. */
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl",
+            comment = "only content://settings/ is understood for now", bug = 457841012)
     public abstract ContentResolver getContentResolver();
 
     /**
@@ -4669,6 +4671,7 @@ public abstract class Context {
                 ADVANCED_PROTECTION_SERVICE,
                 ANOMALY_DETECTOR_SERVICE,
                 TASK_CONTINUITY_SERVICE,
+                NPU_SERVICE,
             })
     @Retention(RetentionPolicy.SOURCE)
     public @interface ServiceName {}
@@ -5779,12 +5782,13 @@ public abstract class Context {
     public static final String VOICE_INTERACTION_MANAGER_SERVICE = "voiceinteraction";
 
     /**
-     * Official published name of the (internal) autofill service.
+     * Use with {@link #getSystemService(String)} to retrieve an
+     *      {@link android.view.autofill.AutofillManager}.
      *
-     * @hide
      * @see #getSystemService(String)
      */
-    public static final String AUTOFILL_MANAGER_SERVICE = "autofill";
+    @FlaggedApi(android.service.autofill.Flags.FLAG_PUBLIC_AUTOFILL_SERVICE_NAME)
+    public static final String AUTOFILL_SERVICE = "autofill";
 
     /**
      * Official published name of the (internal) text to speech manager service.
@@ -6813,7 +6817,6 @@ public abstract class Context {
      * @see #getSystemService(String)
      * @see android.security.advancedprotection.AdvancedProtectionManager
      */
-    @FlaggedApi(android.security.Flags.FLAG_AAPM_API)
     public static final String ADVANCED_PROTECTION_SERVICE = "advanced_protection";
 
     /**
@@ -6833,10 +6836,10 @@ public abstract class Context {
     public static final String REMOTE_PROVISIONING_SERVICE = "remote_provisioning";
 
     /**
-     * Binder service for {@link com.android.server.privatecompute.PccSandboxManagerService}.
-     *
-     * @hide
+     * Use with {@link #getSystemService(String)} to retrieve a
+     * {@link android.app.privatecompute.PccSandboxManager}.
      */
+    @FlaggedApi(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
     public static final String PCC_SANDBOX_SERVICE = "pcc_sandbox";
 
     /**
@@ -7075,6 +7078,15 @@ public abstract class Context {
 
     /**
      * Use with {@link #getSystemService(String)} to retrieve a
+     * {@link android.npumanager.NpuManager}.
+     *
+     * @see #getSystemService(String)
+     */
+    @FlaggedApi(com.android.npumanager.Flags.FLAG_NPUMANAGER_ENABLED)
+    public static final String NPU_SERVICE = "npu";
+
+    /**
+     * Use with {@link #getSystemService(String)} to retrieve a
      * {@link android.devicelock.DeviceLockManager}.
      *
      * @see #getSystemService(String)
@@ -7213,6 +7225,18 @@ public abstract class Context {
 
     /**
      * Use with {@link #getSystemService(String)} to retrieve a
+     * {@link android.app.contentrestriction.ContentRestrictionManager}.
+     *
+     * @see #getSystemService(String)
+     * @see android.app.contentrestriction.ContentRestrictionManager
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(android.app.contentrestriction.flags.Flags.FLAG_CONTENT_RESTRICTION_API)
+    public static final String CONTENT_RESTRICTION_SERVICE = "content_restriction";
+
+    /**
+     * Use with {@link #getSystemService(String)} to retrieve a
      * {@link android.app.supervision.SupervisionManager}.
      *
      * @see #getSystemService(String)
@@ -7241,6 +7265,14 @@ public abstract class Context {
     public static final String DYNAMIC_INSTRUMENTATION_SERVICE = "dynamic_instrumentation";
 
     /**
+     * Bridge service used by uprobestats.
+     * @hide
+     */
+    @SystemApi(client = SystemApi.Client.MODULE_LIBRARIES)
+    @FlaggedApi(android.security.Flags.FLAG_UPROBESTATS_BRIDGE_SERVICE)
+    public static final String UPROBESTATS_BRIDGE_SERVICE = "uprobestats_bridge";
+
+    /**
      * Use with {@link #getSystemService(String)} to retrieve a
      * {@link android.service.chooser.ChooserManager}.
      *
@@ -7256,7 +7288,7 @@ public abstract class Context {
 
     /**
      * Use with {@link #getSystemService(String)} to retrieve an
-     * {@link android.os.AnomalyDetectorManager}.
+     * {@link android.os.profiling.anomaly.AnomalyDetectorManager}.
      *
      * @see #getSystemService(String)
      *
@@ -8761,6 +8793,7 @@ public abstract class Context {
      * @see #getSystemService(String)
      * @see android.os.StrictMode.VmPolicy.Builder#detectIncorrectContextUse()
      */
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public boolean isUiContext() {
         throw new RuntimeException("Not implemented. Must override in a subclass.");
     }

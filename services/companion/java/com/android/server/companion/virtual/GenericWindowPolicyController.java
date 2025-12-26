@@ -106,6 +106,16 @@ final class GenericWindowPolicyController extends DisplayWindowPolicyController 
          */
         void onRunningAppsChanged(int displayId,
                 @NonNull ArraySet<Pair<Integer, String>> uidPackagePairs);
+
+        /**
+         * Called when an activity launch is requested on the given display for the given user.
+         *
+         * @param displayId The display ID on which the activity launch is requested.
+         * @param componentName The component name of the activity whose launch is requested.
+         * @param userId The user ID associated with the activity whose launch is requested.
+         */
+        void onActivityLaunchRequested(int displayId, @NonNull ComponentName componentName,
+                @UserIdInt int userId);
     }
 
     /**
@@ -157,6 +167,8 @@ final class GenericWindowPolicyController extends DisplayWindowPolicyController 
     private boolean mShowTasksInHostDeviceRecents;
     @Nullable private final ComponentName mCustomHomeComponent;
 
+    private final boolean mLocalDeviceOnly;
+
     /**
      * Creates a window policy controller that is generic to the different use cases of virtual
      * device.
@@ -179,6 +191,8 @@ final class GenericWindowPolicyController extends DisplayWindowPolicyController 
      *   {@code null}, then the system-default secondary home activity will be used. This is only
      *   applicable to displays that support home activities, i.e. they're created with the relevant
      *   virtual display flag.
+     * @param localDeviceOnly Whether it is guaranteed that the display contents will never be
+     *   streamed to a remote device.
      */
     GenericWindowPolicyController(
             @NonNull AttributionSource attributionSource,
@@ -191,7 +205,8 @@ final class GenericWindowPolicyController extends DisplayWindowPolicyController 
             @NonNull ActivityListener activityListener,
             @NonNull Set<String> displayCategories,
             boolean showTasksInHostDeviceRecents,
-            @Nullable ComponentName customHomeComponent) {
+            @Nullable ComponentName customHomeComponent,
+            boolean localDeviceOnly) {
         super();
         mAttributionSource = attributionSource;
         mAllowedUsers = allowedUsers;
@@ -204,6 +219,7 @@ final class GenericWindowPolicyController extends DisplayWindowPolicyController 
         mDisplayCategories = displayCategories;
         mShowTasksInHostDeviceRecents = showTasksInHostDeviceRecents;
         mCustomHomeComponent = customHomeComponent;
+        mLocalDeviceOnly = localDeviceOnly;
     }
 
     /**
@@ -296,6 +312,10 @@ final class GenericWindowPolicyController extends DisplayWindowPolicyController 
             @Nullable Intent intent, @WindowConfiguration.WindowingMode int windowingMode,
             int launchingFromDisplayId, boolean isNewTask, boolean isResultExpected,
             @Nullable Supplier<IntentSender> intentSender) {
+        mHandler.post(() -> mActivityListener.onActivityLaunchRequested(
+                mDisplayId, activityInfo.getComponentName(),
+                UserHandle.getUserId(activityInfo.applicationInfo.uid)));
+
         if (intent != null && mActivityListener.shouldInterceptIntent(intent)) {
             logActivityLaunchBlocked("Virtual device intercepting intent");
             return false;
@@ -320,7 +340,8 @@ final class GenericWindowPolicyController extends DisplayWindowPolicyController 
             logActivityLaunchBlocked("Mirror virtual displays cannot contain activities.");
             return false;
         }
-        if (!mIsSecureDisplay && (activityInfo.flags & FLAG_CAN_DISPLAY_ON_REMOTE_DEVICES) == 0) {
+        if (!mIsSecureDisplay && (activityInfo.flags & FLAG_CAN_DISPLAY_ON_REMOTE_DEVICES) == 0
+                && !mLocalDeviceOnly) {
             logActivityLaunchBlocked("Display requires android:canDisplayOnRemoteDevices=true");
             return false;
         }
@@ -408,7 +429,7 @@ final class GenericWindowPolicyController extends DisplayWindowPolicyController 
         final int displayId = waitAndGetDisplayId();
         // Don't send onTopActivityChanged() callback when topActivity is null because it's defined
         // as @NonNull in ActivityListener interface. Sends onDisplayEmpty() callback instead when
-        // there is no activity running on virtual display.
+        // there is no activity running on the virtual display.
         if (topActivity == null || displayId == INVALID_DISPLAY) {
             return;
         }

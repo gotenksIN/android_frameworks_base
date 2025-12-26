@@ -30,9 +30,9 @@ import kotlinx.coroutines.flow.filterNotNull
 class SqueezeEffectInteractor
 @Inject
 constructor(private val squeezeEffectRepository: SqueezeEffectRepository) {
-    val isSqueezeEffectHapticEnabled = squeezeEffectRepository.isSqueezeEffectHapticEnabled
-
     val isPowerButtonLongPressed = squeezeEffectRepository.isPowerButtonLongPressed
+
+    val gestureProgress = squeezeEffectRepository.gestureProgress
 
     val powerButtonSemantics: Flow<PowerButtonSemantics> =
         combine(
@@ -55,12 +55,16 @@ constructor(private val squeezeEffectRepository: SqueezeEffectRepository) {
             .filterNotNull()
             .distinctUntilChanged()
 
-    fun getInvocationEffectInitialDelayMillis(): Long {
-        return squeezeEffectRepository.getInvocationEffectInitialDelayMillis()
+    fun getLppInvocationEffectInitialDelayMillis(): Long {
+        return squeezeEffectRepository.getLppInvocationEffectInitialDelayMillis()
     }
 
-    fun getInvocationEffectInAnimationDurationMillis(): Long {
-        return squeezeEffectRepository.getInvocationEffectInAnimationDurationMillis()
+    fun getLppInvocationEffectInAnimationDurationMillis(): Long {
+        return squeezeEffectRepository.getLppInvocationEffectInAnimationDurationMillis()
+    }
+
+    fun getGestureInvocationEffectInAnimationDurationMillis(): Long {
+        return squeezeEffectRepository.getGestureInvocationEffectInAnimationDurationMillis()
     }
 
     fun getInvocationEffectOutAnimationDurationMillis(): Long {

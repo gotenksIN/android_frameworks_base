@@ -16,10 +16,16 @@
 
 package com.android.wm.shell.dagger.pinnedlayer
 
+import android.content.Context
+import com.android.wm.shell.common.DisplayController
 import com.android.wm.shell.dagger.WMShellBaseModule
 import com.android.wm.shell.dagger.WMSingleton
+import com.android.wm.shell.desktopmode.NormalAppLayerHandler
 import com.android.wm.shell.pinnedlayer.phone.PinnedLayerController
 import com.android.wm.shell.pinnedlayer.phone.PinnedLayerFlags
+import com.android.wm.shell.pinnedlayer.phone.PinnedLayerHandler
+import com.android.wm.shell.pinnedlayer.phone.PinnedLayerPresentationController
+import com.android.wm.shell.shared.desktopmode.DesktopState
 import com.android.wm.shell.sysui.ShellInit
 import com.android.wm.shell.transition.Transitions
 import dagger.Module
@@ -31,16 +37,44 @@ object PinnedLayerModule {
 
     @WMSingleton
     @Provides
-    fun providePinnedLayerController(
+    fun providePinnedLayerHandler(
         shellInit: ShellInit,
         transitions: Transitions,
+        normalAppLayerHandler: Optional<NormalAppLayerHandler>,
+        pinnedLayerController: Optional<PinnedLayerController>,
+    ): Optional<PinnedLayerHandler> {
+        if (PinnedLayerFlags.isPinnedLayerEnabled()) {
+            return Optional.of(
+                PinnedLayerHandler(
+                    shellInit = shellInit,
+                    transitions = transitions,
+                    normalAppLayerHandler = normalAppLayerHandler.get(),
+                    pinnedLayerController = pinnedLayerController.get(),
+                )
+            )
+        }
+        return Optional.empty()
+    }
+
+    @WMSingleton
+    @Provides
+    fun providePinnedLayerController(
+        context: Context,
+        shellInit: ShellInit,
+        transitions: Transitions,
+        displayController: DisplayController,
+        desktopState: DesktopState,
     ): Optional<PinnedLayerController> {
-        return Optional.ofNullable(
-            if (PinnedLayerFlags.isPinnedLayerEnabled()) {
-                PinnedLayerController(shellInit = shellInit, transitions = transitions)
-            } else {
-                null
-            }
-        )
+        if (PinnedLayerFlags.isPinnedLayerEnabled()) {
+            return Optional.of(
+                PinnedLayerController(
+                    shellInit = shellInit,
+                    transitions = transitions,
+                    presentationController =
+                        PinnedLayerPresentationController(context, displayController, desktopState),
+                )
+            )
+        }
+        return Optional.empty()
     }
 }

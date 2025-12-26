@@ -22,6 +22,7 @@ import static android.app.ITaskStackListener.FORCED_RESIZEABLE_REASON_SECONDARY_
 import static android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN;
 import static android.app.WindowConfiguration.WINDOWING_MODE_MULTI_WINDOW;
+import static android.app.WindowConfiguration.WINDOWING_MODE_UNDEFINED;
 
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doAnswer;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doCallRealMethod;
@@ -51,6 +52,7 @@ import static org.mockito.Mockito.timeout;
 
 import android.annotation.NonNull;
 import android.app.ActivityOptions;
+import android.app.TaskInfo;
 import android.app.WaitResult;
 import android.app.WindowConfiguration;
 import android.content.ComponentName;
@@ -472,11 +474,11 @@ public class ActivityTaskSupervisorTests extends WindowTestsBase {
      */
     @Test
     @EnableFlags(Flags.FLAG_HOME_ACTIVITY_ALWAYS_PRESENT)
-    public void testStartHomeAfterUserUnlocked_() {
+    public void testStartHomeAfterUserUnlockedWithHomeAlwaysPresent() {
         mSupervisor.onUserUnlocked(0);
         waitHandlerIdle(mAtm.mH);
         verify(mRootWindowContainer, timeout(TIMEOUT_MS))
-                .startHomeOnDisplaysWithNoHome("userUnlocked");
+                .startHomeOnDisplaysIfNeeded("userUnlocked");
     }
 
     /** Verifies that launch from recents sets the launch cookie on the activity. */
@@ -566,6 +568,45 @@ public class ActivityTaskSupervisorTests extends WindowTestsBase {
         verify(mAtm).moveTaskToFrontLocked(any(), eq(null), anyInt(), anyInt(), eq(safeOptions));
         verify(mRootWindowContainer.getDefaultTaskDisplayArea()).moveHomeRootTaskToFront(any());
         verify(fullscreenRootTask.getDisplayArea()).moveHomeRootTaskToFront(any());
+    }
+
+    /**
+     * Verifies that launch from recents doesn't reparent an automated task to the default display
+     * and instead falls back to startActivity (where the ActivityStartInterceptor can intercept).
+     */
+    @Test
+    @EnableFlags(android.companion.virtualdevice.flags.Flags.FLAG_COMPUTER_CONTROL_ACCESS)
+    public void testStartActivityFromRecents_automatedTask_launchesWarning() {
+        final DisplayContent newDisplay = addNewDisplayContentAt(DisplayContent.POSITION_TOP);
+        final Task stack = new TaskBuilder(mSupervisor)
+                .setDisplay(newDisplay).setCreateActivity(true).build();
+        final ActivityRecord activity = stack.getTopNonFinishingActivity();
+        final Task task = activity.getTask();
+        final ActivityStartController startController = mAtm.getActivityStartController();
+        spyOn(startController);
+        doNothing().when(mSupervisor.mService).moveTaskToFrontLocked(eq(null), eq(null), anyInt(),
+                anyInt(), any());
+        doReturn(0).when(startController).startActivityInPackage(anyInt(),
+                    anyInt(), anyInt(), any(), any(), any(), any(), any(),
+                    any(), anyInt(), anyInt(), any(), anyInt(), any(), any(),
+                    anyBoolean(), any(), anyBoolean());
+
+        doReturn(new Intent()).when(mSupervisor)
+                .createAutomatedAppLaunchWarningIntent(any(), anyInt(), any(), anyInt());
+
+        SafeActivityOptions safeOptions = SafeActivityOptions.fromBundle(
+                ActivityOptions.makeBasic()
+                        .setLaunchDisplayId(mDisplayContent.getDisplayId()).toBundle(),
+                Binder.getCallingPid(), Binder.getCallingUid());
+
+        mSupervisor.startActivityFromRecents(DEFAULT_CALLING_PID, DEFAULT_CALLING_UID,
+                activity.getRootTaskId(), safeOptions);
+
+        assertThat(task.getDisplayContent()).isEqualTo(newDisplay);
+        verify(startController).startActivityInPackage(anyInt(),
+                    anyInt(), anyInt(), any(), any(), eq(task.intent), any(), any(),
+                    any(), anyInt(), anyInt(), any(), anyInt(), any(),
+                    eq("startActivityFromRecents"), anyBoolean(), any(), anyBoolean());
     }
 
     @Test
@@ -701,5 +742,96 @@ public class ActivityTaskSupervisorTests extends WindowTestsBase {
         tf.setWindowingMode(windowingMode);
         tf.setBounds(filling ? new Rect() : new Rect(100, 100, 200, 200));
         return tf;
+    }
+
+    @Test
+    @RequiresFlagsDisabled(Flags.FLAG_ENABLE_BUBBLE_ROOT_TASK)
+    public void testTaskInfoHelper_fillAndReturnTop_flagDisabled_cookieAddedForOrganizedTask() {
+        // Setup a task created by an organizer with an activity that has a launch cookie.
+        final Task rootTask = new TaskBuilder(mSupervisor).setCreatedByOrganizer(true).build();
+        final TaskFragment childTask = createChildTaskFragment(rootTask,
+                WINDOWING_MODE_UNDEFINED, /* opaque */ true, /* filling */ true);
+        final ActivityRecord activity = childTask.getTopMostActivity();
+        final IBinder launchCookie = new Binder();
+        activity.mLaunchCookie = launchCookie;
+
+        final ActivityTaskSupervisor.TaskInfoHelper helper =
+                new ActivityTaskSupervisor.TaskInfoHelper();
+        final TaskInfo taskInfo = new TaskBuilder(mSupervisor).build().getTaskInfo();
+        taskInfo.launchCookies.clear();
+
+        // Execute the method to be tested.
+        helper.fillAndReturnTop(rootTask, taskInfo);
+
+        // When the flag is disabled, the cookie should be added even if the task is created by an
+        // organizer.
+        assertThat(taskInfo.launchCookies).containsExactly(launchCookie);
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_BUBBLE_ROOT_TASK)
+    public void testTaskInfoHelper_fillAndReturnTop_flagEnabled_notByOrganizer_cookieAdded() {
+        // Setup a task NOT created by an organizer with an activity that has a launch cookie.
+        final Task rootTask = new TaskBuilder(mSupervisor).setCreatedByOrganizer(false).build();
+        final TaskFragment childTask = createChildTaskFragment(rootTask,
+                WINDOWING_MODE_UNDEFINED, /* opaque */ true, /* filling */ true);
+        final ActivityRecord activity = childTask.getTopMostActivity();
+        final IBinder launchCookie = new Binder();
+        activity.mLaunchCookie = launchCookie;
+
+        final ActivityTaskSupervisor.TaskInfoHelper helper =
+                new ActivityTaskSupervisor.TaskInfoHelper();
+        final TaskInfo taskInfo = new TaskBuilder(mSupervisor).build().getTaskInfo();
+        taskInfo.launchCookies.clear();
+
+        // Execute the method to be tested.
+        helper.fillAndReturnTop(rootTask, taskInfo);
+
+        // When the flag is enabled, the cookie should be added if the task is not created by an
+        // organizer.
+        assertThat(taskInfo.launchCookies).containsExactly(launchCookie);
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_BUBBLE_ROOT_TASK)
+    public void testTaskInfoHelper_fillAndReturnTop_flagEnabled_byOrganizer_cookieNotAdded() {
+        // Setup a task created by an organizer with an activity that has a launch cookie.
+        final Task rootTask = new TaskBuilder(mSupervisor).setCreatedByOrganizer(true).build();
+        final TaskFragment childTask = createChildTaskFragment(rootTask,
+                WINDOWING_MODE_UNDEFINED, /* opaque */ true, /* filling */ true);
+        final ActivityRecord activity = childTask.getTopMostActivity();
+        final IBinder launchCookie = new Binder();
+        activity.mLaunchCookie = launchCookie;
+
+        final ActivityTaskSupervisor.TaskInfoHelper helper =
+                new ActivityTaskSupervisor.TaskInfoHelper();
+        final TaskInfo taskInfo = new TaskBuilder(mSupervisor).build().getTaskInfo();
+        taskInfo.launchCookies.clear();
+
+        // Execute the method to be tested.
+        helper.fillAndReturnTop(rootTask, taskInfo);
+
+        // When the flag is enabled, the cookie should NOT be added if the task is created by an
+        // organizer.
+        assertThat(taskInfo.launchCookies).isEmpty();
+    }
+
+    @Test
+    public void testTaskInfoHelper_fillAndReturnTop_noCookie_isEmpty() {
+        // Setup a task with an activity that does not have a launch cookie.
+        final Task rootTask = new TaskBuilder(mSupervisor).setCreatedByOrganizer(true).build();
+        final TaskFragment childTask = createChildTaskFragment(rootTask,
+                WINDOWING_MODE_UNDEFINED, /* opaque */ true, /* filling */ true);
+
+        final ActivityTaskSupervisor.TaskInfoHelper helper =
+                new ActivityTaskSupervisor.TaskInfoHelper();
+        final TaskInfo taskInfo = new TaskBuilder(mSupervisor).build().getTaskInfo();
+        taskInfo.launchCookies.clear();
+
+        // Execute the method to be tested.
+        helper.fillAndReturnTop(rootTask, taskInfo);
+
+        // If there's no cookie, the list should be empty.
+        assertThat(taskInfo.launchCookies).isEmpty();
     }
 }

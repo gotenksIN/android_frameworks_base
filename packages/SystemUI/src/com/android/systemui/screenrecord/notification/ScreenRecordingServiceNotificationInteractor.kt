@@ -73,7 +73,7 @@ class ScreenRecordingServiceNotificationInteractor(
                         putString(Notification.EXTRA_SUBSTITUTE_APP_NAME, strings.title)
                     }
                 )
-        notificationManager.notify(notificationId, builder.build())
+        notificationManager.notify(tag, notificationId, builder.build())
     }
 
     override fun notifyRecording(notificationId: Int, audioSource: ScreenRecordingAudioSource) {
@@ -116,7 +116,7 @@ class ScreenRecordingServiceNotificationInteractor(
                         putString(Notification.EXTRA_SUBSTITUTE_APP_NAME, strings.title)
                     }
                 )
-        notificationManager.notify(notificationId, builder.build())
+        notificationManager.notify(tag, notificationId, builder.build())
     }
 
     override fun notifySaved(
@@ -132,11 +132,7 @@ class ScreenRecordingServiceNotificationInteractor(
 
         val viewIntent =
             if (ScreenCaptureRecordFeaturesInteractor.isNewScreenRecordToolbarEnabled) {
-                SmallScreenPostRecordingActivity.getStartingIntent(
-                    context = context,
-                    videoUri = savedRecording.uri,
-                    shouldShowVideoSaved = true,
-                )
+                SmallScreenPostRecordingActivity.showRecording(context, savedRecording.uri)
             } else {
                 Intent(Intent.ACTION_VIEW)
                     .setFlags(
@@ -154,6 +150,7 @@ class ScreenRecordingServiceNotificationInteractor(
                         REQUEST_CODE,
                         Intent.createChooser(
                             Intent(Intent.ACTION_SEND)
+                                .setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                                 .putExtra(Intent.EXTRA_STREAM, savedRecording.uri)
                                 .setDataAndType(savedRecording.uri, MimeTypes.VIDEO_MP4),
                             context.getString(R.string.screenrecord_share_label),
@@ -193,7 +190,7 @@ class ScreenRecordingServiceNotificationInteractor(
                     .showBigPictureWhenCollapsed(true)
             builder.setStyle(pictureStyle)
         }
-        notificationManager.notify(notificationId, builder.build())
+        notificationManager.notify(tag, notificationId, builder.build())
     }
 
     override fun notifyErrorSaving(notificationId: Int) {

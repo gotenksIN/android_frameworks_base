@@ -91,6 +91,7 @@ import com.android.wm.shell.ShellTaskOrganizer;
 import com.android.wm.shell.apptoweb.AppToWebGenericLinksParser;
 import com.android.wm.shell.apptoweb.AppToWebUtils;
 import com.android.wm.shell.apptoweb.AssistContentRequester;
+import com.android.wm.shell.apptoweb.DialogLifecycleListener;
 import com.android.wm.shell.apptoweb.OpenByDefaultDialog;
 import com.android.wm.shell.common.DisplayController;
 import com.android.wm.shell.common.DisplayLayout;
@@ -148,7 +149,11 @@ import java.util.function.Supplier;
  * {@link DesktopModeWindowDecorViewModel}.
  *
  * The shadow's thickness is 20dp when the window is in focus and 5dp when the window isn't.
+ *
+ * @deprecated This class's logic is now split between {@link DefaultWindowDecoration},
+ * {@link AppHeaderController}, and {@link AppHandleController}.
  */
+@Deprecated
 public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLinearLayout>
         implements HandleMenuController, ManageWindowsMenuController, MaximizeMenuController {
     private static final String TAG = "DesktopModeWindowDecoration";
@@ -512,9 +517,7 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
                 mIsStatusBarVisible, mIsKeyguardVisibleAndOccluded, inFullImmersive,
                 mIsDragging, mDisplayController.getInsetsState(taskInfo.displayId), hasGlobalFocus,
                 displayExclusionRegion,
-                /* shouldIgnoreCornerRadius= */ mIsRecentsTransitionRunning
-                        && DesktopModeFlags
-                        .ENABLE_DESKTOP_RECENTS_TRANSITIONS_CORNERS_BUGFIX.isTrue(),
+                /* shouldIgnoreCornerRadius= */ mIsRecentsTransitionRunning,
                 mDesktopModeCompatPolicy.shouldExcludeCaptionFromAppBounds(taskInfo),
                 mDesktopConfig, inSyncWithTransition,
                 mLockTaskChangeListener.isTaskLocked(),
@@ -1374,9 +1377,8 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
                 mDisplayController,
                 mTaskResourceLoader,
                 mSurfaceControlTransactionSupplier,
-                mMainDispatcher,
                 mMainScope,
-                new OpenByDefaultDialog.DialogLifecycleListener() {
+                new DialogLifecycleListener() {
                     @Override
                     public void onDialogCreated() {
                         closeHandleMenu();
@@ -1584,8 +1586,8 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
     /**
      * Close the maximize menu window
      */
-    @VisibleForTesting
-    void closeMaximizeMenu() {
+    @Override
+    public void closeMaximizeMenu() {
         if (!isMaximizeMenuActive()) return;
         mMaximizeMenu.close(() -> {
             // Request the accessibility service to refocus on the maximize button after closing
@@ -2102,6 +2104,11 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
      */
     void setIsDragging(boolean isDragging) {
         mIsDragging = isDragging;
+    }
+
+    /** Returns whether the window decoration is being dragged. */
+    boolean getIsDragging() {
+        return mIsDragging;
     }
 
     /**

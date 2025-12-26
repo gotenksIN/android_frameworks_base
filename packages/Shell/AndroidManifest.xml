@@ -287,6 +287,8 @@
     <uses-permission android:name="android.permission.CHANGE_COMPONENT_ENABLED_STATE" />
     <uses-permission android:name="android.permission.MANAGE_AUTO_FILL" />
     <uses-permission android:name="android.permission.MANAGE_CONTENT_CAPTURE" />
+    <uses-permission android:name="android.permission.SET_CONTENT_PROTECTION_ALLOWLIST"
+        android:featureFlag="android.view.contentprotection.flags.set_content_protection_allowlist_enabled" />
     <uses-permission android:name="android.permission.MANAGE_CONTENT_SUGGESTIONS" />
     <uses-permission android:name="android.permission.MANAGE_APP_PREDICTIONS" />
     <uses-permission android:name="android.permission.MANAGE_LOW_POWER_STANDBY" />
@@ -365,11 +367,14 @@
     <uses-permission android:name="android.permission.REQUEST_COMPANION_PROFILE_MEDICAL" />
     <uses-permission android:name="android.permission.REQUEST_COMPANION_SELF_MANAGED" />
     <uses-permission android:name="android.permission.USE_COMPANION_TRANSPORTS" />
+    <uses-permission android:name="android.permission.ACCESS_COMPANION_MESSAGE_PCC" />
     <uses-permission android:name="android.permission.REQUEST_OBSERVE_DEVICE_UUID_PRESENCE" />
     <uses-permission android:name="android.permission.DELIVER_COMPANION_MESSAGES" />
     <uses-permission android:name="android.permission.ACCESS_COMPANION_INFO" />
     <uses-permission android:name="android.permission.READ_REMOTE_TASKS" />
     <uses-permission android:name="android.permission.REQUEST_TASK_HANDOFF" />
+    <uses-permission android:name="android.permission.READ_HANDOFF_SETTINGS" />
+    <uses-permission android:name="android.permission.MODIFY_HANDOFF_SETTINGS" />
 
     <uses-permission android:name="android.permission.MANAGE_APPOPS" />
     <uses-permission android:name="android.permission.WATCH_APPOPS" />
@@ -393,6 +398,9 @@
 
     <!-- Permission needed for CTS test - CtsSystemUiTestCases:PipNotificationTests -->
     <uses-permission android:name="android.permission.GET_INTENT_SENDER_INTENT" />
+
+    <!-- Permission needed for CTS test - CtsPccApiTests -->
+    <uses-permission android:name="android.permission.PROVIDE_PRIVATE_COMPUTE_SERVICES" />
 
     <!-- Permission needed to run keyguard manager tests in CTS -->
     <uses-permission android:name="android.permission.CONTROL_KEYGUARD_SECURE_NOTIFICATIONS" />
@@ -785,6 +793,7 @@
     <!-- Permission required for CTS test - Notification test suite -->
     <uses-permission android:name="android.permission.REVOKE_POST_NOTIFICATIONS_WITHOUT_KILL" />
     <uses-permission android:name="android.permission.HIDE_STATUS_BAR_NOTIFICATION" />
+    <uses-permission android:name="android.permission.POST_BRIDGED_NOTIFICATIONS" />
 
     <!-- Permission required for test - CellBroadcastComplianceTest -->
     <uses-permission android:name="com.android.cellbroadcastservice.FULL_ACCESS_CELL_BROADCAST_HISTORY" />
@@ -988,10 +997,8 @@
     <!-- Permission required for CTS test - CtsNfcTestCases -->
     <uses-permission android:name="android.permission.NFC_SET_CONTROLLER_ALWAYS_ON" />
     <!-- Permission required for CTS test - AdvancedProtectionManagerTest -->
-    <uses-permission android:name="android.permission.MANAGE_ADVANCED_PROTECTION_MODE"
-        android:featureFlag="android.security.aapm_api"/>
-    <uses-permission android:name="android.permission.QUERY_ADVANCED_PROTECTION_MODE"
-        android:featureFlag="android.security.aapm_api"/>
+    <uses-permission android:name="android.permission.MANAGE_ADVANCED_PROTECTION_MODE"/>
+    <uses-permission android:name="android.permission.QUERY_ADVANCED_PROTECTION_MODE" />
     <uses-permission android:name="android.permission.MANAGE_DEVICE_POLICY_MTE" />
 
     <!-- Permission required for CTS test - IntrusionDetectionManagerTest -->
@@ -1065,6 +1072,12 @@
 
     <!-- Permission required for CTS test - CtsAnomalyDetectorTests -->
     <uses-permission android:name="android.permission.CONFIGURE_ANOMALY_DETECTOR" />
+
+    <!-- Permission required for CTS test - CtsNpuManagerTestCases -->
+    <uses-permission android:name="android.permission.ACCESS_NPU_MODEL_MANAGER_API"/>
+
+    <!-- Permission required for CTS test - CtsProviderUiTestCases -->
+    <uses-permission android:name="android.permission.MANAGE_DOCUMENTS" />
 
     <application
         android:label="@string/app_label"

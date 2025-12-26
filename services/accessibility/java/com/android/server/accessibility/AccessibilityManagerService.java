@@ -58,6 +58,7 @@ import static com.android.internal.accessibility.common.ShortcutConstants.UserSh
 import static com.android.internal.accessibility.common.ShortcutConstants.UserShortcutType.GESTURE;
 import static com.android.internal.accessibility.common.ShortcutConstants.UserShortcutType.HARDWARE;
 import static com.android.internal.accessibility.common.ShortcutConstants.UserShortcutType.KEY_GESTURE;
+import static com.android.internal.accessibility.common.ShortcutConstants.UserShortcutType.QUICK_ACCESS;
 import static com.android.internal.accessibility.common.ShortcutConstants.UserShortcutType.QUICK_SETTINGS;
 import static com.android.internal.accessibility.common.ShortcutConstants.UserShortcutType.SOFTWARE;
 import static com.android.internal.accessibility.common.ShortcutConstants.UserShortcutType.TOP_ROW_KEY;
@@ -1035,7 +1036,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
         final AccessibilityUserState userState = getCurrentUserStateLocked();
         // Reload the installed services since some services may have different attributes
         // or resolve info (does not support equals), etc. Remove them then to force reload.
-        userState.mInstalledServices.clear();
+        userState.mInstalledServicesMap.clear();
         if (readConfigurationForUserStateLocked(userState,
                     parsedAccessibilityServiceInfos, parsedAccessibilityShortcutInfos)) {
             onUserStateChangedLocked(userState);
@@ -1092,7 +1093,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
             String[] packages, AccessibilityUserState userState) {
         final Set<String> packageSet = new HashSet<>(List.of(packages));
         final Set<ComponentName> continuousServices =
-                userState.mInstalledServices.stream().filter(service ->
+                userState.getInstalledServices().stream().filter(service ->
                         (service.flags & FLAG_REQUEST_ACCESSIBILITY_BUTTON)
                                 == FLAG_REQUEST_ACCESSIBILITY_BUTTON
                 ).map(AccessibilityServiceInfo::getComponentName).collect(Collectors.toSet());
@@ -1604,7 +1605,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
             resolvedUserId = mSecurityPolicy
                     .resolveCallingUserIdEnforcingPermissionsLocked(userId);
             serviceInfos = new ArrayList<>(
-                    getUserStateLocked(resolvedUserId).mInstalledServices);
+                    getUserStateLocked(resolvedUserId).getInstalledServices());
         }
 
         if (Binder.getCallingPid() == OWN_PROCESS_ID) {
@@ -1967,10 +1968,10 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
 
         // update in-memory copy of QS_TILES in AccessibilityManager
         synchronized (mLock) {
-            Slog.d(LOG_TAG, TextUtils.formatSimple(
-                    "notifyQuickSettingsTilesChanged userId: %s, tileComponentNames: %s, "
-                            + "userInitializationCompleted? %s",
-                    userId, tileComponentNames, isServiceInitializedLocked()));
+            Slog.d(LOG_TAG,
+                    "notifyQuickSettingsTilesChanged userId: " + userId + ", tileComponentNames: "
+                            + tileComponentNames + ", userInitializationCompleted? "
+                            + isServiceInitializedLocked());
 
             AccessibilityUserState userState = getUserStateLocked(userId);
 
@@ -2754,9 +2755,10 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
             }
         }
 
-        if (!parsedAccessibilityServiceInfos.equals(userState.mInstalledServices)) {
-            userState.mInstalledServices.clear();
-            userState.mInstalledServices.addAll(parsedAccessibilityServiceInfos);
+        List<AccessibilityServiceInfo> installedServices = new ArrayList<>(
+                userState.getInstalledServices());
+        if (!parsedAccessibilityServiceInfos.equals(installedServices)) {
+            userState.buildInstalledServicesMapLocked(parsedAccessibilityServiceInfos);
             userState.updateTileServiceMapForAccessibilityServiceLocked();
             return true;
         }
@@ -3124,8 +3126,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
 
         // Store the list of installed services.
         mTempComponentNameSet.clear();
-        for (int i = 0, count = userState.mInstalledServices.size(); i < count; i++) {
-            AccessibilityServiceInfo installedService = userState.mInstalledServices.get(i);
+        for (AccessibilityServiceInfo installedService : userState.getInstalledServices()) {
             ComponentName componentName = ComponentName.unflattenFromString(
                     installedService.getId());
             mTempComponentNameSet.add(componentName);
@@ -3511,6 +3512,9 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
         if (android.view.accessibility.Flags.enableA11yTopRowShortcut()) {
             updateAccessibilityShortcutTargetsLocked(userState, TOP_ROW_KEY);
         }
+        if (android.view.accessibility.Flags.quickAccessShortcutType()) {
+            updateAccessibilityShortcutTargetsLocked(userState, QUICK_ACCESS);
+        }
         // Update the capabilities before the mode because we will check the current mode is
         // invalid or not..
         updateMagnificationCapabilitiesSettingsChangeLocked(userState);
@@ -3576,9 +3580,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
         // Up to JB-MR1 we had a allowlist with services that can enable touch
         // exploration. When a service is first started we show a dialog to the
         // use to get a permission to allowlist the service.
-        final int installedServiceCount = userState.mInstalledServices.size();
-        for (int i = 0; i < installedServiceCount; i++) {
-            AccessibilityServiceInfo serviceInfo = userState.mInstalledServices.get(i);
+        for (AccessibilityServiceInfo serviceInfo : userState.getInstalledServices()) {
             ResolveInfo resolveInfo = serviceInfo.getResolveInfo();
             if ((serviceInfo.getCapabilities()
                         & AccessibilityServiceInfo.CAPABILITY_CAN_REQUEST_TOUCH_EXPLORATION) == 0
@@ -3643,6 +3645,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
         somethingChanged |= readAccessibilityShortcutTargetsLocked(userState, GESTURE);
         somethingChanged |= readAccessibilityShortcutTargetsLocked(userState, KEY_GESTURE);
         somethingChanged |= readAccessibilityShortcutTargetsLocked(userState, TOP_ROW_KEY);
+        somethingChanged |= readAccessibilityShortcutTargetsLocked(userState, QUICK_ACCESS);
         somethingChanged |= readAccessibilityButtonTargetComponentLocked(userState);
         somethingChanged |= readUserRecommendedUiTimeoutSettingsLocked(userState);
         somethingChanged |= readMagnificationModeForDefaultDisplayLocked(userState);
@@ -3801,6 +3804,10 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
             @UserShortcutType int shortcutType) {
         if (!android.view.accessibility.Flags.enableA11yTopRowShortcut()
                 && shortcutType == TOP_ROW_KEY) {
+            return false;
+        }
+        if (!android.view.accessibility.Flags.quickAccessShortcutType()
+                && shortcutType == QUICK_ACCESS) {
             return false;
         }
         assertNoTapShortcut(shortcutType);
@@ -4075,11 +4082,10 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
         scheduleNotifyClientsOfServicesStateChangeLocked(userState);
 
         // Log new shortcut targets in VERBOSE
-        Slog.v(LOG_TAG, TextUtils.formatSimple(
-                "UserState shortcut targets: userId: %s, type: %s, targets: %s",
-                userState.mUserId,
-                ShortcutUtils.convertToKey(shortcutType),
-                currentTargets));
+        Slog.v(LOG_TAG,
+                "UserState shortcut targets: userId: " + userState.mUserId
+                        + ", type: " + ShortcutUtils.convertToKey(shortcutType)
+                        + ", targets: " + currentTargets);
     }
 
     private void updateShortcutTargetSets(AccessibilityUserState userState,
@@ -4243,6 +4249,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
         shortcutTypes.add(GESTURE);
         shortcutTypes.add(KEY_GESTURE);
         shortcutTypes.add(TOP_ROW_KEY);
+        shortcutTypes.add(QUICK_ACCESS);
 
         final ComponentName serviceName = service.getComponentName();
         for (Integer shortcutType: shortcutTypes) {
@@ -4575,10 +4582,9 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
     private void enableShortcutForTargets(
             boolean enable, @UserShortcutType int shortcutType,
             @NonNull List<String> shortcutTargets, @UserIdInt int userId) {
-        Slog.d(LOG_TAG, TextUtils.formatSimple(
-                "enableShortcutForTargets: enable %s, shortcutType: %s, shortcutTargets: %s, "
-                        + "userId: %s",
-                enable, shortcutType, shortcutTargets, userId));
+        Slog.d(LOG_TAG,
+                "enableShortcutForTargets: enable " + enable + ", shortcutType: " + shortcutType
+                        + ", shortcutTargets: " + shortcutTargets + ", userId: " + userId);
 
         if (shortcutType == UserShortcutType.KEY_GESTURE) {
             if (!enableTalkbackAndMagnifierKeyGestures()
@@ -4654,18 +4660,13 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
             }
 
             if (currentTargets.equals(validNewTargets)) {
-                Slog.d(LOG_TAG,
-                        TextUtils.formatSimple(
-                                "shortcutTargets are the same: skip modifying: target: %s, "
-                                        + "shortcutType: %s, userId: %s",
-                                validNewTargets, shortcutType, userId));
+                Slog.d(LOG_TAG, "shortcutTargets are the same: skip modifying: target: %s, "
+                        + validNewTargets + ", shortcutType: " + shortcutType + ", userId: "
+                        + userId);
                 return;
             }
-            Slog.d(LOG_TAG,
-                    TextUtils.formatSimple(
-                            "writing new shortcut targets: target: %s, "
-                                    + "shortcutType: %s, userId: %s",
-                            validNewTargets, shortcutType, userId));
+            Slog.d(LOG_TAG, "writing new shortcut targets: target: " + validNewTargets
+                    + ", shortcutType: " + shortcutType + ", userId: " + userId);
 
             persistColonDelimitedSetToSettingLocked(
                     shortcutTypeSettingKey,
@@ -4745,11 +4746,8 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
     private void updateA11yTileServicesInQuickSettingsPanel(
             Set<String> newQsTargets,
             Set<String> currentQsTargets, @UserIdInt int userId) {
-        Slog.d(LOG_TAG,
-                TextUtils.formatSimple(
-                        "updateA11yTileServicesInQuickSettingsPanel: newQsTargets: %s , "
-                                + "currentQsTargets: %s, userId: %s",
-                        newQsTargets, currentQsTargets, userId));
+        Slog.d(LOG_TAG, "updateA11yTileServicesInQuickSettingsPanel: newQsTargets: " + newQsTargets
+                + " , currentQsTargets: " + currentQsTargets + ", userId: " + userId);
         // Call StatusBarManager to add/remove tiles
         final StatusBarManagerInternal statusBarManagerInternal =
                 LocalServices.getService(StatusBarManagerInternal.class);
@@ -6048,6 +6046,9 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
         private final Uri mAccessibilityTopRowKeyTargetsUri = Settings.Secure.getUriFor(
                 Settings.Secure.ACCESSIBILITY_TOP_ROW_KEY_TARGETS);
 
+        private final Uri mAccessibilityQuickAccessTargetsUri = Settings.Secure.getUriFor(
+                Settings.Secure.ACCESSIBILITY_QUICK_ACCESS_TARGETS);
+
         private final Uri mUserNonInteractiveUiTimeoutUri = Settings.Secure.getUriFor(
                 Settings.Secure.ACCESSIBILITY_NON_INTERACTIVE_UI_TIMEOUT_MS);
 
@@ -6127,6 +6128,8 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                     mAccessibilityKeyGestureTargetsUri, false, this, UserHandle.USER_ALL);
             contentResolver.registerContentObserver(
                     mAccessibilityTopRowKeyTargetsUri, false, this, UserHandle.USER_ALL);
+            contentResolver.registerContentObserver(
+                    mAccessibilityQuickAccessTargetsUri, false, this, UserHandle.USER_ALL);
             contentResolver.registerContentObserver(
                     mUserNonInteractiveUiTimeoutUri, false, this, UserHandle.USER_ALL);
             contentResolver.registerContentObserver(
@@ -6229,6 +6232,10 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                     }
                 } else if (mAccessibilityTopRowKeyTargetsUri.equals(uri)) {
                     if (readAccessibilityShortcutTargetsLocked(userState, TOP_ROW_KEY)) {
+                        onUserStateChangedLocked(userState);
+                    }
+                } else if (mAccessibilityQuickAccessTargetsUri.equals(uri)) {
+                    if (readAccessibilityShortcutTargetsLocked(userState, QUICK_ACCESS)) {
                         onUserStateChangedLocked(userState);
                     }
                 } else if (mUserNonInteractiveUiTimeoutUri.equals(uri)
@@ -6951,7 +6958,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                         && component.getPackageName().equals(packageName));
                 // Reloads the installed services info to make sure the rebound service could
                 // get a new one.
-                userState.mInstalledServices.clear();
+                userState.mInstalledServicesMap.clear();
                 final boolean configurationChanged;
                 configurationChanged = mManagerService.readConfigurationForUserStateLocked(
                         userState, parsedAccessibilityServiceInfos,

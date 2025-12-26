@@ -59,6 +59,7 @@ interface SceneTransitionsBuilder {
         to: ContentKey,
         key: TransitionKey? = null,
         @CujType cuj: Int? = null,
+        cujTag: String? = null,
         preview: (TransitionBuilder.() -> Unit)? = null,
         reversePreview: (TransitionBuilder.() -> Unit)? = null,
         builder: TransitionBuilder.() -> Unit = {},
@@ -86,6 +87,7 @@ interface SceneTransitionsBuilder {
         to: ContentKey? = null,
         key: TransitionKey? = null,
         @CujType cuj: Int? = null,
+        cujTag: String? = null,
         preview: (TransitionBuilder.() -> Unit)? = null,
         reversePreview: (TransitionBuilder.() -> Unit)? = null,
         builder: TransitionBuilder.() -> Unit = {},
@@ -144,8 +146,19 @@ interface TransitionBuilder : BaseTransitionBuilder {
      */
     var spec: AnimationSpec<Float>?
 
+    /**
+     * Hints at the intrinsic, "design intent" direction of the transition.
+     *
+     * Provides the direction for direction-dependent animations when they are triggered
+     * programmatically via [spec], rather than by a user's swipe.
+     */
+    var intrinsicDirection: SwipeDirection?
+
     /** The CUJ associated to this transitions. */
     @CujType var cuj: Int?
+
+    /** The string appended to the CUJ */
+    var cujTag: String?
 
     /**
      * Define a timestamp-based range for the transformations inside [builder].

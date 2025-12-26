@@ -158,6 +158,7 @@ import android.app.AppGlobals;
 import android.app.AppOpsManager;
 import android.app.Dialog;
 import android.app.HandoffActivityData;
+import android.app.HandoffActivityParams;
 import android.app.IActivityClientController;
 import android.app.IActivityController;
 import android.app.IActivityTaskManager;
@@ -311,7 +312,6 @@ import com.android.server.sdksandbox.SdkSandboxManagerLocal;
 import com.android.server.statusbar.StatusBarManagerInternal;
 import com.android.server.uri.NeededUriGrants;
 import com.android.server.uri.UriGrantsManagerInternal;
-import com.android.server.wm.ActivityTaskManagerInternal.HandoffEnablementListener;
 import com.android.server.wm.utils.WindowStyleCache;
 import com.android.wm.shell.Flags;
 
@@ -535,6 +535,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     private SparseArray<ActivityInterceptorCallback> mActivityInterceptorCallbacks =
             new SparseArray<>();
     PackageConfigPersister mPackageConfigPersister;
+    PackageUpdateManager mPackageUpdateManager;
 
     boolean mSuppressResizeConfigChanges;
 
@@ -1066,6 +1067,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         mVrController = new VrController(mGlobalLock);
         mKeyguardController = mTaskSupervisor.getKeyguardController();
         mPackageConfigPersister = new PackageConfigPersister(mTaskSupervisor.mPersisterQueue, this);
+        mPackageUpdateManager = new PackageUpdateManager(this);
     }
 
     public void onActivityManagerInternalAdded() {
@@ -4011,7 +4013,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     @VisibleForTesting
     public void requestHandoffTaskData(int taskId, IHandoffTaskDataReceiver receiver) {
         synchronized (mGlobalLock) {
-            if (!android.companion.Flags.enableTaskContinuity()) {
+            if (!android.companion.Flags.taskContinuity()) {
                 Slog.w(TAG, "Handoff is not supported on this device.");
                 mH.post(() -> {
                     notifyHandoffTaskDataRequestFailed(
@@ -4247,7 +4249,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             mRunningVoice = session;
             if (!wasRunningVoice) {
                 mVoiceWakeLock.acquire();
-                updateSleepIfNeededLocked();
+                mRootWindowContainer.forAllDisplays(DisplayContent::wakeIfNeeded);
             }
         }
     }
@@ -4256,7 +4258,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         if (mRunningVoice != null) {
             mRunningVoice = null;
             mVoiceWakeLock.release();
-            updateSleepIfNeededLocked();
+            mRootWindowContainer.forAllDisplays(DisplayContent::sleepIfNeeded);
         }
     }
 
@@ -4948,7 +4950,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     }
 
     void notifyHandoffEnablementChanged(ActivityRecord activity, boolean isHandoffEnabled) {
-        if (!android.companion.Flags.enableTaskContinuity()) {
+        if (!android.companion.Flags.taskContinuity()) {
             return;
         }
 
@@ -4978,17 +4980,26 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     }
 
     @Override
-    public void onPictureInPictureUiStateChanged(PictureInPictureUiState pipState) {
+    public void onPictureInPictureUiStateChanged(PictureInPictureUiState pipState, int displayId) {
         enforceTaskPermission("onPictureInPictureUiStateChanged");
         synchronized (mGlobalLock) {
+            TaskDisplayArea tda = mRootWindowContainer.getDefaultTaskDisplayArea();
+            // If the PiP is on a non-default display
+            if (com.android.window.flags.Flags.enablePipUiStateChangeCallbackForConnectedDisplays()
+                    && displayId != DEFAULT_DISPLAY) {
+                DisplayContent dc = mRootWindowContainer.getDisplayContent(displayId);
+                if (dc != null) {
+                    tda = dc.getDefaultTaskDisplayArea();
+                }
+            }
+
             // The PictureInPictureUiState is sent to current pip task if there is any
             // -or- the top standard task (state like entering PiP does not require a pinned task).
             final Task task;
-            if (mRootWindowContainer.getDefaultTaskDisplayArea().hasPinnedTask()) {
-                task = mRootWindowContainer.getDefaultTaskDisplayArea().getRootPinnedTask();
+            if (tda.hasPinnedTask()) {
+                task = tda.getRootPinnedTask();
             } else {
-                task = mRootWindowContainer.getDefaultTaskDisplayArea().getRootTask(
-                        t -> t.isActivityTypeStandard());
+                task = tda.getRootTask(t -> t.isActivityTypeStandard());
             }
             final ActivityRecord topActivity = task != null
                     ? task.getTopMostActivity()
@@ -5396,6 +5407,9 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             }
             for (int i = mRootWindowContainer.getChildCount() - 1; i >= 0; i--) {
                 final DisplayContent dc = mRootWindowContainer.getChildAt(i);
+                if (dc.getTopMostActivity() == null) {
+                    continue;
+                }
                 dc.collectDisplayChange(transition);
                 transition.setKnownConfigChanges(dc, changes);
             }
@@ -5864,50 +5878,40 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         EventLogTags.writeWmSetResumedActivity(r.mUserId, r.shortComponentName, reason);
     }
 
-    void updateSleepIfNeededLocked() {
-        final boolean shouldSleep = !mRootWindowContainer.hasAwakeDisplay();
-
+    void wakeIfNeededLocked() {
+        if (!mSleeping) return;
+        mSleeping = false;
         try (var unused = mActivityStateUpdater.startBatchSession()) {
-            boolean updateOomAdj = false;
-            if (!shouldSleep) {
-                // If mSleeping is true, we need to wake up activity manager state from when
-                // we started sleeping. In either case, we need to apply the sleep tokens, which
-                // will wake up root tasks or put them to sleep as appropriate.
-                if (mSleeping) {
-                    mSleeping = false;
-                    FrameworkStatsLog.write(FrameworkStatsLog.ACTIVITY_MANAGER_SLEEP_STATE_CHANGED,
-                            FrameworkStatsLog.ACTIVITY_MANAGER_SLEEP_STATE_CHANGED__STATE__AWAKE);
-                    startTimeTrackingFocusedActivityLocked();
-                    if (mTopApp != null) {
-                        mTopApp.addToPendingTop();
-                    }
-                    mTopProcessState = ActivityManager.PROCESS_STATE_TOP;
-                    mActivityStateUpdater.setTopProcessStateAsync(mInternal.getTopProcessState());
-                    Slog.d(TAG, "Top Process State changed to PROCESS_STATE_TOP");
-                    mTaskSupervisor.comeOutOfSleepIfNeededLocked();
-                    updateOomAdj = true;
-                }
-                final ActionChain chain = mChainTracker.startTransit("sleepTokens");
-                mRootWindowContainer.applySleepTokens(chain);
-                mChainTracker.endPartial();
-            } else if (!mSleeping) {
-                mSleeping = true;
-                FrameworkStatsLog.write(FrameworkStatsLog.ACTIVITY_MANAGER_SLEEP_STATE_CHANGED,
-                        FrameworkStatsLog.ACTIVITY_MANAGER_SLEEP_STATE_CHANGED__STATE__ASLEEP);
-                if (mCurAppTimeTracker != null) {
-                    mCurAppTimeTracker.stop();
-                }
-                mTopProcessState = ActivityManager.PROCESS_STATE_TOP_SLEEPING;
-                mActivityStateUpdater.setTopProcessStateAsync(mInternal.getTopProcessState());
-                Slog.d(TAG, "Top Process State changed to PROCESS_STATE_TOP_SLEEPING");
-                mTaskSupervisor.goingToSleepLocked();
-                mTaskSupervisor.checkReadyForSleepLocked();
-                updateResumedAppTrace(null /* resumed */);
-                updateOomAdj = true;
+            FrameworkStatsLog.write(FrameworkStatsLog.ACTIVITY_MANAGER_SLEEP_STATE_CHANGED,
+                    FrameworkStatsLog.ACTIVITY_MANAGER_SLEEP_STATE_CHANGED__STATE__AWAKE);
+            startTimeTrackingFocusedActivityLocked();
+            if (mTopApp != null) {
+                mTopApp.addToPendingTop();
             }
-            if (updateOomAdj) {
-                updateOomAdj();
+            mTopProcessState = ActivityManager.PROCESS_STATE_TOP;
+            mActivityStateUpdater.setTopProcessStateAsync(mInternal.getTopProcessState());
+            Slog.d(TAG, "Top Process State changed to PROCESS_STATE_TOP");
+            mTaskSupervisor.comeOutOfSleepIfNeededLocked();
+            updateOomAdj();
+        }
+    }
+
+    void sleepIfNeededLocked() {
+        if (mRootWindowContainer.hasAwakeDisplay() || mSleeping) return;
+        mSleeping = true;
+        try (var unused = mActivityStateUpdater.startBatchSession()) {
+            FrameworkStatsLog.write(FrameworkStatsLog.ACTIVITY_MANAGER_SLEEP_STATE_CHANGED,
+                    FrameworkStatsLog.ACTIVITY_MANAGER_SLEEP_STATE_CHANGED__STATE__ASLEEP);
+            if (mCurAppTimeTracker != null) {
+                mCurAppTimeTracker.stop();
             }
+            mTopProcessState = ActivityManager.PROCESS_STATE_TOP_SLEEPING;
+            mActivityStateUpdater.setTopProcessStateAsync(mInternal.getTopProcessState());
+            Slog.d(TAG, "Top Process State changed to PROCESS_STATE_TOP_SLEEPING");
+            mTaskSupervisor.goingToSleepLocked();
+            mTaskSupervisor.checkReadyForSleepLocked();
+            updateResumedAppTrace(null /* resumed */);
+            updateOomAdj();
         }
     }
 
@@ -6751,7 +6755,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
 
         @Override
         public boolean isHandoffEnabledForTask(int taskId) {
-            if (!android.companion.Flags.enableTaskContinuity()) {
+            if (!android.companion.Flags.taskContinuity()) {
                 return false;
             }
             synchronized (mGlobalLock) {
@@ -6766,8 +6770,24 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         }
 
         @Override
+        public HandoffActivityParams getHandoffActivityParamsForTask(int taskId) {
+            if (!android.companion.Flags.taskContinuity()) {
+                return null;
+            }
+            synchronized (mGlobalLock) {
+                final Task task = mRootWindowContainer.anyTaskForId(taskId);
+                if (task == null) {
+                    return null;
+                }
+
+                final ActivityRecord activity = task.getTopNonFinishingActivity();
+                return activity != null ? activity.getHandoffActivityParams() : null;
+            }
+        }
+
+        @Override
         public void registerHandoffEnablementListener(@NonNull HandoffEnablementListener listener) {
-            if (!android.companion.Flags.enableTaskContinuity()) {
+            if (!android.companion.Flags.taskContinuity()) {
                 return;
             }
 
@@ -6778,7 +6798,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         public void unregisterHandoffEnablementListener(
             @NonNull HandoffEnablementListener listener) {
 
-            if (!android.companion.Flags.enableTaskContinuity()) {
+            if (!android.companion.Flags.taskContinuity()) {
                 return;
             }
 
@@ -7002,11 +7022,6 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         }
 
         @Override
-        public boolean isRecentsComponentHomeActivity(int userId) {
-            return getRecentTasks().isRecentsComponentHomeActivity(userId);
-        }
-
-        @Override
         public boolean checkCanCloseSystemDialogs(int pid, int uid, @Nullable String packageName) {
             return ActivityTaskManagerService.this.checkCanCloseSystemDialogs(pid, uid,
                     packageName);
@@ -7114,6 +7129,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 if (proc == mHomeProcess) {
                     mHomeProcess = null;
                     mActivityStateUpdater.setHomeProcessAsync(null);
+                    mRecentTasks.invalidateIsHomeRecents();
                 }
                 if (proc == mPreviousProcess) {
                     mPreviousProcess = null;
@@ -7917,6 +7933,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         @Override
         public boolean switchUser(int userId, UserState userState) {
             synchronized (mGlobalLock) {
+                mRecentTasks.invalidateIsHomeRecents();
                 return mRootWindowContainer.switchUser(userId, userState);
             }
         }

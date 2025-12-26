@@ -122,6 +122,13 @@ flag {
 }
 
 flag {
+    name: "tunnel_mode_2"
+    namespace: "tv_os"
+    description: "Feature flag to enable APIs for Tunnel Mode 2.0"
+    bug: "452774778"
+}
+
+flag {
   name: "media_quality_fw_bugfix"
   namespace: "tv_os"
   description: "Bug fix flag for Media Quality framework"
@@ -157,4 +164,11 @@ flag {
     namespace: "tv_os"
     description: "Feature flag to enable agentic AI for TV OS using AppFunctions"
     bug: "447154316"
+}
+
+flag {
+    name: "media_quality_fw_c"
+    namespace: "tv_os"
+    description: "Continue efforts for standardizing PQ/AQ Interfaces for Media Quality Framework in Android 17"
+    bug: "443329020"
 }

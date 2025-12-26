@@ -177,6 +177,13 @@ flag {
 }
 
 flag {
+    name: "binder_proxy_use_executor_map"
+    namespace: "system_performance"
+    description: "Whether to use mFrozenStateChangeCallbackExecutors in BinderProxy."
+    bug: "454431919"
+}
+
+flag {
     name: "bluetooth_bugreport_mode"
     is_exported: true
     namespace: "bluetooth"
@@ -225,16 +232,6 @@ flag {
     namespace: "gpu"
     description: "Whether to use angle driver for games not in the denylist"
     bug: "440630034"
-}
-
-flag {
-    name: "enforce_strict_file_mode_check"
-    namespace: "backstage_power"
-    description: "Throw an IllegalArgumentException if the file mode passed to ParcelFileDescriptor#parseMode is unknown."
-    bug: "414387646"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -410,6 +407,14 @@ flag {
 }
 
 flag {
+    name: "strongbox_properties_api"
+    namespace: "hardware_backed_security"
+    description: "Public API app developers use to check a device's Strongbox manufacturer and model."
+    is_exported: true
+    bug: "432311620"
+}
+
+flag {
     name: "supplemental_security_patches"
     is_exported: false
     namespace: "dynamic_spl"
@@ -480,6 +485,20 @@ flag {
      name: "perfetto_sdk_tracing"
      description: "Tracing using Perfetto SDK."
      bug: "303199244"
+}
+
+flag {
+    namespace: "system_performance"
+    name: "perfetto_sdk_tracing_disable_app_registration_sharding"
+    description: "Disables sharding for Perfetto SDK tracing app registration, allowing all apps to register. This flag is intended for local debugging only and will never be enabled in the field."
+    bug: "303199244"
+}
+
+flag {
+    namespace: "system_performance"
+    name: "perfetto_sdk_tracing_enable_app_registration"
+    description: "Enables applications to register with Perfetto SDK tracing."
+    bug: "303199244"
 }
 
 flag {

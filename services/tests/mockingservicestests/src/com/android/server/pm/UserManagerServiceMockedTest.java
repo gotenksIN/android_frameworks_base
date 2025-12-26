@@ -37,9 +37,9 @@ import static android.os.UserManager.DISALLOW_OUTGOING_CALLS;
 import static android.os.UserManager.DISALLOW_SMS;
 import static android.os.UserManager.DISALLOW_USER_SWITCH;
 import static android.os.UserManager.REMOVE_RESULT_ALREADY_BEING_REMOVED;
+import static android.os.UserManager.REMOVE_RESULT_ERROR_DEVICE_OWNER;
 import static android.os.UserManager.REMOVE_RESULT_ERROR_LAST_ADMIN_USER;
 import static android.os.UserManager.REMOVE_RESULT_ERROR_MAIN_USER_PERMANENT_ADMIN;
-import static android.os.UserManager.REMOVE_RESULT_ERROR_DEVICE_OWNER;
 import static android.os.UserManager.REMOVE_RESULT_ERROR_SYSTEM_USER;
 import static android.os.UserManager.REMOVE_RESULT_ERROR_USER_NOT_FOUND;
 import static android.os.UserManager.REMOVE_RESULT_USER_IS_REMOVABLE;
@@ -432,6 +432,22 @@ public final class UserManagerServiceMockedTest {
                 .that(mUmi.getBootUser(/* waitUntilSet= */ false)).isEqualTo(USER_ID2);
     }
 
+    /** Verifies that HSU is not excluded from setBootUser by supportsSwitchTo(). */
+    @Test
+    public void testSetBootUser_canBeHsu() throws Exception {
+        mockCanSwitchToHeadlessSystemUser(true);
+        mockHsumBootStrategy(BOOT_STRATEGY_TO_PREVIOUS_OR_FIRST_SWITCHABLE_USER);
+        setSystemUserHeadless(true);
+        addSecondaryUser(USER_ID);
+        setLastForegroundTime(USER_ID, Long.MAX_VALUE);
+
+        mUms.setBootUser(UserHandle.USER_SYSTEM);
+
+        assertWithMessage("getBootUser")
+                .that(mUmi.getBootUser(/* waitUntilSet= */ false))
+                .isEqualTo(UserHandle.USER_SYSTEM);
+    }
+
     @Test
     public void testGetBootUser_NotHeadless_ReturnsSystemUser() throws Exception {
         setSystemUserHeadless(false);
@@ -672,7 +688,7 @@ public final class UserManagerServiceMockedTest {
     @Test
     public void testAutoLockPrivateProfile() {
         int mainUser = mUms.getMainUserId();
-        assumeTrue(mUms.canAddPrivateProfile(mainUser));
+        assumeTrue(mUms.canAddMoreProfilesToUser(USER_TYPE_PROFILE_PRIVATE, mainUser, false));
         UserManagerService mSpiedUms = spy(mUms);
         UserInfo privateProfileUser =
                 mSpiedUms.createProfileForUserEvenWhenDisallowedWithThrow(PRIVATE_PROFILE_NAME,
@@ -689,7 +705,7 @@ public final class UserManagerServiceMockedTest {
     @Test
     public void testAutoLockOnDeviceLockForPrivateProfile() {
         int mainUser = mUms.getMainUserId();
-        assumeTrue(mUms.canAddPrivateProfile(mainUser));
+        assumeTrue(mUms.canAddMoreProfilesToUser(USER_TYPE_PROFILE_PRIVATE, mainUser, false));
         UserManagerService mSpiedUms = spy(mUms);
         UserInfo privateProfileUser =
                 mSpiedUms.createProfileForUserEvenWhenDisallowedWithThrow(PRIVATE_PROFILE_NAME,
@@ -706,7 +722,7 @@ public final class UserManagerServiceMockedTest {
 
     @Test
     public void testAutoLockOnDeviceLockForPrivateProfile_keyguardUnlocked() {
-        assumeTrue(mUms.canAddPrivateProfile(0));
+        assumeTrue(mUms.canAddMoreProfilesToUser(USER_TYPE_PROFILE_PRIVATE, 0, false));
         UserManagerService mSpiedUms = spy(mUms);
         UserInfo privateProfileUser =
                 mSpiedUms.createProfileForUserEvenWhenDisallowedWithThrow(PRIVATE_PROFILE_NAME,
@@ -723,7 +739,7 @@ public final class UserManagerServiceMockedTest {
     @Test
     public void testAutoLockAfterInactityForPrivateProfile() {
         int mainUser = mUms.getMainUserId();
-        assumeTrue(mUms.canAddPrivateProfile(mainUser));
+        assumeTrue(mUms.canAddMoreProfilesToUser(USER_TYPE_PROFILE_PRIVATE, mainUser, false));
         UserManagerService mSpiedUms = spy(mUms);
         mockAutoLockForPrivateSpace(Settings.Secure.PRIVATE_SPACE_AUTO_LOCK_AFTER_INACTIVITY);
         when(mPowerManager.isInteractive()).thenReturn(false);
@@ -754,7 +770,7 @@ public final class UserManagerServiceMockedTest {
     @Test
     public void testSetOrUpdateAutoLockPreference() {
         int mainUser = mUms.getMainUserId();
-        assumeTrue(mUms.canAddPrivateProfile(mainUser));
+        assumeTrue(mUms.canAddMoreProfilesToUser(USER_TYPE_PROFILE_PRIVATE, mainUser, false));
         mUms.createProfileForUserEvenWhenDisallowedWithThrow(PRIVATE_PROFILE_NAME,
                         USER_TYPE_PROFILE_PRIVATE, 0, mainUser, null);
 
@@ -804,7 +820,7 @@ public final class UserManagerServiceMockedTest {
 
     @Test
     public void testGetProfileIdsExcludingHidden() {
-        assumeTrue(mUms.canAddPrivateProfile(0));
+        assumeTrue(mUms.canAddMoreProfilesToUser(USER_TYPE_PROFILE_PRIVATE, 0, false));
         UserInfo privateProfileUser =
                 mUms.createProfileForUserEvenWhenDisallowedWithThrow("TestPrivateProfile",
                         USER_TYPE_PROFILE_PRIVATE, 0, 0, null);
@@ -838,7 +854,7 @@ public final class UserManagerServiceMockedTest {
         assumeTrue(mUms.isHeadlessSystemUserMode());
         int mainUser = mSpiedUms.getMainUserId();
         // Check whether private space creation is blocked on the device
-        assumeTrue(mSpiedUms.canAddPrivateProfile(mainUser));
+        assumeTrue(mSpiedUms.canAddMoreProfilesToUser(USER_TYPE_PROFILE_PRIVATE, mainUser, false));
         assertThat(mSpiedUms.createProfileForUserEvenWhenDisallowedWithThrow(
                 PRIVATE_PROFILE_NAME, USER_TYPE_PROFILE_PRIVATE, 0, mainUser, null)).isNotNull();
     }
@@ -848,7 +864,8 @@ public final class UserManagerServiceMockedTest {
     public void testCreatePrivateProfileOnSecondaryUser_shouldNotAllowCreation() {
         assumeTrue(mUms.canAddMoreUsersOfType(USER_TYPE_FULL_SECONDARY));
         UserInfo user = mUms.createUserWithThrow(generateLongString(), USER_TYPE_FULL_SECONDARY, 0);
-        assertThat(mUms.canAddPrivateProfile(user.id)).isFalse();
+        assertThat(mUms.canAddMoreProfilesToUser(USER_TYPE_PROFILE_PRIVATE, user.id, false))
+                .isFalse();
         assertThrows(ServiceSpecificException.class,
                 () -> mUms.createProfileForUserWithThrow(PRIVATE_PROFILE_NAME,
                         USER_TYPE_PROFILE_PRIVATE, 0, user.id, null));
@@ -859,7 +876,8 @@ public final class UserManagerServiceMockedTest {
     public void testCreatePrivateProfileOnAutoDevices_shouldNotAllowCreation() {
         doReturn(true).when(mMockPms).hasSystemFeature(eq(FEATURE_AUTOMOTIVE), anyInt());
         int mainUser = mUms.getMainUserId();
-        assertThat(mUms.canAddPrivateProfile(mainUser)).isFalse();
+        assertThat(mUms.canAddMoreProfilesToUser(USER_TYPE_PROFILE_PRIVATE, mainUser, false))
+                .isFalse();
         assertThrows(ServiceSpecificException.class,
                 () -> mUms.createProfileForUserWithThrow(PRIVATE_PROFILE_NAME,
                         USER_TYPE_PROFILE_PRIVATE, 0, mainUser, null));
@@ -870,7 +888,8 @@ public final class UserManagerServiceMockedTest {
     public void testCreatePrivateProfileOnTV_shouldNotAllowCreation() {
         doReturn(true).when(mMockPms).hasSystemFeature(eq(FEATURE_LEANBACK), anyInt());
         int mainUser = mUms.getMainUserId();
-        assertThat(mUms.canAddPrivateProfile(mainUser)).isFalse();
+        assertThat(mUms.canAddMoreProfilesToUser(USER_TYPE_PROFILE_PRIVATE, mainUser, false))
+                .isFalse();
         assertThrows(ServiceSpecificException.class,
                 () -> mUms.createProfileForUserEvenWhenDisallowedWithThrow(PRIVATE_PROFILE_NAME,
                         USER_TYPE_PROFILE_PRIVATE, 0, mainUser, null));
@@ -881,7 +900,8 @@ public final class UserManagerServiceMockedTest {
     public void testCreatePrivateProfileOnEmbedded_shouldNotAllowCreation() {
         doReturn(true).when(mMockPms).hasSystemFeature(eq(FEATURE_EMBEDDED), anyInt());
         int mainUser = mUms.getMainUserId();
-        assertThat(mUms.canAddPrivateProfile(mainUser)).isFalse();
+        assertThat(mUms.canAddMoreProfilesToUser(USER_TYPE_PROFILE_PRIVATE, mainUser, false))
+                .isFalse();
         assertThrows(ServiceSpecificException.class,
                 () -> mUms.createProfileForUserEvenWhenDisallowedWithThrow(PRIVATE_PROFILE_NAME,
                         USER_TYPE_PROFILE_PRIVATE, 0, mainUser, null));
@@ -892,7 +912,8 @@ public final class UserManagerServiceMockedTest {
     public void testCreatePrivateProfileOnWatch_shouldNotAllowCreation() {
         doReturn(true).when(mMockPms).hasSystemFeature(eq(FEATURE_WATCH), anyInt());
         int mainUser = mUms.getMainUserId();
-        assertThat(mUms.canAddPrivateProfile(mainUser)).isFalse();
+        assertThat(mUms.canAddMoreProfilesToUser(USER_TYPE_PROFILE_PRIVATE, mainUser, false))
+                .isFalse();
         assertThrows(ServiceSpecificException.class,
                 () -> mUms.createProfileForUserEvenWhenDisallowedWithThrow(PRIVATE_PROFILE_NAME,
                         USER_TYPE_PROFILE_PRIVATE, 0, mainUser, null));

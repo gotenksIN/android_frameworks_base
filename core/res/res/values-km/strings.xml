@@ -326,6 +326,8 @@
     <string name="notification_channel_accessibility_hearing_device" msgid="7816963856388758952">"ឧបករណ៍ជំនួយការស្ដាប់"</string>
     <string name="notification_channel_accessibility_security_policy" msgid="1727787021725251912">"ការប្រើប្រាស់​ភាពងាយស្រួល"</string>
     <string name="notification_channel_display" msgid="6905032605735615090">"ផ្ទាំងអេក្រង់"</string>
+    <!-- no translation found for notification_channel_parental_controls (2963963315750128538) -->
+    <skip />
     <string name="foreground_service_app_in_background" msgid="1439289699671273555">"<xliff:g id="APP_NAME">%1$s</xliff:g> កំពុងប្រើថ្ម"</string>
     <string name="foreground_service_apps_in_background" msgid="7340037176412387863">"កម្មវិធីចំនួន <xliff:g id="NUMBER">%1$d</xliff:g> កំពុងប្រើថ្ម"</string>
     <string name="foreground_service_tap_for_details" msgid="9078123626015586751">"ចុចដើម្បីមើលព័ត៌មានលម្អិតអំពីការប្រើប្រាស់ទិន្នន័យ និងថ្ម"</string>
@@ -641,6 +643,8 @@
     <string name="permdesc_nearby_wifi_devices" msgid="3054307728646332906">"អនុញ្ញាតឱ្យ​កម្មវិធី​ផ្សាយពាណិជ្ជកម្ម ភ្ជាប់ និងកំណត់ទីតាំង​ពាក់ព័ន្ធរបស់​ឧបករណ៍ Wi‑Fi ដែលនៅជិត"</string>
     <string name="permlab_access_local_network" msgid="3420360767259066877">"ចូលប្រើឧបករណ៍បណ្ដាញមូលដ្ឋាន"</string>
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"អនុញ្ញាតឱ្យកម្មវិធីចូលប្រើឧបករណ៍បណ្ដាញមូលដ្ឋាន"</string>
+    <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"ប្រើផ្ទៃបញ្ជូនត្រឡប់"</string>
+    <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"អនុញ្ញាតឱ្យកម្មវិធីធ្វើអន្តរកម្មជាមួយកម្មវិធីផ្សេងទៀតតាមរយៈផ្ទៃបញ្ជូនត្រឡប់"</string>
     <string name="permlab_ranging" msgid="2854543350668593390">"កំណត់ទីតាំងធៀបរវាងឧបករណ៍នៅជិត"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"អនុញ្ញាតឱ្យកម្មវិធីកំណត់ទីតាំងធៀបរវាងឧបករណ៍នៅជិត"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"ព័ត៌មានអំពី​សេវាបង់ប្រាក់តាម NFC ជាអាទិភាព"</string>
@@ -1043,7 +1047,6 @@
     <string name="keyguard_password_enter_pin_password_code" msgid="7792964196473964340">"បញ្ចូល​កូដ PIN ដើម្បី​ដោះ​សោ"</string>
     <string name="keyguard_password_wrong_pin_code" msgid="8583732939138432793">"កូដ PIN មិន​ត្រឹមត្រូវ។"</string>
     <string name="keyguard_label_text" msgid="3841953694564168384">"ដើម្បី​ដោះ​សោ​​ ចុច​ម៉ឺនុយ​ បន្ទាប់មក 0 ។"</string>
-    <string name="emergency_call_dialog_number_for_display" msgid="2978165477085612673">"លេខ​ពេល​អាសន្ន"</string>
     <string name="lockscreen_carrier_default" msgid="6192313772955399160">"គ្មានសេវាទេ"</string>
     <string name="lockscreen_screen_locked" msgid="7364905540516041817">"ចាក់​អេក្រង់។"</string>
     <string name="lockscreen_instructions_when_pattern_enabled" msgid="7982445492532123308">"ចុច​ម៉ឺនុយ ដើម្បី​ដោះ​សោ​ ឬ​ហៅ​ពេល​អាសន្ន។"</string>
@@ -1277,6 +1280,7 @@
     <string name="whichApplicationLabel" msgid="7852182961472531728">"បញ្ចប់សកម្មភាព"</string>
     <string name="whichViewApplication" msgid="5733194231473132945">"បើក​ជា​មួយ"</string>
     <string name="whichViewApplicationNamed" msgid="415164730629690105">"បើក​ជាមួយ %1$s"</string>
+    <string name="open_app_name" msgid="6114096770130122912">"បើក<xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="whichViewApplicationLabel" msgid="7367556735684742409">"បើក"</string>
     <string name="whichOpenHostLinksWith" msgid="7645631470199397485">"បើក​តំណ <xliff:g id="HOST">%1$s</xliff:g> ដោយប្រើ"</string>
     <string name="whichOpenLinksWith" msgid="1120936181362907258">"បើកតំណដោយប្រើ"</string>
@@ -1798,10 +1802,8 @@
     <string name="accessibility_shortcut_single_service_warning" msgid="6363127705112844257">"ការសង្កត់​គ្រាប់ចុច​កម្រិតសំឡេង​ទាំងពីរ​ឱ្យជាប់​រយៈពេល​ពីរបីវិនាទី​នឹងបើក <xliff:g id="SERVICE">%1$s</xliff:g> ដែលជា​មុខងារ​ភាពងាយប្រើ។ ការធ្វើ​បែបនេះ​អាចផ្លាស់ប្ដូរ​របៀបដែល​ឧបករណ៍​របស់អ្នក​ដំណើរការ។\n\nអ្នកអាច​ប្ដូរផ្លូវកាត់​នេះទៅ​មុខងារ​ផ្សេងទៀត​នៅក្នុង​ការកំណត់ &gt; ភាពងាយស្រួល។"</string>
     <string name="accessibility_shortcut_on" msgid="5463618449556111344">"បើក"</string>
     <string name="accessibility_shortcut_off" msgid="3651336255403648739">"កុំបើក"</string>
-    <!-- no translation found for accessibility_shortcut_menu_item_status_on (6162756705754654002) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_menu_item_status_off (6274512913017713543) -->
-    <skip />
+    <string name="accessibility_shortcut_menu_item_status_on" msgid="6162756705754654002">"បើក"</string>
+    <string name="accessibility_shortcut_menu_item_status_off" msgid="6274512913017713543">"បិទ"</string>
     <string name="accessibility_enable_service_title" msgid="3931558336268541484">"អនុញ្ញាតឱ្យ <xliff:g id="SERVICE">%1$s</xliff:g> មានសិទ្ធិគ្រប់គ្រងឧបករណ៍​របស់អ្នក​ទាំងស្រុងឬ?"</string>
     <string name="accessibility_service_warning_description" msgid="291674995220940133">"ការគ្រប់គ្រង​ទាំងស្រុងមានលក្ខណៈ​សមស្របសម្រាប់​កម្មវិធី ដែលជួយអ្នក​ទាក់ទងនឹងការប្រើមុខងារភាពងាយស្រួល ប៉ុន្តែមិនសមស្របសម្រាប់​កម្មវិធីភាគច្រើនទេ។"</string>
     <string name="accessibility_service_screen_control_title" msgid="190017412626919776">"មើល និង​គ្រប់គ្រងអេក្រង់"</string>
@@ -1815,16 +1817,11 @@
     <string name="accessibility_select_shortcut_menu_title" msgid="6002726538854613272">"ចុចមុខងារណាមួយ ដើម្បចាប់ផ្ដើមប្រើ៖"</string>
     <string name="accessibility_edit_shortcut_menu_button_title" msgid="239446795930436325">"ជ្រើសរើស​មុខងារ ដើម្បីប្រើ​ជាមួយ​ប៊ូតុង​ភាពងាយស្រួល"</string>
     <string name="accessibility_edit_shortcut_menu_volume_title" msgid="2245540598834891500">"ជ្រើសរើស​មុខងារ ដើម្បីប្រើ​ជាមួយផ្លូវកាត់គ្រាប់ចុច​កម្រិតសំឡេង"</string>
-    <!-- no translation found for accessibility_shortcut_label_button (6473341300585254821) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_volume_keys (5642990791242136231) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_gesture (7987298674836890931) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_quick_settings (6851280333772213611) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_triple_tap (9058975959054454796) -->
-    <skip />
+    <string name="accessibility_shortcut_label_button" msgid="6473341300585254821">"ប៊ូតុង​ភាពងាយស្រួល"</string>
+    <string name="accessibility_shortcut_label_volume_keys" msgid="5642990791242136231">"គ្រាប់ចុច​កម្រិតសំឡេង"</string>
+    <string name="accessibility_shortcut_label_gesture" msgid="7987298674836890931">"ចលនា"</string>
+    <string name="accessibility_shortcut_label_quick_settings" msgid="6851280333772213611">"ការកំណត់រហ័ស"</string>
+    <string name="accessibility_shortcut_label_triple_tap" msgid="9058975959054454796">"ចុចបីដង"</string>
     <string name="accessibility_uncheck_legacy_item_warning" msgid="8047830891064817447">"បានបិទ <xliff:g id="SERVICE_NAME">%s</xliff:g>"</string>
     <string name="edit_accessibility_shortcut_menu_button" msgid="8885752738733772935">"កែ​ផ្លូវកាត់"</string>
     <string name="done_accessibility_shortcut_menu_button" msgid="3668407723770815708">"រួចរាល់"</string>
@@ -2614,4 +2611,10 @@
     <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"ការជូនដំណឹងអំពីធនធានប្រព័ន្ធ"</string>
     <string name="tv_watchdog_notification_title" msgid="195239206215922517">"ការប្រើធនធានច្រើនជ្រុល"</string>
     <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"កម្មវិធី \'<xliff:g id="APP_NAME">%1$s</xliff:g> កំពុងប្រើធនធានច្រើនពេក។\""</string>
+    <!-- no translation found for supervision_blocked_app_title (5546803865875383588) -->
+    <skip />
+    <!-- no translation found for supervision_blocked_app_content (4125452996088641559) -->
+    <skip />
+    <!-- no translation found for supervision_unblocked_app_content (8282985265957852278) -->
+    <skip />
 </resources>

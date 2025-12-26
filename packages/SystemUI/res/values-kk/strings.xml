@@ -88,11 +88,9 @@
     <string name="screenshot_failed_to_capture_text" msgid="7818288545874407451">"Қолданба немесе ұйым скриншоттар түсіруге рұқсат етпейді"</string>
     <string name="screenshot_blocked_by_admin" msgid="5486757604822795797">"Әкімшіңіз скриншот жасауға тыйым салды."</string>
     <string name="screenshot_edit_label" msgid="8754981973544133050">"Өзгерту"</string>
-    <!-- no translation found for screenshot_edit_description (7802378587672433507) -->
-    <skip />
+    <string name="screenshot_edit_description" msgid="7802378587672433507">"Скриншотты өзгерту түймесі"</string>
     <string name="screenshot_share_label" msgid="1653061117238861559">"Бөлісу"</string>
-    <!-- no translation found for screenshot_share_description (2654362001720033972) -->
-    <skip />
+    <string name="screenshot_share_description" msgid="2654362001720033972">"Скриншотты бөлісу түймесі"</string>
     <string name="screenshot_scroll_label" msgid="2930198809899329367">"Тағы суретке түсіру"</string>
     <string name="screenshot_dismiss_description" msgid="4702341245899508786">"Скриншотты жабу"</string>
     <string name="screenshot_dismiss_work_profile" msgid="3101530842987697045">"Жұмыс профилі хабарын жабу"</string>
@@ -172,7 +170,13 @@
     <string name="screen_share_no_select_app_thumbnail" msgid="1630012401570567430">"Бөлісу үшін қолданба таңдаңыз"</string>
     <string name="screen_share_audio_sharing_text" msgid="7829391478284315787">"Аудионы бөлісу"</string>
     <string name="screen_share_app_window_sharing_title" msgid="2063554880747318383">"Қолданба терезесін бөлісу"</string>
-    <string name="screen_share_disclaimer" msgid="3953761426122528262">"Бөліскен кезде, экран контенті көрінеді"</string>
+    <string name="screen_share_tab_sharing_title" msgid="1178046793832072728">"Қойындыны бөлісу"</string>
+    <!-- no translation found for screen_share_entire_screen_sharing_title (9093580141248337998) -->
+    <skip />
+    <!-- no translation found for screen_share_disclaimer_app_sharing (4191319837838590771) -->
+    <skip />
+    <!-- no translation found for screen_share_disclaimer_full_screen_sharing (6445373139864031364) -->
+    <skip />
     <string name="screen_capture_toolbar_app_window_button_screenshot_a11y" msgid="1357560392667941303">"Терезенің скриншотын жасау"</string>
     <string name="screen_capture_toolbar_app_window_button_record_a11y" msgid="8984966592912823394">"Терезені жазу"</string>
     <string name="screen_capture_toolbar_region_button_screenshot_a11y" msgid="2102262602357521192">"Таңдалған аймақтың скриншотын жасау"</string>
@@ -369,6 +373,7 @@
     <string name="accessibility_sensors_off_active" msgid="2619725434618911551">"Датчиктер өшірулі."</string>
     <string name="accessibility_clear_all" msgid="970525598287244592">"Барлық хабарларды жойыңыз."</string>
     <string name="accessibility_notification_bell" msgid="7149451526721220526">"Хабарландырулар"</string>
+    <string name="accessibility_status_bar_assistant_icon" msgid="1174898709836451013">"Assistant"</string>
     <string name="notification_group_overflow_indicator" msgid="7605120293801012648">"+ <xliff:g id="NUMBER">%s</xliff:g>"</string>
     <string name="notification_group_overflow_description" msgid="7176322877233433278">"{count,plural, =1{Ішінде тағы # хабарландыру бар.}other{Ішінде тағы # хабарландыру бар.}}"</string>
     <string name="accessibility_rotation_lock_on_landscape" msgid="936972553861524360">"Экран ландшафт бағытында бекітілген."</string>
@@ -427,10 +432,8 @@
     <string name="quick_settings_casting" msgid="1435880708719268055">"Трансляциялануда"</string>
     <string name="quick_settings_cast_device_default_name" msgid="6988469571141331700">"Атаусыз құрылғы"</string>
     <string name="quick_settings_cast_detail_empty_text" msgid="2846282280014617785">"Құрылғылар қол жетімді емес"</string>
-    <!-- no translation found for quick_settings_cast_detail_title (8212426967651562547) -->
-    <skip />
-    <!-- no translation found for quick_settings_cast_detail_subtitle (6406833630052788623) -->
-    <skip />
+    <string name="quick_settings_cast_detail_title" msgid="8212426967651562547">"Экранды құрылғыға трансляциялау"</string>
+    <string name="quick_settings_cast_detail_subtitle" msgid="6406833630052788623">"Құрылғылар ізделіп жатыр..."</string>
     <string name="quick_settings_cast_no_network" msgid="3863016850468559522">"Wi‑Fi немесе Ethernet байланысы жоқ."</string>
     <string name="quick_settings_cast_disconnect" msgid="4836025217838730930">"Ажырату"</string>
     <string name="quick_settings_audio_current_input" msgid="8219735427828862612">"Қазіргі микрофон"</string>
@@ -712,6 +715,7 @@
     <string name="notification_section_header_gentle" msgid="6804099527336337197">"Үнсіз"</string>
     <string name="notification_section_header_alerting" msgid="5581175033680477651">"Хабарландырулар"</string>
     <string name="notification_section_header_conversations" msgid="821834744538345661">"Әңгімелер"</string>
+    <string name="notification_section_header_highlights" msgid="1671475076192152483">"Негізгі мәлімет"</string>
     <string name="accessibility_notification_section_header_gentle_clear_all" msgid="6490207897764933919">"Барлық үнсіз хабарландыруларды өшіру"</string>
     <string name="accessibility_notification_section_header_open_settings" msgid="6235202417954844004">"Хабарландыру параметрлерін ашу"</string>
     <string name="modes_suppressing_shade_text" msgid="6037581130837903239">"{count,plural,offset:1 =0{Хабарландырулар жоқ.}=1{Хабарландыруларды {mode} режимі кідіртті.}=2{Хабарландыруларды {mode} және тағы бір режим кідіртті.}other{Хабарландыруларды {mode} және тағы # режим кідіртті.}}"</string>
@@ -946,6 +950,8 @@
     <string name="notification_unblockable_call_desc" msgid="5907328164696532169">"Қоңырау туралы хабарландыруларды өзгерту мүмкін емес."</string>
     <string name="notification_multichannel_desc" msgid="7414593090056236179">"Мұндай хабарландырулар бұл жерде конфигурацияланбайды."</string>
     <string name="notification_delegate_header" msgid="1264510071031479920">"Прокси-сервер арқылы жіберілген хабарландыру"</string>
+    <!-- no translation found for notification_summarization_header (511445254923268688) -->
+    <skip />
     <string name="notification_channel_dialog_title" msgid="6856514143093200019">"Барлық <xliff:g id="APP_NAME">%1$s</xliff:g> хабарландырулары"</string>
     <string name="see_more_title" msgid="7409317011708185729">"Басқаларын көру"</string>
     <string name="feedback_alerted" msgid="5192459808484271208">"Жүйе бұл хабарландырудың маңыздылық деңгейін автоматты түрде &lt;b&gt;\"Әдепкі\" санатына көтерді&lt;/b&gt;."</string>
@@ -1026,8 +1032,7 @@
     <string name="group_system_access_all_apps_search" msgid="1553588630154197469">"Қолданбалар тізімін ашу"</string>
     <string name="group_system_access_system_settings" msgid="8731721963449070017">"Параметрлер­ді ашу"</string>
     <string name="group_system_access_google_assistant" msgid="3769929488906534254">"Цифрлық көмекшіні ашу"</string>
-    <!-- no translation found for group_system_access_contextual_search (525635757621336007) -->
-    <skip />
+    <string name="group_system_access_contextual_search" msgid="525635757621336007">"Контекст бойынша іздеу"</string>
     <string name="group_system_lock_screen" msgid="7391191300363416543">"Экранды құлыптау"</string>
     <string name="group_system_quick_memo" msgid="3764560265935722903">"Ескертпе жазу"</string>
     <string name="keyboard_shortcut_group_system_multitasking" msgid="6967816258924795558">"Мультитаскинг"</string>
@@ -1152,17 +1157,25 @@
     <string name="accessibility_quick_settings_power_menu" msgid="6820426108301758412">"Қуат мәзірі"</string>
     <string name="accessibility_quick_settings_page" msgid="7506322631645550961">"<xliff:g id="ID_2">%2$d</xliff:g> ішінен <xliff:g id="ID_1">%1$d</xliff:g>"</string>
     <string name="accessibility_key_gesture_dialog_title" msgid="7614965716626605518">"<xliff:g id="ID_1">%1$s</xliff:g> қосылсын ба?"</string>
-    <string name="accessibility_key_gesture_dialog_content" msgid="4519838108423437794">"Әрекет "<annotation id="action_key_icon">"белгішесі"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> – \"<xliff:g id="ID_3">^3</xliff:g>\" функциясын пайдалануға арналған пернелер тіркесімі. <xliff:g id="ID_4">^4</xliff:g>"</string>
-    <string name="accessibility_key_gesture_dialog_screen_reader_tts" msgid="1298171063228024716">"<xliff:g id="ID_3">%3$s</xliff:g> функциясын қосу үшін \"Әрекет\" + <xliff:g id="ID_1">%1$s</xliff:g> + <xliff:g id="ID_2">%2$s</xliff:g> пернелерін қайтадан басыңыз"</string>
+    <string name="accessibility_key_gesture_dialog_content" msgid="2409946187069273612">"<xliff:g id="ID_1">^1</xliff:g> "<annotation id="action_key_icon">"белгішесі"</annotation>" + <xliff:g id="ID_2">^2</xliff:g> + <xliff:g id="ID_3">^3</xliff:g> – <xliff:g id="ID_4">^4</xliff:g> функциясын пайдалануға арналған пернелер тіркесімі. <xliff:g id="ID_5">^5</xliff:g>"</string>
+    <string name="accessibility_key_gesture_dialog_screen_reader_tts" msgid="6466269887128043486">"<xliff:g id="ID_4">%4$s</xliff:g> функциясын қосу үшін <xliff:g id="ID_1">%1$s</xliff:g> + <xliff:g id="ID_2">%2$s</xliff:g> + <xliff:g id="ID_3">%3$s</xliff:g> пернелерін қайтадан басыңыз."</string>
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_dialog_title" msgid="5331043821287212071">"<xliff:g id="ID_1">%1$s</xliff:g> пернелер тіркесімін қосу қажет пе?"</string>
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_negative_button_text" msgid="6711239406914231612">"Қоспау"</string>
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_positive_button_text" msgid="7748487028569821131">"Пернелер тіркесімін қосу"</string>
-    <string name="accessibility_key_gesture_magnification_dialog_title" msgid="5770691510738701250">"<xliff:g id="ID_1">%1$s</xliff:g> пернелер тіркесімі қосылды"</string>
-    <string name="accessibility_key_gesture_magnification_dialog_content" msgid="582920726242272572">"\"Әрекет\" "<annotation id="action_key_icon">"белгішесі"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> – <xliff:g id="ID_3">^3</xliff:g> арнайы мүмкіндігін пайдалануға арналған пернелер тіркесімі. Бұл функция экрандағы контентті жылдам ұлғайтуға мүмкіндік береді. Ұлғайту функциясы қосылған кезде, масштабты түзету үшін \"Әрекет\" "<annotation id="action_key_icon">"белгішесін"</annotation>" + <xliff:g id="ID_4">^1</xliff:g> және \"+\" немесе \"-\" таңбасын басыңыз."</string>
+    <string name="accessibility_key_gesture_magnification_dialog_title" msgid="5770691510738701250">"\"<xliff:g id="ID_1">%1$s</xliff:g>\" пернелер тіркесімі қосылды"</string>
+    <string name="accessibility_key_gesture_magnification_dialog_content" msgid="1647246652170256645">"<xliff:g id="ID_1">^1</xliff:g> "<annotation id="action_key_icon">"белгішесі"</annotation>" + <xliff:g id="ID_2">^2</xliff:g> + <xliff:g id="ID_3">^3</xliff:g> – <xliff:g id="ID_4">^4</xliff:g> арнайы мүмкіндігін пайдалануға арналған пернелер тіркесімі. Бұл функция экрандағы контентті жылдам ұлғайтуға мүмкіндік береді. Ұлғайту функциясы қосылған кезде, масштабты түзету үшін \"Әрекет\" <xliff:g id="ID_5">^1</xliff:g> "<annotation id="action_key_icon">"белгішесін"</annotation>" + <xliff:g id="ID_6">^2</xliff:g> және \"+\" немесе \"-\" таңбасын басыңыз."</string>
     <string name="accessibility_key_gesture_magnification_dialog_negative_button_text" msgid="8393469413785600834">"Пернелер тіркесімін өшіру"</string>
     <string name="accessibility_key_gesture_magnification_dialog_positive_button_text" msgid="895076240681888057">"Қосулы қалдыру"</string>
-    <string name="accessibility_key_gesture_screen_reader_dialog_content" msgid="389338862762665003">"Әрекет "<annotation id="action_key_icon">"белгішесі"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> – <xliff:g id="ID_3">^3</xliff:g> функциясын пайдалануға арналған пернелер тіркесімі. <xliff:g id="ID_4">^3</xliff:g> – элементтердің дауыстап оқылғанын тыңдауға мүмкіндік беретін экран оқу құралы. Ол экранды нашар көретін адамдар үшін пайдалы. Бұл әрекет құрылғының жүмысына әсер етуі мүмкін."</string>
-    <string name="accessibility_key_gesture_voice_access_dialog_content" msgid="7934170819801013870">"\"Әрекет\" "<annotation id="action_key_icon">"белгішесі"</annotation>" + <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> басылса, <xliff:g id="ID_3">^3</xliff:g> арнайы мүмкіндігі қосылады. Ол құрылғыны дауыспен басқаруға арналған."</string>
+    <string name="accessibility_key_gesture_screen_reader_dialog_content" msgid="2322728522389883751">"<xliff:g id="ID_1">^1</xliff:g> "<annotation id="action_key_icon">"белгішесі"</annotation>" + <xliff:g id="ID_2">^2</xliff:g> + <xliff:g id="ID_3">^3</xliff:g> – <xliff:g id="ID_4">^4</xliff:g> функциясын пайдалануға арналған пернелер тіркесімі. <xliff:g id="ID_5">^4</xliff:g> – элементтердің дауыстап оқылғанын тыңдауға мүмкіндік беретін экран оқу құралы. Ол экранды нашар көретін адамдар үшін пайдалы. Бұл әрекет құрылғының жүмысына әсер етуі мүмкін."</string>
+    <string name="accessibility_key_gesture_screen_reader_dialog_warning_heading" msgid="5958960812509429136">"Пернелер тіркесімін қосу арқылы TalkBack-ке құрылғыңызды толық басқаруға рұқсат бересіз."</string>
+    <string name="accessibility_key_gesture_screen_reader_dialog_warning_message" msgid="2026368922103788492">"Құрылғыны толық басқару рұқсатын арнайы мүмкіндіктер бойынша көмектесетін қолданбаларға ғана берген дұрыс."</string>
+    <string name="accessibility_key_gesture_screen_reader_dialog_warning_view_control_screen_heading" msgid="5346128898440400425">"Экранды көру және басқару"</string>
+    <string name="accessibility_key_gesture_screen_reader_dialog_warning_view_control_screen_message" msgid="5810348116536082139">"Экрандағы контентті толық оқып, оны басқа қолданбалардың үстінен көрсете алады."</string>
+    <string name="accessibility_key_gesture_screen_reader_dialog_warning_perform_actions_heading" msgid="6032379987970298008">"Әрекеттерді көру және орындау"</string>
+    <string name="accessibility_key_gesture_screen_reader_dialog_warning_perform_actions_message" msgid="4565304881759944542">"Қолданбамен немесе жабдық датчигімен істеген тапсырмаларыңызды бақылайды және қолданбаларды сіздің атыңыздан пайдаланады."</string>
+    <string name="accessibility_key_gesture_voice_access_dialog_content" msgid="8539054865187379687">"<xliff:g id="ID_1">^1</xliff:g> "<annotation id="action_key_icon">"белгішесі"</annotation>" + <xliff:g id="ID_2">^2</xliff:g> + <xliff:g id="ID_3">^3</xliff:g> пернелерін басу арқылы <xliff:g id="ID_4">^4</xliff:g> арнайы мүмкіндігін қосуға болады. Ол құрылғыны дауыспен басқаруға арналған."</string>
+    <string name="accessibility_quick_access_dialog_title" msgid="8792322423145117379">"Арнайы мүмкіндіктер"</string>
+    <string name="accessibility_quick_access_dialog_done_button_text" msgid="8013849920696848138">"Дайын"</string>
     <string name="tuner_lock_screen" msgid="2267383813241144544">"Құлыптаулы экран"</string>
     <string name="shutdown_progress" msgid="5464239146561542178">"Өшіріліп жатыр…"</string>
     <string name="thermal_shutdown_dialog_help_text" msgid="6413474593462902901">"Пайдалану нұсқаулығын қараңыз"</string>
@@ -1475,8 +1488,12 @@
     <string name="wifi_scan_notify_message" msgid="3753839537448621794">"Құрылғы жұмысын жақсарту үшін қолданбалар мен қызметтер Wi-Fi байланысы өшірулі кезде де Wi-Fi желілерін іздейді. Оны Wi-Fi іздеу параметрлерінен өзгерте аласыз. "<annotation id="link">"Өзгерту"</annotation></string>
     <string name="turn_off_airplane_mode" msgid="8425587763226548579">"Ұшақ режимін өшіру"</string>
     <string name="qs_tile_request_dialog_text" msgid="3501359944139877694">"<xliff:g id="APPNAME">%1$s</xliff:g> Жылдам параметрлерге келесі бөлшекті қосқысы келеді."</string>
+    <string name="qs_tile_request_dialog_text_with_size" msgid="732578771040573291">"<xliff:g id="APPNAME">%1$s</xliff:g> қолданбасы жылдам параметрлерге бөлшек қосқысы келеді. Жалғастыру үшін бөлшек өлшемін таңдаңыз."</string>
     <string name="qs_tile_request_dialog_add" msgid="4888460910694986304">"Бөлшек қосу"</string>
-    <string name="qs_tile_request_dialog_not_add" msgid="4168716573114067296">"Бөлшек қоспау"</string>
+    <string name="qs_tile_request_dialog_not_add" msgid="8375425041428574394">"Бөлшек қоспау"</string>
+    <string name="qs_tile_request_dialog_title" msgid="5654666862347548966">"Жылдам параметрлерге қосу"</string>
+    <string name="qs_tile_request_dialog_small_format_content_description" msgid="5429197059724172135">"Шағын формат"</string>
+    <string name="qs_tile_request_dialog_large_format_content_description" msgid="67983044110405787">"Үлкен формат"</string>
     <string name="qs_user_switch_dialog_title" msgid="3045189293587781366">"Пайдаланушыны таңдау"</string>
     <string name="fgs_manager_footer_label" msgid="8276763570622288231">"{count,plural, =1{# қолданба қосылып тұр.}other{# қолданба қосылып тұр.}}"</string>
     <string name="fgs_dot_content_description" msgid="2865071539464777240">"Жаңа ақпарат"</string>
@@ -1719,6 +1736,8 @@
     <string name="dual_shade_educational_tooltip_notifs" msgid="7666159428113013319">"Хабарландыруларды ашу үшін жоғарғы сол жақ бұрыштан сырғытыңыз"</string>
     <string name="dual_shade_educational_tooltip_qs" msgid="3842355853737057332">"Жылдам параметрлерді ашу үшін жоғарғы оң жақ бұрыштан сырғытыңыз"</string>
     <string name="back_button_on_bouncer" msgid="809134628434396761">"Артқа"</string>
+    <!-- no translation found for sign_in_button_on_bouncer (3595960142516902559) -->
+    <skip />
     <string name="accessibility_button_on_bouncer_description" msgid="9186344135931507168">"Арнайы мүмкіндіктер"</string>
     <string name="pager_dots_previous_content_description" msgid="26963508904918908">"Алдыңғы"</string>
     <string name="pager_dots_next_content_description" msgid="613943992626163120">"Келесі"</string>

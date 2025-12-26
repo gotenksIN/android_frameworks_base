@@ -28,9 +28,11 @@ import androidx.test.filters.SmallTest
 import com.android.wm.shell.Flags
 import com.android.wm.shell.ShellTestCase
 import com.android.wm.shell.activityembedding.ActivityEmbeddingController
+import com.android.wm.shell.bubbles.BubbleHelper
 import com.android.wm.shell.bubbles.BubbleTransitions
 import com.android.wm.shell.desktopmode.DesktopTasksController
 import com.android.wm.shell.keyguard.KeyguardTransitionHandler
+import com.android.wm.shell.pinnedlayer.phone.PinnedLayerHandler
 import com.android.wm.shell.pip.PipTransitionController
 import com.android.wm.shell.splitscreen.StageCoordinator
 import com.android.wm.shell.unfold.UnfoldTransitionHandler
@@ -60,6 +62,8 @@ class DefaultMixedTransitionTest : ShellTestCase() {
     private val mActivityEmbeddingController = mock<ActivityEmbeddingController>()
     private val mDesktopTasksController = mock<DesktopTasksController>()
     private val mBubbleTransitions = mock<BubbleTransitions>()
+    private val mBubbleHelper = mock<BubbleHelper>()
+    private val mPinnedLayerHandler = mock<PinnedLayerHandler>()
     private val mMockTransition = mock<IBinder>()
 
     // Mocks for startAnimation arguments, initialized inline
@@ -177,7 +181,9 @@ class DefaultMixedTransitionTest : ShellTestCase() {
             mUnfoldHandler,
             mActivityEmbeddingController,
             mDesktopTasksController,
-            mBubbleTransitions
+            mBubbleTransitions,
+            mBubbleHelper,
+            mPinnedLayerHandler,
         )
     }
 }

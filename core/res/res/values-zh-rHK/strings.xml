@@ -326,6 +326,8 @@
     <string name="notification_channel_accessibility_hearing_device" msgid="7816963856388758952">"助聽器"</string>
     <string name="notification_channel_accessibility_security_policy" msgid="1727787021725251912">"無障礙功能使用情況"</string>
     <string name="notification_channel_display" msgid="6905032605735615090">"顯示屏"</string>
+    <!-- no translation found for notification_channel_parental_controls (2963963315750128538) -->
+    <skip />
     <string name="foreground_service_app_in_background" msgid="1439289699671273555">"「<xliff:g id="APP_NAME">%1$s</xliff:g>」正在使用電量"</string>
     <string name="foreground_service_apps_in_background" msgid="7340037176412387863">"<xliff:g id="NUMBER">%1$d</xliff:g> 個應用程式正在使用電量"</string>
     <string name="foreground_service_tap_for_details" msgid="9078123626015586751">"輕按即可查看電池和數據用量詳情"</string>
@@ -641,6 +643,8 @@
     <string name="permdesc_nearby_wifi_devices" msgid="3054307728646332906">"允許應用程式向附近的 Wi-Fi 裝置顯示此裝置、連接這些裝置並判斷其相對位置"</string>
     <string name="permlab_access_local_network" msgid="3420360767259066877">"存取本地網絡裝置"</string>
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"允許應用程式存取本地網絡裝置"</string>
+    <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"使用迴環介面"</string>
+    <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"允許應用程式透過迴環介面與其他應用程式互動"</string>
     <string name="permlab_ranging" msgid="2854543350668593390">"判斷附近裝置之間的相對位置"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"允許應用程式判斷附近裝置之間的相對位置"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"由用戶允許授權的 NFC 付款服務資訊"</string>
@@ -1043,7 +1047,6 @@
     <string name="keyguard_password_enter_pin_password_code" msgid="7792964196473964340">"輸入 PIN 碼即可解鎖"</string>
     <string name="keyguard_password_wrong_pin_code" msgid="8583732939138432793">"PIN 碼不正確。"</string>
     <string name="keyguard_label_text" msgid="3841953694564168384">"如要解鎖，請按選單鍵，然後按 0。"</string>
-    <string name="emergency_call_dialog_number_for_display" msgid="2978165477085612673">"緊急電話號碼"</string>
     <string name="lockscreen_carrier_default" msgid="6192313772955399160">"沒有服務"</string>
     <string name="lockscreen_screen_locked" msgid="7364905540516041817">"螢幕已鎖定。"</string>
     <string name="lockscreen_instructions_when_pattern_enabled" msgid="7982445492532123308">"按選單鍵解鎖或撥打緊急電話。"</string>
@@ -1054,10 +1057,8 @@
     <string name="lockscreen_pattern_correct" msgid="8050630103651508582">"正確！"</string>
     <string name="lockscreen_pattern_wrong" msgid="2940138714468358458">"再試一次"</string>
     <string name="lockscreen_password_wrong" msgid="8605355913868947490">"再試一次"</string>
-    <!-- no translation found for lockscreen_click_to_unlock_hint (6056691847669178119) -->
-    <skip />
-    <!-- no translation found for lockscreen_key_to_unlock_hint (9042402393653798264) -->
-    <skip />
+    <string name="lockscreen_click_to_unlock_hint" msgid="6056691847669178119">"按一下即可解鎖"</string>
+    <string name="lockscreen_key_to_unlock_hint" msgid="9042402393653798264">"按任何鍵即可解鎖"</string>
     <string name="lockscreen_storage_locked" msgid="634993789186443380">"解鎖即可使用所有功能和資料"</string>
     <string name="faceunlock_multiple_failures" msgid="681991538434031708">"已超過面孔解鎖嘗試次數上限"</string>
     <string name="lockscreen_missing_sim_message_short" msgid="1229301273156907613">"沒有 SIM 卡"</string>
@@ -1279,6 +1280,7 @@
     <string name="whichApplicationLabel" msgid="7852182961472531728">"完成操作"</string>
     <string name="whichViewApplication" msgid="5733194231473132945">"選擇開啟方式"</string>
     <string name="whichViewApplicationNamed" msgid="415164730629690105">"使用 %1$s 開啟"</string>
+    <string name="open_app_name" msgid="6114096770130122912">"開啟「<xliff:g id="APP_NAME">%1$s</xliff:g>」"</string>
     <string name="whichViewApplicationLabel" msgid="7367556735684742409">"開啟"</string>
     <string name="whichOpenHostLinksWith" msgid="7645631470199397485">"開啟 <xliff:g id="HOST">%1$s</xliff:g> 連結的方式"</string>
     <string name="whichOpenLinksWith" msgid="1120936181362907258">"開啟連結的方式"</string>
@@ -1800,10 +1802,8 @@
     <string name="accessibility_shortcut_single_service_warning" msgid="6363127705112844257">"同時按下兩個音量鍵幾秒，以開啟 <xliff:g id="SERVICE">%1$s</xliff:g> 無障礙功能。這可能會變更裝置的運作。\n\n你可在「設定」&gt;「無障礙功能」中變更此快速鍵。"</string>
     <string name="accessibility_shortcut_on" msgid="5463618449556111344">"開啟"</string>
     <string name="accessibility_shortcut_off" msgid="3651336255403648739">"不要開啟"</string>
-    <!-- no translation found for accessibility_shortcut_menu_item_status_on (6162756705754654002) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_menu_item_status_off (6274512913017713543) -->
-    <skip />
+    <string name="accessibility_shortcut_menu_item_status_on" msgid="6162756705754654002">"開啟"</string>
+    <string name="accessibility_shortcut_menu_item_status_off" msgid="6274512913017713543">"關閉"</string>
     <string name="accessibility_enable_service_title" msgid="3931558336268541484">"要授予「<xliff:g id="SERVICE">%1$s</xliff:g>」裝置的完整控制權嗎？"</string>
     <string name="accessibility_service_warning_description" msgid="291674995220940133">"對於為你提供無障礙功能的應用程式，你可授予完整控制權，但大部分應用程式都不應獲授予此權限。"</string>
     <string name="accessibility_service_screen_control_title" msgid="190017412626919776">"查看和控制螢幕"</string>
@@ -1817,16 +1817,11 @@
     <string name="accessibility_select_shortcut_menu_title" msgid="6002726538854613272">"輕按即可開始使用所需功能："</string>
     <string name="accessibility_edit_shortcut_menu_button_title" msgid="239446795930436325">"選擇要配搭無障礙功能按鈕使用的功能"</string>
     <string name="accessibility_edit_shortcut_menu_volume_title" msgid="2245540598834891500">"選擇要用音量鍵捷徑的功能"</string>
-    <!-- no translation found for accessibility_shortcut_label_button (6473341300585254821) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_volume_keys (5642990791242136231) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_gesture (7987298674836890931) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_quick_settings (6851280333772213611) -->
-    <skip />
-    <!-- no translation found for accessibility_shortcut_label_triple_tap (9058975959054454796) -->
-    <skip />
+    <string name="accessibility_shortcut_label_button" msgid="6473341300585254821">"無障礙功能按鈕"</string>
+    <string name="accessibility_shortcut_label_volume_keys" msgid="5642990791242136231">"音量鍵"</string>
+    <string name="accessibility_shortcut_label_gesture" msgid="7987298674836890931">"手勢"</string>
+    <string name="accessibility_shortcut_label_quick_settings" msgid="6851280333772213611">"快速設定"</string>
+    <string name="accessibility_shortcut_label_triple_tap" msgid="9058975959054454796">"輕按三下"</string>
     <string name="accessibility_uncheck_legacy_item_warning" msgid="8047830891064817447">"<xliff:g id="SERVICE_NAME">%s</xliff:g> 已關閉"</string>
     <string name="edit_accessibility_shortcut_menu_button" msgid="8885752738733772935">"編輯捷徑"</string>
     <string name="done_accessibility_shortcut_menu_button" msgid="3668407723770815708">"完成"</string>
@@ -2616,4 +2611,10 @@
     <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"系統資源警示"</string>
     <string name="tv_watchdog_notification_title" msgid="195239206215922517">"過量使用資源"</string>
     <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"應用程式「<xliff:g id="APP_NAME">%1$s</xliff:g>」使用太多資源。"</string>
+    <!-- no translation found for supervision_blocked_app_title (5546803865875383588) -->
+    <skip />
+    <!-- no translation found for supervision_blocked_app_content (4125452996088641559) -->
+    <skip />
+    <!-- no translation found for supervision_unblocked_app_content (8282985265957852278) -->
+    <skip />
 </resources>

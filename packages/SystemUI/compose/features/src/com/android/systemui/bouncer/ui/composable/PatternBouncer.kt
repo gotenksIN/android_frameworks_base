@@ -46,7 +46,6 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.integerResource
@@ -183,13 +182,12 @@ fun PatternBouncer(
                     // objects have changed.
                     scope.launch {
                         if (dot == currentDot) {
-                            // Reset the fade-out animation for the current dot. When the
-                            // current dot is switched, this entire code block runs again for
-                            // the newly selected dot.
+                            // Reset the fade-out animation for the current dot. When the current
+                            // dot is switched, this entire code block runs again for the newly
+                            // selected dot.
                             line.snapTo(1f)
                         } else {
-                            // For all non-current dots, make sure that the lines are fading
-                            // out.
+                            // For all non-current dots, make sure that the lines are fading out.
                             line.animateTo(
                                 targetValue = 0f,
                                 animationSpec =
@@ -213,11 +211,9 @@ fun PatternBouncer(
         }
     }
 
-    // This is the position of the input pointer. Calculated in context of bouncer Box.
+    // This is the position of the input pointer.
     var inputPosition: Offset? by remember { mutableStateOf(null) }
-    // Calculated in context of Canvas inside the Box.
     var gridCoordinates: LayoutCoordinates? by remember { mutableStateOf(null) }
-    // Calculated in context of Canvas inside the Box.
     var offset: Offset by remember { mutableStateOf(Offset.Zero) }
     var scale: Float by remember { mutableFloatStateOf(1f) }
     // This is the size of the drawing area, in dips.
@@ -347,10 +343,8 @@ fun PatternBouncer(
                     }
 
                     // Draw the line between the most recently-selected dot and the input pointer
-                    // position. Note that `inputPosition` is calculated relative to enclosing
-                    // `Box`.
-                    inputPosition?.let { lineEndInParent ->
-                        val lineEnd = lineEndInParent.minus(nonNullCoordinates.positionInParent())
+                    // position.
+                    inputPosition?.let { lineEnd ->
                         currentDot?.let { dot ->
                             val from = pixelOffset(dot, spacing, horizontalOffset, verticalOffset)
                             val lineLength =
@@ -529,11 +523,11 @@ private fun offset(
     }
 }
 
-private const val DOT_DIAMETER_DP = 14
-private const val SELECTED_DOT_DIAMETER_DP = (DOT_DIAMETER_DP * 1.5).toInt()
+private const val DOT_DIAMETER_DP = 16
+private const val SELECTED_DOT_DIAMETER_DP = 24
 private const val SELECTED_DOT_REACTION_ANIMATION_DURATION_MS = 83
 private const val SELECTED_DOT_RETRACT_ANIMATION_DURATION_MS = 750
-private const val LINE_STROKE_WIDTH_DP = 22
+private const val LINE_STROKE_WIDTH_DP = 32
 private const val FAILURE_ANIMATION_DOT_DIAMETER_DP = (DOT_DIAMETER_DP * 0.81f).toInt()
 private const val FAILURE_ANIMATION_DOT_SHRINK_ANIMATION_DURATION_MS = 50
 private const val FAILURE_ANIMATION_DOT_SHRINK_STAGGER_DELAY_MS = 33

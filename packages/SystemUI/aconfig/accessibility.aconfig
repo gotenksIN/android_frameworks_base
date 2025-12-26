@@ -11,16 +11,6 @@ flag {
 }
 
 flag {
-    name: "cleanup_instances_when_display_removed"
-    namespace: "accessibility"
-    description: "When a specific display is removed, cleanup the cached instances related to it."
-    bug: "437868750"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "floating_menu_drag_to_hide"
     namespace: "accessibility"
     description: "Allows users to hide the FAB then use notification to dismiss or bring it back."
@@ -49,6 +39,16 @@ flag {
 }
 
 flag {
+    name: "floating_menu_tuck_skips_tooltip"
+    namespace: "accessibility"
+    description: "If the user performs a tuck, the tucking tooltip is skipped."
+    bug: "396466246"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "floating_menu_update_on_feature_enabled"
     namespace: "accessibility"
     description: "Adds tracking for multiple features that can be toggled by FAB but are not services."
@@ -66,6 +66,23 @@ flag {
     metadata {
       purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+    name: "keyguard_interactor_for_floating_button"
+    namespace: "accessibility"
+    description: "Switches to using KeyguardInteractor for faster response time to changes"
+    bug: "353629777"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "launch_accessibility_quick_access_dialog_permission"
+    namespace: "accessibility"
+    description: "Adds a permission to allow applications to launch the accessibility quick access dialog."
+    bug: "446014706"
 }
 
 flag {

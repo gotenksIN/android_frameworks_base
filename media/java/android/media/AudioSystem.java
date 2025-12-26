@@ -248,6 +248,8 @@ public class AudioSystem
     /** @hide */
     public static final int AUDIO_FORMAT_LDAC           = 0x23000000;
     /** @hide */
+    public static final int AUDIO_FORMAT_LHDC           = 0x28000000;
+    /** @hide */
     public static final int AUDIO_FORMAT_LC3            = 0x2B000000;
     /** @hide */
     public static final int AUDIO_FORMAT_OPUS           = 0x08000000;
@@ -272,6 +274,7 @@ public class AudioSystem
             AUDIO_FORMAT_APTX,
             AUDIO_FORMAT_APTX_HD,
             AUDIO_FORMAT_LDAC,
+            AUDIO_FORMAT_LHDC,
             AUDIO_FORMAT_LC3,
             AUDIO_FORMAT_OPUS,
             AUDIO_FORMAT_OPUS_HI_RES,
@@ -301,6 +304,9 @@ public class AudioSystem
 
     //TODO b/396350294 : remove when BluetoothLeCodecConfig.SOURCE_CODEC_TYPE_OPUS_HI_RES is public
     private static final int BLUETOOTH_LE_AUDIO_CODEC_CONFIG_SOURCE_CODEC_TYPE_OPUS_HI_RES = 2;
+
+    //TODO b/415848542: replace with BluetoothCodecType.CODEC_ID_LHDC
+    private static final int BLUETOOTH_CODEC_CONFIG_SOURCE_CODEC_TYPE_LHDC = 9;
     /**
      * @hide
      * Convert audio format enum values to Bluetooth codec values
@@ -313,6 +319,7 @@ public class AudioSystem
             case AUDIO_FORMAT_APTX: return BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX;
             case AUDIO_FORMAT_APTX_HD: return BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_HD;
             case AUDIO_FORMAT_LDAC: return BluetoothCodecConfig.SOURCE_CODEC_TYPE_LDAC;
+            case AUDIO_FORMAT_LHDC: return BLUETOOTH_CODEC_CONFIG_SOURCE_CODEC_TYPE_LHDC;
             case AUDIO_FORMAT_CELT: return BluetoothCodecConfig.SOURCE_CODEC_TYPE_CELT;
             case AUDIO_FORMAT_APTX_ADAPTIVE:
                      return BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_ADAPTIVE;
@@ -367,6 +374,8 @@ public class AudioSystem
                 return AudioSystem.AUDIO_FORMAT_APTX_HD;
             case BluetoothCodecConfig.SOURCE_CODEC_TYPE_LDAC:
                 return AudioSystem.AUDIO_FORMAT_LDAC;
+            case BLUETOOTH_CODEC_CONFIG_SOURCE_CODEC_TYPE_LHDC:
+                return AudioSystem.AUDIO_FORMAT_LHDC;
             case BluetoothCodecConfig.SOURCE_CODEC_TYPE_CELT:
                 return AudioSystem.AUDIO_FORMAT_CELT;
             case BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_ADAPTIVE:
@@ -1163,17 +1172,25 @@ public class AudioSystem
     /** @hide */
     public static final Set<Integer> DEVICE_OUT_ALL_SET;
     /** @hide */
-    public static final Set<Integer> DEVICE_OUT_ALL_A2DP_SET;
+    public static final Set<Integer> DEVICE_OUT_ALL_A2DP_SET = Set.of(DEVICE_OUT_BLUETOOTH_A2DP,
+            DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES, DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER);
+
     /** @hide */
-    public static final Set<Integer> DEVICE_OUT_ALL_SCO_SET;
+    public static final Set<Integer> DEVICE_OUT_ALL_SCO_SET = Set.of(DEVICE_OUT_BLUETOOTH_SCO,
+            DEVICE_OUT_BLUETOOTH_SCO_HEADSET, DEVICE_OUT_BLUETOOTH_SCO_CARKIT);
+
     /** @hide */
-    public static final Set<Integer> DEVICE_OUT_ALL_USB_SET;
+    public static final Set<Integer> DEVICE_OUT_ALL_USB_SET =
+            Set.of(DEVICE_OUT_USB_ACCESSORY, DEVICE_OUT_USB_DEVICE, DEVICE_OUT_USB_HEADSET);
+
     /** @hide */
     public static final Set<Integer> DEVICE_OUT_ALL_HDMI_SYSTEM_AUDIO_SET;
     /** @hide */
     public static final Set<Integer> DEVICE_ALL_HDMI_SYSTEM_AUDIO_AND_SPEAKER_SET;
     /** @hide */
-    public static final Set<Integer> DEVICE_OUT_ALL_BLE_SET;
+    public static final Set<Integer> DEVICE_OUT_ALL_BLE_SET =
+            Set.of(DEVICE_OUT_BLE_HEADSET, DEVICE_OUT_BLE_SPEAKER, DEVICE_OUT_BLE_BROADCAST);
+
     /** @hide */
     public static final Set<Integer> DEVICE_OUT_PICK_FOR_VOLUME_SET;
     /** @hide */
@@ -1217,21 +1234,6 @@ public class AudioSystem
         DEVICE_OUT_ALL_SET.add(DEVICE_OUT_BLE_BROADCAST);
         DEVICE_OUT_ALL_SET.add(DEVICE_OUT_DEFAULT);
 
-        DEVICE_OUT_ALL_A2DP_SET = new HashSet<>();
-        DEVICE_OUT_ALL_A2DP_SET.add(DEVICE_OUT_BLUETOOTH_A2DP);
-        DEVICE_OUT_ALL_A2DP_SET.add(DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES);
-        DEVICE_OUT_ALL_A2DP_SET.add(DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER);
-
-        DEVICE_OUT_ALL_SCO_SET = new HashSet<>();
-        DEVICE_OUT_ALL_SCO_SET.add(DEVICE_OUT_BLUETOOTH_SCO);
-        DEVICE_OUT_ALL_SCO_SET.add(DEVICE_OUT_BLUETOOTH_SCO_HEADSET);
-        DEVICE_OUT_ALL_SCO_SET.add(DEVICE_OUT_BLUETOOTH_SCO_CARKIT);
-
-        DEVICE_OUT_ALL_USB_SET = new HashSet<>();
-        DEVICE_OUT_ALL_USB_SET.add(DEVICE_OUT_USB_ACCESSORY);
-        DEVICE_OUT_ALL_USB_SET.add(DEVICE_OUT_USB_DEVICE);
-        DEVICE_OUT_ALL_USB_SET.add(DEVICE_OUT_USB_HEADSET);
-
         DEVICE_OUT_ALL_HDMI_SYSTEM_AUDIO_SET = new HashSet<>();
         DEVICE_OUT_ALL_HDMI_SYSTEM_AUDIO_SET.add(DEVICE_OUT_AUX_LINE);
         DEVICE_OUT_ALL_HDMI_SYSTEM_AUDIO_SET.add(DEVICE_OUT_HDMI_ARC);
@@ -1241,11 +1243,6 @@ public class AudioSystem
         DEVICE_ALL_HDMI_SYSTEM_AUDIO_AND_SPEAKER_SET = new HashSet<>();
         DEVICE_ALL_HDMI_SYSTEM_AUDIO_AND_SPEAKER_SET.addAll(DEVICE_OUT_ALL_HDMI_SYSTEM_AUDIO_SET);
         DEVICE_ALL_HDMI_SYSTEM_AUDIO_AND_SPEAKER_SET.add(DEVICE_OUT_SPEAKER);
-
-        DEVICE_OUT_ALL_BLE_SET = new HashSet<>();
-        DEVICE_OUT_ALL_BLE_SET.add(DEVICE_OUT_BLE_HEADSET);
-        DEVICE_OUT_ALL_BLE_SET.add(DEVICE_OUT_BLE_SPEAKER);
-        DEVICE_OUT_ALL_BLE_SET.add(DEVICE_OUT_BLE_BROADCAST);
 
         DEVICE_OUT_ALL_BLE_UNICAST_SET = new HashSet<>();
         DEVICE_OUT_ALL_BLE_UNICAST_SET.add(DEVICE_OUT_BLE_HEADSET);
@@ -1350,11 +1347,14 @@ public class AudioSystem
     /** @hide */
     public static final Set<Integer> DEVICE_IN_ALL_SET;
     /** @hide */
-    public static final Set<Integer> DEVICE_IN_ALL_SCO_SET;
+    public static final Set<Integer> DEVICE_IN_ALL_SCO_SET =
+            Set.of(DEVICE_IN_BLUETOOTH_SCO_HEADSET);
     /** @hide */
-    public static final Set<Integer> DEVICE_IN_ALL_USB_SET;
+    public static final Set<Integer> DEVICE_IN_ALL_USB_SET =
+            Set.of(DEVICE_IN_USB_ACCESSORY, DEVICE_IN_USB_DEVICE, DEVICE_IN_USB_HEADSET);
+
     /** @hide */
-    public static final Set<Integer> DEVICE_IN_ALL_BLE_SET;
+    public static final Set<Integer> DEVICE_IN_ALL_BLE_SET = Set.of(DEVICE_IN_BLE_HEADSET);
 
     static {
         DEVICE_IN_ALL_SET = new HashSet<>();
@@ -1387,17 +1387,6 @@ public class AudioSystem
         DEVICE_IN_ALL_SET.add(DEVICE_IN_ECHO_REFERENCE);
         DEVICE_IN_ALL_SET.add(DEVICE_IN_BLE_HEADSET);
         DEVICE_IN_ALL_SET.add(DEVICE_IN_DEFAULT);
-
-        DEVICE_IN_ALL_SCO_SET = new HashSet<>();
-        DEVICE_IN_ALL_SCO_SET.add(DEVICE_IN_BLUETOOTH_SCO_HEADSET);
-
-        DEVICE_IN_ALL_USB_SET = new HashSet<>();
-        DEVICE_IN_ALL_USB_SET.add(DEVICE_IN_USB_ACCESSORY);
-        DEVICE_IN_ALL_USB_SET.add(DEVICE_IN_USB_DEVICE);
-        DEVICE_IN_ALL_USB_SET.add(DEVICE_IN_USB_HEADSET);
-
-        DEVICE_IN_ALL_BLE_SET = new HashSet<>();
-        DEVICE_IN_ALL_BLE_SET.add(DEVICE_IN_BLE_HEADSET);
     }
 
     /** @hide */

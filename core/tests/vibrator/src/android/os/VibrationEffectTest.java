@@ -40,15 +40,19 @@ import android.content.Context;
 import android.content.res.Resources;
 import android.hardware.vibrator.IVibrator;
 import android.net.Uri;
+import android.os.vibrator.BasicPwleSegment;
 import android.os.vibrator.Flags;
 import android.os.vibrator.PrebakedSegment;
 import android.os.vibrator.PrimitiveSegment;
+import android.os.vibrator.PwleSegment;
 import android.os.vibrator.StepSegment;
 import android.os.vibrator.VibrationEffectSegment;
+import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.annotations.RequiresFlagsEnabled;
 import android.platform.test.flag.junit.CheckFlagsRule;
 import android.platform.test.flag.junit.DeviceFlagsValueProvider;
+import android.platform.test.flag.junit.SetFlagsRule;
 
 import com.android.internal.R;
 
@@ -67,6 +71,8 @@ import java.util.List;
 public class VibrationEffectTest {
     @Rule
     public final CheckFlagsRule mCheckFlagsRule = DeviceFlagsValueProvider.createCheckFlagsRule();
+    @Rule
+    public final SetFlagsRule mSetFlagsRule = new SetFlagsRule();
 
     private static final float TOLERANCE = 1e-2f;
     private static final String RINGTONE_URI_1 = "content://test/system/ringtone_1";
@@ -1587,6 +1593,51 @@ public class VibrationEffectTest {
     }
 
     @Test
+    @EnableFlags(Flags.FLAG_NORMALIZED_PWLE_EFFECTS)
+    public void testFirstSegmentFlag() {
+        VibrationEffect waveformEnvelope =
+                new VibrationEffect.WaveformEnvelopeBuilder()
+                        .addControlPoint(1.0f, 150f, 100)
+                        .addControlPoint(0.5f, 100f, 100)
+                        .build();
+
+        assertTrue(getPwleSegment(waveformEnvelope, 0).isFirstSegmentOfEnvelope());
+        assertFalse(getPwleSegment(waveformEnvelope, 1).isFirstSegmentOfEnvelope());
+
+        VibrationEffect basicEnvelope =
+                new VibrationEffect.BasicEnvelopeBuilder()
+                        .addControlPoint(1.0f, 1.0f, 100)
+                        .addControlPoint(0.0f, 0.5f, 100)
+                        .build();
+
+        assertTrue(getBasicPwleSegment(basicEnvelope, 0).isFirstSegmentOfEnvelope());
+        assertFalse(getBasicPwleSegment(basicEnvelope, 1).isFirstSegmentOfEnvelope());
+    }
+
+    @Test
+    @EnableFlags({Flags.FLAG_NORMALIZED_PWLE_EFFECTS, Flags.FLAG_COMPOSITION_PWLE_APIS})
+    public void testAddEnvelopes_firstSegmentFlagCorrectlyComputed() {
+        VibrationEffect composed =
+                VibrationEffect.startComposition()
+                        .addEnvelope(
+                                new VibrationEffect.WaveformEnvelopeBuilder()
+                                        .addControlPoint(1.0f, 150f, 100)
+                                        .addControlPoint(0.5f, 100f, 100))
+                        .addPrimitive(VibrationEffect.Composition.PRIMITIVE_CLICK)
+                        .addEnvelope(
+                                new VibrationEffect.BasicEnvelopeBuilder()
+                                        .addControlPoint(1.0f, 1.0f, 100)
+                                        .addControlPoint(0.0f, 0.5f, 100))
+                        .compose();
+
+        assertTrue(getPwleSegment(composed, 0).isFirstSegmentOfEnvelope());
+        assertFalse(getPwleSegment(composed, 1).isFirstSegmentOfEnvelope());
+
+        assertTrue(getBasicPwleSegment(composed, 3).isFirstSegmentOfEnvelope());
+        assertFalse(getBasicPwleSegment(composed, 4).isFirstSegmentOfEnvelope());
+    }
+
+    @Test
     public void testParcelingComposed() {
         Parcel p = Parcel.obtain();
         VibrationEffect effect = VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK);
@@ -1664,6 +1715,18 @@ public class VibrationEffectTest {
         VibrationEffectSegment segment = getEffectSegment(effect, index);
         assertThat(segment).isInstanceOf(PrebakedSegment.class);
         return (PrebakedSegment) segment;
+    }
+
+    private PwleSegment getPwleSegment(VibrationEffect effect, int index) {
+        VibrationEffectSegment segment = getEffectSegment(effect, index);
+        assertThat(segment).isInstanceOf(PwleSegment.class);
+        return (PwleSegment) segment;
+    }
+
+    private BasicPwleSegment getBasicPwleSegment(VibrationEffect effect, int index) {
+        VibrationEffectSegment segment = getEffectSegment(effect, index);
+        assertThat(segment).isInstanceOf(BasicPwleSegment.class);
+        return (BasicPwleSegment) segment;
     }
 
     private VibrationEffectSegment getEffectSegment(VibrationEffect effect, int index) {

@@ -138,7 +138,6 @@ import com.android.server.am.nano.VMCapability;
 import com.android.server.am.nano.VMInfo;
 import com.android.server.compat.PlatformCompat;
 import com.android.server.pm.UserManagerInternal;
-import com.android.server.utils.AnrTimer;
 import com.android.server.utils.Slogf;
 
 import dalvik.annotation.optimization.NeverCompile;
@@ -191,6 +190,7 @@ final class ActivityManagerShellCommand extends ShellCommand {
             DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss", Locale.ROOT);
 
     private static final String PROFILER_OUTPUT_VERSION_FLAG = "--profiler-output-version";
+    private static final String PROFILER_FLAGS = "--flags";
 
     // IPC interface to activity manager -- don't need to do additional security checks.
     final IActivityManager mInterface;
@@ -218,6 +218,7 @@ final class ActivityManagerShellCommand extends ShellCommand {
     private boolean mAttachAgentDuringBind;  // Whether agent should be attached late.
     private int mClockType; // Whether we need thread cpu / wall clock / both.
     private int mProfilerOutputVersion; // The version of the profiler output.
+    private int mProfilerFlags; // Flags for the profiler
     private boolean mLongRunningMethods; // Whether we need to trace only long running methods
     private long mDurationMicros; // duration in microseconds that specifies how long to trace.
     private int mDisplayId;
@@ -294,8 +295,6 @@ final class ActivityManagerShellCommand extends ShellCommand {
                     return -1;
                 case "trace-ipc":
                     return runTraceIpc(pw);
-                case "trace-timer":
-                    return runTraceTimer(pw);
                 case "profile":
                     return runProfile(pw);
                 case "dumpheap":
@@ -460,6 +459,8 @@ final class ActivityManagerShellCommand extends ShellCommand {
                     return runSetMediaForegroundService(pw);
                 case "clear-bad-process":
                     return runClearBadProcess(pw);
+                case "get-broadcast-constant":
+                    return runGetBroadcastConstant(pw);
                 default:
                     return handleDefaultCommands(cmd);
             }
@@ -642,6 +643,8 @@ final class ActivityManagerShellCommand extends ShellCommand {
                     mClockType = ProfilerInfo.getClockTypeFromString(clock_type);
                 } else if (opt.equals(PROFILER_OUTPUT_VERSION_FLAG)) {
                     mProfilerOutputVersion = Integer.parseInt(getNextArgRequired());
+                } else if (opt.equals(PROFILER_FLAGS)) {
+                    mProfilerFlags = Integer.decode(getNextArgRequired());
                 } else if (opt.equals("--streaming")) {
                     mStreaming = true;
                 } else if (opt.equals("--attach-agent")) {
@@ -807,9 +810,11 @@ final class ActivityManagerShellCommand extends ShellCommand {
                         return 1;
                     }
                 }
+                int flags = ProfilerInfo.updateFlags(mClockType, mProfilerOutputVersion,
+                        mProfilerFlags);
                 profilerInfo = new ProfilerInfo(mProfileFile, fd, mSamplingInterval, mAutoStop,
-                        mStreaming, mAgent, mAttachAgentDuringBind, mClockType,
-                        mProfilerOutputVersion, mLongRunningMethods, mDurationMicros);
+                        mStreaming, mAgent, mAttachAgentDuringBind, flags,
+                        mLongRunningMethods, mDurationMicros);
             }
 
             pw.println("Starting: " + intent);
@@ -944,9 +949,9 @@ final class ActivityManagerShellCommand extends ShellCommand {
                             "Error: Not allowed to start background user activity"
                                     + " that shouldn't be displayed for all users.");
                     return 1;
-                case ActivityManager.START_NOT_ALLOWED_FOR_HEADLESS_SYSTEM_USER:
+                case ActivityManager.START_NOT_ALLOWED_FOR_USER:
                     out.println(
-                            "Error: Activity not started, not allowed for headless system user.");
+                            "Error: Activity not started, not allowed for the given user.");
                     return 1;
                 default:
                     out.println(
@@ -1148,23 +1153,6 @@ final class ActivityManagerShellCommand extends ShellCommand {
         return 0;
     }
 
-    // Update AnrTimer tracing.
-    private int runTraceTimer(PrintWriter pw) throws RemoteException {
-        if (!AnrTimer.traceFeatureEnabled()) return -1;
-
-        // Delegate all argument parsing to the AnrTimer method.
-        try {
-            final String result = AnrTimer.traceTimers(peekRemainingArgs());
-            if (result != null) {
-                pw.println(result);
-            }
-            return 0;
-        } catch (IllegalArgumentException e) {
-            getErrPrintWriter().println("Error: bad trace-timer command: " + e);
-            return -1;
-        }
-    }
-
     // NOTE: current profiles can only be started on default display (even on automotive builds with
     // passenger displays), so there's no need to pass a display-id
     private int runProfile(PrintWriter pw) throws RemoteException {
@@ -1178,7 +1166,8 @@ final class ActivityManagerShellCommand extends ShellCommand {
         mClockType = ProfilerInfo.CLOCK_TYPE_DEFAULT;
         mLongRunningMethods = false;
         mDurationMicros = 0;
-        mProfilerOutputVersion = ProfilerInfo.OUTPUT_VERSION_DEFAULT;
+        mProfilerOutputVersion = 0;
+        mProfilerFlags = ProfilerInfo.DEFAULT_FLAGS;
 
         String process = null;
 
@@ -1195,6 +1184,8 @@ final class ActivityManagerShellCommand extends ShellCommand {
                     mClockType = ProfilerInfo.getClockTypeFromString(clock_type);
                 } else if (opt.equals(PROFILER_OUTPUT_VERSION_FLAG)) {
                     mProfilerOutputVersion = Integer.parseInt(getNextArgRequired());
+                } else if (opt.equals(PROFILER_FLAGS)) {
+                    mProfilerFlags = Integer.decode(getNextArgRequired());
                 } else if (opt.equals("--streaming")) {
                     mStreaming = true;
                 } else if (opt.equals("--sampling")) {
@@ -1272,9 +1263,10 @@ final class ActivityManagerShellCommand extends ShellCommand {
         }
 
         if (start || hasFileArg) {
+            int flags = ProfilerInfo.updateFlags(mClockType, mProfilerOutputVersion,
+                    mProfilerFlags);
             profilerInfo = new ProfilerInfo(profileFile, fd, mSamplingInterval, false, mStreaming,
-                    null, false, mClockType, mProfilerOutputVersion, mLongRunningMethods,
-                    mDurationMicros);
+                    null, false, flags, mLongRunningMethods, mDurationMicros);
         }
 
         if (!mInterface.profileControl(process, userId, start, profilerInfo, profileType)) {
@@ -4660,6 +4652,17 @@ final class ActivityManagerShellCommand extends ShellCommand {
         return 0;
     }
 
+    int runGetBroadcastConstant(PrintWriter pw) {
+        final String key = getNextArgRequired();
+        try {
+            pw.println(mInternal.getBroadcastConstant(key));
+        } catch (IllegalArgumentException e) {
+            getErrPrintWriter().println("Error: " + e.getMessage());
+            return -1;
+        }
+        return 0;
+    }
+
     private Resources getResources(PrintWriter pw) throws RemoteException {
         // system resources does not contain all the device configuration, construct it manually.
         Configuration config = mInterface.getConfiguration();
@@ -4752,6 +4755,14 @@ final class ActivityManagerShellCommand extends ShellCommand {
             pw.println("          (use with --start-profiler)");
             pw.println("      " + PROFILER_OUTPUT_VERSION_FLAG + " Specify the version of the");
             pw.println("          profiling output (use with --start-profiler)");
+            pw.println("      " + PROFILER_FLAGS + "<FLAGS> Specify the bit mask of flags to pass");
+            pw.println("          to the profiler. The stable bits are:");
+            pw.println("          Bit 0: Track allocations");
+            pw.println("          Bit 1-2: Output version");
+            pw.println("          Bit 4&8: Clock type");
+            pw.println("          --clock-type / " + PROFILER_OUTPUT_VERSION_FLAG + " take");
+            pw.println("          priority over the values specified in flags. There are other");
+            pw.println("          experimental options that depend on the ART module");
             pw.println("      -P <FILE>: like above, but profiling stops when app goes idle");
             pw.println("      --attach-agent <agent>: attach the given agent before binding");
             pw.println("      --attach-agent-bind <agent>: attach the given agent during binding");
@@ -4848,7 +4859,6 @@ final class ActivityManagerShellCommand extends ShellCommand {
             pw.println("      start: start tracing IPC transactions.");
             pw.println("      stop: stop tracing IPC transactions and dump the results to file.");
             pw.println("      --dump-file <FILE>: Specify the file the trace should be dumped to.");
-            anrTimerHelp(pw);
             pw.println("  profile start [--user <USER_ID> current]");
             pw.println("          [--clock-type <TYPE>]");
             pw.println("          [" + PROFILER_OUTPUT_VERSION_FLAG + " VERSION]");
@@ -4863,6 +4873,14 @@ final class ActivityManagerShellCommand extends ShellCommand {
             pw.println("          value is dual.");
             pw.println("      " + PROFILER_OUTPUT_VERSION_FLAG + "VERSION: specifies the output");
             pw.println("          format version");
+            pw.println("      " + PROFILER_FLAGS + "<FLAGS> Specify the bit mask of flags to pass");
+            pw.println("          to the profiler. The stable bits are:");
+            pw.println("          Bit 0: Track allocations");
+            pw.println("          Bit 1-2: Output version");
+            pw.println("          Bit 4&8: Clock type");
+            pw.println("          --clock-type / " + PROFILER_OUTPUT_VERSION_FLAG + " take");
+            pw.println("          priority over the values specified in flags. There are other");
+            pw.println("          experimental options that depend on the ART module");
             pw.println("      --sampling INTERVAL: use sample profiling with INTERVAL microseconds");
             pw.println("          between samples.");
             pw.println("      --streaming: stream the profiling output to the specified file.");
@@ -5122,21 +5140,6 @@ final class ActivityManagerShellCommand extends ShellCommand {
             pw.println("  clear-bad-process [--user USER_ID] <PROCESS_NAME>");
             pw.println("         Clears a process from the bad processes list.");
             Intent.printIntentArgsHelp(pw, "");
-        }
-    }
-
-    static void anrTimerHelp(PrintWriter pw) {
-        // Return silently if tracing is not feature-enabled.
-        if (!AnrTimer.traceFeatureEnabled()) return;
-
-        String h = AnrTimer.traceTimers(new String[]{"help"});
-        if (h == null) {
-            return;
-        }
-
-        pw.println("  trace-timer <cmd>");
-        for (String s : h.split("\n")) {
-            pw.println("         " + s);
         }
     }
 }

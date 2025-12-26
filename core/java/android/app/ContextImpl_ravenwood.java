@@ -23,21 +23,25 @@ import android.content.IContentProvider;
 import android.content.pm.PackageManager;
 import android.os.FileUtils;
 import android.os.IBinder;
+import android.os.SystemProperties;
 import android.platform.test.ravenwood.RavenwoodEnvironment;
-import android.platform.test.ravenwood.RavenwoodPackageManager;
 
 import java.io.File;
 
 public class ContextImpl_ravenwood {
     private static final String TAG = "ContextImpl_ravenwood";
 
-    // TODO(b/450069205): support setting custom properties to opt-in as system
     static boolean isSystemOrSystemUI(Context context) {
+        if (SystemProperties.getBoolean("ravenwood.android.app.ContextImpl.isSystemOrSystemUI",
+                false)) {
+            return true;
+        }
+        // TODO(b/450069205): Delete it after adding ravenwood.prop to SystemUiRavenTests.
         return "SystemUiRavenTests".equals(RavenwoodEnvironment.getInstance().getTestModuleName());
     }
 
     static PackageManager getPackageManagerInner(ContextImpl contextImpl) {
-        return RavenwoodPackageManager.create(contextImpl);
+        return new ApplicationPackageManager(contextImpl, null);
     }
 
     static File ensurePrivateDirExists(File file, int mode, int gid, String xattr) {
@@ -70,19 +74,16 @@ public class ContextImpl_ravenwood {
 
         static IContentProvider acquireProvider(
                 ContextImpl.ApplicationContentResolver self, Context context, String auth) {
-            onExperimentalApiCalled(2);
             return RavenwoodAppDriver.getInstance().getProvider(context, auth);
         }
 
         static IContentProvider acquireExistingProvider(
                 ContextImpl.ApplicationContentResolver self, Context context, String auth) {
-            onExperimentalApiCalled(2);
             return acquireProvider(self, context, auth);
         }
 
         static IContentProvider acquireUnstableProvider(
                 ContextImpl.ApplicationContentResolver self, Context context, String auth) {
-            onExperimentalApiCalled(2);
             return acquireProvider(self, context, auth);
         }
     }

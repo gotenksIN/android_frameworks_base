@@ -29,8 +29,11 @@ use utils::{apply_runtime_flags, setup_process_dumpability};
 mod library_loader;
 mod native_activity_thread;
 mod native_application_thread;
+mod preload;
 mod task;
 mod utils;
+
+pub use preload::preload_lib;
 
 use crate::native_activity_thread::NativeActivityThread;
 use crate::native_application_thread::NativeApplicationThread;
@@ -45,9 +48,7 @@ const SDK_VERSION_UNSET: i32 = 0;
 /// Zygote forks and transition directly into an app process, or when starting
 /// an App Zygote.
 pub fn app_process_init(target_sdk_version: i32, runtime_flags: u32) {
-    setup_process_dumpability().expect("Failed to set up process dumability");
-
-    // TODO: Enable debugging
+    setup_process_dumpability().expect("Failed to set up process dumpability");
 
     // SAFETY: This opcode takes no arguments so a nullptr is passed
     //         instead.

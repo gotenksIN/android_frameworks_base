@@ -1,4 +1,9 @@
 {
+  "imports": [
+    {
+      "path": "frameworks/base/ravenwood-framework-test-mapping"
+    }
+  ],
   "desktop-presubmit": [
     {
       "name": "CfVkmsCursorTest"
@@ -61,22 +66,9 @@
     },
     {
       "name": "CtsStrictJavaPackagesTestCases"
-    }
-  ],
-  "ravenwood-presubmit": [
-    {
-      "name": "CtsUtilTestCasesRavenwood",
-      "host": true,
-      "file_patterns": [
-        "[Rr]avenwood"
-      ]
     },
     {
-      "name": "RavenwoodBivalentTest",
-      "host": true,
-      "file_patterns": [
-        "[Rr]avenwood"
-      ]
+      "name": "CameraServicesTests"
     }
   ],
   "postsubmit-managedprofile-stress": [
@@ -111,6 +103,9 @@
    },
    {
      "name": "PackageManagerServiceServerTests_Presubmit"
+   },
+   {
+     "name": "CameraServicesTests"
    }
  ],
   "wear-cts-presubmit": [

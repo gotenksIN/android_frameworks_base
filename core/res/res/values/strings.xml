@@ -961,6 +961,9 @@
     <!-- Text shown when viewing channel settings for notifications related to displays -->
     <string name="notification_channel_display">Display</string>
 
+    <!-- Text shown when viewing channel settings for notifications related to parental controls -->
+    <string name="notification_channel_parental_controls">Parental controls</string>
+
     <!-- Label for foreground service notification when one app is running.
     [CHAR LIMIT=NONE BACKUP_MESSAGE_ID=6826789589341671842] -->
     <string name="foreground_service_app_in_background"><xliff:g id="app_name">%1$s</xliff:g> is
@@ -1881,6 +1884,11 @@
     <string name="permlab_access_local_network">access local network devices</string>
     <!-- Description of an application permission, listed so the user can choose whether they want to allow the application to do this. [CHAR LIMIT=120]-->
     <string name="permdesc_access_local_network">Allows the app to access local network devices</string>
+
+    <!-- Title of an application permission, listed so the user can choose whether they want to allow the application to do this. [CHAR LIMIT=50]-->
+    <string name="permlab_use_loopback_interface">use loopback interface</string>
+    <!-- Description of an application permission, listed so the user can choose whether they want to allow the application to do this. [CHAR LIMIT=120]-->
+    <string name="permdesc_use_loopback_interface">Allows the app to interact with other apps over loopback interface</string>
 
     <!-- Title of an application permission, listed so the user can choose whether they want to allow the application to do this. [CHAR LIMIT=50]-->
     <string name="permlab_ranging">determine relative position between nearby devices</string>
@@ -3546,6 +3554,8 @@
     <!-- Title of intent resolver dialog when selecting a viewer application to run
          and a previously used application is known. -->
     <string name="whichViewApplicationNamed">Open with %1$s</string>
+    <!-- Default title for a notification action that opens an app. -->
+    <string name="open_app_name">Open <xliff:g id="app_name" example="Maps">%1$s</xliff:g></string>
     <!-- Label for a link to a intent resolver dialog to view something -->
     <string name="whichViewApplicationLabel">Open</string>
     <!-- Title of intent resolver dialog when selecting a browser/application that opens specific URIs
@@ -6992,4 +7002,9 @@
     <string name="tv_watchdog_notification_channel_name">System Resource Alerts</string>
     <string name="tv_watchdog_notification_title">Resource Overuse</string>
     <string name="tv_watchdog_notification_content">"App '<xliff:g id="app_name">%1$s</xliff:g>' is using too many resources."</string>
+
+    <!-- Supervision strings -->
+    <string name="supervision_blocked_app_title">Update from your parent</string>
+    <string name="supervision_blocked_app_content"><xliff:g id="app_name" example="YouTube">%1$s</xliff:g> was removed for now</string>
+    <string name="supervision_unblocked_app_content"><xliff:g id="app_name" example="YouTube">%1$s</xliff:g> is now available</string>
 </resources>

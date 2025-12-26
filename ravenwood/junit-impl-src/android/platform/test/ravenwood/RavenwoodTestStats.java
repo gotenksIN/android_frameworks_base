@@ -119,8 +119,9 @@ public class RavenwoodTestStats {
                             return getCaller(ex);
                         }
                         if (ex instanceof ExceptionInInitializerError
-                                && ex.getMessage().contains("RavenwoodUnsupportedApiException")) {
-                            // A static initializer hit a Ravenwood unsupported API
+                                && (ex.getMessage().contains("RavenwoodUnsupportedApiException")
+                                || ex.getMessage().contains("Stub!"))) {
+                            // A static initializer hit a Ravenwood unsupported API or stub
                             return getCaller(ex);
                         }
                         if ("Stub!".equals(ex.getMessage())) {
@@ -153,7 +154,7 @@ public class RavenwoodTestStats {
         LocalDateTime now = LocalDateTime.now();
         DateTimeFormatter fmt = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
 
-        var tmpdir = System.getProperty("java.io.tmpdir");
+        var tmpdir = RavenwoodEnvironment.getInstance().getTempDir().getAbsolutePath();
         File outputFile = new File(tmpdir, basename + now.format(fmt) + ".csv");
 
         try {
@@ -232,6 +233,20 @@ public class RavenwoodTestStats {
         mOutputWriter.flush();
         mStats.clear();
         Log.i(TAG, "Added result to stats file: file://" + mOutputSymlinkFile);
+
+        copyToArtifactsDir();
+    }
+
+    private void copyToArtifactsDir() {
+        var artifact = RavenwoodEnvironment.getInstance().getArtifactsDir().toPath()
+                .resolve(mOutputSymlinkFile.getName());
+        try {
+            Files.deleteIfExists(artifact);
+            Files.copy(mOutputSymlinkFile.toPath(), artifact);
+            Log.i(TAG, "Copied to artifacts dir: file://" + artifact);
+        } catch (IOException e) {
+            Log.w(TAG, "Failed to copy to artifacts dir: file://" + artifact);
+        }
     }
 
     private static final Pattern sParamsPattern = Pattern.compile("\\[.*$");
@@ -269,6 +284,7 @@ public class RavenwoodTestStats {
             if (RAVENWOOD_VERBOSE_LOGGING) {
                 Log.d(TAG, "testSuiteFinished: " + description);
             }
+            RavenwoodExperimentalApiChecker.dumpExperimentalApiUsage();
         }
 
         @Override

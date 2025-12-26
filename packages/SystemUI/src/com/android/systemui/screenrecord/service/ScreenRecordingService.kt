@@ -143,7 +143,7 @@ protected constructor(
             } else {
                 setShouldShowTouches(originalShouldShowTouches)
             }
-            Log.d(tag, "Error starting screen recording", e)
+            Log.e(tag, "Error starting screen recording", e)
             notificationInteractor.notifyErrorStarting(notificationId)
             showToast(R.string.screenrecord_start_error)
             stopSelf()
@@ -159,7 +159,9 @@ protected constructor(
             )
             val savedRecording: SavedRecording =
                 withContext(backgroundContext) {
-                    recorder.save().apply { callback?.onRecordingSaved(uri, thumbnail) }
+                    recorder
+                        .save { uri -> callback?.onSavingRecording(uri) }
+                        .apply { callback?.onRecordingSaved(uri, thumbnail) }
                 }
             onRecordingSaved(this, savedRecording)
         } catch (e: Exception) {
@@ -231,7 +233,7 @@ protected constructor(
                     originalShouldShowTouches = getShouldShowTouches(),
                     captureTarget = parameters.captureTarget,
                     audioSource = parameters.audioSource,
-                    displayId = displayId,
+                    displayId = parameters.displayId,
                     shouldShowTaps = parameters.shouldShowTaps,
                     recorder =
                         ScreenMediaRecorder(
@@ -240,7 +242,7 @@ protected constructor(
                             Process.myUid(),
                             parameters.audioSource,
                             parameters.captureTarget,
-                            displayId,
+                            parameters.displayId,
                             screenMediaRecorderListener,
                         ),
                 )

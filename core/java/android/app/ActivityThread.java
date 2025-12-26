@@ -332,6 +332,14 @@ public final class ActivityThread extends ClientTransactionHandler
 
     /** @hide */
     public static final String TAG = "ActivityThread";
+
+    // TODO(b/303199244): This is a temporary allowlist for early field data collection.
+    // It will be replaced by a sharding config in the future.
+    private static final Set<String> PERFETTO_TRACING_ALLOWLIST = new ArraySet<>(Arrays.asList(
+            "com.google.android.youtube",
+            "com.whatsapp"
+    ));
+
     static final boolean localLOGV = false;
     static final boolean DEBUG_MESSAGES = false;
     /** @hide */
@@ -585,8 +593,9 @@ public final class ActivityThread extends ClientTransactionHandler
     final ArrayMap<ProviderKey, ProviderClientRecord> mProviderMap = new ArrayMap<>();
     @UnsupportedAppUsage
     final ArrayMap<IBinder, ProviderRefCount> mProviderRefCountMap = new ArrayMap<>();
+    @VisibleForTesting
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
-    final ArrayMap<IBinder, ProviderClientRecord> mLocalProviders = new ArrayMap<>();
+    public final ArrayMap<IBinder, ProviderClientRecord> mLocalProviders = new ArrayMap<>();
     @UnsupportedAppUsage
     final ArrayMap<ComponentName, ProviderClientRecord> mLocalProvidersByName = new ArrayMap<>();
 
@@ -871,7 +880,8 @@ public final class ActivityThread extends ClientTransactionHandler
         }
     }
 
-    static final class ProviderClientRecord {
+    @VisibleForTesting
+    public static final class ProviderClientRecord {
         final String[] mNames;
         @UnsupportedAppUsage
         final IContentProvider mProvider;
@@ -880,7 +890,8 @@ public final class ActivityThread extends ClientTransactionHandler
         @UnsupportedAppUsage
         final ContentProviderHolder mHolder;
 
-        ProviderClientRecord(String[] names, IContentProvider provider,
+        @VisibleForTesting
+        public ProviderClientRecord(String[] names, IContentProvider provider,
                 ContentProvider localProvider, ContentProviderHolder holder) {
             mNames = names;
             mProvider = provider;
@@ -1046,8 +1057,7 @@ public final class ActivityThread extends ClientTransactionHandler
         int samplingInterval;
         boolean autoStopProfiler;
         boolean streamingOutput;
-        int mClockType;
-        int mProfilerOutputVersion;
+        int mProfilerFlags;
         boolean profiling;
         boolean handlingProfiling;
         public void setProfiler(ProfilerInfo profilerInfo) {
@@ -1074,8 +1084,7 @@ public final class ActivityThread extends ClientTransactionHandler
             samplingInterval = profilerInfo.samplingInterval;
             autoStopProfiler = profilerInfo.autoStopProfiler;
             streamingOutput = profilerInfo.streamingOutput;
-            mClockType = profilerInfo.clockType;
-            mProfilerOutputVersion = profilerInfo.profilerOutputVersion;
+            mProfilerFlags = profilerInfo.profilerFlags;
         }
         public void startProfiling() {
             if (profileFd == null || profiling) {
@@ -1083,11 +1092,9 @@ public final class ActivityThread extends ClientTransactionHandler
             }
             try {
                 int bufferSize = SystemProperties.getInt("debug.traceview-buffer-size-mb", 8);
-                int flags = 0;
-                flags = mClockType | ProfilerInfo.getFlagsForOutputVersion(mProfilerOutputVersion);
                 VMDebug.startMethodTracing(profileFile, profileFd.getFileDescriptor(),
-                        bufferSize * 1024 * 1024, flags, samplingInterval != 0, samplingInterval,
-                        streamingOutput);
+                        bufferSize * 1024 * 1024, mProfilerFlags, samplingInterval != 0,
+                        samplingInterval, streamingOutput);
                 profiling = true;
             } catch (RuntimeException e) {
                 Slog.w(TAG, "Profiling failed on path " + profileFile, e);
@@ -1460,6 +1467,19 @@ public final class ActivityThread extends ClientTransactionHandler
             ApplicationSharedMemory.setInstance(instance);
 
             setCoreSettings(coreSettings);
+
+            // Register the app for tracing as early as possible
+            if (android.os.Flags.perfettoSdkTracingEnableAppRegistration()) {
+                // TODO(b/303199244): This is a temporary solution for Perfetto SDK tracing rollout.
+                // Tracing is enabled only for apps in a specific allowlist. The sharding can be
+                // disabled for local debugging via the
+                // 'perfetto_sdk_tracing_disable_app_registration_sharding' flag, allowing all apps
+                // to register. This flag will never be enabled in the field.
+                if (android.os.Flags.perfettoSdkTracingDisableAppRegistrationSharding() ||
+                    PERFETTO_TRACING_ALLOWLIST.contains(appInfo.packageName)) {
+                    Trace.registerWithPerfetto();
+                }
+            }
 
             AppBindData data = new AppBindData();
             data.processName = processName;
@@ -4693,7 +4713,7 @@ public final class ActivityThread extends ClientTransactionHandler
             }
         }
 
-        if (android.tracing.Flags.imetrackerProtolog()) {
+        if (android.tracing.Flags.surfaceControlRegistryProtolog()) {
             ProtoLog.init();
         }
 
@@ -6347,7 +6367,7 @@ public final class ActivityThread extends ClientTransactionHandler
         stopInfo.setActivity(r);
         stopInfo.setState(r.state);
         stopInfo.setPersistentState(r.persistentState);
-        if (android.companion.Flags.enableTaskContinuity()) {
+        if (android.companion.Flags.taskContinuity()) {
             stopInfo.setHandoffActivityData(r.handoffActivityData);
         }
 
@@ -6896,7 +6916,7 @@ public final class ActivityThread extends ClientTransactionHandler
         r.state = new Bundle();
         r.state.setAllowFds(false);
 
-        if (android.companion.Flags.enableTaskContinuity() && r.activity.isHandoffEnabled()) {
+        if (android.companion.Flags.taskContinuity() && r.activity.isHandoffEnabled()) {
             final HandoffActivityDataRequestInfo requestInfo
                     = new HandoffActivityDataRequestInfo(false /* isActiveRequest */);
             r.handoffActivityData = r.activity.onHandoffActivityDataRequested(requestInfo);
@@ -7136,7 +7156,13 @@ public final class ActivityThread extends ClientTransactionHandler
         }
     }
 
-    private void updateDeviceIdForNonUIContexts(int deviceId) {
+    /**
+     * Updates the deviceId for the non UI Contexts (Application, Service, ContentProvider)
+     * belonging to the same process
+     * @param deviceId The new value to be set for the deviceId of the non UI Contexts
+     */
+    @VisibleForTesting
+    public void updateDeviceIdForNonUIContexts(int deviceId) {
         // Invalid device id is treated as a no-op.
         if (deviceId == Context.DEVICE_ID_INVALID) {
             return;
@@ -7165,7 +7191,11 @@ public final class ActivityThread extends ClientTransactionHandler
         synchronized (mProviderMap) {
             final int numContentProviders = mLocalProviders.size();
             for (int i = 0; i < numContentProviders; i++) {
-                nonUIContexts.add(mLocalProviders.valueAt(i).mLocalProvider.getContext());
+                final Context providerContext = mLocalProviders.valueAt(i).mLocalProvider
+                        .getContext();
+                if (providerContext != null) {
+                    nonUIContexts.add(providerContext);
+                }
             }
         }
 
@@ -7177,6 +7207,7 @@ public final class ActivityThread extends ClientTransactionHandler
                 // and the passed deviceId is no longer valid.
                 // TODO(b/263355088): check for validity of deviceId before updating
                 // instead of catching this exception once VDM add an API to validate ids.
+                Slog.e(TAG, "Exception updating context with deviceId: " + deviceId, e);
             }
         }
     }
@@ -7859,8 +7890,7 @@ public final class ActivityThread extends ClientTransactionHandler
             mProfiler.samplingInterval = data.initProfilerInfo.samplingInterval;
             mProfiler.autoStopProfiler = data.initProfilerInfo.autoStopProfiler;
             mProfiler.streamingOutput = data.initProfilerInfo.streamingOutput;
-            mProfiler.mClockType = data.initProfilerInfo.clockType;
-            mProfiler.mProfilerOutputVersion = data.initProfilerInfo.profilerOutputVersion;
+            mProfiler.mProfilerFlags = data.initProfilerInfo.profilerFlags;
             if (data.initProfilerInfo.attachAgentDuringBind) {
                 agent = data.initProfilerInfo.agent;
             }

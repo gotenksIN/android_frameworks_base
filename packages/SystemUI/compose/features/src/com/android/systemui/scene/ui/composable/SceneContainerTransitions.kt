@@ -12,7 +12,7 @@ import com.android.systemui.notifications.ui.composable.Notifications
 import com.android.systemui.qs.panels.ui.viewmodel.AnimateQsTilesViewModel
 import com.android.systemui.scene.shared.model.Overlays
 import com.android.systemui.scene.shared.model.Scenes
-import com.android.systemui.scene.shared.model.TransitionKeys.SlightlyFasterShadeCollapse
+import com.android.systemui.scene.shared.model.TransitionKeys.SlightlyFasterShadeTransition
 import com.android.systemui.scene.shared.model.TransitionKeys.ToSplitShade
 import com.android.systemui.scene.ui.composable.transitions.bouncerToGoneTransition
 import com.android.systemui.scene.ui.composable.transitions.bouncerToLockscreenPreview
@@ -22,7 +22,10 @@ import com.android.systemui.scene.ui.composable.transitions.communalToShadeTrans
 import com.android.systemui.scene.ui.composable.transitions.dreamToBouncerTransition
 import com.android.systemui.scene.ui.composable.transitions.dreamToCommunalTransition
 import com.android.systemui.scene.ui.composable.transitions.dreamToGoneTransition
+import com.android.systemui.scene.ui.composable.transitions.dreamToNotificationsShadeTransition
+import com.android.systemui.scene.ui.composable.transitions.dreamToQuickSettingsShadeTransition
 import com.android.systemui.scene.ui.composable.transitions.dreamToShadeTransition
+import com.android.systemui.scene.ui.composable.transitions.dreamToQuickSettingsTransition
 import com.android.systemui.scene.ui.composable.transitions.fromBouncerTransition
 import com.android.systemui.scene.ui.composable.transitions.goneToQuickSettingsTransition
 import com.android.systemui.scene.ui.composable.transitions.goneToShadeSceneTransition
@@ -73,10 +76,24 @@ class SceneContainerTransitions : SceneContainerTransitionsBuilder {
                 Scenes.Dream,
                 to = Scenes.Shade,
                 cuj = Cuj.CUJ_NOTIFICATION_SHADE_EXPAND_COLLAPSE,
+                cujTag = TAG_EXPAND,
             ) {
                 dreamToShadeTransition()
             }
-            from(Scenes.Gone, to = Scenes.Shade, cuj = Cuj.CUJ_NOTIFICATION_SHADE_EXPAND_COLLAPSE) {
+            from(
+                Scenes.Dream,
+                to = Scenes.QuickSettings,
+                cuj = Cuj.CUJ_NOTIFICATION_SHADE_QS_EXPAND_COLLAPSE,
+                cujTag = TAG_EXPAND,
+            ) {
+                dreamToQuickSettingsTransition()
+            }
+            from(
+                Scenes.Gone,
+                to = Scenes.Shade,
+                cuj = Cuj.CUJ_NOTIFICATION_SHADE_EXPAND_COLLAPSE,
+                cujTag = TAG_EXPAND,
+            ) {
                 goneToShadeSceneTransition()
             }
             from(
@@ -84,14 +101,16 @@ class SceneContainerTransitions : SceneContainerTransitionsBuilder {
                 to = Scenes.Shade,
                 key = ToSplitShade,
                 cuj = Cuj.CUJ_NOTIFICATION_SHADE_EXPAND_COLLAPSE,
+                cujTag = TAG_EXPAND,
             ) {
                 goneToSplitShadeTransition()
             }
             from(
                 Scenes.Gone,
                 to = Scenes.Shade,
-                key = SlightlyFasterShadeCollapse,
+                key = SlightlyFasterShadeTransition,
                 cuj = Cuj.CUJ_NOTIFICATION_SHADE_EXPAND_COLLAPSE,
+                cujTag = TAG_EXPAND,
             ) {
                 goneToShadeSceneTransition(durationScale = 0.9)
             }
@@ -99,14 +118,16 @@ class SceneContainerTransitions : SceneContainerTransitionsBuilder {
                 Scenes.Gone,
                 to = Scenes.QuickSettings,
                 cuj = Cuj.CUJ_NOTIFICATION_SHADE_QS_EXPAND_COLLAPSE,
+                cujTag = TAG_EXPAND,
             ) {
                 goneToQuickSettingsTransition()
             }
             from(
                 Scenes.Gone,
                 to = Scenes.QuickSettings,
-                key = SlightlyFasterShadeCollapse,
+                key = SlightlyFasterShadeTransition,
                 cuj = Cuj.CUJ_NOTIFICATION_SHADE_QS_EXPAND_COLLAPSE,
+                cujTag = TAG_EXPAND,
             ) {
                 goneToQuickSettingsTransition(durationScale = 0.9)
             }
@@ -118,6 +139,7 @@ class SceneContainerTransitions : SceneContainerTransitionsBuilder {
                 Scenes.Lockscreen,
                 to = Scenes.Shade,
                 cuj = Cuj.CUJ_NOTIFICATION_SHADE_EXPAND_COLLAPSE,
+                cujTag = TAG_EXPAND,
             ) {
                 lockscreenToShadeSceneTransition()
             }
@@ -126,6 +148,7 @@ class SceneContainerTransitions : SceneContainerTransitionsBuilder {
                 to = Scenes.Shade,
                 key = ToSplitShade,
                 cuj = Cuj.CUJ_NOTIFICATION_SHADE_EXPAND_COLLAPSE,
+                cujTag = TAG_EXPAND,
             ) {
                 lockscreenToSplitShadeTransition()
                 sharedElement(Shade.Elements.BackgroundScrim, enabled = false)
@@ -133,8 +156,9 @@ class SceneContainerTransitions : SceneContainerTransitionsBuilder {
             from(
                 Scenes.Lockscreen,
                 to = Scenes.Shade,
-                key = SlightlyFasterShadeCollapse,
+                key = SlightlyFasterShadeTransition,
                 cuj = Cuj.CUJ_NOTIFICATION_SHADE_EXPAND_COLLAPSE,
+                cujTag = TAG_EXPAND,
             ) {
                 lockscreenToShadeSceneTransition(durationScale = 0.9)
             }
@@ -142,6 +166,7 @@ class SceneContainerTransitions : SceneContainerTransitionsBuilder {
                 Scenes.Lockscreen,
                 to = Scenes.QuickSettings,
                 cuj = Cuj.CUJ_NOTIFICATION_SHADE_QS_EXPAND_COLLAPSE,
+                cujTag = TAG_EXPAND,
             ) {
                 lockscreenToQuickSettingsSceneTransition()
             }
@@ -155,8 +180,17 @@ class SceneContainerTransitions : SceneContainerTransitionsBuilder {
             }
             from(
                 Scenes.QuickSettings,
+                to = Scenes.Gone,
+                cuj = Cuj.CUJ_NOTIFICATION_SHADE_QS_EXPAND_COLLAPSE,
+                cujTag = TAG_COLLAPSE,
+            ) {
+                reversed { goneToQuickSettingsTransition() }
+            }
+            from(
+                Scenes.QuickSettings,
                 to = Scenes.Shade,
                 cuj = Cuj.CUJ_NOTIFICATION_SHADE_QS_EXPAND_COLLAPSE,
+                cujTag = TAG_COLLAPSE,
             ) {
                 reversed {
                     shadeToQuickSettingsTransition(
@@ -169,21 +203,39 @@ class SceneContainerTransitions : SceneContainerTransitionsBuilder {
                 )
             }
             from(
-                Scenes.Shade,
-                to = Scenes.QuickSettings,
+                Scenes.QuickSettings,
+                to = Scenes.Dream,
                 cuj = Cuj.CUJ_NOTIFICATION_SHADE_QS_EXPAND_COLLAPSE,
+                cujTag = TAG_COLLAPSE,
             ) {
-                shadeToQuickSettingsTransition(
-                    animateQsTilesAsShared = { animateQsTilesViewModel.animateQsTiles }
-                )
+                reversed { dreamToQuickSettingsTransition() }
+            }
+
+            from(
+                Scenes.Shade,
+                to = Scenes.Gone,
+                cuj = Cuj.CUJ_NOTIFICATION_SHADE_EXPAND_COLLAPSE,
+                cujTag = TAG_COLLAPSE,
+            ) {
+                reversed { goneToShadeSceneTransition() }
+            }
+            from(
+                Scenes.Shade,
+                to = Scenes.Gone,
+                key = ToSplitShade,
+                cuj = Cuj.CUJ_NOTIFICATION_SHADE_EXPAND_COLLAPSE,
+                cujTag = TAG_COLLAPSE,
+            ) {
+                reversed { goneToSplitShadeTransition() }
             }
             from(
                 Scenes.Shade,
                 to = Scenes.Lockscreen,
                 cuj = Cuj.CUJ_NOTIFICATION_SHADE_EXPAND_COLLAPSE,
+                cujTag = TAG_COLLAPSE,
             ) {
                 reversed { lockscreenToShadeSceneTransition() }
-                sharedElement(Notifications.Elements.NotificationStackPlaceholder, enabled = false)
+                sharedElement(Notifications.Elements.StackPlaceholder, enabled = false)
                 sharedElement(
                     Notifications.Elements.HeadsUpNotificationPlaceholder,
                     enabled = false,
@@ -194,13 +246,25 @@ class SceneContainerTransitions : SceneContainerTransitionsBuilder {
                 to = Scenes.Lockscreen,
                 key = ToSplitShade,
                 cuj = Cuj.CUJ_NOTIFICATION_SHADE_EXPAND_COLLAPSE,
+                cujTag = TAG_COLLAPSE,
             ) {
                 reversed { lockscreenToSplitShadeTransition() }
+            }
+            from(
+                Scenes.Shade,
+                to = Scenes.QuickSettings,
+                cuj = Cuj.CUJ_NOTIFICATION_SHADE_QS_EXPAND_COLLAPSE,
+                cujTag = TAG_EXPAND,
+            ) {
+                shadeToQuickSettingsTransition(
+                    animateQsTilesAsShared = { animateQsTilesViewModel.animateQsTiles }
+                )
             }
             from(
                 Scenes.Communal,
                 to = Scenes.Shade,
                 cuj = Cuj.CUJ_NOTIFICATION_SHADE_EXPAND_COLLAPSE,
+                cujTag = TAG_EXPAND,
             ) {
                 communalToShadeTransition()
             }
@@ -211,6 +275,54 @@ class SceneContainerTransitions : SceneContainerTransitionsBuilder {
             from(Overlays.Bouncer) { fromBouncerTransition() }
             from(Overlays.Bouncer, to = Scenes.Gone) { bouncerToGoneTransition() }
             from(Scenes.Dream, to = Overlays.Bouncer) { dreamToBouncerTransition() }
+            from(
+                Scenes.Dream,
+                to = Overlays.NotificationsShade,
+                cuj = Cuj.CUJ_NOTIFICATION_SHADE_EXPAND_COLLAPSE,
+                cujTag = TAG_EXPAND,
+            ) {
+                dreamToNotificationsShadeTransition(
+                    shadeExpansionMotion = shadeExpansionMotion,
+                    revealHaptics = revealHaptics,
+                )
+            }
+            from(
+                Scenes.Dream,
+                to = Overlays.QuickSettingsShade,
+                cuj = Cuj.CUJ_NOTIFICATION_SHADE_QS_EXPAND_COLLAPSE,
+                cujTag = TAG_EXPAND,
+            ) {
+                dreamToQuickSettingsShadeTransition(
+                    shadeExpansionMotion = shadeExpansionMotion,
+                    revealHaptics = revealHaptics,
+                )
+            }
+            from(
+                Overlays.NotificationsShade,
+                to = Scenes.Dream,
+                cuj = Cuj.CUJ_NOTIFICATION_SHADE_EXPAND_COLLAPSE,
+                cujTag = TAG_COLLAPSE,
+            ) {
+                reversed {
+                    dreamToNotificationsShadeTransition(
+                        shadeExpansionMotion = shadeExpansionMotion,
+                        revealHaptics = revealHaptics,
+                    )
+                }
+            }
+            from(
+                Overlays.QuickSettingsShade,
+                to = Scenes.Dream,
+                cuj = Cuj.CUJ_NOTIFICATION_SHADE_QS_EXPAND_COLLAPSE,
+                cujTag = TAG_COLLAPSE,
+            ) {
+                reversed {
+                    dreamToQuickSettingsShadeTransition(
+                        shadeExpansionMotion = shadeExpansionMotion,
+                        revealHaptics = revealHaptics,
+                    )
+                }
+            }
             from(Overlays.Bouncer, to = Scenes.Dream) { fromBouncerTransition() }
             from(Scenes.Lockscreen, to = Overlays.Bouncer) { lockscreenToBouncerTransition() }
             from(Overlays.Bouncer, to = Scenes.Lockscreen) { bouncerToLockscreenTransition() }
@@ -223,23 +335,71 @@ class SceneContainerTransitions : SceneContainerTransitionsBuilder {
                 fromBouncerTransition()
             }
             from(Scenes.Communal, to = Overlays.Bouncer) { communalToBouncerTransition() }
-            to(Overlays.NotificationsShade, cuj = Cuj.CUJ_NOTIFICATION_SHADE_EXPAND_COLLAPSE) {
+            to(
+                Overlays.NotificationsShade,
+                cuj = Cuj.CUJ_NOTIFICATION_SHADE_EXPAND_COLLAPSE,
+                cujTag = TAG_EXPAND,
+            ) {
                 toNotificationsShadeTransition(
                     shadeExpansionMotion = shadeExpansionMotion,
                     revealHaptics = revealHaptics,
                 )
             }
-            to(Overlays.QuickSettingsShade, cuj = Cuj.CUJ_NOTIFICATION_SHADE_QS_EXPAND_COLLAPSE) {
-                toQuickSettingsShadeTransition(
+            from(
+                Overlays.NotificationsShade,
+                to = Scenes.Gone,
+                cuj = Cuj.CUJ_NOTIFICATION_SHADE_EXPAND_COLLAPSE,
+                cujTag = TAG_COLLAPSE,
+            ) {
+                reversed {
+                    toNotificationsShadeTransition(
+                        shadeExpansionMotion = shadeExpansionMotion,
+                        revealHaptics = revealHaptics,
+                    )
+                }
+            }
+            from(
+                Scenes.Gone,
+                to = Overlays.NotificationsShade,
+                cuj = Cuj.CUJ_NOTIFICATION_SHADE_EXPAND_COLLAPSE,
+                cujTag = TAG_EXPAND,
+            ) {
+                toNotificationsShadeTransition(
                     shadeExpansionMotion = shadeExpansionMotion,
                     revealHaptics = revealHaptics,
                 )
             }
             from(
                 Scenes.Gone,
+                to = Overlays.QuickSettingsShade,
+                cuj = Cuj.CUJ_NOTIFICATION_SHADE_QS_EXPAND_COLLAPSE,
+                cujTag = TAG_EXPAND,
+            ) {
+                toQuickSettingsShadeTransition(
+                    shadeExpansionMotion = shadeExpansionMotion,
+                    revealHaptics = revealHaptics,
+                )
+            }
+            from(
+                Overlays.QuickSettingsShade,
+                to = Scenes.Gone,
+                cuj = Cuj.CUJ_NOTIFICATION_SHADE_QS_EXPAND_COLLAPSE,
+                cujTag = TAG_COLLAPSE,
+            ) {
+                reversed {
+                    toQuickSettingsShadeTransition(
+                        shadeExpansionMotion = shadeExpansionMotion,
+                        revealHaptics = revealHaptics,
+                    )
+                }
+            }
+
+            from(
+                Scenes.Gone,
                 to = Overlays.NotificationsShade,
-                key = SlightlyFasterShadeCollapse,
+                key = SlightlyFasterShadeTransition,
                 cuj = Cuj.CUJ_NOTIFICATION_SHADE_EXPAND_COLLAPSE,
+                cujTag = TAG_EXPAND,
             ) {
                 toNotificationsShadeTransition(
                     durationScale = 0.9,
@@ -250,8 +410,9 @@ class SceneContainerTransitions : SceneContainerTransitionsBuilder {
             from(
                 Scenes.Gone,
                 to = Overlays.QuickSettingsShade,
-                key = SlightlyFasterShadeCollapse,
+                key = SlightlyFasterShadeTransition,
                 cuj = Cuj.CUJ_NOTIFICATION_SHADE_QS_EXPAND_COLLAPSE,
+                cujTag = TAG_EXPAND,
             ) {
                 toQuickSettingsShadeTransition(
                     durationScale = 0.9,
@@ -263,6 +424,7 @@ class SceneContainerTransitions : SceneContainerTransitionsBuilder {
                 Scenes.Lockscreen,
                 to = Overlays.NotificationsShade,
                 cuj = Cuj.CUJ_NOTIFICATION_SHADE_EXPAND_COLLAPSE,
+                cujTag = TAG_EXPAND,
             ) {
                 lockscreenToNotificationsShadeTransition(
                     shadeExpansionMotion = shadeExpansionMotion,
@@ -272,8 +434,9 @@ class SceneContainerTransitions : SceneContainerTransitionsBuilder {
             from(
                 Scenes.Lockscreen,
                 to = Overlays.NotificationsShade,
-                key = SlightlyFasterShadeCollapse,
+                key = SlightlyFasterShadeTransition,
                 cuj = Cuj.CUJ_NOTIFICATION_SHADE_EXPAND_COLLAPSE,
+                cujTag = TAG_EXPAND,
             ) {
                 lockscreenToNotificationsShadeTransition(
                     durationScale = 0.9,
@@ -285,6 +448,7 @@ class SceneContainerTransitions : SceneContainerTransitionsBuilder {
                 Scenes.Lockscreen,
                 to = Overlays.QuickSettingsShade,
                 cuj = Cuj.CUJ_NOTIFICATION_SHADE_QS_EXPAND_COLLAPSE,
+                cujTag = TAG_EXPAND,
             ) {
                 lockscreenToQuickSettingsOverlayTransition(
                     shadeExpansionMotion = shadeExpansionMotion,
@@ -294,15 +458,77 @@ class SceneContainerTransitions : SceneContainerTransitionsBuilder {
             from(
                 Scenes.Lockscreen,
                 to = Overlays.QuickSettingsShade,
-                key = SlightlyFasterShadeCollapse,
+                key = SlightlyFasterShadeTransition,
                 cuj = Cuj.CUJ_NOTIFICATION_SHADE_QS_EXPAND_COLLAPSE,
+                cujTag = TAG_EXPAND,
             ) {
                 lockscreenToQuickSettingsOverlayTransition(
                     durationScale = 0.9,
                     shadeExpansionMotion = shadeExpansionMotion,
                     revealHaptics = revealHaptics,
                 )
+            }
+            from(
+                Overlays.NotificationsShade,
+                to = Scenes.Lockscreen,
+                cuj = Cuj.CUJ_NOTIFICATION_SHADE_EXPAND_COLLAPSE,
+                cujTag = TAG_COLLAPSE,
+            ) {
+                reversed {
+                    lockscreenToNotificationsShadeTransition(
+                        shadeExpansionMotion = shadeExpansionMotion,
+                        revealHaptics = revealHaptics,
+                    )
+                }
+            }
+            from(
+                Overlays.NotificationsShade,
+                to = Scenes.Lockscreen,
+                key = SlightlyFasterShadeTransition,
+                cuj = Cuj.CUJ_NOTIFICATION_SHADE_EXPAND_COLLAPSE,
+                cujTag = TAG_COLLAPSE,
+            ) {
+                reversed {
+                    lockscreenToNotificationsShadeTransition(
+                        durationScale = 0.9,
+                        shadeExpansionMotion = shadeExpansionMotion,
+                        revealHaptics = revealHaptics,
+                    )
+                }
+            }
+            from(
+                Overlays.QuickSettingsShade,
+                to = Scenes.Lockscreen,
+                cuj = Cuj.CUJ_NOTIFICATION_SHADE_QS_EXPAND_COLLAPSE,
+                cujTag = TAG_COLLAPSE,
+            ) {
+                reversed {
+                    lockscreenToQuickSettingsOverlayTransition(
+                        shadeExpansionMotion = shadeExpansionMotion,
+                        revealHaptics = revealHaptics,
+                    )
+                }
+            }
+            from(
+                Overlays.QuickSettingsShade,
+                to = Scenes.Lockscreen,
+                key = SlightlyFasterShadeTransition,
+                cuj = Cuj.CUJ_NOTIFICATION_SHADE_QS_EXPAND_COLLAPSE,
+                cujTag = TAG_COLLAPSE,
+            ) {
+                reversed {
+                    lockscreenToQuickSettingsOverlayTransition(
+                        durationScale = 0.9,
+                        shadeExpansionMotion = shadeExpansionMotion,
+                        revealHaptics = revealHaptics,
+                    )
+                }
             }
         }
+    }
+
+    private companion object {
+        const val TAG_EXPAND = "Expand"
+        const val TAG_COLLAPSE = "Collapse"
     }
 }

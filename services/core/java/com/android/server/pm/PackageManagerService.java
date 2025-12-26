@@ -64,6 +64,7 @@ import android.app.ApplicationExitInfo;
 import android.app.ApplicationPackageManager;
 import android.app.BroadcastOptions;
 import android.app.IActivityManager;
+import android.app.PendingIntent;
 import android.app.admin.DevicePolicyManagerInternal;
 import android.app.admin.IDevicePolicyManager;
 import android.app.admin.SecurityLog;
@@ -984,6 +985,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     private final ResolveIntentHelper mResolveIntentHelper;
     private final DexOptHelper mDexOptHelper;
     private final SuspendPackageHelper mSuspendPackageHelper;
+    private final AppLockPackageHelper mAppLockPackageHelper;
     private final DistractingPackageHelper mDistractingPackageHelper;
     private final StorageEventHelper mStorageEventHelper;
     private final FreeStorageHelper mFreeStorageHelper;
@@ -1954,6 +1956,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         mResolveIntentHelper = testParams.resolveIntentHelper;
         mDexOptHelper = testParams.dexOptHelper;
         mSuspendPackageHelper = testParams.suspendPackageHelper;
+        mAppLockPackageHelper = testParams.appLockPackageHelper;
         mDistractingPackageHelper = testParams.distractingPackageHelper;
 
         mSharedLibraries.setDeletePackageHelper(mDeletePackageHelper);
@@ -2142,6 +2145,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         mDexOptHelper = new DexOptHelper(this);
         mSuspendPackageHelper = new SuspendPackageHelper(this, mInjector, mBroadcastHelper,
                 mProtectedPackages);
+        mAppLockPackageHelper = new AppLockPackageHelper(mContext, this, mBroadcastHelper);
         mDistractingPackageHelper = new DistractingPackageHelper(this, mBroadcastHelper,
                 mSuspendPackageHelper);
         mStorageEventHelper = new StorageEventHelper(this, mDeletePackageHelper,
@@ -3510,7 +3514,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     }
 
     private boolean clearApplicationUserDataLIF(@NonNull Computer snapshot, String packageName,
-            int userId) {
+            int userId, boolean restorePregrantedPermissions) {
         if (packageName == null) {
             Slog.w(TAG, "Attempt to delete null packageName.");
             return false;
@@ -3522,7 +3526,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             Slog.w(TAG, "Package named '" + packageName + "' doesn't exist.");
             return false;
         }
-        mPermissionManager.resetRuntimePermissions(pkg, userId);
+        mPermissionManager.resetRuntimePermissions(pkg, userId, restorePregrantedPermissions);
 
         mAppDataHelper.clearAppDataLIF(pkg, userId,
                 FLAG_STORAGE_DE | FLAG_STORAGE_CE | FLAG_STORAGE_EXTERNAL);
@@ -4905,7 +4909,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         @android.annotation.EnforcePermission(android.Manifest.permission.CLEAR_APP_USER_DATA)
         @Override
         public void clearApplicationUserData(final String packageName,
-                final IPackageDataObserver observer, final int userId) {
+                final IPackageDataObserver observer, final int userId,
+                boolean restorePregrantedPermissions) {
             clearApplicationUserData_enforcePermission();
 
             final int callingUid = Binder.getCallingUid();
@@ -4945,7 +4950,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                             /* waitAppKilled= */ true)) {
                         try (PackageManagerTracedLock installLock = mInstallLock.acquireLock()) {
                             succeeded = clearApplicationUserDataLIF(snapshotComputer(), packageName,
-                                    userId);
+                                    userId, restorePregrantedPermissions);
                         }
                         mInstantAppRegistry.deleteInstantApplicationMetadata(packageName, userId);
                         synchronized (mLock) {
@@ -5507,6 +5512,39 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             } catch (PackageManager.NameNotFoundException e) {
                 return null;
             }
+        }
+
+        @Override
+        @android.annotation.EnforcePermission(Manifest.permission.LOCK_APPS)
+        @Nullable
+        public PendingIntent getEnableAppLockIntentForPackage(String pkgName, boolean enabled) {
+            getEnableAppLockIntentForPackage_enforcePermission();
+            if (!android.security.Flags.appLockApis()) {
+                return null;
+            }
+            final Computer snapshot = snapshotComputer();
+            final int callingUserId = UserHandle.getUserId(Binder.getCallingUid());
+            return mAppLockPackageHelper.getEnableAppLockIntentForPackage(snapshot, pkgName,
+                    callingUserId, enabled);
+        }
+
+        @Override
+        public boolean setPackageAppLockEnabled(String pkgName, int userId, boolean enabled) {
+            if (!android.security.Flags.appLockApis()) {
+                return false;
+            }
+            return mAppLockPackageHelper.setPackageAppLockEnabled(
+                    PackageManagerService.this::snapshotComputer, pkgName, userId, enabled,
+                    Binder.getCallingUid());
+        }
+
+        @Override
+        public boolean isPackageAppLockEnabled(String pkgName, int userId) {
+            if (!android.security.Flags.appLockApis()) {
+                return false;
+            }
+            final Computer snapshot = snapshotComputer();
+            return mAppLockPackageHelper.isPackageAppLockEnabled(snapshot, pkgName, userId);
         }
 
         @Override
@@ -6514,23 +6552,21 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             final PackageStateInternal packageState = snapshot
                     .getPackageStateForInstalledAndFiltered(packageName, callingUid, userId);
             if (packageState == null) {
-                if (com.android.window.flags.Flags.restoreUserAspectRatioSettingsUsingService()) {
-                    Slog.d(TAG, "Package: " + packageName + " not yet installed. "
-                            + "Scheduling aspect ratio update upon install, for aspect ratio: "
-                            + aspectRatio);
-                    // Pass along the request to `AppWindowLayoutSettingsService`, which will retry
-                    // to set the user aspect ratio after the package has been installed.
-                    final AppWindowLayoutSettingsService appWindowLayoutSettingsService =
-                            LocalServices.getService(AppWindowLayoutSettingsService.class);
-                    if (appWindowLayoutSettingsService == null) {
-                        Slog.w(TAG, "Could not find AppWindowLayoutSettingsService.");
-                        return;
-                    }
-                    // TODO(b/414381398): expose this API to the Settings app to call directly, so
-                    //  that `setUserMinAspectRatio()` becomes a no-op when app is not installed.
-                    appWindowLayoutSettingsService.awaitPackageInstallForAspectRatio(packageName,
-                            userId, aspectRatio);
+                Slog.d(TAG, "Package: " + packageName + " not yet installed. "
+                        + "Scheduling aspect ratio update upon install, for aspect ratio: "
+                        + aspectRatio);
+                // Pass along the request to `AppWindowLayoutSettingsService`, which will retry
+                // to set the user aspect ratio after the package has been installed.
+                final AppWindowLayoutSettingsService appWindowLayoutSettingsService =
+                        LocalServices.getService(AppWindowLayoutSettingsService.class);
+                if (appWindowLayoutSettingsService == null) {
+                    Slog.w(TAG, "Could not find AppWindowLayoutSettingsService.");
+                    return;
                 }
+                // TODO(b/414381398): expose this API to the Settings app to call directly, so
+                //  that `setUserMinAspectRatio()` becomes a no-op when app is not installed.
+                appWindowLayoutSettingsService.awaitPackageInstallForAspectRatio(packageName,
+                        userId, aspectRatio);
                 return;
             }
 
@@ -6735,6 +6771,32 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                 apexDirectories.add(apex.apexDirectory.getAbsolutePath());
             }
             return apexDirectories;
+        }
+
+        @Override
+        public int getAppUidForPccUid(int pccUid) {
+            final int callerUid = Binder.getCallingUid();
+            if (!Process.isPccUid(pccUid)) {
+                return Process.INVALID_UID;
+            }
+
+            final int userId = UserHandle.getUserId(pccUid);
+            final PackageSetting setting;
+            synchronized (mLock) {
+                setting = (PackageSetting) mSettings.getPccSettingLPr(
+                        UserHandle.getAppId(pccUid));
+            }
+            if (setting == null) {
+                Slog.w(TAG, "No application found for PCC UID " + pccUid);
+                return Process.INVALID_UID;
+            }
+            final Computer snapshot = snapshotComputer();
+            final PackageStateInternal ps = snapshot.getPackageStateForInstalledAndFiltered(
+                    setting.getPackageName(), callerUid, userId);
+            if (ps == null) {
+                return Process.INVALID_UID;
+            }
+            return UserHandle.getUid(userId, setting.getAppId());
         }
 
         @Override

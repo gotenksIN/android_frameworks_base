@@ -33,6 +33,7 @@ import android.hardware.input.IStickyModifierStateListener;
 import android.hardware.input.ITabletModeChangedListener;
 import android.hardware.input.IVirtualGamepad;
 import android.hardware.input.IVirtualInputDevice;
+import android.hardware.input.IVirtualKeyboard;
 import android.hardware.input.KeyboardLayoutSelectionResult;
 import android.hardware.input.TouchCalibration;
 import android.hardware.input.VirtualGamepadConfig;
@@ -90,7 +91,7 @@ interface IInputManager {
     boolean injectInputEvent(in InputEvent ev, int mode);
 
     @EnforcePermission(anyOf = {"INJECT_KEY_EVENTS", "INJECT_EVENTS"})
-    IVirtualInputDevice createVirtualKeyboard(in IBinder token,
+    IVirtualKeyboard createVirtualKeyboard(in IBinder token,
             in VirtualKeyboardConfig config);
 
     @EnforcePermission("INJECT_EVENTS")
@@ -166,12 +167,34 @@ interface IInputManager {
     @EnforcePermission("CONTROLLER_REMAPPING")
     @JavaPassthrough(annotation="@android.annotation.RequiresPermission(value = "
             + "android.Manifest.permission.CONTROLLER_REMAPPING)")
-    void clearAllControllerButtonRemapping(int userId, in InputDeviceIdentifier identifier);
+    void clearAllControllerButtonRemappings(int userId, in InputDeviceIdentifier identifier);
 
     @EnforcePermission("CONTROLLER_REMAPPING")
     @JavaPassthrough(annotation="@android.annotation.RequiresPermission(value = "
             + "android.Manifest.permission.CONTROLLER_REMAPPING)")
-    Map getControllerButtonRemapping(int userId, in InputDeviceIdentifier identifier);
+    Map getControllerButtonRemappings(int userId, in InputDeviceIdentifier identifier);
+
+    @EnforcePermission("CONTROLLER_REMAPPING")
+    @JavaPassthrough(annotation="@android.annotation.RequiresPermission(value = "
+            + "android.Manifest.permission.CONTROLLER_REMAPPING)")
+    void remapControllerAxis(int userId, in InputDeviceIdentifier identifier, int fromAxis,
+            int toAxis);
+
+    @EnforcePermission("CONTROLLER_REMAPPING")
+    @JavaPassthrough(annotation="@android.annotation.RequiresPermission(value = "
+            + "android.Manifest.permission.CONTROLLER_REMAPPING)")
+    void removeControllerAxisRemapping(int userId, in InputDeviceIdentifier identifier,
+            int fromAxis);
+
+    @EnforcePermission("CONTROLLER_REMAPPING")
+    @JavaPassthrough(annotation="@android.annotation.RequiresPermission(value = "
+            + "android.Manifest.permission.CONTROLLER_REMAPPING)")
+    void clearAllControllerAxisRemappings(int userId, in InputDeviceIdentifier identifier);
+
+    @EnforcePermission("CONTROLLER_REMAPPING")
+    @JavaPassthrough(annotation="@android.annotation.RequiresPermission(value = "
+            + "android.Manifest.permission.CONTROLLER_REMAPPING)")
+    Map getControllerAxisRemappings(int userId, in InputDeviceIdentifier identifier);
 
     // Registers an input devices changed listener.
     void registerInputDevicesChangedListener(IInputDevicesChangedListener listener);

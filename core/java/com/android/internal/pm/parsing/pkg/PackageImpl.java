@@ -20,6 +20,7 @@ import static java.util.Collections.emptyList;
 import static java.util.Collections.emptyMap;
 import static java.util.Collections.emptySet;
 
+import android.annotation.FlaggedApi;
 import android.annotation.LongDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -371,6 +372,12 @@ public class PackageImpl implements ParsedPackage, AndroidPackageInternal,
     @Nullable
     @DataClass.ParcelWith(ForInternedString.class)
     private String zygotePreloadName;
+    @Nullable
+    @DataClass.ParcelWith(ForInternedString.class)
+    private String mZygotePreloadNativeLib;
+    @Nullable
+    @DataClass.ParcelWith(ForInternedString.class)
+    private String mZygotePreloadNativeFunc;
     /**
      * @see AndroidPackage#getResizeableActivity()
      */
@@ -536,6 +543,7 @@ public class PackageImpl implements ParsedPackage, AndroidPackageInternal,
                 new ParsedUsesPermissionImpl(
                         permission,
                         /* usesPermissionFlags= */ 0,
+                        /* purposeStringResource= */ 0,
                         /* purposes= */ emptySet(),
                         /* generalPurposes= */ emptySet()));
         this.implicitPermissions = CollectionUtils.add(this.implicitPermissions,
@@ -1548,6 +1556,18 @@ public class PackageImpl implements ParsedPackage, AndroidPackageInternal,
         return zygotePreloadName;
     }
 
+    @Nullable
+    @Override
+    public String getZygotePreloadNativeFunc() {
+        return mZygotePreloadNativeFunc;
+    }
+
+    @Nullable
+    @Override
+    public String getZygotePreloadNativeLib() {
+        return mZygotePreloadNativeLib;
+    }
+
     @Override
     public boolean isAllowCrossUidActivitySwitchFromBelow() {
         return mAllowCrossUidActivitySwitchFromBelow;
@@ -1838,6 +1858,14 @@ public class PackageImpl implements ParsedPackage, AndroidPackageInternal,
         return getBoolean(Booleans.USE_EMBEDDED_DEX);
     }
 
+    /**
+     * @deprecated This API will be deprecated in the future and will always return false for
+     * newer platform versions.
+     * The future-proof mechanism to opt-in to cleartext traffic is to specify a
+     * <a href="{@docRoot}privacy-and-security/security-config#CleartextTrafficOptIn">Network
+     * Security Configuration file</a> in addition to android:usesCleartextTraffic in the
+     * manifest.
+     */
     @Override
     public boolean isCleartextTrafficAllowed() {
         return getBoolean(Booleans.USES_CLEARTEXT_TRAFFIC);
@@ -2541,7 +2569,14 @@ public class PackageImpl implements ParsedPackage, AndroidPackageInternal,
         return setBoolean(Booleans.USE_EMBEDDED_DEX, value);
     }
 
+    /**
+     * @deprecated This API will be deprecated in the future and will have no effect.
+     * Specify a <a href="{@docRoot}privacy-and-security/security-config#CleartextTrafficOptIn">
+     * Network Security Configuration file</a> in addition to this API to prevent future breakage.
+     */
+    @Deprecated
     @Override
+    @FlaggedApi(android.security.Flags.FLAG_DEPRECATE_USES_CLEARTEXT_TRAFFIC2)
     public PackageImpl setCleartextTrafficAllowed(boolean value) {
         return setBoolean(Booleans.USES_CLEARTEXT_TRAFFIC, value);
     }
@@ -2576,6 +2611,18 @@ public class PackageImpl implements ParsedPackage, AndroidPackageInternal,
     @Override
     public PackageImpl setZygotePreloadName(@Nullable String zygotePreloadName) {
         this.zygotePreloadName = zygotePreloadName;
+        return this;
+    }
+
+    @Override
+    public PackageImpl setZygotePreloadNativeLib(@Nullable String zygotePreloadNativeLib) {
+        this.mZygotePreloadNativeLib = zygotePreloadNativeLib;
+        return this;
+    }
+
+    @Override
+    public PackageImpl setZygotePreloadNativeFunc(@Nullable String zygotePreloadNativeFunc) {
+        this.mZygotePreloadNativeFunc = zygotePreloadNativeFunc;
         return this;
     }
 
@@ -2669,6 +2716,8 @@ public class PackageImpl implements ParsedPackage, AndroidPackageInternal,
         appInfo.uiOptions = uiOptions;
         appInfo.volumeUuid = volumeUuid;
         appInfo.zygotePreloadName = zygotePreloadName;
+        appInfo.zygotePreloadNativeLib = mZygotePreloadNativeLib;
+        appInfo.zygotePreloadNativeFunc = mZygotePreloadNativeFunc;
         appInfo.setGwpAsanMode(gwpAsanMode);
         appInfo.setMemtagMode(memtagMode);
         appInfo.setNativeHeapZeroInitialized(nativeHeapZeroInitialized);
@@ -3256,6 +3305,8 @@ public class PackageImpl implements ParsedPackage, AndroidPackageInternal,
         dest.writeInt(this.theme);
         dest.writeInt(this.uiOptions);
         dest.writeString(this.zygotePreloadName);
+        dest.writeString(this.mZygotePreloadNativeLib);
+        dest.writeString(this.mZygotePreloadNativeFunc);
         dest.writeStringArray(this.splitClassLoaderNames);
         dest.writeStringArray(this.splitCodePaths);
         dest.writeSparseArray(this.splitDependencies);
@@ -3455,6 +3506,8 @@ public class PackageImpl implements ParsedPackage, AndroidPackageInternal,
         this.theme = in.readInt();
         this.uiOptions = in.readInt();
         this.zygotePreloadName = in.readString();
+        this.mZygotePreloadNativeLib = in.readString();
+        this.mZygotePreloadNativeFunc = in.readString();
         this.splitClassLoaderNames = in.createStringArray();
         this.splitCodePaths = in.createStringArray();
         this.splitDependencies = in.readSparseArray(boot);

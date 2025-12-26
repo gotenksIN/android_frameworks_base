@@ -43,6 +43,7 @@ import android.os.vibrator.persistence.VibrationXmlParser;
 import android.os.vibrator.persistence.VibrationXmlSerializer;
 import android.provider.Settings;
 import android.service.notification.Adjustment;
+import android.service.notification.DynamicBundle;
 import android.service.notification.NotificationListenerService;
 import android.text.TextUtils;
 import android.util.Log;
@@ -82,6 +83,11 @@ public final class NotificationChannel implements Parcelable {
      */
     public static final String DEFAULT_CHANNEL_ID = "miscellaneous";
 
+    /**
+     * A reserved prefix for dynamic bundle channels
+     *  @hide
+     */
+    public static final String DYNAMIC_BUNDLE_PREFIX = "android.app.dynamic.";
     /**
      * A reserved id for a system channel reserved for promotional notifications.
      *  @hide
@@ -220,6 +226,7 @@ public final class NotificationChannel implements Parcelable {
     private static final String ATT_DEMOTE = "dem";
     private static final String ATT_DELETED_TIME_MS = "del_time";
     private static final String DELIMITER = ",";
+    private static final String ATT_BUNDLE = "is_bundle";
 
     /**
      * @hide
@@ -329,6 +336,7 @@ public final class NotificationChannel implements Parcelable {
      * is reset on each boot {@link NotificationAttentionHelper#buzzBeepBlinkLocked}.
      */
     private long mLastNotificationUpdateTimeMs = 0;
+    private boolean mIsBundleChannel;
 
     /**
      * Creates a notification channel.
@@ -419,6 +427,9 @@ public final class NotificationChannel implements Parcelable {
                 mVibrationEffect = mVibrationEffect.cropToLengthOrNull(MAX_VIBRATION_LENGTH);
             }
         }
+        if (Flags.nmContextualDisplay()) {
+            mIsBundleChannel = in.readBoolean();
+        }
     }
 
     @Override
@@ -489,6 +500,10 @@ public final class NotificationChannel implements Parcelable {
                 dest.writeInt(0);
             }
         }
+
+        if (Flags.nmContextualDisplay()) {
+            dest.writeBoolean(mIsBundleChannel);
+        }
     }
 
     /** @hide */
@@ -521,6 +536,7 @@ public final class NotificationChannel implements Parcelable {
         copy.setDeletedTimeMs(mDeletedTime);
         copy.setImportanceLockedByCriticalDeviceFunction(mImportanceLockedDefaultApp);
         copy.setLastNotificationUpdateTimeMs(mLastNotificationUpdateTimeMs);
+        copy.setIsBundleChannel(mIsBundleChannel);
 
         return copy;
     }
@@ -882,6 +898,16 @@ public final class NotificationChannel implements Parcelable {
     }
 
     /**
+     * Sets whether this channel is a reserved notification channel for bundling (silencing
+     * and minimizing).
+     *
+     * @hide
+     */
+    public void setIsBundleChannel(boolean isBundleChannel) {
+        mIsBundleChannel = isBundleChannel;
+    }
+
+    /**
      * Returns the id of this channel.
      */
     public String getId() {
@@ -1073,6 +1099,18 @@ public final class NotificationChannel implements Parcelable {
      */
     public @Nullable String getConversationId() {
         return mConversationId;
+    }
+
+    /**
+     * Returns whether this channel backs a bundle.
+     *
+     * @hide
+     */
+    @TestApi
+    @FlaggedApi(Flags.FLAG_NM_CONTEXTUAL_DISPLAY)
+    public boolean isBundleChannel() {
+        return SYSTEM_RESERVED_IDS.contains(mId)
+                || (Flags.nmContextualDisplay() && mIsBundleChannel);
     }
 
     /**
@@ -1269,6 +1307,9 @@ public final class NotificationChannel implements Parcelable {
                 parser.getAttributeValue(null, ATT_CONVERSATION_ID));
         setDemoted(safeBool(parser, ATT_DEMOTE, false));
         setImportantConversation(safeBool(parser, ATT_IMP_CONVERSATION, false));
+        if (Flags.nmContextualDisplay()) {
+            setIsBundleChannel(safeBool(parser, ATT_BUNDLE, false));
+        }
     }
 
     /**
@@ -1492,6 +1533,10 @@ public final class NotificationChannel implements Parcelable {
             out.attributeBoolean(null, ATT_IMP_CONVERSATION, isImportantConversation());
         }
 
+        if (Flags.nmContextualDisplay() && isBundleChannel()) {
+            out.attributeBoolean(null, ATT_BUNDLE, isBundleChannel());
+        }
+
         // mImportanceLockedDefaultApp has a different source of truth and so isn't written to
         // this xml file
 
@@ -1622,11 +1667,11 @@ public final class NotificationChannel implements Parcelable {
 
     /**
      * Get the reserved bundle channel ID for an Adjustment type
-     * @param the Adjustment type
+     * @param type the Adjustment type
      * @return the channel ID, or null if type is invalid
      * @hide
      */
-    public static @Nullable String getChannelIdForBundleType(@Adjustment.Types int type) {
+    public static @Nullable String getChannelIdForBundleType(int type) {
         switch (type) {
             case TYPE_CONTENT_RECOMMENDATION:
                 return RECS_ID;
@@ -1636,6 +1681,10 @@ public final class NotificationChannel implements Parcelable {
                 return PROMOTIONS_ID;
             case TYPE_SOCIAL_MEDIA:
                 return SOCIAL_MEDIA_ID;
+        }
+        if (Flags.nmContextualDisplay() && type >= DynamicBundle.DYNAMIC_RANGE_START
+                && type <= DynamicBundle.DYNAMIC_RANGE_END) {
+            return DYNAMIC_BUNDLE_PREFIX + type;
         }
         return null;
     }

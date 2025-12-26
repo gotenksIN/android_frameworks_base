@@ -95,7 +95,7 @@ public final class HsumBootUserInitializer {
         }
         var instance = new HsumBootUserInitializer(ums, ams, pms, contentResolver,
                 designateMainUserOnBoot(context), createInitialUserOnBoot(context),
-                isManagedDevice);
+                isManagedDevice, context);
         setDumpable(instance, context);
         return instance;
     }
@@ -104,7 +104,7 @@ public final class HsumBootUserInitializer {
     HsumBootUserInitializer(UserManagerService ums, ActivityManagerService ams,
             PackageManagerService pms, ContentResolver contentResolver,
             boolean shouldDesignateMainUser, boolean shouldCreateInitialUser,
-            boolean isManagedDevice) {
+            boolean isManagedDevice, Context context) {
         mUms = ums;
         mAms = ams;
         mPms = pms;
@@ -113,7 +113,8 @@ public final class HsumBootUserInitializer {
         mShouldCreateInitialUser = shouldCreateInitialUser;
         mIsManagedDevice = isManagedDevice;
         mDeviceProvisionedObserver = (Flags.hsuDeviceProvisioner()
-                    ? new HsuDeviceProvisioner(new Handler(Looper.getMainLooper()), contentResolver)
+                    ? new HsuDeviceProvisioner(
+                            context, new Handler(Looper.getMainLooper()), contentResolver, ums)
                     : new ContentObserver(new Handler(Looper.getMainLooper())) {
                         @Override
                         public void onChange(boolean selfChange) {
@@ -441,6 +442,8 @@ public final class HsumBootUserInitializer {
 
     @VisibleForTesting
     void observeDeviceProvisioning() {
+        // TODO(b/446947591): Remove the cast once Flags.hsuDeviceProvisioner() is completely
+        // pushed.
         if (Flags.hsuDeviceProvisioner()) {
             ((HsuDeviceProvisioner) mDeviceProvisionedObserver).init();
             return;
@@ -501,11 +504,6 @@ public final class HsumBootUserInitializer {
             // set the time now.
             mUms.setLastEnteredForegroundTimeToNow(bootUserId);
         }
-        // TODO(b/446947591): Remove the cast once Flags.hsuDeviceProvisioner() is completely
-        // pushed.
-        if (mDeviceProvisionedObserver instanceof HsuDeviceProvisioner) {
-            ((HsuDeviceProvisioner) mDeviceProvisionedObserver).setBootUser(bootUserId);
-        }
         final boolean started = mAms.startUserInForegroundWithListener(bootUserId,
                 /* unlockListener= */ null);
         if (!started) {
@@ -550,7 +548,8 @@ public final class HsumBootUserInitializer {
         return context.getResources().getBoolean(R.bool.config_createInitialUser);
     }
 
-    private static UserFilter getFullAdminFilter() {
+    @VisibleForTesting
+    static UserFilter getFullAdminFilter() {
         return UserFilter.builder().setRequiredFlags(FLAG_FULL | FLAG_ADMIN).build();
     }
 

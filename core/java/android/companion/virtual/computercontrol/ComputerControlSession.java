@@ -24,7 +24,6 @@ import android.annotation.Nullable;
 import android.app.Activity;
 import android.app.Notification;
 import android.app.PendingIntent;
-import android.companion.virtualdevice.flags.Flags;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -34,7 +33,10 @@ import android.hardware.display.DisplayManagerGlobal;
 import android.media.Image;
 import android.media.ImageReader;
 import android.os.Binder;
+import android.os.Handler;
+import android.os.HandlerThread;
 import android.os.RemoteException;
+import android.util.Log;
 import android.util.Size;
 import android.view.Display;
 import android.view.DisplayInfo;
@@ -66,6 +68,8 @@ import java.util.concurrent.Executor;
 public final class ComputerControlSession extends IComputerControlLifecycleCallback.Stub
         implements AutoCloseable {
 
+    private static final String TAG = ComputerControlSession.class.getSimpleName();
+
     /** @hide */
     public static final String ACTION_REQUEST_ACCESS =
             "android.companion.virtual.computercontrol.action.REQUEST_ACCESS";
@@ -73,6 +77,11 @@ public final class ComputerControlSession extends IComputerControlLifecycleCallb
     /** @hide */
     public static final String EXTRA_AUTOMATING_PACKAGE_NAME =
             "android.companion.virtual.computercontrol.extra.AUTOMATING_PACKAGE_NAME";
+
+    /**
+     * Unknown session creation error.
+     */
+    public static final int ERROR_UNKNOWN = 0;
 
     /**
      * Error code indicating that a new session cannot be created because the maximum number of
@@ -100,12 +109,18 @@ public final class ComputerControlSession extends IComputerControlLifecycleCallb
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
     @IntDef(prefix = "ERROR_", value = {
+            ERROR_UNKNOWN,
             ERROR_SESSION_LIMIT_REACHED,
             ERROR_DEVICE_LOCKED,
             ERROR_PERMISSION_DENIED})
     @Target({ElementType.TYPE_PARAMETER, ElementType.TYPE_USE})
     public @interface SessionCreationError {
     }
+
+    /**
+     * Unknown session close reason.
+     */
+    public static final int CLOSE_REASON_UNKNOWN = 0;
 
     /**
      * Close reason indicating the session was closed by the caller.
@@ -125,15 +140,28 @@ public final class ComputerControlSession extends IComputerControlLifecycleCallb
      */
     public static final int CLOSE_REASON_SESSION_TIMED_OUT = 3;
 
+    /**
+     * Close reason indicating that the session became empty.
+     */
+    public static final int CLOSE_REASON_SESSION_EMPTY = 4;
+
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
     @IntDef(prefix = "CLOSE_REASON_", value = {
+            CLOSE_REASON_UNKNOWN,
             CLOSE_REASON_CALLER_INITIATED,
             CLOSE_REASON_USER_INITIATED,
-            CLOSE_REASON_SESSION_TIMED_OUT})
+            CLOSE_REASON_SESSION_TIMED_OUT,
+            CLOSE_REASON_SESSION_EMPTY,
+    })
     @Target({ElementType.TYPE_PARAMETER, ElementType.TYPE_USE})
     public @interface SessionCloseReason {
     }
+
+    /**
+     * Unknown session block reason.
+     */
+    public static final int BLOCK_REASON_UNKNOWN = 0;
 
     /**
      * Reason indicating that the session was blocked due to secure content being present.
@@ -149,6 +177,7 @@ public final class ComputerControlSession extends IComputerControlLifecycleCallb
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
     @IntDef(prefix = "BLOCK_REASON_", value = {
+            BLOCK_REASON_UNKNOWN,
             BLOCK_REASON_SECURE_CONTENT,
             BLOCK_REASON_DISALLOWED_ACTIVITY_LAUNCH})
     @Target({ElementType.TYPE_PARAMETER, ElementType.TYPE_USE})
@@ -169,6 +198,9 @@ public final class ComputerControlSession extends IComputerControlLifecycleCallb
     public @interface Action {
     }
 
+    /** Auxiliary thread for any client-side work related to the computer control session. */
+    private final HandlerThread mHandlerThread;
+    private final Handler mHandler;
     @NonNull
     private final IComputerControlSession mSession;
     @NonNull
@@ -207,6 +239,9 @@ public final class ComputerControlSession extends IComputerControlLifecycleCallb
             @NonNull AccessibilityManager accessibilityManager,
             @NonNull Runnable onClosedRunnable,
             @NonNull DisplayManagerGlobal displayManagerGlobal) {
+        mHandlerThread = new HandlerThread("ComputerControlSession");
+        mHandlerThread.start();
+        mHandler = new Handler(mHandlerThread.getLooper());
         mSession = Objects.requireNonNull(session);
         mOnClosedRunnable = onClosedRunnable;
 
@@ -225,7 +260,7 @@ public final class ComputerControlSession extends IComputerControlLifecycleCallb
             e.rethrowFromSystemServer();
         }
 
-        mAccessibilityProxy = new ComputerControlAccessibilityProxy(displayId);
+        mAccessibilityProxy = new ComputerControlAccessibilityProxy(displayId, mHandler);
         accessibilityManager.registerDisplayProxy(mAccessibilityProxy);
     }
 
@@ -286,16 +321,19 @@ public final class ComputerControlSession extends IComputerControlLifecycleCallb
      */
     @Nullable
     public Image getScreenshot() {
-        if (Flags.computerControlBlockInputAndScreenshots()) {
-            synchronized (mLifecycle) {
-                if (!(mLifecycle.getCurrentState() instanceof LifecycleState.Active)) {
-                    return null;
-                }
+        synchronized (mLifecycle) {
+            if (!(mLifecycle.getCurrentState() instanceof LifecycleState.Active)) {
+                return null;
             }
         }
+        final Image image;
         synchronized (mImageReaderLock) {
-            return mImageReader == null ? null : mImageReader.acquireLatestImage();
+            image = mImageReader == null ? null : mImageReader.acquireLatestImage();
         }
+        if (image == null) {
+            Log.w(TAG, "getScreenshot: No new image available!");
+        }
+        return image;
     }
 
     /**
@@ -454,9 +492,11 @@ public final class ComputerControlSession extends IComputerControlLifecycleCallb
                 }
 
                 @Override
-                public void onBlocked(@SessionBlockReason int reason) {
+                public void onBlocked(@SessionBlockReason int reason,
+                        @Nullable String blockingPackage) {
                     Binder.withCleanCallingIdentity(
-                            () -> executor.execute(() -> callback.onBlocked(reason)));
+                            () -> executor.execute(
+                                    () -> callback.onBlocked(reason, blockingPackage)));
                 }
 
                 @Override
@@ -493,9 +533,9 @@ public final class ComputerControlSession extends IComputerControlLifecycleCallb
     }
 
     @Override
-    public void onBlocked(@SessionBlockReason int reason) {
+    public void onBlocked(@SessionBlockReason int reason, @Nullable String blockingPackage) {
         synchronized (mLifecycle) {
-            mLifecycle.onBlocked(reason);
+            mLifecycle.onBlocked(reason, blockingPackage);
         }
     }
 
@@ -506,6 +546,7 @@ public final class ComputerControlSession extends IComputerControlLifecycleCallb
             mLifecycle.onClosed(closeReason);
         }
         mOnClosedRunnable.run();
+        mHandlerThread.quitSafely();
     }
 
     /**
@@ -515,11 +556,9 @@ public final class ComputerControlSession extends IComputerControlLifecycleCallb
     @NonNull
     public List<AccessibilityWindowInfo> getAccessibilityWindows() {
         // TODO: b/452703212: Implement this inside system_server instead of the client.
-        if (Flags.computerControlBlockInputAndScreenshots()) {
-            synchronized (mLifecycle) {
-                if (!(mLifecycle.getCurrentState() instanceof LifecycleState.Active)) {
-                    return Collections.emptyList();
-                }
+        synchronized (mLifecycle) {
+            if (!(mLifecycle.getCurrentState() instanceof LifecycleState.Active)) {
+                return Collections.emptyList();
             }
         }
         return mAccessibilityProxy.getWindows();
@@ -543,6 +582,20 @@ public final class ComputerControlSession extends IComputerControlLifecycleCallb
     public void attachNotificationInfo(int notificationId, @Nullable String notificationTag) {
         try {
             mSession.attachNotificationInfo(notificationId, notificationTag);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Sets the intent launched when the user wants to preview the automation, or null if none.
+     *
+     * <p>This overrides the intent set in {@link
+     * ComputerControlSessionParams.Builder#setPreviewIntent}.
+     */
+    public void setPreviewIntent(@Nullable PendingIntent previewIntent) {
+        try {
+            mSession.setPreviewIntent(previewIntent);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -661,8 +714,10 @@ public final class ComputerControlSession extends IComputerControlLifecycleCallb
          *
          * @param reason the reason that the session initially entered the blocked
          *               state.
+         * @param blockingPackage the package name of the application that blocked the session,
+         *                        or null if the blocking package is not known.
          */
-        void onBlocked(@SessionBlockReason int reason);
+        void onBlocked(@SessionBlockReason int reason, @Nullable String blockingPackage);
 
         /**
          * Called when the computer control session is closed. This marks the end of the session's

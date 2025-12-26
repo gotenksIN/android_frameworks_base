@@ -88,6 +88,7 @@ flag {
     name: "scvh_set_focusable_api"
     namespace: "window_surfaces"
     description: "Adds a focusable flag to SurfaceControlViewHost"
+    is_exported: true
     bug: "425415517"
 }
 
@@ -137,4 +138,12 @@ flag {
     metadata {
         purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+    name: "mirror_surface_api"
+    namespace: "window_surfaces"
+    description: "Gate the api that allows apps to get mirrored surface control of its own window."
+    bug: "437391557"
+    is_exported: true
 }

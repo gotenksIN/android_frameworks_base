@@ -195,8 +195,15 @@ class Session extends IWindowSession.Stub implements IBinder.DeathRecipient {
         }
     }
 
-    boolean canCreateSystemApplicationOverlay() {
-        return mCanCreateSystemApplicationOverlay;
+    boolean canCreateSystemApplicationOverlay(@NonNull WindowState windowState) {
+        if (mCanCreateSystemApplicationOverlay) {
+            return true;
+        }
+        if (com.android.window.flags.Flags.virtualDisplayCanCreateSystemApplicationOverlay()
+                && windowState.isOnVirtualDisplay()) {
+            return windowState.getDisplayContent().getDisplayInfo().ownerUid == mUid;
+        }
+        return false;
     }
 
     void updateCanCreateSystemApplicationOverlay(PermissionManager permissionManager) {
@@ -300,11 +307,28 @@ class Session extends IWindowSession.Stub implements IBinder.DeathRecipient {
     }
 
     @Override
+    public int relayout2(@NonNull IWindow window, @Nullable WindowManager.LayoutParams attrs,
+            int requestedWidth, int requestedHeight, int viewFlags, int flags, int seq,
+            int syncSeqId, @Nullable SurfaceControl surface,
+            @Nullable WindowRelayoutResult outRelayoutResult) {
+        return relayout(window, attrs, requestedWidth, requestedHeight, viewFlags, flags, seq,
+                syncSeqId, outRelayoutResult, surface);
+    }
+
+    @Override
     public void relayoutAsync(IWindow window, WindowManager.LayoutParams attrs,
             int requestedWidth, int requestedHeight, int viewFlags, int flags, int seq,
             int lastSyncSeqId) {
         relayout(window, attrs, requestedWidth, requestedHeight, viewFlags, flags, seq,
                 lastSyncSeqId, null /* outRelayoutResult */, null /* outSurface */);
+    }
+
+    @Override
+    public void relayoutAsync2(@NonNull IWindow window, @Nullable WindowManager.LayoutParams attrs,
+            int requestedWidth, int requestedHeight, int viewFlags, int flags, int seq,
+            int lastSyncSeqId, @Nullable SurfaceControl surface) {
+        relayout(window, attrs, requestedWidth, requestedHeight, viewFlags, flags, seq,
+                lastSyncSeqId, null /* outRelayoutResult */, surface);
     }
 
     @Override
@@ -787,7 +811,7 @@ class Session extends IWindowSession.Stub implements IBinder.DeathRecipient {
         // Track non-system apps adding overlay/alert windows, so a notification can post for the
         // user to control their visibility.
         final boolean noSystemOverlayPermission =
-                !mCanAddInternalSystemWindow && !mCanCreateSystemApplicationOverlay;
+                !mCanAddInternalSystemWindow && !canCreateSystemApplicationOverlay(window);
         if (visible) {
             changed = mAlertWindows.add(window);
             if (type == TYPE_APPLICATION_OVERLAY) {

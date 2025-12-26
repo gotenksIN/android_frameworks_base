@@ -71,9 +71,9 @@ public enum DesktopExperienceFlags {
     ENABLE_ACTIVITY_EMBEDDING_SUPPORT_FOR_CONNECTED_DISPLAYS(
             Flags::enableActivityEmbeddingSupportForConnectedDisplays, true,
             Flags.FLAG_ENABLE_ACTIVITY_EMBEDDING_SUPPORT_FOR_CONNECTED_DISPLAYS),
-    ENABLE_APPLY_DESK_ACTIVATION_ON_USER_SWITCH(
-            Flags::applyDeskActivationOnUserSwitch, false,
-            Flags.FLAG_APPLY_DESK_ACTIVATION_ON_USER_SWITCH),
+    ENABLE_ADD_WINDOW_DECORATION_TO_ALL_TASKS(
+            Flags::enableAddWindowDecorationToAllTasks, false,
+            Flags.FLAG_ENABLE_ADD_WINDOW_DECORATION_TO_ALL_TASKS),
     ENABLE_APP_HANDLE_POSITION_REPORTING(Flags::enableAppHandlePositionReporting, false,
             Flags.FLAG_ENABLE_APP_HANDLE_POSITION_REPORTING),
     ENABLE_APP_TO_WEB_EDUCATION_ANIMATION(Flags::enableAppToWebEducationAnimation, false,
@@ -141,9 +141,6 @@ public enum DesktopExperienceFlags {
     ENABLE_DESKTOP_INVISIBLE_TASK_REMOVAL_CLEANUP_BUGFIX(
             Flags::enableDesktopInvisibleTaskRemovalCleanupBugfix, false,
             Flags.FLAG_ENABLE_DESKTOP_INVISIBLE_TASK_REMOVAL_CLEANUP_BUGFIX),
-    ENABLE_DESKTOP_SPLITSCREEN_TRANSITION_BUGFIX(
-            Flags::enableDesktopSplitscreenTransitionBugfix,false,
-            Flags.FLAG_ENABLE_DESKTOP_SPLITSCREEN_TRANSITION_BUGFIX),
     ENABLE_DESKTOP_TAB_TEARING_LAUNCH_ANIMATION(
             Flags::enableDesktopTabTearingLaunchAnimation, true,
             Flags.FLAG_ENABLE_DESKTOP_TAB_TEARING_LAUNCH_ANIMATION),
@@ -163,9 +160,6 @@ public enum DesktopExperienceFlags {
             Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MULTI_ACTIVITY_PIP_KEEP_PARENT_OPEN),
     ENABLE_DESKTOP_WINDOWING_PIP(Flags::enableDesktopWindowingPip, true,
             Flags.FLAG_ENABLE_DESKTOP_WINDOWING_PIP),
-    ENABLE_DESKTOP_WINDOWING_PIP_IN_OVERVIEW_BUGFIX(
-            Flags::enableDesktopWindowingPipInOverviewBugfix, false,
-            Flags.FLAG_ENABLE_DESKTOP_WINDOWING_PIP_IN_OVERVIEW_BUGFIX),
     ENABLE_DISPLAY_COMPAT_MODE(Flags::enableDisplayCompatMode, false,
             Flags.FLAG_ENABLE_DISPLAY_COMPAT_MODE),
     ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT(
@@ -197,8 +191,6 @@ public enum DesktopExperienceFlags {
             Flags.FLAG_ENABLE_FILTER_REMOVING_DISPLAY_BUGFIX),
     ENABLE_FREEFORM_BOX_SHADOWS(Flags::enableFreeformBoxShadows, false,
             Flags.FLAG_ENABLE_FREEFORM_BOX_SHADOWS),
-    ENABLE_FREEFORM_DISPLAY_LAUNCH_PARAMS(Flags::enableFreeformDisplayLaunchParams, true,
-            Flags.FLAG_ENABLE_FREEFORM_DISPLAY_LAUNCH_PARAMS),
     ENABLE_FULLSCREEN_WINDOW_CONTROLS(Flags::enableFullscreenWindowControls, false,
             Flags.FLAG_ENABLE_FULLSCREEN_WINDOW_CONTROLS),
     ENABLE_INDEPENDENT_BACK_IN_PROJECTED(Flags::enableIndependentBackInProjected, true,
@@ -213,9 +205,6 @@ public enum DesktopExperienceFlags {
             Flags.FLAG_ENABLE_INTERACTIVE_PICTURE_IN_PICTURE),
     ENABLE_KEYBOARD_SHORTCUTS_TO_SWITCH_DESKS(Flags::keyboardShortcutsToSwitchDesks, true,
             Flags.FLAG_KEYBOARD_SHORTCUTS_TO_SWITCH_DESKS),
-    ENABLE_LAUNCHER_HANDLE_GO_HOME_KEYBOARD_SHORTCUT(
-            Flags::enableLauncherHandleGoHomeKeyboardShortcut, false,
-            Flags.FLAG_ENABLE_LAUNCHER_HANDLE_GO_HOME_KEYBOARD_SHORTCUT),
     ENABLE_MIRROR_DISPLAY_NO_ACTIVITY(Flags::enableMirrorDisplayNoActivity, true,
             Flags.FLAG_ENABLE_MIRROR_DISPLAY_NO_ACTIVITY),
     ENABLE_MOVE_TO_NEXT_DISPLAY_SHORTCUT(Flags::enableMoveToNextDisplayShortcut, true,
@@ -251,9 +240,6 @@ public enum DesktopExperienceFlags {
             false, Flags.FLAG_ENABLE_PER_DISPLAY_WINDOW_DECOR_VIEW_HOST_POOL),
     ENABLE_PINNING_APP_WITH_CONTEXT_MENU(Flags::enablePinningAppWithContextMenu, true,
             Flags.FLAG_ENABLE_PINNING_APP_WITH_CONTEXT_MENU),
-    ENABLE_PRESENTATION_DISALLOWED_ON_UNFOCUSED_HOST_TASK(
-            Flags::enablePresentationDisallowedOnUnfocusedHostTask, false,
-            Flags.FLAG_ENABLE_PRESENTATION_DISALLOWED_ON_UNFOCUSED_HOST_TASK),
     ENABLE_PRESENTATION_FOR_CONNECTED_DISPLAYS(Flags::enablePresentationForConnectedDisplays, true,
             Flags.FLAG_ENABLE_PRESENTATION_FOR_CONNECTED_DISPLAYS),
     ENABLE_PROJECTED_DISPLAY_DESKTOP_MODE(Flags::enableProjectedDisplayDesktopMode, true,
@@ -279,8 +265,6 @@ public enum DesktopExperienceFlags {
             Flags.FLAG_RESTRICT_FREEFORM_HIDDEN_SYSTEM_BARS_TO_FILLING_TASKS),
     ENABLE_SEE_THROUGH_TASK_FRAGMENTS(Flags::enableSeeThroughTaskFragments,
             true, Flags.FLAG_ENABLE_SEE_THROUGH_TASK_FRAGMENTS),
-    ENABLE_SHRINK_WINDOW_BOUNDS_AFTER_DRAG(Flags::enableShrinkWindowBoundsAfterDrag, false,
-            Flags.FLAG_ENABLE_SHRINK_WINDOW_BOUNDS_AFTER_DRAG),
     ENABLE_SIZE_COMPAT_MODE_IMPROVEMENTS_FOR_CONNECTED_DISPLAYS(
             Flags::enableSizeCompatModeImprovementsForConnectedDisplays, true,
             Flags.FLAG_ENABLE_SIZE_COMPAT_MODE_IMPROVEMENTS_FOR_CONNECTED_DISPLAYS),
@@ -296,8 +280,6 @@ public enum DesktopExperienceFlags {
     ENABLE_TASK_MOVE_ALLOWED_LISTENER_API(Flags::enableTaskMoveAllowedListenerApi, false,
             Flags.FLAG_ENABLE_TASK_MOVE_ALLOWED_LISTENER_API),
     ENABLE_TILE_RESIZING(Flags::enableTileResizing, true, Flags.FLAG_ENABLE_TILE_RESIZING),
-    ENABLE_UPDATED_DISPLAY_CONNECTION_DIALOG(Flags::enableUpdatedDisplayConnectionDialog, false,
-            Flags.FLAG_ENABLE_UPDATED_DISPLAY_CONNECTION_DIALOG),
     ENABLE_UPSCALING_SIZE_COMPAT_ON_EXITING_DESKTOP_BUGFIX(
             Flags::enableUpscalingSizeCompatOnExitingDesktopBugfix, false,
             Flags.FLAG_ENABLE_UPSCALING_SIZE_COMPAT_ON_EXITING_DESKTOP_BUGFIX),
@@ -322,12 +304,6 @@ public enum DesktopExperienceFlags {
             Flags.FLAG_FORCE_CLOSE_TOP_TRANSPARENT_FULLSCREEN_TASK),
     FORM_FACTOR_BASED_DESKTOP_FIRST_SWITCH(Flags::formFactorBasedDesktopFirstSwitch, true,
             Flags.FLAG_FORM_FACTOR_BASED_DESKTOP_FIRST_SWITCH),
-    IGNORE_OVERRIDE_TASK_BOUNDS_IF_INCOMPATIBLE_WITH_DISPLAY(
-            Flags::ignoreOverrideTaskBoundsIfIncompatibleWithDisplay, false,
-            Flags.FLAG_IGNORE_OVERRIDE_TASK_BOUNDS_IF_INCOMPATIBLE_WITH_DISPLAY),
-    MOVE_TO_NEXT_DISPLAY_SHORTCUT_WITH_PROJECTED_MODE(
-            Flags::moveToNextDisplayShortcutWithProjectedMode, true,
-            Flags.FLAG_MOVE_TO_NEXT_DISPLAY_SHORTCUT_WITH_PROJECTED_MODE),
     REPARENT_WINDOW_TOKEN_API(Flags::reparentWindowTokenApi, true,
             Flags.FLAG_REPARENT_WINDOW_TOKEN_API),
     REPOSITORY_BASED_PERSISTENCE(Flags::repositoryBasedPersistence, false,
@@ -341,6 +317,9 @@ public enum DesktopExperienceFlags {
     TOGGLE_FULLSCREEN_STATE_VIA_FULLSCREEN_KEY(
             Flags::toggleFullscreenStateViaFullscreenKey, false,
             Flags.FLAG_TOGGLE_FULLSCREEN_STATE_VIA_FULLSCREEN_KEY),
+    UPDATE_TDAS_TASK_MOVE_ALLOWED_ON_DESKTOP_FIRST_CHANGE(
+            Flags::updateTdasTaskMoveAllowedOnDesktopFirstChange, false,
+            Flags.FLAG_UPDATE_TDAS_TASK_MOVE_ALLOWED_ON_DESKTOP_FIRST_CHANGE),
     USE_RESOURCES_FROM_CONTEXT_TO_CREATE_DRAWABLE_ICONS(
             com.android.graphics.flags.Flags::useResourcesFromContextToCreateDrawableIcons,
             true,

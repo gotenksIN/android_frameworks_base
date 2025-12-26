@@ -23,6 +23,7 @@ import static android.Manifest.permission.MANAGE_USERS;
 import static android.Manifest.permission.QUERY_USERS;
 import static android.app.role.RoleManager.ROLE_SUPERVISION;
 import static android.app.role.RoleManager.ROLE_SYSTEM_SUPERVISION;
+import static android.content.pm.PackageInstaller.SessionParams.MAX_PACKAGE_NAME_LENGTH;
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
 import static android.provider.Settings.Secure.BROWSER_CONTENT_FILTERS_ENABLED;
 import static android.provider.Settings.Secure.SEARCH_CONTENT_FILTERS_ENABLED;
@@ -35,6 +36,9 @@ import android.annotation.Nullable;
 import android.annotation.SuppressLint;
 import android.annotation.UserIdInt;
 import android.app.KeyguardManager;
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.admin.DevicePolicyManager;
 import android.app.admin.DevicePolicyManagerInternal;
 import android.app.role.OnRoleHoldersChangedListener;
@@ -43,6 +47,7 @@ import android.app.supervision.ISupervisionListener;
 import android.app.supervision.ISupervisionManager;
 import android.app.supervision.PackagePolicy;
 import android.app.supervision.Policy;
+import android.app.supervision.PolicyKey;
 import android.app.supervision.SupervisionManager;
 import android.app.supervision.SupervisionManagerInternal;
 import android.app.supervision.SupervisionRecoveryInfo;
@@ -75,6 +80,8 @@ import android.util.SparseArray;
 import com.android.internal.R;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
+import com.android.internal.content.PackageMonitor;
+import com.android.internal.notification.SystemNotificationChannels;
 import com.android.internal.util.DumpUtils;
 import com.android.internal.util.FunctionalUtils.RemoteExceptionIgnoringConsumer;
 import com.android.internal.util.IndentingPrintWriter;
@@ -85,12 +92,14 @@ import com.android.server.appbinding.AppBindingService;
 import com.android.server.appbinding.AppServiceConnection;
 import com.android.server.appbinding.finders.SupervisionAppServiceFinder;
 import com.android.server.pm.UserManagerInternal;
+import com.android.server.supervision.SupervisionUserData.PolicyData;
 import com.android.server.utils.Slogf;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
@@ -110,6 +119,8 @@ public class SupervisionService extends ISupervisionManager.Stub {
     @VisibleForTesting
     static final String ACTION_CONFIRM_SUPERVISION_CREDENTIALS =
             "android.app.supervision.action.CONFIRM_SUPERVISION_CREDENTIALS";
+
+    @VisibleForTesting static final String SETTINGS_PACKAGE_NAME = "com.android.settings";
 
     @VisibleForTesting
     static final List<String> SYSTEM_ENTITIES =
@@ -132,6 +143,7 @@ public class SupervisionService extends ISupervisionManager.Stub {
     // BackgroundThread for its connection callbacks. Using the same thread would block while
     // waiting for those callbacks, preventing the new connections from being perceived.
     final Handler mServiceThreadHandler;
+    final SupervisionPackageMonitor mPackageMonitor = new SupervisionPackageMonitor();
     public static final boolean DEBUG = false; // DO NOT SUBMIT WITH TRUE
 
     @GuardedBy("getLockObject()")
@@ -222,7 +234,7 @@ public class SupervisionService extends ISupervisionManager.Stub {
         }
         final Intent intent = new Intent(ACTION_CONFIRM_SUPERVISION_CREDENTIALS);
         // explicitly set the package for security
-        intent.setPackage("com.android.settings");
+        intent.setPackage(SETTINGS_PACKAGE_NAME);
 
         return intent;
     }
@@ -230,6 +242,10 @@ public class SupervisionService extends ISupervisionManager.Stub {
     /** Set the Supervision Recovery Info. */
     @Override
     public void setSupervisionRecoveryInfo(SupervisionRecoveryInfo recoveryInfo) {
+        if (Flags.supervisionRecoveryImprovements()) {
+            checkCallAuthorization(isCallerSystem());
+        }
+
         if (!Flags.persistentSupervisionSettings()) {
             SupervisionRecoveryInfoStorage.getInstance(mInjector.context)
                     .saveRecoveryInfo(recoveryInfo);
@@ -246,7 +262,13 @@ public class SupervisionService extends ISupervisionManager.Stub {
     /** Returns the Supervision Recovery Info or null if recovery is not set. */
     @Override
     public SupervisionRecoveryInfo getSupervisionRecoveryInfo() {
-        if (Flags.persistentSupervisionSettings()) {
+        if (Flags.supervisionRecoveryImprovements()) {
+            checkCallAuthorization(isCallerSystem());
+
+            synchronized (getLockObject()) {
+                return mSupervisionSettings.getRecoveryInfo();
+            }
+        } else if (Flags.persistentSupervisionSettings()) {
             return mSupervisionSettings.getRecoveryInfo();
         }
         return SupervisionRecoveryInfoStorage.getInstance(mInjector.context).loadRecoveryInfo();
@@ -331,15 +353,33 @@ public class SupervisionService extends ISupervisionManager.Stub {
         }
     }
 
+    /**
+     * Returns true if the user has at least one supervision credential recovery method available.
+     */
+    @Override
+    public boolean canLaunchPinRecovery(int userId) {
+        if (!Flags.enableSupervisionSettingsUiUpdates()) {
+            return false;
+        }
+        List<ResolveInfo> activities = querySupervisionApprovalActivities(userId);
+        SupervisionRecoveryInfo recoveryInfo = getSupervisionRecoveryInfo();
+        return !activities.isEmpty()
+                || (recoveryInfo != null && !recoveryInfo.getAccountName().isEmpty());
+    }
+
     @Override
     public List<Policy> getPolicies(@UserIdInt int userId) {
-        return mSupervisionSettings.getUserData(userId).policies;
+        return mSupervisionSettings.getUserData(userId).policies.getPolicies();
     }
 
     @Override
     public void setPolicy(@UserIdInt int userId, @NonNull Policy policy) {
-        // TODO(b/446218039): Implement policy verification and storage.
-
+        synchronized (getLockObject()) {
+            validatePolicyLocked(userId, policy);
+            policy.incrementVersion();
+            getUserDataLocked(userId).policies.add(policy);
+            mSupervisionSettings.saveUserData();
+        }
         executeOnServiceThread(
                 () -> {
                     applyPolicy(userId, policy);
@@ -348,10 +388,20 @@ public class SupervisionService extends ISupervisionManager.Stub {
                 });
     }
 
+    /**
+     * Returns true if the user has a verified recovery email or if there exist alternative
+     * recovery methods.
+     */
     @Override
-    public List<ResolveInfo> querySupervisionApprovalActivities(int userId) {
-        // TODO(b/444529979): Implement the querySupervisionApprovalActivities.
-        return List.of();
+    public boolean hasValidRecoveryMethod(int userId) {
+        if (!Flags.enableSupervisionSettingsUiUpdates()) {
+            return false;
+        }
+        List<ResolveInfo> activities = querySupervisionApprovalActivities(userId);
+        SupervisionRecoveryInfo recoveryInfo = getSupervisionRecoveryInfo();
+        return !activities.isEmpty()
+                || (recoveryInfo != null
+                        && (recoveryInfo.getState() == SupervisionRecoveryInfo.STATE_VERIFIED));
     }
 
     private void clearAllPolicies(@UserIdInt int userId) {
@@ -379,8 +429,16 @@ public class SupervisionService extends ISupervisionManager.Stub {
         String packageName = policy.getPackageName();
         int restrictionType = policy.getRestrictionType();
         switch (restrictionType) {
-            case PackagePolicy.RESTRICTION_TYPE_BLOCKED ->
-                    setApplicationHiddenForUser(userId, packageName, policy.isEnabled());
+            case PackagePolicy.RESTRICTION_TYPE_BLOCKED -> {
+                setApplicationHiddenForUser(userId, packageName, policy.isEnabled());
+                synchronized (getLockObject()) {
+                    PolicyData policyData =
+                            getUserDataLocked(userId).policies.get(policy.getPolicyKey());
+                    if (policyData != null) {
+                        policyData.hasPendingNotification = true;
+                    }
+                }
+            }
             default ->
                     Slogf.w(
                             SupervisionLog.TAG,
@@ -390,13 +448,167 @@ public class SupervisionService extends ISupervisionManager.Stub {
         }
     }
 
+    @Override
+    public List<ResolveInfo> querySupervisionApprovalActivities(int userId) {
+        checkCallAuthorization(isCallerSystem());
+
+        if (UserHandle.getUserId(Binder.getCallingUid()) != userId) {
+            enforcePermission(INTERACT_ACROSS_USERS);
+        }
+
+        UserHandle userHandle = UserHandle.of(userId);
+
+        PackageManager packageManager =
+                mInjector
+                        .context
+                        .createContextAsUser(userHandle, /* flags= */ 0)
+                        .getPackageManager();
+        List<String> supervisionPackages =
+                mInjector.getRoleHoldersAsUser(ROLE_SUPERVISION, userHandle);
+
+        Intent intent = new Intent(SupervisionManager.ACTION_CONFIRM_SUPERVISION_APPROVAL);
+        List<ResolveInfo> availableMethods = new ArrayList<>();
+
+        for (String packageName : supervisionPackages) {
+            intent.setPackage(packageName);
+            List<ResolveInfo> resolveInfo =
+                    packageManager.queryIntentActivities(intent, PackageManager.MATCH_DEFAULT_ONLY);
+            availableMethods.addAll(resolveInfo);
+        }
+
+        // Sort alphabetically by label loaded using the user-specific package manager
+        availableMethods.sort(
+                Comparator.comparing(ri -> ri.loadLabel(packageManager), CharSequence::compare));
+
+        return availableMethods;
+    }
+
     private void setApplicationHiddenForUser(
             @UserIdInt int userId, String packageName, boolean hidden) {
         DevicePolicyManagerInternal dpmi = mInjector.getDpmInternal();
         if (dpmi != null) {
-            dpmi.setApplicationHiddenBySystem(SupervisionManager.SUPERVISION_SYSTEM_ENTITY,
-                    packageName, userId, hidden);
+            dpmi.setApplicationHiddenBySystem(
+                    SupervisionManager.SUPERVISION_SYSTEM_ENTITY, packageName, userId, hidden);
         }
+    }
+
+    private void validatePolicyLocked(@UserIdInt int userId, @NonNull Policy policy) {
+        switch (policy) {
+            case PackagePolicy pp -> validatePackagePolicy(pp);
+            default -> {
+                throw new IllegalArgumentException(
+                        "Unsupported policy type: " + policy.getClass().getSimpleName());
+            }
+        }
+        long currentPolicyVersion =
+                getUserDataLocked(userId).policies.getCurrentVersion(policy.getPolicyKey());
+        if (currentPolicyVersion != policy.getVersion()) {
+            throw new IllegalArgumentException("Policy version mismatch.");
+        }
+    }
+
+    private void validatePackagePolicy(@NonNull PackagePolicy policy) {
+        if (policy.getPackageName().isEmpty()
+                || policy.getPackageName().length() > MAX_PACKAGE_NAME_LENGTH
+                || policy.getRestrictionType() != PackagePolicy.RESTRICTION_TYPE_BLOCKED) {
+            throw new IllegalArgumentException("Invalid package policy");
+        }
+    }
+
+    private void postApplicationHiddenNotification(
+            @UserIdInt int userId, String packageName, boolean hidden) {
+        String title = mInjector.context.getString(R.string.supervision_blocked_app_title);
+        CharSequence appLabel;
+        try {
+            PackageManager pm = mInjector.getPackageManager();
+            appLabel =
+                    pm.getApplicationInfoAsUser(
+                                    packageName,
+                                    PackageManager.MATCH_UNINSTALLED_PACKAGES,
+                                    UserHandle.of(userId))
+                            .loadLabel(pm);
+        } catch (PackageManager.NameNotFoundException e) {
+            Slogf.e(
+                    SupervisionLog.TAG,
+                    "postApplicationHiddenNotification: package not found " + packageName);
+            // Package is uninstalled, just skip the notification.
+            return;
+        }
+
+        String text =
+                mInjector.context.getString(
+                        hidden
+                                ? R.string.supervision_blocked_app_content
+                                : R.string.supervision_unblocked_app_content,
+                        appLabel);
+
+        final Intent intent =
+                hidden
+                        ? new Intent(Settings.ACTION_SUPERVISION_SETTINGS)
+                                .setPackage(SETTINGS_PACKAGE_NAME)
+                        : mInjector.getPackageManager().getLaunchIntentForPackage(packageName);
+
+        final Bundle extras = new Bundle();
+        extras.putString(
+                Notification.EXTRA_SUBSTITUTE_APP_NAME,
+                mInjector.context.getString(R.string.notification_channel_parental_controls));
+        final Notification notification =
+                new Notification.Builder(
+                                mInjector.context, SystemNotificationChannels.PARENTAL_CONTROLS)
+                        .setSmallIcon(R.drawable.ic_account_child_invert)
+                        .setTicker(title)
+                        .setColor(
+                                mInjector.context.getColor(
+                                        R.color.system_notification_accent_color))
+                        .setContentTitle(title)
+                        .setContentText(text)
+                        .setContentIntent(createActivityPendingIntent(intent, userId))
+                        .setExtras(extras)
+                        .build();
+        mInjector
+                .getNotificationManager()
+                .notifyAsUser(
+                        /* tag= */ packageName, /* id= */ 0, notification, UserHandle.of(userId));
+    }
+
+    private PendingIntent createActivityPendingIntent(Intent intent, int userId) {
+        if (intent == null) {
+            return null;
+        }
+        return PendingIntent.getActivityAsUser(
+                mInjector.context,
+                /* requestCode= */ 0,
+                intent,
+                PendingIntent.FLAG_IMMUTABLE,
+                /* options= */ null,
+                UserHandle.of(userId));
+    }
+
+    @Override
+    public List<UserInfo> getUsersThatRequirePlatformCredential() {
+        if (!Flags.enableSupervisionSettingsUiUpdates()) {
+            return List.of();
+        }
+        List<UserInfo> users = mInjector
+                .getUserManagerInternal()
+                .getUsers(UserManagerInternal.USER_FILTER_WITH_ALL_COMPLETE_USERS);
+        return users.stream().filter(userInfo -> {
+            if (!isSupervisionEnabledForUser(userInfo.id)) {
+                return false;
+            }
+            // Get active supervision role holders for this user.
+            List<String> roleHolders =
+                    mInjector.getRoleHoldersAsUser(ROLE_SUPERVISION, UserHandle.of(userInfo.id));
+            // Get all packages that have a supervision approval activity for this user.
+            List<String> packagesWithSupervisionApprovalActivities =
+                    querySupervisionApprovalActivities(userInfo.id)
+                            .stream()
+                            .map(resolveInfo -> resolveInfo.activityInfo.packageName)
+                            .toList();
+            return roleHolders.isEmpty() || roleHolders
+                    .stream()
+                    .anyMatch(pkg -> !packagesWithSupervisionApprovalActivities.contains(pkg));
+        }).toList();
     }
 
     /**
@@ -719,9 +931,15 @@ public class SupervisionService extends ISupervisionManager.Stub {
     private void updateContentFilterSetting(@UserIdInt int userId, boolean enabled, String key) {
         try {
             final ContentResolver contentResolver = mInjector.context.getContentResolver();
-            final int value = Settings.Secure.getIntForUser(contentResolver, key, userId);
-            if (!enabled || value != 1) {
-                Settings.Secure.putIntForUser(contentResolver, key, value * -1, userId);
+            if (Flags.enableSupervisionSettingsUiUpdates()) {
+                if (!enabled) {
+                    Settings.Secure.putIntForUser(contentResolver, key, 0, userId);
+                }
+            } else {
+                final int value = Settings.Secure.getIntForUser(contentResolver, key, userId);
+                if (!enabled || value != 1) {
+                    Settings.Secure.putIntForUser(contentResolver, key, value * -1, userId);
+                }
             }
         } catch (Settings.SettingNotFoundException ignored) {
             // Ignore the exception and do not change the value as no value has been set.
@@ -801,7 +1019,7 @@ public class SupervisionService extends ISupervisionManager.Stub {
     }
 
     private boolean isCallerSystem() {
-        return UserHandle.isSameApp(Binder.getCallingUid(), Process.SYSTEM_UID);
+        return UserHandle.isSameApp(mInjector.getCallingUid(), Process.SYSTEM_UID);
     }
 
     /**
@@ -841,6 +1059,7 @@ public class SupervisionService extends ISupervisionManager.Stub {
         private UserManagerInternal mUserManagerInternal;
         private ServiceThread mServiceThread;
         private Handler mServiceThreadHandler;
+        private NotificationManager mNotificationManager;
 
         Injector(Context context) {
             this.context = context;
@@ -889,6 +1108,13 @@ public class SupervisionService extends ISupervisionManager.Stub {
                 mPackageManagerInternal = LocalServices.getService(PackageManagerInternal.class);
             }
             return mPackageManagerInternal;
+        }
+
+        NotificationManager getNotificationManager() {
+            if (mNotificationManager == null) {
+                mNotificationManager = context.getSystemService(NotificationManager.class);
+            }
+            return mNotificationManager;
         }
 
         void addOnRoleHoldersChangedListenerAsUser(
@@ -940,6 +1166,62 @@ public class SupervisionService extends ISupervisionManager.Stub {
             }
             return mServiceThreadHandler;
         }
+
+        // TODO: b/458276188 - potentially get rid of this if we can use a robolectric shadow to
+        //  set the calling uid instead.
+        /** Provides a way to override the calling uid for testing purposes. */
+        int getCallingUid() {
+            return Binder.getCallingUid();
+        }
+    }
+
+    final class SupervisionPackageMonitor extends PackageMonitor {
+        @Override
+        public void onPackageAppeared(String packageName, int reason) {
+            handlePackageHiddenStateChange(packageName);
+        }
+
+        @Override
+        public void onPackageDisappeared(String packageName, int reason) {
+            handlePackageHiddenStateChange(packageName);
+        }
+
+        private void handlePackageHiddenStateChange(String packageName) {
+            final int userId = getChangingUserId();
+            final boolean isHidden =
+                    mInjector
+                            .getPackageManager()
+                            .getApplicationHiddenSettingAsUser(packageName, UserHandle.of(userId));
+
+            boolean shouldPostNotification = false;
+            synchronized (getLockObject()) {
+                final SupervisionUserData data = getUserDataLocked(userId);
+                final PolicyKey policyKey =
+                        PolicyKey.builder()
+                                .setType(Policy.PACKAGE_POLICY_IDENTIFIER)
+                                .setPackageName(packageName)
+                                .build();
+                final PolicyData policyData = data.policies.get(policyKey);
+
+                if (policyData == null) {
+                    return;
+                }
+
+                if (policyData.policy instanceof PackagePolicy pp) {
+                    if (policyData.hasPendingNotification
+                            && pp.getRestrictionType() == PackagePolicy.RESTRICTION_TYPE_BLOCKED
+                            && pp.isEnabled() == isHidden) {
+                        shouldPostNotification = true;
+                        policyData.hasPendingNotification = false;
+                    }
+                }
+            }
+
+            // Post the notification if needed, after releasing the lock.
+            if (shouldPostNotification) {
+                postApplicationHiddenNotification(userId, packageName, isHidden);
+            }
+        }
     }
 
     /** Publishes local and binder services and allows the service to act during initialization. */
@@ -963,6 +1245,18 @@ public class SupervisionService extends ISupervisionManager.Stub {
             publishBinderService(Context.SUPERVISION_SERVICE, mSupervisionService);
             if (Flags.enableSyncWithDpm()) {
                 registerProfileOwnerListener();
+            }
+        }
+
+        @Override
+        public void onBootPhase(int phase) {
+            if (Flags.enableSupervisionManagerPolicyApis()
+                    && phase == SystemService.PHASE_BOOT_COMPLETED) {
+                mSupervisionService.mPackageMonitor.register(
+                        getContext(),
+                        mSupervisionService.mServiceThreadHandler.getLooper(),
+                        UserHandle.ALL,
+                        /* externalStorage= */ false);
             }
         }
 

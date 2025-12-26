@@ -147,6 +147,18 @@ public class AdbDebuggingManager {
     // Polls for a tls port property when adb wifi is enabled
     private AdbConnectionPortPoller mConnectionPortPoller;
 
+    /**
+     * The port used for the ADB over Wi-Fi TLS connection.
+     *
+     * <p>This value is updated when the TLS server starts and is reset to 0 when wireless debugging
+     * is disabled. A value of 0 indicates that the port is not active or known.
+     *
+     * <p>This field is marked as volatile to ensure that writes from the {@link
+     * AdbDebuggingHandler} thread are immediately visible to other threads that may call {@link
+     * #getAdbWirelessPort()}.
+     */
+    private volatile int mAdbWifiTlsPort = 0;
+
     private final Ticker mTicker;
 
     public AdbDebuggingManager(Context context) {
@@ -903,6 +915,7 @@ public class AdbDebuggingManager {
                         break;
                     }
                     mAdbWifiEnabled = false;
+                    mAdbWifiTlsPort = 0;
                     mAdbConnectionInfo.clear();
                     mAdbNetworkMonitor.unregister();
                     stopAdbdWifi();
@@ -1008,7 +1021,7 @@ public class AdbDebuggingManager {
                 case MSG_SERVER_CONNECTED -> {
                     int port = (int) msg.obj;
                     onAdbdWifiServerConnected(port);
-                    mAdbConnectionInfo.setPort(port);
+                    mAdbWifiTlsPort = port;
                 }
                 case MSG_SERVER_DISCONNECTED -> {
                     if (!mAdbWifiEnabled) {
@@ -1211,8 +1224,18 @@ public class AdbDebuggingManager {
         private boolean verifyWifiNetwork(String bssid, String ssid) {
             // Check against a list of user-trusted networks.
             if (mAdbKeyStore.isTrustedNetwork(bssid, ssid)) {
+                Slog.d(
+                        TAG,
+                        TextUtils.formatSimple(
+                                "Network {bssid=%s, ssid=%s} is a trusted network", bssid, ssid));
                 return true;
             }
+            Slog.d(
+                    TAG,
+                    TextUtils.formatSimple(
+                            "Network {bssid=%s, ssid=%s} isn't a trusted network, Displaying auth "
+                                    + "prompt",
+                            bssid, ssid));
 
             // Ask user to confirm using wireless debugging on this network.
             startConfirmationForNetwork(ssid, bssid);
@@ -1523,7 +1546,7 @@ public class AdbDebuggingManager {
 
     /** Returns the port adbwifi is currently opened on. */
     public int getAdbWirelessPort() {
-        return mAdbConnectionInfo.getPort();
+        return mAdbWifiTlsPort;
     }
 
     /** Returns the list of paired devices. */

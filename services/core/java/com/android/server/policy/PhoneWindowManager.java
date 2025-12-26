@@ -109,8 +109,8 @@ import static com.android.server.policy.WindowManagerPolicy.WindowManagerFuncs.L
 import static com.android.server.policy.WindowManagerPolicy.WindowManagerFuncs.LID_BEHAVIOR_SLEEP;
 import static com.android.server.policy.WindowManagerPolicy.WindowManagerFuncs.LID_CLOSED;
 import static com.android.server.policy.WindowManagerPolicy.WindowManagerFuncs.LID_OPEN;
+import static com.android.server.power.feature.flags.Flags.interactiveDozeExperience;
 import static com.android.systemui.shared.Flags.enableLppAssistInvocationEffect;
-import static com.android.systemui.shared.Flags.enableLppAssistInvocationHapticEffect;
 
 import android.accessibilityservice.AccessibilityService;
 import android.annotation.NonNull;
@@ -219,7 +219,6 @@ import android.view.animation.Animation;
 import android.view.animation.AnimationUtils;
 import android.view.autofill.AutofillManagerInternal;
 import android.widget.Toast;
-import android.window.DesktopExperienceFlags;
 
 import com.android.internal.R;
 import com.android.internal.annotations.VisibleForTesting;
@@ -722,6 +721,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
     // Timeout for showing the keyguard after the screen is on, in case no "ready" is received.
     private int mKeyguardDrawnTimeout = 1000;
+
+    // Whether or not the device supports interactive doze.
+    private boolean mInteractiveDozeEnabled;
 
     private final boolean mVisibleBackgroundUsersEnabled = isVisibleBackgroundUsersEnabled();
 
@@ -1416,7 +1418,12 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             case MULTI_PRESS_POWER_BRIGHTNESS_BOOST:
                 Slog.i(TAG, "Starting brightness boost.");
                 if (!interactive) {
-                    wakeUpFromWakeKey(displayId, eventTime, KEYCODE_POWER, /* isDown= */ false);
+                    wakeUpFromWakeKey(
+                            displayId,
+                            eventTime,
+                            KEYCODE_POWER,
+                            /* isDown= */ false,
+                            /* keyEventFlags= */ 0);
                 }
                 mPowerManager.boostScreenBrightness(eventTime);
                 break;
@@ -1887,7 +1894,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         // If there's a dream running then use home to escape the dream
         // but don't actually go home.
         final DreamManagerInternal dreamManagerInternal = getDreamManagerInternal();
-        if (dreamManagerInternal != null && dreamManagerInternal.isDreaming()) {
+        if (dreamManagerInternal != null
+                && dreamManagerInternal.isDreaming()
+                && !skipDreamWakeForInteractiveDoze()) {
             dreamManagerInternal.stopDream(false /*immediate*/, "short press on home" /*reason*/);
             if (mHasFeatureLeanback) {
                 if (localLOGV) Log.v(TAG, "TV will launch home after stopping dream");
@@ -2529,6 +2538,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         initKeyGestures();
         mButtonOverridePermissionChecker = injector.getButtonOverridePermissionChecker();
         mSideFpsEventHandler = new SideFpsEventHandler(mContext, mHandler, mPowerManager);
+        mInteractiveDozeEnabled =
+                interactiveDozeExperience()
+                        && mContext.getResources().getBoolean(
+                                com.android.internal.R.bool.config_enableInteractiveDoze);
     }
 
     /**
@@ -2614,13 +2627,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 if (getResolvedLongPressOnPowerBehavior() == LONG_PRESS_POWER_ASSISTANT) {
                     handleSingleKeyGestureInKeyGestureController(
                             KeyGestureEvent.KEY_GESTURE_TYPE_LAUNCH_ASSISTANT, event);
-                    if (!enableLppAssistInvocationHapticEffect()
-                            && event.getAction() == ACTION_COMPLETE) {
-                        // The invocation effect will not play haptics so we must play the
-                        // assistant effect here
-                        performHapticFeedback(HapticFeedbackConstants.ASSISTANT_BUTTON,
-                                "Power - Long Press - Go To Assistant");
-                    }
                     return;
                 }
             }
@@ -4236,8 +4242,13 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
     }
 
+    private boolean skipDreamWakeForInteractiveDoze() {
+        return mInteractiveDozeEnabled && mDefaultDisplay.getState() == Display.STATE_ON;
+    }
+
     void launchHomeFromHotKey(int displayId) {
-        launchHomeFromHotKey(displayId, true /* awakenFromDreams */, true /*respectKeyguard*/);
+        final boolean awakenFromDreams = !skipDreamWakeForInteractiveDoze();
+        launchHomeFromHotKey(displayId, awakenFromDreams, true /*respectKeyguard*/);
     }
 
     /**
@@ -5570,20 +5581,22 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 event.getDisplayId(),
                 event.getEventTime(),
                 event.getKeyCode(),
-                event.getAction() == KeyEvent.ACTION_DOWN);
+                event.getAction() == KeyEvent.ACTION_DOWN,
+                event.getFlags());
     }
 
     private void wakeUpFromWakeKey(
-            int eventDisplayId, long eventTime, int keyCode, boolean isDown) {
+            int eventDisplayId, long eventTime, int keyCode, boolean isDown, int keyEventFlags) {
         final int displayId = useEventDisplayIdForKeyWakeup() ? eventDisplayId : DEFAULT_DISPLAY;
-        if (mWindowWakeUpPolicy.wakeUpFromKey(displayId, eventTime, keyCode, isDown)) {
+        if (mWindowWakeUpPolicy.wakeUpFromKey(
+                displayId, eventTime, keyCode, isDown, keyEventFlags)) {
             final boolean keyCanLaunchHome = keyCode == KEYCODE_HOME || keyCode == KEYCODE_POWER;
             // Start HOME with "reason" extra if sleeping for more than mWakeUpToLastStateTimeout
             if (shouldWakeUpWithHomeIntent() &&  keyCanLaunchHome) {
                 startDockOrHome(
                         displayId,
                         /*fromHomeKey*/ keyCode == KEYCODE_HOME,
-                        /*wakenFromDreams*/ true,
+                        /*wakenFromDreams*/ !skipDreamWakeForInteractiveDoze(),
                         "Wake from " + KeyEvent. keyCodeToString(keyCode));
             }
         }
@@ -6352,8 +6365,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
         DisplayInfo displayInfo = mDisplayManagerInternal.getDisplayInfo(displayId);
         boolean isDisplayExternal = displayInfo != null && displayInfo.type == TYPE_EXTERNAL;
-        if (DesktopExperienceFlags.ENABLE_LAUNCHER_HANDLE_GO_HOME_KEYBOARD_SHORTCUT.isTrue()
-                && isDisplayExternal) {
+        if (isDisplayExternal) {
             // TODO(b/441952247): Clean up using home gesture handling in WM Core
             mInputManagerInternal.handleKeyGestureInKeyGestureController(
                     new KeyGestureEvent.Builder()
@@ -6470,6 +6482,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     @Override
     public void setDismissImeOnBackKeyPressed(boolean newValue) {
         mDismissImeOnBackKeyPressed = newValue;
+    }
+
+    @Override
+    public boolean getDismissImeOnBackKeyPressed() {
+        return mDismissImeOnBackKeyPressed;
     }
 
     @Override

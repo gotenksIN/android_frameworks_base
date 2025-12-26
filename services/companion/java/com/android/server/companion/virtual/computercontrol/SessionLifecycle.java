@@ -23,7 +23,6 @@ import android.companion.virtual.computercontrol.IComputerControlLifecycleCallba
 import android.companion.virtual.computercontrol.LifecycleState;
 import android.companion.virtual.computercontrol.LifecycleState.Blocked;
 import android.companion.virtual.computercontrol.LifecycleStateTracker;
-import android.companion.virtualdevice.flags.Flags;
 import android.os.RemoteException;
 import android.util.Slog;
 
@@ -45,8 +44,6 @@ final class SessionLifecycle {
     private boolean mIsRemoteCallbackAdded = false;
     @GuardedBy("mLifecycle")
     private final LifecycleConfig mLifecycleConfig = new LifecycleConfig();
-    @GuardedBy("mLifecycle")
-    private LifecycleState mCurrentState = null;
 
     /** Configuration args that fully determine the lifecycle state of the session. */
     static final class LifecycleConfig {
@@ -55,34 +52,32 @@ final class SessionLifecycle {
         @Nullable
         LifecycleState.Closed mClosed = null;
 
-        /** True if any blocked activity is running on the display. */
-        boolean mBlockedActivityVisible = false;
+        /** Package name of the blocking activity is running on the display, if any. */
+        @Nullable
+        String mBlockingActivityPackage = null;
 
-        /** True if there is a FLAG_SECURE window on the display. */
-        boolean mSecureWindowVisible = false;
+        /** Package name of the app showing a FLAG_SECURE window on the display, if any. */
+        @Nullable
+        String mSecureWindowPackage = null;
 
         @NonNull
-        private LifecycleState computeState(
-                LifecycleState previousState) {
+        private LifecycleState computeState() {
             if (mClosed != null) {
                 return mClosed;
             }
-            if (Flags.computerControlBlockedState()
-                    && (mBlockedActivityVisible || mSecureWindowVisible)) {
-                final int reason = mBlockedActivityVisible
-                        ? ComputerControlSession.BLOCK_REASON_DISALLOWED_ACTIVITY_LAUNCH
-                        : ComputerControlSession.BLOCK_REASON_SECURE_CONTENT;
-                if (previousState instanceof Blocked
-                        && reason == ((Blocked) previousState).reason) {
-                    return previousState;
-                }
-                return new Blocked(reason);
+            if (mBlockingActivityPackage != null || mSecureWindowPackage != null) {
+                return mBlockingActivityPackage != null
+                        ? new Blocked(
+                                ComputerControlSession.BLOCK_REASON_DISALLOWED_ACTIVITY_LAUNCH,
+                                mBlockingActivityPackage)
+                        : new Blocked(ComputerControlSession.BLOCK_REASON_SECURE_CONTENT,
+                                mSecureWindowPackage);
             }
             return LifecycleState.ACTIVE;
         }
     }
 
-    SessionLifecycle(ComputerControlSession.LifecycleCallback localCallback) {
+    SessionLifecycle(@NonNull ComputerControlSession.LifecycleCallback localCallback) {
         mLifecycle.addCallback(localCallback);
     }
 
@@ -94,24 +89,27 @@ final class SessionLifecycle {
      * @return The lifecycle state after the update.
      */
     @NonNull
-    LifecycleState updateLifecycleState(Consumer<LifecycleConfig> update) {
+    LifecycleState updateLifecycleState(@NonNull Consumer<LifecycleConfig> update) {
         synchronized (mLifecycle) {
-            final var previousState = mCurrentState;
+            final var previousState = mLifecycle.getCurrentState();
             update.accept(mLifecycleConfig);
-            mCurrentState = mLifecycleConfig.computeState(previousState);
-            if (Objects.equals(mCurrentState, previousState)) {
-                return mCurrentState;
+            final var requestedState = mLifecycleConfig.computeState();
+            if (Objects.equals(requestedState, previousState)) {
+                return requestedState;
             }
-            switch (mCurrentState) {
+            switch (requestedState) {
                 case LifecycleState.Active ignored ->
                         mLifecycle.onActive();
                 case Blocked blocked ->
-                        mLifecycle.onBlocked(blocked.reason);
-                case LifecycleState.Closed closed ->
-                        mLifecycle.onClosed(closed.reason);
+                        mLifecycle.onBlocked(blocked.reason, blocked.blockingPackage);
+                case LifecycleState.Closed closed -> mLifecycle.onClosed(closed.reason);
             }
-            Slog.i(TAG, "Updated lifecycle state from " + previousState + " to " + mCurrentState);
-            return mCurrentState;
+            final var newState = mLifecycle.getCurrentState();
+            if (!Objects.equals(previousState, newState)) {
+                Slog.i(TAG,
+                        "Updated lifecycle state from " + previousState + " to " + requestedState);
+            }
+            return newState;
         }
     }
 
@@ -123,7 +121,7 @@ final class SessionLifecycle {
      */
     LifecycleState getCurrentState() {
         synchronized (mLifecycle) {
-            return mCurrentState;
+            return mLifecycle.getCurrentState();
         }
     }
 
@@ -144,17 +142,18 @@ final class SessionLifecycle {
                     try {
                         callback.onActive();
                     } catch (RemoteException e) {
-                        // Ignore
+                        Slog.e(TAG, "Failed to notify remote callback about active state");
                     }
                 }
 
                 @Override
                 public void onBlocked(
-                        @ComputerControlSession.SessionBlockReason int initialBlockReason) {
+                        @ComputerControlSession.SessionBlockReason int reason,
+                        @Nullable String blockingPackage) {
                     try {
-                        callback.onBlocked(initialBlockReason);
+                        callback.onBlocked(reason, blockingPackage);
                     } catch (RemoteException e) {
-                        // Ignore
+                        Slog.e(TAG, "Failed to notify remote callback about blocked state");
                     }
                 }
 
@@ -163,7 +162,7 @@ final class SessionLifecycle {
                     try {
                         callback.onClosed(reason);
                     } catch (RemoteException e) {
-                        // Ignore
+                        Slog.e(TAG, "Failed to notify remote callback about closed state");
                     }
                 }
             });

@@ -38,6 +38,8 @@ android.content.ClipboardManager
 android.content.ComponentCallbacksController
 android.content.ComponentName
 android.content.ContentProvider
+android.content.ContentProviderClient
+android.content.ContentProviderNative
 android.content.ContentResolver
 android.content.ContentUris
 android.content.ContentValues
@@ -326,6 +328,8 @@ android.os.connectivity.CellularBatteryStats
 android.os.connectivity.WifiActivityEnergyInfo
 android.os.connectivity.WifiBatteryStats
 
+android.provider.Settings
+
 android.telephony.ActivityStatsTechSpecificInfo
 android.telephony.CellSignalStrength
 android.telephony.ModemActivityInfo
@@ -546,12 +550,14 @@ android.util.Rational
 android.util.RecurrenceRule
 android.util.ReflectiveProperty
 android.util.RotationUtils
+android.util.SequenceUtils
 android.util.Singleton
 android.util.Size
 android.util.SizeF
 android.util.Slog
 android.util.SparseArray
 android.util.SparseArrayMap
+android.util.CopyOnWriteSparseArray
 android.util.SparseBooleanArray
 android.util.SparseDoubleArray
 android.util.SparseIntArray
@@ -649,6 +655,7 @@ com.android.internal.util.BitwiseInputStream
 com.android.internal.util.BitwiseOutputStream
 com.android.internal.util.CallbackRegistry
 com.android.internal.util.CollectionUtils
+com.android.internal.util.ContrastColorUtil
 com.android.internal.util.DumpUtils
 com.android.internal.util.DumpableContainer
 com.android.internal.util.FastMath
@@ -657,6 +664,7 @@ com.android.internal.util.FileRotator
 com.android.internal.util.GrowingArrayUtils
 com.android.internal.util.HeavyHitterSketch
 com.android.internal.util.HexDump
+com.android.internal.util.ImageUtils
 com.android.internal.util.IndentingPrintWriter
 com.android.internal.util.IntPair
 com.android.internal.util.LineBreakBufferedWriter

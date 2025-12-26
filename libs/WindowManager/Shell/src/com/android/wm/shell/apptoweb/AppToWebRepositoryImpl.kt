@@ -20,18 +20,28 @@ import android.app.ActivityManager.RunningTaskInfo
 import android.app.assist.AssistContent
 import android.content.Context
 import android.content.Intent
+import android.content.pm.LauncherApps
 import android.net.Uri
+import android.os.UserHandle
 import android.util.IndentingPrintWriter
 import android.util.SparseArray
 import androidx.core.net.toUri
 import androidx.core.util.forEach
 import com.android.internal.protolog.ProtoLog
+import com.android.window.flags.Flags
+import com.android.wm.shell.R
 import com.android.wm.shell.ShellTaskOrganizer
 import com.android.wm.shell.ShellTaskOrganizer.TaskVanishedListener
+import com.android.wm.shell.apptoweb.data.AppToWebDatastoreRepository
 import com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_DESKTOP_MODE
+import com.android.wm.shell.shared.annotations.ShellBackgroundThread
+import com.android.wm.shell.shared.annotations.ShellMainThread
 import com.android.wm.shell.sysui.ShellInit
 import java.io.PrintWriter
 import kotlin.coroutines.suspendCoroutine
+import android.os.SystemProperties
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
 /**
  * App-to-Web has the following features: transferring an app session to the web and transferring
@@ -51,20 +61,83 @@ class AppToWebRepositoryImpl(
     private val context: Context,
     private val assistContentRequester: AssistContentRequester,
     private val genericLinksParser: AppToWebGenericLinksParser,
-    shellTaskOrganizer: ShellTaskOrganizer,
+    private val appToWebDatastoreRepository: AppToWebDatastoreRepository,
+    @ShellMainThread private val mainCoroutineScope: CoroutineScope,
+    @ShellBackgroundThread private val bgCoroutineScope: CoroutineScope,
+    private val shellTaskOrganizer: ShellTaskOrganizer,
+    private val launcherApps: LauncherApps,
     shellInit: ShellInit,
 ) : TaskVanishedListener, AppToWebRepository {
     private var appToWebDataByTask = SparseArray<TaskAppToWebData>()
+    private val firstRunPromptShownByTaskId = mutableSetOf<Int>()
+    private var firstRunPromptAckedPackagesByUserId: MutableMap<Int, MutableSet<String>> =
+        mutableMapOf()
+
+    private val launcherAppsCallback = object : LauncherApps.Callback() {
+        override fun onPackageRemoved(packageName: String, user: UserHandle) {
+            val userId = user.identifier
+            val packageRemoved = firstRunPromptAckedPackagesByUserId[userId]?.remove(packageName)
+            if (packageRemoved == true) {
+                persistFirstRunPromptAckedPackages()
+            }
+        }
+
+        override fun onPackageAdded(packageName: String, user: UserHandle) {}
+
+        override fun onPackageChanged(packageName: String, user: UserHandle) {}
+
+        override fun onPackagesAvailable(
+            packageNames: Array<out String>,
+            user: UserHandle,
+            replacing: Boolean
+        ) {}
+
+        override fun onPackagesUnavailable(
+            packageNames: Array<out String>,
+            user: UserHandle,
+            replacing: Boolean
+        ) {
+            if (replacing) {
+                return
+            }
+            val userId = user.identifier
+            var packageRemoved = false
+            packageNames.forEach { packageName ->
+                if (firstRunPromptAckedPackagesByUserId[userId]?.remove(packageName) == true) {
+                    packageRemoved = true
+                }
+            }
+            if (packageRemoved) {
+                persistFirstRunPromptAckedPackages()
+            }
+        }
+    }
 
     init {
-        shellInit.addInitCallback(
-            { shellTaskOrganizer.addTaskVanishedListener(this) }, this
-        )
+        shellInit.addInitCallback(::onInit, this)
+    }
+
+    private fun onInit() {
+        shellTaskOrganizer.addTaskVanishedListener(this)
+
+        if (Flags.enableEnhancedAppToWebTransition()) {
+            launcherApps.registerCallback(launcherAppsCallback)
+            mainCoroutineScope.launch {
+                val appToWebProto = appToWebDatastoreRepository.getAppToWebProto() ?: return@launch
+                appToWebProto.appToWebRepoByUserMap.forEach { (userId, userRepo) ->
+                    firstRunPromptAckedPackagesByUserId[userId] = userRepo
+                        .firstRunPromptAckedPackagesList.toMutableSet()
+                }
+            }
+        }
     }
 
     override fun onTaskVanished(taskInfo: RunningTaskInfo) {
         logD("Task %d is vanishing. Removing task data from repository", taskInfo.taskId)
         appToWebDataByTask.remove(taskInfo.taskId)
+        if (Flags.enableEnhancedAppToWebTransition()) {
+            firstRunPromptShownByTaskId.remove(taskInfo.taskId)
+        }
     }
 
     /** Sets the captured link for the given task if a new link is provided. */
@@ -150,6 +223,76 @@ class AppToWebRepositoryImpl(
         }
     }
 
+    override fun shouldShowFirstRunPrompt(taskInfo: RunningTaskInfo): Boolean {
+        if (!Flags.enableEnhancedAppToWebTransition()) {
+            return false
+        }
+        val packageName = taskInfo.baseActivity?.packageName ?: return false
+        if (isBrowserApp(context, packageName, taskInfo.userId)) {
+            // Browser apps are not the target.
+            return false
+        }
+        if (taskInfo.capturedLink == null) {
+            // No captured link, so no prompt.
+            return false
+        }
+        if (ALWAYS_SHOW_APP_TO_WEB_FIRST_RUN_PROMPT_FOR_TESTING) {
+            return true
+        }
+        if (!context.resources.getBoolean(R.bool.config_appToWebActivePrompting)) {
+            // Active prompting is disabled.
+            return false
+        }
+        val everAcked =
+            firstRunPromptAckedPackagesByUserId[taskInfo.userId]?.contains(packageName) ?: false
+        if (everAcked) {
+            // The prompt has been acknowledged before.
+            return false
+        }
+        return true
+    }
+
+    override fun isFirstRunPromptShown(taskInfo: RunningTaskInfo): Boolean {
+        if (!Flags.enableEnhancedAppToWebTransition()) {
+            return false
+        }
+        return firstRunPromptShownByTaskId.contains(taskInfo.taskId)
+    }
+
+    override fun onFirstRunPromptShown(taskInfo: RunningTaskInfo) {
+        if (!Flags.enableEnhancedAppToWebTransition()) {
+            return
+        }
+        firstRunPromptShownByTaskId.add(taskInfo.taskId)
+    }
+
+    override fun onFirstRunPromptAcked(taskInfo: RunningTaskInfo) {
+        if (!Flags.enableEnhancedAppToWebTransition()) {
+            return
+        }
+        val packageName = taskInfo.baseActivity?.packageName ?: return
+        firstRunPromptAckedPackagesByUserId.putIfAbsent(taskInfo.userId, mutableSetOf())
+        checkNotNull(firstRunPromptAckedPackagesByUserId[taskInfo.userId]) {
+            "firstRunPromptAckedPackagesByUserId must be non-null for userId ${taskInfo.userId}"
+        }.add(packageName)
+        persistFirstRunPromptAckedPackages()
+    }
+
+    private fun persistFirstRunPromptAckedPackages() {
+        bgCoroutineScope.launch {
+            try {
+                appToWebDatastoreRepository.updateFirstRunPromptAckedPackages(
+                    firstRunPromptAckedPackagesByUserId
+                )
+            } catch (exception: Exception) {
+                logE(
+                    "An exception occurred while updating the app-to-web repository \n%s",
+                    exception.stackTrace,
+                )
+            }
+        }
+    }
+
     private suspend fun AssistContentRequester.requestAssistContent(taskId: Int): AssistContent? =
         suspendCoroutine { continuation ->
             requestAssistContent(taskId) { continuation.resumeWith(Result.success(it)) }
@@ -210,6 +353,10 @@ class AppToWebRepositoryImpl(
         ProtoLog.d(WM_SHELL_DESKTOP_MODE, "%s: $msg", TAG, *arguments)
     }
 
+    private fun logE(msg: String, vararg arguments: Any?) {
+        ProtoLog.d(WM_SHELL_DESKTOP_MODE, "%s: $msg", TAG, *arguments)
+    }
+
     /** Encapsulates data associated with a captured link. */
     private data class CapturedLink(val uri: Uri, val timeStamp: Long) {
 
@@ -224,5 +371,11 @@ class AppToWebRepositoryImpl(
 
     companion object {
         private const val TAG = "AppToWebRepository"
+
+        private val ALWAYS_SHOW_APP_TO_WEB_FIRST_RUN_PROMPT_FOR_TESTING =
+            SystemProperties.getBoolean(
+                "persist.wm.debug.always_show_app_to_web_first_run_prompt_for_testing",
+                false,
+            )
     }
 }

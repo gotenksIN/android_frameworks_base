@@ -88,6 +88,17 @@ flag {
 }
 
 flag {
+    name: "notification_x_button_clip_fix"
+    namespace: "systemui"
+    description: "fix the clipped notification x button which shows when the group notification is "
+        "under mouse hover"
+    bug: "455839877"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "notification_async_group_header_inflation"
     namespace: "systemui"
     description: "Inflates the notification group summary header views from the background thread."
@@ -191,14 +202,6 @@ flag {
 }
 
 flag {
-    name: "visual_interruptions_refactor"
-    namespace: "systemui"
-    description: "Enables the refactored version of the code to decide when notifications "
-        "HUN, bubble, pulse, or FSI."
-    bug: "261728888"
-}
-
-flag {
    name: "no_expansion_on_overscroll"
    namespace: "systemui"
    description: "Enable the fix where QS Expansion is set to zero on overscroll. This should"
@@ -275,16 +278,6 @@ flag {
 }
 
 flag {
-    name: "status_bar_privacy_chip_animation_exemption"
-    namespace: "systemui"
-    description: "Exempt the default camera app from the privacy chip animation."
-    bug: "422243884"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "notification_shade_ui_thread"
     namespace: "systemui"
     description: "Move the NotificationShade window to a new UI thread, which is separate from "
@@ -312,17 +305,6 @@ flag {
     namespace: "systemui"
     description: "Refactors the mobile connection icon in the status bar to use the Kairos library"
     bug: "383172066"
-}
-
-flag {
-    name: "status_bar_chips_modernization"
-    namespace: "systemui"
-    description: "Deprecate OngoingCallController and implement OngoingActivityChips"
-    "in compose"
-    bug: "372657935"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -372,16 +354,6 @@ flag {
     namespace: "systemui"
     description: "Fix the HUN animation when tapping on a status bar call chip"
     bug: "444551887"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "status_bar_always_schedule_auto_hide"
-    namespace: "systemui"
-    description: "Schedule the status bar auto-hide functionality more often for fullscreen mode"
-    bug: "428659575"
     metadata {
       purpose: PURPOSE_BUGFIX
     }
@@ -461,6 +433,16 @@ flag {
 }
 
 flag {
+   name: "system_status_animation_per_display"
+   namespace: "systemui"
+   description: "Make system status events / animations per display"
+   bug: "378578911"
+   metadata {
+       purpose: PURPOSE_BUGFIX
+   }
+}
+
+flag {
    name: "avalanche_replace_hun_when_critical"
    namespace: "systemui"
    description: "Fix for replacing a sticky HUN when a critical HUN posted"
@@ -492,13 +474,6 @@ flag {
    namespace: "systemui"
    description: "Replace Record Trace QS Tile with expanded Record Issue QS Tile"
    bug: "305049544"
-}
-
-flag {
-   name: "confine_notification_touch_to_view_width"
-   namespace: "systemui"
-   description: "Use notification view width when detecting gestures."
-   bug: "335828150"
 }
 
 flag {
@@ -552,6 +527,16 @@ flag {
     namespace: "systemui"
     description: "Bugfix flag to control the percentage-outside-battery behavior"
     bug: "408730362"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "status_bar_chronometer_width_reset"
+    namespace: "systemui"
+    description: "Bugfix flag to reset status bar chip chronometer width in more circumstances"
+    bug: "450956553"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -763,13 +748,6 @@ flag {
 }
 
 flag {
-   name: "shaderlib_loading_effect_refactor"
-   namespace: "systemui"
-   description: "Extend shader library to provide the common loading effects."
-   bug: "282007590"
-}
-
-flag {
     name: "hearing_aids_qs_tile_dialog"
     namespace: "systemui"
     description: "Show a dialog when clicking on hearing aids quick settings tile."
@@ -883,13 +861,6 @@ flag {
     namespace: "systemui"
     description: "Glow bar indicator reveals upon keyboard docking."
     bug: "324600132"
-}
-
-flag {
-    name: "keyboard_shortcut_helper_rewrite"
-    namespace: "systemui"
-    description: "A new implementation of the keyboards shortcuts helper sheet."
-    bug: "327364197"
 }
 
 flag {
@@ -1060,16 +1031,6 @@ flag {
 }
 
 flag {
-  name: "restrict_communal_shade_to_when_idle"
-  namespace: "systemui"
-  description: "Only allow for the shade to be pulled down over the hub when idle on the hub"
-  bug: "446291379"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
   name: "communal_shade_touch_handling_fixes"
   namespace: "systemui"
   description: "Flags some minor bug fixes for opening the shade on the hub"
@@ -1095,6 +1056,13 @@ flag {
   metadata {
     purpose: PURPOSE_BUGFIX
   }
+}
+
+flag {
+  name: "aosp_posture_detection"
+  namespace: "systemui"
+  description: "Enables an AOSP-based posture detection algorithm using device accelerometer data"
+  bug: "456482519"
 }
 
 flag {
@@ -1363,6 +1331,13 @@ flag {
     namespace: "systemui"
     description: "Enables the expanded audio detailed view and entry point."
     bug: "374173773"
+}
+
+flag {
+    name: "desktop_optimized_notification"
+    namespace: "systemui"
+    description: "Enables improved notification UX for Desktop."
+    bug: "456554989"
 }
 
 flag {
@@ -1734,10 +1709,31 @@ flag {
 }
 
 flag {
+    name: "new_screen_record_toolbar_markup"
+    namespace: "systemui"
+    description: "Enables the markup functionality in the new screen record"
+    bug: "427481098"
+}
+
+flag {
+    name: "new_screen_record_toolbar_selfie"
+    namespace: "systemui"
+    description: "Enables the selfie functionality in the new screen record"
+    bug: "427481098"
+}
+
+flag {
     name: "large_screen_sharing"
     namespace: "systemui"
     description: "Enables the new large screen window and tab sharing experience."
     bug: "430582532"
+}
+
+flag {
+    name: "large_screen_qs_inline_power_menu"
+    namespace: "systemui"
+    description: "Enables an inline power menu for the QS Panel on large screens."
+    bug: "454094385"
 }
 
 flag {
@@ -1781,17 +1777,6 @@ flag {
     bug: "418243972"
 }
 
-
-flag {
-    name: "hub_blurred_by_shade_fix"
-    namespace: "systemui"
-    description: "Fixes the blurring issue on hub after the shade is pulled down slightly."
-    bug: "412261838"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
-
 flag {
     name: "animation_library_shell_migration"
     namespace: "systemui"
@@ -1800,20 +1785,20 @@ flag {
 }
 
 flag {
-    name: "lowlight_clock_set_brightness"
+    name: "low_light_dream_hysteresis"
     namespace: "systemui"
-    description: "Sets brightness to minimum when using lowlight clock"
-    bug: "419096438"
+    description: "Enables hysteresis in the low light dream debounce algorithm to prevent rapid switching."
+    bug: "447857169"
     metadata {
       purpose: PURPOSE_BUGFIX
     }
 }
 
 flag {
-    name: "lowlight_clock_uses_keyguard_charging_status"
+    name: "lowlight_clock_set_brightness"
     namespace: "systemui"
-    description: "Make sure keyguard and low-light clock show the same charging status."
-    bug: "424297980"
+    description: "Sets brightness to minimum when using lowlight clock"
+    bug: "419096438"
     metadata {
       purpose: PURPOSE_BUGFIX
     }
@@ -1871,16 +1856,6 @@ flag {
     namespace: "systemui"
     description: "Enable glanceable hub by default (this flag is intended to enable GH for DF only)."
     bug: "428215526"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "reset_tiles_removes_custom_tiles"
-    namespace: "systemui"
-    description: "Fixes bug where calling Reset Tiles will not properly mark custom tiles as removed."
-    bug: "431235255"
     metadata {
       purpose: PURPOSE_BUGFIX
     }
@@ -1946,30 +1921,10 @@ flag {
 }
 
 flag {
-    name: "shortcut_helper_multi_display_support"
-    namespace: "systemui"
-    description: "Shortcut helper is triggered on the current display"
-    bug: "406740115"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "ambient_cue_plugin"
     namespace: "ailabs"
     description: "Enable plugin for ambient cue project"
     bug: "439907833"
-}
-
-flag {
-   name: "update_keyguard_on_wake_and_unlock_earlier"
-   namespace: "systemui"
-   description: "Call updateIsKeyguard earlier than on the dozing callback."
-   bug: "441261701"
-   metadata {
-        purpose: PURPOSE_BUGFIX
-   }
 }
 
 flag {
@@ -2050,6 +2005,14 @@ flag {
   }
 }
 
+
+flag {
+    name: "animation_library_dynamic_target_resolution"
+    namespace: "systemui"
+    description: "Enabling new robust animation system for ensuring accurate transition to the optimal target. This allows launch and return animations to intelligently adapt to changes in the underlying UI (e.g., scrolling, rotation, new views)"
+    bug: "412899675"
+}
+
 flag {
   name: "fix_privacy_indicator_both_dot_chip_visible_qs"
   namespace: "systemui"
@@ -2061,10 +2024,30 @@ flag {
 }
 
 flag {
+    name: "fix_dialog_anim_collapse_flicker"
+    namespace: "systemui"
+    description: "Fix a flicker in bluetooth tile when it is tapping during dialog collapse animation"
+    bug: "450208234"
+    metadata {
+       purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "fix_cast_dialog_flicker"
     namespace: "systemui"
     description: "Fix a flicker in activity launch animations originating from the Cast QS dialog"
     bug: "437996864"
+    metadata {
+       purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "launch_internet_details"
+    namespace: "systemui"
+    description: "Fix the crash when launching details view with INTERNET_CONNECTIVITY"
+    bug: "425987324"
     metadata {
        purpose: PURPOSE_BUGFIX
     }
@@ -2088,4 +2071,18 @@ flag {
     metadata {
        purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+    name: "split_show_passwords_to_touch_and_physical"
+    namespace: "systemui"
+    description: "Splits the 'Show passwords' setting into two new settings: one for touch inputs and one for physical inputs."
+    bug: "417951523"
+}
+
+flag {
+    name: "enable_ambient_cue_with_ime_visible"
+    namespace: "ailabs"
+    description: "Enables showing Cue Bar while IME is visible"
+    bug: "451865977"
 }

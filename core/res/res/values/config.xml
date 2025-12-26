@@ -2379,7 +2379,11 @@
          Note: this flag is subtly different from the
          PackageManager.FEATURE_TELEPHONY system feature, which is
          available on *any* device with a telephony radio, even if the
-         device is data-only. -->
+         device is data-only.
+
+         Note: This config is deprecated, please declare
+         PackageManager#FEATURE_TELEPHONY_CALLING instead.
+    -->
     <bool name="config_voice_capable">true</bool>
 
     <!-- Flag indicating whether all audio streams should be mapped to
@@ -2442,7 +2446,11 @@
          which can't send and receive sms message.
 
          Note: Disable SMS also disable voicemail waiting sms,
-               cell broadcasting sms, and MMS. -->
+         cell broadcasting sms, and MMS.
+
+         Note: This config is deprecated, please declare
+         PackageManager#FEATURE_TELEPHONY_MESSAGING instead.
+    -->
     <bool name="config_sms_capable">true</bool>
 
     <!-- Default SMS Application. This will be the default SMS application when
@@ -2470,7 +2478,11 @@
     <!-- Flag indicating whether the current device allows data.
          If true, this means that the device supports data connectivity through
          the telephony network.
-         This can be overridden to false for devices that support voice and/or sms . -->
+         This can be overridden to false for devices that support voice and/or sms.
+
+         Note: This config is deprecated, please declare
+         PackageManager#FEATURE_TELEPHONY_DATA instead.
+    -->
     <bool name="config_mobile_data_capable">true</bool>
 
     <!-- Default web browser.  This is the package name of the application that will
@@ -3333,8 +3345,12 @@
     -->
     <bool name="config_designateMainUser">false</bool>
 
-    <!-- Whether switch to headless system user is allowed. If allowed,
-    headless system user can run in the foreground even though it is not a full user. -->
+    <!-- Whether switching to the headless system user is allowed.
+         If allowed, the headless system user can run in the foreground even though it is not a
+         full user. However, it is not a human user, and may not show up in the list of human users.
+         It is expected that, if true, its UI always provides a way to switch to a human user (and
+         create one if one doesn't already exist).
+         This config is only relevant on Headless System User Mode (HSUM) devices. -->
     <bool name="config_canSwitchToHeadlessSystemUser">false</bool>
 
     <!-- Whether UI for multi user should be shown.
@@ -3355,7 +3371,7 @@
     <integer name="config_hsumBootStrategy">0</integer>
 
     <!-- List of activities (flattened component names) allowed to be launched when the current user is the Headless System User -->
-    <string-array name="config_hsu_allowlist_activitivies" translatable="false">
+    <string-array name="config_hsu_allowlist_activities" translatable="false">
        <!-- default empty (meaning all activities will be allowed) -->
     </string-array>
 
@@ -3458,7 +3474,7 @@
          When false, presentations are not allowed on internal displays by default, but vendors can
          still explicitly override this by explicitly adding the flag to the internal display(s).
     -->
-    <bool name="config_allowPresentationOnInternalDisplay">true</bool>
+    <bool name="config_allowPresentationOnInternalDisplay">false</bool>
 
     <!-- When true, udfps vote is ignored. This feature is disabled by default. -->
     <bool name="config_ignoreUdfpsVote">false</bool>
@@ -4947,6 +4963,11 @@
         <item>android</item>
     </string-array>
 
+    <!-- An array of packages that can make sound on the ringer or notification stream
+     if listener hints are set -->
+    <string-array translatable="false" name="config_listenerHintsExemptPackages">
+    </string-array>
+
     <!-- The default value for transition animation scale found in developer settings.
          1.0 corresponds to 1x animator scale, 0 means that there will be no transition
          animations. Note that this is only a default and will be overridden by a
@@ -5211,6 +5232,13 @@
          Example: "com.android.contentprotection/.ContentProtectionService"
     -->
     <string name="config_defaultContentProtectionService" translatable="false"></string>
+
+    <!-- The package name for the system's consumer of dynamic instrumentation events.
+         This service must be trusted, as it can be activated without explicit consent of the user.
+         If no service with the specified name exists on the device, the data will be discarded.
+         Example: "com.android.instrumentation/.DynamicInstrumentationEventConsumer"
+    -->
+    <string name="config_dynamicInstrumentationEventConsumer" translatable="false"></string>
 
     <!-- The package name for the system's augmented autofill service.
          This service must be trusted, as it can be activated without explicit consent of the user.
@@ -6326,6 +6354,9 @@
 
     <!-- Retention policy: number of records to kept for the historical exit info per package. -->
     <integer name="config_app_exit_info_history_list_size">16</integer>
+
+    <!-- Retention policy: number of records to kept for the historical start info per package. -->
+    <integer name="config_app_start_info_history_list_size">16</integer>
 
     <!-- Packages that can't be killed even if it's requested to be killed on imperceptible -->
     <string-array name="config_defaultImperceptibleKillingExemptionPkgs" translatable="false" />
@@ -7835,5 +7866,8 @@
     <bool name="config_forceColorFade">false</bool>
 
     <!-- location button service components -->
-    <string name="config_locationButtonRenderService" translatable="false">com.android.systemui/.widget.service.LocationButtonRenderService</string>
+    <string name="config_locationButtonRenderService" translatable="false">com.android.systemui/.locationbutton.LocationButtonRenderService</string>
+
+     <!-- Whether user information setup is enabled in SuW. -->
+    <bool name="config_enableUserInfoSetupInSuw">false</bool>
 </resources>

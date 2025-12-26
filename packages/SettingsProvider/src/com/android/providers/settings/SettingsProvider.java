@@ -81,6 +81,7 @@ import android.database.sqlite.SQLiteQueryBuilder;
 import android.hardware.camera2.utils.ArrayUtils;
 import android.media.AudioManager;
 import android.media.IRingtonePlayer;
+import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.Binder;
 import android.os.Build;
@@ -855,6 +856,15 @@ public class SettingsProvider extends ContentProvider {
         final String cacheRingtoneSetting;
         if (Settings.System.RINGTONE_CACHE_URI.equals(uri)) {
             cacheRingtoneSetting = Settings.System.RINGTONE;
+        } else if (uri != null && ContentResolver.SCHEME_CONTENT.equals(uri.getScheme())
+                && Settings.AUTHORITY.equals(
+                        ContentProvider.getAuthorityWithoutUserId(uri.getAuthority()))
+                && uri.getPathSegments().size() == 2
+                && uri.getPathSegments().get(1).startsWith(Settings.System.RINGTONE_CACHE)) {
+            // Check whether the uri is ringtone cache uri for a specific PhoneAccountHandle,
+            // which should be in the form of "content://settings/system/ringtone_cache_xxxx".
+            cacheRingtoneSetting = uri.getPathSegments().get(1)
+                    .replace(Settings.System.RINGTONE_CACHE, Settings.System.RINGTONE);
         } else if (Settings.System.NOTIFICATION_SOUND_CACHE_URI.equals(uri)) {
             cacheRingtoneSetting = Settings.System.NOTIFICATION_SOUND;
         } else if (Settings.System.ALARM_ALERT_CACHE_URI.equals(uri)) {
@@ -870,8 +880,13 @@ public class SettingsProvider extends ContentProvider {
 
     @Nullable
     private String getCacheName(String setting) {
-        if (Settings.System.RINGTONE.equals(setting)) {
+        if (setting == null) {
+            return null;
+        } else if (Settings.System.RINGTONE.equals(setting)) {
             return Settings.System.RINGTONE_CACHE;
+        } else if (setting.startsWith(Settings.System.RINGTONE
+                + RingtoneManager.RINGTONE_DELIMITER_FOR_PHONE_ACCOUNT_HANDLE)) {
+            return setting.replace(Settings.System.RINGTONE, Settings.System.RINGTONE_CACHE);
         } else if (Settings.System.NOTIFICATION_SOUND.equals(setting)) {
             return Settings.System.NOTIFICATION_SOUND_CACHE;
         } else if (Settings.System.ALARM_ALERT.equals(setting)) {
@@ -2200,17 +2215,29 @@ public class SettingsProvider extends ContentProvider {
             }
             final boolean isPrivilegedApp = aInfo != null ? aInfo.isPrivilegedApp() : false;
             String mimeType = null;
+            final int uriUserId = ContentProvider.getUserIdFromUri(
+                    audioUri, /* defaultUserId= */ callingUserId);
+            // Ensure context matches the uriUserId; The wrong context may cause
+            // the ContentResolver to fail to obtain the MIME type.
+            Context context = getContext();
+            if (context.getUserId() != uriUserId
+                    && (isPrivilegedApp || callingUserId == uriUserId)) {
+                final long identity = Binder.clearCallingIdentity();
+                try {
+                    context = context.createContextAsUser(UserHandle.of(uriUserId), 0);
+                } finally {
+                    Binder.restoreCallingIdentity(identity);
+                }
+            }
             if (isPrivilegedApp) {
                 final long identity = Binder.clearCallingIdentity();
                 try {
-                    mimeType = getContext().getContentResolver().getType(audioUri);
+                    mimeType = context.getContentResolver().getType(audioUri);
                 } finally {
                     Binder.restoreCallingIdentity(identity);
                 }
             } else {
                 // Check if the URI has a userId and if it matches the callingUserId
-                final int uriUserId = ContentProvider.getUserIdFromUri(
-                        audioUri, /* defaultUserId= */ callingUserId);
                 if (callingUserId != uriUserId) {
                     Slog.e(LOG_TAG,
                             "mutateSystemSetting for setting: " + name + " URI: " + audioUri
@@ -2218,7 +2245,7 @@ public class SettingsProvider extends ContentProvider {
                                     + ") does not match calling userId (" + callingUserId + ")");
                     return false;
                 }
-                mimeType = getContext().getContentResolver().getType(audioUri);
+                mimeType = context.getContentResolver().getType(audioUri);
             }
             if (DEBUG) {
                 Slog.v(LOG_TAG, "isValidMediaUri mimeType: " + mimeType);
@@ -2326,7 +2353,8 @@ public class SettingsProvider extends ContentProvider {
         switch (operation) {
             // Insert updates.
             case MUTATION_OPERATION_INSERT, MUTATION_OPERATION_UPDATE -> {
-                if (Settings.System.PUBLIC_SETTINGS.contains(name)) {
+                if (Settings.System.PUBLIC_SETTINGS.contains(name)
+                        || name.startsWith(Settings.System.RINGTONE)) {
                     return;
                 }
 
@@ -2344,7 +2372,8 @@ public class SettingsProvider extends ContentProvider {
             }
             case MUTATION_OPERATION_DELETE -> {
                 if (Settings.System.PUBLIC_SETTINGS.contains(name)
-                        || Settings.System.PRIVATE_SETTINGS.contains(name)) {
+                        || Settings.System.PRIVATE_SETTINGS.contains(name)
+                        || name.startsWith(Settings.System.RINGTONE)) {
                     throw new IllegalArgumentException("You cannot delete system defined"
                             + " secure settings.");
                 }
@@ -2739,12 +2768,14 @@ public class SettingsProvider extends ContentProvider {
             int targetSdkVersion, String name) {
         // If the app targets Lollipop MR1 or older SDK we warn, otherwise crash.
         if (targetSdkVersion <= Build.VERSION_CODES.LOLLIPOP_MR1) {
-            if (Settings.System.PRIVATE_SETTINGS.contains(name)) {
-                Slog.w(LOG_TAG, "You shouldn't not change private system settings."
-                        + " This will soon become an error.");
-            } else {
-                Slog.w(LOG_TAG, "You shouldn't keep your settings in the secure settings."
-                        + " This will soon become an error.");
+            if (Build.IS_DEBUGGABLE) {
+                if (Settings.System.PRIVATE_SETTINGS.contains(name)) {
+                    Slog.w(LOG_TAG, "You shouldn't not change private system settings."
+                            + " This will soon become an error.");
+                } else {
+                    Slog.w(LOG_TAG, "You shouldn't keep your settings in the secure settings."
+                            + " This will soon become an error.");
+                }
             }
         } else {
             if (Settings.System.PRIVATE_SETTINGS.contains(name)) {
@@ -5293,7 +5324,7 @@ public class SettingsProvider extends ContentProvider {
                     }
 
                     // Update the settings for NTP_SERVER_2
-// QTI_BEGIN: 2018-08-11: Core: base: Secondary NTP Server Settings
+// QTI_BEGIN: 2018-08-11: Frameworks: base: Secondary NTP Server Settings
                     final Setting currentSetting = globalSettings.getSettingLocked(
                             Global.NTP_SERVER_2);
                     if (currentSetting.isNull()) {
@@ -5303,7 +5334,7 @@ public class SettingsProvider extends ContentProvider {
                                         R.string.def_ntp_server_2),
                                 null, true, SettingsState.SYSTEM_PACKAGE_NAME);
                     }
-// QTI_END: 2018-08-11: Core: base: Secondary NTP Server Settings
+// QTI_END: 2018-08-11: Frameworks: base: Secondary NTP Server Settings
                     currentVersion = 170;
                 }
 

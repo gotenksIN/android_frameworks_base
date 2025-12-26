@@ -20,6 +20,14 @@ flag {
 }
 
 flag {
+    name: "a11y_extra_rendering_info_color_additions"
+    namespace: "accessibility"
+    is_exported: true
+    description: "Adds a public Builder API for AccessibilityNodeInfo.ExtraRenderingInfo and adds color properties"
+    bug: "452371989"
+}
+
+flag {
     name: "a11y_is_required_api"
     namespace: "accessibility"
     description: "Adds an API to indicate whether a form field (or similar element) is required."
@@ -32,6 +40,14 @@ flag {
     namespace: "accessibility"
     description: "Adds an API to indicate whether a URL has been visited or not."
     bug: "391469786"
+    is_exported: true
+}
+
+flag {
+    name: "a11y_layout_based_actions_api"
+    namespace: "accessibility"
+    description: "Enables new extra data key for an AccessibilityService to request layout-based actions."
+    bug: "455070192"
     is_exported: true
 }
 
@@ -182,13 +198,6 @@ flag {
 }
 
 flag {
-    name: "ignore_unimportant_root"
-    namespace: "accessibility"
-    description: "findViewByAccessibilityId will return null if the id matches the root but the root is unimportant."
-    bug: "407099631"
-}
-
-flag {
     name: "indeterminate_range_info"
     namespace: "accessibility"
     description: "Creates a way to create an INDETERMINATE RangeInfo"
@@ -222,6 +231,16 @@ flag {
 }
 
 flag {
+    name: "prevent_a11y_event_null_record"
+    namespace: "accessibility"
+    description: "Prevent apps adding null record via accessibilityEvent#appendRecord"
+    bug: "454269244"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "prevent_leaking_viewrootimpl"
     namespace: "accessibility"
     description: "Clear pending messages and callbacks of the handler in AccessibilityInteractionController when the ViewRootImpl is detached from Window to prevent leaking ViewRootImpl"
@@ -242,6 +261,13 @@ flag {
 }
 
 flag {
+    name: "quick_access_shortcut_type"
+    namespace: "accessibility"
+    description: "Add a new QUICK_ACCESS accessibility shortcut type used by the Quick Access dialog"
+    bug: "455679688"
+}
+
+flag {
     name: "reduce_window_content_changed_event_throttle"
     namespace: "accessibility"
     description: "Reduces the throttle of AccessibilityEvent of TYPE_WINDOW_CONTENT_CHANGED"
@@ -253,6 +279,13 @@ flag {
     namespace: "accessibility"
     description: "Remove a check for a hovered child that prevents touch events from being delegated to non-direct descendants"
     bug: "304770837"
+}
+
+flag {
+    name: "request_rectangle_migrate_legacy_apis"
+    namespace: "accessibility"
+    description: "Update calls to legacy requestRectangleOnScreen APIs to use the new API and pass a source parameter"
+    bug: "456809623"
 }
 
 flag {

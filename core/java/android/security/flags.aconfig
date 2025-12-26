@@ -161,9 +161,15 @@ flag {
 flag {
     name: "deprecate_uses_cleartext_traffic"
     namespace: "network_security"
+    description: "[DEPRECATED] If enabled, the XML application flag usesCleartextTraffic is ignored for targetSdk version C+."
+    bug: "415007211"
+}
+
+flag {
+    name: "deprecate_uses_cleartext_traffic2"
+    namespace: "network_security"
     description: "If enabled, the XML application flag usesCleartextTraffic is ignored for targetSdk version C+."
     bug: "415007211"
-    is_fixed_read_only: true
 }
 
 flag {
@@ -213,4 +219,29 @@ flag {
   metadata {
     purpose: PURPOSE_BUGFIX
   }
+}
+
+flag {
+    name: "app_lock_apis"
+    namespace: "security"
+    description: "Flag to enable access to the App Lock APIs in PackageManager"
+    bug: "415167460"
+    is_exported: true
+}
+
+flag {
+    name: "app_lock_core"
+    namespace: "security"
+    description: "Flag to enable access to the core App Lock functionality"
+    bug: "415167460"
+}
+
+flag {
+    name: "enable_atomic_child_profile_lskf"
+    namespace: "security"
+    description: "Enable atomic cutover for child profile LSKF in LockSettingsService"
+    bug: "412331826"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
 }

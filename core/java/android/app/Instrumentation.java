@@ -250,6 +250,7 @@ public class Instrumentation {
      *         If true is returned, the system will proceed as if the exception
      *         didn't happen.
      */
+    @RavenwoodKeep
     public boolean onException(Object obj, Throwable e) {
         return false;
     }
@@ -260,6 +261,7 @@ public class Instrumentation {
      * @param resultCode Current success/failure of instrumentation. 
      * @param results Any results to send back to the code that started the instrumentation.
      */
+    @RavenwoodIgnore(reason = "mWatcher not used on Ravenwood")
     public void sendStatus(int resultCode, Bundle results) {
         if (mWatcher != null) {
             try {
@@ -2497,6 +2499,11 @@ public class Instrumentation {
             case ActivityManager.START_CANCELED:
                 throw new AndroidRuntimeException("Activity could not be started for "
                         + intent);
+            case ActivityManager.START_NOT_ALLOWED_FOR_USER:
+                throw new AndroidRuntimeException(
+                        "Cannot start activity for " + intent + " for this user");
+            // NOTE: new cases should always throw AndroidRuntimeException, otherwise they could
+            // break existing apps.
             default:
                 throw new AndroidRuntimeException("Unknown error code "
                         + res + " when starting " + intent);

@@ -528,9 +528,34 @@ public class Cuj {
      */
     public static final int CUJ_BOUNCER_SECURE_LOCK_DEVICE_BIOMETRIC_AUTH_DISAPPEAR = 150;
 
+    /**
+     * Track the animation of an app back into its status bar ongoing notification chip when
+     * returning Home.
+     *
+     * <p>Tracking starts when the RemoteTransition registered to handle the transition from the app
+     * to Home is sent the startAnimation()/takeOverAnimation() signal and starts the animation.
+     * Tracking ends when the animation is fully settled and the transition is complete.</p>
+     */
+    public static final int CUJ_STATUS_BAR_APP_RETURN_TO_ONGOING_CHIP = 151;
+
+    /**
+     * Tracking transition from HUN to dual shade notifications overlay. Tracking starts on swipe
+     * down from the HUN and ends when the dual shade notifications overlay is fully expanded.
+     */
+    public static final int CUJ_HUN_TO_DUAL_SHADE_NOTIF_OVERLAY = 152;
+
+    /**
+     * Tracks the Desktop Mode Desk Switch animation which covers the move from one desk to another.
+     *
+     * <p>This CUJ can be triggered using a keyboard shortcut (“ACTION + CTRL + ]“ or
+     * “ACTION + CTRL + [“), or by tapping the taskbar app icon of an app that lives in a desk that
+     * is currently not visible.
+     */
+    public static final int CUJ_DESKTOP_MODE_DESK_SWITCH = 153;
+
     // When adding a CUJ, update this and make sure to also update CUJ_TO_STATSD_INTERACTION_TYPE.
     @VisibleForTesting static final int LAST_CUJ =
-            CUJ_BOUNCER_SECURE_LOCK_DEVICE_BIOMETRIC_AUTH_DISAPPEAR;
+            CUJ_DESKTOP_MODE_DESK_SWITCH;
 
     /** @hide */
     @IntDef({
@@ -672,7 +697,10 @@ public class Cuj {
             CUJ_AMBIENT_CUE_EXPAND,
             CUJ_AMBIENT_CUE_COLLAPSE,
             CUJ_BOUNCER_SECURE_LOCK_DEVICE_BIOMETRIC_AUTH_APPEAR,
-            CUJ_BOUNCER_SECURE_LOCK_DEVICE_BIOMETRIC_AUTH_DISAPPEAR
+            CUJ_BOUNCER_SECURE_LOCK_DEVICE_BIOMETRIC_AUTH_DISAPPEAR,
+            CUJ_STATUS_BAR_APP_RETURN_TO_ONGOING_CHIP,
+            CUJ_HUN_TO_DUAL_SHADE_NOTIF_OVERLAY,
+            CUJ_DESKTOP_MODE_DESK_SWITCH
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface CujType {}
@@ -825,6 +853,9 @@ public class Cuj {
         CUJ_TO_STATSD_INTERACTION_TYPE[CUJ_AMBIENT_CUE_COLLAPSE] = FrameworkStatsLog.UIINTERACTION_FRAME_INFO_REPORTED__INTERACTION_TYPE__AMBIENT_CUE_COLLAPSE;
         CUJ_TO_STATSD_INTERACTION_TYPE[CUJ_BOUNCER_SECURE_LOCK_DEVICE_BIOMETRIC_AUTH_APPEAR] = FrameworkStatsLog.UIINTERACTION_FRAME_INFO_REPORTED__INTERACTION_TYPE__BOUNCER_SECURE_LOCK_DEVICE_BIOMETRIC_AUTH_APPEAR;
         CUJ_TO_STATSD_INTERACTION_TYPE[CUJ_BOUNCER_SECURE_LOCK_DEVICE_BIOMETRIC_AUTH_DISAPPEAR] = FrameworkStatsLog.UIINTERACTION_FRAME_INFO_REPORTED__INTERACTION_TYPE__BOUNCER_SECURE_LOCK_DEVICE_BIOMETRIC_AUTH_DISAPPEAR;
+        CUJ_TO_STATSD_INTERACTION_TYPE[CUJ_STATUS_BAR_APP_RETURN_TO_ONGOING_CHIP] = FrameworkStatsLog.UIINTERACTION_FRAME_INFO_REPORTED__INTERACTION_TYPE__STATUS_BAR_APP_RETURN_TO_ONGOING_CHIP;
+        CUJ_TO_STATSD_INTERACTION_TYPE[CUJ_HUN_TO_DUAL_SHADE_NOTIF_OVERLAY] = FrameworkStatsLog.UIINTERACTION_FRAME_INFO_REPORTED__INTERACTION_TYPE__HUN_TO_DUAL_SHADE_NOTIF_OVERLAY;
+        CUJ_TO_STATSD_INTERACTION_TYPE[CUJ_DESKTOP_MODE_DESK_SWITCH] = FrameworkStatsLog.UIINTERACTION_FRAME_INFO_REPORTED__INTERACTION_TYPE__DESKTOP_MODE_DESK_SWITCH;
     }
 
     private Cuj() {
@@ -1121,6 +1152,12 @@ public class Cuj {
                 return "BOUNCER_SECURE_LOCK_DEVICE_BIOMETRIC_AUTH_APPEAR";
             case CUJ_BOUNCER_SECURE_LOCK_DEVICE_BIOMETRIC_AUTH_DISAPPEAR:
                 return "BOUNCER_SECURE_LOCK_DEVICE_BIOMETRIC_AUTH_DISAPPEAR";
+            case CUJ_STATUS_BAR_APP_RETURN_TO_ONGOING_CHIP:
+                return "STATUS_BAR_APP_RETURN_TO_ONGOING_CHIP";
+            case CUJ_HUN_TO_DUAL_SHADE_NOTIF_OVERLAY:
+                return "HUN_TO_DUAL_SHADE_NOTIF_OVERLAY";
+            case CUJ_DESKTOP_MODE_DESK_SWITCH:
+                return "DESKTOP_MODE_DESK_SWITCH";
         }
         return "UNKNOWN";
     }

@@ -19,7 +19,6 @@ package com.android.server.wm;
 import static android.view.Display.TYPE_INTERNAL;
 import static android.view.WindowManager.LayoutParams.TYPE_PRESENTATION;
 import static android.view.WindowManager.LayoutParams.TYPE_PRIVATE_PRESENTATION;
-import static android.window.DesktopExperienceFlags.ENABLE_PRESENTATION_DISALLOWED_ON_UNFOCUSED_HOST_TASK;
 import static android.window.DesktopExperienceFlags.ENABLE_PRESENTATION_FOR_CONNECTED_DISPLAYS;
 
 import static com.android.internal.protolog.WmProtoLogGroups.WM_ERROR;
@@ -140,6 +139,35 @@ class PresentationController implements DisplayManager.DisplayListener {
             return false;
         }
 
+        Task hostTask = findHostTask(win, displayContent, uid);
+        if (hostTask != null && displayId == hostTask.getDisplayId()) {
+            // A presentation can't cover its own host task.
+            return false;
+        }
+        final boolean isHostGloballyFocused = hostTask != null
+                && hostTask == displayContent.mWmService.mRoot.getTopDisplayFocusedLeafTask();
+        if (!isHostGloballyFocused && displayContent.getDisplay().getType() == TYPE_INTERNAL) {
+            // A globally focused host task on a different display is needed to show a
+            // presentation on an internal display.
+            return false;
+        }
+
+        return true;
+    }
+
+    @Nullable
+    private Task findHostTask(@Nullable WindowState win, @NonNull DisplayContent displayContent,
+            int uid) {
+        if (!ENABLE_PRESENTATION_FOR_CONNECTED_DISPLAYS.isTrue()) {
+            return null;
+        }
+
+        if (displayContent.isPrivate()) {
+            // Other apps can't launch on private displays, so we don't need to apply the host-task
+            // policies.
+            return null;
+        }
+
         Task hostTask = null;
         final Task globallyFocusedTask =
                 displayContent.mWmService.mRoot.getTopDisplayFocusedLeafTask();
@@ -151,8 +179,7 @@ class PresentationController implements DisplayManager.DisplayListener {
                 hostTask = globallyFocusedTask;
             }
 
-            if (ENABLE_PRESENTATION_DISALLOWED_ON_UNFOCUSED_HOST_TASK.isTrue()
-                    && hostTask == null) {
+            if (hostTask == null) {
                 final Task[] topVisibleTaskWithSameUid = new Task[1];
                 // Assume that the top visible task from the same app is the host task.
                 displayContent.mWmService.mRoot.forAllLeafTasks(task -> {
@@ -166,18 +193,7 @@ class PresentationController implements DisplayManager.DisplayListener {
                 hostTask = topVisibleTaskWithSameUid[0];
             }
         }
-        if (hostTask != null && displayId == hostTask.getDisplayId()) {
-            // A presentation can't cover its own host task.
-            return false;
-        }
-        final boolean isHostGloballyFocused = hostTask != null && hostTask == globallyFocusedTask;
-        if (!isHostGloballyFocused && displayContent.getDisplay().getType() == TYPE_INTERNAL) {
-            // A globally focused host task on a different display is needed to show a
-            // presentation on an internal display.
-            return false;
-        }
-
-        return true;
+        return hostTask;
     }
 
     boolean shouldOccludeActivities(int displayId) {
@@ -217,14 +233,8 @@ class PresentationController implements DisplayManager.DisplayListener {
         };
         win.mToken.registerWindowContainerListener(presentationWindowListener);
 
-        Task hostTask = null;
-        if (ENABLE_PRESENTATION_FOR_CONNECTED_DISPLAYS.isTrue()) {
-            final Task globallyFocusedTask =
-                    win.mWmService.mRoot.getTopDisplayFocusedLeafTask();
-            if (globallyFocusedTask != null && uid == globallyFocusedTask.effectiveUid) {
-                hostTask = globallyFocusedTask;
-            }
-        }
+        // Intentionally give |null| as presentation window to indicate it's being newly created.
+        Task hostTask = findHostTask(null, win.getDisplayContent(), uid);
         WindowContainerListener hostTaskListener = null;
         if (hostTask != null) {
             hostTaskListener = new WindowContainerListener() {

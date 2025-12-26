@@ -24,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.KeyEvent
 import androidx.compose.ui.input.key.type
+import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.core.graphics.drawable.toBitmap
 import com.android.app.tracing.coroutines.launchTraced as launch
 import com.android.app.tracing.coroutines.traceCoroutine
@@ -40,6 +41,7 @@ import com.android.systemui.bouncer.ui.helper.BouncerHapticPlayer
 import com.android.systemui.common.shared.model.Icon
 import com.android.systemui.common.shared.model.Text
 import com.android.systemui.dagger.qualifiers.Application
+import com.android.systemui.deviceentry.domain.interactor.DeviceEntryFaceAuthInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardDismissActionInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardMediaKeyInteractor
 import com.android.systemui.lifecycle.HydratedActivatable
@@ -80,6 +82,7 @@ constructor(
     private val keyguardDismissActionInteractor: KeyguardDismissActionInteractor,
     private val sceneInteractor: SceneInteractor,
     private val windowRootViewBlurInteractor: WindowRootViewBlurInteractor,
+    private val faceAuthInteractor: DeviceEntryFaceAuthInteractor,
 ) : HydratedActivatable() {
     private val _selectedUserImage = MutableStateFlow<Bitmap?>(null)
     val selectedUserImage: StateFlow<Bitmap?> = _selectedUserImage.asStateFlow()
@@ -153,10 +156,29 @@ constructor(
     val showBackButton =
         Flags.backButtonOnBouncerFix() && bouncerInteractor.isImproveLargeScreenInteractionEnabled
 
+    private val _showSignInButton = MutableStateFlow(showSignInButton(authMethodViewModel.value))
+    val showSignInButton: StateFlow<Boolean> = _showSignInButton.asStateFlow()
+
+    private val _isSignInButtonEnabled =
+        MutableStateFlow(authMethodViewModel.value?.readyToTryAuthenticate?.value ?: false)
+    val isSignInButtonEnabled: StateFlow<Boolean> = _isSignInButtonEnabled.asStateFlow()
+
     /** Whether to show the accessibility button on the bouncer. */
     val showAccessibilityButton =
         Flags.bouncerAccessibilityButtonForDesktop() &&
             bouncerInteractor.isShowAccessibilityButtonOnBouncerEnabled
+
+    val accessibilityActions: List<CustomAccessibilityAction>
+        get() = buildList {
+            if (faceAuthInteractor.canFaceAuthRun()) {
+                add(
+                    CustomAccessibilityAction(applicationContext.getString(R.string.retry_face)) {
+                        faceAuthInteractor.onAccessibilityAction()
+                        true
+                    }
+                )
+            }
+        }
 
     private val _isInputPreferredOnLeftSide = MutableStateFlow(false)
     val isInputPreferredOnLeftSide = _isInputPreferredOnLeftSide.asStateFlow()
@@ -296,9 +318,21 @@ constructor(
             }
 
             launch {
+                authMethodViewModel.collect {
+                    _showSignInButton.value = showSignInButton(it)
+                    _isFoldSplitRequired.value = isFoldSplitRequired(it)
+                }
+            }
+
+            launch {
                 authMethodViewModel
-                    .map { authMethod -> isFoldSplitRequired(authMethod) }
-                    .collect { _isFoldSplitRequired.value = it }
+                    .filter { it != null }
+                    .map { it!! }
+                    .collectLatest { authVM ->
+                        authVM.readyToTryAuthenticate.collect { isReady ->
+                            _isSignInButtonEnabled.value = isReady
+                        }
+                    }
             }
 
             launch {
@@ -313,6 +347,10 @@ constructor(
 
     private fun isFoldSplitRequired(authMethod: AuthMethodBouncerViewModel?): Boolean {
         return authMethod !is PasswordBouncerViewModel
+    }
+
+    private fun showSignInButton(authMethod: AuthMethodBouncerViewModel?): Boolean {
+        return authMethod?.showSignInButton ?: false
     }
 
     private fun getChildViewModel(
@@ -449,6 +487,12 @@ constructor(
         bouncerInteractor.onDown()
     }
 
+    fun backgroundTap() {
+        if (!bouncerInteractor.isFalseBackgroundTap()) {
+            bouncerInteractor.onIntentionalUserInput()
+        }
+    }
+
     /**
      * Notifies that a key event has occurred.
      *
@@ -503,6 +547,10 @@ constructor(
 
     fun navigateBack() {
         sceneInteractor.hideOverlay(Overlays.Bouncer, "back button clicked")
+    }
+
+    fun onSignIn() {
+        authMethodViewModel.value?.tryAuthenticate()
     }
 
     fun showAccessibilityDialog() {

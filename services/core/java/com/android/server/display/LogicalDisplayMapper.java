@@ -26,6 +26,7 @@ import static android.hardware.devicestate.DeviceState.PROPERTY_LAPTOP_HARDWARE_
 import static android.hardware.devicestate.DeviceState.PROPERTY_POWER_CONFIGURATION_TRIGGER_SLEEP;
 import static android.hardware.devicestate.DeviceState.PROPERTY_POWER_CONFIGURATION_TRIGGER_WAKE;
 import static android.hardware.devicestate.DeviceStateManager.INVALID_DEVICE_STATE;
+import static android.hardware.devicestate.feature.flags.Flags.deviceStatePropertyMigration;
 import static android.view.Display.DEFAULT_DISPLAY;
 
 import static com.android.server.display.DeviceStateToLayoutMap.STATE_DEFAULT;
@@ -42,8 +43,6 @@ import android.annotation.Nullable;
 import android.content.Context;
 import android.hardware.devicestate.DeviceState;
 import android.hardware.devicestate.DeviceStateManager;
-import android.hardware.devicestate.feature.flags.FeatureFlags;
-import android.hardware.devicestate.feature.flags.FeatureFlagsImpl;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.Message;
@@ -52,6 +51,7 @@ import android.os.SystemClock;
 import android.os.SystemProperties;
 import android.text.TextUtils;
 import android.util.ArrayMap;
+import android.util.CopyOnWriteSparseArray;
 import android.util.IndentingPrintWriter;
 import android.util.Slog;
 import android.util.SparseArray;
@@ -232,22 +232,23 @@ class LogicalDisplayMapper implements DisplayDeviceRepository.Listener {
     private boolean mInteractive;
     private final DisplayManagerFlags mFlags;
     private final SyntheticModeManager mSyntheticModeManager;
-    private final FeatureFlags mDeviceStateManagerFlags;
     private final Context mContext;
     private final DisplayGroupAllocator mDisplayGroupAllocator;
     private final Predicate<DisplayInfo> mIsDisplayAllowedInTopology;
+    private final CopyOnWriteSparseArray<LogicalDisplay.CachedDisplayInfo> mDisplayInfoCache;
 
     LogicalDisplayMapper(@NonNull Context context, FoldSettingProvider foldSettingProvider,
             @NonNull DisplayDeviceRepository repo,
             @NonNull Listener listener, @NonNull DisplayManagerService.SyncRoot syncRoot,
             @NonNull Handler handler, DisplayManagerFlags flags,
-            Predicate<DisplayInfo> isDisplayAllowedInTopology, boolean stableEdidsFlag) {
+            Predicate<DisplayInfo> isDisplayAllowedInTopology, boolean stableEdidsFlag,
+            CopyOnWriteSparseArray<LogicalDisplay.CachedDisplayInfo> displayInfoCache) {
         this(context, foldSettingProvider, repo, listener, syncRoot, handler,
                 new DeviceStateToLayoutMap(
                         (isDefault) -> isDefault ? DEFAULT_DISPLAY
                                 : sNextNonDefaultDisplayId++, stableEdidsFlag),
                 flags, new SyntheticModeManager(flags), new DisplayGroupAllocator(context),
-                isDisplayAllowedInTopology);
+                isDisplayAllowedInTopology, displayInfoCache);
     }
 
     LogicalDisplayMapper(@NonNull Context context, FoldSettingProvider foldSettingProvider,
@@ -256,7 +257,8 @@ class LogicalDisplayMapper implements DisplayDeviceRepository.Listener {
             @NonNull Handler handler, @NonNull DeviceStateToLayoutMap deviceStateToLayoutMap,
             DisplayManagerFlags flags, SyntheticModeManager syntheticModeManager,
             DisplayGroupAllocator displayGroupAllocator,
-            Predicate<DisplayInfo> isDisplayAllowedInTopology) {
+            Predicate<DisplayInfo> isDisplayAllowedInTopology,
+            CopyOnWriteSparseArray<LogicalDisplay.CachedDisplayInfo> displayInfoCache) {
         mSyncRoot = syncRoot;
         mContext = context;
         mPowerManager = context.getSystemService(PowerManager.class);
@@ -277,9 +279,9 @@ class LogicalDisplayMapper implements DisplayDeviceRepository.Listener {
         mDeviceStateToLayoutMap = deviceStateToLayoutMap;
         mFlags = flags;
         mSyntheticModeManager = syntheticModeManager;
-        mDeviceStateManagerFlags = new FeatureFlagsImpl();
         mDisplayGroupAllocator = displayGroupAllocator;
         mIsDisplayAllowedInTopology = isDisplayAllowedInTopology;
+        mDisplayInfoCache = displayInfoCache;
     }
 
     @Override
@@ -673,7 +675,7 @@ class LogicalDisplayMapper implements DisplayDeviceRepository.Listener {
      */
     private boolean shouldDeviceBeWoken(DeviceState pendingState, DeviceState currentState,
             boolean isInteractive, boolean isBootCompleted) {
-        if (mDeviceStateManagerFlags.deviceStatePropertyMigration()) {
+        if (deviceStatePropertyMigration()) {
             if (currentState.hasProperties(PROPERTY_EMULATED_ONLY)
                     && !pendingState.hasProperties(PROPERTY_EMULATED_ONLY)) {
                 // Do not wake the device, since this transition may occur due to the user pressing
@@ -714,7 +716,7 @@ class LogicalDisplayMapper implements DisplayDeviceRepository.Listener {
      */
     private boolean shouldDeviceBePutToSleep(DeviceState pendingState, DeviceState currentState,
             boolean isInteractive, boolean isBootCompleted) {
-        if (mDeviceStateManagerFlags.deviceStatePropertyMigration()) {
+        if (android.hardware.devicestate.feature.flags.Flags.deviceStatePropertyMigration()) {
             return (pendingState.hasProperty(PROPERTY_POWER_CONFIGURATION_TRIGGER_SLEEP) || (
                     pendingState.hasProperty(PROPERTY_LAPTOP_HARDWARE_CONFIGURATION_DOCKED)
                             && mDeviceStateToLayoutMap.get(pendingState.getIdentifier())
@@ -895,6 +897,10 @@ class LogicalDisplayMapper implements DisplayDeviceRepository.Listener {
                 } else {
                     // This display never left this class, safe to remove without notification
                     mLogicalDisplays.removeAt(i);
+                    if (Flags.displayInfoCopyOnWriteCacheEnabled()
+                            && displayId != Display.DEFAULT_DISPLAY) {
+                        mDisplayInfoCache.remove(displayId);
+                    }
                 }
                 mLogicalDisplaysToUpdate.put(displayId, logicalDisplayEventMask);
                 continue;
@@ -1086,6 +1092,10 @@ class LogicalDisplayMapper implements DisplayDeviceRepository.Listener {
 
             if ((eventsToDispatch & LOGICAL_DISPLAY_EVENT_DISCONNECTED) != 0) {
                 mLogicalDisplays.delete(id);
+                if (Flags.displayInfoCopyOnWriteCacheEnabled()
+                        && id != Display.DEFAULT_DISPLAY) {
+                    mDisplayInfoCache.remove(id);
+                }
             }
         }
     }
@@ -1370,7 +1380,7 @@ class LogicalDisplayMapper implements DisplayDeviceRepository.Listener {
         final int layerStack = assignLayerStackLocked(displayId);
         final LogicalDisplay display = new LogicalDisplay(displayId, layerStack, device,
                 mFlags.isSyncedResolutionSwitchEnabled(), mFlags.isSyntheticModesV2Enabled(),
-                mFlags.isSizeOverrideForExternalDisplaysEnabled());
+                mFlags.isSizeOverrideForExternalDisplaysEnabled(), mDisplayInfoCache);
         display.updateLocked(mDisplayDeviceRepo, mSyntheticModeManager);
 
         final DisplayInfo info = display.getDisplayInfoLocked();
@@ -1401,6 +1411,14 @@ class LogicalDisplayMapper implements DisplayDeviceRepository.Listener {
             Slog.i(TAG, "SetEnabled on display " + displayId + ": " + isEnabled);
             display.setEnabledLocked(isEnabled);
         }
+    }
+
+    boolean isEnabledInLayoutLocked(LogicalDisplay display) {
+        final DisplayInfo info = display.getDisplayInfoLocked();
+        Layout layout = mCurrentLayout != null
+                ? mCurrentLayout : mDeviceStateToLayoutMap.get(mDeviceState.getIdentifier());
+        Layout.Display displayLayout = layout.getByAddress(info.address);
+        return displayLayout != null && displayLayout.isEnabled();
     }
 
     private int assignDisplayGroupIdLocked(boolean needsDeviceDisplayGroup,

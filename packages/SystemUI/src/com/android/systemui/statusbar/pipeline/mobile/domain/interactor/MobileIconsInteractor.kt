@@ -13,6 +13,7 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+// QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
 
 /*
  * Changes from Qualcomm Innovation Center are provided under the following license:
@@ -20,6 +21,7 @@
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
+// QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
 package com.android.systemui.statusbar.pipeline.mobile.domain.interactor
 import android.content.Context
 import android.telephony.CarrierConfigManager
@@ -34,20 +36,23 @@ import com.android.systemui.flags.Flags.FILTER_PROVISIONING_NETWORK_SUBSCRIPTION
 import com.android.systemui.log.table.TableLogBuffer
 import com.android.systemui.log.table.logDiffsForTable
 import com.android.systemui.statusbar.core.NewStatusBarIcons
-import com.android.systemui.statusbar.core.StatusBarRootModernization
 import com.android.systemui.statusbar.pipeline.dagger.MobileSummaryLog
 import com.android.systemui.statusbar.pipeline.mobile.data.model.SubscriptionModel
 import com.android.systemui.statusbar.pipeline.mobile.data.repository.MobileConnectionRepository
 import com.android.systemui.statusbar.pipeline.mobile.data.repository.MobileConnectionsRepository
+// QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
 import com.android.systemui.statusbar.pipeline.mobile.data.model.MobileIconCustomizationMode
-// QTI_BEGIN: 2024-01-30: Data: SystemUI: Implementation for MSIM C_IWLAN feature
+// QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
+// QTI_BEGIN: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
 import com.android.systemui.statusbar.pipeline.mobile.domain.model.SignalIconModel
-// QTI_END: 2024-01-30: Data: SystemUI: Implementation for MSIM C_IWLAN feature
+// QTI_END: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
 import com.android.systemui.statusbar.pipeline.shared.data.model.ConnectivitySlot
 import com.android.systemui.statusbar.pipeline.shared.data.repository.ConnectivityRepository
 import com.android.systemui.statusbar.policy.data.repository.UserSetupRepository
 import com.android.systemui.util.CarrierConfigTracker
+// QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
 import com.android.systemui.util.CarrierNameCustomization
+// QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
 import java.lang.ref.WeakReference
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
@@ -65,8 +70,10 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.transformLatest
+// QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
 import kotlinx.coroutines.flow.MutableStateFlow
 
+// QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
 /**
  * Business layer logic for the set of mobile subscription icons.
  *
@@ -130,6 +137,7 @@ interface MobileIconsInteractor {
      * subId.
      */
     fun getMobileConnectionInteractorForSubId(subId: Int): MobileIconInteractor
+// QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
 
     /** True if the LTE rsrp should be preferred over the primary level. */
     val alwaysUseRsrpLevelForLte: StateFlow<Boolean>
@@ -144,6 +152,7 @@ interface MobileIconsInteractor {
     val showVowifiIcon: StateFlow<Boolean>
 
     fun setDdsIconFLow(iconFlow: StateFlow<SignalIconModel?>) {}
+// QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
 }
 @OptIn(ExperimentalCoroutinesApi::class)
 @Suppress("EXPERIMENTAL_IS_NOT_ENABLED")
@@ -159,10 +168,13 @@ constructor(
     @Background private val scope: CoroutineScope,
     private val context: Context,
     private val featureFlagsClassic: FeatureFlagsClassic,
+// QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
     val carrierNameCustomization: CarrierNameCustomization,
+// QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
 ) : MobileIconsInteractor {
     // Weak reference lookup for created interactors
     private val reuseCache = mutableMapOf<Int, WeakReference<MobileIconInteractor>>()
+// QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
     private var ddsIcon: StateFlow<SignalIconModel?> = MutableStateFlow(null)
 
     override fun setDdsIconFLow(iconFlow: StateFlow<SignalIconModel?>) {
@@ -170,6 +182,7 @@ constructor(
     }
 
 
+// QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
     override val mobileIsDefault =
         combine(
                 mobileConnectionsRepo.mobileIsDefault,
@@ -302,7 +315,7 @@ constructor(
             }
             .stateIn(scope, SharingStarted.WhileSubscribed(), emptyList())
     override val isStackable =
-        if (NewStatusBarIcons.isEnabled && StatusBarRootModernization.isEnabled) {
+        if (NewStatusBarIcons.isEnabled) {
             icons.flatMapLatest { icons ->
                 if (icons.isEmpty()) {
                     flowOf(false)
@@ -412,6 +425,7 @@ constructor(
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
     override val isDeviceInEmergencyCallsOnlyMode: Flow<Boolean> =
         mobileConnectionsRepo.isDeviceEmergencyCallCapable
+// QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
 
     override val alwaysUseRsrpLevelForLte: StateFlow<Boolean> =
         mobileConnectionsRepo.defaultDataSubRatConfig
@@ -454,6 +468,7 @@ constructor(
             .mapLatest { it.crossSimdisplaySingnalLevel }
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
 
+// QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
     /** Vends out new [MobileIconInteractor] for a particular subId */
     override fun getMobileConnectionInteractorForSubId(subId: Int): MobileIconInteractor =
         reuseCache[subId]?.get() ?: createMobileConnectionInteractorForSubId(subId)
@@ -471,6 +486,7 @@ constructor(
                 isForceHidden,
                 mobileConnectionsRepo.getRepoForSubId(subId),
                 context,
+// QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
                 alwaysUseRsrpLevelForLte = alwaysUseRsrpLevelForLte,
                 hideNoInternetState = hideNoInternetState,
                 networkTypeIconCustomizationFlow = networkTypeIconCustomization,
@@ -480,6 +496,7 @@ constructor(
                 ddsIcon = ddsIcon,
                 crossSimdisplaySingnalLevel = crossSimdisplaySingnalLevel,
                 carrierNameCustomization = carrierNameCustomization,
+// QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
             )
             .also { reuseCache[subId] = WeakReference(it) }
     companion object {

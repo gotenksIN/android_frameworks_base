@@ -21,14 +21,18 @@ import com.android.systemui.kairos.ExperimentalKairosApi
 import com.android.systemui.kairos.toColdConflatedFlow
 import com.android.systemui.kairos.util.nameTag
 import com.android.systemui.log.table.TableLogBuffer
+// QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
 import com.android.systemui.statusbar.pipeline.mobile.data.model.MobileIconCustomizationMode
+// QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
 import com.android.systemui.statusbar.pipeline.mobile.data.model.NetworkNameModel
 import com.android.systemui.statusbar.pipeline.mobile.domain.model.NetworkTypeIconModel
 import com.android.systemui.statusbar.pipeline.mobile.domain.model.SignalIconModel
 import com.android.systemui.statusbar.pipeline.shared.data.model.DataActivityModel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+// QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
 import kotlinx.coroutines.flow.MutableStateFlow
+// QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
 
 @ExperimentalKairosApi
 fun BuildScope.MobileIconInteractorKairosAdapter(
@@ -169,6 +173,7 @@ private class MobileIconInteractorKairosAdapter(
     override val isForceHidden: Flow<Boolean>,
     override val isAllowedDuringAirplaneMode: StateFlow<Boolean>,
     override val carrierNetworkChangeActive: StateFlow<Boolean>,
+// QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
 ) : MobileIconInteractor {
     override val isConnectionFailed = MutableStateFlow(false)
     override val customizedNetworkName = MutableStateFlow(NetworkNameModel.IntentDerived("demo mode"))
@@ -182,3 +187,4 @@ private class MobileIconInteractorKairosAdapter(
     override val hideNoInternetState = MutableStateFlow(false)
     override val alwaysUseRsrpLevelForLte = MutableStateFlow(false)
 }
+// QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)

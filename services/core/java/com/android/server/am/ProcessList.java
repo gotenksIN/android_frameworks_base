@@ -1575,7 +1575,6 @@ public final class ProcessList {
         }
     }
 
-// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
     /**
      * Set the out-of-memory badness adjustment for a process.
      * If {@code pid <= 0}, this method will be a no-op.
@@ -1610,7 +1609,6 @@ public final class ProcessList {
         }
     }
 
-// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
 
     // The max size for PROCS_PRIO cmd in LMKD
     private static final int MAX_PROCS_PRIO_PACKET_SIZE = 3;
@@ -1655,7 +1653,6 @@ public final class ProcessList {
         writeLmkd(buf, null);
     }
 
-// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
     /**
      * Set the out-of-memory badness adjustment for a list of processes.
      *
@@ -1698,7 +1695,6 @@ public final class ProcessList {
         writeLmkd(buf, null);
     }
 
-// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
     /*
      * {@hide}
      */

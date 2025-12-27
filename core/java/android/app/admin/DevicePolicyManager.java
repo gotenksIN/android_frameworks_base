@@ -7677,7 +7677,7 @@ public class DevicePolicyManager {
      * of the installation, were made aware of the risks, viewed the certificate and still wanted to
      * keep the certificate on the device.
      *
-     * Calling with {@param approval} as {@code true} will cancel any ongoing warnings related to
+     * Calling with {@code approval} as {@code true} will cancel any ongoing warnings related to
      * this certificate.
      *
      * @hide
@@ -11053,7 +11053,7 @@ public class DevicePolicyManager {
      * {@link #KEYGUARD_DISABLE_TRUST_AGENTS}. If any admin declares
      * {@link #KEYGUARD_DISABLE_TRUST_AGENTS} but doesn't call
      * {@link #setTrustAgentConfiguration(ComponentName, ComponentName, PersistableBundle)}
-     * for this {@param agent} or calls it with a null configuration, null is returned.
+     * for this {@code agent} or calls it with a null configuration, null is returned.
      * @param agent Which component to get enabled features for.
      * @return configuration for the given trust agent.
      */
@@ -13551,7 +13551,6 @@ public class DevicePolicyManager {
 
     /**
      * Sets preferential network configurations.
-     * {@see PreferentialNetworkServiceConfig}
      *
      * An example of a supported preferential network service is the Enterprise
      * slice on 5G networks. For devices on 4G networks, the profile owner needs to additionally
@@ -13565,6 +13564,7 @@ public class DevicePolicyManager {
      *
      * @param preferentialNetworkServiceConfigs list of preferential network configurations.
      * @throws SecurityException if the caller is not the profile owner or device owner.
+     * @see PreferentialNetworkServiceConfig
      **/
     public void setPreferentialNetworkServiceConfigs(
             @NonNull List<PreferentialNetworkServiceConfig> preferentialNetworkServiceConfigs) {
@@ -13581,10 +13581,10 @@ public class DevicePolicyManager {
 
     /**
      * Get preferential network configuration
-     * {@see PreferentialNetworkServiceConfig}
      *
      * @return preferential network configuration.
      * @throws SecurityException if the caller is not the profile owner or device owner.
+     * @see PreferentialNetworkServiceConfig
      */
     public @NonNull List<PreferentialNetworkServiceConfig> getPreferentialNetworkServiceConfigs() {
         throwIfParentInstance("getPreferentialNetworkServiceConfigs");
@@ -15271,11 +15271,11 @@ public class DevicePolicyManager {
 
     /**
      * Called by the system to check if a package is restricted from using metered data
-     * by {@param admin}.
+     * by {@code admin}.
      *
      * @param admin which {@link DeviceAdminReceiver} this request is associated with.
      * @param packageName the package whose restricted status is needed.
-     * @param userId the user to which {@param packageName} belongs.
+     * @param userId the user to which {@code packageName} belongs.
      * @return {@code true} if the package is restricted by admin, otherwise {@code false}
      * @throws SecurityException if the caller doesn't run with {@link Process#SYSTEM_UID}
      * @hide

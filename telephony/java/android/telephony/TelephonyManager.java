@@ -6992,7 +6992,7 @@ public class TelephonyManager {
          *
          * @param cellInfo a list of {@link CellInfo} or an empty list.
          *
-         * {@see android.telephony.TelephonyManager#getAllCellInfo getAllCellInfo()}
+         * @see android.telephony.TelephonyManager#getAllCellInfo getAllCellInfo()
          */
         public abstract void onCellInfo(@NonNull List<CellInfo> cellInfo);
 
@@ -8262,9 +8262,9 @@ public class TelephonyManager {
      * If this object has been created with {@link #createForSubscriptionId}, then the provided
      * subId is returned. Otherwise, the preferred subId which is based on caller's context is
      * returned.
-     * {@see SubscriptionManager#getDefaultDataSubscriptionId()}
-     * {@see SubscriptionManager#getDefaultVoiceSubscriptionId()}
-     * {@see SubscriptionManager#getDefaultSmsSubscriptionId()}
+     * @see SubscriptionManager#getDefaultDataSubscriptionId()
+     * @see SubscriptionManager#getDefaultVoiceSubscriptionId()
+     * @see SubscriptionManager#getDefaultSmsSubscriptionId()
      */
     @UnsupportedAppUsage
     private int getSubId(int preferredSubId) {
@@ -8291,9 +8291,9 @@ public class TelephonyManager {
      * If this object has been created with {@link #createForSubscriptionId}, then the phoneId
      * associated with the provided subId is returned. Otherwise, return the phoneId associated
      * with the preferred subId based on caller's context.
-     * {@see SubscriptionManager#getDefaultDataSubscriptionId()}
-     * {@see SubscriptionManager#getDefaultVoiceSubscriptionId()}
-     * {@see SubscriptionManager#getDefaultSmsSubscriptionId()}
+     * @see SubscriptionManager#getDefaultDataSubscriptionId()
+     * @see SubscriptionManager#getDefaultVoiceSubscriptionId()
+     * @see SubscriptionManager#getDefaultSmsSubscriptionId()
      */
     @UnsupportedAppUsage
     private int getPhoneId(int preferredSubId) {

@@ -16,6 +16,8 @@
 
 package com.android.server.wm;
 
+import static android.app.FullscreenRequestHandler.REQUEST_ALLOW_MODE_INHERIT;
+import static android.app.FullscreenRequestHandler.REQUEST_ALLOW_MODE_NONE;
 import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_BEHIND;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSET;
@@ -57,6 +59,7 @@ import android.annotation.CallSuper;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.app.FullscreenRequestHandler.RequestAllowMode;
 import android.content.pm.ActivityInfo;
 import android.content.pm.ActivityInfo.ScreenOrientation;
 import android.content.res.Configuration;
@@ -263,6 +266,10 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
      * using the {@link android.app.ActivityManager.AppTask#moveTaskTo} method.
      */
     private boolean mIsTaskMoveAllowed = false;
+
+    /** The type of request allowed for this container. */
+    @RequestAllowMode
+    private int mFullscreenRequestAllowMode = REQUEST_ALLOW_MODE_NONE;
 
     /** This isn't participating in a sync. */
     public static final int SYNC_STATE_NONE = 0;
@@ -1840,7 +1847,7 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
      * Process all activities in this branch of the tree.
      *
      * @param callback Called for each activity found.
-     * @param boundary We don't return activities via {@param callback} until we get to this node in
+     * @param boundary We don't return activities via {@code callback} until we get to this node in
      *                 the tree.
      * @param includeBoundary If the boundary from be processed to return activities.
      * @param traverseTopToBottom direction to traverse the tree.
@@ -1943,7 +1950,7 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
      * Gets an activity in a branch of the tree.
      *
      * @param callback called to test if this is the activity that should be returned.
-     * @param boundary We don't return activities via {@param callback} until we get to this node in
+     * @param boundary We don't return activities via {@code callback} until we get to this node in
      *                 the tree.
      * @param includeBoundary If the boundary from be processed to return activities.
      * @param traverseTopToBottom direction to traverse the tree.
@@ -2053,7 +2060,7 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
     }
 
     /**
-     * Calls the given {@param callback} for all tasks in depth-first top-down z-order at or below
+     * Calls the given {@code callback} for all tasks in depth-first top-down z-order at or below
      * this container.
      *
      * @param callback Calls the {@link ToBooleanFunction#apply} method for each task found and
@@ -2258,7 +2265,7 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
      * Gets an task in a branch of the tree.
      *
      * @param callback called to test if this is the task that should be returned.
-     * @param boundary We don't return tasks via {@param callback} until we get to this node in
+     * @param boundary We don't return tasks via {@code callback} until we get to this node in
      *                 the tree.
      * @param includeBoundary If the boundary from be processed to return tasks.
      * @param traverseTopToBottom direction to traverse the tree.
@@ -3838,6 +3845,30 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
 
     boolean getIsTaskMoveAllowed() {
         return mIsTaskMoveAllowed;
+    }
+
+    /**
+     * Sets the allow mode for fullscreen requests on this container.
+     */
+    void setFullscreenRequestAllowMode(@RequestAllowMode int allowMode) {
+        if (mFullscreenRequestAllowMode == allowMode) return;
+        mFullscreenRequestAllowMode = allowMode;
+    }
+
+    /**
+     * Returns the allow mode for fullscreen requests on this container.
+     */
+    @RequestAllowMode
+    int getFullscreenRequestAllowMode() {
+        if (mFullscreenRequestAllowMode == REQUEST_ALLOW_MODE_INHERIT) {
+            final WindowContainer parent = getParent();
+            if (parent != null) {
+                return parent.getFullscreenRequestAllowMode();
+            }
+            // Default to disallowing requests if unset and can't inherit.
+            return REQUEST_ALLOW_MODE_NONE;
+        }
+        return mFullscreenRequestAllowMode;
     }
 
     // LINT.IfChange(canHoldSelfMovableTasks)

@@ -191,3 +191,32 @@ android_test_helper_app {
     ],
     manifest: "AndroidManifestPccAndIsolatedService.xml",
 }
+
+android_test_helper_app {
+    name: "PackageParserTestActivityAlias",
+    sdk_version: "current",
+    srcs: ["**/*.java"],
+    dex_preopt: {
+        enabled: false,
+    },
+    optimize: {
+        enabled: false,
+    },
+    manifest: "AndroidManifestActivityAlias.xml",
+}
+
+android_test_helper_app {
+    name: "PackageParserTestAllowComponentAccess",
+    sdk_version: "current",
+    srcs: ["**/*.java"],
+    dex_preopt: {
+        enabled: false,
+    },
+    optimize: {
+        enabled: false,
+    },
+    flags_packages: [
+        "android.app.privatecompute.flags-aconfig",
+    ],
+    manifest: "AndroidManifestAllowComponentAccess.xml",
+}

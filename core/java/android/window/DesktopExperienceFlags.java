@@ -151,8 +151,6 @@ public enum DesktopExperienceFlags {
     ENABLE_DRAG_TO_MAXIMIZE(Flags::enableDragToMaximize, true, Flags.FLAG_ENABLE_DRAG_TO_MAXIMIZE),
     ENABLE_DRAWING_APP_HANDLE(Flags::enableDrawingAppHandle, false,
             Flags.FLAG_ENABLE_DRAWING_APP_HANDLE),
-    ENABLE_DREAM_ACTIVITY_WINDOWING_EXCLUSION(Flags::enableDreamActivityWindowingExclusion, false,
-            Flags.FLAG_ENABLE_DREAM_ACTIVITY_WINDOWING_EXCLUSION),
     ENABLE_FREEFORM_BOX_SHADOWS_V2(Flags::enableFreeformBoxShadowsV2, false,
             Flags.FLAG_ENABLE_FREEFORM_BOX_SHADOWS_V2),
     ENABLE_FULLSCREEN_WINDOW_CONTROLS(Flags::enableFullscreenWindowControls, false,
@@ -180,8 +178,6 @@ public enum DesktopExperienceFlags {
             Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_DEFAULT_ACTIVATION_IN_DESKTOP_FIRST_DISPLAYS),
     ENABLE_MULTIPLE_DESKTOPS_BACKEND(Flags::enableMultipleDesktopsBackend, true,
             Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND),
-    ENABLE_MULTIPLE_DESKTOPS_FRONTEND(Flags::enableMultipleDesktopsFrontend, true,
-            Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_FRONTEND),
     ENABLE_NESTED_TASKS_WITH_INDEPENDENT_BOUNDS_BUGFIX(
             Flags::nestedTasksWithIndependentBoundsBugfix, true,
             Flags.FLAG_NESTED_TASKS_WITH_INDEPENDENT_BOUNDS_BUGFIX),
@@ -193,9 +189,6 @@ public enum DesktopExperienceFlags {
         Flags.FLAG_ENABLE_NO_WINDOW_DECORATION_FOR_DESKS),
     ENABLE_PARALLEL_CD_TRANSITIONS_DURING_RECENTS(Flags::parallelCdTransitionsDuringRecents, true,
             Flags.FLAG_PARALLEL_CD_TRANSITIONS_DURING_RECENTS),
-    ENABLE_PERSISTING_DISPLAY_SIZE_FOR_CONNECTED_DISPLAYS(
-            Flags::enablePersistingDisplaySizeForConnectedDisplays, true,
-            Flags.FLAG_ENABLE_PERSISTING_DISPLAY_SIZE_FOR_CONNECTED_DISPLAYS),
     ENABLE_PER_DISPLAY_DESKTOP_WALLPAPER_ACTIVITY(Flags::enablePerDisplayDesktopWallpaperActivity,
             true, Flags.FLAG_ENABLE_PER_DISPLAY_DESKTOP_WALLPAPER_ACTIVITY),
     ENABLE_PINNING_APP_WITH_CONTEXT_MENU(Flags::enablePinningAppWithContextMenu, true,

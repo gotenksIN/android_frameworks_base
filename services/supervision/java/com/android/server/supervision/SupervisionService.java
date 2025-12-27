@@ -668,13 +668,12 @@ public class SupervisionService extends ISupervisionManager.Stub {
      * <p>This excludes the system and main user(s) as those users are created by default.
      */
     private boolean hasNonTestDefaultUsers() {
-        List<UserInfo> users = mInjector.getUserManagerInternal().getUsers(true);
-        for (var user : users) {
-            if (!user.isForTesting() && !user.isMain() && !isSystemUser(user)) {
-                return true;
-            }
-        }
-        return false;
+        UserManagerInternal userManager = mInjector.getUserManagerInternal();
+        // Headless system user mode has two default users: system and main/primary users.
+        int numOfDefaultUsers = userManager.isHeadlessSystemUserMode()
+                ? 2 : 1;
+        List<UserInfo> users = userManager.getUsers(true);
+        return users.stream().filter(user -> !user.isForTesting()).count() > numOfDefaultUsers;
     }
 
     private static boolean isSystemUser(UserInfo userInfo) {
@@ -707,58 +706,12 @@ public class SupervisionService extends ISupervisionManager.Stub {
 
             List<UserInfo> users = mInjector.getUserManagerInternal().getUsers(false);
             synchronized (getLockObject()) {
-                if (Flags.enableSupervisionManagerPolicyApis()) {
-                    mSupervisionSettings.dump(pw);
-                }
                 for (var user : users) {
                     getUserDataLocked(user.id).dump(pw);
                     pw.println();
                 }
             }
         }
-    }
-
-    private boolean doUpgrade(int fromVersion, int toVersion) {
-        // Perform upgrade without holding the lock
-        if (!mInjector.areAllRequiredServicesAvailable()) {
-            Slogf.e(
-                    SupervisionLog.TAG,
-                    "Cannot perform upgrade, required services are not available.");
-            return false;
-        }
-
-        final Context context = mInjector.context;
-        return new SupervisionSettingsUpgrader(
-                        context,
-                        mInjector.getUserManagerInternal(),
-                        context.getSystemService(RoleManager.class),
-                        context.getSystemService(DevicePolicyManager.class))
-                .upgrade(fromVersion, toVersion);
-    }
-
-    private void onBootCompleted() {
-        final int fromVersion;
-        final int toVersion = SupervisionSettings.VERSION;
-
-        synchronized (getLockObject()) {
-            fromVersion = mSupervisionSettings.getVersion();
-        }
-
-        if (fromVersion < toVersion) {
-            final boolean success = doUpgrade(fromVersion, toVersion);
-            if (success) {
-                synchronized (getLockObject()) {
-                    mSupervisionSettings.setVersion(toVersion);
-                    mSupervisionSettings.saveUserData();
-                }
-            }
-        }
-
-        mPackageMonitor.register(
-                mInjector.context,
-                mServiceThreadHandler.getLooper(),
-                UserHandle.ALL,
-                /* externalStorage= */ false);
     }
 
     private Object getLockObject() {
@@ -1303,17 +1256,6 @@ public class SupervisionService extends ISupervisionManager.Stub {
         int getCallingUid() {
             return Binder.getCallingUid();
         }
-
-        boolean areAllRequiredServicesAvailable() {
-            if (getDpmInternal() == null
-                    || getUserManagerInternal() == null
-                    || context.getSystemService(RoleManager.class) == null
-                    || context.getSystemService(DevicePolicyManager.class) == null) {
-                Slogf.e(SupervisionLog.TAG, "Required services are not available.");
-                return false;
-            }
-            return true;
-        }
     }
 
     final class SupervisionPackageMonitor extends PackageMonitor {
@@ -1406,7 +1348,11 @@ public class SupervisionService extends ISupervisionManager.Stub {
                 mSupervisionService.registerStatsPullAtomCallback();
             }
             if (Flags.enableSupervisionManagerPolicyApis()) {
-                mSupervisionService.onBootCompleted();
+                mSupervisionService.mPackageMonitor.register(
+                        getContext(),
+                        mSupervisionService.mServiceThreadHandler.getLooper(),
+                        UserHandle.ALL,
+                        /* externalStorage= */ false);
             }
         }
 

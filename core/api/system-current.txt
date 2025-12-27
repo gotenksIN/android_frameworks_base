@@ -109,6 +109,7 @@ package android {
     field public static final String BIND_TRACE_REPORT_SERVICE = "android.permission.BIND_TRACE_REPORT_SERVICE";
     field public static final String BIND_TRANSLATION_SERVICE = "android.permission.BIND_TRANSLATION_SERVICE";
     field public static final String BIND_TRUST_AGENT = "android.permission.BIND_TRUST_AGENT";
+    field @FlaggedApi("android.security.talisman_service_api") public static final String BIND_TRUST_TOKEN_SERVICE = "android.permission.BIND_TRUST_TOKEN_SERVICE";
     field public static final String BIND_TV_REMOTE_SERVICE = "android.permission.BIND_TV_REMOTE_SERVICE";
     field public static final String BIND_VISUAL_QUERY_DETECTION_SERVICE = "android.permission.BIND_VISUAL_QUERY_DETECTION_SERVICE";
     field public static final String BIND_WALLPAPER_EFFECTS_GENERATION_SERVICE = "android.permission.BIND_WALLPAPER_EFFECTS_GENERATION_SERVICE";
@@ -335,7 +336,7 @@ package android {
     field public static final String QUERY_ADMIN_POLICY = "android.permission.QUERY_ADMIN_POLICY";
     field public static final String QUERY_CLONED_APPS = "android.permission.QUERY_CLONED_APPS";
     field @FlaggedApi("android.app.admin.flags.device_theft_api_enabled") public static final String QUERY_DEVICE_STOLEN_STATE = "android.permission.QUERY_DEVICE_STOLEN_STATE";
-    field @FlaggedApi("android.content.pm.enable_query_domain_verification") public static final String QUERY_DOMAIN_VERIFICATION = "android.permission.QUERY_DOMAIN_VERIFICATION";
+    field @FlaggedApi("android.view.flags.redact_web_otp_sms_api") public static final String QUERY_DOMAIN_VERIFICATION = "android.permission.QUERY_DOMAIN_VERIFICATION";
     field @Deprecated public static final String QUERY_TIME_ZONE_RULES = "android.permission.QUERY_TIME_ZONE_RULES";
     field public static final String QUERY_USERS = "android.permission.QUERY_USERS";
     field public static final String RADIO_SCAN_WITHOUT_LOCATION = "android.permission.RADIO_SCAN_WITHOUT_LOCATION";
@@ -1242,6 +1243,7 @@ package android.app {
   }
 
   public class StatusBarManager {
+    method @FlaggedApi("android.app.enable_motion_cues") @RequiresPermission(android.Manifest.permission.DRAW_MOTION_CUES) public void endMotionCuesSession();
     method @NonNull @RequiresPermission(android.Manifest.permission.STATUS_BAR) public android.app.StatusBarManager.DisableInfo getDisableInfo();
     method @RequiresPermission(android.Manifest.permission.STATUS_BAR) public int getNavBarMode();
     method @RequiresPermission(android.Manifest.permission.MEDIA_CONTENT_CONTROL) public void registerNearbyMediaDevicesProvider(@NonNull android.media.NearbyMediaDevicesProvider);
@@ -1249,6 +1251,7 @@ package android.app {
     method @RequiresPermission(android.Manifest.permission.STATUS_BAR) public void setDisabledForSetup(boolean);
     method @FlaggedApi("android.telecom.flags.release_icon_as_api") @RequiresPermission(android.Manifest.permission.STATUS_BAR) public void setIcon(@NonNull String, @DrawableRes int, int, @Nullable String);
     method @RequiresPermission(android.Manifest.permission.STATUS_BAR) public void setNavBarMode(int);
+    method @FlaggedApi("android.app.enable_motion_cues") @RequiresPermission(android.Manifest.permission.DRAW_MOTION_CUES) public void startMotionCuesSession(@NonNull android.content.ComponentName, @NonNull android.app.motioncues.MotionCuesSettings);
     method @RequiresPermission(android.Manifest.permission.MEDIA_CONTENT_CONTROL) public void unregisterNearbyMediaDevicesProvider(@NonNull android.media.NearbyMediaDevicesProvider);
     method @RequiresPermission(android.Manifest.permission.MEDIA_CONTENT_CONTROL) public void updateMediaTapToTransferReceiverDisplay(int, @NonNull android.media.MediaRoute2Info, @Nullable android.graphics.drawable.Icon, @Nullable CharSequence);
     method @RequiresPermission(android.Manifest.permission.MEDIA_CONTENT_CONTROL) public void updateMediaTapToTransferSenderDisplay(int, @NonNull android.media.MediaRoute2Info, @Nullable java.util.concurrent.Executor, @Nullable Runnable);
@@ -2475,6 +2478,50 @@ package android.app.modes {
 
 }
 
+package android.app.motioncues {
+
+  @FlaggedApi("android.app.enable_motion_cues") public final class MotionCuesData implements android.os.Parcelable {
+    ctor @FlaggedApi("android.app.enable_motion_cues") public MotionCuesData(@ColorInt int, @DrawableRes int);
+    ctor @FlaggedApi("android.app.enable_motion_cues") public MotionCuesData(@NonNull android.app.motioncues.MotionCuesData);
+    method @FlaggedApi("android.app.enable_motion_cues") public int describeContents();
+    method @FlaggedApi("android.app.enable_motion_cues") @ColorInt public int getColor();
+    method @FlaggedApi("android.app.enable_motion_cues") @DrawableRes public int getShapeRes();
+    method @FlaggedApi("android.app.enable_motion_cues") public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @FlaggedApi("android.app.enable_motion_cues") @NonNull public static final android.os.Parcelable.Creator<android.app.motioncues.MotionCuesData> CREATOR;
+  }
+
+  @FlaggedApi("android.app.enable_motion_cues") public abstract class MotionCuesService extends android.app.Service {
+    ctor public MotionCuesService();
+    method @FlaggedApi("android.app.enable_motion_cues") @Nullable @RequiresPermission(android.Manifest.permission.BIND_MOTION_CUES_SERVICE) public final android.os.IBinder onBind(@Nullable android.content.Intent);
+    method @FlaggedApi("android.app.enable_motion_cues") public abstract void onClientConnected();
+    method @FlaggedApi("android.app.enable_motion_cues") public abstract void onClientDisconnected();
+    method @FlaggedApi("android.app.enable_motion_cues") public final void updateBubblePixelPos(float, float);
+    method @FlaggedApi("android.app.enable_motion_cues") public final void updateMotionCuesData(@NonNull android.app.motioncues.MotionCuesData);
+    field @FlaggedApi("android.app.enable_motion_cues") public static final String EXTRA_API_CALLBACK = "android.app.motioncues.extra.API_CALLBACK";
+  }
+
+  @FlaggedApi("android.app.enable_motion_cues") public final class MotionCuesSettings implements android.os.Parcelable {
+    method @FlaggedApi("android.app.enable_motion_cues") public int describeContents();
+    method @FlaggedApi("android.app.enable_motion_cues") public int getHorizontalSpacingDp();
+    method @FlaggedApi("android.app.enable_motion_cues") public int getMarginSize();
+    method @FlaggedApi("android.app.enable_motion_cues") public int getRadius();
+    method @FlaggedApi("android.app.enable_motion_cues") public int getVerticalSpacingDp();
+    method @FlaggedApi("android.app.enable_motion_cues") public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @FlaggedApi("android.app.enable_motion_cues") @NonNull public static final android.os.Parcelable.Creator<android.app.motioncues.MotionCuesSettings> CREATOR;
+  }
+
+  @FlaggedApi("android.app.enable_motion_cues") public static final class MotionCuesSettings.Builder {
+    ctor @FlaggedApi("android.app.enable_motion_cues") public MotionCuesSettings.Builder();
+    ctor @FlaggedApi("android.app.enable_motion_cues") public MotionCuesSettings.Builder(@NonNull android.app.motioncues.MotionCuesSettings);
+    method @FlaggedApi("android.app.enable_motion_cues") @NonNull public android.app.motioncues.MotionCuesSettings build();
+    method @FlaggedApi("android.app.enable_motion_cues") @NonNull public android.app.motioncues.MotionCuesSettings.Builder setHorizontalSpacingDp(int);
+    method @FlaggedApi("android.app.enable_motion_cues") @NonNull public android.app.motioncues.MotionCuesSettings.Builder setMarginSize(int);
+    method @FlaggedApi("android.app.enable_motion_cues") @NonNull public android.app.motioncues.MotionCuesSettings.Builder setRadius(int);
+    method @FlaggedApi("android.app.enable_motion_cues") @NonNull public android.app.motioncues.MotionCuesSettings.Builder setVerticalSpacingDp(int);
+  }
+
+}
+
 package android.app.people {
 
   @RestrictedForEnvironment(environments=android.annotation.RestrictedForEnvironment.ENVIRONMENT_SDK_RUNTIME, from=android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) public final class PeopleManager {
@@ -3641,6 +3688,7 @@ package android.companion {
     method @RequiresPermission("android.permission.MANAGE_COMPANION_DEVICES") public boolean canPairWithoutPrompt(@NonNull String, @NonNull String, @NonNull android.os.UserHandle);
     method @NonNull @RequiresPermission("android.permission.MANAGE_COMPANION_DEVICES") public java.util.List<android.companion.AssociationInfo> getAllAssociations();
     method @FlaggedApi("android.companion.association_verification") @Nullable @RequiresPermission(android.Manifest.permission.ACCESS_COMPANION_INFO) public android.companion.AssociationInfo getAssociationByDeviceId(@NonNull android.companion.DeviceId);
+    method @FlaggedApi("android.companion.trusted_devices") @NonNull @RequiresPermission(android.Manifest.permission.ACCESS_COMPANION_MESSAGE_PCC) @WorkerThread public java.util.List<android.companion.AssociationInfo> getTrustedAssociations();
     method @RequiresPermission("android.permission.MANAGE_COMPANION_DEVICES") public boolean isDeviceAssociatedForWifiConnection(@NonNull String, @NonNull android.net.MacAddress, @NonNull android.os.UserHandle);
     method @Deprecated @FlaggedApi("android.companion.enable_data_sync") @RequiresPermission(android.Manifest.permission.REQUEST_COMPANION_SELF_MANAGED) public void notifyDeviceAppeared(int);
     method @Deprecated @FlaggedApi("android.companion.enable_data_sync") @RequiresPermission(android.Manifest.permission.REQUEST_COMPANION_SELF_MANAGED) public void notifyDeviceDisappeared(int);
@@ -3706,11 +3754,11 @@ package android.companion.datatransfer.continuity {
 
   @FlaggedApi("android.companion.task_continuity") public class TaskContinuityManager {
     method @RequiresPermission(android.Manifest.permission.READ_HANDOFF_SETTINGS) public void registerHandoffFeatureStateListener(@NonNull java.util.concurrent.Executor, @NonNull android.companion.datatransfer.continuity.TaskContinuityManager.HandoffFeatureStateListener);
-    method @RequiresPermission(android.Manifest.permission.READ_REMOTE_TASKS) public void registerRemoteTaskListener(@NonNull java.util.concurrent.Executor, @NonNull android.companion.datatransfer.continuity.TaskContinuityManager.RemoteTaskListener);
+    method @RequiresPermission(android.Manifest.permission.READ_REMOTE_TASKS) public void registerRemoteTaskListener(@NonNull java.util.concurrent.Executor, @NonNull java.util.function.Consumer<java.util.List<android.companion.datatransfer.continuity.RemoteTask>>);
     method @RequiresPermission(android.Manifest.permission.REQUEST_TASK_HANDOFF) public void requestHandoff(int, int, @NonNull java.util.concurrent.Executor, @NonNull android.companion.datatransfer.continuity.TaskContinuityManager.HandoffRequestCallback);
     method @RequiresPermission(android.Manifest.permission.MODIFY_HANDOFF_SETTINGS) public void setHandoffForDeviceEnabled(boolean);
     method @RequiresPermission(android.Manifest.permission.READ_HANDOFF_SETTINGS) public void unregisterHandoffFeatureStateListener(@NonNull android.companion.datatransfer.continuity.TaskContinuityManager.HandoffFeatureStateListener);
-    method @RequiresPermission(android.Manifest.permission.READ_REMOTE_TASKS) public void unregisterRemoteTaskListener(@NonNull android.companion.datatransfer.continuity.TaskContinuityManager.RemoteTaskListener);
+    method @RequiresPermission(android.Manifest.permission.READ_REMOTE_TASKS) public void unregisterRemoteTaskListener(@NonNull java.util.function.Consumer<java.util.List<android.companion.datatransfer.continuity.RemoteTask>>);
     field public static final int HANDOFF_AVAILABILITY_STATUS_AVAILABLE = 0; // 0x0
     field public static final int HANDOFF_AVAILABILITY_STATUS_DISABLED_BY_POLICY = 1; // 0x1
     field public static final int HANDOFF_AVAILABILITY_STATUS_UNSUPPORTED_HARDWARE = 2; // 0x2
@@ -3730,10 +3778,6 @@ package android.companion.datatransfer.continuity {
 
   public static interface TaskContinuityManager.HandoffRequestCallback {
     method public void onHandoffRequestFinished(int, int, int);
-  }
-
-  public static interface TaskContinuityManager.RemoteTaskListener {
-    method public void onRemoteTasksChanged(@NonNull java.util.List<android.companion.datatransfer.continuity.RemoteTask>);
   }
 
 }
@@ -5123,7 +5167,7 @@ package android.content.pm.verify.domain {
     method @Nullable @RequiresPermission(anyOf={android.Manifest.permission.DOMAIN_VERIFICATION_AGENT, android.Manifest.permission.QUERY_DOMAIN_VERIFICATION}) public android.content.pm.verify.domain.DomainVerificationInfo getDomainVerificationInfo(@NonNull String) throws android.content.pm.PackageManager.NameNotFoundException;
     method @NonNull @RequiresPermission(anyOf={android.Manifest.permission.UPDATE_DOMAIN_VERIFICATION_USER_SELECTION, android.Manifest.permission.QUERY_DOMAIN_VERIFICATION}) public java.util.SortedSet<android.content.pm.verify.domain.DomainOwner> getOwnersForDomain(@NonNull String);
     method @FlaggedApi("android.content.pm.relative_reference_intent_filters") @NonNull public java.util.Map<java.lang.String,java.util.List<android.content.UriRelativeFilterGroup>> getUriRelativeFilterGroups(@NonNull String, @NonNull java.util.List<java.lang.String>);
-    method @FlaggedApi("android.content.pm.enable_query_domain_verification") @NonNull @RequiresPermission(android.Manifest.permission.QUERY_DOMAIN_VERIFICATION) public java.util.SortedSet<android.content.pm.verify.domain.DomainOwner> getVerifiedOwnersForDomain(@NonNull String);
+    method @FlaggedApi("android.view.flags.redact_web_otp_sms_api") @NonNull @RequiresPermission(android.Manifest.permission.QUERY_DOMAIN_VERIFICATION) public java.util.SortedSet<android.content.pm.verify.domain.DomainOwner> getVerifiedOwnersForDomain(@NonNull String);
     method @NonNull @RequiresPermission(android.Manifest.permission.DOMAIN_VERIFICATION_AGENT) public java.util.List<java.lang.String> queryValidVerificationPackageNames();
     method @RequiresPermission(android.Manifest.permission.UPDATE_DOMAIN_VERIFICATION_USER_SELECTION) public void setDomainVerificationLinkHandlingAllowed(@NonNull String, boolean) throws android.content.pm.PackageManager.NameNotFoundException;
     method @CheckResult @RequiresPermission(android.Manifest.permission.DOMAIN_VERIFICATION_AGENT) public int setDomainVerificationStatus(@NonNull java.util.UUID, @NonNull java.util.Set<java.lang.String>, int) throws android.content.pm.PackageManager.NameNotFoundException;
@@ -6053,13 +6097,13 @@ package android.hardware.display {
   }
 
   public final class VirtualDisplayConfig implements android.os.Parcelable {
-    method @FlaggedApi("android.companion.virtualdevice.flags.virtual_display_insets") @Nullable public android.view.DisplayCutout getDisplayCutout();
+    method @Nullable public android.view.DisplayCutout getDisplayCutout();
     method public boolean isHomeSupported();
     method @FlaggedApi("com.android.window.flags.vdm_force_app_universal_resizable_api") public boolean isIgnoreActivitySizeRestrictions();
   }
 
   public static final class VirtualDisplayConfig.Builder {
-    method @FlaggedApi("android.companion.virtualdevice.flags.virtual_display_insets") @NonNull public android.hardware.display.VirtualDisplayConfig.Builder setDisplayCutout(@Nullable android.view.DisplayCutout);
+    method @NonNull public android.hardware.display.VirtualDisplayConfig.Builder setDisplayCutout(@Nullable android.view.DisplayCutout);
     method @NonNull public android.hardware.display.VirtualDisplayConfig.Builder setHomeSupported(boolean);
     method @FlaggedApi("com.android.window.flags.vdm_force_app_universal_resizable_api") @NonNull public android.hardware.display.VirtualDisplayConfig.Builder setIgnoreActivitySizeRestrictions(boolean);
   }
@@ -8248,6 +8292,7 @@ package android.media {
     method @RequiresPermission(android.Manifest.permission.MODIFY_AUDIO_ROUTING) public boolean setPreferredDeviceForCapturePreset(int, @NonNull android.media.AudioDeviceAttributes);
     method @RequiresPermission(android.Manifest.permission.MODIFY_AUDIO_ROUTING) public boolean setPreferredDeviceForStrategy(@NonNull android.media.audiopolicy.AudioProductStrategy, @NonNull android.media.AudioDeviceAttributes);
     method @RequiresPermission(android.Manifest.permission.MODIFY_AUDIO_ROUTING) public boolean setPreferredDevicesForStrategy(@NonNull android.media.audiopolicy.AudioProductStrategy, @NonNull java.util.List<android.media.AudioDeviceAttributes>);
+    method @FlaggedApi("android.telecom.flags.telecom_mainline_api") @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE) public static void setRttEnabled(boolean);
     method @RequiresPermission(android.Manifest.permission.MODIFY_AUDIO_ROUTING) public void setSupportedSystemUsages(@NonNull int[]);
     method @RequiresPermission(anyOf={android.Manifest.permission.MODIFY_AUDIO_SETTINGS_PRIVILEGED, android.Manifest.permission.MODIFY_AUDIO_ROUTING}) public void setVolumeGroupVolumeIndex(int, int, int);
     method @RequiresPermission(android.Manifest.permission.MODIFY_AUDIO_ROUTING) public void setVolumeIndexForAttributes(@NonNull android.media.AudioAttributes, int, int);
@@ -14613,10 +14658,30 @@ package android.service.personalcontext.hint {
 
 package android.service.personalcontext.refiner {
 
+  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class HintFilter implements android.os.Parcelable {
+    method public int describeContents();
+    method @NonNull public java.util.Set<java.lang.String> getHintClasses();
+    method @NonNull public java.util.Set<android.service.personalcontext.Token> getHintTokens();
+    method @NonNull public java.util.Set<java.lang.String> getPackages();
+    method @NonNull public java.util.Set<java.lang.String> getRequiredHintClasses();
+    method @NonNull public java.util.Set<android.service.personalcontext.Token> getRequiredHintTokens();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.service.personalcontext.refiner.HintFilter> CREATOR;
+  }
+
+  public static final class HintFilter.Builder {
+    ctor public HintFilter.Builder();
+    method @NonNull public android.service.personalcontext.refiner.HintFilter.Builder addHintClass(@NonNull Class<? extends android.service.personalcontext.hint.ContextHint>, boolean);
+    method @NonNull public android.service.personalcontext.refiner.HintFilter.Builder addHintToken(@NonNull android.service.personalcontext.Token, boolean);
+    method @NonNull public android.service.personalcontext.refiner.HintFilter.Builder addPackage(@NonNull String);
+    method @NonNull public android.service.personalcontext.refiner.HintFilter build();
+  }
+
   @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public abstract class HintRefinerService extends android.app.Service {
     ctor public HintRefinerService();
     method @Nullable public final android.os.IBinder onBind(@Nullable android.content.Intent);
     method public void onConnected();
+    method @NonNull public abstract android.service.personalcontext.refiner.HintFilter onInitializeFilter();
     method public abstract void onRefine(@NonNull java.util.List<android.service.personalcontext.hint.ContextHint>, @NonNull java.util.function.Consumer<java.util.List<android.service.personalcontext.hint.ContextHint>>);
   }
 
@@ -14657,8 +14722,10 @@ package android.service.personalcontext.understander {
     ctor public ContextUnderstanderService();
     method @Nullable public final android.os.IBinder onBind(@Nullable android.content.Intent);
     method public void onConnected();
+    method @NonNull public abstract android.service.personalcontext.refiner.HintFilter onInitializeFilter();
     method public abstract void onUnderstand(@NonNull java.util.List<android.service.personalcontext.hint.ContextHintWithSignature>);
-    method public final void understood(@NonNull java.util.List<android.service.personalcontext.insight.ContextInsight>);
+    method @Deprecated public final void understood(@NonNull java.util.List<android.service.personalcontext.insight.ContextInsight>);
+    method public final void understood(@NonNull android.service.personalcontext.insight.ContextInsight);
   }
 
 }

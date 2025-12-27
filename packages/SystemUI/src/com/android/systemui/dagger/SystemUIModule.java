@@ -95,11 +95,13 @@ import com.android.systemui.mediaprojection.appselector.MediaProjectionActivitie
 import com.android.systemui.mediaprojection.taskswitcher.MediaProjectionTaskSwitcherModule;
 import com.android.systemui.mediarouter.MediaRouterModule;
 import com.android.systemui.model.SysUiState;
+import com.android.systemui.motioncues.MotionCuesModule;
 import com.android.systemui.motiontool.MotionToolModule;
 import com.android.systemui.navigationbar.NavigationBarComponent;
 import com.android.systemui.navigationbar.gestural.dagger.GestureModule;
 import com.android.systemui.notetask.NoteTaskModule;
 import com.android.systemui.people.PeopleModule;
+import com.android.systemui.personalcontext.SysuiVisualizerService;
 import com.android.systemui.personalcontext.dagger.PersonalContextModule;
 import com.android.systemui.plugins.BcSmartspaceConfigPlugin;
 import com.android.systemui.plugins.BcSmartspaceDataPlugin;
@@ -269,6 +271,7 @@ import javax.inject.Named;
         MediaProjectionModule.class,
         MediaProjectionTaskSwitcherModule.class,
         MediaRouterModule.class,
+        MotionCuesModule.class,
         MotionToolModule.class,
         MSDLModule.class,
         PeopleHubModule.class,
@@ -488,6 +491,11 @@ public abstract class SystemUIModule {
     @IntoMap
     @ClassKey(SystemUISecondaryUserService.class)
     abstract Service bindsSystemUISecondaryUserService(SystemUISecondaryUserService service);
+
+    @Binds
+    @IntoMap
+    @ClassKey(SysuiVisualizerService.class)
+    abstract Service bindSysuiVisualizerService(SysuiVisualizerService service);
 
     @Provides
     @SysUISingleton

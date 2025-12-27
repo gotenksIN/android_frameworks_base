@@ -858,6 +858,7 @@ public class StatusBarKeyguardViewManager implements RemoteInputController.Callb
     public void showPrimaryBouncer(boolean scrimmed, String reason) {
         hideAlternateBouncer(
                 /* updateScrim= */ false,
+                // When the scene framework is on, don't ever clear the pending dismiss action from
                 /* clearDismissAction= */ false);
         if (mKeyguardStateController.isShowing() && !isBouncerShowing()) {
             if (SceneContainerFlag.isEnabled()) {
@@ -1004,7 +1005,7 @@ public class StatusBarKeyguardViewManager implements RemoteInputController.Callb
     }
 
     /**
-     * Adds a {@param runnable} to be executed after Keyguard is gone.
+     * Adds a {@code runnable} to be executed after Keyguard is gone.
      */
     public void addAfterKeyguardGoneRunnable(Runnable runnable) {
         if (SceneContainerFlag.isEnabled()) {

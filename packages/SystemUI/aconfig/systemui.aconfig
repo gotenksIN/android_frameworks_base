@@ -3,16 +3,6 @@ container: "system"
 
 # go/keep-sorted start block=yes newline_separated=yes by_regex=name:\s*"([^"]+)"
 flag {
-    name: "activity_starter_display_aware"
-    namespace: "systemui"
-    description: "Fix non display aware calls in ActivityStarter"
-    bug: "432402434"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "ambient_cue_plugin"
     namespace: "ailabs"
     description: "Enable plugin for ambient cue project"
@@ -27,6 +17,16 @@ flag {
   metadata {
     purpose: PURPOSE_BUGFIX
   }
+}
+
+flag {
+    name: "animation_library_atomic_listeners"
+    namespace: "systemui"
+    description: "Better atomicity enforcement for Animation Library listeners."
+    bug: "468224528"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -114,6 +114,16 @@ flag {
     namespace: "systemui"
     description: "enables new focus outline for the brightness slider when focused on with physical keyboard"
     bug: "329244723"
+}
+
+flag {
+    name: "broadcast_dispatcher_custom_executor"
+    namespace: "systemui"
+    description: "Default BroadcastDispatcher to use a custom executor instead of main executor"
+    bug: "466355597"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -324,6 +334,16 @@ flag {
     metadata {
       purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+  name: "display_aware_shade_controller_impl"
+  namespace: "systemui"
+  description: "Make ShadeControllerImpl display aware"
+  bug: "444658034"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
 }
 
 flag {
@@ -1357,16 +1377,6 @@ flag {
 }
 
 flag {
-    name: "qs_edit_mode_v2"
-    namespace: "systemui"
-    description: "Updates the removal process of tiles and improves tiles selection."
-    bug: "438943936"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "qs_material_expressive_tiles"
     namespace: "systemui"
     description: "Uses the Material Expressive button groups for QS tiles."
@@ -1433,9 +1443,9 @@ flag {
 
 flag {
     name: "qs_wifi_config"
-    namespace: "desktop_connectivity"
+    namespace: "systemui"
     description: "Enables the multi-user WiFi configuration UI in Interent detailed tiles. This flag depends on qs_tile_detailed_view flag"
-    bug: "406548883"
+    bug: "402214828"
 }
 
 flag {
@@ -1657,16 +1667,6 @@ flag {
    namespace: "systemui"
    description: "Relocate Smartspace to bottom of the Lock Screen"
    bug: "316212788"
-}
-
-flag {
-    name: "smartspace_swipe_event_logging_fix"
-    namespace: "systemui"
-    description: "Log card swipe events in smartspace"
-    bug: "374150422"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-   }
 }
 
 flag {
@@ -1907,16 +1907,6 @@ flag {
    metadata {
        purpose: PURPOSE_BUGFIX
    }
-}
-
-flag {
-    name: "sysui_intrinsic_lock_dispatcher"
-    namespace: "systemui"
-    description: "Custom dispatcher for background tasks, which uses intrinsic locks instead of ReentrantLock"
-    bug: "419472502"
-    metadata {
-         purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {

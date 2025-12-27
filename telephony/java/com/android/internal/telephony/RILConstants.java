@@ -553,6 +553,7 @@ public interface RILConstants {
     int RIL_REQUEST_SET_SATELLITE_NETWORK_INFO = 261;
     int RIL_REQUEST_START_PRIORITIZED_NETWORK_SCAN = 262;
     int RIL_REQUEST_STOP_PRIORITIZED_NETWORK_SCAN = 263;
+    int RIL_REQUEST_REBOOT_MODEM = 264;
 
 // QTI_BEGIN: 2021-02-25: Telephony: Configure same GID based APNs as per carrier requirements
     /* RIL Request to get newly supported radio

@@ -438,6 +438,7 @@ class Task extends TaskFragment {
     // Id of the previous display the root task was on.
     int mPrevDisplayId = INVALID_DISPLAY;
 
+    // TODO: b/296268915 - clean these up with flag delegate_request_fullscreen_handling_to_shell
     int mMultiWindowRestoreWindowingMode = INVALID_WINDOWING_MODE;
     WindowContainerToken mMultiWindowRestoreParent;
 
@@ -746,8 +747,8 @@ class Task extends TaskFragment {
         mDisableAppCompatRoundedCorners = disableAppCompatRoundedCorners;
         EventLogTags.writeWmTaskCreated(mTaskId);
 
-        if (android.security.Flags.appLockCore()) {
-            mWmService.mAppLockOverlayController.registerTask(this);
+        if (mWmService.mAppLockController != null) {
+            mWmService.mAppLockController.registerTask(this);
         }
     }
 
@@ -1737,7 +1738,7 @@ class Task extends TaskFragment {
 
     /**
      * @return whether or not there are ONLY task overlay activities in the task.
-     *         If {@param includeFinishing} is set, then don't ignore finishing activities in the
+     *         If {@code includeFinishing} is set, then don't ignore finishing activities in the
      *         check. If there are no task overlay activities, this call returns false.
      */
     boolean onlyHasTaskOverlayActivities(boolean includeFinishing) {
@@ -4656,7 +4657,7 @@ class Task extends TaskFragment {
     }
 
     /**
-     * Sets/unsets the forced-hidden state flag for this task depending on {@param set}.
+     * Sets/unsets the forced-hidden state flag for this task depending on {@code set}.
      * @return Whether the force hidden state changed
      */
     @Override
@@ -4778,6 +4779,7 @@ class Task extends TaskFragment {
      * the previous parent if parent has changed.
      */
     void restoreWindowingMode() {
+        if (Flags.delegateRequestFullscreenHandlingToShell()) return;
         if (mMultiWindowRestoreWindowingMode == INVALID_WINDOWING_MODE) {
             return;
         }
@@ -4805,7 +4807,9 @@ class Task extends TaskFragment {
         // Calling Task#setWindowingMode() for leaf task since this is a specialization of
         // {@link #setWindowingMode(int)} for root task.
         if (!isRootTask()) {
-            mMultiWindowRestoreWindowingMode = INVALID_WINDOWING_MODE;
+            if (!Flags.delegateRequestFullscreenHandlingToShell()) {
+                mMultiWindowRestoreWindowingMode = INVALID_WINDOWING_MODE;
+            }
             super.setWindowingMode(windowingMode);
             return;
         }
@@ -4861,8 +4865,10 @@ class Task extends TaskFragment {
             return;
         }
 
-        // Reset multi-window restore windowing mode.
-        mMultiWindowRestoreWindowingMode = INVALID_WINDOWING_MODE;
+        if (!Flags.delegateRequestFullscreenHandlingToShell()) {
+            // Reset multi-window restore windowing mode.
+            mMultiWindowRestoreWindowingMode = INVALID_WINDOWING_MODE;
+        }
 
         final ActivityRecord topActivity = getTopNonFinishingActivity();
 
@@ -5628,8 +5634,8 @@ class Task extends TaskFragment {
 
     /**
      * When switching to another Task, marks the currently PiP candidate activity as supporting to
-     * enter PiP while it is pausing (if supported). Only one of {@param toFrontTask} or
-     * {@param toFrontActivity} should be set.
+     * enter PiP while it is pausing (if supported). Only one of {@code toFrontTask} or
+     * {@code toFrontActivity} should be set.
      */
     static void enableEnterPipOnTaskSwitch(@Nullable ActivityRecord pipCandidate,
             @Nullable Task toFrontTask, @Nullable ActivityRecord toFrontActivity,

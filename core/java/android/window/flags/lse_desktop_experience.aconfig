@@ -756,16 +756,6 @@ flag {
 }
 
 flag {
-    name: "enable_dream_activity_windowing_exclusion"
-    namespace: "lse_desktop_experience"
-    description: "When enabled activities with type dream will be exempt from desktop windowing"
-    bug: "414619063"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "enable_enhanced_app_to_web_transition"
     namespace: "lse_desktop_experience"
     description: "Enables the enhanced app-to-web transition feature."
@@ -929,13 +919,6 @@ flag {
 }
 
 flag {
-    name: "enable_multiple_desktops_frontend"
-    namespace: "lse_desktop_experience"
-    description: "Enable multiple desktop sessions for desktop windowing (frontend)."
-    bug: "362720309"
-}
-
-flag {
     name: "enable_no_window_decoration_for_desks"
     namespace: "lse_desktop_experience"
     description: "Stops the creation of a window decoration for desk tasks."
@@ -974,13 +957,6 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Enables having a DesktopWallpaperActivity at a per-display level."
     bug: "381935663"
-}
-
-flag {
-    name: "enable_persisting_display_size_for_connected_displays"
-    namespace: "lse_desktop_experience"
-    description: "Enables persisting display size on resolution change for connected displays."
-    bug: "392855657"
 }
 
 flag {
@@ -1100,18 +1076,6 @@ flag {
 }
 
 flag {
-    name: "enable_shell_initial_bounds_regression_bug_fix"
-    namespace: "lse_desktop_experience"
-    description: "Enables fix for Shell initial bounds regression, forcing core to calculate /n"
-                 "initial bounds in desktop launch params while respecting cascading position /n"
-                 "passed by Shell."
-    bug: "396075922"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "enable_shell_thread_lint_check"
     namespace: "lse_desktop_experience"
     description: "Enables annotation to check invoking thread in Shell."
@@ -1168,16 +1132,6 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Show recent apps in the taskbar overflow."
     bug: "375627272"
-}
-
-flag {
-    name: "enable_taskbar_recents_layout_transition"
-    namespace: "lse_desktop_experience"
-    description: "Enable Taskbar LayoutTransition for Recent Apps"
-    bug: "343521765"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -1245,13 +1199,6 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Enables edge drag resizing for stylus input (cursor is enabled by default)"
     bug: "337782092"
-}
-
-flag {
-    name: "enable_windowing_scaled_resizing"
-    namespace: "lse_desktop_experience"
-    description: "Enables the resizing of non-resizable apps through scaling their bounds up/down"
-    bug: "319844447"
 }
 
 flag {
@@ -1414,6 +1361,13 @@ flag {
     metadata {
         purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+    name: "refactor_caption_sandboxing_to_core"
+    namespace: "lse_desktop_experience"
+    description: "Refactor sandboxing of caption insets from app bounds from shell to core"
+    bug: "442542077"
 }
 
 flag {

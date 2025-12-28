@@ -37,8 +37,14 @@ import com.android.wm.shell.ShellTestCase
 import com.android.wm.shell.common.UserProfileContexts
 import com.android.wm.shell.sysui.ShellInit
 import com.android.wm.shell.transition.Transitions
+import com.android.wm.shell.windowdecor.DesktopModeWindowDecorViewModel
+import com.android.wm.shell.windowdecor.common.WindowDecorTaskResourceLoader
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
+import java.util.Optional
+import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -62,6 +68,10 @@ class PackageUpdateControllerTest : ShellTestCase() {
     private val shellTaskOrganizer = mock<ShellTaskOrganizer>()
     private val shellInit = mock<ShellInit>()
     private val userProfileContexts = mock<UserProfileContexts>()
+    private val taskResourceLoader = mock<WindowDecorTaskResourceLoader>()
+    private val viewModel = mock<DesktopModeWindowDecorViewModel>()
+    private val testScope = TestScope()
+    private val testDispatcher = StandardTestDispatcher(testScope.testScheduler)
     private lateinit var packageUpdateController: PackageUpdateController
 
     @Before
@@ -70,38 +80,48 @@ class PackageUpdateControllerTest : ShellTestCase() {
             transitions,
             shellTaskOrganizer,
             shellInit,
-            userProfileContexts
-        )
+            userProfileContexts,
+            taskResourceLoader,
+            Optional.of(viewModel),
+            testScope,
+            )
 
         whenever(userProfileContexts[anyInt()]).thenReturn(context)
         whenever(userProfileContexts.getOrCreate(anyInt())).thenReturn(context)
+        whenever(viewModel.hasWindowDecoration(anyInt())).thenReturn(true)
     }
 
     @Test
     fun onPackageUpdateRequested_visibleTask_launchesPlaceholder() {
-        val task = createTaskInfo(1)
+        runTest(testDispatcher) {
+            val task = createTaskInfo(1)
 
-        packageUpdateController.onPackageUpdateRequested(listOf(task))
+            packageUpdateController.onPackageUpdateRequested(listOf(task))
+            testScope.testScheduler.advanceUntilIdle()
 
-        val wct = getLatestWct(type = TRANSIT_OPEN)
-        assertThat(wct.hierarchyOps.map { it.type }).containsExactly(
-            HIERARCHY_OP_TYPE_PENDING_INTENT,
-            HIERARCHY_OP_TYPE_CONTINUE_PACKAGE_UPDATE
-        )
-        wct.assertPendingIntent(createPuActivityIntent())
-        wct.assertContinuePackageUpdate(task)
+            val wct = getLatestWct(type = TRANSIT_OPEN)
+            assertThat(wct.hierarchyOps.map { it.type }).containsExactly(
+                HIERARCHY_OP_TYPE_PENDING_INTENT,
+                HIERARCHY_OP_TYPE_CONTINUE_PACKAGE_UPDATE
+            )
+            wct.assertPendingIntent(createPuActivityIntent())
+            wct.assertContinuePackageUpdate(task)
+        }
     }
 
     @Test
     fun onPackageUpdateRequested_invisibleTask_doesNotLaunchPlaceholder() {
-        val task = createTaskInfo(id = 1, visible = false)
-        packageUpdateController.onPackageUpdateRequested(listOf(task))
+        runTest(testDispatcher) {
+            val task = createTaskInfo(id = 1, visible = false)
+            packageUpdateController.onPackageUpdateRequested(listOf(task))
+            testScope.testScheduler.advanceUntilIdle()
 
-        val wct = getLatestWct(type = TRANSIT_OPEN)
-        assertThat(wct.hierarchyOps.map { it.type }).containsExactly(
-            HIERARCHY_OP_TYPE_CONTINUE_PACKAGE_UPDATE
-        )
-        wct.assertContinuePackageUpdate(task)
+            val wct = getLatestWct(type = TRANSIT_OPEN)
+            assertThat(wct.hierarchyOps.map { it.type }).containsExactly(
+                HIERARCHY_OP_TYPE_CONTINUE_PACKAGE_UPDATE
+            )
+            wct.assertContinuePackageUpdate(task)
+        }
     }
 
     @Test
@@ -134,6 +154,26 @@ class PackageUpdateControllerTest : ShellTestCase() {
         wct.assertRemoveTask(task, removeFromRecents = false)
     }
 
+    @Test
+    fun onTaskAppeared_setsHandlePackageUpdate() {
+        val task = createTaskInfo(1)
+
+        packageUpdateController.onTaskAppeared(task)
+
+        val wct = getLatestWctThroughTransaction()
+        wct.assertHandlePackageUpdate(task, true)
+    }
+
+    @Test
+    fun onTaskVanished_unsetsHandlePackageUpdate() {
+        val task = createTaskInfo(1)
+
+        packageUpdateController.onTaskVanished(task)
+
+        val wct = getLatestWctThroughTransaction()
+        wct.assertHandlePackageUpdate(task, false)
+    }
+
     private fun createTaskInfo(
         id: Int,
         windowingMode: Int = WINDOWING_MODE_FULLSCREEN,
@@ -161,6 +201,27 @@ class PackageUpdateControllerTest : ShellTestCase() {
         return arg.value
     }
 
+    private fun getLatestWctThroughTransaction(): WindowContainerTransaction {
+        val arg = ArgumentCaptor.forClass(WindowContainerTransaction::class.java)
+        verify(shellTaskOrganizer).applyTransaction(arg.capture())
+        return arg.value
+    }
+
+    private fun WindowContainerTransaction.assertHandlePackageUpdate(
+        task: RunningTaskInfo,
+        shouldHandlePackageUpdate: Boolean
+    ) {
+        val change = changes[task.token.asBinder()]
+
+        assertWithMessage("Expected WCT to contain change for task ${task.taskId}")
+            .that(change)
+            .isNotNull()
+
+        assertWithMessage("Wrong handlePackageUpdate value for task ${task.taskId} expected " +
+                "$shouldHandlePackageUpdate but found ${change?.handlePackageUpdate}")
+            .that(change?.handlePackageUpdate)
+            .isEqualTo(shouldHandlePackageUpdate)
+    }
     private fun WindowContainerTransaction.assertPendingIntent(intent: Intent) {
         assertHop("Type=PENDING_INTENT with component=${intent.component}") { hop ->
             hop.type == HIERARCHY_OP_TYPE_PENDING_INTENT &&

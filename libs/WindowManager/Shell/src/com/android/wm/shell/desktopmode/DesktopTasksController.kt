@@ -133,6 +133,7 @@ import com.android.wm.shell.desktopmode.DesktopModeVisualIndicator.IndicatorType
 import com.android.wm.shell.desktopmode.DragToDesktopTransitionHandler.Companion.DRAG_TO_DESKTOP_FINISH_ANIM_DURATION_MS
 import com.android.wm.shell.desktopmode.DragToDesktopTransitionHandler.DragToDesktopStateListener
 import com.android.wm.shell.desktopmode.ExitDesktopTaskTransitionHandler.FULLSCREEN_ANIMATION_DURATION
+import com.android.wm.shell.desktopmode.api.IDesktopMode
 import com.android.wm.shell.desktopmode.clientfullscreenrequest.DesktopFullscreenRequestHandler
 import com.android.wm.shell.desktopmode.common.ToggleTaskSizeInteraction
 import com.android.wm.shell.desktopmode.data.DesktopDisplay
@@ -278,6 +279,7 @@ class DesktopTasksController(
     private val desksController: DesksController,
 ) :
     RemoteCallable<DesktopTasksController>,
+    TransitionHandler,
     DragAndDropController.DragAndDropListener,
     UserChangeListener {
 
@@ -406,6 +408,7 @@ class DesktopTasksController(
         shellController.addUserChangeListener(this)
         // Update the current user id again because it might be updated between init and onInit().
         updateCurrentUser(ActivityManager.getCurrentUser())
+        transitions.addHandler(this)
         desktopFullscreenRequestHandler.desktopTasksController = this
         dragToDesktopTransitionHandler.dragToDesktopStateListener = dragToDesktopStateListener
         recentsTransitionHandler.addTransitionStateListener(
@@ -2797,10 +2800,8 @@ class DesktopTasksController(
                     ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
                 launchBounds = bounds
                 launchDisplayId = displayId
-                if (DesktopModeFlags.ENABLE_SHELL_INITIAL_BOUNDS_REGRESSION_BUG_FIX.isTrue) {
-                    // Sets launch bounds size as flexible so core can recalculate.
-                    flexibleLaunchSize = rememberedBounds == null
-                }
+                // Set launch bounds size as flexible so core can recalculate.
+                flexibleLaunchSize = rememberedBounds == null
             }
 
         wct.sendPendingIntent(pendingIntent, null, ops.toBundle())
@@ -3734,10 +3735,21 @@ class DesktopTasksController(
 
     override fun getRemoteCallExecutor(): ShellExecutor = mainExecutor
 
+    override fun startAnimation(
+        transition: IBinder,
+        info: TransitionInfo,
+        startTransaction: Transaction,
+        finishTransaction: Transaction,
+        finishCallback: TransitionFinishCallback,
+    ): Boolean {
+        // This handler should never be the sole handler, so should not animate anything.
+        return false
+    }
+
     private fun taskDisplaySupportDesktopMode(triggerTask: RunningTaskInfo) =
         desktopState.isDesktopModeSupportedOnDisplay(triggerTask.displayId)
 
-    fun handleRequest(
+    override fun handleRequest(
         transition: IBinder,
         request: TransitionRequestInfo,
     ): WindowContainerTransaction? {
@@ -6829,9 +6841,9 @@ class DesktopTasksController(
     fun isDisplayInDesktopMode(displayId: Int): Boolean =
         desktopState.isDesktopModeSupportedOnDisplay(displayId) &&
             // TODO: b/440645027 - Simplify this call.
-            userRepositories.current
-                .getDeskDisplayStateForRemote()
-                .any { it.displayId == displayId && it.activeDeskId != INVALID_DISPLAY }
+            userRepositories.current.getDeskDisplayStateForRemote().any {
+                it.displayId == displayId && it.activeDeskId != INVALID_DISPLAY
+            }
 
     private fun updateTaskBarAndWallpaperDimIfNeeded(
         displayId: Int,

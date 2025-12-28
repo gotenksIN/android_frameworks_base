@@ -21,6 +21,7 @@ import static android.Manifest.permission.MANAGE_ACTIVITY_TASKS;
 import static android.app.ActivityManager.LOCK_TASK_MODE_LOCKED;
 import static android.app.ActivityManager.LOCK_TASK_MODE_PINNED;
 import static android.app.ActivityTaskManager.INVALID_TASK_ID;
+import static android.app.FullscreenRequestHandler.REQUEST_ALLOW_MODE_INHERIT;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_ASSISTANT;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_HOME;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_RECENTS;
@@ -73,6 +74,8 @@ import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.ActivityOptions;
+import android.app.FullscreenRequestHandler;
+import android.app.FullscreenRequestHandler.RequestAllowMode;
 import android.app.IApplicationThread;
 import android.app.ResultInfo;
 import android.app.WindowConfiguration;
@@ -92,6 +95,7 @@ import android.util.ArraySet;
 // QTI_BEGIN: 2021-11-22: Performance: perf: Refactor Animation Boost
 import android.util.BoostFramework;
 // QTI_END: 2021-11-22: Performance: perf: Refactor Animation Boost
+import android.util.DebugUtils;
 import android.util.DisplayMetrics;
 import android.util.Slog;
 import android.util.proto.ProtoOutputStream;
@@ -470,6 +474,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         mLockTaskController = mAtmService.getLockTaskController();
         mFragmentToken = fragmentToken;
         mRemoteToken = new RemoteToken(this);
+        setFullscreenRequestAllowMode(REQUEST_ALLOW_MODE_INHERIT);
     }
 
     @Nullable
@@ -1026,7 +1031,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
     }
 
     /**
-     * Sets/unsets the forced-hidden state flag for this task depending on {@param set}.
+     * Sets/unsets the forced-hidden state flag for this task depending on {@code set}.
      * @return Whether the force hidden state changed
      */
     boolean setForceHidden(@FlagForceHidden int flags, boolean set) {
@@ -3537,6 +3542,9 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         if (mIsRemovalRequested) {
             pw.println(prefix + "  mIsRemovalRequested=true");
         }
+        pw.println(prefix + "  fullscreenRequestAllowMode="
+                + DebugUtils.valueToString(FullscreenRequestHandler.class,
+                "REQUEST_ALLOW_MODE_", getFullscreenRequestAllowMode()));
         if (dumpAll) {
             printThisActivity(pw, mLastPausedActivity, dumpPackage, false,
                     prefix + "  mLastPausedActivity: ", null);

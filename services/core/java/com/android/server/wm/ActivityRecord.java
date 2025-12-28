@@ -2887,8 +2887,8 @@ public final class ActivityRecord extends WindowToken {
     }
 
     /**
-     * Reparents this activity into {@param newTaskFrag} at the provided {@param position}. The
-     * caller should ensure that the {@param newTaskFrag} is not already the parent of this
+     * Reparents this activity into {@code newTaskFrag} at the provided {@code position}. The
+     * caller should ensure that the {@code newTaskFrag} is not already the parent of this
      * activity.
      */
     void reparent(TaskFragment newTaskFrag, int position, String reason) {
@@ -6160,13 +6160,23 @@ public final class ActivityRecord extends WindowToken {
                                 && task.topRunningActivity(true /* focusableOnly */) == this) {
                             break;
                         }
-                        // Otherwise, starting to pause it since it is not visible.
-                        final TaskFragment taskFragment = getTaskFragment();
-                        if (taskFragment != null && taskFragment.startPausing(
-                                mTaskSupervisor.mUserLeaving, false /* uiSleeping */,
-                                null /* resuming */, "makeInvisible")) {
-                            break;
+
+                        // Checks if the activity can enter pip
+                        boolean inPip = false;
+                        final Transition finishingTransition =
+                                mTransitionController.mFinishingTransition;
+                        if (finishingTransition != null
+                                && finishingTransition.isInTransientHide(task)) {
+                            inPip = finishingTransition.checkEnterPipOnFinish(this);
                         }
+
+                        // If the activity is not entering pip and is still in RESUMED state,
+                        // starting to pause it since it is no longer visible.
+                        if (!inPip && mState == RESUMED) {
+                            getTaskFragment().startPausing(mTaskSupervisor.mUserLeaving,
+                                    false /* uiSleeping */, null /* resuming */, "makeInvisible");
+                        }
+                        break;
                     }
                     // fall through
                 case INITIALIZING:
@@ -8917,9 +8927,8 @@ public final class ActivityRecord extends WindowToken {
             skipRelaunchConfigMask |= CONFIG_UI_MODE;
         }
 
-        // TODO(b/274944389): remove workaround after long-term solution is implemented
         // Don't restart due to desk mode change if the app does not have desk resources.
-        if (mWmService.mSkipActivityRelaunchWhenDocking && onlyDeskInUiModeChanged(changesConfig)
+        if (shouldSkipActivityRelaunchWhenDocking() && onlyDeskInUiModeChanged(changesConfig)
                 && !hasDeskResources()) {
             skipRelaunchConfigMask |= CONFIG_UI_MODE;
         }
@@ -9000,6 +9009,16 @@ public final class ActivityRecord extends WindowToken {
             Slog.w(TAG, "Exception thrown during checking for desk resources " + this, e);
         }
         return mHasDeskResources;
+    }
+
+    /**
+     * Returns true if we should skip the activity recreation when the device is docked or undocked
+     * and the application does not have desk mode resources.
+     */
+    boolean shouldSkipActivityRelaunchWhenDocking() {
+        return (Flags.enableLessActivityRecreationOnConfigChange()
+                && info.isChangeEnabled(ActivityInfo.SKIP_ACTIVITY_RECREATION_ON_CONFIG_CHANGE))
+                || mWmService.mSkipActivityRelaunchWhenDocking;
     }
 
     private int getConfigurationChanges(Configuration lastReportedConfig) {

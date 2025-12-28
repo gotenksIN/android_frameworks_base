@@ -118,8 +118,8 @@ public class TaskViewTaskController implements ShellTaskOrganizer.TaskListener {
         mHideTaskWithSurface = hideTaskWithSurface;
     }
 
-    @VisibleForTesting
-    SurfaceControl getTaskLeash() {
+    /** @return the {@link SurfaceControl} of the task associated with the task view. */
+    public SurfaceControl getTaskLeash() {
         return mTaskLeash;
     }
 
@@ -584,7 +584,7 @@ public class TaskViewTaskController implements ShellTaskOrganizer.TaskListener {
     }
 
     /**
-     * Prepare this taskview to open {@param taskInfo}.
+     * Prepare this taskview to open {@code taskInfo}.
      * @return The bounds of the task or {@code null} on failure (surface is destroyed)
      */
     Rect prepareOpen(ActivityManager.RunningTaskInfo taskInfo, SurfaceControl leash) {

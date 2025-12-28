@@ -116,6 +116,7 @@ import com.android.internal.annotations.GuardedBy;
 import com.android.internal.inputmethod.DirectBootAwareness;
 import com.android.internal.inputmethod.IBooleanListener;
 import com.android.internal.inputmethod.IConnectionlessHandwritingCallback;
+import com.android.internal.inputmethod.IImeSwitcherMenu;
 import com.android.internal.inputmethod.IInputMethodClient;
 import com.android.internal.inputmethod.IInputMethodSession;
 import com.android.internal.inputmethod.IRemoteAccessibilityInputConnection;
@@ -2524,7 +2525,7 @@ public final class InputMethodManager {
      * {@link #RESULT_UNCHANGED_HIDDEN}, {@link #RESULT_SHOWN}, or
      * {@link #RESULT_HIDDEN}.
      * @return {@code true} if a request was sent to system_server, {@code false} otherwise. Note:
-     * this does not return result of the request. For result use {@param resultReceiver} instead.
+     * this does not return result of the request. For result use {@code resultReceiver} instead.
      *
      * @deprecated The {@link ResultReceiver} is not a reliable way of determining whether the
      * Input Method is actually shown or hidden. If result is needed, use
@@ -2721,7 +2722,7 @@ public final class InputMethodManager {
      * {@link #RESULT_HIDDEN}.
      * @return {@code true} if a request was sent to system_server, {@code false} otherwise. Note:
      * This does not return the result of that request (i.e. whether the IME was actually hidden).
-     * For result use {@param resultReceiver} instead.
+     * For result use {@code resultReceiver} instead.
      *
      * @deprecated The {@link ResultReceiver} is not a reliable way of determining whether the
      * Input Method is actually shown or hidden. If result is needed, use
@@ -4752,7 +4753,8 @@ public final class InputMethodManager {
     @TestApi
     @RequiresPermission(Manifest.permission.TEST_INPUT_METHOD)
     public boolean isInputMethodPickerShown() {
-        return IInputMethodManagerGlobalInvoker.isInputMethodPickerShownForTest();
+        return IInputMethodManagerGlobalInvoker
+                .isInputMethodPickerShownForTest(UserHandle.myUserId());
     }
 
     /**
@@ -4780,6 +4782,23 @@ public final class InputMethodManager {
     @RequiresPermission(Manifest.permission.TEST_INPUT_METHOD)
     public boolean shouldShowImeSwitcherButtonForTest() {
         return IInputMethodManagerGlobalInvoker.shouldShowImeSwitcherButtonForTest();
+    }
+
+    /**
+     * Registers an interface for sending calls to the IME Switcher Menu controller. This is called
+     * after the IME Switcher Menu is fully initialized.
+     *
+     * @param imeSwitcherMenu the interface to send calls to the IME Switcher Menu controller.
+     *
+     * @hide
+     */
+    @RequiresPermission(allOf = {
+            Manifest.permission.WRITE_SECURE_SETTINGS,
+            Manifest.permission.INTERACT_ACROSS_USERS_FULL,
+            Manifest.permission.STATUS_BAR_SERVICE,
+    })
+    public void registerImeSwitcherMenu(@NonNull IImeSwitcherMenu imeSwitcherMenu) {
+        IInputMethodManagerGlobalInvoker.registerImeSwitcherMenu(imeSwitcherMenu);
     }
 
     /**

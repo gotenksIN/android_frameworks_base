@@ -31,7 +31,9 @@ import android.content.Intent;
 import android.content.ComponentName;
 import android.content.pm.ApplicationInfo;
 import android.content.ContentResolver;
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
 import android.content.pm.PackageManager;
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
 import android.provider.Settings;
 // QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
 import android.database.ContentObserver;
@@ -62,10 +64,10 @@ public class AppBackgroundManager {
 // QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
     private static final int DEFAULT_FREEZE_ADJ_THRESHOLD = ProcessList.FOREGROUND_APP_ADJ + 1;
     private static final int FREEZE_BINDER_TIMEOUT_MS = 10;
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
     private static final int DEFAULT_PROC_WEIGHT = -1;
     private static final int LOW_PROC_WEIGHT = 0;
 
-// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
     private static final int REPORT_UNFREEZE_SERVICE_MSG = 0;
     private static final int FROZEN_AND_UPDATE_PROCESS_MSG = 1;
     private static final int REPORT_UNFREEZE_PROCESS_MSG = 2;
@@ -113,10 +115,12 @@ public class AppBackgroundManager {
     private static volatile boolean mUseAggressivePolicy = false;
     private static volatile boolean mUsePackageLevelFreezer = false;
     private static volatile boolean mUseRestrictBgAutoStart = false;
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
     private static volatile boolean mUseUiFluencyMode = false;
     private static volatile boolean mUseAppKeepaliveManager = false;
     private static volatile boolean mUseUIRTSettings = false;
     private static volatile boolean mUseUIAffinitySettings = false;
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
 
     private static final String SETTINGS_AUTO_START_PREFIX = "auto_start_policy_";
     private static final String SETTINGS_FREEZE_PREFIX = "freeze_policy_";
@@ -346,6 +350,7 @@ public class AppBackgroundManager {
 
 // QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
     public static AppBackgroundManager getInstance() {
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
         if (mInstance == null) {
 // QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
             synchronized (AppBackgroundManager.class) {
@@ -659,9 +664,11 @@ public class AppBackgroundManager {
 // QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
     private SparseArray<ProcessRecord> findPidsByPackageName(String packageName) {
         SparseArray<ProcessRecord> pids = new SparseArray<>();
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
         synchronized (mAm.mPidsSelfLocked) {
             for (int i = 0; i < mAm.mPidsSelfLocked.size(); i++) {
                 final ProcessRecord app = mAm.mPidsSelfLocked.valueAt(i);
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
                 if (app.info.packageName.equals(packageName)) {
                     pids.put(app.getPid(), app);
                 }
@@ -1148,11 +1155,11 @@ public class AppBackgroundManager {
 
 // QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
     public void startFreeze(String packageName, int freezeReason) {
-// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
         if (!mUseUiFluencyMode && !mUseAppBgManager) {
             return;
         }
 
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
         if (!mUseProcessLevelFreezer) {
             return;
         }
@@ -1222,11 +1229,11 @@ public class AppBackgroundManager {
 
     // unfreeze process that the application depends on when it launchs.
     public void startUnfreezeService(ProcessRecord app, int unfreezeReason) {
-// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
         if (!mUseUiFluencyMode && !mUseAppBgManager) {
             return;
         }
 
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
         if (!mUseProcessLevelFreezer) {
             return;
         }
@@ -1236,11 +1243,11 @@ public class AppBackgroundManager {
     }
 
     public void startUnfreeze(String packageName, int unfreezeReason) {
-// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
         if (!mUseUiFluencyMode && !mUseAppBgManager) {
             return;
         }
 
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
         if (!mUseProcessLevelFreezer) {
             return;
         }
@@ -1438,7 +1445,9 @@ public class AppBackgroundManager {
                 return;
             }
 
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
             mHandler.sendMessage(mHandler.obtainMessage(
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
                 FREEZE_PACKAGE_LEVEL, 0, 0 /* unused */, packageName));
             if (mUseDebug) {
                 Slog.i(TAG, "Freeze request queued for package: " + packageName);
@@ -1459,12 +1468,15 @@ public class AppBackgroundManager {
                 }
                 return;
             }
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
             mHandler.sendMessage(mHandler.obtainMessage(
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
                 UNFREEZE_PACKAGE_LEVEL, 0, 0 /* unused */, packageName));
             if (mUseDebug) {
                 Slog.i(TAG, "Unfreeze request queued for package: " + packageName);
             }
         }
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
 
         public void unfreezeAllPackageLevel() {
             synchronized (mAppPidsLock) {
@@ -1473,6 +1485,7 @@ public class AppBackgroundManager {
                 }
             }
         }
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
     }
 
     private void freezePackageLevel(String packageName) {
@@ -1483,21 +1496,25 @@ public class AppBackgroundManager {
         mPackageFreezerManager.unfreezePackageLevel(packageName);
     }
 
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
     private void unfreezeAllPackageLevel() {
         mPackageFreezerManager.unfreezeAllPackageLevel();
     }
 
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
     public class AutoStartManagement {
         private final String CUR_TAG = TAG;
         private final Map<String, Boolean> mMainProcState = new HashMap<>();
         private Object mLock = new Object();
 
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
         public void clearAutoStartMap() {
             synchronized (mLock) {
                 mMainProcState.clear();
             }
         }
 
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
         public boolean shouldPreventStart(String packageName, String processName) {
             synchronized (mLock) {
                 final Boolean isMainProcFg  = mMainProcState.get(packageName);
@@ -1544,15 +1561,19 @@ public class AppBackgroundManager {
         mAutoStartManagement.setPackageAutoStartBlocked(packageName);
     }
 
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
     private void clearAutoStartMap() {
         mAutoStartManagement.clearAutoStartMap();
     }
 
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
     public boolean shouldPreventProcessStart(String processName, ApplicationInfo info) {
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
         if (!mUseUiFluencyMode && !mUseAppBgManager) {
             return false;
         }
 
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
         if (!mUseRestrictBgAutoStart) {
             return false;
         }
@@ -1564,6 +1585,7 @@ public class AppBackgroundManager {
         return mAutoStartManagement.shouldPreventStart(info.packageName, processName);
     }
 
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
     private void handleUIFluencyModeDisabled() {
         // clear restrict auto-start flag
         // unfreeze the frozen processes
@@ -1601,11 +1623,14 @@ public class AppBackgroundManager {
         }
     }
 
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
     public void handleActivityStart(ApplicationInfo info) {
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
         if (!mUseUiFluencyMode && !mUseAppBgManager) {
             return;
         }
 
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
         if (info == null || info.isSystemApp() || info.isUpdatedSystemApp()) {
             return;
         }
@@ -1619,10 +1644,12 @@ public class AppBackgroundManager {
     }
 
     public void handleSchedGroupTransition(ProcessRecord app) {
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
         if (!mUseUiFluencyMode && !mUseAppBgManager) {
             return;
         }
 
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
         if (app.info.isSystemApp() || app.info.isUpdatedSystemApp()
                 || !app.processName.equals(app.info.packageName)) {
             return;
@@ -1663,7 +1690,9 @@ public class AppBackgroundManager {
         }
     }
 
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
     private void deactivateAppForBackground(String packageName) {
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
         if (mUseDebug) {
             Slog.d(TAG, "(deactivating) app for background use: " + packageName);
         }

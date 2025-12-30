@@ -532,10 +532,10 @@ public class OomAdjuster {
             ProcessList.batchSetOomAdj(procsToOomAdj);
         }
 
-// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
         void batchSetOomAdjExt(ArrayList<ProcessRecord> procsToOomAdj,
                 ArrayList<Integer> weights) {
             ProcessList.batchSetOomAdjExt(procsToOomAdj, weights);
+// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
         }
 
 // QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
@@ -543,9 +543,9 @@ public class OomAdjuster {
             ProcessList.setOomAdj(pid, uid, adj);
         }
 
-// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
         void setOomAdjExt(int pid, int uid, int adj, int weight) {
             ProcessList.setOomAdjExt(pid, uid, adj, weight);
+// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
         }
 
 // QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
@@ -1659,9 +1659,11 @@ public class OomAdjuster {
                 ArrayList<Integer> weights =
                     AppBackgroundManager.getInstance().getProcsKeepaliveWeight(mProcsToOomAdj);
                 mInjector.batchSetOomAdjExt(mProcsToOomAdj, weights);
+// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             } else {
                 mInjector.batchSetOomAdj(mProcsToOomAdj);
             }
+// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             mProcsToOomAdj.clear();
         }
 
@@ -1686,12 +1688,20 @@ public class OomAdjuster {
             if (AppBackgroundManager.getInstance().useAppKeepaliveManager()) {
                 int weight =
                     AppBackgroundManager.getInstance().getProcKeepaliveWeight(selectedAppRecord);
+// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
                 ProcessList.setOomAdjExt(selectedAppRecord.getPid(), selectedAppRecord.info.uid,
+// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
                     ProcessList.CACHED_APP_MAX_ADJ, weight);
+// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             } else {
                 ProcessList.setOomAdj(selectedAppRecord.getPid(), selectedAppRecord.info.uid,
+// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
+// QTI_BEGIN: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
                     ProcessList.CACHED_APP_MAX_ADJ);
+// QTI_END: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
+// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             }
+// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             selectedAppRecord.mState.setSetAdj(selectedAppRecord.mState.getCurAdj());
 // QTI_BEGIN: 2019-02-12: Performance: Refactor B-services from AMS to OomAdjuster.
             if (DEBUG_OOM_ADJ) Slog.d(TAG,"app.processName = " + selectedAppRecord.processName
@@ -3905,9 +3915,13 @@ public class OomAdjuster {
                     int weight =
                         AppBackgroundManager.getInstance().getProcKeepaliveWeight(app);
                     mInjector.setOomAdjExt(app.getPid(), app.uid, state.getCurAdj(), weight);
+// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
                 } else {
+// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
                     mInjector.setOomAdj(app.getPid(), app.uid, state.getCurAdj());
+// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
                 }
+// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             }
 
             if (DEBUG_SWITCH || DEBUG_OOM_ADJ || mService.mCurOomAdjUid == app.info.uid) {

@@ -130,6 +130,7 @@ java_library_static {
         "android.hardware.power-java_shared",
         "latest_android_hardware_broadcastradio_java_static",
         "ondeviceintelligence_conditionally",
+        "qcomfeatureconfig_java_defaults",
     ],
     srcs: [
         ":android.hardware.audio.effect-V1-java-source",

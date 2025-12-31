@@ -97,6 +97,8 @@ import java.util.stream.Collectors;
 
 import javax.inject.Inject;
 
+import com.android.qcomfeatureconfig.QcomLowRamConfig;
+
 /** Encapsulates all logic for the notification shade window state management. */
 @SysUISingleton
 public class NotificationShadeWindowControllerImpl
@@ -439,6 +441,10 @@ public class NotificationShadeWindowControllerImpl
             // backdrop for this animation.
             mLpChanged.flags |= LayoutParams.FLAG_SHOW_WALLPAPER;
         } else {
+            mLpChanged.flags &= ~LayoutParams.FLAG_SHOW_WALLPAPER;
+        }
+
+        if (QcomLowRamConfig.TARGET_IS_QLMD) {
             mLpChanged.flags &= ~LayoutParams.FLAG_SHOW_WALLPAPER;
         }
 

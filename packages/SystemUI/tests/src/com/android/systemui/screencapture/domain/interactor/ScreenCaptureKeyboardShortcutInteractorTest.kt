@@ -29,11 +29,13 @@ import com.android.systemui.screencapture.ScreenCaptureEvent
 import com.android.systemui.screencapture.common.shared.model.ScreenCaptureType
 import com.android.systemui.screencapture.common.shared.model.ScreenCaptureUiParameters
 import com.android.systemui.screencapture.common.shared.model.ScreenCaptureUiState
+import com.android.systemui.screencapture.data.repository.fakeScreenCaptureDeviceStateRepository
 import com.android.systemui.screencapture.record.largescreen.shared.model.ScreenCaptureRegion
 import com.android.systemui.screencapture.record.largescreen.shared.model.ScreenCaptureType as LargeScreenCaptureType
 import com.android.systemui.testKosmosNew
 import com.android.systemui.user.domain.interactor.fakeHeadlessSystemUserMode
 import com.google.common.truth.Truth.assertThat
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -44,6 +46,12 @@ class ScreenCaptureKeyboardShortcutInteractorTest : SysuiTestCase() {
 
     private val underTest: ScreenCaptureKeyboardShortcutInteractor by lazy {
         kosmos.screenCaptureKeyboardShortcutInteractor
+    }
+
+    @Before
+    fun setUp() {
+        // Default to large screen.
+        kosmos.fakeScreenCaptureDeviceStateRepository.setLargeScreen(true)
     }
 
     @Test
@@ -156,6 +164,155 @@ class ScreenCaptureKeyboardShortcutInteractorTest : SysuiTestCase() {
             assertThat(uiEventLoggerFake.numLogs()).isEqualTo(1)
             val event =
                 ScreenCaptureEvent.SCREEN_CAPTURE_LARGE_SCREEN_PARTIAL_SCREENSHOT_KEYBOARD_SHORTCUT
+            assertThat(uiEventLoggerFake.eventId(0)).isEqualTo(event.id)
+        }
+
+    @Test
+    @DisableFlags(Flags.FLAG_LARGE_SCREEN_SCREENCAPTURE)
+    fun attemptAppWindowScreenshot_umbrellaFlagDisabled_doesNotShowUi() =
+        kosmos.runTest {
+            val uiState by
+                collectLastValue(screenCaptureUiInteractor.uiState(ScreenCaptureType.RECORD))
+            assertThat(uiState).isInstanceOf(ScreenCaptureUiState.Invisible::class.java)
+
+            underTest.attemptAppWindowScreenshot()
+
+            assertThat(uiState).isInstanceOf(ScreenCaptureUiState.Invisible::class.java)
+
+            // Nothing is logged.
+            assertThat(uiEventLoggerFake.numLogs()).isEqualTo(0)
+        }
+
+    @Test
+    @EnableFlags(Flags.FLAG_LARGE_SCREEN_SCREENCAPTURE)
+    @DisableFlags(Flags.FLAG_LARGE_SCREEN_SCREENSHOT_APP_WINDOW)
+    fun attemptAppWindowScreenshot_appWindowFlagDisabled_doesNotShowUi() =
+        kosmos.runTest {
+            val uiState by
+                collectLastValue(screenCaptureUiInteractor.uiState(ScreenCaptureType.RECORD))
+            assertThat(uiState).isInstanceOf(ScreenCaptureUiState.Invisible::class.java)
+
+            underTest.attemptAppWindowScreenshot()
+
+            assertThat(uiState).isInstanceOf(ScreenCaptureUiState.Invisible::class.java)
+
+            // Nothing is logged.
+            assertThat(uiEventLoggerFake.numLogs()).isEqualTo(0)
+        }
+
+    @Test
+    @EnableFlags(
+        Flags.FLAG_LARGE_SCREEN_SCREENCAPTURE,
+        Flags.FLAG_LARGE_SCREEN_SCREENSHOT_APP_WINDOW,
+    )
+    fun attemptAppWindowScreenshot_whenUiVisibleAlready_doesNothing() =
+        kosmos.runTest {
+            screenCaptureUiInteractor.show(ScreenCaptureUiParameters.Record())
+
+            val uiState by
+                collectLastValue(screenCaptureUiInteractor.uiState(ScreenCaptureType.RECORD))
+            assertThat(uiState).isInstanceOf(ScreenCaptureUiState.Visible::class.java)
+
+            underTest.attemptAppWindowScreenshot()
+
+            assertThat(uiState).isInstanceOf(ScreenCaptureUiState.Visible::class.java)
+
+            // Nothing is logged.
+            assertThat(uiEventLoggerFake.numLogs()).isEqualTo(0)
+        }
+
+    @Test
+    @EnableFlags(
+        Flags.FLAG_LARGE_SCREEN_SCREENCAPTURE,
+        Flags.FLAG_LARGE_SCREEN_SCREENSHOT_APP_WINDOW,
+    )
+    fun attemptAppWindowScreenshot_headlessSystemUserIsCurrent_doesNotShowUi() =
+        kosmos.runTest {
+            val uiState by
+                collectLastValue(screenCaptureUiInteractor.uiState(ScreenCaptureType.RECORD))
+            assertThat(uiState).isInstanceOf(ScreenCaptureUiState.Invisible::class.java)
+
+            fakeHeadlessSystemUserMode.setIsHeadlessSystemUser(true)
+            underTest.attemptAppWindowScreenshot()
+
+            assertThat(uiState).isInstanceOf(ScreenCaptureUiState.Invisible::class.java)
+
+            // Nothing is logged.
+            assertThat(uiEventLoggerFake.numLogs()).isEqualTo(0)
+        }
+
+    @Test
+    @EnableFlags(
+        Flags.FLAG_LARGE_SCREEN_SCREENCAPTURE,
+        Flags.FLAG_LARGE_SCREEN_SCREENSHOT_APP_WINDOW,
+    )
+    fun attemptAppWindowScreenshot_keyguardShowing_doesNotShowUi() =
+        kosmos.runTest {
+            val uiState by
+                collectLastValue(screenCaptureUiInteractor.uiState(ScreenCaptureType.RECORD))
+            assertThat(uiState).isInstanceOf(ScreenCaptureUiState.Invisible::class.java)
+
+            fakeKeyguardRepository.setKeyguardShowing(true)
+            underTest.attemptAppWindowScreenshot()
+
+            assertThat(uiState).isInstanceOf(ScreenCaptureUiState.Invisible::class.java)
+
+            // Nothing is logged.
+            assertThat(uiEventLoggerFake.numLogs()).isEqualTo(0)
+        }
+
+    @Test
+    @EnableFlags(
+        Flags.FLAG_LARGE_SCREEN_SCREENCAPTURE,
+        Flags.FLAG_LARGE_SCREEN_SCREENSHOT_APP_WINDOW,
+    )
+    fun attemptAppWindowScreenshot_keyguardNotShowing_showsUi() =
+        kosmos.runTest {
+            val uiState by
+                collectLastValue(screenCaptureUiInteractor.uiState(ScreenCaptureType.RECORD))
+            assertThat(uiState).isInstanceOf(ScreenCaptureUiState.Invisible::class.java)
+
+            fakeKeyguardRepository.setKeyguardShowing(false)
+            underTest.attemptAppWindowScreenshot()
+
+            assertThat(uiState).isInstanceOf(ScreenCaptureUiState.Visible::class.java)
+        }
+
+    @Test
+    @EnableFlags(
+        Flags.FLAG_LARGE_SCREEN_SCREENCAPTURE,
+        Flags.FLAG_LARGE_SCREEN_SCREENSHOT_APP_WINDOW,
+    )
+    fun attemptAppWindowScreenshot_setsLargeScreenCaptureParameters() =
+        kosmos.runTest {
+            underTest.attemptAppWindowScreenshot()
+            val uiState by
+                collectLastValue(screenCaptureUiInteractor.uiState(ScreenCaptureType.RECORD))
+
+            val largeScreenParams =
+                ((uiState as ScreenCaptureUiState.Visible).parameters
+                        as ScreenCaptureUiParameters.Record)
+                    .largeScreenParameters
+            assertThat(largeScreenParams).isNotNull()
+            assertThat(largeScreenParams?.defaultCaptureType)
+                .isEqualTo(LargeScreenCaptureType.SCREENSHOT)
+            assertThat(largeScreenParams?.defaultCaptureRegion)
+                .isEqualTo(ScreenCaptureRegion.APP_WINDOW)
+        }
+
+    @Test
+    @EnableFlags(
+        Flags.FLAG_LARGE_SCREEN_SCREENCAPTURE,
+        Flags.FLAG_LARGE_SCREEN_SCREENSHOT_APP_WINDOW,
+    )
+    fun attemptAppWindowScreenshot_logsEvent() =
+        kosmos.runTest {
+            underTest.attemptAppWindowScreenshot()
+
+            assertThat(uiEventLoggerFake.numLogs()).isEqualTo(1)
+            val event =
+                ScreenCaptureEvent
+                    .SCREEN_CAPTURE_LARGE_SCREEN_APP_WINDOW_SCREENSHOT_KEYBOARD_SHORTCUT
             assertThat(uiEventLoggerFake.eventId(0)).isEqualTo(event.id)
         }
 }

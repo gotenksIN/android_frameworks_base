@@ -117,6 +117,7 @@ public class UserRestrictionsUtils {
             UserManager.DISALLOW_SMS,
             UserManager.DISALLOW_FUN,
             UserManager.DISALLOW_CREATE_WINDOWS,
+            UserManager.DISALLOW_HANDOFF,
             UserManager.DISALLOW_SYSTEM_ERROR_DIALOGS,
             UserManager.DISALLOW_CROSS_PROFILE_COPY_PASTE,
             UserManager.DISALLOW_OUTGOING_BEAM,
@@ -159,7 +160,8 @@ public class UserRestrictionsUtils {
             UserManager.DISALLOW_SIM_GLOBALLY,
             UserManager.DISALLOW_ASSIST_CONTENT,
             UserManager.DISALLOW_THREAD_NETWORK,
-            UserManager.DISALLOW_CHANGE_NEAR_FIELD_COMMUNICATION_RADIO
+            UserManager.DISALLOW_CHANGE_NEAR_FIELD_COMMUNICATION_RADIO,
+            UserManager.DISALLOW_NON_TOOL_ACCESSIBILITY_SERVICE
     });
 
     public static final Set<String> DEPRECATED_USER_RESTRICTIONS = Sets.newArraySet(
@@ -238,6 +240,7 @@ public class UserRestrictionsUtils {
             UserManager.DISALLOW_UNMUTE_DEVICE,
             UserManager.DISALLOW_CAMERA,
             UserManager.DISALLOW_ASSIST_CONTENT,
+            UserManager.DISALLOW_HANDOFF,
             UserManager.DISALLOW_CONFIG_DEFAULT_APPS
     );
 
@@ -283,6 +286,7 @@ public class UserRestrictionsUtils {
                     UserManager.DISALLOW_CONTENT_CAPTURE,
                     UserManager.DISALLOW_CONTENT_SUGGESTIONS,
                     UserManager.DISALLOW_DEBUGGING_FEATURES,
+                    UserManager.DISALLOW_HANDOFF,
                     UserManager.DISALLOW_SHARE_LOCATION,
                     UserManager.DISALLOW_OUTGOING_CALLS,
                     UserManager.DISALLOW_CAMERA,

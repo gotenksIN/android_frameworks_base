@@ -756,7 +756,9 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
     int createSessionInternal(SessionParams params, String installerPackageName,
             String installerAttributionTag, int callingUid, int userId)
             throws IOException {
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(90);
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         final Computer snapshot = mPm.snapshotComputer();
         snapshot.enforceCrossUserPermission(callingUid, userId, true, true, "createSession");
 
@@ -1139,6 +1141,8 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
         }
 
         final var dpmi = LocalServices.getService(DevicePolicyManagerInternal.class);
+        // Only the system should be able to set this flag - so ensure it is unset when not needed.
+        params.installFlags &= ~PackageManager.INSTALL_FROM_MANAGED_USER_OR_PROFILE;
         if (dpmi != null && dpmi.isUserOrganizationManaged(userId)) {
             params.installFlags |= PackageManager.INSTALL_FROM_MANAGED_USER_OR_PROFILE;
         }

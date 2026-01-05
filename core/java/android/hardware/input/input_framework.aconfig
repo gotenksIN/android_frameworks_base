@@ -29,13 +29,6 @@ flag {
 }
 
 flag {
-    name: "keyboard_repeat_keys"
-    namespace: "input_native"
-    description: "Allow configurable timeout before key repeat and repeat delay rate for key repeats"
-    bug: "336585002"
-}
-
-flag {
     name: "mouse_reverse_vertical_scrolling"
     namespace: "input"
     description: "Controls whether external mouse vertical scrolling can be reversed"
@@ -48,14 +41,6 @@ flag {
     description: "Controls whether the connected mice's primary buttons, left and right, can be swapped."
     bug: "352598211"
 }
-
-flag {
-    name: "keyboard_a11y_shortcut_control"
-    namespace: "input"
-    description: "Adds shortcuts to toggle and control a11y keyboard features"
-    bug: "373458181"
-}
-
 flag {
     name: "touchpad_system_gesture_disable"
     namespace: "input"
@@ -86,20 +71,10 @@ flag {
 }
 
 flag {
-    name: "enable_display_color_inversion_key_gestures"
-    namespace: "input"
-    description: "Adds key gestures for display color inversion for accessibility needs"
-    bug: "383730505"
-}
-
-flag {
-    name: "enable_magnify_magnification_key_gesture_dialog"
+    name: "enable_color_inversion_key_gestures"
     namespace: "accessibility"
-    description: "Enables magnifying the magnification key gesture dialog so that low vision users can see the dialog"
-    bug: "425722546"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
+    description: "Adds key gestures for color inversion for accessibility needs"
+    bug: "383730505"
 }
 
 flag {

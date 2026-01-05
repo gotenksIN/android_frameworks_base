@@ -18,18 +18,23 @@ package com.android.internal.widget.remotecompose.player.platform;
 import android.annotation.NonNull;
 import android.text.StaticLayout;
 
-import com.android.internal.widget.remotecompose.core.Platform;
+import com.android.internal.widget.remotecompose.core.RcPlatformServices;
 
-public class AndroidComputedTextLayout implements Platform.ComputedTextLayout {
+public class AndroidComputedTextLayout implements RcPlatformServices.ComputedTextLayout {
     StaticLayout mStaticLayout;
     float mWidth;
     float mHeight;
+    boolean mIsHyphenatedText;
 
     public AndroidComputedTextLayout(
-            @NonNull StaticLayout staticLayout, float width, float height) {
+            @NonNull StaticLayout staticLayout,
+            float width,
+            float height,
+            boolean isHyphenatedText) {
         mStaticLayout = staticLayout;
         mWidth = width;
         mHeight = height;
+        mIsHyphenatedText = isHyphenatedText;
     }
 
     /** Set a StaticLayout on this container */
@@ -51,5 +56,10 @@ public class AndroidComputedTextLayout implements Platform.ComputedTextLayout {
     @Override
     public float getHeight() {
         return mHeight;
+    }
+
+    @Override
+    public boolean isHyphenatedText() {
+        return mIsHyphenatedText;
     }
 }

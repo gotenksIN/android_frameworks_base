@@ -211,6 +211,9 @@ droidstubs {
             removed_api_file: ":android-removed.api.combined.public.latest",
         },
     },
+    visibility: [
+        "//development/build",
+    ],
 }
 
 droidstubs {
@@ -319,6 +322,9 @@ droiddoc {
         "-title \"Android SDK\"",
     ],
     static_doc_index_redirect: "docs/docs-preview-index.html",
+    visibility: [
+        "//development/build",
+    ],
 }
 
 droiddoc {

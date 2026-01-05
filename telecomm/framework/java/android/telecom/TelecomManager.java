@@ -45,7 +45,7 @@ import android.os.IBinder;
 import android.os.OutcomeReceiver;
 import android.os.Process;
 import android.os.RemoteException;
-import android.os.ServiceManager;
+import android.os.TelecomServiceManager;
 import android.os.UserHandle;
 import android.telephony.Annotation.CallState;
 import android.telephony.Annotation.TtyMode;
@@ -204,6 +204,7 @@ public class TelecomManager {
     public static final String ACTION_DEFAULT_DIALER_CHANGED =
             "android.telecom.action.DEFAULT_DIALER_CHANGED";
 
+// QTI_BEGIN: 2018-06-13: Bluetooth: BT: Send info if call is CS type from telecomm service to BT apps.
     /**
      *@hide Broadcast intent action indicating the call type(CS call or Non-CS call).
      * The string extra {@link #EXTRA_CALL_TYPE_CS} will contain the
@@ -215,6 +216,7 @@ public class TelecomManager {
             "codeaurora.telecom.action.CALL_TYPE";
 
 
+// QTI_END: 2018-06-13: Bluetooth: BT: Send info if call is CS type from telecomm service to BT apps.
     /**
      * Activity action: Triggers the calling UI and initiates a call back to a previous call
      * made by the application. The specific call to be re-called is identified by the UUID,
@@ -228,10 +230,37 @@ public class TelecomManager {
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_CALL_BACK = "android.telecom.action.CALL_BACK";
 
+    /**
+     * Activity Action: Show the settings for configuring call log integration.
+     * <p>
+     * This activity allows the user to view and turn off/on the system call logs
+     * for available VoIP applications that have integrated with the system's
+     * call log.
+     * <p>
+     * This activity must be present on a device that supports call log integration.
+     */
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_INTEGRATED_CALL_LOGS_STAGE2)
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_CONFIGURE_CALL_LOG_INTEGRATION =
+            "android.telecom.action.CONFIGURE_CALL_LOG_INTEGRATION";
+
+    /**
+     * Broadcast intent action indicating that the call log preference is updated
+     * by the user.
+     * <p>The intent is sent to VoIP applications whose preferences have been affected
+     * by the user's choice. Upon receiving this broadcast, the application may
+     * re-evaluate its behavior regarding call log entries.
+     * <p>To receive this broadcast, applications must declare a receiver in
+     * their manifest file with an intent filter for this action.
+     */
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_INTEGRATED_CALL_LOGS_STAGE2)
+    public static final String ACTION_VOIP_CALL_LOG_PREFERENCE =
+            "android.telecom.action.VOIP_CALL_LOG_PREFERENCE";
+
     private static final String ACTION_MANAGE_BLOCKED_NUMBERS =
             "android.telecom.action.MANAGE_BLOCKED_NUMBERS";
 
-    private static final String TELECOM_PACKAGE = "com.android.server.telecom";
+    private static final String TELECOM_UI_PACKAGE = "com.android.server.telecomui";
 
     /**
      * Extra value used to provide the package name for {@link #ACTION_CHANGE_DEFAULT_DIALER}.
@@ -351,6 +380,24 @@ public class TelecomManager {
      */
     @FlaggedApi(Flags.FLAG_INTEGRATED_CALL_LOGS)
     public static final String EXTRA_UUID = "android.telecom.extra.UUID";
+
+    /**
+     * Extra used with {@link #ACTION_VOIP_CALL_LOG_PREFERENCE} to specify the value of the
+     * VoIP call log preference for the app receiving the broadcast.
+     *
+     * <p>This extra is required when using {@link #ACTION_VOIP_CALL_LOG_PREFERENCE} to signal
+     * what the preference for an app was changed to.</p>
+     *
+     * <p>Type: boolean</p>
+     *
+     * <p> Applications that support the {@link #ACTION_VOIP_CALL_LOG_PREFERENCE} will receive
+     * broadcast updates for their app when the VoIP call log preference changes. They can use this
+     * to determine if their VoIP call log will be logged to the system call log so that caching
+     * mechanisms to store call information can be conditionally enforced.</p>
+     */
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_INTEGRATED_CALL_LOGS_STAGE2)
+    public static final String EXTRA_VOIP_CALL_LOG_PREFERENCE_STATUS =
+            "android.telecom.extra.VOIP_CALL_LOG_PREFERENCE_STATUS";
 
     /**
      * An optional {@link Intent} extra used with {@link #ACTION_CALL_BACK} to specify
@@ -604,6 +651,7 @@ public class TelecomManager {
     public static final String EXTRA_CALL_NETWORK_TYPE =
             "android.telecom.extra.CALL_NETWORK_TYPE";
 
+// QTI_BEGIN: 2018-06-13: Bluetooth: BT: Send info if call is CS type from telecomm service to BT apps.
     /**
      *@hide  Extra value used to provide the call type for {@link #ACTION_CALL_TYPE}.
      */
@@ -611,6 +659,7 @@ public class TelecomManager {
             "codeaurora.telecom.extra.CALL_TYPE_CS";
 
 
+// QTI_END: 2018-06-13: Bluetooth: BT: Send info if call is CS type from telecomm service to BT apps.
     /**
      * An optional {@link android.content.Intent#ACTION_CALL} intent extra denoting the
      * package name of the app specifying an alternative gateway for the call.
@@ -888,7 +937,7 @@ public class TelecomManager {
      * @hide
      */
     @Deprecated
-    @FlaggedApi(com.android.server.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
     @SystemApi
     public static final int TTY_MODE_OFF = 0;
 
@@ -900,7 +949,7 @@ public class TelecomManager {
      * @hide
      */
     @Deprecated
-    @FlaggedApi(com.android.server.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
     @SystemApi
     public static final int TTY_MODE_FULL = 1;
 
@@ -913,7 +962,7 @@ public class TelecomManager {
      * @hide
      */
     @Deprecated
-    @FlaggedApi(com.android.server.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
     @SystemApi
     public static final int TTY_MODE_HCO = 2;
 
@@ -926,7 +975,7 @@ public class TelecomManager {
      * @hide
      */
     @Deprecated
-    @FlaggedApi(com.android.server.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
     @SystemApi
     public static final int TTY_MODE_VCO = 3;
 
@@ -1033,14 +1082,6 @@ public class TelecomManager {
     @SystemApi
     public static final String EXTRA_CALL_BACK_INTENT =
             "android.telecom.extra.CALL_BACK_INTENT";
-
-    /**
-     * The dialer activity responsible for placing emergency calls from, for example, a locked
-     * keyguard.
-     * @hide
-     */
-    public static final ComponentName EMERGENCY_DIALER_COMPONENT =
-            ComponentName.createRelative("com.android.phone", ".EmergencyDialer");
 
     /**
      * The boolean indicated by this extra controls whether or not a call is eligible to undergo
@@ -1174,6 +1215,7 @@ public class TelecomManager {
     @ChangeId
     @EnabledSince(targetSdkVersion = Build.VERSION_CODES.S)
     // this magic number is a bug ID
+    // if removing this ChangeId, remove this constant in TelephonyManager as well
     public static final long ENABLE_GET_CALL_STATE_PERMISSION_PROTECTION = 157233955L;
 
     /**
@@ -2385,9 +2427,9 @@ public class TelecomManager {
     @SystemApi
     @Deprecated
     @RequiresPermission(READ_PRIVILEGED_PHONE_STATE)
-    @FlaggedApi(com.android.server.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
     public @TtyMode int getCurrentTtyMode() {
-        if (Flags.moveGetTtyModeToTelephonyManager()) {
+        if (android.telecom.flags.Flags.moveGetTtyModeToTelephonyManager()) {
             TelephonyManager tm = mContext.getSystemService(TelephonyManager.class);
             if (tm != null) {
                 return tm.getCurrentTtyMode();
@@ -2816,7 +2858,7 @@ public class TelecomManager {
      */
     public Intent createManageBlockedNumbersIntent() {
         Intent result = new Intent(ACTION_MANAGE_BLOCKED_NUMBERS);
-        result.setPackage(TELECOM_PACKAGE);
+        result.setPackage(TELECOM_UI_PACKAGE);
         return result;
     }
 
@@ -3458,9 +3500,8 @@ public class TelecomManager {
             return mTelecomServiceOverride;
         }
         if (sTelecomService == null) {
-            ITelecomService temp =
-                    ITelecomService.Stub.asInterface(
-                            ServiceManager.getService(Context.TELECOM_SERVICE));
+            ITelecomService temp = ITelecomService.Stub.asInterface(
+                    TelecomServiceManager.getTelecomServiceRegisterer().get());
             synchronized (CACHE_LOCK) {
                 if (sTelecomService == null && temp != null) {
                     try {

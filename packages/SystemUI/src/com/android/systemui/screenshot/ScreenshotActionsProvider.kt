@@ -26,6 +26,8 @@ import com.android.systemui.Flags
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.log.DebugLogger.debugLog
 import com.android.systemui.res.R
+import com.android.systemui.screencapture.record.domain.interactor.ScreenCaptureRecordFeaturesInteractor
+import com.android.systemui.screenshot.ScreenshotEvent.SCREENSHOT_COPY_TAPPED
 import com.android.systemui.screenshot.ScreenshotEvent.SCREENSHOT_EDIT_TAPPED
 import com.android.systemui.screenshot.ScreenshotEvent.SCREENSHOT_PREVIEW_TAPPED
 import com.android.systemui.screenshot.ScreenshotEvent.SCREENSHOT_SHARE_TAPPED
@@ -75,6 +77,7 @@ constructor(
     private val uiEventLogger: UiEventLogger,
     private val actionIntentCreator: ActionIntentCreator,
     @Application private val applicationScope: CoroutineScope,
+    screenCaptureRecordFeaturesInteractor: ScreenCaptureRecordFeaturesInteractor,
     @Assisted val requestId: UUID,
     @Assisted val request: ScreenshotData,
     @Assisted val actionExecutor: ActionExecutor,
@@ -126,22 +129,41 @@ constructor(
             }
         }
 
-        actionsCallback.provideActionButton(
-            ActionButtonAppearance(
-                AppCompatResources.getDrawable(context, R.drawable.ic_screenshot_edit),
-                context.resources.getString(R.string.screenshot_edit_label),
-                context.resources.getString(R.string.screenshot_edit_description),
-            ),
-            showDuringEntrance = true,
-        ) {
-            debugLog(LogConfig.DEBUG_ACTIONS) { "Edit tapped" }
-            uiEventLogger.log(SCREENSHOT_EDIT_TAPPED, 0, request.packageNameString)
-            onDeferrableActionTapped { result ->
-                actionExecutor.startSharedTransition(
-                    actionIntentCreator.createEdit(result.uri),
-                    result.user,
-                    true,
-                )
+        if (screenCaptureRecordFeaturesInteractor.isLargeScreenScreencaptureEnabled) {
+            actionsCallback.provideActionButton(
+                ActionButtonAppearance(
+                    AppCompatResources.getDrawable(context, R.drawable.ic_content_copy),
+                    null,
+                    context.resources.getString(R.string.screenshot_copy_description),
+                ),
+                showDuringEntrance = true,
+            ) {
+                debugLog(LogConfig.DEBUG_ACTIONS) { "Copy tapped" }
+                uiEventLogger.log(SCREENSHOT_COPY_TAPPED, 0, request.packageNameString)
+                onDeferrableActionTapped { result ->
+                    actionExecutor.copyScreenshotToClipboard(result.uri)
+                }
+            }
+        } else {
+            // The edit button is intentionally hidden on large-screen devices since the screenshot
+            // thumbnail serves the same action.
+            actionsCallback.provideActionButton(
+                ActionButtonAppearance(
+                    AppCompatResources.getDrawable(context, R.drawable.ic_screenshot_edit),
+                    context.resources.getString(R.string.screenshot_edit_label),
+                    context.resources.getString(R.string.screenshot_edit_description),
+                ),
+                showDuringEntrance = true,
+            ) {
+                debugLog(LogConfig.DEBUG_ACTIONS) { "Edit tapped" }
+                uiEventLogger.log(SCREENSHOT_EDIT_TAPPED, 0, request.packageNameString)
+                onDeferrableActionTapped { result ->
+                    actionExecutor.startSharedTransition(
+                        actionIntentCreator.createEdit(result.uri),
+                        result.user,
+                        true,
+                    )
+                }
             }
         }
     }

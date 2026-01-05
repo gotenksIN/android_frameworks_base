@@ -18,6 +18,7 @@ package com.android.systemui.statusbar;
 
 import static android.app.Flags.notificationsRedesignTemplates;
 
+import android.app.Flags;
 import android.app.Notification;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.Icon;
@@ -39,7 +40,6 @@ import com.android.internal.widget.ConversationLayout;
 import com.android.internal.widget.ImageFloatingTextView;
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow;
 import com.android.systemui.statusbar.notification.row.NotificationContentView;
-import com.android.systemui.statusbar.notification.row.shared.AsyncGroupHeaderViewInflation;
 import com.android.systemui.statusbar.notification.row.wrapper.NotificationViewWrapper;
 import com.android.systemui.statusbar.notification.shared.NotificationBundleUi;
 
@@ -147,6 +147,9 @@ public class NotificationGroupingUtil {
         // To hide the header text if it's the same
         mProcessors.add(Processor.forTextView(mRow, com.android.internal.R.id.header_text));
 
+        if (Flags.apiMetricStyle()) {
+            mDividers.add(com.android.internal.R.id.app_name_text_divider);
+        }
         mDividers.add(com.android.internal.R.id.header_text_divider);
         mDividers.add(com.android.internal.R.id.header_text_secondary_divider);
         mDividers.add(com.android.internal.R.id.time_divider);
@@ -375,7 +378,7 @@ public class NotificationGroupingUtil {
 
         @Override
         public boolean isEmpty(View view) {
-            if (AsyncGroupHeaderViewInflation.isEnabled() && view == null) {
+            if (view == null) {
                 return true;
             }
             if (view instanceof ImageView) {

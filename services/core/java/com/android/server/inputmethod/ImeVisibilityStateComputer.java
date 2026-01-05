@@ -45,7 +45,6 @@ import android.util.Slog;
 import android.util.proto.ProtoOutputStream;
 import android.view.MotionEvent;
 import android.view.WindowManager;
-import android.view.inputmethod.Flags;
 import android.view.inputmethod.ImeTracker;
 import android.view.inputmethod.InputMethodManager;
 
@@ -178,9 +177,11 @@ public final class ImeVisibilityStateComputer {
         if (mHasVisibleImeLayeringOverlay
                 && mCurVisibleImeInputTarget == imeInputTarget) {
             final int reason = SoftInputShowHideReason.HIDE_WHEN_INPUT_TARGET_INVISIBLE;
-            final var statsToken = ImeTracker.forLogging().onStart(ImeTracker.TYPE_HIDE,
-                    ImeTracker.ORIGIN_SERVER, reason, false /* fromUser */);
             final var userData = mService.getUserData(mUserId);
+            final var client = userData.mImeBindingState.mFocusedWindowClient;
+            final var statsToken = ImeTracker.forLogging().onStart(ImeTracker.TYPE_HIDE,
+                    ImeTracker.ORIGIN_SERVER, reason, false /* fromUser */, mUserId,
+                    client != null ? client.mSelfReportedDisplayId : INVALID_DISPLAY);
             mService.setImeVisibilityOnFocusedWindowClient(false /* visible */, userData,
                     statsToken);
         }
@@ -202,8 +203,7 @@ public final class ImeVisibilityStateComputer {
         final int displayToShowIme;
         final PackageManager pm = mService.mContext.getPackageManager();
         if (pm.hasSystemFeature(PackageManager.FEATURE_AUTOMOTIVE)
-                && mUserManagerInternal.isVisibleBackgroundFullUser(mUserId)
-                && Flags.fallbackDisplayForSecondaryUserOnSecondaryDisplay()) {
+                && mUserManagerInternal.isVisibleBackgroundFullUser(mUserId)) {
             displayToShowIme = mService.computeImeDisplayIdForVisibleBackgroundUserOnAutomotive(
                     displayId, mUserId, mImeDisplayValidator);
         } else {

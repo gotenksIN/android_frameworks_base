@@ -43,6 +43,7 @@ android_test {
         "a11ychecker",
         "aatf",
         "accessibility_protos_lite",
+        "android.credentials.flags-aconfig-java",
         "androidx.test.core",
         "androidx.test.ext.junit",
         "androidx.test.ext.truth",
@@ -153,7 +154,8 @@ android_test {
         ":SuspendTestApp",
         ":TopologyTestApp",
         "data/broken_shortcut.xml",
-        "data/test_supplemental_security_patches.xml",
+        "data/test_system_supplemental_security_patches.xml",
+        "data/test_vendor_supplemental_security_patches.xml",
     ],
 
     java_resources: [
@@ -217,7 +219,6 @@ android_ravenwood_test {
     ],
     srcs: [
         "src/com/android/server/am/psc/**/*.java",
-        "src/com/android/server/am/BinderSessionTests.java",
     ],
 }
 
@@ -1135,4 +1136,15 @@ test_module_config {
         "device-tests",
     ],
     include_filters: ["com.android.server.companion.virtual"],
+}
+
+test_module_config {
+    name: "FrameworksServicesTests_contextual_mode",
+    base: "FrameworksServicesTests",
+    team: "trendy_team_notifications",
+    test_suites: [
+        "automotive-tests",
+        "device-tests",
+    ],
+    include_filters: ["com.android.server.modes"],
 }

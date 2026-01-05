@@ -17,7 +17,6 @@
 package com.android.server.adb;
 
 import android.content.Context;
-import android.net.nsd.NsdManager;
 import android.net.nsd.NsdServiceInfo;
 import android.os.Handler;
 import android.os.Message;
@@ -27,7 +26,9 @@ import android.util.Slog;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.server.adb.AdbDebuggingManager.AdbDebuggingHandler;
 
-class AdbPairingThread extends Thread implements NsdManager.RegistrationListener {
+import java.util.Optional;
+
+class AdbPairingThread extends Thread implements AdbdServicesManager.RegistrationCallback {
     private static final String TAG = AdbPairingThread.class.getSimpleName();
     private final Context mContext;
     private final String mPairingCode;
@@ -43,10 +44,16 @@ class AdbPairingThread extends Thread implements NsdManager.RegistrationListener
     @VisibleForTesting static final String SERVICE_PROTOCOL = "adb-tls-pairing";
     private final String mServiceType = String.format("_%s._tcp.", SERVICE_PROTOCOL);
     private int mPort;
+    private final AdbWifiPairingMethod mAdbWifiPairingMethod;
 
     private final Handler mHandler;
 
-    AdbPairingThread(String pairingCode, String serviceName, Context context, Handler handler) {
+    AdbPairingThread(
+            String pairingCode,
+            String serviceName,
+            Context context,
+            AdbWifiPairingMethod adbWifiPairingMethod,
+            Handler handler) {
         super(TAG);
         mPairingCode = pairingCode;
         mGuid = SystemProperties.get(AdbDebuggingManager.WIFI_PERSISTENT_GUID);
@@ -56,13 +63,14 @@ class AdbPairingThread extends Thread implements NsdManager.RegistrationListener
         }
         mPort = -1;
         mContext = context;
+        mAdbWifiPairingMethod = adbWifiPairingMethod;
         mHandler = handler;
     }
 
     @Override
     public void run() {
         AdbdServicesManager servicesManager = new AdbdServicesManager(mContext);
-        servicesManager.registerService(mServiceName, mServiceType, mPort);
+        servicesManager.registerService(mServiceName, mServiceType, mPort, this);
 
         // Send pairing port to UI
         Message msg = mHandler.obtainMessage(AdbDebuggingHandler.MSG_RESPONSE_PAIRING_PORT);
@@ -80,7 +88,10 @@ class AdbPairingThread extends Thread implements NsdManager.RegistrationListener
 
         Message message =
                 Message.obtain(
-                        mHandler, AdbDebuggingHandler.MSG_RESPONSE_PAIRING_RESULT, publicKey);
+                        mHandler,
+                        AdbDebuggingHandler.MSG_RESPONSE_PAIRING_RESULT,
+                        new AdbWifiPairingResult(
+                                Optional.ofNullable(publicKey), mAdbWifiPairingMethod));
         mHandler.sendMessage(message);
     }
 
@@ -110,30 +121,34 @@ class AdbPairingThread extends Thread implements NsdManager.RegistrationListener
         native_pairing_cancel();
     }
 
-    @Override
-    public void onServiceRegistered(NsdServiceInfo serviceInfo) {
-        Slog.i(TAG, "Registered pairing service: " + serviceInfo);
-    }
-
-    @Override
-    public void onRegistrationFailed(NsdServiceInfo serviceInfo, int errorCode) {
-        Slog.e(TAG, "Failed to register pairing service(err=" + errorCode + "): " + serviceInfo);
-        cancelPairing();
-    }
-
-    @Override
-    public void onServiceUnregistered(NsdServiceInfo serviceInfo) {
-        Slog.i(TAG, "Unregistered pairing service: " + serviceInfo);
-    }
-
-    @Override
-    public void onUnregistrationFailed(NsdServiceInfo serviceInfo, int errorCode) {
-        Slog.w(TAG, "Failed to unregister pairing service(err=" + errorCode + "): " + serviceInfo);
-    }
-
     private native int native_pairing_start(String guid, String password);
 
     private native void native_pairing_cancel();
 
     private native String native_pairing_wait();
+
+    @Override
+    public void onRegistrationFailed(NsdServiceInfo serviceInfo, int errorCode) {
+        cancelPairing();
+    }
+
+    @Override
+    public void onServiceRegistered(NsdServiceInfo serviceInfo) {
+        // nothing to do, pairing is in progress.
+    }
+
+    enum AdbWifiPairingMethod {
+        QR_CODE,
+        PAIRING_CODE
+    }
+
+    /**
+     * Represents the result of a pairing operation.
+     *
+     * @param publicKey The key of the device that was paired. If not present, then the pairing
+     *     failed.
+     * @param adbWifiPairingMethod The pairing method used.
+     */
+    record AdbWifiPairingResult(
+            Optional<String> publicKey, AdbWifiPairingMethod adbWifiPairingMethod) {}
 }

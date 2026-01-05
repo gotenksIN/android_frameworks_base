@@ -60,6 +60,7 @@ import com.android.wm.shell.desktopmode.DesktopUserRepositories;
 import com.android.wm.shell.desktopmode.ShellDesktopState;
 import com.android.wm.shell.desktopmode.common.ToggleTaskSizeInteraction;
 import com.android.wm.shell.desktopmode.data.DesktopRepository;
+import com.android.wm.shell.pinnedlayer.phone.PinnedLayerController;
 import com.android.wm.shell.transition.FocusTransitionObserver;
 import com.android.wm.shell.windowdecor.DesktopModeWindowDecorViewModel.AppHandleMotionEventHandler;
 import com.android.wm.shell.windowdecor.DesktopModeWindowDecorViewModel.CaptionTouchStatusListener;
@@ -104,6 +105,7 @@ public class DesktopModeTouchEventListener
             mCaptionTouchStatusListener;
     private final @NonNull AppHandleMotionEventHandler
             mAppHandleMotionEventHandler;
+    private final @Nullable PinnedLayerController mPinnedLayerController;
 
     private final DragDetector mHandleDragDetector;
     private final DragDetector mHeaderDragDetector;
@@ -140,11 +142,12 @@ public class DesktopModeTouchEventListener
             @Nullable InputManager inputManager,
             @NonNull FocusTransitionObserver focusTransitionObserver,
             @NonNull ShellDesktopState shellDesktopState,
-            @NonNull MultiDisplayDragMoveIndicatorController
-                    multiDisplayDragMoveIndicatorController,
+            @NonNull
+            MultiDisplayDragMoveIndicatorController multiDisplayDragMoveIndicatorController,
             @NonNull Supplier<SurfaceControl.Transaction> transactionFactory,
             @Nullable CaptionTouchStatusListener captionTouchStatusListener,
-            @NonNull AppHandleMotionEventHandler appHandleMotionEventHandler) {
+            @NonNull AppHandleMotionEventHandler appHandleMotionEventHandler,
+            @Nullable PinnedLayerController pinnedLayerController) {
         mContext = context;
         mDragPositioningCallback = dragPositioningCallback;
         mWindowDecorationFinder = windowDecorationFinder;
@@ -162,6 +165,7 @@ public class DesktopModeTouchEventListener
         mTransactionFactory = transactionFactory;
         mCaptionTouchStatusListener = captionTouchStatusListener;
         mAppHandleMotionEventHandler = appHandleMotionEventHandler;
+        mPinnedLayerController = pinnedLayerController;
 
         mTaskId = taskInfo.taskId;
         mTaskToken = taskInfo.token;
@@ -244,9 +248,9 @@ public class DesktopModeTouchEventListener
             final ActivityManager.RunningTaskInfo taskInfo = decoration.getTaskInfo();
             final int nextFocusedTaskId =
                     mDesktopTasksController.getTopTask(
-                        taskInfo.getDisplayId(),
-                        taskInfo.userId,
-                        taskInfo.getTaskId());
+                            taskInfo.getDisplayId(),
+                            taskInfo.userId,
+                            taskInfo.getTaskId());
             final WindowDecorationWrapper nextFocusedWindow =
                     mWindowDecorationFinder.apply(nextFocusedTaskId);
             if (nextFocusedWindow != null) nextFocusedWindow.a11yAnnounceNewFocusedWindow();
@@ -566,48 +570,40 @@ public class DesktopModeTouchEventListener
                 }
                 final int dragPointerIdx = e.findPointerIndex(mDragPointerId);
 
-                if (DesktopExperienceFlags
-                        .ENABLE_BLOCK_NON_DESKTOP_DISPLAY_WINDOW_DRAG_BUGFIX.isTrue()) {
-                    final boolean inDesktopModeDisplay = mShellDesktopState
-                            .isEligibleWindowDropTarget(e.getDisplayId());
-                    // TODO: b/418651425 - Use a more specific pointer icon when available.
-                    final IBinder inputToken = v.getViewRootImpl() != null
-                            ? v.getViewRootImpl().getInputToken() : null;
-                    updatePointerIcon(e, dragPointerIdx, inputToken,
-                            inDesktopModeDisplay ? PointerIcon.TYPE_ARROW
-                                    : PointerIcon.TYPE_NO_DROP);
-                    // Allow bounds update only when cursor is on desktop-mode displays.
-                    // Otherwise, ignore the MOVE event and the window holds its current bounds.
-                    if (inDesktopModeDisplay) {
-                        mCurrentBounds.set(mDragPositioningCallback.onDragPositioningMove(
-                                e.getDisplayId(),
-                                e.getRawX(dragPointerIdx), e.getRawY(dragPointerIdx)));
-                        debugLogD("handleFreeformMotionEvent(%s) action=%s "
-                                        + "inDesktopModeDisplay=%b dispatched "
-                                        + "|onDragPositioningMove| mCurrentBounds=%s",
-                                viewName, MotionEvent.actionToString(e.getAction()),
-                                inDesktopModeDisplay, mCurrentBounds);
-                    } else {
-                        debugLogD("handleFreeformMotionEvent(%s) action=%s "
-                                        + "not a desktop mode display, ignore",
-                                viewName, MotionEvent.actionToString(e.getAction()));
-                    }
-                } else {
+                final boolean inDesktopModeDisplay = mShellDesktopState
+                        .isEligibleWindowDropTarget(e.getDisplayId());
+                // TODO: b/418651425 - Use a more specific pointer icon when available.
+                final IBinder inputToken = v.getViewRootImpl() != null
+                        ? v.getViewRootImpl().getInputToken() : null;
+                updatePointerIcon(e, dragPointerIdx, inputToken,
+                        inDesktopModeDisplay ? PointerIcon.TYPE_ARROW
+                                : PointerIcon.TYPE_NO_DROP);
+                // Allow bounds update only when cursor is on desktop-mode displays.
+                // Otherwise, ignore the MOVE event and the window holds its current bounds.
+                if (inDesktopModeDisplay) {
                     mCurrentBounds.set(mDragPositioningCallback.onDragPositioningMove(
                             e.getDisplayId(),
                             e.getRawX(dragPointerIdx), e.getRawY(dragPointerIdx)));
-                    debugLogD("handleFreeformMotionEvent(%s) action=%s dispatched "
+                    debugLogD("handleFreeformMotionEvent(%s) action=%s "
+                                    + "inDesktopModeDisplay=%b dispatched "
                                     + "|onDragPositioningMove| mCurrentBounds=%s",
                             viewName, MotionEvent.actionToString(e.getAction()),
-                            mCurrentBounds);
+                            inDesktopModeDisplay, mCurrentBounds);
+                } else {
+                    debugLogD("handleFreeformMotionEvent(%s) action=%s "
+                                    + "not a desktop mode display, ignore",
+                            viewName, MotionEvent.actionToString(e.getAction()));
                 }
 
-                mDesktopTasksController.onDragPositioningMove(taskInfo,
-                        decoration.getTaskSurface(),
-                        e.getDisplayId(),
-                        e.getRawX(dragPointerIdx),
-                        e.getRawY(dragPointerIdx),
-                        mCurrentBounds);
+                if (!isPinned(taskInfo)) {
+                    mDesktopTasksController.onDragPositioningMove(
+                            taskInfo,
+                            decoration.getTaskSurface(),
+                            e.getDisplayId(),
+                            e.getRawX(dragPointerIdx),
+                            e.getRawY(dragPointerIdx),
+                            mCurrentBounds);
+                }
                 debugLogD("handleFreeformMotionEvent(%s) action=%s updated controller "
                                 + "mIsDragging=%b mCurrentBounds=%s "
                                 + "mOnDragStartInitialBounds=%s",
@@ -644,25 +640,36 @@ public class DesktopModeTouchEventListener
                                 + "|onDragPositioningEnd| newTaskBounds=%s",
                         viewName, MotionEvent.actionToString(e.getAction()), newTaskBounds);
 
-                if (DesktopExperienceFlags
-                        .ENABLE_BLOCK_NON_DESKTOP_DISPLAY_WINDOW_DRAG_BUGFIX.isTrue()) {
-                    final IBinder inputToken = v.getViewRootImpl() != null
-                            ? v.getViewRootImpl().getInputToken() : null;
-                    updatePointerIcon(e, dragPointerIdx, inputToken,
-                            PointerIcon.TYPE_ARROW);
-                }
-
-                // Tasks bounds haven't actually been updated (only its leash), so pass to
-                // DesktopTasksController to allow secondary transformations (i.e. snap resizing
-                // or transforming to fullscreen) before setting new task bounds.
+                final IBinder inputToken = v.getViewRootImpl() != null
+                        ? v.getViewRootImpl().getInputToken() : null;
+                updatePointerIcon(e, dragPointerIdx, inputToken,
+                        PointerIcon.TYPE_ARROW);
+                // Tasks bounds haven't actually been updated (only its leash), so pass them to
+                // window's managing controller to allow secondary transformations (i.e. snap
+                // resizing or transforming to fullscreen) before setting new task bounds.
                 final Rect validDragArea = decoration.getValidDragArea();
-                final boolean needDragIndicatorCleanup =
-                        mDesktopTasksController.onDragPositioningEnd(
-                                taskInfo, decoration.getTaskSurface(),
-                                new PointF(
-                                        e.getRawX(dragPointerIdx), e.getRawY(dragPointerIdx)),
-                                newTaskBounds, validDragArea,
-                                new Rect(mOnDragStartInitialBounds), e);
+                final boolean needDragIndicatorCleanup;
+                if (isPinned(taskInfo)) {
+                    needDragIndicatorCleanup =
+                            mPinnedLayerController.onDragEnded(
+                                    decoration.getTaskSurface(),
+                                    taskInfo,
+                                    new Rect(mOnDragStartInitialBounds),
+                                    newTaskBounds,
+                                    e.getDisplayId());
+                } else {
+                    needDragIndicatorCleanup =
+                            mDesktopTasksController.onDragPositioningEnd(
+                                    taskInfo,
+                                    decoration.getTaskSurface(),
+                                    new PointF(
+                                            e.getRawX(dragPointerIdx),
+                                            e.getRawY(dragPointerIdx)),
+                                    newTaskBounds,
+                                    validDragArea,
+                                    new Rect(mOnDragStartInitialBounds),
+                                    e);
+                }
                 debugLogD("handleFreeformMotionEvent(%s) action=%s updated controller "
                                 + "newTaskBounds%s validDragArea=%s "
                                 + "mOnDragStartInitialBounds=%s touchingButton=%b "
@@ -772,6 +779,10 @@ public class DesktopModeTouchEventListener
 
     private DesktopModeEventLogger.Companion.InputMethod getInputMethod(MotionEvent ev) {
         return DesktopModeEventLogger.getInputMethodFromMotionEvent(ev);
+    }
+
+    private boolean isPinned(ActivityManager.RunningTaskInfo taskInfo) {
+        return mPinnedLayerController != null && mPinnedLayerController.isPinned(taskInfo.taskId);
     }
 
     private void debugLogD(@NonNull String msg, @NonNull Object... args) {

@@ -90,9 +90,9 @@
     <string name="bubble_overflow_empty_title" msgid="2397251267073294968">"Ez dago azkenaldiko burbuilarik"</string>
     <string name="bubble_overflow_empty_subtitle" msgid="2627417924958633713">"Azkenaldiko burbuilak eta baztertutakoak agertuko dira hemen"</string>
     <string name="bubble_bar_education_stack_title" msgid="2486903590422497245">"Txateatu burbuilak erabilita"</string>
-    <string name="bubble_bar_education_stack_text" msgid="2446934610817409820">"Elkarrizketa berriak ikono gisa agertzen dira pantailaren beheko izkinan. Zabaltzeko, saka itzazu. Baztertzeko, aldiz, arrasta itzazu."</string>
+    <string name="bubble_bar_education_stack_text" msgid="2446934610817409820">"Elkarrizketa berriak ikono gisa agertzen dira pantailaren beheko izkina batean. Zabaltzeko, saka itzazu. Baztertzeko, aldiz, arrasta itzazu."</string>
     <string name="bubble_bar_education_manage_title" msgid="6148404487810835924">"Kontrolatu burbuilak edonoiz"</string>
-    <string name="bubble_bar_education_manage_text" msgid="3199732148641842038">"Sakatu hau burbuiletan zein aplikazio eta elkarrizketa ager daitezkeen kudeatzeko"</string>
+    <string name="bubble_bar_education_manage_text" msgid="3199732148641842038">"Sakatu hau burbuila gisa zein aplikazio eta elkarrizketa erakuts daitezkeen kudeatzeko"</string>
     <string name="notification_bubble_title" msgid="6082910224488253378">"Burbuila"</string>
     <string name="manage_bubbles_text" msgid="7730624269650594419">"Kudeatu"</string>
     <string name="accessibility_bubble_dismissed" msgid="8367471990421247357">"Baztertu da globoa."</string>
@@ -167,7 +167,7 @@
     <string name="app_header_talkback_action_minimize_button_text" msgid="7491054416186901764">"Minimizatu aplikazioaren leihoa"</string>
     <string name="app_header_talkback_action_close_button_text" msgid="5159612596378268926">"Itxi aplikazioaren leihoa"</string>
     <string name="open_by_default_settings_text" msgid="2526548548598185500">"Modu lehenetsian irekitzearen ezarpenak"</string>
-    <string name="open_by_default_dialog_subheader_text" msgid="1729599730664063881">"Aukeratu nola ireki sareko estekak aplikazio honetan"</string>
+    <string name="open_by_default_dialog_subheader_text" msgid="1729599730664063881">"Aukeratu nola ireki web-estekak aplikazio honetan"</string>
     <string name="open_by_default_dialog_in_app_text" msgid="6978022419634199806">"Aplikazioan"</string>
     <string name="open_by_default_dialog_in_browser_text" msgid="8042769465958497081">"Arakatzailean"</string>
     <string name="open_by_default_dialog_dismiss_button_text" msgid="3487238795534582291">"Ados"</string>
@@ -176,4 +176,5 @@
     <string name="open_by_default_splash_dialog_checkbox_text" msgid="7367791478473586694">"Gogoratu aukeratutakoa"</string>
     <string name="open_by_default_splash_dialog_browser_text" msgid="4439951040200685938">"Ireki arakatzailean"</string>
     <string name="open_by_default_splash_dialog_app_text" msgid="2680408983754147907">"Gelditu aplikazioan"</string>
+    <string name="open_by_default_splash_dialog_ask_me_later_text" msgid="2706872945449736432">"Galdetu geroago"</string>
 </resources>

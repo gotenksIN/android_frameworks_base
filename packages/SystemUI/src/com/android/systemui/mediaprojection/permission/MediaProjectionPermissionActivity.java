@@ -429,9 +429,14 @@ public class MediaProjectionPermissionActivity extends Activity {
         intent.setFlags(Intent.FLAG_ACTIVITY_FORWARD_RESULT);
 
         mUserSelectingTask = true;
-        startActivityAsUser(intent, UserHandle.getUserHandleForUid(getLaunchedFromUid()));
+        // Start activity as system user. ShareScreenActivity uses SYSTEM_FLAG_SHOW_FOR_ALL_USERS
+        // to ensure it's visible across all users.
+        startActivityAsUser(intent, UserHandle.of(USER_SYSTEM));
         // close shade if it's open
         mStatusBarManager.collapsePanels();
+        // Finish this activity immediately, as the result is forwarded to the original
+        // launching activity using FLAG_ACTIVITY_FORWARD_RESULT.
+        finish();
     }
 
     private void setCommonIntentExtras(

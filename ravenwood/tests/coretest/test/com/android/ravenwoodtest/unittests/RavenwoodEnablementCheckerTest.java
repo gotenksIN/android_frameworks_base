@@ -21,12 +21,23 @@ import static org.junit.Assert.fail;
 
 import android.platform.test.ravenwood.RavenwoodEnablementChecker;
 import android.platform.test.ravenwood.RavenwoodEnablementChecker.PolicyChecker;
+import android.platform.test.ravenwood.RavenwoodEnablementChecker.RunMode;
 
+import org.junit.After;
 import org.junit.Test;
 
 import java.util.concurrent.Callable;
 
 public class RavenwoodEnablementCheckerTest {
+    /**
+     * Resets the singleton instance to its default state after each test.
+     * This is important because some tests modify the singleton via `overrideInstance`.
+     */
+    @After
+    public void tearDown() {
+        RavenwoodEnablementChecker.setDefaultInstance();
+    }
+
     private static PolicyChecker parse(String text) throws Exception {
         return RavenwoodEnablementChecker.getTextPolicyCheckerForTest("[filename]", text);
     }
@@ -77,5 +88,43 @@ f1 f2 f3 # too many fields
 !module RandomAnotherTestModule
 x@ # Invalid char, but this file should be ignored.
 """);
+    }
+
+    /**
+     * Verifies that wouldRunDisabledTests() returns false when the checker is in Normal run mode.
+     */
+    @Test
+    public void testWouldRunDisabledTests_normalMode() {
+        // In normal mode, disabled tests should not run.
+        RavenwoodEnablementChecker.overrideInstance(
+                RavenwoodEnablementChecker.RunMode.Normal, /* policyText= */ null,
+                /* overridingPattern= */ null);
+        assertThat(RavenwoodEnablementChecker.getInstance().wouldRunDisabledTests()).isFalse();
+    }
+
+    /**
+     * Verifies that wouldRunDisabledTests() returns true when the checker is in
+     * AlsoDisabledTests run mode.
+     */
+    @Test
+    public void testWouldRunDisabledTests_alsoDisabledMode() {
+        // In "also disabled" mode, disabled tests should run.
+        RavenwoodEnablementChecker.overrideInstance(
+                RavenwoodEnablementChecker.RunMode.AlsoDisabledTests, /* policyText= */ null,
+                /* overridingPattern= */ null);
+        assertThat(RavenwoodEnablementChecker.getInstance().wouldRunDisabledTests()).isTrue();
+    }
+
+    /**
+     * Verifies that wouldRunDisabledTests() returns true when the checker is in
+     * AlsoDisabledTests run mode.
+     */
+    @Test
+    public void testWouldRunDisabledTests_DisabledOnly() {
+        // In "also disabled" mode, disabled tests should run.
+        RavenwoodEnablementChecker.overrideInstance(
+                RunMode.DisabledOnly, /* policyText= */ null,
+                /* overridingPattern= */ null);
+        assertThat(RavenwoodEnablementChecker.getInstance().wouldRunDisabledTests()).isTrue();
     }
 }

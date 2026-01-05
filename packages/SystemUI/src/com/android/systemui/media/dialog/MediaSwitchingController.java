@@ -21,6 +21,7 @@ import static android.media.RouteListingPreference.EXTRA_ROUTE_ID;
 import static android.media.RoutingChangeInfo.ENTRY_POINT_SYSTEM_OUTPUT_SWITCHER;
 import static android.media.RoutingSessionInfo.RELEASE_TYPE_CASTING;
 import static android.media.RoutingSessionInfo.RELEASE_TYPE_SHARING;
+import static android.permission.flags.Flags.accessLocalNetworkPermissionEnabled;
 import static android.provider.Settings.ACTION_BLUETOOTH_SETTINGS;
 
 import static com.android.systemui.media.dialog.MediaItem.MediaItemType.TYPE_GROUP_DIVIDER;
@@ -41,6 +42,7 @@ import android.media.INearbyMediaDevicesUpdateCallback;
 import android.media.MediaMetadata;
 import android.media.MediaRoute2Info;
 import android.media.NearbyDevice;
+import android.media.RouteListingPreference;
 import android.media.RoutingChangeInfo;
 import android.media.RoutingSessionInfo;
 import android.media.session.MediaController;
@@ -75,6 +77,7 @@ import com.android.settingslib.media.InputMediaDevice;
 import com.android.settingslib.media.InputRouteManager;
 import com.android.settingslib.media.LocalMediaManager;
 import com.android.settingslib.media.MediaDevice;
+import com.android.settingslib.media.MissingPermissionsInfo;
 import com.android.settingslib.volume.data.repository.AudioSharingRepository;
 import com.android.systemui.animation.ActivityTransitionAnimator;
 import com.android.systemui.animation.DialogTransitionAnimator;
@@ -88,6 +91,7 @@ import com.android.systemui.statusbar.notification.collection.NotificationEntry;
 import com.android.systemui.statusbar.notification.collection.notifcollection.CommonNotifCollection;
 import com.android.systemui.util.kotlin.JavaAdapter;
 import com.android.systemui.util.time.SystemClock;
+import com.android.systemui.volume.dialog.domain.interactor.ExpandedAudioTileDetailsFeatureInteractor;
 import com.android.systemui.volume.panel.domain.interactor.VolumePanelGlobalStateInteractor;
 
 import dagger.assisted.Assisted;
@@ -169,6 +173,7 @@ public class MediaSwitchingController
     @Nullable private Boolean mGroupSelectedItems = null; // Unset until the first render.
     private final JavaAdapter mJavaAdapter;
     private final AudioSharingRepository mAudioSharingRepository;
+    private final boolean mIsExpandedAudioTileDetailsFeatureEnabled;
     private boolean mInAudioSharing = false;
     @Nullable private Job mAudioShareJob = null;
 
@@ -205,7 +210,8 @@ public class MediaSwitchingController
             VolumePanelGlobalStateInteractor volumePanelGlobalStateInteractor,
             UserTracker userTracker,
             JavaAdapter javaAdapter,
-            AudioSharingRepository audioSharingRepository) {
+            AudioSharingRepository audioSharingRepository,
+            ExpandedAudioTileDetailsFeatureInteractor expandedAudioTileDetailsFeatureInteractor) {
         mContext = context;
         mPackageName = packageName;
         mUserHandle = userHandle;
@@ -246,6 +252,8 @@ public class MediaSwitchingController
 
         mJavaAdapter = javaAdapter;
         mAudioSharingRepository = audioSharingRepository;
+        mIsExpandedAudioTileDetailsFeatureEnabled =
+                expandedAudioTileDetailsFeatureInteractor.isEnabled();
     }
 
     @AssistedFactory
@@ -405,6 +413,13 @@ public class MediaSwitchingController
     @Override
     public void onDeviceAttributesChanged() {
         mCallback.onRouteChanged();
+    }
+
+    @Override
+    public void onMissingPermissionsUpdated(MissingPermissionsInfo info) {
+        if (accessLocalNetworkPermissionEnabled()) {
+            mCallback.onRouteChanged();
+        }
     }
 
     @Override
@@ -724,12 +739,6 @@ public class MediaSwitchingController
                 currentConnectedMediaDevice);
     }
 
-    boolean isCurrentOutputDeviceHasSessionOngoing() {
-        MediaDevice currentConnectedMediaDevice = getCurrentConnectedMediaDevice();
-        return currentConnectedMediaDevice != null
-                && (currentConnectedMediaDevice.isHostForOngoingSession());
-    }
-
     protected void connectDevice(MediaDevice device) {
         mInfoMediaManager.setDeviceState(
                 device, LocalMediaManager.MediaDeviceState.STATE_CONNECTING);
@@ -814,6 +823,29 @@ public class MediaSwitchingController
                 yield mediaItems;
             }
         };
+    }
+
+    /**
+     * Returns an intent to resolve missing permissions if UI should be shown to prompt the user
+     * to resolve permissions, or null if the UI should not be shown.
+     */
+    @Nullable
+    public Intent getMissingPermissionsResolveIntent() {
+        if (!accessLocalNetworkPermissionEnabled()) {
+            return null;
+        }
+        MissingPermissionsInfo permissionsInfo = mLocalMediaManager.getMissingPermissionsInfo();
+        if (permissionsInfo == null
+                || permissionsInfo.getComponentName() == null
+                || permissionsInfo.getPermissions().isEmpty()) {
+            return null;
+        }
+        Intent intent = new Intent(RouteListingPreference.ACTION_RESOLVE_MISSING_PERMISSIONS);
+        intent.setComponent(permissionsInfo.getComponentName());
+        intent.putStringArrayListExtra(RouteListingPreference.EXTRA_MISSING_PERMISSIONS,
+                new ArrayList<>(permissionsInfo.getPermissions()));
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        return intent;
     }
 
     public MediaDevice getCurrentConnectedMediaDevice() {
@@ -996,6 +1028,10 @@ public class MediaSwitchingController
 
     boolean isVolumeControlEnabledForSession() {
         return mLocalMediaManager.isMediaSessionAvailableForVolumeControl();
+    }
+
+    boolean isExpandedAudioTileDetailsFeatureEnabled() {
+        return mIsExpandedAudioTileDetailsFeatureEnabled;
     }
 
     /**

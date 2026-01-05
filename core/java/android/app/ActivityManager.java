@@ -1288,6 +1288,12 @@ public class ActivityManager {
     /** @hide requestType for assist context: generate AssistContent but not AssistStructure. */
     public static final int ASSIST_CONTEXT_CONTENT = 3;
 
+    /**
+     * @hide requestType for assist context: generate AssistStructure, but skip screen content
+     * & view hierarchy.
+     **/
+    public static final int ASSIST_CONTEXT_SKIP_SCREEN_CONTENT = 4;
+
     /** @hide Flag for registerUidObserver: report changes in process state. */
     public static final int UID_OBSERVER_PROCSTATE = 1<<0;
 
@@ -3712,11 +3718,11 @@ public class ActivityManager {
         public long availMem;
 
         /**
-         * The free memory on the system.  This is the unused RAM size of the
+         * The free memory on the system. This is the unused RAM size of the
          * device. Unlike {@link #availMem}, it's a basic snapshot of free RAM,
          * not accounting for reclaimable memory.
          */
-        @FlaggedApi(Flags.FLAG_GET_FREE_MEMORY)
+        @FlaggedApi(Flags.FLAG_GET_FREE_MEMORY_V2)
         @SuppressLint("MutableBareField")
         public long freeMem;
 
@@ -6322,7 +6328,7 @@ public class ActivityManager {
      * </p>
      *
      * @param pids The list of the pids to be killed
-     * @pram reason The reason of the kill
+     * @param reason The reason of the kill
      *
      * @hide
      */
@@ -6524,6 +6530,8 @@ public class ActivityManager {
          * <ul>
          * <li>{@link SecurityException} if the requester doesn't hold the permission required to
          * use this method;</li>
+         * <li>{@link SecurityException} if this task cannot be placed as requested due to violation
+         * of the Background Activity Launch (BAL) policy;</li>
          * <li>{@link IllegalStateException} if the task is not in a state that allows it to
          * change its {@link TaskLocation} programmatically at runtime of the request;</li>
          * <li>{@link SecurityException} if this task cannot be placed on the target display

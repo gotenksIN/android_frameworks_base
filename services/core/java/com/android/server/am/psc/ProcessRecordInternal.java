@@ -20,20 +20,22 @@ import static android.app.ActivityManager.PROCESS_CAPABILITY_NONE;
 import static android.app.ActivityManager.PROCESS_STATE_CACHED_EMPTY;
 import static android.app.ActivityManager.PROCESS_STATE_NONEXISTENT;
 
-import static com.android.server.am.OomAdjuster.CPU_TIME_REASON_NONE;
-import static com.android.server.am.OomAdjuster.IMPLICIT_CPU_TIME_REASON_NONE;
-import static com.android.server.am.OomAdjusterImpl.ProcessRecordNode.NUM_NODE_TYPE;
 import static com.android.server.am.psc.Constants.CACHED_APP_MIN_ADJ;
 import static com.android.server.am.psc.Constants.INVALID_ADJ;
 import static com.android.server.am.psc.Constants.SCHED_GROUP_BACKGROUND;
 import static com.android.server.am.psc.Constants.SERVICE_B_ADJ;
 import static com.android.server.am.psc.Constants.UNKNOWN_ADJ;
+import static com.android.server.am.psc.OomAdjuster.CPU_TIME_REASON_NONE;
+import static com.android.server.am.psc.OomAdjuster.IMPLICIT_CPU_TIME_REASON_NONE;
+import static com.android.server.am.psc.OomAdjusterImpl.ProcessRecordNode.NUM_NODE_TYPE;
 import static com.android.server.wm.WindowProcessController.ACTIVITY_STATE_FLAG_IS_VISIBLE;
 import static com.android.server.wm.WindowProcessController.ACTIVITY_STATE_FLAG_MASK_MIN_TASK_LAYER;
 
 import android.annotation.ElapsedRealtimeLong;
+import android.annotation.Nullable;
 import android.app.ActivityManager;
 import android.app.ApplicationExitInfo;
+import android.app.ProcessMemoryState.HostingComponentType;
 import android.os.Process;
 import android.os.SystemClock;
 import android.os.Trace;
@@ -42,8 +44,6 @@ import android.util.TimeUtils;
 
 import com.android.internal.annotations.CompositeRWLock;
 import com.android.internal.annotations.GuardedBy;
-import com.android.server.am.OomAdjuster;
-import com.android.server.am.OomAdjusterImpl;
 import com.android.server.am.ProcessCachedOptimizerRecord.ShouldNotFreezeReason;
 import com.android.server.am.psc.PlatformCompatCache.CachedCompatChangeId;
 
@@ -135,7 +135,16 @@ public abstract class ProcessRecordInternal {
     public abstract boolean hasCompatChange(@CachedCompatChangeId int cachedCompatChangeId);
 
     /** Returns true if there is an active instrumentation running in this process. */
-    public abstract boolean hasActiveInstrumentation();
+    @GuardedBy(anyOf = {"mServiceLock", "mProcLock"})
+    public boolean hasActiveInstrumentation() {
+        return mHasActiveInstrumentation;
+    }
+
+    /** Sets whether an active instrumentation is running in this process. */
+    @GuardedBy({"mServiceLock", "mProcLock"})
+    public void setHasActiveInstrumentation(boolean value) {
+        mHasActiveInstrumentation = value;
+    }
 
     /** Returns whether this process is frozen. */
     public abstract boolean isFrozen();
@@ -213,6 +222,12 @@ public abstract class ProcessRecordInternal {
     /** Returns the next scheduled time for PSS collection for this process. */
     public abstract long getNextPssTime();
 
+    /** Registers a hosting component type for this process. */
+    public abstract void addHostingComponentType(@HostingComponentType int type);
+
+    /** Unregisters a hosting component type for this process. */
+    public abstract void clearHostingComponentType(@HostingComponentType int type);
+
     /**
      * Kills the process with the given reason code, using the provided reason string
      * as both the reason and a default description. The process group is killed
@@ -242,6 +257,52 @@ public abstract class ProcessRecordInternal {
     public void killLocked(String reason, @ApplicationExitInfo.Reason int reasonCode,
             @ApplicationExitInfo.SubReason int subReason, boolean noisy) {
         killLocked(reason, reason, reasonCode, subReason, noisy, true);
+    }
+
+    /**
+     * Kills the process with the given reason code and ANR info, using the provided reason string
+     * as both the reason and a default description. The process group is killed asynchronously.
+     *
+     * @param reason A string describing the reason for the kill.
+     * @param reasonCode The reason code for the kill.
+     * @param noisy If true, a log message will be reported.
+     * @param anrInfo The ANR info to be associated with the exit.
+     */
+    @GuardedBy("mServiceLock")
+    public void killLocked(
+            String reason,
+            @ApplicationExitInfo.Reason int reasonCode,
+            @Nullable ApplicationExitInfo.AnrInfo anrInfo,
+            boolean noisy) {
+        killLocked(
+                reason,
+                reason,
+                reasonCode,
+                ApplicationExitInfo.SUBREASON_UNKNOWN,
+                anrInfo,
+                noisy,
+                true);
+    }
+
+    /**
+     * Kills the process with the given reason code , subreason, and ANR info, using the provided
+     * reason string as both the reason and a default description. The process group is killed
+     * asynchronously.
+     *
+     * @param reason A string describing the reason for the kill.
+     * @param reasonCode The reason code for the kill.
+     * @param subReason The subreason code for the kill.
+     * @param noisy If true, a log message will be reported.
+     * @param anrInfo The ANR info to be associated with the exit.
+     */
+    @GuardedBy("mServiceLock")
+    public void killLocked(
+            String reason,
+            @ApplicationExitInfo.Reason int reasonCode,
+            @ApplicationExitInfo.SubReason int subReason,
+            @Nullable ApplicationExitInfo.AnrInfo anrInfo,
+            boolean noisy) {
+        killLocked(reason, reason, reasonCode, subReason, anrInfo, noisy, true);
     }
 
     /**
@@ -289,9 +350,37 @@ public abstract class ProcessRecordInternal {
      * @param asyncKPG If true, kills the process group asynchronously.
      */
     @GuardedBy("mServiceLock")
-    public abstract void killLocked(String reason, String description,
+    public void killLocked(
+            String reason,
+            String description,
             @ApplicationExitInfo.Reason int reasonCode,
-            @ApplicationExitInfo.SubReason int subReason, boolean noisy, boolean asyncKPG);
+            @ApplicationExitInfo.SubReason int subReason,
+            boolean noisy,
+            boolean asyncKPG) {
+        killLocked(
+                reason, description, reasonCode, subReason, /* anrInfo= */ null, noisy, asyncKPG);
+    }
+
+    /**
+     * Kills the process with the given reason, description, reason codes, ANR info, and async KPG.
+     *
+     * @param reason A string describing the reason for the kill.
+     * @param description A more detailed description of the kill reason.
+     * @param reasonCode The reason code for the kill.
+     * @param subReason The subreason code for the kill.
+     * @param noisy If true, a log message will be reported.
+     * @param anrInfo The ANR info to be associated with the exit.
+     * @param asyncKPG If true, kills the process group asynchronously.
+     */
+    @GuardedBy("mServiceLock")
+    public abstract void killLocked(
+            String reason,
+            String description,
+            @ApplicationExitInfo.Reason int reasonCode,
+            @ApplicationExitInfo.SubReason int subReason,
+            @Nullable ApplicationExitInfo.AnrInfo anrInfo,
+            boolean noisy,
+            boolean asyncKPG);
 
     // Enable this to trace all OomAdjuster state transitions
     private static final boolean TRACE_OOM_ADJ = false;
@@ -667,6 +756,9 @@ public abstract class ProcessRecordInternal {
 
     @GuardedBy("mServiceLock")
     private boolean mHasActivities = false;
+
+    @CompositeRWLock({"mServiceLock", "mProcLock"})
+    private boolean mHasActiveInstrumentation = false;
 
     @GuardedBy("mServiceLock")
     private int mActivityStateFlags = ACTIVITY_STATE_FLAG_MASK_MIN_TASK_LAYER;

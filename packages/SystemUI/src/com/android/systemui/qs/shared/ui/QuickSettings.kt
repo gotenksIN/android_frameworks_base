@@ -24,8 +24,10 @@ object QuickSettings {
     /** Element keys to be used by the compose implementation of QS for animations. */
     object Elements {
         val QuickSettingsContent = ElementKey("QuickSettingsContent")
+        val QuickSettingsTiles = ElementKey("QuickSettingsTiles")
         val GridAnchor = ElementKey("QuickSettingsGridAnchor")
         val FooterActions = ElementKey("QuickSettingsFooterActions")
+        val BrightnessSlider = ElementKey("BrightnessSlider")
 
         fun TileSpec.toElementKey() = ElementKey(this.spec, TileIdentity(this))
 
@@ -40,7 +42,7 @@ object QuickSettings {
 
         object SquishinessValues {
             val Default = 1f
-            val LockscreenSceneStarting = 0f
+            val LockscreenSceneStarting = 0.3f
             val GoneSceneStarting = 0.3f
             val OccludedSceneStarting = 0.3f
         }

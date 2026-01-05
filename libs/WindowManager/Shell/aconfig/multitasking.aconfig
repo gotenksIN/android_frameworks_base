@@ -5,14 +5,6 @@
 package: "com.android.wm.shell"
 container: "system"
 
-
-flag {
-    name: "enable_taskbar_navbar_unification"
-    namespace: "multitasking"
-    description: "Enables taskbar / navbar unification"
-    bug: "309671494"
-}
-
 flag {
     name: "enable_pip2"
     namespace: "multitasking"
@@ -173,7 +165,7 @@ flag {
 }
 
 flag {
-    name: "enable_pip_box_shadows"
+    name: "enable_pip_box_shadows_v2"
     namespace: "multitasking"
     description: "Enables box shadows for PiP"
     bug: "367464660"
@@ -184,16 +176,6 @@ flag {
     namespace: "multitasking"
     description: "Fixes a bug where clicking the rotation button would open the bubble."
     bug: "424165276"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "fix_task_view_rotation_animation"
-    namespace: "multitasking"
-    description: "Fixes jump-cut animation and un-synced bounds (including bubbles) when rotating."
-    bug: "351813733"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -247,15 +229,7 @@ flag {
      bug: "439992109"
 }
 
-flag {
-    name: "split_to_full_set_window_mode"
-    namespace: "multitasking"
-    description: "Set the launch windowing mode when split screen launches app in fullscreen."
-    bug: "427103183"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
+
 
 flag {
     name: "bug_dont_remove_task_bubble"
@@ -319,6 +293,26 @@ flag {
     namespace: "multitasking"
     description: "Allows you to swipe up to dismiss a bubble in bubble bar"
     bug: "399910368"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "resolve_trampoline_destination_packages"
+    namespace: "multitasking"
+    description: "Fixes a bug where resolving package name for task trampoline."
+    bug: "370653710"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "fix_open_app_bubble_from_lockscreen"
+    namespace: "multitasking"
+    description: "Fix opening app bubble from notification on lock screen"
+    bug: "416389130"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

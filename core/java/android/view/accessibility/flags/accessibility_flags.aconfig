@@ -52,6 +52,14 @@ flag {
 }
 
 flag {
+    name: "a11y_math_api"
+    namespace: "accessibility"
+    description: "Enables new APIs for an app to convey mathematical expressions."
+    bug: "394599112"
+    is_exported: true
+}
+
+flag {
     name: "a11y_overlay_callbacks"
     is_exported: true
     namespace: "accessibility"
@@ -64,6 +72,13 @@ flag {
     namespace: "accessibility"
     description: "Enables new APIs for an AccessibilityService to control selection across nodes."
     bug: "362782866"
+}
+
+flag {
+    name: "a11y_selection_position_app_getters_api"
+    namespace: "accessibility"
+    description: "Enables new APIs for an app to get the nodes from a SelectionPosition without a direct node instance."
+    bug: "362783892"
 }
 
 flag {

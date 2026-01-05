@@ -17,16 +17,25 @@
 package com.android.systemui.statusbar.notification.collection.coordinator
 
 import android.app.INotificationManager
-import android.app.NotificationChannel
 import android.app.NotificationChannel.NEWS_ID
 import android.app.NotificationChannel.PROMOTIONS_ID
 import android.app.NotificationChannel.RECS_ID
 import android.app.NotificationChannel.SOCIAL_MEDIA_ID
+import android.app.NotificationManager.ACTION_DYNAMIC_BUNDLE_MODIFIED
+import android.app.NotificationManager.DYNAMIC_BUNDLE_MODIFICATION_TYPE_ADDED
+import android.app.NotificationManager.DYNAMIC_BUNDLE_MODIFICATION_TYPE_REMOVED
+import android.app.NotificationManager.EXTRA_DYNAMIC_BUNDLE
+import android.app.NotificationManager.EXTRA_DYNAMIC_BUNDLE_MODIFICATION_TYPE
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.os.Build
 import android.os.SystemProperties
 import android.os.UserHandle
+import android.service.notification.DynamicBundle
 import androidx.annotation.VisibleForTesting
-import com.android.internal.R
+import com.android.systemui.broadcast.BroadcastDispatcher
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.dagger.qualifiers.Main
@@ -60,7 +69,6 @@ import com.android.systemui.statusbar.notification.stack.BUCKET_NEWS
 import com.android.systemui.statusbar.notification.stack.BUCKET_PROMO
 import com.android.systemui.statusbar.notification.stack.BUCKET_RECS
 import com.android.systemui.statusbar.notification.stack.BUCKET_SOCIAL
-import com.android.systemui.statusbar.notification.stack.NotificationSectionsManager
 import com.android.systemui.util.time.SystemClock
 import java.util.concurrent.Executor
 import javax.inject.Inject
@@ -84,7 +92,7 @@ constructor(
     @Main private val mainExecutor: Executor,
     @Background private val backgroundExecutor: Executor,
     private val userTracker: UserTracker,
-    private val sectionsManager: NotificationSectionsManager,
+    private val broadcastDispatcher: BroadcastDispatcher,
 ) : Coordinator {
 
     val newsSectioner =
@@ -142,7 +150,7 @@ constructor(
                     BundleSpec.RECOMMENDED,
                 )
 
-            private var bundleIds = this.bundleSpecs.map { it.key }
+            private val bundleIds = this.bundleSpecs.map { it.key }.toMutableList()
 
             /**
              * Return the id string of the bundle this ListEntry belongs in Or null if this
@@ -171,35 +179,51 @@ constructor(
                 return notifEntry.representativeEntry?.channel?.id?.takeIf { it in this.bundleIds }
             }
 
+            private val invalidator = object : Invalidator("dynamic bundles") {}
+
+            private val broadcastReceiver: BroadcastReceiver =
+                object : BroadcastReceiver() {
+                    override fun onReceive(context: Context, intent: Intent) {
+                        val dynamicBundle =
+                            intent.getParcelableExtra(
+                                EXTRA_DYNAMIC_BUNDLE,
+                                DynamicBundle::class.java,
+                            )!!
+                        val modificationType =
+                            intent.getIntExtra(EXTRA_DYNAMIC_BUNDLE_MODIFICATION_TYPE, -1)
+                        when (modificationType) {
+                            DYNAMIC_BUNDLE_MODIFICATION_TYPE_ADDED -> {
+                                val bundleSpec = BundleSpec.fromDynamicBundle(dynamicBundle)
+                                bundleSpecs.add(bundleSpec)
+                                bundleIds.add(bundleSpec.key)
+                            }
+                            DYNAMIC_BUNDLE_MODIFICATION_TYPE_REMOVED -> {
+                                val bundleSpec = BundleSpec.fromDynamicBundle(dynamicBundle)
+                                bundleSpecs.remove(bundleSpec)
+                                bundleIds.remove(bundleSpec.key)
+                            }
+                        }
+                        invalidator.invalidateList("dynamic bundle list changed")
+                    }
+                }
+
             init {
                 if (NmContextualDisplay.isEnabled) {
-                    var newTypes: MutableList<Int> = mutableListOf()
                     backgroundExecutor.execute {
                         val dynamicBundles =
                             notificationManager.getDynamicBundles(null, userTracker.userHandle)
                         for (dynamicBundle in dynamicBundles) {
-                            val bundleSpec =
-                                BundleSpec(
-                                    key =
-                                        NotificationChannel.getChannelIdForBundleType(
-                                            dynamicBundle.dynamicBundleType
-                                        )!!,
-                                    titleText = R.string.promotional_notification_channel_label,
-                                    summaryText = dynamicBundle.bundleName,
-                                    icon = com.android.settingslib.R.drawable.ic_dynamic_bundle,
-                                    bucket = dynamicBundle.dynamicBundleType,
-                                    bundleType = dynamicBundle.dynamicBundleType,
-                                )
+                            val bundleSpec = BundleSpec.fromDynamicBundle(dynamicBundle)
                             bundleSpecs.add(bundleSpec)
-                            newTypes.add(dynamicBundle.dynamicBundleType)
+                            bundleIds.add(bundleSpec.key)
                         }
-                        bundleIds = this.bundleSpecs.map { it.key }
                         mainExecutor.execute {
-                            newTypes.forEach { sectionsManager.addSection(it) }
-                            val invalidator = object : Invalidator("dynamic bundles") {}
                             invalidator.invalidateList("dynamic bundles loaded")
                         }
                     }
+                    val intentFilter = IntentFilter()
+                    intentFilter.addAction(ACTION_DYNAMIC_BUNDLE_MODIFIED)
+                    broadcastDispatcher.registerReceiver(broadcastReceiver, intentFilter)
                 }
             }
         }

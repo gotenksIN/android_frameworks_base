@@ -203,6 +203,10 @@ applications that come with the platform
         <permission name="android.permission.INTERACT_ACROSS_USERS" />
     </privapp-permissions>
 
+    <privapp-permissions package="com.android.contactspicker">
+        <permission name="android.permission.MANAGE_CONTACTS_PICKER_SESSION" />
+    </privapp-permissions>
+
     <privapp-permissions package="com.android.providers.calendar">
         <permission name="android.permission.GET_ACCOUNTS_PRIVILEGED"/>
         <permission name="android.permission.INTERACT_ACROSS_USERS" />
@@ -334,8 +338,12 @@ applications that come with the platform
         <permission name="android.permission.ACCESS_MTP"/>
         <!-- Needed for test only -->
         <permission name="android.permission.INTERACT_ACROSS_PROFILES"/>
+        <!-- Needed for test only -->
+        <permission name="android.permission.ACCESS_COMPUTER_CONTROL"/>
         <!-- Permission required to test onPermissionsChangedListener -->
         <permission name="android.permission.OBSERVE_GRANT_REVOKE_PERMISSIONS"/>
+        <!-- Needed for CTS tests only -->
+        <permission name="android.permission.INJECT_KEY_EVENTS"/>
         <permission name="android.permission.INTERACT_ACROSS_USERS"/>
         <permission name="android.permission.QUERY_USERS"/>
         <permission name="android.permission.LOCAL_MAC_ADDRESS"/>
@@ -450,6 +458,8 @@ applications that come with the platform
         <!-- Permission required for vendor vibration effects and sessions. -->
         <permission name="android.permission.VIBRATE_VENDOR_EFFECTS"/>
         <permission name="android.permission.START_VIBRATION_SESSIONS"/>
+        <!-- Permission required for haptic generator sessions. -->
+        <permission name="android.permission.USE_VIBRATOR_HAPTIC_GENERATOR"/>
         <!-- Permission required for UsageStatsTest CTS test. -->
         <permission name="android.permission.MANAGE_NOTIFICATIONS"/>
         <!-- Permission required for CompanionDeviceManager CTS test. -->
@@ -683,6 +693,10 @@ applications that come with the platform
         <permission name="android.permission.ACCESS_NPU_MODEL_MANAGER_API"/>
         <!-- Permission required for CTS test - CtsProviderUiTestCases -->
         <permission name="android.permission.MANAGE_DOCUMENTS"/>
+        <!-- Permission required for CTS test - StatusBarManagerTest -->
+        <permission name="android.permission.SHOW_POWER_MENU_PRIVILEGED" />
+        <!-- Permission required for Health Connect CTS tests -->
+        <permission name="android.permission.PROVIDE_HEALTH_CONNECT_DEVICE_DATA" />
     </privapp-permissions>
 
     <privapp-permissions package="com.android.soundpicker">
@@ -755,5 +769,6 @@ applications that come with the platform
 
     <privapp-permissions package="com.android.crossdevicesync">
         <permission name="android.permission.INTERACT_ACROSS_USERS" />
+        <permission name="android.permission.MANAGE_USERS" />
     </privapp-permissions>
 </permissions>

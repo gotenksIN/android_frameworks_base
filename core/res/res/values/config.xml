@@ -769,6 +769,9 @@
     <!-- Timeout for receiving the keyguard drawn event from System UI.  -->
     <integer name="config_keyguardDrawnTimeout">1000</integer>
 
+    <!-- Timeout for receiving the keyguard drawn event from System UI the first time after boot. -->
+    <integer name="config_keyguardDrawnTimeoutOnBoot">5000</integer>
+
     <!-- Indicates that the device supports having more than one internal display on at the same
          time. Only applicable to devices with more than one internal display. If this option is
          set to false, DisplayManager will make additional effort to ensure no more than 1 internal
@@ -902,6 +905,14 @@
              2 - MODE_NIGHT_YES
     -->
     <integer name="config_defaultNightMode">1</integer>
+
+     <!-- Boolean indicating whether Color Inversion is enabled within the Setup Wizard flow.
+         This flag is disabled by default. -->
+    <bool name="config_enableColorInversionInSetupWizard">false</bool>
+
+    <!-- Boolean indicating whether Color Daltonizer is enabled within the Setup Wizard flow.
+         This flag is disabled by default. -->
+    <bool name="config_enableColorDaltonizerInSetupWizard">false</bool>
 
     <!-- Boolean indicating whether the HWC setColorTransform function can be performed efficiently
          in hardware. -->
@@ -1339,12 +1350,6 @@
          to this list.  If this is empty, no parts of the host USB bus will be excluded.
     -->
     <string-array name="config_usbHostDenylist" translatable="false">
-    </string-array>
-
-    <!-- List of paths to serial ports that are available to the serial manager.
-         for example, /dev/ttyUSB0
-    -->
-    <string-array translatable="false" name="config_serialPorts">
     </string-array>
 
     <!-- Vibrator pattern for feedback about a long screen/key press -->
@@ -2116,8 +2121,9 @@
          See com.android.server.timezonedetector.TimeZoneDetectorStrategy for more information. -->
     <bool name="config_supportTelephonyTimeZoneFallback" translatable="false">true</bool>
 
-    <!-- Whether the time notifications feature is enabled. Settings this to false means the feature
-         cannot be used. Setting this to true means the feature can be enabled on the device. -->
+    <!-- Whether the time zone notifications feature is enabled. Settings this to false means the
+         feature cannot be used. Setting this to true means the feature can be enabled on the
+         device. -->
     <bool name="config_enableTimeZoneNotificationsSupported" translatable="false">true</bool>
 
     <!-- Whether the time zone notifications tracking feature is enabled. Settings this to false
@@ -2127,6 +2133,11 @@
     <!-- Whether the time zone manual change tracking feature is enabled. Settings this to false
          means the feature cannot be used. -->
     <bool name="config_enableTimeZoneManualChangeTrackingSupported" translatable="false">true</bool>
+
+    <!-- Whether the time zone offset change notifications feature is enabled. Settings this to
+         false means the feature cannot be used. Setting this to true means the feature can be enabled
+         on the device. -->
+    <bool name="config_enableTimeZoneOffsetChangeNotificationsSupported" translatable="false">true</bool>
 
     <!-- Whether to enable network location overlay which allows network location provider to be
          replaced by an app at run-time. When disabled, only the
@@ -3284,6 +3295,12 @@
          When set to true, config_multiuserVisibleBackgroundUsers must also be true. -->
     <bool name="config_multiuserVisibleBackgroundUsersOnDefaultDisplay">false</bool>
 
+    <!-- Allow to skip showing keyguard/bouncer upon user switch when the user being switched to
+         already has their credential-encrypted (CE) storage unlocked, and not require strong
+         authentication. This will also force users to require strong authentication when switching
+         away from them. -->
+    <bool name="config_multiuserSkipKeyguardWhenSwitchingToUnlockedUsers">false</bool>
+
     <!-- Whether to automatically switch to the designated Dock User (the user chosen for
          displaying dreams, etc.) after a timeout when the device is docked.  -->
     <bool name="config_enableTimeoutToDockUserWhenDocked">false</bool>
@@ -3321,19 +3338,23 @@
          since then the main user is a permanent admin. -->
     <bool name="config_disallowRemovingLastAdminUser">true</bool>
 
-    <!-- Whether all secondary users (and the system user) are eligible to have profiles.
+    <!-- Whether all secondary users (and a full system user) are eligible to have profiles.
          If false, only the MainUser is eligible to have profiles.
           NOTE: this feature not supported yet, and CTS will fail if it's set to
           true.
     -->
     <bool name="config_supportProfilesOnNonMainUser">false</bool>
 
-    <!-- Whether the system should create the initial full user on boot.
-         Notice that if config_isMainUserPermanentAdmin is true, this config is
-         ignored (as the initial user is the main user). -->
-    <bool name="config_createInitialUser">false</bool>
+    <!-- Whether to automatically create a full Admin user on boot if none currently exists.
+         If false, the system will not automatically create an initial secondary user.
+         This config is only relevant on Headless System User Mode (HSUM) devices.
+         Note that if config_isMainUserPermanentAdmin is true, then this config is
+         ignored, since an initial Admin MainUser will necessarily be created regardless. -->
+    <bool name="config_createInitialAdminUserOnHsum">true</bool>
 
-    <!-- Whether the system should "designate" the main user on boot:
+    <!-- Experimental development-only config specifying whether the system should "designate" the
+         main user on boot.
+         TODO(b/428080837): Remove this config now that it is no longer needed.
          - If it's true and the device doesn't have a main user (meaning it's the first boot or it
            migrated from false to true), then the system will either promote the first admin
            (migration) to be the main user, or create a main user (first boot).
@@ -3343,21 +3364,24 @@
          Notice that if config_isMainUserPermanentAdmin is true, this config is
          ignored (i.e, the system will act as it was true) as main user is required in this case.
     -->
-    <bool name="config_designateMainUser">false</bool>
+    <bool name="config_experimental_designateMainUser">false</bool>
 
     <!-- Whether switching to the headless system user is allowed.
          If allowed, the headless system user can run in the foreground even though it is not a
          full user. However, it is not a human user, and may not show up in the list of human users.
          It is expected that, if true, its UI always provides a way to switch to a human user (and
-         create one if one doesn't already exist).
+         create one if one doesn't already exist), and have an appropriate HOME app reflecting
+         its intended usage (e.g. a login screen app, rather than a standard launcher app).
          This config is only relevant on Headless System User Mode (HSUM) devices. -->
     <bool name="config_canSwitchToHeadlessSystemUser">false</bool>
 
-    <!-- Whether UI for multi user should be shown.
+    <!-- Whether this device supports multiple switchable users.
+         Note that, even if false, multiple users such as profiles can still be supported since
+         they are not switchable.
          Note: If true, it is expected that secondary users are supported on the device (at least
          for testing purposes, even if in practice the UI really only allows other switchable
          types, such as restricted profiles or guests, to be created).
-         @deprecated  Use config_multiuserMaximumUsers instead.
+         @deprecated  Rely on config_multiuserMaximumUsers instead. For now, OEMs must set both.
          This config will likely be removed in the future; config_multiuserMaximumUsers, which now
          only applies to full users, not profiles, should be updated accordingly as needed.
          TODO(b/435521983): Remove this since it's now made redundant by config_multiuserMaximumUsers
@@ -3366,14 +3390,20 @@
 
     <!-- Indicates the boot strategy in Headless System User Mode (HSUM)
          This config has no effect if the device is not in HSUM.
-         0 (Default) : boot to the previous foreground user if there is one, otherwise the first switchable user.
-         1 : boot to the first switchable full user for initial boot (unprovisioned device), else to the headless system user, i.e. user 0. -->
+         0 (Default) : boot to the previous foreground user (or, if there is none, some switchable
+                       user). User 0 counts if it is switchable.
+         1 : boot to the headless system user, except on the initial boot (unprovisioned device),
+             in which case, boot to the first full user. -->
     <integer name="config_hsumBootStrategy">0</integer>
 
-    <!-- List of activities (flattened component names) allowed to be launched when the current user is the Headless System User -->
-    <string-array name="config_hsu_allowlist_activities" translatable="false">
-       <!-- default empty (meaning all activities will be allowed) -->
-    </string-array>
+    <!-- Indicates the mode of activities allowlist for HSU (Headless System User)
+         This config has no effect if the device is not in HSUM.
+         0 (Default): disabled
+         1: enabled (allowlist read from arrays/hsu_allowlist_activities)
+         2: log-only (disabled, but logs what would be blocked if enabled)
+    -->
+    <integer name="config_hsuActivitiesAllowlistMode">0</integer>
+
 
     <!-- Whether multiple admins are allowed on the device. If set to true, new users can be created
          with admin privileges and admin privileges can be granted/revoked from existing users. -->
@@ -3971,6 +4001,7 @@
          "settings" = An action to launch settings
          "airplane" = Airplane mode toggle
          "bugreport" = Take bug report, if available
+         "feedback" = Send feedback, if available
          "silent" = silent mode
          "users" = list of users
          "restart" = restart device
@@ -6447,9 +6478,10 @@
     <!-- If true, multiuser switcher would be automatically enabled when second user is created on the device. -->
     <bool name="config_enableUserSwitcherUponUserCreation">true</bool>
 
-    <!--
-    Whether the user switching can only happen by logging out and going through the system user (login screen).
-    -->
+    <!-- Used by Settings and SysUi to indicate whether UI-based user switching should happen by
+         logging out and going through the system user (login screen).
+         Only intended for interactive Headless System User Mode (HSUM) devices that have set up
+         their system user to serve as a login screen. -->
     <bool name="config_userSwitchingMustGoThroughLoginScreen">false</bool>
 
     <!-- Set to true to make assistant show in front of the dream/screensaver. -->
@@ -6484,6 +6516,12 @@
 
     <!-- Component names of the services which will keep critical code path warm -->
     <string-array name="config_keep_warming_services" translatable="false" />
+
+    <!-- The system virtual gamepad app package name. Empty if not supported on this device. -->
+    <string name="config_virtual_gamepad_package_name" translatable="false" />
+
+    <!-- The system virtual gamepad app activity name. Empty if not supported on this device. -->
+    <string name="config_virtual_gamepad_activity_name" translatable="false" />
 
     <!-- WindowsManager JetPack display features -->
     <string name="config_display_features" translatable="false" />
@@ -7499,6 +7537,12 @@
     <string-array name="config_accessComputerControlKnownSigners">
     </string-array>
 
+    <!-- Package names for trusted apps that will be allowed to automate any app using
+         computer control on debuggable builds. They still need to hold the ACCESS_COMPUTER_CONTROL
+         permission. This must be empty in non-debuggable (i.e., user) builds. -->
+    <string-array name="config_computerControlKnownSuperAgents" translatable="false">
+    </string-array>
+
     <!-- Certificate digests for trusted apps that will be allowed to obtain the knownSigner
          permission for staging HealthConnect's remote data. The digest should be computed over the
          DER encoding of the trusted certificate using the SHA-256 digest algorithm. -->
@@ -7865,9 +7909,57 @@
     <!-- Whether to force color fade. -->
     <bool name="config_forceColorFade">false</bool>
 
+    <!-- The locale countries that force camera shutter sound-->
+    <string-array name="config_cameraSoundForcedCountry" translatable="false">
+        <item>JP</item>
+        <item>KR</item>
+    </string-array>
+
     <!-- location button service components -->
     <string name="config_locationButtonRenderService" translatable="false">com.android.systemui/.locationbutton.LocationButtonRenderService</string>
 
      <!-- Whether user information setup is enabled in SuW. -->
     <bool name="config_enableUserInfoSetupInSuw">false</bool>
+
+     <!-- Adapt the default WindowManager behavior onBackPressed so that root activities are
+     not finished, regardless of the startup source or whether the intent was ACTION_MAIN.
+     This is particularly useful for Wear OS to better suit the wearable user experience and
+     improve performance. If the application overrides onBackPressed, this configuration will
+     be ignored. -->
+     <bool name="config_alwaysMoveTaskToBackOnBackPressed">false</bool>
+
+    <!-- Whether to override wfc roaming mode while using ntn. -->
+    <bool name="config_override_wfc_roaming_mode_while_using_ntn">true</bool>
+
+    <!-- How long to wait from eligible to freeze to freezing an app (milliseconds) -->
+    <integer name="config_defaultFreezerDebounceTimeout">10000</integer>
+
+    <!-- Whether contextual mode (e.g. Do Not Disturb Mode) sync is supported by this device. -->
+    <bool name="config_supportContextualModeSync">true</bool>
+    <!-- If supported, should contextual mode sync be enabled by default. -->
+    <bool name="config_enableContextualModeSyncByDefault">true</bool>
+
+    <!-- The number of top UID I/O usage summaries to report on TV watchdog I/O usage
+         summary atom pull. -->
+    <integer name="config_tvWatchdogUidIoUsageSummaryTopCount">20</integer>
+
+    <!-- The minimum number of total bytes written to disk by the system required to
+         report the stats on TV watchdog I/O usage summary atom pull. Currently 100 MiB. -->
+    <integer name="config_tvWatchdogIoUsageSummaryMinSystemTotalWrittenBytes">104857600</integer>
+
+    <!-- The number of days past until the current day considered by TV watchdog to
+         reset the killable state of a package back to KILLABLE_STATE_YES if the package
+         was set to prioritize performance by the user. -->
+    <integer name="config_tvWatchdogUserPackageSettingsResetDays">30</integer>
+
+    <!-- The number of days past until the current day considered by TV watchdog to
+         attribute recurring overuse to a package. -->
+    <integer name="config_tvWatchdogRecurringOverusePeriodInDays">30</integer>
+
+    <!-- The number of overuses a package has to exceed for TV watchdog to attribute
+         recurring overuse. -->
+    <integer name="config_tvWatchdogRecurringOveruseTimes">3</integer>
+
+     <!-- Whether to enable app launch blur -->
+    <bool name="config_enableAppLaunchBlur">true</bool>
 </resources>

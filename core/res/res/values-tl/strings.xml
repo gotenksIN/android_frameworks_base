@@ -278,6 +278,7 @@
     <string name="global_action_restart" msgid="4678451019561687074">"I-restart"</string>
     <string name="global_action_emergency" msgid="1387617624177105088">"Emergency"</string>
     <string name="global_action_bug_report" msgid="5127867163044170003">"Ulat sa bug"</string>
+    <string name="global_action_feedback" msgid="3480836834202300036">"Feedback"</string>
     <string name="global_action_logout" msgid="6093581310002476511">"Tapusin ang session"</string>
     <string name="global_action_screenshot" msgid="2610053466156478564">"Screenshot"</string>
     <string name="global_action_standby" msgid="6786920589970257642">"Standby"</string>
@@ -326,8 +327,7 @@
     <string name="notification_channel_accessibility_hearing_device" msgid="7816963856388758952">"Hearing device"</string>
     <string name="notification_channel_accessibility_security_policy" msgid="1727787021725251912">"Paggamit sa pagiging accessible"</string>
     <string name="notification_channel_display" msgid="6905032605735615090">"Display"</string>
-    <!-- no translation found for notification_channel_parental_controls (2963963315750128538) -->
-    <skip />
+    <string name="notification_channel_parental_controls" msgid="2963963315750128538">"Parental controls"</string>
     <string name="foreground_service_app_in_background" msgid="1439289699671273555">"Gumagamit ng baterya ang <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="foreground_service_apps_in_background" msgid="7340037176412387863">"Gumagamit ng baterya ang <xliff:g id="NUMBER">%1$d</xliff:g> (na) app"</string>
     <string name="foreground_service_tap_for_details" msgid="9078123626015586751">"I-tap para sa mga detalye tungkol sa paggamit ng baterya at data"</string>
@@ -645,6 +645,10 @@
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"Pinapayagan ang app na i-access ang mga local network device"</string>
     <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"gamitin ang loopback interface"</string>
     <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"Nagbibigay-daan sa app na makipag-interact sa iba pang app sa pamamagitan ng loopback interface"</string>
+    <!-- no translation found for permlab_force_use_loopback_interface (1319727311706416481) -->
+    <skip />
+    <!-- no translation found for permdesc_force_use_loopback_interface (5829032514048681980) -->
+    <skip />
     <string name="permlab_ranging" msgid="2854543350668593390">"alamin ang relative position sa kalapit na device"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"Payagan ang app na alamin ang relatibong posisyon sa pagitan ng mga kalapit na device"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"Impormasyon sa Gustong NFC na Serbisyo sa Pagbabayad"</string>
@@ -825,6 +829,8 @@
     <string name="permdesc_readMediaVideo" msgid="3846400073770403528">"Nagbibigay-daan sa app na magbasa ng mga video file mula sa iyong nakabahaging storage."</string>
     <string name="permlab_readMediaImages" msgid="4057590631020986789">"magbasa ng mga image file mula sa nakabahaging storage"</string>
     <string name="permdesc_readMediaImages" msgid="5836219373138469259">"Nagbibigay-daan sa app na magbasa ng mga image file mula sa iyong nakabahaging storage."</string>
+    <string name="permlab_readMediaDocuments" msgid="5716810755602938263">"magbasa ng mga document file mula sa naka-share na storage"</string>
+    <string name="permdesc_readMediaDocuments" msgid="5665930210237304120">"Nagbibigay-daan sa app na magbasa ng mga file ng dokumento mula sa iyong naka-share na storage."</string>
     <string name="permlab_readVisualUserSelect" msgid="5516204215354667586">"magbasa ng mga image at video file na pinili ng user mula sa nakabahaging storage"</string>
     <string name="permdesc_readVisualUserSelect" msgid="8027174717714968217">"Nagbibigay-daan sa app na magbasa ng mga image at video file na pipiliin mo mula sa iyong nakabahaging storage."</string>
     <string name="permlab_sdcardWrite" msgid="4863021819671416668">"baguhin o i-delete ang content ng nakabahagi mong storage"</string>
@@ -1047,6 +1053,7 @@
     <string name="keyguard_password_enter_pin_password_code" msgid="7792964196473964340">"I-type ang PIN upang i-unlock"</string>
     <string name="keyguard_password_wrong_pin_code" msgid="8583732939138432793">"Maling PIN code."</string>
     <string name="keyguard_label_text" msgid="3841953694564168384">"Upang i-unlock, pindutin ang Menu pagkatapos ay 0."</string>
+    <string name="emergency_call_dialog_number_for_display" msgid="2978165477085612673">"Pang-emergency na numero"</string>
     <string name="lockscreen_carrier_default" msgid="6192313772955399160">"Walang serbisyo"</string>
     <string name="lockscreen_screen_locked" msgid="7364905540516041817">"Naka-lock ang screen."</string>
     <string name="lockscreen_instructions_when_pattern_enabled" msgid="7982445492532123308">"Pindutin ang Menu upang i-unlock o magsagawa ng pang-emergency na tawag."</string>
@@ -2176,13 +2183,21 @@
     <string name="autofill_picker_no_suggestions" msgid="1076022650427481509">"Walang suhestyon sa autofill"</string>
     <string name="autofill_picker_some_suggestions" msgid="5560549696296202701">"{count,plural, =1{Isang suhestyon sa autofill}one{# suhestyon sa autofill}other{# na suhestyon sa autofill}}"</string>
     <string name="autofill_save_title" msgid="7719802414283739775">"I-save sa "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_save_title_expressive" msgid="2665408870424848558">"I-save ang impormasyon sa "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b></string>
     <string name="autofill_save_title_with_type" msgid="3002460014579799605">"I-save ang <xliff:g id="TYPE">%1$s</xliff:g> sa "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_save_title_with_type_expressive" msgid="6063660551496235255">"I-save ang <xliff:g id="TYPE">%1$s</xliff:g> sa "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b></string>
     <string name="autofill_save_title_with_2types" msgid="3783270967447869241">"I-save ang <xliff:g id="TYPE_0">%1$s</xliff:g> at <xliff:g id="TYPE_1">%2$s</xliff:g> sa "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_save_title_with_2types_expressive" msgid="2996687022212666293">"I-save ang <xliff:g id="TYPE_0">%1$s</xliff:g> at <xliff:g id="TYPE_1">%2$s</xliff:g> sa "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b></string>
     <string name="autofill_save_title_with_3types" msgid="6598228952100102578">"I-save ang <xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g>, at <xliff:g id="TYPE_2">%3$s</xliff:g> sa "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_save_title_with_3types_expressive" msgid="3301676215501214049">"I-save ang <xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g>, at <xliff:g id="TYPE_2">%3$s</xliff:g> sa "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b></string>
     <string name="autofill_update_title" msgid="3630695947047069136">"I-update sa "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_update_title_expressive" msgid="7660582214109012920">"I-update ang impormasyon sa "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b></string>
     <string name="autofill_update_title_with_type" msgid="5264152633488495704">"I-update ang <xliff:g id="TYPE">%1$s</xliff:g> sa "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_update_title_with_type_expressive" msgid="6162413585161767846">"I-update ang <xliff:g id="TYPE">%1$s</xliff:g> sa "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b></string>
     <string name="autofill_update_title_with_2types" msgid="1797514386321086273">"I-update ang <xliff:g id="TYPE_0">%1$s</xliff:g> at <xliff:g id="TYPE_1">%2$s</xliff:g> sa "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_update_title_with_2types_expressive" msgid="1911825941498393471">"I-update ang <xliff:g id="TYPE_0">%1$s</xliff:g> at <xliff:g id="TYPE_1">%2$s</xliff:g> sa "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b></string>
     <string name="autofill_update_title_with_3types" msgid="8285767070604652626">"I-update ang mga item na ito sa "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>": <xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g>, at <xliff:g id="TYPE_2">%3$s</xliff:g>?"</string>
+    <string name="autofill_update_title_with_3types_expressive" msgid="6040725201378429027">"I-update ang mga item na ito sa "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>": <xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g>, at <xliff:g id="TYPE_2">%3$s</xliff:g>"</string>
     <string name="autofill_save_yes" msgid="8035743017382012850">"I-save"</string>
     <string name="autofill_save_no" msgid="9212826374207023544">"Hindi, salamat na lang"</string>
     <string name="autofill_save_notnow" msgid="2853932672029024195">"Hindi ngayon"</string>
@@ -2611,10 +2626,7 @@
     <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"Mga Alerto sa Resource ng System"</string>
     <string name="tv_watchdog_notification_title" msgid="195239206215922517">"Sobrang Paggamit ng Resource"</string>
     <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"Gumagamit ang app na <xliff:g id="APP_NAME">%1$s</xliff:g> ng masyadong maraming resource.\""</string>
-    <!-- no translation found for supervision_blocked_app_title (5546803865875383588) -->
-    <skip />
-    <!-- no translation found for supervision_blocked_app_content (4125452996088641559) -->
-    <skip />
-    <!-- no translation found for supervision_unblocked_app_content (8282985265957852278) -->
-    <skip />
+    <string name="supervision_blocked_app_title" msgid="5546803865875383588">"Update mula sa iyong magulang"</string>
+    <string name="supervision_blocked_app_content" msgid="4125452996088641559">"Inalis ang <xliff:g id="APP_NAME">%1$s</xliff:g> sa ngayon"</string>
+    <string name="supervision_unblocked_app_content" msgid="8282985265957852278">"Available na ngayon ang <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
 </resources>

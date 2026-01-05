@@ -61,6 +61,7 @@ import static com.android.server.wm.TaskFragment.EMBEDDING_DISALLOWED_UNTRUSTED_
 import static com.android.server.wm.WindowContainer.POSITION_BOTTOM;
 import static com.android.server.wm.WindowContainer.POSITION_TOP;
 import static com.android.server.wm.WindowTestsBase.ActivityBuilder.DEFAULT_FAKE_UID;
+import static com.android.window.flags.Flags.FLAG_TRACK_LAUNCH_ORIGINATOR;
 
 import static com.google.common.truth.Truth.assertThat;
 
@@ -74,6 +75,7 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.notNull;
@@ -93,6 +95,7 @@ import android.graphics.Rect;
 import android.os.Binder;
 import android.os.IBinder;
 import android.os.RemoteException;
+import android.platform.test.annotations.EnableFlags;
 import android.platform.test.annotations.Presubmit;
 import android.platform.test.annotations.RequiresFlagsDisabled;
 import android.platform.test.annotations.RequiresFlagsEnabled;
@@ -211,7 +214,8 @@ public final class ActivityStarterTests extends ActivityStarterTestBase {
                         mController,
                         service,
                         service.mTaskSupervisor,
-                        mock(ActivityStartInterceptor.class));
+                        mock(ActivityStartInterceptor.class),
+                        mock(UserHelper.class));
         prepareStarter(launchFlags);
         final IApplicationThread caller = mock(IApplicationThread.class);
         final WindowProcessListener listener = mock(WindowProcessListener.class);
@@ -301,7 +305,8 @@ public final class ActivityStarterTests extends ActivityStarterTestBase {
         // Ensure that {@link ActivityOptions} are aborted with unsuccessful result.
         if (expectedResult != START_SUCCESS) {
             final ActivityStarter optionStarter = new ActivityStarter(mController, mAtm,
-                    mAtm.mTaskSupervisor, mock(ActivityStartInterceptor.class));
+                    mAtm.mTaskSupervisor, mock(ActivityStartInterceptor.class),
+                    mock(UserHelper.class));
             final ActivityOptions options = spy(ActivityOptions.makeBasic());
 
             final int optionResult = optionStarter.setCaller(caller)
@@ -598,7 +603,6 @@ public final class ActivityStarterTests extends ActivityStarterTestBase {
     @Test
     public void testActivityStartsLogging_noLoggingWhenDisabled() {
         doReturn(false).when(mAtm).isActivityStartsLoggingEnabled();
-        doReturn(mActivityMetricsLogger).when(mAtm.mTaskSupervisor).getActivityMetricsLogger();
 
         ActivityStarter starter = prepareStarter(FLAG_ACTIVITY_NEW_TASK);
         starter.execute();
@@ -616,7 +620,6 @@ public final class ActivityStarterTests extends ActivityStarterTestBase {
     public void testActivityStartsLogging_logsWhenEnabled() {
         // note: conveniently this package doesn't have any activity visible
         doReturn(true).when(mAtm).isActivityStartsLoggingEnabled();
-        doReturn(mActivityMetricsLogger).when(mAtm.mTaskSupervisor).getActivityMetricsLogger();
 
         ActivityStarter starter = prepareStarter(FLAG_ACTIVITY_NEW_TASK)
                 .setCallingUid(FAKE_CALLING_UID)
@@ -835,7 +838,6 @@ public final class ActivityStarterTests extends ActivityStarterTestBase {
         final Task topTask = new TaskBuilder(mSupervisor).setParentTask(topStack).build();
         new ActivityBuilder(mAtm).setTask(topTask).build();
 
-        doReturn(mActivityMetricsLogger).when(mSupervisor).getActivityMetricsLogger();
         // Start activity with the same intent as {@code singleTaskActivity} on secondary display.
         final ActivityOptions options = ActivityOptions.makeBasic()
                 .setLaunchDisplayId(secondaryDisplay.mDisplayId);
@@ -1851,6 +1853,102 @@ public final class ActivityStarterTests extends ActivityStarterTestBase {
                 null /* inTask */, null /* inTaskFragment*/);
 
         assertNotEquals(bubbledActivity.getTask(), targetRecord.getTask());
+    }
+
+    @Test
+    @EnableFlags(FLAG_TRACK_LAUNCH_ORIGINATOR)
+    public void launchActivity_resultToHome_setsLaunchOriginatedFromHome() {
+        final Task homeTask = mRootWindowContainer.getDefaultTaskDisplayArea().getRootHomeTask();
+        final ActivityRecord homeActivity = new ActivityBuilder(mAtm).setTask(homeTask).build();
+        final ActivityStarter starter = prepareStarter(FLAG_ACTIVITY_NEW_TASK)
+                .setResultTo(homeActivity.token);
+
+        // Launch from home.
+        starter.execute();
+
+        assertTrue(starter.mRequest.mLaunchOriginatedFromHome);
+    }
+
+    /**
+     * This test simulates the following scenario:
+     * 1. Privileged app (P) starts malicious app's activity (M1).
+     * 2. M1 starts M2 (also in malicious app) using startNextMatchingActivity().
+     *     This causes M2's launchedFromPackage to be P.
+     * 3. M2 starts an activity in P (P2) using startActivity() with
+     *     FLAG_ACTIVITY_FORWARD_RESULT.
+     * The test verifies that P2's launchedFromPackage is M, not P.
+     * See b/457742426 for details.
+     */
+    @Test
+    public void testLaunchedFromPackage_nextMatchingActivity_forwardResult() {
+        final String privilegedPackage = "com.test.privileged";
+        final int privilegedUid = 10001;
+        final String maliciousPackage = "com.test.malicious";
+        final int maliciousUid = 10002;
+
+        // Setup P1 activity
+        final ActivityRecord p1 = new ActivityBuilder(mAtm)
+                .setComponent(new ComponentName(privilegedPackage, "P1Activity"))
+                .setUid(privilegedUid)
+                .setCreateTask(true)
+                .build();
+
+        // Setup M1 activity, launched by P1
+        final ActivityRecord m1 = new ActivityBuilder(mAtm)
+                .setComponent(new ComponentName(maliciousPackage, "M1Activity"))
+                .setUid(maliciousUid)
+                .setCreateTask(true)
+                .setLaunchedFromPackage(privilegedPackage)
+                .setLaunchedFromUid(privilegedUid)
+                .build();
+        m1.resultTo = p1;
+
+        // Setup M2 activity, as if launched from M1 via startNextMatchingActivity()
+        final ActivityRecord m2 = new ActivityBuilder(mAtm)
+                .setComponent(new ComponentName(maliciousPackage, "M2Activity"))
+                .setUid(maliciousUid)
+                .setCreateTask(true)
+                .setLaunchedFromPackage(privilegedPackage) // Spoofed package name
+                .setLaunchedFromUid(maliciousUid)
+                .build();
+        m2.resultTo = p1; // result is forwarded
+
+        // M2 starts P2
+        final ActivityStarter starter = prepareStarter(0);
+        doReturn(privilegedUid).when(mMockPackageManager).getPackageUid(
+                eq(privilegedPackage), anyLong(), anyInt());
+        doReturn(maliciousUid).when(mMockPackageManager).getPackageUid(
+                eq(maliciousPackage), anyLong(), anyInt());
+        starter.setCallingPackage(maliciousPackage);
+        starter.setCallingUid(maliciousUid);
+
+        final Intent p2Intent = new Intent();
+        p2Intent.setComponent(new ComponentName(privilegedPackage, "P2Activity"));
+        p2Intent.addFlags(Intent.FLAG_ACTIVITY_FORWARD_RESULT);
+
+        final ActivityInfo p2ActivityInfo = new ActivityInfo();
+        p2ActivityInfo.applicationInfo = new ApplicationInfo();
+        p2ActivityInfo.applicationInfo.packageName = privilegedPackage;
+        p2ActivityInfo.applicationInfo.uid = privilegedUid;
+        p2ActivityInfo.name = "P2Activity";
+
+        final ActivityRecord[] outActivity = new ActivityRecord[1];
+
+        // The request simulates M2 starting P2
+        starter.setIntent(p2Intent)
+                .setActivityInfo(p2ActivityInfo)
+                .setResultTo(m2.token) // sourceRecord is m2
+                .setRequestCode(-1) // for startActivity()
+                .setOutActivity(outActivity)
+                .execute();
+
+        final ActivityRecord p2 = outActivity[0];
+
+        assertNotNull(p2);
+        assertEquals("launchedFromPackage should be the immediate caller",
+                maliciousPackage, p2.launchedFromPackage);
+        assertEquals("launchedFromUid should be the immediate caller",
+                maliciousUid, p2.launchedFromUid);
     }
 
     private ActivityRecord createBubbledActivity() {

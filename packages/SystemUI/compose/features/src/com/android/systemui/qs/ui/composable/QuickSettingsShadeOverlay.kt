@@ -98,12 +98,12 @@ import com.android.systemui.qs.ui.viewmodel.QuickSettingsShadeOverlayActionsView
 import com.android.systemui.qs.ui.viewmodel.QuickSettingsShadeOverlayContentViewModel
 import com.android.systemui.res.R
 import com.android.systemui.scene.shared.model.Overlays
-import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.scene.ui.composable.Overlay
 import com.android.systemui.shade.ui.composable.ChipHighlightModel
 import com.android.systemui.shade.ui.composable.OverlayShade
 import com.android.systemui.shade.ui.composable.OverlayShadeHeader
 import com.android.systemui.shade.ui.composable.QuickSettingsOverlayHeader
+import com.android.systemui.shade.ui.composable.QuickSettingsOverlayPrivacyChip
 import com.android.systemui.shade.ui.composable.isFullWidthShade
 import com.android.systemui.statusbar.notification.stack.shared.model.ShadeScrimBounds
 import com.android.systemui.statusbar.notification.stack.shared.model.ShadeScrimShape
@@ -158,7 +158,7 @@ constructor(
             }
         val hunPlaceholderViewModel =
             rememberViewModel("QuickSettingsShadeOverlayPlaceholder") {
-                notificationsPlaceholderViewModelFactory.create()
+                notificationsPlaceholderViewModelFactory.create(Overlays.QuickSettingsShade)
             }
 
         val showBrightnessMirror =
@@ -227,13 +227,6 @@ constructor(
             }
             SnoozableHeadsUpNotificationPlaceholder(
                 tag = "QSShadeOverlay",
-                useStackBounds = {
-                    with(layoutState.transitionState) {
-                        // When overlaid on top of the lock screen, drawBounds updates are already
-                        // being sent.
-                        isIdle(key) && !isIdle(Scenes.Lockscreen)
-                    }
-                },
                 stackScrollView = notificationStackScrollView.get(),
                 viewModel = hunPlaceholderViewModel,
             )
@@ -340,6 +333,7 @@ private fun ContentScope.QuickSettingsLayout(
         modifier = modifier.padding(horizontal = QuickSettingsShade.Dimensions.HorizontalPadding),
     ) {
         if (isFullWidthShade()) {
+            QuickSettingsOverlayPrivacyChip(qsContainerViewModel.shadeHeaderViewModel)
             VerticalSeparator(QuickSettingsShade.Dimensions.ShortPadding)
             QuickSettingsOverlayHeader(
                 viewModel = qsContainerViewModel.shadeHeaderViewModel,
@@ -349,6 +343,10 @@ private fun ContentScope.QuickSettingsLayout(
             VerticalSeparator(QuickSettingsShade.Dimensions.ShortPadding)
         } else {
             VerticalSeparator(QuickSettingsShade.Dimensions.VerticalPadding)
+            QuickSettingsOverlayPrivacyChip(
+                qsContainerViewModel.shadeHeaderViewModel,
+                modifier = Modifier.padding(bottom = QuickSettingsShade.Dimensions.ShortPadding),
+            )
         }
 
         val toolbarViewModel =
@@ -356,12 +354,14 @@ private fun ContentScope.QuickSettingsLayout(
 
         Toolbar(
             modifier =
-                Modifier.fillMaxWidth().requiredHeight(QuickSettingsShade.Dimensions.ToolbarHeight),
+                Modifier.fillMaxWidth()
+                    .requiredHeight(QuickSettingsShade.Dimensions.ToolbarHeight)
+                    .sysuiResTag("quick_settings_toolbar"),
             viewModel = toolbarViewModel,
             isFullyVisible = { layoutState.isIdle(contentKey) },
         )
 
-        VerticalSeparator(QuickSettingsShade.Dimensions.ShortPadding)
+        VerticalSeparator(QuickSettingsShade.Dimensions.ToolbarBottomPadding)
 
         Column(modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
             Media(
@@ -399,7 +399,7 @@ private fun ContentScope.QuickSettingsLayout(
             if (volumeSliderViewModel != null) {
                 val volumeSliderState by volumeSliderViewModel.slider.collectAsStateWithLifecycle()
 
-                VerticalSeparator(QuickSettingsShade.Dimensions.VerticalPadding)
+                VerticalSeparator(QuickSettingsShade.Dimensions.VolumeSliderExtraPadding)
                 Box(
                     Modifier.systemGestureExclusionInShade(
                         enabled = { layoutState.transitionState is TransitionState.Idle }
@@ -423,12 +423,12 @@ private fun ContentScope.QuickSettingsLayout(
                             sliderColors = PlatformSliderDefaults.defaultPlatformSliderColors(),
                             hapticsViewModelFactory =
                                 volumeSliderViewModel.getSliderHapticsViewModelFactory(),
-                            dimensions = QuickSettingsShade.Dimensions.volumeSliderDimensions,
+                            dimensions = QuickSettingsShade.Dimensions.VolumeSliderDimensions,
                         )
                         Spacer(Modifier.width(8.dp))
                         IconButton(
                             modifier = Modifier.size(
-                                QuickSettingsShade.Dimensions.volumeSliderDimensions.trackHeight
+                                QuickSettingsShade.Dimensions.VolumeSliderDimensions.trackHeight
                             ),
                             colors =
                                 IconButtonDefaults.iconButtonColors(
@@ -514,7 +514,7 @@ object QuickSettingsShade {
             @ReadOnlyComposable
             get() = dimensionResource(id = R.dimen.overlay_qs_layout_vertical_padding)
 
-        val volumeSliderDimensions: VolumeSliderDimensions
+        val VolumeSliderDimensions: VolumeSliderDimensions
             @Composable
             @ReadOnlyComposable
             get() =
@@ -524,6 +524,16 @@ object QuickSettingsShade {
                     volumeTrackHeight,
                     volumeVerticalPadding,
                 )
+
+        val ToolbarBottomPadding: Dp
+            @Composable
+            @ReadOnlyComposable
+            get() = dimensionResource(id = R.dimen.toolbar_bottom_padding)
+
+        val VolumeSliderExtraPadding: Dp
+            @Composable
+            @ReadOnlyComposable
+            get() = dimensionResource(id = R.dimen.overlay_qs_layout_volume_extra_padding)
 
         val ToolbarHeight: Dp
             @Composable

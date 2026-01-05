@@ -24,7 +24,6 @@ import android.app.appfunctions.flags.Flags
 import android.content.pm.PackageManagerInternal
 import android.content.pm.Signature
 import android.content.pm.SignedPackage
-import android.content.pm.UserInfo
 import android.os.IBinder
 import android.permission.flags.Flags.FLAG_APP_FUNCTION_ACCESS_API_ENABLED
 import android.permission.flags.Flags.FLAG_APP_FUNCTION_ACCESS_SERVICE_ENABLED
@@ -39,7 +38,7 @@ import com.android.internal.R
 import com.android.modules.utils.testing.ExtendedMockitoRule
 import com.android.server.LocalServices
 import com.android.server.SystemService
-import com.android.server.SystemService.TargetUser
+import com.android.server.appinteraction.AppInteractionService
 import com.android.server.uri.UriGrantsManagerInternal
 import com.google.common.truth.Truth.assertThat
 import com.google.common.util.concurrent.MoreExecutors
@@ -56,7 +55,6 @@ import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.spy
-import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 
@@ -78,11 +76,11 @@ class AppFunctionManagerServiceImplTest {
 
     private val appFunctionAccessService = mock<AppFunctionAccessServiceInterface>()
     private val agentAllowlistStorage = mock<AppFunctionAgentAllowlistStorage>()
-    private val multiUserAccessHistory = mock<MultiUserAppFunctionAccessHistory>()
 
     private val dynamicRegistry = mock<MultiUserDynamicAppFunctionRegistry>()
     private val agentAllowlistCaptor = argumentCaptor<Set<SignedPackage>>()
-    private var allowlistWasEnabled: Boolean = true
+
+    private val appInteractionService = mock<AppInteractionService>()
 
     private val serviceImpl =
         AppFunctionManagerServiceImpl(
@@ -95,8 +93,8 @@ class AppFunctionManagerServiceImplTest {
             },
             mock<AppFunctionsLoggerWrapper>(),
             agentAllowlistStorage,
-            multiUserAccessHistory,
             dynamicRegistry,
+            appInteractionService,
             MoreExecutors.directExecutor(),
         )
 
@@ -475,33 +473,6 @@ class AppFunctionManagerServiceImplTest {
         val expectedPackage2 =
             SignedPackage("com.example.preload2", Signature("222222").toByteArray())
         assertThat(capturedSet).containsAtLeast(expectedPackage1, expectedPackage2)
-    }
-
-    @RequiresFlagsEnabled(
-        FLAG_APP_FUNCTION_ACCESS_SERVICE_ENABLED,
-        FLAG_APP_FUNCTION_ACCESS_API_ENABLED,
-    )
-    @Test
-    fun onUserUnlocked_shouldUnlockTargetUserStorage() {
-        val targetUser = TargetUser(UserInfo(context.userId, "testUser", 0))
-
-        serviceImpl.onUserUnlocked(targetUser)
-
-        verify(multiUserAccessHistory, times(1)).onUserUnlocked(eq(targetUser))
-    }
-
-    @RequiresFlagsEnabled(
-        FLAG_APP_FUNCTION_ACCESS_SERVICE_ENABLED,
-        FLAG_APP_FUNCTION_ACCESS_API_ENABLED,
-    )
-    @Test
-    fun onUserStopping_shouldStopTargetUserStorage() {
-        val targetUser = TargetUser(UserInfo(context.userId, "testUser", 0))
-
-        serviceImpl.onUserUnlocked(targetUser)
-        serviceImpl.onUserStopping(targetUser)
-
-        verify(multiUserAccessHistory, times(1)).onUserStopping(eq(targetUser))
     }
 
     private fun setDeviceSettingPackages(deviceSettings: Array<String>) {

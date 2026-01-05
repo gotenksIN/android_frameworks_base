@@ -279,6 +279,7 @@
     <string name="global_action_restart" msgid="4678451019561687074">"הפעלה מחדש"</string>
     <string name="global_action_emergency" msgid="1387617624177105088">"חירום"</string>
     <string name="global_action_bug_report" msgid="5127867163044170003">"דוח איתור באגים"</string>
+    <string name="global_action_feedback" msgid="3480836834202300036">"משוב"</string>
     <string name="global_action_logout" msgid="6093581310002476511">"סיום הפעלה"</string>
     <string name="global_action_screenshot" msgid="2610053466156478564">"צילום מסך"</string>
     <string name="global_action_standby" msgid="6786920589970257642">"המתנה"</string>
@@ -327,8 +328,7 @@
     <string name="notification_channel_accessibility_hearing_device" msgid="7816963856388758952">"מכשיר שמיעה"</string>
     <string name="notification_channel_accessibility_security_policy" msgid="1727787021725251912">"שימוש בנגישות"</string>
     <string name="notification_channel_display" msgid="6905032605735615090">"מסך"</string>
-    <!-- no translation found for notification_channel_parental_controls (2963963315750128538) -->
-    <skip />
+    <string name="notification_channel_parental_controls" msgid="2963963315750128538">"אמצעי בקרת הורים"</string>
     <string name="foreground_service_app_in_background" msgid="1439289699671273555">"האפליקציה <xliff:g id="APP_NAME">%1$s</xliff:g> משתמשת בסוללה"</string>
     <string name="foreground_service_apps_in_background" msgid="7340037176412387863">"<xliff:g id="NUMBER">%1$d</xliff:g> אפליקציות משתמשות בסוללה"</string>
     <string name="foreground_service_tap_for_details" msgid="9078123626015586751">"אפשר ללחוץ כדי לקבל פרטים על צריכה של נתונים וסוללה"</string>
@@ -646,6 +646,10 @@
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"ההרשאה מאפשרת לאפליקציה לגשת למכשירים ברשת המקומית"</string>
     <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"‏שימוש בממשק לולאה חוזרת (loopback)"</string>
     <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"‏ההרשאה מאפשרת לאפליקציה ליצור אינטראקציה עם אפליקציות אחרות דרך ממשק לולאה חוזרת (loopback)"</string>
+    <!-- no translation found for permlab_force_use_loopback_interface (1319727311706416481) -->
+    <skip />
+    <!-- no translation found for permdesc_force_use_loopback_interface (5829032514048681980) -->
+    <skip />
     <string name="permlab_ranging" msgid="2854543350668593390">"זיהוי המיקום היחסי בין מכשירים קרובים"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"האפליקציה תזהה את המיקום היחסי בין מכשירים קרובים"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"‏פרטים על שירות תשלום מועדף ב-NFC"</string>
@@ -826,6 +830,8 @@
     <string name="permdesc_readMediaVideo" msgid="3846400073770403528">"מאפשרת לאפליקציה לקרוא קובצי וידאו מתוך האחסון המשותף."</string>
     <string name="permlab_readMediaImages" msgid="4057590631020986789">"קריאה של קובצי תמונה מתוך האחסון המשותף"</string>
     <string name="permdesc_readMediaImages" msgid="5836219373138469259">"מאפשרת לאפליקציה לקרוא קובצי תמונה מתוך האחסון המשותף."</string>
+    <string name="permlab_readMediaDocuments" msgid="5716810755602938263">"קריאת קבצים של מסמכים מתוך האחסון המשותף"</string>
+    <string name="permdesc_readMediaDocuments" msgid="5665930210237304120">"ההרשאה מאפשרת לאפליקציה לקרוא קובצי תמונה מתוך האחסון המשותף."</string>
     <string name="permlab_readVisualUserSelect" msgid="5516204215354667586">"קריאה של קובצי הווידאו והתמונה שנבחרו על ידי המשתמש מתוך נפח האחסון המשותף"</string>
     <string name="permdesc_readVisualUserSelect" msgid="8027174717714968217">"ההרשאה מאפשרת לאפליקציה לקרוא קובצי וידאו ותמונה שבחרת מתוך נפח האחסון המשותף."</string>
     <string name="permlab_sdcardWrite" msgid="4863021819671416668">"שינוי או מחיקה של תוכן האחסון המשותף שלך"</string>
@@ -1048,6 +1054,7 @@
     <string name="keyguard_password_enter_pin_password_code" msgid="7792964196473964340">"יש להקליד קוד אימות לביטול הנעילה"</string>
     <string name="keyguard_password_wrong_pin_code" msgid="8583732939138432793">"קוד אימות שגוי"</string>
     <string name="keyguard_label_text" msgid="3841953694564168384">"כדי לבטל את הנעילה, צריך ללחוץ על \'תפריט\' ואז על 0."</string>
+    <string name="emergency_call_dialog_number_for_display" msgid="2978165477085612673">"מספר חירום"</string>
     <string name="lockscreen_carrier_default" msgid="6192313772955399160">"אין שירות"</string>
     <string name="lockscreen_screen_locked" msgid="7364905540516041817">"המסך נעול."</string>
     <string name="lockscreen_instructions_when_pattern_enabled" msgid="7982445492532123308">"יש ללחוץ על \'תפריט\' כדי לבטל את הנעילה או כדי לבצע שיחת חירום."</string>
@@ -1431,7 +1438,7 @@
     <string name="sms_short_code_confirm_allow" msgid="920477594325526691">"שליחה"</string>
     <string name="sms_short_code_confirm_deny" msgid="1356917469323768230">"ביטול"</string>
     <string name="sms_short_code_remember_choice" msgid="1374526438647744862">"תזכרו את הבחירה שלי"</string>
-    <string name="sms_short_code_remember_undo_instruction" msgid="2620984439143080410">"‏ניתן לשנות זאת מאוחר יותר ב\'הגדרות\' &gt; \'אפליקציות\'"</string>
+    <string name="sms_short_code_remember_undo_instruction" msgid="2620984439143080410">"‏ניתן לשנות זאת מאוחר יותר ב\'הגדרות\' &gt; \'אפליקציות‘"</string>
     <string name="sms_short_code_confirm_always_allow" msgid="2223014893129755950">"אפשר תמיד"</string>
     <string name="sms_short_code_confirm_never_allow" msgid="2688828813521652079">"לא לאפשר אף פעם"</string>
     <string name="sim_removed_title" msgid="1349026474932481037">"‏כרטיס ה-SIM הוסר"</string>
@@ -1808,9 +1815,9 @@
     <string name="accessibility_enable_service_title" msgid="3931558336268541484">"להעניק לשירות \'<xliff:g id="SERVICE">%1$s</xliff:g>\' שליטה מלאה במכשיר?"</string>
     <string name="accessibility_service_warning_description" msgid="291674995220940133">"האפשרות לשליטה מלאה במכשיר לא מתאימה לרוב האפליקציות, אלא רק לאפליקציות שעוזרות עם צורכי הנגישות שלך."</string>
     <string name="accessibility_service_screen_control_title" msgid="190017412626919776">"הצגת המסך ושליטה בו"</string>
-    <string name="accessibility_service_screen_control_description" msgid="6946315917771791525">"אפשרות לקריאת כל התוכן במסך ולהצגת התוכן מעל אפליקציות אחרות."</string>
+    <string name="accessibility_service_screen_control_description" msgid="6946315917771791525">"התכונה תוכל לקרוא את כל התוכן במסך ולהציג תוכן מעל אפליקציות אחרות."</string>
     <string name="accessibility_service_action_perform_title" msgid="779670378951658160">"הצגה וביצוע של פעולות"</string>
-    <string name="accessibility_service_action_perform_description" msgid="2718852014003170558">"אפשרות למעקב אחר האינטראקציה שלך עם אפליקציות או חיישני חומרה, וביצוע אינטראקציה בשמך."</string>
+    <string name="accessibility_service_action_perform_description" msgid="2718852014003170558">"התכונה יכולה לעקוב אחרי הפעילות שלך באפליקציות או עם חיישני חומרה, ולבצע בשבילך פעולות."</string>
     <string name="accessibility_dialog_button_allow" msgid="2092558122987144530">"אישור"</string>
     <string name="accessibility_dialog_button_deny" msgid="4129575637812472671">"עדיף שלא"</string>
     <string name="accessibility_dialog_button_uninstall" msgid="2952465517671708108">"הסרה"</string>
@@ -1833,7 +1840,7 @@
     <string name="one_handed_mode_feature_name" msgid="2334330034828094891">"מצב שימוש ביד אחת"</string>
     <string name="reduce_bright_colors_feature_name" msgid="3222994553174604132">"מעומעם במיוחד"</string>
     <string name="hearing_aids_feature_name" msgid="1125892105105852542">"מכשירי שמיעה"</string>
-    <string name="autoclick_feature_name" msgid="4056260617171267864">"קליק אוטומטי (משך ההמתנה)"</string>
+    <string name="autoclick_feature_name" msgid="4056260617171267864">"קליק אוטומטי"</string>
     <string name="mouse_keys_feature_name" msgid="3362643216513384542">"שליטה בעכבר מהמקלדת"</string>
     <string name="hearing_device_status_disconnected" msgid="497547752953543832">"מנותק"</string>
     <string name="hearing_device_status_connected" msgid="2149385149669918764">"מחובר"</string>
@@ -2177,13 +2184,21 @@
     <string name="autofill_picker_no_suggestions" msgid="1076022650427481509">"אין הצעות של מילוי אוטומטי"</string>
     <string name="autofill_picker_some_suggestions" msgid="5560549696296202701">"{count,plural, =1{הצעה אחת של מילוי אוטומטי}one{# הצעות של מילוי אוטומטי}two{# הצעות של מילוי אוטומטי}other{# הצעות של מילוי אוטומטי}}"</string>
     <string name="autofill_save_title" msgid="7719802414283739775">"לשמור בשירות "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_save_title_expressive" msgid="2665408870424848558">"שמירה של המידע ב-"<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b></string>
     <string name="autofill_save_title_with_type" msgid="3002460014579799605">"האם לשמור את <xliff:g id="TYPE">%1$s</xliff:g> ב-"<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_save_title_with_type_expressive" msgid="6063660551496235255">"שמירה של <xliff:g id="TYPE">%1$s</xliff:g> ב-"<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b></string>
     <string name="autofill_save_title_with_2types" msgid="3783270967447869241">"האם לשמור את <xliff:g id="TYPE_0">%1$s</xliff:g> ואת <xliff:g id="TYPE_1">%2$s</xliff:g> ב-"<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_save_title_with_2types_expressive" msgid="2996687022212666293">"שמירה של <xliff:g id="TYPE_0">%1$s</xliff:g>,‏ <xliff:g id="TYPE_1">%2$s</xliff:g> ו-"<b>" ב-<xliff:g id="LABEL">%3$s</xliff:g>"</b></string>
     <string name="autofill_save_title_with_3types" msgid="6598228952100102578">"לשמור את <xliff:g id="TYPE_0">%1$s</xliff:g>,‏ <xliff:g id="TYPE_1">%2$s</xliff:g> ואת <xliff:g id="TYPE_2">%3$s</xliff:g> בשירות "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_save_title_with_3types_expressive" msgid="3301676215501214049">"שמירה של <xliff:g id="TYPE_0">%1$s</xliff:g>,‏ <xliff:g id="TYPE_1">%2$s</xliff:g> ו-<xliff:g id="TYPE_2">%3$s</xliff:g> ב-"<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b></string>
     <string name="autofill_update_title" msgid="3630695947047069136">"לעדכן בשירות "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_update_title_expressive" msgid="7660582214109012920">"עדכון הפרטים ב-"<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b></string>
     <string name="autofill_update_title_with_type" msgid="5264152633488495704">"לעדכן <xliff:g id="TYPE">%1$s</xliff:g> בשירות "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_update_title_with_type_expressive" msgid="6162413585161767846">"עדכון של <xliff:g id="TYPE">%1$s</xliff:g> ב-"<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b></string>
     <string name="autofill_update_title_with_2types" msgid="1797514386321086273">"האם לעדכן את <xliff:g id="TYPE_0">%1$s</xliff:g> ואת <xliff:g id="TYPE_1">%2$s</xliff:g> ב-"<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_update_title_with_2types_expressive" msgid="1911825941498393471">"עדכון של <xliff:g id="TYPE_0">%1$s</xliff:g> ו-<xliff:g id="TYPE_1">%2$s</xliff:g> ב-"<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b></string>
     <string name="autofill_update_title_with_3types" msgid="8285767070604652626">"לעדכן את הפריטים אלה ב-"<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>":‏ <xliff:g id="TYPE_0">%1$s</xliff:g>,‏ <xliff:g id="TYPE_1">%2$s</xliff:g> ו-<xliff:g id="TYPE_2">%3$s</xliff:g>?"</string>
+    <string name="autofill_update_title_with_3types_expressive" msgid="6040725201378429027">"עדכון של הפריטים האלה ב-"<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>":‏ <xliff:g id="TYPE_0">%1$s</xliff:g>,‏ <xliff:g id="TYPE_1">%2$s</xliff:g> ו-<xliff:g id="TYPE_2">%3$s</xliff:g>"</string>
     <string name="autofill_save_yes" msgid="8035743017382012850">"שמירה"</string>
     <string name="autofill_save_no" msgid="9212826374207023544">"לא, תודה"</string>
     <string name="autofill_save_notnow" msgid="2853932672029024195">"לא עכשיו"</string>
@@ -2612,10 +2627,7 @@
     <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"התראות על משאבי מערכת"</string>
     <string name="tv_watchdog_notification_title" msgid="195239206215922517">"שימוש יתר במשאבים"</string>
     <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"האפליקציה <xliff:g id="APP_NAME">%1$s</xliff:g> משתמשת ביותר מדי משאבים."</string>
-    <!-- no translation found for supervision_blocked_app_title (5546803865875383588) -->
-    <skip />
-    <!-- no translation found for supervision_blocked_app_content (4125452996088641559) -->
-    <skip />
-    <!-- no translation found for supervision_unblocked_app_content (8282985265957852278) -->
-    <skip />
+    <string name="supervision_blocked_app_title" msgid="5546803865875383588">"בוצע עדכון על ידי ההורה"</string>
+    <string name="supervision_blocked_app_content" msgid="4125452996088641559">"אפליקציית <xliff:g id="APP_NAME">%1$s</xliff:g> הוסרה בינתיים"</string>
+    <string name="supervision_unblocked_app_content" msgid="8282985265957852278">"אפליקציית <xliff:g id="APP_NAME">%1$s</xliff:g> זמינה עכשיו"</string>
 </resources>

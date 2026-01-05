@@ -476,8 +476,24 @@ status_t NativeInputEventReceiver::consumeEvents(JNIEnv* env,
         uint32_t seq;
         InputEvent* inputEvent;
 
-        status_t status = mInputConsumer->consume(&mInputEventFactory, consumeBatches, frameTime,
-                                                  &seq, &inputEvent);
+        const auto& [result, unfinishedInputMessages] =
+                mInputConsumer->consume(&mInputEventFactory, consumeBatches, frameTime, &seq,
+                                        &inputEvent);
+        status_t status;
+        if (result.ok()) {
+            status = OK;
+        } else {
+            status = result.error().code();
+        }
+
+        for (const InputMessage& msg : unfinishedInputMessages) {
+            // We ignore the result here as we are concerned with the status of the
+            // socket read in our function, whereas this result is related to the
+            // socket write status. On failure, processOutboundEvents will keep retrying
+            // until the finish is sent from the outbound queue.
+            finishInputEvent(msg.header.seq, /*handled=*/false);
+        }
+
         if (status != OK && status != WOULD_BLOCK) {
             ALOGE("channel '%s' ~ Failed to consume input event.  status=%s(%d)", mName.c_str(),
                   statusToString(status).c_str(), status);

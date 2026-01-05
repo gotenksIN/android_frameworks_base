@@ -36,6 +36,7 @@ import static android.internal.perfetto.protos.Windowmanagerservice.WindowContai
 import static android.internal.perfetto.protos.Windowmanagerservice.WindowContainerProto.SURFACE_ANIMATOR;
 import static android.internal.perfetto.protos.Windowmanagerservice.WindowContainerProto.SURFACE_CONTROL;
 import static android.internal.perfetto.protos.Windowmanagerservice.WindowContainerProto.VISIBLE;
+import static android.internal.perfetto.protos.Windowmanagerservice.WindowContainerProto.VISIBLE_REQUESTED;
 import static android.os.UserHandle.USER_NULL;
 import static android.view.SurfaceControl.Transaction;
 import static android.view.WindowInsets.Type.InsetsType;
@@ -326,7 +327,7 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
      * @param insetsChangedWindows         The windows which the insets changed have changed for.
      */
     void updateAboveInsetsState(InsetsState aboveInsetsState,
-            SparseArray<InsetsSource> localInsetsSourcesFromParent,
+            @Nullable SparseArray<InsetsSource> localInsetsSourcesFromParent,
             ArraySet<WindowState> insetsChangedWindows) {
         final SparseArray<InsetsSource> mergedLocalInsetsSources =
                 createMergedSparseArray(localInsetsSourcesFromParent, mLocalInsetsSources);
@@ -337,9 +338,13 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
         }
     }
 
+    @Nullable
     static <T> SparseArray<T> createMergedSparseArray(SparseArray<T> sa1, SparseArray<T> sa2) {
         final int size1 = sa1 != null ? sa1.size() : 0;
         final int size2 = sa2 != null ? sa2.size() : 0;
+        if (size1 == 0 && size2 == 0) {
+            return null;
+        }
         final SparseArray<T> mergedArray = new SparseArray<>(size1 + size2);
         if (size1 > 0) {
             for (int i = 0; i < size1; i++) {
@@ -2746,13 +2751,13 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
      * @param proto     Stream to write the WindowContainer object to.
      * @param fieldId   Field Id of the WindowContainer as defined in the parent message.
      * @param logLevel  Determines the amount of data to be written to the Protobuf.
-     * @hide
      */
     @CallSuper
     @Override
     public void dumpDebug(ProtoOutputStream proto, long fieldId,
             @WindowTracingLogLevel int logLevel) {
         boolean isVisible = isVisible();
+        // Critical log level logs only visible elements to mitigate performance overheard
         if (logLevel == WindowTracingLogLevel.CRITICAL && !isVisible) {
             return;
         }
@@ -2768,6 +2773,7 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
         if (mSurfaceControl != null) {
             mSurfaceControl.dumpDebug(proto, SURFACE_CONTROL);
         }
+        proto.write(VISIBLE_REQUESTED, isVisibleRequested());
 
         // add children to proto
         for (int i = 0; i < getChildCount(); i++) {
@@ -3315,6 +3321,12 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
 
     /** Cheap way of doing cast and instanceof. */
     WallpaperWindowToken asWallpaperToken() {
+        return null;
+    }
+
+    /** Cheap way of doing cast and instanceof. */
+    @Nullable
+    ImeWindowToken asImeToken() {
         return null;
     }
 

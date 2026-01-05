@@ -79,7 +79,7 @@ object PreferenceScreenRegistry {
         return (preferenceScreenMetadataFactories[screenKey] as? PreferenceScreenMetadataParameterizedFactory)?.parameters(context) ?: emptyFlow()
     }
 
-    fun getKeyParameters(context: Context, screenKey: String): Flow<KeyParameters> {
+    fun getKeyParameters(context: Context, screenKey: String): Flow<ValidatedKeyParameters> {
         return (preferenceScreenMetadataFactories[screenKey] as? PreferenceScreenMetadataParameterizedFactory)?.keyParameters(context) ?: emptyFlow()
     }
 
@@ -90,7 +90,10 @@ object PreferenceScreenRegistry {
     /** Creates [PreferenceScreenMetadata] of particular screen. */
     fun create(context: Context, screenCoordinate: PreferenceScreenCoordinate) =
         if (CatalystFlags.catalystUseKeyParameters()) {
-            createWithKeyParameters(context, screenCoordinate.screenKey, screenCoordinate.keyParameters)
+            val validatedKeyParameters = screenCoordinate.keyParameters?.let {
+                getScreenParametersSchema(screenCoordinate.screenKey)?.prepare(it)
+            }
+            createWithKeyParameters(context, screenCoordinate.screenKey, validatedKeyParameters)
         } else {
             create(context, screenCoordinate.screenKey, screenCoordinate.args)
         }
@@ -116,7 +119,7 @@ object PreferenceScreenRegistry {
     }
 
     /** Creates [PreferenceScreenMetadata] of particular screen key with given arguments. */
-    fun createWithKeyParameters(context: Context, screenKey: String?, keyParameters: KeyParameters?): PreferenceScreenMetadata? {
+    fun createWithKeyParameters(context: Context, screenKey: String?, keyParameters: ValidatedKeyParameters?): PreferenceScreenMetadata? {
         if (screenKey == null) return null
         val factory = preferenceScreenMetadataFactories[screenKey] ?: return null
         val appContext = context.applicationContext
@@ -125,11 +128,11 @@ object PreferenceScreenRegistry {
             // In case the parameterized screen was a normal screen, it is expected to accept
             // Bundle.EMPTY arguments and take care of backward compatibility.
             if (factory.acceptEmptyArguments()) return factory.create(appContext)
-            Log.e(TAG, "screen $screenKey is parameterized but args is not provided")
+            Log.e(TAG, "screen $screenKey is parameterized but keyParameters is not provided")
             return null
         } else {
             if (keyParameters == null) return factory.create(appContext)
-            Log.e(TAG, "screen $screenKey is not parameterized but args is provided")
+            Log.e(TAG, "screen $screenKey is not parameterized but keyParameters is provided")
             return null
         }
     }

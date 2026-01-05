@@ -110,6 +110,9 @@ flag {
   namespace: "supervision"
   description: "Enables AppBindingService to dispatch actions to be executed by AppServiceConnection after a connection is established."
   bug: "441932377"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
 }
 
 flag {
@@ -145,7 +148,7 @@ flag {
 
 flag {
   name: "enable_supervision_manager_policy_apis"
-  is_exported: false
+  is_exported: true
   namespace: "supervision"
   description: "Flag that enables supervision policy APIs in Supervision Service"
   bug: "443997530"
@@ -160,4 +163,15 @@ flag {
   metadata {
     purpose: PURPOSE_BUGFIX
   }
+}
+
+flag {
+    name: "enable_supervision_manager_cache"
+    is_exported: false
+    namespace: "supervision"
+    description: "Enables caching in SupervisionManager"
+    bug: "446219688"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
 }

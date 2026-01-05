@@ -15,6 +15,7 @@ flag {
     name: "aapm_api_v2"
     namespace: "responsible_apis"
     description: "Flag for V2 of Advanced Protection Manager changes"
+    is_exported: true
     bug: "419508351"
 }
 
@@ -24,7 +25,6 @@ flag {
     description: "Android Advanced Protection Mode Feature: Disable Insecure Wifi Autojoin"
     is_exported: true
     bug: "424512082"
-    is_fixed_read_only: true
 }
 
 flag {
@@ -89,16 +89,6 @@ flag {
     namespace: "responsible_apis"
     description: "Do not allow intents without an action to match any intent filters"
     bug: "293560872"
-}
-
-flag {
-    name: "check_application_thread_called_by_system"
-    namespace: "responsible_apis"
-    description: "Allow only the system to call methods on ApplicationThread."
-    bug: "317346668"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -245,6 +235,13 @@ flag {
     namespace: "responsible_apis"
     description: "Flag that enables the uprobestats system service"
     bug: "408041227"
+}
+
+flag {
+    name: "strict_mode_violation_for_implicit_uri_grants_enabled"
+    namespace: "permissions"
+    description: "Flag for strict mode violation for implicit uri grants"
+    bug: "295238578"
 }
 
 flag {

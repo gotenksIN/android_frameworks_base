@@ -524,18 +524,20 @@ public class BubbleStackView extends FrameLayout
                                 view /* bubble */,
                                 mDismissView.getHeight() /* translationYBy */,
                                 () -> {
-                                    BubbleExpandedView bev = getExpandedView();
-                                    if (bev != null) {
-                                        // When dragging a bubble to dismiss, keep it invisible
-                                        // throughout the switch animation.
-                                        bev.setContentVisibility(false);
-                                    }
                                     Bubble bubbleToDismiss =
                                             mBubbleData.getBubbleInStackWithView(view);
                                     BubbleLog.d(
                                             "BubbleStackView.onReleasedInTarget() DROP bubble=%s "
                                                     + "to dismiss", bubbleToDismiss == null ? "null"
                                                     : bubbleToDismiss.getKey());
+                                    BubbleExpandedView draggedBubbleBev = bubbleToDismiss == null
+                                            ? null
+                                            : bubbleToDismiss.getExpandedView();
+                                    if (draggedBubbleBev != null) {
+                                        // When dragging a bubble to dismiss, keep it invisible
+                                        // throughout the switch animation.
+                                        draggedBubbleBev.setContentVisibility(false);
+                                    }
                                     dismissBubbleIfExists(bubbleToDismiss);
                                 } /* after */);
                     }
@@ -2605,6 +2607,7 @@ public class BubbleStackView extends FrameLayout
                         + " mIsExpanded=%b", newlySelectedKey, previouslySelectedKey, mIsExpanded);
         if (mIsExpanded) {
             final boolean isJumpcutBubbleSwitching = isJumpcutBubbleSwitching();
+            // TODO: b/424812643 - clean up the onImeHidden runnable
             final Runnable onImeHidden = () -> {
                 // Make the container of the expanded view transparent before removing the expanded
                 // view from it. Otherwise a punch hole created by {@link android.view.SurfaceView}
@@ -2638,7 +2641,12 @@ public class BubbleStackView extends FrameLayout
                 });
             };
             if (mPositioner.isImeVisible()) {
-                hideCurrentInputMethod(onImeHidden);
+                if (Flags.fixBubbleSwipeUpGesture()) {
+                    hideCurrentInputMethod();
+                    onImeHidden.run();
+                } else {
+                    hideCurrentInputMethod(onImeHidden);
+                }
             } else {
                 onImeHidden.run();
             }
@@ -2731,8 +2739,13 @@ public class BubbleStackView extends FrameLayout
         };
 
         if (mPositioner.isImeVisible()) {
-            BubbleLog.d("BubbleStackView.setExpanded IME is visible, delaying animation");
-            hideCurrentInputMethod(onImeHidden);
+            if (Flags.fixBubbleSwipeUpGesture()) {
+                hideCurrentInputMethod();
+                onImeHidden.run();
+            } else {
+                BubbleLog.d("BubbleStackView.setExpanded IME is visible, delaying animation");
+                hideCurrentInputMethod(onImeHidden);
+            }
         } else {
             // Clear out the existing runnable if one was scheduled to run after IME was hidden.
             // IME hide action can take time or in some cases not trigger at all. And we can
@@ -3549,6 +3562,7 @@ public class BubbleStackView extends FrameLayout
     }
 
     private void dismissBubbleIfExists(@Nullable BubbleViewProvider bubble) {
+        android.util.Log.e("Liran", "BSV::dismissBubbleIfExists -- bubble = " + bubble);
         if (bubble != null && mBubbleData.hasBubbleInStackWithKey(bubble.getKey())) {
             if (mIsExpanded && mBubbleData.getBubbles().size() > 1
                     && Objects.equals(bubble, mExpandedBubble)) {

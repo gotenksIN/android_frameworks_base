@@ -16,22 +16,28 @@
 
 package com.android.server.supervision
 
-import android.app.supervision.PackagePolicy
+import android.app.supervision.PackageUsagePolicy
 import android.app.supervision.Policy
-import android.app.supervision.PolicyKey
 import android.app.supervision.SupervisionRecoveryInfo
 import android.app.supervision.flags.Flags
+import android.content.Context
+import android.content.res.Resources
 import android.os.PersistableBundle
 import android.platform.test.annotations.DisableFlags
 import android.platform.test.annotations.EnableFlags
-import android.platform.test.annotations.RequiresFlagsDisabled
 import android.platform.test.annotations.RequiresFlagsEnabled
 import android.platform.test.flag.junit.DeviceFlagsValueProvider
 import android.platform.test.flag.junit.SetFlagsRule
 import android.util.ArraySet
+import android.util.Xml
+import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.android.frameworks.servicestests.R
 import com.google.common.truth.Truth.assertThat
+import java.io.DataOutputStream
+import java.io.File
 import java.nio.file.Files
+import java.nio.charset.StandardCharsets
 import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
@@ -52,14 +58,16 @@ class SupervisionSettingsTest {
     @get:Rule val setFlagsRule = SetFlagsRule()
 
     private lateinit var mSupervisionSettings: SupervisionSettings
+    private lateinit var mResources: Resources
+    private lateinit var tempSupervisionDir: File
 
     @Before
     fun setUp() {
         mSupervisionSettings = SupervisionSettings.getInstance()
+        mResources = ApplicationProvider.getApplicationContext<Context>().getResources()
         // Creating a temporary folder to enable access.
-        mSupervisionSettings.changeDirForTesting(
-            Files.createTempDirectory("tempSupervisionFolder").toFile()
-        )
+        tempSupervisionDir = Files.createTempDirectory("tempSupervisionFolder").toFile()
+        mSupervisionSettings.changeDirForTesting(tempSupervisionDir)
     }
 
     @Test
@@ -246,7 +254,7 @@ class SupervisionSettingsTest {
 
         // save user data, update with empty policies and load user data
         mSupervisionSettings.saveUserData()
-        mSupervisionSettings.removeUserData(1)
+        mSupervisionSettings.getUserData(1).changeUserData(false, null, false, null)
         mSupervisionSettings.loadUserData()
 
         // check if policy was loaded correctly
@@ -260,6 +268,57 @@ class SupervisionSettingsTest {
                 ArraySet<String>(),
                 listOf(TEST_PACKAGE_POLICY, TEST_PACKAGE_POLICY_2),
             )
+    }
+
+    @Test
+    @RequiresFlagsEnabled(Flags.FLAG_ENABLE_SUPERVISION_MANAGER_POLICY_APIS)
+    fun loadUserData_withMixedPolicyIdentifiers_loadsKnownPoliciesCorrectly() {
+        val file = File(tempSupervisionDir, "supervision_settings.xml")
+        file.outputStream().use { fileOutputStream ->
+            val dataOutputStream = DataOutputStream(fileOutputStream)
+            val xmlIn = mResources.getXml(R.xml.supervision_user_data_v0)
+            val xmlOut = Xml.newBinarySerializer()
+
+            xmlOut.setOutput(dataOutputStream, StandardCharsets.UTF_8.name())
+            Xml.copy(xmlIn, xmlOut)
+            xmlOut.flush()
+        }
+
+        mSupervisionSettings.loadUserData()
+
+        val userData = mSupervisionSettings.getUserData(1)
+        assertThat(userData.policies.values).containsExactly(TEST_PACKAGE_POLICY)
+    }
+
+     @Test
+    @RequiresFlagsEnabled(Flags.FLAG_ENABLE_SUPERVISION_MANAGER_POLICY_APIS)
+    fun loadUserData_withUnknownTag_skipsTagAndLoadsCorrectly() {
+        // TODO: b/463800582 - Transition to a XML resource file.
+        val malformedFile = File(tempSupervisionDir, "supervision_settings.xml")
+        malformedFile.writeText(
+            """
+            <supervision_data>
+                <supervision_user_data
+                    user_id="1"
+                    supervision_enabled="true"
+                    supervision_app_package="package1"
+                    supervision_lockscreen_enabled="true">
+                    <unknown_tag>some value</unknown_tag>
+                    <supervision_lockscreen_options>
+                        <string name="id">id</string>
+                        <number name="key1" value="1" />
+                        <boolean name="key2" value="true" />
+                        <string name="key3">value</string>
+                        <number name="key4" value="4" />
+                    </supervision_lockscreen_options>
+                </supervision_user_data>
+            </supervision_data>
+            """.trimIndent()
+        )
+
+        mSupervisionSettings.loadUserData()
+
+        mSupervisionSettings.getUserData(1).checkUserData(true, "package1", true, BUNDLE_1)
     }
 
     private companion object {
@@ -290,9 +349,17 @@ class SupervisionSettingsTest {
             )
 
         private val TEST_PACKAGE_POLICY =
-            PackagePolicy(1, "test.package", PackagePolicy.RESTRICTION_TYPE_BLOCKED, true)
+            PackageUsagePolicy.Builder()
+                .setVersion(1)
+                .setPackageName("test.package")
+                .setType(PackageUsagePolicy.TYPE_BLOCKED)
+                .build()
         private val TEST_PACKAGE_POLICY_2 =
-            PackagePolicy(1, "test.package2", PackagePolicy.RESTRICTION_TYPE_BLOCKED, true)
+            PackageUsagePolicy.Builder()
+                .setVersion(1)
+                .setPackageName("test.package2")
+                .setType(PackageUsagePolicy.TYPE_BLOCKED)
+                .build()
 
         fun SupervisionUserData.changeUserData(
             enabled: Boolean,
@@ -330,7 +397,7 @@ class SupervisionSettingsTest {
                     .isEqualTo(lockScreenOptions.toString())
             }
             assertThat(this.supervisionRoleHolders).containsExactlyElementsIn(roleHolders)
-            assertThat(this.policies.values).containsExactlyElementsIn(policies)
+            assertThat(this.policies.getPolicies()).containsExactlyElementsIn(policies)
         }
     }
 }

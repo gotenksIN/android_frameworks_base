@@ -53,6 +53,7 @@ import com.android.internal.jank.Cuj
 import com.android.internal.policy.ScreenDecorationsUtils
 import com.android.internal.policy.SystemBarUtils
 import com.android.internal.protolog.ProtoLog
+import com.android.window.flags.Flags.fixCrossActivityBackAnimationInBubbles
 import com.android.wm.shell.R
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer
 import com.android.wm.shell.protolog.ShellProtoLogGroup
@@ -118,7 +119,8 @@ abstract class CrossActivityBackAnimation(
 
     private val postCommitFlingScale = FloatValueHolder(SPRING_SCALE)
     private var lastPostCommitFlingScale = SPRING_SCALE
-    private val postCommitFlingSpring = SpringForce(SPRING_SCALE)
+    private val postCommitFlingSpring =
+        SpringForce(SPRING_SCALE)
             .setStiffness(SpringForce.STIFFNESS_LOW)
             .setDampingRatio(SpringForce.DAMPING_RATIO_LOW_BOUNCY)
     private var swipeEdge = EDGE_LEFT
@@ -134,8 +136,8 @@ abstract class CrossActivityBackAnimation(
     abstract val allowEnteringYShift: Boolean
 
     /**
-     * Subclasses must set the [startClosingRect] and [targetClosingRect] to define the movement
-     * of the closingTarget during pre-commit phase.
+     * Subclasses must set the [startClosingRect] and [targetClosingRect] to define the movement of
+     * the closingTarget during pre-commit phase.
      */
     abstract fun preparePreCommitClosingRectMovement(@BackEvent.SwipeEdge swipeEdge: Int)
 
@@ -145,9 +147,7 @@ abstract class CrossActivityBackAnimation(
      */
     abstract fun preparePreCommitEnteringRectMovement()
 
-    /**
-     * Subclasses must provide a duration (in ms) for the post-commit part of the animation
-     */
+    /** Subclasses must provide a duration (in ms) for the post-commit part of the animation */
     abstract fun getPostCommitAnimationDuration(): Long
 
     /**
@@ -176,7 +176,7 @@ abstract class CrossActivityBackAnimation(
         if (enteringTarget == null || closingTarget == null) {
             ProtoLog.d(
                 ShellProtoLogGroup.WM_SHELL_BACK_PREVIEW,
-                "Entering target or closing target is null."
+                "Entering target or closing target is null.",
             )
             return
         }
@@ -203,15 +203,23 @@ abstract class CrossActivityBackAnimation(
         preparePreCommitClosingRectMovement(backMotionEvent.swipeEdge)
         preparePreCommitEnteringRectMovement()
 
+        val backgroundCrop =
+            if (
+                closingTarget!!.windowConfiguration.tasksAreFloating() ||
+                    fixCrossActivityBackAnimationInBubbles()
+            ) {
+                closingTarget!!.localBounds
+            } else {
+                null
+            }
         background.ensureBackground(
-                closingTarget!!.windowConfiguration.bounds,
-                getBackgroundColor(),
-                transaction,
-                statusbarHeight,
-                if (closingTarget!!.windowConfiguration.tasksAreFloating())
-                    closingTarget!!.localBounds else null,
-                cornerRadius,
-                closingTarget!!.taskInfo.getDisplayId()
+            closingTarget!!.windowConfiguration.bounds,
+            getBackgroundColor(),
+            transaction,
+            statusbarHeight,
+            backgroundCrop,
+            cornerRadius,
+            closingTarget!!.taskInfo.getDisplayId(),
         )
         ensureScrimLayer()
         if (isLetterboxed && enteringHasSameLetterbox) {
@@ -220,7 +228,7 @@ abstract class CrossActivityBackAnimation(
                 closingTarget!!.localBounds.left,
                 0,
                 closingTarget!!.localBounds.right,
-                closingTarget!!.windowConfiguration.bounds.height()
+                closingTarget!!.windowConfiguration.bounds.height(),
             )
             // and add fake letterbox square surfaces instead
             ensureLetterboxes()
@@ -244,7 +252,7 @@ abstract class CrossActivityBackAnimation(
             enteringTarget?.leash,
             currentEnteringRect,
             enteringTransformation?.alpha ?: 1f,
-            enteringTransformation
+            enteringTransformation,
         )
         applyTransaction()
         background.customizeStatusBarAppearance(currentClosingRect.top.toInt())
@@ -286,10 +294,11 @@ abstract class CrossActivityBackAnimation(
         if (gestureProgress < 0.1f) {
             startVelocity = startVelocity.coerceAtLeast(DEFAULT_FLING_VELOCITY)
         }
-        val flingAnimation = SpringAnimation(postCommitFlingScale, SPRING_SCALE)
-            .setStartVelocity(-startVelocity.coerceIn(0f, MAX_FLING_VELOCITY))
-            .setStartValue(SPRING_SCALE)
-            .setSpring(postCommitFlingSpring)
+        val flingAnimation =
+            SpringAnimation(postCommitFlingScale, SPRING_SCALE)
+                .setStartVelocity(-startVelocity.coerceIn(0f, MAX_FLING_VELOCITY))
+                .setStartValue(SPRING_SCALE)
+                .setSpring(postCommitFlingSpring)
         flingAnimation.start()
         // do an animation-frame immediately to prevent idle frame
         flingAnimation.doAnimationFrame(
@@ -358,15 +367,16 @@ abstract class CrossActivityBackAnimation(
         rect: RectF,
         alpha: Float,
         baseTransformation: Transformation? = null,
-        flingMode: FlingMode = FlingMode.NO_FLING
+        flingMode: FlingMode = FlingMode.NO_FLING,
     ) {
         if (leash == null || !leash.isValid) return
         tempRectF.set(rect)
         if (flingMode != FlingMode.NO_FLING) {
-            lastPostCommitFlingScale = min(
-                postCommitFlingScale.value / SPRING_SCALE,
-                if (flingMode == FlingMode.FLING_BOUNCE) 1f else lastPostCommitFlingScale
-            )
+            lastPostCommitFlingScale =
+                min(
+                    postCommitFlingScale.value / SPRING_SCALE,
+                    if (flingMode == FlingMode.FLING_BOUNCE) 1f else lastPostCommitFlingScale,
+                )
             // apply an additional scale to the closing target to account for fling velocity
             tempRectF.scaleCentered(lastPostCommitFlingScale)
         }
@@ -405,7 +415,9 @@ abstract class CrossActivityBackAnimation(
 
         if (DesktopExperienceFlags.ENABLE_MULTIDISPLAY_TRACKPAD_BACK_GESTURE.isTrue()) {
             rootTaskDisplayAreaOrganizer.attachToDisplayArea(
-                closingTarget!!.taskInfo.getDisplayId(), scrimBuilder)
+                closingTarget!!.taskInfo.getDisplayId(),
+                scrimBuilder,
+            )
         } else {
             rootTaskDisplayAreaOrganizer.attachToDisplayArea(Display.DEFAULT_DISPLAY, scrimBuilder)
         }
@@ -443,7 +455,7 @@ abstract class CrossActivityBackAnimation(
                         0,
                         t.windowConfiguration.bounds.top,
                         t.localBounds.left,
-                        t.windowConfiguration.bounds.bottom
+                        t.windowConfiguration.bounds.bottom,
                     )
                 leftLetterboxLayer = ensureLetterbox(bounds)
             }
@@ -456,7 +468,7 @@ abstract class CrossActivityBackAnimation(
                         t.localBounds.right,
                         t.windowConfiguration.bounds.top,
                         t.windowConfiguration.bounds.right,
-                        t.windowConfiguration.bounds.bottom
+                        t.windowConfiguration.bounds.bottom,
                     )
                 rightLetterboxLayer = ensureLetterbox(bounds)
             }
@@ -474,17 +486,21 @@ abstract class CrossActivityBackAnimation(
 
         if (DesktopExperienceFlags.ENABLE_MULTIDISPLAY_TRACKPAD_BACK_GESTURE.isTrue()) {
             rootTaskDisplayAreaOrganizer.attachToDisplayArea(
-                closingTarget!!.taskInfo.getDisplayId(), letterboxBuilder)
+                closingTarget!!.taskInfo.getDisplayId(),
+                letterboxBuilder,
+            )
         } else {
             rootTaskDisplayAreaOrganizer.attachToDisplayArea(
-                Display.DEFAULT_DISPLAY, letterboxBuilder)
+                Display.DEFAULT_DISPLAY,
+                letterboxBuilder,
+            )
         }
         val layer = letterboxBuilder.build()
         val colorComponents =
             floatArrayOf(
                 Color.red(letterboxColor) / 255f,
                 Color.green(letterboxColor) / 255f,
-                Color.blue(letterboxColor) / 255f
+                Color.blue(letterboxColor) / 255f,
             )
         transaction
             .setColor(layer, colorComponents)
@@ -512,7 +528,7 @@ abstract class CrossActivityBackAnimation(
 
     override fun prepareNextAnimation(
         animationInfo: BackNavigationInfo.CustomAnimationInfo?,
-        letterboxColor: Int
+        letterboxColor: Int,
     ): Boolean {
         this.letterboxColor = letterboxColor
         return false
@@ -554,11 +570,11 @@ abstract class CrossActivityBackAnimation(
             apps: Array<RemoteAnimationTarget>,
             wallpapers: Array<RemoteAnimationTarget>?,
             nonApps: Array<RemoteAnimationTarget>?,
-            finishedCallback: IRemoteAnimationFinishedCallback
+            finishedCallback: IRemoteAnimationFinishedCallback,
         ) {
             ProtoLog.d(
                 ShellProtoLogGroup.WM_SHELL_BACK_PREVIEW,
-                "Start back to activity animation."
+                "Start back to activity animation.",
             )
             for (a in apps) {
                 when (a.mode) {
@@ -595,10 +611,10 @@ abstract class CrossActivityBackAnimation(
 
         /**
          * This is used for the closing and opening target in the default cross-activity back
-         * animation. When the back gesture is flung, the closing and opening targets shrink a
-         * bit further and then bounce back with a spring motion.
+         * animation. When the back gesture is flung, the closing and opening targets shrink a bit
+         * further and then bounce back with a spring motion.
          */
-        FLING_BOUNCE
+        FLING_BOUNCE,
     }
 }
 
@@ -618,7 +634,7 @@ internal fun RectF.setInterpolatedRectF(start: RectF, target: RectF, progress: F
 internal fun RectF.scaleCentered(
     scale: Float,
     pivotX: Float = left + width() / 2,
-    pivotY: Float = top + height() / 2
+    pivotY: Float = top + height() / 2,
 ) {
     offset(-pivotX, -pivotY) // move pivot to origin
     scale(scale)

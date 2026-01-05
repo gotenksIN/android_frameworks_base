@@ -25,15 +25,18 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.SigningDetails;
+import android.content.res.Resources;
 import android.os.Binder;
 import android.os.Build;
 import android.os.Environment;
 import android.provider.DeviceConfig;
 import android.text.TextUtils;
+import android.util.ArraySet;
 import android.util.AtomicFile;
 import android.util.Pair;
 import android.util.Slog;
 
+import com.android.internal.R;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.os.BackgroundThread;
@@ -71,12 +74,14 @@ final class ComputerControlAllowlistController implements DeviceConfig.OnPropert
     @VisibleForTesting
     static final String COMPUTER_CONTROL_AUTOMATABLE_APP_DENYLIST_KEY = "blocked_automatable_apps";
 
-    private final PackageManager mPackageManager;
     private final Executor mBackgroundExecutor;
     private final RemoteList mSessionOwnerAllowlist;
     private final RemoteList mAutomatableAppAllowlist;
     private final RemoteList mAutomatableAppDenylist;
     private final boolean mBuildIsDebuggable;
+    // In debuggable builds, we can have a list of "super agents" (defined by a config resource)
+    // which are allowed to automate any app.
+    private final Set<String> mSuperAgentPackages;
 
     ComputerControlAllowlistController(@NonNull Context context) {
         this(context, BackgroundThread.getExecutor(),
@@ -93,7 +98,6 @@ final class ComputerControlAllowlistController implements DeviceConfig.OnPropert
     ComputerControlAllowlistController(@NonNull Context context, @NonNull Executor executor,
             @NonNull File agentAllowlistFile, @NonNull File automatableAppsAllowlistFile,
             @NonNull File automatableAppsDenylistFile, boolean buildIsDebuggable) {
-        mPackageManager = context.getPackageManager();
         mBackgroundExecutor = executor;
         mSessionOwnerAllowlist = new RemoteList(agentAllowlistFile,
                 COMPUTER_CONTROL_SESSION_OWNER_ALLOWLIST_KEY);
@@ -102,6 +106,15 @@ final class ComputerControlAllowlistController implements DeviceConfig.OnPropert
         mAutomatableAppDenylist = new RemoteList(automatableAppsDenylistFile,
                 COMPUTER_CONTROL_AUTOMATABLE_APP_DENYLIST_KEY);
         mBuildIsDebuggable = buildIsDebuggable;
+        final Resources resources = context.getResources();
+        String[] superAgentPackages = null;
+        try {
+            superAgentPackages =
+                    resources.getStringArray(R.array.config_computerControlKnownSuperAgents);
+        } catch (Resources.NotFoundException e) {
+            Slog.e(TAG, "superAgentPackages not found in resources", e);
+        }
+        mSuperAgentPackages = new ArraySet<>(superAgentPackages);
     }
 
     @Override
@@ -136,25 +149,32 @@ final class ComputerControlAllowlistController implements DeviceConfig.OnPropert
                 COMPUTER_CONTROL_NAMESPACE, mBackgroundExecutor, this);
     }
 
-    boolean isPackageAllowedToCreateSession(@Nullable String packageName) {
-        if (!Flags.computerControlAllowlists()) {
-            return true;
-        }
+    boolean isPackageAllowedToCreateSession(@Nullable String packageName,
+            @NonNull PackageManager packageManager) {
         if (packageName == null) {
             return false;
         }
 
         // Check if the caller actually has this packageName.
-        if (!packageAssociatedToCallingUid(packageName)) {
+        if (!packageAssociatedToCallingUid(packageName, packageManager)) {
             return false;
         }
 
-        if (!mBuildIsDebuggable && !isPreInstalledApp(packageName)) {
+        if (!mBuildIsDebuggable && !isPreInstalledApp(packageName, packageManager)) {
             Slog.i(TAG, packageName + " is not pre-installed, hence cannot be a session owner");
             return false;
         }
 
-        final SigningDetails signingDetails = getSigningDetails(packageName);
+        if (isSuperAgent(packageName)) {
+            Slog.i(TAG, "isPackageAllowedToCreateSession: Found super agent " + packageName);
+            return true;
+        }
+
+        if (!Flags.computerControlAllowlists()) {
+            return true;
+        }
+
+        final SigningDetails signingDetails = getSigningDetails(packageName, packageManager);
         if (signingDetails == null) {
             Slog.e(TAG, "isPackageAllowedToCreateSession: Failed to fetch signing details for "
                     + packageName);
@@ -167,38 +187,69 @@ final class ComputerControlAllowlistController implements DeviceConfig.OnPropert
         return isInAllowlist;
     }
 
-    boolean isPackageAutomatable(@Nullable String packageName) {
-        if (!Flags.computerControlAllowlists()) {
-            return true;
-        }
-        if (packageName == null) {
+    boolean isPackageAutomatable(@Nullable String targetPackage,
+            @Nullable String sessionOwnerPackage, @NonNull PackageManager packageManager) {
+        if (targetPackage == null || sessionOwnerPackage == null) {
             return false;
         }
 
-        final SigningDetails signingDetails = getSigningDetails(packageName);
-        if (signingDetails == null) {
-            Slog.e(TAG, "isPackageAutomatable: Failed to fetch signing details for "
-                    + packageName);
+        if (isSuperAgent(sessionOwnerPackage)) {
+            Slog.i(TAG, "isPackageAutomatable: Found super agent " + sessionOwnerPackage);
+            return true;
+        }
+
+        if (packageManager.getLaunchIntentForPackage(targetPackage) == null) {
+            Slog.i(TAG, "isPackageAutomatable: No launch intent for package " + targetPackage);
+            return false;
+        }
+
+        if (Objects.equals(packageManager.getPermissionControllerPackageName(), targetPackage)) {
+            Slog.i(TAG, "isPackageAutomatable: Cannot automate permission controller");
+            return false;
+        }
+
+        if (!Flags.computerControlAllowlists()) {
+            return true;
+        }
+
+        final SigningDetails targetPackageSigningDetails =
+                getSigningDetails(targetPackage, packageManager);
+        if (targetPackageSigningDetails == null) {
+            Slog.e(TAG, "isPackageAutomatable: Failed to fetch signing details for target package "
+                    + targetPackage);
             return false;
         }
 
         // Check if the app is denylisted first.
-        if (mAutomatableAppDenylist.anyMatch(packageName, signingDetails)) {
-            Slog.i(TAG, "isPackageAutomatable: Found denylist entry for " + packageName);
+        if (mAutomatableAppDenylist.anyMatch(targetPackage, targetPackageSigningDetails)) {
+            Slog.i(TAG, "isPackageAutomatable: Found denylist entry for " + targetPackage);
             return false;
         }
 
         // Check if the app is allowlisted.
-        final boolean isInAllowlist = mAutomatableAppAllowlist.anyMatch(packageName,
-                signingDetails);
-        Slog.i(TAG, "isPackageAutomatable: Is there any allowlist entry for " + packageName
+        final boolean isInAllowlist = mAutomatableAppAllowlist.anyMatch(targetPackage,
+                targetPackageSigningDetails);
+        Slog.i(TAG, "isPackageAutomatable: Is there any allowlist entry for " + targetPackage
                 + " : " + isInAllowlist);
         return isInAllowlist;
     }
 
-    private boolean isPreInstalledApp(@NonNull String packageName) {
+    /**
+     * Returns whether the given {@code packageName} is a "super agent". In debuggable builds, we
+     * can have a list of "super agents" (defined by a config resource) which are allowed to
+     * automate any app.
+     */
+    private boolean isSuperAgent(@NonNull String packageName) {
+        if (!mBuildIsDebuggable) {
+            return false;
+        }
+        return mSuperAgentPackages.contains(packageName);
+    }
+
+    private static boolean isPreInstalledApp(@NonNull String packageName,
+            @NonNull PackageManager packageManager) {
         try {
-            final ApplicationInfo applicationInfo = mPackageManager.getApplicationInfo(packageName,
+            final ApplicationInfo applicationInfo = packageManager.getApplicationInfo(packageName,
                     0);
             return applicationInfo.isSystemApp();
         } catch (PackageManager.NameNotFoundException e) {
@@ -208,9 +259,10 @@ final class ComputerControlAllowlistController implements DeviceConfig.OnPropert
         }
     }
 
-    private boolean packageAssociatedToCallingUid(@NonNull String packageName) {
+    private static boolean packageAssociatedToCallingUid(@NonNull String packageName,
+            @NonNull PackageManager packageManager) {
         try {
-            final int uid = mPackageManager.getPackageUidAsUser(packageName,
+            final int uid = packageManager.getPackageUidAsUser(packageName,
                     Binder.getCallingUserHandle().getIdentifier());
             if (uid != Binder.getCallingUid()) {
                 Slog.w(TAG, "Package " + packageName + " is not owned by calling uid " + uid);
@@ -224,9 +276,10 @@ final class ComputerControlAllowlistController implements DeviceConfig.OnPropert
     }
 
     @Nullable
-    private SigningDetails getSigningDetails(@NonNull String packageName) {
+    private static SigningDetails getSigningDetails(@NonNull String packageName,
+            @NonNull PackageManager packageManager) {
         try {
-            final PackageInfo packageInfo = mPackageManager.getPackageInfo(packageName,
+            final PackageInfo packageInfo = packageManager.getPackageInfo(packageName,
                     PackageManager.GET_SIGNING_CERTIFICATES);
             if (packageInfo == null || packageInfo.signingInfo == null) {
                 return null;
@@ -281,13 +334,18 @@ final class ComputerControlAllowlistController implements DeviceConfig.OnPropert
             return new SignedPackages();
         }
 
-        if (INCLUDE_EVERYTHING_WILDCARD.equals(input)) {
-            return new SignedPackages(true /* includeEverything */);
+        final List<SignedPackage> signedPackages = new ArrayList<>();
+        final String[] parts = input.split(SIGNED_PACKAGE_SEPARATOR);
+        if (parts.length == 0) {
+            throw new IllegalArgumentException("Invalid input string " + input);
         }
 
-        final List<SignedPackage> signedPackages = new ArrayList<>();
-        for (String signedPackageInput : input.split(SIGNED_PACKAGE_SEPARATOR)) {
-            final SignedPackage signedPackage = parse(signedPackageInput);
+        for (int i = 0; i < parts.length; i++) {
+            final String part = parts[i];
+            if (INCLUDE_EVERYTHING_WILDCARD.equals(part)) {
+                return new SignedPackages(true /* includeEverything */);
+            }
+            final SignedPackage signedPackage = parse(part);
             Slog.v(TAG, "Parsed signed package : " + signedPackage);
             signedPackages.add(signedPackage);
         }
@@ -303,6 +361,7 @@ final class ComputerControlAllowlistController implements DeviceConfig.OnPropert
         private final String mDeviceConfigKey;
         private final Object mLock = new Object();
         @GuardedBy("mLock")
+        @Nullable
         private SignedPackages mSignedPackages = null;
 
         RemoteList(@NonNull File file, @NonNull String deviceConfigKey) {

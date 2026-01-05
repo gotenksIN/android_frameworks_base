@@ -244,7 +244,7 @@ public class ComputerEngine implements Computer {
         // TODO: Find replacement
         @Nullable
         public SettingBase getSettingBase(int appId) {
-            if (Process.isPccUid(appId)) {
+            if (Process.isPrivateComputeCoreUid(appId)) {
                 return mSettings.getPccSettingLPr(appId);
             } else {
                 return mSettings.getSettingLPr(appId);
@@ -2271,12 +2271,24 @@ public class ComputerEngine implements Computer {
             return (packageName != null
                     && packageName.equals(mService.getSdkSandboxPackageName()));
         }
-        AndroidPackage pkg = mPackages.get(packageName);
+
+        final AndroidPackage pkg = mPackages.get(packageName);
+
+        if (pkg == null) {
+            return false;
+        }
+
+        if (Process.isPrivateComputeCoreUid(uid)) {
+            PackageSetting packageSetting =
+                    (PackageSetting) mSettings.mSettings.getPccSettingLPr(UserHandle.getAppId(uid));
+            return packageSetting != null && packageSetting.getAppId() == pkg.getUid();
+        }
+
         if (resolveIsolatedUid && Process.isIsolated(uid)) {
             uid = getIsolatedOwner(uid);
         }
-        return pkg != null
-                && UserHandle.getAppId(uid) == pkg.getUid();
+
+        return UserHandle.getAppId(uid) == pkg.getUid();
     }
 
     private boolean isCallerFromManagedUserOrProfile(@UserIdInt int userId) {
@@ -2710,6 +2722,12 @@ public class ComputerEngine implements Computer {
 
     public int getPackageUidInternal(String packageName,
             @PackageManager.PackageInfoFlagsBits long flags, int userId, int callingUid) {
+        return getPackageUidInternal(packageName, flags, userId, callingUid, /*forPcc*/ false);
+    }
+
+    private int getPackageUidInternal(String packageName,
+            @PackageManager.PackageInfoFlagsBits long flags, int userId, int callingUid,
+            boolean forPcc) {
         // reader
         var packageState = mSettings.getPackage(packageName);
         final AndroidPackage p = mPackages.get(packageName);
@@ -2717,14 +2735,14 @@ public class ComputerEngine implements Computer {
             final PackageStateInternal ps = getPackageStateInternal(p.getPackageName(), callingUid);
             if (ps != null && ps.getUserStateOrDefault(userId).isInstalled()
                     && !shouldFilterApplication(ps, callingUid, userId)) {
-                return UserHandle.getUid(userId, p.getUid());
+                return UserHandle.getUid(userId, forPcc ? ps.getPccId() : ps.getAppId());
             }
         }
         if ((flags & (MATCH_KNOWN_PACKAGES | MATCH_ARCHIVED_PACKAGES)) != 0) {
             final PackageStateInternal ps = mSettings.getPackage(packageName);
             if (ps != null && PackageStateUtils.isMatch(ps, flags)
                     && !shouldFilterApplication(ps, callingUid, userId)) {
-                return UserHandle.getUid(userId, ps.getAppId());
+                return UserHandle.getUid(userId, forPcc ? ps.getPccId() : ps.getAppId());
             }
         }
 
@@ -2732,7 +2750,9 @@ public class ComputerEngine implements Computer {
     }
 
     /**
-     * Update given flags based on encryption status of current user.
+     * Update given flags based on encryption status of current user. Additionally, check that if
+     * {@link PackageManager#GET_APP_LOCK_INFO} is supplied, the caller has the
+     * {@link Manifest.permission.LOCK_APPS} permission.
      */
     private long updateFlags(long flags, int userId) {
         if ((flags & (PackageManager.MATCH_DIRECT_BOOT_UNAWARE
@@ -2747,6 +2767,13 @@ public class ComputerEngine implements Computer {
                 flags |= PackageManager.MATCH_DIRECT_BOOT_AWARE | MATCH_DIRECT_BOOT_UNAWARE;
             } else {
                 flags |= PackageManager.MATCH_DIRECT_BOOT_AWARE;
+            }
+        }
+        if (android.security.Flags.appLockApis()
+                && (flags & (PackageManager.GET_APP_LOCK_INFO)) != 0) {
+            if (!hasPermission(Manifest.permission.LOCK_APPS, Binder.getCallingUid())) {
+                throw new SecurityException(
+                        "Caller must hold the LOCK_APPS permission to use GET_APP_LOCK_INFO");
             }
         }
         return flags;
@@ -5446,12 +5473,19 @@ public class ComputerEngine implements Computer {
     @Override
     public int getPackageUid(@NonNull String packageName,
             @PackageManager.PackageInfoFlagsBits long flags, @UserIdInt int userId) {
+        return getPackageUid(packageName, flags, userId, /*forPcc*/ false);
+    }
+
+    @Override
+    public int getPackageUid(@NonNull String packageName,
+            @PackageManager.PackageInfoFlagsBits long flags, @UserIdInt int userId,
+            boolean forPcc) {
         if (!mUserManager.exists(userId)) return -1;
         final int callingUid = Binder.getCallingUid();
         flags = updateFlagsForPackage(flags, userId);
         enforceCrossUserPermission(callingUid, userId, false /*requireFullPermission*/,
                 false /*checkShell*/, "getPackageUid");
-        return getPackageUidInternal(packageName, flags, userId, callingUid);
+        return getPackageUidInternal(packageName, flags, userId, callingUid, forPcc);
     }
 
     @Override

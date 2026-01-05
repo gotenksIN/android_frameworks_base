@@ -32,13 +32,13 @@ import com.android.systemui.classifier.Classifier
 import com.android.systemui.common.shared.model.ContentDescription
 import com.android.systemui.common.shared.model.Icon
 import com.android.systemui.lifecycle.ExclusiveActivatable
+import com.android.systemui.media.controls.shared.MediaLogger
 import com.android.systemui.media.remedia.domain.interactor.MediaInteractor
 import com.android.systemui.media.remedia.domain.model.MediaActionModel
 import com.android.systemui.media.remedia.shared.model.MediaColorScheme
 import com.android.systemui.media.remedia.shared.model.MediaSessionState
 import com.android.systemui.plugins.FalsingManager
 import com.android.systemui.res.R
-import com.android.systemui.statusbar.notification.collection.provider.OnReorderingAllowedListener
 import com.android.systemui.statusbar.notification.collection.provider.VisualStabilityProvider
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
@@ -55,6 +55,7 @@ class MediaViewModel
 constructor(
     private val interactor: MediaInteractor,
     private val falsingSystem: MediaFalsingSystem,
+    val mediaLogger: MediaLogger,
     val visualStabilityProvider: VisualStabilityProvider,
     @Assisted private val context: Context,
     @Assisted private val carouselVisibility: MediaCarouselVisibility,
@@ -110,7 +111,28 @@ constructor(
 
                     override val navigation: MediaNavigationViewModel
                         get() {
-                            return if (session.canBeScrubbed) {
+                            val onScrubChange = { progress: Float ->
+                                check(selectedCardIndex == sessionIndex) {
+                                    "Can't seek on a card that's not the selected card!"
+                                }
+                                isScrubbing = true
+                                seekProgress = progress
+                            }
+
+                            val onScrubFinished = { dragDelta: Offset ->
+                                if (
+                                    dragDelta.isHorizontal() &&
+                                        !falsingSystem.isFalseTouch(Classifier.MEDIA_SEEKBAR)
+                                ) {
+                                    interactor.seek(
+                                        sessionKey = session.key,
+                                        to = (seekProgress * session.durationMs).roundToLong(),
+                                    )
+                                }
+                                isScrubbing = false
+                            }
+
+                            return if (session.canShowSeekbar) {
                                 MediaNavigationViewModel.Showing(
                                     progress =
                                         if (!isCurrentSessionAndScrubbing) {
@@ -124,29 +146,10 @@ constructor(
                                         session.state != MediaSessionState.Paused &&
                                             !isCurrentSessionAndScrubbing,
                                     isScrubbing = isCurrentSessionAndScrubbing,
-                                    onScrubChange = { progress ->
-                                        check(selectedCardIndex == sessionIndex) {
-                                            "Can't seek on a card that's not the selected card!"
-                                        }
-                                        isScrubbing = true
-                                        seekProgress = progress
-                                    },
-                                    onScrubFinished = { dragDelta ->
-                                        if (
-                                            dragDelta.isHorizontal() &&
-                                                !falsingSystem.isFalseTouch(
-                                                    Classifier.MEDIA_SEEKBAR
-                                                )
-                                        ) {
-                                            interactor.seek(
-                                                sessionKey = session.key,
-                                                to =
-                                                    (seekProgress * session.durationMs)
-                                                        .roundToLong(),
-                                            )
-                                        }
-                                        isScrubbing = false
-                                    },
+                                    onScrubChange =
+                                        if (session.canBeScrubbed) onScrubChange else null,
+                                    onScrubFinished =
+                                        if (session.canBeScrubbed) onScrubFinished else null,
                                     contentDescription =
                                         context.getString(
                                             R.string.controls_media_seekbar_description,
@@ -155,7 +158,10 @@ constructor(
                                         ),
                                 )
                             } else {
-                                MediaNavigationViewModel.Hidden
+                                MediaNavigationViewModel.Hidden(
+                                    left = session.leftAction.toSecondaryActionViewModel(),
+                                    right = session.rightAction.toSecondaryActionViewModel(),
+                                )
                             }
                         }
 
@@ -186,6 +192,7 @@ constructor(
                                                     interactor.hide(
                                                         session.key,
                                                         MEDIA_PLAYER_ANIMATION_DELAY_MS,
+                                                        userInitiated = true,
                                                     )
                                                     interactor.setIsGutsVisible(false)
                                                 }
@@ -286,8 +293,7 @@ constructor(
                                     falsingSystem.runIfNotFalseTap(
                                         FalsingManager.MODERATE_PENALTY
                                     ) {
-                                        // TODO(b/397989775): tell the UI to show the output
-                                        // switcher.
+                                        session.outputDevice.onClick(null)
                                     }
                                 },
                             )
@@ -305,6 +311,9 @@ constructor(
             }
             .let {
                 if (isVisible()) {
+                    if (latestVersion.size != it.size) {
+                        mediaLogger.logMediaCarouselSize(it.size)
+                    }
                     latestVersion = it
                 }
                 latestVersion
@@ -355,17 +364,8 @@ constructor(
         interactor.resetScrollToFirst()
     }
 
-    private val reorderingAllowedListener = OnReorderingAllowedListener {
-        interactor.reorderMedia()
-    }
-
     override suspend fun onActivated(): Nothing {
-        visualStabilityProvider.addPersistentReorderingAllowedListener(reorderingAllowedListener)
         awaitCancellation()
-    }
-
-    override suspend fun onDeactivated() {
-        visualStabilityProvider.removeReorderingAllowedListener(reorderingAllowedListener)
     }
 
     private fun MediaActionModel.toPlayPauseActionViewModel(

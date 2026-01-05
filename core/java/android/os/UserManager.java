@@ -720,6 +720,22 @@ public class UserManager {
             "no_install_unknown_sources_globally";
 
     /**
+     * User restriction to disallow non-tool accessibility services globally.
+     * <p>
+     * This setting is used to enhance security, particularly in Advanced
+     * Protection Mode (APM), by preventing accessibility services that are not
+     * classified as tools from running. This helps mitigate potential risks
+     * associated with powerful accessibility APIs being exploited.
+     *
+     * @see DevicePolicyManager#addUserRestriction(ComponentName, String)
+     * @see DevicePolicyManager#clearUserRestriction(ComponentName, String)
+     * @see #getUserRestrictions()
+     * @hide
+     */
+    public static final String DISALLOW_NON_TOOL_ACCESSIBILITY_SERVICE =
+            "no_non_tool_accessibility_service";
+
+    /**
      * Specifies if a user is disallowed from configuring bluetooth via Settings. This does
      * <em>not</em> restrict the user from turning bluetooth on or off.
      *
@@ -1358,6 +1374,26 @@ public class UserManager {
      * @see #getUserRestrictions()
      */
     public static final String DISALLOW_FUN = "no_fun";
+
+    /**
+     * Specifies if the user is not allowed to handoff tasks to other devices.
+     *
+     * <p> This policy may be set by a device owner or a profile owner. When set by a device owner,
+     * no applications will be able to send data to other devices for Handoff, nor will the current
+     * device exchange task metadata for other devices. When it is set by a profile owner of an
+     * organization-owned managed profile or the parent profile, applications running in the
+     * personal user will be disallowed from performing Handoff and excluded from appearing in
+     * Handoff metadata exchanges
+     *
+     * <p>The default value is <code>false</code>.
+     *
+     * <p>Key for user restrictions.
+     * <p>Type: Boolean
+     * @see DevicePolicyManager#addUserRestriction(ComponentName, String)
+     * @see DevicePolicyManager#clearUserRestriction(ComponentName, String)
+     */
+    @FlaggedApi(android.companion.Flags.FLAG_TASK_CONTINUITY)
+    public static final String DISALLOW_HANDOFF = "no_handoff";
 
     /**
      * Specifies that windows besides app windows should not be
@@ -2139,6 +2175,7 @@ public class UserManager {
             DISALLOW_FACTORY_RESET,
             DISALLOW_FUN,
             DISALLOW_GRANT_ADMIN,
+            DISALLOW_HANDOFF,
             DISALLOW_INSTALL_APPS,
             DISALLOW_INSTALL_UNKNOWN_SOURCES,
             DISALLOW_INSTALL_UNKNOWN_SOURCES_GLOBALLY,
@@ -2147,6 +2184,7 @@ public class UserManager {
             DISALLOW_MOUNT_PHYSICAL_MEDIA,
             DISALLOW_NEAR_FIELD_COMMUNICATION_RADIO,
             DISALLOW_NETWORK_RESET,
+            DISALLOW_NON_TOOL_ACCESSIBILITY_SERVICE,
             DISALLOW_OEM_UNLOCK,
             DISALLOW_OUTGOING_BEAM,
             DISALLOW_OUTGOING_CALLS,
@@ -2769,17 +2807,6 @@ public class UserManager {
         return SystemProperties.getBoolean("persist.fw.omnipresent_communal_user",
                 Resources.getSystem()
                         .getBoolean(com.android.internal.R.bool.config_omnipresentCommunalUser));
-    }
-
-    /**
-     * Returns whether the device supports Private Profile
-     * @hide
-     */
-    public static boolean isPrivateProfileEnabled() {
-        if (android.multiuser.Flags.blockPrivateSpaceCreation()) {
-            return !ActivityManager.isLowRamDeviceStatic();
-        }
-        return true;
     }
 
     /**

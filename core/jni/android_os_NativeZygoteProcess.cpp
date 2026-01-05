@@ -14,7 +14,10 @@
  * limitations under the License.
  */
 
+#define ATRACE_TAG ATRACE_TAG_ACTIVITY_MANAGER
+
 #include <android-base/logging.h>
+#include <android-base/properties.h>
 #include <android-base/unique_fd.h>
 #include <binder/IInterface.h>
 #include <cutils/sockets.h>
@@ -26,6 +29,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <unistd.h>
+#include <utils/Trace.h>
 
 #include <cstring>
 
@@ -35,6 +39,15 @@
 
 // Should be in sync with MESSAGE_BUFFER_SIZE in system/zygote/zygote-messages/src/lib.rs
 #define RESPONSE_DATA_BUF_SIZE 2048
+
+constexpr char NATIVE_ZYGOTE_INIT_SERVICE_NAME[] = "zygote_next";
+constexpr int NATIVE_ZYGOTE_STARTUP_TIMEOUT_IN_MILLIS = 20000;
+
+constexpr char PROP_INIT_START_SERVICE[] = "ctl.start";
+constexpr char PROP_ZYGOTE_NEXT_READY[] = "zygote.zygote_next.server_ready";
+constexpr char PROP_ZYGOTE_NEXT_START_ON_BOOT[] = "persist.zygote.zygote_next.start_on_boot";
+
+constexpr char PROP_VALUE_TRUE[] = "true";
 
 namespace {
 
@@ -106,6 +119,19 @@ static jint ReadSpawnResponse(int fd, JNIEnv* env) {
     }
 }
 
+bool isNativeZygoteReady() {
+    return android::base::GetBoolProperty(PROP_ZYGOTE_NEXT_READY, false);
+}
+
+void startNativeZygote() {
+    android::base::SetProperty(PROP_INIT_START_SERVICE, NATIVE_ZYGOTE_INIT_SERVICE_NAME);
+}
+
+bool waitUntilNativeZygoteReady() {
+    std::chrono::milliseconds timeout{NATIVE_ZYGOTE_STARTUP_TIMEOUT_IN_MILLIS};
+    return android::base::WaitForProperty(PROP_ZYGOTE_NEXT_READY, PROP_VALUE_TRUE, timeout);
+}
+
 } // namespace
 
 namespace android {
@@ -150,7 +176,8 @@ static jint android_os_NativeZygoteProcess_startNativeChildZygote(
         JNIEnv* env, jclass /* classObj */, jobject sockFd, jint uid, jint gid, jstring niceName,
         jstring seInfo, jint targetSdkVersion, jint runtimeFlags, jstring serverPath,
         jint uidRangeStart, jint uidRangeEnd, jstring allowedLibPath, jstring librarySearchPaths,
-        jstring libraryPath, jstring preloadFunc) {
+        jboolean isShared, jstring zipPath, jstring nativeSharedLibPath, jstring libraryPath,
+        jstring preloadFunc) {
     int fd = jniGetFDFromFileDescriptor(env, sockFd);
     if (fd < 0) {
         jniThrowRuntimeException(env, "Failed to get a valid file descriptor");
@@ -163,6 +190,8 @@ static jint android_os_NativeZygoteProcess_startNativeChildZygote(
     auto librarySearchChars = extract_jstring(env, librarySearchPaths);
     auto preloadFuncChars = extract_jstring(env, preloadFunc);
     auto serverPathName = extract_jstring(env, serverPath);
+    auto zipPathChars = extract_jstring(env, zipPath);
+    auto nativeSharedLibPathChars = extract_jstring(env, nativeSharedLibPath);
 
     const char* niceNameStr = niceNameChars ? niceNameChars->c_str() : nullptr;
     const char* seInfoStr = seInfoChars ? seInfoChars->c_str() : nullptr;
@@ -171,6 +200,9 @@ static jint android_os_NativeZygoteProcess_startNativeChildZygote(
     const char* librarySearchStr = librarySearchChars ? librarySearchChars->c_str() : nullptr;
     const char* preloadFuncStr = preloadFuncChars ? preloadFuncChars->c_str() : nullptr;
     const char* serverPathStr = serverPathName ? serverPathName->c_str() : nullptr;
+    const char* zipPathStr = zipPathChars ? zipPathChars->c_str() : nullptr;
+    const char* nativeSharedLibPathStr =
+            nativeSharedLibPathChars ? nativeSharedLibPathChars->c_str() : nullptr;
 
     flatbuffers::FlatBufferBuilder builder;
 
@@ -178,8 +210,9 @@ static jint android_os_NativeZygoteProcess_startNativeChildZygote(
             CreateSpawnSubspeciesAndroidNativeDirect(builder, targetSdkVersion,
                                                      static_cast<unsigned>(runtimeFlags),
                                                      libraryPathStr, librarySearchStr,
-                                                     allowedLibPathStr, preloadFuncStr,
-                                                     uidRangeStart, uidRangeEnd);
+                                                     allowedLibPathStr, isShared == JNI_TRUE,
+                                                     zipPathStr, nativeSharedLibPathStr,
+                                                     preloadFuncStr, uidRangeStart, uidRangeEnd);
 
     CreateSpawnParcel(builder, env, uid, gid, niceNameStr, /**is_child_zygote=*/true, seInfoStr,
                       serverPathStr, SpawnPayload_SpawnSubspeciesAndroidNative,
@@ -197,6 +230,31 @@ static jint android_os_NativeZygoteProcess_startNativeChildZygote(
     return ReadSpawnResponse(fd, env);
 }
 
+static jboolean android_os_NativeZygoteProcess_ensureNativeZygoteReadyBlocking(
+        JNIEnv* env, jclass /* classObj */) {
+    ATRACE_NAME("ensureNativeZygoteReadyBlocking");
+    jboolean res = JNI_TRUE;
+    if (!isNativeZygoteReady()) {
+        startNativeZygote();
+        res = waitUntilNativeZygoteReady() ? JNI_TRUE : JNI_FALSE;
+    }
+    return res;
+}
+
+static void android_os_NativeZygoteProcess_prewarmNativeZygote(JNIEnv* env, jclass /* classObj */) {
+    if (isNativeZygoteReady()) return;
+    startNativeZygote();
+
+    // It's likely the first time to use a native service on this device.
+    // Update the prop to start the native zygote on boot from next time,
+    // assuming that native services continue to be used. This is a simplified
+    // assumption and may not always be true, but enough for a temporary solution to
+    // mitigate impact by running the native zygote unnecessarily.
+    // TODO: b/458223100 - Remove this logic when zygote_next is used in all
+    // form-factors.
+    android::base::SetProperty(PROP_ZYGOTE_NEXT_START_ON_BOOT, PROP_VALUE_TRUE);
+}
+
 // ----------------------------------------------------------------------------
 
 static const JNINativeMethod method_table[] = {
@@ -206,9 +264,14 @@ static const JNINativeMethod method_table[] = {
          (void*)android_os_NativeZygoteProcess_startNativeProcess},
         {"nativeStartNativeChildZygote",
          "(Ljava/io/FileDescriptor;IILjava/lang/String;Ljava/lang/String;II"
-         "Ljava/lang/String;IILjava/lang/String;Ljava/lang/String;Ljava/lang/String;"
+         "Ljava/lang/String;IILjava/lang/String;Ljava/lang/String;ZLjava/lang/String;Ljava/lang/"
+         "String;Ljava/lang/String;"
          "Ljava/lang/String;)I",
          (void*)android_os_NativeZygoteProcess_startNativeChildZygote},
+        {"nativeEnsureNativeZygoteReadyBlocking", "()Z",
+         (void*)android_os_NativeZygoteProcess_ensureNativeZygoteReadyBlocking},
+        {"nativePrewarmNativeZygote", "()V",
+         (void*)android_os_NativeZygoteProcess_prewarmNativeZygote},
 };
 
 int register_android_os_NativeZygoteProcess(JNIEnv* env) {

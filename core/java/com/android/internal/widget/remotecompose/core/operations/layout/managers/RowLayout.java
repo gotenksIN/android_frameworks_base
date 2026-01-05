@@ -32,6 +32,7 @@ import com.android.internal.widget.remotecompose.core.operations.layout.LayoutCo
 import com.android.internal.widget.remotecompose.core.operations.layout.measure.ComponentMeasure;
 import com.android.internal.widget.remotecompose.core.operations.layout.measure.MeasurePass;
 import com.android.internal.widget.remotecompose.core.operations.layout.measure.Size;
+import com.android.internal.widget.remotecompose.core.operations.layout.modifiers.AlignByModifierOperation;
 import com.android.internal.widget.remotecompose.core.operations.layout.modifiers.ScrollModifierOperation;
 import com.android.internal.widget.remotecompose.core.operations.layout.modifiers.WidthInModifierOperation;
 import com.android.internal.widget.remotecompose.core.operations.layout.utils.DebugLog;
@@ -125,8 +126,8 @@ public class RowLayout extends LayoutManager {
     @Override
     public void computeWrapSize(
             @NonNull PaintContext context,
-            float maxWidth,
-            float maxHeight,
+            float minWidth, float maxWidth,
+            float minHeight, float maxHeight,
             boolean horizontalWrap,
             boolean verticalWrap,
             @NonNull MeasurePass measure,
@@ -134,16 +135,68 @@ public class RowLayout extends LayoutManager {
         DebugLog.s(() -> "COMPUTE WRAP SIZE in " + this + " (" + mComponentId + ")");
         int visibleChildrens = 0;
         float currentMaxWidth = maxWidth;
-        for (Component c : mChildrenComponents) {
-            c.measure(context, 0f, currentMaxWidth, 0f, maxHeight, measure);
-            ComponentMeasure m = measure.get(c);
-            if (!m.isGone()) {
-                size.setWidth(size.getWidth() + m.getW());
-                size.setHeight(Math.max(size.getHeight(), m.getH()));
-                visibleChildrens++;
-                currentMaxWidth -= m.getW();
+
+        float totalWeights = 0f;
+        boolean hasWeights = false;
+        for (Component child : mChildrenComponents) {
+            ComponentMeasure childMeasure = measure.get(child);
+            if (childMeasure.isGone()) {
+                continue;
+            }
+            if (child instanceof LayoutComponent
+                    && ((LayoutComponent) child).getWidthModifier().hasWeight()) {
+                hasWeights = true;
+                totalWeights += ((LayoutComponent) child).getWidthModifier().getValue();
             }
         }
+
+        if (hasWeights) {
+            // we have to measure all children first that do not have weight
+            for (Component c : mChildrenComponents) {
+                if (c instanceof LayoutComponent
+                        && ((LayoutComponent) c).getWidthModifier().hasWeight()) {
+                    continue;
+                }
+                c.measure(context, 0f, currentMaxWidth, 0f, maxHeight, measure);
+                ComponentMeasure m = measure.get(c);
+                if (!m.isGone()) {
+                    size.setWidth(size.getWidth() + m.getW());
+                    size.setHeight(Math.max(size.getHeight(), m.getH()));
+                    visibleChildrens++;
+                    currentMaxWidth -= m.getW();
+                }
+            }
+            // Then we can measure the children with weight
+            for (Component c : mChildrenComponents) {
+                if (!(c instanceof LayoutComponent
+                        && ((LayoutComponent) c).getWidthModifier().hasWeight())) {
+                    continue;
+                }
+                float childWeight = ((LayoutComponent) c).getWidthModifier().getValue();
+                float childMinWidth = (childWeight * currentMaxWidth) / totalWeights;
+                float childMaxWidth = childMinWidth;
+
+                c.measure(context, childMinWidth, childMaxWidth, 0f, maxHeight, measure);
+                ComponentMeasure m = measure.get(c);
+                if (!m.isGone()) {
+                    size.setWidth(size.getWidth() + m.getW());
+                    size.setHeight(Math.max(size.getHeight(), m.getH()));
+                    visibleChildrens++;
+                }
+            }
+        } else {
+            for (Component c : mChildrenComponents) {
+                c.measure(context, 0f, currentMaxWidth, 0f, maxHeight, measure);
+                ComponentMeasure m = measure.get(c);
+                if (!m.isGone()) {
+                    size.setWidth(size.getWidth() + m.getW());
+                    size.setHeight(Math.max(size.getHeight(), m.getH()));
+                    visibleChildrens++;
+                    currentMaxWidth -= m.getW();
+                }
+            }
+        }
+
         if (!mChildrenComponents.isEmpty()) {
             size.setWidth(size.getWidth() + (mSpacedBy * (visibleChildrens - 1)));
         }
@@ -292,6 +345,8 @@ public class RowLayout extends LayoutManager {
 
         childrenWidth = 0f;
         int visibleChildrens = 0;
+        boolean hasAlignBy = false;
+        float alignByValue = 0f;
         for (Component child : mChildrenComponents) {
             ComponentMeasure childMeasure = measure.get(child);
             if (childMeasure.isGone()) {
@@ -300,7 +355,14 @@ public class RowLayout extends LayoutManager {
             childrenWidth += childMeasure.getW();
             childrenHeight = Math.max(childrenHeight, childMeasure.getH());
             visibleChildrens++;
+            AlignByModifierOperation alignByModifier = child.selfOrModifier(
+                    AlignByModifierOperation.class);
+            if (alignByModifier != null) {
+                hasAlignBy = true;
+                alignByValue = Math.max(alignByValue, alignByModifier.getValue(context));
+            }
         }
+
         childrenWidth += mSpacedBy * (visibleChildrens - 1);
 
         float tx = 0f;
@@ -360,15 +422,34 @@ public class RowLayout extends LayoutManager {
 
         for (Component child : mChildrenComponents) {
             ComponentMeasure childMeasure = measure.get(child);
+            float alignByOffset = 0f;
+            if (hasAlignBy) {
+                AlignByModifierOperation alignByModifier = child.selfOrModifier(
+                        AlignByModifierOperation.class);
+                if (alignByModifier != null) {
+                    alignByOffset = alignByModifier.getValue(context);
+                }
+            }
             switch (mVerticalPositioning) {
                 case TOP:
                     ty = 0f;
+                    if (hasAlignBy) {
+                        ty += alignByValue - alignByOffset;
+                    }
                     break;
                 case CENTER:
                     ty = (selfHeight - childMeasure.getH()) / 2f;
+                    if (hasAlignBy) {
+                        ty = (selfHeight - childrenHeight) / 2f;
+                        ty += alignByValue - alignByOffset;
+                    }
                     break;
                 case BOTTOM:
                     ty = selfHeight - childMeasure.getH();
+                    if (hasAlignBy) {
+                        ty = (selfHeight - childrenHeight);
+                        ty += alignByValue - alignByOffset;
+                    }
                     break;
             }
             childMeasure.setX(tx);

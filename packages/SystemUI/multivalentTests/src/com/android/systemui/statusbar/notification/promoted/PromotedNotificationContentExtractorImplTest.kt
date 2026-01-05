@@ -17,6 +17,7 @@
 package com.android.systemui.statusbar.notification.promoted
 
 import android.app.Flags.FLAG_API_METRIC_STYLE
+import android.app.Flags.FLAG_API_NOTIFICATION_SEMANTIC_STYLE
 import android.app.Notification
 import android.app.Notification.BigTextStyle
 import android.app.Notification.CallStyle
@@ -28,9 +29,11 @@ import android.app.PendingIntent
 import android.app.Person
 import android.content.Intent
 import android.graphics.drawable.Icon
+import android.platform.test.annotations.DisableFlags
 import android.platform.test.annotations.EnableFlags
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
+import com.android.systemui.Flags.FLAG_NOTIFICATION_CHIP_FROM_COMPACT_CONTENT
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.runTest
@@ -150,13 +153,40 @@ class PromotedNotificationContentExtractorImplTest : SysuiTestCase() {
         }
 
     @Test
-    fun extractContent_apiFlagOn_shortCriticalTextExtracted() =
+    @DisableFlags(FLAG_NOTIFICATION_CHIP_FROM_COMPACT_CONTENT)
+    fun extractContent_chipFlagOff_shortCriticalTextExtracted() =
         kosmos.runTest {
             val entry = createEntry { setShortCriticalText(TEST_SHORT_CRITICAL_TEXT) }
 
             val content = requireContent(entry).privateVersion
 
             assertThat(content.shortCriticalText).isEqualTo(TEST_SHORT_CRITICAL_TEXT)
+            assertThat(content.compactContent).isNull()
+        }
+
+    @Test
+    @EnableFlags(
+        FLAG_NOTIFICATION_CHIP_FROM_COMPACT_CONTENT,
+        FLAG_API_METRIC_STYLE,
+        FLAG_API_NOTIFICATION_SEMANTIC_STYLE,
+    )
+    fun extractContent_compactContent_compactContentExtracted() =
+        kosmos.runTest {
+            val entry = createEntry {
+                setShortCriticalText("Won't be used")
+                // There are extensive CompactContent->ResolvedCompactContent tests in CTS, so we
+                // just try a simple example here.
+                setCompactContent(
+                    Notification.BasicCompactContent(
+                        Notification.CompactText.fromMetricValue(Notification.Metric.FixedInt(598))
+                    )
+                )
+            }
+
+            val content = requireContent(entry).privateVersion
+            assertThat(content.compactContent)
+                .isInstanceOf(Notification.ResolvedBasicCompactContent::class.java)
+            assertThat(content.shortCriticalText).isNull()
         }
 
     @Test

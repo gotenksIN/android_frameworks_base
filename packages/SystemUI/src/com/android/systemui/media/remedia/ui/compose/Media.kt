@@ -18,6 +18,7 @@
 
 package com.android.systemui.media.remedia.ui.compose
 
+import android.util.Log
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
@@ -126,6 +127,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastCoerceIn
+import androidx.compose.ui.util.fastForEach
 import androidx.compose.ui.util.fastForEachIndexed
 import androidx.compose.ui.util.fastRoundToInt
 import com.android.compose.PlatformButton
@@ -286,6 +288,9 @@ private fun CardCarouselContent(
                     key = { index: Int -> viewModel.cards[index].key },
                     overscrollEffect = overscrollEffect ?: rememberOffsetOverscrollEffect(),
                 ) { pageIndex: Int ->
+                    if (Media.DEBUG) {
+                        Log.d(Media.TAG, "composing media card ${viewModel.cards[pageIndex].key}")
+                    }
                     Card(
                         viewModel = viewModel.cards[pageIndex],
                         presentationStyle = presentationStyle,
@@ -377,7 +382,7 @@ private fun Card(
             useModifierBasedImplementation = true,
         ) {
             key(stlState) {
-                SceneTransitionLayout(state = stlState) {
+                SceneTransitionLayout(state = stlState, debugName = "Media Card") {
                     scene(Media.Scenes.Default) {
                         CardForeground(
                             expandable = it,
@@ -701,17 +706,20 @@ private fun ContentScope.CardForegroundContent(
                     )
 
                     if (
-                        viewModel.actionButtonLayout ==
-                            MediaCardActionButtonLayout.SecondaryActionsOnly
+                        viewModel.actionButtonLayout
+                            is MediaCardActionButtonLayout.SecondaryActionsOnly
                     ) {
-                        viewModel.additionalActions.fastForEachIndexed { index, action ->
-                            SecondaryAction(
-                                viewModel = action,
-                                resId = "action$index",
-                                element = Media.Elements.additionalActionButton(index),
-                                modifier = Modifier.padding(end = 8.dp),
-                            )
-                        }
+                        (viewModel.actionButtonLayout
+                                as MediaCardActionButtonLayout.SecondaryActionsOnly)
+                            .indicesForCompressed
+                            .fastForEach { index ->
+                                SecondaryAction(
+                                    viewModel = viewModel.additionalActions[index],
+                                    resId = "action$index",
+                                    element = Media.Elements.additionalActionButton(index),
+                                    modifier = Modifier.padding(end = 8.dp),
+                                )
+                            }
                     }
                 }
 
@@ -775,7 +783,7 @@ private fun ContentScope.CompactCardForeground(
             iconColor = MaterialTheme.colorScheme.onSurface,
         )
 
-        val rightAction = (viewModel.navigation as? MediaNavigationViewModel.Showing)?.right
+        val rightAction = viewModel.navigation.right
         if (rightAction != null) {
             SecondaryAction(
                 viewModel = rightAction,
@@ -863,16 +871,14 @@ private fun ContentScope.Navigation(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = modifier,
             ) {
-                if (areActionsVisible) {
-                    if (viewModel.left is MediaSecondaryActionViewModel.None) {
-                        Spacer(Modifier.size(width = 16.dp, height = 48.dp))
-                    } else {
-                        SecondaryAction(
-                            viewModel = viewModel.left,
-                            modifier = Modifier.sysuiResTag(MediaRes.PREV_BTN),
-                            element = Media.Elements.PrevButton,
-                        )
-                    }
+                if (!areActionsVisible || viewModel.left is MediaSecondaryActionViewModel.None) {
+                    Spacer(Modifier.size(width = 16.dp, height = 48.dp))
+                } else {
+                    SecondaryAction(
+                        viewModel = viewModel.left,
+                        modifier = Modifier.sysuiResTag(MediaRes.PREV_BTN),
+                        element = Media.Elements.PrevButton,
+                    )
                 }
 
                 val interactionSource = remember { MutableInteractionSource() }
@@ -892,22 +898,32 @@ private fun ContentScope.Navigation(
                                 var value = Offset.Zero
                             }
                         }
+                        val isEnabled = viewModel.onScrubChange != null
                         Slider(
                             interactionSource = interactionSource,
                             value = viewModel.progress,
-                            onValueChange = { progress -> viewModel.onScrubChange(progress) },
+                            enabled = isEnabled,
+                            onValueChange = { progress ->
+                                viewModel.onScrubChange?.invoke(progress)
+                            },
                             onValueChangeFinished = {
-                                viewModel.onScrubFinished(sliderDragDelta.value)
+                                viewModel.onScrubFinished?.invoke(sliderDragDelta.value)
                             },
                             colors = colors,
                             thumb = {
-                                SeekBarThumb(interactionSource = interactionSource, colors = colors)
+                                if (isEnabled) {
+                                    SeekBarThumb(
+                                        interactionSource = interactionSource,
+                                        colors = colors,
+                                    )
+                                }
                             },
                             track = { sliderState ->
                                 SeekBarTrack(
                                     sliderState = sliderState,
                                     isSquiggly = viewModel.isSquiggly,
                                     colors = colors,
+                                    isThumbEnabled = isEnabled,
                                     modifier = Modifier.fillMaxWidth(),
                                 )
                             },
@@ -953,22 +969,37 @@ private fun ContentScope.Navigation(
                     }
                 }
 
-                if (areActionsVisible) {
-                    if (viewModel.right is MediaSecondaryActionViewModel.None) {
-                        Spacer(Modifier.size(width = 16.dp, height = 48.dp))
-                    } else {
-                        SecondaryAction(
-                            viewModel = viewModel.right,
-                            modifier = Modifier.sysuiResTag(MediaRes.NEXT_BTN),
-                            element = Media.Elements.NextButton,
-                        )
-                    }
+                if (!areActionsVisible || viewModel.right is MediaSecondaryActionViewModel.None) {
+                    Spacer(Modifier.size(width = 16.dp, height = 48.dp))
+                } else {
+                    SecondaryAction(
+                        viewModel = viewModel.right,
+                        modifier = Modifier.sysuiResTag(MediaRes.NEXT_BTN),
+                        element = Media.Elements.NextButton,
+                    )
                 }
             }
         }
 
         is MediaNavigationViewModel.Hidden -> {
-            Spacer(Modifier.size(48.dp))
+            if (!areActionsVisible || viewModel.left is MediaSecondaryActionViewModel.None) {
+                Spacer(Modifier.size(width = 16.dp, height = 48.dp))
+            } else {
+                SecondaryAction(
+                    viewModel = viewModel.left,
+                    modifier = Modifier.sysuiResTag(MediaRes.PREV_BTN),
+                    element = Media.Elements.PrevButton,
+                )
+            }
+            if (!areActionsVisible || viewModel.right is MediaSecondaryActionViewModel.None) {
+                Spacer(Modifier.size(width = 16.dp, height = 48.dp))
+            } else {
+                SecondaryAction(
+                    viewModel = viewModel.right,
+                    modifier = Modifier.sysuiResTag(MediaRes.NEXT_BTN),
+                    element = Media.Elements.NextButton,
+                )
+            }
         }
     }
 }
@@ -1014,6 +1045,7 @@ private fun SeekBarTrack(
     sliderState: SliderState,
     isSquiggly: Boolean,
     colors: SliderColors,
+    isThumbEnabled: Boolean,
     modifier: Modifier = Modifier,
     waveLength: Dp = 20.dp,
     amplitude: Dp = 3.dp,
@@ -1051,61 +1083,93 @@ private fun SeekBarTrack(
     // Render the track.
     Canvas(modifier = modifier) {
         val thumbPositionPx = size.width * sliderState.value
+        val amplitudePx = amplitude.toPx()
+        val animatedAmplitudePx = animatedAmplitude.toPx()
+        val waveLengthPx = waveLength.toPx()
+        val halfWaveLengthPx = waveLengthPx / 2
 
-        // The squiggly part before the thumb.
-        if (thumbPositionPx > 0) {
-            val amplitudePx = amplitude.toPx()
-            val animatedAmplitudePx = animatedAmplitude.toPx()
-            val waveLengthPx = waveLength.toPx()
+        val offsetPx = waveLengthPx * animatedWaveOffset.value
+        val totalWidth = size.width + waveLengthPx
+        val halfWaveCount = (totalWidth / halfWaveLengthPx).toInt()
 
-            val path =
-                Path().apply {
-                    val halfWaveLengthPx = waveLengthPx / 2
-                    val halfWaveCount = (thumbPositionPx / halfWaveLengthPx).toInt()
+        var currentX = 0f
+        val path =
+            Path().apply {
+                repeat(halfWaveCount + 3) { index ->
+                    // the position of either the peak or the trough.
+                    val centerX = currentX + (halfWaveLengthPx / 2)
 
-                    repeat(halfWaveCount + 3) { index ->
-                        // Draw a half wave (either a hill or a valley shape starting and ending on
-                        // the horizontal center).
-                        relativeQuadraticTo(
-                            // The control point for the bezier curve is on top of the peak of the
-                            // hill or the very center bottom of the valley shape.
-                            dx1 = halfWaveLengthPx / 2,
-                            dy1 = if (index % 2 == 0) -animatedAmplitudePx else animatedAmplitudePx,
-                            // Advance horizontally, half a wave length at a time.
-                            dx2 = halfWaveLengthPx,
-                            dy2 = 0f,
-                        )
-                    }
+                    // We subtract offsetPx because we are shifting the whole path to the left by
+                    // offsetPx, in order to calculate the new point.
+                    val posDiff = centerX - (offsetPx + thumbPositionPx)
+                    val transitionRatio =
+                        when {
+                            posDiff <= 0 -> 1f // Active part
+                            posDiff < waveLengthPx ->
+                                1f - (posDiff / waveLengthPx) // Active -> Inactive
+                            else -> 0f // Inactive part (flat)
+                        }
+                    val calculatedAmplitude = animatedAmplitudePx * transitionRatio
+
+                    // Draw a half wave (either a hill or a valley shape starting and ending on
+                    // the horizontal center).
+                    relativeQuadraticTo(
+                        // The control point for the bezier curve is on top of the peak of the
+                        // hill or the very center bottom of the valley shape.
+                        dx1 = halfWaveLengthPx / 2,
+                        dy1 = if (index % 2 == 0) -calculatedAmplitude else calculatedAmplitude,
+                        // Advance horizontally, half a wave length at a time.
+                        dx2 = halfWaveLengthPx,
+                        dy2 = 0f,
+                    )
+
+                    currentX += halfWaveLengthPx
                 }
+            }
 
-            // Now that the squiggle is rendered a bit past the thumb, clip off the part that passed
-            // the thumb. It's easier to clip the extra squiggle than to figure out the bezier curve
-            // for part of a hill/valley.
-            clipRect(
-                left = 0f,
-                top = -amplitudePx,
-                right = thumbPositionPx,
-                bottom = amplitudePx * 2,
-            ) {
-                translate(left = -waveLengthPx * animatedWaveOffset.value, top = 0f) {
-                    // Actually render the squiggle.
+        // To handle the change in colors, we use the same path twice.
+        // Paths are shifted by offsetPx due to the translation to the left.
+        translate(left = -offsetPx, top = 0f) {
+            // Draw inactive path first.
+            if (isThumbEnabled) {
+                // The flat line after the thumb, if thumb is enabled.
+                drawLine(
+                    color = colors.inactiveTrackColor,
+                    start = Offset(thumbPositionPx + offsetPx, 0f),
+                    end = Offset(size.width + offsetPx, 0f),
+                    strokeWidth = 2.dp.toPx(),
+                    cap = StrokeCap.Round,
+                )
+            } else {
+                // Draw the full path (wave -> transition -> flat).
+                clipRect(
+                    left = offsetPx,
+                    top = -amplitudePx * 2,
+                    right = size.width + offsetPx,
+                    bottom = amplitudePx * 2,
+                ) {
                     drawPath(
                         path = path,
-                        color = colors.activeTrackColor,
+                        color = colors.inactiveTrackColor,
                         style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round),
                     )
                 }
             }
-        }
 
-        // The flat line after the thumb.
-        drawLine(
-            color = colors.inactiveTrackColor,
-            start = Offset(thumbPositionPx, 0f),
-            end = Offset(size.width, 0f),
-            strokeWidth = 2.dp.toPx(),
-            cap = StrokeCap.Round,
-        )
+            // Draw the same path with active Color clipped to the thumb.
+            clipRect(
+                left = offsetPx,
+                top = -amplitudePx * 2,
+                right = thumbPositionPx + offsetPx,
+                bottom = amplitudePx * 2,
+            ) {
+                drawPath(
+                    path = path,
+                    color = colors.activeTrackColor,
+                    style = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round),
+                )
+            }
+        }
     }
 }
 
@@ -1617,6 +1681,9 @@ object Media {
         CardGuts,
         CardRevealedContent,
     }
+
+    const val TAG = "Media"
+    val DEBUG = Log.isLoggable(TAG, Log.DEBUG)
 }
 
 private fun MediaPresentationStyle.toScene(): SceneKey {

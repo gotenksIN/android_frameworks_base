@@ -43,7 +43,6 @@ import java.io.PrintWriter;
  */
 @RavenwoodKeepWholeClass
 final class ConnectionRecord extends ConnectionRecordInternal {
-    BoundServiceSession mBoundServiceSession;  // The associated bound service session if created.
     final AppBindRecord binding;    // The application/service binding.
     final ActivityServiceConnectionsHolder<ConnectionRecord> activity;  // If non-null, the owning activity.
     final IServiceConnection conn;  // The client connection.
@@ -116,8 +115,8 @@ final class ConnectionRecord extends ConnectionRecordInternal {
         pw.print(prefix);
         pw.print("ongoingCalls=");
         pw.println(getOngoingCalls());
-        if (mBoundServiceSession != null) {
-            mBoundServiceSession.dump(new IndentingPrintWriter(pw, "  ", prefix));
+        if (getBoundServiceSession() != null) {
+            getBoundServiceSession().dump(new IndentingPrintWriter(pw, "  ", prefix));
         }
     }
 
@@ -172,19 +171,21 @@ final class ConnectionRecord extends ConnectionRecordInternal {
         // If we don't already have an active association, create one...  but only if this
         // is an association between two different processes.
         if (ActivityManagerService.TRACK_PROCSTATS_ASSOCIATIONS
-                && association == null && binding.service.app != null
+                && association == null && binding.service.getHostProcess() != null
                 && (binding.service.appInfo.uid != clientUid
                         || !binding.service.processName.equals(clientProcessName))) {
-            ProcessStats.ProcessStateHolder holder = binding.service.app.getPkgList().get(
-                    binding.service.instanceName.getPackageName());
+            ProcessStats.ProcessStateHolder holder = binding.service.getHostProcess().getPkgList()
+                    .get(binding.service.instanceName.getPackageName());
             if (holder == null) {
                 Slog.wtf(TAG_AM, "No package in referenced service "
-                        + binding.service.shortInstanceName + ": proc=" + binding.service.app);
+                        + binding.service.shortInstanceName + ": proc="
+                        + binding.service.getHostProcess());
             } else if (holder.pkg == null) {
                 Slog.wtf(TAG_AM, "Inactive holder in referenced service "
-                        + binding.service.shortInstanceName + ": proc=" + binding.service.app);
+                        + binding.service.shortInstanceName + ": proc="
+                        + binding.service.getHostProcess());
             } else {
-                mProcStatsLock = binding.service.app.mService.mProcessStats.mLock;
+                mProcStatsLock = binding.service.getHostProcess().mService.mProcessStats.mLock;
                 synchronized (mProcStatsLock) {
                     association = holder.pkg.getAssociationStateLocked(holder.state,
                             binding.service.instanceName.getClassName()).startSource(clientUid,
@@ -212,7 +213,8 @@ final class ConnectionRecord extends ConnectionRecordInternal {
         }
     }
 
-    String toShortString() {
+    @Override
+    public String toShortString() {
         final StringBuilder sb = new StringBuilder(128);
         sb.append("CR{");
         sb.append(Integer.toHexString(System.identityHashCode(this)));

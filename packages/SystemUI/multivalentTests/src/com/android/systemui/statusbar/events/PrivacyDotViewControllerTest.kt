@@ -54,9 +54,9 @@ import com.android.systemui.statusbar.events.PrivacyDotCorner.BottomLeft
 import com.android.systemui.statusbar.events.PrivacyDotCorner.BottomRight
 import com.android.systemui.statusbar.events.PrivacyDotCorner.TopLeft
 import com.android.systemui.statusbar.events.PrivacyDotCorner.TopRight
-import com.android.systemui.statusbar.featurepods.av.domain.interactor.fakeAvControlsChipInteractor
 import com.android.systemui.statusbar.layout.StatusBarContentInsetsProvider
 import com.android.systemui.statusbar.policy.FakeConfigurationController
+import com.android.systemui.statusbar.quickactions.av.domain.interactor.fakeAvControlsChipInteractor
 import com.android.systemui.testKosmos
 import com.android.systemui.util.concurrency.DelayableExecutor
 import com.android.systemui.util.leak.RotationUtils.ROTATION_LANDSCAPE
@@ -483,6 +483,17 @@ class PrivacyDotViewControllerTest(flags: FlagsParameterization) : SysuiTestCase
             // Show dot
             assertThat(controller.currentViewState.shouldShowDot()).isTrue()
         }
+
+    @Test
+    fun onStop_removesSystemStatusAnimationCallback() {
+        val captor = ArgumentCaptor.forClass(SystemStatusAnimationCallback::class.java)
+        val controller = createAndInitializeController()
+        Mockito.verify(mockAnimationScheduler).addCallback(captor.capture())
+
+        controller.stop()
+
+        Mockito.verify(mockAnimationScheduler).removeCallback(captor.value)
+    }
 
     @Test
     @EnableFlags(FLAG_FIX_PRIVACY_INDICATOR_BOTH_DOT_CHIP_VISIBLE_QS)

@@ -18,7 +18,10 @@ package com.android.systemui.media.remedia.data.repository
 
 import android.content.packageManager
 import android.content.pm.ApplicationInfo
+import android.media.MediaMetadata
+import android.media.session.MediaController
 import android.media.session.MediaSession
+import android.media.session.PlaybackState
 import android.os.UserHandle
 import android.provider.Settings
 import androidx.test.annotation.UiThreadTest
@@ -30,8 +33,11 @@ import com.android.systemui.common.shared.model.Icon
 import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.kosmos.testScope
 import com.android.systemui.media.controls.shared.model.MediaData
+import com.android.systemui.media.controls.util.fakeMediaControllerFactory
 import com.android.systemui.media.remedia.data.model.MediaDataModel
 import com.android.systemui.res.R
+import com.android.systemui.statusbar.notification.collection.provider.mockVisualStabilityProvider
+import com.android.systemui.statusbar.notification.collection.provider.visualStabilityProvider
 import com.android.systemui.testKosmosNew
 import com.android.systemui.util.settings.fakeSettings
 import com.google.common.truth.Truth.assertThat
@@ -39,13 +45,17 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
+import org.junit.After
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.ArgumentMatchers.anyString
 import org.mockito.kotlin.any
+import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -62,11 +72,30 @@ class MediaRepositoryTest : SysuiTestCase() {
                 .thenReturn(appInfo)
             whenever(packageManager.getApplicationIcon(any<ApplicationInfo>())).thenReturn(drawable)
             context.setMockPackageManager(packageManager)
+            visualStabilityProvider = mockVisualStabilityProvider
         }
     private val testScope = kosmos.testScope
-    private val session = MediaSession(context, "MediaRepositoryTestSession")
+    private val mediaResumption =
+        Settings.Secure.getInt(context.contentResolver, Settings.Secure.MEDIA_CONTROLS_RESUME, 0)
+    private lateinit var session: MediaSession
 
     private val underTest: MediaRepositoryImpl = kosmos.mediaRepository
+
+    @Before
+    fun setUp() {
+        session = MediaSession(context, "MediaRepositoryTestSession")
+    }
+
+    @After
+    fun tearDown() {
+        session.release()
+        kosmos.fakeMediaControllerFactory.reset()
+        Settings.Secure.putInt(
+            context.contentResolver,
+            Settings.Secure.MEDIA_CONTROLS_RESUME,
+            mediaResumption,
+        )
+    }
 
     @Test
     fun addCurrentUserMediaEntry_activeThenInactivate() =
@@ -320,6 +349,235 @@ class MediaRepositoryTest : SysuiTestCase() {
         }
     }
 
+    @Test
+    fun metadataAndStateSupportSeeking() =
+        testScope.runTest {
+            val state =
+                PlaybackState.Builder().run {
+                    setState(PlaybackState.STATE_PAUSED, 200L, 1f)
+                    setActions(PlaybackState.ACTION_SEEK_TO)
+                    build()
+                }
+            val metadata =
+                MediaMetadata.Builder().run {
+                    putLong(MediaMetadata.METADATA_KEY_DURATION, 400L)
+                    build()
+                }
+
+            val mockController = mock<MediaController>()
+            whenever(mockController.metadata).thenReturn(metadata)
+            whenever(mockController.playbackState).thenReturn(state)
+            kosmos.fakeMediaControllerFactory.setControllerForToken(
+                session.sessionToken,
+                mockController,
+            )
+
+            val instanceId = InstanceId.fakeInstanceId(123)
+            val userMedia =
+                createMediaData(
+                        app = "TEST_APP",
+                        playing = false,
+                        playbackLocation = LOCAL,
+                        isResume = false,
+                        instanceId = instanceId,
+                    )
+                    .copy(token = session.sessionToken)
+            addCurrentUserMediaEntry(userMedia)
+
+            val callbackCaptor = argumentCaptor<MediaController.Callback>()
+            verify(mockController).registerCallback(callbackCaptor.capture())
+
+            val entry = underTest.currentMedia.find { it.instanceId == instanceId }
+            assertThat(entry).isNotNull()
+            assertThat(entry!!.canShowSeekbar).isTrue()
+            assertThat(entry.canBeScrubbed).isTrue()
+        }
+
+    @Test
+    fun metadataCannotShowSeekbar() =
+        testScope.runTest {
+            val state =
+                PlaybackState.Builder().run {
+                    setState(PlaybackState.STATE_PAUSED, 200L, 1f)
+                    setActions(PlaybackState.ACTION_SEEK_TO)
+                    build()
+                }
+            val metadata =
+                MediaMetadata.Builder().run {
+                    putLong(MediaMetadata.METADATA_KEY_DURATION, 400L)
+                    build()
+                }
+
+            val mockController = mock<MediaController>()
+            whenever(mockController.metadata).thenReturn(metadata)
+            whenever(mockController.playbackState).thenReturn(state)
+            kosmos.fakeMediaControllerFactory.setControllerForToken(
+                session.sessionToken,
+                mockController,
+            )
+
+            val instanceId = InstanceId.fakeInstanceId(123)
+            val userMedia =
+                createMediaData(
+                        app = "TEST_APP",
+                        playing = false,
+                        playbackLocation = LOCAL,
+                        isResume = false,
+                        instanceId = instanceId,
+                    )
+                    .copy(token = session.sessionToken)
+            addCurrentUserMediaEntry(userMedia)
+
+            val callbackCaptor = argumentCaptor<MediaController.Callback>()
+            verify(mockController).registerCallback(callbackCaptor.capture())
+
+            val entry = underTest.currentMedia.find { it.instanceId == instanceId }
+            assertThat(entry!!.canShowSeekbar).isTrue()
+
+            val noSeekbarMetadata =
+                MediaMetadata.Builder().run {
+                    putLong(MediaMetadata.METADATA_KEY_DURATION, 0L)
+                    build()
+                }
+            callbackCaptor.lastValue.onMetadataChanged(noSeekbarMetadata)
+            runCurrent()
+
+            val updatedEntry = underTest.currentMedia.find { it.instanceId == instanceId }
+            assertThat(updatedEntry).isNotNull()
+            assertThat(updatedEntry!!.canShowSeekbar).isFalse()
+        }
+
+    fun playbackStateCannotSeek() =
+        testScope.runTest {
+            val state =
+                PlaybackState.Builder().run {
+                    setState(PlaybackState.STATE_PAUSED, 200L, 1f)
+                    setActions(PlaybackState.ACTION_SEEK_TO)
+                    build()
+                }
+            val metadata =
+                MediaMetadata.Builder().run {
+                    putLong(MediaMetadata.METADATA_KEY_DURATION, 400L)
+                    build()
+                }
+
+            val mockController = mock<MediaController>()
+            whenever(mockController.metadata).thenReturn(metadata)
+            whenever(mockController.playbackState).thenReturn(state)
+            kosmos.fakeMediaControllerFactory.setControllerForToken(
+                session.sessionToken,
+                mockController,
+            )
+
+            val instanceId = InstanceId.fakeInstanceId(123)
+            val userMedia =
+                createMediaData(
+                        app = "TEST_APP",
+                        playing = false,
+                        playbackLocation = LOCAL,
+                        isResume = false,
+                        instanceId = instanceId,
+                    )
+                    .copy(token = session.sessionToken)
+            addCurrentUserMediaEntry(userMedia)
+
+            val callbackCaptor = argumentCaptor<MediaController.Callback>()
+            verify(mockController).registerCallback(callbackCaptor.capture())
+
+            val entry = underTest.currentMedia.find { it.instanceId == instanceId }
+            assertThat(entry!!.canBeScrubbed).isTrue()
+
+            // Update the state so it can't seek
+            val noSeekState =
+                PlaybackState.Builder().run {
+                    setState(PlaybackState.STATE_PAUSED, 200L, 1f)
+                    build()
+                }
+            callbackCaptor.lastValue.onPlaybackStateChanged(noSeekState)
+            runCurrent()
+
+            val updatedEntry = underTest.currentMedia.find { it.instanceId == instanceId }
+            assertThat(updatedEntry).isNotNull()
+            assertThat(updatedEntry!!.canBeScrubbed).isFalse()
+        }
+
+    @Test
+    fun swipeToDismiss_pausedAndResumeOff_userInitiated() {
+        testScope.runTest {
+            val instanceId = InstanceId.fakeInstanceId(123)
+            val mediaData = createMediaData("app1", false, LOCAL, false, instanceId)
+            // When resumption is disabled, paused media should be dismissed after being swiped away
+            Settings.Secure.putInt(
+                context.contentResolver,
+                Settings.Secure.MEDIA_CONTROLS_RESUME,
+                0,
+            )
+
+            addCurrentUserMediaEntry(mediaData)
+
+            whenever(kosmos.visualStabilityProvider.isReorderingAllowed).thenReturn(false)
+            // Swipe away the media entry
+            val inactiveMedia = mediaData.copy(active = false)
+            underTest.setSwipedAwayState()
+            addCurrentUserMediaEntry(inactiveMedia)
+
+            assertThat(underTest.isUserInitiatedRemovalQueued).isTrue()
+            assertThat(underTest.keysNeedRemoval.contains(instanceId)).isTrue()
+        }
+    }
+
+    @Test
+    fun pausedAndResumeOff_inactive_notUserInitiated() {
+        testScope.runTest {
+            val instanceId = InstanceId.fakeInstanceId(123)
+            val mediaData = createMediaData("app1", false, LOCAL, false, instanceId)
+            // When resumption is disabled, paused media should be dismissed after being swiped away
+            Settings.Secure.putInt(
+                context.contentResolver,
+                Settings.Secure.MEDIA_CONTROLS_RESUME,
+                0,
+            )
+
+            addCurrentUserMediaEntry(mediaData)
+
+            whenever(kosmos.visualStabilityProvider.isReorderingAllowed).thenReturn(false)
+            // Media becomes inactive
+            val inactiveMedia = mediaData.copy(active = false)
+            addCurrentUserMediaEntry(inactiveMedia)
+
+            assertThat(underTest.isUserInitiatedRemovalQueued).isFalse()
+            assertThat(underTest.keysNeedRemoval.contains(instanceId)).isTrue()
+        }
+    }
+
+    @Test
+    fun pausedAndResumeOff_inactive_orderingAllowed_immediateRemoval() {
+        testScope.runTest {
+            val instanceId = InstanceId.fakeInstanceId(123)
+            val mediaData = createMediaData("app1", false, LOCAL, false, instanceId)
+            // When resumption is disabled, paused media should be dismissed after being swiped away
+            Settings.Secure.putInt(
+                context.contentResolver,
+                Settings.Secure.MEDIA_CONTROLS_RESUME,
+                0,
+            )
+
+            addCurrentUserMediaEntry(mediaData)
+
+            whenever(kosmos.visualStabilityProvider.isReorderingAllowed).thenReturn(true)
+            // Media becomes inactive
+            val inactiveMedia = mediaData.copy(active = false)
+            addCurrentUserMediaEntry(inactiveMedia)
+
+            assertThat(
+                    underTest.currentMedia
+                        .find { it.instanceId == instanceId }
+                        ?.needsImmediateRemoval
+                )
+                .isTrue()
+        }
+    }
+
     private fun TestScope.addCurrentUserMediaEntry(data: MediaData) {
         underTest.addCurrentUserMediaEntry(data)
         runCurrent()
@@ -355,12 +613,14 @@ class MediaRepositoryTest : SysuiTestCase() {
             subtitle = artist.toString(),
             colorScheme = mediaModel.colorScheme,
             notificationActions = actions,
+            notificationActionsCompressed = mutableListOf(),
             playbackStateActions = semanticActions,
             outputDevice = device,
             clickIntent = clickIntent,
             state = mediaModel.state,
             durationMs = mediaModel.durationMs,
             positionMs = mediaModel.positionMs,
+            canShowSeekbar = mediaModel.canShowSeekbar,
             canBeScrubbed = mediaModel.canBeScrubbed,
             canBeDismissed = isClearable,
             isActive = active,
@@ -369,6 +629,7 @@ class MediaRepositoryTest : SysuiTestCase() {
             isExplicit = isExplicit,
             suggestionData = mediaModel.suggestionData,
             token = session.sessionToken,
+            needsImmediateRemoval = mediaModel.needsImmediateRemoval,
         )
     }
 

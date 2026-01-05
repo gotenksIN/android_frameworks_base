@@ -114,6 +114,7 @@ import android.os.Message;
 import android.os.Parcel;
 import android.os.Process;
 import android.os.RemoteException;
+import android.os.ServiceManager;
 import android.os.SystemClock;
 import android.os.UserHandle;
 import android.os.instrumentation.IOffsetCallback;
@@ -142,6 +143,7 @@ import com.android.server.am.UidObserverController.ChangeRecord;
 import com.android.server.appop.AppOpsService;
 import com.android.server.job.JobSchedulerInternal;
 import com.android.server.notification.NotificationManagerInternal;
+import com.android.server.privatecompute.PccSandboxManagerInternal;
 import com.android.server.wm.ActivityTaskManagerInternal;
 import com.android.server.wm.ActivityTaskManagerService;
 
@@ -162,7 +164,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
@@ -201,6 +202,15 @@ public class ActivityManagerServiceTest {
     private static final int TEST_PID = 22222;
     private static final String TEST_PACKAGE = "com.test.package";
     private static final int USER_ID = 666;
+
+    // Example UIDs for different process types
+    private static final int PCC_UID_1 = Process.FIRST_PCC_UID;
+    private static final int REGULAR_UID = 10200;
+    private static final int REGULAR_UID_2 = 10201;
+
+    private static final String PCC_PACKAGE_1 = "com.pcc.package1";
+    private static final String REGULAR_PACKAGE = "com.regular.package";
+    private static final String REGULAR_PACKAGE_2 = "com.regular.package2";
 
     private static final long TEST_PROC_STATE_SEQ1 = 555;
     private static final long TEST_PROC_STATE_SEQ2 = 556;
@@ -251,6 +261,7 @@ public class ActivityManagerServiceTest {
     @Mock private NotificationManagerInternal mNotificationManagerInternal;
     @Mock private JobSchedulerInternal mJobSchedulerInternal;
     @Mock private ContentResolver mContentResolver;
+    @Mock private PccSandboxManagerInternal mMockPccSandboxManagerInternal;
 
     private TestInjector mInjector;
     private ActivityManagerService mAms;
@@ -265,6 +276,7 @@ public class ActivityManagerServiceTest {
         mMockingSession = mockitoSession()
                 .initMocks(this)
                 .mockStatic(AppGlobals.class)
+                .spyStatic(ServiceManager.class)
                 .strictness(Strictness.LENIENT)
                 .startMocking();
         MockitoAnnotations.initMocks(this);
@@ -280,6 +292,8 @@ public class ActivityManagerServiceTest {
         doReturn(mPackageManager).when(AppGlobals::getPackageManager);
         doReturn(mPermissionManager).when(AppGlobals::getPermissionManager);
         doReturn(new String[]{""}).when(mPackageManager).getPackagesForUid(eq(Process.myUid()));
+
+        LocalServices.addService(PccSandboxManagerInternal.class, mMockPccSandboxManagerInternal);
 
         mHandlerThread = new HandlerThread(TAG);
         mHandlerThread.start();
@@ -320,6 +334,34 @@ public class ActivityManagerServiceTest {
                 mAms.mConstants.SERVICE_USAGE_INTERACTION_TIME_POST_S);
     }
 
+    @Test
+    @RequiresFlagsEnabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    public void testValidateAssociationAllowed_pccToRegular_isDelegatedToPccSandboxManager() {
+        when(mMockPccSandboxManagerInternal.validateAssociationAllowed(
+                eq(PCC_UID_1), eq(PCC_PACKAGE_1), eq(REGULAR_UID), eq(REGULAR_PACKAGE),
+                anyInt(), nullable(Bundle.class)))
+                .thenReturn(false);
+
+        boolean allowed = mAms.validateAssociationAllowedLocked(
+                PCC_PACKAGE_1, PCC_UID_1, REGULAR_PACKAGE, REGULAR_UID,
+                ActivityManagerService.ASSOCIATION_TYPE_SERVICE, /*debugTag=*/ null);
+
+        assertFalse("Association between a PCC UID and a regular UID should be denied", allowed);
+    }
+
+    // ActivityManagerService allows associations if there are no associations defined.
+    // This test ensures that the PCC logic is NOT triggered for regular UIDs.
+    @Test
+    @RequiresFlagsEnabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    public void testValidateAssociationAllowed_regularToRegular_fallsThrough() {
+        boolean allowed = mAms.validateAssociationAllowedLocked(
+                REGULAR_PACKAGE, REGULAR_UID, REGULAR_PACKAGE_2, REGULAR_UID_2,
+                ActivityManagerService.ASSOCIATION_TYPE_SERVICE, /*debugTag=*/ null);
+
+        assertTrue("Association between two regular UIDs with no restrictions is allowed", allowed);
+    }
+
+
     private void mockNoteOperation() {
         SyncNotedAppOp allowed = new SyncNotedAppOp(AppOpsManager.MODE_ALLOWED,
                 AppOpsManager.OP_GET_USAGE_STATS, null, mContext.getPackageName());
@@ -339,6 +381,7 @@ public class ActivityManagerServiceTest {
         }
         clearInvocations(mNotificationManagerInternal);
 
+        LocalServices.removeServiceForTest(PccSandboxManagerInternal.class);
         LocalServices.removeServiceForTest(PackageManagerInternal.class);
         LocalServices.removeServiceForTest(ActivityTaskManagerInternal.class);
         LocalServices.removeServiceForTest(NotificationManagerInternal.class);
@@ -1735,16 +1778,27 @@ public class ActivityManagerServiceTest {
 
     @Test
     public void testStartForegroundServiceDelegateWithNotification() throws Exception {
-        testStartForegroundServiceDelegate(true);
+        testForegroundServiceDelegate(true, true);
     }
 
     @Test
     public void testStartForegroundServiceDelegateWithoutNotification() throws Exception {
-        testStartForegroundServiceDelegate(false);
+        testForegroundServiceDelegate(true, false);
+    }
+
+    // Tests the start/stop foreground service delegate System Apis exposed to mainline modules.
+    @Test
+    @RequiresFlagsEnabled(com.android.server.am.Flags.FLAG_FGS_DELEGATE_SYSTEM_API)
+    public void testStartForegroundServiceDelegateSystemApis() throws Exception {
+        testForegroundServiceDelegate(false, false);
     }
 
     @SuppressWarnings("GuardedBy")
-    private void testStartForegroundServiceDelegate(boolean withNotification) throws Exception {
+    private void testForegroundServiceDelegate(
+            // If true, it will construct ForegroundServiceDelegationOptions else
+            // ForegroundServiceDelegationParams and calls the appropriate method.
+            boolean useOptions,
+            boolean withNotification) throws Exception {
         mockNoteOperation();
 
         final int notificationId = 42;
@@ -1774,27 +1828,52 @@ public class ActivityManagerServiceTest {
 
         mAms.mAppProfiler.mCachedAppsWatermarkData.mCachedAppHighWatermark = Integer.MAX_VALUE;
 
-        final ForegroundServiceDelegationOptions.Builder optionsBuilder =
-                new ForegroundServiceDelegationOptions.Builder()
-                .setClientPid(app.mPid)
-                .setClientUid(app.uid)
-                .setClientPackageName(app.info.packageName)
-                .setClientAppThread(app.getThread())
-                .setSticky(false)
-                .setClientInstanceName(
-                        "SpecialUseFgsDelegate_"
-                        + Process.myUid()
-                        + "_"
-                        + app.uid
-                        + "_"
-                        + app.info.packageName)
-                .setForegroundServiceTypes(ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-                .setDelegationService(
-                        ForegroundServiceDelegationOptions.DELEGATION_SERVICE_SPECIAL_USE);
-        if (withNotification) {
-            optionsBuilder.setClientNotification(notificationId, notification);
+        ForegroundServiceDelegationOptions fgsdo = null;
+        ForegroundServiceDelegationParams fgsdp = null;
+
+        if (useOptions) {
+            final ForegroundServiceDelegationOptions.Builder optionsBuilder =
+                    new ForegroundServiceDelegationOptions.Builder()
+                            .setClientPid(app.mPid)
+                            .setClientUid(app.uid)
+                            .setClientPackageName(app.info.packageName)
+                            .setClientAppThread(app.getThread())
+                            .setSticky(false)
+                            .setClientInstanceName(
+                                    "SpecialUseFgsDelegate_"
+                                            + Process.myUid()
+                                            + "_"
+                                            + app.uid
+                                            + "_"
+                                            + app.info.packageName)
+                            .setForegroundServiceTypes(
+                                    ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+                            .setDelegationService(
+                                ForegroundServiceDelegationOptions.DELEGATION_SERVICE_SPECIAL_USE);
+            if (withNotification) {
+                optionsBuilder.setClientNotification(notificationId, notification);
+            }
+            fgsdo = optionsBuilder.build();
+        } else {
+            // Spy on the real mPidsSelfLocked map object to mock its behavior.
+            spyOn(mAms.mPidsSelfLocked);
+            doReturn(app).when(mAms.mPidsSelfLocked).get(anyInt());
+            fgsdp = new ForegroundServiceDelegationParams(
+                app.mPid,
+                app.uid,
+                app.info.packageName,  // clientPackageName
+                false,  // isSticky
+                "SpecialUseFgsDelegate_"
+                    + Process.myUid()
+                    + "_"
+                    + app.uid
+                    + "_"
+                    + app.info.packageName,  // clientInstanceName
+                // foregroundServiceTypes
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
+                // delegationReason
+                ForegroundServiceDelegationParams.DELEGATION_REASON_SPECIAL_USE);
         }
-        final ForegroundServiceDelegationOptions options = optionsBuilder.build();
 
         final CountDownLatch[] latchHolder = new CountDownLatch[1];
         final ServiceConnection conn = new ServiceConnection() {
@@ -1810,7 +1889,11 @@ public class ActivityManagerServiceTest {
         };
 
         latchHolder[0] = new CountDownLatch(1);
-        mAms.mInternal.startForegroundServiceDelegate(options, conn);
+        if (useOptions) {
+            mAms.mInternal.startForegroundServiceDelegate(fgsdo, conn);
+        } else {
+            ((ActivityManagerLocal) mAms.mInternal).startForegroundServiceDelegate(fgsdp, conn);
+        }
 
         assertThat(latchHolder[0].await(5, TimeUnit.SECONDS)).isTrue();
         assertEquals(ActivityManager.PROCESS_STATE_FOREGROUND_SERVICE, app.getCurProcState());
@@ -1823,7 +1906,11 @@ public class ActivityManagerServiceTest {
                         eq(notificationId), eq(notification), anyInt(), eq(true));
 
         latchHolder[0] = new CountDownLatch(1);
-        mAms.mInternal.stopForegroundServiceDelegate(options);
+        if (useOptions) {
+            mAms.mInternal.stopForegroundServiceDelegate(fgsdo);
+        } else {
+            ((ActivityManagerLocal) mAms.mInternal).stopForegroundServiceDelegate(fgsdp);
+        }
 
         assertThat(latchHolder[0].await(5, TimeUnit.SECONDS)).isTrue();
         assertEquals(ActivityManager.PROCESS_STATE_CACHED_EMPTY, app.getCurProcState());
@@ -1875,6 +1962,27 @@ public class ActivityManagerServiceTest {
                 false);
 
         assertThat(appRec.isInFullBackup()).isFalse();
+    }
+
+    @Test
+    public void testCallsForegroundServiceOptionsWithDefault_throwsException()
+            throws Exception {
+        final ForegroundServiceDelegationOptions.Builder optionsBuilder =
+                new ForegroundServiceDelegationOptions.Builder()
+                .setClientPid(1)
+                .setClientUid(2)
+                .setClientPackageName("package_name")
+                .setSticky(false)
+                .setClientInstanceName("dummy")
+                .setForegroundServiceTypes(ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
+                .setDelegationService(
+                        ForegroundServiceDelegationOptions.DELEGATION_SERVICE_DEFAULT);
+        Exception e = assertThrows(
+            IllegalArgumentException.class, () -> optionsBuilder.build());
+
+        assertThat(e).hasMessageThat().isEqualTo(
+            "Default is not allowed to be passed in. "
+            + "Use a more specific Delegation Service Identifier!");
     }
 
     private static class TestHandler extends Handler {

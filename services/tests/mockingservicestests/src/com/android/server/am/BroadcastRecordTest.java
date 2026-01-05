@@ -27,6 +27,7 @@ import static com.android.server.am.BroadcastRecord.DELIVERY_PENDING;
 import static com.android.server.am.BroadcastRecord.DELIVERY_SKIPPED;
 import static com.android.server.am.BroadcastRecord.DELIVERY_TIMEOUT;
 import static com.android.server.am.BroadcastRecord.LIMIT_PRIORITY_SCOPE;
+import static com.android.server.am.BroadcastRecord.UNSPECIFIED_QUEUE_INDEX;
 import static com.android.server.am.BroadcastRecord.calculateBlockedUntilBeyondCount;
 import static com.android.server.am.BroadcastRecord.calculateDeferUntilActive;
 import static com.android.server.am.BroadcastRecord.calculateUrgent;
@@ -41,9 +42,11 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
@@ -66,6 +69,7 @@ import android.telephony.SubscriptionManager;
 
 import androidx.test.filters.SmallTest;
 
+import com.android.server.am.ActivityManagerService;
 import com.android.server.compat.PlatformCompat;
 
 import org.junit.Before;
@@ -117,6 +121,7 @@ public class BroadcastRecordTest {
     @Mock BroadcastQueue mQueue;
     @Mock ProcessRecord mProcess;
     @Mock PlatformCompat mPlatformCompat;
+    @Mock ActivityManagerService mService;
 
     @Before
     public void setUp() throws Exception {
@@ -360,25 +365,25 @@ public class BroadcastRecordTest {
         assertBlocked(r, false);
         assertTerminalDeferredBeyond(r, 0, 0, 0);
 
-        r.setDeliveryState(0, DELIVERY_DEFERRED, TAG);
+        r.setDeliveryState(0, DELIVERY_DEFERRED, TAG, UNSPECIFIED_QUEUE_INDEX);
         assertEquals(DELIVERY_DEFERRED, r.getDeliveryState(0));
         assertBlocked(r, false);
         assertTerminalDeferredBeyond(r, 0, 1, 1);
 
         // Identical state change has no effect
-        r.setDeliveryState(0, DELIVERY_DEFERRED, TAG);
+        r.setDeliveryState(0, DELIVERY_DEFERRED, TAG, UNSPECIFIED_QUEUE_INDEX);
         assertEquals(DELIVERY_DEFERRED, r.getDeliveryState(0));
         assertBlocked(r, false);
         assertTerminalDeferredBeyond(r, 0, 1, 1);
 
         // Moving to terminal state updates counters
-        r.setDeliveryState(0, DELIVERY_DELIVERED, TAG);
+        r.setDeliveryState(0, DELIVERY_DELIVERED, TAG, UNSPECIFIED_QUEUE_INDEX);
         assertEquals(DELIVERY_DELIVERED, r.getDeliveryState(0));
         assertBlocked(r, false);
         assertTerminalDeferredBeyond(r, 1, 0, 1);
 
         // Trying to change terminal state has no effect
-        r.setDeliveryState(0, DELIVERY_TIMEOUT, TAG);
+        r.setDeliveryState(0, DELIVERY_TIMEOUT, TAG, UNSPECIFIED_QUEUE_INDEX);
         assertEquals(DELIVERY_DELIVERED, r.getDeliveryState(0));
         assertBlocked(r, false);
         assertTerminalDeferredBeyond(r, 1, 0, 1);
@@ -396,15 +401,15 @@ public class BroadcastRecordTest {
 
         // Even though we finish a middle item in the tranche, we're not
         // "beyond" it because there is still unfinished work before it
-        r.setDeliveryState(1, DELIVERY_DELIVERED, TAG);
+        r.setDeliveryState(1, DELIVERY_DELIVERED, TAG, UNSPECIFIED_QUEUE_INDEX);
         assertBlocked(r, false, false, false);
         assertTerminalDeferredBeyond(r, 1, 0, 0);
 
-        r.setDeliveryState(0, DELIVERY_DELIVERED, TAG);
+        r.setDeliveryState(0, DELIVERY_DELIVERED, TAG, UNSPECIFIED_QUEUE_INDEX);
         assertBlocked(r, false, false, false);
         assertTerminalDeferredBeyond(r, 2, 0, 2);
 
-        r.setDeliveryState(2, DELIVERY_DELIVERED, TAG);
+        r.setDeliveryState(2, DELIVERY_DELIVERED, TAG, UNSPECIFIED_QUEUE_INDEX);
         assertBlocked(r, false, false, false);
         assertTerminalDeferredBeyond(r, 3, 0, 3);
     }
@@ -419,15 +424,15 @@ public class BroadcastRecordTest {
         assertBlocked(r, false, true, true);
         assertTerminalDeferredBeyond(r, 0, 0, 0);
 
-        r.setDeliveryState(0, DELIVERY_DELIVERED, TAG);
+        r.setDeliveryState(0, DELIVERY_DELIVERED, TAG, UNSPECIFIED_QUEUE_INDEX);
         assertBlocked(r, false, false, true);
         assertTerminalDeferredBeyond(r, 1, 0, 1);
 
-        r.setDeliveryState(1, DELIVERY_DELIVERED, TAG);
+        r.setDeliveryState(1, DELIVERY_DELIVERED, TAG, UNSPECIFIED_QUEUE_INDEX);
         assertBlocked(r, false, false, false);
         assertTerminalDeferredBeyond(r, 2, 0, 2);
 
-        r.setDeliveryState(2, DELIVERY_DELIVERED, TAG);
+        r.setDeliveryState(2, DELIVERY_DELIVERED, TAG, UNSPECIFIED_QUEUE_INDEX);
         assertBlocked(r, false, false, false);
         assertTerminalDeferredBeyond(r, 3, 0, 3);
     }
@@ -448,15 +453,15 @@ public class BroadcastRecordTest {
         assertBlocked(r, false, false, false, false, false, false, false, false, false);
         assertTerminalDeferredBeyond(r, 0, 0, 0);
 
-        r.setDeliveryState(0, DELIVERY_PENDING, TAG);
-        r.setDeliveryState(1, DELIVERY_DEFERRED, TAG);
-        r.setDeliveryState(2, DELIVERY_PENDING, TAG);
-        r.setDeliveryState(3, DELIVERY_DEFERRED, TAG);
-        r.setDeliveryState(4, DELIVERY_DEFERRED, TAG);
-        r.setDeliveryState(5, DELIVERY_DEFERRED, TAG);
-        r.setDeliveryState(6, DELIVERY_DEFERRED, TAG);
-        r.setDeliveryState(7, DELIVERY_PENDING, TAG);
-        r.setDeliveryState(8, DELIVERY_DEFERRED, TAG);
+        r.setDeliveryState(0, DELIVERY_PENDING, TAG, UNSPECIFIED_QUEUE_INDEX);
+        r.setDeliveryState(1, DELIVERY_DEFERRED, TAG, UNSPECIFIED_QUEUE_INDEX);
+        r.setDeliveryState(2, DELIVERY_PENDING, TAG, UNSPECIFIED_QUEUE_INDEX);
+        r.setDeliveryState(3, DELIVERY_DEFERRED, TAG, UNSPECIFIED_QUEUE_INDEX);
+        r.setDeliveryState(4, DELIVERY_DEFERRED, TAG, UNSPECIFIED_QUEUE_INDEX);
+        r.setDeliveryState(5, DELIVERY_DEFERRED, TAG, UNSPECIFIED_QUEUE_INDEX);
+        r.setDeliveryState(6, DELIVERY_DEFERRED, TAG, UNSPECIFIED_QUEUE_INDEX);
+        r.setDeliveryState(7, DELIVERY_PENDING, TAG, UNSPECIFIED_QUEUE_INDEX);
+        r.setDeliveryState(8, DELIVERY_DEFERRED, TAG, UNSPECIFIED_QUEUE_INDEX);
 
         // Verify deferred counts ratchet up, but we're not "beyond" the first
         // still-pending receiver
@@ -465,38 +470,38 @@ public class BroadcastRecordTest {
 
         // We're still not "beyond" the first still-pending receiver, even when
         // we finish a receiver later in the first tranche
-        r.setDeliveryState(2, DELIVERY_DELIVERED, TAG);
+        r.setDeliveryState(2, DELIVERY_DELIVERED, TAG, UNSPECIFIED_QUEUE_INDEX);
         assertBlocked(r, false, false, false, false, false, false, false, false, false);
         assertTerminalDeferredBeyond(r, 1, 6, 0);
 
         // Completing that last item in first tranche means we now unblock the
         // second tranche, and since it's entirely deferred, the third traunche
         // is unblocked too
-        r.setDeliveryState(0, DELIVERY_DELIVERED, TAG);
+        r.setDeliveryState(0, DELIVERY_DELIVERED, TAG, UNSPECIFIED_QUEUE_INDEX);
         assertBlocked(r, false, false, false, false, false, false, false, false, false);
         assertTerminalDeferredBeyond(r, 2, 6, 7);
 
         // Moving a deferred item in an earlier tranche back to being pending
         // doesn't change the fact that we've already moved beyond it
-        r.setDeliveryState(1, DELIVERY_PENDING, TAG);
+        r.setDeliveryState(1, DELIVERY_PENDING, TAG, UNSPECIFIED_QUEUE_INDEX);
         assertBlocked(r, false, false, false, false, false, false, false, false, false);
         assertTerminalDeferredBeyond(r, 2, 5, 7);
-        r.setDeliveryState(1, DELIVERY_DELIVERED, TAG);
+        r.setDeliveryState(1, DELIVERY_DELIVERED, TAG, UNSPECIFIED_QUEUE_INDEX);
         assertBlocked(r, false, false, false, false, false, false, false, false, false);
         assertTerminalDeferredBeyond(r, 3, 5, 7);
 
         // Completing middle pending item is enough to fast-forward to end
-        r.setDeliveryState(7, DELIVERY_DELIVERED, TAG);
+        r.setDeliveryState(7, DELIVERY_DELIVERED, TAG, UNSPECIFIED_QUEUE_INDEX);
         assertBlocked(r, false, false, false, false, false, false, false, false, false);
         assertTerminalDeferredBeyond(r, 4, 5, 9);
 
         // Moving everyone else directly into a finished state updates all the
         // terminal counters
-        r.setDeliveryState(3, DELIVERY_SKIPPED, TAG);
-        r.setDeliveryState(4, DELIVERY_SKIPPED, TAG);
-        r.setDeliveryState(5, DELIVERY_SKIPPED, TAG);
-        r.setDeliveryState(6, DELIVERY_SKIPPED, TAG);
-        r.setDeliveryState(8, DELIVERY_SKIPPED, TAG);
+        r.setDeliveryState(3, DELIVERY_SKIPPED, TAG, UNSPECIFIED_QUEUE_INDEX);
+        r.setDeliveryState(4, DELIVERY_SKIPPED, TAG, UNSPECIFIED_QUEUE_INDEX);
+        r.setDeliveryState(5, DELIVERY_SKIPPED, TAG, UNSPECIFIED_QUEUE_INDEX);
+        r.setDeliveryState(6, DELIVERY_SKIPPED, TAG, UNSPECIFIED_QUEUE_INDEX);
+        r.setDeliveryState(8, DELIVERY_SKIPPED, TAG, UNSPECIFIED_QUEUE_INDEX);
         assertBlocked(r, false, false, false, false, false, false, false, false, false);
         assertTerminalDeferredBeyond(r, 9, 0, 9);
     }
@@ -519,15 +524,15 @@ public class BroadcastRecordTest {
         assertBlocked(r, false, false, false, true, true, true, true, true, true);
         assertTerminalDeferredBeyond(r, 0, 0, 0);
 
-        r.setDeliveryState(0, DELIVERY_PENDING, TAG);
-        r.setDeliveryState(1, DELIVERY_DEFERRED, TAG);
-        r.setDeliveryState(2, DELIVERY_PENDING, TAG);
-        r.setDeliveryState(3, DELIVERY_DEFERRED, TAG);
-        r.setDeliveryState(4, DELIVERY_DEFERRED, TAG);
-        r.setDeliveryState(5, DELIVERY_DEFERRED, TAG);
-        r.setDeliveryState(6, DELIVERY_DEFERRED, TAG);
-        r.setDeliveryState(7, DELIVERY_PENDING, TAG);
-        r.setDeliveryState(8, DELIVERY_DEFERRED, TAG);
+        r.setDeliveryState(0, DELIVERY_PENDING, TAG, UNSPECIFIED_QUEUE_INDEX);
+        r.setDeliveryState(1, DELIVERY_DEFERRED, TAG, UNSPECIFIED_QUEUE_INDEX);
+        r.setDeliveryState(2, DELIVERY_PENDING, TAG, UNSPECIFIED_QUEUE_INDEX);
+        r.setDeliveryState(3, DELIVERY_DEFERRED, TAG, UNSPECIFIED_QUEUE_INDEX);
+        r.setDeliveryState(4, DELIVERY_DEFERRED, TAG, UNSPECIFIED_QUEUE_INDEX);
+        r.setDeliveryState(5, DELIVERY_DEFERRED, TAG, UNSPECIFIED_QUEUE_INDEX);
+        r.setDeliveryState(6, DELIVERY_DEFERRED, TAG, UNSPECIFIED_QUEUE_INDEX);
+        r.setDeliveryState(7, DELIVERY_PENDING, TAG, UNSPECIFIED_QUEUE_INDEX);
+        r.setDeliveryState(8, DELIVERY_DEFERRED, TAG, UNSPECIFIED_QUEUE_INDEX);
 
         // Verify deferred counts ratchet up, but we're not "beyond" the first
         // still-pending receiver
@@ -536,38 +541,38 @@ public class BroadcastRecordTest {
 
         // We're still not "beyond" the first still-pending receiver, even when
         // we finish a receiver later in the first tranche
-        r.setDeliveryState(2, DELIVERY_DELIVERED, TAG);
+        r.setDeliveryState(2, DELIVERY_DELIVERED, TAG, UNSPECIFIED_QUEUE_INDEX);
         assertBlocked(r, false, false, false, true, true, true, true, true, true);
         assertTerminalDeferredBeyond(r, 1, 6, 0);
 
         // Completing that last item in first tranche means we now unblock the
         // second tranche, and since it's entirely deferred, the third traunche
         // is unblocked too
-        r.setDeliveryState(0, DELIVERY_DELIVERED, TAG);
+        r.setDeliveryState(0, DELIVERY_DELIVERED, TAG, UNSPECIFIED_QUEUE_INDEX);
         assertBlocked(r, false, false, false, false, false, false, false, false, false);
         assertTerminalDeferredBeyond(r, 2, 6, 7);
 
         // Moving a deferred item in an earlier tranche back to being pending
         // doesn't change the fact that we've already moved beyond it
-        r.setDeliveryState(1, DELIVERY_PENDING, TAG);
+        r.setDeliveryState(1, DELIVERY_PENDING, TAG, UNSPECIFIED_QUEUE_INDEX);
         assertBlocked(r, false, false, false, false, false, false, false, false, false);
         assertTerminalDeferredBeyond(r, 2, 5, 7);
-        r.setDeliveryState(1, DELIVERY_DELIVERED, TAG);
+        r.setDeliveryState(1, DELIVERY_DELIVERED, TAG, UNSPECIFIED_QUEUE_INDEX);
         assertBlocked(r, false, false, false, false, false, false, false, false, false);
         assertTerminalDeferredBeyond(r, 3, 5, 7);
 
         // Completing middle pending item is enough to fast-forward to end
-        r.setDeliveryState(7, DELIVERY_DELIVERED, TAG);
+        r.setDeliveryState(7, DELIVERY_DELIVERED, TAG, UNSPECIFIED_QUEUE_INDEX);
         assertBlocked(r, false, false, false, false, false, false, false, false, false);
         assertTerminalDeferredBeyond(r, 4, 5, 9);
 
         // Moving everyone else directly into a finished state updates all the
         // terminal counters
-        r.setDeliveryState(3, DELIVERY_SKIPPED, TAG);
-        r.setDeliveryState(4, DELIVERY_SKIPPED, TAG);
-        r.setDeliveryState(5, DELIVERY_SKIPPED, TAG);
-        r.setDeliveryState(6, DELIVERY_SKIPPED, TAG);
-        r.setDeliveryState(8, DELIVERY_SKIPPED, TAG);
+        r.setDeliveryState(3, DELIVERY_SKIPPED, TAG, UNSPECIFIED_QUEUE_INDEX);
+        r.setDeliveryState(4, DELIVERY_SKIPPED, TAG, UNSPECIFIED_QUEUE_INDEX);
+        r.setDeliveryState(5, DELIVERY_SKIPPED, TAG, UNSPECIFIED_QUEUE_INDEX);
+        r.setDeliveryState(6, DELIVERY_SKIPPED, TAG, UNSPECIFIED_QUEUE_INDEX);
+        r.setDeliveryState(8, DELIVERY_SKIPPED, TAG, UNSPECIFIED_QUEUE_INDEX);
         assertBlocked(r, false, false, false, false, false, false, false, false, false);
         assertTerminalDeferredBeyond(r, 9, 0, 9);
     }
@@ -1009,6 +1014,112 @@ public class BroadcastRecordTest {
     @EnableFlags(Flags.FLAG_LOG_BROADCAST_PROCESSED_EVENT)
     public void testLogBroadcastProcessedEventRecord_flagEnabled_allBroadcastProcessedEventLogged() {
         testLogBroadcastProcessedEventRecord(1);
+    }
+
+    @Test
+    public void testToShortString() {
+        final Intent intent = new Intent(Intent.ACTION_AIRPLANE_MODE_CHANGED)
+                .addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
+        final BroadcastRecord record = createBroadcastRecord(
+                List.of(createResolveInfo(PACKAGE1, APP_UID)),
+                UserHandle.USER_ALL, intent);
+        final String actualShortString = record.toShortString();
+        assertTrue("Missing identity hashcode in " + actualShortString,
+                actualShortString.contains(Integer.toHexString(System.identityHashCode(record))));
+        assertTrue("Missing intent action in " + actualShortString,
+                actualShortString.contains(intent.getAction()));
+        assertTrue("Missing userId in " + actualShortString,
+                actualShortString.contains("u" + UserHandle.USER_ALL));
+        assertTrue("Missing broadcast type in " + actualShortString,
+                actualShortString.contains("0x" + Integer.toHexString(
+                        record.calculateTypeForLogging())));
+    }
+
+    /**
+     * Verifies that {@link BroadcastRecord#getReceiverUid(Object)} returns the UID from
+     * {@link ActivityInfo#getUid()}, which may differ from the application's UID.
+     */
+    @Test
+    public void testGetReceiverUid() {
+        final int appUid = 10123;
+        final int pccUid = 10456;
+
+        // Create a ResolveInfo with a spied ActivityInfo
+        ResolveInfo resolveInfo = createResolveInfo(PACKAGE1, appUid);
+        // By default, getUid() should return the applicationInfo.uid
+        assertEquals(appUid, BroadcastRecord.getReceiverUid(resolveInfo));
+
+        ActivityInfo activityInfo = spy(resolveInfo.activityInfo);
+        doReturn(pccUid).when(activityInfo).getUid();
+        resolveInfo.activityInfo = activityInfo;
+
+        // Verify that getReceiverUid returns the UID from ActivityInfo.getUid()
+        assertEquals(pccUid, BroadcastRecord.getReceiverUid(resolveInfo));
+    }
+
+    /**
+     * Verifies that {@link BroadcastRecord#applySingletonPolicy(ActivityManagerService)} uses the
+     * UID from {@link ActivityInfo#getUid()} when performing singleton checks.
+     */
+    @Test
+    public void testApplySingletonPolicy_usesPccUid() {
+        final int appUid = 10123;
+        final int pccUid = 10456;
+        final int callingUid = 10789;
+
+        // Create a ResolveInfo with a spied ActivityInfo that returns a PCC UID
+        ResolveInfo resolveInfo = createResolveInfo(PACKAGE1, appUid);
+        ActivityInfo activityInfo = spy(resolveInfo.activityInfo);
+        doReturn(pccUid).when(activityInfo).getUid();
+        resolveInfo.activityInfo = activityInfo;
+
+        List<Object> receivers = new ArrayList<>();
+        receivers.add(resolveInfo);
+
+        // Create a BroadcastRecord with a non-system calling UID
+        BroadcastRecord record = new BroadcastRecord(
+                mQueue,
+                new Intent("test.action.APPLY_SINGLETON_POLICY"),
+                mProcess,
+                "caller.pkg",
+                null, // callerFeatureId
+                123, // callingPid
+                callingUid,
+                false, // callerInstantApp
+                null, // resolvedType
+                null, // requiredPermissions
+                null, // excludedPermissions
+                null, // excludedPackages
+                0, // appOp
+                null, // options
+                receivers,
+                null, // resultToApp
+                null, // resultTo
+                0, // resultCode
+                null, // resultData
+                null, // resultExtras
+                false, // serialized
+                false, // sticky
+                false, // initialSticky
+                UserHandle.USER_SYSTEM,
+                BackgroundStartPrivileges.NONE,
+                false, // timeoutExempt
+                null, // filterExtrasForReceiver
+                PROCESS_STATE_UNKNOWN,
+                mPlatformCompat);
+
+        // Mock service calls
+        doReturn(true).when(mService).isSingleton(any(), any(), any(), anyInt());
+        doReturn(true).when(mService).isValidSingletonCall(callingUid, pccUid);
+
+        // Act
+        record.applySingletonPolicy(mService);
+
+        // Assert
+        // Verify that isValidSingletonCall was checked with the PCC UID
+        verify(mService).isValidSingletonCall(callingUid, pccUid);
+        // Verify that the activity info was updated for the system user
+        verify(mService).getActivityInfoForUser(eq(activityInfo), eq(UserHandle.USER_SYSTEM));
     }
 
     private void testLogBroadcastProcessedEventRecord(int times) {

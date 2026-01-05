@@ -85,13 +85,6 @@ flag {
 }
 
 flag {
-  name: "notification_force_group_singletons"
-  namespace: "systemui"
-  description: "This flag enables forced auto-grouping singleton groups"
-  bug: "336488844"
-}
-
-flag {
   name: "notification_force_group_conversations"
   namespace: "systemui"
   description: "This flag enables forced auto-grouping conversations"
@@ -185,30 +178,10 @@ flag {
 }
 
 flag {
-  name: "show_noisy_bundled_notifications"
-  namespace: "notifications"
-  description: "If a classification arrived late and the notification made noise, show the notification as unclassified temporarily"
-  bug: "430573835"
-  metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
   name: "fix_managed_services_double_binding"
   namespace: "notifications"
   description: "Couple of tweaks to fix b/434679743"
   bug: "434679743"
-}
-
-flag {
-  name: "limit_managed_services_count"
-  namespace: "systemui"
-  description: "Enforce a maximum number of allowed components in ManagedServices"
-  bug: "428701593"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
 }
 
 flag {

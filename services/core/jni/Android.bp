@@ -74,13 +74,16 @@ cc_library_static {
         "com_android_server_sensor_SensorService.cpp",
         "com_android_server_utils_LongMethodTracer.cpp",
         "com_android_server_wm_TaskFpsCallbackController.cpp",
+// QTI_BEGIN: 2019-11-13: Core: Add mechanism to improve consistancy of notification
         "com_android_server_activityTriggerService.cpp",
+// QTI_END: 2019-11-13: Core: Add mechanism to improve consistancy of notification
         "onload.cpp",
         ":lib_cachedAppOptimizer_native",
         ":lib_freezer_native",
         ":lib_oomConnection_native",
         ":lib_anrTimer_native",
         ":lib_lazilyRegisteredServices_native",
+        ":lib_memoryLimiter_native",
         ":lib_phantomProcessList_native",
     ],
 
@@ -201,7 +204,6 @@ cc_defaults {
         "android.hidl.token@1.0-utils",
         "android.frameworks.sensorservice@1.0",
         "android.frameworks.sensorservice-V1-ndk",
-        "android.frameworks.stats@1.0",
         "android.frameworks.stats-V2-ndk",
         "android.os.vibrator.flags-aconfig-cc",
         "android.system.suspend.control-V1-cpp",
@@ -255,6 +257,13 @@ filegroup {
     name: "lib_anrTimer_native",
     srcs: [
         "com_android_server_utils_AnrTimer.cpp",
+    ],
+}
+
+filegroup {
+    name: "lib_memoryLimiter_native",
+    srcs: [
+        "com_android_server_am_MemoryLimiter.cpp",
     ],
 }
 

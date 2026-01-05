@@ -27,8 +27,10 @@ import static android.companion.virtual.computercontrol.ComputerControlSession.B
 import static android.companion.virtual.computercontrol.ComputerControlSession.CLOSE_REASON_CALLER_INITIATED;
 import static android.companion.virtual.computercontrol.ComputerControlSession.CLOSE_REASON_SESSION_EMPTY;
 import static android.companion.virtual.computercontrol.ComputerControlSession.CLOSE_REASON_SESSION_TIMED_OUT;
+import static android.companion.virtual.computercontrol.ComputerControlSession.CLOSE_REASON_USER_INITIATED;
 
 import static com.android.server.companion.virtual.computercontrol.ComputerControlSessionImpl.CLOSE_ON_DISPLAY_EMPTY_TIMEOUT_MS;
+import static com.android.server.companion.virtual.computercontrol.ComputerControlSessionImpl.KEY_EVENT_DELAY_MS;
 import static com.android.server.companion.virtual.computercontrol.ComputerControlSessionImpl.LONG_PRESS_TIMEOUT_MULTIPLIER;
 import static com.android.server.companion.virtual.computercontrol.ComputerControlSessionImpl.PRODUCT_ID_DPAD;
 import static com.android.server.companion.virtual.computercontrol.ComputerControlSessionImpl.PRODUCT_ID_TOUCHSCREEN;
@@ -42,6 +44,7 @@ import static org.junit.Assert.assertTrue;
 import static org.mockito.AdditionalMatchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
@@ -57,6 +60,7 @@ import static org.mockito.Mockito.when;
 
 import android.annotation.SuppressLint;
 import android.app.ActivityOptions;
+import android.app.AppOpsManager;
 import android.companion.virtual.ActivityPolicyExemption;
 import android.companion.virtual.VirtualDeviceManager;
 import android.companion.virtual.VirtualDeviceManager.VirtualDevice;
@@ -94,6 +98,8 @@ import android.os.Bundle;
 import android.os.IBinder;
 import android.os.RemoteException;
 import android.os.UserHandle;
+import android.platform.test.annotations.DisableFlags;
+import android.platform.test.annotations.EnableFlags;
 import android.platform.test.annotations.Presubmit;
 import android.platform.test.flag.junit.SetFlagsRule;
 import android.view.Display;
@@ -103,11 +109,13 @@ import android.view.Surface;
 import android.view.SurfaceControl;
 import android.view.ViewConfiguration;
 import android.view.WindowManager;
+import android.view.inputmethod.EditorInfo;
 
 import androidx.test.platform.app.InstrumentationRegistry;
 
 import com.android.internal.inputmethod.IRemoteComputerControlInputConnection;
 import com.android.server.LocalServices;
+import com.android.server.appinteraction.AppInteractionService;
 import com.android.server.input.InputManagerInternal;
 import com.android.server.inputmethod.InputMethodManagerInternal;
 import com.android.server.pm.UserManagerInternal;
@@ -136,7 +144,6 @@ import java.util.function.Consumer;
 @Presubmit
 @RunWith(JUnitParamsRunner.class)
 public class ComputerControlSessionImplTest {
-    private static final String PERMISSION_CONTROLLER_PACKAGE = "permission.controller.package";
     private static final int USER_ID = UserHandle.USER_SYSTEM;
     private static final int MAIN_DISPLAY_ID = 41;
     private static final int VIRTUAL_DISPLAY_ID = 42;
@@ -151,6 +158,7 @@ public class ComputerControlSessionImplTest {
     private static final String UNDECLARED_TARGET_PACKAGE = "com.android.baz";
     private static final String TARGET_CLASS = "com.android.foo.FooActivity";
     private static final long GLOBAL_TIMEOUT_MILLIS = 10000L;
+    private static final String AGENT_PACKAGE = "com.package";
     private static final ComponentName TEST_COMPONENT = new ComponentName(TARGET_PACKAGE_1,
             TARGET_CLASS);
     private static final ComponentName BLOCKED_COMPONENT = new ComponentName(
@@ -173,9 +181,9 @@ public class ComputerControlSessionImplTest {
     @Mock
     private IDisplayManager mDisplayManager;
     @Mock
-    private PackageManager mPackageManager;
-    @Mock
     private PackageManager mOwnerPackageManager;
+    @Mock
+    private AppOpsManager mAppOpsManager;
     @Mock
     private WindowManagerInternal mWindowManagerInternal;
     @Mock
@@ -220,6 +228,8 @@ public class ComputerControlSessionImplTest {
     private IntentSender mIntentSender;
     @Mock
     private ComputerControlAllowlistController mAllowlistController;
+    @Mock
+    private AppInteractionService mAppInteractionService;
 
     @Captor
     private ArgumentCaptor<Intent> mIntentArgumentCaptor;
@@ -252,19 +262,19 @@ public class ComputerControlSessionImplTest {
     private final Context mContext =
             spy(new ContextWrapper(
                     InstrumentationRegistry.getInstrumentation().getTargetContext()));
-    private final Context mOwnerContext =
-            spy(new ContextWrapper(
-                    InstrumentationRegistry.getInstrumentation().getTargetContext()));
+    private final EditorInfo mEditorInfo = new EditorInfo();
 
     @Before
     public void setUp() throws Exception {
         mMockitoSession = MockitoAnnotations.openMocks(this);
         mTransaction = spy(new StubTransaction());
 
+        final Context ownerContext = spy(new ContextWrapper(
+                InstrumentationRegistry.getInstrumentation().getTargetContext()));
         when(mContext.createContextAsUser(UserHandle.of(USER_ID), /* flags = */ 0))
-                .thenReturn(mOwnerContext);
-        when(mContext.getPackageManager()).thenReturn(mPackageManager);
-        when(mOwnerContext.getPackageManager()).thenReturn(mOwnerPackageManager);
+                .thenReturn(ownerContext);
+        when(ownerContext.getPackageManager()).thenReturn(mOwnerPackageManager);
+        when(ownerContext.getSystemService(Context.APP_OPS_SERVICE)).thenReturn(mAppOpsManager);
 
         LocalServices.removeAllServicesForTest();
         LocalServices.addService(WindowManagerInternal.class, mWindowManagerInternal);
@@ -272,13 +282,17 @@ public class ComputerControlSessionImplTest {
         LocalServices.addService(InputMethodManagerInternal.class, mInputMethodManagerInternal);
         LocalServices.addService(InputManagerInternal.class, mInputManagerInternal);
         LocalServices.addService(ActivityTaskManagerInternal.class, mActivityTaskManagerInternal);
+        if (android.app.appfunctions.flags.Flags.enableAppInteractionApi()) {
+            LocalServices.addService(AppInteractionService.class, mAppInteractionService);
+        }
         ViewConfiguration.setInstanceForTesting(mContext, mViewConfiguration);
 
         when(mUserManagerInternal.getMainDisplayAssignedToUser(anyInt()))
                 .thenReturn(MAIN_DISPLAY_ID);
         when(mInputMethodManagerInternal
-                .getComputerControlInputConnection(anyInt(), eq(VIRTUAL_DISPLAY_ID)))
-                .thenReturn(mRemoteComputerControlInputConnection);
+                .getComputerControlInputConnectionData(anyInt(), eq(VIRTUAL_DISPLAY_ID)))
+                .thenReturn(new InputMethodManagerInternal.ComputerControlInputConnectionData(
+                        mRemoteComputerControlInputConnection, mEditorInfo));
 
         DisplayInfo displayInfo = new DisplayInfo();
         displayInfo.logicalWidth = DISPLAY_WIDTH;
@@ -288,8 +302,6 @@ public class ComputerControlSessionImplTest {
         when(mDisplayManager.getDisplayInfo(MAIN_DISPLAY_ID)).thenReturn(displayInfo);
         when(mDisplayManager.getDisplayInfo(VIRTUAL_DISPLAY_ID)).thenReturn(displayInfo);
 
-        when(mPackageManager.getPermissionControllerPackageName())
-                .thenReturn(PERMISSION_CONTROLLER_PACKAGE);
         when(mVirtualDeviceFactory.createVirtualDevice(any(), any(), any()))
                 .thenReturn(mVirtualDevice);
 
@@ -304,7 +316,8 @@ public class ComputerControlSessionImplTest {
                 mVirtualAudioDevice);
         when(mVirtualAudioDevice.startAudioCapture(any())).thenReturn(mAudioCapture);
         when(mVirtualAudioDevice.startAudioInjection(any())).thenReturn(mAudioInjection);
-        when(mAllowlistController.isPackageAutomatable(anyString())).thenReturn(true);
+        when(mAllowlistController.isPackageAutomatable(anyString(), anyString(), any()))
+                .thenReturn(true);
     }
 
     @After
@@ -435,6 +448,25 @@ public class ComputerControlSessionImplTest {
     }
 
     @Test
+    public void createSession_virtualDeviceCreationFails_throwsException() {
+        // Setup: Configure the virtual device factory to throw a RuntimeException upon creation.
+        // This simulates a failure during virtual device creation, for example, due to invalid
+        // parameters or a system service issue. The change being tested wraps this call in
+        // Binder.withCleanCallingIdentity() to prevent SecurityExceptions, so testing general
+        // exception propagation is important.
+        final RuntimeException expectedException = new RuntimeException("Creation failed");
+        when(mVirtualDeviceFactory.createVirtualDevice(any(), any(), any()))
+                .thenThrow(expectedException);
+
+        // Action & Verification: Assert that creating the session throws the same exception,
+        // ensuring that creation failures are propagated to the caller.
+        final RuntimeException thrown = assertThrows(RuntimeException.class,
+                () -> createComputerControlSessionWithoutInitializing(
+                        mDefaultParams, GLOBAL_TIMEOUT_MILLIS));
+        assertThat(thrown).isEqualTo(expectedException);
+    }
+
+    @Test
     public void createSession_noActivityPolicy() throws Exception {
         createComputerControlSession(mDefaultParams);
 
@@ -444,12 +476,31 @@ public class ComputerControlSessionImplTest {
     }
 
     @Test
+    public void createSession_startsWatchingAppOps() throws Exception {
+        createComputerControlSession(mDefaultParams);
+
+        verify(mAppOpsManager).startWatchingMode(
+                eq(AppOpsManager.OP_COMPUTER_CONTROL), any(), any());
+    }
+
+    @Test
     public void closeSession_closesVirtualDevice() throws Exception {
         createComputerControlSession(mDefaultParams);
+
         mSession.close();
+
         verify(mVirtualDevice).close();
         verify(mOnClosedListener).accept(mSession);
         verify(mLifecycleCallback).onClosed(eq(CLOSE_REASON_CALLER_INITIATED));
+    }
+
+    @Test
+    public void closeSession_stopsWatchingAppOps() throws Exception {
+        createComputerControlSession(mDefaultParams);
+
+        mSession.close();
+
+        verify(mAppOpsManager).stopWatchingMode(mSession);
     }
 
     @Test
@@ -457,6 +508,74 @@ public class ComputerControlSessionImplTest {
         createComputerControlSession(mDefaultParams);
         mSession.close(123);
         verify(mLifecycleCallback).onClosed(eq(123));
+    }
+
+    @Test
+    public void onOpChanged_modeIgnored_closesSession() throws Exception {
+        // Create a session.
+        createComputerControlSession(mDefaultParams);
+        when(mAppOpsManager.checkOpNoThrow(eq(AppOpsManager.OPSTR_COMPUTER_CONTROL), anyInt(),
+                any())).thenReturn(AppOpsManager.MODE_IGNORED);
+
+        // onOpChanged callback triggered.
+        mSession.onOpChanged(AppOpsManager.OPSTR_COMPUTER_CONTROL, mSession.getOwnerPackageName(),
+                USER_ID);
+
+        // Verify the session is closed.
+        verify(mVirtualDevice).close();
+        verify(mOnClosedListener).accept(mSession);
+        verify(mLifecycleCallback).onClosed(eq(CLOSE_REASON_USER_INITIATED));
+    }
+
+    @Test
+    public void onOpChanged_modeNotIgnored_doesNothing() throws Exception {
+        // Create a session.
+        createComputerControlSession(mDefaultParams);
+        when(mAppOpsManager.checkOpNoThrow(eq(AppOpsManager.OPSTR_COMPUTER_CONTROL), anyInt(),
+                any())).thenReturn(AppOpsManager.MODE_ALLOWED);
+
+        // onOpChanged callback triggered.
+        mSession.onOpChanged(AppOpsManager.OPSTR_COMPUTER_CONTROL, mSession.getOwnerPackageName(),
+                USER_ID);
+
+        // Verify the session is not closed.
+        verify(mVirtualDevice, never()).close();
+        verify(mOnClosedListener, never()).accept(mSession);
+        verify(mLifecycleCallback, never()).onClosed(eq(CLOSE_REASON_USER_INITIATED));
+    }
+
+    @Test
+    public void onOpChanged_differentPackage_doesNothing() throws Exception {
+        // Create a session.
+        createComputerControlSession(mDefaultParams);
+        when(mAppOpsManager.checkOpNoThrow(eq(AppOpsManager.OPSTR_COMPUTER_CONTROL), anyInt(),
+                any())).thenReturn(AppOpsManager.MODE_IGNORED);
+
+        // onOpChanged callback triggered.
+        mSession.onOpChanged(AppOpsManager.OPSTR_COMPUTER_CONTROL, UNDECLARED_TARGET_PACKAGE,
+                USER_ID);
+
+        // Verify the session is not closed.
+        verify(mVirtualDevice, never()).close();
+        verify(mOnClosedListener, never()).accept(mSession);
+        verify(mLifecycleCallback, never()).onClosed(eq(CLOSE_REASON_USER_INITIATED));
+    }
+
+    @Test
+    public void onOpChanged_differentUser_doesNothing() throws Exception {
+        // Create a session.
+        createComputerControlSession(mDefaultParams);
+        when(mAppOpsManager.checkOpNoThrow(eq(AppOpsManager.OPSTR_COMPUTER_CONTROL), anyInt(),
+                any())).thenReturn(AppOpsManager.MODE_IGNORED);
+
+        // onOpChanged callback triggered.
+        mSession.onOpChanged(AppOpsManager.OPSTR_COMPUTER_CONTROL, mSession.getOwnerPackageName(),
+                USER_ID + 1);
+
+        // Verify the session is not closed.
+        verify(mVirtualDevice, never()).close();
+        verify(mOnClosedListener, never()).accept(mSession);
+        verify(mLifecycleCallback, never()).onClosed(eq(CLOSE_REASON_USER_INITIATED));
     }
 
     @Test
@@ -515,7 +634,8 @@ public class ComputerControlSessionImplTest {
         createComputerControlSession(mDefaultParams);
         when(mOwnerPackageManager.queryIntentActivities(any(), any()))
                 .thenReturn(List.of(new ResolveInfo()));
-        when(mAllowlistController.isPackageAutomatable(anyString())).thenReturn(false);
+        when(mAllowlistController.isPackageAutomatable(anyString(), anyString(), any()))
+                .thenReturn(false);
 
         assertThrows(IllegalArgumentException.class,
                 () -> mSession.launchApplication(TARGET_PACKAGE_1, TARGET_CLASS));
@@ -542,11 +662,12 @@ public class ComputerControlSessionImplTest {
         verify(mVirtualTouchscreen,
                 timeout(TOUCH_EVENT_DELAY_MS * (SWIPE_STEPS + 1)).times(SWIPE_STEPS))
                 .sendTouchEvent(argThat(new MatchesTouchEvent(VirtualTouchEvent.ACTION_MOVE)));
-        verify(mVirtualTouchscreen, timeout(TOUCH_EVENT_DELAY_MS))
+        verify(mVirtualTouchscreen, timeout(2 * TOUCH_EVENT_DELAY_MS))
                 .sendTouchEvent(argThat(
                         new MatchesTouchEvent(180, 400, VirtualTouchEvent.ACTION_MOVE)));
-        verify(mVirtualTouchscreen).sendTouchEvent(argThat(
-                new MatchesTouchEvent(180, 400, VirtualTouchEvent.ACTION_UP)));
+        verify(mVirtualTouchscreen, timeout(2 * TOUCH_EVENT_DELAY_MS))
+                .sendTouchEvent(argThat(
+                        new MatchesTouchEvent(180, 400, VirtualTouchEvent.ACTION_UP)));
     }
 
     @Test
@@ -607,16 +728,31 @@ public class ComputerControlSessionImplTest {
     }
 
     @Test
-    public void insertTextWithCommit_sendEnterKeyOnAvailableInputConnection()
+    public void insertTextWithCommit_ifNoDefaultEditorAction_sendsEnterKeyOnInputConnection()
             throws RemoteException {
         createComputerControlSession(mDefaultParams);
+        mEditorInfo.imeOptions = EditorInfo.IME_ACTION_NONE;
 
         mSession.insertText("text", false /* replaceExisting */, true /* commit */);
         verify(mRemoteComputerControlInputConnection).commitText(any(), eq("text"), eq(1));
-        verify(mRemoteComputerControlInputConnection).sendKeyEvent(any(),
-                argThat(new MatchesKeyEvent(KeyEvent.KEYCODE_ENTER, KeyEvent.ACTION_DOWN)));
-        verify(mRemoteComputerControlInputConnection).sendKeyEvent(any(),
-                argThat(new MatchesKeyEvent(KeyEvent.KEYCODE_ENTER, KeyEvent.ACTION_UP)));
+        verify(mRemoteComputerControlInputConnection, timeout(2 * KEY_EVENT_DELAY_MS)).sendKeyEvent(
+                any(), argThat(new MatchesKeyEvent(KeyEvent.KEYCODE_ENTER, KeyEvent.ACTION_DOWN)));
+        verify(mRemoteComputerControlInputConnection, timeout(2 * KEY_EVENT_DELAY_MS)).sendKeyEvent(
+                any(), argThat(new MatchesKeyEvent(KeyEvent.KEYCODE_ENTER, KeyEvent.ACTION_UP)));
+    }
+
+    @Test
+    public void insertTextWithCommit_performsDefaultEditorAction()
+            throws RemoteException {
+        createComputerControlSession(mDefaultParams);
+        mEditorInfo.imeOptions = EditorInfo.IME_ACTION_DONE;
+
+        mSession.insertText("text", false /* replaceExisting */, true /* commit */);
+        verify(mRemoteComputerControlInputConnection).commitText(any(), eq("text"), eq(1));
+        verify(mRemoteComputerControlInputConnection,
+                timeout(2 * KEY_EVENT_DELAY_MS)).performEditorAction(any(),
+                eq(EditorInfo.IME_ACTION_DONE));
+        verify(mRemoteComputerControlInputConnection, never()).sendKeyEvent(any(), any());
     }
 
     @Test
@@ -642,13 +778,14 @@ public class ComputerControlSessionImplTest {
     public void createInteractiveMirror_successfullyReturnsInitializedMirror()
             throws Exception {
         createComputerControlSession(mDefaultParams);
-        final var mirrorSurface = new SurfaceControl();
+        final var displayMirror = mockDisplayMirror();
         when(mWindowManagerInternal.createMirrorForDisplayContent(VIRTUAL_DISPLAY_ID))
-                .thenReturn(mirrorSurface);
+                .thenReturn(displayMirror);
 
         final var returnedMirrorSurface = Mockito.mock(SurfaceControl.class);
         IInteractiveMirror mirror = mSession.createInteractiveMirror(returnedMirrorSurface);
 
+        final var mirrorSurface = displayMirror.getMirrorSurfaceControl();
         verify(mWindowManagerInternal).createMirrorForDisplayContent(VIRTUAL_DISPLAY_ID);
         assertThat(mirror).isNotNull();
         verify(mTransaction).reparent(eq(mirrorSurface), mSurfaceControlArgumentCaptor.capture());
@@ -673,40 +810,61 @@ public class ComputerControlSessionImplTest {
     @Test
     public void closeInteractiveMirror_removesMirrorSurface() throws Exception {
         createComputerControlSession(mDefaultParams);
-        final var mirrorSurface = new SurfaceControl();
+        final var displayMirror = mockDisplayMirror();
         when(mWindowManagerInternal.createMirrorForDisplayContent(VIRTUAL_DISPLAY_ID))
-                .thenReturn(mirrorSurface);
-        final var returnedMirrorSurface = new SurfaceControl();
+                .thenReturn(displayMirror);
+        final var returnedMirrorSurface = Mockito.mock(SurfaceControl.class);
         IInteractiveMirror mirror = mSession.createInteractiveMirror(returnedMirrorSurface);
         assertThat(mirror).isNotNull();
         verify(mWindowManagerInternal).createMirrorForDisplayContent(VIRTUAL_DISPLAY_ID);
-        Mockito.reset(mTransaction);
+        verify(returnedMirrorSurface).copyFrom(mSurfaceControlArgumentCaptor.capture(), any());
+        clearInvocations(mTransaction);
 
         mirror.close();
 
-        verify(mTransaction).reparent(eq(mirrorSurface), eq(null));
+        verify(displayMirror).close();
+        verify(mTransaction).remove(mSurfaceControlArgumentCaptor.getValue());
     }
 
     @Test
     public void closeSession_removesAllInteractiveMirrors() throws Exception {
         createComputerControlSession(mDefaultParams);
-        final var mirrorSurface1 = new SurfaceControl();
+        final var displayMirror1 = mockDisplayMirror();
         when(mWindowManagerInternal.createMirrorForDisplayContent(VIRTUAL_DISPLAY_ID))
-                .thenReturn(mirrorSurface1);
+                .thenReturn(displayMirror1);
         IInteractiveMirror mirror1 = mSession.createInteractiveMirror(new SurfaceControl());
         assertThat(mirror1).isNotNull();
-        final var mirrorSurface2 = new SurfaceControl();
+        final var displayMirror2 = mockDisplayMirror();
         when(mWindowManagerInternal.createMirrorForDisplayContent(VIRTUAL_DISPLAY_ID))
-                .thenReturn(mirrorSurface2);
+                .thenReturn(displayMirror2);
         IInteractiveMirror mirror2 = mSession.createInteractiveMirror(new SurfaceControl());
         assertThat(mirror2).isNotNull();
         verify(mWindowManagerInternal, times(2)).createMirrorForDisplayContent(VIRTUAL_DISPLAY_ID);
-        Mockito.reset(mTransaction);
+        clearInvocations(mTransaction);
 
         mSession.close();
 
-        verify(mTransaction).reparent(eq(mirrorSurface1), eq(null));
-        verify(mTransaction).reparent(eq(mirrorSurface2), eq(null));
+        verify(displayMirror1).close();
+        verify(displayMirror2).close();
+    }
+
+    @Test
+    public void duplicateCloseInteractiveMirrorCall_doesNothing() throws Exception {
+        createComputerControlSession(mDefaultParams);
+        final var displayMirror = mockDisplayMirror();
+        when(mWindowManagerInternal.createMirrorForDisplayContent(VIRTUAL_DISPLAY_ID))
+                .thenReturn(displayMirror);
+        final var returnedMirrorSurface = Mockito.mock(SurfaceControl.class);
+        IInteractiveMirror mirror = mSession.createInteractiveMirror(returnedMirrorSurface);
+        assertThat(mirror).isNotNull();
+        mirror.close();
+        clearInvocations(mTransaction, displayMirror);
+
+        mirror.close();
+        mirror.close();
+        mSession.close();
+
+        verifyNoInteractions(displayMirror, mTransaction);
     }
 
     @Test
@@ -761,6 +919,59 @@ public class ComputerControlSessionImplTest {
         activityListener.onSecureWindowHidden(VIRTUAL_DISPLAY_ID);
 
         verify(mLifecycleCallback).onActive();
+    }
+
+    @Test
+    @EnableFlags(android.app.appfunctions.flags.Flags.FLAG_ENABLE_APP_INTERACTION_API)
+    public void onActivityLaunchRequested_whenActivityIsAllowed_reportsAppInteraction()
+            throws RemoteException {
+        createComputerControlSession(mDefaultParams);
+        verify(mVirtualDevice)
+                .addActivityListener(any(), mActivityListenerArgumentCaptor.capture());
+
+        mActivityListenerArgumentCaptor
+                .getValue()
+                .onActivityLaunchRequested(VIRTUAL_DISPLAY_ID, TEST_COMPONENT, USER_ID);
+
+        verify(mAppInteractionService)
+                .noteAppInteraction(
+                        eq(AGENT_PACKAGE),
+                        eq(TEST_COMPONENT.getPackageName()),
+                        isNull(),
+                        anyLong(),
+                        eq(0L),
+                        eq(USER_ID));
+    }
+
+    @Test
+    @EnableFlags(android.app.appfunctions.flags.Flags.FLAG_ENABLE_APP_INTERACTION_API)
+    public void onActivityLaunchRequested_whenActivityIsBlocked_doesNotReportAppInteraction()
+            throws RemoteException {
+        createComputerControlSession(mDefaultParams);
+        verify(mVirtualDevice)
+                .addActivityListener(any(), mActivityListenerArgumentCaptor.capture());
+
+        mActivityListenerArgumentCaptor
+                .getValue()
+                .onActivityLaunchRequested(VIRTUAL_DISPLAY_ID, BLOCKED_COMPONENT, USER_ID);
+
+        verify(mAppInteractionService, never())
+                .noteAppInteraction(any(), any(), any(), anyLong(), anyLong(), anyInt());
+    }
+
+    @Test
+    @DisableFlags(android.app.appfunctions.flags.Flags.FLAG_ENABLE_APP_INTERACTION_API)
+    public void onActivityLaunchRequested_whenFlagIsDisabled_doesNotCrash()
+            throws RemoteException {
+        assertThat(LocalServices.getService(AppInteractionService.class)).isNull();
+
+        createComputerControlSession(mDefaultParams);
+        verify(mVirtualDevice)
+                .addActivityListener(any(), mActivityListenerArgumentCaptor.capture());
+
+        mActivityListenerArgumentCaptor
+                .getValue()
+                .onActivityLaunchRequested(VIRTUAL_DISPLAY_ID, TEST_COMPONENT, USER_ID);
     }
 
     @Test
@@ -1031,8 +1242,8 @@ public class ComputerControlSessionImplTest {
         mSession = new ComputerControlSessionImpl(
                 mContext, displayManagerGlobal, mAllowlistController, mViewConfiguration,
                 globalSessionTimeoutDurationMs, () -> mTransaction, mAppToken, params,
-                new AttributionSource(UserHandle.getUid(USER_ID, 0), "com.package", "tag"),
-                mVirtualDeviceFactory, mOnClosedListener);
+                new AttributionSource(UserHandle.getUid(USER_ID, 0), AGENT_PACKAGE, "tag"),
+                mVirtualDeviceFactory, mOnClosedListener, Runnable::run);
     }
 
     @SuppressLint("MissingPermission")
@@ -1102,6 +1313,16 @@ public class ComputerControlSessionImplTest {
             }
             return mX == event.getX() && mY == event.getY();
         }
+
+        @Override
+        public String toString() {
+            return "MatchesTouchEvent{"
+                    + "mX=" + mX
+                    + ", mY=" + mY
+                    + ", mAction=" + mAction
+                    + ", mToolType=" + mToolType
+                    + '}';
+        }
     }
 
     private static final class MatchesVirtualKeyEvent implements ArgumentMatcher<VirtualKeyEvent> {
@@ -1133,5 +1354,11 @@ public class ComputerControlSessionImplTest {
         public boolean matches(KeyEvent event) {
             return mKeyCode == event.getKeyCode() && mAction == event.getAction();
         }
+    }
+
+    private static WindowManagerInternal.DisplayMirror mockDisplayMirror() {
+        final var mirror = Mockito.mock(WindowManagerInternal.DisplayMirror.class);
+        when(mirror.getMirrorSurfaceControl()).thenReturn(new SurfaceControl());
+        return mirror;
     }
 }

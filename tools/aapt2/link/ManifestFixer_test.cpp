@@ -256,12 +256,6 @@ TEST_F(ManifestFixerTest, RenameManifestPackageAndFullyQualifyClasses) {
           <receiver android:name="com.foo.android.Receiver" />
           <activity-alias android:name=".activityAlias.Start"
                           android:targetActivity=".activity.Start" />
-          <private-compute>
-            <activity android:name=".activity.Start" />
-            <receiver android:name="com.foo.android.Receiver" />
-            <activity-alias android:name=".activityAlias.Start"
-                            android:targetActivity=".activity.Start" />
-          </private-compute>
         </application>
       </manifest>)EOF",
                                                             options);
@@ -319,38 +313,9 @@ TEST_F(ManifestFixerTest, RenameManifestPackageAndFullyQualifyClasses) {
   attr = el->FindAttribute(xml::kSchemaAndroid, "targetActivity");
   ASSERT_THAT(el, NotNull());
   EXPECT_THAT(attr->value, StrEq("android.activity.Start"));
-
-  xml::Element* private_compute_el = application_el->FindChild({}, "private-compute");
-  ASSERT_THAT(private_compute_el, NotNull());
-
-  el = private_compute_el->FindChild({}, "activity");
-  ASSERT_THAT(el, NotNull());
-
-  attr = el->FindAttribute(xml::kSchemaAndroid, "name");
-  ASSERT_THAT(el, NotNull());
-  EXPECT_THAT(attr->value, StrEq("android.activity.Start"));
-
-  el = private_compute_el->FindChild({}, "receiver");
-  ASSERT_THAT(el, NotNull());
-
-  attr = el->FindAttribute(xml::kSchemaAndroid, "name");
-  ASSERT_THAT(el, NotNull());
-  EXPECT_THAT(attr->value, StrEq("com.foo.android.Receiver"));
-
-  el = private_compute_el->FindChild({}, "activity-alias");
-  ASSERT_THAT(el, NotNull());
-
-  attr = el->FindAttribute(xml::kSchemaAndroid, "name");
-  ASSERT_THAT(el, NotNull());
-  EXPECT_THAT(attr->value, StrEq("android.activityAlias.Start"));
-
-  attr = el->FindAttribute(xml::kSchemaAndroid, "targetActivity");
-  ASSERT_THAT(el, NotNull());
-  EXPECT_THAT(attr->value, StrEq("android.activity.Start"));
 }
 
-TEST_F(ManifestFixerTest,
-       RenameManifestInstrumentationPackageAndFullyQualifyTarget) {
+TEST_F(ManifestFixerTest, RenameManifestInstrumentationPackageAndFullyQualifyTarget) {
   ManifestFixerOptions options;
   options.rename_instrumentation_target_package = std::string("com.android");
 
@@ -1711,53 +1676,53 @@ TEST_F(ManifestFixerTest, DoNothingForOtherConfigChanges) {
 }
 
 TEST_F(ManifestFixerTest, PermissionPurposeTagsAreAllowed) {
-  // Verifies that <specific-purpose> is a valid child of <uses-permission>.
+  // Verifies that <purpose> is a valid child of <uses-permission>.
   std::string input = R"(
     <manifest xmlns:android="http://schemas.android.com/apk/res/android"
         package="android">
       <uses-permission android:name="android.permission.INTERNET">
-        <specific-purpose />
+        <purpose />
       </uses-permission>
     </manifest>)";
   EXPECT_THAT(Verify(input), NotNull());
 
-  // Verifies that <specific-purpose> is a valid child of <uses-permission-sdk-23>.
+  // Verifies that <purpose> is a valid child of <uses-permission-sdk-23>.
   input = R"(
     <manifest xmlns:android="http://schemas.android.com/apk/res/android"
         package="android">
       <uses-permission-sdk-23 android:name="android.permission.INTERNET">
-        <specific-purpose />
+        <purpose />
       </uses-permission-sdk-23>
     </manifest>)";
   EXPECT_THAT(Verify(input), NotNull());
 
-  // Verifies that <valid-specific-purpose> is a valid child of <permission>
+  // Verifies that <valid-purpose> is a valid child of <permission>
   // and has a non-empty name attribute.
   input = R"(
     <manifest xmlns:android="http://schemas.android.com/apk/res/android"
         package="android">
       <permission android:name="my.permission">
-        <valid-specific-purpose android:name="foo" />
+        <valid-purpose android:name="foo" />
       </permission>
     </manifest>)";
   EXPECT_THAT(Verify(input), NotNull());
 
-  // Verifies that <valid-specific-purpose> must have a name attribute.
+  // Verifies that <valid-purpose> must have a name attribute.
   input = R"(
     <manifest xmlns:android="http://schemas.android.com/apk/res/android"
         package="android">
       <permission android:name="my.permission">
-        <valid-specific-purpose />
+        <valid-purpose />
       </permission>
     </manifest>)";
   EXPECT_THAT(Verify(input), IsNull());
 
-  // Verifies that the name attribute of <valid-specific-purpose> must not be empty.
+  // Verifies that the name attribute of <valid-purpose> must not be empty.
   input = R"(
     <manifest xmlns:android="http://schemas.android.com/apk/res/android"
         package="android">
       <permission android:name="my.permission">
-        <valid-specific-purpose android:name="" />
+        <valid-purpose android:name="" />
       </permission>
     </manifest>)";
   EXPECT_THAT(Verify(input), IsNull());

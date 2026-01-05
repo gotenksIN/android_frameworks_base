@@ -40,9 +40,9 @@ import java.util.concurrent.Executor;
 public final class ProcessCachedOptimizerRecord {
 
     static final int SHOULD_NOT_FREEZE_REASON_NONE = 1;
-    static final int SHOULD_NOT_FREEZE_REASON_UID_ALLOWLISTED = 1 << 1;
-    static final int SHOULD_NOT_FREEZE_REASON_BINDER_ALLOW_OOM_MANAGEMENT = 1 << 2;
-    static final int SHOULD_NOT_FREEZE_REASON_BIND_WAIVE_PRIORITY = 1 << 3;
+    public static final int SHOULD_NOT_FREEZE_REASON_UID_ALLOWLISTED = 1 << 1;
+    public static final int SHOULD_NOT_FREEZE_REASON_BINDER_ALLOW_OOM_MANAGEMENT = 1 << 2;
+    public static final int SHOULD_NOT_FREEZE_REASON_BIND_WAIVE_PRIORITY = 1 << 3;
 
     @IntDef(flag = true, prefix = {"SHOULD_NOT_FREEZE_REASON_"}, value = {
         SHOULD_NOT_FREEZE_REASON_NONE,
@@ -214,7 +214,9 @@ public final class ProcessCachedOptimizerRecord {
     CachedAppOptimizer.CompactProfile getLastCompactProfile() {
         if (mLastCompactProfile == null) {
             // The first compaction won't have a previous one, so assign one to avoid crashing.
+// QTI_BEGIN: 2024-07-04: Performance: CachedAppOptimizer: Initialize compactProfile and compactTime
             mLastCompactProfile = CachedAppOptimizer.CompactProfile.FULL;
+// QTI_END: 2024-07-04: Performance: CachedAppOptimizer: Initialize compactProfile and compactTime
         }
 
         return mLastCompactProfile;
@@ -403,7 +405,9 @@ public final class ProcessCachedOptimizerRecord {
 
     void init(long nowUptime) {
         mFreezeUnfreezeTime = nowUptime;
+// QTI_BEGIN: 2024-07-04: Performance: CachedAppOptimizer: Initialize compactProfile and compactTime
         mLastCompactTime = nowUptime;
+// QTI_END: 2024-07-04: Performance: CachedAppOptimizer: Initialize compactProfile and compactTime
     }
 
     @GuardedBy("mProcLock")

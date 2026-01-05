@@ -2945,7 +2945,9 @@ public class SizeCompatTests extends WindowTestsBase {
 
         // Update with new activity requested orientation and recompute bounds with no previous
         // size compat cache.
-        verify(mTask).onDescendantOrientationChanged(same(newActivity));
+        if (!com.android.window.flags.Flags.removeLegacyOrientationReport()) {
+            verify(mTask).onDescendantOrientationChanged(same(newActivity));
+        }
 
         final Rect displayBounds = new Rect(display.getBounds());
         final Rect taskBounds = new Rect(mTask.getBounds());
@@ -3011,7 +3013,9 @@ public class SizeCompatTests extends WindowTestsBase {
 
         // Update with new activity requested orientation and recompute bounds with no previous
         // size compat cache.
-        verify(mTask).onDescendantOrientationChanged(same(newActivity));
+        if (!com.android.window.flags.Flags.removeLegacyOrientationReport()) {
+            verify(mTask).onDescendantOrientationChanged(same(newActivity));
+        }
 
         final Rect displayBounds = new Rect(display.getBounds());
         final Rect taskBounds = new Rect(mTask.getBounds());
@@ -4528,7 +4532,6 @@ public class SizeCompatTests extends WindowTestsBase {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_UPSCALING_SIZE_COMPAT_ON_EXITING_DESKTOP_BUGFIX)
     public void testUpscaling_boundsUpscaledWithWindowingModeChange() {
         allowDesktopMode();
 
@@ -4591,7 +4594,6 @@ public class SizeCompatTests extends WindowTestsBase {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_UPSCALING_SIZE_COMPAT_ON_EXITING_DESKTOP_BUGFIX)
     public void testUpscaling_boundsUpscaledWithDisplayMove() {
         final int dw = 1000;
         final int dh = 600;
@@ -5558,9 +5560,6 @@ public class SizeCompatTests extends WindowTestsBase {
             overrides.resetSystemFullscreenOverrideCache();
 
             assertTrue(overrides.isSystemOverrideToFullscreenEnabled());
-            if (!com.android.window.flags.Flags.optOutOverrideOrientationToUser()) {
-                return;
-            }
 
             final AppCompatResizeOverrides resizeOverrides =
                     mActivity.mAppCompatController.getResizeOverrides();

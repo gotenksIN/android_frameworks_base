@@ -27,10 +27,11 @@ import static android.view.Display.DEFAULT_DISPLAY;
 
 import static com.android.server.policy.PhoneWindowManager.SYSTEM_DIALOG_REASON_ASSIST;
 
-import android.annotation.IntDef;
 import android.Manifest;
+import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.RequiresPermission;
 import android.app.ActivityManager;
 import android.app.ActivityTaskManager;
 import android.app.AppGlobals;
@@ -64,6 +65,7 @@ import android.os.RemoteCallback;
 import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.SharedMemory;
+import android.os.SystemClock;
 import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.provider.Settings;
@@ -89,6 +91,7 @@ import com.android.internal.app.IVoiceInteractionSessionShowCallback;
 import com.android.internal.app.IVoiceInteractor;
 import com.android.internal.util.function.pooled.PooledLambda;
 import com.android.server.LocalServices;
+import com.android.server.compat.PlatformCompat;
 import com.android.server.wm.ActivityAssistInfo;
 import com.android.server.wm.ActivityTaskManagerInternal;
 import com.android.server.wm.ActivityTaskManagerInternal.ActivityTokens;
@@ -148,8 +151,10 @@ class VoiceInteractionManagerServiceImpl implements VoiceInteractionSessionConne
     final IWindowManager mIWindowManager;
     final ComponentName mHotwordDetectionComponentName;
     final ComponentName mVisualQueryDetectionComponentName;
+    final PlatformCompat mPlatformCompat;
     boolean mEnableAssistStructure = true;
     boolean mBound = false;
+    long mLastHotwordDetectionTimestamp = 0L;
     IVoiceInteractionService mService;
     volatile HotwordDetectionConnection mHotwordDetectionConnection;
 
@@ -252,6 +257,7 @@ class VoiceInteractionManagerServiceImpl implements VoiceInteractionSessionConne
         mAtm = ActivityTaskManager.getService();
         mPackageManagerInternal =
                 Objects.requireNonNull(LocalServices.getService(PackageManagerInternal.class));
+        mPlatformCompat = new PlatformCompat(context);
         VoiceInteractionServiceInfo info;
         try {
             info = new VoiceInteractionServiceInfo(context.getPackageManager(), service, mUser);
@@ -310,6 +316,11 @@ class VoiceInteractionManagerServiceImpl implements VoiceInteractionSessionConne
                 /* direct= */ true);
     }
 
+    @RequiresPermission(
+            allOf = {
+                Manifest.permission.LOG_COMPAT_CHANGE,
+                Manifest.permission.READ_COMPAT_CHANGE_CONFIG
+            })
     public boolean showSessionLocked(
             @Nullable Bundle args,
             int flags,
@@ -330,6 +341,12 @@ class VoiceInteractionManagerServiceImpl implements VoiceInteractionSessionConne
         }
 
         if (mActiveSession == null) {
+
+            final boolean shouldRestrictAssistStructureScreenContent =
+                    mPlatformCompat.isChangeEnabled(
+                            VoiceInteractionManagerService.ENABLE_RESTRICT_ASSIST_STRUCTURE,
+                            getApplicationInfo());
+
             mActiveSession =
                     new VoiceInteractionSessionConnection(
                             mServiceStub,
@@ -339,7 +356,9 @@ class VoiceInteractionManagerServiceImpl implements VoiceInteractionSessionConne
                             this,
                             mInfo.getServiceInfo().applicationInfo.uid,
                             mHandler,
-                            mEnableAssistStructure);
+                            mEnableAssistStructure,
+                            shouldRestrictAssistStructureScreenContent
+            );
         }
         if (!mActiveSession.mBound) {
             try {
@@ -672,6 +691,10 @@ class VoiceInteractionManagerServiceImpl implements VoiceInteractionSessionConne
         return mInfo.getServiceInfo().applicationInfo;
     }
 
+    public long getLastHotwordDetectedMillis() {
+        return mLastHotwordDetectionTimestamp;
+    }
+
     public void startListeningVisibleActivityChangedLocked(@NonNull IBinder token) {
         if (DEBUG) {
             Slog.d(TAG, "startListeningVisibleActivityChangedLocked: token=" + token);
@@ -880,6 +903,7 @@ class VoiceInteractionManagerServiceImpl implements VoiceInteractionSessionConne
             ServiceInfo hotwordDetectionServiceInfo =
                     getHotwordDetectionServiceInfoLocked(callback, detectorType);
             hotwordDetectionServiceType = getServiceTypeLocked(hotwordDetectionServiceInfo);
+            Slog.d(TAG, "hotwordDetectionServiceType: " + hotwordDetectionServiceType);
             if (hotwordDetectionServiceType == SERVICE_TYPE_UNRESTRICTED) {
                 logUnrestrictedServiceTypeAndThrowExceptionLocked(callback, detectorType);
             }
@@ -1090,6 +1114,9 @@ class VoiceInteractionManagerServiceImpl implements VoiceInteractionSessionConne
                             + " isn't established");
             return;
         }
+        // Manually set the hotword detection time to now since this won't run through the regular
+        // SoundTriggerCallback path.
+        mLastHotwordDetectionTimestamp = SystemClock.uptimeMillis();
         mHotwordDetectionConnection.triggerHardwareRecognitionEventForTestLocked(event, callback);
     }
 
@@ -1101,7 +1128,13 @@ class VoiceInteractionManagerServiceImpl implements VoiceInteractionSessionConne
             Slog.d(TAG, "createSoundTriggerCallbackLocked");
         }
         return new HotwordDetectionConnection.SoundTriggerCallback(
-                context, callback, mHotwordDetectionConnection, voiceInteractorIdentity);
+                context,
+                callback,
+                mHotwordDetectionConnection,
+                voiceInteractorIdentity,
+                () -> {
+                    mLastHotwordDetectionTimestamp = SystemClock.uptimeMillis();
+                });
     }
 
     private static ServiceInfo getServiceInfoLocked(

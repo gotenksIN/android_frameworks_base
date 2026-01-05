@@ -16,6 +16,7 @@
 
 package android.app;
 
+import static android.aiseal.Flags.aisealHostApis;
 import static android.app.appfunctions.flags.Flags.enableAppFunctionManager;
 import static android.app.lskfreset.flags.Flags.enableLskfResetManager;
 import static android.app.privatecompute.flags.Flags.enablePccFrameworkSupport;
@@ -27,6 +28,7 @@ import static android.service.chooser.Flags.interactiveChooser;
 import android.accounts.AccountManager;
 import android.accounts.IAccountManager;
 import android.adservices.AdServicesFrameworkInitializer;
+import android.aiseal.AiSealManager;
 import android.annotation.FlaggedApi;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -50,6 +52,7 @@ import android.app.ecm.EnhancedConfirmationFrameworkInitializer;
 import android.app.job.JobSchedulerFrameworkInitializer;
 import android.app.lskfreset.ILskfResetManager;
 import android.app.lskfreset.LskfResetManager;
+import android.app.modes.ContextualModeManager;
 import android.app.ondeviceintelligence.OnDeviceIntelligenceFrameworkInitializer;
 import android.app.people.PeopleManager;
 import android.app.prediction.AppPredictionManager;
@@ -109,6 +112,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.ShortcutManager;
 import android.content.pm.verify.domain.DomainVerificationManager;
 import android.content.pm.verify.domain.IDomainVerificationManager;
+import android.content.pm.webapp.WebAppFrameworkInitializer;
 import android.content.res.Resources;
 import android.content.rollback.RollbackManagerFrameworkInitializer;
 import android.credentials.CredentialManager;
@@ -271,6 +275,7 @@ import android.service.persistentdata.IPersistentDataBlockService;
 import android.service.persistentdata.PersistentDataBlockManager;
 import android.service.personalcontext.IPersonalContextManager;
 import android.service.personalcontext.PersonalContextManager;
+import android.service.uprobestats.DynamicInstrumentationManager;
 import android.service.uprobestats.UprobestatsFrameworkInitializer;
 import android.service.vr.IVrManager;
 import android.system.virtualmachine.VirtualizationFrameworkInitializer;
@@ -316,6 +321,7 @@ import com.android.internal.net.INetworkWatchlistManager;
 import com.android.internal.os.IBinaryTransparencyService;
 import com.android.internal.os.IDropBoxManagerService;
 import com.android.internal.policy.PhoneLayoutInflater;
+import com.android.internal.telecom.TelecomDependencies;
 import com.android.internal.util.Preconditions;
 import com.android.modules.utils.ravenwood.RavenwoodHelper;
 
@@ -693,6 +699,16 @@ public final class SystemServiceRegistry {
                 );
             }});
 
+        if (android.service.notification.Flags.enableDndSync()) {
+            registerService(Context.CONTEXTUAL_MODE_SERVICE, ContextualModeManager.class,
+                    new CachedServiceFetcher<ContextualModeManager>() {
+                @Override
+                public ContextualModeManager createService(ContextImpl ctx) {
+                    return new ContextualModeManager(ctx);
+                }
+            });
+        }
+
         registerService(Context.PEOPLE_SERVICE, PeopleManager.class,
                 new CachedServiceFetcher<PeopleManager>() {
             @Override
@@ -815,12 +831,15 @@ public final class SystemServiceRegistry {
                     return new TelephonyRegistryManager(ctx);
                 }});
 
-        registerService(Context.TELECOM_SERVICE, TelecomManager.class,
+        if (!android.telecom.flags.Flags.telecomMainlineApi()) {
+            registerService(Context.TELECOM_SERVICE, TelecomManager.class,
                 new CachedServiceFetcher<TelecomManager>() {
-            @Override
-            public TelecomManager createService(ContextImpl ctx) {
-                return new TelecomManager(ctx.getOuterContext());
-            }});
+                    @Override
+                    public TelecomManager createService(ContextImpl ctx) {
+                        return TelecomDependencies.createTelecomManager(ctx);
+                    }
+                });
+        }
 
         registerService(Context.MMS_SERVICE, MmsManager.class,
                 new CachedServiceFetcher<MmsManager>() {
@@ -2015,6 +2034,33 @@ public final class SystemServiceRegistry {
                     });
         }
 
+        if (aisealHostApis()) {
+            registerService(
+                    Context.AISEAL_HOST_SERVICE,
+                    AiSealManager.class,
+                    new CachedServiceFetcher<>() {
+                        @Override
+                        public AiSealManager createService(ContextImpl ctx)
+                                throws ServiceNotFoundException {
+                            return new AiSealManager(ctx);
+                        }
+                    });
+        }
+
+        registerService(Context.DYNAMIC_INSTRUMENTATION_SERVICE,
+                DynamicInstrumentationManager.class,
+                new CachedServiceFetcher<DynamicInstrumentationManager>() {
+                    @Override
+                    public DynamicInstrumentationManager createService(ContextImpl ctx)
+                            throws ServiceNotFoundException {
+                        if (!android.security.Flags.dynamicInstrumentationApi()) {
+                            throw new ServiceNotFoundException(
+                                    Context.DYNAMIC_INSTRUMENTATION_SERVICE + " is not supported");
+                        }
+                        return new DynamicInstrumentationManager(ctx);
+                    }
+                });
+
         sInitializing = true;
         try {
             // Note: the following functions need to be @SystemApis, once they become mainline
@@ -2046,6 +2092,14 @@ public final class SystemServiceRegistry {
             NpuManagerFrameworkInitializer.registerServiceWrappers();
             VirtualizationFrameworkInitializer.registerServiceWrappers();
             ConnectivityFrameworkInitializerBaklava.registerServiceWrappers();
+
+            if (android.telecom.flags.Flags.telecomMainlineApi()) {
+                TelecomDependencies.registerServiceWrapper();
+            }
+
+            if (com.android.webapp.flags.Flags.enableWebAppService()) {
+                WebAppFrameworkInitializer.registerServiceWrappers();
+            }
 
             if (newStoragePublicApi()) {
                 ConfigInfrastructureFrameworkInitializer.registerServiceWrappers();
@@ -2558,12 +2612,29 @@ public final class SystemServiceRegistry {
         @Override
         @SuppressWarnings("unchecked")
         public final T getService(ContextImpl ctx) {
+            // These arrays should only be touched within synchronized (cache).
             final Object[] cache = ctx.mServiceCache;
-            final int[] gates = ctx.mServiceInitializationStateArray;
+            final byte[] gates = ctx.mServiceInitializationStateArray;
             boolean interrupted = false;
 
             T ret = null;
 
+            // If the service is cached, we return it.
+            // Otherwise, we create it with createService().
+            //
+            // We used to run the whole logic within a per-ContextImpl
+            // lock and the logic was a lot simpler.
+            //
+            // However, unfortunately, some of the services are
+            // very slow to create, so we need to release the lock
+            // before calling createService(). We use a per-service,
+            // per-contgext "gate" to ensure only one thread calls
+            // into createService() for each service at a time
+            // (for each context), while allowing other threads to
+            // call createService() for other services
+            // (or the same service on different contexts)
+            //
+            // See b/457769621 for more information about this code.
             for (;;) {
                 boolean doInitialize = false;
                 synchronized (cache) {
@@ -2599,7 +2670,7 @@ public final class SystemServiceRegistry {
                     // Only the first thread gets here.
 
                     T service = null;
-                    @ServiceInitializationState int newState = ContextImpl.STATE_NOT_FOUND;
+                    @ServiceInitializationState byte newState = ContextImpl.STATE_NOT_FOUND;
                     try {
                         // This thread is the first one to get here. Instantiate the service
                         // *without* the cache lock held.

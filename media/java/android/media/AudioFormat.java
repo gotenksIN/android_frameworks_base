@@ -29,6 +29,8 @@ import android.compat.annotation.UnsupportedAppUsage;
 import android.os.Build;
 import android.os.Parcel;
 import android.os.Parcelable;
+import android.os.vibrator.Flags;
+import android.ravenwood.annotation.RavenwoodKeepWholeClass;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -263,6 +265,7 @@ import java.util.Objects;
  * For the purposes of {@link AudioFormat#getFrameSizeInBytes()}, a compressed data format
  * returns a frame size of 1 byte.
  */
+@RavenwoodKeepWholeClass
 public final class AudioFormat implements Parcelable {
 
     //---------------------------------------------------------
@@ -481,6 +484,7 @@ public final class AudioFormat implements Parcelable {
     @FlaggedApi(FLAG_IAMF_DEFINITIONS_API)
     public static final int ENCODING_IAMF_BASE_ENHANCED_PROFILE_PCM = 44;
 
+// QTI_BEGIN: 2018-02-19: Audio: add support for extended formats
     /** Audio data format: AMRNB
      * @hide
      * */
@@ -505,6 +509,8 @@ public final class AudioFormat implements Parcelable {
      * @hide
      * */
     public static final int ENCODING_EVRCNW = 105;
+// QTI_END: 2018-02-19: Audio: add support for extended formats
+// QTI_BEGIN: 2023-03-22: Audio: add AAC ADTS encodings for LC,HE V1,HE V2 formats
     /** Audio data format: AAC ADTS LC compressed
      * @hide
     */
@@ -520,6 +526,7 @@ public final class AudioFormat implements Parcelable {
     /** Audio data format: FLAC compressed
      * @hide
     */
+// QTI_END: 2023-03-22: Audio: add AAC ADTS encodings for LC,HE V1,HE V2 formats
 
     /** @hide */
     public static String toLogFriendlyEncoding(int enc) {
@@ -612,12 +619,14 @@ public final class AudioFormat implements Parcelable {
                 return "ENCODING_IAMF_SIMPLE_PROFILE_OPUS";
             case ENCODING_IAMF_SIMPLE_PROFILE_PCM:
                 return "ENCODING_IAMF_SIMPLE_PROFILE_PCM";
+// QTI_BEGIN: 2023-03-22: Audio: add AAC ADTS encodings for LC,HE V1,HE V2 formats
             case ENCODING_AAC_ADTS_LC:
                 return "ENCODING_AAC_ADTS_LC";
             case ENCODING_AAC_ADTS_HE_V1:
                 return "ENCODING_AAC_ADTS_HE_V1";
             case ENCODING_AAC_ADTS_HE_V2:
                 return "ENCODING_AAC_ADTS_HE_V2";
+// QTI_END: 2023-03-22: Audio: add AAC ADTS encodings for LC,HE V1,HE V2 formats
             default :
                 return "invalid encoding " + enc;
         }
@@ -702,8 +711,12 @@ public final class AudioFormat implements Parcelable {
     /** @hide
      * Haptic channels can be used by internal framework code. Use the same values as in native.
      */
+    @FlaggedApi(Flags.FLAG_HAPTIC_PCM_GENERATION)
+    @TestApi
     public static final int CHANNEL_OUT_HAPTIC_B = 0x10000000;
     /** @hide */
+    @FlaggedApi(Flags.FLAG_HAPTIC_PCM_GENERATION)
+    @TestApi
     public static final int CHANNEL_OUT_HAPTIC_A = 0x20000000;
 
     public static final int CHANNEL_OUT_MONO = CHANNEL_OUT_FRONT_LEFT;
@@ -1032,7 +1045,9 @@ public final class AudioFormat implements Parcelable {
     public static final int CHANNEL_IN_3POINT0POINT2 = (
             CHANNEL_IN_LEFT | CHANNEL_IN_CENTER | CHANNEL_IN_RIGHT | CHANNEL_IN_TOP_LEFT
             | CHANNEL_IN_TOP_RIGHT);
+// QTI_BEGIN: 2018-02-19: Audio: add support for extended formats
     /** @hide */
+// QTI_END: 2018-02-19: Audio: add support for extended formats
     public static final int CHANNEL_IN_3POINT1POINT2 = (
             CHANNEL_IN_LEFT | CHANNEL_IN_CENTER | CHANNEL_IN_RIGHT | CHANNEL_IN_TOP_LEFT
             | CHANNEL_IN_TOP_RIGHT | CHANNEL_IN_LOW_FREQUENCY);
@@ -1130,9 +1145,11 @@ public final class AudioFormat implements Parcelable {
             case ENCODING_IAMF_SIMPLE_PROFILE_FLAC:
             case ENCODING_IAMF_SIMPLE_PROFILE_OPUS:
             case ENCODING_IAMF_SIMPLE_PROFILE_PCM:
+// QTI_BEGIN: 2023-03-22: Audio: add AAC ADTS encodings for LC,HE V1,HE V2 formats
             case ENCODING_AAC_ADTS_LC:
             case ENCODING_AAC_ADTS_HE_V1:
             case ENCODING_AAC_ADTS_HE_V2:
+// QTI_END: 2023-03-22: Audio: add AAC ADTS encodings for LC,HE V1,HE V2 formats
                 return true;
             default:
                 return false;
@@ -1186,9 +1203,11 @@ public final class AudioFormat implements Parcelable {
             case ENCODING_IAMF_SIMPLE_PROFILE_FLAC:
             case ENCODING_IAMF_SIMPLE_PROFILE_OPUS:
             case ENCODING_IAMF_SIMPLE_PROFILE_PCM:
+// QTI_BEGIN: 2023-05-30: Audio: AudioFormat: add AAC ADTS formats as public encodings
             case ENCODING_AAC_ADTS_LC:
             case ENCODING_AAC_ADTS_HE_V1:
             case ENCODING_AAC_ADTS_HE_V2:
+// QTI_END: 2023-05-30: Audio: AudioFormat: add AAC ADTS formats as public encodings
                 return true;
             default:
                 return false;
@@ -1250,9 +1269,11 @@ public final class AudioFormat implements Parcelable {
             case ENCODING_IAMF_SIMPLE_PROFILE_FLAC:
             case ENCODING_IAMF_SIMPLE_PROFILE_OPUS:
             case ENCODING_IAMF_SIMPLE_PROFILE_PCM: // PCM but inside compressed stream
+// QTI_BEGIN: 2023-03-22: Audio: add AAC ADTS encodings for LC,HE V1,HE V2 formats
             case ENCODING_AAC_ADTS_LC:
             case ENCODING_AAC_ADTS_HE_V1:
             case ENCODING_AAC_ADTS_HE_V2:
+// QTI_END: 2023-03-22: Audio: add AAC ADTS encodings for LC,HE V1,HE V2 formats
                 return false;
             case ENCODING_INVALID:
             default:
@@ -1308,9 +1329,11 @@ public final class AudioFormat implements Parcelable {
             case ENCODING_IAMF_SIMPLE_PROFILE_FLAC:
             case ENCODING_IAMF_SIMPLE_PROFILE_OPUS:
             case ENCODING_IAMF_SIMPLE_PROFILE_PCM:
+// QTI_BEGIN: 2023-03-22: Audio: add AAC ADTS encodings for LC,HE V1,HE V2 formats
             case ENCODING_AAC_ADTS_LC:
             case ENCODING_AAC_ADTS_HE_V1:
             case ENCODING_AAC_ADTS_HE_V2:
+// QTI_END: 2023-03-22: Audio: add AAC ADTS encodings for LC,HE V1,HE V2 formats
                 return false;
             case ENCODING_INVALID:
             default:
@@ -1589,12 +1612,14 @@ public final class AudioFormat implements Parcelable {
                 case ENCODING_AAC_XHE:
                 case ENCODING_AC4:
                 case ENCODING_AC4_L4:
+// QTI_BEGIN: 2018-02-19: Audio: add support for extended formats
                 case ENCODING_AMRNB:
                 case ENCODING_AMRWB:
                 case ENCODING_EVRC:
                 case ENCODING_EVRCB:
                 case ENCODING_EVRCWB:
                 case ENCODING_EVRCNW:
+// QTI_END: 2018-02-19: Audio: add support for extended formats
                 case ENCODING_E_AC3_JOC:
                 case ENCODING_DOLBY_MAT:
                 case ENCODING_OPUS:
@@ -1621,9 +1646,11 @@ public final class AudioFormat implements Parcelable {
                 case ENCODING_IAMF_SIMPLE_PROFILE_FLAC:
                 case ENCODING_IAMF_SIMPLE_PROFILE_OPUS:
                 case ENCODING_IAMF_SIMPLE_PROFILE_PCM:
+// QTI_BEGIN: 2023-03-22: Audio: add AAC ADTS encodings for LC,HE V1,HE V2 formats
                 case ENCODING_AAC_ADTS_LC:
                 case ENCODING_AAC_ADTS_HE_V1:
                 case ENCODING_AAC_ADTS_HE_V2:
+// QTI_END: 2023-03-22: Audio: add AAC ADTS encodings for LC,HE V1,HE V2 formats
                     mEncoding = encoding;
                     break;
                 case ENCODING_INVALID:
@@ -1839,13 +1866,17 @@ public final class AudioFormat implements Parcelable {
         ENCODING_DOLBY_TRUEHD,
         ENCODING_AAC_ELD,
         ENCODING_AAC_XHE,
+// QTI_BEGIN: 2018-02-19: Audio: add support for extended formats
         ENCODING_AC4,
+// QTI_END: 2018-02-19: Audio: add support for extended formats
         ENCODING_AC4_L4,        
+// QTI_BEGIN: 2018-02-19: Audio: add support for extended formats
         ENCODING_AMRNB,
         ENCODING_AMRWB,
         ENCODING_EVRC,
         ENCODING_EVRCB,
         ENCODING_EVRCWB,
+// QTI_END: 2018-02-19: Audio: add support for extended formats
         ENCODING_EVRCNW,
         ENCODING_E_AC3_JOC,
         ENCODING_DOLBY_MAT,
@@ -1860,7 +1891,9 @@ public final class AudioFormat implements Parcelable {
         ENCODING_DRA,
         ENCODING_DTS_HD_MA,
         ENCODING_DTS_UHD_P2,
+// QTI_BEGIN: 2023-03-22: Audio: add AAC ADTS encodings for LC,HE V1,HE V2 formats
         ENCODING_DSD,
+// QTI_END: 2023-03-22: Audio: add AAC ADTS encodings for LC,HE V1,HE V2 formats
         ENCODING_IAMF_BASE_ENHANCED_PROFILE_AAC,
         ENCODING_IAMF_BASE_ENHANCED_PROFILE_FLAC,
         ENCODING_IAMF_BASE_ENHANCED_PROFILE_OPUS,
@@ -1873,9 +1906,11 @@ public final class AudioFormat implements Parcelable {
         ENCODING_IAMF_SIMPLE_PROFILE_FLAC,
         ENCODING_IAMF_SIMPLE_PROFILE_OPUS,
         ENCODING_IAMF_SIMPLE_PROFILE_PCM,
+// QTI_BEGIN: 2023-03-22: Audio: add AAC ADTS encodings for LC,HE V1,HE V2 formats
         ENCODING_AAC_ADTS_LC,
         ENCODING_AAC_ADTS_HE_V1,
         ENCODING_AAC_ADTS_HE_V2 }
+// QTI_END: 2023-03-22: Audio: add AAC ADTS encodings for LC,HE V1,HE V2 formats
     )
     @Retention(RetentionPolicy.SOURCE)
     public @interface Encoding {}

@@ -405,7 +405,7 @@ public class DeveloperVerifierController {
             @PackageInstaller.DeveloperVerificationPolicy int verificationPolicy,
             @Nullable PersistableBundle extensionParams,
             PackageInstallerSession.DeveloperVerifierCallback callback,
-            Runnable onConnectionEstablished, boolean retry) {
+            Runnable onConnectionEstablished, boolean retry, int verificationFlags) {
         // Try connecting to the verifier if not already connected
         if (!bindToVerifierServiceIfNeeded(snapshotSupplier, userId, onConnectionEstablished)) {
             return false;
@@ -427,7 +427,8 @@ public class DeveloperVerifierController {
                     /* id= */ verificationId,
                     /* installSessionId= */ installationSessionId,
                     packageName, stagedPackageUri, signingInfo, declaredLibraries, extensionParams,
-                    verificationPolicy, new DeveloperVerificationSessionInterface(callback));
+                    verificationPolicy, new DeveloperVerificationSessionInterface(callback),
+                    verificationFlags);
             AndroidFuture<Void> unusedFuture = remoteService.getService().post(service -> {
                 if (!retry) {
                     if (DEBUG) {
@@ -442,6 +443,8 @@ public class DeveloperVerifierController {
                     }
                     service.onVerificationRetry(session);
                 }
+                // We've sent out a new verification request, so stop auto-disconnection countdown
+                stopAutoDisconnectCountdown(remoteService.getAutoDisconnectCallback());
             }).orTimeout(mInjector.getVerifierConnectionTimeoutMillis(), TimeUnit.MILLISECONDS)
                     .whenComplete((res, err) -> {
                         if (err != null) {
@@ -454,8 +457,6 @@ public class DeveloperVerifierController {
                             removeStatusTracker(verificationId);
                         }
                     });
-            // We've sent out a new verification request, so stop the auto-disconnection countdown.
-            stopAutoDisconnectCountdown(remoteService.getAutoDisconnectCallback());
         }
         // Keep track of the session status with the ID. Start counting down the session timeout.
         final long defaultTimeoutMillis = mInjector.getVerificationRequestTimeoutMillis();

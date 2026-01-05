@@ -18,6 +18,7 @@ package com.android.server.wm;
 
 import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
 import static android.internal.perfetto.protos.Windowmanagerservice.WindowContainerChildProto.WINDOW_TOKEN;
+import static android.internal.perfetto.protos.Windowmanagerservice.WindowTokenProto.CLIENT_VISIBLE;
 import static android.internal.perfetto.protos.Windowmanagerservice.WindowTokenProto.HASH_CODE;
 import static android.internal.perfetto.protos.Windowmanagerservice.WindowTokenProto.PAUSED;
 import static android.internal.perfetto.protos.Windowmanagerservice.WindowTokenProto.WINDOW_CONTAINER;
@@ -391,6 +392,25 @@ class WindowToken extends WindowContainer<WindowState> {
         sendAppVisibilityToClients();
     }
 
+    /**
+     * Returns whether the token must be {@link #isClientVisible} to allow a child to be
+     * {@link #isVisible}.
+     */
+    boolean shouldCheckTokenClientVisible() {
+        return false;
+    }
+
+    /**
+     * Returns whether the token must be {@link #isVisibleRequested} to allow a child to be
+     * {@link #isVisibleRequested}.
+     *
+     * <p>Implementations that override both this and {@link #isVisibleRequested} must avoid calling
+     * the superclass {@link #isVisibleRequested}, to avoid infinite recursion.
+     */
+    boolean shouldCheckTokenVisibleRequested() {
+        return false;
+    }
+
     boolean hasFixedRotationTransform() {
         return mFixedRotationTransformState != null;
     }
@@ -726,6 +746,7 @@ class WindowToken extends WindowContainer<WindowState> {
     @Override
     public void dumpDebug(ProtoOutputStream proto, long fieldId,
             @WindowTracingLogLevel int logLevel) {
+        // Critical log level logs only visible elements to mitigate performance overheard
         if (logLevel == WindowTracingLogLevel.CRITICAL && !isVisible()) {
             return;
         }
@@ -734,6 +755,7 @@ class WindowToken extends WindowContainer<WindowState> {
         super.dumpDebug(proto, WINDOW_CONTAINER, logLevel);
         proto.write(HASH_CODE, System.identityHashCode(this));
         proto.write(PAUSED, paused);
+        proto.write(CLIENT_VISIBLE, isClientVisible());
         proto.end(token);
     }
 

@@ -21,14 +21,6 @@ flag {
 }
 
 flag {
-  name: "notifications_redesign_fonts"
-  namespace: "systemui"
-  description: "Notifications Redesign: Update text styles in notification templates"
-  bug: "409496809"
-  is_fixed_read_only: true
-}
-
-flag {
   name: "headline_prototypes"
   namespace: "notifications"
   description: "This flag adds static control for enabling prototypes for the headline project"
@@ -47,7 +39,7 @@ flag {
   name: "api_notification_action_custom"
   is_exported: true
   namespace: "notifications"
-  description: "Adds APIs to control Notification Action emphasis and style (for RONs)"
+  description: "Adds APIs to control Notification Action emphasis and style (for RONs). Also shows RON actions as pill buttons."
   bug: "440125908"
 }
 
@@ -57,6 +49,14 @@ flag {
   namespace: "notifications"
   description: "Adds APIs to apply semantic style (color) to notification components"
   bug: "440125908"
+}
+
+flag {
+  name: "api_notification_chip"
+  is_exported: true
+  namespace: "notifications"
+  description: "Adds Notification.CompactContent and related classes. Mostly dependent on api_metric_style."
+  bug: "444195983"
 }
 
 flag {
@@ -74,13 +74,6 @@ flag {
   namespace: "systemui"
   description: "Experiment to restore the pre-S behavior where standard notifications are not expandable unless they have actions."
   bug: "339523906"
-}
-
-flag {
-  name: "compact_heads_up_notification_reply"
-  namespace: "systemui"
-  description: "[Minimal HUN] Enables the compact heads up notification reply capability for Conversation Notifications"
-  bug: "336229954"
 }
 
 flag {
@@ -303,6 +296,7 @@ flag {
 flag {
   name: "nm_summarization_all"
   namespace: "notifications"
+  is_exported: true
   description: "Allows the NAS to summarize notifications of any type"
   bug: "430487852"
 }
@@ -324,16 +318,33 @@ flag {
 flag {
   name: "nm_contextual_display"
   namespace: "notifications"
+  is_exported: true
   description: "Changes notification appearance based on user created rules"
   bug: "438704204"
 }
 
 flag {
-   name: "bridged_notifications_api"
+   name: "bridged_notifications"
    is_exported: true
-   namespace: "better_together"
+   namespace: "notifications"
    description: "Adds support for specifying bridged notification metadata for displaying to the user."
    bug: "438827600"
+}
+
+flag {
+  name: "notification_semantic_actions_for_playback"
+  namespace: "notifications"
+  description: "Adds semantic action values for PLAY/PAUSE/STOP"
+  is_exported: true
+  bug: "458744035"
+}
+
+flag {
+  name: "api_projected_extender"
+  namespace: "notifications"
+  description: "Guards new android.app.Notification.ProjectedExtender api"
+  bug: "455909258"
+  is_exported: true
 }
 
 # End: exported flags that cannot be removed

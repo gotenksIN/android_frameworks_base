@@ -37,6 +37,7 @@ import android.util.MathUtils;
 import android.util.Slog;
 import android.util.SparseArray;
 import android.util.Spline;
+import android.view.FrameRateVelocityPoint;
 import android.view.SurfaceControl;
 
 import com.android.internal.R;
@@ -45,14 +46,14 @@ import com.android.internal.display.BrightnessSynchronizer;
 import com.android.server.display.config.AutoBrightness;
 import com.android.server.display.config.BlockingZoneConfig;
 import com.android.server.display.config.BrightnessLimitMap;
-import com.android.server.display.config.BrightnessThrottlingMap;
-import com.android.server.display.config.BrightnessThrottlingPoint;
 import com.android.server.display.config.Density;
 import com.android.server.display.config.DisplayBrightnessMappingConfig;
 import com.android.server.display.config.DisplayBrightnessPoint;
 import com.android.server.display.config.DisplayConfiguration;
+import com.android.server.display.config.DisplayDeviceConfigUtils;
 import com.android.server.display.config.DisplayQuirks;
 import com.android.server.display.config.EvenDimmerBrightnessData;
+import com.android.server.display.config.FrameRateVelocityData;
 import com.android.server.display.config.HdrBrightnessData;
 import com.android.server.display.config.HighBrightnessMode;
 import com.android.server.display.config.HighBrightnessModeData;
@@ -72,12 +73,10 @@ import com.android.server.display.config.PredefinedBrightnessLimitNames;
 import com.android.server.display.config.RefreshRateConfigs;
 import com.android.server.display.config.RefreshRateData;
 import com.android.server.display.config.RefreshRateRange;
-import com.android.server.display.config.RefreshRateThrottlingMap;
-import com.android.server.display.config.RefreshRateThrottlingPoint;
 import com.android.server.display.config.RefreshRateZone;
 import com.android.server.display.config.SensorData;
 import com.android.server.display.config.ThermalStatus;
-import com.android.server.display.config.ThermalThrottling;
+import com.android.server.display.config.ThermalThrottlingData;
 import com.android.server.display.config.UsiVersion;
 import com.android.server.display.config.XmlParser;
 import com.android.server.display.feature.DisplayManagerFlags;
@@ -205,6 +204,24 @@ import javax.xml.datatype.DatatypeConfigurationException;
  *                 </refreshRateRange>
  *            </refreshRateThrottlingPoint>
  *        </refreshRateThrottlingMap>
+ *        <workDurationsThrottlingMap id="default">
+ *              <workDurationsThrottlingPair>
+ *                  <thermalStatus>severe</thermalStatus>
+ *                  <workDurations>
+ *                      <lateWorkDuration>20000000</lateWorkDuration>
+ *                      <earlyWorkDuration>21000000</earlyWorkDuration>
+ *                      <appWorkDuration>21000000</appWorkDuration>
+ *                  </workDurations>
+ *              </workDurationsThrottlingPair>
+ *              <workDurationsThrottlingPair>
+ *                  <thermalStatus>critical</thermalStatus>
+ *                  <workDurations>
+ *                      <lateWorkDuration>25000000</lateWorkDuration>
+ *                      <earlyWorkDuration>26000000</earlyWorkDuration>
+ *                      <appWorkDuration>26000000</appWorkDuration>
+ *                  </workDurations>
+ *              </workDurationsThrottlingPair>
+ *          </workDurationsThrottlingMap>
  *      </thermalThrottling>
  *
  *      <refreshRate>
@@ -218,6 +235,11 @@ import javax.xml.datatype.DatatypeConfigurationException;
  *        </refreshRateZoneProfiles>
  *        <defaultRefreshRateInHbmHdr>75</defaultRefreshRateInHbmHdr>
  *        <defaultRefreshRateInHbmSunlight>75</defaultRefreshRateInHbmSunlight>
+ *        <lowPowerWorkDurations>
+ *            <lateWorkDuration>10500000</lateWorkDuration>
+ *            <earlyWorkDuration>16600000</earlyWorkDuration>
+ *            <appWorkDuration>16600000</appWorkDuration>
+ *        </lowPowerWorkDurations>
  *        <lowerBlockingZoneConfigs>
  *          <defaultRefreshRate>75</defaultRefreshRate>
  *          <refreshRateThermalThrottlingId>id_of_a_throttling_map</refreshRateThermalThrottlingId>
@@ -265,6 +287,11 @@ import javax.xml.datatype.DatatypeConfigurationException;
  *            <second>240</second> // vsync
  *          </point>
  *        </lowPowerSupportedModes>
+ *        <lowPowerWorkDurations>
+ *            <lateWorkDuration>10500000</lateWorkDuration>
+ *            <earlyWorkDuration>16600000</earlyWorkDuration>
+ *            <appWorkDuration>16600000</appWorkDuration>
+ *        </lowPowerWorkDurations>
  *      </refreshRate>
  *
  *      <highBrightnessMode enabled="true">
@@ -880,14 +907,9 @@ public class DisplayDeviceConfig {
     private String mLowBlockingZoneThermalMapId = null;
     private String mHighBlockingZoneThermalMapId = null;
 
-    private final Map<String, ThermalBrightnessThrottlingData>
-            mThermalBrightnessThrottlingDataMapByThrottlingId = new HashMap<>();
-
+    private final ThermalThrottlingData mThermalThrottlingData = new ThermalThrottlingData();
     private final Map<String, PowerThrottlingData>
             mPowerThrottlingDataMapByThrottlingId = new HashMap<>();
-
-    private final Map<String, SparseArray<SurfaceControl.RefreshRateRange>>
-            mRefreshRateThrottlingMap = new HashMap<>();
 
     private final Map<BrightnessLimitMapType, Map<Float, Float>>
             mLuxThrottlingData = new HashMap<>();
@@ -929,6 +951,12 @@ public class DisplayDeviceConfig {
     private float mDefaultDozeBrightness;
 
     private final DisplayManagerFlags mFlags;
+
+    /**
+     * Frame rate / velocity thresholds mappings for Adaptive Refresh Rate (ARR).
+     */
+    @NonNull
+    private List<FrameRateVelocityPoint> mFrameRateVelocityMapping = new ArrayList<>();
 
     @VisibleForTesting
     public DisplayDeviceConfig(Context context, DisplayManagerFlags flags) {
@@ -1483,7 +1511,7 @@ public class DisplayDeviceConfig {
      */
     public Map<String, ThermalBrightnessThrottlingData>
             getThermalBrightnessThrottlingDataMapByThrottlingId() {
-        return mThermalBrightnessThrottlingDataMapByThrottlingId;
+        return mThermalThrottlingData.getThermalBrightnessThrottlingDataMapByThrottlingId();
     }
 
     /**
@@ -1494,7 +1522,7 @@ public class DisplayDeviceConfig {
     public SparseArray<SurfaceControl.RefreshRateRange> getThermalRefreshRateThrottlingData(
             @Nullable String id) {
         String key = id == null ? DEFAULT_ID : id;
-        return mRefreshRateThrottlingMap.get(key);
+        return mThermalThrottlingData.getRefreshRateThrottlingMap().get(key);
     }
 
     /**
@@ -1737,6 +1765,23 @@ public class DisplayDeviceConfig {
         return mDefaultDozeBrightness;
     }
 
+    /**
+     * @return The mapping between frame rate and velocity that can be used to determine the
+     * appropriate frame rate based on the content velocity.
+     */
+    @NonNull
+    public List<FrameRateVelocityPoint> getFrameRateVelocityMapping() {
+        return mFrameRateVelocityMapping;
+    }
+
+    /**
+     * @return The thermal throttling data including brightness throttling data map, refresh rate
+     * throttling data map, thermal throttling work durations.
+     */
+    public ThermalThrottlingData getThermalThrottlingData() {
+        return mThermalThrottlingData;
+    }
+
     @Override
     public String toString() {
         return "DisplayDeviceConfig{"
@@ -1760,9 +1805,7 @@ public class DisplayDeviceConfig {
                 + "\n"
                 + "mLuxThrottlingData=" + mLuxThrottlingData
                 + ", mHbmData=" + mHbmData
-                + ", mThermalBrightnessThrottlingDataMapByThrottlingId="
-                + mThermalBrightnessThrottlingDataMapByThrottlingId
-                + "\n"
+                + ", mThermalThrottlingData=" + mThermalThrottlingData + "\n"
                 + ", mPowerThrottlingDataMapByThrottlingId="
                 + mPowerThrottlingDataMapByThrottlingId
                 + "\n"
@@ -1811,7 +1854,6 @@ public class DisplayDeviceConfig {
                 + ", mDefaultHighBlockingZoneRefreshRate= " + mDefaultHighBlockingZoneRefreshRate
                 + ", mRefreshRateData= " + mRefreshRateData
                 + ", mRefreshRateZoneProfiles= " + mRefreshRateZoneProfiles
-                + ", mRefreshRateThrottlingMap= " + mRefreshRateThrottlingMap
                 + ", mLowBlockingZoneThermalMapId= " + mLowBlockingZoneThermalMapId
                 + ", mHighBlockingZoneThermalMapId= " + mHighBlockingZoneThermalMapId
                 + "\n"
@@ -1838,6 +1880,7 @@ public class DisplayDeviceConfig {
                 + "mDozeBrightnessSensorValueToBrightness= "
                 + Arrays.toString(mDozeBrightnessSensorValueToBrightness) + "\n"
                 + "mDefaultDozeBrightness= " + mDefaultDozeBrightness + "\n"
+                + "mFrameRateVelocityMapping=" + mFrameRateVelocityMapping + "\n"
                 + "}";
     }
 
@@ -1893,7 +1936,7 @@ public class DisplayDeviceConfig {
                     mEvenDimmerBrightnessData = EvenDimmerBrightnessData.loadConfig(config);
                 }
                 loadBrightnessMap(config);
-                loadThermalThrottlingConfig(config);
+                mThermalThrottlingData.loadThermalThrottlingConfig(config);
                 loadPowerThrottlingConfigData(config);
                 // Backlight and evenDimmer data should be loaded for HbmData
                 Function<HighBrightnessMode, Float> transitionPointProvider = (hbm) -> {
@@ -1936,6 +1979,7 @@ public class DisplayDeviceConfig {
                 loadBrightnessCapForMinMode(config);
                 mVrrSupportEnabled = config.getSupportsVrr();
                 loadDozeBrightness(config);
+                loadFrameRateVelocityMapping(config);
             } else {
                 Slog.w(TAG, "DisplayDeviceConfig file is null");
             }
@@ -2123,106 +2167,6 @@ public class DisplayDeviceConfig {
         mRawBacklight = backlight;
         constrainNitsAndBacklightArrays();
     }
-
-    private void loadThermalThrottlingConfig(DisplayConfiguration config) {
-        final ThermalThrottling throttlingConfig = config.getThermalThrottling();
-        if (throttlingConfig == null) {
-            Slog.i(TAG, "No thermal throttling config found");
-            return;
-        }
-        loadThermalBrightnessThrottlingMaps(throttlingConfig);
-        loadThermalRefreshRateThrottlingMap(throttlingConfig);
-    }
-
-    private void loadThermalBrightnessThrottlingMaps(ThermalThrottling throttlingConfig) {
-        final List<BrightnessThrottlingMap> maps = throttlingConfig.getBrightnessThrottlingMap();
-        if (maps == null || maps.isEmpty()) {
-            Slog.i(TAG, "No brightness throttling map found");
-            return;
-        }
-
-        for (BrightnessThrottlingMap map : maps) {
-            final List<BrightnessThrottlingPoint> points = map.getBrightnessThrottlingPoint();
-            // At least 1 point is guaranteed by the display device config schema
-            List<ThermalBrightnessThrottlingData.ThrottlingLevel> throttlingLevels =
-                    new ArrayList<>(points.size());
-
-            boolean badConfig = false;
-            for (BrightnessThrottlingPoint point : points) {
-                ThermalStatus status = point.getThermalStatus();
-                if (!thermalStatusIsValid(status)) {
-                    badConfig = true;
-                    break;
-                }
-
-                throttlingLevels.add(new ThermalBrightnessThrottlingData.ThrottlingLevel(
-                        convertThermalStatus(status), point.getBrightness().floatValue()));
-            }
-
-            if (!badConfig) {
-                String id = map.getId() == null ? DEFAULT_ID
-                        : map.getId();
-                if (mThermalBrightnessThrottlingDataMapByThrottlingId.containsKey(id)) {
-                    throw new RuntimeException("Brightness throttling data with ID " + id
-                            + " already exists");
-                }
-                mThermalBrightnessThrottlingDataMapByThrottlingId.put(id,
-                        ThermalBrightnessThrottlingData.create(throttlingLevels));
-            }
-        }
-    }
-
-    private void loadThermalRefreshRateThrottlingMap(ThermalThrottling throttlingConfig) {
-        List<RefreshRateThrottlingMap> maps = throttlingConfig.getRefreshRateThrottlingMap();
-        if (maps == null || maps.isEmpty()) {
-            Slog.w(TAG, "RefreshRateThrottling: map not found");
-            return;
-        }
-
-        for (RefreshRateThrottlingMap map : maps) {
-            List<RefreshRateThrottlingPoint> points = map.getRefreshRateThrottlingPoint();
-            String id = map.getId() == null ? DEFAULT_ID : map.getId();
-
-            if (points == null || points.isEmpty()) {
-                // Expected at lease 1 throttling point for each map
-                Slog.w(TAG, "RefreshRateThrottling: points not found for mapId=" + id);
-                continue;
-            }
-            if (mRefreshRateThrottlingMap.containsKey(id)) {
-                Slog.wtf(TAG, "RefreshRateThrottling: map already exists, mapId=" + id);
-                continue;
-            }
-
-            SparseArray<SurfaceControl.RefreshRateRange> refreshRates = new SparseArray<>();
-            for (RefreshRateThrottlingPoint point : points) {
-                ThermalStatus status = point.getThermalStatus();
-                if (!thermalStatusIsValid(status)) {
-                    Slog.wtf(TAG,
-                            "RefreshRateThrottling: Invalid thermalStatus=" + status.getRawName()
-                                    + ",mapId=" + id);
-                    continue;
-                }
-                int thermalStatusInt = convertThermalStatus(status);
-                if (refreshRates.contains(thermalStatusInt)) {
-                    Slog.wtf(TAG, "RefreshRateThrottling: thermalStatus=" + status.getRawName()
-                            + " is already in the map, mapId=" + id);
-                    continue;
-                }
-
-                refreshRates.put(thermalStatusInt, new SurfaceControl.RefreshRateRange(
-                        point.getRefreshRateRange().getMinimum().floatValue(),
-                        point.getRefreshRateRange().getMaximum().floatValue()
-                ));
-            }
-            if (refreshRates.size() == 0) {
-                Slog.w(TAG, "RefreshRateThrottling: no valid throttling points found for map, "
-                        + "mapId=" + id);
-                continue;
-            }
-            mRefreshRateThrottlingMap.put(id, refreshRates);
-        }
-    }
-
     private boolean loadPowerThrottlingMaps(PowerThrottlingConfig throttlingConfig) {
         final List<PowerThrottlingMap> maps = throttlingConfig.getPowerThrottlingMap();
         if (maps == null || maps.isEmpty()) {
@@ -2239,13 +2183,14 @@ public class DisplayDeviceConfig {
             boolean badConfig = false;
             for (PowerThrottlingPoint point : points) {
                 ThermalStatus status = point.getThermalStatus();
-                if (!thermalStatusIsValid(status)) {
+                @PowerManager.ThermalStatus int thermalStatus =
+                        DisplayDeviceConfigUtils.convertValidThermalStatus(status);
+                if (thermalStatus == PowerManager.THERMAL_STATUS_INVALID) {
                     badConfig = true;
                     break;
                 }
 
-                throttlingLevels.add(new PowerThrottlingData.ThrottlingLevel(
-                        convertThermalStatus(status),
+                throttlingLevels.add(new PowerThrottlingData.ThrottlingLevel(thermalStatus,
                             point.getPowerQuotaMilliWatts().floatValue()));
             }
 
@@ -2580,6 +2525,10 @@ public class DisplayDeviceConfig {
         constrainNitsAndBacklightArrays();
     }
 
+    private void loadFrameRateVelocityMapping(DisplayConfiguration config) {
+        mFrameRateVelocityMapping = FrameRateVelocityData.load(config);
+    }
+
     private void setSimpleMappingStrategyValues() {
         // No translation from backlight to brightness should occur if we are using a
         // SimpleMappingStrategy (ie they should be the same) so the splines are
@@ -2840,51 +2789,6 @@ public class DisplayDeviceConfig {
                 HysteresisLevels.loadAmbientBrightnessConfig(config, res);
         mAmbientBrightnessIdleHysteresis =
                 HysteresisLevels.loadAmbientBrightnessIdleConfig(config, res);
-    }
-
-    private boolean thermalStatusIsValid(ThermalStatus value) {
-        if (value == null) {
-            return false;
-        }
-
-        switch (value) {
-            case none:
-            case light:
-            case moderate:
-            case severe:
-            case critical:
-            case emergency:
-            case shutdown:
-                return true;
-            default:
-                return false;
-        }
-    }
-
-    @VisibleForTesting
-    static @PowerManager.ThermalStatus int convertThermalStatus(ThermalStatus value) {
-        if (value == null) {
-            return PowerManager.THERMAL_STATUS_NONE;
-        }
-        switch (value) {
-            case none:
-                return PowerManager.THERMAL_STATUS_NONE;
-            case light:
-                return PowerManager.THERMAL_STATUS_LIGHT;
-            case moderate:
-                return PowerManager.THERMAL_STATUS_MODERATE;
-            case severe:
-                return PowerManager.THERMAL_STATUS_SEVERE;
-            case critical:
-                return PowerManager.THERMAL_STATUS_CRITICAL;
-            case emergency:
-                return PowerManager.THERMAL_STATUS_EMERGENCY;
-            case shutdown:
-                return PowerManager.THERMAL_STATUS_SHUTDOWN;
-            default:
-                Slog.wtf(TAG, "Unexpected Thermal Status: " + value);
-                return PowerManager.THERMAL_STATUS_NONE;
-        }
     }
 
     private int convertInterpolationType(String value) {

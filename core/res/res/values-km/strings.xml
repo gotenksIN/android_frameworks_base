@@ -278,6 +278,7 @@
     <string name="global_action_restart" msgid="4678451019561687074">"ចាប់ផ្ដើមឡើងវិញ"</string>
     <string name="global_action_emergency" msgid="1387617624177105088">"អាសន្ន"</string>
     <string name="global_action_bug_report" msgid="5127867163044170003">"របាយការណ៍អំពីបញ្ហា"</string>
+    <string name="global_action_feedback" msgid="3480836834202300036">"មតិកែលម្អ"</string>
     <string name="global_action_logout" msgid="6093581310002476511">"បញ្ចប់​សម័យ"</string>
     <string name="global_action_screenshot" msgid="2610053466156478564">"រូបថតអេក្រង់"</string>
     <string name="global_action_standby" msgid="6786920589970257642">"ផ្អាក​ដំណើរការ"</string>
@@ -326,8 +327,7 @@
     <string name="notification_channel_accessibility_hearing_device" msgid="7816963856388758952">"ឧបករណ៍ជំនួយការស្ដាប់"</string>
     <string name="notification_channel_accessibility_security_policy" msgid="1727787021725251912">"ការប្រើប្រាស់​ភាពងាយស្រួល"</string>
     <string name="notification_channel_display" msgid="6905032605735615090">"ផ្ទាំងអេក្រង់"</string>
-    <!-- no translation found for notification_channel_parental_controls (2963963315750128538) -->
-    <skip />
+    <string name="notification_channel_parental_controls" msgid="2963963315750128538">"ការគ្រប់គ្រងដោយមាតាបិតា"</string>
     <string name="foreground_service_app_in_background" msgid="1439289699671273555">"<xliff:g id="APP_NAME">%1$s</xliff:g> កំពុងប្រើថ្ម"</string>
     <string name="foreground_service_apps_in_background" msgid="7340037176412387863">"កម្មវិធីចំនួន <xliff:g id="NUMBER">%1$d</xliff:g> កំពុងប្រើថ្ម"</string>
     <string name="foreground_service_tap_for_details" msgid="9078123626015586751">"ចុចដើម្បីមើលព័ត៌មានលម្អិតអំពីការប្រើប្រាស់ទិន្នន័យ និងថ្ម"</string>
@@ -645,6 +645,10 @@
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"អនុញ្ញាតឱ្យកម្មវិធីចូលប្រើឧបករណ៍បណ្ដាញមូលដ្ឋាន"</string>
     <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"ប្រើផ្ទៃបញ្ជូនត្រឡប់"</string>
     <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"អនុញ្ញាតឱ្យកម្មវិធីធ្វើអន្តរកម្មជាមួយកម្មវិធីផ្សេងទៀតតាមរយៈផ្ទៃបញ្ជូនត្រឡប់"</string>
+    <!-- no translation found for permlab_force_use_loopback_interface (1319727311706416481) -->
+    <skip />
+    <!-- no translation found for permdesc_force_use_loopback_interface (5829032514048681980) -->
+    <skip />
     <string name="permlab_ranging" msgid="2854543350668593390">"កំណត់ទីតាំងធៀបរវាងឧបករណ៍នៅជិត"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"អនុញ្ញាតឱ្យកម្មវិធីកំណត់ទីតាំងធៀបរវាងឧបករណ៍នៅជិត"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"ព័ត៌មានអំពី​សេវាបង់ប្រាក់តាម NFC ជាអាទិភាព"</string>
@@ -825,6 +829,8 @@
     <string name="permdesc_readMediaVideo" msgid="3846400073770403528">"អនុញ្ញាតឱ្យ​កម្មវិធី​អានឯកសារវីដេអូពីទំហំផ្ទុករួមរបស់អ្នក។"</string>
     <string name="permlab_readMediaImages" msgid="4057590631020986789">"អានឯកសាររូបភាពពីទំហំ​ផ្ទុករួម"</string>
     <string name="permdesc_readMediaImages" msgid="5836219373138469259">"អនុញ្ញាតឱ្យ​កម្មវិធី​អានឯកសាររូបភាពពីទំហំផ្ទុករួមរបស់អ្នក។"</string>
+    <string name="permlab_readMediaDocuments" msgid="5716810755602938263">"អានឯកសារពីទំហំ​ផ្ទុករួម"</string>
+    <string name="permdesc_readMediaDocuments" msgid="5665930210237304120">"អនុញ្ញាតឱ្យ​កម្មវិធី​អានឯកសារពីទំហំផ្ទុករួមរបស់អ្នក។"</string>
     <string name="permlab_readVisualUserSelect" msgid="5516204215354667586">"អានឯកសាររូបភាព និងវីដេអូដែលអ្នកប្រើប្រាស់ជ្រើសរើសពីទំហំផ្ទុករួម"</string>
     <string name="permdesc_readVisualUserSelect" msgid="8027174717714968217">"អនុញ្ញាតឱ្យកម្មវិធីអានឯកសាររូបភាព និងវីដេអូដែលអ្នកជ្រើសរើសពីទំហំផ្ទុករួមរបស់អ្នក។"</string>
     <string name="permlab_sdcardWrite" msgid="4863021819671416668">"កែប្រែ ឬលុប​ខ្លឹមសារនៃ​ទំហំផ្ទុករួម​របស់អ្នក"</string>
@@ -1047,6 +1053,7 @@
     <string name="keyguard_password_enter_pin_password_code" msgid="7792964196473964340">"បញ្ចូល​កូដ PIN ដើម្បី​ដោះ​សោ"</string>
     <string name="keyguard_password_wrong_pin_code" msgid="8583732939138432793">"កូដ PIN មិន​ត្រឹមត្រូវ។"</string>
     <string name="keyguard_label_text" msgid="3841953694564168384">"ដើម្បី​ដោះ​សោ​​ ចុច​ម៉ឺនុយ​ បន្ទាប់មក 0 ។"</string>
+    <string name="emergency_call_dialog_number_for_display" msgid="2978165477085612673">"លេខ​ពេល​អាសន្ន"</string>
     <string name="lockscreen_carrier_default" msgid="6192313772955399160">"គ្មានសេវាទេ"</string>
     <string name="lockscreen_screen_locked" msgid="7364905540516041817">"ចាក់​អេក្រង់។"</string>
     <string name="lockscreen_instructions_when_pattern_enabled" msgid="7982445492532123308">"ចុច​ម៉ឺនុយ ដើម្បី​ដោះ​សោ​ ឬ​ហៅ​ពេល​អាសន្ន។"</string>
@@ -2176,13 +2183,21 @@
     <string name="autofill_picker_no_suggestions" msgid="1076022650427481509">"មិនមានការណែនាំអំពីការបំពេញដោយស្វ័យប្រវត្តិទេ"</string>
     <string name="autofill_picker_some_suggestions" msgid="5560549696296202701">"{count,plural, =1{ការណែនាំដែលបំពេញដោយស្វ័យប្រវត្តិមួយ}other{ការណែនាំដែលបំពេញដោយស្វ័យប្រវត្តិ #}}"</string>
     <string name="autofill_save_title" msgid="7719802414283739775">"រក្សាទុក​ទៅក្នុង "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_save_title_expressive" msgid="2665408870424848558">"រក្សាទុកព័ត៌មានទៅ "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b></string>
     <string name="autofill_save_title_with_type" msgid="3002460014579799605">"រក្សាទុក <xliff:g id="TYPE">%1$s</xliff:g> ទៅក្នុង "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_save_title_with_type_expressive" msgid="6063660551496235255">"រក្សាទុក<xliff:g id="TYPE">%1$s</xliff:g>ទៅ "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b></string>
     <string name="autofill_save_title_with_2types" msgid="3783270967447869241">"រក្សាទុក​ <xliff:g id="TYPE_0">%1$s</xliff:g> និង <xliff:g id="TYPE_1">%2$s</xliff:g> ទៅ​ក្នុង "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_save_title_with_2types_expressive" msgid="2996687022212666293">"រក្សាទុក<xliff:g id="TYPE_0">%1$s</xliff:g> និង<xliff:g id="TYPE_1">%2$s</xliff:g> ទៅ "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b></string>
     <string name="autofill_save_title_with_3types" msgid="6598228952100102578">"រក្សាទុក​ <xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g> និង <xliff:g id="TYPE_2">%3$s</xliff:g> ទៅក្នុង "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_save_title_with_3types_expressive" msgid="3301676215501214049">"រក្សាទុក<xliff:g id="TYPE_0">%1$s</xliff:g> <xliff:g id="TYPE_1">%2$s</xliff:g> និង<xliff:g id="TYPE_2">%3$s</xliff:g> ទៅ "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b></string>
     <string name="autofill_update_title" msgid="3630695947047069136">"ធ្វើ​បច្ចុប្បន្នភាព​នៅក្នុង "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_update_title_expressive" msgid="7660582214109012920">"ធ្វើបច្ចុប្បន្នភាពព័ត៌មាននៅក្នុង "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b></string>
     <string name="autofill_update_title_with_type" msgid="5264152633488495704">"ធ្វើ​បច្ចុប្បន្នភាព <xliff:g id="TYPE">%1$s</xliff:g> នៅក្នុង "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_update_title_with_type_expressive" msgid="6162413585161767846">"ធ្វើ​បច្ចុប្បន្នភាព<xliff:g id="TYPE">%1$s</xliff:g>នៅក្នុង "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b></string>
     <string name="autofill_update_title_with_2types" msgid="1797514386321086273">"ធ្វើ​បច្ចុប្បន្នភាព​ <xliff:g id="TYPE_0">%1$s</xliff:g> និង <xliff:g id="TYPE_1">%2$s</xliff:g> នៅក្នុង "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_update_title_with_2types_expressive" msgid="1911825941498393471">"ធ្វើបច្ចុប្បន្នភាព<xliff:g id="TYPE_0">%1$s</xliff:g> និង<xliff:g id="TYPE_1">%2$s</xliff:g>នៅក្នុង "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b></string>
     <string name="autofill_update_title_with_3types" msgid="8285767070604652626">"ធ្វើ​បច្ចុប្បន្នភាព​ធាតុ​ទាំងនេះ​នៅក្នុង "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>"៖ <xliff:g id="TYPE_0">%1$s</xliff:g> <xliff:g id="TYPE_1">%2$s</xliff:g> និង<xliff:g id="TYPE_2">%3$s</xliff:g>ឬ?"</string>
+    <string name="autofill_update_title_with_3types_expressive" msgid="6040725201378429027">"ធ្វើ​បច្ចុប្បន្នភាព​ធាតុ​ទាំងនេះ​នៅក្នុង "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>"៖ <xliff:g id="TYPE_0">%1$s</xliff:g> <xliff:g id="TYPE_1">%2$s</xliff:g> និង<xliff:g id="TYPE_2">%3$s</xliff:g>"</string>
     <string name="autofill_save_yes" msgid="8035743017382012850">"រក្សាទុក"</string>
     <string name="autofill_save_no" msgid="9212826374207023544">"ទេ អរគុណ"</string>
     <string name="autofill_save_notnow" msgid="2853932672029024195">"កុំ​ទាន់"</string>
@@ -2611,10 +2626,7 @@
     <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"ការជូនដំណឹងអំពីធនធានប្រព័ន្ធ"</string>
     <string name="tv_watchdog_notification_title" msgid="195239206215922517">"ការប្រើធនធានច្រើនជ្រុល"</string>
     <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"កម្មវិធី \'<xliff:g id="APP_NAME">%1$s</xliff:g> កំពុងប្រើធនធានច្រើនពេក។\""</string>
-    <!-- no translation found for supervision_blocked_app_title (5546803865875383588) -->
-    <skip />
-    <!-- no translation found for supervision_blocked_app_content (4125452996088641559) -->
-    <skip />
-    <!-- no translation found for supervision_unblocked_app_content (8282985265957852278) -->
-    <skip />
+    <string name="supervision_blocked_app_title" msgid="5546803865875383588">"ព័ត៌មានថ្មីៗពីមាតាបិតារបស់អ្នក"</string>
+    <string name="supervision_blocked_app_content" msgid="4125452996088641559">"<xliff:g id="APP_NAME">%1$s</xliff:g> ត្រូវបានលុបចេញហើយឥឡូវនេះ"</string>
+    <string name="supervision_unblocked_app_content" msgid="8282985265957852278">"ឥឡូវនេះមាន <xliff:g id="APP_NAME">%1$s</xliff:g> ហើយ"</string>
 </resources>

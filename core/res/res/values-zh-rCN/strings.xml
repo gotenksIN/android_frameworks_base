@@ -278,6 +278,7 @@
     <string name="global_action_restart" msgid="4678451019561687074">"重启"</string>
     <string name="global_action_emergency" msgid="1387617624177105088">"紧急呼叫"</string>
     <string name="global_action_bug_report" msgid="5127867163044170003">"错误报告"</string>
+    <string name="global_action_feedback" msgid="3480836834202300036">"反馈"</string>
     <string name="global_action_logout" msgid="6093581310002476511">"结束会话"</string>
     <string name="global_action_screenshot" msgid="2610053466156478564">"屏幕截图"</string>
     <string name="global_action_standby" msgid="6786920589970257642">"待机"</string>
@@ -326,8 +327,7 @@
     <string name="notification_channel_accessibility_hearing_device" msgid="7816963856388758952">"助听装置"</string>
     <string name="notification_channel_accessibility_security_policy" msgid="1727787021725251912">"无障碍功能使用情况"</string>
     <string name="notification_channel_display" msgid="6905032605735615090">"显示屏"</string>
-    <!-- no translation found for notification_channel_parental_controls (2963963315750128538) -->
-    <skip />
+    <string name="notification_channel_parental_controls" msgid="2963963315750128538">"家长控制"</string>
     <string name="foreground_service_app_in_background" msgid="1439289699671273555">"<xliff:g id="APP_NAME">%1$s</xliff:g>正在消耗电量"</string>
     <string name="foreground_service_apps_in_background" msgid="7340037176412387863">"<xliff:g id="NUMBER">%1$d</xliff:g> 个应用正在消耗电量"</string>
     <string name="foreground_service_tap_for_details" msgid="9078123626015586751">"点按即可详细了解电量和流量消耗情况"</string>
@@ -645,6 +645,10 @@
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"允许此应用访问本地网络设备"</string>
     <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"使用环回接口"</string>
     <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"允许该应用通过环回接口与其他应用交互"</string>
+    <!-- no translation found for permlab_force_use_loopback_interface (1319727311706416481) -->
+    <skip />
+    <!-- no translation found for permdesc_force_use_loopback_interface (5829032514048681980) -->
+    <skip />
     <string name="permlab_ranging" msgid="2854543350668593390">"确定附近的设备之间的相对位置"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"允许应用确定附近的设备之间的相对位置"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"首选 NFC 支付服务信息"</string>
@@ -825,6 +829,8 @@
     <string name="permdesc_readMediaVideo" msgid="3846400073770403528">"允许应用读取您共享存储空间中的视频文件。"</string>
     <string name="permlab_readMediaImages" msgid="4057590631020986789">"读取共享存储空间中的图片文件"</string>
     <string name="permdesc_readMediaImages" msgid="5836219373138469259">"允许应用读取您共享存储空间中的图片文件。"</string>
+    <string name="permlab_readMediaDocuments" msgid="5716810755602938263">"从共享存储空间读取文档文件"</string>
+    <string name="permdesc_readMediaDocuments" msgid="5665930210237304120">"允许应用读取您共享存储空间中的文档文件。"</string>
     <string name="permlab_readVisualUserSelect" msgid="5516204215354667586">"从共享存储空间读取用户选择的图片和视频文件"</string>
     <string name="permdesc_readVisualUserSelect" msgid="8027174717714968217">"使应用能够从共享存储空间读取您所选的图片和视频文件。"</string>
     <string name="permlab_sdcardWrite" msgid="4863021819671416668">"修改或删除您共享存储空间中的内容"</string>
@@ -1047,6 +1053,7 @@
     <string name="keyguard_password_enter_pin_password_code" msgid="7792964196473964340">"输入PIN码进行解锁"</string>
     <string name="keyguard_password_wrong_pin_code" msgid="8583732939138432793">"PIN码有误。"</string>
     <string name="keyguard_label_text" msgid="3841953694564168384">"要解锁，请先按 MENU 再按 0。"</string>
+    <string name="emergency_call_dialog_number_for_display" msgid="2978165477085612673">"急救或报警电话"</string>
     <string name="lockscreen_carrier_default" msgid="6192313772955399160">"没有服务"</string>
     <string name="lockscreen_screen_locked" msgid="7364905540516041817">"屏幕已锁定。"</string>
     <string name="lockscreen_instructions_when_pattern_enabled" msgid="7982445492532123308">"按 Menu 解锁或进行紧急呼救。"</string>
@@ -1805,7 +1812,7 @@
     <string name="accessibility_shortcut_menu_item_status_on" msgid="6162756705754654002">"已开启"</string>
     <string name="accessibility_shortcut_menu_item_status_off" msgid="6274512913017713543">"已关闭"</string>
     <string name="accessibility_enable_service_title" msgid="3931558336268541484">"要允许“<xliff:g id="SERVICE">%1$s</xliff:g>”完全控制您的设备吗？"</string>
-    <string name="accessibility_service_warning_description" msgid="291674995220940133">"对于能满足您的无障碍功能需求的应用，可授予其完全控制权限；但对大部分应用来说，都不适合授予此权限。"</string>
+    <string name="accessibility_service_warning_description" msgid="291674995220940133">"如果需要使用无障碍功能，可以将完全控制权限授予具有相应功能的应用，但大多数应用并不适合获得此权限。"</string>
     <string name="accessibility_service_screen_control_title" msgid="190017412626919776">"查看和控制屏幕"</string>
     <string name="accessibility_service_screen_control_description" msgid="6946315917771791525">"此功能可以读出屏幕上的所有内容，并在其他应用上层显示内容。"</string>
     <string name="accessibility_service_action_perform_title" msgid="779670378951658160">"查看及执行操作"</string>
@@ -2176,13 +2183,21 @@
     <string name="autofill_picker_no_suggestions" msgid="1076022650427481509">"没有自动填充建议"</string>
     <string name="autofill_picker_some_suggestions" msgid="5560549696296202701">"{count,plural, =1{1 条自动填充建议}other{# 条自动填充建议}}"</string>
     <string name="autofill_save_title" msgid="7719802414283739775">"要保存到"<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>"吗？"</string>
+    <string name="autofill_save_title_expressive" msgid="2665408870424848558">"将信息保存到"<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b></string>
     <string name="autofill_save_title_with_type" msgid="3002460014579799605">"要将<xliff:g id="TYPE">%1$s</xliff:g>保存到"<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>"吗？"</string>
+    <string name="autofill_save_title_with_type_expressive" msgid="6063660551496235255">"将<xliff:g id="TYPE">%1$s</xliff:g>保存到"<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b></string>
     <string name="autofill_save_title_with_2types" msgid="3783270967447869241">"要将<xliff:g id="TYPE_0">%1$s</xliff:g>和<xliff:g id="TYPE_1">%2$s</xliff:g>保存到"<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>"吗？"</string>
+    <string name="autofill_save_title_with_2types_expressive" msgid="2996687022212666293">"将<xliff:g id="TYPE_0">%1$s</xliff:g>和<xliff:g id="TYPE_1">%2$s</xliff:g>保存到"<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b></string>
     <string name="autofill_save_title_with_3types" msgid="6598228952100102578">"要将<xliff:g id="TYPE_0">%1$s</xliff:g>、<xliff:g id="TYPE_1">%2$s</xliff:g>和<xliff:g id="TYPE_2">%3$s</xliff:g>保存到"<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>"吗？"</string>
+    <string name="autofill_save_title_with_3types_expressive" msgid="3301676215501214049">"将<xliff:g id="TYPE_0">%1$s</xliff:g>、<xliff:g id="TYPE_1">%2$s</xliff:g>和<xliff:g id="TYPE_2">%3$s</xliff:g>保存到"<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b></string>
     <string name="autofill_update_title" msgid="3630695947047069136">"要在"<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>"中更新吗？"</string>
+    <string name="autofill_update_title_expressive" msgid="7660582214109012920">"在"<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>"中更新信息"</string>
     <string name="autofill_update_title_with_type" msgid="5264152633488495704">"要在"<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>"中更新<xliff:g id="TYPE">%1$s</xliff:g>吗？"</string>
+    <string name="autofill_update_title_with_type_expressive" msgid="6162413585161767846">"在"<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>"中更新<xliff:g id="TYPE">%1$s</xliff:g>"</string>
     <string name="autofill_update_title_with_2types" msgid="1797514386321086273">"要在"<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>"中更新<xliff:g id="TYPE_0">%1$s</xliff:g>和<xliff:g id="TYPE_1">%2$s</xliff:g>吗？"</string>
+    <string name="autofill_update_title_with_2types_expressive" msgid="1911825941498393471">"在"<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>"中更新<xliff:g id="TYPE_0">%1$s</xliff:g>和<xliff:g id="TYPE_1">%2$s</xliff:g>"</string>
     <string name="autofill_update_title_with_3types" msgid="8285767070604652626">"要在"<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>"中更新<xliff:g id="TYPE_0">%1$s</xliff:g>、<xliff:g id="TYPE_1">%2$s</xliff:g>和<xliff:g id="TYPE_2">%3$s</xliff:g>吗？"</string>
+    <string name="autofill_update_title_with_3types_expressive" msgid="6040725201378429027">"在"<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>"中更新<xliff:g id="TYPE_0">%1$s</xliff:g>、<xliff:g id="TYPE_1">%2$s</xliff:g>和<xliff:g id="TYPE_2">%3$s</xliff:g>"</string>
     <string name="autofill_save_yes" msgid="8035743017382012850">"保存"</string>
     <string name="autofill_save_no" msgid="9212826374207023544">"不用了"</string>
     <string name="autofill_save_notnow" msgid="2853932672029024195">"以后再说"</string>
@@ -2277,7 +2292,7 @@
     <string name="bluetooth_airplane_mode_toast" msgid="2066399056595768554">"在飞行模式下，蓝牙将保持开启状态"</string>
     <string name="car_loading_profile" msgid="8219978381196748070">"正在加载"</string>
     <string name="file_count" msgid="3220018595056126969">"{count,plural, =1{{file_name} 以及另外 # 个文件}other{{file_name} 以及另外 # 个文件}}"</string>
-    <string name="chooser_no_direct_share_targets" msgid="1511722103987329028">"没有任何推荐的分享对象"</string>
+    <string name="chooser_no_direct_share_targets" msgid="1511722103987329028">"没有推荐的分享对象"</string>
     <string name="chooser_all_apps_button_label" msgid="3230427756238666328">"应用列表"</string>
     <string name="usb_device_resolve_prompt_warn" msgid="325871329788064199">"此应用未获得录音权限，但能通过此 USB 设备录制音频。"</string>
     <string name="accessibility_system_action_home_label" msgid="3234748160850301870">"主屏幕"</string>
@@ -2611,10 +2626,7 @@
     <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"系统资源提醒"</string>
     <string name="tv_watchdog_notification_title" msgid="195239206215922517">"资源过度使用"</string>
     <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"应用“<xliff:g id="APP_NAME">%1$s</xliff:g>”使用的资源过多。"</string>
-    <!-- no translation found for supervision_blocked_app_title (5546803865875383588) -->
-    <skip />
-    <!-- no translation found for supervision_blocked_app_content (4125452996088641559) -->
-    <skip />
-    <!-- no translation found for supervision_unblocked_app_content (8282985265957852278) -->
-    <skip />
+    <string name="supervision_blocked_app_title" msgid="5546803865875383588">"家长进行的更新"</string>
+    <string name="supervision_blocked_app_content" msgid="4125452996088641559">"“<xliff:g id="APP_NAME">%1$s</xliff:g>”现已移除"</string>
+    <string name="supervision_unblocked_app_content" msgid="8282985265957852278">"“<xliff:g id="APP_NAME">%1$s</xliff:g>”现已可用"</string>
 </resources>

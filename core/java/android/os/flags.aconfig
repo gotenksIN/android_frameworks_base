@@ -136,6 +136,22 @@ flag {
 }
 
 flag {
+    name: "battery_charging_info_api"
+    is_exported: true
+    namespace: "system_sw_battery"
+    description: "Feature flag for adding Health Hal v5 APIs."
+    bug: "446695799"
+}
+
+flag {
+    name: "battery_manufacturer_diagnostics_api"
+    is_exported: false
+    namespace: "system_sw_battery"
+    description: "Feature flag for adding Health Hal battery manufacturer diagnostics APIs."
+    bug: "425196435"
+}
+
+flag {
     name: "battery_part_status_api"
     is_exported: true
     namespace: "phoenix"
@@ -240,6 +256,13 @@ flag {
     description: "Guards a new Private Profile API in LauncherApps"
     bug: "346294653"
     is_exported: true
+}
+
+flag {
+     name: "holdback_concurrent_message_queue_in_systemui"
+     namespace: "system_performance"
+     description: "Holdback for concurrent MessageQueue in SystemUI; if enabled, don't use concurrent MessageQueue in SystemUI."
+     bug: "463114494"
 }
 
 flag {
@@ -443,16 +466,6 @@ flag {
     namespace: "gpu"
     description: "Use new query for ANGLE choice"
     bug: "408439360"
-}
-
-flag {
-    namespace: "system_performance"
-    name: "binder_cache_transaction_trace_names"
-    description: "Reuse transaction names caches across binder instances of the same interface."
-    bug: "330738126"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {

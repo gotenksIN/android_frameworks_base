@@ -75,7 +75,9 @@ import android.util.IntArray;
 import android.util.Slog;
 import android.util.SparseArray;
 import android.util.SparseBooleanArray;
+// QTI_BEGIN: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
 import android.util.BoostFramework;
+// QTI_END: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
 import android.view.InsetsState;
 import android.view.MotionEvent;
 import android.view.WindowManager;
@@ -219,7 +221,9 @@ class RecentTasks {
     private final HashMap<ComponentName, ActivityInfo> mTmpAvailActCache = new HashMap<>();
     private final HashMap<String, ApplicationInfo> mTmpAvailAppCache = new HashMap<>();
     private final SparseBooleanArray mTmpQuietProfileUserIds = new SparseBooleanArray();
+// QTI_BEGIN: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
     private final BoostFramework mUxPerf = new BoostFramework();
+// QTI_END: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
     private final Rect mTmpRect = new Rect();
 
     // TODO(b/127498985): This is currently a rough heuristic for interaction inside an app
@@ -764,6 +768,35 @@ class RecentTasks {
         }
     }
 
+    /**
+     * Called when the App Lock enabled state changes for a package.
+     *
+     * <p>Updates the App Lock enabled state for relevant tasks and persists the change.
+     *
+     * @param packageName the package name whose App Lock state changed.
+     * @param userId      the user ID for whom the App Lock state changed.
+     * @param enabled     {@code true} if App Lock is enabled, {@code false} otherwise.
+     */
+    void onPackageAppLockEnabledChanged(String packageName, int userId, boolean enabled) {
+        if (!android.security.Flags.appLockCore()) {
+            return;
+        }
+        synchronized (mService.mGlobalLock) {
+            ProtoLog.d(WM_DEBUG_TASKS, "onPackageAppLockEnabledChanged: package=%s, userId=%d,"
+                    + " enabled=%b", packageName, userId, enabled);
+            for (int i = mTasks.size() - 1; i >= 0; --i) {
+                final Task task = mTasks.get(i);
+                if (task.realActivity != null
+                        && task.realActivity.getPackageName().equals(packageName)
+                        && task.mUserId == userId
+                        && task.mRealActivityAppLockEnabled != enabled) {
+                    task.mRealActivityAppLockEnabled = enabled;
+                    notifyTaskPersisterLocked(task, /* flush= */ false);
+                }
+            }
+        }
+    }
+
     void onLockTaskModeStateChanged(int lockTaskModeState, int userId) {
         if (lockTaskModeState != ActivityManager.LOCK_TASK_MODE_LOCKED) {
             return;
@@ -1010,7 +1043,7 @@ class RecentTasks {
 
             if (isVisibleRecentTask(task)) {
                 numVisibleTasks++;
-                if (isInVisibleRange(task, i, numVisibleTasks, withExcluded)) {
+                if (isInVisibleRange(task, numVisibleTasks, withExcluded)) {
                     // Fall through
                 } else {
                     // Not in visible range
@@ -1115,7 +1148,7 @@ class RecentTasks {
             final Task task = mTasks.get(i);
             if (isVisibleRecentTask(task)) {
                 numVisibleTasks++;
-                if (isInVisibleRange(task, i, numVisibleTasks, false /* skipExcludedCheck */)) {
+                if (isInVisibleRange(task, numVisibleTasks, false /* skipExcludedCheck */)) {
                     res.put(task.mTaskId, true);
                 }
             }
@@ -1338,22 +1371,28 @@ class RecentTasks {
     void remove(Task task) {
         mTasks.remove(task);
         notifyTaskRemoved(task, false /* wasTrimmed */, false /* killProcess */);
+// QTI_BEGIN: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
         if (task != null) {
+// QTI_END: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
             final Intent intent = task.getBaseIntent();
             if (intent == null) return;
             final ComponentName componentName = intent.getComponent();
             if (componentName == null) return;
 
             final String taskPkgName = componentName.getPackageName();
+// QTI_BEGIN: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
             if (mUxPerf != null) {
+// QTI_END: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
                 if (mUxPerf.board_first_api_lvl < BoostFramework.VENDOR_T_API_LEVEL &&
                     mUxPerf.board_api_lvl < BoostFramework.VENDOR_T_API_LEVEL) {
                     mUxPerf.perfUXEngine_events(BoostFramework.UXE_EVENT_KILL, 0, taskPkgName, 0);
                 } else {
                     mUxPerf.perfEvent(BoostFramework.VENDOR_HINT_KILL, taskPkgName, 2, 0, 0);
                 }
+// QTI_BEGIN: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
             }
         }
+// QTI_END: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
     }
 
     /**
@@ -1429,7 +1468,7 @@ class RecentTasks {
                     continue;
                 } else {
                     numVisibleTasks++;
-                    if (isInVisibleRange(task, i, numVisibleTasks, false /* skipExcludedCheck */)
+                    if (isInVisibleRange(task, numVisibleTasks, false /* skipExcludedCheck */)
                             || !isTrimmable(task)) {
                         // Keep visible tasks in range
                         i++;
@@ -1556,10 +1595,9 @@ class RecentTasks {
     /**
      * @return whether the given visible task is within the policy range.
      */
-    private boolean isInVisibleRange(Task task, int taskIndex, int numVisibleTasks,
-            boolean skipExcludedCheck) {
+    private boolean isInVisibleRange(Task task, int numVisibleTasks, boolean skipExcludedCheck) {
         if (!skipExcludedCheck) {
-            // Keep the most recent task of home display even if it is excluded from recents.
+            // Keep the top visible task even if it is excluded from recents.
             final boolean isExcludeFromRecents = task.getBaseIntent() != null
                     && (task.getBaseIntent().getFlags() & FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS)
                     == FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS;
@@ -1567,14 +1605,9 @@ class RecentTasks {
                 if (DEBUG_RECENTS_TRIM_TASKS) {
                     Slog.d(TAG,
                             "\texcludeFromRecents=true,"
-                                + " taskIndex: " + taskIndex
-                                + " getTopVisibleActivity: " + task.getTopVisibleActivity()
-                                + " isOnHomeDisplay: " + task.isOnHomeDisplay());
+                                + " getTopVisibleActivity: " + task.getTopVisibleActivity());
                 }
-                // The Recents is only supported on default display now, we should only keep the
-                // most recent task of home display.
-                boolean isMostRecentTask = task.getTopVisibleActivity() != null;
-                return (task.isOnHomeDisplay() && isMostRecentTask);
+                return task.getTopVisibleActivity() != null;
             }
         }
 

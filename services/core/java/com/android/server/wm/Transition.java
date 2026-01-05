@@ -50,7 +50,6 @@ import static android.view.WindowManager.transitTypeToString;
 import static android.window.DesktopExperienceFlags.ENABLE_DESKTOP_WINDOWING_PIP;
 import static android.window.DesktopExperienceFlags.ENABLE_DISPLAY_DISCONNECT_INTERACTION;
 import static android.window.DesktopExperienceFlags.ENABLE_DISPLAY_FOCUS_IN_SHELL_TRANSITIONS;
-import static android.window.DesktopExperienceFlags.ENABLE_FILTER_REMOVING_DISPLAY_BUGFIX;
 import static android.window.DesktopExperienceFlags.ENABLE_INTERACTIVE_PICTURE_IN_PICTURE;
 import static android.window.TaskFragmentAnimationParams.DEFAULT_ANIMATION_BACKGROUND_COLOR;
 import static android.window.TransitionInfo.AnimationOptions;
@@ -75,6 +74,7 @@ import static android.window.TransitionInfo.FLAG_WILL_IME_SHOWN;
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_PENDING_INTENT;
 
 import static com.android.server.policy.WindowManagerPolicy.FINISH_LAYOUT_REDO_WALLPAPER;
+import static com.android.server.wm.ActivityClientController.reportMultiwindowFullscreenRequestFallbackResult;
 import static com.android.server.wm.ActivityRecord.State.RESUMED;
 import static com.android.server.wm.ActivityTaskManagerInternal.APP_TRANSITION_RECENTS_ANIM;
 import static com.android.server.wm.ActivityTaskManagerInternal.APP_TRANSITION_SNAPSHOT;
@@ -111,7 +111,9 @@ import android.os.SystemClock;
 import android.os.Trace;
 import android.util.ArrayMap;
 import android.util.ArraySet;
+// QTI_BEGIN: 2023-05-15: Performance: perf: Add Rotation boosts, based on ShellTransitions.
 import android.util.BoostFramework;
+// QTI_END: 2023-05-15: Performance: perf: Add Rotation boosts, based on ShellTransitions.
 import android.util.Slog;
 import android.util.SparseArray;
 import android.view.Display;
@@ -223,10 +225,12 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
     private SurfaceControl.Transaction mStartTransaction = null;
     private SurfaceControl.Transaction mFinishTransaction = null;
 
+// QTI_BEGIN: 2023-05-15: Performance: perf: Add Rotation boosts, based on ShellTransitions.
     /** Perf **/
     private BoostFramework mPerf = null;
     private boolean mIsAnimationPerfLockAcquired = false;
 
+// QTI_END: 2023-05-15: Performance: perf: Add Rotation boosts, based on ShellTransitions.
     /** Used for failsafe clean-up to prevent leaks due to misbehaving player impls. */
     private SurfaceControl.Transaction mCleanupTransaction = null;
 
@@ -287,6 +291,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
 
     private static final Duration TRANSACTION_PRESENTED_TIMEOUT = Duration.ofSeconds(1);
 
+    private ObservedRemoteCallback mPendingFullscreenRequest;
     private ArrayList<Runnable> mTransactionPresentedListeners = null;
 
     private ArrayList<Runnable> mTransitionEndedListeners = null;
@@ -408,10 +413,12 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
        if (!mController.useFullReadyTracking()) {
             mReadyTracker.add(mReadyTrackerOld);
         }
+// QTI_BEGIN: 2023-05-15: Performance: perf: Add Rotation boosts, based on ShellTransitions.
 
         if (mPerf == null) {
             mPerf = new BoostFramework();
         }
+// QTI_END: 2023-05-15: Performance: perf: Add Rotation boosts, based on ShellTransitions.
     }
 
     @Nullable
@@ -720,6 +727,14 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
     }
 
     /**
+     * @return true if the existence of the given container has changed in this transition.
+     */
+    boolean getExistenceChanged(@NonNull WindowContainer wc) {
+        final ChangeInfo info = mChanges.get(wc);
+        return info != null && info.mExistenceChanged;
+    }
+
+    /**
      * Sets the FLAG_TRANSIENT_LAUNCH flag to all changes associated with the given activity
      * container and parent tasks. This is mainly used to force a change when keyguard is occluded.
      */
@@ -822,11 +837,15 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         }
         mState = STATE_STARTED;
 
+// QTI_BEGIN: 2023-07-03: Performance: perf: Add Transition Type check.
         if (mPerf != null && mType == TRANSIT_CHANGE) {
+// QTI_END: 2023-07-03: Performance: perf: Add Transition Type check.
+// QTI_BEGIN: 2023-05-15: Performance: perf: Add Rotation boosts, based on ShellTransitions.
             mPerf.perfHint(BoostFramework.VENDOR_HINT_ROTATION_ANIM_BOOST, null);
             mIsAnimationPerfLockAcquired = true;
         }
 
+// QTI_END: 2023-05-15: Performance: perf: Add Rotation boosts, based on ShellTransitions.
         ProtoLog.v(WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS, "Starting Transition %d",
                 mSyncId);
         applyReady();
@@ -834,6 +853,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         mLogger.mStartTimeNs = SystemClock.elapsedRealtimeNanos();
 
         mController.updateAnimatingState();
+        reportFullscreenRequestFallbackResult();
     }
 
     /**
@@ -1743,10 +1763,12 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         validateKeyguardOcclusion();
 
         mState = STATE_FINISHED;
+// QTI_BEGIN: 2023-05-15: Performance: perf: Add Rotation boosts, based on ShellTransitions.
         if (mPerf != null && mIsAnimationPerfLockAcquired) {
             mPerf.perfLockRelease();
             mIsAnimationPerfLockAcquired = false;
         }
+// QTI_END: 2023-05-15: Performance: perf: Add Rotation boosts, based on ShellTransitions.
         // Rotation change may be deferred while there is a display change transition, so check
         // again in case there is a new pending change.
         if (hasParticipatedDisplay && !mController.useShellTransitionsRotation()) {
@@ -1763,6 +1785,14 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         mController.updateAnimatingState();
 
         invokeTransitionEndedListeners();
+    }
+
+    private void reportFullscreenRequestFallbackResult() {
+        if (mPendingFullscreenRequest == null) {
+            return;
+        }
+        reportMultiwindowFullscreenRequestFallbackResult(mPendingFullscreenRequest);
+
     }
 
     private void invokeTransitionEndedListeners() {
@@ -2323,6 +2353,14 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
     }
 
     /**
+     * Adds a pending client requested fullscreen requested callback that should be invoked when
+     * the transition starts with a fallback result in case Shell did not send a result.
+     */
+    void addPendingFullscreenRequest(ObservedRemoteCallback callback) {
+        mPendingFullscreenRequest = callback;
+    }
+
+    /**
      * Adds a listener that will be executed after the start transaction of this transition
      * is presented on the screen, the listener will be executed on a binder thread
      */
@@ -2492,15 +2530,8 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             mController.mLatestOnTopTasksReported.put(displayId, onTopTasksEnd);
             onTopTasksEnd = reportedOnTop != null ? reportedOnTop : new ArrayList<>();
             onTopTasksEnd.clear();
-            if (!ENABLE_FILTER_REMOVING_DISPLAY_BUGFIX.isTrue()
-                    && ENABLE_DISPLAY_FOCUS_IN_SHELL_TRANSITIONS.isTrue()
-                    && mOnTopDisplayStart != onTopDisplayEnd
-                    && displayId == onTopDisplayEnd.mDisplayId) {
-                addToTopChange(onTopDisplayEnd);
-            }
         }
-        if (ENABLE_FILTER_REMOVING_DISPLAY_BUGFIX.isTrue()
-                && ENABLE_DISPLAY_FOCUS_IN_SHELL_TRANSITIONS.isTrue()
+        if (ENABLE_DISPLAY_FOCUS_IN_SHELL_TRANSITIONS.isTrue()
                 && mOnTopDisplayStart != onTopDisplayEnd) {
             addToTopChange(onTopDisplayEnd);
         }

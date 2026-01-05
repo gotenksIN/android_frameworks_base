@@ -92,6 +92,7 @@ public abstract class SysuiTestCase {
     public static final SetFlagsRule.ClassRule mSetFlagsClassRule =
             new SetFlagsRule.ClassRule(
                     android.app.Flags.class,
+                    android.app.admin.flags.Flags.class,
                     android.hardware.biometrics.Flags.class,
                     android.multiuser.Flags.class,
                     android.net.platform.flags.Flags.class,
@@ -234,7 +235,7 @@ public abstract class SysuiTestCase {
             InstrumentationRegistry.registerInstance(mRealInstrumentation,
                     InstrumentationRegistry.getArguments());
         }
-        if (TestableLooper.get(this) != null) {
+        if (!isRobolectricTest() && TestableLooper.get(this) != null) {
             TestableLooper.get(this).processAllMessages();
             // Must remove static reference to this test object to prevent leak (b/261039202)
             TestableLooper.remove(this);

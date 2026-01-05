@@ -16,6 +16,7 @@
 
 package com.android.settingslib;
 
+import static android.app.admin.DevicePolicyIdentifiers.getIdentifierForUserRestriction;
 import static android.app.admin.DevicePolicyManager.KEYGUARD_DISABLE_FEATURES_NONE;
 import static android.app.admin.DevicePolicyManager.MTE_NOT_CONTROLLED_BY_POLICY;
 import static android.app.admin.DevicePolicyManager.PROFILE_KEYGUARD_FEATURES_AFFECT_OWNER;
@@ -43,6 +44,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.UserInfo;
 import android.content.res.TypedArray;
 import android.graphics.drawable.Drawable;
+import android.os.Binder;
 import android.os.Build;
 import android.os.RemoteException;
 import android.os.UserHandle;
@@ -561,6 +563,10 @@ public class RestrictedLockUtilsInternal extends RestrictedLockUtils {
         return null;
     }
 
+    // LINT.IfChange
+    /**
+     * Disables accessibility service that are not permitted.
+     */
     public static EnforcedAdmin checkIfAccessibilityServiceDisallowed(Context context,
             String packageName, int userId) {
         DevicePolicyManager dpm = (DevicePolicyManager) context.getSystemService(
@@ -589,9 +595,27 @@ public class RestrictedLockUtilsInternal extends RestrictedLockUtils {
         } else if (!permittedByProfileAdmin) {
             return profileAdmin;
         }
-        return null;
-    }
 
+        String userRestriction = UserManager.DISALLOW_NON_TOOL_ACCESSIBILITY_SERVICE;
+        PolicyEnforcementInfo policyEnforcementInfo;
+        final long identity = Binder.clearCallingIdentity();
+        try {
+            policyEnforcementInfo = dpm.getEnforcingAdminsForPolicy(
+                    getIdentifierForUserRestriction(userRestriction), userId);
+        } finally {
+            Binder.restoreCallingIdentity(identity);
+        }
+        if (policyEnforcementInfo.getAllAdmins().isEmpty()) {
+            return null;
+        }
+        EnforcingAdmin aapmEnforcingAdmin = policyEnforcementInfo.getMostImportantEnforcingAdmin();
+        EnforcedAdmin aapmEnforcedAdmin = new EnforcedAdmin(aapmEnforcingAdmin.getComponentName(),
+                userRestriction,
+                aapmEnforcingAdmin.getUserHandle());
+        return aapmEnforcedAdmin;
+    }
+    // LINT.ThenChange(frameworks/base/services/accessibility/java/com/android/server
+    // /accessibility/RestrictedLockUtilsInternal.java)
     /**
      * Retrieves the user ID of a managed profile associated with a specific user.
      *

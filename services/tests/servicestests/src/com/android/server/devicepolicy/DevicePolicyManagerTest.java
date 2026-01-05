@@ -180,6 +180,7 @@ import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mockito;
 import org.mockito.internal.util.collections.Sets;
 import org.mockito.stubbing.Answer;
@@ -192,6 +193,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -1176,7 +1178,6 @@ public class DevicePolicyManagerTest extends DpmTestBase {
         assertThat(dpm.getDeviceOwnerComponentOnAnyUser()).isEqualTo(admin1);
     }
 
-    // TODO(b/174859111): move to automotive-only section
     private void setDeviceOwner_headlessSystemUser() throws Exception {
         mContext.callerPermissions.add(permission.MANAGE_DEVICE_ADMINS);
         mContext.callerPermissions.add(permission.MANAGE_PROFILE_AND_DEVICE_OWNERS);
@@ -3933,7 +3934,6 @@ public class DevicePolicyManagerTest extends DpmTestBase {
         assertProvisioningAllowed(DevicePolicyManager.ACTION_PROVISION_MANAGED_PROFILE, false);
     }
 
-    // TODO(b/174859111): move to automotive-only section
     private void setup_firstBoot_headlessSystemUserMode() throws Exception {
         mContext.binder.callingUid = DpmMockContext.CALLER_UID;
         when(getServices().userManager.canAddMoreManagedProfiles(UserHandle.USER_SYSTEM, false))
@@ -3943,7 +3943,6 @@ public class DevicePolicyManagerTest extends DpmTestBase {
     }
 
     /**
-     * TODO(b/174859111): move to automotive-only section
      * Tests provision from secondary user during first boot.
     **/
     @Test
@@ -9016,6 +9015,111 @@ public class DevicePolicyManagerTest extends DpmTestBase {
         assertThat(enforcingAdmins.getFirst().getComponentName()).isEqualTo(admin1);
     }
 
+    @Test
+    public void getEnforcingAdminsForPolicy_passwordComplexity_returnsManagedProfileAdminForParent()
+            throws Exception {
+        // Set-up managed profile with parent as system user.
+        mContext.callerPermissions.add(permission.BIND_DEVICE_ADMIN);
+        final int managedProfileUserId = 78;
+        final int managedProfileAdminUid = UserHandle.getUid(managedProfileUserId,
+                DpmMockContext.SYSTEM_UID);
+        mContext.binder.callingUid = DpmMockContext.SYSTEM_UID;
+        mContext.packageName = admin1.getPackageName();
+        // Add a managed profile belonging to the system user.
+        addManagedProfileForPasswordTests(managedProfileUserId,
+                managedProfileAdminUid, /* separateChallenge = */ false);
+        // Set policy on the managed profile.
+        mContext.binder.callingUid = managedProfileAdminUid;
+        dpm.setRequiredPasswordComplexity(PASSWORD_COMPLEXITY_HIGH);
+        mContext.callerPermissions.add(permission.QUERY_ADMIN_POLICY);
+
+        // Get enforcing admins on parent.
+        List<EnforcingAdmin> enforcingAdmins = dpm.getEnforcingAdminsForPolicy(
+                DevicePolicyIdentifiers.PASSWORD_COMPLEXITY_POLICY,
+                UserHandle.USER_SYSTEM).getAllAdmins();
+
+        assertThat(enforcingAdmins.size()).isEqualTo(1);
+        assertThat(enforcingAdmins.getFirst().getComponentName()).isEqualTo(admin1);
+    }
+
+    @Test
+    public void getEnforcingAdminsForPolicy_passwordQuality_returnsManagedProfileAdminForParent()
+            throws Exception {
+        // Set-up managed profile with parent as system user.
+        mContext.callerPermissions.add(permission.BIND_DEVICE_ADMIN);
+        final int managedProfileUserId = 78;
+        final int managedProfileAdminUid = UserHandle.getUid(managedProfileUserId,
+                DpmMockContext.SYSTEM_UID);
+        mContext.binder.callingUid = DpmMockContext.SYSTEM_UID;
+        mContext.packageName = admin1.getPackageName();
+        // Add a managed profile belonging to the system user.
+        addManagedProfileForPasswordTests(managedProfileUserId,
+                managedProfileAdminUid, /* separateChallenge = */ false);
+        // Set policy on the managed profile.
+        mContext.binder.callingUid = managedProfileAdminUid;
+        dpm.setPasswordQuality(admin1, DevicePolicyManager.PASSWORD_QUALITY_MANAGED);
+        mContext.callerPermissions.add(permission.QUERY_ADMIN_POLICY);
+
+        // Get enforcing admins on parent.
+        List<EnforcingAdmin> enforcingAdmins = dpm.getEnforcingAdminsForPolicy(
+                DevicePolicyIdentifiers.PASSWORD_QUALITY_POLICY,
+                UserHandle.USER_SYSTEM).getAllAdmins();
+
+        assertThat(enforcingAdmins.size()).isEqualTo(1);
+        assertThat(enforcingAdmins.getFirst().getComponentName()).isEqualTo(admin1);
+    }
+
+    @Test
+    public void testGetPermittedA11yServices_withPolicy_returnPolicy() throws Exception {
+        mServiceContext.permissions.add(permission.MANAGE_USERS);
+        mServiceContext.permissions.add(permission.QUERY_ADMIN_POLICY);
+        final int userId = CALLER_USER_HANDLE;
+        List<String> adminAllowedList = Arrays.asList(
+                "com.system.tool", "com.user.tool", "com.user.test"
+        );
+        setupAdminPermittedA11yServices(userId, admin1, adminAllowedList);
+        setupMockAccessibilityManager(new HashSet<>(adminAllowedList));
+
+        List<String> permitted = dpms.getPermittedAccessibilityServicesForUser(userId);
+
+        assertThat(permitted).containsExactlyElementsIn(adminAllowedList);
+    }
+
+    @Test
+    public void testGetPermittedA11yServices_withPolicy_rightPolicyPassed() throws Exception {
+        mServiceContext.permissions.add(permission.MANAGE_USERS);
+        mServiceContext.permissions.add(permission.QUERY_ADMIN_POLICY);
+        final int userId = CALLER_USER_HANDLE;
+        List<String> adminAllowedList = Arrays.asList(
+                "com.system.tool", "com.user.tool", "com.user.test"
+        );
+        setupAdminPermittedA11yServices(userId, admin1, adminAllowedList);
+        setupMockAccessibilityManager(new HashSet<>(adminAllowedList));
+
+        dpms.getPermittedAccessibilityServicesForUser(userId);
+
+        ArgumentCaptor<List<String>> packagesCaptor = ArgumentCaptor.forClass(List.class);
+        verify(getServices().accessibilityManagerInternal).getPermittedAccessibilityServicePackages(
+                packagesCaptor.capture(),
+                eq(userId) // The user ID
+        );
+        assertThat(packagesCaptor.getValue())
+                .containsExactlyElementsIn(adminAllowedList);
+    }
+
+    @Test
+    public void testGetPermittedA11yServices_noPolicy_returnNull() throws Exception {
+        mServiceContext.permissions.add(permission.MANAGE_USERS);
+        mServiceContext.permissions.add(permission.QUERY_ADMIN_POLICY);
+        final int userId = CALLER_USER_HANDLE;
+        setupAdminPermittedA11yServices(userId, admin1, null);
+        setupMockAccessibilityManager(null);
+
+        List<String> permitted = dpms.getPermittedAccessibilityServicesForUser(userId);
+
+        assertThat(permitted).isNull();
+    }
+
     private void setupVpnAuthorization(String userVpnPackage, int userVpnUid) {
         final AppOpsManager.PackageOps vpnOp = new AppOpsManager.PackageOps(userVpnPackage,
                 userVpnUid, List.of(new AppOpsManager.OpEntry(
@@ -9316,5 +9420,20 @@ public class DevicePolicyManagerTest extends DpmTestBase {
 
     private static PasswordMetrics metricsForPin(String pin) {
         return PasswordMetrics.computeForCredential(LockscreenCredential.createPin(pin));
+    }
+
+    private void setupMockAccessibilityManager(Set<String> services) {
+        doReturn(services).when(getServices().accessibilityManagerInternal)
+                .getPermittedAccessibilityServicePackages(any(), anyInt());
+    }
+
+    private void setupAdminPermittedA11yServices(int userId, ComponentName adminComponent,
+            List<String> services) throws Exception {
+        // Setup the admin as a profile owner for the given userId.
+        final int adminUid = UserHandle.getUid(userId, DpmMockContext.CALLER_UID);
+        setUpProfileOwnerAdmin(adminComponent, adminUid);
+
+        // Set the permitted accessibility services using the DPM API.
+        dpm.setPermittedAccessibilityServices(adminComponent, services);
     }
 }

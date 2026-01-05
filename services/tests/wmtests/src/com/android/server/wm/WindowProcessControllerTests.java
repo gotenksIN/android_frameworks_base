@@ -17,10 +17,13 @@
 package com.android.server.wm;
 
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_HOME;
+import static android.app.WindowConfiguration.ACTIVITY_TYPE_STANDARD;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_UNDEFINED;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM;
+import static android.app.WindowConfiguration.WINDOWING_MODE_MULTI_WINDOW;
 import static android.content.pm.ActivityInfo.INSETS_DECOUPLED_CONFIGURATION_ENFORCED;
 import static android.content.pm.ActivityInfo.OVERRIDE_ENABLE_INSETS_DECOUPLED_CONFIGURATION;
+import static android.content.pm.ActivityInfo.PERSIST_ACROSS_REBOOTS;
 import static android.content.res.Configuration.GRAMMATICAL_GENDER_NOT_SPECIFIED;
 import static android.content.res.Configuration.ORIENTATION_LANDSCAPE;
 import static android.content.res.Configuration.ORIENTATION_PORTRAIT;
@@ -53,6 +56,7 @@ import static org.mockito.Mockito.when;
 
 import android.Manifest;
 import android.app.ActivityManager;
+import android.app.ActivityManagerInternal;
 import android.app.ClientTransactionHandler;
 import android.app.IApplicationThread;
 import android.app.servertransaction.ConfigurationChangeItem;
@@ -67,12 +71,17 @@ import android.platform.test.annotations.Presubmit;
 import android.view.Display;
 import android.view.DisplayInfo;
 
+import com.android.server.wm.utils.StubOrganizer;
+
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InOrder;
 import org.mockito.Mockito;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Tests for the {@link WindowProcessController} class.
@@ -86,6 +95,7 @@ public class WindowProcessControllerTests extends WindowTestsBase {
 
     WindowProcessController mWpc;
     WindowProcessListener mMockListener;
+    StubOrganizer mStubOrganizer;
 
     @Before
     public void setUp() {
@@ -97,6 +107,8 @@ public class WindowProcessControllerTests extends WindowTestsBase {
         mWpc = new WindowProcessController(
                 mAtm, info, null, 0, -1, null, mMockListener);
         mWpc.setThread(mock(IApplicationThread.class));
+        mStubOrganizer = new StubOrganizer();
+        mWm.mAtmService.mTaskOrganizerController.registerTaskOrganizer(mStubOrganizer);
     }
 
     @Test
@@ -294,6 +306,24 @@ public class WindowProcessControllerTests extends WindowTestsBase {
         assertTrue(mWpc.registeredForActivityConfigChanges());
         assertEquals("Config seq of process should not be affected by activity",
                 mWpc.getConfiguration().seq, globalSeq);
+    }
+
+    @Test
+    public void testResolveOverrideConfiguration_clearsActivityTypeInRequestedConfig() {
+        // Set a requested override configuration with a specific activity type.
+        Configuration requestedOverride = new Configuration();
+        requestedOverride.windowConfiguration.setActivityType(ACTIVITY_TYPE_HOME);
+        mWpc.onRequestedOverrideConfigurationChanged(requestedOverride);
+
+        // After a configuration change, the requested override should have its activity type
+        // cleared. This is because resolveOverrideConfiguration modifies the requested config
+        // directly.
+        assertEquals(ACTIVITY_TYPE_UNDEFINED,
+                mWpc.getRequestedOverrideConfiguration().windowConfiguration.getActivityType());
+
+        // And the resolved config should also have it cleared.
+        assertEquals(ACTIVITY_TYPE_UNDEFINED,
+                mWpc.getResolvedOverrideConfiguration().windowConfiguration.getActivityType());
     }
 
     @Test
@@ -554,6 +584,241 @@ public class WindowProcessControllerTests extends WindowTestsBase {
         mWpc.addRecentTask(task);
 
         assertEquals("Freeform-Tasks=1 On-External-Display=Yes", mWpc.getCrashTag());
+    }
+
+    @Test
+    public void testStopAndKillProcess_rootPersistableActivity_isStoppedAnKilled() {
+        class PackageUpdateOrganizer extends StubOrganizer {
+            List<ActivityManager.RunningTaskInfo> mUpdatingTaskInfos = new ArrayList<>();
+
+            @Override
+            public void onPackageUpdateRequested(
+                    List<ActivityManager.RunningTaskInfo> updatingTaskInfos) {
+                mUpdatingTaskInfos = updatingTaskInfos;
+            }
+        }
+        PackageUpdateOrganizer o = new PackageUpdateOrganizer();
+        mWm.mAtmService.mTaskOrganizerController.registerTaskOrganizer(o);
+        mAtm.mAmInternal = mock(ActivityManagerInternal.class);
+        final ActivityRecord activity = createActivityRecord(mWpc);
+        activity.getTask().mHandlePackageUpdate = true;
+        activity.info.persistableMode = PERSIST_ACROSS_REBOOTS;
+        activity.setState(RESUMED, "test");
+        spyOn(activity);
+
+        mWpc.stopAndKillProcessForUpdate(activity.packageName);
+
+        verify(activity, never()).stopIfPossible();
+        assertEquals(o.mUpdatingTaskInfos.get(0).taskId, activity.getTask().mTaskId);
+
+        mWpc.onActivityStopped(activity);
+        mWpc.onTaskPackageUpdateHandled(activity.getTask());
+
+        verify(mAtm).onProcessReadyToBeKilled(activity.packageName, mWpc);
+    }
+
+    @Test
+    public void testStopAndKillProcess_rootPersistableActivity_taskNotHandled_doesNothing() {
+        class PackageUpdateOrganizer extends StubOrganizer {
+            List<ActivityManager.RunningTaskInfo> mUpdatingTaskInfos = new ArrayList<>();
+
+            @Override
+            public void onPackageUpdateRequested(
+                    List<ActivityManager.RunningTaskInfo> updatingTaskInfos) {
+                mUpdatingTaskInfos = updatingTaskInfos;
+            }
+        }
+        PackageUpdateOrganizer o = new PackageUpdateOrganizer();
+        mWm.mAtmService.mTaskOrganizerController.registerTaskOrganizer(o);
+        mAtm.mAmInternal = mock(ActivityManagerInternal.class);
+        final ActivityRecord activity = createActivityRecord(mWpc);
+        activity.getTask().mHandlePackageUpdate = true;
+        activity.info.persistableMode = PERSIST_ACROSS_REBOOTS;
+        activity.setState(RESUMED, "test");
+        spyOn(activity);
+
+        mWpc.stopAndKillProcessForUpdate(activity.packageName);
+
+        verify(activity, never()).stopIfPossible();
+        assertEquals(o.mUpdatingTaskInfos.get(0).taskId, activity.getTask().mTaskId);
+
+        mWpc.onActivityStopped(activity);
+
+        verify(mAtm, never()).onProcessReadyToBeKilled(activity.packageName, mWpc);
+    }
+
+    @Test
+    public void testStopAndKillProcess_notHandled_rootPersistableActivity_isStoppedAnKilled() {
+        mAtm.mAmInternal = mock(ActivityManagerInternal.class);
+        final ActivityRecord activity = createActivityRecord(mWpc);
+        final Task task = activity.getTask();
+        activity.info.persistableMode = PERSIST_ACROSS_REBOOTS;
+        activity.setState(RESUMED, "test");
+        spyOn(activity);
+        spyOn(task);
+
+        mWpc.stopAndKillProcessForUpdate(activity.packageName);
+
+        verify(task).moveTaskToBack(task);
+        verify(activity).stopIfPossible();
+
+        // Set state to STOPPING, or ActivityRecord#activityStoppedLocked() call will be ignored.
+        mWpc.onActivityStopped(activity);
+        waitHandlerIdle(mAtm.mH);
+
+        verify(mAtm).onProcessReadyToBeKilled(activity.packageName, mWpc);
+    }
+
+    @Test
+    public void testStopAndKillProcess_noActivitiesToStopTaskHandled_killsProcess() {
+        class PackageUpdateOrganizer extends StubOrganizer {
+            List<ActivityManager.RunningTaskInfo> mUpdatingTaskInfos = new ArrayList<>();
+
+            @Override
+            public void onPackageUpdateRequested(
+                    List<ActivityManager.RunningTaskInfo> updatingTaskInfos) {
+                mUpdatingTaskInfos = updatingTaskInfos;
+            }
+        }
+        PackageUpdateOrganizer o = new PackageUpdateOrganizer();
+        mWm.mAtmService.mTaskOrganizerController.registerTaskOrganizer(o);
+        mAtm.mAmInternal = mock(ActivityManagerInternal.class);
+        final ActivityRecord activity = createActivityRecord(mWpc);
+        activity.getTask().mHandlePackageUpdate = true;
+        activity.setState(STOPPED, "test");
+
+        mWpc.stopAndKillProcessForUpdate(activity.packageName);
+        assertEquals(o.mUpdatingTaskInfos.get(0).taskId, activity.getTask().mTaskId);
+
+        mWpc.onTaskPackageUpdateHandled(activity.getTask());
+        verify(activity, never()).stopIfPossible();
+        verify(mAtm).onProcessReadyToBeKilled(activity.packageName, mWpc);
+    }
+
+    @Test
+    public void testStopAndKillProcess_noActivitiesToStop_taskHandled_wrongPkg_doesNotNotify() {
+        class PackageUpdateOrganizer extends StubOrganizer {
+            List<ActivityManager.RunningTaskInfo> mUpdatingTaskInfos = new ArrayList<>();
+
+            @Override
+            public void onPackageUpdateRequested(
+                    List<ActivityManager.RunningTaskInfo> updatingTaskInfos) {
+                mUpdatingTaskInfos = updatingTaskInfos;
+            }
+        }
+        PackageUpdateOrganizer o = new PackageUpdateOrganizer();
+        mWm.mAtmService.mTaskOrganizerController.registerTaskOrganizer(o);
+        mAtm.mAmInternal = mock(ActivityManagerInternal.class);
+        final ActivityRecord activity = createActivityRecord(mWpc);
+        activity.getTask().mHandlePackageUpdate = true;
+        activity.setState(STOPPED, "test");
+
+        mWpc.stopAndKillProcessForUpdate("wrong.pkg");
+        mWpc.onTaskPackageUpdateHandled(activity.getTask());
+
+        assertTrue(o.mUpdatingTaskInfos.isEmpty());
+    }
+
+    @Test
+    public void testStopAndKillProcess_noActivitiesToStopTaskNotHandled_killsProcess() {
+        class PackageUpdateOrganizer extends StubOrganizer {
+            List<ActivityManager.RunningTaskInfo> mUpdatingTaskInfos = new ArrayList<>();
+
+            @Override
+            public void onPackageUpdateRequested(
+                    List<ActivityManager.RunningTaskInfo> updatingTaskInfos) {
+                mUpdatingTaskInfos = updatingTaskInfos;
+            }
+        }
+        PackageUpdateOrganizer o = new PackageUpdateOrganizer();
+        mWm.mAtmService.mTaskOrganizerController.registerTaskOrganizer(o);
+        mAtm.mAmInternal = mock(ActivityManagerInternal.class);
+        final ActivityRecord activity = createActivityRecord(mWpc);
+        activity.setState(STOPPED, "test");
+
+        mWpc.stopAndKillProcessForUpdate(activity.packageName);
+
+        verify(activity, never()).stopIfPossible();
+        verify(mAtm).onProcessReadyToBeKilled(activity.packageName, mWpc);
+    }
+
+    @Test
+    public void testStopAndKillProcess_noHandlePackageUpdate_noActivitiesToStop_killsProcess() {
+        mAtm.mAmInternal = mock(ActivityManagerInternal.class);
+        final ActivityRecord activity = createActivityRecord(mWpc);
+        activity.setState(STOPPED, "test");
+
+        mWpc.stopAndKillProcessForUpdate(activity.packageName);
+
+        verify(activity, never()).stopIfPossible();
+        verify(mAtm).onProcessReadyToBeKilled(activity.packageName, mWpc);
+    }
+
+    @Test
+    public void testStopAndKillProcess_handlePackageUpdateOnRoot_marksLeafUpdating() {
+        class PackageUpdateOrganizer extends StubOrganizer {
+            List<ActivityManager.RunningTaskInfo> mUpdatingTaskInfos = new ArrayList<>();
+
+            @Override
+            public void onPackageUpdateRequested(
+                    List<ActivityManager.RunningTaskInfo> updatingTaskInfos) {
+                mUpdatingTaskInfos = updatingTaskInfos;
+            }
+        }
+        final PackageUpdateOrganizer o = new PackageUpdateOrganizer();
+        mWm.mAtmService.mTaskOrganizerController.registerTaskOrganizer(o);
+        mAtm.mAmInternal = mock(ActivityManagerInternal.class);
+        final ActivityRecord activity = createActivityRecord(mWpc);
+        activity.info.persistableMode = PERSIST_ACROSS_REBOOTS;
+        activity.setState(RESUMED, "test");
+
+        // Set up root task
+        final Task rootTask = createTask(mDisplayContent, WINDOWING_MODE_MULTI_WINDOW,
+                ACTIVITY_TYPE_STANDARD);
+        activity.getTask().setParent(rootTask);
+        activity.getTask().mTaskOrganizer = o;
+        rootTask.mHandlePackageUpdate = true;
+        spyOn(activity);
+
+        mWpc.stopAndKillProcessForUpdate(activity.packageName);
+
+        verify(activity, never()).stopIfPossible();
+        assertEquals(o.mUpdatingTaskInfos.get(0).taskId, activity.getTask().mTaskId);
+    }
+
+    @Test
+    public void testOnActivityStoppedForUpdate_killsProcessWhenLastActivityStopped() {
+        mAtm.mAmInternal = mock(ActivityManagerInternal.class);
+        final ActivityRecord activity1 = createActivityRecord(mWpc);
+        activity1.info.persistableMode = PERSIST_ACROSS_REBOOTS;
+        activity1.setState(RESUMED, "test");
+        spyOn(activity1);
+        final ActivityRecord activity2 = createActivityRecord(mWpc);
+        activity2.info.persistableMode = PERSIST_ACROSS_REBOOTS;
+        activity2.setState(RESUMED, "test");
+        spyOn(activity2);
+
+        mWpc.stopAndKillProcessForUpdate(activity1.packageName);
+        verify(activity1).stopIfPossible();
+        verify(activity2).stopIfPossible();
+
+        mWpc.onActivityStopped(activity1);
+        verify(mAtm, never()).onProcessReadyToBeKilled(activity1.packageName, mWpc);
+
+        mWpc.onActivityStopped(activity2);
+        verify(mAtm).onProcessReadyToBeKilled(activity1.packageName, mWpc);
+    }
+
+    @Test
+    public void testOnActivityStoppedForUpdate_noActivitiesToBeStopped_doesNothing() {
+        mAtm.mAmInternal = mock(ActivityManagerInternal.class);
+        final ActivityRecord activity1 = createActivityRecord(mWpc);
+        activity1.setState(STOPPED, "test");
+        spyOn(activity1);
+
+        mWpc.onActivityStopped(activity1);
+
+        verify(mAtm, never()).onProcessReadyToBeKilled(activity1.packageName, mWpc);
     }
 
     private TestDisplayContent createTestDisplayContentInContainer() {

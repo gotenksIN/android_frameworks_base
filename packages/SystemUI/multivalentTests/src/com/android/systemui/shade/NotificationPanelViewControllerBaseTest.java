@@ -355,6 +355,7 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
                 new ShadeInteractorLegacyImpl(
                         mTestScope.getBackgroundScope(),
                         mFakeKeyguardRepository,
+                        mKosmos.getKeyguardTransitionInteractor(),
                         mShadeRepository,
                         mKosmos.getShadeConfigRepository()
                 ),

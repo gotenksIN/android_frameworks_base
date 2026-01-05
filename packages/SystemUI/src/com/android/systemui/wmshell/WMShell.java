@@ -308,14 +308,12 @@ public final class WMShell implements
                         // No op.
                     }
                 }, mSysUiMainExecutor);
-        pip.addOnIsInPipStateChangedListener((isInPip) -> {
-            mSysUiMainExecutor.execute(() -> {
-                if (!isInPip) {
-                    Log.d(TAG, "Reset disable_gesture_pip_animating on pip exit");
-                    mSysUiState.setFlag(SYSUI_STATE_DISABLE_GESTURE_PIP_ANIMATING, false)
-                            .commitUpdate();
-                }
-            });
+        pip.addOnIsInPipStateChangedListener(mSysUiMainExecutor, isInPip -> {
+            if (!isInPip) {
+                Log.d(TAG, "Reset disable_gesture_pip_animating on pip exit");
+                mSysUiState.setFlag(SYSUI_STATE_DISABLE_GESTURE_PIP_ANIMATING, false)
+                        .commitUpdate();
+            }
         });
         mSysUiState.addCallback((sysUiStateFlag, displayId) -> {
             mIsSysUiStateValid = (sysUiStateFlag & INVALID_SYSUI_STATE_MASK) == 0;
@@ -427,7 +425,7 @@ public final class WMShell implements
 
             @Override
             public void setImeWindowStatus(int displayId, @ImeWindowVisibility int vis,
-                    @BackDispositionMode int backDisposition, boolean showImeSwitcher) {
+                    @BackDispositionMode int backDisposition, boolean showImeSwitcherButton) {
                 if (displayId == mDisplayTracker.getDefaultDisplayId()
                         && (vis & InputMethodService.IME_VISIBLE) != 0) {
                     oneHanded.stopOneHanded(
@@ -514,6 +512,9 @@ public final class WMShell implements
             public void onCanCreateDesksChanged(boolean canCreateDesks) {
 
             }
+
+            @Override
+            public void onTaskAppearingInDesk(int displayId, int deskId, int taskId) {}
         }, mSysUiMainExecutor);
         mCommandQueue.addCallback(new CommandQueue.Callbacks() {
             @Override
@@ -526,14 +527,11 @@ public final class WMShell implements
                 desktopMode.moveFocusedTaskToFullscreen(displayId,
                         DesktopModeTransitionSource.KEYBOARD_SHORTCUT);
             }
-            @Override
-            public void moveFocusedTaskToStageSplit(int displayId, boolean leftOrTop) {
-                desktopMode.moveFocusedTaskToStageSplit(displayId, leftOrTop);
-            }
         });
     }
 
     @VisibleForTesting
+    // TODO(b/461749621): Adjust for scene container or deprecate
     void initRecentTasks(RecentTasks recentTasks) {
         recentTasks.addAnimationStateListener(mSysUiMainExecutor,
                 mCommandQueue::onRecentsAnimationStateChanged);

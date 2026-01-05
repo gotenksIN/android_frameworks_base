@@ -17,6 +17,7 @@
 package android.os;
 
 import android.annotation.Nullable;
+import android.os.PowerManager.GoToSleepReason;
 import android.os.PowerManager.UserActivityEvent;
 import android.os.PowerManager.UserActivityFlag;
 import android.os.PowerManager.WakeReason;
@@ -223,6 +224,17 @@ public abstract class PowerManagerInternal {
          *      otherwise.
          */
         boolean wakeUp(long eventTime, @WakeReason int reason, String details, int uid);
+
+        /**
+         * Invokes the sleep logic of the delegate.
+         *
+         * @param eventTime The time when the request to sleep request was issued, in the
+         *      {@link SystemClock#uptimeMillis()} time base.
+         * @param uid The UID that triggered this sleep request.
+         * @return {@code true} if the delegate successfully handles the sleep, {@code false}
+         *      otherwise.
+         */
+        boolean sleep(long eventTime, @GoToSleepReason int reason, int uid);
     }
 
     /**
@@ -452,6 +464,7 @@ public abstract class PowerManagerInternal {
      * Notifies PowerManager that settings have changed and that it should refresh its state.
      */
     public abstract void updateSettings();
+// QTI_BEGIN: 2025-03-20: Snapdragon_IoT/Wearables: Adding adpation for deepsleep and hibernate state.
 
     /**
      * Forces the device to go to sleep, even if there are currently wakelocks being held.
@@ -464,4 +477,5 @@ public abstract class PowerManagerInternal {
      * Note: only used for wearables
      */
     public abstract void wakeupFromForceDisplaySleep();
+// QTI_END: 2025-03-20: Snapdragon_IoT/Wearables: Adding adpation for deepsleep and hibernate state.
 }

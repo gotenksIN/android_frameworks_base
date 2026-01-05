@@ -22,6 +22,7 @@ import android.annotation.Nullable;
 import android.annotation.RequiresPermission;
 import android.annotation.TestApi;
 import android.bluetooth.BluetoothCodecConfig;
+import android.bluetooth.BluetoothCodecType;
 import android.bluetooth.BluetoothLeAudioCodecConfig;
 import android.compat.annotation.UnsupportedAppUsage;
 import android.content.Context;
@@ -36,10 +37,14 @@ import android.os.Build;
 import android.os.IBinder;
 import android.os.Parcel;
 import android.os.Vibrator;
+import android.ravenwood.annotation.RavenwoodKeepPartialClass;
+import android.ravenwood.annotation.RavenwoodKeepStaticInitializer;
+import android.ravenwood.annotation.RavenwoodReplace;
 import android.telephony.TelephonyManager;
 import android.util.IntArray;
 import android.util.Log;
 import android.util.Pair;
+
 
 import com.android.internal.annotations.GuardedBy;
 
@@ -61,6 +66,8 @@ import java.util.Set;
  * @hide
  */
 @TestApi
+@RavenwoodKeepPartialClass
+@RavenwoodKeepStaticInitializer
 public class AudioSystem
 {
     private static final boolean DEBUG_VOLUME = false;
@@ -127,19 +134,34 @@ public class AudioSystem
      * @hide
      */
     public static final int OUT_CHANNEL_COUNT_MAX = native_getMaxChannelCount();
+
+    @RavenwoodReplace
     private static native int native_getMaxChannelCount();
+    private static int native_getMaxChannelCount$ravenwood() {
+        return 2;
+    }
 
     /** Maximum value for sample rate, used by AudioFormat.
      * @hide
      */
     public static final int SAMPLE_RATE_HZ_MAX = native_getMaxSampleRate();
+
+    @RavenwoodReplace
     private static native int native_getMaxSampleRate();
+    private static int native_getMaxSampleRate$ravenwood() {
+        return 48000;
+    }
 
     /** Minimum value for sample rate, used by AudioFormat.
      * @hide
      */
     public static final int SAMPLE_RATE_HZ_MIN = native_getMinSampleRate();
+
+    @RavenwoodReplace
     private static native int native_getMinSampleRate();
+    private static int native_getMinSampleRate$ravenwood() {
+        return 16000;
+    }
 
     /** @hide */
     public static final int FCC_24 = 24; // fixed channel count 24; do not change.
@@ -216,6 +238,7 @@ public class AudioSystem
     public static final int NUM_MODES               = 8;
 
     /** @hide */
+    @android.ravenwood.annotation.RavenwoodKeep
     public static String modeToString(int mode) {
         switch (mode) {
             case MODE_CURRENT: return "MODE_CURRENT";
@@ -257,29 +280,37 @@ public class AudioSystem
     public static final int AUDIO_FORMAT_OPUS_HI_RES    = 0x08000001;
     /** @hide */
 
+// QTI_BEGIN: 2019-04-10: Audio: Add support for audio extended codecs
     public static final int AUDIO_FORMAT_CELT           = 0x26000000;
+// QTI_END: 2019-04-10: Audio: Add support for audio extended codecs
     /** @hide */
+// QTI_BEGIN: 2019-04-10: Audio: Add support for audio extended codecs
     public static final int AUDIO_FORMAT_APTX_ADAPTIVE  = 0x27000000;
+// QTI_END: 2019-04-10: Audio: Add support for audio extended codecs
     /** @hide */
+// QTI_BEGIN: 2019-04-30: Audio: Add support for APTX TWSP audio codec
     public static final int AUDIO_FORMAT_APTX_TWSP      = 0x2A000000;
+// QTI_END: 2019-04-30: Audio: Add support for APTX TWSP audio codec
     /** @hide */
     public static final int VX_AUDIO_FORMAT_APTX_ADAPTIVE_QLEA       = 0x30000000;
 
     /** @hide */
-    @IntDef(flag = false, prefix = "AUDIO_FORMAT_", value = {
-            AUDIO_FORMAT_INVALID,
-            AUDIO_FORMAT_DEFAULT,
-            AUDIO_FORMAT_AAC,
-            AUDIO_FORMAT_SBC,
-            AUDIO_FORMAT_APTX,
-            AUDIO_FORMAT_APTX_HD,
-            AUDIO_FORMAT_LDAC,
-            AUDIO_FORMAT_LHDC,
-            AUDIO_FORMAT_LC3,
-            AUDIO_FORMAT_OPUS,
-            AUDIO_FORMAT_OPUS_HI_RES,
-           }
-    )
+    @IntDef(
+            flag = false,
+            prefix = "AUDIO_FORMAT_",
+            value = {
+                AUDIO_FORMAT_INVALID,
+                AUDIO_FORMAT_DEFAULT,
+                AUDIO_FORMAT_AAC,
+                AUDIO_FORMAT_SBC,
+                AUDIO_FORMAT_APTX,
+                AUDIO_FORMAT_APTX_HD,
+                AUDIO_FORMAT_LDAC,
+                AUDIO_FORMAT_LHDC,
+                AUDIO_FORMAT_LC3,
+                AUDIO_FORMAT_OPUS,
+                AUDIO_FORMAT_OPUS_HI_RES,
+            })
     @Retention(RetentionPolicy.SOURCE)
     public @interface AudioFormatNativeEnumForBtCodec {}
 
@@ -297,7 +328,8 @@ public class AudioSystem
     @IntDef(flag = false, prefix = "DEVICE_", value = {
             DEVICE_OUT_BLUETOOTH_A2DP,
             DEVICE_OUT_BLE_HEADSET,
-            DEVICE_OUT_BLE_BROADCAST}
+            DEVICE_OUT_BLE_BROADCAST,
+            DEVICE_OUT_BLE_HEARING_AID}
     )
     @Retention(RetentionPolicy.SOURCE)
     public @interface BtOffloadDeviceType {}
@@ -306,6 +338,7 @@ public class AudioSystem
     private static final int BLUETOOTH_LE_AUDIO_CODEC_CONFIG_SOURCE_CODEC_TYPE_OPUS_HI_RES = 2;
 
     //TODO b/415848542: replace with BluetoothCodecType.CODEC_ID_LHDC
+    //Remove with a2dpCreateCodecTypeFromIdApi flag
     private static final int BLUETOOTH_CODEC_CONFIG_SOURCE_CODEC_TYPE_LHDC = 9;
     /**
      * @hide
@@ -320,11 +353,15 @@ public class AudioSystem
             case AUDIO_FORMAT_APTX_HD: return BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_HD;
             case AUDIO_FORMAT_LDAC: return BluetoothCodecConfig.SOURCE_CODEC_TYPE_LDAC;
             case AUDIO_FORMAT_LHDC: return BLUETOOTH_CODEC_CONFIG_SOURCE_CODEC_TYPE_LHDC;
+// QTI_BEGIN: 2019-04-10: Audio: Add support for audio extended codecs
             case AUDIO_FORMAT_CELT: return BluetoothCodecConfig.SOURCE_CODEC_TYPE_CELT;
             case AUDIO_FORMAT_APTX_ADAPTIVE:
                      return BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_ADAPTIVE;
+// QTI_END: 2019-04-10: Audio: Add support for audio extended codecs
+// QTI_BEGIN: 2019-04-30: Audio: Add support for APTX TWSP audio codec
             case AUDIO_FORMAT_APTX_TWSP:
                      return BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_TWSP;
+// QTI_END: 2019-04-30: Audio: Add support for APTX TWSP audio codec
             case AUDIO_FORMAT_OPUS: return BluetoothCodecConfig.SOURCE_CODEC_TYPE_OPUS;
             case VX_AUDIO_FORMAT_APTX_ADAPTIVE_QLEA:
                  return BluetoothLeAudioCodecConfig.SOURCE_CODEC_TYPE_APTX_ADAPTIVE_LE;
@@ -333,6 +370,47 @@ public class AudioSystem
                         + " for conversion to BT codec");
                 return BluetoothCodecConfig.SOURCE_CODEC_TYPE_INVALID;
         }
+    }
+
+    /**
+     * @hide Convert audio format enum values to Bluetooth A2DP codec values
+     * @param audioFormat the audio format to convert to codec ID.
+     * @return the codec ID, or -1 if unknown
+     */
+    public static long audioFormatToBluetoothA2dpSourceCodec(
+            @AudioFormatNativeEnumForBtCodec int audioFormat) {
+        return switch (audioFormat) {
+            case AUDIO_FORMAT_AAC -> BluetoothCodecType.CODEC_ID_AAC;
+            case AUDIO_FORMAT_SBC -> BluetoothCodecType.CODEC_ID_SBC;
+            case AUDIO_FORMAT_APTX -> BluetoothCodecType.CODEC_ID_APTX;
+            case AUDIO_FORMAT_APTX_HD -> BluetoothCodecType.CODEC_ID_APTX_HD;
+            case AUDIO_FORMAT_LDAC -> {
+                if (com.android.bluetooth.flags.Flags.a2dpLdacApi()) {
+                    yield BluetoothCodecType.CODEC_ID_SONY_LDAC;
+                }
+                yield BluetoothCodecType.CODEC_ID_LDAC;
+            }
+            case AUDIO_FORMAT_OPUS -> BluetoothCodecType.CODEC_ID_OPUS;
+            case AUDIO_FORMAT_LHDC -> {
+                if (com.android.bluetooth.flags.Flags.a2dpLhdcApi()) {
+                    yield BluetoothCodecType.CODEC_ID_LHDCV5;
+                }
+                Log.e(
+                        TAG,
+                        "Unknown audio format 0x"
+                                + Integer.toHexString(audioFormat)
+                                + " for conversion to BT codec");
+                yield -1;
+            }
+            default -> {
+                Log.e(
+                        TAG,
+                        "Unknown audio format 0x"
+                                + Integer.toHexString(audioFormat)
+                                + " for conversion to BT codec");
+                yield -1;
+            }
+        };
     }
 
     /**
@@ -356,40 +434,50 @@ public class AudioSystem
     }
 
     /**
-     * @hide
-     * Convert an A2DP Bluetooth codec to an audio format enum
-     * @param btCodec the codec to convert.
+     * @hide Convert an A2DP Bluetooth codec to an audio format enum
+     * @param codecId the codec to convert.
      * @return the audio format, or {@link #AUDIO_FORMAT_DEFAULT} if unknown
      */
     public static @AudioFormatNativeEnumForBtCodec int bluetoothA2dpCodecToAudioFormat(
-            int btCodec) {
-        switch (btCodec) {
-            case BluetoothCodecConfig.SOURCE_CODEC_TYPE_SBC:
-                return AudioSystem.AUDIO_FORMAT_SBC;
-            case BluetoothCodecConfig.SOURCE_CODEC_TYPE_AAC:
-                return AudioSystem.AUDIO_FORMAT_AAC;
-            case BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX:
-                return AudioSystem.AUDIO_FORMAT_APTX;
-            case BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_HD:
-                return AudioSystem.AUDIO_FORMAT_APTX_HD;
-            case BluetoothCodecConfig.SOURCE_CODEC_TYPE_LDAC:
-                return AudioSystem.AUDIO_FORMAT_LDAC;
-            case BLUETOOTH_CODEC_CONFIG_SOURCE_CODEC_TYPE_LHDC:
-                return AudioSystem.AUDIO_FORMAT_LHDC;
-            case BluetoothCodecConfig.SOURCE_CODEC_TYPE_CELT:
-                return AudioSystem.AUDIO_FORMAT_CELT;
-            case BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_ADAPTIVE:
-                return AudioSystem.AUDIO_FORMAT_APTX_ADAPTIVE;
-            case BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_TWSP:
-                return AudioSystem.AUDIO_FORMAT_APTX_TWSP;
-            case BluetoothCodecConfig.SOURCE_CODEC_TYPE_OPUS:
-                return AudioSystem.AUDIO_FORMAT_OPUS;
-            default:
-                Log.e(TAG, "Unknown A2DP BT codec 0x" + Integer.toHexString(btCodec)
-                        + " for conversion to audio format");
-                // TODO returning DEFAULT is the current behavior, should this return INVALID?
-                return AudioSystem.AUDIO_FORMAT_DEFAULT;
+            long codecId) {
+        if (codecId == BluetoothCodecType.CODEC_ID_SBC) {
+            return AudioSystem.AUDIO_FORMAT_SBC;
         }
+        if (codecId == BluetoothCodecType.CODEC_ID_AAC) {
+            return AudioSystem.AUDIO_FORMAT_AAC;
+        }
+        if (codecId == BluetoothCodecType.CODEC_ID_APTX) {
+            return AudioSystem.AUDIO_FORMAT_APTX;
+        }
+        if (codecId == BluetoothCodecType.CODEC_ID_APTX_HD) {
+            return AudioSystem.AUDIO_FORMAT_APTX_HD;
+        }
+        if (com.android.bluetooth.flags.Flags.a2dpLdacApi()) {
+            if (codecId == BluetoothCodecType.CODEC_ID_SONY_LDAC) {
+                return AudioSystem.AUDIO_FORMAT_LDAC;
+            }
+        } else if (codecId == (BluetoothCodecType.CODEC_ID_LDAC & 0xFFFFFFFFL)) {
+            return AudioSystem.AUDIO_FORMAT_LDAC;
+        }
+        if (codecId == BluetoothCodecConfig.SOURCE_CODEC_TYPE_CELT) {
+            return AudioSystem.AUDIO_FORMAT_CELT;
+        }
+        if (codecId == BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_ADAPTIVE) {
+            return AudioSystem.AUDIO_FORMAT_APTX_ADAPTIVE;
+        }
+        if (codecId == BluetoothCodecConfig.SOURCE_CODEC_TYPE_APTX_TWSP) {
+            return AudioSystem.AUDIO_FORMAT_APTX_TWSP;
+        }
+        if (codecId == BluetoothCodecType.CODEC_ID_OPUS) {
+            return AudioSystem.AUDIO_FORMAT_OPUS;
+        }
+        if (com.android.bluetooth.flags.Flags.a2dpLhdcApi()) {
+            if (codecId == BluetoothCodecType.CODEC_ID_LHDCV5) {
+                return AudioSystem.AUDIO_FORMAT_LHDC;
+            }
+        }
+        Log.e(TAG, "Unknown A2DP BT codec: " + codecId + " for conversion to audio format");
+        return AudioSystem.AUDIO_FORMAT_DEFAULT;
     }
 
     /**
@@ -418,6 +506,7 @@ public class AudioSystem
      * @hide
      * Convert a native audio format integer constant to a string.
      */
+    @android.ravenwood.annotation.RavenwoodKeep
     public static String audioFormatToString(int audioFormat) {
         switch (audioFormat) {
             case /* AUDIO_FORMAT_INVALID         */ 0xFFFFFFFF:
@@ -712,7 +801,13 @@ public class AudioSystem
      *    key1=value1;key2=value2;...
      */
     @UnsupportedAppUsage
+    @RavenwoodReplace(reason = "Updating audio HAL can be safely considered a noop on host")
     public static native int setParameters(String keyValuePairs);
+
+    /** @hide */
+    public static int setParameters$ravenwood(String keyValuePairs) {
+        return 0;
+    }
 
     /**
      * @hide
@@ -1030,6 +1125,7 @@ public class AudioSystem
      * @param error one of the java AudioSystem errors
      * @return a human-readable string
      */
+    @android.ravenwood.annotation.RavenwoodKeep
     public static String audioSystemErrorToString(@AudioSystemError int error) {
         switch(error) {
             case SUCCESS:
@@ -1157,6 +1253,8 @@ public class AudioSystem
     public static final int DEVICE_OUT_BLE_SPEAKER = 0x20000001;
     /** @hide */
     public static final int DEVICE_OUT_BLE_BROADCAST = 0x20000002;
+    /** @hide */
+    public static final int DEVICE_OUT_BLE_HEARING_AID = 0x20000004;
 
     /** @hide */
     public static final int DEVICE_OUT_DEFAULT = DEVICE_BIT_DEFAULT;
@@ -1171,15 +1269,19 @@ public class AudioSystem
 
     /** @hide */
     public static final Set<Integer> DEVICE_OUT_ALL_SET;
+
     /** @hide */
+    @android.ravenwood.annotation.RavenwoodKeep
     public static final Set<Integer> DEVICE_OUT_ALL_A2DP_SET = Set.of(DEVICE_OUT_BLUETOOTH_A2DP,
             DEVICE_OUT_BLUETOOTH_A2DP_HEADPHONES, DEVICE_OUT_BLUETOOTH_A2DP_SPEAKER);
 
     /** @hide */
+    @android.ravenwood.annotation.RavenwoodKeep
     public static final Set<Integer> DEVICE_OUT_ALL_SCO_SET = Set.of(DEVICE_OUT_BLUETOOTH_SCO,
             DEVICE_OUT_BLUETOOTH_SCO_HEADSET, DEVICE_OUT_BLUETOOTH_SCO_CARKIT);
 
     /** @hide */
+    @android.ravenwood.annotation.RavenwoodKeep
     public static final Set<Integer> DEVICE_OUT_ALL_USB_SET =
             Set.of(DEVICE_OUT_USB_ACCESSORY, DEVICE_OUT_USB_DEVICE, DEVICE_OUT_USB_HEADSET);
 
@@ -1187,9 +1289,12 @@ public class AudioSystem
     public static final Set<Integer> DEVICE_OUT_ALL_HDMI_SYSTEM_AUDIO_SET;
     /** @hide */
     public static final Set<Integer> DEVICE_ALL_HDMI_SYSTEM_AUDIO_AND_SPEAKER_SET;
+
     /** @hide */
+    @android.ravenwood.annotation.RavenwoodKeep
     public static final Set<Integer> DEVICE_OUT_ALL_BLE_SET =
-            Set.of(DEVICE_OUT_BLE_HEADSET, DEVICE_OUT_BLE_SPEAKER, DEVICE_OUT_BLE_BROADCAST);
+            Set.of(DEVICE_OUT_BLE_HEADSET, DEVICE_OUT_BLE_SPEAKER, DEVICE_OUT_BLE_BROADCAST,
+                    DEVICE_OUT_BLE_HEARING_AID);
 
     /** @hide */
     public static final Set<Integer> DEVICE_OUT_PICK_FOR_VOLUME_SET;
@@ -1232,6 +1337,7 @@ public class AudioSystem
         DEVICE_OUT_ALL_SET.add(DEVICE_OUT_BLE_HEADSET);
         DEVICE_OUT_ALL_SET.add(DEVICE_OUT_BLE_SPEAKER);
         DEVICE_OUT_ALL_SET.add(DEVICE_OUT_BLE_BROADCAST);
+        DEVICE_OUT_ALL_SET.add(DEVICE_OUT_BLE_HEARING_AID);
         DEVICE_OUT_ALL_SET.add(DEVICE_OUT_DEFAULT);
 
         DEVICE_OUT_ALL_HDMI_SYSTEM_AUDIO_SET = new HashSet<>();
@@ -1247,6 +1353,7 @@ public class AudioSystem
         DEVICE_OUT_ALL_BLE_UNICAST_SET = new HashSet<>();
         DEVICE_OUT_ALL_BLE_UNICAST_SET.add(DEVICE_OUT_BLE_HEADSET);
         DEVICE_OUT_ALL_BLE_UNICAST_SET.add(DEVICE_OUT_BLE_SPEAKER);
+        DEVICE_OUT_ALL_BLE_UNICAST_SET.add(DEVICE_OUT_BLE_HEARING_AID);
 
         DEVICE_OUT_PICK_FOR_VOLUME_SET = new HashSet<>();
         DEVICE_OUT_PICK_FOR_VOLUME_SET.add(DEVICE_OUT_WIRED_HEADSET);
@@ -1263,6 +1370,7 @@ public class AudioSystem
         DEVICE_OUT_PICK_FOR_VOLUME_SET.add(DEVICE_OUT_BLE_HEADSET);
         DEVICE_OUT_PICK_FOR_VOLUME_SET.add(DEVICE_OUT_BLE_SPEAKER);
         DEVICE_OUT_PICK_FOR_VOLUME_SET.add(DEVICE_OUT_BLE_BROADCAST);
+        DEVICE_OUT_PICK_FOR_VOLUME_SET.add(DEVICE_OUT_BLE_HEARING_AID);
     }
 
     // input devices
@@ -1341,20 +1449,26 @@ public class AudioSystem
     /** @hide */
     public static final int DEVICE_IN_BLE_HEADSET = DEVICE_BIT_IN | 0x20000000;
     /** @hide */
+    public static final int DEVICE_IN_BLE_HEARING_AID = DEVICE_BIT_IN | 0x20000001;
+    /** @hide */
     @UnsupportedAppUsage
     public static final int DEVICE_IN_DEFAULT = DEVICE_BIT_IN | DEVICE_BIT_DEFAULT;
 
     /** @hide */
     public static final Set<Integer> DEVICE_IN_ALL_SET;
     /** @hide */
+    @android.ravenwood.annotation.RavenwoodKeep
     public static final Set<Integer> DEVICE_IN_ALL_SCO_SET =
             Set.of(DEVICE_IN_BLUETOOTH_SCO_HEADSET);
     /** @hide */
+    @android.ravenwood.annotation.RavenwoodKeep
     public static final Set<Integer> DEVICE_IN_ALL_USB_SET =
             Set.of(DEVICE_IN_USB_ACCESSORY, DEVICE_IN_USB_DEVICE, DEVICE_IN_USB_HEADSET);
 
     /** @hide */
-    public static final Set<Integer> DEVICE_IN_ALL_BLE_SET = Set.of(DEVICE_IN_BLE_HEADSET);
+    @android.ravenwood.annotation.RavenwoodKeep
+    public static final Set<Integer> DEVICE_IN_ALL_BLE_SET = Set.of(DEVICE_IN_BLE_HEADSET,
+            DEVICE_IN_BLE_HEARING_AID);
 
     static {
         DEVICE_IN_ALL_SET = new HashSet<>();
@@ -1386,6 +1500,7 @@ public class AudioSystem
         DEVICE_IN_ALL_SET.add(DEVICE_IN_HDMI_EARC);
         DEVICE_IN_ALL_SET.add(DEVICE_IN_ECHO_REFERENCE);
         DEVICE_IN_ALL_SET.add(DEVICE_IN_BLE_HEADSET);
+        DEVICE_IN_ALL_SET.add(DEVICE_IN_BLE_HEARING_AID);
         DEVICE_IN_ALL_SET.add(DEVICE_IN_DEFAULT);
     }
 
@@ -1474,6 +1589,7 @@ public class AudioSystem
     private static final int NUM_DEVICE_STATES = 1;
 
     /** @hide */
+    @android.ravenwood.annotation.RavenwoodKeep
     public static String deviceStateToString(int state) {
         switch (state) {
             case DEVICE_STATE_UNAVAILABLE: return "DEVICE_STATE_UNAVAILABLE";
@@ -1519,6 +1635,7 @@ public class AudioSystem
     /** @hide */ public static final String DEVICE_OUT_BLE_HEADSET_NAME = "ble_headset";
     /** @hide */ public static final String DEVICE_OUT_BLE_SPEAKER_NAME = "ble_speaker";
     /** @hide */ public static final String DEVICE_OUT_BLE_BROADCAST_NAME = "ble_broadcast";
+    /** @hide */ public static final String DEVICE_OUT_BLE_HEARING_AID_NAME = "ble_hearing_aid";
 
     /** @hide */ public static final String DEVICE_IN_COMMUNICATION_NAME = "communication";
     /** @hide */ public static final String DEVICE_IN_AMBIENT_NAME = "ambient";
@@ -1548,9 +1665,11 @@ public class AudioSystem
     /** @hide */ public static final String DEVICE_IN_HDMI_ARC_NAME = "hdmi_arc";
     /** @hide */ public static final String DEVICE_IN_HDMI_EARC_NAME = "hdmi_earc";
     /** @hide */ public static final String DEVICE_IN_BLE_HEADSET_NAME = "ble_headset";
+    /** @hide */ public static final String DEVICE_IN_BLE_HEARING_AID_NAME = "ble_hearing_aid";
 
     /** @hide */
     @UnsupportedAppUsage
+    @android.ravenwood.annotation.RavenwoodKeep
     public static String getOutputDeviceName(int device)
     {
         switch(device) {
@@ -1622,6 +1741,8 @@ public class AudioSystem
             return DEVICE_OUT_BLE_SPEAKER_NAME;
         case DEVICE_OUT_BLE_BROADCAST:
             return DEVICE_OUT_BLE_BROADCAST_NAME;
+        case DEVICE_OUT_BLE_HEARING_AID:
+            return DEVICE_OUT_BLE_HEARING_AID_NAME;
         case DEVICE_OUT_DEFAULT:
         default:
             return "0x" + Integer.toHexString(device);
@@ -1629,6 +1750,7 @@ public class AudioSystem
     }
 
     /** @hide */
+    @android.ravenwood.annotation.RavenwoodKeep
     public static String getInputDeviceName(int device)
     {
         switch(device) {
@@ -1688,6 +1810,8 @@ public class AudioSystem
             return DEVICE_IN_HDMI_EARC_NAME;
         case DEVICE_IN_BLE_HEADSET:
             return DEVICE_IN_BLE_HEADSET_NAME;
+        case DEVICE_IN_BLE_HEARING_AID:
+            return DEVICE_IN_BLE_HEARING_AID_NAME;
         case DEVICE_IN_DEFAULT:
         default:
             return Integer.toString(device);
@@ -1734,6 +1858,7 @@ public class AudioSystem
     /** @hide */ public static final int FORCE_DEFAULT = FORCE_NONE;
 
     /** @hide */
+    @android.ravenwood.annotation.RavenwoodKeep
     public static String forceUseConfigToString(int config) {
         switch (config) {
             case FORCE_NONE: return "FORCE_NONE";
@@ -1774,6 +1899,7 @@ public class AudioSystem
     public static final int DEVICE_ROLE_DISABLED = 2;
 
     /** @hide */
+    @android.ravenwood.annotation.RavenwoodKeep
     public static String forceUseUsageToString(int usage) {
         switch (usage) {
             case FOR_COMMUNICATION: return "FOR_COMMUNICATION";
@@ -2047,6 +2173,7 @@ public class AudioSystem
 
     /** @hide */
     @NonNull
+    @android.ravenwood.annotation.RavenwoodKeep
     public static String deviceSetToString(@NonNull Set<AudioDeviceAttributes> devices) {
         int n = 0;
         StringBuilder sb = new StringBuilder();
@@ -2754,14 +2881,6 @@ public class AudioSystem
      */
     public static boolean isSingleAudioDeviceType(@NonNull Set<Integer> types, int type) {
         return types.size() == 1 && types.contains(type);
-    }
-
-    /**
-     * @hide
-     * Return true if the audio device type is a Bluetooth LE Audio device.
-     */
-    public static boolean isLeAudioDeviceType(int type) {
-        return DEVICE_OUT_ALL_BLE_SET.contains(type);
     }
 
     /** @hide */

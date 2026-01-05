@@ -278,6 +278,7 @@
     <string name="global_action_restart" msgid="4678451019561687074">"ફરી શરૂ કરો"</string>
     <string name="global_action_emergency" msgid="1387617624177105088">"ઇમર્જન્સી"</string>
     <string name="global_action_bug_report" msgid="5127867163044170003">"બગ રિપોર્ટ"</string>
+    <string name="global_action_feedback" msgid="3480836834202300036">"પ્રતિસાદ"</string>
     <string name="global_action_logout" msgid="6093581310002476511">"સત્ર સમાપ્ત કરો"</string>
     <string name="global_action_screenshot" msgid="2610053466156478564">"સ્ક્રીનશૉટ"</string>
     <string name="global_action_standby" msgid="6786920589970257642">"સ્ટૅન્ડબાય"</string>
@@ -326,8 +327,7 @@
     <string name="notification_channel_accessibility_hearing_device" msgid="7816963856388758952">"સાંભળવામાં મદદ આપતા ડિવાઇસ"</string>
     <string name="notification_channel_accessibility_security_policy" msgid="1727787021725251912">"ઍક્સેસિબિલિટી વપરાશ"</string>
     <string name="notification_channel_display" msgid="6905032605735615090">"ડિસ્પ્લે"</string>
-    <!-- no translation found for notification_channel_parental_controls (2963963315750128538) -->
-    <skip />
+    <string name="notification_channel_parental_controls" msgid="2963963315750128538">"માતાપિતાના યોગ્ય નિયંત્રણો"</string>
     <string name="foreground_service_app_in_background" msgid="1439289699671273555">"<xliff:g id="APP_NAME">%1$s</xliff:g> બૅટરીનો ઉપયોગ કરી રહ્યું છે"</string>
     <string name="foreground_service_apps_in_background" msgid="7340037176412387863">"<xliff:g id="NUMBER">%1$d</xliff:g> ઍપ બૅટરીનો ઉપયોગ કરી રહ્યાં છે"</string>
     <string name="foreground_service_tap_for_details" msgid="9078123626015586751">"બૅટરી અને ડેટા વપરાશ વિશેની વિગતો માટે ટૅપ કરો"</string>
@@ -645,6 +645,10 @@
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"ઍપને સ્થાનિક નેટવર્કના ડિવાઇસ ઍક્સેસ કરવાની મંજૂરી આપે છે"</string>
     <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"લૂપબૅક ઇન્ટરફેસનો ઉપયોગ કરો"</string>
     <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"ઍપને લૂપબૅક ઇન્ટરફેસ પર અન્ય ઍપ સાથે ક્રિયાપ્રતિક્રિયા કરવાની મંજૂરી આપે છે"</string>
+    <!-- no translation found for permlab_force_use_loopback_interface (1319727311706416481) -->
+    <skip />
+    <!-- no translation found for permdesc_force_use_loopback_interface (5829032514048681980) -->
+    <skip />
     <string name="permlab_ranging" msgid="2854543350668593390">"ડિવાઇસની વચ્ચેનું સાપેક્ષ અંતર નક્કી કરો"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"ઍપને નજીકના ડિવાઇસની વચ્ચેનું સાપેક્ષ અંતર નક્કી કરવાની મંજૂરી આપો"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"પસંદગીની NFC ચુકવણીની સેવા વિશે માહિતી"</string>
@@ -825,6 +829,8 @@
     <string name="permdesc_readMediaVideo" msgid="3846400073770403528">"ઍપને તમારા શેર કરાયેલા સ્ટોરેજમાંથી વીડિયો ફાઇલો વાંચવાની મંજૂરી આપે છે."</string>
     <string name="permlab_readMediaImages" msgid="4057590631020986789">"શેર કરાયેલા સ્ટોરેજમાંથી છબી ફાઇલો વાંચવા માટે"</string>
     <string name="permdesc_readMediaImages" msgid="5836219373138469259">"ઍપને તમારા શેર કરાયેલા સ્ટોરેજમાંથી છબી ફાઇલો વાંચવાની મંજૂરી આપે છે."</string>
+    <string name="permlab_readMediaDocuments" msgid="5716810755602938263">"શેર કરેલા સ્ટોરેજમાંથી દસ્તાવેજની ફાઇલો વાંચવી"</string>
+    <string name="permdesc_readMediaDocuments" msgid="5665930210237304120">"તમારા શેર કરેલા સ્ટોરેજમાંથી ઍપને દસ્તાવેજની ફાઇલો વાંચવાની મંજૂરી આપે છે."</string>
     <string name="permlab_readVisualUserSelect" msgid="5516204215354667586">"શેર કરેલા સ્ટોરેજમાંથી વપરાશકર્તા દ્વારા પસંદ કરેલી છબી અને વીડિયો ફાઇલો વાંચો"</string>
     <string name="permdesc_readVisualUserSelect" msgid="8027174717714968217">"ઍપને તમારા શેર કરેલા સ્ટોરેજમાંથી તમે પસંદ કરેલી છબી અને વીડિયો ફાઇલો વાંચવાની મંજૂરી આપે છે."</string>
     <string name="permlab_sdcardWrite" msgid="4863021819671416668">"શેર કરેલા સ્ટોરેજ કન્ટેન્ટમાં ફેરફાર કરો/ડિલીટ કરો"</string>
@@ -1047,6 +1053,7 @@
     <string name="keyguard_password_enter_pin_password_code" msgid="7792964196473964340">"અનલૉક કરવા માટે પિન લખો"</string>
     <string name="keyguard_password_wrong_pin_code" msgid="8583732939138432793">"ખોટો પિન કોડ."</string>
     <string name="keyguard_label_text" msgid="3841953694564168384">"અનલૉક કરવા માટે, મેનૂ દબાવો તે પછી 0."</string>
+    <string name="emergency_call_dialog_number_for_display" msgid="2978165477085612673">"ઇમર્જન્સી નંબર"</string>
     <string name="lockscreen_carrier_default" msgid="6192313772955399160">"કોઈ સેવા નથી"</string>
     <string name="lockscreen_screen_locked" msgid="7364905540516041817">"સ્ક્રીન લૉક કરી."</string>
     <string name="lockscreen_instructions_when_pattern_enabled" msgid="7982445492532123308">"અનલૉક કરવા માટે અથવા કટોકટીનો કૉલ કરવા માટે મેનૂ દબાવો."</string>
@@ -1808,7 +1815,7 @@
     <string name="accessibility_service_warning_description" msgid="291674995220940133">"ઍક્સેસિબિલિટી સંબંધિત આવશ્યકતા માટે સહાય કરતી ઍપ માટે સંપૂર્ણ નિયંત્રણ યોગ્ય છે, પણ મોટા ભાગની ઍપ માટે યોગ્ય નથી."</string>
     <string name="accessibility_service_screen_control_title" msgid="190017412626919776">"જોવા અને નિયંત્રણ માટેની સ્ક્રીન"</string>
     <string name="accessibility_service_screen_control_description" msgid="6946315917771791525">"તે સ્ક્રીન પરનું બધું કન્ટેન્ટ વાંચી શકે છે અને કન્ટેન્ટને અન્ય ઍપ પર બતાવી શકે છે."</string>
-    <string name="accessibility_service_action_perform_title" msgid="779670378951658160">"ક્રિયાઓ જુઓ અને કરો"</string>
+    <string name="accessibility_service_action_perform_title" msgid="779670378951658160">"ઍક્શન જુઓ અને તેને પર્ફોર્મ કરો"</string>
     <string name="accessibility_service_action_perform_description" msgid="2718852014003170558">"તે ઍપ અથવા હાર્ડવેર સેન્સર વડે તમારી ક્રિયાપ્રતિક્રિયાને ટ્રૅક કરી શકે છે અને તમારા વતી ઍપ સાથે ક્રિયાપ્રતિક્રિયા કરી શકે છે."</string>
     <string name="accessibility_dialog_button_allow" msgid="2092558122987144530">"મંજૂરી આપો"</string>
     <string name="accessibility_dialog_button_deny" msgid="4129575637812472671">"નકારો"</string>
@@ -2176,13 +2183,21 @@
     <string name="autofill_picker_no_suggestions" msgid="1076022650427481509">"સ્વતઃભરણ વિશે કોઈ સૂચન નથી"</string>
     <string name="autofill_picker_some_suggestions" msgid="5560549696296202701">"{count,plural, =1{આપમેળે ભરવા માટે એક સૂચન}one{આપમેળે ભરવા માટે # સૂચન}other{આપમેળે ભરવા માટે # સૂચન}}"</string>
     <string name="autofill_save_title" msgid="7719802414283739775"><b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>" પર સાચવીએ?"</string>
+    <string name="autofill_save_title_expressive" msgid="2665408870424848558"><b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>" પર માહિતી સાચવો"</string>
     <string name="autofill_save_title_with_type" msgid="3002460014579799605">"<xliff:g id="TYPE">%1$s</xliff:g>ને "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>" પર સાચવીએ?"</string>
+    <string name="autofill_save_title_with_type_expressive" msgid="6063660551496235255">"<xliff:g id="TYPE">%1$s</xliff:g>ને "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>" પર સાચવો"</string>
     <string name="autofill_save_title_with_2types" msgid="3783270967447869241">"<xliff:g id="TYPE_0">%1$s</xliff:g> અને <xliff:g id="TYPE_1">%2$s</xliff:g>ને "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>" પર સાચવીએ?"</string>
+    <string name="autofill_save_title_with_2types_expressive" msgid="2996687022212666293">"<xliff:g id="TYPE_0">%1$s</xliff:g> અને <xliff:g id="TYPE_1">%2$s</xliff:g>ને "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>" પર સાચવીએ?"</string>
     <string name="autofill_save_title_with_3types" msgid="6598228952100102578">"<xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g> અને <xliff:g id="TYPE_2">%3$s</xliff:g>ને "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>" પર સાચવીએ?"</string>
+    <string name="autofill_save_title_with_3types_expressive" msgid="3301676215501214049">"<xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g> અને <xliff:g id="TYPE_2">%3$s</xliff:g>ને "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>" પર સાચવીએ?"</string>
     <string name="autofill_update_title" msgid="3630695947047069136"><b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>"માં અપડેટ કરીએ?"</string>
+    <string name="autofill_update_title_expressive" msgid="7660582214109012920"><b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>"માં માહિતી અપડેટ કરો"</string>
     <string name="autofill_update_title_with_type" msgid="5264152633488495704">"<xliff:g id="TYPE">%1$s</xliff:g>ને "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>"માં અપડેટ કરીએ?"</string>
+    <string name="autofill_update_title_with_type_expressive" msgid="6162413585161767846">"<xliff:g id="TYPE">%1$s</xliff:g>ને "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>"માં અપડેટ કરો"</string>
     <string name="autofill_update_title_with_2types" msgid="1797514386321086273">"<xliff:g id="TYPE_0">%1$s</xliff:g> અને <xliff:g id="TYPE_1">%2$s</xliff:g>ને "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>"માં અપડેટ કરીએ?"</string>
+    <string name="autofill_update_title_with_2types_expressive" msgid="1911825941498393471">"<xliff:g id="TYPE_0">%1$s</xliff:g> અને <xliff:g id="TYPE_1">%2$s</xliff:g>ને "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>"માં અપડેટ કરીએ?"</string>
     <string name="autofill_update_title_with_3types" msgid="8285767070604652626">"શું "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>"માંની: આ <xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g> અને <xliff:g id="TYPE_2">%3$s</xliff:g> આઇટમને અપડેટ કરીએ?"</string>
+    <string name="autofill_update_title_with_3types_expressive" msgid="6040725201378429027"><b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>"માં આ આઇટમને અપડેટ કરો: <xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g> અને <xliff:g id="TYPE_2">%3$s</xliff:g>"</string>
     <string name="autofill_save_yes" msgid="8035743017382012850">"સાચવો"</string>
     <string name="autofill_save_no" msgid="9212826374207023544">"ના, આભાર"</string>
     <string name="autofill_save_notnow" msgid="2853932672029024195">"હમણાં નહીં"</string>
@@ -2277,7 +2292,7 @@
     <string name="bluetooth_airplane_mode_toast" msgid="2066399056595768554">"એરપ્લેન મોડ દરમિયાન બ્લૂટૂથ ચાલુ રહેશે"</string>
     <string name="car_loading_profile" msgid="8219978381196748070">"લોડિંગ"</string>
     <string name="file_count" msgid="3220018595056126969">"{count,plural, =1{{file_name} + # ફાઇલ}one{{file_name} + # ફાઇલ}other{{file_name} + # ફાઇલો}}"</string>
-    <string name="chooser_no_direct_share_targets" msgid="1511722103987329028">"શેર કરવા માટે સુઝાવ આપવામાં આવેલા કોઈ લોકો નથી"</string>
+    <string name="chooser_no_direct_share_targets" msgid="1511722103987329028">"શેર કરવા માટે સુઝાવ આપવામાં આવેલી કોઈ વ્યક્તિ નથી"</string>
     <string name="chooser_all_apps_button_label" msgid="3230427756238666328">"ઍપની સૂચિ"</string>
     <string name="usb_device_resolve_prompt_warn" msgid="325871329788064199">"આ ઍપને રેકૉર્ડ કરવાની પરવાનગી આપવામાં આવી નથી પરંતુ તે આ USB ડિવાઇસ મારફતે ઑડિયો કૅપ્ચર કરી શકે છે."</string>
     <string name="accessibility_system_action_home_label" msgid="3234748160850301870">"હોમ"</string>
@@ -2611,10 +2626,7 @@
     <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"સિસ્ટમ સંસાધન સંબંધિત અલર્ટ"</string>
     <string name="tv_watchdog_notification_title" msgid="195239206215922517">"સંસાધનનો વધુ પડતો ઉપયોગ"</string>
     <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"ઍપ ‘<xliff:g id="APP_NAME">%1$s</xliff:g> ઘણા બધા સંસાધનોનો ઉપયોગ કરી રહી છે.\""</string>
-    <!-- no translation found for supervision_blocked_app_title (5546803865875383588) -->
-    <skip />
-    <!-- no translation found for supervision_blocked_app_content (4125452996088641559) -->
-    <skip />
-    <!-- no translation found for supervision_unblocked_app_content (8282985265957852278) -->
-    <skip />
+    <string name="supervision_blocked_app_title" msgid="5546803865875383588">"તમારા માતાપિતા તરફથી અપડેટ"</string>
+    <string name="supervision_blocked_app_content" msgid="4125452996088641559">"<xliff:g id="APP_NAME">%1$s</xliff:g> હાલ પૂરતી કાઢી નાખવામાં આવી હતી"</string>
+    <string name="supervision_unblocked_app_content" msgid="8282985265957852278">"<xliff:g id="APP_NAME">%1$s</xliff:g> હવે ઉપલબ્ધ છે"</string>
 </resources>

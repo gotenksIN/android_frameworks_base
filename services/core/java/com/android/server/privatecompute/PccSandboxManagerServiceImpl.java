@@ -16,22 +16,42 @@
 
 package com.android.server.privatecompute;
 
+import android.annotation.NonNull;
+import android.annotation.Nullable;
 import android.annotation.RequiresNoPermission;
 import android.app.privatecompute.IPccSandboxManager;
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.os.PersistableBundle;
 import android.os.Process;
+
+import com.android.internal.annotations.GuardedBy;
+
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * Implementation of the {@link IPccSandboxManager} binder service.
  */
 public class PccSandboxManagerServiceImpl extends IPccSandboxManager.Stub {
+
     private static final String TAG = "PccSandboxManagerServiceImpl";
 
     private final Context mContext;
 
+    // Only instantiated when audit mode is enabled.
+    @GuardedBy("mAuditLogLock")
+    private @Nullable AuditModeContext mAuditModeContext = null;
+
+    private final Object mAuditModeLock = new Object();
+    private final ExecutorService mExecutorService = Executors.newSingleThreadExecutor();
+
     public PccSandboxManagerServiceImpl(Context context) {
         mContext = context;
+    }
+
+    public ExecutorService getExecutorService() {
+        return mExecutorService;
     }
 
     @Override
@@ -60,4 +80,25 @@ public class PccSandboxManagerServiceImpl extends IPccSandboxManager.Stub {
         return false;
     }
 
+    @Override
+    @RequiresNoPermission
+    public void writeToAuditLog(@NonNull PersistableBundle data) {
+        synchronized (mAuditModeLock) {
+            // TODO: introduce a system property to toggle audit mode on/off.
+            boolean auditModeEnabled = true;
+            if (!auditModeEnabled) {
+                // If audit mode was toggled off, clean up, including writing pending data to disk.
+                if(mAuditModeContext != null){
+                    mAuditModeContext.stopAuditing();
+                    mAuditModeContext = null;
+                }
+                return;
+            }
+            if (mAuditModeContext == null) {
+                mAuditModeContext = AuditModeContext.create(Executors.newSingleThreadExecutor());
+            }
+            // TODO: Once ag/36599762 is merged, call sanitizeBundle(data) on the incoming data
+            mAuditModeContext.writeToAuditLog(data);
+        }
+    }
 }

@@ -120,6 +120,7 @@ import static android.view.accessibility.Flags.a11ySequentialFocusStartingPoint;
 import static android.view.accessibility.Flags.forceInvertColor;
 import static android.view.accessibility.Flags.reduceWindowContentChangedEventThrottle;
 import static android.view.flags.Flags.disableDrawWakeLock;
+import static android.view.flags.Flags.enableWindowlessWindowFocusNavigation;
 import static android.view.flags.Flags.sensitiveContentAppProtection;
 import static android.view.flags.Flags.sensitiveContentPrematureProtectionRemovedFix;
 import static android.view.flags.Flags.toolkitDisableCategoryOnMrr;
@@ -139,7 +140,7 @@ import static com.android.text.flags.Flags.disableHandwritingInitiatorForIme;
 import static com.android.window.flags.Flags.alwaysSeqIdLayout;
 import static com.android.window.flags.Flags.alwaysSeqIdLayoutWear;
 import static com.android.window.flags.Flags.enableWindowContextResourcesUpdateOnConfigChange;
-import static com.android.window.flags.Flags.predictiveBackStopKeycodeBackForwarding;
+import static com.android.window.flags.Flags.predictiveBackFixImeEventsSkipBackDispatcher;
 import static com.android.window.flags.Flags.reduceChangedExclusionRectsMsgs;
 import static com.android.window.flags.Flags.setScPropertiesInClient;
 
@@ -164,6 +165,7 @@ import android.app.WindowConfiguration;
 import android.app.compat.CompatChanges;
 import android.app.servertransaction.WindowStateTransactionItem;
 import android.compat.annotation.ChangeId;
+import android.compat.annotation.EnabledAfter;
 import android.compat.annotation.EnabledSince;
 import android.compat.annotation.UnsupportedAppUsage;
 import android.content.ClipData;
@@ -207,6 +209,7 @@ import android.os.Binder;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Debug;
+import android.os.DropBoxManager;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
@@ -227,9 +230,9 @@ import android.sysprop.DisplayProperties;
 import android.sysprop.ViewProperties;
 import android.text.TextUtils;
 import android.util.AndroidRuntimeException;
-// QTI_BEGIN: 2020-06-15: Core: Pre-rendering AOSP part
+// QTI_BEGIN: 2020-06-15: Performance: Pre-rendering AOSP part
 import android.util.BoostFramework.ScrollOptimizer;
-// QTI_END: 2020-06-15: Core: Pre-rendering AOSP part
+// QTI_END: 2020-06-15: Performance: Pre-rendering AOSP part
 import android.util.DisplayMetrics;
 import android.util.EventLog;
 import android.util.IndentingPrintWriter;
@@ -371,6 +374,38 @@ public final class ViewRootImpl implements ViewParent,
     private static final long DISABLE_DRAW_WAKE_LOCK = 349153669L;
 
     /**
+     * When enabled, {@link #checkThreadCompat} will throw an exception if called from the wrong
+     * thread.
+     * <p>When disabled, an exception will be logged instead.
+     *
+     * @hide
+     */
+    @ChangeId
+    @EnabledAfter(targetSdkVersion = Build.VERSION_CODES.CINNAMON_BUN)
+    public static final long ENFORCE_THREAD_CHECKS_ON_VIEW_ROOT_IMPL_APIS = 464275874L;
+
+    /**
+     * When enabled, if {@link #checkThreadCompat} detects that the calling thread is not the
+     * correct thread, and an exception isn't thrown, the caller may proceed to perform the action.
+     *
+     * <p>When disabled, if {@link #checkThreadCompat} detects that the calling thread is not the
+     * correct thread, and an exception isn't thrown, the caller will proceed to post the action to
+     * the correct thread.
+     *
+     * <p>This leniency may be required for apps that rely on being able to perform the action
+     * inline, even if it means performing the action on the wrong thread. For such apps, disable
+     * this flag.
+     *
+     * <p>Note that if {@link #ENFORCE_THREAD_CHECKS_ON_VIEW_ROOT_IMPL_APIS} is enabled then this
+     * flag practically does nothing, since {@link #checkThreadCompat} will throw an exception
+     * before this flag is checked.
+     *
+     * @hide
+     */
+    @ChangeId
+    public static final long ALLOW_INLINE_CALL_ON_FAILED_THREAD_CHECK = 464275875L;
+
+    /**
      * Set to false if we do not want to use the multi threaded renderer even though
      * threaded renderer (aka hardware renderering) is used. Note that by disabling
      * this, WindowCallbacks will not fire.
@@ -384,6 +419,14 @@ public final class ViewRootImpl implements ViewParent,
      */
     public static final boolean CLIENT_TRANSIENT =
             SystemProperties.getBoolean("persist.wm.debug.client_transient", false);
+
+    /**
+     * Allow enabling IPC rendering on a per-package basis for debugging.
+     * Use a comma-separated list of packages.
+     */
+    private static final String IPC_RENDERING_PACKAGES =
+            SystemProperties.get("viewroot.ipc_rendering_packages", "");
+    private boolean mIpcRenderingEnabled = false;
 
     /**
      * Set this system property to true to force the view hierarchy to render
@@ -537,6 +580,7 @@ public final class ViewRootImpl implements ViewParent,
      * target SDK versions.
      */
     private static boolean sCompatibilityDone = false;
+    private static int sCalledFromWrongThreadCount = 0;
 
     /**
      * Always assign focus if a focusable View is available.
@@ -910,13 +954,51 @@ public final class ViewRootImpl implements ViewParent,
     private int mLastReportedInsetsStateSeq = getInitSeq();
     private int mLastReportedActiveControlsSeq = getInitSeq();
 
+    /**
+     * Whether the scroll position of items in the view hierarchy might change on the next layout.
+     * This is set when a layout is requested (e.g. via {@link #requestLayout()}).
+     */
     boolean mScrollMayChange;
+
+    /**
+     * The soft input mode for this window, as specified by
+     * {@link WindowManager.LayoutParams#softInputMode}.
+     */
     @SoftInputModeFlags
     int mSoftInputMode;
+
+    /**
+     * The last view that was scrolled to avoid being occluded by the soft keyboard. This is a weak
+     * reference to prevent possible memory leaks (if the view is no longer needed). Used in {@link
+     * WindowManager.LayoutParams#SOFT_INPUT_ADJUST_PAN} mode to avoid unnecessary scrolling if the
+     * focused view has not changed since the last adjustment.
+     *
+     * @see #scrollToRectOrFocus
+     */
     @UnsupportedAppUsage
+    @Nullable
     WeakReference<View> mLastScrolledFocus;
+
+    /**
+     * The Y coordinate that should be at the top of the window. It represents the final target
+     * position. E.g., when the IME appears, this value is used to prevent occluding the focused
+     * view when in {@link WindowManager.LayoutParams#SOFT_INPUT_ADJUST_PAN} mode.
+     */
     int mScrollY;
+
+    /**
+     * The Y coordinate of the content that is currently at the top of the window. This is the
+     * value actually used to offset the canvas during drawing. It may be an intermediate value
+     * during a scroll animation (provided by {@link #mScroller}).
+     */
     int mCurScrollY;
+
+    /**
+     * The {@link Scroller} instance used to implement smooth scrolling of the window's content.
+     * This is primarily used for the {@link WindowManager.LayoutParams#SOFT_INPUT_ADJUST_PAN}
+     * behavior to prevent occluding a focused view when the IME is shown.
+     */
+    @Nullable
     Scroller mScroller;
     private ArrayList<LayoutTransition> mPendingTransitions;
 
@@ -1375,6 +1457,7 @@ public final class ViewRootImpl implements ViewParent,
             preInitBufferAllocator();
             sPreInitializedBufferAllocator = true;
         }
+        mIpcRenderingEnabled = useIpcRendering();
     }
 
     public static void addFirstDrawHandler(Runnable callback) {
@@ -1405,6 +1488,10 @@ public final class ViewRootImpl implements ViewParent,
      * compat control state updates.
      */
     public void setActivityConfigCallback(@Nullable ActivityConfigCallback callback) {
+        if (!checkThreadCompat()) {
+            executeOnCorrectThread(() -> setActivityConfigCallback(callback));
+            return;
+        }
         mActivityConfigCallback = callback;
         if (callback == null) {
             mPendingActivityWindowInfo = null;
@@ -1416,6 +1503,10 @@ public final class ViewRootImpl implements ViewParent,
     }
 
     public void setOnContentApplyWindowInsetsListener(OnContentApplyWindowInsetsListener listener) {
+        if (!checkThreadCompat()) {
+            executeOnCorrectThread(() -> setOnContentApplyWindowInsetsListener(listener));
+            return;
+        }
         mAttachInfo.mContentOnApplyWindowInsetsListener = listener;
 
         // System windows will be fitted on first traversal, so no reason to request additional
@@ -1426,14 +1517,26 @@ public final class ViewRootImpl implements ViewParent,
     }
 
     public void addWindowCallbacks(WindowCallbacks callback) {
+        if (!checkThreadCompat()) {
+            executeOnCorrectThread(() -> addWindowCallbacks(callback));
+            return;
+        }
         mWindowCallbacks.add(callback);
     }
 
     public void removeWindowCallbacks(WindowCallbacks callback) {
+        if (!checkThreadCompat()) {
+            executeOnCorrectThread(() -> removeWindowCallbacks(callback));
+            return;
+        }
         mWindowCallbacks.remove(callback);
     }
 
     public void reportDrawFinish() {
+        if (!checkThreadCompat()) {
+            executeOnCorrectThread(this::reportDrawFinish);
+            return;
+        }
         if (mWindowDrawCountDown != null) {
             mWindowDrawCountDown.countDown();
         }
@@ -1456,6 +1559,10 @@ public final class ViewRootImpl implements ViewParent,
      * @hide
      */
     public void notifyChildRebuilt() {
+        if (!checkThreadCompat()) {
+            executeOnCorrectThread(this::notifyChildRebuilt);
+            return;
+        }
         if (mView instanceof RootViewSurfaceTaker) {
             if (mSurfaceHolderCallback != null) {
                 mSurfaceHolder.removeCallback(mSurfaceHolderCallback);
@@ -1516,6 +1623,11 @@ public final class ViewRootImpl implements ViewParent,
      */
     public void setView(View view, WindowManager.LayoutParams attrs, View panelParentView,
             int userId) {
+        if (!checkThreadCompat()) {
+            final WindowManager.LayoutParams capturedAttrs = attrs;
+            executeOnCorrectThread(() -> setView(view, capturedAttrs, panelParentView, userId));
+            return;
+        }
         synchronized (this) {
             if (mView == null) {
                 mView = view;
@@ -1961,6 +2073,10 @@ public final class ViewRootImpl implements ViewParent,
      * @param animator animator to register with the hardware renderer
      */
     public void registerAnimatingRenderNode(RenderNode animator) {
+        if (!checkThreadCompat()) {
+            executeOnCorrectThread(() -> registerAnimatingRenderNode(animator));
+            return;
+        }
         if (mAttachInfo.mThreadedRenderer != null) {
             mAttachInfo.mThreadedRenderer.registerAnimatingRenderNode(animator);
         } else {
@@ -1975,6 +2091,10 @@ public final class ViewRootImpl implements ViewParent,
      * @param animator animator to register with the hardware renderer
      */
     public void registerVectorDrawableAnimator(NativeVectorDrawableAnimator animator) {
+        if (!checkThreadCompat()) {
+            executeOnCorrectThread(() -> registerVectorDrawableAnimator(animator));
+            return;
+        }
         if (mAttachInfo.mThreadedRenderer != null) {
             mAttachInfo.mThreadedRenderer.registerVectorDrawableAnimator(animator);
         }
@@ -1988,6 +2108,10 @@ public final class ViewRootImpl implements ViewParent,
      * @param callback The callback to register.
      */
     public void registerRtFrameCallback(@NonNull FrameDrawingCallback callback) {
+        if (!checkThreadCompat()) {
+            executeOnCorrectThread(() -> registerRtFrameCallback(callback));
+            return;
+        }
         if (mAttachInfo.mThreadedRenderer != null) {
             mAttachInfo.mThreadedRenderer.registerRtFrameCallback(new FrameDrawingCallback() {
                 @Override
@@ -2043,7 +2167,7 @@ public final class ViewRootImpl implements ViewParent,
                         || insets.top != 0 || insets.bottom != 0;
                 final boolean translucent = attrs.format != PixelFormat.OPAQUE || hasSurfaceInsets;
                 final ThreadedRenderer renderer = ThreadedRenderer.create(mContext, translucent,
-                        attrs.getTitle().toString());
+                        attrs.getTitle().toString(), mIpcRenderingEnabled);
                 mAttachInfo.mThreadedRenderer = renderer;
                 renderer.setSurfaceControl(mSurfaceControl, mBlastBufferQueue);
                 updateColorModeIfNeeded(attrs.getColorMode(), attrs.getDesiredHdrHeadroom());
@@ -2151,6 +2275,10 @@ public final class ViewRootImpl implements ViewParent,
 
     @VisibleForTesting
     public void setLayoutParams(WindowManager.LayoutParams attrs, boolean newView) {
+        if (!checkThreadCompat()) {
+            executeOnCorrectThread(() -> setLayoutParams(attrs, newView));
+            return;
+        }
         synchronized (this) {
             final int oldInsetLeft = mWindowAttributes.surfaceInsets.left;
             final int oldInsetTop = mWindowAttributes.surfaceInsets.top;
@@ -2530,6 +2658,10 @@ public final class ViewRootImpl implements ViewParent,
      * @hide
      */
     public void onMovedToDisplay(int displayId, Configuration config) {
+        if (!checkThreadCompat()) {
+            executeOnCorrectThread(() -> onMovedToDisplay(displayId, config));
+            return;
+        }
         if (mDisplay.getDisplayId() == displayId) {
             return;
         }
@@ -2622,6 +2754,10 @@ public final class ViewRootImpl implements ViewParent,
      */
     public void updateAnimatingTypes(@InsetsType int animatingTypes,
             @Nullable ImeTracker.Token statsToken) {
+        if (!checkThreadCompat()) {
+            executeOnCorrectThread(() -> updateAnimatingTypes(animatingTypes, statsToken));
+            return;
+        }
         if (sToolkitSetFrameRateReadOnlyFlagValue) {
             boolean running = animatingTypes != 0;
             if (Trace.isTagEnabled(Trace.TRACE_TAG_VIEW)) {
@@ -2789,10 +2925,18 @@ public final class ViewRootImpl implements ViewParent,
 
     private final ArrayList<SurfaceChangedCallback> mSurfaceChangedCallbacks = new ArrayList<>();
     public void addSurfaceChangedCallback(SurfaceChangedCallback c) {
+        if (!checkThreadCompat()) {
+            executeOnCorrectThread(() -> addSurfaceChangedCallback(c));
+            return;
+        }
         mSurfaceChangedCallbacks.add(c);
     }
 
     public void removeSurfaceChangedCallback(SurfaceChangedCallback c) {
+        if (!checkThreadCompat()) {
+            executeOnCorrectThread(() -> removeSurfaceChangedCallback(c));
+            return;
+        }
         mSurfaceChangedCallbacks.remove(c);
     }
 
@@ -2864,9 +3008,9 @@ public final class ViewRootImpl implements ViewParent,
             mBlastBufferQueue.destroy();
         }
         mBlastBufferQueue = new BLASTBufferQueue(mTag, true /* updateDestinationFrame */);
-// QTI_BEGIN: 2022-03-08: Core: Correct mismatch hook of pre-rendering FR due to T-upgrade
+// QTI_BEGIN: 2022-03-08: Performance: Correct mismatch hook of pre-rendering FR due to T-upgrade
         ScrollOptimizer.setBLASTBufferQueue(mBlastBufferQueue);
-// QTI_END: 2022-03-08: Core: Correct mismatch hook of pre-rendering FR due to T-upgrade
+// QTI_END: 2022-03-08: Performance: Correct mismatch hook of pre-rendering FR due to T-upgrade
         // If we create and destroy BBQ without recreating the SurfaceControl, we can end up
         // queuing buffers on multiple apply tokens causing out of order buffer submissions. We
         // fix this by setting the same apply token on all BBQs created by this VRI.
@@ -3039,6 +3183,10 @@ public final class ViewRootImpl implements ViewParent,
      * @hide
      */
     public void requestTransitionStart(LayoutTransition transition) {
+        if (!checkThreadCompat()) {
+            executeOnCorrectThread(() -> requestTransitionStart(transition));
+            return;
+        }
         if (mPendingTransitions == null || !mPendingTransitions.contains(transition)) {
             if (mPendingTransitions == null) {
                  mPendingTransitions = new ArrayList<LayoutTransition>();
@@ -3095,6 +3243,10 @@ public final class ViewRootImpl implements ViewParent,
 
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
     void scheduleTraversals() {
+        if (!checkThreadCompat()) {
+            executeOnCorrectThread(() -> scheduleTraversals());
+            return;
+        }
         if (!mTraversalScheduled) {
             mTraversalScheduled = true;
             // The following behavior is load-bearing for public API correctness.
@@ -3124,6 +3276,10 @@ public final class ViewRootImpl implements ViewParent,
     }
 
     void unscheduleTraversals() {
+        if (!checkThreadCompat()) {
+            executeOnCorrectThread(() -> unscheduleTraversals());
+            return;
+        }
         if (mTraversalScheduled) {
             mTraversalScheduled = false;
             mQueue.removeSyncBarrier(mTraversalBarrier);
@@ -4639,7 +4795,11 @@ public final class ViewRootImpl implements ViewParent,
         if (shouldEnableDvrr()) {
             boolean wasPosted;
             synchronized (mThreadedRendererViews) {
-                wasPosted = mInvalidationIdleMessagePosted;
+                if (com.android.graphics.hwui.flags.Flags.animatedImageFrameRateHint()) {
+                    wasPosted = mInvalidationIdleMessagePosted || mThreadedRendererViews.size() > 0;
+                } else {
+                    wasPosted = mInvalidationIdleMessagePosted;
+                }
                 mInvalidationIdleMessagePosted = true;
             }
             if (!wasPosted) {
@@ -6817,9 +6977,7 @@ public final class ViewRootImpl implements ViewParent,
                     WindowTokenClientController.getInstance().onWindowConfigurationChanged(
                             windowContextToken,
                             mLastReportedMergedConfiguration.getMergedConfiguration(),
-                            newDisplayId == INVALID_DISPLAY
-                                    ? mDisplay.getDisplayId()
-                                    : newDisplayId
+                            newDisplayId
                     );
                 }
             }
@@ -6841,6 +6999,10 @@ public final class ViewRootImpl implements ViewParent,
      * @param newDisplayId Id of new display if moved, {@link Display#INVALID_DISPLAY} otherwise.
      */
     public void updateConfiguration(int newDisplayId) {
+        if (!checkThreadCompat()) {
+            executeOnCorrectThread(() -> updateConfiguration(newDisplayId));
+            return;
+        }
         if (mView == null) {
             return;
         }
@@ -7173,7 +7335,7 @@ public final class ViewRootImpl implements ViewParent,
                         event = KeyEvent.changeFlags(event,
                                 event.getFlags() & ~KeyEvent.FLAG_FROM_SYSTEM);
                     }
-                    enqueueInputEvent(event, null, QueuedInputEvent.FLAG_DELIVER_POST_IME, true);
+                    enqueueInputEvent(event, null, QueuedInputEvent.FLAG_SKIP_IME, true);
                 } break;
                 case MSG_DISPATCH_KEY_FROM_AUTOFILL: {
                     if (LOCAL_LOGV) {
@@ -7283,10 +7445,12 @@ public final class ViewRootImpl implements ViewParent,
                         mFrameRateCategoryHighHintCount = 0;
                         mFrameRateCategoryNormalCount = 0;
                         mFrameRateCategoryLowCount = 0;
-                        mPreferredFrameRate = 0;
                         mPreferredFrameRateCategory = FRAME_RATE_CATEGORY_NO_PREFERENCE;
                         updateFrameRateFromThreadedRendererViews();
-                        setPreferredFrameRate(mPreferredFrameRate);
+                        if (mThreadedRendererViews.size() == 0) {
+                            mPreferredFrameRate = 0;
+                            setPreferredFrameRate(mPreferredFrameRate);
+                        }
                         setPreferredFrameRateCategory(mPreferredFrameRateCategory);
                         mInvalidationIdleMessagePosted = false;
                         mIsPressedGesture = false;
@@ -7325,8 +7489,10 @@ public final class ViewRootImpl implements ViewParent,
                     updatePointerIcon(mPointerIconEvent);
                     break;
                 case MSG_FRAME_RATE_SETTING:
-                    mPreferredFrameRate = 0;
-                    mFrameRateCompatibility = FRAME_RATE_COMPATIBILITY_FIXED_SOURCE;
+                    if (mThreadedRendererViews.size() == 0) {
+                        mPreferredFrameRate = 0;
+                        mFrameRateCompatibility = FRAME_RATE_COMPATIBILITY_FIXED_SOURCE;
+                    }
                     break;
                 case MSG_SURFACE_REPLACED_TIMEOUT:
                     mSurfaceReplaced = false;
@@ -7830,23 +7996,31 @@ public final class ViewRootImpl implements ViewParent,
                             // Unable to forward the back key to host, forward to next stage.
                             return FORWARD;
                         }
-                    } else if (mContext != null
-                            && (mOnBackInvokedDispatcher.isOnBackInvokedCallbackEnabled()
-                            || mOnBackInvokedDispatcher.getTopCallback()
-                            instanceof ImeBackAnimationController
-                            || mOnBackInvokedDispatcher.getTopCallback()
-                            instanceof ImeBackCallbackProxy.ImeOnBackInvokedCallback)
-                    ) {
-                        return doOnBackKeyEvent(keyEvent);
+                    } else if (mContext != null) {
+                        OnBackInvokedCallback topCallback =
+                                mOnBackInvokedDispatcher.getTopCallback();
+                        boolean isImeCallback = isImeCallback(topCallback);
+
+                        boolean shouldHandleBackKey = isImeCallback
+                                ? !q.shouldSkipIme()
+                                : mOnBackInvokedDispatcher.isOnBackInvokedCallbackEnabled();
+                        if (shouldHandleBackKey) {
+                            return doOnBackKeyEvent(keyEvent);
+                        }
                     }
                 }
 
-                if (mInputQueue != null) {
+                if (mInputQueue != null && !q.shouldSkipIme()) {
                     mInputQueue.sendInputEvent(q.mEvent, q, true, this);
                     return DEFER;
                 }
             }
             return FORWARD;
+        }
+
+        private static boolean isImeCallback(@Nullable OnBackInvokedCallback callback) {
+            return callback instanceof ImeBackAnimationController
+                    || callback instanceof ImeBackCallbackProxy.ImeOnBackInvokedCallback;
         }
 
         private int doOnBackKeyEvent(KeyEvent keyEvent) {
@@ -7874,27 +8048,14 @@ public final class ViewRootImpl implements ViewParent,
                             dispatcher.onBackCancelled(topCallback);
                         } else {
                             dispatcher.onBackInvoked(topCallback);
-                            if (predictiveBackStopKeycodeBackForwarding()) {
-                                return FINISH_HANDLED;
-                            }
+                            return FINISH_HANDLED;
                         }
                         break;
                 }
             } else {
-                if (predictiveBackStopKeycodeBackForwarding()) {
-                    return FORWARD;
-                }
-            }
-            if (predictiveBackStopKeycodeBackForwarding()) {
-                return FINISH_NOT_HANDLED;
-            } else {
-                // Do not cancel the keyEvent if no callback can handle the back event.
-                if (topCallback != null && keyEvent.getAction() == KeyEvent.ACTION_UP) {
-                    // forward a cancelled event so that following stages cancel their back logic
-                    keyEvent.cancel();
-                }
                 return FORWARD;
             }
+            return FINISH_NOT_HANDLED;
         }
 
         @Override
@@ -7905,6 +8066,21 @@ public final class ViewRootImpl implements ViewParent,
                 return;
             }
             forward(q);
+        }
+
+        @Override
+        protected void onDeliverToNext(QueuedInputEvent q) {
+            if (q.shouldSkipIme()) {
+                if (DEBUG_INPUT_STAGES) {
+                    Log.v(mTag, "Done with " + getClass().getSimpleName()
+                            + ". Directly forwarding to mFirstPostImeInputStage due to "
+                            + "shouldSkipIme()=true. "
+                            + q);
+                }
+                mFirstPostImeInputStage.deliver(q);
+            } else {
+                super.onDeliverToNext(q);
+            }
         }
     }
 
@@ -8237,13 +8413,17 @@ public final class ViewRootImpl implements ViewParent,
 
         private boolean moveFocusToAdjacentWindow(@FocusDirection int direction) {
             final int windowingMode = getConfiguration().windowConfiguration.getWindowingMode();
+            final boolean isEmbeddedWindow = enableWindowlessWindowFocusNavigation()
+                            && mWindowSession instanceof WindowlessWindowManager;
             if (windowingMode != WINDOWING_MODE_MULTI_WINDOW
-                    && windowingMode != WINDOWING_MODE_FREEFORM) {
+                    && windowingMode != WINDOWING_MODE_FREEFORM
+                    && !isEmbeddedWindow) {
                 return false;
             }
             try {
                 return mWindowSession.moveFocusToAdjacentWindow(mWindow, direction);
             } catch (RemoteException e) {
+                Log.d(TAG, "moveFocusToAdjacentWindow: RemoteException", e);
                 return false;
             }
         }
@@ -8373,12 +8553,12 @@ public final class ViewRootImpl implements ViewParent,
             mAttachInfo.mHandlingPointerEvent = true;
             handled = mView.dispatchPointerEvent(event);
             final int action = event.getActionMasked();
-// QTI_BEGIN: 2019-07-16: Core: perf: Remove Scroll Boosts and use GestureflingBoost
+// QTI_BEGIN: 2019-07-16: Performance: perf: Remove Scroll Boosts and use GestureflingBoost
             if (action == MotionEvent.ACTION_MOVE) {
                 mHaveMoveEvent = true;
             } else if (action == MotionEvent.ACTION_UP) {
                 mHaveMoveEvent = false;
-// QTI_END: 2019-07-16: Core: perf: Remove Scroll Boosts and use GestureflingBoost
+// QTI_END: 2019-07-16: Performance: perf: Remove Scroll Boosts and use GestureflingBoost
 // QTI_BEGIN: 2018-02-20: Performance: BoostFramework: To Enhance performance.
             }
 // QTI_END: 2018-02-20: Performance: BoostFramework: To Enhance performance.
@@ -9658,6 +9838,15 @@ public final class ViewRootImpl implements ViewParent,
         return mAccessibilityInteractionController;
     }
 
+    @Nullable
+    private SurfaceControl getSurfaceControlForRelayout(int viewVisibility) {
+        if (mWindowLayout.isLocallyManaged()) {
+            return mSurfaceControl;
+        }
+        // WindowManagerService only attaches visible surface of regular window to WindowState.
+        return viewVisibility == View.VISIBLE && mSurfaceControl.isValid() ? mSurfaceControl : null;
+    }
+
     @NonNull
     private SurfaceControl createSurfaceControl() {
         // The surface is visible by default (replace default HIDDEN flag).
@@ -9695,7 +9884,7 @@ public final class ViewRootImpl implements ViewParent,
     private int relayoutWindow(WindowManager.LayoutParams params, int viewVisibility,
             boolean insetsPending) throws RemoteException {
         int relayoutResult = 0;
-        if (WindowManager.useClientSurface()) {
+        if (WindowManager.useClientSurface() && !mWindowLayout.isLocallyManaged()) {
             relayoutResult = updateSurfaceControl(viewVisibility);
         }
 
@@ -9784,8 +9973,7 @@ public final class ViewRootImpl implements ViewParent,
         final int seqId = NoPreloadHolder.sAlwaysSeqId ? mSeqId : mLastSyncSeqId;
         if (relayoutAsync) {
             if (WindowManager.useClientSurface()) {
-                final SurfaceControl surfaceControl = viewVisibility == View.VISIBLE
-                        && mSurfaceControl.isValid() ? mSurfaceControl : null;
+                final SurfaceControl surfaceControl = getSurfaceControlForRelayout(viewVisibility);
                 mWindowSession.relayoutAsync2(mWindow, params,
                         requestedWidth, requestedHeight, viewVisibility,
                         insetsPending ? WindowManagerGlobal.RELAYOUT_INSETS_PENDING : 0,
@@ -9801,8 +9989,7 @@ public final class ViewRootImpl implements ViewParent,
             }
         } else {
             if (WindowManager.useClientSurface()) {
-                final SurfaceControl surfaceControl = viewVisibility == View.VISIBLE
-                        && mSurfaceControl.isValid() ? mSurfaceControl : null;
+                final SurfaceControl surfaceControl = getSurfaceControlForRelayout(viewVisibility);
                 relayoutResult |= mWindowSession.relayout2(mWindow, params,
                         requestedWidth, requestedHeight, viewVisibility,
                         insetsPending ? WindowManagerGlobal.RELAYOUT_INSETS_PENDING : 0,
@@ -10563,12 +10750,12 @@ public final class ViewRootImpl implements ViewParent,
      */
     public void notifyImeVisibilityChanged(boolean visible, @NonNull ImeTracker.Token statsToken) {
         ImeTracker.forLogging().onProgress(statsToken,
-                ImeTracker.PHASE_CLIENT_NOTIFY_IME_VISIBILITY_CHANGED);
+                ImeTracker.PHASE_IME_NOTIFY_IME_VISIBILITY_CHANGED);
         try {
             mWindowSession.notifyImeWindowVisibilityChangedFromClient(mWindow, visible, statsToken);
         } catch (RemoteException e) {
             ImeTracker.forLogging().onFailed(statsToken,
-                    ImeTracker.PHASE_CLIENT_NOTIFY_IME_VISIBILITY_CHANGED);
+                    ImeTracker.PHASE_IME_NOTIFY_IME_VISIBILITY_CHANGED);
             e.rethrowFromSystemServer();
         }
     }
@@ -10586,7 +10773,7 @@ public final class ViewRootImpl implements ViewParent,
      * needing a queue on the application's side.
      */
     private static final class QueuedInputEvent {
-        public static final int FLAG_DELIVER_POST_IME = 1 << 0;
+        public static final int FLAG_SKIP_IME = 1 << 0;
         public static final int FLAG_DEFERRED = 1 << 1;
         public static final int FLAG_FINISHED = 1 << 2;
         public static final int FLAG_FINISHED_HANDLED = 1 << 3;
@@ -10609,7 +10796,7 @@ public final class ViewRootImpl implements ViewParent,
         }
 
         public boolean shouldSkipIme() {
-            if ((mFlags & FLAG_DELIVER_POST_IME) != 0) {
+            if ((mFlags & FLAG_SKIP_IME) != 0) {
                 return true;
             }
             return mEvent instanceof MotionEvent
@@ -10628,7 +10815,7 @@ public final class ViewRootImpl implements ViewParent,
         public String toString() {
             StringBuilder sb = new StringBuilder("QueuedInputEvent{flags=");
             boolean hasPrevious = false;
-            hasPrevious = flagToString("DELIVER_POST_IME", FLAG_DELIVER_POST_IME, hasPrevious, sb);
+            hasPrevious = flagToString("SKIP_IME", FLAG_SKIP_IME, hasPrevious, sb);
             hasPrevious = flagToString("DEFERRED", FLAG_DEFERRED, hasPrevious, sb);
             hasPrevious = flagToString("FINISHED", FLAG_FINISHED, hasPrevious, sb);
             hasPrevious = flagToString("FINISHED_HANDLED", FLAG_FINISHED_HANDLED, hasPrevious, sb);
@@ -10743,9 +10930,9 @@ public final class ViewRootImpl implements ViewParent,
     }
 
     void doProcessInputEvents() {
-// QTI_BEGIN: 2021-05-11: Core: refactor pre-rendering feature for BLASTBufferQueue
+// QTI_BEGIN: 2021-05-11: Performance: refactor pre-rendering feature for BLASTBufferQueue
         ScrollOptimizer.setBLASTBufferQueue(mBlastBufferQueue);
-// QTI_END: 2021-05-11: Core: refactor pre-rendering feature for BLASTBufferQueue
+// QTI_END: 2021-05-11: Performance: refactor pre-rendering feature for BLASTBufferQueue
         // Deliver all pending input events in the queue.
         while (mPendingInputEventHead != null) {
             QueuedInputEvent q = mPendingInputEventHead;
@@ -10761,12 +10948,12 @@ public final class ViewRootImpl implements ViewParent,
 
             mViewFrameInfo.setInputEvent(mInputEventAssigner.processEvent(q.mEvent));
 
-// QTI_BEGIN: 2023-02-15: Core: perf: recover the pre-rendering feature in the U
+// QTI_BEGIN: 2023-02-15: Performance: perf: recover the pre-rendering feature in the U
             if (q.mEvent instanceof MotionEvent) {
                 ScrollOptimizer.setMotionType(((MotionEvent)q.mEvent).getActionMasked());
             }
 
-// QTI_END: 2023-02-15: Core: perf: recover the pre-rendering feature in the U
+// QTI_END: 2023-02-15: Performance: perf: recover the pre-rendering feature in the U
             deliverInputEvent(q);
         }
 
@@ -10802,7 +10989,18 @@ public final class ViewRootImpl implements ViewParent,
             if (q.shouldSendToSynthesizer()) {
                 stage = mSyntheticInputStage;
             } else {
-                stage = q.shouldSkipIme() ? mFirstPostImeInputStage : mFirstInputStage;
+                if (predictiveBackFixImeEventsSkipBackDispatcher()) {
+                    // Optimization: Skip to Post-IME stage for pointer events (touch), unless the
+                    // SKIP_IME flag is set.
+                    // Why? The flag implies we need to handle Pre-IME logic (for KEYCODE_BACK
+                    // interception) which lives in the NativePreImeStage, so we can't take the
+                    // shortcut.
+                    boolean canSkipToPostIme = q.shouldSkipIme()
+                            && (q.mFlags & QueuedInputEvent.FLAG_SKIP_IME) == 0;
+                    stage = canSkipToPostIme ? mFirstPostImeInputStage : mFirstInputStage;
+                } else {
+                    stage = q.shouldSkipIme() ? mFirstPostImeInputStage : mFirstInputStage;
+                }
             }
 
             if (q.mEvent instanceof KeyEvent) {
@@ -11621,11 +11819,90 @@ public final class ViewRootImpl implements ViewParent,
     void checkThread() {
         Thread current = Thread.currentThread();
         if (mThread != current) {
-            throw new CalledFromWrongThreadException(
-                    "Only the original thread that created a view hierarchy can touch its views."
-                            + " Expected: " + mThread.getName()
-                            + " Calling: " + current.getName());
+            throwCalledFromWrongThreadException();
         }
+    }
+
+    private void throwCalledFromWrongThreadException() {
+        throw newCalledFromWrongThreadException();
+    }
+
+    private CalledFromWrongThreadException newCalledFromWrongThreadException() {
+        return new CalledFromWrongThreadException(
+                "Only the original thread that created a view hierarchy can touch its views."
+                        + " Expected: " + mThread.getName()
+                        + " Calling: " + Thread.currentThread().getName());
+    }
+
+    /**
+     * Checks if the current thread is the same as the thread that created the view hierarchy.
+     *
+     * <p>If the check fails, logs or throws an exception depending on the {@link
+     * ViewRootImpl#ENFORCE_THREAD_CHECKS_ON_VIEW_ROOT_IMPL_APIS} ChangeId.
+     *
+     * <p>If logging, logs at most once per process lifetime.
+     *
+     * @return true if the caller may proceed to perform the action on the current thread.
+     *         false if the caller must post the work using {@link #executeOnCorrectThread}.
+     */
+    // TODO(b/465527827): eventually delete this method, replace with plain checkThread()
+    private boolean checkThreadCompat() {
+        final Thread current = Thread.currentThread();
+        if (mThread == current) {
+            return true;
+        }
+
+        if (CompatChanges.isChangeEnabled(ENFORCE_THREAD_CHECKS_ON_VIEW_ROOT_IMPL_APIS)) {
+            throwCalledFromWrongThreadException();
+        }
+
+        // Log the issue, but not too many times per process.
+        // Note that this counter is not atomic, so it's possible we log more than the requisite
+        // times per process lifetime. That's fine because the precise number of logs isn't
+        // important so long as we eventually stop logging.
+        if (++sCalledFromWrongThreadCount <= 10) {
+            final CalledFromWrongThreadException e = newCalledFromWrongThreadException();
+            Log.e(
+                    TAG,
+                    "Attempt to call method from wrong thread. "
+                            + "This will throw an exception in a future version.",
+                    e);
+            // TODO(b/464275874): remove the dropbox logging once we've fixed the SysUI bug
+            final DropBoxManager db = mContext.getSystemService(DropBoxManager.class);
+            if (db != null) {
+                db.addText("view_wrong_thread", Log.getStackTraceString(e));
+            }
+        }
+
+        if (CompatChanges.isChangeEnabled(ALLOW_INLINE_CALL_ON_FAILED_THREAD_CHECK)) {
+            // Allow the caller to proceed to perform the action as if the thread check passed.
+            return true;
+        } else {
+            // Notify the caller that they must post the work to the correct thread.
+            return false;
+        }
+    }
+
+    /**
+     * Executes the given action on the correct thread.
+     *
+     * @param action the action to execute
+     */
+    private void executeOnCorrectThread(Runnable action) {
+        // Post the wrapper to the head of the correct thread's queue, skipping sync barriers if any
+        final Message msg = Message.obtain(mHandler, action);
+        msg.setAsynchronous(true);
+        mHandler.sendMessageAtFrontOfQueue(msg);
+
+        // Note that when this method returns, the action likely hasn't run yet.
+        // This is a subtle behavior change. Before we guarded against races, calling a method on
+        // the wrong thread would execute that method inline. Now that we post the work to the
+        // correct thread and return immediately, we risk introducing a race in the caller.
+        // We could maintain that behavior in compatibility mode by blocking on the posted Runnable.
+        // However, that risks introducing deadlocks.
+        // We choose the former over the latter, because code that runs on the wrong thread is
+        // already arcy, and blocking on the posted Runnable can make the problem
+        // worse.
     }
 
     @Override
@@ -11921,6 +12198,10 @@ public final class ViewRootImpl implements ViewParent,
      * @hide
      */
     public void setReportNextDraw(boolean syncBuffer, String reason) {
+        if (!checkThreadCompat()) {
+            executeOnCorrectThread(() -> setReportNextDraw(syncBuffer, reason));
+            return;
+        }
         mSyncBuffer = syncBuffer;
         reportNextDraw(reason);
         invalidate();
@@ -13971,5 +14252,12 @@ public final class ViewRootImpl implements ViewParent,
      */
     public Choreographer getChoreographer() {
         return mChoreographer;
+    }
+
+    private boolean useIpcRendering() {
+        if (IPC_RENDERING_PACKAGES.contains(mBasePackageName)) {
+            return true;
+        }
+        return false;
     }
 }

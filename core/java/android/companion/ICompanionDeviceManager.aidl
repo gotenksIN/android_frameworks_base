@@ -165,7 +165,11 @@ interface ICompanionDeviceManager {
 
     DeviceId setDeviceId(int associationId, in DeviceId deviceId);
 
+    @EnforcePermission("MANAGE_COMPANION_DEVICES")
     void setLocalMetadata(int userId, String key, in PersistableBundle value);
+
+    @EnforcePermission("MANAGE_COMPANION_DEVICES")
+    PersistableBundle getLocalMetadata(int userId);
 
     @EnforcePermission("USE_COMPANION_TRANSPORTS")
     void setOnDevicePresenceEventListener(in int[] associationIds, in String serviceName,
@@ -190,4 +194,7 @@ interface ICompanionDeviceManager {
     void removeOnActionResultListener(in String serviceName, in int userId);
 
     boolean isSystemDataTransportAttached(in int associationId);
+
+    @EnforcePermission("USE_COMPANION_TRANSPORTS")
+    void setRequestActionAllowList(in List<String> allowList);
 }

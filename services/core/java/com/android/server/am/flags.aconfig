@@ -70,6 +70,13 @@ flag {
 }
 
 flag {
+    name: "memory_limiter_enable"
+    namespace: "system_performance"
+    description: "Enable the memory limiter"
+    bug: "461546255"
+}
+
+flag {
     name: "oomadjuster_cached_app_tiers"
     namespace: "system_performance"
     is_fixed_read_only: true
@@ -141,17 +148,6 @@ flag {
     namespace: "system_performance"
     description: "Notify ActivityTaskManager of cold starts early to fix app launch behavior."
     bug: "319519089"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "lower_sms_oom_importance"
-    namespace: "backstage_power"
-    description: "Lower messaging app process oom importance to PERCEPTIBLE_APP_ADJ + 1."
-    bug: "372511805"
-    is_fixed_read_only: true
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -312,4 +308,12 @@ flag {
     namespace: "backstage_power"
     description: "Whether to use new System APIs to start and stop FGS delegation."
     bug: "303241170"
+}
+
+flag {
+    name: "get_package_names_for_pid_api"
+    namespace: "backstage_power"
+    description: "Enable getting package names for a PID."
+    is_exported: true
+    bug: "456466241"
 }

@@ -18,6 +18,7 @@ package com.android.wm.shell.apptoweb
 
 import android.app.assist.AssistContent
 import android.content.ComponentName
+import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.LauncherApps
 import android.content.pm.PackageManager
@@ -83,6 +84,7 @@ class AppToWebRepositoryImplTests : ShellTestCase() {
     private val taskInfo = createTaskInfo().apply {
         taskId = TEST_TASK_ID
         baseActivity = ComponentName("appToWeb", "testActivity")
+        topActivity = baseActivity
     }
     private val resolveInfo = ResolveInfo().apply {
         activityInfo = ActivityInfo()
@@ -220,6 +222,7 @@ class AppToWebRepositoryImplTests : ShellTestCase() {
         val taskInfo2 = createTaskInfo().apply {
             taskId = taskInfo.taskId + 1
             baseActivity = taskInfo.baseActivity
+            topActivity = taskInfo.topActivity
         }
         assertFalse(appToWebRepository.isFirstRunPromptShown(taskInfo))
         assertFalse(appToWebRepository.isFirstRunPromptShown(taskInfo2))
@@ -250,6 +253,7 @@ class AppToWebRepositoryImplTests : ShellTestCase() {
         val taskInfoWithCapturedLink = createTaskInfo().apply {
             taskId = taskInfo.taskId + 1
             baseActivity = taskInfo.baseActivity
+            topActivity = taskInfo.topActivity
             capturedLink = TEST_CAPTURED_URI
         }
 
@@ -266,6 +270,7 @@ class AppToWebRepositoryImplTests : ShellTestCase() {
         val taskInfoWithCapturedLink = createTaskInfo().apply {
             taskId = taskInfo.taskId + 1
             baseActivity = taskInfo.baseActivity
+            topActivity = taskInfo.topActivity
             capturedLink = TEST_CAPTURED_URI
         }
         // Ack the first-run prompt for `taskInfo`.
@@ -285,6 +290,7 @@ class AppToWebRepositoryImplTests : ShellTestCase() {
         val taskInfoWithCapturedLink = createTaskInfo().apply {
             taskId = taskInfo.taskId + 1
             baseActivity = taskInfo.baseActivity
+            topActivity = taskInfo.topActivity
             capturedLink = TEST_CAPTURED_URI
         }
         // Ack the first-run prompt for `taskInfo`.
@@ -296,6 +302,67 @@ class AppToWebRepositoryImplTests : ShellTestCase() {
             arrayOf(taskInfo.baseActivity!!.packageName), UserHandle.of(taskInfo.userId), false)
 
         assertTrue(appToWebRepository.shouldShowFirstRunPrompt(taskInfoWithCapturedLink))
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_ENHANCED_APP_TO_WEB_TRANSITION)
+    fun firstRunPrompt_alreadyShown() {
+        val taskInfoWithCapturedLink = createTaskInfo().apply {
+            taskId = taskInfo.taskId + 1
+            baseActivity = taskInfo.baseActivity
+            topActivity = taskInfo.topActivity
+            capturedLink = TEST_CAPTURED_URI
+        }
+        assertTrue(appToWebRepository.shouldShowFirstRunPrompt(taskInfoWithCapturedLink))
+
+        appToWebRepository.onFirstRunPromptShown(taskInfoWithCapturedLink)
+
+        assertFalse(appToWebRepository.shouldShowFirstRunPrompt(taskInfoWithCapturedLink))
+    }
+
+    @EnableFlags(Flags.FLAG_ENABLE_ENHANCED_APP_TO_WEB_TRANSITION)
+    fun firstRunPrompt_browserApp() {
+        val browserPackageName = "com.android.chrome"
+        val nonBrowserPackageName = "not.browser"
+        val browserResolveInfo = ResolveInfo().apply {
+            activityInfo = ActivityInfo()
+            handleAllWebDataURI = true
+        }
+        whenever(mockPackageManager.queryIntentActivitiesAsUser(any(), anyInt(), anyInt()))
+            .thenAnswer {
+                val intent = it.getArgument<Intent>(0)
+                if (intent.getPackage() == browserPackageName) {
+                    listOf(browserResolveInfo)
+                } else {
+                    emptyList()
+                }
+            }
+        val taskInfoWithCapturedLink = createTaskInfo().apply {
+            taskId = taskInfo.taskId + 1
+            baseActivity = taskInfo.baseActivity
+            topActivity = ComponentName(nonBrowserPackageName, "")
+            capturedLink = TEST_CAPTURED_URI
+        }
+        assertTrue(appToWebRepository.shouldShowFirstRunPrompt(taskInfoWithCapturedLink))
+
+        taskInfoWithCapturedLink.baseActivity = ComponentName(browserPackageName, "")
+        assertFalse(appToWebRepository.shouldShowFirstRunPrompt(taskInfoWithCapturedLink))
+
+        taskInfoWithCapturedLink.baseActivity = taskInfo.baseActivity
+        taskInfoWithCapturedLink.topActivity = ComponentName(browserPackageName, "")
+        assertFalse(appToWebRepository.shouldShowFirstRunPrompt(taskInfoWithCapturedLink))
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_ENHANCED_APP_TO_WEB_TRANSITION)
+    fun shouldShowFirstRunPrompt_returnsFalse_withRequireNonBrowserFlag() {
+        val taskInfoWithFlag = createTaskInfo().apply {
+            taskId = taskInfo.taskId + 1
+            baseActivity = taskInfo.baseActivity
+            capturedLink = TEST_CAPTURED_URI
+            baseIntent = Intent().apply { addFlags(Intent.FLAG_ACTIVITY_REQUIRE_NON_BROWSER) }
+        }
+        assertFalse(appToWebRepository.shouldShowFirstRunPrompt(taskInfoWithFlag))
     }
 
     private suspend fun assertAppToWebIntent(expectedUri: Uri, isBrowserApp: Boolean = false) {

@@ -23,7 +23,6 @@ import android.util.ArrayMap
 import android.util.ArraySet
 import android.util.Log
 import android.view.Display.DEFAULT_DISPLAY
-import android.window.DesktopExperienceFlags
 import androidx.datastore.core.CorruptionException
 import androidx.datastore.core.DataStore
 import androidx.datastore.core.DataStoreFactory
@@ -125,19 +124,12 @@ class DesktopPersistentRepository(private val dataStore: DataStore<DesktopPersis
     ) {
         try {
             dataStore.updateData { persistentRepositories: DesktopPersistentRepositories ->
-                val currentRepository =
-                    persistentRepositories.getDesktopRepoByUserOrDefault(
-                        userId,
-                        DesktopRepositoryState.getDefaultInstance(),
-                    )
+                val currentUserRepoBuilder = DesktopRepositoryState.getDefaultInstance().toBuilder()
 
-                val currentUserRepoBuilder = currentRepository.toBuilder()
                 desks.forEach { desk ->
-                    if (isEmptyDesk(desk.freeformTasksInZOrder)) {
-                        currentUserRepoBuilder.removeDesktop(desk.deskId)
-                    } else {
+                    if (!isEmptyDesk(desk.freeformTasksInZOrder)) {
                         val updatedDesktop =
-                            getDesktop(currentRepository, desk.deskId, desk.displayId)
+                            Desktop.getDefaultInstance()
                                 .toBuilder()
                                 .updateTaskStates(
                                     desk.visibleTasks,
@@ -154,10 +146,7 @@ class DesktopPersistentRepository(private val dataStore: DataStore<DesktopPersis
 
                         currentUserRepoBuilder.putDesktop(desk.deskId, updatedDesktop)
                         desk.uniqueDisplayId?.let {
-                            if (
-                                DesktopExperienceFlags.ENABLE_EXTERNAL_DISPLAY_PERSISTENCE_BUGFIX
-                                    .isTrue && desk.deskId == activeDeskId
-                            ) {
+                            if (desk.deskId == activeDeskId) {
                                 currentUserRepoBuilder.putActiveDeskByUniqueDisplayId(
                                     it,
                                     desk.deskId,
@@ -166,14 +155,8 @@ class DesktopPersistentRepository(private val dataStore: DataStore<DesktopPersis
                         }
                     }
                 }
-                if (DesktopExperienceFlags.ENABLE_EXTERNAL_DISPLAY_PERSISTENCE_BUGFIX.isTrue) {
-                    if (activeDeskId == null) {
-                        desks.first().uniqueDisplayId.let {
-                            currentUserRepoBuilder.removeActiveDeskByUniqueDisplayId(it)
-                        }
-                    }
-                    addOrUpdatePreservedDisplays(currentUserRepoBuilder, preservedDisplays)
-                }
+
+                addOrUpdatePreservedDisplays(currentUserRepoBuilder, preservedDisplays)
 
                 if (Flags.enableRememberedBounds()) {
                     addOrUpdatePackageState(

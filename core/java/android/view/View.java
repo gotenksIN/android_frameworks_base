@@ -34,6 +34,7 @@ import static android.view.Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE;
 import static android.view.Surface.FRAME_RATE_COMPATIBILITY_AT_LEAST;
 import static android.view.WindowManager.LayoutParams.TYPE_INPUT_METHOD;
 import static android.view.accessibility.AccessibilityEvent.CONTENT_CHANGE_TYPE_UNDEFINED;
+import static android.view.accessibility.Flags.a11yExtraRenderingInfoColorAdditions;
 import static android.view.accessibility.Flags.a11ySequentialFocusStartingPoint;
 import static android.view.accessibility.Flags.FLAG_DEPRECATE_ACCESSIBILITY_ANNOUNCEMENT_APIS;
 import static android.view.accessibility.Flags.FLAG_REQUEST_RECTANGLE_WITH_SOURCE;
@@ -5651,6 +5652,17 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * {@link android.service.voice.VoiceInteractionService} may use this flag.
      */
     public static final int DRAG_FLAG_HIDE_CALLING_TASK_ON_DRAG_START = 1 << 14;
+
+    /**
+     * Flag indicating that the caller wishes to disable the default {@link PointerIcon} that would
+     * otherwise be set on drag start when the input source is {@link InputDevice.SOURCE_MOUSE}.
+     *
+     * The caller must hold the {@link android.Manifest.permission#START_TASKS_FROM_RECENTS}
+     * permission in order to use this flag.
+     *
+     * @hide
+     */
+    public static final int DRAG_FLAG_DISABLE_DEFAULT_POINTER_ICON = 1 << 15;
 
     /**
      * Vertical scroll factor cached by {@link #getVerticalScrollFactor}.
@@ -11753,8 +11765,12 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
         if (canAcceptAccessibilityDrop()) {
             info.addAction(AccessibilityAction.ACTION_DRAG_DROP);
         }
-    }
 
+        if (a11yExtraRenderingInfoColorAdditions()) {
+            info.setAvailableExtraData(
+                    Collections.singletonList(AccessibilityNodeInfo.EXTRA_DATA_RENDERING_INFO_KEY));
+        }
+    }
 
     /**
      * Adds extra data to an {@link AccessibilityNodeInfo} based on an explicit request for the
@@ -11773,9 +11789,22 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      *
      * @see AccessibilityNodeInfo#setAvailableExtraData(List)
      */
+    @FlaggedApi(android.view.accessibility.Flags.FLAG_A11Y_EXTRA_RENDERING_INFO_COLOR_ADDITIONS)
+    @CallSuper
     public void addExtraDataToAccessibilityNodeInfo(
             @NonNull AccessibilityNodeInfo info, @NonNull String extraDataKey,
             @Nullable Bundle arguments) {
+        if (extraDataKey.equals(AccessibilityNodeInfo.EXTRA_DATA_RENDERING_INFO_KEY)
+                && a11yExtraRenderingInfoColorAdditions()) {
+            final AccessibilityNodeInfo.ExtraRenderingInfo.Builder builder =
+                    new AccessibilityNodeInfo.ExtraRenderingInfo.Builder();
+            Drawable background = getBackground();
+            if (background instanceof ColorDrawable backgroundColorDrawable) {
+                builder.setBackgroundColor(backgroundColorDrawable.getColor());
+            }
+            builder.setAlpha(getAlpha());
+            info.setExtraRenderingInfo(builder.build());
+        }
     }
 
     /**
@@ -16823,9 +16852,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
 
         final int actionMasked = event.getActionMasked();
         if (actionMasked == MotionEvent.ACTION_DOWN) {
-// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
             android.util.SeempLog.record(3);
-// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
             // Defensive cleanup for new gesture
             stopNestedScroll();
         }
@@ -17598,9 +17627,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * @param event the KeyEvent object that defines the button action
      */
     public boolean onKeyDown(int keyCode, KeyEvent event) {
-// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(4);
-// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         if (KeyEvent.isConfirmKey(keyCode) && event.hasNoModifiers()) {
             if ((mViewFlags & ENABLED_MASK) == DISABLED) {
                 return true;
@@ -17658,9 +17687,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * @param event   The KeyEvent object that defines the button action.
      */
     public boolean onKeyUp(int keyCode, KeyEvent event) {
-// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(5);
-// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         if (KeyEvent.isConfirmKey(keyCode) && event.hasNoModifiers()) {
             if ((mViewFlags & ENABLED_MASK) == DISABLED) {
                 return true;
@@ -18330,9 +18359,9 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * @return True if the event was handled, false otherwise.
      */
     public boolean onTouchEvent(MotionEvent event) {
-// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(3);
-// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         final float x = event.getX();
         final float y = event.getY();
         final int viewFlags = mViewFlags;
@@ -34270,7 +34299,11 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * @param isCredential Whether the view is a credential.
      *
      * @attr ref android.R.styleable#View_isCredential
+     *
+     * @deprecated The {@link #isCredential} is no longer needed.
      */
+    @FlaggedApi(android.view.flags.Flags.FLAG_DEPRECATE_IS_CREDENTIAL_API)
+    @Deprecated
     public void setIsCredential(boolean isCredential) {
         if (isCredential) {
             mPrivateFlags4 |= PFLAG4_IMPORTANT_FOR_CREDENTIAL_MANAGER;
@@ -34287,7 +34320,11 @@ public class View implements Drawable.Callback, KeyEvent.Callback,
      * @return false by default, or value passed to {@link #setIsCredential(boolean)}.
      *
      * @attr ref android.R.styleable#View_isCredential
+     *
+     * @deprecated The {@link #isCredential} is no longer needed.
      */
+    @FlaggedApi(android.view.flags.Flags.FLAG_DEPRECATE_IS_CREDENTIAL_API)
+    @Deprecated
     public boolean isCredential() {
         return ((mPrivateFlags4 & PFLAG4_IMPORTANT_FOR_CREDENTIAL_MANAGER)
                 == PFLAG4_IMPORTANT_FOR_CREDENTIAL_MANAGER);

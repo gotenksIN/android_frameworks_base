@@ -21,6 +21,7 @@ import static android.app.ActivityManager.PROCESS_STATE_NONEXISTENT;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_UNDEFINED;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM;
 import static android.app.WindowConfiguration.WINDOWING_MODE_MULTI_WINDOW;
+import static android.content.pm.ActivityInfo.PERSIST_ACROSS_REBOOTS;
 import static android.content.res.Configuration.ASSETS_SEQ_UNDEFINED;
 import static android.os.Build.VERSION_CODES.Q;
 import static android.os.InputConstants.DEFAULT_DISPATCHING_TIMEOUT_MILLIS;
@@ -28,6 +29,7 @@ import static android.view.WindowManager.TRANSIT_CLOSE;
 import static android.view.WindowManager.TRANSIT_FLAG_APP_CRASHED;
 
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_CONFIGURATION;
+import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_PACKAGE_UPDATE;
 import static com.android.internal.util.Preconditions.checkArgument;
 import static com.android.server.am.psc.Constants.INVALID_ADJ;
 import static com.android.server.am.psc.Constants.PERCEPTIBLE_APP_ADJ;
@@ -82,6 +84,7 @@ import android.os.RemoteException;
 import android.os.SystemProperties;
 import android.os.UserHandle;
 import android.util.ArrayMap;
+import android.util.ArraySet;
 import android.util.Log;
 import android.util.Slog;
 import android.util.proto.ProtoOutputStream;
@@ -242,6 +245,12 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
     private volatile boolean mHasActivities;
     /** All activities running in the process (exclude destroying). */
     private final ArrayList<ActivityRecord> mActivities = new ArrayList<>();
+
+    /** All activities that are waiting to be stopped due to package update. */
+    private final ArrayList<ActivityRecord> mActivitiesToBeStopped = new ArrayList<>();
+    /** All tasks that are waiting to be handled as part of package update. */
+    private final ArraySet<Task> mUpdatingTasks = new ArraySet<>();
+
     /** The activities will be removed but still belong to this process. */
     private ArrayList<ActivityRecord> mInactiveActivities;
     /** Whether {@link #mRecentTasks} is not empty. */
@@ -1575,6 +1584,102 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         }
     }
 
+    /**
+     * This method has a few steps:
+     *
+     * 1) Go over all the activities in the process and find the ones that needs to be stopped.
+     * 2) During the above loop also find tasks that are handled outside of system.
+     * 3.a) If the tasks are handled outside the system
+     *      1) Send a signal about the tasks to external handler
+     *      2) Stop the activities that need to be stopped or kill the application.
+     *
+     * 3.b) If there are no tasks handled outside the system, stop the activities that need to be
+     * stopped or kill the application.
+     *
+     */
+    void stopAndKillProcessForUpdate(String pkg) {
+        final ArrayList<ActivityRecord> activities = new ArrayList<>(mActivities);
+
+        for (int i = 0; i < activities.size(); i++) {
+            final ActivityRecord r = activities.get(i);
+            final Task task = r.getTask();
+            if (pkg.equals(r.packageName) && r.isRootOfTask()) {
+                if (task.getRootTask().mHandlePackageUpdate) {
+                    mUpdatingTasks.add(task);
+                }
+                // Only stop activities that are resumed and the package name of the root
+                // activity is also the same as desired package.
+                if (r.isState(RESUMED) && r.info.persistableMode == PERSIST_ACROSS_REBOOTS) {
+                    mActivitiesToBeStopped.add(r);
+                }
+            }
+        }
+
+        if (!mUpdatingTasks.isEmpty()) {
+            // TODO: b/455568724 - Wait for shells response to go ahead with killing
+            mAtm.mTaskOrganizerController.onPackageUpdateRequest(mUpdatingTasks);
+
+            // Only stop the activities that are not meant to be handled by Shell.
+            for (int i = 0; i < mActivitiesToBeStopped.size(); i++) {
+                final ActivityRecord ar = mActivitiesToBeStopped.get(i);
+                if (!mUpdatingTasks.contains(ar.getTask())) {
+                    final Task task = ar.getTask();
+                    task.moveTaskToBack(task);
+                    ar.stopIfPossible();
+                    ProtoLog.w(WM_DEBUG_PACKAGE_UPDATE,
+                            "Process has tasks that are partially handled, so stopping and "
+                                    + "hiding %d instead",
+                            task.mTaskId);
+                }
+            }
+        } else {
+            // Shell is not handling, should core just hide the tasks here?
+            if (mActivitiesToBeStopped.isEmpty()) {
+                // There are no activities to be stopped, we can now kill the process
+                // appropriate presentation.
+                mAtm.onProcessReadyToBeKilled(pkg, this);
+            } else {
+                // Stop the activities, kill will be handled in onActivityStoppedForUpdate(). Only
+                // the persistent ones.
+                for (int i = 0; i < mActivitiesToBeStopped.size(); i++) {
+                    final ActivityRecord ar = mActivitiesToBeStopped.get(i);
+                    final Task task = ar.getTask();
+                    task.moveTaskToBack(task);
+                    ar.stopIfPossible();
+                }
+            }
+
+        }
+    }
+
+    void onActivityStopped(ActivityRecord r) {
+        // Only check for completion if the removal was successful
+        if (mActivitiesToBeStopped.remove(r)) {
+            checkAndNotifyProcessKill(r.packageName);
+        }
+    }
+
+    /**
+     * Called when a task that was marked with {@link Task#mHandlePackageUpdate} has finished
+     * its external handling process during a package update.
+     * @param task The task that has completed its package update handling.
+     */
+    void onTaskPackageUpdateHandled(Task task) {
+        if (mUpdatingTasks.remove(task)) {
+            checkAndNotifyProcessKill(task.getBasePackageName());
+        }
+    }
+
+    /**
+     * Checks if all pending activities and tasks are finished.
+     * If so, notifies the ATM that the process is ready to be killed.
+     */
+    private void checkAndNotifyProcessKill(String packageName) {
+        if (mActivitiesToBeStopped.isEmpty() && mUpdatingTasks.isEmpty()) {
+            mAtm.onProcessReadyToBeKilled(packageName, this);
+        }
+    }
+
     void appDied(String reason) {
         // Posting on handler so WM lock isn't held when we call into AM.
         final Message m = PooledLambda.obtainMessage(
@@ -1786,10 +1891,10 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
                 && newParentConfig.assetsSeq > requestedOverrideConfig.assetsSeq) {
             requestedOverrideConfig.assetsSeq = ASSETS_SEQ_UNDEFINED;
         }
+        // Make sure that we don't accidentally override the activity type.
+        requestedOverrideConfig.windowConfiguration.setActivityType(ACTIVITY_TYPE_UNDEFINED);
         super.resolveOverrideConfiguration(newParentConfig);
         final Configuration resolvedConfig = getResolvedOverrideConfiguration();
-        // Make sure that we don't accidentally override the activity type.
-        resolvedConfig.windowConfiguration.setActivityType(ACTIVITY_TYPE_UNDEFINED);
         // Activity has an independent ActivityRecord#mConfigurationSeq. If this process registers
         // activity configuration, its config seq shouldn't go backwards by activity configuration.
         // Otherwise if other places send wpc.getConfiguration() to client, the configuration may

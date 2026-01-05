@@ -1050,7 +1050,7 @@ public final class InputMethodManager {
             final var statsToken = ImeTracker.forLogging().onStart(
                     ImeTracker.TYPE_HIDE, ImeTracker.ORIGIN_CLIENT,
                     SoftInputShowHideReason.HIDE_WINDOW_LOST_FOCUS,
-                    false /* fromUser */);
+                    false /* fromUser */, UserHandle.myUserId(), mDisplayId);
             if (android.tracing.Flags.imetrackerProtolog()) {
                 ProtoLog.d(INPUT_METHOD_MANAGER_DEBUG,
                         "onImeFocusLost, hiding IME because of STATE_ALWAYS_HIDDEN");
@@ -1174,7 +1174,7 @@ public final class InputMethodManager {
                         if (curBindSequence < 0 || curBindSequence != res.sequence) {
                             if (android.tracing.Flags.imetrackerProtolog()) {
                                 ProtoLog.w(INPUT_METHOD_MANAGER_WITH_LOGCAT,
-                                        "Ignoring onBind: cur seq=%s, given seq=%s",
+                                        "Ignoring onBind: cur seq=%d, given seq=%d",
                                         curBindSequence, res.sequence);
                             } else {
                                 Log.w(TAG, "Ignoring onBind: cur seq=" + curBindSequence
@@ -1306,7 +1306,7 @@ public final class InputMethodManager {
                         if (curBindSequence < 0 || curBindSequence != res.sequence) {
                             if (android.tracing.Flags.imetrackerProtolog()) {
                                 ProtoLog.w(INPUT_METHOD_MANAGER_WITH_LOGCAT,
-                                        "Ignoring onBind: cur seq=%s, given seq=%s",
+                                        "Ignoring onBind: cur seq=%d, given seq=%d",
                                         curBindSequence, res.sequence);
                             } else {
                                 Log.w(TAG, "Ignoring onBind: cur seq=" + curBindSequence
@@ -1357,7 +1357,7 @@ public final class InputMethodManager {
                         if (getBindSequenceLocked() != sequence) {
                             if (android.tracing.Flags.imetrackerProtolog()) {
                                 ProtoLog.i(INPUT_METHOD_MANAGER_DEBUG,
-                                        "current BindSequence=%s sequence=%s id=%s",
+                                        "current BindSequence=%d sequence=%d id=%d",
                                         getBindSequenceLocked(), sequence, id);
                             } else if (DEBUG) {
                                 Log.i(TAG, "current BindSequence =" + getBindSequenceLocked()
@@ -2257,7 +2257,7 @@ public final class InputMethodManager {
     @GuardedBy("mH")
     private void clearAccessibilityBindingLocked(int id) {
         if (android.tracing.Flags.imetrackerProtolog()) {
-            ProtoLog.v(INPUT_METHOD_MANAGER_DEBUG, "Clearing accessibility binding %s", id);
+            ProtoLog.v(INPUT_METHOD_MANAGER_DEBUG, "Clearing accessibility binding %d", id);
         } else if (DEBUG) {
             Log.v(TAG, "Clearing accessibility binding " + id);
         }
@@ -2557,7 +2557,8 @@ public final class InputMethodManager {
             @Nullable ResultReceiver resultReceiver, @SoftInputShowHideReason int reason) {
         // TODO(b/303041796): handle tracking physical keyboard and DPAD as user interactions
         final var statsToken = ImeTracker.forLogging().onStart(ImeTracker.TYPE_SHOW,
-                ImeTracker.ORIGIN_CLIENT, reason, ImeTracker.isFromUser(view));
+                ImeTracker.ORIGIN_CLIENT, reason, ImeTracker.isFromUser(view),
+                UserHandle.myUserId(), mDisplayId);
         return showSoftInput(view, statsToken, flags, resultReceiver, reason);
     }
 
@@ -2633,7 +2634,8 @@ public final class InputMethodManager {
         synchronized (mH) {
             final int reason = SoftInputShowHideReason.SHOW_SOFT_INPUT;
             final var statsToken = ImeTracker.forLogging().onStart(ImeTracker.TYPE_SHOW,
-                    ImeTracker.ORIGIN_CLIENT, reason, false /* fromUser */);
+                    ImeTracker.ORIGIN_CLIENT, reason, false /* fromUser */,
+                    UserHandle.myUserId(), mDisplayId);
 
             Log.w(TAG, "showSoftInputUnchecked() is a hidden method, which will be"
                     + " removed soon. If you are using androidx.appcompat.widget.SearchView,"
@@ -2761,7 +2763,8 @@ public final class InputMethodManager {
 
         if (statsToken == null) {
             statsToken = ImeTracker.forLogging().onStart(ImeTracker.TYPE_HIDE,
-                    ImeTracker.ORIGIN_CLIENT, reason, ImeTracker.isFromUser(initialServedView));
+                    ImeTracker.ORIGIN_CLIENT, reason, ImeTracker.isFromUser(initialServedView),
+                    UserHandle.myUserId(), mDisplayId);
             ImeTracker.forLatency().onRequestHide(statsToken, ImeTracker.ORIGIN_CLIENT, reason,
                     ActivityThread::currentApplication);
         }
@@ -2838,7 +2841,8 @@ public final class InputMethodManager {
 
             final int reason = SoftInputShowHideReason.HIDE_SOFT_INPUT_FROM_VIEW;
             final var statsToken = ImeTracker.forLogging().onStart(ImeTracker.TYPE_HIDE,
-                    ImeTracker.ORIGIN_CLIENT, reason, ImeTracker.isFromUser(view));
+                    ImeTracker.ORIGIN_CLIENT, reason, ImeTracker.isFromUser(view),
+                    UserHandle.myUserId(), mDisplayId);
             ImeTracker.forLatency().onRequestHide(statsToken,
                     ImeTracker.ORIGIN_CLIENT, reason, ActivityThread::currentApplication);
             ImeTracing.getInstance().triggerClientDump("InputMethodManager#hideSoftInputFromView",
@@ -3657,7 +3661,7 @@ public final class InputMethodManager {
                         && ProtoLog.isEnabled(INPUT_METHOD_MANAGER_DEBUG, LogLevel.VERBOSE)) {
                     ProtoLog.v(INPUT_METHOD_MANAGER_DEBUG,
                             "Starting input: finished by someone else. view=%s servedView=%s "
-                                    + "mServedConnecting=%s",
+                                    + "mServedConnecting=%b",
                             InputMethodDebug.dumpViewInfo(view),
                             InputMethodDebug.dumpViewInfo(servedView), mServedConnecting);
                 } else if (DEBUG) {
@@ -3781,9 +3785,7 @@ public final class InputMethodManager {
             // Create a runnable for delayed notification to the app that the InputConnection is
             // initialized and ready for use.
             if (ic != null) {
-                if (Flags.invalidateInputCallsRestart()) {
-                    mLastPendingStartSeqId = startInputSeq;
-                }
+                mLastPendingStartSeqId = startInputSeq;
                 mReportInputConnectionOpenedRunner =
                         new ReportInputConnectionOpenedRunner(startInputSeq) {
                             @Override
@@ -3791,7 +3793,7 @@ public final class InputMethodManager {
                                 if (android.tracing.Flags.imetrackerProtolog()) {
                                     ProtoLog.v(INPUT_METHOD_MANAGER_DEBUG,
                                             "Calling View.onInputConnectionOpened: view=%s, ic=%s, "
-                                                    + "editorInfo=%s, handler=%s, startInputSeq=%s",
+                                                    + "editorInfo=%s, handler=%s, startInputSeq=%d",
                                             view, ic, editorInfo, icHandler, startInputSeq);
                                 } else if (DEBUG) {
                                     Log.v(TAG, "Calling View.onInputConnectionOpened: view= "
@@ -3961,7 +3963,7 @@ public final class InputMethodManager {
         }
         if (android.tracing.Flags.imetrackerProtolog()) {
             ProtoLog.v(INPUT_METHOD_MANAGER_DEBUG,
-                    "checkFocus: view=%s next=%s force=%s package=%s",
+                    "checkFocus: view=%s next=%s force=%b package=%s",
                     mServedView, mNextServedView, forceNewFocus,
                     (mServedView != null ? mServedView.getContext().getPackageName() : "<none>"));
         } else if (DEBUG) {
@@ -4027,7 +4029,8 @@ public final class InputMethodManager {
     void closeCurrentInput() {
         final int reason = SoftInputShowHideReason.HIDE_CLOSE_CURRENT_SESSION;
         final var statsToken = ImeTracker.forLogging().onStart(ImeTracker.TYPE_HIDE,
-                ImeTracker.ORIGIN_CLIENT, reason, false /* fromUser */);
+                ImeTracker.ORIGIN_CLIENT, reason, false /* fromUser */,
+                UserHandle.myUserId(), mDisplayId);
         ImeTracker.forLatency().onRequestHide(statsToken,
                 ImeTracker.ORIGIN_CLIENT, reason,
                 ActivityThread::currentApplication);
@@ -4180,7 +4183,7 @@ public final class InputMethodManager {
                 return;
             }
             if (android.tracing.Flags.imetrackerProtolog()) {
-                ProtoLog.v(INPUT_METHOD_MANAGER_DEBUG, "onViewClicked: %s", focusChanged);
+                ProtoLog.v(INPUT_METHOD_MANAGER_DEBUG, "onViewClicked: %b", focusChanged);
             } else if (DEBUG) {
                 Log.v(TAG, "onViewClicked: " + focusChanged);
             }
@@ -4468,7 +4471,8 @@ public final class InputMethodManager {
     public void hideSoftInputFromInputMethod(IBinder token, @HideFlags int flags) {
         final int reason = SoftInputShowHideReason.HIDE_SOFT_INPUT_IMM_DEPRECATION;
         final var statsToken = ImeTracker.forLogging().onStart(ImeTracker.TYPE_HIDE,
-                ImeTracker.ORIGIN_CLIENT, reason, false /* fromUser */);
+                ImeTracker.ORIGIN_CLIENT, reason, false /* fromUser */,  UserHandle.myUserId(),
+                mDisplayId);
         InputMethodPrivilegedOperationsRegistry.get(token).hideMySoftInput(statsToken, flags,
                 reason);
     }
@@ -4490,7 +4494,8 @@ public final class InputMethodManager {
     public void showSoftInputFromInputMethod(IBinder token, @ShowFlags int flags) {
         final int reason = SoftInputShowHideReason.SHOW_SOFT_INPUT_IMM_DEPRECATION;
         final var statsToken = ImeTracker.forLogging().onStart(ImeTracker.TYPE_SHOW,
-                ImeTracker.ORIGIN_CLIENT, reason, false /* fromUser */);
+                ImeTracker.ORIGIN_CLIENT, reason, false /* fromUser */, UserHandle.myUserId(),
+                mDisplayId);
         InputMethodPrivilegedOperationsRegistry.get(token).showMySoftInput(statsToken, flags,
                 reason);
     }
@@ -4651,7 +4656,7 @@ public final class InputMethodManager {
             if (timeout) {
                 if (android.tracing.Flags.imetrackerProtolog()) {
                     ProtoLog.w(INPUT_METHOD_MANAGER_WITH_LOGCAT,
-                            "Timeout waiting for IME to handle input event after %s ms: %s",
+                            "Timeout waiting for IME to handle input event after %d ms: %s",
                             INPUT_METHOD_NOT_RESPONDING_TIMEOUT, p.mInputMethodId);
                 } else {
                     Log.w(TAG, "Timeout waiting for IME to handle input event after "

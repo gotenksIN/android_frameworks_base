@@ -536,15 +536,6 @@ public class BubbleBarExpandedView extends FrameLayout implements BubbleTaskView
         mTaskView.setObscuredTouchRect(obscured ? mLayerBoundsSupplier.get() : null);
     }
 
-    /**
-     * Call when the location or size of the view has changed to update TaskView.
-     */
-    public void updateLocation() {
-        if (mTaskView != null) {
-            mTaskView.onLocationChanged();
-        }
-    }
-
     /** Shows the expanded view for the overflow if it exists. */
     void maybeShowOverflow() {
         if (mOverflowView != null) {
@@ -719,6 +710,23 @@ public class BubbleBarExpandedView extends FrameLayout implements BubbleTaskView
                 mTaskView.setClipBounds(clipBounds);
             }
         }
+    }
+
+    /**
+     * Return content height: taskView or overflow.
+     *
+     * <p>Takes into account clippings represented by {@code mBottomClip}
+     *
+     * @return if bubble is for overflow, return overflow height, otherwise return taskView height
+     */
+    public int getContentHeight() {
+        if (mIsOverflow) {
+            return mOverflowView.getHeight() - mBottomClip;
+        }
+        if (mTaskView != null) {
+            return mTaskView.getHeight() - mBottomClip;
+        }
+        return 0;
     }
 
     private class HandleViewAccessibilityDelegate extends AccessibilityDelegate {

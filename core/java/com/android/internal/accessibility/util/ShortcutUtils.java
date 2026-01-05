@@ -21,6 +21,7 @@ import static android.provider.Settings.Secure.ACCESSIBILITY_BUTTON_MODE_FLOATIN
 import static android.provider.Settings.Secure.ACCESSIBILITY_BUTTON_MODE_GESTURE;
 import static android.provider.Settings.Secure.ACCESSIBILITY_BUTTON_MODE_NAVIGATION_BAR;
 
+import static com.android.internal.accessibility.AccessibilityShortcutController.COLOR_INVERSION_COMPONENT_NAME;
 import static com.android.internal.accessibility.AccessibilityShortcutController.MAGNIFICATION_CONTROLLER_NAME;
 import static com.android.internal.accessibility.common.ShortcutConstants.AccessibilityFragmentType.INVISIBLE_TOGGLE;
 import static com.android.internal.accessibility.common.ShortcutConstants.SERVICES_SEPARATOR;
@@ -42,17 +43,21 @@ import android.annotation.SuppressLint;
 import android.annotation.UserIdInt;
 import android.content.ComponentName;
 import android.content.Context;
+import android.hardware.input.KeyGestureEvent;
 import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.ArraySet;
 import android.util.Slog;
+import android.view.KeyEvent;
 import android.view.accessibility.AccessibilityManager;
 
 import com.android.internal.R;
 import com.android.internal.accessibility.common.ShortcutConstants.UserShortcutType;
 
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.StringJoiner;
 
@@ -395,5 +400,136 @@ public final class ShortcutUtils {
         }
         return Settings.Secure.putIntForUser(
                 context.getContentResolver(), ACCESSIBILITY_BUTTON_MODE, mode, userId);
+    }
+
+    /**
+     * Returns the target name for the default screen reader service.
+     * @param context Context
+     * @return the screen reader target name
+     */
+    public static String getScreenReaderTargetName(Context context) {
+        return context.getString(R.string.config_defaultAccessibilityService);
+    }
+
+    /**
+     * Returns the target name for the default select to speak service.
+     * @param context Context
+     * @return the select to speak target name
+     */
+    public static String getSelectToSpeakTargetName(Context context) {
+        return context.getString(R.string.config_defaultSelectToSpeakService);
+    }
+
+    /**
+     * Returns the target name for the default voice access service.
+     * @param context Context
+     * @return the voice access target name
+     */
+    public static String getVoiceAccessTargetName(Context context) {
+        return context.getString(R.string.config_defaultVoiceAccessService);
+    }
+
+    /**
+     * Returns the string label for the given key code. The key code must be for the single key
+     * for one of the keyboard shortcuts that toggles an assistive technology, i.e.
+     * one of: Magnification, Screen reader, Select to Speak, or Voice Access.
+     * @param keyCode integer key code for a keyboard shortcut to toggle an assistive technology
+     * @return the string label for the key code
+     */
+    public static String getLabelFromKeyCode(int keyCode) {
+        return switch (keyCode) {
+            case KeyEvent.KEYCODE_I -> "I";
+            case KeyEvent.KEYCODE_M -> "M";
+            case KeyEvent.KEYCODE_S -> "S";
+            case KeyEvent.KEYCODE_T -> "T";
+            case KeyEvent.KEYCODE_V -> "V";
+            default -> null;
+        };
+    }
+
+    /**
+     * Return the string key code label for the keyboard shortcut to toggle the assistive
+     * technology as denoted by the target name.
+     * @param context Context
+     * @param targetName the target name for the assistive technology
+     * @return the key code label as a string
+     */
+    public static String getKeyCodeLabelFromTarget(Context context, String targetName) {
+        return getLabelFromKeyCode(getKeyCodeFromTarget(context, targetName));
+    }
+
+    /**
+     * Get the target name as a string from a key gesture event associated with toggling an
+     * assistive technology.
+     * @param context Context
+     * @param event the key gesture event for toggling an assistive technology.
+     * @return the target name of the assistive technology associated with the key gesture event
+     */
+    public static String getTargetFromKeyGestureEvent(Context context, KeyGestureEvent event) {
+        // For the supported key gesture types, there is one and only one keyCode.
+        int[] keyCodes = event.getKeycodes();
+        if (keyCodes.length != 1) {
+            return null;
+        }
+        return getTargetFromKeyCode(context, keyCodes[0]);
+    }
+
+
+    private static int getKeyCodeFromTarget(Context context, String targetName) {
+        // Magnification uses the package name rather than a component name.
+        if (targetName.equals(COLOR_INVERSION_COMPONENT_NAME.flattenToString())) {
+            return KeyEvent.KEYCODE_I;
+        } else if (targetName.equals(MAGNIFICATION_CONTROLLER_NAME)) {
+            return KeyEvent.KEYCODE_M;
+        }
+
+        final Map<String, Integer> serviceToKeyCodeMap = new LinkedHashMap<>();
+        serviceToKeyCodeMap.put(getSelectToSpeakTargetName(context), KeyEvent.KEYCODE_S);
+        serviceToKeyCodeMap.put(getScreenReaderTargetName(context), KeyEvent.KEYCODE_T);
+        serviceToKeyCodeMap.put(getVoiceAccessTargetName(context), KeyEvent.KEYCODE_V);
+
+        for (Map.Entry<String, Integer> entry : serviceToKeyCodeMap.entrySet()) {
+            final String serviceName = entry.getKey();
+            final int keyCode = entry.getValue();
+
+            // Check if the input targetName directly matches the service name.
+            if (targetName.equals(serviceName)) {
+                return keyCode;
+            }
+
+            // If not, try to unflatten the service name and compare its flattened form
+            // with the input targetName.
+            if (!TextUtils.isEmpty(serviceName)) {
+                final ComponentName componentName = ComponentName.unflattenFromString(serviceName);
+                if (componentName != null && targetName.equals(componentName.flattenToString())) {
+                    return keyCode;
+                }
+            }
+        }
+
+        return KeyEvent.KEYCODE_UNKNOWN;
+    }
+
+    private static String getTargetFromKeyCode(Context context, int keyCode) {
+        // Magnification uses the package name rather than a component name.
+        if (keyCode == KeyEvent.KEYCODE_I) {
+            return COLOR_INVERSION_COMPONENT_NAME.flattenToString();
+        } else if (keyCode == KeyEvent.KEYCODE_M) {
+            return MAGNIFICATION_CONTROLLER_NAME;
+        }
+
+        String feature = switch (keyCode) {
+            case KeyEvent.KEYCODE_S ->
+                    ShortcutUtils.getSelectToSpeakTargetName(context);
+            case KeyEvent.KEYCODE_T ->
+                    ShortcutUtils.getScreenReaderTargetName(context);
+            case KeyEvent.KEYCODE_V ->
+                    ShortcutUtils.getVoiceAccessTargetName(context);
+            default -> "";
+        };
+
+        ComponentName componentName = TextUtils.isEmpty(feature)
+                ? null : ComponentName.unflattenFromString(feature);
+        return componentName != null ? componentName.flattenToString() : feature;
     }
 }

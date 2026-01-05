@@ -17,6 +17,7 @@
 package com.android.systemui.media.dialog;
 
 import static android.media.RoutingChangeInfo.ENTRY_POINT_SYSTEM_OUTPUT_SWITCHER;
+import static android.permission.flags.Flags.FLAG_ACCESS_LOCAL_NETWORK_PERMISSION_ENABLED;
 
 import static com.android.systemui.media.dialog.MediaItem.MediaItemType.TYPE_DEVICE;
 import static com.android.systemui.media.dialog.MediaItem.MediaItemType.TYPE_DEVICE_GROUP;
@@ -61,6 +62,7 @@ import android.media.MediaDescription;
 import android.media.MediaMetadata;
 import android.media.MediaRoute2Info;
 import android.media.NearbyDevice;
+import android.media.RouteListingPreference;
 import android.media.RoutingChangeInfo;
 import android.media.RoutingSessionInfo;
 import android.media.session.ISessionController;
@@ -73,6 +75,8 @@ import android.os.PowerExemptionManager;
 import android.os.RemoteException;
 import android.os.UserHandle;
 import android.platform.test.annotations.EnableFlags;
+import android.platform.test.annotations.RequiresFlagsDisabled;
+import android.platform.test.annotations.RequiresFlagsEnabled;
 import android.platform.test.annotations.UsesFlags;
 import android.platform.test.flag.junit.FlagsParameterization;
 import android.service.notification.StatusBarNotification;
@@ -92,6 +96,7 @@ import com.android.settingslib.media.InputMediaDevice;
 import com.android.settingslib.media.InputRouteManager;
 import com.android.settingslib.media.LocalMediaManager;
 import com.android.settingslib.media.MediaDevice;
+import com.android.settingslib.media.MissingPermissionsInfo;
 import com.android.settingslib.volume.data.repository.AudioSharingRepository;
 import com.android.systemui.SysuiTestCase;
 import com.android.systemui.SysuiTestCaseExtKt;
@@ -107,6 +112,7 @@ import com.android.systemui.statusbar.notification.collection.notifcollection.Co
 import com.android.systemui.util.concurrency.FakeExecutor;
 import com.android.systemui.util.kotlin.JavaAdapter;
 import com.android.systemui.util.time.FakeSystemClock;
+import com.android.systemui.volume.dialog.domain.interactor.ExpandedAudioTileDetailsFeatureInteractor;
 import com.android.systemui.volume.panel.domain.interactor.VolumePanelGlobalStateInteractor;
 import com.android.systemui.volume.panel.domain.interactor.VolumePanelGlobalStateInteractorKosmosKt;
 
@@ -128,6 +134,7 @@ import platform.test.runner.parameterized.Parameters;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
@@ -205,6 +212,8 @@ public class MediaSwitchingControllerTest extends SysuiTestCase {
     @Mock
     private UserTracker mUserTracker;
     @Mock private AudioSharingRepository mAudioSharingRepository;
+    @Mock private ExpandedAudioTileDetailsFeatureInteractor
+            mExpandedAudioTileDetailsFeatureInteractor;
 
     private final Kosmos mKosmos = SysuiTestCaseExtKt.testKosmos(this);
     @Mock private JavaAdapter mJavaAdapter;
@@ -308,6 +317,8 @@ public class MediaSwitchingControllerTest extends SysuiTestCase {
         when(bundle.getParcelable(Notification.EXTRA_MEDIA_SESSION,
                 MediaSession.Token.class)).thenReturn(token);
         when(token.getBinder()).thenReturn(binder);
+
+        when(mExpandedAudioTileDetailsFeatureInteractor.isEnabled()).thenReturn(false);
     }
 
     @Test
@@ -368,7 +379,8 @@ public class MediaSwitchingControllerTest extends SysuiTestCase {
                         mVolumePanelGlobalStateInteractor,
                         mUserTracker,
                         mJavaAdapter,
-                        mAudioSharingRepository);
+                        mAudioSharingRepository,
+                        mExpandedAudioTileDetailsFeatureInteractor);
 
         mMediaSwitchingController.start(mCb);
 
@@ -415,7 +427,8 @@ public class MediaSwitchingControllerTest extends SysuiTestCase {
                         mVolumePanelGlobalStateInteractor,
                         mUserTracker,
                         mJavaAdapter,
-                        mAudioSharingRepository);
+                        mAudioSharingRepository,
+                        mExpandedAudioTileDetailsFeatureInteractor);
 
         mMediaSwitchingController.start(mCb);
 
@@ -683,7 +696,8 @@ public class MediaSwitchingControllerTest extends SysuiTestCase {
                         mVolumePanelGlobalStateInteractor,
                         mUserTracker,
                         mJavaAdapter,
-                        mAudioSharingRepository);
+                        mAudioSharingRepository,
+                        mExpandedAudioTileDetailsFeatureInteractor);
         AudioDeviceInfo[] audioDeviceInfos = {};
         when(mAudioManager.getDevices(AudioManager.GET_DEVICES_INPUTS))
                 .thenReturn(audioDeviceInfos);
@@ -742,7 +756,8 @@ public class MediaSwitchingControllerTest extends SysuiTestCase {
                         mVolumePanelGlobalStateInteractor,
                         mUserTracker,
                         mJavaAdapter,
-                        mAudioSharingRepository);
+                        mAudioSharingRepository,
+                        mExpandedAudioTileDetailsFeatureInteractor);
         AudioDeviceInfo[] audioDeviceInfos = {};
         when(mAudioManager.getDevices(AudioManager.GET_DEVICES_INPUTS))
                 .thenReturn(audioDeviceInfos);
@@ -1059,7 +1074,8 @@ public class MediaSwitchingControllerTest extends SysuiTestCase {
                         mVolumePanelGlobalStateInteractor,
                         mUserTracker,
                         mJavaAdapter,
-                        mAudioSharingRepository);
+                        mAudioSharingRepository,
+                        mExpandedAudioTileDetailsFeatureInteractor);
         testMediaSwitchingController.start(mCb);
         reset(mCb);
 
@@ -1091,7 +1107,8 @@ public class MediaSwitchingControllerTest extends SysuiTestCase {
                         mVolumePanelGlobalStateInteractor,
                         mUserTracker,
                         mJavaAdapter,
-                        mAudioSharingRepository);
+                        mAudioSharingRepository,
+                        mExpandedAudioTileDetailsFeatureInteractor);
         testMediaSwitchingController.start(mCb);
         reset(mCb);
 
@@ -1143,7 +1160,8 @@ public class MediaSwitchingControllerTest extends SysuiTestCase {
                         mVolumePanelGlobalStateInteractor,
                         mUserTracker,
                         mJavaAdapter,
-                        mAudioSharingRepository);
+                        mAudioSharingRepository,
+                        mExpandedAudioTileDetailsFeatureInteractor);
 
         LocalMediaManager mockLocalMediaManager = mock(LocalMediaManager.class);
         testMediaSwitchingController.mLocalMediaManager = mockLocalMediaManager;
@@ -1179,7 +1197,8 @@ public class MediaSwitchingControllerTest extends SysuiTestCase {
                         mVolumePanelGlobalStateInteractor,
                         mUserTracker,
                         mJavaAdapter,
-                        mAudioSharingRepository);
+                        mAudioSharingRepository,
+                        mExpandedAudioTileDetailsFeatureInteractor);
 
         LocalMediaManager mockLocalMediaManager = mock(LocalMediaManager.class);
         testMediaSwitchingController.mLocalMediaManager = mockLocalMediaManager;
@@ -1401,7 +1420,8 @@ public class MediaSwitchingControllerTest extends SysuiTestCase {
                         mVolumePanelGlobalStateInteractor,
                         mUserTracker,
                         mJavaAdapter,
-                        mAudioSharingRepository);
+                        mAudioSharingRepository,
+                        mExpandedAudioTileDetailsFeatureInteractor);
 
         assertThat(mMediaSwitchingController.getNotificationIcon()).isNull();
     }
@@ -1549,7 +1569,8 @@ public class MediaSwitchingControllerTest extends SysuiTestCase {
                         mVolumePanelGlobalStateInteractor,
                         mUserTracker,
                         mJavaAdapter,
-                        mAudioSharingRepository);
+                        mAudioSharingRepository,
+                        mExpandedAudioTileDetailsFeatureInteractor);
 
         testMediaSwitchingController.setTemporaryAllowListExceptionIfNeeded(mMediaDevice2);
 
@@ -1984,6 +2005,65 @@ public class MediaSwitchingControllerTest extends SysuiTestCase {
         assertThat(buttonState).isNull();
     }
 
+    @Test
+    public void onMissingPermissionsUpdated_verifyCallback() {
+        mMediaSwitchingController.start(mCb);
+        reset(mCb);
+
+        mMediaSwitchingController.onMissingPermissionsUpdated(null);
+
+        verify(mCb).onRouteChanged();
+    }
+
+    @Test
+    @RequiresFlagsEnabled(FLAG_ACCESS_LOCAL_NETWORK_PERMISSION_ENABLED)
+    public void getMissingPermissionsResolveIntent_noMissingPermissionsInfo_returnsNull() {
+        when(mLocalMediaManager.getMissingPermissionsInfo()).thenReturn(null);
+
+        assertThat(mMediaSwitchingController.getMissingPermissionsResolveIntent()).isNull();
+    }
+
+    @Test
+    @RequiresFlagsEnabled(FLAG_ACCESS_LOCAL_NETWORK_PERMISSION_ENABLED)
+    public void getMissingPermissionsResolveIntent_emptyPermissions_returnsNull() {
+        ComponentName componentName = new ComponentName(mPackageName, "class");
+        MissingPermissionsInfo info = new MissingPermissionsInfo(componentName, Set.of());
+        when(mLocalMediaManager.getMissingPermissionsInfo()).thenReturn(info);
+
+        assertThat(mMediaSwitchingController.getMissingPermissionsResolveIntent()).isNull();
+    }
+
+    @Test
+    @RequiresFlagsDisabled(FLAG_ACCESS_LOCAL_NETWORK_PERMISSION_ENABLED)
+    public void getMissingPermissionsResolveIntent_flagDisabled_returnsNull() {
+        ComponentName componentName = new ComponentName(mPackageName, "class");
+        Set<String> perms = Set.of("perm1", "perm2");
+        MissingPermissionsInfo info = new MissingPermissionsInfo(componentName, perms);
+        when(mLocalMediaManager.getMissingPermissionsInfo()).thenReturn(info);
+
+        assertThat(mMediaSwitchingController.getMissingPermissionsResolveIntent()).isNull();
+    }
+
+    @Test
+    @RequiresFlagsEnabled(FLAG_ACCESS_LOCAL_NETWORK_PERMISSION_ENABLED)
+    public void getMissingPermissionsResolveIntent_validInfo_returnsIntent() {
+        ComponentName componentName = new ComponentName(mPackageName, "class");
+        Set<String> perms = Set.of("perm1", "perm2");
+        MissingPermissionsInfo info = new MissingPermissionsInfo(componentName, perms);
+        when(mLocalMediaManager.getMissingPermissionsInfo()).thenReturn(info);
+
+        Intent intent = mMediaSwitchingController.getMissingPermissionsResolveIntent();
+
+        assertThat(intent).isNotNull();
+        assertThat(intent.getAction()).isEqualTo(
+                RouteListingPreference.ACTION_RESOLVE_MISSING_PERMISSIONS);
+        assertThat(intent.getComponent()).isEqualTo(componentName);
+        List<String> extraPermissions = intent.getStringArrayListExtra(
+                RouteListingPreference.EXTRA_MISSING_PERMISSIONS);
+        assertThat(extraPermissions).containsExactly("perm1", "perm2");
+        assertThat(intent.getFlags() & Intent.FLAG_ACTIVITY_NEW_TASK).isNotEqualTo(0);
+    }
+
     private List<MediaDevice> getMediaDevices(List<MediaItem> mediaItemList) {
         return mediaItemList.stream()
                 .filter(item -> item.getMediaDevice().isPresent())
@@ -2024,7 +2104,8 @@ public class MediaSwitchingControllerTest extends SysuiTestCase {
                 mVolumePanelGlobalStateInteractor,
                 mUserTracker,
                 mJavaAdapter,
-                mAudioSharingRepository);
+                mAudioSharingRepository,
+                mExpandedAudioTileDetailsFeatureInteractor);
     }
 
     private Notification setupNotificationMock() {

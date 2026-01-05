@@ -16,11 +16,11 @@
 
 package com.android.server.am.psc;
 
+import android.annotation.Nullable;
 import android.content.Context;
 import android.content.pm.ServiceInfo;
 import android.os.SystemClock;
-
-import com.android.server.am.OomAdjuster;
+import android.util.ArraySet;
 
 import java.util.ArrayList;
 
@@ -29,7 +29,7 @@ import java.util.ArrayList;
  * This class provides common fields and methods for managing service-related properties
  * that influence process importance and OOM adjustment.
  */
-public abstract class ProcessServiceRecordInternal {
+public class ProcessServiceRecordInternal {
     /** Controls whether argument validation checks are performed. */
     private static final boolean DEBUG_FGS_ARGS = false;
 
@@ -85,6 +85,15 @@ public abstract class ProcessServiceRecordInternal {
      */
     private long mLastTopStartedAlmostPerceptibleBindRequestUptimeMs;
 
+    /** All ServiceRecord running in this process. */
+    final ArraySet<ServiceRecordInternal> mServices = new ArraySet<>();
+    /** Services that are currently executing code (need to remain foreground). */
+    private final ArraySet<ServiceRecordInternal> mExecutingServices = new ArraySet<>();
+    /** All outgoing connections from this process. */
+    private final ArraySet<ConnectionRecordInternal> mConnections = new ArraySet<>();
+    /** All ConnectionRecord this process holds indirectly to SDK sandbox processes. */
+    private @Nullable ArraySet<ConnectionRecordInternal> mSdkSandboxConnections;
+
     protected ProcessServiceRecordInternal(OomAdjuster.Constants oomConstants, Observer observer) {
         mOomConstants = oomConstants;
         mObserver = observer;
@@ -120,6 +129,27 @@ public abstract class ProcessServiceRecordInternal {
 
     public void setHasAboveClient(boolean hasAboveClient) {
         mHasAboveClient = hasAboveClient;
+    }
+
+    /** Resets service-related flags when the application record is being cleaned up. */
+    public void onCleanupApplicationRecord() {
+        setTreatLikeActivity(false);
+        setHasAboveClient(false);
+        setHasClientActivities(false);
+    }
+
+    /** Recalculates and updates the {@link #mHasAboveClient} flag. */
+    public void updateHasAboveClient() {
+        setHasAboveClient(false);
+        for (int i = numberOfConnections() - 1; i >= 0; i--) {
+            final ConnectionRecordInternal cr = getConnectionInternalAt(i);
+            final boolean isSameProcess = cr.getService().getHostProcessInternal() != null
+                    && cr.getService().getHostProcessInternal().getServices() == this;
+            if (!isSameProcess && cr.hasFlag(Context.BIND_ABOVE_CLIENT)) {
+                setHasAboveClient(true);
+                break;
+            }
+        }
     }
 
     /**
@@ -223,7 +253,7 @@ public abstract class ProcessServiceRecordInternal {
         mHasTopStartedAlmostPerceptibleServices = false;
         mLastTopStartedAlmostPerceptibleBindRequestUptimeMs = 0;
         for (int s = numberOfRunningServices() - 1; s >= 0; --s) {
-            final ServiceRecordInternal sr = getRunningServiceAt(s);
+            final ServiceRecordInternal sr = getRunningServiceInternalAt(s);
             mLastTopStartedAlmostPerceptibleBindRequestUptimeMs = Math.max(
                     mLastTopStartedAlmostPerceptibleBindRequestUptimeMs,
                     sr.getLastTopAlmostPerceptibleBindRequestUptimeMs());
@@ -265,7 +295,7 @@ public abstract class ProcessServiceRecordInternal {
 
     private boolean hasUndemotedShortForegroundService(long nowUptime) {
         for (int i = numberOfRunningServices() - 1; i >= 0; i--) {
-            final ServiceRecordInternal sr = getRunningServiceAt(i);
+            final ServiceRecordInternal sr = getRunningServiceInternalAt(i);
             if (!sr.isShortFgs() || !sr.hasShortFgsStartTime()) {
                 continue;
             }
@@ -278,28 +308,149 @@ public abstract class ProcessServiceRecordInternal {
     }
 
     /** Returns the number of services currently running in this process. */
-    public abstract int numberOfRunningServices();
+    public int numberOfRunningServices() {
+        return mServices.size();
+    }
 
     /** Retrieves the {@link ServiceRecordInternal} for a running service at the specified index. */
-    public abstract ServiceRecordInternal getRunningServiceAt(int index);
+    public ServiceRecordInternal getRunningServiceInternalAt(int index) {
+        return mServices.valueAt(index);
+    }
+
+    /** Adds the specified service to the set of running services for this process. */
+    public boolean addRunningService(ServiceRecordInternal service) {
+        return mServices.add(service);
+    }
+
+    /** Removes the specified service from the set of running services for this process. */
+    public boolean removeRunningService(ServiceRecordInternal service) {
+        return mServices.remove(service);
+    }
+
+    /** Stops all services running in this process. */
+    public void stopAllServices() {
+        mServices.clear();
+        updateHasTopStartedAlmostPerceptibleServices();
+    }
+
+    /** Checks if there are any services currently executing in this process. */
+    public boolean hasExecutingServices() {
+        return !mExecutingServices.isEmpty();
+    }
+
+    /** Returns the number of services that are currently executing code in this process. */
+    public int numberOfExecutingServices() {
+        return mExecutingServices.size();
+    }
+
+    /** Retrieves the executing service at the specified index. */
+    protected ServiceRecordInternal getExecutingServiceInternalAt(int index) {
+        return mExecutingServices.valueAt(index);
+    }
+
+    /** Adds a service to the set of services that are currently executing code. */
+    public void startExecutingService(ServiceRecordInternal service) {
+        mExecutingServices.add(service);
+    }
+
+    /** Removes a service from the set of services that are currently executing code. */
+    public void stopExecutingService(ServiceRecordInternal service) {
+        mExecutingServices.remove(service);
+    }
+
+    /** Clears the set of all executing services. */
+    public void stopAllExecutingServices() {
+        mExecutingServices.clear();
+    }
 
     /** Returns the number of active connections to services in this process. */
-    public abstract int numberOfConnections();
+    public int numberOfConnections() {
+        return mConnections.size();
+    }
 
     /** Retrieves the {@link ConnectionRecordInternal} at the specified index. */
-    public abstract ConnectionRecordInternal getConnectionAt(int index);
+    public ConnectionRecordInternal getConnectionInternalAt(int index) {
+        return mConnections.valueAt(index);
+    }
+
+    /**
+     * Adds an outgoing connection from this process to a service.
+     * This also handles the special logic for connections to services running in an SDK sandbox.
+     */
+    public void addConnection(ConnectionRecordInternal connection) {
+        mConnections.add(connection);
+        addSdkSandboxConnectionIfNecessary(connection);
+    }
+
+    /**
+     * Removes an outgoing connection from this process.
+     * This also handles the necessary cleanup for connections to services in an SDK sandbox.
+     */
+    public void removeConnection(ConnectionRecordInternal connection) {
+        mConnections.remove(connection);
+        removeSdkSandboxConnectionIfNecessary(connection);
+    }
+
+    /**
+     * Removes all outgoing connections from this process.
+     * This clears the connection set and performs necessary cleanup for any SDK sandbox
+     * connections.
+     */
+    public void removeAllConnections() {
+        for (int i = 0, size = mConnections.size(); i < size; i++) {
+            removeSdkSandboxConnectionIfNecessary(mConnections.valueAt(i));
+        }
+        mConnections.clear();
+    }
+
+    private void addSdkSandboxConnectionIfNecessary(ConnectionRecordInternal connection) {
+        final ProcessRecordInternal attributedClient = connection.getAttributedClient();
+        if (attributedClient != null && connection.getService().isSdkSandbox) {
+            attributedClient.getServices().addSdkSandboxConnection(connection);
+        }
+    }
+
+    private void removeSdkSandboxConnectionIfNecessary(ConnectionRecordInternal connection) {
+        final ProcessRecordInternal attributedClient = connection.getAttributedClient();
+        if (attributedClient != null && connection.getService().isSdkSandbox) {
+            attributedClient.getServices().removeSdkSandboxConnection(connection);
+        }
+    }
 
     /** Returns the number of active connections to services within SDK sandbox processes. */
-    public abstract int numberOfSdkSandboxConnections();
+    public int numberOfSdkSandboxConnections() {
+        return mSdkSandboxConnections != null ? mSdkSandboxConnections.size() : 0;
+    }
 
     /**
      * Retrieves the {@link ConnectionRecordInternal} for an SDK sandbox process at the
      * specified index.
      */
-    public abstract ConnectionRecordInternal getSdkSandboxConnectionAt(int index);
+    public ConnectionRecordInternal getSdkSandboxConnectionInternalAt(int index) {
+        return mSdkSandboxConnections != null ? mSdkSandboxConnections.valueAt(index) : null;
+    }
 
-    /** Checks if there are any services currently executing in this process. */
-    public abstract boolean hasExecutingServices();
+    /** Adds a connection record that this process holds indirectly to an SDK sandbox process. */
+    public void addSdkSandboxConnection(ConnectionRecordInternal connection) {
+        if (mSdkSandboxConnections == null) {
+            mSdkSandboxConnections = new ArraySet<>();
+        }
+        mSdkSandboxConnections.add(connection);
+    }
+
+    /** Removes a connection record to a service running in an SDK sandbox. */
+    public void removeSdkSandboxConnection(ConnectionRecordInternal connection) {
+        if (mSdkSandboxConnections != null) {
+            mSdkSandboxConnections.remove(connection);
+        }
+    }
+
+    /** Removes all tracked connection records to services running in SDK sandboxes. */
+    public void removeAllSdkSandboxConnections() {
+        if (mSdkSandboxConnections != null) {
+            mSdkSandboxConnections.clear();
+        }
+    }
 
     protected static boolean isAlmostPerceptible(ServiceRecordInternal record) {
         if (record.getLastTopAlmostPerceptibleBindRequestUptimeMs() <= 0) {

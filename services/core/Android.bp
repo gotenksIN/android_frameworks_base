@@ -143,17 +143,13 @@ java_library_static {
 
         // Java/AIDL sources to be moved out to CrashRecovery module
         ":services-crashrecovery-sources",
-
-        // Telecom sources to move out to Telecom module
-        ":service-telecom-sources",
     ],
 
     libs: [
         "android.frameworks.location.altitude-V2-java",
         "android.hardware.common-V2-java",
         "android.hardware.gnss-V2-java",
-        "android.hardware.light-V2.0-java",
-        "android.hardware.vibrator-V3-java",
+        "android.hardware.vibrator-V4-java",
         "androidx.annotation_annotation",
         "app-compat-annotations",
         "device_policy_aconfig_flags_lib",
@@ -190,9 +186,10 @@ java_library_static {
         "android.hardware.health-V1.0-java", // HIDL
         "android.hardware.health-V2.0-java", // HIDL
         "android.hardware.health-V2.1-java", // HIDL
-        "android.hardware.health-V4-java", // AIDL
+        "android.hardware.health-V5-java", // AIDL
         "android.hardware.health-translate-java",
-        "android.hardware.light-V1-java",
+        "android.hardware.light-V2.0-java", // HIDL
+        "android.hardware.light-V3-java", // AIDL
         "android.hardware.security.authgraph-V1-java",
         "android.hardware.security.rkp-V3-java",
         "android.hardware.security.secretkeeper-V1-java",
@@ -200,8 +197,8 @@ java_library_static {
         "android.hardware.tv.hdmi.cec-V1-java",
         "android.hardware.tv.hdmi.connection-V1-java",
         "android.hardware.tv.hdmi.earc-V1-java",
-        "android.hardware.weaver-V1.0-java",
-        "android.hardware.weaver-V2-java",
+        "android.hardware.weaver-V1.0-java", // HIDL
+        "android.hardware.weaver-V3-java", // AIDL
         "android.hardware.biometrics.face-V1.0-java",
         "android.hardware.biometrics.fingerprint-V2.3-java",
         "android.hardware.oemlock-V1.0-java",
@@ -221,9 +218,15 @@ java_library_static {
         "SurfaceFlingerProperties",
         "com.android.sysprop.watchdog",
         "securebox",
+// QTI_BEGIN: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
         "vendor.qti.hardware.servicetracker-V1.0-java",
+// QTI_END: 2019-06-24: Core: Inform Servicetracker HAL about Service Lifecycle events
+// QTI_BEGIN: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
         "vendor.qti.hardware.servicetracker-V1.2-java",
+// QTI_END: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
+// QTI_BEGIN: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
         "vendor.qti.hardware.servicetrackeraidl-V1-java",
+// QTI_END: 2023-04-06: Frameworks: Add servicetracker AIDl support for service lifecycle event
         "apache-commons-math",
         "apache-commons-compress",
         "adb_flags_lib",

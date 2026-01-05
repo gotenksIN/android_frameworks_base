@@ -82,7 +82,6 @@ public class TaskViewTaskController implements ShellTaskOrganizer.TaskListener {
     private boolean mTaskNotFound;
     private boolean mSurfaceCreated;
     private SurfaceControl mSurfaceControl;
-    private boolean mIsInitialized;
     private boolean mNotifiedForInitialized;
     private boolean mHideTaskWithSurface = true;
     private TaskView.Listener mListener;
@@ -145,8 +144,8 @@ public class TaskViewTaskController implements ShellTaskOrganizer.TaskListener {
     /**
      * @return {@code True} when the TaskView's surface has been created, {@code False} otherwise.
      */
-    public boolean isInitialized() {
-        return mIsInitialized;
+    public boolean isSurfaceCreated() {
+        return mSurfaceCreated;
     }
 
     /** Returns the task token for the task in the TaskView. */
@@ -201,7 +200,6 @@ public class TaskViewTaskController implements ShellTaskOrganizer.TaskListener {
             resetTaskInfo();
         });
         mGuard.close();
-        mIsInitialized = false;
         notifyReleased();
     }
 
@@ -308,7 +306,8 @@ public class TaskViewTaskController implements ShellTaskOrganizer.TaskListener {
     }
 
     @Override
-    public void onBackPressedOnTaskRoot(ActivityManager.RunningTaskInfo taskInfo) {
+    public void onBackPressedOnTaskRoot(ActivityManager.RunningTaskInfo taskInfo,
+            boolean isFromMoveActivityTaskToBack, boolean isOptInOnBackInvoked) {
         if (mTaskToken == null || !mTaskToken.equals(taskInfo.token)) {
             ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "TaskController.onBackPressedOnTaskRoot(): "
                     + "taskView=%d Ignored", hashCode());
@@ -328,7 +327,7 @@ public class TaskViewTaskController implements ShellTaskOrganizer.TaskListener {
     public void attachChildSurfaceToTask(int taskId, SurfaceControl.Builder b) {
         if (BubbleAnythingFlagHelper.enableCreateAnyBubble()) {
             // TODO(b/419342398): Add a notifier when the surface is ready for this to be called.
-            if (!mIsInitialized) return;
+            if (mTaskLeash == null) return;
         }
         b.setParent(findTaskSurface(taskId));
     }
@@ -338,7 +337,7 @@ public class TaskViewTaskController implements ShellTaskOrganizer.TaskListener {
             SurfaceControl.Transaction t) {
         if (BubbleAnythingFlagHelper.enableCreateAnyBubble()) {
             // TODO(b/419342398): Add a notifier when the surface is ready for this to be called.
-            if (!mIsInitialized) return;
+            if (mTaskLeash == null) return;
         }
         t.reparent(sc, findTaskSurface(taskId));
     }
@@ -371,7 +370,6 @@ public class TaskViewTaskController implements ShellTaskOrganizer.TaskListener {
         ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "TaskController.surfaceCreated(): taskView=%d",
                 hashCode());
         mSurfaceCreated = true;
-        mIsInitialized = true;
         mSurfaceControl = surfaceControl;
         // SurfaceControl is expected to be null only in the case of unit tests. Guard against it
         // to avoid runtime exception in SurfaceControl.Transaction.
@@ -575,9 +573,12 @@ public class TaskViewTaskController implements ShellTaskOrganizer.TaskListener {
      * Called when the associated Task closes. If the TaskView is just being hidden, prepareHide
      * is used instead.
      */
-    void prepareCloseAnimation() {
+    void prepareCloseAnimation(SurfaceControl leash, SurfaceControl.Transaction transaction) {
         ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "TaskController.prepareCloseAnimation(): taskView=%d",
                 hashCode());
+        if (mTaskViewBase.shouldHideSurfaceWhileClosing()) {
+            transaction.setAlpha(leash, 0);
+        }
         handleAndNotifyTaskRemoval(mTaskInfo);
         resetTaskInfo();
     }

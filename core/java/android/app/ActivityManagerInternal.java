@@ -770,7 +770,8 @@ public abstract class ActivityManagerInternal {
 
     /** Starts a given process. */
     public abstract void startProcess(String processName, ApplicationInfo info,
-            boolean knownToBeDead, boolean isTop, String hostingType, ComponentName hostingName);
+            boolean knownToBeDead, boolean isTop, String hostingType, ComponentName hostingName,
+            boolean isPcc);
 
     /** Starts up the starting activity process for debugging if needed.
      * This function needs to be called synchronously from WindowManager context so the caller
@@ -995,10 +996,10 @@ public abstract class ActivityManagerInternal {
      */
     public abstract @TempAllowListType int getPushMessagingOverQuotaBehavior();
 
-// QTI_BEGIN: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
+// QTI_BEGIN: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
     // Starts a process as empty.
     public abstract int startActivityAsUserEmpty(Bundle options);
-// QTI_END: 2019-05-01: Core: IOP: Fix and rebase PreferredApps.
+// QTI_END: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
 
     /**
      * Return the startForeground() grace period after calling startForegroundService().

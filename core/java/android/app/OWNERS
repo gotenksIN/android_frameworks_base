@@ -62,6 +62,9 @@ per-file AndroidForwardingOS.java = file:RESOURCES_OWNERS
 # AppInteraction
 per-file *AppInteraction* = file:/core/java/android/app/appfunctions/OWNERS
 
+# App Lock
+per-file *AppLock* = file:/core/java/android/content/pm/APP_LOCK_OWNERS
+
 # AppOps
 per-file *AppOp* = file:/core/java/android/permission/OWNERS
 
@@ -97,6 +100,7 @@ per-file *Zen* = file:/packages/SystemUI/OWNERS
 per-file *StatusBar* = file:/packages/SystemUI/OWNERS
 per-file *UiModeManager* = file:/packages/SystemUI/OWNERS
 per-file notification.aconfig = file:/packages/SystemUI/OWNERS
+per-file statusbar.aconfig = file:/packages/SystemUI/OWNERS
 
 # PackageManager
 per-file ApplicationPackageManager*.java = file:/services/core/java/com/android/server/pm/OWNERS
@@ -131,6 +135,9 @@ per-file *VoiceInteract* = file:/core/java/android/service/voice/OWNERS
 # Wallpaper
 per-file *Wallpaper* = file:/core/java/android/service/wallpaper/OWNERS
 per-file wallpaper.aconfig = file:/core/java/android/service/wallpaper/OWNERS
+
+# ThemeManager
+per-file ThemeManager.java = file:/services/core/java/com/android/server/theming/OWNERS
 
 # WindowManager
 per-file *Activity* = file:/services/core/java/com/android/server/wm/OWNERS

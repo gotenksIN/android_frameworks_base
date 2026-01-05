@@ -19,6 +19,7 @@ package com.android.server.textclassifier;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.UserIdInt;
+import android.app.AppGlobals;
 import android.app.RemoteAction;
 import android.content.ComponentName;
 import android.content.Context;
@@ -115,6 +116,8 @@ public final class TextClassificationManagerService extends ITextClassifierServi
         public void onStart() {
             try {
                 publishBinderService(Context.TEXT_CLASSIFICATION_SERVICE, mManagerService);
+                publishLocalService(
+                        PersonalContextBridge.class, mManagerService.mPersonalContextBridge);
                 mManagerService.startListenSettings();
                 mManagerService.startTrackingPackageChanges();
             } catch (Throwable t) {
@@ -179,6 +182,7 @@ public final class TextClassificationManagerService extends ITextClassifierServi
     @Nullable
     private final String mSystemTextClassifierPackage;
     private final MyPackageMonitor mPackageMonitor;
+    private final PersonalContextBridge mPersonalContextBridge;
 
     private TextClassificationManagerService(Context context) {
         mContext = Objects.requireNonNull(context);
@@ -190,6 +194,7 @@ public final class TextClassificationManagerService extends ITextClassifierServi
         mSystemTextClassifierPackage = packageManager.getSystemTextClassifierPackageName();
         mSessionCache = new SessionCache(mLock);
         mPackageMonitor = new MyPackageMonitor();
+        mPersonalContextBridge = new PersonalContextBridge.LocalService();
     }
 
     private void startListenSettings() {
@@ -251,7 +256,8 @@ public final class TextClassificationManagerService extends ITextClassifierServi
                 request.getSystemTextClassifierMetadata(),
                 /* verifyCallingPackage= */ true,
                 /* attemptToBind= */ true,
-                service -> service.onSuggestSelection(sessionId, request, wrap(callback)),
+                service -> service.onSuggestSelection(
+                    sessionId, request, wrap(callback, Binder.getCallingUid())),
                 "onSuggestSelection",
                 callback);
     }
@@ -268,9 +274,17 @@ public final class TextClassificationManagerService extends ITextClassifierServi
                 request.getSystemTextClassifierMetadata(),
                 /* verifyCallingPackage= */ true,
                 /* attemptToBind= */ true,
-                service -> service.onClassifyText(sessionId, request, wrap(callback)),
+                service -> service.onClassifyText(
+                        sessionId, request, wrap(callback, Binder.getCallingUid())),
                 "onClassifyText",
                 callback);
+        if (sessionId != null && PersonalContextBridge.isPersonalContextEnabled()) {
+            mPersonalContextBridge.trigger(
+                    request.getSystemTextClassifierMetadata().getUserId(),
+                    sessionId.getValue(),
+                    request
+            );
+        }
     }
 
     @Override
@@ -355,7 +369,7 @@ public final class TextClassificationManagerService extends ITextClassifierServi
                 /* verifyCallingPackage= */ true,
                 /* attemptToBind= */ true,
                 service -> service.onSuggestConversationActions(
-                        sessionId, request, wrap(callback)),
+                        sessionId, request, wrap(callback, Binder.getCallingUid())),
                 "onSuggestConversationActions",
                 callback);
     }
@@ -569,7 +583,19 @@ public final class TextClassificationManagerService extends ITextClassifierServi
         }
     }
 
-    private static ITextClassifierCallback wrap(ITextClassifierCallback orig) {
+    private static ITextClassifierCallback wrap(ITextClassifierCallback orig, int uid) {
+        if (com.android.server.textclassifier.Flags.textclassifierSkipRedundantIconRewriting()) {
+            // If the caller has full package visibility there's no need to rewrite any responses.
+            try {
+                if (AppGlobals.getPackageManager()
+                                .checkUidPermission(
+                                        android.Manifest.permission.QUERY_ALL_PACKAGES, uid)
+                        == PackageManager.PERMISSION_GRANTED) {
+                    return orig;
+                }
+            } catch (RemoteException exception) {
+            }
+        }
         return new CallbackWrapper(orig);
     }
 

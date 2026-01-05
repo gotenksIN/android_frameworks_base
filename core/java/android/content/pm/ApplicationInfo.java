@@ -35,10 +35,10 @@ import android.content.res.Resources;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Environment;
-// QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2018-02-20: Performance: Activity Trigger frameworks support
 import android.os.SystemProperties;
 import android.util.DisplayMetrics;
-// QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
+// QTI_END: 2018-02-20: Performance: Activity Trigger frameworks support
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.os.SystemClock;
@@ -917,7 +917,7 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
      */
     public static final String METADATA_PRELOADED_FONTS = "preloaded_fonts";
 
-// QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2018-02-20: Performance: Activity Trigger frameworks support
     /**
      * Boolean indicating whether the resolution of the SurfaceView associated
      * with this appplication can be overriden.
@@ -931,7 +931,7 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
      */
     public int overrideDensity = 0;
 
-// QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
+// QTI_END: 2018-02-20: Performance: Activity Trigger frameworks support
     /**
      * The required smallest screen width the application can run on.  If 0,
      * nothing has been specified.  Comes from
@@ -2133,10 +2133,10 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         flags = orig.flags;
         privateFlags = orig.privateFlags;
         privateFlagsExt = orig.privateFlagsExt;
-// QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2018-02-20: Performance: Activity Trigger frameworks support
         overrideRes = orig.overrideRes;
         overrideDensity = orig.overrideDensity;
-// QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
+// QTI_END: 2018-02-20: Performance: Activity Trigger frameworks support
         requiresSmallestWidthDp = orig.requiresSmallestWidthDp;
         compatibleWidthLimitDp = orig.compatibleWidthLimitDp;
         largestWidthLimitDp = orig.largestWidthLimitDp;
@@ -2233,10 +2233,10 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         dest.writeInt(flags);
         dest.writeInt(privateFlags);
         dest.writeInt(privateFlagsExt);
-// QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2018-02-20: Performance: Activity Trigger frameworks support
         dest.writeInt(overrideRes);
         dest.writeInt(overrideDensity);
-// QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
+// QTI_END: 2018-02-20: Performance: Activity Trigger frameworks support
         dest.writeInt(requiresSmallestWidthDp);
         dest.writeInt(compatibleWidthLimitDp);
         dest.writeInt(largestWidthLimitDp);
@@ -2350,10 +2350,10 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         flags = source.readInt();
         privateFlags = source.readInt();
         privateFlagsExt = source.readInt();
-// QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2018-02-20: Performance: Activity Trigger frameworks support
         overrideRes = source.readInt();
         overrideDensity = source.readInt();
-// QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
+// QTI_END: 2018-02-20: Performance: Activity Trigger frameworks support
         requiresSmallestWidthDp = source.readInt();
         compatibleWidthLimitDp = source.readInt();
         largestWidthLimitDp = source.readInt();
@@ -2966,13 +2966,13 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         return output.toArray(new String[output.size()]);
     }
 
-// QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2018-02-20: Performance: Activity Trigger frameworks support
     /** @hide */
     public int getOverrideDensity() {
         return overrideDensity;
     }
 
-// QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
+// QTI_END: 2018-02-20: Performance: Activity Trigger frameworks support
     /** @hide */ public void setCodePath(String codePath) { scanSourceDir = codePath; }
     /** @hide */ public void setBaseCodePath(String baseCodePath) { sourceDir = baseCodePath; }
     /** @hide */ public void setSplitCodePaths(String[] splitCodePaths) { splitSourceDirs = splitCodePaths; }
@@ -2988,9 +2988,9 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
     public void setRequestRawExternalStorageAccess(@Nullable Boolean value) {
         requestRawExternalStorageAccess = value;
     }
-// QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2018-02-20: Performance: Activity Trigger frameworks support
     /** {@hide} */ public void setOverrideRes(int overrideResolution) { overrideRes = overrideResolution; }
-// QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
+// QTI_END: 2018-02-20: Performance: Activity Trigger frameworks support
 
     /** @hide */
     public void setPageSizeAppCompatFlags(@PageSizeAppCompatFlags int value) {
@@ -3148,7 +3148,34 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         }
     }
 
-// QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
+    /** @hide */
+    public boolean isBundledApp() {
+        boolean bundled = isSystemApp() && !isUpdatedSystemApp();
+
+        // Vendor apks are treated as bundled only when /vendor/lib is in the default search
+        // paths. If not, they are treated as unbundled; access to system libs is limited.
+        // Having /vendor/lib in the default search paths means that all system processes
+        // are allowed to use any vendor library, which in turn means that system is dependent
+        // on vendor partition. In the contrary, not having /vendor/lib in the default search
+        // paths mean that the two partitions are separated and thus we can treat vendor apks
+        // as unbundled.
+        final String defaultSearchPaths = System.getProperty("java.library.path");
+        final boolean treatVendorApkAsUnbundled = !defaultSearchPaths.contains("/vendor/lib");
+        if (getCodePath() != null && isVendor() && treatVendorApkAsUnbundled) {
+            bundled = false;
+        }
+
+        // Similar to vendor apks, we should add /product/lib for apks from product partition
+        // when product apps are marked as unbundled. Product is separated as long as the
+        // partition exists, so it can be handled with same approach from the vendor partition.
+        if (getCodePath() != null && isProduct()) {
+            bundled = false;
+        }
+
+        return bundled;
+    }
+
+// QTI_BEGIN: 2018-02-20: Performance: Activity Trigger frameworks support
     /** {@hide} */ public int canOverrideRes() { return overrideRes; }
-// QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
+// QTI_END: 2018-02-20: Performance: Activity Trigger frameworks support
 }

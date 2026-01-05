@@ -29,6 +29,7 @@ import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceGroup
 import androidx.preference.PreferenceGroupAdapter
 import androidx.preference.PreferenceViewHolder
+import androidx.recyclerview.widget.RecyclerView
 import com.android.settingslib.widget.theme.R
 
 /**
@@ -44,12 +45,13 @@ import com.android.settingslib.widget.theme.R
  * (yet).
  */
 @SuppressLint("RestrictedApi")
-open class SettingsPreferenceGroupAdapter(preferenceGroup: PreferenceGroup) :
-    PreferenceGroupAdapter(preferenceGroup) {
+open class SettingsPreferenceGroupAdapter @JvmOverloads constructor(
+    preferenceGroup: PreferenceGroup,
+    private val footerDataMap: Map<String, FooterData> = emptyMap(),
+) : PreferenceGroupAdapter(preferenceGroup) {
 
     private val mPreferenceGroup = preferenceGroup
     private var mItemPositionStates = intArrayOf()
-
     private var mNormalPaddingStart = 0
     private var mGroupPaddingStart = 0
     private var mNormalPaddingEnd = 0
@@ -88,6 +90,18 @@ open class SettingsPreferenceGroupAdapter(preferenceGroup: PreferenceGroup) :
         }
     }
 
+    /**
+     * Public API to refresh a specific preference.
+     * This fixes the timing issue where data is added after the view is created.
+     */
+    fun notifyPreferenceChanged(preference: Preference) {
+        val index = getPreferenceAdapterPosition(preference)
+
+        if (index != RecyclerView.NO_POSITION) {
+            notifyItemChanged(index)
+        }
+    }
+
     @SuppressLint("RestrictedApi")
     override fun onBindViewHolder(holder: PreferenceViewHolder, position: Int) {
         super.onBindViewHolder(holder, position)
@@ -95,6 +109,9 @@ open class SettingsPreferenceGroupAdapter(preferenceGroup: PreferenceGroup) :
         if (SettingsThemeHelper.isExpressiveTheme(holder.itemView.context)) {
             updateBackground(holder, position)
         }
+        val preference = getItem(position)
+        val footerData = preference?.key?.let { footerDataMap[it] }
+        bindFooter(holder, footerData)
     }
 
     private fun updatePreferencesList() {
@@ -224,9 +241,15 @@ open class SettingsPreferenceGroupAdapter(preferenceGroup: PreferenceGroup) :
         } else { // Handle the background of the preferences that are group divider
             val backgroundRes = getRoundCornerDrawableRes(position, isSelected = false)
             val (paddingStart, paddingEnd) = getStartEndPadding(position)
-            v.setPaddingRelative(paddingStart, v.paddingTop, paddingEnd, v.paddingBottom)
             v.clipToOutline = backgroundRes != 0
+            // Cache the current vertical padding. We must do this before calling
+            // setBackgroundResource, because that method resets the View's padding
+            // to the drawable's intrinsic padding.
+            val paddingTop = v.paddingTop
+            val paddingBottom = v.paddingBottom
             v.setBackgroundResource(backgroundRes)
+            // Restore the preserved vertical padding and apply the calculated horizontal padding.
+            v.setPaddingRelative(paddingStart, paddingTop, paddingEnd, paddingBottom)
         }
     }
 

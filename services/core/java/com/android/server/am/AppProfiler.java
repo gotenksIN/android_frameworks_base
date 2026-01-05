@@ -137,7 +137,7 @@ import java.util.function.Predicate;
 public class AppProfiler {
     private static final String TAG = TAG_WITH_CLASS_NAME ? "ProcessList" : TAG_AM;
 
-    static final String TAG_PSS = TAG + POSTFIX_PSS;
+    public static final String TAG_PSS = TAG + POSTFIX_PSS;
     static final String TAG_RSS = TAG + POSTFIX_RSS;
 
     static final String TAG_OOM_ADJ = ActivityManagerService.TAG_OOM_ADJ;
@@ -2415,15 +2415,13 @@ public class AppProfiler {
                             // This is the wildcard mode, where every process brought up for
                             // the target instrumentation should be included.
                             if (aInstr.mTargetInfo.packageName.equals(app.info.packageName)) {
-                                mService.mProcessStateController.setActiveInstrumentation(app,
-                                        aInstr);
+                                app.setActiveInstrumentation(aInstr);
                                 aInstr.mRunningProcesses.add(app);
                             }
                         } else {
                             for (String proc : aInstr.mTargetProcesses) {
                                 if (proc.equals(app.processName)) {
-                                    mService.mProcessStateController.setActiveInstrumentation(app,
-                                            aInstr);
+                                    app.setActiveInstrumentation(aInstr);
                                     aInstr.mRunningProcesses.add(app);
                                     break;
                                 }

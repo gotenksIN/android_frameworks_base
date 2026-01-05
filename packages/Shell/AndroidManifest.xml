@@ -29,6 +29,8 @@
     <uses-permission android:name="android.permission.MANAGE_HEALTH_DATA" />
     <uses-permission android:name="android.permission.health.READ_EXERCISE_ROUTE" />
     <uses-permission android:name="android.permission.MIGRATE_HEALTH_CONNECT_DATA" />
+    <uses-permission android:name="android.permission.PROVIDE_HEALTH_CONNECT_DEVICE_DATA"
+        android:featureFlag="android.permission.flags.health_connect_provide_device_data_permission_enabled"/>
     <uses-permission android:name="android.permission.LAUNCH_DEVICE_MANAGER_SETUP" />
     <uses-permission android:name="android.permission.GET_RUNTIME_PERMISSIONS" />
     <uses-permission android:name="android.permission.SEND_SMS" />
@@ -276,6 +278,7 @@
     <uses-permission android:name="android.permission.ACCESS_VIBRATOR_STATE" />
     <uses-permission android:name="android.permission.VIBRATE_VENDOR_EFFECTS" />
     <uses-permission android:name="android.permission.START_VIBRATION_SESSIONS" />
+    <uses-permission android:name="android.permission.USE_VIBRATOR_HAPTIC_GENERATOR"/>
     <uses-permission android:name="android.permission.MANAGE_ACTIVITY_TASKS" />
     <uses-permission android:name="android.permission.START_TASKS_FROM_RECENTS" />
     <uses-permission android:name="android.permission.START_ACTIVITIES_FROM_BACKGROUND" />
@@ -1014,6 +1017,8 @@
     <uses-permission android:name="android.permission.ADD_ALWAYS_UNLOCKED_DISPLAY" />
     <uses-permission android:name="android.permission.ADD_MIRROR_DISPLAY"
         android:featureFlag="android.companion.virtualdevice.flags.vdm_mirror_display_permission"/>
+    <uses-permission android:name="android.permission.ACCESS_COMPUTER_CONTROL"
+        android:featureFlag="android.companion.virtualdevice.flags.computer_control_access"/>
 
     <!-- Permission required for CTS test - CtsAppTestCases -->
     <uses-permission android:name="android.permission.KILL_UID" />
@@ -1054,6 +1059,7 @@
     <!-- Permissions required for CTS test - CtsModernMediaProviderTests -->
     <uses-permission android:name="com.android.providers.media.permission.ACCESS_OEM_METADATA" />
     <uses-permission android:name="com.android.providers.media.permission.UPDATE_OEM_METADATA" />
+    <uses-permission android:name="com.android.providers.media.permission.BIND_SEARCH_MEDIA_SERVICE" />
 
     <!-- Permission required for trade-in mode testing -->
     <uses-permission android:name="android.permission.ENTER_TRADE_IN_MODE" />
@@ -1063,6 +1069,9 @@
 
     <!-- Permission required for CTS test - CtsAppFunctionTestCases -->
     <uses-permission android:name="android.permission.MANAGE_APP_FUNCTION_ACCESS" />
+
+    <!-- Permission required for CTS test - CtsAppFunctionTestCases -->
+    <uses-permission android:name="android.permission.READ_APP_INTERACTION" />
 
     <!-- Permissions required for integration test - InputTest -->
     <uses-permission android:name="android.permission.LISTEN_FOR_KEY_ACTIVITY" />
@@ -1078,6 +1087,13 @@
 
     <!-- Permission required for CTS test - CtsProviderUiTestCases -->
     <uses-permission android:name="android.permission.MANAGE_DOCUMENTS" />
+
+    <!-- PermissionRequired for CTS test - StatusBarManagerTest -->
+    <uses-permission android:name="android.permission.SHOW_POWER_MENU_PRIVILEGED" />
+    <uses-permission android:name="android.permission.SHOW_POWER_MENU" />
+
+    <!-- Permission required for contextual mode tests -->
+    <uses-permission android:name="android.permission.MANAGE_CONTEXTUAL_MODES" />
 
     <application
         android:label="@string/app_label"

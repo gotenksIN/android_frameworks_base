@@ -89,6 +89,8 @@ filegroup {
         ":ProxyHandler-aidl-sources",
         ":vcn-utils-platform-sources",
         ":net-utils-framework-common-srcs",
+        // Temporary dependencies during Telecom Mainline launch
+        ":telecom_mainline_deps_srcs",
 
         // AIDL from frameworks/base/native/
         ":platform-compat-native-aidl",
@@ -99,7 +101,7 @@ filegroup {
         ":android.hardware.biometrics.fingerprint-V5-java-source",
         ":android.hardware.biometrics.fingerprint.virtualhal-java-source",
         ":android.hardware.biometrics.face.virtualhal-java-source",
-        ":android.hardware.biometrics.face-V4-java-source",
+        ":android.hardware.biometrics.face-V5-java-source",
         ":android.hardware.gnss-V2-java-source",
         ":android.hardware.graphics.common-V3-java-source",
         ":android.hardware.keymaster-V4-java-source",
@@ -219,7 +221,7 @@ java_library {
         "android.hardware.contexthub-V1.0-java",
         "android.hardware.contexthub-V1.1-java",
         "android.hardware.contexthub-V1.2-java",
-        "android.hardware.contexthub-V4-java",
+        "android.hardware.contexthub-V5-java",
         "android.hardware.gnss-V1.0-java",
         "android.hardware.gnss-V2.1-java",
         "android.hardware.health-V1.0-java-constants",
@@ -243,7 +245,7 @@ java_library {
         "android.hardware.usb.gadget-V1.0-java",
         "android.hardware.usb.gadget-V1.1-java",
         "android.hardware.usb.gadget-V1.2-java",
-        "android.hardware.vibrator-V3-java",
+        "android.hardware.vibrator-V4-java",
         "android.se.omapi-V1-java",
         "android.system.suspend.control.internal-java",
         "devicepolicyprotosnano",
@@ -265,6 +267,7 @@ filegroup {
     visibility: ["//visibility:public"],
 }
 
+// QTI_BEGIN: 2021-03-11: Bluetooth: BT fwk: Changes to compile only when bt_adv_audio present
 soong_config_module_type_import {
     from: "device/qcom/qssi/Android.bp",
     module_types: [
@@ -272,6 +275,7 @@ soong_config_module_type_import {
     ],
 }
 
+// QTI_END: 2021-03-11: Bluetooth: BT fwk: Changes to compile only when bt_adv_audio present
 java_defaults {
     name: "framework-minus-apex-defaults",
     defaults: [
@@ -350,6 +354,7 @@ java_defaults {
             "hardware/interfaces/biometrics/fingerprint/aidl",
             "hardware/interfaces/common/aidl",
             "hardware/interfaces/common/fmq/aidl",
+            "hardware/interfaces/contexthub/aidl",
             "hardware/interfaces/graphics/common/aidl",
             "hardware/interfaces/keymaster/aidl",
             "hardware/interfaces/power/aidl",
@@ -409,6 +414,7 @@ java_defaults {
         "bouncycastle-repackaged-unbundled",
         "com.android.sysprop.view",
         "framework-internal-utils",
+        "aisealhostservice_aidl-java",
         "dropboxmanager_aidl-java",
         "dynamic_instrumentation_manager_aidl-java",
         "process_info_service_aidl-java",
@@ -759,3 +765,10 @@ build = [
     "TestProtoLibraries.bp",
     "Ravenwood.bp",
 ]
+
+filegroup {
+    name: "docs_samples_redirect",
+    srcs: [
+        "docs/docs-samples-redirect.html",
+    ],
+}

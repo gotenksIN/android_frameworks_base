@@ -46,6 +46,7 @@ import com.android.internal.display.BrightnessSynchronizer;
 import com.android.internal.protolog.ProtoLog;
 import com.android.server.wm.Transition.ReadyCondition;
 import com.android.server.wm.utils.DisplayInfoOverrides.DisplayInfoFieldsUpdater;
+import com.android.window.flags.Flags;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -74,6 +75,9 @@ class DeferredDisplayUpdater {
         out.uniqueId = override.uniqueId;
         out.address = override.address;
         out.canHostTasks = override.canHostTasks;
+        if (Flags.displayinfoStateDeferrable()) {
+            out.state = override.state;
+        }
 
         // Also apply WM-override fields, since they might produce differences in window hierarchy
         WM_OVERRIDE_FIELDS.setFields(out, override);
@@ -278,7 +282,8 @@ class DeferredDisplayUpdater {
 
                 if (physicalDisplayUpdated) {
                     onDisplayUpdated(transition, fromRotation, startBounds);
-                } else {
+                } else if (!transition.mParticipants.isEmpty()
+                        || !Flags.displayinfoStateDeferrable()) {
                     final TransitionRequestInfo.DisplayChange displayChange =
                             getCurrentDisplayChange(fromRotation, startBounds);
                     // If the display has become unable to host tasks, identify a potential
@@ -295,6 +300,9 @@ class DeferredDisplayUpdater {
                             mDisplayContent.updateContentMode();
                         });
                     }
+                } else {
+                    // Display change didn't result in any WM changes that need to be animated.
+                    transition.abort();
                 }
             } finally {
                 // Run surface placement after requestStartTransition, so shell side can receive
@@ -553,15 +561,15 @@ class DeferredDisplayUpdater {
                 || first.defaultModeId != second.defaultModeId
                 || first.userPreferredModeId != second.userPreferredModeId
                 || !Arrays.equals(first.supportedModes, second.supportedModes)
-                || !Arrays.equals(first.appsSupportedModes, second.appsSupportedModes)
                 || first.colorMode != second.colorMode
                 || !Arrays.equals(first.supportedColorModes, second.supportedColorModes)
+                || !Objects.equals(first.frameRateVelocityMapping, second.frameRateVelocityMapping)
                 || !Objects.equals(first.hdrCapabilities, second.hdrCapabilities)
                 || !Arrays.equals(first.userDisabledHdrTypes, second.userDisabledHdrTypes)
                 || first.minimalPostProcessingSupported != second.minimalPostProcessingSupported
                 || first.appVsyncOffsetNanos != second.appVsyncOffsetNanos
                 || first.presentationDeadlineNanos != second.presentationDeadlineNanos
-                || first.state != second.state
+                || (!Flags.displayinfoStateDeferrable() && first.state != second.state)
                 || first.committedState != second.committedState
                 || first.ownerUid != second.ownerUid
                 || !Objects.equals(first.ownerPackageName, second.ownerPackageName)
@@ -593,6 +601,7 @@ class DeferredDisplayUpdater {
                 || first.logicalHeight != second.logicalHeight
                 || first.physicalXDpi != second.physicalXDpi
                 || first.physicalYDpi != second.physicalYDpi
+                || (Flags.displayinfoStateDeferrable() && first.state != second.state)
                 || first.rotation != second.rotation
                 || !Objects.equals(first.displayCutout, second.displayCutout)
                 || first.logicalDensityDpi != second.logicalDensityDpi

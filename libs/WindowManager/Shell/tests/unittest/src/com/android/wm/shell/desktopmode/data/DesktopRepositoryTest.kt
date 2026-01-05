@@ -336,6 +336,29 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
     }
 
     @Test
+    @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
+    fun addTaskToDesk_notifiesTaskAppearingInDeskListener() {
+        repo.addDesk(DEFAULT_DISPLAY, deskId = 5)
+        val listener = TestDeskChangeListener()
+        val executor = TestShellExecutor()
+        repo.addDeskChangeListener(listener, executor)
+
+        repo.addTaskToDesk(
+            displayId = DEFAULT_DISPLAY,
+            deskId = 5,
+            taskId = 1,
+            isVisible = true,
+            taskBounds = TEST_TASK_BOUNDS,
+        )
+        executor.flushAll()
+
+        val lastAppearance = assertNotNull(listener.lastTaskAppearingInDesk)
+        assertThat(lastAppearance.taskId).isEqualTo(1)
+        assertThat(lastAppearance.displayId).isEqualTo(DEFAULT_DISPLAY)
+        assertThat(lastAppearance.deskId).isEqualTo(5)
+    }
+
+    @Test
     fun removeActiveTask_notifiesActiveTaskListener() {
         val listener = TestListener()
         repo.addActiveTaskListener(listener)
@@ -2649,10 +2672,7 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
     }
 
     @Test
-    @EnableFlags(
-        Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
-        Flags.FLAG_ENABLE_EXTERNAL_DISPLAY_PERSISTENCE_BUGFIX,
-    )
+    @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
     fun addActiveTask_toTransientDesk_persistentRepoNotUpdated() = runTest {
         val listener = TestDeskChangeListener()
         val executor = TestShellExecutor()
@@ -2680,10 +2700,7 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
     }
 
     @Test
-    @EnableFlags(
-        Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
-        Flags.FLAG_ENABLE_EXTERNAL_DISPLAY_PERSISTENCE_BUGFIX,
-    )
+    @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
     fun removeActiveTask_fromTransientDesk_listenersNotUpdated() = runTest {
         val listener = TestDeskChangeListener()
         val executor = TestShellExecutor()
@@ -2713,10 +2730,7 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
     }
 
     @Test
-    @EnableFlags(
-        Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
-        Flags.FLAG_ENABLE_EXTERNAL_DISPLAY_PERSISTENCE_BUGFIX,
-    )
+    @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
     fun preserveDesk_transientDeskRemoved() = runTest {
         val listener = TestDeskChangeListener()
         val executor = TestShellExecutor()
@@ -2749,10 +2763,7 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
     }
 
     @Test
-    @EnableFlags(
-        Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
-        Flags.FLAG_ENABLE_EXTERNAL_DISPLAY_PERSISTENCE_BUGFIX,
-    )
+    @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
     fun minimizeTask_inTransientDesk_persistentRepoNotUpdated() = runTest {
         val listener = TestDeskChangeListener()
         val executor = TestShellExecutor()
@@ -2799,6 +2810,47 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
         assertThat(repo.hasBoundsBeforeSnapOrMaximize(taskInfo)).isFalse()
     }
 
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
+    fun removeDesk_lastDeskOnDisplay_persistsEmptyList() = runTest {
+        repo.addDesk(displayId = SECOND_DISPLAY, deskId = 1, uniqueDisplayId = "unique_id_1")
+        clearInvocations(persistentRepository)
+
+        repo.removeDesk(deskId = 1)
+        bgScope.testScheduler.advanceUntilIdle()
+
+        verify(persistentRepository)
+            .addOrUpdateRepository(
+                userId = eq(DEFAULT_USER_ID),
+                desks = eq(emptyList()),
+                activeDeskId = isNull(),
+                preservedDisplays = any(),
+                rememberedBoundsRatioByPackageName = any(),
+            )
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_REMEMBERED_BOUNDS)
+    fun setRememberedBoundsRatio_clearRememberedBoundsRatio() = runTest {
+        val packageName = "com.test.app"
+        val bounds = RectF(0.1f, 0.2f, 0.8f, 0.9f)
+        repo.setRememberedBoundsRatio(packageName, bounds)
+        assertThat(repo.getRememberedBoundsRatio(packageName)).isEqualTo(bounds)
+
+        repo.clearRememberedBoundsRatio(packageName)
+        bgScope.testScheduler.advanceUntilIdle()
+
+        assertThat(repo.getRememberedBoundsRatio(packageName)).isNull()
+        verify(persistentRepository)
+            .addOrUpdateRepository(
+                userId = eq(DEFAULT_USER_ID),
+                desks = any(),
+                activeDeskId = any(),
+                preservedDisplays = any(),
+                rememberedBoundsRatioByPackageName = eq(ArrayMap()),
+            )
+    }
+
     private class TestDeskChangeListener : DesktopRepository.DeskChangeListener {
         var lastAddition: LastAddition? = null
             private set
@@ -2811,6 +2863,9 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
             get() = activationChanges.lastOrNull()
 
         var lastCanCreateDesks: Boolean? = null
+            private set
+
+        var lastTaskAppearingInDesk: LastTaskAppearingInDesk? = null
             private set
 
         override fun onDeskAdded(displayId: Int, deskId: Int) {
@@ -2838,11 +2893,17 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
             lastCanCreateDesks = canCreateDesks
         }
 
+        override fun onTaskAppearingInDesk(taskId: Int, displayId: Int, deskId: Int) {
+            lastTaskAppearingInDesk = LastTaskAppearingInDesk(taskId, displayId, deskId)
+        }
+
         data class LastAddition(val displayId: Int, val deskId: Int)
 
         data class LastRemoval(val displayId: Int, val deskId: Int)
 
         data class ActivationChange(val displayId: Int, val oldActive: Int, val newActive: Int)
+
+        data class LastTaskAppearingInDesk(val taskId: Int, val displayId: Int, val deskId: Int)
     }
 
     class TestListener : DesktopRepository.ActiveTasksListener {

@@ -21,9 +21,12 @@ import android.platform.test.annotations.EnableFlags
 import android.view.MotionEvent
 import android.view.MotionEvent.ACTION_DOWN
 import android.view.MotionEvent.ACTION_OUTSIDE
+import android.view.WindowInsetsController
+import androidx.core.view.WindowInsetsCompat
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.compose.animation.scene.DefaultEdgeDetector
+import com.android.compose.animation.scene.ObservableTransitionState
 import com.android.systemui.Flags.FLAG_DUAL_SHADE
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.classifier.fakeFalsingManager
@@ -34,6 +37,7 @@ import com.android.systemui.keyguard.domain.interactor.biometricUnlockInteractor
 import com.android.systemui.keyguard.shared.model.BiometricUnlockSource
 import com.android.systemui.kosmos.collectLastValue
 import com.android.systemui.kosmos.currentValue
+import com.android.systemui.kosmos.runCurrent
 import com.android.systemui.kosmos.runTest
 import com.android.systemui.kosmos.testScope
 import com.android.systemui.kosmos.useUnconfinedTestDispatcher
@@ -57,11 +61,15 @@ import com.android.systemui.testKosmos
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.flowOf
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.kotlin.doReturn
+import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
+import org.mockito.kotlin.verify
+import org.mockito.kotlin.whenever
 
 @SmallTest
 @RunWith(AndroidJUnit4::class)
@@ -156,7 +164,7 @@ class SceneContainerViewModelTest : SysuiTestCase() {
     @Test
     fun canChangeScene_whenNotAllowed_fromLockscreen_toFalsingProtectedScenes_returnsFalse() =
         kosmos.runTest {
-            fakeFalsingManager.setIsFalseTouch(true)
+            fakeFalsingManager.setIsFalseTouch(true) // not allowed by falsing
             val currentScene by collectLastValue(underTest.currentScene)
             fakeSceneDataSource.changeScene(toScene = Scenes.Lockscreen)
             assertThat(currentScene).isEqualTo(Scenes.Lockscreen)
@@ -165,19 +173,42 @@ class SceneContainerViewModelTest : SysuiTestCase() {
                 .filter { it != currentScene }
                 .filter {
                     // These scenes are not currently falsing protected.
-                    it != Scenes.Communal && it != Scenes.Dream && it != Scenes.Occluded
+                    it != Scenes.Dream && it != Scenes.Occluded
                 }
                 .forEach { toScene ->
+                    // Lockscreen => toScene, initiatedByUserInput=true
+                    sceneInteractor.setTransitionState(
+                        flowOf(
+                            ObservableTransitionState.Transition(
+                                fromScene = Scenes.Lockscreen,
+                                toScene = toScene,
+                                currentScene = flowOf(Scenes.Lockscreen),
+                                progress = flowOf(0.5f),
+                                isInitiatedByUserInput = true,
+                                isUserInputOngoing = flowOf(true),
+                            )
+                        )
+                    )
+                    runCurrent()
+                    assertThat(sceneInteractor.transitionState).isNotNull()
+                    sendMotionEventUp()
+
                     assertWithMessage("Protected scene $toScene not properly protected")
                         .that(underTest.canChangeScene(toScene = toScene))
                         .isFalse()
                 }
         }
 
+    private fun sendMotionEventUp() {
+        val motionEventUp = mock<MotionEvent>()
+        whenever(motionEventUp.actionMasked).thenReturn(MotionEvent.ACTION_UP)
+        underTest.onMotionEvent(motionEventUp)
+    }
+
     @Test
     fun canChangeScene_whenNotAllowed_fromLockscreen_toFalsingUnprotectedScenes_returnsTrue() =
         kosmos.runTest {
-            fakeFalsingManager.setIsFalseTouch(true)
+            fakeFalsingManager.setIsFalseTouch(true) // not allowed by falsing
             val currentScene by collectLastValue(underTest.currentScene)
             fakeSceneDataSource.changeScene(toScene = Scenes.Lockscreen)
             assertThat(currentScene).isEqualTo(Scenes.Lockscreen)
@@ -185,9 +216,25 @@ class SceneContainerViewModelTest : SysuiTestCase() {
             sceneContainerConfig.sceneKeys
                 .filter {
                     // Moving to the Communal scene is not currently falsing protected.
-                    it == Scenes.Communal
+                    it == Scenes.Dream || it == Scenes.Occluded
                 }
                 .forEach { toScene ->
+                    // Lockscreen => toScene, initiatedByUserInput=true
+                    sceneInteractor.setTransitionState(
+                        flowOf(
+                            ObservableTransitionState.Transition(
+                                fromScene = Scenes.Lockscreen,
+                                toScene = toScene,
+                                currentScene = flowOf(Scenes.Lockscreen),
+                                progress = flowOf(0.5f),
+                                isInitiatedByUserInput = true,
+                                isUserInputOngoing = flowOf(true),
+                            )
+                        )
+                    )
+                    runCurrent()
+                    sendMotionEventUp()
+
                     assertWithMessage("Unprotected scene $toScene is incorrectly protected")
                         .that(underTest.canChangeScene(toScene = toScene))
                         .isTrue()
@@ -197,7 +244,7 @@ class SceneContainerViewModelTest : SysuiTestCase() {
     @Test
     fun canChangeScene_whenNotAllowed_fromGone_toAnyOtherScene_returnsTrue() =
         kosmos.runTest {
-            fakeFalsingManager.setIsFalseTouch(true)
+            fakeFalsingManager.setIsFalseTouch(true) // not allowed by falsing
             val currentScene by collectLastValue(underTest.currentScene)
             fakeSceneDataSource.changeScene(toScene = Scenes.Gone)
             assertThat(currentScene).isEqualTo(Scenes.Gone)
@@ -205,6 +252,22 @@ class SceneContainerViewModelTest : SysuiTestCase() {
             sceneContainerConfig.sceneKeys
                 .filter { it != currentScene }
                 .forEach { toScene ->
+                    // Gone => toScene, initiatedByUserInput=true
+                    sceneInteractor.setTransitionState(
+                        flowOf(
+                            ObservableTransitionState.Transition(
+                                fromScene = Scenes.Gone,
+                                toScene = toScene,
+                                currentScene = flowOf(Scenes.Lockscreen),
+                                progress = flowOf(0.5f),
+                                isInitiatedByUserInput = true,
+                                isUserInputOngoing = flowOf(true),
+                            )
+                        )
+                    )
+                    runCurrent()
+                    sendMotionEventUp()
+
                     assertWithMessage("Protected scene $toScene not properly protected")
                         .that(underTest.canChangeScene(toScene = toScene))
                         .isTrue()
@@ -226,7 +289,7 @@ class SceneContainerViewModelTest : SysuiTestCase() {
     fun canChangeScene_toGone_whenUnlocked_returnsTrue() =
         kosmos.runTest {
             kosmos.biometricUnlockInteractor.setBiometricUnlockState(
-                unlockStateInt = BiometricUnlockController.MODE_UNLOCK_COLLAPSING,
+                unlockStateInt = BiometricUnlockController.MODE_DISMISS,
                 biometricUnlockSource = BiometricUnlockSource.FINGERPRINT_SENSOR,
             )
             assertThat(currentValue(deviceUnlockedInteractor.deviceUnlockStatus).isUnlocked)
@@ -268,12 +331,28 @@ class SceneContainerViewModelTest : SysuiTestCase() {
     @Test
     fun canShowOrReplaceOverlay_whenNotAllowed_whileOnLockscreen_returnsFalse() =
         kosmos.runTest {
-            fakeFalsingManager.setIsFalseTouch(true)
+            fakeFalsingManager.setIsFalseTouch(true) // not allowed by falsing
             val currentScene by collectLastValue(underTest.currentScene)
             fakeSceneDataSource.changeScene(toScene = Scenes.Lockscreen)
             assertThat(currentScene).isEqualTo(Scenes.Lockscreen)
 
             sceneContainerConfig.overlayKeys.forEach { overlay ->
+                // Lockscreen => showOverlay(overlay), isInitiatedByUserInput=true
+                sceneInteractor.setTransitionState(
+                    flowOf(
+                        ObservableTransitionState.Transition.showOverlay(
+                            overlay = overlay,
+                            fromScene = Scenes.Lockscreen,
+                            currentOverlays = flowOf(emptySet()),
+                            progress = flowOf(.5f),
+                            isInitiatedByUserInput = true,
+                            isUserInputOngoing = flowOf(true),
+                        )
+                    )
+                )
+                runCurrent()
+                sendMotionEventUp()
+
                 assertWithMessage("Protected overlay $overlay not properly protected")
                     .that(underTest.canShowOrReplaceOverlay(newlyShown = overlay))
                     .isFalse()
@@ -283,12 +362,28 @@ class SceneContainerViewModelTest : SysuiTestCase() {
     @Test
     fun canShowOrReplaceOverlay_whenNotAllowed_whileOnGone_returnsTrue() =
         kosmos.runTest {
-            fakeFalsingManager.setIsFalseTouch(true)
+            fakeFalsingManager.setIsFalseTouch(true) // not allowed by falsing
             val currentScene by collectLastValue(underTest.currentScene)
             fakeSceneDataSource.changeScene(toScene = Scenes.Gone)
             assertThat(currentScene).isEqualTo(Scenes.Gone)
 
             sceneContainerConfig.overlayKeys.forEach { overlay ->
+                // Gone => showOverlay(overlay), isInitiatedByUserInput=true
+                sceneInteractor.setTransitionState(
+                    flowOf(
+                        ObservableTransitionState.Transition.showOverlay(
+                            overlay = overlay,
+                            fromScene = Scenes.Gone,
+                            currentOverlays = flowOf(emptySet()),
+                            progress = flowOf(.5f),
+                            isInitiatedByUserInput = true,
+                            isUserInputOngoing = flowOf(true),
+                        )
+                    )
+                )
+                runCurrent()
+                sendMotionEventUp()
+
                 assertWithMessage("Protected overlay $overlay not properly protected")
                     .that(underTest.canShowOrReplaceOverlay(newlyShown = overlay))
                     .isTrue()
@@ -447,5 +542,63 @@ class SceneContainerViewModelTest : SysuiTestCase() {
 
             // THEN the overlay is hidden
             assertThat(currentOverlays).isEmpty()
+        }
+
+    @Test
+    fun lockscreenAod_updateNavigationBarVisibility_hide() =
+        kosmos.runTest {
+            val windowInsetsController: WindowInsetsController = mock()
+            underTest.updateNavigationBarVisibility(
+                windowInsetsController = windowInsetsController,
+                hasBackAction = false,
+                sceneKey = Scenes.Lockscreen,
+                aodOrDozing = true,
+            )
+
+            verify(windowInsetsController).hide(eq(WindowInsetsCompat.Type.navigationBars()))
+        }
+
+    @Test
+    fun lockscreen_updateNavigationBarVisibility_show() =
+        kosmos.runTest {
+            val windowInsetsController: WindowInsetsController = mock()
+            underTest.updateNavigationBarVisibility(
+                windowInsetsController = windowInsetsController,
+                hasBackAction = false,
+                sceneKey = Scenes.Lockscreen,
+                aodOrDozing = false,
+            )
+
+            verify(windowInsetsController).show(eq(WindowInsetsCompat.Type.navigationBars()))
+        }
+
+    @Test
+    fun gone_updateNavigationBarVisibility_show() =
+        kosmos.runTest {
+            val windowInsetsController: WindowInsetsController = mock()
+            underTest.updateNavigationBarVisibility(
+                windowInsetsController = windowInsetsController,
+                hasBackAction = false,
+                sceneKey = Scenes.Gone,
+                aodOrDozing = false,
+            )
+
+            verify(windowInsetsController).show(eq(WindowInsetsCompat.Type.navigationBars()))
+        }
+
+    @Test
+    fun updateNavigationBarVisibilityCalledMultipleTimes_showOnlyCalledOnce() =
+        kosmos.runTest {
+            val windowInsetsController: WindowInsetsController = mock()
+            for (i in 0..5) {
+                underTest.updateNavigationBarVisibility(
+                    windowInsetsController = windowInsetsController,
+                    hasBackAction = true,
+                    sceneKey = Scenes.Gone,
+                    aodOrDozing = false,
+                )
+            }
+            // verify "show" is only called once
+            verify(windowInsetsController).show(eq(WindowInsetsCompat.Type.navigationBars()))
         }
 }

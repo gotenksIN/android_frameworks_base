@@ -44,7 +44,9 @@ import android.database.ContentObserver;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Handler;
+// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 import android.os.Process;
+// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 import android.os.SystemClock;
 import android.os.SystemProperties;
 import android.os.Message;
@@ -55,7 +57,9 @@ import android.provider.DeviceConfig.Properties;
 import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.ArraySet;
+// QTI_BEGIN: 2019-04-15: Performance: perf: Use get API for perf Properties.
 import android.util.BoostFramework;
+// QTI_END: 2019-04-15: Performance: perf: Use get API for perf Properties.
 import android.util.KeyValueListParser;
 import android.util.Slog;
 import android.util.SparseBooleanArray;
@@ -63,6 +67,7 @@ import android.util.SparseBooleanArray;
 import com.android.internal.R;
 import com.android.internal.annotations.GuardedBy;
 import com.android.server.LocalServices;
+import com.android.server.am.psc.OomAdjuster;
 
 import dalvik.annotation.optimization.NeverCompile;
 
@@ -999,19 +1004,6 @@ final class ActivityManagerConstants extends ContentObserver {
      */
     volatile long mNetworkAccessTimeoutMs = DEFAULT_NETWORK_ACCESS_TIMEOUT_MS;
 
-    @SuppressWarnings("unused")
-    private static final int OOMADJ_UPDATE_POLICY_SLOW = 0;
-    private static final int OOMADJ_UPDATE_POLICY_QUICK = 1;
-    private static final int DEFAULT_OOMADJ_UPDATE_POLICY = OOMADJ_UPDATE_POLICY_QUICK;
-
-    private static final String KEY_OOMADJ_UPDATE_POLICY = "oomadj_update_policy";
-
-    // Indicate if the oom adjuster should take the quick path to update the oom adj scores,
-    // in which no futher actions will be performed if there are no significant adj/proc state
-    // changes for the specific process; otherwise, use the traditonal slow path which would
-    // keep updating all processes in the LRU list.
-    private boolean mOomadjUpdateQuick = DEFAULT_OOMADJ_UPDATE_POLICY == OOMADJ_UPDATE_POLICY_QUICK;
-
     private static final long MIN_AUTOMATIC_HEAP_DUMP_PSS_THRESHOLD_BYTES = 100 * 1024; // 100 KB
 
     private final boolean mSystemServerAutomaticHeapDumpEnabled;
@@ -1265,9 +1257,6 @@ final class ActivityManagerConstants extends ContentObserver {
                             case KEY_PUSH_MESSAGING_OVER_QUOTA_BEHAVIOR:
                                 updatePushMessagingOverQuotaBehavior();
                                 break;
-                            case KEY_OOMADJ_UPDATE_POLICY:
-                                updateOomAdjUpdatePolicy();
-                                break;
                             case KEY_IMPERCEPTIBLE_KILL_EXEMPT_PACKAGES:
                             case KEY_IMPERCEPTIBLE_KILL_EXEMPT_PROC_STATES:
                                 updateImperceptibleKillExemptions();
@@ -1517,30 +1506,48 @@ final class ActivityManagerConstants extends ContentObserver {
                 com.android.internal.R.integer.config_am_tieredCachedAdjUiTierSize);
         TIERED_CACHED_ADJ_UI_TIER_SIZE = Math.min(
                 mDefaultTieredCachedAdjUiTierSize, TIERED_CACHED_ADJ_MAX_UI_TIER_SIZE);
+// QTI_BEGIN: 2020-05-19: Performance: perf: Set defaults for cached and empty processes.
     }
+// QTI_END: 2020-05-19: Performance: perf: Set defaults for cached and empty processes.
 
+// QTI_BEGIN: 2020-05-19: Performance: perf: Set defaults for cached and empty processes.
     private void updatePerfConfigConstants() {
+// QTI_END: 2020-05-19: Performance: perf: Set defaults for cached and empty processes.
+// QTI_BEGIN: 2019-04-15: Performance: perf: Use get API for perf Properties.
         if (mPerf != null) {
+// QTI_END: 2019-04-15: Performance: perf: Use get API for perf Properties.
+// QTI_BEGIN: 2024-07-04: Performance: Add MAX_CACHED_PROCESSES and associated constants
             // Wait time after bootup to trigger system compaction
             MAX_CACHED_PROCESSES = CUR_MAX_CACHED_PROCESSES = Integer.valueOf(
                                        mPerf.perfGetProp("ro.vendor.qti.sys.fw.bg_apps_limit",
                                        String.valueOf(DEFAULT_MAX_CACHED_PROCESSES)));
             // The maximum number of empty app processes we will let sit around.
             CUR_MAX_EMPTY_PROCESSES = computeEmptyProcessLimit(CUR_MAX_CACHED_PROCESSES);
+// QTI_END: 2024-07-04: Performance: Add MAX_CACHED_PROCESSES and associated constants
+// QTI_BEGIN: 2024-03-28: Performance: appcompaction: Delay system compaction trigger.
             // Wait time after bootup to trigger system compaction
             COMPACTION_DELAY_MS = Integer.valueOf(mPerf.perfGetProp("ro.vendor.qti.sys.fw.compaction_delay_sec", "300")) * 1000;
 
+// QTI_END: 2024-03-28: Performance: appcompaction: Delay system compaction trigger.
+// QTI_BEGIN: 2020-05-19: Performance: perf: Set defaults for cached and empty processes.
             //Trim Settings
+// QTI_END: 2020-05-19: Performance: perf: Set defaults for cached and empty processes.
+// QTI_BEGIN: 2019-04-15: Performance: perf: Use get API for perf Properties.
             USE_TRIM_SETTINGS = Boolean.parseBoolean(mPerf.perfGetProp("ro.vendor.qti.sys.fw.use_trim_settings", "true"));
             EMPTY_APP_PERCENT = Integer.valueOf(mPerf.perfGetProp("ro.vendor.qti.sys.fw.empty_app_percent", "50"));
             TRIM_EMPTY_PERCENT = Integer.valueOf(mPerf.perfGetProp("ro.vendor.qti.sys.fw.trim_empty_percent", "100"));
             TRIM_CACHE_PERCENT = Integer.valueOf(mPerf.perfGetProp("ro.vendor.qti.sys.fw.trim_cache_percent", "100"));
             TRIM_ENABLE_MEMORY = Long.valueOf(mPerf.perfGetProp("ro.vendor.qti.sys.fw.trim_enable_memory", "1073741824"));
+// QTI_END: 2019-04-15: Performance: perf: Use get API for perf Properties.
 
+// QTI_BEGIN: 2024-07-07: Performance: Add CUR_TRIM_EMPTY_PROCESSES and associated constants
             final int rawEmptyProcesses = computeEmptyProcessLimit(MAX_CACHED_PROCESSES);
             CUR_TRIM_EMPTY_PROCESSES = computeTrimEmptyApps(rawEmptyProcesses);
             CUR_TRIM_CACHED_PROCESSES = computeTrimCachedApps(rawEmptyProcesses, MAX_CACHED_PROCESSES);
+// QTI_END: 2024-07-07: Performance: Add CUR_TRIM_EMPTY_PROCESSES and associated constants
+// QTI_BEGIN: 2019-04-15: Performance: perf: Use get API for perf Properties.
         }
+// QTI_END: 2019-04-15: Performance: perf: Use get API for perf Properties.
     }
 
     public void start(ContentResolver resolver) {
@@ -1555,8 +1562,10 @@ final class ActivityManagerConstants extends ContentObserver {
         }
         mResolver.registerContentObserver(FORCE_ENABLE_PSS_PROFILING_URI, false, this);
         updateConstants();
+// QTI_BEGIN: 2020-05-19: Performance: perf: Set defaults for cached and empty processes.
         updatePerfConfigConstants();
 
+// QTI_END: 2020-05-19: Performance: perf: Set defaults for cached and empty processes.
         if (mSystemServerAutomaticHeapDumpEnabled) {
             updateEnableAutomaticSystemServerHeapDumps();
         }
@@ -1606,6 +1615,7 @@ final class ActivityManagerConstants extends ContentObserver {
                 SystemProperties.getBoolean(propertyFor(key), def));
     }
 
+// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
     public static int computeTrimEmptyApps(int rawMaxEmptyProcesses) {
         if (USE_TRIM_SETTINGS && allowTrim()) {
             return rawMaxEmptyProcesses*TRIM_EMPTY_PERCENT/100;
@@ -1620,6 +1630,7 @@ final class ActivityManagerConstants extends ContentObserver {
         } else {
             return (totalProcessLimit-rawMaxEmptyProcesses)/3;
         }
+// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
     }
 
     public void setOverrideMaxCachedProcesses(int value) {
@@ -1632,11 +1643,13 @@ final class ActivityManagerConstants extends ContentObserver {
     }
 
     public static int computeEmptyProcessLimit(int totalProcessLimit) {
+// QTI_BEGIN: 2024-07-07: Performance: Add CUR_TRIM_EMPTY_PROCESSES and associated constants
         if(USE_TRIM_SETTINGS && allowTrim()) {
             return totalProcessLimit*EMPTY_APP_PERCENT/100;
         } else {
             return totalProcessLimit/2;
         }
+// QTI_END: 2024-07-07: Performance: Add CUR_TRIM_EMPTY_PROCESSES and associated constants
     }
 
     @Override
@@ -1877,15 +1890,6 @@ final class ActivityManagerConstants extends ContentObserver {
             mPushMessagingOverQuotaBehavior =
                     DEFAULT_PUSH_MESSAGING_OVER_QUOTA_BEHAVIOR;
         }
-    }
-
-    private void updateOomAdjUpdatePolicy() {
-        mOomadjUpdateQuick = DeviceConfig.getInt(
-                DeviceConfig.NAMESPACE_ACTIVITY_MANAGER,
-                KEY_OOMADJ_UPDATE_POLICY,
-                /* defaultValue */ DEFAULT_OOMADJ_UPDATE_POLICY)
-                == OOMADJ_UPDATE_POLICY_QUICK;
-        mService.mProcessStateController.setOomadjUpdateQuick(mOomadjUpdateQuick);
     }
 
     private void updateForceRestrictedBackgroundCheck() {
@@ -2171,7 +2175,9 @@ final class ActivityManagerConstants extends ContentObserver {
 
         final int rawMaxEmptyProcesses = computeEmptyProcessLimit(
                 Integer.min(CUR_MAX_CACHED_PROCESSES, MAX_CACHED_PROCESSES));
+// QTI_BEGIN: 2024-07-07: Performance: Add CUR_TRIM_EMPTY_PROCESSES and associated constants
         CUR_TRIM_EMPTY_PROCESSES = computeTrimEmptyApps(rawMaxEmptyProcesses);
+// QTI_END: 2024-07-07: Performance: Add CUR_TRIM_EMPTY_PROCESSES and associated constants
         CUR_TRIM_CACHED_PROCESSES = (Integer.min(CUR_MAX_CACHED_PROCESSES, MAX_CACHED_PROCESSES)
                     - rawMaxEmptyProcesses) / 3;
 
@@ -2413,6 +2419,8 @@ final class ActivityManagerConstants extends ContentObserver {
                 DeviceConfig.NAMESPACE_ACTIVITY_MANAGER,
                 KEY_FOLLOW_UP_OOMADJ_UPDATE_WAIT_DURATION,
                 DEFAULT_FOLLOW_UP_OOMADJ_UPDATE_WAIT_DURATION);
+        mService.mProcessStateController.setFollowUpOomadjUpdateWaitDuration(
+                FOLLOW_UP_OOMADJ_UPDATE_WAIT_DURATION);
     }
 
     private void updateFGSPermissionEnforcementFlagsIfNecessary(@NonNull String name) {
@@ -2456,7 +2464,6 @@ final class ActivityManagerConstants extends ContentObserver {
         oomConstants.mEnableProcStateStacktrace = mEnableProcStateStacktrace;
         oomConstants.mProcStateDebugSetProcStateDelay = mProcStateDebugSetProcStateDelay;
         oomConstants.mProcStateDebugSetUidStateDelay = mProcStateDebugSetUidStateDelay;
-        oomConstants.mOomadjUpdateQuick = mOomadjUpdateQuick;
         oomConstants.mProactiveKillsEnabled = mProactiveKillsEnabled;
         oomConstants.mLowSwapThresholdPercent = mLowSwapThresholdPercent;
         oomConstants.mNoKillCachedProcessesUntilBootCompleted =
@@ -2465,6 +2472,7 @@ final class ActivityManagerConstants extends ContentObserver {
                 mNoKillCachedProcessesPostBootCompletedDurationMillis;
         oomConstants.mFreezerCutoffAdj = mFreezerCutoffAdj;
         oomConstants.mEnableBatchingOomAdj = mEnableBatchingOomAdj;
+        oomConstants.mFollowUpOomadjUpdateWaitDuration = FOLLOW_UP_OOMADJ_UPDATE_WAIT_DURATION;
 
         return oomConstants;
     }
@@ -2689,7 +2697,6 @@ final class ActivityManagerConstants extends ContentObserver {
         pw.print("  CUR_MAX_EMPTY_PROCESSES="); pw.println(CUR_MAX_EMPTY_PROCESSES);
         pw.print("  CUR_TRIM_EMPTY_PROCESSES="); pw.println(CUR_TRIM_EMPTY_PROCESSES);
         pw.print("  CUR_TRIM_CACHED_PROCESSES="); pw.println(CUR_TRIM_CACHED_PROCESSES);
-        pw.print("  OOMADJ_UPDATE_QUICK="); pw.println(mOomadjUpdateQuick);
         pw.print("  ENABLE_WAIT_FOR_FINISH_ATTACH_APPLICATION=");
         pw.println(mEnableWaitForFinishAttachApplication);
 

@@ -366,9 +366,21 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screenshot_failed_title">Couldn\'t save screenshot</string>
     <!-- Title label indicating the folder where the screenshot will be saved. [CHAR LIMIT=30] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screenshot_save_to">Save to</string>
     <!-- Menu item text to open a file picker to select a custom folder for saving screenshots. [CHAR LIMIT=30] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screenshot_select_folder">Select folder</string>
+    <!-- Title notification text when custom location save failed, saved to default folder instead. [CHAR LIMIT=100] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+    <string name="screenshot_custom_uri_save_fail_title">Saved to %1$s folder</string>
+    <!-- Bottom notification text when we fail to save a screenshot in a custom location. [CHAR LIMIT=100] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+    <string name="screenshot_custom_uri_save_fail_message">Something went wrong. Can\'t save to \"%1$s\" folder.</string>
     <!-- Appended to the notification content when a screenshot failure happens on an external display. [CHAR LIMIT=50] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -396,6 +408,10 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screenshot_blocked_by_admin">Taking screenshots is blocked by your IT admin</string>
+    <!-- Content description indicating that tapping the element will allow copying the screenshot to clipboard [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+    <string name="screenshot_copy_description">Copy screenshot to clipboard</string>
     <!-- Label for UI element which allows editing the screenshot [CHAR LIMIT=30] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -740,14 +756,20 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_share_app_window_sharing_title">Share app window</string>
     <!-- Text for tab sharing title [CHAR LIMIT=35] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_share_tab_sharing_title">Share tab</string>
     <!-- Title for the screen prompting the user to begin sharing their entire screen [CHAR LIMIT=NONE]-->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_share_entire_screen_sharing_title">Share entire screen</string>
     <!-- Text disclaimer that tells a user that they're currently sharing an app [CHAR LIMIT=100] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_share_disclaimer_app_sharing">When you’re sharing an app, anything shown or played in that app is visible to [APP NAME]. So be careful with things like passwords, payment details, messages, photos and audio &amp; video.</string>
     <!-- Disclaimer text for full screen sharing. [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_share_disclaimer_full_screen_sharing">When you’re sharing your entire screen, anything on your screen is visible to [APP NAME]. So be careful with things like passwords, payment details, messages, photos, and audio &amp; video.</string>
     <!-- Content description for the app window screenshot button in the toolbar, when the capture mode is set to "screenshot". [CHAR LIMIT=NONE] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -1578,6 +1600,8 @@
     <string name="accessibility_notification_bell">Notifications</string>
 
     <!-- Accessibility text describing the status bar assistant icon. [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="accessibility_status_bar_assistant_icon">Assistant</string>
 
     <!-- The overflow indicator shown when a group has more notification inside the group than the visible ones. An example is "+ 3" [CHAR LIMIT=5] -->
@@ -3170,6 +3194,11 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="manage_notifications_history_text">History</string>
 
+    <!-- The text for the notification close button -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+    <string name="notification_dismiss_button_text">Close</string>
+
     <!-- The accessibility description for the notification settings button in the notification shade. -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -3275,6 +3304,8 @@
     <string name="quick_settings_disclosure_parental_controls">Some settings are managed by your parent</string>
 
     <!-- Disclosure at the bottom of Quick Settings that indicates that parental controls are enabled. [CHAR LIMIT=100] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="quick_settings_disclosure_parental_controls_legacy">This device is managed by your parent</string>
 
     <!-- Disclosure at the bottom of Quick Settings that indicates that some of the settings changes are protected by a PIN. [CHAR LIMIT=100] -->
@@ -3740,6 +3771,10 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="volume_panel_noise_control_title">Noise Control</string>
+    <!-- Label for button to enabled/disable mic noise cancellation [CHAR_LIMIT=30] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+    <string name="volume_panel_mic_noise_cancellation_title">Mic Noise Cancellation</string>
     <!-- Label for button to enabled/disable spatial audio [CHAR_LIMIT=30] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -4080,7 +4115,13 @@
 
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
-    <string name="qs_customize_remove" translatable="false">Remove</string>
+    <string name="tuner_remove" translatable="false">Remove</string>
+
+    <!-- Button in QS edit mode to remove the selected tile [CHAR LIMIT=12] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+    <string name="qs_customize_remove">Remove</string>
+
 
     <!-- Dialog title asking if Bluetooth should be enabled [CHAR LIMIT=NONE] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -4180,6 +4221,36 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="inline_turn_off_notifications">Turn off</string>
 
+    <!-- Notification Inline controls: device type for button to open bridged notification settings on associated device [CHAR_LIMIT=20] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+    <string name="bridged_device_type_phone">phone</string>
+
+    <!-- Notification Inline controls: device type for button to open bridged notification settings on associated device [CHAR_LIMIT=20] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+    <string name="bridged_device_type_tablet">tablet</string>
+
+    <!-- Notification Inline controls: device type for button to open bridged notification settings on associated device [CHAR_LIMIT=20] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+    <string name="bridged_device_type_laptop">laptop</string>
+
+    <!-- Notification Inline controls: device type for button to open bridged notification settings on associated device [CHAR_LIMIT=20] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+    <string name="bridged_device_type_watch">watch</string>
+
+    <!-- Notification Inline controls: device type for button to open bridged notification settings on associated device [CHAR_LIMIT=20] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+    <string name="bridged_device_type_tv">TV</string>
+
+    <!-- Notification inline controls: button to open bridged notification settings on associated device [CHAR_LIMIT=35] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+    <string name="inline_bridged_open_associated_device_settings">Open <xliff:g id="device_type" example="phone">%1$s</xliff:g> settings</string>
+
     <!-- [CHAR LIMIT=100] Notification Importance title -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -4194,6 +4265,11 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="notification_automatic_title">Automatic</string>
+
+    <!-- [CHAR LIMIT=100] Notification Importance title -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+    <string name="notification_bridged_title">This notification is from your <xliff:g id="device_type" example="phone">%1$s</xliff:g></string>
 
     <!-- [CHAR LIMIT=150] Notification Importance title: low importance level summary -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -4224,6 +4300,11 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="notification_channel_summary_automatic_alerted">&lt;b>Status:&lt;/b> Promoted to Default</string>
+
+    <!-- [CHAR LIMIT=150] Notification Importance title: bridged importance level summary -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+    <string name="notification_channel_summary_bridged">Synced notification priority and settings can be adjusted on your <xliff:g id="device_name" example="Jane's Phone">%1$s</xliff:g></string>
 
     <!-- [CHAR LIMIT=150] Notification Importance title: automatic importance level summary (silenced) -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -4316,6 +4397,8 @@
 
 
     <!-- Notification: Control panel: text that appears when the posting app has provided the summarization text for the notification -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="notification_summarization_header">Summarized by <xliff:g id="app_name" example="YouTube">%1$s</xliff:g></string>
 
     <!-- [CHAR LIMIT=40 Notification: Label for the inline channel blocking view -->
@@ -5339,6 +5422,9 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_positive_button_text">Turn on shortcut</string>
 
+    <!-- Dialog content for the color inversion shortcut confirmation. [CHAR LIMIT=NONE] -->
+    <string name="accessibility_key_gesture_color_inversion_dialog_content"><xliff:g name="meta_key" example="Action">^1</xliff:g> <annotation id="action_key_icon">icon</annotation> + <xliff:g name="secondary_key" example="Alt">^2</xliff:g> + <xliff:g name="key_code" example="I">^3</xliff:g> is the keyboard shortcut to use color inversion. Color inversion turns light screens dark. It also turns dark screens light.</string>
+
     <!-- Text for the Magnification dialog title when the keyboard shortcut is enabled and Magnification has been toggled on. [CHAR LIMIT=NONE] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -5361,16 +5447,28 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="accessibility_key_gesture_screen_reader_dialog_content"><xliff:g name="meta_key" example="Action">^1</xliff:g> <annotation id="action_key_icon">icon</annotation> + <xliff:g name="secondary_key" example="Alt">^2</xliff:g> + <xliff:g name="key_code" example="T">^3</xliff:g> is the keyboard shortcut to use <xliff:g name="feature_name" example="TalkBack">^4</xliff:g>. <xliff:g name="feature_name" example="TalkBack">^4</xliff:g> is a screen reader that allows you to hear items spoken aloud. It can be helpful for people who have difficulty seeing the screen. This may change how your device works.</string>
     <!-- Warning for screen reader dialog [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="accessibility_key_gesture_screen_reader_dialog_warning_heading">By turning on the keyboard shortcut, you will allow TalkBack to have full control of your device.</string>
     <!-- Warning description for screen reader dialog [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="accessibility_key_gesture_screen_reader_dialog_warning_message">Full control is appropriate for apps that help you with accessibility needs, but not for most apps.</string>
     <!-- Title for view/control screen warning section in screen reader dialog [CHAR LIMIT=60] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="accessibility_key_gesture_screen_reader_dialog_warning_view_control_screen_heading">View and control screen</string>
     <!-- Description for view/control screen warning section in screen reader dialog [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="accessibility_key_gesture_screen_reader_dialog_warning_view_control_screen_message">It can read all content on the screen and display content over other apps.</string>
     <!-- Title for view/perform actions section in screen reader dialog [CHAR LIMIT=60] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="accessibility_key_gesture_screen_reader_dialog_warning_perform_actions_heading">View and perform actions</string>
     <!-- Description for view/perform actions section in screen reader dialog [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="accessibility_key_gesture_screen_reader_dialog_warning_perform_actions_message">It can track your interactions with an app or a hardware sensor, and interact with apps on your behalf.</string>
 
     <!-- Text for showing inside the Voice Access dialog. [CHAR LIMIT=NONE] -->
@@ -5395,21 +5493,29 @@
     <string name="accessibility_shortcutchooser_toprow_tutorial_dialog_positive_button_text" translatable="false">Add features</string>
     <!-- TODO: b/450609147 - Update to final string and remove "translatable" -->
     <!-- Title text for the dialog where the user chooses a set of accessibility features to be activated by this accessibility shortcut type. [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="accessibility_shortcutchooser_editor_dialog_title" translatable="false">Set up <xliff:g name="shortcut_type" example="top row key">%1$s</xliff:g></string>
     <!-- TODO: b/450609147 - Update to final string and remove "translatable" -->
     <!-- Text for the Done button on the Edit dialog and the Toggle dialog. [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="accessibility_shortcutchooser_done_button" translatable="false">Done</string>
     <!-- TODO: b/450609147 - Update to final string and remove "translatable" -->
     <!-- Title text for the dialog where the user can enable or disable any feature just chosen from shortcut editor dialog. [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="accessibility_shortcutchooser_picker_dialog_title" translatable="false">Select a feature to start using it</string>
     <!-- TODO: b/450609147 - Update to final string and remove "translatable" -->
     <!-- Text for the Edit button on the Toggle dialog. [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="accessibility_shortcutchooser_edit_button" translatable="false">Edit</string>
 
     <!-- Title text for the accessibility quick access dialog that allows users to quickly toggle on accessibility features. [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="accessibility_quick_access_dialog_title">Accessibility</string>
-    <!-- Text for the primary button at the bottom of the accessibility quick access dialog that closes the dialog after the user is done toggling accessibility features. [CHAR LIMIT=NONE] -->
-    <string name="accessibility_quick_access_dialog_done_button_text">Done</string>
 
     <!-- Plugin control section of the tuner. Non-translatable since it should
          not appear on production builds ever. -->
@@ -5833,6 +5939,9 @@
     <!-- Text for media projection privacy type [CHAR LIMIT=20]-->
     <string name="privacy_type_media_projection">screen recording</string>
 
+    <!-- Text showing leading the privacy chips container in some screen configurations [CHAR LIMIT=12] -->
+    <string name="privacy_chip_container_leading_title">Privacy</string>
+
     <!-- What to show on the ambient display player when song doesn't have a title. [CHAR LIMIT=20] -->
     <string name="music_controls_no_title">No title</string>
 
@@ -6178,6 +6287,14 @@
     <string name="media_output_dialog_accessibility_seekbar">Volume</string>
     <!-- Summary for media output volume of a device in percentage [CHAR LIMIT=NONE] -->
     <string name="media_output_dialog_volume_percentage"><xliff:g id="percentage" example="10">%1$d</xliff:g>%%</string>
+    <!-- Warning text shown below the list of devices in a dialog letting users choose devices to
+         use as media outputs, when some devices cannot be shown because permissions are missing.
+         [CHAR LIMIT=NONE] -->
+    <string name="media_output_dialog_missing_permissions_warning">Some devices are not visible. Update your app permissions</string>
+    <!-- Text of a button displayed below a warning text indicating that some media output devices
+         are not shown because permissions are missing. Tapping the button triggers a flow for the
+         user to grant the missing permissions to the app. [CHAR LIMIT=NONE] -->
+    <string name="media_output_dialog_warning_button_fix">Fix</string>
     <!-- Title for Connected speakers expandable group. [CHAR LIMIT=NONE] -->
     <string name="media_output_group_title_connected_speakers">Connected speakers</string>
     <!-- Title for Speakers and Displays group. [CHAR LIMIT=NONE] -->
@@ -6188,10 +6305,6 @@
     <string name="media_input_group_title">Input</string>
     <!-- Title for output device group. [CHAR LIMIT=NONE] -->
     <string name="media_output_group_title">Output</string>
-    <!-- Summary for end session dialog. [CHAR LIMIT=NONE] -->
-    <string name="media_output_end_session_dialog_summary">Stop your shared session to move media to another device</string>
-    <!-- Button text for stopping session [CHAR LIMIT=60] -->
-    <string name="media_output_end_session_dialog_stop">Stop</string>
     <!-- Button text for stopping sharing [CHAR LIMIT=60] -->
     <string name="media_output_dialog_button_stop_sharing">Stop sharing</string>
     <!-- Button text when doing audio sharing. [CHAR LIMIT=60] -->
@@ -6624,6 +6737,12 @@
 
     <!-- Content description for location in use icon on dream [CHAR LIMIT=NONE] -->
     <string name="location_active_dream_overlay_content_description">Location active</string>
+
+    <!-- Content description for camera active icon on dream [CHAR LIMIT=NONE] -->
+    <string name="camera_privacy_dream_overlay_content_description">Camera active</string>
+
+    <!-- Content description for microphone active icon on dream [CHAR LIMIT=NONE] -->
+    <string name="mic_privacy_dream_overlay_content_description">Microphone active</string>
 
     <!-- Content description for camera blocked icon on dream [CHAR LIMIT=NONE] -->
     <string name="camera_blocked_dream_overlay_content_description">Camera blocked</string>

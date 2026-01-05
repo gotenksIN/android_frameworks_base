@@ -23,7 +23,6 @@ import static android.view.accessibility.AccessibilityEvent.CONTENT_CHANGE_TYPE_
 import static android.view.accessibility.AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED;
 
 import static com.android.systemui.Flags.notificationRowTransparency;
-import static com.android.systemui.flags.Flags.ENABLE_NOTIFICATIONS_SIMULATE_SLOW_MEASURE;
 import static com.android.systemui.statusbar.NotificationLockscreenUserManager.REDACTION_TYPE_NONE;
 import static com.android.systemui.statusbar.notification.NotificationUtils.logKey;
 import static com.android.systemui.statusbar.notification.collection.NotificationEntry.DismissState.PARENT_DISMISSED;
@@ -50,7 +49,6 @@ import android.graphics.drawable.Drawable;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.SystemClock;
-import android.os.SystemProperties;
 import android.os.Trace;
 import android.os.UserHandle;
 import android.text.TextUtils;
@@ -94,7 +92,6 @@ import com.android.internal.widget.CallLayout;
 import com.android.internal.widget.ConversationLayout;
 import com.android.internal.widget.MessagingLayout;
 import com.android.systemui.Flags;
-import com.android.systemui.flags.RefactorFlag;
 import com.android.systemui.plugins.FalsingManager;
 import com.android.systemui.plugins.PluginListener;
 import com.android.systemui.plugins.statusbar.NotificationMenuRowPlugin;
@@ -109,10 +106,8 @@ import com.android.systemui.statusbar.StatusBarIconView;
 import com.android.systemui.statusbar.notification.AboveShelfChangedListener;
 import com.android.systemui.statusbar.notification.BundleInteractionLogger;
 import com.android.systemui.statusbar.notification.ColorUpdateLogger;
-import com.android.systemui.statusbar.notification.FeedbackIcon;
 import com.android.systemui.statusbar.notification.LaunchAnimationParameters;
 import com.android.systemui.statusbar.notification.NmSummarizationAllFlag;
-import com.android.systemui.statusbar.notification.NmSummarizationUiFlag;
 import com.android.systemui.statusbar.notification.NotificationActivityStarter;
 import com.android.systemui.statusbar.notification.NotificationFadeAware;
 import com.android.systemui.statusbar.notification.NotificationTransitionAnimatorController;
@@ -130,12 +125,12 @@ import com.android.systemui.statusbar.notification.headsup.HeadsUpManager;
 import com.android.systemui.statusbar.notification.headsup.PinnedStatus;
 import com.android.systemui.statusbar.notification.logging.NotificationCounters;
 import com.android.systemui.statusbar.notification.people.PeopleNotificationIdentifier;
-import com.android.systemui.statusbar.notification.row.shared.AsyncGroupHeaderViewInflation;
 import com.android.systemui.statusbar.notification.row.ui.viewmodel.BundleHeaderViewModel;
 import com.android.systemui.statusbar.notification.row.wrapper.NotificationCompactMessagingTemplateViewWrapper;
 import com.android.systemui.statusbar.notification.row.wrapper.NotificationViewWrapper;
 import com.android.systemui.statusbar.notification.shared.NotificationAddXOnHoverToDismiss;
 import com.android.systemui.statusbar.notification.shared.NotificationBundleUi;
+import com.android.systemui.statusbar.notification.shared.NotificationXButtonClipFix;
 import com.android.systemui.statusbar.notification.shared.TransparentHeaderFix;
 import com.android.systemui.statusbar.notification.stack.AmbientState;
 import com.android.systemui.statusbar.notification.stack.AnimationProperties;
@@ -286,6 +281,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
     private String mAppName;
     private NotificationRebindingTracker mRebindingTracker;
     private FalsingManager mFalsingManager;
+    private ImageView mDismissButton;
 
     /**
      * Whether or not the notification is using the heads up view and should peek from the top.
@@ -320,18 +316,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
     private boolean mShowNoBackground;
     private ExpandableNotificationRow mNotificationParent;
     private OnExpandClickListener mOnExpandClickListener;
-    private View.OnClickListener mOnFeedbackClickListener;
     private Path mExpandingClipPath;
-
-    private static boolean shouldSimulateSlowMeasure() {
-        return Compile.IS_DEBUG && RefactorFlag.forView(
-                ENABLE_NOTIFICATIONS_SIMULATE_SLOW_MEASURE).isEnabled();
-    }
-
-    private static final String SLOW_MEASURE_SIMULATE_DELAY_PROPERTY =
-            "persist.notifications.extra_measure_delay_ms";
-    private static final int SLOW_MEASURE_SIMULATE_DELAY_MS =
-            SystemProperties.getInt(SLOW_MEASURE_SIMULATE_DELAY_PROPERTY, 150);
 
     // Listener will be called when receiving a long click event.
     // Use #setLongPressPosition to optionally assign positional data with the long press.
@@ -697,12 +682,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
             mMenuRow.setAppName(mAppName);
         }
         if (mIsSummaryWithChildren) {
-            if (AsyncGroupHeaderViewInflation.isEnabled()) {
-                mChildrenContainer.updateGroupHeaderExpandState();
-            } else {
-                // We create the header from the background thread instead
-                mChildrenContainer.recreateNotificationHeader(mExpandClickListener);
-            }
+            mChildrenContainer.updateGroupHeaderExpandState();
             mChildrenContainer.onNotificationUpdated();
         }
         if (mAnimationRunning) {
@@ -779,11 +759,6 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
     }
 
     public int getOriginalIconColor() {
-        if (mIsSummaryWithChildren && !shouldShowPublic()) {
-            if (!AsyncGroupHeaderViewInflation.isEnabled()) {
-                return mChildrenContainer.getVisibleWrapper().getOriginalIconColor();
-            }
-        }
         int color = getShowingLayout().getOriginalIconColor();
         if (color != Notification.COLOR_INVALID) {
             return color;
@@ -855,9 +830,13 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
 
         final Boolean targetVisible = getDismissButtonTargetVisibilityIfAny(event);
         if (targetVisible != null) {
-            for (DismissButtonTargetVisibilityListener listener :
-                    mDismissButtonTargetVisibilityListeners) {
-                listener.onTargetVisibilityChanged(targetVisible);
+            if (NotificationXButtonClipFix.isEnabled()) {
+                mDismissButton.setVisibility(targetVisible ? VISIBLE : GONE);
+            } else {
+                for (DismissButtonTargetVisibilityListener listener :
+                        mDismissButtonTargetVisibilityListeners) {
+                    listener.onTargetVisibilityChanged(targetVisible);
+                }
             }
         }
 
@@ -878,7 +857,8 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
                 return Boolean.FALSE;
             }
         } else if (event.getAction() == MotionEvent.ACTION_HOVER_ENTER) {
-            return Boolean.TRUE;
+            // Hide the dismiss button for a child notification if the parent group is not expanded.
+            return !isChildInGroup() || isParentGroupExpanded();
         }
 
         return null;
@@ -1553,9 +1533,10 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
     }
 
     private void updateClickAndFocus() {
-        boolean normalChild = !isChildInGroup() || isGroupExpanded();
-        boolean clickable = mOnClickListener != null
-                && (normalChild || isBundledSummaryClickable());
+        boolean normalChild = !isChildInGroup() || isGroupExpanded() ||
+                (NotificationBundleUi.isEnabled()
+                        && getEntryAdapter().isBundled() && isParentGroupExpanded());
+        boolean clickable = mOnClickListener != null && normalChild;
         if (isFocusable() != normalChild) {
             setFocusable(normalChild);
         }
@@ -1666,7 +1647,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         // Let's update our childrencontainer. This is intentionally not guarded with
         // mIsSummaryWithChildren since we might have had children but not anymore.
         if (mChildrenContainer != null) {
-            mChildrenContainer.reInflateViews(mExpandClickListener);
+            mChildrenContainer.reInflateViews();
         }
         if (mGuts != null) {
             NotificationGuts oldGuts = mGuts;
@@ -2001,7 +1982,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
     public View getShelfTransformationTarget() {
         if (mIsSummaryWithChildren && !shouldShowPublic()) {
             NotificationViewWrapper viewWrapper = mChildrenContainer.getVisibleWrapper();
-            if (AsyncGroupHeaderViewInflation.isEnabled() && viewWrapper == null) {
+            if (viewWrapper == null) {
                 return null;
             }
             return viewWrapper.getShelfTransformationTarget();
@@ -2260,7 +2241,6 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
             HeadsUpManager headsUpManager,
             RowContentBindStage rowContentBindStage,
             OnExpandClickListener onExpandClickListener,
-            CoordinateOnClickListener onFeedbackClickListener,
             FalsingManager falsingManager,
             StatusBarStateController statusBarStateController,
             PeopleNotificationIdentifier peopleNotificationIdentifier,
@@ -2309,7 +2289,6 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         mHeadsUpManager = headsUpManager;
         mRowContentBindStage = rowContentBindStage;
         mOnExpandClickListener = onExpandClickListener;
-        setOnFeedbackClickListener(onFeedbackClickListener);
         mFalsingManager = falsingManager;
         mStatusBarStateController = statusBarStateController;
         mPeopleNotificationIdentifier = peopleNotificationIdentifier;
@@ -2406,17 +2385,6 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
     }
 
     /**
-     * Shows the given feedback icon, or hides the icon if null.
-     */
-    public void setFeedbackIcon(@Nullable FeedbackIcon icon) {
-        if (mIsSummaryWithChildren) {
-            mChildrenContainer.setFeedbackIcon(icon);
-        }
-        mPrivateLayout.setFeedbackIcon(icon);
-        mPublicLayout.setFeedbackIcon(icon);
-    }
-
-    /**
      * Sets the last time the notification being displayed audibly alerted the user.
      */
     public void setLastAudiblyAlertedMs(long lastAudiblyAlertedMs) {
@@ -2454,24 +2422,6 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         mPublicLayout.setRecentlyAudiblyAlerted(audiblyAlertedRecently);
     }
 
-    public View.OnClickListener getFeedbackOnClickListener() {
-        return mOnFeedbackClickListener;
-    }
-
-    void setOnFeedbackClickListener(CoordinateOnClickListener l) {
-        mOnFeedbackClickListener = v -> {
-            createMenu();
-            NotificationMenuRowPlugin provider = getProvider();
-            if (provider == null) {
-                return;
-            }
-            MenuItem menuItem = provider.getFeedbackMenuItem(mContext);
-            if (menuItem != null) {
-                l.onClick(this, v.getWidth() / 2, v.getHeight() / 2, menuItem);
-            }
-        };
-    }
-
     /**
      * Retrieves an OnClickListener for the dismiss button of this notification, which when invoked,
      * dismisses the notification represented by this ExpandableNotificationRow.
@@ -2490,23 +2440,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         }
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
 
-        if (shouldSimulateSlowMeasure()) {
-            simulateExtraMeasureDelay();
-        }
         Trace.endSection();
-    }
-
-    private void simulateExtraMeasureDelay() {
-        // Add extra delay in a notification row instead of NotificationStackScrollLayout
-        // to make sure that when the measure cache is used we won't add this delay
-        try {
-            Trace.beginSection("ExtraDebugMeasureDelay");
-            Thread.sleep(SLOW_MEASURE_SIMULATE_DELAY_MS);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        } finally {
-            Trace.endSection();
-        }
     }
 
     /**
@@ -2568,7 +2502,18 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         // We don't handle focus highlight in this view, it's done in background drawable instead
         setDefaultFocusHighlightEnabled(false);
 
-        if (NotificationAddXOnHoverToDismiss.isEnabled()) {
+        if (NotificationXButtonClipFix.isEnabled()) {
+            mDismissButton = findViewById(R.id.dismiss_button);
+
+            View.OnClickListener listener = getDismissButtonOnClickListener();
+            if (listener != null) {
+                mDismissButton.setOnClickListener(listener);
+            }
+        }
+
+        // The background cutout should not show when NotificationXButtonClipFix is enabled.
+        if (NotificationAddXOnHoverToDismiss.isEnabled()
+                && !NotificationXButtonClipFix.isEnabled()) {
             addDismissButtonTargetStateListener(findViewById(R.id.backgroundNormal));
         }
     }
@@ -3411,12 +3356,6 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
                 && mChildrenContainer.getNotificationChildCount() > 0;
         if (mIsSummaryWithChildren) {
             Trace.beginSection("ExpNotRow#onChildCountChanged (summary)");
-            if (!AsyncGroupHeaderViewInflation.isEnabled()) {
-                NotificationViewWrapper wrapper = mChildrenContainer.getNotificationViewWrapper();
-                if (wrapper == null || wrapper.getNotificationHeader() == null) {
-                    mChildrenContainer.recreateNotificationHeader(mExpandClickListener);
-                }
-            }
         }
         if (!mIsSummaryWithChildren && wasSummary) {
             // Reset the 'when' once the row stops being a summary
@@ -3467,7 +3406,13 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         }
     }
 
-    private boolean isPromotedNotificationExpanded(boolean allowOnKeyguard) {
+    /**
+     * Returns if promoted notification can use expanded template or not.
+     * It can only fallback to contracted on the lock screen
+     * when there is no available height to accommodate the promoted notification.
+     * @hide
+     */
+    public boolean canPromotedNotificationShowExpanded(boolean allowOnKeyguard) {
         // public view in non group notifications is always collapsed.
         if (shouldShowPublic()) {
             return false;
@@ -3527,7 +3472,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
 
     public boolean isExpanded(boolean allowOnKeyguard) {
         if (isPromotedOngoing()) {
-            return isPromotedNotificationExpanded(allowOnKeyguard);
+            return canPromotedNotificationShowExpanded(allowOnKeyguard);
         }
 
         return (!shouldShowPublic()) && (!mOnKeyguard || allowOnKeyguard)
@@ -3781,6 +3726,13 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         mChildrenExpanded = expanded;
         if (mChildrenContainer != null) {
             mChildrenContainer.setChildrenExpanded(expanded);
+            if (isBundle()) {
+                // bundles are groups that can contain groups. reset the click state of the children
+                // so that inner groups can be clicked
+                for (ExpandableNotificationRow child : mChildrenContainer.getAttachedChildren()) {
+                    child.updateClickAndFocus();
+                }
+            }
         }
         updateBackgroundForGroupState();
         updateClickAndFocus();
@@ -4314,6 +4266,10 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
 
     public void setOnExpansionChangedListener(@Nullable OnExpansionChangedListener listener) {
         mExpansionChangedListener = listener;
+    }
+
+    public void setOnBundleHeaderClickedListener(@Nullable OnClickListener listener) {
+        mChildrenContainer.setBundleHeaderOnClickListener(listener);
     }
 
     /**

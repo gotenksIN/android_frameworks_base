@@ -24,11 +24,16 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapShader;
 import android.graphics.BlendMode;
 import android.graphics.Canvas;
+import android.graphics.ComposePathEffect;
+import android.graphics.DashPathEffect;
+import android.graphics.DiscretePathEffect;
 import android.graphics.LinearGradient;
 import android.graphics.Matrix;
 import android.graphics.Outline;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.PathDashPathEffect;
+import android.graphics.PathEffect;
 import android.graphics.PathMeasure;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffColorFilter;
@@ -39,6 +44,7 @@ import android.graphics.RenderEffect;
 import android.graphics.RenderNode;
 import android.graphics.RuntimeShader;
 import android.graphics.Shader;
+import android.graphics.SumPathEffect;
 import android.graphics.SweepGradient;
 import android.graphics.Typeface;
 import android.graphics.fonts.Font;
@@ -52,15 +58,16 @@ import android.text.TextUtils;
 
 import com.android.internal.widget.remotecompose.core.MatrixAccess;
 import com.android.internal.widget.remotecompose.core.PaintContext;
-import com.android.internal.widget.remotecompose.core.Platform;
+import com.android.internal.widget.remotecompose.core.RcPlatformServices;
 import com.android.internal.widget.remotecompose.core.RemoteContext;
 import com.android.internal.widget.remotecompose.core.operations.ClipPath;
 import com.android.internal.widget.remotecompose.core.operations.ShaderData;
 import com.android.internal.widget.remotecompose.core.operations.Utils;
-import com.android.internal.widget.remotecompose.core.operations.layout.managers.TextLayout;
+import com.android.internal.widget.remotecompose.core.operations.layout.managers.CoreText;
 import com.android.internal.widget.remotecompose.core.operations.layout.modifiers.GraphicsLayerModifierOperation;
 import com.android.internal.widget.remotecompose.core.operations.paint.PaintBundle;
 import com.android.internal.widget.remotecompose.core.operations.paint.PaintChanges;
+import com.android.internal.widget.remotecompose.core.operations.paint.PaintPathEffects;
 
 import java.io.File;
 import java.io.IOException;
@@ -425,7 +432,7 @@ public class AndroidPaintContext extends PaintContext {
     }
 
     @Override
-    public @Nullable Platform.ComputedTextLayout layoutComplexText(
+    public @Nullable RcPlatformServices.ComputedTextLayout layoutComplexText(
             int textId,
             int start,
             int end,
@@ -433,6 +440,14 @@ public class AndroidPaintContext extends PaintContext {
             int overflow,
             int maxLines,
             float maxWidth,
+            float letterSpacing,
+            float lineHeightAdd,
+            float lineHeightMultiplier,
+            int lineBreakStrategy,
+            int hyphenationFrequency,
+            int justificationMode,
+            boolean underline,
+            boolean strikethrough,
             int flags) {
         String str = getText(textId);
         if (str == null) {
@@ -441,30 +456,37 @@ public class AndroidPaintContext extends PaintContext {
         if (end == -1 || end > str.length()) {
             end = str.length();
         }
+        boolean useAdvancedFeatures = (flags & PaintContext.TEXT_USE_CORE_TEXT) != 0;
 
         TextPaint textPaint = new TextPaint();
+        if (useAdvancedFeatures) {
+            textPaint.setLetterSpacing(letterSpacing);
+            mPaint.setLetterSpacing(letterSpacing);
+            mPaint.setUnderlineText(underline);
+            mPaint.setStrikeThruText(strikethrough);
+        }
         textPaint.set(mPaint);
         StaticLayout.Builder staticLayoutBuilder =
                 StaticLayout.Builder.obtain(str, start, end, textPaint, (int) maxWidth);
         switch (alignment) {
-            case TextLayout.TEXT_ALIGN_RIGHT:
-            case TextLayout.TEXT_ALIGN_END:
+            case CoreText.TEXT_ALIGN_RIGHT:
+            case CoreText.TEXT_ALIGN_END:
                 staticLayoutBuilder.setAlignment(Layout.Alignment.ALIGN_OPPOSITE);
                 break;
-            case TextLayout.TEXT_ALIGN_CENTER:
+            case CoreText.TEXT_ALIGN_CENTER:
                 staticLayoutBuilder.setAlignment(Layout.Alignment.ALIGN_CENTER);
                 break;
             default:
                 staticLayoutBuilder.setAlignment(Layout.Alignment.ALIGN_NORMAL);
         }
         switch (overflow) {
-            case TextLayout.OVERFLOW_ELLIPSIS:
+            case CoreText.OVERFLOW_ELLIPSIS:
                 staticLayoutBuilder.setEllipsize(TextUtils.TruncateAt.END);
                 break;
-            case TextLayout.OVERFLOW_MIDDLE_ELLIPSIS:
+            case CoreText.OVERFLOW_MIDDLE_ELLIPSIS:
                 staticLayoutBuilder.setEllipsize(TextUtils.TruncateAt.MIDDLE);
                 break;
-            case TextLayout.OVERFLOW_START_ELLIPSIS:
+            case CoreText.OVERFLOW_START_ELLIPSIS:
                 staticLayoutBuilder.setEllipsize(TextUtils.TruncateAt.START);
                 break;
             default:
@@ -472,9 +494,90 @@ public class AndroidPaintContext extends PaintContext {
         staticLayoutBuilder.setMaxLines(maxLines);
         staticLayoutBuilder.setIncludePad(false);
 
+        if (useAdvancedFeatures) {
+            staticLayoutBuilder.setBreakStrategy(lineBreakStrategy);
+            staticLayoutBuilder.setHyphenationFrequency(hyphenationFrequency);
+            staticLayoutBuilder.setJustificationMode(justificationMode);
+            if (lineHeightAdd > 0f || lineHeightMultiplier != 1f) {
+                staticLayoutBuilder.setLineSpacing(lineHeightAdd, lineHeightMultiplier);
+            }
+        }
+
         StaticLayout staticLayout = staticLayoutBuilder.build();
-        return new AndroidComputedTextLayout(
-                staticLayout, staticLayout.getWidth(), staticLayout.getHeight());
+        if (useAdvancedFeatures) {
+            Rect bounds = new Rect(0, 0, 0, 0);
+            boolean isHyphenatedText = getTightBoundingBox(staticLayout, bounds);
+            return new AndroidComputedTextLayout(
+                    staticLayout, bounds.width(), bounds.height(), isHyphenatedText);
+        } else {
+            return new AndroidComputedTextLayout(
+                    staticLayout, staticLayout.getWidth(), staticLayout.getHeight(), false);
+        }
+    }
+
+    /**
+     * Returns true if a line is hyphenated.
+     *
+     * @param layout
+     * @param originalText
+     * @param lineIndex
+     * @return
+     */
+    public boolean isLineHyphenated(
+            @NonNull StaticLayout layout, @NonNull CharSequence originalText, int lineIndex) {
+        if (lineIndex >= layout.getLineCount() - 1) {
+            return false;
+        }
+        int lastCharIndexOnLine = layout.getLineEnd(lineIndex) - 1;
+        char charBeforeBreak = originalText.charAt(lastCharIndexOnLine);
+        char charAfterBreak = originalText.charAt(lastCharIndexOnLine + 1);
+        if (!Character.isWhitespace(charBeforeBreak) && !Character.isWhitespace(charAfterBreak)) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Returns the bounding box of the static layout
+     *
+     * @param layout
+     * @param bounds
+     * @return
+     */
+    public boolean getTightBoundingBox(@NonNull StaticLayout layout, @NonNull Rect bounds) {
+        int lineCount = layout.getLineCount();
+        if (lineCount == 0) {
+            return false;
+        }
+
+        boolean isHyphenated = false;
+
+        int top = layout.getLineTop(0);
+        int bottom = layout.getLineBottom(lineCount - 1);
+
+        float maxContentWidth = 0f;
+        for (int i = 0; i < lineCount; i++) {
+            float lineWidth = layout.getLineMax(i);
+            if (lineWidth > maxContentWidth) {
+                maxContentWidth = lineWidth;
+            }
+        }
+
+        float minLeft = 0f;
+        for (int i = 0; i < lineCount; i++) {
+            float lineLeft = layout.getLineLeft(i);
+            if (lineLeft < minLeft) {
+                minLeft = lineLeft;
+            }
+            if (!isHyphenated) {
+                isHyphenated |= isLineHyphenated(layout, layout.getText(), i);
+            }
+        }
+        bounds.left = (int) minLeft;
+        bounds.top = top;
+        bounds.right = (int) maxContentWidth;
+        bounds.bottom = bottom;
+        return isHyphenated;
     }
 
     @Override
@@ -506,7 +609,8 @@ public class AndroidPaintContext extends PaintContext {
     }
 
     @Override
-    public void drawComplexText(@Nullable Platform.ComputedTextLayout computedTextLayout) {
+    public void drawComplexText(
+            @Nullable RcPlatformServices.ComputedTextLayout computedTextLayout) {
         if (computedTextLayout == null) {
             return;
         }
@@ -708,6 +812,9 @@ public class AndroidPaintContext extends PaintContext {
                 @Override
                 public void setTypeFace(@NonNull String fontType, int weight, boolean italic) {
                     String path = getFontPath(fontType);
+                    if (path == null) {
+                        return;
+                    }
                     mFontBuilder = new Font.Builder(new File(path));
                     mFontBuilder.setWeight(weight);
                     mFontBuilder.setSlant(
@@ -730,6 +837,9 @@ public class AndroidPaintContext extends PaintContext {
                 }
 
                 private void setAxis(FontVariationAxis[] axis) {
+                    if (mFontBuilder == null) {
+                        return;
+                    }
                     Font font = null;
                     try {
                         if (axis != null) {
@@ -834,6 +944,61 @@ public class AndroidPaintContext extends PaintContext {
                 }
 
                 @Override
+                public void setPathEffect(@Nullable float[] pathEffect) {
+                    if (pathEffect == null) {
+                        mPaint.setPathEffect(null);
+                        return;
+                    }
+                    PaintPathEffects pe = PaintPathEffects.parse(pathEffect, 0);
+                    mPaint.setPathEffect(getPathEffect(pe));
+                }
+
+                private PathEffect getPathEffect(PaintPathEffects pe) {
+                    if (pe == null) {
+                        return null;
+                    }
+                    int type = pe.getType();
+                    PathEffect ret;
+                    switch (type) {
+                        case PaintPathEffects.DASH:
+                            PaintPathEffects.Dash dash = (PaintPathEffects.Dash) pe;
+                            ret = new DashPathEffect(dash.mIntervals, dash.mPhase);
+                            break;
+                        case PaintPathEffects.DISCRETE_PATH:
+                            PaintPathEffects.Discrete discrete = (PaintPathEffects.Discrete) pe;
+                            ret =
+                                    new DiscretePathEffect(
+                                            discrete.mSegmentLength, discrete.mDeviation);
+                            break;
+                        case PaintPathEffects.PATH_DASH:
+                            PaintPathEffects.PathDash pathDash = (PaintPathEffects.PathDash) pe;
+                            ret =
+                                    new PathDashPathEffect(
+                                            getPath(pathDash.mShapeId, 0f, 1f),
+                                            pathDash.mAdvance,
+                                            pathDash.mPhase,
+                                            PathDashPathEffect.Style.values()[pathDash.mStyle]);
+                            break;
+                        case PaintPathEffects.SUM:
+                            PaintPathEffects.Sum sum = (PaintPathEffects.Sum) pe;
+                            ret =
+                                    new SumPathEffect(
+                                            getPathEffect(sum.mFirst), getPathEffect(sum.mSecond));
+                            break;
+                        case PaintPathEffects.COMPOSE:
+                            PaintPathEffects.Compose compose = (PaintPathEffects.Compose) pe;
+                            ret =
+                                    new ComposePathEffect(
+                                            getPathEffect(compose.mOuterPE),
+                                            getPathEffect(compose.mInnerPE));
+                            break;
+                        default:
+                            ret = null;
+                    }
+                    return ret;
+                }
+
+                @Override
                 public void setStrokeWidth(float width) {
                     mPaint.setStrokeWidth(width);
                 }
@@ -870,7 +1035,15 @@ public class AndroidPaintContext extends PaintContext {
                     for (int i = 0; i < names.length; i++) {
                         String name = names[i];
                         float[] val = data.getUniformFloats(name);
-                        shader.setFloatUniform(name, val);
+                        if (val.length == 1 && Float.isNaN(val[0])) {
+                            // check if dynamic array
+                            float[] values =
+                                    mContext.getCollectionsAccess()
+                                            .getDynamicFloats(Utils.idFromNan(val[0]));
+                            shader.setFloatUniform(name, values);
+                        } else {
+                            shader.setFloatUniform(name, val);
+                        }
                     }
                     names = data.getUniformIntegerNames();
                     for (int i = 0; i < names.length; i++) {

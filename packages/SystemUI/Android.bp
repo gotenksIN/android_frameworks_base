@@ -558,11 +558,14 @@ android_library {
         "androidx.datastore_datastore-preferences",
         "androidx.media3.media3-common",
         "androidx.media3.media3-session",
+        "androidx.graphics_graphics-core",
         "androidx.ink_ink-authoring",
+        "androidx.ink_ink-authoring-compose",
         "androidx.ink_ink-brush",
         "androidx.ink_ink-nativeloader",
         "androidx.ink_ink-rendering",
         "androidx.ink_ink-strokes",
+        "androidx.ink_ink-storage",
         "com.google.android.material_material",
         "device_state_flags_lib",
         "kotlinx_coroutines_android",
@@ -578,6 +581,7 @@ android_library {
         "lottie",
         "lottie_compose",
         "LowLightDreamLib",
+        "SerialPortAccessDialog",
         "TraceurCommon",
         "Traceur-res",
         "//frameworks/libs/systemui:motion_tool_lib",
@@ -786,6 +790,14 @@ android_library {
         "androidx.datastore_datastore-preferences",
         "androidx.media3.media3-common",
         "androidx.media3.media3-session",
+        "androidx.graphics_graphics-core",
+        "androidx.ink_ink-authoring",
+        "androidx.ink_ink-authoring-compose",
+        "androidx.ink_ink-brush",
+        "androidx.ink_ink-nativeloader",
+        "androidx.ink_ink-rendering",
+        "androidx.ink_ink-strokes",
+        "androidx.ink_ink-storage",
         "device_state_flags_lib",
         "kotlinx-coroutines-android",
         "kotlinx-coroutines-core",
@@ -830,6 +842,8 @@ android_library {
         "aconfig_settings_flags_lib",
         "kairos",
         "displaylib",
+        "device_policy_aconfig_flags_lib",
+        "SurfaceEffectsComposeLib",
     ],
 }
 
@@ -946,6 +960,9 @@ android_app {
         shrink_resources: false,
         optimized_shrink_resources: false,
         proguard_flags_files: ["proguard.flags"],
+        included_proguard_flags_files: [
+            ":sysui_proguard_common_and_kotlin",
+        ],
     },
 
     plugins: ["dagger2-compiler"],
@@ -1151,8 +1168,25 @@ android_app {
     dxflags: ["--multi-dex"],
     optimize: {
         proguard_flags_files: ["proguard.flags"],
+        included_proguard_flags_files: [
+            ":sysui_proguard_common_and_kotlin",
+        ],
     },
     required: [
         "privapp_whitelist_com.android.systemui",
+    ],
+}
+
+filegroup {
+    name: "sysui_proguard_kotlin",
+    srcs: ["proguard_kotlin.flags"],
+    visibility: ["//frameworks/base/packages/SystemUI:__subpackages__"],
+}
+
+filegroup {
+    name: "sysui_proguard_common_and_kotlin",
+    srcs: [
+        "proguard_common.flags",
+        "proguard_kotlin.flags",
     ],
 }

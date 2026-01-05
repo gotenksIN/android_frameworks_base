@@ -16,7 +16,9 @@
 
 package android.hardware.camera2.impl;
 
+// QTI_BEGIN: 2018-03-10: Camera: Skip stream size check for whitelisted apps..
 import static android.hardware.camera2.CameraAccessException.CAMERA_IN_USE;
+// QTI_END: 2018-03-10: Camera: Skip stream size check for whitelisted apps..
 import static com.android.internal.util.function.pooled.PooledLambda.obtainRunnable;
 
 import android.annotation.FlaggedApi;
@@ -28,8 +30,10 @@ import android.compat.annotation.EnabledSince;
 import android.content.Context;
 import android.graphics.ImageFormat;
 import android.hardware.ICameraService;
+// QTI_BEGIN: 2018-03-10: Camera: Skip stream size check for whitelisted apps..
 import android.app.ActivityThread;
 import android.graphics.ImageFormat;
+// QTI_END: 2018-03-10: Camera: Skip stream size check for whitelisted apps..
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
@@ -45,7 +49,9 @@ import android.hardware.camera2.CaptureResult;
 import android.hardware.camera2.ICameraDeviceCallbacks;
 import android.hardware.camera2.ICameraDeviceUser;
 import android.hardware.camera2.ICameraOfflineSession;
+import android.hardware.camera2.MultiResolutionImageReader;
 import android.hardware.camera2.TotalCaptureResult;
+import android.hardware.camera2.impl.MultiResConcurrentReadersStartInfo;
 import android.hardware.camera2.params.DynamicRangeProfiles;
 import android.hardware.camera2.params.ExtensionSessionConfiguration;
 import android.hardware.camera2.params.InputConfiguration;
@@ -56,6 +62,7 @@ import android.hardware.camera2.params.SessionConfiguration;
 import android.hardware.camera2.params.SharedSessionConfiguration;
 import android.hardware.camera2.params.SharedSessionConfiguration.SharedOutputConfiguration;
 import android.hardware.camera2.params.StreamConfigurationMap;
+import android.hardware.camera2.utils.ArrayUtils;
 import android.hardware.camera2.utils.SessionConfigurationAndStreamIds;
 import android.hardware.camera2.utils.ListUtils;
 import android.hardware.camera2.utils.OutputAndInputStreamIds;
@@ -71,8 +78,10 @@ import android.os.Parcelable;
 import android.os.RemoteException;
 import android.os.ServiceSpecificException;
 import android.os.SystemClock;
+// QTI_BEGIN: 2018-03-10: Camera: Skip stream size check for whitelisted apps..
 import android.os.SystemProperties;
 import android.text.TextUtils;
+// QTI_END: 2018-03-10: Camera: Skip stream size check for whitelisted apps..
 import android.util.Log;
 import android.util.Range;
 import android.util.Size;
@@ -81,6 +90,7 @@ import android.view.Surface;
 
 import com.android.internal.camera.flags.Flags;
 
+import java.lang.ref.WeakReference;
 import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -118,7 +128,9 @@ public class CameraDeviceImpl extends CameraDevice
     };
 
     private static final int REQUEST_ID_NONE = -1;
+// QTI_BEGIN: 2018-06-19: Camera: Camera2: Notify fps as Session Based Parameter
     private int customOpMode = 0;
+// QTI_END: 2018-06-19: Camera: Camera2: Notify fps as Session Based Parameter
 
     /**
      * Starting {@link Build.VERSION_CODES#VANILLA_ICE_CREAM},
@@ -172,6 +184,9 @@ public class CameraDeviceImpl extends CameraDevice
     private final SparseArray<OutputConfiguration> mConfiguredOutputs =
             new SparseArray<>();
 
+    private final SparseArray<List<WeakReference<Surface>>> mReplacedOutputs =
+            new SparseArray<>();
+
     // Cache all stream IDs capable of supporting offline mode.
     private final HashSet<Integer> mOfflineSupport = new HashSet<>();
 
@@ -203,7 +218,9 @@ public class CameraDeviceImpl extends CameraDevice
     private int mNextSessionId = 0;
 
     private final int mAppTargetSdkVersion;
+// QTI_BEGIN: 2018-03-10: Camera: Skip stream size check for whitelisted apps..
     private boolean mIsPrivilegedApp = false;
+// QTI_END: 2018-03-10: Camera: Skip stream size check for whitelisted apps..
 
     private ExecutorService mOfflineSwitchService;
     private CameraOfflineSessionImpl mOfflineSessionImpl;
@@ -455,7 +472,9 @@ public class CameraDeviceImpl extends CameraDevice
         } else {
             mTotalPartialCount = partialCount;
         }
+// QTI_BEGIN: 2018-03-10: Camera: Skip stream size check for whitelisted apps..
         mIsPrivilegedApp = checkPrivilegedAppList();
+// QTI_END: 2018-03-10: Camera: Skip stream size check for whitelisted apps..
     }
 
     /**
@@ -587,10 +606,12 @@ public class CameraDeviceImpl extends CameraDevice
         }
     }
 
+// QTI_BEGIN: 2018-06-19: Camera: Camera2: Notify fps as Session Based Parameter
     public void setVendorStreamConfigMode(int fpsrange) {
         customOpMode = fpsrange;
     }
 
+// QTI_END: 2018-06-19: Camera: Camera2: Notify fps as Session Based Parameter
     @Override
     public String getId() {
         return mCameraId;
@@ -717,7 +738,8 @@ public class CameraDeviceImpl extends CameraDevice
                     for (OutputConfiguration outConfig : outputs) {
                         if (addSet.contains(outConfig)) {
                             int streamId = mRemoteDevice.createStream(outConfig);
-                            mConfiguredOutputs.put(streamId, outConfig);
+                            mConfiguredOutputs.put(streamId, Flags.seamlessTransitions() ?
+                                    new OutputConfiguration(outConfig) : outConfig);
                         }
                     }
 
@@ -791,7 +813,9 @@ public class CameraDeviceImpl extends CameraDevice
                     for (OutputConfiguration outConfig : outputs) {
                         if (addSet.contains(outConfig)) {
                             mConfiguredOutputs.put(
-                                    outputAndInputStreamIds.outputStreamIds[i], outConfig);
+                                    outputAndInputStreamIds.outputStreamIds[i],
+                                    Flags.seamlessTransitions() ?
+                                            new OutputConfiguration(outConfig) : outConfig);
                             i++;
                         }
                     }
@@ -1297,9 +1321,102 @@ public class CameraDeviceImpl extends CameraDevice
             }
 
             mRemoteDevice.updateOutputConfiguration(streamId, config);
-            mConfiguredOutputs.put(streamId, config);
+            mConfiguredOutputs.put(streamId, Flags.seamlessTransitions() ?
+                    new OutputConfiguration(config) : config);
         }
     }
+
+    @FlaggedApi(Flags.FLAG_SEAMLESS_TRANSITIONS)
+    public void updateOutputConfigurations(@NonNull List<OutputConfiguration> configurations)
+            throws CameraAccessException {
+        android.os.Trace.beginSection("Seamless transition");
+        synchronized(mInterfaceLock) {
+            try {
+                checkIfCameraClosedOrInError();
+
+                // Prune any stale replaced output surfaces
+                for (int i = 0; i < mReplacedOutputs.size(); i++) {
+                    int streamId = mReplacedOutputs.keyAt(i);
+                    List<WeakReference<Surface>> replacedSurfaces = mReplacedOutputs.valueAt(i);
+                    replacedSurfaces.removeIf(l -> l.get() == null);
+                    if (replacedSurfaces.isEmpty()) {
+                        mReplacedOutputs.delete(streamId);
+                    }
+                }
+
+                if (configurations.size() != mConfiguredOutputs.size()) {
+                    throw new IllegalArgumentException("The number of configured outputs " +
+                            mConfiguredOutputs.size() + " doesn't match with the number of updated"
+                            + " outputs " + configurations.size());
+                }
+
+                // Map the new OutputConfigurations to the existing configured stream ids
+                HashMap<OutputConfiguration, Integer> deferredConfiguredMap = new HashMap<>();
+                HashMap<OutputConfiguration, Integer> configuredMap = new HashMap<>();
+                SparseArray<OutputConfiguration> replacedOutputs = new SparseArray<>(
+                        configurations.size());
+                int[] streamIds = new int[configurations.size()];
+                OutputConfiguration[] newConfigs = new OutputConfiguration[configurations.size()];
+
+                for (int i = 0; i < mConfiguredOutputs.size(); i++) {
+                    OutputConfiguration config = mConfiguredOutputs.valueAt(i);
+                    if (config.isDeferredConfiguration()) {
+                        deferredConfiguredMap.put(new OutputConfiguration(config),
+                                mConfiguredOutputs.keyAt(i));
+                    } else {
+                        configuredMap.put(new OutputConfiguration(config),
+                                mConfiguredOutputs.keyAt(i));
+                        deferredConfiguredMap.put(
+                                new OutputConfiguration(config).makeDeferredAndRemoveSurfaces(),
+                                mConfiguredOutputs.keyAt(i));
+                    }
+                }
+
+                int i = 0;
+                for (OutputConfiguration config : configurations) {
+                    OutputConfiguration deferredConfig = config.isDeferredConfiguration() ?
+                            config :
+                            new OutputConfiguration(config).makeDeferredAndRemoveSurfaces();
+
+                    if (configuredMap.containsKey(config)) {
+                        streamIds[i] = configuredMap.get(config);
+                        newConfigs[i++] = new OutputConfiguration(config);
+                        configuredMap.remove(config);
+                    } else if (deferredConfiguredMap.containsKey(deferredConfig)) {
+                        int streamId = deferredConfiguredMap.get(deferredConfig);
+                        streamIds[i] = streamId;
+                        newConfigs[i++] = new OutputConfiguration(config);
+                        deferredConfiguredMap.remove(deferredConfig);
+                        OutputConfiguration oldConfig = mConfiguredOutputs.get(streamId);
+                        if (!oldConfig.isDeferredConfiguration()) {
+                            replacedOutputs.put(streamId, oldConfig);
+                        }
+                    } else {
+                        throw new IllegalArgumentException("Unknown OutputConfiguration!");
+                    }
+                }
+
+                mRemoteDevice.updateOutputConfigurations(streamIds, newConfigs);
+
+                for (i = 0; i < streamIds.length; i++) {
+                    mConfiguredOutputs.put(streamIds[i], newConfigs[i]);
+                }
+                for (i = 0; i < replacedOutputs.size(); i++) {
+                    int streamId = replacedOutputs.keyAt(i);
+                    List<WeakReference<Surface>> replacedSurfaces = mReplacedOutputs.get(streamId,
+                            new ArrayList<>());
+
+                    for (Surface replacedSurface : replacedOutputs.valueAt(i).getSurfaces()) {
+                        replacedSurfaces.add(new WeakReference<>(replacedSurface));
+                    }
+                    mReplacedOutputs.put(streamId, replacedSurfaces);
+                }
+            } finally {
+                android.os.Trace.endSection();
+            }
+        }
+    }
+
 
     public CameraOfflineSession switchToOffline(
             @NonNull Collection<Surface> offlineOutputs, @NonNull Executor executor,
@@ -1439,9 +1556,27 @@ public class CameraDeviceImpl extends CameraDevice
                 for (int i = 0; i < mConfiguredOutputs.size(); i++) {
                     // Have to use equal here, as createCaptureSessionByOutputConfigurations() and
                     // createReprocessableCaptureSessionByConfigurations() do a copy of the configs.
-                    if (config.equals(mConfiguredOutputs.valueAt(i))) {
-                        streamId = mConfiguredOutputs.keyAt(i);
-                        break;
+                    if (Flags.seamlessTransitions()) {
+                        // We cannot directly compare incoming non-deferred output configurations
+                        // with the internal deferred copies.
+                        OutputConfiguration deferredConfig =
+                                (new OutputConfiguration(config)).makeDeferredAndRemoveSurfaces();
+                        OutputConfiguration configuredOutput =
+                                new OutputConfiguration(mConfiguredOutputs.valueAt(i));
+                        // Shared surfaces can have several output surface already present so
+                        // comparison should be done while they are deferred too.
+                        if (configuredOutput.isShared()) {
+                            configuredOutput.makeDeferredAndRemoveSurfaces();
+                        }
+                        if (deferredConfig.equals(configuredOutput)) {
+                            streamId = mConfiguredOutputs.keyAt(i);
+                            break;
+                        }
+                    } else {
+                        if (config.equals(mConfiguredOutputs.valueAt(i))) {
+                            streamId = mConfiguredOutputs.keyAt(i);
+                            break;
+                        }
                     }
                 }
                 if (streamId == -1) {
@@ -1454,7 +1589,8 @@ public class CameraDeviceImpl extends CameraDevice
                             + " must have at least 1 surface");
                 }
                 mRemoteDevice.finalizeOutputConfigurations(streamId, config);
-                mConfiguredOutputs.put(streamId, config);
+                mConfiguredOutputs.put(streamId,
+                        Flags.seamlessTransitions() ? new OutputConfiguration(config) : config);
             }
         }
     }
@@ -1961,6 +2097,7 @@ public class CameraDeviceImpl extends CameraDevice
         return false;
     }
 
+// QTI_BEGIN: 2018-03-10: Camera: Skip stream size check for whitelisted apps..
     private boolean checkPrivilegedAppList() {
         String packageName = ActivityThread.currentOpPackageName();
         String packageList = SystemProperties.get("persist.vendor.camera.privapp.list");
@@ -1982,6 +2119,7 @@ public class CameraDeviceImpl extends CameraDevice
         return mIsPrivilegedApp;
     }
 
+// QTI_END: 2018-03-10: Camera: Skip stream size check for whitelisted apps..
     private boolean checkSurfaceSizesCompatible(List<OutputConfiguration> outputConfigs) {
         for (OutputConfiguration outputConfig : outputConfigs) {
             Size configuredSize = outputConfig.getConfiguredSize();
@@ -2040,6 +2178,7 @@ public class CameraDeviceImpl extends CameraDevice
                         inputConfig.getWidth() + "x" + inputConfig.getHeight() + " is not valid");
             }
         } else {
+// QTI_BEGIN: 2018-03-10: Camera: Skip stream size check for whitelisted apps..
             /*
              * don't check input format and size,
              * if the package name is in the white list
@@ -2048,6 +2187,7 @@ public class CameraDeviceImpl extends CameraDevice
                 Log.w(TAG, "ignore input format/size check for white listed app");
                 return;
             }
+// QTI_END: 2018-03-10: Camera: Skip stream size check for whitelisted apps..
             if (!checkInputConfigurationWithStreamConfigurations(inputConfig, /*maxRes*/false) &&
                     !checkInputConfigurationWithStreamConfigurations(inputConfig, /*maxRes*/true)) {
                 throw new IllegalArgumentException("Input config with format " +
@@ -2375,15 +2515,31 @@ public class CameraDeviceImpl extends CameraDevice
         if (errorCode == CameraDeviceCallbacks.ERROR_CAMERA_BUFFER) {
             // Because 1 stream id could map to multiple surfaces, we need to specify both
             // streamId and surfaceId.
-            OutputConfiguration config = mConfiguredOutputs.get(
-                    resultExtras.getErrorStreamId());
-            if (config == null) {
-                Log.v(TAG, String.format(
-                        "Stream %d has been removed. Skipping buffer lost callback",
-                        resultExtras.getErrorStreamId()));
+            int streamId = resultExtras.getErrorStreamId();
+            OutputConfiguration config = mConfiguredOutputs.get(streamId);
+            List<WeakReference<Surface>> replacedSurfaces =
+                    mReplacedOutputs.get(streamId, null);
+            if ((config == null) && (replacedSurfaces == null)) {
+                Log.v(TAG, "Stream " + streamId + " has been removed. Skipping buffer lost " +
+                        "callback");
                 return;
             }
-            for (Surface surface : config.getSurfaces()) {
+            List<Surface> surfaces = new ArrayList<>();
+            if (config != null) {
+                surfaces.addAll(config.getSurfaces());
+            }
+            if (replacedSurfaces != null) {
+                Iterator<WeakReference<Surface>> it = replacedSurfaces.iterator();
+                while (it.hasNext()) {
+                    Surface s = it.next().get();
+                    if (s != null) {
+                        surfaces.add(s);
+                    } else {
+                        it.remove();
+                    }
+                }
+            }
+            for (Surface surface : surfaces) {
                 if (!request.containsTarget(surface)) {
                     continue;
                 }
@@ -2572,6 +2728,8 @@ public class CameraDeviceImpl extends CameraDevice
                     resultExtras.getLastCompletedZslFrameNumber();
             final boolean hasReadoutTimestamp = resultExtras.hasReadoutTimestamp();
             final long readoutTimestamp = resultExtras.getReadoutTimestamp();
+            final MultiResConcurrentReadersStartInfo[] multiResConcurrentReadersInfo =
+                    resultExtras.getMultiResConcurrentReadersStartInfo();
 
             if (DEBUG) {
                 Log.d(TAG, "Capture started for id " + requestId + " frame number " + frameNumber
@@ -2627,11 +2785,12 @@ public class CameraDeviceImpl extends CameraDevice
                                         final Range<Integer> fpsRange =
                                             request.get(CaptureRequest.CONTROL_AE_TARGET_FPS_RANGE);
                                         for (int i = 0; i < holder.getRequestCount(); i++) {
+                                            long timestampForReq = timestamp - (subsequenceId - i) *
+                                                    NANO_PER_SECOND / fpsRange.getUpper();
                                             holder.getCallback().onCaptureStarted(
                                                 CameraDeviceImpl.this,
                                                 holder.getRequest(i),
-                                                timestamp - (subsequenceId - i) *
-                                                NANO_PER_SECOND / fpsRange.getUpper(),
+                                                timestampForReq,
                                                 frameNumber - (subsequenceId - i));
                                             if (hasReadoutTimestamp) {
                                                 holder.getCallback().onReadoutStarted(
@@ -2641,6 +2800,12 @@ public class CameraDeviceImpl extends CameraDevice
                                                     NANO_PER_SECOND / fpsRange.getUpper(),
                                                     frameNumber - (subsequenceId - i));
                                             }
+
+                                            sendOnMultiResolutionOutputStarted(
+                                                    holder.getRequest(i),
+                                                    frameNumber - (subsequenceId - i),
+                                                    timestampForReq,
+                                                    multiResConcurrentReadersInfo);
                                         }
                                     } else {
                                         holder.getCallback().onCaptureStarted(
@@ -2651,6 +2816,9 @@ public class CameraDeviceImpl extends CameraDevice
                                                 CameraDeviceImpl.this, request,
                                                 readoutTimestamp, frameNumber);
                                         }
+                                        sendOnMultiResolutionOutputStarted(
+                                                request, frameNumber, timestamp,
+                                                multiResConcurrentReadersInfo);
                                     }
                                 }
                             }
@@ -2660,6 +2828,70 @@ public class CameraDeviceImpl extends CameraDevice
                 }
             }
         }
+
+        private void sendOnMultiResolutionOutputStarted(CaptureRequest request, long frameNumber,
+                long timestamp,
+                MultiResConcurrentReadersStartInfo[] multiResConcurrentReadersInfo) {
+            if (!Flags.multiResolutionConcurrentReaders()) {
+                return;
+            }
+            // Iterate through all MultiResolutionImageReaders' concurrent start info, and send
+            // callbacks.
+            for (MultiResConcurrentReadersStartInfo info : multiResConcurrentReadersInfo) {
+                Surface targetSurface = null;
+                MultiResolutionImageReader multiResImageReader = null;
+                ArrayList<Surface> activeOutputSurfaces = new ArrayList<Surface>();
+                for (int i = 0; i < mConfiguredOutputs.size(); ++i) {
+                    int streamId = mConfiguredOutputs.keyAt(i);
+                    OutputConfiguration config = mConfiguredOutputs.valueAt(i);
+
+                    if (config.getSurfaceGroupId() != info.groupId) {
+                        continue;
+                    }
+                    // The OutputConfiguration with matching groupId must
+                    // cache a MultiResolutionImageReader.
+                    MultiResolutionImageReader multiResReaderForConfig =
+                            config.getMultiResolutionReader();
+                    if (multiResReaderForConfig == null) {
+                        Log.e(TAG, "OutputConfiguration doesn't belong to "
+                                + "a MultiResolutionImageReader!");
+                        return;
+                    }
+                    // All cached MultiResolutionImageReaders with the same groupId
+                    // must match.
+                    if (multiResImageReader != null
+                            && multiResImageReader != multiResReaderForConfig) {
+                        Log.e(TAG, "OutputConfigurations having mismatch "
+                                + "MultiResolutionImageReader!");
+                        return;
+                    }
+                    multiResImageReader = multiResReaderForConfig;
+
+                    Surface surface = config.getSurface();
+                    if (request.containsTarget(surface)) {
+                        targetSurface = surface;
+                    }
+                    if (ArrayUtils.contains(info.streamIds, streamId)) {
+                        activeOutputSurfaces.add(surface);
+                    }
+                }
+                // The MultiResolutionOutputStartInfo must belong to a
+                // MultiResolutionImageReader the application requested on.
+                if (targetSurface == null) {
+                    Log.e(TAG, "MultiResolutionOutputStarted doesn't contain targetSurface!");
+                    return;
+                }
+                // The cached MultiResolutionImageReader object must be valid.
+                if (multiResImageReader == null) {
+                    Log.e(TAG, "MultiResolutionImageReader not found in OutputConfiguration!");
+                    return;
+                }
+
+                multiResImageReader.postOnActiveOutputSurfacesCallback(
+                        activeOutputSurfaces, timestamp, frameNumber);
+            }
+        }
+
         private PhysicalCaptureResultInfo[] readMetadata(
             PhysicalCaptureResultInfo[] srcPhysicalResults) {
             PhysicalCaptureResultInfo[] retVal =

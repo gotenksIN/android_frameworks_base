@@ -25,6 +25,7 @@ import android.os.Looper;
 import android.os.Message;
 import android.util.Log;
 
+import com.android.internal.annotations.VisibleForTesting;
 import com.android.ravenwood.OpenJdkWorkaround;
 import com.android.ravenwood.common.RavenwoodInternalUtils;
 import com.android.ravenwood.common.SneakyThrow;
@@ -69,15 +70,19 @@ public class RavenwoodErrorHandler {
     // Several callbacks regarding test lifecycle
 
     static void init() {
-        if (ENABLE_UNCAUGHT_EXCEPTION_DETECTION) {
-            Thread.setDefaultUncaughtExceptionHandler(new UncaughtExceptionHandler());
-        }
+        setDefaultUncaughtExceptionHandler();
 
         // `pkill -USR1 -f tradefed-isolation.jar` will trigger a full thread dumps
         OpenJdkWorkaround.registerSignalHandler("USR1", () -> {
             sRawStdErr.println("-----SIGUSR1 HANDLER-----");
             RavenwoodErrorHandler.doBugreport(null, null, false);
         });
+    }
+
+    public static void setDefaultUncaughtExceptionHandler() {
+        if (ENABLE_UNCAUGHT_EXCEPTION_DETECTION) {
+            Thread.setDefaultUncaughtExceptionHandler(new UncaughtExceptionHandler());
+        }
     }
 
     static void enterTestRunner() {
@@ -106,7 +111,8 @@ public class RavenwoodErrorHandler {
 
     static void exitTestMethod(Description description) {
         cancelTimeout();
-        maybeThrowPendingRecoverableUncaughtException();
+        RavenwoodMessageTracker.getInstance().logPendingMessages();
+        maybeThrowPendingRecoverableUncaughtExceptionAndClear();
         maybeThrowUnrecoverableUncaughtException();
     }
 
@@ -201,12 +207,14 @@ public class RavenwoodErrorHandler {
     static class UncaughtExceptionHandler implements Thread.UncaughtExceptionHandler {
         @Override
         public void uncaughtException(Thread thread, Throwable inner) {
-            if (isThrowableRecoverable(inner)) {
+            Log.w(TAG, "Uncaught exception detected on thread " + Thread.currentThread(), inner);
+            var isRecoverable = isThrowableRecoverable(inner);
+            if (isRecoverable) {
                 setPendingRecoverableUncaughtException(inner);
-                return;
+            } else {
+                setPendingUnrecoverableUncaughtException(thread, inner);
             }
-            setPendingUnrecoverableUncaughtException(thread, inner);
-            doBugreport(thread, inner, DIE_ON_UNCAUGHT_EXCEPTION);
+            doBugreport(thread, inner, !isRecoverable && DIE_ON_UNCAUGHT_EXCEPTION);
         }
     }
 
@@ -216,9 +224,10 @@ public class RavenwoodErrorHandler {
     public static void onBeforeEnqueue(@NonNull Message msg) {
         // Check for pending exception, and throw it if any.
         // We don't want to enqueue any more messages if a pending exception exists.
-        maybeThrowPendingRecoverableUncaughtException();
+        maybeThrowPendingRecoverableUncaughtExceptionNoClear();
+
         // Track the msg poster in case an exception is thrown later during msg dispatch.
-        RavenwoodMessageTracker.getInstance().trackMessagePoster(msg);
+        RavenwoodMessageTracker.getInstance().trackMessage(msg);
     }
 
     /**
@@ -314,11 +323,25 @@ public class RavenwoodErrorHandler {
         }
     }
 
-    public static void maybeThrowPendingRecoverableUncaughtException() {
+    private static void maybeThrowPendingRecoverableUncaughtExceptionAndClear() {
         var pending = sPendingRecoverableUncaughtException.getAndSet(null);
         if (pending != null) {
             SneakyThrow.sneakyThrow(pending);
         }
+    }
+
+    @VisibleForTesting // Used by unit tests too
+    public static void maybeThrowPendingRecoverableUncaughtExceptionNoClear() {
+        var pending = sPendingRecoverableUncaughtException.get();
+        if (pending != null) {
+            SneakyThrow.sneakyThrow(pending);
+        }
+    }
+
+    @VisibleForTesting
+    @Nullable
+    public static Throwable getPendingRecoverableUncaughtException() {
+        return sPendingRecoverableUncaughtException.get();
     }
 
     // Dump all thread stack traces
@@ -343,20 +366,17 @@ public class RavenwoodErrorHandler {
 
             var stacks = Thread.getAllStackTraces();
             var threads = stacks.keySet().stream().sorted(
-                    Comparator.comparingLong(Thread::getId)).collect(Collectors.toList());
+                    Comparator.comparingLong(Thread::threadId)).collect(Collectors.toList());
 
             // Put the test and the main thread at the top.
-            var env = RavenwoodEnvironment.getInstance();
-            var testThread = env.getTestThread();
+            var testThread = RavenwoodAwareTestRunner.sTestThread;
             var mainThread = Looper.getMainLooper().getThread();
             if (mainThread != null) {
                 threads.remove(mainThread);
-                threads.add(0, mainThread);
+                threads.addFirst(mainThread);
             }
-            if (testThread != null) {
-                threads.remove(testThread);
-                threads.add(0, testThread);
-            }
+            threads.remove(testThread);
+            threads.addFirst(testThread);
             // Put the exception thread at the top.
             // Also inject the stacktrace from the exception.
             if (exceptionThread != null) {

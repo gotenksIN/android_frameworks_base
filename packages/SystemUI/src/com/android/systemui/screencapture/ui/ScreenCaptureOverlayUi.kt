@@ -18,12 +18,14 @@ package com.android.systemui.screencapture.ui
 
 import android.content.Context
 import android.graphics.PixelFormat
-import android.graphics.Rect
+import android.graphics.Region
+import android.view.ViewTreeObserver.InternalInsetsInfo
 import android.view.Window
 import android.view.WindowManager
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.AndroidEmbeddedExternalSurface
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.TransformableState
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.Box
@@ -31,29 +33,34 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asAndroidPath
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.toAndroidRectF
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.unit.IntSize
+import androidx.core.graphics.toRegion
+import androidx.ink.authoring.compose.InProgressStrokes
+import com.android.compose.modifiers.thenIf
+import com.android.internal.R as internalR
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.lifecycle.rememberViewModel
 import com.android.systemui.res.R
 import com.android.systemui.screencapture.common.ScreenCaptureScope
-import com.android.systemui.screencapture.ui.viewmodel.ScreenCaptureCameraViewModel
+import com.android.systemui.screencapture.record.camera.ui.viewmodel.ScreenCaptureCameraTransformationViewModel
+import com.android.systemui.screencapture.record.camera.ui.viewmodel.ScreenCaptureCameraViewModel
+import com.android.systemui.screencapture.record.markup.ui.viewmodel.ScreenCaptureMarkupOverlayViewModel
 import com.android.systemui.statusbar.phone.EdgeToEdgeDialogDelegate
 import com.android.systemui.statusbar.phone.SystemUIDialogFactory
 import com.android.systemui.statusbar.phone.create
+import com.android.systemui.util.view.listenToComputeInternalInsets
 import javax.inject.Inject
 import kotlin.coroutines.resume
-import kotlin.math.sin
+import kotlin.math.roundToInt
 import kotlinx.coroutines.suspendCancellableCoroutine
 
 @ScreenCaptureScope
@@ -63,6 +70,8 @@ constructor(
     @Application context: Context,
     dialogFactory: SystemUIDialogFactory,
     private val cameraViewModelFactory: ScreenCaptureCameraViewModel.Factory,
+    private val cameraTransformationViewModel: ScreenCaptureCameraTransformationViewModel.Factory,
+    private val markupViewModelFactory: ScreenCaptureMarkupOverlayViewModel.Factory,
 ) {
 
     private val dialog =
@@ -72,8 +81,8 @@ constructor(
                 theme = R.style.Theme_SystemUI_Dialog_ScreenCapture,
                 dialogDelegate = EdgeToEdgeDialogDelegate(),
                 dismissOnDeviceLock = false,
-            ) { dialog ->
-                DialogContent(dialog.window!!)
+            ) {
+                DialogContent(it.window!!)
             }
             .apply {
                 setupWindow(window!!)
@@ -85,6 +94,7 @@ constructor(
         window.attributes =
             window.attributes.apply {
                 type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                title = "ScreenCaptureOverlayUi"
                 format = PixelFormat.TRANSLUCENT
                 layoutInDisplayCutoutMode =
                     WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
@@ -92,74 +102,117 @@ constructor(
             }
         with(window) {
             addPrivateFlags(WindowManager.LayoutParams.PRIVATE_FLAG_TRUSTED_OVERLAY)
-            setWindowAnimations(-1)
+            setWindowAnimations(internalR.style.Animation_Toast)
         }
     }
 
     @Composable
     private fun DialogContent(window: Window) {
-        Box(modifier = Modifier.fillMaxSize().background(Color.White.copy(alpha = 0.5f))) {
-            Camera(modifier = Modifier)
+        val drawingTouchableRegion = remember { Region.obtain() }
+        val cameraTouchableRegion = remember { Region.obtain() }
+        LaunchedEffect(window.decorView.viewTreeObserver) {
+            window.decorView.viewTreeObserver.listenToComputeInternalInsets {
+                setTouchableInsets(InternalInsetsInfo.TOUCHABLE_INSETS_REGION)
+                touchableRegion.op(drawingTouchableRegion, Region.Op.UNION)
+                touchableRegion.op(cameraTouchableRegion, Region.Op.UNION)
+            }
+        }
+        Box(modifier = Modifier.fillMaxSize()) {
+            DrawingView(outTouchableRegion = drawingTouchableRegion, modifier = Modifier)
+            Camera(outTouchableRegion = cameraTouchableRegion, modifier = Modifier)
         }
     }
 
     @Composable
-    private fun Camera(modifier: Modifier) {
+    private fun DrawingView(outTouchableRegion: Region, modifier: Modifier = Modifier) {
+        val viewModel =
+            rememberViewModel("ScreenCaptureMarkupOverlayViewModel") {
+                markupViewModelFactory.create()
+            }
+        ConditionalLaunchedEffect(!viewModel.shouldShowMarkup) { outTouchableRegion.setEmpty() }
+        AnimatedVisibility(
+            visible = viewModel.shouldShowMarkup,
+            modifier =
+                modifier.fillMaxSize().thenIf(viewModel.shouldShowMarkup) {
+                    Modifier.onGloballyPositioned { layoutCoordinates ->
+                        // Enabling markup prohibits passing touches throughout the whole overlay
+                        // because user can draw everywhere
+                        val bounds = layoutCoordinates.boundsInWindow(false)
+                        outTouchableRegion.set(
+                            bounds.left.roundToInt(),
+                            bounds.top.roundToInt(),
+                            bounds.right.roundToInt(),
+                            bounds.bottom.roundToInt(),
+                        )
+                    }
+                },
+        ) {
+            InProgressStrokes(
+                defaultBrush = null,
+                nextBrush = { viewModel.brush },
+                onStrokesFinished = { /* do nothing */ },
+            )
+        }
+    }
+
+    @Composable
+    private fun Camera(outTouchableRegion: Region, modifier: Modifier = Modifier) {
         val viewModel =
             rememberViewModel("ScreenCaptureCameraViewModel") { cameraViewModelFactory.create() }
-        var scale by remember { mutableFloatStateOf(1f) }
-        var rotation by remember { mutableFloatStateOf(0f) }
-        var offset by remember { mutableStateOf(Offset.Zero) }
-        val state = rememberTransformableState { zoomChange, offsetChange, rotationChange ->
-            scale *= zoomChange
-            rotation += rotationChange
-            offset += offsetChange
+        val surfaceSize =
+            viewModel.surfaceSize?.let { IntSize(width = it.width, height = it.height) }
+        val shouldShowCamera = viewModel.shouldShowCamera
+        ConditionalLaunchedEffect(shouldShowCamera != true || surfaceSize == null) {
+            outTouchableRegion.setEmpty()
         }
-
-        Box(modifier = modifier.fillMaxSize().transformable(state = state)) {
-            // TODO(b/441486122): Wire the surface to the ViewModel for the actual output from the
-            // service
-            AndroidEmbeddedExternalSurface(
-                modifier =
-                    Modifier.align(Alignment.BottomCenter)
-                        .fillMaxWidth()
-                        .graphicsLayer {
-                            translationX = offset.x
-                            translationY = offset.y
-                            scaleX = scale
-                            scaleY = scale
-                            rotationZ = rotation
+        if (shouldShowCamera != null && surfaceSize != null) {
+            AnimatedVisibility(shouldShowCamera) {
+                val transformationViewModel =
+                    rememberViewModel("ScreenCaptureCameraTransformationViewModel") {
+                        cameraTransformationViewModel.create()
+                    }
+                val state: TransformableState =
+                    rememberTransformableState { zoomChange, offsetChange, rotationChange ->
+                        with(transformationViewModel) {
+                            changeTransformation(
+                                offsetChange = offsetChange,
+                                zoomChange = zoomChange,
+                                rotationChange = rotationChange,
+                            )
+                            fillRegion(outTouchableRegion)
                         }
-                        .clickable { viewModel.onSurfaceClicked() }
-                        .aspectRatio(2f)
-            ) {
-                onSurface { surface, width, height ->
-                    viewModel.onSurfaceReady(surface)
-                    var w = width
-                    var h = height
-                    // Initial draw to avoid a black frame
-                    surface.lockCanvas(Rect(0, 0, w, h)).apply {
-                        drawColor(Color.Yellow.toArgb())
-                        surface.unlockCanvasAndPost(this)
-                    } // React to surface dimension changes
-                    surface.onChanged { newWidth, newHeight ->
-                        w = newWidth
-                        h = newHeight
-                    } // Cleanup if needed
-                    surface.onDestroyed { viewModel.onSurfaceDestroyed() }
-                    // Render loop, automatically cancelled on surface destruction
-                    while (true) {
-                        withFrameNanos { time ->
-                            surface.lockCanvas(Rect(0, 0, w, h)).apply {
-                                val timeMs = time / 1_000_000L
-                                val t = 0.5f + 0.5f * sin(timeMs / 1_000.0f)
-                                drawColor(
-                                    androidx.compose.ui.graphics
-                                        .lerp(Color.Yellow, Color.Red, t)
-                                        .toArgb()
-                                )
-                                surface.unlockCanvasAndPost(this)
-                            }
+                    }
+
+                Box(contentAlignment = Alignment.BottomCenter, modifier = modifier.fillMaxSize()) {
+                    AndroidEmbeddedExternalSurface(
+                        surfaceSize = surfaceSize,
+                        modifier =
+                            Modifier.fillMaxWidth()
+                                .aspectRatio(surfaceSize.height.toFloat() / surfaceSize.width)
+                                .onGloballyPositioned { layoutCoordinates ->
+                                    transformationViewModel.bounds =
+                                        layoutCoordinates.boundsInWindow(false)
+                                    transformationViewModel.fillRegion(outTouchableRegion)
+                                }
+                                .graphicsLayer {
+                                    with(transformationViewModel) {
+                                        scaleX = scale
+                                        scaleY = scale
+                                        translationX = offsetX
+                                        translationY = offsetY
+                                        rotationZ = rotation
+                                    }
+                                }
+                                .transformable(state)
+                                .clickable { viewModel.onSurfaceClicked() },
+                    ) {
+                        onSurface { surface, width, height ->
+                            viewModel.onSurfaceReady(
+                                surface = surface,
+                                width = width,
+                                height = height,
+                            )
+                            surface.onDestroyed { viewModel.onSurfaceDestroyed() }
                         }
                     }
                 }
@@ -183,4 +236,17 @@ constructor(
     private fun hide() {
         dialog.dismissWithoutAnimation()
     }
+}
+
+@Composable
+private fun ConditionalLaunchedEffect(condition: Boolean, action: suspend () -> Unit) {
+    LaunchedEffect(condition) {
+        if (condition) {
+            action()
+        }
+    }
+}
+
+private fun ScreenCaptureCameraTransformationViewModel.fillRegion(region: Region) {
+    region.setPath(transformedBounds.asAndroidPath(), bounds.toAndroidRectF().toRegion())
 }

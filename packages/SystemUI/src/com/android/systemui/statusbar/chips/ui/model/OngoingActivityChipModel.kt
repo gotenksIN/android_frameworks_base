@@ -17,9 +17,7 @@
 package com.android.systemui.statusbar.chips.ui.model
 
 import android.annotation.CurrentTimeMillisLong
-import android.annotation.ElapsedRealtimeLong
 import android.annotation.StringRes
-import android.os.SystemClock
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Shape
 import com.android.internal.logging.InstanceId
@@ -29,8 +27,8 @@ import com.android.systemui.common.shared.model.ContentDescription
 import com.android.systemui.common.shared.model.Icon
 import com.android.systemui.res.R
 import com.android.systemui.statusbar.StatusBarIconView
-import com.android.systemui.statusbar.chips.ui.viewmodel.TimeSource
 import com.android.systemui.statusbar.core.StatusBarConnectedDisplays
+import com.android.systemui.util.time.SystemClock
 
 /** Model representing the display of an ongoing activity as a chip in the status bar. */
 sealed class OngoingActivityChipModel {
@@ -123,34 +121,34 @@ sealed class OngoingActivityChipModel {
             override val logName = "IconOnly"
         }
 
-        /** The chip shows a timer, counting up from [startTimeMs]. */
+        /** The chip shows a timer. */
         data class Timer(
             /**
-             * The time this event started, used to show the timer.
-             *
-             * This time should be relative to
-             * [com.android.systemui.util.time.SystemClock.elapsedRealtime], *not*
-             * [com.android.systemui.util.time.SystemClock.currentTimeMillis] because the
-             * [ChipChronometer] is based off of elapsed realtime. See
-             * [android.widget.Chronometer.setBase].
+             * The timer's value (as a chronometer from/to a point in time, or a paused duration).
              */
-            @ElapsedRealtimeLong val startTimeMs: Long,
+            val value: Chronometer,
+
+            /** How the [value] should be formatted. */
+            val format: Format = Format.CHRONOMETER,
 
             /**
-             * The [TimeSource] that should be used to track the current time for this timer. Should
-             * be compatible units with [startTimeMs]. Only used in the Compose version of the
-             * chips.
+             * The [SystemClock] used to track the current time for this timer. Only used in the
+             * Compose version of the chips.
              */
-            val timeSource: TimeSource = TimeSource { SystemClock.elapsedRealtime() },
-
-            /**
-             * True if this chip represents an event starting in the future and false if this chip
-             * represents an event that has already started. If true, [startTimeMs] should be in the
-             * future. Otherwise, [startTimeMs] should be in the past.
-             */
-            val isEventInFuture: Boolean = false,
+            val timeSource: SystemClock,
         ) : Content() {
-            override val logName = "Timer(time=$startTimeMs isFuture=$isEventInFuture)"
+            override val logName = "Timer(value=$value format=$format)"
+
+            enum class Format {
+                /** "Normal" chronometer appearance (e.g. 04:30) */
+                CHRONOMETER,
+
+                /**
+                 * Adaptive/textual chronometer format. See
+                 * [android.widget.ChronometerAdaptiveFormat.format]
+                 */
+                ADAPTIVE,
+            }
         }
 
         /**
@@ -160,8 +158,8 @@ sealed class OngoingActivityChipModel {
         data class ShortTimeDelta(
             /**
              * The time of the event that this chip represents. Relative to
-             * [com.android.systemui.util.time.SystemClock.currentTimeMillis] because that's what's
-             * required by [android.widget.DateTimeView].
+             * [SystemClock.currentTimeMillis] because that's what's required by
+             * [android.widget.DateTimeView].
              *
              * TODO(b/372657935): When the Compose chips are launched, we should convert this to be
              *   relative to [com.android.systemui.util.time.SystemClock.elapsedRealtime] so that
@@ -170,10 +168,10 @@ sealed class OngoingActivityChipModel {
             @CurrentTimeMillisLong val time: Long,
 
             /**
-             * The [TimeSource] that should be used to track the current time for this timer. Should
-             * be compatible units with [time]. Only used in the Compose version of the chips.
+             * The [SystemClock] that should be used to track the current time for this timer. Only
+             * used in the Compose version of the chips.
              */
-            val timeSource: TimeSource = TimeSource { System.currentTimeMillis() },
+            val timeSource: SystemClock,
         ) : Content() {
             override val logName = "ShortTimeDelta(time=$time)"
         }

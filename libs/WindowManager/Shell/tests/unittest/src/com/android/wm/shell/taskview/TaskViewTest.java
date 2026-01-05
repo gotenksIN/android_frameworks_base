@@ -221,7 +221,7 @@ public class TaskViewTest extends ShellTestCase {
 
         verify(mViewListener).onTaskCreated(eq(mTaskInfo.taskId), any());
         verify(mViewListener, never()).onInitialized();
-        assertThat(mTaskView.isInitialized()).isFalse();
+        assertThat(mTaskView.isSurfaceCreated()).isFalse();
         // If there's no surface the task should be made invisible
         verify(mViewListener).onTaskVisibilityChanged(eq(mTaskInfo.taskId), eq(false));
     }
@@ -232,7 +232,7 @@ public class TaskViewTest extends ShellTestCase {
         verify(mTaskViewTransitions, never()).setTaskViewVisible(any(), anyBoolean());
 
         verify(mViewListener).onInitialized();
-        assertThat(mTaskView.isInitialized()).isTrue();
+        assertThat(mTaskView.isSurfaceCreated()).isTrue();
         // No task, no visibility change
         verify(mViewListener, never()).onTaskVisibilityChanged(anyInt(), anyBoolean());
     }
@@ -253,6 +253,7 @@ public class TaskViewTest extends ShellTestCase {
 
         verify(mViewListener).onInitialized();
         verify(mTaskViewTransitions).setTaskViewVisible(eq(mTaskViewTaskController), eq(true));
+        assertThat(mTaskView.isSurfaceCreated()).isTrue();
 
         prepareOpenAnimation(wct, false /* newTask */);
 
@@ -265,6 +266,7 @@ public class TaskViewTest extends ShellTestCase {
         mTaskView.surfaceDestroyed(mSurfaceHolder);
 
         verify(mViewListener, never()).onTaskVisibilityChanged(anyInt(), anyBoolean());
+        assertThat(mTaskView.isSurfaceCreated()).isFalse();
     }
 
     @Test
@@ -275,6 +277,7 @@ public class TaskViewTest extends ShellTestCase {
         mTaskView.surfaceDestroyed(mSurfaceHolder);
 
         verify(mTaskViewTransitions).setTaskViewVisible(eq(mTaskViewTaskController), eq(false));
+        assertThat(mTaskView.isSurfaceCreated()).isFalse();
 
         mTaskViewTaskController.prepareHideAnimation(new SurfaceControl.Transaction());
 
@@ -289,7 +292,6 @@ public class TaskViewTest extends ShellTestCase {
 
         verify(mOrganizer).removeListener(eq(mTaskViewTaskController));
         verify(mViewListener).onReleased();
-        assertThat(mTaskView.isInitialized()).isFalse();
         verify(mTaskViewTransitions).unregisterTaskView(eq(mTaskViewTaskController));
     }
 
@@ -298,7 +300,8 @@ public class TaskViewTest extends ShellTestCase {
         prepareOpenAnimation(true /* newTask */);
         final SurfaceControl taskLeash = mTaskViewTaskController.getTaskLeash();
         mTaskView.surfaceCreated(mSurfaceHolder);
-        mTaskViewTaskController.prepareCloseAnimation();
+        final SurfaceControl.Transaction tx = mock(SurfaceControl.Transaction.class);
+        mTaskViewTaskController.prepareCloseAnimation(taskLeash, tx);
 
         verify(mViewListener).onTaskRemovalStarted(eq(mTaskInfo.taskId));
         assertThat(mTaskViewTaskController.getTaskLeash()).isNull();
@@ -349,7 +352,7 @@ public class TaskViewTest extends ShellTestCase {
     public void testOnBackPressedOnTaskRoot() {
         prepareOpenAnimation(true /* newTask */);
 
-        mTaskViewTaskController.onBackPressedOnTaskRoot(mTaskInfo);
+        mTaskViewTaskController.onBackPressedOnTaskRoot(mTaskInfo, false, false);
 
         verify(mViewListener).onBackPressedOnTaskRoot(eq(mTaskInfo.taskId));
     }
@@ -579,7 +582,8 @@ public class TaskViewTest extends ShellTestCase {
 
         assertThat(mTaskViewTaskController.getTaskInfo()).isEqualTo(mTaskInfo);
 
-        mTaskViewTaskController.prepareCloseAnimation();
+        final SurfaceControl.Transaction tx = mock(SurfaceControl.Transaction.class);
+        mTaskViewTaskController.prepareCloseAnimation(mTaskView.getSurfaceControl(), tx);
 
         assertThat(mTaskViewTaskController.getTaskInfo()).isNull();
     }
@@ -635,6 +639,18 @@ public class TaskViewTest extends ShellTestCase {
         mTaskViewTransitions.moveTaskViewToFullscreen(mTaskViewTaskController);
 
         verify(mViewListener).onTaskRemovalStarted(eq(mTaskInfo.taskId));
+    }
+
+    @Test
+    public void prepareCloseAnimation_taskViewWithZeroAlpha_hidesSurface() {
+        prepareOpenAnimation(true /* newTask */);
+        final SurfaceControl taskLeash = mTaskViewTaskController.getTaskLeash();
+        mTaskView.surfaceCreated(mSurfaceHolder);
+        mTaskView.setAlpha(0);
+        final SurfaceControl.Transaction tx = mock(SurfaceControl.Transaction.class);
+        mTaskViewTaskController.prepareCloseAnimation(taskLeash, tx);
+
+        verify(tx).setAlpha(taskLeash, 0);
     }
 
     @NonNull

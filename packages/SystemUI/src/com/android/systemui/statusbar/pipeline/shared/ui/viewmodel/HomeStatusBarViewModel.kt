@@ -25,6 +25,7 @@ import android.view.View
 import androidx.compose.runtime.getValue
 import com.android.app.tracing.FlowTracing.traceEach
 import com.android.app.tracing.TrackGroupUtils.trackGroup
+import com.android.systemui.Flags
 import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.desktop.domain.interactor.DesktopInteractor
 import com.android.systemui.display.dagger.SystemUIDisplaySubcomponent.DisplayAware
@@ -41,6 +42,11 @@ import com.android.systemui.keyguard.shared.model.KeyguardState.OCCLUDED
 import com.android.systemui.keyguard.shared.model.TransitionState
 import com.android.systemui.lifecycle.Activatable
 import com.android.systemui.lifecycle.HydratedActivatable
+import com.android.systemui.log.LogBuffer
+import com.android.systemui.log.LogBufferFactory
+import com.android.systemui.log.core.LogLevel
+import com.android.systemui.log.core.MessageInitializer
+import com.android.systemui.log.core.MessagePrinter
 import com.android.systemui.log.table.TableLogBufferFactory
 import com.android.systemui.log.table.logDiffsForTable
 import com.android.systemui.plugins.DarkIconDispatcher
@@ -60,9 +66,6 @@ import com.android.systemui.statusbar.chips.ui.viewmodel.OngoingActivityChipsVie
 import com.android.systemui.statusbar.chips.uievents.StatusBarChipsUiEventLogger
 import com.android.systemui.statusbar.events.domain.interactor.SystemStatusEventAnimationInteractor
 import com.android.systemui.statusbar.events.shared.model.SystemEventAnimationState.Idle
-import com.android.systemui.statusbar.featurepods.popups.StatusBarPopupChips
-import com.android.systemui.statusbar.featurepods.popups.ui.model.PopupChipModel
-import com.android.systemui.statusbar.featurepods.popups.ui.viewmodel.StatusBarPopupChipsViewModel
 import com.android.systemui.statusbar.layout.ui.viewmodel.AppHandlesViewModel
 import com.android.systemui.statusbar.layout.ui.viewmodel.StatusBarBoundsViewModel
 import com.android.systemui.statusbar.layout.ui.viewmodel.StatusBarContentInsetsViewModelStore
@@ -79,7 +82,12 @@ import com.android.systemui.statusbar.pipeline.shared.domain.interactor.HomeStat
 import com.android.systemui.statusbar.pipeline.shared.ui.model.ChipsVisibilityModel
 import com.android.systemui.statusbar.pipeline.shared.ui.model.SystemInfoCombinedVisibilityModel
 import com.android.systemui.statusbar.pipeline.shared.ui.model.VisibilityModel
+import com.android.systemui.statusbar.policy.domain.interactor.DeviceProvisioningInteractor
+import com.android.systemui.statusbar.quickactions.popups.StatusBarPopupChips
+import com.android.systemui.statusbar.quickactions.popups.ui.viewmodel.StatusBarPopupChipsViewModel
+import com.android.systemui.statusbar.quickactions.ui.viewmodel.QuickActionChipUiState
 import com.android.systemui.statusbar.systemstatusicons.ui.viewmodel.SystemStatusIconsViewModel
+import com.android.systemui.user.domain.interactor.UserLogoutInteractor
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import javax.inject.Provider
@@ -177,7 +185,7 @@ interface HomeStatusBarViewModel : Activatable {
     val operatorNameViewModel: StatusBarOperatorNameViewModel
 
     /** The popup chips that should be shown on the right-hand side of the status bar. */
-    val popupChips: List<PopupChipModel.Shown>
+    val popupChips: List<QuickActionChipUiState.PopupChip>
 
     /**
      * True if the status bar should be visible.
@@ -234,6 +242,18 @@ interface HomeStatusBarViewModel : Activatable {
     /** Emits `true` whenever there is at least one status bar notification. */
     val hasStatusBarNotifications: Boolean
 
+    /** True if the user can click on the notifications chip. */
+    val isNotificationsChipClickable: Boolean
+
+    /** True if the user can click on the quick settings chip. */
+    val isQuickSettingsChipClickable: Boolean
+
+    /** True if the sign out button is currently visible. */
+    val isSignOutButtonVisible: Boolean
+
+    /** Notifies that the current user should be signed out. */
+    fun onSignOut()
+
     /** Interface for the assisted factory, to allow for providing a fake in tests */
     interface HomeStatusBarViewModelFactory {
         fun create(): HomeStatusBarViewModel
@@ -249,6 +269,7 @@ constructor(
     override val systemStatusIconsViewModelFactory: SystemStatusIconsViewModel.Factory,
     override val statusBarBoundsViewModelFactory: StatusBarBoundsViewModel.Factory,
     override val appHandlesViewModelFactory: AppHandlesViewModel.Factory,
+    loggerFactory: LogBufferFactory,
     tableLoggerFactory: TableLogBufferFactory,
     @DisplayAware private val resources: Resources,
     @DisplayAware homeStatusBarInteractor: HomeStatusBarInteractor,
@@ -258,7 +279,7 @@ constructor(
     desktopInteractor: DesktopInteractor,
     darkIconInteractor: DarkIconInteractor,
     keyguardTransitionInteractor: KeyguardTransitionInteractor,
-    keyguardInteractor: KeyguardInteractor,
+    private val keyguardInteractor: KeyguardInteractor,
     statusBarNotificationIconsInteractor: StatusBarNotificationIconsInteractor,
     override val operatorNameViewModel: StatusBarOperatorNameViewModel,
     private val sceneInteractor: SceneInteractor,
@@ -274,8 +295,11 @@ constructor(
     @Background bgDispatcher: CoroutineDispatcher,
     shadeDisplaysInteractor: Provider<ShadeDisplaysInteractor>,
     private val uiEventLogger: StatusBarChipsUiEventLogger,
-) : HomeStatusBarViewModel, HydratedActivatable() {
+    deviceProvisioningInteractor: DeviceProvisioningInteractor,
+    private val userLogoutInteractor: UserLogoutInteractor,
+) : HomeStatusBarViewModel, HydratedActivatable(enableEnqueuedActivations = true) {
 
+    val logger = loggerFactory.getOrCreate(logBufferName(thisDisplayId), 60)
     val tableLogger = tableLoggerFactory.getOrCreate(tableLogBufferName(thisDisplayId), 200)
 
     private val statusBarPopupChips by lazy { statusBarPopupChipsViewModelFactory.create() }
@@ -306,7 +330,7 @@ constructor(
         shareToAppChipViewModel.stopDialogToShow
 
     override val popupChips
-        get() = statusBarPopupChips.shownPopupChips
+        get() = statusBarPopupChips.shownQuickActionChips
 
     private val isShadeExpandedEnough =
         // Keep the status bar visible while the shade is just starting to open or while a HUN is
@@ -458,6 +482,18 @@ constructor(
     override val hasStatusBarNotifications: Boolean by
         statusBarNotificationIconsInteractor.hasStatusBarNotifications.hydratedStateOf(
             traceName = "hasStatusBarNotifications",
+            initialValue = false,
+        )
+
+    override val isNotificationsChipClickable: Boolean by
+        deviceProvisioningInteractor.isDeviceProvisioned.hydratedStateOf(
+            traceName = "isNotificationsChipClickable",
+            initialValue = false,
+        )
+
+    override val isQuickSettingsChipClickable: Boolean by
+        deviceProvisioningInteractor.isDeviceProvisioned.hydratedStateOf(
+            traceName = "isQuickSettingsChipClickable",
             initialValue = false,
         )
 
@@ -711,6 +747,22 @@ constructor(
         statusBarContentInsetsViewModelStore.forDisplay(thisDisplayId)?.contentArea
             ?: flowOf(Rect(0, 0, 0, 0)).flowOn(bgDispatcher)
 
+    override val isSignOutButtonVisible: Boolean by
+        combine(userLogoutInteractor.isLogoutToSystemUserEnabled, sceneInteractor.currentScene) {
+                isLogoutToSystemUserEnabled,
+                currentScene ->
+                Flags.signOutButtonOnKeyguardStatusBar() &&
+                    keyguardInteractor.isSignOutButtonOnStatusBarEnabled &&
+                    isLogoutToSystemUserEnabled &&
+                    currentScene == Scenes.Lockscreen
+            }
+            .hydratedStateOf(traceName = "isSignOutButtonVisible", initialValue = false)
+
+    override fun onSignOut() {
+        logger.d { "onSignOut" }
+        enqueueOnActivatedScope { userLogoutInteractor.logOutToSystemUser() }
+    }
+
     @View.Visibility
     private fun Boolean.toVisibleOrGone(): Int {
         return if (this) View.VISIBLE else View.GONE
@@ -751,9 +803,17 @@ constructor(
         private const val COL_PREFIX_NOTIF_CONTAINER = "notifContainer"
         private const val COL_PREFIX_SYSTEM_INFO = "systemInfo"
 
+        private const val TAG = "HomeStatusBarViewModel"
+
         private const val TRACK_GROUP = "StatusBar"
 
-        fun tableLogBufferName(displayId: Int) = "HomeStatusBarViewModel[$displayId]"
+        private fun logBufferName(displayId: Int) = "HomeStatusBarViewModelLog[$displayId]"
+
+        private fun tableLogBufferName(displayId: Int) =
+            "HomeStatusBarViewModelTableLog[$displayId]"
+
+        private fun LogBuffer.d(initializer: MessageInitializer = {}, printer: MessagePrinter) =
+            this.log(TAG, LogLevel.DEBUG, initializer, printer)
     }
 }
 

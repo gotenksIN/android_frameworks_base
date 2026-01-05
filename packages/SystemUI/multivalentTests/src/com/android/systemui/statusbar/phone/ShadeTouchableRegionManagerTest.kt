@@ -190,7 +190,10 @@ class ShadeTouchableRegionManagerTest : SysuiTestCase() {
         assertThat(shadeMode).isEqualTo(ShadeMode.Dual)
 
         sceneInteractor.showOverlay(overlay, "test")
-        setSceneTransition(Idle(initialScene, checkNotNull(currentOverlays)))
+        setSceneTransition(
+            Idle(initialScene, checkNotNull(currentOverlays)),
+            skipChangeScene = true,
+        )
         assertThat(currentScene).isEqualTo(initialScene)
         assertThat(currentOverlays).contains(overlay)
     }
@@ -206,7 +209,7 @@ class ShadeTouchableRegionManagerTest : SysuiTestCase() {
 
     private fun Kosmos.unlockDevice() {
         kosmos.biometricUnlockInteractor.setBiometricUnlockState(
-            unlockStateInt = BiometricUnlockController.MODE_UNLOCK_COLLAPSING,
+            unlockStateInt = BiometricUnlockController.MODE_DISMISS,
             biometricUnlockSource = BiometricUnlockSource.FINGERPRINT_SENSOR,
         )
         sceneInteractor.changeScene(Scenes.Gone, "unlock")

@@ -17,6 +17,7 @@
 package com.android.wm.shell.compatui.impl
 
 import android.app.ActivityManager
+import android.content.res.Configuration
 import android.graphics.Point
 import android.testing.AndroidTestingRunner
 import android.view.View
@@ -99,6 +100,10 @@ class CompatUIComponentTest : ShellTestCase() {
             assertEquals(info, lastPositionFactoryCompatUIInfo)
             assertEquals(view, lastPositionFactoryView)
             assertEquals(componentState, lastPositionFactoryCompState)
+            assertPositionFactoryInvocation(1)
+            assertEquals(info, lastSizeFactoryCompatUIInfo)
+            assertEquals(view, lastSizeFactoryView)
+            assertEquals(componentState, lastSizeFactoryCompState)
         }
     }
 
@@ -114,6 +119,7 @@ class CompatUIComponentTest : ShellTestCase() {
             assertViewBuilderInvocation(0)
             assertViewBinderInvocation(1)
             assertPositionFactoryInvocation(1)
+            assertPositionFactoryInvocation(1)
         }
     }
 
@@ -124,6 +130,10 @@ class CompatUIComponentTest : ShellTestCase() {
     }
 
     private fun initShareRepositoryForTask(taskId: Int = 1) {
-        sharedStateRepository.insert(taskId, CompatUISharedState(), overrideIfPresent = true)
+        sharedStateRepository.insert(
+            taskId,
+            CompatUISharedState(taskConfiguration = Configuration()),
+            overrideIfPresent = true,
+        )
     }
 }

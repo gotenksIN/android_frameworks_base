@@ -24,6 +24,7 @@ import android.util.ArrayMap
 import android.util.ArraySet
 import android.util.Slog
 import android.util.SparseArray
+import android.view.Display.DEFAULT_DISPLAY
 import android.view.Display.INVALID_DISPLAY
 import android.window.DesktopExperienceFlags
 import android.window.DesktopModeFlags
@@ -131,13 +132,22 @@ class DesktopRepository(
         activeTasksListeners.onEach { it.onActiveTasksChanged(displayId) }
     }
 
+    private fun updateTaskAppearedInDeskListeners(taskId: Int, displayId: Int, deskId: Int) {
+        deskChangeListeners.forEach { (listener, executor) ->
+            executor.execute {
+                listener.onTaskAppearingInDesk(
+                    taskId = taskId,
+                    displayId = displayId,
+                    deskId = deskId,
+                )
+            }
+        }
+    }
+
     /** Stores the last state of the given display, along with the bounds of the tasks on it. */
     fun preserveDisplay(displayId: Int, uniqueDisplayId: String) {
         logD("preserveDisplay for displayId=%d, uniqueId=%s", displayId, uniqueDisplayId)
-        if (
-            preservedDisplaysByUniqueId.containsKey(uniqueDisplayId) &&
-                DesktopExperienceFlags.ENABLE_EXTERNAL_DISPLAY_PERSISTENCE_BUGFIX.isTrue
-        ) {
+        if (preservedDisplaysByUniqueId.containsKey(uniqueDisplayId)) {
             // Prevents multiple preserve requests from overwriting the previously
             // preserved display. Occurs during boot where we see display disabled
             // + display becoming desktop ineligible both requesting preserve.
@@ -250,8 +260,12 @@ class DesktopRepository(
 
     /** Creates a new merged region representative of all exclusion regions in all desktop tasks. */
     private fun calculateDesktopExclusionRegion(): Region {
+        // TODO: b/457129297 - Remove log once bug is fixed
+        logD("calculateDesktopExclusionRegion: desktopExclusionRegions=%s", desktopExclusionRegions)
         val desktopExclusionRegion = Region()
-        desktopExclusionRegions.valueIterator().forEach { taskExclusionRegion ->
+        // TODO: b/466443921 - Investigate why a non-Region object is in desktopExclusionRegions
+        desktopExclusionRegions.valueIterator().asSequence().filterIsInstance<Region>().forEach {
+            taskExclusionRegion ->
             desktopExclusionRegion.op(taskExclusionRegion, Region.Op.UNION)
         }
         return desktopExclusionRegion
@@ -564,6 +578,11 @@ class DesktopRepository(
         if (desk.activeTasks.add(taskId)) {
             if (desk.transientDesk) return
             updateActiveTasksListeners(displayId)
+            updateTaskAppearedInDeskListeners(
+                taskId = taskId,
+                displayId = displayId,
+                deskId = deskId,
+            )
         } else {
             logD("Active task=%d already added, displayId=%d, deskId=%d", taskId, displayId, deskId)
         }
@@ -1178,7 +1197,8 @@ class DesktopRepository(
      * appropriate classes.
      */
     fun updateTaskExclusionRegions(taskId: Int, taskExclusionRegions: Region) {
-        desktopExclusionRegions.put(taskId, taskExclusionRegions)
+        val exclusionRegion = Region.obtain(taskExclusionRegions)
+        desktopExclusionRegions.put(taskId, exclusionRegion)
         desktopGestureExclusionExecutor?.execute {
             desktopGestureExclusionListener?.accept(calculateDesktopExclusionRegion())
         }
@@ -1266,6 +1286,20 @@ class DesktopRepository(
             return
         }
         rememberedBoundsRatioByPackageName.remove(packageName)
+        // The display ID doesn't matter actually because only [rememberedBoundsRatioByPackageName]
+        // needs to be updated.
+        updatePersistentRepository(DEFAULT_DISPLAY)
+    }
+
+    /** Clears the remembered bounds ratio for all package. */
+    fun clearAllRememberedBoundsRatio() {
+        if (!Flags.enableRememberedBounds()) {
+            return
+        }
+        rememberedBoundsRatioByPackageName.clear()
+        // The display ID doesn't matter actually because only [rememberedBoundsRatioByPackageName]
+        // needs to be updated.
+        updatePersistentRepository(DEFAULT_DISPLAY)
     }
 
     fun restoreRememberedBoundsRatioByPackageName(source: ArrayMap<String, RectF>) {
@@ -1283,13 +1317,6 @@ class DesktopRepository(
             if (displayId == INVALID_DISPLAY) return
 
             val desks = desktopData.desksSequence(displayId).map { it.deepCopy() }.toList()
-            if (desks.isEmpty()) {
-                logD(
-                    "updatePersistentRepository: no desks found for displayId=%d, skipping",
-                    displayId,
-                )
-                return
-            }
             if (DesktopExperienceFlags.REPOSITORY_BASED_PERSISTENCE.isTrue) {
                 persistentUpdateQueue.post {
                     Trace.beginSection("DesktopRepository#UpdateRepoWork")
@@ -1393,6 +1420,12 @@ class DesktopRepository(
         dumpDesktopTaskData(pw, innerPrefix)
         pw.println("${innerPrefix}activeTasksListeners=${activeTasksListeners.size}")
         pw.println("${innerPrefix}visibleTasksListeners=${visibleTasksListeners.size}")
+        if (Flags.enableRememberedBounds()) {
+            pw.println("${innerPrefix}rememberedBoundsRatioByPackageName:")
+            rememberedBoundsRatioByPackageName.forEach { (packageName, bounds) ->
+                pw.println("$innerPrefix  $packageName -> $bounds")
+            }
+        }
     }
 
     private fun dumpDesktopTaskData(pw: PrintWriter, prefix: String) {
@@ -1440,6 +1473,9 @@ class DesktopRepository(
 
         /** Called when the conditions that allow the creation of a new desk change. */
         fun onCanCreateDesksChanged(canCreateDesks: Boolean)
+
+        /** Called when a task is appearing in a desk. */
+        fun onTaskAppearingInDesk(taskId: Int, displayId: Int, deskId: Int)
     }
 
     /** Listens to changes for active tasks in desktop mode. */

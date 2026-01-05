@@ -52,6 +52,7 @@ import static android.window.TaskFragmentOperation.OP_TYPE_UNKNOWN;
 import static android.window.TaskFragmentOperation.PRIVILEGED_OP_START;
 import static android.window.WindowContainerTransaction.Change.CHANGE_FOCUSABLE;
 import static android.window.WindowContainerTransaction.Change.CHANGE_FORCE_TRANSLUCENT;
+import static android.window.WindowContainerTransaction.Change.CHANGE_HANDLE_PACKAGE_UPDATE;
 import static android.window.WindowContainerTransaction.Change.CHANGE_HIDDEN;
 import static android.window.WindowContainerTransaction.Change.CHANGE_INTERCEPT_BACK_PRESSED;
 import static android.window.WindowContainerTransaction.Change.CHANGE_LAUNCH_NEXT_TO_BUBBLE;
@@ -62,6 +63,7 @@ import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_CHILDREN_TASKS_REPARENT;
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_CLEAR_ADJACENT_ROOTS;
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_DISALLOW_OVERRIDE_BOUNDS_FOR_CHILDREN;
+import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_DISALLOW_OVERRIDE_WINDOWING_MODE_FOR_CHILDREN;
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_FINISH_ACTIVITY;
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_LAUNCH_TASK;
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_MOVE_PIP_ACTIVITY_TO_PINNED_TASK;
@@ -81,7 +83,9 @@ import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_SET_KEYGUARD_STATE;
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_SET_LAUNCH_ADJACENT_FLAG_ROOT;
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_SET_LAUNCH_ROOT;
+import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_CONTINUE_PACKAGE_UPDATE;
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_SET_REPARENT_LEAF_TASK_IF_RELAUNCH;
+import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_SET_REPARENT_LEAF_TASK_IF_RELAUNCH_FROM_HOME;
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_SET_SAFE_REGION_BOUNDS;
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_SET_SYSTEM_BAR_VISIBILITY_OVERRIDE;
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_START_SHORTCUT;
@@ -827,6 +831,9 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
         int effects = TRANSACT_EFFECTS_NONE;
         final int windowingMode = change.getWindowingMode();
         if (configMask != 0) {
+            // Save a copy before the configuration is updated.
+            final Rect prevRequestedBounds = new Rect(container.getRequestedOverrideConfiguration()
+                    .windowConfiguration.getBounds());
             if (windowingMode > -1 && windowingMode != container.getWindowingMode()) {
                 // Special handling for when we are setting a windowingMode in the same transaction.
                 // Setting the windowingMode is going to call onConfigurationChanged so we don't
@@ -901,9 +908,23 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
                 container.onRequestedOverrideConfigurationChanged(c);
             }
             effects |= TRANSACT_EFFECTS_CLIENT_CONFIG;
-            if (windowMask != 0 && container.isEmbedded()) {
-                // Changing bounds of the embedded TaskFragments may result in lifecycle changes.
-                effects |= TRANSACT_EFFECTS_LIFECYCLE;
+            if (windowMask != 0) {
+                if (container.isEmbedded()) {
+                    // Changing bounds of the embedded TaskFragments may result in lifecycle
+                    // changes.
+                    effects |= TRANSACT_EFFECTS_LIFECYCLE;
+                }
+                if (Flags.makeFillingBoundsChangeEffectLifecycle()) {
+                    final boolean hasBoundsConfigChange =
+                            (windowMask & WindowConfiguration.WINDOW_CONFIG_BOUNDS) != 0;
+                    final boolean wasFillingParent = prevRequestedBounds.isEmpty();
+                    final boolean isFillingParent = change.getConfiguration()
+                            .windowConfiguration.getBounds().isEmpty();
+                    if (hasBoundsConfigChange && (wasFillingParent || isFillingParent)) {
+                        // Changing bounds to fill or from filling may result in lifecycle changes.
+                        effects |= TRANSACT_EFFECTS_LIFECYCLE;
+                    }
+                }
             }
         }
         if ((change.getChangeMask() & WindowContainerTransaction.Change.CHANGE_FOCUSABLE) != 0) {
@@ -1046,6 +1067,10 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
         if ((c.getChangeMask() & CHANGE_INTERCEPT_BACK_PRESSED) != 0) {
             mTaskOrganizerController.setInterceptBackPressedOnTaskRoot(tr.mTaskId,
                     c.getInterceptBackPressed());
+        }
+
+        if (((c.getChangeMask() & CHANGE_HANDLE_PACKAGE_UPDATE) != 0) && tr.isRootTask()) {
+            tr.mHandlePackageUpdate = c.getHandlePackageUpdate();
         }
 
         return effects;
@@ -1609,6 +1634,26 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
                 task.setReparentLeafTaskIfRelaunch(hop.isReparentLeafTaskIfRelaunch());
                 break;
             }
+            case HIERARCHY_OP_TYPE_SET_REPARENT_LEAF_TASK_IF_RELAUNCH_FROM_HOME: {
+                final WindowContainer container = WindowContainer.fromBinder(hop.getContainer());
+                final Task task = container != null ? container.asTask() : null;
+                if (task == null || !task.isAttached()) {
+                    Slog.e(TAG, "Attempt to operate on unknown or detached container: "
+                            + container);
+                    break;
+                }
+                if (!task.mCreatedByOrganizer) {
+                    throw new UnsupportedOperationException(
+                            "Cannot set reparent leaf task flag on non-organized task : " + task);
+                }
+                if (!task.isRootTask()) {
+                    throw new UnsupportedOperationException(
+                            "Cannot set reparent leaf task flag on non-root task : " + task);
+                }
+                task.setReparentLeafTaskIfRelaunchFromHome(
+                        hop.isReparentLeafTaskIfRelaunchFromHome());
+                break;
+            }
             case HIERARCHY_OP_TYPE_SET_IS_TRIMMABLE: {
                 final WindowContainer container = WindowContainer.fromBinder(hop.getContainer());
                 final Task task = container != null ? container.asTask() : null;
@@ -1680,6 +1725,37 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
 
                 if (task.setDisallowOverrideBoundsForChildren(
                         hop.getDisallowOverrideBoundsForChildren()) != BOUNDS_CHANGE_NONE) {
+                    effects |= TRANSACT_EFFECTS_LIFECYCLE;
+                }
+                break;
+            }
+            case HIERARCHY_OP_TYPE_CONTINUE_PACKAGE_UPDATE: {
+                final WindowContainer container = WindowContainer.fromBinder(hop.getContainer());
+                final Task task = container != null ? container.asTask() : null;
+                if (task == null || !task.isAttached()) {
+                    Slog.e(TAG, "Attempt to operate on unknown or detached container: "
+                            + container);
+                    break;
+                }
+                task.continuePackageUpdate();
+                break;
+            }
+            case HIERARCHY_OP_TYPE_DISALLOW_OVERRIDE_WINDOWING_MODE_FOR_CHILDREN: {
+                final WindowContainer<?> container = WindowContainer.fromBinder(hop.getContainer());
+                if (container == null || !container.isAttached()) {
+                    Slog.e(TAG, "Attempt to operate on unknown or detached container: "
+                            + container);
+                    break;
+                }
+                final Task task = container.asTask();
+                if (task == null) {
+                    Slog.e(TAG, "Cannot disallow override windowing mode for children on "
+                            + "a non-task: " + container);
+                    break;
+                }
+
+                if (task.setDisallowOverrideWindowingModeForChildren(
+                        hop.getDisallowOverrideWindowingModeForChildren())) {
                     effects |= TRANSACT_EFFECTS_LIFECYCLE;
                 }
                 break;
@@ -2238,12 +2314,9 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
                                 + " taskDisplayArea, but not " + newParent);
                     }
                 } else {
-                    final Task rootTask = (Task) (
-                            (newParent != null && !(newParent instanceof TaskDisplayArea))
-                                    ? newParent : task.getRootTask());
-                    as.getDisplayArea().positionChildAt(
-                            hop.getToTop() ? POSITION_TOP : POSITION_BOTTOM, rootTask,
-                            false /* includingParents */);
+                    // Parents are the same, so just apply the requested reordering
+                    newParent.positionChildAt(hop.getToTop() ? POSITION_TOP : POSITION_BOTTOM,
+                            task, false /* includingParents */);
                 }
             } else {
                 throw new RuntimeException("Reparenting leaf Tasks is not supported now. " + task);

@@ -187,8 +187,8 @@ public class TaskView extends SurfaceView implements SurfaceHolder.Callback,
     /**
      * @return {@code True} when the TaskView's surface has been created, {@code False} otherwise.
      */
-    public boolean isInitialized() {
-        return mTaskViewTaskController.isInitialized();
+    public boolean isSurfaceCreated() {
+        return mTaskViewTaskController.isSurfaceCreated();
     }
 
     @Override
@@ -207,6 +207,11 @@ public class TaskView extends SurfaceView implements SurfaceHolder.Callback,
         } else {
             runOnViewThread(() -> setResizeBackgroundColor(bgColor));
         }
+    }
+
+    @Override
+    public boolean shouldHideSurfaceWhileClosing() {
+        return getAlpha() == 0 || getVisibility() != VISIBLE;
     }
 
     /**

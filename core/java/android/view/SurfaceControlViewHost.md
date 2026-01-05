@@ -55,9 +55,19 @@ The View hierarchy within the SurfaceControlViewHost receives its own InputChann
 InputDisptcher sends touch events to the remote Window via hit testing. If the remote Window is attached to a SurfaceView that is z-ordered above, all touches to the remote Window will be received by the remote process.
 If the SurfaceView is z-ordered below, then the remote Window will be occluded by the host window and touches will not reach the remote Window. If the host Window has a cutout for its touchable region to let touches go through, the touches will still be dropped because the remote Window will be considered occluded by InputDispatcher.
 
+### OnBackInvokedCallback Handling
+
+The OnBackInvokedCallback registered from the View hierarchy within the SurfaceControlViewHost can be triggered when a back gesture occurs if the SurfaceControlViewHost has been granted input focus.
+
 ### Insets
 
 Remote Windows attached to a host Window will not get inset callbacks. The host view hierarchy is expected to handle insets since the remote view is apart of its view hierarchy. In some cases where the remote Window is not attached to a host window but directly into the WindowManager hierarchy via `WindowManagerInternal#addTrustedTaskOverlay` the Remote window will be receive of inset callbacks.
+
+### Accessibility
+
+When a `SurfacePackage` is attached to a `SurfaceView`, the accessibility hierarchy from the remote view is automatically embedded into the host application's view hierarchy. The `SurfaceView` acts as the bridge, making the remote view's accessibility tree a child of the `SurfaceView`'s accessibility node. This integration allows accessibility services, such as screen readers, to navigate and interact with the remote content as if it were a native part of the host application.
+
+By default, accessibility embedding is enabled. However, it can be disabled if the embedded content is purely decorative, or if its accessibility information is represented elsewhere in the host's UI. The `SurfaceView` provides the `@hide` `setAccessibilityHierarchyEmbeddingEnabled(boolean)` method to disable this feature. If the `SurfaceView` itself is decorative and should be excluded from the accessibility hierarchy, `View#setImportantForAccessibility(int)` should be considered.
 
 ### Security Considerations
 SurfaceControlViewHost can be used to provide a sandboxed environment.

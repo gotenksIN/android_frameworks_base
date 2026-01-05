@@ -20,6 +20,7 @@ import static android.app.Flags.notificationsRedesignTemplates;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.app.Flags;
 import android.app.Notification;
 import android.app.PendingIntent;
 import android.content.Context;
@@ -53,7 +54,6 @@ import com.android.systemui.res.R;
 import com.android.systemui.statusbar.RemoteInputController;
 import com.android.systemui.statusbar.SmartReplyController;
 import com.android.systemui.statusbar.TransformableView;
-import com.android.systemui.statusbar.notification.FeedbackIcon;
 import com.android.systemui.statusbar.notification.NotificationFadeAware;
 import com.android.systemui.statusbar.notification.NotificationUtils;
 import com.android.systemui.statusbar.notification.collection.NotificationEntry;
@@ -1297,7 +1297,8 @@ public class NotificationContentView extends FrameLayout implements Notification
         return getVisualTypeForHeight(viewHeight);
     }
 
-    private int getVisualTypeForHeight(float viewHeight) {
+    @VisibleForTesting
+    public int getVisualTypeForHeight(float viewHeight) {
         boolean noExpandedChild = mExpandedChild == null;
         if (!noExpandedChild && viewHeight == getViewHeight(VISIBLE_TYPE_EXPANDED)) {
             return VISIBLE_TYPE_EXPANDED;
@@ -1306,6 +1307,13 @@ public class NotificationContentView extends FrameLayout implements Notification
 
         if (!mUserExpanding && shouldShowSingleLineView() && isSingleLinePresent) {
             return VISIBLE_TYPE_SINGLELINE;
+        }
+
+        if (Flags.richOngoingImprovements() && !noExpandedChild
+                && mContainingNotification.isPromotedOngoing()
+                && mContainingNotification.canPromotedNotificationShowExpanded(
+                        /* allowOnKeyguard = */false)) {
+            return VISIBLE_TYPE_EXPANDED;
         }
 
         if ((mIsHeadsUp || mHeadsUpAnimatingAway) && mHeadsUpChild != null
@@ -1981,19 +1989,6 @@ public class NotificationContentView extends FrameLayout implements Notification
             return mHeadsUpWrapper;
         }
         return null;
-    }
-
-    /** Shows the given feedback icon, or hides the icon if null. */
-    public void setFeedbackIcon(@Nullable FeedbackIcon icon) {
-        if (mContractedChild != null) {
-            mContractedWrapper.setFeedbackIcon(icon);
-        }
-        if (mExpandedChild != null) {
-            mExpandedWrapper.setFeedbackIcon(icon);
-        }
-        if (mHeadsUpChild != null) {
-            mHeadsUpWrapper.setFeedbackIcon(icon);
-        }
     }
 
     /** Sets whether the notification being displayed audibly alerted the user. */

@@ -986,6 +986,12 @@ public class WindowStateTests extends WindowTestsBase {
         clearInvocations(t);
         child2.prepareSurfaces();
         verify(t).setMatrix(child2.mSurfaceControl, w.mInvGlobalScale, 0, 0, w.mInvGlobalScale);
+
+        // If the child is offset by 100px relative to the parent, the surface position should be
+        // 50px, as the parent's 2x scale doubles the offset.
+        child2.transformFrameToSurfacePosition(parentFrame.left + 100, parentFrame.top + 100,
+                childPos);
+        assertEquals(new Point(50, 50), childPos);
     }
 
     @SetupWindows(addWindows = { W_ABOVE_ACTIVITY, W_NOTIFICATION_SHADE })
@@ -1582,6 +1588,10 @@ public class WindowStateTests extends WindowTestsBase {
     public void testLocalInsetsDoesNotCopyToIme() {
         WindowState app = newWindowBuilder("app", TYPE_BASE_APPLICATION).setWindowToken(
                 mAppWindow.mToken).build();
+
+        mDisplayContent.getInsetsStateController().updateAboveInsetsState(
+                false /* notifyInsetsChange */);
+        assertNull("Initially no merged local insets", app.mMergedLocalInsetsSources);
 
         Binder owner = new Binder();
         final Insets attachedInsets = Insets.of(0, 10, 0, 0);

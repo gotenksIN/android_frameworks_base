@@ -555,13 +555,11 @@ public final class FusedTimeZoneDetectorImpl implements FusedTimeZoneDetector {
     private boolean isLocationTimeZoneDetectionEnabled() {
         return mServiceConfigAccessor
                         .getCurrentUserConfigurationInternal()
-                        .isGeoDetectionSupported()
-                && mServiceConfigAccessor
-                        .getCurrentUserConfigurationInternal()
                         .getLocationEnabledSetting()
                 && mServiceConfigAccessor
                         .getCurrentUserConfigurationInternal()
-                        .getGeoDetectionEnabledSetting();
+                        .isGeoDetectionSupported()
+                && isGeoDetectionEnabledInSettings();
     }
 
     private boolean isTelephonyTimeZoneDetectionSupported() {
@@ -577,6 +575,23 @@ public final class FusedTimeZoneDetectorImpl implements FusedTimeZoneDetector {
                 != 0;
     }
 
+    private boolean isGeoDetectionEnabledInSettings() {
+        ConfigurationInternal config = mServiceConfigAccessor.getCurrentUserConfigurationInternal();
+
+        // If the user has explicitly enabled "Use location for time zone", use that setting.
+        if (config.getGeoDetectionEnabledSetting()) {
+            return true;
+        }
+
+        // On devices without telephony (e.g. Wi-Fi-only tablets), the single "Automatic time zone
+        // detection" toggle is the only way to enable location-based time zone detection. As per
+        // the setting's wording, enabling this toggle acts as a direct acceptance to use location
+        // for this purpose.
+        return config.getAutoDetectionEnabledBehavior()
+                && !config.isTelephonyDetectionSupported()
+                && config.isGeoDetectionSupported();
+    }
+
     /** Dumps internal state such as field values. */
     @Override
     public synchronized void dump(@NonNull IndentingPrintWriter ipw, @Nullable String[] args) {
@@ -588,7 +603,22 @@ public final class FusedTimeZoneDetectorImpl implements FusedTimeZoneDetector {
 
         ipw.println("Configuration:");
         ipw.increaseIndent(); // level 2
-        ipw.println("isLocationEnabled=" + isLocationTimeZoneDetectionEnabled());
+        ipw.println("isLocationTimeZoneDetectionEnabled=" + isLocationTimeZoneDetectionEnabled());
+
+        ipw.increaseIndent(); // level 3
+        ipw.println(
+                "isLocationEnabledSetting="
+                        + mServiceConfigAccessor
+                                .getCurrentUserConfigurationInternal()
+                                .getLocationEnabledSetting());
+        ipw.println(
+                "isGeoDetectionSupported="
+                        + mServiceConfigAccessor
+                                .getCurrentUserConfigurationInternal()
+                                .isGeoDetectionSupported());
+        ipw.println("isGeoDetectionEnabledSetting=" + isGeoDetectionEnabledInSettings());
+        ipw.decreaseIndent(); // level 3
+
         ipw.println("isTelephonySupported=" + isTelephonyTimeZoneDetectionSupported());
         ipw.println("mIsAirplaneModeOn=" + mIsAirplaneModeOn);
         ipw.println("mIsLocationOnlyTzDetection=" + mIsLocationOnlyTzDetection);

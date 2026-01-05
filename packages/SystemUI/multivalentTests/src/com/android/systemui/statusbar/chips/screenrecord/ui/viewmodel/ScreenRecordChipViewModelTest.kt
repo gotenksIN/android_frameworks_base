@@ -48,7 +48,9 @@ import com.android.systemui.screenrecord.data.repository.screenRecordRepository
 import com.android.systemui.statusbar.chips.mediaprojection.domain.interactor.MediaProjectionChipInteractorTest.Companion.setUpPackageManagerForMediaProjection
 import com.android.systemui.statusbar.chips.screenrecord.ui.view.EndScreenRecordingDialogDelegate
 import com.android.systemui.statusbar.chips.sharetoapp.ui.viewmodel.shareToAppChipViewModel
+import com.android.systemui.statusbar.chips.ui.model.Chronometer
 import com.android.systemui.statusbar.chips.ui.model.ColorsModel
+import com.android.systemui.statusbar.chips.ui.model.EventTime
 import com.android.systemui.statusbar.chips.ui.model.OngoingActivityChipModel
 import com.android.systemui.statusbar.chips.ui.view.ChipBackgroundContainer
 import com.android.systemui.statusbar.chips.ui.viewmodel.OngoingActivityChipsWithNotifsViewModelTest.Companion.getStopActionFromDialog
@@ -199,7 +201,11 @@ class ScreenRecordChipViewModelTest : SysuiTestCase() {
         }
 
     @Test
-    @DisableFlags(Flags.FLAG_NEW_SCREEN_RECORD_TOOLBAR)
+    @DisableFlags(
+        Flags.FLAG_NEW_SCREEN_RECORD_TOOLBAR,
+        Flags.FLAG_LARGE_SCREEN_SCREENCAPTURE,
+        Flags.FLAG_LARGE_SCREEN_RECORDING,
+    )
     fun chip_recordingStoppedFromDialog_screenRecordAndShareToAppChipImmediatelyHidden() =
         testScope.runTest {
             val latest by collectLastValue(underTest.chip)
@@ -293,9 +299,9 @@ class ScreenRecordChipViewModelTest : SysuiTestCase() {
             assertThat(
                     ((latest as OngoingActivityChipModel.Active).content
                             as OngoingActivityChipModel.Content.Timer)
-                        .startTimeMs
+                        .value
                 )
-                .isEqualTo(1234)
+                .isEqualTo(Chronometer.Running(EventTime.ElapsedRealtime(1234)))
 
             screenRecordRepo.screenRecordState.value = ScreenRecordModel.DoingNothing
             assertThat(latest).isInstanceOf(OngoingActivityChipModel.Inactive::class.java)
@@ -307,9 +313,9 @@ class ScreenRecordChipViewModelTest : SysuiTestCase() {
             assertThat(
                     ((latest as OngoingActivityChipModel.Active).content
                             as OngoingActivityChipModel.Content.Timer)
-                        .startTimeMs
+                        .value
                 )
-                .isEqualTo(5678)
+                .isEqualTo(Chronometer.Running(EventTime.ElapsedRealtime(5678)))
         }
 
     /** Regression test for b/349620526. */
@@ -328,9 +334,9 @@ class ScreenRecordChipViewModelTest : SysuiTestCase() {
             assertThat(
                     ((latest as OngoingActivityChipModel.Active).content
                             as OngoingActivityChipModel.Content.Timer)
-                        .startTimeMs
+                        .value
                 )
-                .isEqualTo(1234)
+                .isEqualTo(Chronometer.Running(EventTime.ElapsedRealtime(1234)))
 
             // WHEN we receive the recording task info a few milliseconds later
             systemClock.setElapsedRealtime(1240)
@@ -347,9 +353,9 @@ class ScreenRecordChipViewModelTest : SysuiTestCase() {
             assertThat(
                     ((latest as OngoingActivityChipModel.Active).content
                             as OngoingActivityChipModel.Content.Timer)
-                        .startTimeMs
+                        .value
                 )
-                .isEqualTo(1234)
+                .isEqualTo(Chronometer.Running(EventTime.ElapsedRealtime(1234)))
         }
 
     @Test
@@ -364,7 +370,11 @@ class ScreenRecordChipViewModelTest : SysuiTestCase() {
         }
 
     @Test
-    @DisableFlags(Flags.FLAG_NEW_SCREEN_RECORD_TOOLBAR)
+    @DisableFlags(
+        Flags.FLAG_NEW_SCREEN_RECORD_TOOLBAR,
+        Flags.FLAG_LARGE_SCREEN_SCREENCAPTURE,
+        Flags.FLAG_LARGE_SCREEN_RECORDING,
+    )
     fun chip_notProjecting_expandActionBehaviorShowsDialog() =
         testScope.runTest {
             val latest by collectLastValue(underTest.chip)
@@ -380,7 +390,11 @@ class ScreenRecordChipViewModelTest : SysuiTestCase() {
         }
 
     @Test
-    @DisableFlags(Flags.FLAG_NEW_SCREEN_RECORD_TOOLBAR)
+    @DisableFlags(
+        Flags.FLAG_NEW_SCREEN_RECORD_TOOLBAR,
+        Flags.FLAG_LARGE_SCREEN_SCREENCAPTURE,
+        Flags.FLAG_LARGE_SCREEN_RECORDING,
+    )
     fun chip_projectingEntireScreen_expandActionBehaviorShowsDialog() =
         testScope.runTest {
             val latest by collectLastValue(underTest.chip)
@@ -395,7 +409,11 @@ class ScreenRecordChipViewModelTest : SysuiTestCase() {
         }
 
     @Test
-    @DisableFlags(Flags.FLAG_NEW_SCREEN_RECORD_TOOLBAR)
+    @DisableFlags(
+        Flags.FLAG_NEW_SCREEN_RECORD_TOOLBAR,
+        Flags.FLAG_LARGE_SCREEN_SCREENCAPTURE,
+        Flags.FLAG_LARGE_SCREEN_RECORDING,
+    )
     fun chip_projectingSingleTask_expandActionBehaviorShowsDialog() =
         testScope.runTest {
             val latest by collectLastValue(underTest.chip)
@@ -416,7 +434,11 @@ class ScreenRecordChipViewModelTest : SysuiTestCase() {
         }
 
     @Test
-    @EnableFlags(Flags.FLAG_NEW_SCREEN_RECORD_TOOLBAR)
+    @EnableFlags(
+        Flags.FLAG_NEW_SCREEN_RECORD_TOOLBAR,
+        Flags.FLAG_LARGE_SCREEN_SCREENCAPTURE,
+        Flags.FLAG_LARGE_SCREEN_RECORDING,
+    )
     fun chip_recording_tapShowsScreenCaptureUi() =
         kosmos.runTest {
             whenever(

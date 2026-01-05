@@ -182,48 +182,68 @@ public final class ImsReasonInfo implements Parcelable {
     /**
      * The operation is restricted to fixed dialing numbers only.
      */
+// QTI_BEGIN: 2015-07-06: Telephony: MWI,phantom call,Suppl services, error codes
     public static final int CODE_FDN_BLOCKED = 241;
 
+// QTI_END: 2015-07-06: Telephony: MWI,phantom call,Suppl services, error codes
     /**
      * Network rejected the emergency call request because IMEI was used as identification
      * and this capability is not supported by the network.
      */
     public static final int CODE_IMEI_NOT_ACCEPTED = 243;
 
+// QTI_BEGIN: 2017-12-06: Video: IMS: Add support for STK CC feature
     //STK CC errors
+// QTI_END: 2017-12-06: Video: IMS: Add support for STK CC feature
     /**
      * Stk Call Control modified DIAL request to USSD request.
      */
+// QTI_BEGIN: 2017-12-06: Video: IMS: Add support for STK CC feature
     public static final int CODE_DIAL_MODIFIED_TO_USSD = 244;
+// QTI_END: 2017-12-06: Video: IMS: Add support for STK CC feature
     /**
      * Stk Call Control modified DIAL request to SS request.
      */
+// QTI_BEGIN: 2017-12-06: Video: IMS: Add support for STK CC feature
     public static final int CODE_DIAL_MODIFIED_TO_SS = 245;
+// QTI_END: 2017-12-06: Video: IMS: Add support for STK CC feature
     /**
      * Stk Call Control modified DIAL request to DIAL with modified data.
      */
+// QTI_BEGIN: 2017-12-06: Video: IMS: Add support for STK CC feature
     public static final int CODE_DIAL_MODIFIED_TO_DIAL = 246;
+// QTI_END: 2017-12-06: Video: IMS: Add support for STK CC feature
     /**
      * Stk Call Control modified DIAL request to Video DIAL request.
      */
+// QTI_BEGIN: 2017-12-06: Video: IMS: Add support for STK CC feature
     public static final int CODE_DIAL_MODIFIED_TO_DIAL_VIDEO = 247;
+// QTI_END: 2017-12-06: Video: IMS: Add support for STK CC feature
     /**
      * Stk Call Control modified Video DIAL request to DIAL request.
      */
+// QTI_BEGIN: 2017-12-06: Video: IMS: Add support for STK CC feature
     public static final int CODE_DIAL_VIDEO_MODIFIED_TO_DIAL = 248;
+// QTI_END: 2017-12-06: Video: IMS: Add support for STK CC feature
     /**
      * Stk Call Control modified Video DIAL request to Video DIAL request.
      */
+// QTI_BEGIN: 2017-12-06: Video: IMS: Add support for STK CC feature
     public static final int CODE_DIAL_VIDEO_MODIFIED_TO_DIAL_VIDEO = 249;
+// QTI_END: 2017-12-06: Video: IMS: Add support for STK CC feature
     /**
      * Stk Call Control modified Video DIAL request to SS request.
      */
+// QTI_BEGIN: 2017-12-06: Video: IMS: Add support for STK CC feature
     public static final int CODE_DIAL_VIDEO_MODIFIED_TO_SS = 250;
+// QTI_END: 2017-12-06: Video: IMS: Add support for STK CC feature
     /**
      * Stk Call Control modified Video DIAL request to USSD request.
      */
+// QTI_BEGIN: 2017-12-06: Video: IMS: Add support for STK CC feature
     public static final int CODE_DIAL_VIDEO_MODIFIED_TO_USSD = 251;
 
+// QTI_END: 2017-12-06: Video: IMS: Add support for STK CC feature
     /*
      * STATUSCODE (SIP response code) (IMS -> Telephony)
      */
@@ -510,23 +530,33 @@ public final class ImsReasonInfo implements Parcelable {
      * The password entered for UT operations does not match the stored password.
      */
     public static final int CODE_UT_CB_PASSWORD_MISMATCH = 821;
+// QTI_BEGIN: 2017-12-06: Video: IMS: Add support for STK CC feature
     //STK CC errors
+// QTI_END: 2017-12-06: Video: IMS: Add support for STK CC feature
     /**
      * Sim Toolkit Call Control modified the UT operation to a dial command.
      */
+// QTI_BEGIN: 2017-12-06: Video: IMS: Add support for STK CC feature
     public static final int CODE_UT_SS_MODIFIED_TO_DIAL = 822;
+// QTI_END: 2017-12-06: Video: IMS: Add support for STK CC feature
     /**
      * Sim Toolkit Call Control modified the UT operation to a USSD command.
      */
+// QTI_BEGIN: 2017-12-06: Video: IMS: Add support for STK CC feature
     public static final int CODE_UT_SS_MODIFIED_TO_USSD = 823;
+// QTI_END: 2017-12-06: Video: IMS: Add support for STK CC feature
     /**
      * Sim Toolkit Call Control modified the UT operation to another supplementary service command.
      */
+// QTI_BEGIN: 2017-12-06: Video: IMS: Add support for STK CC feature
     public static final int CODE_UT_SS_MODIFIED_TO_SS = 824;
+// QTI_END: 2017-12-06: Video: IMS: Add support for STK CC feature
     /**
      * Sim Toolkit Call Control modified the UT operation to a video call dial command.
      */
+// QTI_BEGIN: 2017-12-06: Video: IMS: Add support for STK CC feature
     public static final int CODE_UT_SS_MODIFIED_TO_DIAL_VIDEO = 825;
+// QTI_END: 2017-12-06: Video: IMS: Add support for STK CC feature
 
     /**@hide*/
     @IntDef(value = {
@@ -564,9 +594,11 @@ public final class ImsReasonInfo implements Parcelable {
      */
     /**
      * MT call has ended due to a release from the network because the call was answered elsewhere.
+// QTI_BEGIN: 2015-07-06: Telephony: MWI,phantom call,Suppl services, error codes
      */
     public static final int CODE_ANSWERED_ELSEWHERE = 1014;
 
+// QTI_END: 2015-07-06: Telephony: MWI,phantom call,Suppl services, error codes
     /**
      * For MultiEndpoint - Call Pull request has failed.
      */
@@ -902,6 +934,7 @@ public final class ImsReasonInfo implements Parcelable {
      */
     public static final int CODE_RETRY_ON_IMS_WITHOUT_RTT = 3001;
 
+// QTI_BEGIN: 2021-08-12: Telephony: IMS: Add support for additional call information
     /**
      * Call failed due to concurrent calls not possible, this value should be in sync with {link@
      * QtiCallConstants.CODE_CONCURRENT_CALLS_NOT_POSSIBLE}.
@@ -910,6 +943,7 @@ public final class ImsReasonInfo implements Parcelable {
      */
     public static final int CODE_CONCURRENT_CALLS_NOT_POSSIBLE = 3002;
 
+// QTI_END: 2021-08-12: Telephony: IMS: Add support for additional call information
     /*
      * OEM specific error codes. To be used by OEMs when they don't want to reveal error code which
      * would be replaced by ERROR_UNSPECIFIED.
@@ -1092,7 +1126,9 @@ public final class ImsReasonInfo implements Parcelable {
             CODE_REJECT_ONGOING_CS_CALL,
             CODE_NETWORK_CONGESTION,
             CODE_RETRY_ON_IMS_WITHOUT_RTT,
+// QTI_BEGIN: 2021-08-12: Telephony: IMS: Add support for additional call information
             CODE_CONCURRENT_CALLS_NOT_POSSIBLE,
+// QTI_END: 2021-08-12: Telephony: IMS: Add support for additional call information
             CODE_OEM_CAUSE_1,
             CODE_OEM_CAUSE_2,
             CODE_OEM_CAUSE_3,
@@ -1286,7 +1322,9 @@ public final class ImsReasonInfo implements Parcelable {
         sImsCodeMap.put(CODE_REJECT_ONGOING_CS_CALL, "CODE_REJECT_ONGOING_CS_CALL");
         sImsCodeMap.put(CODE_NETWORK_CONGESTION, "CODE_NETWORK_CONGESTION");
         sImsCodeMap.put(CODE_RETRY_ON_IMS_WITHOUT_RTT, "CODE_RETRY_ON_IMS_WITHOUT_RTT");
+// QTI_BEGIN: 2021-08-12: Telephony: IMS: Add support for additional call information
         sImsCodeMap.put(CODE_CONCURRENT_CALLS_NOT_POSSIBLE, "CODE_CONCURRENT_CALLS_NOT_POSSIBLE");
+// QTI_END: 2021-08-12: Telephony: IMS: Add support for additional call information
         sImsCodeMap.put(CODE_OEM_CAUSE_1, "CODE_OEM_CAUSE_1");
         sImsCodeMap.put(CODE_OEM_CAUSE_2, "CODE_OEM_CAUSE_2");
         sImsCodeMap.put(CODE_OEM_CAUSE_3, "CODE_OEM_CAUSE_3");

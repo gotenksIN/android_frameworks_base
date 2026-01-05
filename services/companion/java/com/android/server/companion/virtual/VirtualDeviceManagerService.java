@@ -20,6 +20,7 @@ import static android.companion.virtual.VirtualDeviceParams.DEVICE_POLICY_DEFAUL
 import static android.companion.virtual.VirtualDeviceParams.DEVICE_POLICY_INVALID;
 import static android.companion.virtual.VirtualDeviceParams.POLICY_TYPE_DEFAULT_DEVICE_CAMERA_ACCESS;
 import static android.media.AudioManager.AUDIO_SESSION_ID_GENERATE;
+import static android.os.IServiceManager.DUMP_FLAG_PRIORITY_NORMAL;
 
 import static com.android.server.wm.ActivityInterceptorCallback.VIRTUAL_DEVICE_SERVICE_ORDERED_ID;
 
@@ -80,6 +81,7 @@ import android.window.DisplayWindowPolicyController;
 
 import com.android.internal.R;
 import com.android.internal.annotations.GuardedBy;
+import com.android.internal.annotations.Initializer;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.DumpUtils;
 import com.android.internal.widget.LockPatternUtils;
@@ -140,6 +142,7 @@ public class VirtualDeviceManagerService extends SystemService {
      */
     private final Object mVirtualDeviceManagerLock = new Object();
 
+    @SuppressWarnings("NullAway") // Initialized on start, not in constructor
     private ActivityTaskManagerInternal mActivityTaskManagerInternal;
     private final VirtualDeviceManagerImpl mImpl;
     private final VirtualDeviceManagerNativeImpl mNativeImpl;
@@ -150,7 +153,7 @@ public class VirtualDeviceManagerService extends SystemService {
     private final ComputerControlSessionProcessor mComputerControlSessionProcessor;
     private final AutomatedPackagesRepository mAutomatedPackagesRepository;
 
-    private static AtomicInteger sNextUniqueIndex = new AtomicInteger(
+    private static final AtomicInteger sNextUniqueIndex = new AtomicInteger(
             Context.DEVICE_ID_DEFAULT + 1);
 
     @GuardedBy("mVirtualDeviceManagerLock")
@@ -174,6 +177,7 @@ public class VirtualDeviceManagerService extends SystemService {
             }
         }
     }
+    @Nullable
     private StrongAuthTracker mStrongAuthTracker;
 
     private final RemoteCallbackList<IVirtualDeviceListener> mVirtualDeviceListeners =
@@ -257,10 +261,12 @@ public class VirtualDeviceManagerService extends SystemService {
                 }
             };
 
+    @Initializer
     @Override
     @RequiresPermission(android.Manifest.permission.MANAGE_COMPANION_DEVICES)
     public void onStart() {
-        publishBinderService(Context.VIRTUAL_DEVICE_SERVICE, mImpl);
+        publishBinderService(Context.VIRTUAL_DEVICE_SERVICE, mImpl, /* allowIsolated= */ false,
+                DUMP_FLAG_PRIORITY_NORMAL);
         publishBinderService(VIRTUAL_DEVICE_NATIVE_SERVICE, mNativeImpl);
         publishLocalService(VirtualDeviceManagerInternal.class, mLocalService);
         mActivityTaskManagerInternal = getLocalService(ActivityTaskManagerInternal.class);
@@ -309,6 +315,7 @@ public class VirtualDeviceManagerService extends SystemService {
         }
     }
 
+    @Nullable
     private CameraAccessController getCameraAccessController(UserHandle userHandle,
             VirtualDeviceParams params, String callingPackage) {
         if (CompatChanges.isChangeEnabled(ENABLE_DEFAULT_DEVICE_CAMERA_ACCESS, callingPackage,
@@ -458,6 +465,7 @@ public class VirtualDeviceManagerService extends SystemService {
         }
     }
 
+    @Nullable
     private String getDeviceOwnerForDisplayId(int displayId) {
         if (displayId == Display.INVALID_DISPLAY || displayId == Display.DEFAULT_DISPLAY) {
             return null;
@@ -571,16 +579,19 @@ public class VirtualDeviceManagerService extends SystemService {
                 IBinder token,
                 AttributionSource attributionSource,
                 @NonNull VirtualDeviceParams params) {
+            IVirtualDeviceActivityListener stubActivityListener =
+                    new IVirtualDeviceActivityListener.Default();
             return createVirtualDevice(token, attributionSource, /* associationInfo= */ null,
-                    params, /* activityListener= */ null, /* soundEffectListener= */ null);
+                    params, /* activityListener= */ stubActivityListener,
+                    /* soundEffectListener= */ null);
         }
 
         private IVirtualDevice createVirtualDevice(
                 IBinder token,
                 AttributionSource attributionSource,
-                AssociationInfo associationInfo,
+                @Nullable AssociationInfo associationInfo,
                 @NonNull VirtualDeviceParams params,
-                @Nullable IVirtualDeviceActivityListener activityListener,
+                @NonNull IVirtualDeviceActivityListener activityListener,
                 @Nullable IVirtualDeviceSoundEffectListener soundEffectListener) {
             attributionSource.enforceCallingUid();
 
@@ -639,6 +650,7 @@ public class VirtualDeviceManagerService extends SystemService {
         }
 
         @Override // Binder call
+        @Nullable
         public VirtualDevice getVirtualDevice(int deviceId) {
             VirtualDeviceImpl device = getVirtualDeviceForId(deviceId);
             return device == null ? null : device.getPublicVirtualDeviceObject();
@@ -872,12 +884,14 @@ public class VirtualDeviceManagerService extends SystemService {
 
             Objects.requireNonNull(params, "params must not be null");
             Objects.requireNonNull(params.getName(), "virtual device name must not be null");
+            IVirtualDeviceActivityListener stubActivityListener =
+                    new IVirtualDeviceActivityListener.Default();
             IVirtualDevice virtualDevice = mImpl.createVirtualDevice(
                     new Binder(),
                     getContext().getAttributionSource(),
                     /* associationInfo= */ null,
                     params,
-                    /* activityListener= */ null,
+                    /* activityListener= */ stubActivityListener,
                     /* soundEffectListener= */ null);
             return new VirtualDeviceManager.VirtualDevice(getContext(), virtualDevice);
         }
@@ -993,6 +1007,7 @@ public class VirtualDeviceManagerService extends SystemService {
         }
 
         @Override
+        @Nullable
         public VirtualDevice getVirtualDevice(int deviceId) {
             return mImpl.getVirtualDevice(deviceId);
         }

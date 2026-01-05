@@ -1,6 +1,8 @@
 package com.android.server.wm;
 
+// QTI_BEGIN: 2020-01-20: Performance: Changing app classification logic from manifest-based to WLC-based
 import android.app.ActivityManager;
+// QTI_END: 2020-01-20: Performance: Changing app classification logic from manifest-based to WLC-based
 import static android.app.ActivityManager.PROCESS_STATE_NONEXISTENT;
 import static android.app.ActivityManager.START_SUCCESS;
 import static android.app.ActivityManager.START_TASK_TO_FRONT;
@@ -98,7 +100,9 @@ import android.os.SystemClock;
 import android.os.Trace;
 import android.os.incremental.IncrementalManager;
 import android.util.ArrayMap;
+// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 import android.util.BoostFramework;
+// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 import android.util.EventLog;
 import android.util.Log;
 import android.util.Slog;
@@ -189,10 +193,16 @@ class ActivityMetricsLogger {
     private ArtManagerInternal mArtManagerInternal;
     private final StringBuilder mStringBuilder = new StringBuilder();
 
+// QTI_BEGIN: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
     public static BoostFramework mUxPerf = new BoostFramework();
+// QTI_END: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
+// QTI_BEGIN: 2021-06-14: Performance: BoostFramework: Fix the broken Displayed activity hint.
     public static BoostFramework mPerfBoost = new BoostFramework();
+// QTI_END: 2021-06-14: Performance: BoostFramework: Fix the broken Displayed activity hint.
+// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
     private static ActivityRecord mLaunchedActivity;
 
+// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
     /**
      * Due to the global single concurrent launch sequence, all calls to this observer must be made
      * in-order on the same thread to fulfill the "happens-before" guarantee in LaunchObserver.
@@ -200,6 +210,9 @@ class ActivityMetricsLogger {
     private final LaunchObserverRegistryImpl mLaunchObserver;
     private final ArrayMap<String, Boolean> mLastHibernationStates = new ArrayMap<>();
     private AppHibernationManagerInternal mAppHibernationManagerInternal;
+
+    private final CrossPackageLaunchTracker mCrossPackageLaunchTracker =
+            new CrossPackageLaunchTracker();
 
     /**
      * The information created when an intent is incoming but we do not yet know whether it will be
@@ -218,6 +231,8 @@ class ActivityMetricsLogger {
         final long mStartRealtimeNs = SystemClock.elapsedRealtimeNanos();
         /** Non-null when a {@link TransitionInfo} is created for this state. */
         private TransitionInfo mAssociatedTransitionInfo;
+        /** Tracking origination for the consecutive launch among trampoline activities. */
+        private ActivityRecord mOriginalCaller;
         /** The sequence id for trace. It is used to map the traces before resolving intent. */
         private static int sTraceSeqId;
         /** The trace format is "launchingActivity#$seqId:$state(:$packageName)". */
@@ -279,6 +294,14 @@ class ActivityMetricsLogger {
         boolean contains(ActivityRecord r) {
             return mAssociatedTransitionInfo != null && mAssociatedTransitionInfo.contains(r);
         }
+
+        @NonNull
+        ActivityRecord tracksOriginator(@NonNull ActivityRecord caller) {
+            if (mOriginalCaller == null) {
+                mOriginalCaller = caller;
+            }
+            return mOriginalCaller;
+        }
     }
 
     /** The information created when an activity is confirmed to be launched. */
@@ -289,7 +312,7 @@ class ActivityMetricsLogger {
          *
          * @see LaunchingState#mAssociatedTransitionInfo
          */
-        final LaunchingState mLaunchingState;
+        @NonNull final LaunchingState mLaunchingState;
 
         /** The type can be cold (new process), warm (new activity), or hot (bring to front). */
         int mTransitionType;
@@ -305,6 +328,8 @@ class ActivityMetricsLogger {
         final boolean mIsInTaskActivityStart;
         /** Whether the last launched activity has reported drawn. */
         boolean mIsDrawn;
+        /** The first activity launched in the launch sequence (which may be a trampoline). */
+        @NonNull final ActivityRecord mStartActivity;
         /** The latest activity to have been launched. */
         @NonNull ActivityRecord mLastLaunchedActivity;
         /** The next activity if the latest launched activity in the same task is finishing. */
@@ -374,6 +399,7 @@ class ActivityMetricsLogger {
             mProcessOomAdj = processOomAdj;
             mIsInTaskActivityStart = isInTaskActivityStart;
             setLatestLaunchedActivity(r);
+            mStartActivity = mLastLaunchedActivity;
             // The launching state can be reused by consecutive launch. Its original association
             // shouldn't be changed by a separated transition.
             if (launchingState.mAssociatedTransitionInfo == null) {
@@ -508,6 +534,11 @@ class ActivityMetricsLogger {
         final private int reason;
         final private int startingWindowDelayMs;
         final private int bindApplicationDelayMs;
+        /**
+         * The uid of the launching activity. It can be either ApplicationInfo.uid
+         * or ApplicationInfo.pccuid based on where the activity should run
+         */
+        final private int uid;
         final int windowsDrawnDelayMs;
         final int type;
         final int userId;
@@ -543,6 +574,7 @@ class ActivityMetricsLogger {
             type = info.mTransitionType;
             processRecord = launchedActivity.app;
             processName = launchedActivity.processName;
+            uid = launchedActivity.getUid();
             sourceType = info.mSourceType;
             userId = launchedActivity.mUserId;
             launchedActivityShortComponentName = launchedActivity.shortComponentName;
@@ -593,6 +625,42 @@ class ActivityMetricsLogger {
         /** The last logged state. */
         int mLastLoggedState = APP_COMPAT_STATE_CHANGED__STATE__NOT_VISIBLE;
         @Nullable ActivityRecord mLastLoggedActivity;
+    }
+
+    private static final class CrossPackageLaunchTracker {
+        // Hardcode the max package size to 50.
+        private static final int PACKAGE_MAX_SIZE = 50;
+        // Maps the package name of the original activity (A) to the package name of the
+        // activity it launched (B), where A != B.
+        private final ArrayMap<String, String> mOriginalToDestinationPackageMap = new ArrayMap<>();
+        /**
+         * Tracking the packaged if the launch represents a new, cross-package transition
+         * that can be coalesced.
+         */
+        void track(@NonNull String startPackage, @NonNull String launchedPackage) {
+            if (!mOriginalToDestinationPackageMap.containsKey(startPackage)
+                    && mOriginalToDestinationPackageMap.size() >= PACKAGE_MAX_SIZE) {
+                mOriginalToDestinationPackageMap.removeAt(0);
+            }
+
+            mOriginalToDestinationPackageMap.put(startPackage, launchedPackage);
+        }
+
+        /**
+         * Retrieves the package name of the destination activity for a given original package.
+         *
+         * @param originalPackageName The package name of the activity that initiated the
+         *         transition.
+         * @return The destination package name, or the original package name if no transition is
+         *         tracked.
+         */
+        String getDestinationPackage(String originalPackageName) {
+            final String destinationPackage = mOriginalToDestinationPackageMap.getOrDefault(
+                    originalPackageName, originalPackageName);
+            Slog.d(TAG,
+                    "getDestinationPackage " + originalPackageName + " -> " + destinationPackage);
+            return destinationPackage;
+        }
     }
 
     ActivityMetricsLogger(ActivityTaskSupervisor supervisor, Looper looper) {
@@ -662,6 +730,7 @@ class ActivityMetricsLogger {
      *
      * @see #notifyActivityLaunching(Intent, ActivityRecord, int)
      */
+    @NonNull
     LaunchingState notifyActivityLaunching(Intent intent) {
         return notifyActivityLaunching(intent, null /* caller */, IGNORE_CALLER);
     }
@@ -672,6 +741,7 @@ class ActivityMetricsLogger {
      * with the returned {@link LaunchingState}. If the caller is found in an active transition,
      * it will be considered as consecutive launch and coalesced into the active transition.
      */
+    @NonNull
     LaunchingState notifyActivityLaunching(Intent intent, @Nullable ActivityRecord caller,
             int callingUid) {
         TransitionInfo existingInfo = null;
@@ -711,8 +781,8 @@ class ActivityMetricsLogger {
      * @param launchingState The launching state to track the new or active transition.
      * @param resultCode One of the {@link android.app.ActivityManager}.START_* flags, indicating
      *                   the result of the launch.
-     * @param launchedActivity The activity that is being launched
      * @param newActivityCreated Whether a new activity instance is created.
+     * @param launchedActivity The activity that is being launched
      * @param options The given options of the launching activity.
      */
     void notifyActivityLaunched(@NonNull LaunchingState launchingState, int resultCode,
@@ -727,7 +797,7 @@ class ActivityMetricsLogger {
         final WindowProcessController processRecord = launchedActivity.app != null
                 ? launchedActivity.app
                 : mSupervisor.mService.getProcessController(
-                        launchedActivity.processName, launchedActivity.info.applicationInfo.uid);
+                        launchedActivity.processName, launchedActivity.getUid());
         // Whether the process that will contains the activity is already running.
         final boolean processRunning = processRecord != null;
         // We consider this a "process switch" if the process of the activity that gets launched
@@ -765,6 +835,10 @@ class ActivityMetricsLogger {
                     !info.mLastLaunchedActivity.packageName.equals(launchedActivity.packageName);
             // The trace name uses package name so different packages should be separated.
             if (crossPackage) {
+                if (com.android.wm.shell.Flags.resolveTrampolineDestinationPackages()) {
+                    mCrossPackageLaunchTracker.track(info.mStartActivity.packageName,
+                            launchedActivity.packageName);
+                }
                 stopLaunchTrace(info);
             }
 
@@ -828,6 +902,10 @@ class ActivityMetricsLogger {
                 scheduleCheckActivityToBeDrawn(prevInfo.mLastLaunchedActivity, 0 /* delay */);
             }
         }
+    }
+
+    String getDestinationPackage(String originalPackageName) {
+        return mCrossPackageLaunchTracker.getDestinationPackage(originalPackageName);
     }
 
     /**
@@ -908,6 +986,9 @@ class ActivityMetricsLogger {
         final TransitionInfoSnapshot infoSnapshot = new TransitionInfoSnapshot(info);
         if (info.mLoggedTransitionStarting || !r.mTransitionController.isCollecting(r)) {
             done(false /* abort */, info, "notifyWindowsDrawn", timestampNs);
+        } else if (!r.isVisibleRequested() && r.mDisplayContent.isSleeping()) {
+            done(true /* abort */, info, "drawnWhileSleeping", timestampNs);
+            return null;
         }
 
         final int pid = r.getPid();
@@ -915,7 +996,7 @@ class ActivityMetricsLogger {
         mLoggerHandler.post(
                 () -> mSupervisor.mService.mWindowManager.mAmInternal.addStartInfoTimestamp(
                         ApplicationStartInfo.START_TIMESTAMP_FIRST_FRAME,
-                        timestampNs, infoSnapshot.applicationInfo.uid, pid,
+                        timestampNs, infoSnapshot.uid, pid,
                         infoSnapshot.userId));
 
         return infoSnapshot;
@@ -1182,13 +1263,13 @@ class ActivityMetricsLogger {
         mMetricsLogger.write(builder);
         FrameworkStatsLog.write(
                 FrameworkStatsLog.APP_START_CANCELED,
-                activity.info.applicationInfo.uid,
+                activity.getUid(),
                 activity.packageName,
                 getAppStartTransitionType(type, info.mRelaunched),
                 activity.info.name);
         if (DEBUG_METRICS) {
             Slog.i(TAG, String.format("APP_START_CANCELED(%s, %s, %s, %s)",
-                    activity.info.applicationInfo.uid,
+                    activity.getUid(),
                     activity.packageName,
                     getAppStartTransitionType(type, info.mRelaunched),
                     activity.info.name));
@@ -1281,7 +1362,7 @@ class ActivityMetricsLogger {
 
         FrameworkStatsLog.write(
                 FrameworkStatsLog.APP_START_OCCURRED,
-                info.applicationInfo.uid,
+                info.uid,
                 info.packageName,
                 getAppStartTransitionType(info.type, info.relaunched),
                 info.launchedActivityName,
@@ -1318,7 +1399,7 @@ class ActivityMetricsLogger {
         if (DEBUG_METRICS) {
             Slog.i(TAG, String.format(
                     "APP_START_OCCURRED(%s, %s, %s, %s, %s, wasStopped=%b, firstLaunch=%b)",
-                    info.applicationInfo.uid,
+                    info.uid,
                     info.packageName,
                     getAppStartTransitionType(info.type, info.relaunched),
                     info.launchedActivityName,
@@ -1347,7 +1428,7 @@ class ActivityMetricsLogger {
                     + " transitionDelayMs=" + transitionDelayMs + "ms");
         }
         FrameworkStatsLog.write(FrameworkStatsLog.IN_TASK_ACTIVITY_STARTED,
-                info.applicationInfo.uid,
+                info.uid,
                 getAppStartTransitionType(info.type, info.relaunched),
                 isOpaque,
                 transitionDelayMs,
@@ -1369,23 +1450,38 @@ class ActivityMetricsLogger {
         sb.append(": ");
         TimeUtils.formatDuration(info.windowsDrawnDelayMs, sb);
 
+// QTI_BEGIN: 2021-06-14: Performance: BoostFramework: Fix the broken Displayed activity hint.
         if (mPerfBoost != null) {
+// QTI_END: 2021-06-14: Performance: BoostFramework: Fix the broken Displayed activity hint.
+// QTI_BEGIN: 2021-07-29: Performance: Address Null pointer exception
             if (info.processRecord != null) {
                 mPerfBoost.perfHint(BoostFramework.VENDOR_HINT_FIRST_DRAW, info.packageName,
+// QTI_END: 2021-07-29: Performance: Address Null pointer exception
                     info.processRecord.getPid(), info.windowsDrawnDelayMs);
+// QTI_BEGIN: 2021-07-29: Performance: Address Null pointer exception
             }
+// QTI_END: 2021-07-29: Performance: Address Null pointer exception
+// QTI_BEGIN: 2021-06-14: Performance: BoostFramework: Fix the broken Displayed activity hint.
         }
 
+// QTI_END: 2021-06-14: Performance: BoostFramework: Fix the broken Displayed activity hint.
+// QTI_BEGIN: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
         if (mUxPerf != null) {
+// QTI_END: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
             if (mUxPerf.board_first_api_lvl < BoostFramework.VENDOR_T_API_LEVEL &&
                 mUxPerf.board_api_lvl < BoostFramework.VENDOR_T_API_LEVEL) {
                 mUxPerf.perfUXEngine_events(BoostFramework.UXE_EVENT_DISPLAYED_ACT, 0, info.packageName, info.windowsDrawnDelayMs);
             }
+// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
         }
 
+// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
         Log.i(TAG, sb.toString());
 
+// QTI_BEGIN: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
         if (mUxPerf !=  null) {
+// QTI_END: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
+// QTI_BEGIN: 2020-01-20: Performance: Changing app classification logic from manifest-based to WLC-based
             int isGame;
 
             if (ActivityManager.isLowRamDeviceStatic()) {
@@ -1394,21 +1490,26 @@ class ActivityMetricsLogger {
                 isGame = (mUxPerf.perfGetFeedback(BoostFramework.VENDOR_FEEDBACK_WORKLOAD_TYPE,
                                         mLaunchedActivity.packageName) == BoostFramework.WorkloadType.GAME) ? 1 : 0;
             }
+// QTI_END: 2020-01-20: Performance: Changing app classification logic from manifest-based to WLC-based
+// QTI_BEGIN: 2020-08-13: Performance: Fix app crashes due to PApps.
             if (mLaunchedActivity.processName != null) {
                 if (!mLaunchedActivity.processName.equals(info.packageName)) {
                     isGame = 1;
                 }
             }
+// QTI_END: 2020-08-13: Performance: Fix app crashes due to PApps.
             if (mUxPerf.board_first_api_lvl < BoostFramework.VENDOR_T_API_LEVEL &&
                 mUxPerf.board_api_lvl < BoostFramework.VENDOR_T_API_LEVEL) {
                 mUxPerf.perfUXEngine_events(BoostFramework.UXE_EVENT_GAME, 0, info.packageName, isGame);
             }
+// QTI_BEGIN: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
         }
 
         if (mLaunchedActivity.mPerf != null && mLaunchedActivity.perfActivityBoostHandler > 0) {
             mLaunchedActivity.mPerf.perfLockReleaseHandler(mLaunchedActivity.perfActivityBoostHandler);
             mLaunchedActivity.perfActivityBoostHandler = -1;
         }
+// QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
     }
 
     private void logRecentsAnimationLatency(TransitionInfo info) {
@@ -1512,7 +1613,7 @@ class ActivityMetricsLogger {
         }
         FrameworkStatsLog.write(
                 FrameworkStatsLog.APP_START_FULLY_DRAWN,
-                info.applicationInfo.uid,
+                info.uid,
                 info.packageName,
                 restoredFromBundle
                         ? FrameworkStatsLog.APP_START_FULLY_DRAWN__TYPE__WITH_BUNDLE
@@ -1615,7 +1716,7 @@ class ActivityMetricsLogger {
         }
 
         final int pid = info.processRecord.getPid();
-        final int uid = info.applicationInfo.uid;
+        final int uid = info.uid;
         final MemoryStat memoryStat = readMemoryStatFromFilesystem(uid, pid);
         if (memoryStat == null) {
             if (DEBUG_METRICS) Slog.i(TAG, "logAppStartMemoryStateCapture memoryStat null");
@@ -1658,7 +1759,7 @@ class ActivityMetricsLogger {
 
         FrameworkStatsLog.write(
                 FrameworkStatsLog.APP_RESTART_OCCURRED,
-                info.applicationInfo.uid,
+                info.uid,
                 startType,
                 millisSinceLastExit,
                 lastExitInfo.getReason(),
@@ -1668,7 +1769,7 @@ class ActivityMetricsLogger {
         if (DEBUG_METRICS) {
             final String message = String.format(
                     "APP_RESTART_OCCURRED(%s, %s, %s, lastExit={%.1fs ago, %s / %s})",
-                    info.applicationInfo.uid,
+                    info.uid,
                     info.packageName,
                     WaitResult.launchStateToString(info.getLaunchState()),
                     millisSinceLastExit / 1000.0,

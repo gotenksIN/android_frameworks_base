@@ -175,6 +175,7 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
     private static final long FORWARD_BACK_KEY_TOLERANCE_MS = 100;
     private static final int LOGTAG_SURFACEVIEW_LAYOUT = 60005;
     private static final int LOGTAG_SURFACEVIEW_CALLBACK = 60006;
+    private static final int LOGTAG_INPUT_FOCUS = 62001;
 
     @UnsupportedAppUsage(
             maxTargetSdk = Build.VERSION_CODES.TIRAMISU,
@@ -318,6 +319,8 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
 
     private int mParentSurfaceSequenceId;
 
+    private boolean mShouldEmbedAccessibilityHierarchy = true;
+
     private RemoteAccessibilityController mRemoteAccessibilityController =
         new RemoteAccessibilityController(this);
 
@@ -433,6 +436,45 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
                 }
                 vri.enqueueInputEvent(keyEvent, null /* receiver */, 0 /* flags */,
                         true /* processImmediately */);
+            });
+        }
+
+        @Override
+        public void transferFocusToParent(int direction) {
+            SurfaceView sv;
+            synchronized (this) {
+                sv = mSurfaceView;
+            }
+            if (sv == null) {
+                EventLog.writeEvent(LOGTAG_INPUT_FOCUS,
+                        "transferFocusToParent failed",
+                        "reason=detached_surface_view");
+                return;
+            }
+            sv.runOnUiThread(() -> {
+                if (!sv.isAttachedToWindow()) {
+                    EventLog.writeEvent(LOGTAG_INPUT_FOCUS,
+                            "transferFocusToParent failed: " + sv.getName(),
+                            "reason=not_attached");
+                    return;
+                }
+                if (!sv.isFocused()) {
+                    EventLog.writeEvent(LOGTAG_INPUT_FOCUS,
+                            "transferFocusToParent failed: " + sv.getName(),
+                            "reason=not_focused");
+                    return;
+                }
+                View nextFocus = sv.focusSearch(direction);
+                if (nextFocus != null && nextFocus != sv) {
+                    EventLog.writeEvent(LOGTAG_INPUT_FOCUS,
+                            "transferFocusToParent success: " + sv.getName(),
+                            "reason=focus_request");
+                    nextFocus.requestFocus(direction);
+                } else {
+                    EventLog.writeEvent(LOGTAG_INPUT_FOCUS,
+                            "transferFocusToParent failed: " + sv.getName(),
+                            "reason=no_next_focus");
+                }
             });
         }
     }
@@ -1062,7 +1104,7 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
         updateSurface();
     }
 
-// QTI_BEGIN: 2020-05-06: Core: SurfaceView: Add API to allow protected content presentation
+// QTI_BEGIN: 2020-05-06: SecureSystems: SurfaceView: Add API to allow protected content presentation
     /**
      * Control whether the surface view's content should flow through
      * protected hardware path to display disallowing access from non-secure
@@ -1083,7 +1125,7 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
         }
     }
 
-// QTI_END: 2020-05-06: Core: SurfaceView: Add API to allow protected content presentation
+// QTI_END: 2020-05-06: SecureSystems: SurfaceView: Add API to allow protected content presentation
     private void updateOpaqueFlag() {
         if (!PixelFormat.formatHasAlpha(mRequestedFormat)) {
             mSurfaceFlags |= SurfaceControl.OPAQUE;
@@ -2370,6 +2412,48 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
         }
     }
 
+    /**
+     * Sets whether accessibility hierarchy embedding is enabled for this SurfaceView.
+     *
+     * <p>By default, when backed by a {@link SurfaceControlViewHost.SurfacePackage} through use
+     * of {@link #setChildSurfacePackage(android.view.SurfaceControlViewHost.SurfacePackage)},
+     * the embedded view hierarchy's accessibility tree is exposed as the subtree of this
+     * SurfaceView. This method allows for disabling such behavior, which may be useful when an
+     * instance is used to provide a visual preview, where its embedded content is either
+     * decorative or its accessibility information is replicated elsewhere in the view hierarchy.
+     *
+     * <p class="note"><strong>Note:</strong> This method controls only how an embedded view
+     * hierarchy is exposed to accessibility services. The SurfaceView itself may be managed
+     * using {@link View#setImportantForAccessibility(int)}.
+     *
+     * @param enabled {@code true} to enable accessibility hierarchy embedding, {@code false} to
+     *                disable.
+     *
+     * @hide
+     */
+    public void setAccessibilityHierarchyEmbeddingEnabled(boolean enabled) {
+        if (mShouldEmbedAccessibilityHierarchy == enabled) {
+            return;
+        }
+        mShouldEmbedAccessibilityHierarchy = enabled;
+        if (mSurfacePackage != null) {
+            initEmbeddedHierarchyForAccessibility(mSurfacePackage);
+        }
+    }
+
+    /**
+     * Returns whether accessibility hierarchy embedding is enabled for this SurfaceView.
+     *
+     * @return {@code true} if accessibility hierarchy embedding is enabled, {@code false}
+     *         otherwise.
+     * @see #setAccessibilityHierarchyEmbeddingEnabled(boolean)
+     *
+     * @hide
+     */
+    public boolean isAccessibilityHierarchyEmbeddingEnabled() {
+        return mShouldEmbedAccessibilityHierarchy;
+    }
+
     private void reparentSurfacePackage(SurfaceControl.Transaction t,
             SurfaceControlViewHost.SurfacePackage p) {
         final SurfaceControl sc = p.getSurfaceControl();
@@ -2425,6 +2509,12 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
     }
 
     private void initEmbeddedHierarchyForAccessibility(SurfaceControlViewHost.SurfacePackage p) {
+        if (!mShouldEmbedAccessibilityHierarchy) {
+            if (mRemoteAccessibilityController.connected()) {
+                mRemoteAccessibilityController.disassosciateHierarchy();
+            }
+            return;
+        }
         final IAccessibilityEmbeddedConnection connection = p.getAccessibilityEmbeddedConnection();
         if (mRemoteAccessibilityController.alreadyAssociated(connection)) {
             return;
@@ -2491,6 +2581,9 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
             return;
         }
         try {
+            EventLog.writeEvent(LOGTAG_INPUT_FOCUS,
+                    "requestEmbeddedFocus: " + gainFocus + " " + getName(),
+                    "reason=requestEmbeddedFocus");
             viewRoot.mWindowSession.grantEmbeddedWindowFocus(viewRoot.mWindow,
                     mSurfacePackage.getInputTransferToken(), gainFocus);
         } catch (Exception e) {

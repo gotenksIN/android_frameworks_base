@@ -596,13 +596,8 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler,
                         ProtoLog.v(ShellProtoLogGroup.WM_SHELL_RECENTS_TRANSITION,
                                 "[%d] RecentsController.sendCancel: Snapshotting task=%d",
                                 mInstanceId, state.mTaskInfo.taskId);
-                        if (com.android.window.flags.Flags.reduceTaskSnapshotMemoryUsage()) {
-                            snapshots[i] = TaskSnapshotManager.getInstance().takeTaskSnapshot(
-                                    state.mTaskInfo.taskId, true /* updateCache */);
-                        } else {
-                            snapshots[i] = ActivityTaskManager.getService().takeTaskSnapshot(
-                                    state.mTaskInfo.taskId, true /* updateCache */);
-                        }
+                        snapshots[i] = TaskSnapshotManager.getInstance().takeTaskSnapshot(
+                                state.mTaskInfo.taskId, true /* updateCache */);
                     }
                 } catch (RemoteException e) {
                     taskIds = null;
@@ -1173,7 +1168,7 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler,
                                 "[%d]   %s recents", mInstanceId, chgTypeMsg);
                         recentsOpening = change;
                     } else if (isRootTask || isLeafTask) {
-                        String containerTypeMsg = "task";
+                        String containerTypeMsg = "task=" + taskInfo.taskId;
                         if (isLeafTask && taskInfo.topActivityType == ACTIVITY_TYPE_HOME) {
                             // This is usually a 3p launcher
                             mOpeningSeparateHome = true;
@@ -1198,7 +1193,7 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler,
                         foundRecentsClosing = true;
                     } else if (isRootTask || isLeafTask) {
                         ProtoLog.v(ShellProtoLogGroup.WM_SHELL_RECENTS_TRANSITION,
-                                "[%d]   Closing task", mInstanceId);
+                                "[%d]   Closing task=%d", mInstanceId, taskInfo.taskId);
                         if (closingTasks == null) {
                             closingTasks = new ArrayList<>();
                         }
@@ -1435,17 +1430,15 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler,
                 mergeActivityOnly(info, startT);
             } else if (!didMergeThings) {
                 // Didn't recognize anything in incoming transition so don't merge it.
-                Slog.w(TAG, "Don't know how to merge this transition, foundRecentsClosing="
-                        + foundRecentsClosing + " recentsTaskId=" + mRecentsTaskId);
-                if (foundRecentsClosing || mRecentsTaskId < 0) {
+                final boolean recentsChanging = (recentsOpening != null) || foundRecentsClosing;
+                Slog.w(TAG, "Don't know how to merge this transition, recentsChanging="
+                        + recentsChanging + " recentsTaskId=" + mRecentsTaskId);
+                if (recentsChanging || mRecentsTaskId < 0) {
                     mWillFinishToHome = false;
                     cancel("didn't merge");
                 }
                 return;
             }
-
-            // At this point, we are accepting the merge.
-            consumeMerge(info, startT, finishT, finishCallback);
 
             // Notify Launcher of the new opening tasks if necessary
             if (appearedTargets != null) {
@@ -1459,6 +1452,13 @@ public class RecentsTransitionHandler implements Transitions.TransitionHandler,
                     Slog.e(TAG, "Error sending appeared tasks to recents animation", e);
                 }
             }
+
+            // At this point, we are accepting the merge. Note that this has to be called at the end
+            // as it is possible that multiple transitions have queued and merging the transition
+            // can trigger subsequent queued transitions to run, including a transition that
+            // finishes the recents transition (so we can't rely on referencing any recents
+            // controller state after merging).
+            consumeMerge(info, startT, finishT, finishCallback);
         }
 
         /**

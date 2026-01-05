@@ -676,6 +676,55 @@ class BubblePositionerTest {
         assertThat(paddings).isEqualTo(intArrayOf(padding - positioner.pointerSize, 0, padding, 0))
     }
 
+    @Test
+    fun update_showingAsFloating_shouldNotBePendingBubbleBarTopOnScreen() {
+        positioner.isShowingInBubbleBar = false
+        positioner.update(defaultDeviceConfig)
+
+        assertThat(positioner.isPendingBubbleBarTopOnScreenUpdate).isFalse()
+    }
+
+    @Test
+    fun update_showingAsBubbleBar_shouldBePendingBubbleBarTopOnScreen() {
+        positioner.isShowingInBubbleBar = true
+        positioner.update(defaultDeviceConfig)
+
+        assertThat(positioner.isPendingBubbleBarTopOnScreenUpdate).isTrue()
+    }
+
+    @Test
+    fun updateBubbleBarTopOnScreen_shouldResetPendingSignal() {
+        positioner.isShowingInBubbleBar = true
+        positioner.update(defaultDeviceConfig)
+        positioner.updateBubbleBarTopOnScreen(200)
+
+        assertThat(positioner.isPendingBubbleBarTopOnScreenUpdate).isFalse()
+    }
+
+    @Test
+    fun update_showingAsBubbleBar_switchToFloating_shouldNotBePendingBubbleBarTopOnScreen() {
+        positioner.isShowingInBubbleBar = true
+        positioner.update(defaultDeviceConfig)
+
+        assertThat(positioner.isPendingBubbleBarTopOnScreenUpdate).isTrue()
+
+        positioner.isShowingInBubbleBar = false
+        assertThat(positioner.isPendingBubbleBarTopOnScreenUpdate).isFalse()
+    }
+
+    @Test
+    fun updateInBubbleBar_thenUpdateInFloating_shouldNotBePendingBubbleBarTopOnScreen() {
+        positioner.isShowingInBubbleBar = true
+        positioner.update(defaultDeviceConfig)
+
+        assertThat(positioner.isPendingBubbleBarTopOnScreenUpdate).isTrue()
+
+        positioner.isShowingInBubbleBar = false
+        positioner.update(defaultDeviceConfig)
+
+        assertThat(positioner.isPendingBubbleBarTopOnScreenUpdate).isFalse()
+    }
+
     private fun verifyGetBubbleBarExpandedViewBounds(onLeft: Boolean, isOverflow: Boolean) {
         positioner.isShowingInBubbleBar = true
         positioner.bubbleBarLocation =

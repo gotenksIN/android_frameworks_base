@@ -156,6 +156,7 @@ android_app {
     generate_product_characteristics_rro: true,
 
     flags_packages: [
+        "android.aiseal.flags-aconfig",
         "android.systemserver.flags-aconfig",
         "android.app.appfunctions.flags-aconfig",
         "android.app.contentrestriction.flags-aconfig",
@@ -164,6 +165,7 @@ android_app {
         "android.app.flags-aconfig",
         "android.app.privatecompute.flags-aconfig",
         "android.appwidget.flags-aconfig",
+        "android.bluetooth.platform.flags-aconfig",
         "android.companion.virtualdevice.flags-aconfig",
         "android.content.flags-aconfig",
         "android.content.pm.flags-aconfig",
@@ -196,6 +198,7 @@ android_app {
         "appsearch_aconfig_flags",
         "aconfig_trade_in_mode_flags",
         "com.android.media.flags.projection-aconfig",
+        "android.service.notification.flags-aconfig",
         "android.service.personalcontext.flags-aconfig",
         "surfaceflinger_flags",
         "power_flags",
@@ -204,6 +207,8 @@ android_app {
         "com.android.media.flags.mediasession-aconfig",
         "npumanager_aconfig_flags",
         "telecom_flags",
+        "android.multiuser.flags-aconfig",
+        "com.android.nfc.module.flags-aconfig",
     ],
 }
 
@@ -260,4 +265,17 @@ filegroup {
         "//frameworks/base",
         "//frameworks/base/api",
     ],
+}
+
+// For packaging part of sdk-repo-platforms*.zip.
+genrule {
+    name: "sdk_platforms_data_res",
+    tools: ["soong_zip"],
+    srcs: [
+        "res/**/*",
+    ],
+    out: ["sdk_platforms_data_res.zip"],
+    cmd: "mkdir -p $(genDir)/out/data/ && " +
+        "cp -r frameworks/base/core/res/res/ $(genDir)/out/data/ && " +
+        "$(location soong_zip) -o $(out) -C $(genDir)/out -D $(genDir)/out",
 }

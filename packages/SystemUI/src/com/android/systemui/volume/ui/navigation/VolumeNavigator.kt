@@ -36,6 +36,7 @@ import com.android.systemui.statusbar.phone.SystemUIDialogFactory
 import com.android.systemui.statusbar.phone.createBottomSheet
 import com.android.systemui.utils.coroutines.flow.conflatedCallbackFlow
 import com.android.systemui.volume.VolumePanelDialogManager
+import com.android.systemui.volume.dialog.domain.interactor.ExpandedAudioTileDetailsFeatureInteractor
 import com.android.systemui.volume.domain.model.VolumePanelRoute
 import com.android.systemui.volume.panel.domain.interactor.VolumePanelGlobalStateInteractor
 import com.android.systemui.volume.panel.ui.VolumePanelUiEvent
@@ -64,9 +65,10 @@ constructor(
     private val dialogFactory: SystemUIDialogFactory,
     private val uiEventLogger: UiEventLogger,
     private val volumePanelGlobalStateInteractor: VolumePanelGlobalStateInteractor,
+    private val expandedAudioTileDetailsFeatureInteractor: ExpandedAudioTileDetailsFeatureInteractor,
 ) {
 
-    init {
+    fun start() {
         volumePanelGlobalStateInteractor.globalState
             .map { it.isVisible }
             .distinctUntilChanged()
@@ -123,6 +125,7 @@ constructor(
                 val coroutineScope = rememberCoroutineScope()
                 VolumePanelRoot(
                     remember(coroutineScope) { viewModelFactory.create(coroutineScope) },
+                    expandedAudioTileDetailsFeatureInteractor.isEnabled(),
                     Modifier.sysUiResTagContainer(),
                 )
             },

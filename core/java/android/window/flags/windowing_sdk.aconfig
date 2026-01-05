@@ -59,16 +59,6 @@ flag {
 }
 
 flag {
-    namespace: "windowing_sdk"
-    name: "activity_embedding_delay_task_fragment_finish_for_activity_launch"
-    description: "Fixes a race condition that we finish the TaskFragment too early when there is a pending activity launch."
-    bug: "390452023"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     namespace: "aaos_core_contrib"
     name: "safe_region_letterboxing_v1"
     description: "Enables letterboxing for a safe region"
@@ -117,16 +107,6 @@ flag {
     name: "fix_bubble_trampoline_animation"
     description: "Fix the animation for Bubble Task Trampoline"
     bug: "417848405"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    namespace: "windowing_sdk"
-    name: "fix_bubble_trampoline_launch_twice"
-    description: "Fix the transition when a Task Trampoline is launched to Bubble twice"
-    bug: "448009266"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -201,6 +181,48 @@ flag {
     namespace: "windowing_sdk"
     description: "Pause the invisible activity vs. stopping it after idle."
     bug: "457585218"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "assist_display_id_public"
+    namespace: "windowing_sdk"
+    description: "Make the preferred display id extra for launching assistant public."
+    bug: "428619705"
+    is_exported: true
+}
+
+flag {
+    name: "always_move_task_to_back_on_back_pressed_feature_flag"
+    namespace: "watch_software_performance"
+    description: "Enable the alwaysMoveTaskToBackOnBackPressed feature"
+    bug: "444439703"
+}
+
+flag {
+    namespace: "windowing_sdk"
+    name: "enable_force_opaque"
+    description: "Enable to make task force opaque"
+    bug: "441101757"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "track_launch_originator"
+    namespace: "windowing_sdk"
+    description: "Track origination for the consecutive launch among trampoline activities"
+    bug: "456621541"
+}
+
+flag {
+    namespace: "windowing_sdk"
+    name: "clear_lock_task_when_task_end"
+    description: "Clear the lock task when the last activity in the task finishes"
+    bug: "461662709"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

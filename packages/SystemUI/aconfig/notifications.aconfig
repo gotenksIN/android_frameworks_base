@@ -1,6 +1,7 @@
 package: "com.android.systemui"
 container: "system"
 
+# go/keep-sorted start block=yes newline_separated=yes by_regex=name:\s*"([^"]+)"
 flag {
     name: "launch_new_fsi_on_update"
     namespace: "notifications"
@@ -10,3 +11,12 @@ flag {
         purpose: PURPOSE_BUGFIX
     }
 }
+
+flag {
+    name: "notification_chip_from_compact_content"
+    namespace: "notifications"
+    description: "Use resolveCompactContent() as the source of truth for promoted notification chips."
+    bug: "444195986"
+}
+
+# go/keep-sorted end

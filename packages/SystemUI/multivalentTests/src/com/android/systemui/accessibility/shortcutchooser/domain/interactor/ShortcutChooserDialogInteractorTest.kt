@@ -17,41 +17,68 @@
 package com.android.systemui.accessibility.shortcutchooser.domain.interactor
 
 import android.content.Intent
+import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
+import android.os.UserHandle
+import android.platform.test.annotations.DisableFlags
+import android.platform.test.annotations.EnableFlags
 import android.view.Display.DEFAULT_DISPLAY
 import android.view.Display.INVALID_DISPLAY
+import android.view.accessibility.Flags as AccessibilityFlags
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.internal.accessibility.common.ShortcutChooserDialogConstants
 import com.android.internal.accessibility.common.ShortcutConstants.UserShortcutType
+import com.android.systemui.Flags as SystemUIFlags
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.accessibility.data.repository.AccessibilityShortcutsRepository
+import com.android.systemui.accessibility.shortcutchooser.shared.model.AccessibilityTargetModel
+import com.android.systemui.accessibility.shortcutchooser.shared.model.DialogRequestModel
 import com.android.systemui.broadcast.broadcastDispatcher
+import com.android.systemui.broadcast.mockBroadcastSender
 import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.collectLastValue
 import com.android.systemui.kosmos.runTest
 import com.android.systemui.testKosmosNew
+import com.android.systemui.user.data.repository.userRepository
+import com.android.systemui.user.domain.interactor.fakeHeadlessSystemUserMode
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.ArgumentMatchers.anyString
-import org.mockito.Mockito.mock
-import org.mockito.Mockito.never
+import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.eq
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.never
+import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
+import org.mockito.kotlin.whenever
 
 @SmallTest
 @RunWith(AndroidJUnit4::class)
+@EnableFlags(AccessibilityFlags.FLAG_ENABLE_A11Y_TOP_ROW_SHORTCUT)
 class ShortcutChooserDialogInteractorTest : SysuiTestCase() {
-    private val kosmos = testKosmosNew()
-    private val broadcastDispatcher = kosmos.broadcastDispatcher
+    private companion object {
+        const val TALKBACK_TARGET_NAME = "fakeTalkBackTargetName"
+        const val MAGNIFICATION_TARGET_NAME = "fakeMagnificationTargetName"
+    }
 
-    // mocks
-    private val mockRepository = mock(AccessibilityShortcutsRepository::class.java)
+    private val kosmos = testKosmosNew()
+
+    private val mockRepository = mock<AccessibilityShortcutsRepository>()
 
     private val Kosmos.underTest by
-        Kosmos.Fixture { ShortcutChooserDialogInteractor(mockRepository, broadcastDispatcher) }
+        Kosmos.Fixture {
+            ShortcutChooserDialogInteractor(
+                mockRepository,
+                broadcastDispatcher,
+                mockBroadcastSender,
+                userRepository,
+                fakeHeadlessSystemUserMode,
+            )
+        }
 
     @Test
     fun dialogRequest_topRowKeyType_onDefaultDisplay_flowIsValid() =
@@ -94,47 +121,118 @@ class ShortcutChooserDialogInteractorTest : SysuiTestCase() {
         }
 
     @Test
-    fun getAllAccessibilityTargetsInfo_getListForAllByType() =
+    @EnableFlags(SystemUIFlags.FLAG_LAUNCH_ACCESSIBILITY_QUICK_ACCESS_DIALOG_PERMISSION)
+    fun dialogRequest_quickAccess_validDisplay_emitsRequestModel() =
         kosmos.runTest {
-            val shortcutType = UserShortcutType.TOP_ROW_KEY
+            val requestModel by collectLastValue(underTest.dialogRequest)
 
-            underTest.getAllAccessibilityTargetsInfo(shortcutType)
+            sendIntentBroadcast(UserShortcutType.QUICK_ACCESS, DEFAULT_DISPLAY)
 
-            verify(mockRepository).getAllAccessibilityTargetsInfo(eq(shortcutType))
+            assertThat(requestModel)
+                .isEqualTo(DialogRequestModel(UserShortcutType.QUICK_ACCESS, DEFAULT_DISPLAY))
         }
 
     @Test
-    fun getSelectedAccessibilityTargetsInfo_getListForSelectedTargetsByType() =
+    @DisableFlags(SystemUIFlags.FLAG_LAUNCH_ACCESSIBILITY_QUICK_ACCESS_DIALOG_PERMISSION)
+    fun dialogRequest_quickAccess_withFlagDisabled_validDisplay_emitsNull() =
         kosmos.runTest {
-            val shortcutType = UserShortcutType.TOP_ROW_KEY
+            val requestModel by collectLastValue(underTest.dialogRequest)
 
-            underTest.getSelectedAccessibilityTargetsInfo(shortcutType)
+            sendIntentBroadcast(UserShortcutType.QUICK_ACCESS, DEFAULT_DISPLAY)
 
-            verify(mockRepository).getSelectedAccessibilityTargetsInfo(eq(shortcutType))
+            assertThat(requestModel).isNull()
         }
 
     @Test
-    fun enableShortcutForTargets_topRowKeyType_enableMagnification() =
+    @EnableFlags(SystemUIFlags.FLAG_LAUNCH_ACCESSIBILITY_QUICK_ACCESS_DIALOG_PERMISSION)
+    fun dialogRequest_quickAccess_invalidDisplay_emitsNull() =
+        kosmos.runTest {
+            val requestModel by collectLastValue(underTest.dialogRequest)
+
+            sendIntentBroadcast(UserShortcutType.QUICK_ACCESS, INVALID_DISPLAY)
+
+            assertThat(requestModel).isNull()
+        }
+
+    @Test
+    fun getAllAccessibilityTargets_getListForAllByType() =
         kosmos.runTest {
             val shortcutType = UserShortcutType.TOP_ROW_KEY
-            val targetName = "fakeMagnifiactionTargetName"
 
-            underTest.enableShortcutForTargets(enable = true, shortcutType, targetName)
+            underTest.getAllAccessibilityTargets(shortcutType)
+
+            verify(mockRepository).getAllAccessibilityTargets(eq(shortcutType))
+        }
+
+    @Test
+    fun getAssignedAccessibilityTargets_getListForSelectedTargetsByType() =
+        kosmos.runTest {
+            val shortcutType = UserShortcutType.TOP_ROW_KEY
+
+            underTest.getAssignedAccessibilityTargets(shortcutType)
+
+            verify(mockRepository).getSelectedAccessibilityTargets(eq(shortcutType))
+        }
+
+    @Test
+    fun getAssignedAccessibilityTargetsCount_getAssignedTargetsCount() =
+        kosmos.runTest {
+            val shortcutType = UserShortcutType.TOP_ROW_KEY
+            val targets =
+                listOf(
+                    createTargetModel(shortcutType, TALKBACK_TARGET_NAME),
+                    createTargetModel(shortcutType, MAGNIFICATION_TARGET_NAME),
+                )
+
+            whenever(mockRepository.getSelectedAccessibilityTargetsInfo(shortcutType))
+                .thenReturn(targets)
+
+            assertThat(underTest.getAssignedAccessibilityTargetsCount(shortcutType))
+                .isEqualTo(targets.size)
+        }
+
+    @Test
+    fun enableShortcutForTarget_topRowKeyType_enableMagnification() =
+        kosmos.runTest {
+            val shortcutType = UserShortcutType.TOP_ROW_KEY
+            val targetName = MAGNIFICATION_TARGET_NAME
+
+            underTest.enableShortcutForTarget(enable = true, shortcutType, targetName)
 
             verify(mockRepository)
                 .enableShortcutsForTargets(eq(true), eq(shortcutType), eq(setOf(targetName)))
         }
 
     @Test
-    fun enableShortcutForTargets_topRowKeyType_disableMagnification() =
+    fun enableShortcutForTarget_topRowKeyType_disableMagnification() =
         kosmos.runTest {
             val shortcutType = UserShortcutType.TOP_ROW_KEY
-            val targetName = "fakeMagnifiactionTargetName"
+            val targetName = MAGNIFICATION_TARGET_NAME
 
-            underTest.enableShortcutForTargets(enable = false, shortcutType, targetName)
+            underTest.enableShortcutForTarget(enable = false, shortcutType, targetName)
 
             verify(mockRepository)
                 .enableShortcutsForTargets(eq(false), eq(shortcutType), eq(setOf(targetName)))
+        }
+
+    @Test
+    fun enableShortcutForAllTargets_enablesUnassignedShortcuts() =
+        kosmos.runTest {
+            val shortcutType = UserShortcutType.QUICK_ACCESS
+            val targetName1 = "com.android.test/TestService1"
+            val targetName2 = "com.android.test/TestService2"
+            val targets =
+                listOf(
+                    createTargetModel(shortcutType, targetName1, isAssigned = true),
+                    createTargetModel(shortcutType, targetName2, isAssigned = false),
+                )
+            whenever(mockRepository.getAllAccessibilityTargetsInfo(shortcutType))
+                .thenReturn(targets)
+
+            underTest.enableShortcutForAllTargets(shortcutType)
+
+            verify(mockRepository)
+                .enableShortcutsForTargets(eq(true), eq(shortcutType), eq(setOf(targetName2)))
         }
 
     @Test
@@ -142,7 +240,7 @@ class ShortcutChooserDialogInteractorTest : SysuiTestCase() {
         kosmos.runTest {
             val displayId = DEFAULT_DISPLAY
             val shortcutType = UserShortcutType.TOP_ROW_KEY
-            val targetName = "fakeMagnifiactionTargetName"
+            val targetName = MAGNIFICATION_TARGET_NAME
 
             underTest.performAccessibilityShortcut(displayId, shortcutType, targetName)
 
@@ -155,7 +253,7 @@ class ShortcutChooserDialogInteractorTest : SysuiTestCase() {
         kosmos.runTest {
             val displayId = INVALID_DISPLAY
             val shortcutType = UserShortcutType.TOP_ROW_KEY
-            val targetName = "fakeMagnifiactionTargetName"
+            val targetName = MAGNIFICATION_TARGET_NAME
 
             underTest.performAccessibilityShortcut(displayId, shortcutType, targetName)
 
@@ -163,14 +261,58 @@ class ShortcutChooserDialogInteractorTest : SysuiTestCase() {
                 .performAccessibilityShortcut(anyInt(), anyInt(), anyString())
         }
 
-    private fun sendIntentBroadcast(@UserShortcutType shortcutType: Int, displayId: Int) {
-        val intent =
-            Intent().apply {
-                action = ShortcutChooserDialogInteractor.ACTION
-                putExtra(ShortcutChooserDialogConstants.SHORTCUT_TYPE, shortcutType)
+    @Test
+    fun launchQuickAccessDialog_sendBroadcast() =
+        kosmos.runTest {
+            val intentArgumentCaptor = argumentCaptor<Intent>()
+            val userHandleArgumentCaptor = argumentCaptor<UserHandle>()
+            underTest.launchQuickAccessDialog(DEFAULT_DISPLAY)
+
+            verify(mockBroadcastSender, times(1))
+                .sendBroadcastAsUser(
+                    intentArgumentCaptor.capture(),
+                    userHandleArgumentCaptor.capture(),
+                )
+            assertThat(intentArgumentCaptor.firstValue.`package`)
+                .isEqualTo(ShortcutChooserDialogInteractor.SYSTEMUI_PACKAGE)
+            assertThat(intentArgumentCaptor.firstValue.action)
+                .isEqualTo(ShortcutChooserDialogInteractor.QUICK_ACCESS_ACTION)
+            assertThat(
+                    intentArgumentCaptor.firstValue.getIntExtra(
+                        ShortcutChooserDialogConstants.DISPLAY_ID,
+                        INVALID_DISPLAY,
+                    )
+                )
+                .isEqualTo(DEFAULT_DISPLAY)
+            assertThat(userHandleArgumentCaptor.firstValue).isEqualTo(UserHandle.SYSTEM)
+        }
+
+    private fun Kosmos.sendIntentBroadcast(@UserShortcutType shortcutType: Int, displayId: Int) {
+        Intent()
+            .apply {
+                if (shortcutType == UserShortcutType.QUICK_ACCESS) {
+                    action = ShortcutChooserDialogInteractor.QUICK_ACCESS_ACTION
+                } else {
+                    action = ShortcutChooserDialogInteractor.SHORTCUT_CHOOSER_ACTION
+                    putExtra(ShortcutChooserDialogConstants.SHORTCUT_TYPE, shortcutType)
+                }
                 putExtra(ShortcutChooserDialogConstants.DISPLAY_ID, displayId)
             }
-
-        broadcastDispatcher.sendIntentToMatchingReceiversOnly(context, intent)
+            .let { broadcastDispatcher.sendIntentToMatchingReceiversOnly(context, it) }
     }
+
+    private fun createTargetModel(
+        @UserShortcutType shortcutType: Int,
+        targetName: String,
+        isAssigned: Boolean = true,
+    ) =
+        AccessibilityTargetModel(
+            shortcutType = shortcutType,
+            targetName = targetName,
+            featureName = targetName,
+            icon = ColorDrawable(Color.RED),
+            isAssigned = isAssigned,
+            isToggleable = true,
+            isToggleOn = false,
+        )
 }

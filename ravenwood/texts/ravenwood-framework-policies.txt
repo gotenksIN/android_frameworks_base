@@ -52,6 +52,10 @@ class android.content.Context  # no-pta
 class android.text.ClipboardManager keep  # no-pta
     method <init> ()V keep
 
+# Audio
+# AIDL generated parcel
+class com.android.media.permission.UidPackageState keepclass  # no-pta
+
 #####################
 # Experimental APIs
 #####################
@@ -63,8 +67,10 @@ class com.android.internal.ravenwood.RavenwoodHelperBridge
 # Enable all the classes in the following packages as "experimental".
 package android.animation exp
 package android.app exp
+package android.gesture exp
 package android.graphics.drawable exp
 package android.hardware exp
+package android.inputmethodservice exp
 package android.tracing exp
 package android.transition exp
 package android.util exp
@@ -76,7 +82,6 @@ package com.android.internal exp
 package android.appwidget exp
 package android.media exp
 package android.audio exp
-package android.os.vibrator exp
 package android.service.dreams exp
 package android.service.notification exp
 package android.service.quicksettings exp
@@ -120,18 +125,13 @@ class android.view.animation.AnimationUtils exp
 
 class android.view.Display exp
 
-class android.os.Vibrator exp
-class android.os.VibrationEffect exp
 class android.os.UserManager exp
 class android.os.UserManagerCache exp
 class android.os.GraphicsEnvironment exp
-class android.os.StrictMode
-    method trackActivity exp
-    method assertConfigurationContext exp
-    method vmRegistrationLeaksEnabled ignore
-    method vmUnsafeIntentLaunchEnabled ignore
 
-class android.os.StrictMode$InstanceTracker exp
+class android.content.UndoManager exp
+class android.content.UndoOwner exp
+class android.content.UndoOperation exp
 
 class android.content.res.AssetManager
     method getLoaders exp # let it return an empty loader
@@ -157,3 +157,6 @@ class android.tracing.perfetto.Producer exp
 
 class android.view.SurfaceControl exp
     method nativeSetTransformHint i #experimental -- ignore native methods
+
+class android.view.accessibility.AccessibilityManager
+    method isEnabled i #experimental -- accessibility disabled

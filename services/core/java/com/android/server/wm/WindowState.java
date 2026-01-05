@@ -873,14 +873,14 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
 
             if (android.view.inputmethod.Flags.reportAnimatingInsetsTypes()) {
                 ImeTracker.forLogging().onProgress(statsToken,
-                        ImeTracker.PHASE_WM_WINDOW_ANIMATING_TYPES_CHANGED);
+                        ImeTracker.PHASE_SERVER_WINDOW_ANIMATING_TYPES_CHANGED);
                 final InsetsStateController insetsStateController =
                         getDisplayContent().getInsetsStateController();
                 insetsStateController.onAnimatingTypesChanged(this, statsToken);
             }
         } else {
             ImeTracker.forLogging().onFailed(statsToken,
-                    ImeTracker.PHASE_WM_WINDOW_ANIMATING_TYPES_CHANGED);
+                    ImeTracker.PHASE_SERVER_WINDOW_ANIMATING_TYPES_CHANGED);
         }
     }
 
@@ -912,7 +912,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             // Starting window doesn't consider insets.
             return false;
         }
-        final boolean visible = shouldCheckTokenVisibleRequested()
+        final boolean visible = mToken.shouldCheckTokenVisibleRequested()
                 ? isVisibleRequested() : isVisible();
         return visible && mFrozenInsetsState == null;
     }
@@ -1337,7 +1337,8 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         if (mIsWallpaper) {
             final Rect lastFrame = windowFrames.mLastFrame;
             final Rect frame = windowFrames.mFrame;
-            if (lastFrame.width() != frame.width() || lastFrame.height() != frame.height()) {
+            if (lastFrame.width() != frame.width() || lastFrame.height() != frame.height()
+                    || windowFrames.hasContentChanged()) {
                 mDisplayContent.mWallpaperController.updateWallpaperOffset(this);
             }
         }
@@ -1729,27 +1730,14 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
 
     @Override
     boolean isVisible() {
-        return wouldBeVisibleIfPolicyIgnored() && isVisibleByPolicyOrInsets();
+        return wouldBeVisibleIfPolicyIgnored() && isVisibleByPolicyOrInsets()
+                && (!mToken.shouldCheckTokenClientVisible() || mToken.isClientVisible());
     }
 
     @Override
     boolean isVisibleRequested() {
-        final boolean localVisibleRequested =
-                wouldBeVisibleRequestedIfPolicyIgnored() && isVisibleByPolicyOrInsets();
-        if (localVisibleRequested && shouldCheckTokenVisibleRequested()) {
-            return mToken.isVisibleRequested();
-        }
-        return localVisibleRequested;
-    }
-
-    /**
-     * Returns {@code true} if {@link WindowToken#isVisibleRequested()} should be considered
-     * before dispatching the latest configuration. Currently only {@link
-     * ActivityRecord#isVisibleRequested()} and {@link WallpaperWindowToken#isVisibleRequested()}
-     * implement explicit visible-requested.
-     */
-    boolean shouldCheckTokenVisibleRequested() {
-        return mActivityRecord != null || mToken.asWallpaperToken() != null;
+        return wouldBeVisibleRequestedIfPolicyIgnored() && isVisibleByPolicyOrInsets()
+                && (!mToken.shouldCheckTokenVisibleRequested() || mToken.isVisibleRequested());
     }
 
     /**
@@ -3284,8 +3272,10 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         // requested to be visible in a short time (e.g. before activity stopped).
         if (!clientVisible && mActivityRecord != null && mWinAnimator.mDrawState == HAS_DRAWN) {
             mWinAnimator.resetDrawState();
-            // Make sure the app can report drawn if it becomes visible again.
-            forceReportingResized();
+            if (!WindowManager.useClientSurface()) {
+                // Make sure the app can report drawn if it becomes visible again.
+                forceReportingResized();
+            }
         }
     }
 
@@ -3314,6 +3304,11 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         mWinAnimator.resetDrawState();
         setHasSurface(true);
         mInputWindowHandle.forceChange();
+        // Avoid unnecessary resize for snapshot starting window because it always uses async
+        // relayout, and it won't redraw for resize.
+        if (mStartingData instanceof SnapshotStartingData) {
+            mLastConfigReportedToClient = true;
+        }
     }
 
     boolean destroySurface(boolean cleanupOnResume, boolean appStopped) {
@@ -3747,7 +3742,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         // If this is an activity or wallpaper and is invisible or going invisible, don't report
         // either since it is going away. This is likely during a transition so we want to preserve
         // the original state.
-        if (shouldCheckTokenVisibleRequested() && !mToken.isVisibleRequested()) {
+        if (mToken.shouldCheckTokenVisibleRequested() && !mToken.isVisibleRequested()) {
             return;
         }
 
@@ -3906,12 +3901,12 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     public void showInsets(@InsetsType int types, @Nullable ImeTracker.Token statsToken) {
         try {
             ImeTracker.forLogging().onProgress(statsToken,
-                    ImeTracker.PHASE_WM_WINDOW_INSETS_CONTROL_TARGET_SHOW_INSETS);
+                    ImeTracker.PHASE_SERVER_WINDOW_INSETS_CONTROL_TARGET_SHOW_INSETS);
             mClient.showInsets(types, statsToken);
         } catch (RemoteException e) {
             Slog.w(TAG, "Failed to deliver showInsets", e);
             ImeTracker.forLogging().onFailed(statsToken,
-                    ImeTracker.PHASE_WM_WINDOW_INSETS_CONTROL_TARGET_SHOW_INSETS);
+                    ImeTracker.PHASE_SERVER_WINDOW_INSETS_CONTROL_TARGET_SHOW_INSETS);
         }
     }
 
@@ -3919,12 +3914,12 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     public void hideInsets(@InsetsType int types, @Nullable ImeTracker.Token statsToken) {
         try {
             ImeTracker.forLogging().onProgress(statsToken,
-                    ImeTracker.PHASE_WM_WINDOW_INSETS_CONTROL_TARGET_HIDE_INSETS);
+                    ImeTracker.PHASE_SERVER_WINDOW_INSETS_CONTROL_TARGET_HIDE_INSETS);
             mClient.hideInsets(types, statsToken);
         } catch (RemoteException e) {
             Slog.w(TAG, "Failed to deliver hideInsets", e);
             ImeTracker.forLogging().onFailed(statsToken,
-                    ImeTracker.PHASE_WM_WINDOW_INSETS_CONTROL_TARGET_HIDE_INSETS);
+                    ImeTracker.PHASE_SERVER_WINDOW_INSETS_CONTROL_TARGET_HIDE_INSETS);
         }
     }
 
@@ -4083,6 +4078,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     public void dumpDebug(ProtoOutputStream proto, long fieldId,
             @WindowTracingLogLevel int logLevel) {
         boolean isVisible = isVisible();
+        // Critical log level logs only visible elements to mitigate performance overheard
         if (logLevel == WindowTracingLogLevel.CRITICAL && !isVisible) {
             return;
         }
@@ -4634,9 +4630,17 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         return false;
     }
 
+    private static boolean contentEqualsSparseArray(@Nullable SparseArray<?> sa1,
+            @Nullable SparseArray<?> sa2) {
+        if (sa1 == null || sa2 == null) {
+            return sa1 == sa2;
+        }
+        return sa1.contentEquals(sa2);
+    }
+
     @Override
     void updateAboveInsetsState(InsetsState aboveInsetsState,
-            SparseArray<InsetsSource> localInsetsSourcesFromParent,
+            @Nullable SparseArray<InsetsSource> localInsetsSourcesFromParent,
             ArraySet<WindowState> insetsChangedWindows) {
         final SparseArray<InsetsSource> mergedLocalInsetsSources =
                 createMergedSparseArray(localInsetsSourcesFromParent, mLocalInsetsSources);
@@ -4651,7 +4655,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
                 insetsChangedWindows.add(w);
             }
 
-            if (!mergedLocalInsetsSources.contentEquals(w.mMergedLocalInsetsSources)) {
+            if (!contentEqualsSparseArray(mergedLocalInsetsSources, w.mMergedLocalInsetsSources)) {
                 // The traversal will reach the ImeContainer (and thus the IME Window) if this
                 // window is the current IME Layering Target. However, we should not copy the local
                 // insets to the IME window.
@@ -5411,9 +5415,9 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             outPoint.offset(-parent.mWindowFrames.mFrame.left, -parent.mWindowFrames.mFrame.top);
             // Undo the scale of window position because the relative coordinates for child are
             // based on the scaled parent.
-            if (mInvGlobalScale != 1f) {
-                outPoint.x = (int) (outPoint.x * mInvGlobalScale + 0.5f);
-                outPoint.y = (int) (outPoint.y * mInvGlobalScale + 0.5f);
+            if (parent.mInvGlobalScale != 1f) {
+                outPoint.x = (int) (outPoint.x * parent.mInvGlobalScale + 0.5f);
+                outPoint.y = (int) (outPoint.y * parent.mInvGlobalScale + 0.5f);
             }
             // Since the parent was outset by its surface insets, we need to undo the outsetting
             // with insetting by the same amount.
@@ -6215,12 +6219,6 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     @Override
     public boolean isInputMethodClientFocus(int uid, int pid) {
         return getDisplayContent().isInputMethodClientFocus(uid, pid);
-    }
-
-    @Override
-    public void dumpProto(ProtoOutputStream proto, long fieldId,
-                          @WindowTracingLogLevel int logLevel) {
-        dumpDebug(proto, fieldId, logLevel);
     }
 
     public boolean cancelAndRedraw(int seqId) {

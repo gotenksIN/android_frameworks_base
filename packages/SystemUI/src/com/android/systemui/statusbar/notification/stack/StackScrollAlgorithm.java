@@ -16,8 +16,6 @@
 
 package com.android.systemui.statusbar.notification.stack;
 
-import static com.android.systemui.Flags.notificationFixHunShadows;
-
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.content.Context;
@@ -66,6 +64,7 @@ public class StackScrollAlgorithm {
     private float mBundleGapHeight;
     private float mBundleExpandedGapHeight;
     private float mGapHeight;
+    private float mGroupingDisabledSectionGapHeight;
     private float mGapHeightOnLockscreen;
     private int mCollapsedSize;
     private boolean mEnableNotificationClipping;
@@ -84,6 +83,8 @@ public class StackScrollAlgorithm {
     private float mSmallCornerRadius;
     private float mLargeCornerRadius;
     private int mHeadsUpCyclingPadding;
+    // mFullQsHeadsUpTop is only valid when SceneContainerFlag is on.
+    private float mFullQsHeadsUpTop = -1;
 
     public StackScrollAlgorithm(
             Context context,
@@ -121,6 +122,8 @@ public class StackScrollAlgorithm {
                 R.dimen.bundle_divider_height);
         mBundleExpandedGapHeight = res.getDimensionPixelSize(
                 R.dimen.bundle_expanded_divider_height);
+        mGroupingDisabledSectionGapHeight = res.getDimensionPixelSize(
+                R.dimen.grouping_disabled_section_gap_height);
         mNotificationScrimPadding = res.getDimensionPixelSize(R.dimen.notification_side_paddings);
         mMarginBottom = res.getDimensionPixelSize(R.dimen.notification_panel_margin_bottom);
         mQuickQsOffsetHeight = SystemBarUtils.getQuickQsOffsetHeight(context);
@@ -293,6 +296,12 @@ public class StackScrollAlgorithm {
         android.util.Log.i(TAG, s);
     }
 
+    public static void debugRow(View view, String s) {
+        if (view instanceof ExpandableNotificationRow row) {
+            debugLog(row.getKey() + " " + s);
+        }
+    }
+
     public static void debugLogView(View view, String s) {
         String viewString = "";
         if (view instanceof ExpandableNotificationRow row) {
@@ -382,8 +391,7 @@ public class StackScrollAlgorithm {
                     && !firstHeadsUp
                     && (isHeadsUp || child.isHeadsUpAnimatingAway())
                     && newNotificationEnd > firstHeadsUpEnd
-                    && !ambientState.isShadeExpanded()
-                    && !skipClipBottomForCycling(child, ambientState)) {
+                    && !ambientState.isShadeExpanded()) {
                 // The bottom of this view is peeking out from under the previous view.
                 // Clip the part that is peeking out.
                 float overlapAmount = newNotificationEnd - firstHeadsUpEnd;
@@ -406,17 +414,6 @@ public class StackScrollAlgorithm {
     }
 
     /**
-     * @return Should we skip clipping the bottom clipping when new hun has lower bottom line for
-     *         the hun cycling animation.
-     */
-    private boolean skipClipBottomForCycling(ExpandableView view, AmbientState ambientState) {
-        if (!NotificationHeadsUpCycling.isEnabled()) return false;
-        if (!isCyclingOut(view, ambientState)) return false;
-        // skip bottom clipping if we animate the bottom line
-        return NotificationHeadsUpCycling.getAnimateTallToShort();
-    }
-
-    /**
      * Whether the view is the hun that is cycling out by the notification avalanche.
      */
     public boolean isCyclingOut(ExpandableView view, AmbientState ambientState) {
@@ -431,6 +428,9 @@ public class StackScrollAlgorithm {
     public boolean isCyclingOut(ExpandableNotificationRow row, AmbientState ambientState) {
         if (!NotificationHeadsUpCycling.isEnabled()) return false;
         String cyclingOutKey = ambientState.getAvalanchePreviousHunKey();
+        if (cyclingOutKey == null || row.getKey() == null) {
+            return false;
+        }
         return row.getKey().equals(cyclingOutKey);
     }
 
@@ -440,6 +440,9 @@ public class StackScrollAlgorithm {
     public boolean isCyclingIn(ExpandableNotificationRow row, AmbientState ambientState) {
         if (!NotificationHeadsUpCycling.isEnabled()) return false;
         String cyclingInKey = ambientState.getAvalancheShowingHunKey();
+        if (cyclingInKey == null || row.getKey() == null) {
+            return false;
+        }
         return row.getKey().equals(cyclingInKey);
     }
 
@@ -517,8 +520,11 @@ public class StackScrollAlgorithm {
                         ambientState.getSectionProvider(), i,
                         view, getPreviousView(i, state));
                 if (applyGapHeight) {
+                    final boolean isGroupingDisabled =
+                            ambientState.getSectionProvider().isGroupingDisabled(view);
                     currentY += getGapForLocation(
-                            ambientState.getFractionToShade(), ambientState.isOnKeyguard());
+                            ambientState.getFractionToShade(), ambientState.isOnKeyguard(),
+                            isGroupingDisabled);
                 }
             }
 
@@ -705,7 +711,9 @@ public class StackScrollAlgorithm {
                             view, getPreviousView(i, algorithmState));
             if (applyGapHeight) {
                 final float gap = getGapForLocation(
-                        ambientState.getFractionToShade(), ambientState.isOnKeyguard());
+                        ambientState.getFractionToShade(), ambientState.isOnKeyguard(),
+                        ambientState.getSectionProvider().isGroupingDisabled(view)
+                );
                 algorithmState.mCurrentYPosition += expansionFraction * gap;
                 algorithmState.mCurrentExpandedYPosition += gap;
             }
@@ -713,7 +721,8 @@ public class StackScrollAlgorithm {
 
         // Must set viewState.yTranslation _before_ use.
         // Incoming views have yTranslation=0 by default.
-        viewState.setYTranslation(algorithmState.mCurrentYPosition);
+        viewState.setYTranslation(algorithmState.mCurrentYPosition,
+                "StackScrollAlgorithm.updateChild.init");
 
         float stackTop = SceneContainerFlag.isEnabled()
                 ? ambientState.getStackScrollTop()
@@ -759,7 +768,8 @@ public class StackScrollAlgorithm {
                         ? ambientState.getStackCutoff() - ambientState.getStackScrollTop()
                         : ambientState.getLayoutMaxHeight() + mMarginBottom
                         - ambientState.getStackY();
-                viewState.setYTranslation((fullHeight - getMaxAllowedChildHeight(view)) / 2f);
+                viewState.setYTranslation((fullHeight - getMaxAllowedChildHeight(view)) / 2f,
+                        "StackScrollAlgorithm.updateChild.emptyShade");
             } else if (view != ambientState.getTrackedHeadsUpRow()) {
                 if (ambientState.isExpansionChanging()) {
                     // We later update shelf state, then hide views below the shelf.
@@ -802,12 +812,14 @@ public class StackScrollAlgorithm {
                 + mPaddingBetweenElements;
 
         setLocation(view.getViewState(), algorithmState.mCurrentYPosition, i);
-        viewState.setYTranslation(viewState.getYTranslation() + stackTop);
+        viewState.setYTranslation(viewState.getYTranslation() + stackTop,
+                "StackScrollAlgorithm.updateChild.stackTop");
     }
 
     @VisibleForTesting
     void updateViewWithShelf(ExpandableView view, ExpandableViewState viewState, float shelfStart) {
-        viewState.setYTranslation(Math.min(viewState.getYTranslation(), shelfStart));
+        viewState.setYTranslation(Math.min(viewState.getYTranslation(), shelfStart),
+                "StackScrollAlgorithm.updateViewWithShelf");
         if (viewState.getYTranslation() >= shelfStart) {
             viewState.hidden = !view.isExpandAnimationRunning()
                     && !view.hasExpandingChild();
@@ -840,8 +852,10 @@ public class StackScrollAlgorithm {
             } else {
                 return mBundleGapHeight;
             }
+
         } else if (childNeedsGapHeight(sectionProvider, visibleIndex, child, previousChild)) {
-            return getGapForLocation(fractionToShade, onKeyguard);
+            return getGapForLocation(fractionToShade, onKeyguard,
+                    sectionProvider.isGroupingDisabled(child));
         } else {
             return 0;
         }
@@ -865,14 +879,19 @@ public class StackScrollAlgorithm {
     }
 
     @VisibleForTesting
-    float getGapForLocation(float fractionToShade, boolean onKeyguard) {
+    float getGapForLocation(float fractionToShade, boolean onKeyguard, boolean isGroupingDisabled) {
+        final float nominalGapHeight =
+                isGroupingDisabled ? mGroupingDisabledSectionGapHeight : mGapHeight;
+        final float nominalGapHeightOnLockscreen =
+                isGroupingDisabled ? mGroupingDisabledSectionGapHeight : mGapHeightOnLockscreen;
+
         if (fractionToShade > 0f) {
-            return MathUtils.lerp(mGapHeightOnLockscreen, mGapHeight, fractionToShade);
+            return MathUtils.lerp(nominalGapHeightOnLockscreen, nominalGapHeight, fractionToShade);
         }
         if (onKeyguard) {
-            return mGapHeightOnLockscreen;
+            return nominalGapHeightOnLockscreen;
         }
-        return mGapHeight;
+        return nominalGapHeight;
     }
 
     /**
@@ -889,7 +908,8 @@ public class StackScrollAlgorithm {
             int visibleIndex,
             View child,
             View previousChild) {
-        return sectionProvider.beginsSection(child, previousChild)
+        return (sectionProvider.beginsSection(child, previousChild)
+                || sectionProvider.isGroupingDisabled(child))
                 && visibleIndex > 0
                 && !(previousChild instanceof SectionHeaderView)
                 && !(child instanceof FooterView);
@@ -932,17 +952,31 @@ public class StackScrollAlgorithm {
 
         // Move the tracked heads up into position during the appear animation, by interpolating
         // between the HUN inset (where it will appear as a HUN) and the end position in the shade
-        float headsUpTranslation =
-                SceneContainerFlag.isEnabled()
-                        ? ambientState.getHeadsUpTop()
-                        : mHeadsUpInset - ambientState.getStackTopMargin();
+        float headsUpTranslation;
+        if (SceneContainerFlag.isEnabled()) {
+            headsUpTranslation = ambientState.getHeadsUpTop();
+            // During the transition from (fullscreen) QuickSettingsScene to the ShadeScene,
+            // headsUpTop source changes to ShadeScene's HUNPlaceholder, which causes a jump unless
+            // we clamp to the last known headsUpTop in QuickSettingsScene to ensure that the HUN
+            // waits at its current position until the new headsUpTop catches up visually.
+            if (ambientState.getQsExpansionFraction() == 1.0f) {
+                mFullQsHeadsUpTop = headsUpTranslation;
+            } else if (ambientState.getQsExpansionFraction() == 0f) {
+                mFullQsHeadsUpTop = -1;
+            } else if (mFullQsHeadsUpTop != -1 && headsUpTranslation > mFullQsHeadsUpTop) {
+                headsUpTranslation = mFullQsHeadsUpTop;
+            }
+        } else {
+            headsUpTranslation = mHeadsUpInset - ambientState.getStackTopMargin();
+        }
         ExpandableNotificationRow trackedHeadsUpRow = ambientState.getTrackedHeadsUpRow();
         if (trackedHeadsUpRow != null) {
             ExpandableViewState childState = trackedHeadsUpRow.getViewState();
             if (childState != null) {
                 float endPos = childState.getYTranslation() - ambientState.getStackTranslation();
                 childState.setYTranslation(MathUtils.lerp(
-                        headsUpTranslation, endPos, ambientState.getAppearFraction()));
+                        headsUpTranslation, endPos, ambientState.getAppearFraction()),
+                        "StackScrollAlgorithm.updateHeadsUpStates.tracked");
             }
         }
 
@@ -953,7 +987,10 @@ public class StackScrollAlgorithm {
             if (!(child instanceof ExpandableNotificationRow row)) {
                 continue;
             }
-            if (!(row.isHeadsUp() || row.isHeadsUpAnimatingAway())) {
+            final boolean isCyclingOut = NotificationHeadsUpCycling.isEnabled()
+                    && isCyclingOut(row, ambientState);
+            if (!(row.isHeadsUp() || row.isHeadsUpAnimatingAway()
+                    || (SceneContainerFlag.isEnabled() && isCyclingOut))) {
                 continue;
             }
             ExpandableViewState childState = row.getViewState();
@@ -984,7 +1021,8 @@ public class StackScrollAlgorithm {
                         // HUN to the correct Y position from the placeholder.
                         boolean isHunToShadeTransition = ambientState.getTrackedHeadsUpRow() == row;
                         if (ambientState.shouldApplyHunTranslation() && !isHunToShadeTransition) {
-                            childState.setYTranslation(headsUpTranslation);
+                            childState.setYTranslation(headsUpTranslation,
+                                    "StackScrollAlgorithm.updateHeadsUpStates.applyHunTranslation");
                         }
                         clampHunToTop(
                                 /* headsUpTop = */ headsUpTranslation,
@@ -1063,7 +1101,8 @@ public class StackScrollAlgorithm {
                 // which accounts for AmbientState.stackTopMargin in split-shade.
                 // Once we start opening the shade, we keep the previously calculated translation.
                 childState.setYTranslation(
-                        Math.max(childState.getYTranslation(), headsUpTranslation));
+                        Math.max(childState.getYTranslation(), headsUpTranslation),
+                        "StackScrollAlgorithm.updateHeadsUpStates.pinned");
                 childState.height = Math.max(row.getIntrinsicHeight(), childState.height);
                 if (NotificationHeadsUpCycling.isEnabled()) {
                     if (isCyclingIn(row, ambientState)) {
@@ -1089,28 +1128,22 @@ public class StackScrollAlgorithm {
                 // translationY need to move up the HUN.
                 if (!mIsExpanded && isTopEntry && ambientState.getScrollY() > 0) {
                     childState.setYTranslation(
-                            childState.getYTranslation() - ambientState.getScrollY());
+                            childState.getYTranslation() - ambientState.getScrollY(),
+                            "StackScrollAlgorithm.updateHeadsUpStates.scroll");
                 }
             }
-            if (row.isHeadsUpAnimatingAway()) {
-                if (NotificationHeadsUpCycling.isEnabled() && isCyclingOut(row, ambientState)) {
+            if (row.isHeadsUpAnimatingAway() || isCyclingOut) {
+                if (isCyclingOut) {
                     // If the two HUNs in the cycling animation have different heights, we need
                     // an extra y translation to align the animation.
                     int extraTranslation;
-                    if (NotificationHeadsUpCycling.getAnimateTallToShort()) {
-                        if (cyclingInHunHeight > 0) {
-                            extraTranslation = cyclingInHunHeight - childState.height;
-                        } else {
-                            extraTranslation = 0;
-                        }
-                    } else {
-                        extraTranslation = cyclingInHunHeight >= childState.height
-                                ? cyclingInHunHeight - childState.height : 0;
-                    }
+                    extraTranslation = cyclingInHunHeight >= childState.height
+                            ? cyclingInHunHeight - childState.height : 0;
                     extraTranslation += mHeadsUpCyclingPadding;
                     float inSpaceTranslation = Math.max(childState.getYTranslation(),
                             headsUpTranslation);
-                    childState.setYTranslation(inSpaceTranslation + extraTranslation);
+                    childState.setYTranslation(inSpaceTranslation + extraTranslation,
+                            "StackScrollAlgorithm.updateHeadsUpStates.cyclingOut");
                     cyclingInHunHeight = -1;
                 } else if (!ambientState.isDozing()) {
                     boolean shouldHunAppearFromBottom =
@@ -1119,12 +1152,14 @@ public class StackScrollAlgorithm {
                             mHeadsUpAnimator.getHeadsUpYTranslation(
                                     shouldHunAppearFromBottom,
                                     row.hasStatusBarChipDuringHeadsUpAnimation());
-                    childState.setYTranslation(yTranslation);
+                    childState.setYTranslation(yTranslation,
+                            "StackScrollAlgorithm.updateHeadsUpStates.notDozing");
                 } else {
                     // Make sure row yTranslation is at maximum the HUN yTranslation,
                     // which accounts for AmbientState.stackTopMargin in split-shade.
                     childState.setYTranslation(
-                            Math.max(childState.getYTranslation(), headsUpTranslation));
+                            Math.max(childState.getYTranslation(), headsUpTranslation),
+                            "StackScrollAlgorithm.updateHeadsUpStates.limitMax");
                 }
                 // keep it visible for the animation
                 childState.hidden = false;
@@ -1161,7 +1196,7 @@ public class StackScrollAlgorithm {
         final float distToRealY = newTranslation - viewState.getYTranslation();
         final float availableHeight = viewState.height - distToRealY;
 
-        viewState.setYTranslation(newTranslation);
+        viewState.setYTranslation(newTranslation, "StackScrollAlgorithm.clampHunToTop");
         viewState.height = (int) Math.max(availableHeight, collapsedHeight);
     }
 
@@ -1201,14 +1236,16 @@ public class StackScrollAlgorithm {
         final float newTranslation = Math.min(childState.getYTranslation(), bottomPosition);
         childState.height = (int) Math.min(childState.height, maxHeadsUpTranslation
                 - newTranslation);
-        childState.setYTranslation(newTranslation);
+        childState.setYTranslation(newTranslation,
+                "StackScrollAlgorithm.clampHunToMaxTranslation.legacy");
     }
 
     private void clampHunToMaxTranslation(float headsUpTop, float headsUpBottom,
             ExpandableViewState viewState) {
         if (SceneContainerFlag.isUnexpectedlyInLegacyMode()) return;
         final float maxHeight = Math.max(0f, headsUpBottom - headsUpTop);
-        viewState.setYTranslation(Math.min(headsUpTop, viewState.getYTranslation()));
+        viewState.setYTranslation(Math.min(headsUpTop, viewState.getYTranslation()),
+                "StackScrollAlgorithm.clampHunToMaxTranslation");
         viewState.height = (int) Math.min(maxHeight, viewState.height);
     }
 
@@ -1296,10 +1333,11 @@ public class StackScrollAlgorithm {
             // SceneContainer simplifies this logic, because:
             // - there are no overlapping HUNs anymore, no need for multiplying their shadows
             // - shadows for HUNs overlapping with the stack are now set from updateHeadsUpStates
-            if (child.isPinned() || ambientState.getTrackedHeadsUpRow() == child) {
-                // set a default elevation on the HUN, which would be overridden
-                // from updateHeadsUpStates if it is displayed in the shade
-                childViewState.setZTranslation(baseZ + mPinnedZTranslationExtra);
+            if (child.isPinned()
+                    || (child.mustStayOnScreen() && ambientState.isDozing())
+                    || ambientState.getTrackedHeadsUpRow() == child) {
+                childrenOnTop++;
+                childViewState.setZTranslation(baseZ + childrenOnTop * mPinnedZTranslationExtra);
             } else {
                 // set baseZ for every notification
                 childViewState.setZTranslation(baseZ);
@@ -1313,7 +1351,7 @@ public class StackScrollAlgorithm {
                 if (childrenOnTop != 0.0f) {
                     // To elevate the later HUN over previous HUN when multiple HUNs exist
                     childrenOnTop++;
-                } else if (ambientState.isShadeExpanded() || !notificationFixHunShadows()) {
+                } else if (ambientState.isShadeExpanded()) {
                     // Handles HUN shadow when Shade is opened, and AmbientState.mScrollY > 0
                     // Calculate the HUN's z-value based on its overlapping fraction with QQS Panel.
                     // When scrolling down shade to make HUN back to in-position in Notif Panel,
@@ -1415,8 +1453,13 @@ public class StackScrollAlgorithm {
          * notifications section. False if sections are not enabled.
          */
         boolean beginsSection(@NonNull View view, @Nullable View previous);
-    }
 
+        /**
+         * True if grouping views is disabled for the section in which view is.
+         * False if grouping is enabled.
+         */
+        boolean isGroupingDisabled(@NonNull View view);
+    }
     /**
      * Interface for telling the StackScrollAlgorithm information about the bypass state
      */

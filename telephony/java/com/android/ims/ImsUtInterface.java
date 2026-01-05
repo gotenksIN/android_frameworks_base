@@ -128,12 +128,14 @@ public interface ImsUtInterface {
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
     public void queryCallForward(int condition, String number, Message result);
 
+// QTI_BEGIN: 2018-03-30: Telephony: IMS: Add UT interface to query CF setting for service class.
     /**
      * Retrieves the configuration of the call forward for the specified service class.
      * The return value of ((AsyncResult)result.obj) is an array of {@link ImsCallForwardInfo}.
      */
     public void queryCallForward(int condition, String number,
             int serviceClass, Message result);
+// QTI_END: 2018-03-30: Telephony: IMS: Add UT interface to query CF setting for service class.
     /**
      * Retrieves the configuration of the call waiting.
      * The return value of ((AsyncResult)result.obj) is an array of {@link ImsSsInfo}.

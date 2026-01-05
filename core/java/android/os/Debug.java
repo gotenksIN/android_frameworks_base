@@ -53,10 +53,10 @@ import java.lang.reflect.Modifier;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-// QTI_BEGIN: 2025-05-28: Core: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
+// QTI_BEGIN: 2025-05-28: Performance: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
 import java.util.List;
 import java.util.ArrayList;
-// QTI_END: 2025-05-28: Core: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
+// QTI_END: 2025-05-28: Performance: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
 
 
 /**
@@ -1005,7 +1005,7 @@ public final class Debug
         }
     }
 
-// QTI_BEGIN: 2025-05-28: Core: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
+// QTI_BEGIN: 2025-05-28: Performance: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
     /**
      * This class is used to retrieved process allocated dma buffer
      * {@hide}
@@ -1034,7 +1034,7 @@ public final class Debug
             return size / pids.size();
         }
     }
-// QTI_END: 2025-05-28: Core: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
+// QTI_END: 2025-05-28: Performance: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
 
     /**
      * Wait until a debugger attaches. As soon as a debugger attaches,
@@ -2947,7 +2947,7 @@ public final class Debug
      */
     public static native long getKernelCmaUsageKb();
 
-// QTI_BEGIN: 2025-05-28: Core: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
+// QTI_BEGIN: 2025-05-28: Performance: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
     /**
      * Retrieves the list of DMA buffers used by all processes that are currently using DMA.
      * @return true if the DMA buffers were read successfully, false otherwise.
@@ -2963,5 +2963,5 @@ public final class Debug
      */
     public static native String getPidComm(int pid);
 
-// QTI_END: 2025-05-28: Core: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
+// QTI_END: 2025-05-28: Performance: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
 }

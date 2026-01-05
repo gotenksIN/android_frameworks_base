@@ -49,6 +49,7 @@ object BubbleUtils {
             if (toBubble && rootToken != null) {
                 wct.reparent(token, rootToken, true /* onTop */)
                 wct.setBounds(rootToken, bounds)
+                wct.setBounds(token, Rect())
                 wct.setAlwaysOnTop(rootToken, true /* alwaysOnTop */)
             } else if (reparentToTda) {
                 wct.reparent(token, null, true /* onTop */)
@@ -61,10 +62,8 @@ object BubbleUtils {
             }
             wct.setWindowingMode(
                 token,
-                if (toBubble)
-                    WindowConfiguration.WINDOWING_MODE_MULTI_WINDOW
-                else
-                    WindowConfiguration.WINDOWING_MODE_UNDEFINED,
+                if (toBubble) WindowConfiguration.WINDOWING_MODE_MULTI_WINDOW
+                else WindowConfiguration.WINDOWING_MODE_UNDEFINED,
             )
             wct.setInterceptBackPressedOnTaskRoot(token, toBubble)
             wct.setTaskForceExcludedFromRecents(token, toBubble /* forceExcluded */)
@@ -91,7 +90,10 @@ object BubbleUtils {
         if (BubbleAnythingFlagHelper.enableCreateAnyBubble()) {
             if (!toBubble && captionInsetsOwner != null) {
                 wct.removeInsetsSource(
-                    token, captionInsetsOwner, 0 /* index */, WindowInsets.Type.captionBar()
+                    token,
+                    captionInsetsOwner,
+                    0 /* index */,
+                    WindowInsets.Type.captionBar(),
                 )
             }
         }
@@ -104,7 +106,7 @@ object BubbleUtils {
      *
      * @param isAppBubble App Bubble has some different UX from Chat Bubble.
      * @param reparentToTda Whether to reparent the task to the ancestor TaskDisplayArea (for if
-     *                      this task is a child of another root task)
+     *   this task is a child of another root task)
      */
     @JvmOverloads
     @JvmStatic
@@ -164,17 +166,16 @@ object BubbleUtils {
     /** Determines if a bubble task is moving to fullscreen based on its windowing mode. */
     @JvmStatic
     fun ActivityManager.RunningTaskInfo?.isBubbleToFullscreen(): Boolean {
-        return BubbleAnythingFlagHelper.enableCreateAnyBubble()
-                && this?.windowingMode == WINDOWING_MODE_FULLSCREEN
+        return BubbleAnythingFlagHelper.enableCreateAnyBubble() &&
+            this?.windowingMode == WINDOWING_MODE_FULLSCREEN
     }
 
     /** Determines if a bubble task is moving to split-screen based on its parent task. */
     @JvmStatic
     fun ActivityManager.RunningTaskInfo?.isBubbleToSplit(
-        splitScreenController: Lazy<Optional<SplitScreenController>>,
+        splitScreenController: Lazy<Optional<SplitScreenController>>
     ): Boolean {
-        return this?.hasParentTask() == true && splitScreenController.get()
-            .map { it.isTaskRootOrStageRoot(parentTaskId) }
-            .orElse(false)
+        return this?.hasParentTask() == true &&
+            splitScreenController.get().map { it.isTaskRootOrStageRoot(parentTaskId) }.orElse(false)
     }
 }

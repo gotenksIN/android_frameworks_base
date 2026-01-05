@@ -35,7 +35,6 @@ import com.android.app.concurrent.benchmark.util.ExecutorServiceThreadWithExecut
 import com.android.app.concurrent.benchmark.util.ExecutorServiceThreadWithExecutorCoroutineDispatcherBuilder
 import com.android.app.concurrent.benchmark.util.ThreadBuilder
 import com.android.app.concurrent.benchmark.util.times
-import com.android.systemui.kairos.ExperimentalKairosApi
 import com.android.systemui.kairos.State as KairosState
 import java.util.concurrent.Executor
 import kotlinx.coroutines.CoroutineScope
@@ -120,9 +119,9 @@ class FlowShallowEventBenchmark(
 ) : BaseFlowEventBenchmark(threadParam), ShallowEventBenchmark<FlowWritableEventBuilder, Flow<*>> {
 
     companion object {
-        @Parameters(name = "{0},{1},{2}")
+        @Parameters(name = "{0}:producers={1}:consumers={2}")
         @JvmStatic
-        fun getDispatchers() =
+        fun getParameters() =
             listOf(ExecutorServiceThreadWithExecutorCoroutineDispatcherBuilder) *
                 PRODUCER_LIST *
                 CONSUMER_LIST
@@ -140,9 +139,9 @@ class SimpleEventShallowEventBenchmark(
     ShallowEventBenchmark<SimpleWritableEventBuilder, SimpleEvent<*>> {
 
     companion object {
-        @Parameters(name = "{0},{1},{2}")
+        @Parameters(name = "{0}:producers={1}:consumers={2}")
         @JvmStatic
-        fun getDispatchers() =
+        fun getParameters() =
             listOf(ExecutorServiceThreadWithExecutorBuilder) * PRODUCER_LIST * CONSUMER_LIST
     }
 }
@@ -159,9 +158,9 @@ class ExecutorSnapshotShallowEventBenchmark(
     ShallowEventBenchmark<SnapshotWritableEventExecutorBuilder, SnapshotState<*>> {
 
     companion object {
-        @Parameters(name = "{0},{1},{2}")
+        @Parameters(name = "{0}:producers={1}:consumers={2}")
         @JvmStatic
-        fun getDispatchers() =
+        fun getParameters() =
             listOf(ExecutorServiceThreadWithExecutorBuilder) * PRODUCER_LIST * CONSUMER_LIST
     }
 }
@@ -178,16 +177,15 @@ class CoroutineSnapshotShallowEventBenchmark(
     ShallowEventBenchmark<SnapshotWritableEventCoroutineBuilder, SnapshotState<*>> {
 
     companion object {
-        @Parameters(name = "{0},{1},{2}")
+        @Parameters(name = "{0}:producers={1}:consumers={2}")
         @JvmStatic
-        fun getDispatchers() =
+        fun getParameters() =
             listOf(ExecutorServiceThreadWithExecutorCoroutineDispatcherBuilder) *
                 PRODUCER_LIST *
                 CONSUMER_LIST
     }
 }
 
-@OptIn(ExperimentalKairosApi::class)
 @RunWith(Parameterized::class)
 @FixMethodOrder(MethodSorters.NAME_ASCENDING)
 class KairosShallowEventBenchmark(
@@ -199,9 +197,9 @@ class KairosShallowEventBenchmark(
     ShallowEventBenchmark<KairosWritableEventBuilder, KairosState<*>> {
 
     companion object {
-        @Parameters(name = "{0},{1},{2}")
+        @Parameters(name = "{0}:producers={1}:consumers={2}")
         @JvmStatic
-        fun getDispatchers() =
+        fun getParameters() =
             listOf(ExecutorServiceThreadWithExecutorCoroutineDispatcherBuilder) *
                 PRODUCER_LIST *
                 CONSUMER_LIST

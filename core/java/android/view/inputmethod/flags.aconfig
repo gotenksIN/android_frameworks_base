@@ -45,17 +45,6 @@ flag {
 }
 
 flag {
-    name: "use_input_method_info_safe_list"
-    namespace: "input_method"
-    description: "Use InputMethodInfoSafeList for more reliable binder IPCs"
-    bug: "339761278"
-    is_fixed_read_only: true
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "ime_switcher_revamp"
     is_exported: true
     namespace: "input_method"
@@ -138,14 +127,10 @@ flag {
 }
 
 flag {
-  name: "fallback_display_for_secondary_user_on_secondary_display"
+  name: "back_disposition_controls_back_interception"
   namespace: "input_method"
-  description: "Feature flag to fix the fallback display bug for visible background users"
-  bug: "383228193"
-  is_fixed_read_only: true
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
+  description: "Setting ADJUST_NOTHING as back disposition causes back events to bypass IME"
+  bug: "454542168"
 }
 
 flag {
@@ -164,16 +149,6 @@ flag {
     metadata {
         purpose: PURPOSE_BUGFIX
     }
-}
-
-flag {
-  name: "invalidate_input_calls_restart"
-  namespace: "input_method"
-  description: "Feature flag to fix the race between invalidateInput and restartInput"
-  bug: "396066692"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
 }
 
 flag {
@@ -264,4 +239,19 @@ flag {
   metadata {
     purpose: PURPOSE_BUGFIX
   }
+}
+
+flag {
+  name: "ime_subtype_short_label"
+  namespace: "input_method"
+  description: "Feature flag for supporting IME subtype short labels"
+  bug: "443854916"
+  is_exported: true
+}
+
+flag {
+  name: "warm_work_profile_ime"
+  namespace: "input_method"
+  description: "Maintain a binding to the IME of all active users, to enable a warm restart when switching across user profile apps"
+  bug: "293644773"
 }

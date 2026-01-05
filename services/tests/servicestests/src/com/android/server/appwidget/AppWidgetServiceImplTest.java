@@ -23,6 +23,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assume.assumeNotNull;
 import static org.mockito.ArgumentMatchers.any;
@@ -34,6 +35,7 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -54,9 +56,15 @@ import android.content.ComponentName;
 import android.content.ContextWrapper;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.pm.ActivityInfo;
+import android.content.pm.ApplicationInfo;
 import android.content.pm.LauncherApps;
+import android.content.pm.PackageManager;
 import android.content.pm.PackageManagerInternal;
 import android.content.pm.ShortcutServiceInternal;
+import android.graphics.Bitmap;
+import android.graphics.Point;
+import android.graphics.drawable.Icon;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.UserHandle;
@@ -66,6 +74,7 @@ import android.util.ArraySet;
 import android.util.AtomicFile;
 import android.util.SparseArray;
 import android.util.Xml;
+import android.view.Display;
 import android.widget.RemoteViews;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -74,9 +83,13 @@ import androidx.test.platform.app.InstrumentationRegistry;
 
 import com.android.frameworks.servicestests.R;
 import com.android.internal.appwidget.IAppWidgetHost;
+import com.android.internal.content.PackageMonitor;
 import com.android.modules.utils.TypedXmlPullParser;
 import com.android.modules.utils.TypedXmlSerializer;
 import com.android.server.LocalServices;
+import com.android.server.ServiceThread;
+import com.android.server.appwidget.AppWidgetServiceImpl.Provider;
+import com.android.server.appwidget.AppWidgetServiceImpl.Widget;
 
 import org.junit.After;
 import org.junit.Before;
@@ -91,6 +104,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
@@ -98,6 +112,7 @@ import java.util.Objects;
 import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Tests for {@link AppWidgetManager} and {@link AppWidgetServiceImpl}.
@@ -115,6 +130,7 @@ public class AppWidgetServiceImplTest {
     private TestContext mTestContext;
     private String mPkgName;
     private AppWidgetServiceImpl mService;
+    private PackageManager mSpiedPackageManager;
     private AppWidgetManager mManager;
 
     private ShortcutServiceInternal mMockShortcutService;
@@ -133,6 +149,12 @@ public class AppWidgetServiceImplTest {
 
         mTestContext = new TestContext();
         mPkgName = mTestContext.getOpPackageName();
+
+        // Spy the package manager to allow mocking specific methods like isPackageAppLockEnabled
+        PackageManager realPackageManager = mTestContext.getBaseContext().getPackageManager();
+        mSpiedPackageManager = spy(realPackageManager);
+        mTestContext.setPackageManager(mSpiedPackageManager);
+
         mService = new AppWidgetServiceImpl(mTestContext);
         mManager = new AppWidgetManager(mTestContext, mService);
 
@@ -161,6 +183,57 @@ public class AppWidgetServiceImplTest {
         AppWidgetProviderInfo info =
                 mManager.getInstalledProvidersForPackage(mPkgName, null).get(0);
         assertEquals(info.loadDescription(mTestContext), "widget description string");
+    }
+
+    @Test
+    public void testAppLockEnabledProvidersIsNull() throws Exception {
+        final int userId = mTestContext.getUserId();
+
+        // Get the PackageMonitor and its handler via reflection for triggering and synchronization.
+        final PackageMonitor packageMonitor = mService.mPackageMonitor;
+
+        final ServiceThread serviceThread = mService.mServiceThread;
+        final Handler handler = serviceThread.getThreadHandler();
+
+        // Set the changing user ID via reflection, as it's not set when calling
+        // onPackageAppLockEnabled directly.
+        Field userIdField = PackageMonitor.class.getDeclaredField("mChangeUserId");
+        userIdField.setAccessible(true);
+        userIdField.set(packageMonitor, userId);
+
+        // 1. Initial State: Provider should be available.
+        doReturn(false).when(mSpiedPackageManager).isPackageAppLockEnabled(eq(mPkgName));
+        List<AppWidgetProviderInfo> providers = mManager.getInstalledProvidersForPackage(
+                mPkgName, null);
+        assertFalse("Providers should be available initially", providers.isEmpty());
+
+        // 2. Simulate App Lock
+        doReturn(true).when(mSpiedPackageManager).isPackageAppLockEnabled(eq(mPkgName));
+        final CountDownLatch lockLatch = new CountDownLatch(1);
+        handler.post(() -> {
+            packageMonitor.onPackageAppLockEnabled(mPkgName);
+            lockLatch.countDown();
+        });
+        assertTrue("Timed out waiting for onPackageAppLockEnabled",
+                lockLatch.await(5, TimeUnit.SECONDS));
+
+        // 3. Verify provider is gone
+        providers = mManager.getInstalledProvidersForPackage(mPkgName, null);
+        assertTrue("Providers should be gone when app is locked", providers.isEmpty());
+
+        // 4. Simulate App Unlock
+        doReturn(false).when(mSpiedPackageManager).isPackageAppLockEnabled(eq(mPkgName));
+        final CountDownLatch unlockLatch = new CountDownLatch(1);
+        handler.post(() -> {
+            packageMonitor.onPackageAppLockDisabled(mPkgName);
+            unlockLatch.countDown();
+        });
+        assertTrue("Timed out waiting for onPackageAppLockDisabled",
+                unlockLatch.await(5, TimeUnit.SECONDS));
+
+        // 5. Verify provider is back
+        providers = mManager.getInstalledProvidersForPackage(mPkgName, null);
+        assertFalse("Providers should be back when app is unlocked", providers.isEmpty());
     }
 
     @Test
@@ -239,12 +312,12 @@ public class AppWidgetServiceImplTest {
     @Test
     public void testIsRequestPinAppWidgetSupported() {
         // Set up users.
-        when(mMockShortcutService.isRequestPinItemSupported(anyInt(), anyInt()))
+        when(mMockShortcutService.isRequestPinItemSupported(anyString(), anyInt(), anyInt()))
                 .thenReturn(true, false);
         assertTrue(mManager.isRequestPinAppWidgetSupported());
         assertFalse(mManager.isRequestPinAppWidgetSupported());
 
-        verify(mMockShortcutService, times(2)).isRequestPinItemSupported(anyInt(),
+        verify(mMockShortcutService, times(2)).isRequestPinItemSupported(anyString(), anyInt(),
                 eq(LauncherApps.PinItemRequest.REQUEST_TYPE_APPWIDGET));
     }
 
@@ -594,6 +667,75 @@ public class AppWidgetServiceImplTest {
         assertThat(id1.hashCode()).isEqualTo(id2.hashCode());
     }
 
+    @Test
+    public void testWidgetViewsMemoryLimit_pre38_bitmap() {
+        RemoteViews viewsWithBitmapOverLimit = new RemoteViews(mTestContext.getPackageName(),
+                R.layout.widget_preview);
+        viewsWithBitmapOverLimit.setBitmap(R.id.widget_preview, "method", createTooBigBitmap());
+        Widget widget = setupWidgetWithTargetSdk(37, viewsWithBitmapOverLimit);
+        assertThrows(IllegalArgumentException.class, () -> {
+            mService.ensureWidgetViewsMemoryLimitLocked(widget);
+        });
+    }
+
+    @Test
+    public void testWidgetViewsMemoryLimit_pre38_icon() {
+        RemoteViews viewsWithIconOverLimit = new RemoteViews(mTestContext.getPackageName(),
+                R.layout.widget_preview);
+        viewsWithIconOverLimit.setIcon(R.id.widget_preview, "method", Icon.createWithBitmap(
+                createTooBigBitmap()));
+        Widget widget = setupWidgetWithTargetSdk(37, viewsWithIconOverLimit);
+        // The following will only log, not throw an error
+        mService.ensureWidgetViewsMemoryLimitLocked(widget);
+    }
+
+    @Test
+    public void testWidgetViewsMemoryLimit_post38_bitmap() {
+        RemoteViews viewsWithBitmapOverLimit = new RemoteViews(mTestContext.getPackageName(),
+                R.layout.widget_preview);
+        viewsWithBitmapOverLimit.setBitmap(R.id.widget_preview, "method", createTooBigBitmap());
+
+        Widget widget = setupWidgetWithTargetSdk(38, viewsWithBitmapOverLimit);
+        assertThrows(IllegalArgumentException.class, () -> {
+            mService.ensureWidgetViewsMemoryLimitLocked(widget);
+        });
+    }
+
+    @EnableFlags(Flags.FLAG_LIMIT_ICON_MEMORY)
+    @Test
+    public void testWidgetViewsMemoryLimit_post38_icon() {
+        RemoteViews viewsWithIconOverLimit = new RemoteViews(mTestContext.getPackageName(),
+                R.layout.widget_preview);
+        viewsWithIconOverLimit.setIcon(R.id.widget_preview, "method", Icon.createWithBitmap(
+                createTooBigBitmap()));
+
+        Widget widget = setupWidgetWithTargetSdk(38, viewsWithIconOverLimit);
+        assertThrows(IllegalArgumentException.class, () -> {
+            mService.ensureWidgetViewsMemoryLimitLocked(widget);
+        });
+    }
+
+    /**
+     * Create a bitmap that is bigger than mMaxWidgetBitmapMemory.
+     */
+    private Bitmap createTooBigBitmap() {
+        Display display = mTestContext.getDisplayNoVerify();
+        Point size = new Point();
+        display.getRealSize(size);
+        return  Bitmap.createBitmap(2 * size.x, 2 * size.y, Bitmap.Config.ARGB_8888);
+    }
+
+    private static Widget setupWidgetWithTargetSdk(int targetSdk, RemoteViews views) {
+        Widget widget = new Widget();
+        widget.views = views;
+        widget.provider = new Provider();
+        widget.provider.info = new AppWidgetProviderInfo();
+        widget.provider.info.providerInfo = new ActivityInfo();
+        widget.provider.info.providerInfo.applicationInfo = new ApplicationInfo();
+        widget.provider.info.providerInfo.applicationInfo.targetSdkVersion = targetSdk;
+        return widget;
+    }
+
     private void verifyRestoreUpdateRecord(
             @NonNull final List<AppWidgetServiceImpl.BackupRestoreController.RestoreUpdateRecord>
                     actualUpdates,
@@ -751,9 +893,20 @@ public class AppWidgetServiceImplTest {
     }
 
     private class TestContext extends ContextWrapper {
+        private PackageManager mPackageManager;
 
         public TestContext() {
             super(InstrumentationRegistry.getInstrumentation().getTargetContext());
+            mPackageManager = super.getPackageManager();
+        }
+
+        void setPackageManager(PackageManager pm) {
+            mPackageManager = pm;
+        }
+
+        @Override
+        public PackageManager getPackageManager() {
+            return mPackageManager;
         }
 
         @Override

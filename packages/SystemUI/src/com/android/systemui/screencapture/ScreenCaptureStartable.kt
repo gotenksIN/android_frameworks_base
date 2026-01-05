@@ -60,6 +60,7 @@ constructor(
     private val screenRecordingServiceInteractor: ScreenRecordingServiceInteractor,
     private val postRecordingShelfFactory: PostRecordingShelf.Factory,
     private val activityStarter: ActivityStarter,
+    private val screenCaptureRecordFeaturesInteractor: ScreenCaptureRecordFeaturesInteractor,
 ) : CoreStartable {
 
     override fun start() {
@@ -104,7 +105,7 @@ constructor(
     }
 
     private fun setupSmallScreenPostRecordings() {
-        if (!ScreenCaptureRecordFeaturesInteractor.isNewScreenRecordToolbarEnabled) return
+        if (!screenCaptureRecordFeaturesInteractor.isSmallScreenRecordingEnabled) return
 
         screenRecordingServiceInteractor.screenRecordings
             .filter { it is ScreenRecording.Saving }
@@ -123,13 +124,28 @@ constructor(
     }
 
     private fun setupLargeScreenPostRecordings() {
-        if (!ScreenCaptureRecordFeaturesInteractor.isLargeScreenRecordingEnabled) return
+        if (!screenCaptureRecordFeaturesInteractor.isLargeScreenRecordingEnabled) return
 
         screenRecordingServiceInteractor.screenRecordings
             .filterIsInstance<ScreenRecording.Saved>()
             .onEach { recording ->
-                val shelf = postRecordingShelfFactory.create(recording.uri, recording.thumbnail)
-                shelf.show()
+                val displayId = focusedDisplayRepository.focusedDisplayId.value
+                val display = displayRepository.getDisplay(displayId)
+
+                if (display == null) {
+                    Log.e(
+                        "ScreenCapture",
+                        "PostRecordingShelf: Couldn't find display for id=$displayId",
+                    )
+                } else {
+                    val shelf =
+                        postRecordingShelfFactory.create(
+                            recording.uri,
+                            recording.thumbnail,
+                            display,
+                        )
+                    shelf.show()
+                }
             }
             .launchIn(appScope)
     }

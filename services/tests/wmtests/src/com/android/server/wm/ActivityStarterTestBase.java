@@ -23,6 +23,7 @@ import static com.android.dx.mockito.inline.extended.ExtendedMockito.clearInvoca
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doNothing;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doReturn;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.mock;
+import static com.android.dx.mockito.inline.extended.ExtendedMockito.spyOn;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -70,6 +71,7 @@ abstract class ActivityStarterTestBase extends WindowTestsBase {
     protected ActivityMetricsLogger mActivityMetricsLogger;
     protected PackageManagerInternal mMockPackageManager;
     protected final UserManagerInternal mMockUmi = mock(UserManagerInternal.class);
+    protected final UserHelper mMockUserHelper = mock(UserHelper.class);
     protected AppOpsManager mAppOpsManager;
 
     @Before
@@ -78,8 +80,8 @@ abstract class ActivityStarterTestBase extends WindowTestsBase {
         BackgroundActivityStartController balController =
                 new BackgroundActivityStartController(mAtm, mSupervisor);
         doReturn(balController).when(mAtm.mTaskSupervisor).getBackgroundActivityLaunchController();
-        mActivityMetricsLogger = mock(ActivityMetricsLogger.class);
-        clearInvocations(mActivityMetricsLogger);
+        mActivityMetricsLogger = mAtm.mTaskSupervisor.getActivityMetricsLogger();
+        spyOn(mActivityMetricsLogger);
         mAppOpsManager = mAtm.getAppOpsManager();
         doReturn(AppOpsManager.MODE_DEFAULT).when(mAppOpsManager).checkOpNoThrow(
                 eq(AppOpsManager.OP_SYSTEM_EXEMPT_FROM_ACTIVITY_BG_START_RESTRICTION),
@@ -112,6 +114,16 @@ abstract class ActivityStarterTestBase extends WindowTestsBase {
      */
     protected final ActivityStarter prepareStarter(@Intent.Flags int launchFlags,
             boolean mockGetRootTask, int launchMode) {
+        return prepareStarter(launchFlags, mockGetRootTask, launchMode, mMockUserHelper);
+    }
+
+    /**
+     * Same as {@link #prepareStarter(int, boolean, int)}, but explicitly setting the
+     * {@code UserHelper} (instead of using {@link #mMockUserHelper}).
+     */
+    protected final ActivityStarter prepareStarter(@Intent.Flags int launchFlags,
+            boolean mockGetRootTask, int launchMode, UserHelper userHelper) {
+
         // always allow test to start activity.
         doReturn(true).when(mSupervisor).checkStartAnyActivityPermission(
                 any(), any(), any(), anyInt(), anyInt(), anyInt(), any(), any(),
@@ -169,7 +181,7 @@ abstract class ActivityStarterTestBase extends WindowTestsBase {
         info.launchMode = launchMode;
 
         return new ActivityStarter(mController, mAtm,
-                mAtm.mTaskSupervisor, mock(ActivityStartInterceptor.class))
+                mAtm.mTaskSupervisor, mock(ActivityStartInterceptor.class), userHelper)
                 .setReason(name.getMethodName())
                 .setIntent(intent)
                 .setActivityInfo(info);

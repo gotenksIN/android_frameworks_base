@@ -121,6 +121,10 @@ constructor(
      * Asks for an asynchronous scene witch to [newScene], which will use the corresponding
      * installed transition or the one specified by [transitionKey], if provided.
      */
+    @Deprecated(
+        "Use SceneInteractor when SceneContainerFlag is enabled",
+        replaceWith = ReplaceWith("sceneInteractor.changeScene"),
+    )
     fun changeScene(
         newScene: SceneKey,
         loggingReason: String,
@@ -133,7 +137,7 @@ constructor(
                     toScene = newScene.toSceneContainerSceneKey(),
                     loggingReason = loggingReason,
                     transitionKey = transitionKey,
-                    sceneState = keyguardState,
+                    keyguardState = keyguardState,
                 )
                 return@launch
             }
@@ -158,6 +162,10 @@ constructor(
     }
 
     /** Immediately snaps to the new scene. */
+    @Deprecated(
+        "Use SceneInteractor when SceneContainerFlag is enabled",
+        replaceWith = ReplaceWith("sceneInteractor.snapToScene"),
+    )
     fun snapToScene(
         newScene: SceneKey,
         loggingReason: String,
@@ -165,6 +173,8 @@ constructor(
         keyguardState: KeyguardState? = null,
     ) {
         applicationScope.launch("$TAG#snapToScene", mainImmediateDispatcher) {
+            delay(delayMillis)
+
             if (SceneContainerFlag.isEnabled) {
                 sceneInteractor.snapToScene(
                     toScene = newScene.toSceneContainerSceneKey(),
@@ -173,7 +183,6 @@ constructor(
                 return@launch
             }
 
-            delay(delayMillis)
             if (currentScene.value == newScene) return@launch
             logger.logSceneChangeRequested(
                 from = currentScene.value,

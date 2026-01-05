@@ -39,7 +39,6 @@ import static android.view.WindowManager.TRANSIT_FLAG_DISPLAY_LEVEL_TRANSITION;
 import static android.view.WindowManager.TRANSIT_PIP;
 import static android.view.WindowManager.TRANSIT_SLEEP;
 import static android.window.DesktopExperienceFlags.ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT;
-import static android.window.DesktopExperienceFlags.ENABLE_FILTER_REMOVING_DISPLAY_BUGFIX;
 
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_FOCUS_LIGHT;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_KEEP_SCREEN_ON;
@@ -81,6 +80,7 @@ import static com.android.server.wm.WindowManagerService.UPDATE_FOCUS_WILL_PLACE
 
 import static java.lang.Integer.MAX_VALUE;
 
+import android.annotation.CallSuper;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -95,6 +95,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.content.pm.UserProperties;
 import android.content.res.Configuration;
@@ -121,7 +122,9 @@ import android.provider.Settings;
 import android.service.voice.IVoiceInteractionSession;
 import android.util.ArrayMap;
 import android.util.ArraySet;
+// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
 import android.util.BoostFramework;
+// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
 import android.util.IntArray;
 import android.util.Pair;
 import android.util.Slog;
@@ -134,7 +137,6 @@ import android.view.DisplayInfo;
 import android.view.SurfaceControl;
 import android.view.WindowManager;
 import android.window.DesktopExperienceFlags;
-import android.window.DesktopModeFlags;
 import android.window.TaskFragmentAnimationParams;
 import android.window.TransitionRequestInfo;
 import android.window.WindowContainerToken;
@@ -152,7 +154,9 @@ import com.android.server.pm.UserManagerInternal;
 import com.android.server.policy.PermissionPolicyInternal;
 import com.android.server.policy.WindowManagerPolicy;
 import com.android.server.utils.Slogf;
+// QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
 import com.android.server.am.ProcessFreezerManager;
+// QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
 import com.android.server.wm.utils.RegionUtils;
 import com.android.window.flags.Flags;
 
@@ -237,12 +241,14 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
     @NonNull
     private final DisplayRotationCoordinator mDisplayRotationCoordinator;
 
+// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
     public static boolean mPerfSendTapHint = false;
     public static boolean mIsPerfBoostAcquired = false;
     public static int mPerfHandle = -1;
     public BoostFramework mPerfBoost = null;
     public BoostFramework mUxPerf = null;
 
+// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
     /** Reference to default display so we can quickly look it up. */
     private DisplayContent mDefaultDisplay;
     private final SparseArray<IntArray> mDisplayAccessUIDs = new SparseArray<>();
@@ -250,7 +256,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             new SparseArray<>();
 
     /** The current user */
-    int mCurrentUser;
+    @UserIdInt int mCurrentUser;
     /** Root task id of the front root task when user switched, indexed by userId. */
     SparseIntArray mUserRootTaskInFront = new SparseIntArray(2);
     SparseArray<IntArray> mUserVisibleRootTasks = new SparseArray<>();
@@ -332,7 +338,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             if (mInfo.targetActivity != null) {
                 cls = new ComponentName(mInfo.packageName, mInfo.targetActivity);
             }
-            userId = UserHandle.getUserId(mInfo.applicationInfo.uid);
+            userId = UserHandle.getUserId(mInfo.getUid());
             isDocument = mIntent != null & mIntent.isDocument();
             // If documentData is non-null then it must match the existing task data.
             documentData = isDocument ? mIntent.getData() : null;
@@ -438,6 +444,10 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         }
     };
 
+    // TODO(b/412177078): remove @Nullable (and checks) once Flags.hsuAllowlistActivities() is gone
+    @Nullable
+    private final UserHelper mUserHelper;
+
     RootWindowContainer(WindowManagerService service) {
         super(service);
         mHandler = new MyHandler(service.mH.getLooper());
@@ -449,6 +459,15 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         mDeviceStateAutoRotateSettingController =
                 DisplayRotation.createDeviceStateAutoRotateDependencies(service.mContext,
                         mDeviceStateController, service);
+        mUserHelper = android.multiuser.Flags.hsuAllowlistActivities()
+                ? new UserHelper(service.mAtmService.getUserManagerInternal())
+                : null;
+    }
+
+    // TODO(b/412177078): remove @Nullable (and checks) once Flags.hsuAllowlistActivities() is gone
+    @Nullable
+    UserHelper getUserHelper() {
+        return mUserHelper;
     }
 
     /**
@@ -461,8 +480,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         // Go through the children in z-order starting at the top-most
         for (int i = mChildren.size() - 1; i >= 0; --i) {
             final DisplayContent dc = mChildren.get(i);
-            if (ENABLE_FILTER_REMOVING_DISPLAY_BUGFIX.isTrue()
-                    && (dc.isRemoved() || dc.isRemoving())) {
+            if ((dc.isRemoved() || dc.isRemoving())) {
                 continue;
             }
             changed |= dc.updateFocusedWindowLocked(mode, updateInputWindows, topFocusedDisplayId);
@@ -1075,9 +1093,11 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         }
     }
 
+    @CallSuper
     @Override
     public void dumpDebug(ProtoOutputStream proto, long fieldId,
             @WindowTracingLogLevel int logLevel) {
+        // Critical log level logs only visible elements to mitigate performance overheard
         if (logLevel == WindowTracingLogLevel.CRITICAL && !isVisible()) {
             return;
         }
@@ -1289,15 +1309,35 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         });
     }
 
+    @Nullable
+    private Pair<ActivityInfo, Intent> getHomeIntentAndInfoForTaskDisplayArea(
+            @NonNull TaskDisplayArea taskDisplayArea, int userId) {
+        Intent homeIntent;
+        ActivityInfo aInfo;
+        if (taskDisplayArea == getDefaultTaskDisplayArea()
+                || mWmService.shouldPlacePrimaryHomeOnDisplay(
+                taskDisplayArea.getDisplayId(), userId)) {
+            homeIntent = mService.getHomeIntent();
+            aInfo = resolveHomeActivity(userId, homeIntent);
+        } else if (shouldPlaceSecondaryHomeOnDisplayArea(taskDisplayArea)) {
+            Pair<ActivityInfo, Intent> info = resolveSecondaryHomeActivity(userId, taskDisplayArea);
+            aInfo = info.first;
+            homeIntent = info.second;
+        } else {
+            return null;
+        }
+        return (aInfo == null) ? null : Pair.create(aInfo, homeIntent);
+    }
+
     /**
      * Checks if the home is required in the given {@link TaskDisplayArea} for the specified user.
      *
      * @param userId          The ID of the user.
      * @param taskDisplayArea The {@link TaskDisplayArea} to check.
      * @return {@code true} if there is no home present in the given {@link TaskDisplayArea} or if
-     * the home component names are different; {@code false} otherwise.
+     * the home package names are different; {@code false} otherwise.
      */
-    private boolean needsHomeLaunchOnDisplay(int userId, TaskDisplayArea taskDisplayArea) {
+    boolean needsHomeLaunchOnDisplay(int userId, TaskDisplayArea taskDisplayArea) {
         if (!taskDisplayArea.canHostHomeTask()) {
             return false;
         }
@@ -1311,24 +1351,65 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         }
 
         // Even if a home activity for the given userId is present, it could be a different
-        // component and thereby requiring launch of the correctly resolved home activity.
-        final ActivityInfo resolvedHomeComponent = resolveHomeActivity(userId,
-                mService.getHomeIntent());
-        if (resolvedHomeComponent == null) {
+        // package and thereby requiring launch of the correctly resolved home activity.
+        final Pair<ActivityInfo, Intent> resolvedHomeActivityIntentPair =
+                getHomeIntentAndInfoForTaskDisplayArea(taskDisplayArea, userId);
+        final ActivityInfo resolvedHomePackage = resolvedHomeActivityIntentPair == null ? null
+                : resolvedHomeActivityIntentPair.first;
+        if (resolvedHomePackage == null) {
             return false;
         }
-        return !Objects.equals(resolvedHomeComponent.getComponentName(),
-                existingHomeForUserOnDisplay.mActivityComponent);
+        return !Objects.equals(resolvedHomePackage.packageName,
+                existingHomeForUserOnDisplay.packageName);
     }
 
     void startHomeOnDisplaysIfNeeded(String reason) {
         forAllTaskDisplayAreas(taskDisplayArea -> {
             final int userId = mWmService.getUserAssignedToDisplay(taskDisplayArea.getDisplayId());
-            if (needsHomeLaunchOnDisplay(userId, taskDisplayArea)) {
-                startHomeOnTaskDisplayArea(userId, reason, taskDisplayArea,
-                        false /* allowInstrumenting */, false /* fromHomeKey */, false /* onTop */);
+            final Pair<ActivityInfo, Intent> homeActivityIntentPair =
+                    getHomeIntentAndInfoForTaskDisplayArea(taskDisplayArea, userId);
+
+            if (homeActivityIntentPair == null) {
+                return;
+            }
+
+            boolean allowHomeAlwaysPresent = isHomeAlwaysPresentAllowed(
+                    homeActivityIntentPair.first, userId);
+            if (allowHomeAlwaysPresent
+                    && homeActivityIntentPair.first.applicationInfo.isPrivilegedApp()) {
+                if (needsHomeLaunchOnDisplay(userId, taskDisplayArea)) {
+                    // Launch home not on top as this path ensures the correct home activity is
+                    // running in the background without disrupting the current foreground activity.
+                    startHomeOnTaskDisplayArea(userId, reason, taskDisplayArea,
+                            false /* allowInstrumenting */, false /* fromHomeKey */,
+                            false /* onTop */);
+                }
+            } else {
+                if (taskDisplayArea.topRunningActivity() == null) {
+                    startHomeOnTaskDisplayArea(userId, reason, taskDisplayArea,
+                            false /* allowInstrumenting */, false /* fromHomeKey */,
+                            true /* onTop */);
+                }
             }
         });
+    }
+
+    boolean isHomeAlwaysPresentAllowed(ActivityInfo aInfo, int userId) {
+        boolean allowHomeAlwaysPresent = false;
+        try {
+            final PackageManager pm = mService.mContext.getPackageManager();
+            final PackageManager.Property prop = pm.getPropertyAsUser(
+                    WindowManager.ALLOW_HOME_ACTIVITY_ALWAYS_PRESENT,
+                    aInfo.packageName,
+                    aInfo.name,
+                    userId);
+            if (prop != null) {
+                allowHomeAlwaysPresent = prop.getBoolean();
+            }
+        } catch (PackageManager.NameNotFoundException e) {
+            // Property not found or package not found, default to false.
+        }
+        return allowHomeAlwaysPresent;
     }
 
     boolean startHomeOnDisplay(int userId, String reason, int displayId) {
@@ -1379,18 +1460,15 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             taskDisplayArea.setShouldKeepNoTask(false);
         }
 
-        Intent homeIntent = null;
-        ActivityInfo aInfo = null;
-        if (taskDisplayArea == getDefaultTaskDisplayArea()
-                || mWmService.shouldPlacePrimaryHomeOnDisplay(
-                        taskDisplayArea.getDisplayId(), userId)) {
-            homeIntent = mService.getHomeIntent();
-            aInfo = resolveHomeActivity(userId, homeIntent);
-        } else if (shouldPlaceSecondaryHomeOnDisplayArea(taskDisplayArea)) {
-            Pair<ActivityInfo, Intent> info = resolveSecondaryHomeActivity(userId, taskDisplayArea);
-            aInfo = info.first;
-            homeIntent = info.second;
+        final Pair<ActivityInfo, Intent> homeActivityIntentPair =
+                getHomeIntentAndInfoForTaskDisplayArea(taskDisplayArea, userId);
+
+        if (homeActivityIntentPair == null) {
+            return false;
         }
+
+        final ActivityInfo aInfo = homeActivityIntentPair.first;
+        final Intent homeIntent = homeActivityIntentPair.second;
 
         if (aInfo == null || homeIntent == null) {
             return false;
@@ -1417,7 +1495,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         // Update the reason for ANR debugging to verify if the user activity is the one that
         // actually launched.
         final String myReason = reason + ":" + userId + ":" + UserHandle.getUserId(
-                aInfo.applicationInfo.uid) + ":" + taskDisplayArea.getDisplayId();
+                aInfo.getUid()) + ":" + taskDisplayArea.getDisplayId();
         mService.getActivityStartController().startHomeActivity(homeIntent, aInfo, myReason,
                 taskDisplayArea, onTop);
         return true;
@@ -1662,7 +1740,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         }
 
         final WindowProcessController app =
-                mService.getProcessController(homeInfo.processName, homeInfo.applicationInfo.uid);
+                mService.getProcessController(homeInfo.processName, homeInfo.getUid());
         if (!allowInstrumenting && app != null && app.isInstrumenting()) {
             // Don't do this if the home app is currently being instrumented.
             return false;
@@ -1815,7 +1893,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         boolean hasActivityStarted = false;
         for (int i = activities.size() - 1; i >= 0; i--) {
             final ActivityRecord r = activities.get(i);
-            if (app.mUid != r.info.applicationInfo.uid || !app.mName.equals(r.processName)) {
+            if (app.mUid != r.getUid() || !app.mName.equals(r.processName)) {
                 // The attaching process does not match the starting activity.
                 continue;
             }
@@ -1881,7 +1959,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         }
     }
 
-    boolean switchUser(int userId, UserState uss) {
+    boolean switchUser(@UserIdInt int userId, UserState uss) {
         final Task topFocusedRootTask = getTopDisplayFocusedRootTask();
         final int focusRootTaskId = topFocusedRootTask != null
                 ? topFocusedRootTask.getRootTaskId() : INVALID_TASK_ID;
@@ -1889,29 +1967,24 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         // will also cause all tasks to be moved to the fullscreen root task at a position that is
         // appropriate.
         removeRootTasksInWindowingModes(WINDOWING_MODE_PINNED);
-
-        if (DesktopModeFlags.ENABLE_TOP_VISIBLE_ROOT_TASK_PER_USER_TRACKING.isTrue()) {
-            final IntArray visibleRootTasks = new IntArray();
-            forAllRootTasks(rootTask -> {
-                final boolean restoreTask;
-                if (DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue()) {
-                    // If the task is visible, it should have activities that are visible to
-                    // the current user, so don't check for task's user id since it is
-                    // redundant and might accidentally exclude a non-leaf tasks that
-                    // aren't associated with one particular user.
-                    restoreTask = rootTask.isVisible();
-                } else {
-                    restoreTask = (mCurrentUser == rootTask.mUserId || rootTask.showForAllUsers())
-                            && rootTask.isVisible();
-                }
-                if (restoreTask) {
-                    visibleRootTasks.add(rootTask.getRootTaskId());
-                }
-            }, /* traverseTopToBottom */ false);
-            mUserVisibleRootTasks.put(mCurrentUser, visibleRootTasks);
-        } else {
-            mUserRootTaskInFront.put(mCurrentUser, focusRootTaskId);
-        }
+        final IntArray visibleRootTasks = new IntArray();
+        forAllRootTasks(rootTask -> {
+            final boolean restoreTask;
+            if (DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue()) {
+                // If the task is visible, it should have activities that are visible to
+                // the current user, so don't check for task's user id since it is
+                // redundant and might accidentally exclude a non-leaf tasks that
+                // aren't associated with one particular user.
+                restoreTask = rootTask.isVisible();
+            } else {
+                restoreTask = (mCurrentUser == rootTask.mUserId || rootTask.showForAllUsers())
+                        && rootTask.isVisible();
+            }
+            if (restoreTask) {
+                visibleRootTasks.add(rootTask.getRootTaskId());
+            }
+        }, /* traverseTopToBottom */ false);
+        mUserVisibleRootTasks.put(mCurrentUser, visibleRootTasks);
 
         mCurrentUser = userId;
 
@@ -1925,38 +1998,32 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             Slog.i(TAG, "Persisting top task because it belongs to an always-visible user");
             // For a normal user-switch, we will restore the new user's task. But if the pre-switch
             // top task is an always-visible (Communal) one, keep it even after the switch.
-            if (Flags.enableTopVisibleRootTaskPerUserTracking()) {
-                final IntArray rootTasks = mUserVisibleRootTasks.get(mCurrentUser);
-                rootTasks.add(focusRootTaskId);
-                mUserVisibleRootTasks.put(mCurrentUser, rootTasks);
-            } else {
-                mUserRootTaskInFront.put(mCurrentUser, focusRootTaskId);
-            }
+            final IntArray rootTasks = mUserVisibleRootTasks.get(mCurrentUser);
+            rootTasks.add(focusRootTaskId);
+            mUserVisibleRootTasks.put(mCurrentUser, rootTasks);
 
         }
 
-        final int restoreRootTaskId = mUserRootTaskInFront.get(userId);
         final IntArray rootTaskIdsToRestore = mUserVisibleRootTasks.get(userId);
         boolean homeInFront = false;
-        if (Flags.enableTopVisibleRootTaskPerUserTracking()) {
-            if (rootTaskIdsToRestore == null || rootTaskIdsToRestore.size() == 0) {
-                // If there are no root tasks saved, try restore id 0 which should create and launch
-                // the home task.
-                handleRootTaskLaunchOnUserSwitch(/* restoreRootTaskId */INVALID_TASK_ID);
-                homeInFront = true;
-            } else {
-                for (int i = 0; i < rootTaskIdsToRestore.size(); i++) {
-                    handleRootTaskLaunchOnUserSwitch(rootTaskIdsToRestore.get(i));
-                }
-                // Check if the top task is type home
-                final int topRootTaskId = rootTaskIdsToRestore.get(rootTaskIdsToRestore.size() - 1);
-                homeInFront = isHomeTask(topRootTaskId);
-            }
+        if (rootTaskIdsToRestore == null || rootTaskIdsToRestore.size() == 0) {
+            // If there are no root tasks saved, try restore id 0 which should create and launch
+            // the home task.
+            handleRootTaskLaunchOnUserSwitch(/* restoreRootTaskId */INVALID_TASK_ID);
+            homeInFront = true;
         } else {
-            handleRootTaskLaunchOnUserSwitch(restoreRootTaskId);
+            for (int i = 0; i < rootTaskIdsToRestore.size(); i++) {
+                handleRootTaskLaunchOnUserSwitch(rootTaskIdsToRestore.get(i));
+            }
             // Check if the top task is type home
-            homeInFront = isHomeTask(restoreRootTaskId);
+            final int topRootTaskId = rootTaskIdsToRestore.get(rootTaskIdsToRestore.size() - 1);
+            homeInFront = isHomeTask(topRootTaskId);
         }
+
+        if (mUserHelper != null) {
+            mUserHelper.setCurrentUserId(userId);
+        }
+
         return homeInFront;
     }
 
@@ -1986,11 +2053,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
     }
 
     void removeUser(int userId) {
-        if (Flags.enableTopVisibleRootTaskPerUserTracking()) {
-            mUserVisibleRootTasks.delete(userId);
-        } else {
-            mUserRootTaskInFront.delete(userId);
-        }
+        mUserVisibleRootTasks.delete(userId);
     }
 
     /**
@@ -2003,18 +2066,14 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                 rootTask = getDefaultTaskDisplayArea().getOrCreateRootHomeTask();
             }
 
-            if (Flags.enableTopVisibleRootTaskPerUserTracking()) {
-                final IntArray rootTasks = mUserVisibleRootTasks.get(userId, new IntArray());
-                // If root task already exists in the list, move it to the top instead.
-                final int rootTaskIndex = rootTasks.indexOf(rootTask.getRootTaskId());
-                if (rootTaskIndex != -1) {
-                    rootTasks.remove(rootTaskIndex);
-                }
-                rootTasks.add(rootTask.getRootTaskId());
-                mUserVisibleRootTasks.put(userId, rootTasks);
-            } else {
-                mUserRootTaskInFront.put(userId, rootTask.getRootTaskId());
+            final IntArray rootTasks = mUserVisibleRootTasks.get(userId, new IntArray());
+            // If root task already exists in the list, move it to the top instead.
+            final int rootTaskIndex = rootTasks.indexOf(rootTask.getRootTaskId());
+            if (rootTaskIndex != -1) {
+                rootTasks.remove(rootTaskIndex);
             }
+            rootTasks.add(rootTask.getRootTaskId());
+            mUserVisibleRootTasks.put(userId, rootTasks);
         }
     }
 
@@ -2429,24 +2488,37 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         }
     }
 
+// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
     void acquireAppLaunchPerfLock(ActivityRecord r) {
         /* Acquire perf lock during new app launch */
         if (mPerfBoost == null) {
             mPerfBoost = new BoostFramework();
         }
         if (mPerfBoost != null) {
+// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
+// QTI_BEGIN: 2022-01-18: Performance: Perf: Added support for app type in launch hint
             int pkgType = mPerfBoost.perfGetFeedback(BoostFramework.VENDOR_FEEDBACK_WORKLOAD_TYPE,
                                                      r.packageName);
             int wpcPid = -1;
             if (mService != null && r != null && r.info != null && r.info.applicationInfo !=null) {
+// QTI_END: 2022-01-18: Performance: Perf: Added support for app type in launch hint
+// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
                 final WindowProcessController wpc =
+// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
+// QTI_BEGIN: 2022-01-18: Performance: Perf: Added support for app type in launch hint
                         mService.getProcessController(r.processName, r.info.applicationInfo.uid);
+// QTI_END: 2022-01-18: Performance: Perf: Added support for app type in launch hint
+// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
                 if (wpc != null && wpc.hasThread()) {
+// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
+// QTI_BEGIN: 2022-01-18: Performance: Perf: Added support for app type in launch hint
                    //If target process didn't start yet,
                    // this operation will be done when app call attach
                    wpcPid = wpc.getPid();
                 }
             }
+// QTI_END: 2022-01-18: Performance: Perf: Added support for app type in launch hint
+// QTI_BEGIN: 2025-06-30: Core: Binder call reduction while launch am: 85e71044cc am: 85e71044cc
             if (mPerfBoost.board_first_api_lvl <= BoostFramework.VENDOR_V_API_LEVEL &&
                   mPerfBoost.board_api_lvl <= BoostFramework.VENDOR_V_API_LEVEL) {
 
@@ -2485,7 +2557,9 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                                r.packageName, wpcPid,
                                BoostFramework.Launch.TYPE_ATTACH_APPLICATION);
                    }
+// QTI_END: 2025-06-30: Core: Binder call reduction while launch am: 85e71044cc am: 85e71044cc
 
+// QTI_BEGIN: 2025-06-30: Core: Binder call reduction while launch am: 85e71044cc am: 85e71044cc
                    if (pkgType  == BoostFramework.WorkloadType.GAME)
                    {
                        mPerfHandle = mPerfBoost.perfHint(
@@ -2505,22 +2579,29 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                    mPerfBoost.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST, r.packageName,
                     wpcPid, BoostFramework.Launch.BOOST_V1);
                 }
+// QTI_END: 2025-06-30: Core: Binder call reduction while launch am: 85e71044cc am: 85e71044cc
+// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
             }
             if (mPerfHandle > 0)
                 mIsPerfBoostAcquired = true;
             // Start IOP
             if(r.info.applicationInfo != null &&
                 r.info.applicationInfo.sourceDir != null) {
+// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
                   if (mPerfBoost.board_first_api_lvl < BoostFramework.VENDOR_T_API_LEVEL &&
                     mPerfBoost.board_api_lvl < BoostFramework.VENDOR_T_API_LEVEL) {
                       mPerfBoost.perfIOPrefetchStart(-1,r.packageName,
                       r.info.applicationInfo.sourceDir.substring(
+// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
                         0, r.info.applicationInfo.sourceDir.lastIndexOf('/')));
+// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
                   }
+// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
             }
         }
     }
 
+// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
     @Nullable
     ActivityRecord findTask(ActivityRecord r, TaskDisplayArea preferredTaskDisplayArea,
             boolean includeLaunchedFromBubble) {
@@ -2542,6 +2623,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         if (preferredTaskDisplayArea != null) {
             mTmpFindTaskResult.process(preferredTaskDisplayArea);
             if (mTmpFindTaskResult.mIdealRecord != null) {
+// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
                 if(mTmpFindTaskResult.mIdealRecord.getState() == DESTROYED) {
                     /*It's a new app launch */
                     acquireAppLaunchPerfLock(r);
@@ -2549,6 +2631,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
 
                 if(mTmpFindTaskResult.mIdealRecord.getState() == STOPPED) {
                      /*Warm launch */
+// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
                      mUxPerf = new BoostFramework();
                      if (mUxPerf != null) {
                          if (mUxPerf.board_first_api_lvl < BoostFramework.VENDOR_T_API_LEVEL &&
@@ -2558,31 +2641,47 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                              mUxPerf.perfEvent(BoostFramework.VENDOR_HINT_WARM_LAUNCH, r.packageName, 2, 0, 0);
                          }
                      }
+// QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
                     ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
                     if (freezer != null && freezer.useFreezerManager()) {
                         freezer.startFreeze(r.packageName, ProcessFreezerManager.WARM_LAUNCH_FREEZE);
                     }
+// QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
+// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
                 }
+// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
                 return mTmpFindTaskResult.mIdealRecord;
             } else if (mTmpFindTaskResult.mCandidateRecord != null) {
                 candidateActivity = mTmpFindTaskResult.mCandidateRecord;
             }
         }
 
+// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
         /* Acquire perf lock *only* during new app launch */
+// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
+// QTI_BEGIN: 2021-10-08: Core: Revert "Perf:fix issue that launch boost worked abnormal"
         if ((mTmpFindTaskResult.mIdealRecord == null) ||
             (mTmpFindTaskResult.mIdealRecord.getState() == DESTROYED)) {
+// QTI_END: 2021-10-08: Core: Revert "Perf:fix issue that launch boost worked abnormal"
+// QTI_BEGIN: 2023-06-28: Performance: Perf:Fix the issue that activity boost duration abnormal.
             if (r != null && r.isMainIntent(r.intent)) {
                 acquireAppLaunchPerfLock(r);
+// QTI_END: 2023-06-28: Performance: Perf:Fix the issue that activity boost duration abnormal.
+// QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
                 ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
                 if (freezer != null && freezer.useFreezerManager()) {
                     freezer.startFreeze(r.packageName, ProcessFreezerManager.FIRST_LAUNCH_FREEZE);
                 }
+// QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
+// QTI_BEGIN: 2023-06-28: Performance: Perf:Fix the issue that activity boost duration abnormal.
             } else if (r == null) {
                 Slog.w(TAG, "Should not happen! Didn't apply launch boost");
             }
+// QTI_END: 2023-06-28: Performance: Perf:Fix the issue that activity boost duration abnormal.
+// QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
         }
 
+// QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
         final ActivityRecord idealMatchActivity = getItemFromTaskDisplayAreas(taskDisplayArea -> {
             if (taskDisplayArea == preferredTaskDisplayArea) {
                 return null;
@@ -3160,7 +3259,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         if (info.targetActivity != null) {
             cls = new ComponentName(info.packageName, info.targetActivity);
         }
-        final int userId = UserHandle.getUserId(info.applicationInfo.uid);
+        final int userId = UserHandle.getUserId(info.getUid());
 
         final PooledPredicate p = PooledLambda.obtainPredicate(
                 RootWindowContainer::matchesActivity, PooledLambda.__(ActivityRecord.class),

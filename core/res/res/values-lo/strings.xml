@@ -278,6 +278,7 @@
     <string name="global_action_restart" msgid="4678451019561687074">"ຣີສະຕາດ"</string>
     <string name="global_action_emergency" msgid="1387617624177105088">"ສຸກເສີນ"</string>
     <string name="global_action_bug_report" msgid="5127867163044170003">"ລາຍງານຂໍ້ຜິດພາດ"</string>
+    <string name="global_action_feedback" msgid="3480836834202300036">"ຄຳຕິຊົມ"</string>
     <string name="global_action_logout" msgid="6093581310002476511">"ສິ້ນສຸດເຊດຊັນ"</string>
     <string name="global_action_screenshot" msgid="2610053466156478564">"ພາບໜ້າຈໍ"</string>
     <string name="global_action_standby" msgid="6786920589970257642">"ສະແຕນບາຍ"</string>
@@ -326,8 +327,7 @@
     <string name="notification_channel_accessibility_hearing_device" msgid="7816963856388758952">"ອຸປະກອນຊ່ວຍຟັງ"</string>
     <string name="notification_channel_accessibility_security_policy" msgid="1727787021725251912">"ການໃຊ້ການຊ່ວຍເຂົ້າເຖິງ"</string>
     <string name="notification_channel_display" msgid="6905032605735615090">"ຈໍສະແດງຜົນ"</string>
-    <!-- no translation found for notification_channel_parental_controls (2963963315750128538) -->
-    <skip />
+    <string name="notification_channel_parental_controls" msgid="2963963315750128538">"ການຄວບຄຸມຂອງພໍ່ແມ່"</string>
     <string name="foreground_service_app_in_background" msgid="1439289699671273555">"<xliff:g id="APP_NAME">%1$s</xliff:g> ກຳລັງໃຊ້ແບັດເຕີຣີຢູ່"</string>
     <string name="foreground_service_apps_in_background" msgid="7340037176412387863">"<xliff:g id="NUMBER">%1$d</xliff:g> ແອັບກຳລັງໃຊ້ແບັດເຕີຣີຢູ່"</string>
     <string name="foreground_service_tap_for_details" msgid="9078123626015586751">"ແຕະເພື່ອເບິ່ງລາຍລະອຽດການນຳໃຊ້ແບັດເຕີຣີ ແລະ ອິນເຕີເນັດ"</string>
@@ -645,6 +645,10 @@
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"ອະນຸຍາດໃຫ້ແອັບເຂົ້າເຖິງອຸປະກອນໃນເຄືອຂ່າຍທ້ອງຖິ່ນ"</string>
     <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"ໃຊ້ສ່ວນຕິດຕໍ່ Loopback"</string>
     <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"ອະນຸຍາດໃຫ້ແອັບໂຕ້ຕອບກັບແອັບອື່ນໆຜ່ານສ່ວນຕິດຕໍ່ Loopback"</string>
+    <!-- no translation found for permlab_force_use_loopback_interface (1319727311706416481) -->
+    <skip />
+    <!-- no translation found for permdesc_force_use_loopback_interface (5829032514048681980) -->
+    <skip />
     <string name="permlab_ranging" msgid="2854543350668593390">"ກຳນົດຕຳແໜ່ງທີ່ກ່ຽວຂ້ອງກັນລະຫວ່າງອຸປະກອນທີ່ຢູ່ໃກ້ຄຽງ"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"ອະນຸຍາດໃຫ້ແອັບກຳນົດຕຳແໜ່ງທີ່ກ່ຽວຂ້ອງກັນລະຫວ່າງອຸປະກອນທີ່ຢູ່ໃກ້ຄຽງ"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"ຂໍ້ມູນບໍລິການການຈ່າຍເງິນ NFC ທີ່ຕ້ອງການ"</string>
@@ -825,6 +829,8 @@
     <string name="permdesc_readMediaVideo" msgid="3846400073770403528">"ອະນຸຍາດໃຫ້ແອັບອ່ານໄຟລ໌ວິດີໂອຈາກບ່ອນຈັດເກັບຂໍ້ມູນທີ່ແບ່ງປັນຂອງທ່ານ."</string>
     <string name="permlab_readMediaImages" msgid="4057590631020986789">"ອ່ານໄຟລ໌ຮູບຈາກບ່ອນຈັດເກັບຂໍ້ມູນທີ່ແບ່ງປັນ"</string>
     <string name="permdesc_readMediaImages" msgid="5836219373138469259">"ອະນຸຍາດໃຫ້ແອັບອ່ານໄຟລ໌ຮູບຈາກບ່ອນຈັດເກັບຂໍ້ມູນທີ່ແບ່ງປັນຂອງທ່ານ."</string>
+    <string name="permlab_readMediaDocuments" msgid="5716810755602938263">"ອ່ານໄຟລ໌ເອກະສານຈາກບ່ອນຈັດເກັບຂໍ້ມູນທີ່ແບ່ງປັນ"</string>
+    <string name="permdesc_readMediaDocuments" msgid="5665930210237304120">"ອະນຸຍາດໃຫ້ແອັບອ່ານໄຟລ໌ເອກະສານຈາກບ່ອນຈັດເກັບຂໍ້ມູນທີ່ແບ່ງປັນຂອງທ່ານ."</string>
     <string name="permlab_readVisualUserSelect" msgid="5516204215354667586">"ອ່ານໄຟລ໌ຮູບ ແລະ ວິດີໂອທີ່ຜູ້ໃຊ້ເລືອກຈາກບ່ອນຈັດເກັບຂໍ້ມູນທີ່ແບ່ງປັນ"</string>
     <string name="permdesc_readVisualUserSelect" msgid="8027174717714968217">"ອະນຸຍາດໃຫ້ແອັບອ່ານໄຟລ໌ຮູບ ແລະ ວິດີໂອທີ່ທ່ານເລືອກຈາກບ່ອນຈັດເກັບຂໍ້ມູນທີ່ແບ່ງປັນຂອງທ່ານ."</string>
     <string name="permlab_sdcardWrite" msgid="4863021819671416668">"ແກ້ໄຂ ຫຼືລຶບເນື້ອຫາໃນບ່ອນຈັດເກັບຂໍ້ມູນທີ່ແບ່ງປັນຂອງທ່ານ"</string>
@@ -1047,6 +1053,7 @@
     <string name="keyguard_password_enter_pin_password_code" msgid="7792964196473964340">"ພິມລະຫັດ PIN ເພື່ອປົດລັອກ"</string>
     <string name="keyguard_password_wrong_pin_code" msgid="8583732939138432793">"ລະຫັດ PIN ບໍ່ຖືກຕ້ອງ."</string>
     <string name="keyguard_label_text" msgid="3841953694564168384">"ເພື່ອປົດລັອກ, ໃຫ້ກົດເມນູ ແລ້ວກົດ 0."</string>
+    <string name="emergency_call_dialog_number_for_display" msgid="2978165477085612673">"ເບີໂທສຸກເສີນ"</string>
     <string name="lockscreen_carrier_default" msgid="6192313772955399160">"ບໍ່ມີບໍລິການ"</string>
     <string name="lockscreen_screen_locked" msgid="7364905540516041817">"ລັອກໜ້າຈໍແລ້ວ."</string>
     <string name="lockscreen_instructions_when_pattern_enabled" msgid="7982445492532123308">"ກົດ ເມນູ ເພື່ອປົດລັອກ ຫຼື ໂທອອກຫາເບີສຸກເສີນ."</string>
@@ -2176,13 +2183,29 @@
     <string name="autofill_picker_no_suggestions" msgid="1076022650427481509">"ບໍ່ມີການຕື່ມຂໍ້ມູນອັດຕະໂນມັດ"</string>
     <string name="autofill_picker_some_suggestions" msgid="5560549696296202701">"{count,plural, =1{ການແນະນຳການຕື່ມຂໍ້ມູນອັດຕະໂນມັດ 1 ລາຍການ}other{ການແນະນຳການຕື່ມຂໍ້ມູນອັດຕະໂນມັດ # ລາຍການ}}"</string>
     <string name="autofill_save_title" msgid="7719802414283739775">"ບັນທຶກໄວ້ໃນ "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>" ບໍ?"</string>
+    <!-- no translation found for autofill_save_title_expressive (2665408870424848558) -->
+    <skip />
     <string name="autofill_save_title_with_type" msgid="3002460014579799605">"ບັນທຶກ <xliff:g id="TYPE">%1$s</xliff:g> ໄວ້ໃນ "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>" ບໍ?"</string>
+    <!-- no translation found for autofill_save_title_with_type_expressive (6063660551496235255) -->
+    <skip />
     <string name="autofill_save_title_with_2types" msgid="3783270967447869241">"ບັນທຶກ <xliff:g id="TYPE_0">%1$s</xliff:g> ແລະ <xliff:g id="TYPE_1">%2$s</xliff:g> ໄວ້ໃນ "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>" ບໍ?"</string>
+    <!-- no translation found for autofill_save_title_with_2types_expressive (2996687022212666293) -->
+    <skip />
     <string name="autofill_save_title_with_3types" msgid="6598228952100102578">"ບັນທຶກ <xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g> ແລະ <xliff:g id="TYPE_2">%3$s</xliff:g> ໄວ້ໃນ "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>" ບໍ?"</string>
+    <!-- no translation found for autofill_save_title_with_3types_expressive (3301676215501214049) -->
+    <skip />
     <string name="autofill_update_title" msgid="3630695947047069136">"ອັບເດດໃນ "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>" ບໍ?"</string>
+    <!-- no translation found for autofill_update_title_expressive (7660582214109012920) -->
+    <skip />
     <string name="autofill_update_title_with_type" msgid="5264152633488495704">"ອັບເດດ <xliff:g id="TYPE">%1$s</xliff:g> ໃນ "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>" ບໍ?"</string>
+    <!-- no translation found for autofill_update_title_with_type_expressive (6162413585161767846) -->
+    <skip />
     <string name="autofill_update_title_with_2types" msgid="1797514386321086273">"ອັບເດດ <xliff:g id="TYPE_0">%1$s</xliff:g> ແລະ <xliff:g id="TYPE_1">%2$s</xliff:g> ໃນ "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>" ບໍ?"</string>
+    <!-- no translation found for autofill_update_title_with_2types_expressive (1911825941498393471) -->
+    <skip />
     <string name="autofill_update_title_with_3types" msgid="8285767070604652626">"ອັບເດດລາຍການເຫຼົ່ານີ້ໃນ "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>": <xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g> ແລະ <xliff:g id="TYPE_2">%3$s</xliff:g> ບໍ?"</string>
+    <!-- no translation found for autofill_update_title_with_3types_expressive (6040725201378429027) -->
+    <skip />
     <string name="autofill_save_yes" msgid="8035743017382012850">"ບັນທຶກ"</string>
     <string name="autofill_save_no" msgid="9212826374207023544">"ບໍ່, ຂອບໃຈ"</string>
     <string name="autofill_save_notnow" msgid="2853932672029024195">"ບໍ່ຟ້າວເທື່ອ"</string>
@@ -2611,10 +2634,7 @@
     <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"ການແຈ້ງເຕືອນຊັບພະຍາກອນລະບົບ"</string>
     <string name="tv_watchdog_notification_title" msgid="195239206215922517">"ການໃຊ້ຊັບພະຍາກອນຫຼາຍເກີນໄປ"</string>
     <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"ແອັບ \'<xliff:g id="APP_NAME">%1$s</xliff:g> ໃຊ້ຊັບພະຍາກອນຫຼາຍເກີນໄປ.\""</string>
-    <!-- no translation found for supervision_blocked_app_title (5546803865875383588) -->
-    <skip />
-    <!-- no translation found for supervision_blocked_app_content (4125452996088641559) -->
-    <skip />
-    <!-- no translation found for supervision_unblocked_app_content (8282985265957852278) -->
-    <skip />
+    <string name="supervision_blocked_app_title" msgid="5546803865875383588">"ອັບເດດຈາກຜູ້ປົກຄອງຂອງທ່ານ"</string>
+    <string name="supervision_blocked_app_content" msgid="4125452996088641559">"<xliff:g id="APP_NAME">%1$s</xliff:g> ຖືກລຶບອອກແລ້ວໃນຕອນນີ້"</string>
+    <string name="supervision_unblocked_app_content" msgid="8282985265957852278">"ຕອນນີ້ <xliff:g id="APP_NAME">%1$s</xliff:g> ພ້ອມໃຫ້ນຳໃຊ້ແລ້ວ"</string>
 </resources>

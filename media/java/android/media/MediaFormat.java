@@ -26,7 +26,6 @@ import static android.media.codec.Flags.FLAG_VVC_SUPPORT;
 import static android.media.tv.flags.Flags.FLAG_APPLY_PICTURE_PROFILES;
 
 import static com.android.media.codec.flags.Flags.FLAG_CODEC_IMPORTANCE;
-import static com.android.media.codec.flags.Flags.FLAG_LARGE_AUDIO_FRAME;
 
 import android.annotation.FlaggedApi;
 import android.annotation.IntDef;
@@ -179,11 +178,13 @@ public final class MediaFormat {
     public static final String MIMETYPE_VIDEO_SCRAMBLED = "video/scrambled";
     @FlaggedApi(FLAG_VVC_SUPPORT)
     public static final String MIMETYPE_VIDEO_VVC = "video/vvc";
+// QTI_BEGIN: 2024-09-12: Video: base: Define MIMETYPE_VIDEO_MVHEVC and Profile/Level handling for MVHEVC
     /**
     * MV-HEVC mimetype
     * @hide
     */
     public static final String MIMETYPE_VIDEO_MVHEVC = "video/x-mvhevc";
+// QTI_END: 2024-09-12: Video: base: Define MIMETYPE_VIDEO_MVHEVC and Profile/Level handling for MVHEVC
 
     public static final String MIMETYPE_AUDIO_AMR_NB = "audio/3gpp";
     public static final String MIMETYPE_AUDIO_AMR_WB = "audio/amr-wb";
@@ -507,7 +508,6 @@ public final class MediaFormat {
      *
      * @see MediaCodecInfo.CodecCapabilities#FEATURE_MultipleFrames
      */
-    @FlaggedApi(FLAG_LARGE_AUDIO_FRAME)
     public static final String KEY_BUFFER_BATCH_MAX_OUTPUT_SIZE = "buffer-batch-max-output-size";
 
     /**
@@ -530,7 +530,6 @@ public final class MediaFormat {
      *
      * @see MediaCodecInfo.CodecCapabilities#FEATURE_MultipleFrames
      */
-    @FlaggedApi(FLAG_LARGE_AUDIO_FRAME)
     public static final String KEY_BUFFER_BATCH_THRESHOLD_OUTPUT_SIZE =
             "buffer-batch-threshold-output-size";
 

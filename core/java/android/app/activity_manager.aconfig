@@ -64,17 +64,6 @@ flag {
 }
 
 flag {
-     namespace: "backstage_power"
-     name: "use_sticky_bcast_cache"
-     description: "Use cache for sticky broadcast intents"
-     is_fixed_read_only: true
-     bug: "356148006"
-     metadata {
-         purpose: PURPOSE_BUGFIX
-     }
-}
-
-flag {
      namespace: "system_performance"
      name: "app_start_info_component"
      description: "Control ApplicationStartInfo component field and API"
@@ -95,15 +84,6 @@ flag {
     description: "Holdback study for jank_perceptible_narrow"
     bug: "304837972"
 }
-flag {
-     namespace: "system_performance"
-     name: "early_render_thread_priority_boost"
-     description: "Boost the render thread priority during preload."
-     bug: "417909658"
-     metadata {
-         purpose: PURPOSE_BUGFIX
-     }
-}
 
 flag {
     namespace: "telecom"
@@ -118,7 +98,14 @@ flag {
 flag {
      namespace: "desktop_serviceability"
      name: "get_free_memory"
-     is_exported: true
      description: "Add API to get free memory."
      bug: "417906997"
+}
+
+flag {
+     namespace: "serviceability"
+     name: "get_free_memory_v2"
+     is_exported: true
+     description: "Add API to get free memory."
+     bug: "417358222"
 }

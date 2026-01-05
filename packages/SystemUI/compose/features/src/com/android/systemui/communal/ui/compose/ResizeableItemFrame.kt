@@ -55,8 +55,7 @@ import androidx.compose.ui.util.fastIsFinite
 import androidx.compose.ui.zIndex
 import com.android.compose.modifiers.thenIf
 import com.android.internal.R.dimen.system_app_widget_background_radius
-import com.android.systemui.Flags.hubEditModeTransition
-import com.android.systemui.communal.ui.viewmodel.DragHandle
+import com.android.systemui.communal.ui.viewmodel.ResizeHandle
 import com.android.systemui.communal.ui.viewmodel.ResizeInfo
 import com.android.systemui.communal.ui.viewmodel.ResizeableItemFrameViewModel
 import kotlinx.coroutines.flow.collectLatest
@@ -121,7 +120,7 @@ private fun UpdateGridLayoutInfo(
 
 @Composable
 private fun BoxScope.DragHandle(
-    handle: DragHandle,
+    handle: ResizeHandle,
     dragState: AnchoredDraggableState<Int>,
     radius: Dp,
     outlinePadding: Dp,
@@ -129,8 +128,8 @@ private fun BoxScope.DragHandle(
     alpha: () -> Float,
     modifier: Modifier = Modifier,
 ) {
-    val directionalModifier = if (handle == DragHandle.TOP) -1 else 1
-    val alignment = if (handle == DragHandle.TOP) Alignment.TopCenter else Alignment.BottomCenter
+    val directionalModifier = if (handle == ResizeHandle.TOP) -1 else 1
+    val alignment = if (handle == ResizeHandle.TOP) Alignment.TopCenter else Alignment.BottomCenter
     Box(
         modifier
             .align(alignment)
@@ -188,12 +187,10 @@ fun ResizableItemFrame(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     dragHandleRadius: Dp = 8.dp,
-    outlinePadding: Dp = if (hubEditModeTransition()) 0.dp else 8.dp,
+    outlinePadding: Dp = 0.dp,
     outlineColor: Color = MaterialTheme.colorScheme.primary,
-    cornerRadius: Dp =
-        if (hubEditModeTransition()) dimensionResource(system_app_widget_background_radius)
-        else 37.dp,
-    strokeWidth: Dp = if (hubEditModeTransition()) 4.dp else 3.dp,
+    cornerRadius: Dp = dimensionResource(system_app_widget_background_radius),
+    strokeWidth: Dp = 4.dp,
     minHeightPx: Int = 0,
     maxHeightPx: Int = Int.MAX_VALUE,
     resizeMultiple: Int = 1,
@@ -204,15 +201,13 @@ fun ResizableItemFrame(
 ) {
     val brush = SolidColor(outlineColor)
     val onResizeUpdated by rememberUpdatedState(onResize)
-    val dragHandleHeight =
-        if (hubEditModeTransition()) dragHandleRadius * 2
-        else verticalArrangement.spacing - outlinePadding * 2
+    val dragHandleHeight = dragHandleRadius * 2
     val isDragging by
         remember(viewModel) {
             derivedStateOf {
-                val topOffset = viewModel.topDragState.offset.takeIf { it.fastIsFinite() } ?: 0f
+                val topOffset = viewModel.topResizeState.offset.takeIf { it.fastIsFinite() } ?: 0f
                 val bottomOffset =
-                    viewModel.bottomDragState.offset.takeIf { it.fastIsFinite() } ?: 0f
+                    viewModel.bottomResizeState.offset.takeIf { it.fastIsFinite() } ?: 0f
                 topOffset > 0 || bottomOffset > 0
             }
         }
@@ -224,8 +219,8 @@ fun ResizableItemFrame(
 
         if (enabled) {
             DragHandle(
-                handle = DragHandle.TOP,
-                dragState = viewModel.topDragState,
+                handle = ResizeHandle.TOP,
+                dragState = viewModel.topResizeState,
                 radius = dragHandleRadius,
                 outlinePadding = outlinePadding,
                 brush = brush,
@@ -234,8 +229,8 @@ fun ResizableItemFrame(
             )
 
             DragHandle(
-                handle = DragHandle.BOTTOM,
-                dragState = viewModel.bottomDragState,
+                handle = ResizeHandle.BOTTOM,
+                dragState = viewModel.bottomResizeState,
                 radius = dragHandleRadius,
                 outlinePadding = outlinePadding,
                 brush = brush,
@@ -246,9 +241,9 @@ fun ResizableItemFrame(
             // Draw outline around the element.
             Canvas(modifier = Modifier.matchParentSize()) {
                 val paddingPx = outlinePadding.toPx()
-                val topOffset = viewModel.topDragState.offset.takeIf { it.fastIsFinite() } ?: 0f
+                val topOffset = viewModel.topResizeState.offset.takeIf { it.fastIsFinite() } ?: 0f
                 val bottomOffset =
-                    viewModel.bottomDragState.offset.takeIf { it.fastIsFinite() } ?: 0f
+                    viewModel.bottomResizeState.offset.takeIf { it.fastIsFinite() } ?: 0f
                 drawRoundRect(
                     brush,
                     alpha = alpha(),

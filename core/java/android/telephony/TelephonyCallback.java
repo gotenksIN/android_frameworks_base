@@ -31,6 +31,7 @@ import android.telephony.ims.ImsReasonInfo;
 import android.telephony.ims.MediaQualityStatus;
 import android.telephony.ims.MediaThreshold;
 import android.telephony.satellite.NtnSignalStrength;
+import android.util.ArraySet;
 import android.util.Log;
 
 import com.android.internal.annotations.VisibleForTesting;
@@ -739,6 +740,31 @@ public class TelephonyCallback {
     public static final int EVENT_CELLULAR_IDENTIFIER_DISCLOSED_CHANGED = 47;
 
     /**
+     * Event for updates to network security events.
+     * See {@link NetworkSecurityEventListener#onNetworkSecurityEvents}
+     *
+     * @hide
+     */
+    @FlaggedApi(Flags.FLAG_NETWORK_SECURITY_EVENT_INDICATIONS)
+    @RequiresPermission(android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
+    @SystemApi
+    public static final int EVENT_NETWORK_SECURITY_EVENTS = 48;
+
+    /**
+     * Event for changes to the emergency mode when AP domain selection is enabled.
+     *
+     * <p>Requires permission {@link android.Manifest.permission#READ_BASIC_PHONE_STATE}
+     *
+     * @see DomainSelectionEmergencyModeListener#onEmergencyModeEntered(int, int, int)
+     * @see DomainSelectionEmergencyModeListener#onEmergencyModeExited(int, int, int)
+     *
+     * @hide
+     */
+    @FlaggedApi(Flags.FLAG_DOMAIN_SELECTION_EMERGENCY_MODE_NOTIFICATION)
+    @RequiresPermission(Manifest.permission.READ_BASIC_PHONE_STATE)
+    public static final int EVENT_DOMAIN_SELECTION_EMERGENCY_MODE_CHANGED = 49;
+
+    /**
      * @hide
      */
     @IntDef(prefix = {"EVENT_"}, value = {
@@ -788,7 +814,9 @@ public class TelephonyCallback {
             EVENT_CARRIER_ROAMING_NTN_AVAILABLE_SERVICES_CHANGED,
             EVENT_CARRIER_ROAMING_NTN_SIGNAL_STRENGTH_CHANGED,
             EVENT_SECURITY_ALGORITHMS_CHANGED,
-            EVENT_CELLULAR_IDENTIFIER_DISCLOSED_CHANGED
+            EVENT_CELLULAR_IDENTIFIER_DISCLOSED_CHANGED,
+            EVENT_NETWORK_SECURITY_EVENTS,
+            EVENT_DOMAIN_SELECTION_EMERGENCY_MODE_CHANGED
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface TelephonyEvent {
@@ -1893,6 +1921,92 @@ public class TelephonyCallback {
         void onSecurityAlgorithmsChanged(@NonNull SecurityAlgorithmUpdate securityAlgorithmUpdate);
     }
 
+
+    /**
+     * Interface for NetworkSecurityEventsListener
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_NETWORK_SECURITY_EVENT_INDICATIONS)
+    public interface NetworkSecurityEventsListener {
+        /**
+         * Callback invoked when network security events are received.
+         *
+         * @param events details of the network security events
+         * See {@link NetworkSecurityEvent} for more details
+         */
+        void onNetworkSecurityEvents(@NonNull Set<NetworkSecurityEvent>  events);
+    }
+
+    /**
+     * Interface for the emergency mode listener.
+     *
+     * Note: This listener is only available when AP domain selection is enabled.
+     * If the domain selection is not enabled, even if this listener is registered,
+     * the callbacks will not be called when an emergency call/SMS is made.
+     *
+     * @hide
+     */
+    @FlaggedApi(Flags.FLAG_DOMAIN_SELECTION_EMERGENCY_MODE_NOTIFICATION)
+    public interface DomainSelectionEmergencyModeListener {
+        /**
+         * Callback invoked when the device enters the emergency mode.
+         *
+         * When an emergency call or SMS starts, domain selection triggers the modem to enter
+         * emergency mode, and once that is complete, it notifies the application of the entry
+         * of emergency mode.
+         *
+         * If the emergency mode was started for an emergency call and an emergency SMS is sent
+         * while in emergency mode, then this method will be called once again with
+         * {@link TelephonyManager#DOMAIN_SELECTION_EMERGENCY_TYPE_SMS}.
+         *
+         * The calling app should have the
+         * {@link android.Manifest.permission#READ_BASIC_PHONE_STATE}.
+         *
+         * @param type for the emergency mode entry
+         *             See {@link TelephonyManager.DomainSelectionEmergencyType}.
+         * @param slotIndex for which emergency mode entered.
+         *                  Can be derived from {@code subscriptionId} except
+         *                  when {@code subscriptionId} is invalid.
+         * @param subscriptionId The subscription ID used to start the emergency mode.
+         *
+         * @see TelephonyManager#DOMAIN_SELECTION_EMERGENCY_TYPE_CALL
+         * @see TelephonyManager#DOMAIN_SELECTION_EMERGENCY_TYPE_SMS
+         */
+        @RequiresPermission(Manifest.permission.READ_BASIC_PHONE_STATE)
+        void onDomainSelectionEmergencyModeEntered(
+                @TelephonyManager.DomainSelectionEmergencyType int type,
+                int slotIndex, int subscriptionId);
+
+        /**
+         * Callback invoked when the device exits the emergency mode.
+         *
+         * When the emergency call or SMS ends and all emergency modes are exited, domain
+         * selection notifies the modem to exit emergency mode and simultaneously reports
+         * the emergency mode exit to the application.
+         *
+         * If the emergency callback mode is supported, this method will be called
+         * after the emergency callback mode is ended.
+         *
+         * The calling app should have the
+         * {@link android.Manifest.permission#READ_BASIC_PHONE_STATE}.
+         *
+         * @param type for the emergency mode exit
+         *             See {@link TelephonyManager.DomainSelectionEmergencyType}.
+         * @param slotIndex for which emergency mode exited.
+         *                  Can be derived from {@code subscriptionId} except
+         *                  when {@code subscriptionId} is invalid.
+         * @param subscriptionId The subscription ID used to end the emergency mode.
+         *
+         * @see TelephonyManager#DOMAIN_SELECTION_EMERGENCY_TYPE_CALL
+         * @see TelephonyManager#DOMAIN_SELECTION_EMERGENCY_TYPE_SMS
+         */
+        @RequiresPermission(Manifest.permission.READ_BASIC_PHONE_STATE)
+        void onDomainSelectionEmergencyModeExited(
+                @TelephonyManager.DomainSelectionEmergencyType int type,
+                int slotIndex, int subscriptionId);
+    }
+
     /**
      * The callback methods need to be called on the handler thread where
      * this object was created.  If the binder did that for us it'd be nice.
@@ -2374,6 +2488,44 @@ public class TelephonyCallback {
 
             Binder.withCleanCallingIdentity(() -> mExecutor.execute(
                     () -> listener.onCellularIdentifierDisclosedChanged(disclosure)));
+        }
+
+        public void onNetworkSecurityEvents(List<NetworkSecurityEvent> events) {
+            if (!Flags.networkSecurityEventIndications()) return;
+            NetworkSecurityEventsListener listener =
+                    (NetworkSecurityEventsListener) mTelephonyCallbackWeakRef.get();
+            if (listener == null) return;
+
+            Binder.withCleanCallingIdentity(() -> mExecutor.execute(
+                    () -> listener.onNetworkSecurityEvents(new ArraySet<>(events))));
+        }
+
+        public void onDomainSelectionEmergencyModeEntered(
+                @TelephonyManager.DomainSelectionEmergencyType int type,
+                int slotIndex, int subscriptionId) {
+            if (!Flags.domainSelectionEmergencyModeNotification()) return;
+
+            DomainSelectionEmergencyModeListener listener =
+                    (DomainSelectionEmergencyModeListener) mTelephonyCallbackWeakRef.get();
+            if (listener == null) return;
+
+            Binder.withCleanCallingIdentity(() -> mExecutor.execute(
+                    () -> listener.onDomainSelectionEmergencyModeEntered(
+                            type, slotIndex, subscriptionId)));
+        }
+
+        public void onDomainSelectionEmergencyModeExited(
+                @TelephonyManager.DomainSelectionEmergencyType int type,
+                int slotIndex, int subscriptionId) {
+            if (!Flags.domainSelectionEmergencyModeNotification()) return;
+
+            DomainSelectionEmergencyModeListener listener =
+                    (DomainSelectionEmergencyModeListener) mTelephonyCallbackWeakRef.get();
+            if (listener == null) return;
+
+            Binder.withCleanCallingIdentity(() -> mExecutor.execute(
+                    () -> listener.onDomainSelectionEmergencyModeExited(
+                            type, slotIndex, subscriptionId)));
         }
     }
 }

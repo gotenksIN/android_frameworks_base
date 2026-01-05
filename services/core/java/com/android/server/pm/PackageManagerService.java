@@ -19,6 +19,7 @@ import static android.Manifest.permission.MANAGE_DEVICE_ADMINS;
 import static android.Manifest.permission.SET_HARMFUL_APP_WARNINGS;
 import static android.app.AppOpsManager.MODE_IGNORED;
 import static android.app.admin.flags.Flags.crossUserSuspensionEnabledRo;
+import static android.content.pm.Flags.isDeviceUpgradingUsesSharedMemory;
 import static android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DEFAULT;
 import static android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
 import static android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED_UNTIL_USED;
@@ -33,6 +34,7 @@ import static android.content.pm.PackageManager.MATCH_SYSTEM_ONLY;
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
 import static android.content.pm.PackageManager.USER_MIN_ASPECT_RATIO_UNSET;
 import static android.crashrecovery.flags.Flags.refactorCrashrecovery;
+import static android.os.PerfettoTrace.BIG_LOCKS_V3;
 import static android.os.Process.INVALID_UID;
 import static android.os.Trace.TRACE_TAG_PACKAGE_MANAGER;
 import static android.os.UserHandle.USER_ALL;
@@ -177,7 +179,9 @@ import android.util.Slog;
 import android.util.SparseArray;
 import android.util.SparseBooleanArray;
 import android.util.Xml;
+// QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
 import android.util.BoostFramework;
+// QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
 import android.view.Display;
 
 import com.android.internal.R;
@@ -187,6 +191,8 @@ import com.android.internal.app.ResolverActivity;
 import com.android.internal.content.F2fsUtils;
 import com.android.internal.content.InstallLocationUtils;
 import com.android.internal.content.om.OverlayConfig;
+import com.android.internal.dev.perfetto.sdk.PerfettoTrace;
+import com.android.internal.os.ApplicationSharedMemory;
 import com.android.internal.pm.parsing.PackageParser2;
 import com.android.internal.pm.parsing.pkg.AndroidPackageInternal;
 import com.android.internal.pm.parsing.pkg.ParsedPackage;
@@ -259,6 +265,7 @@ import com.android.server.utils.WatchedArrayMap;
 import com.android.server.utils.WatchedSparseBooleanArray;
 import com.android.server.utils.WatchedSparseIntArray;
 import com.android.server.utils.Watcher;
+import com.android.server.wm.ActivityTaskManagerInternal;
 
 import libcore.util.EmptyArray;
 import libcore.util.HexEncoding;
@@ -400,6 +407,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     static final int SCAN_AS_FACTORY = 1 << 25;
     static final int SCAN_AS_APEX = 1 << 26;
     static final int SCAN_AS_STOPPED_SYSTEM_APP = 1 << 27;
+
+    private static final int STOP_AND_KILL_APP_TIMEOUT_MS = 15000;
 
     @IntDef(flag = true, prefix = { "SCAN_" }, value = {
             SCAN_NO_DEX,
@@ -947,7 +956,9 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     int mNextInstallToken = 1;  // nonzero; will be wrapped back to 1 when ++ overflows
 
     final @NonNull String[] mRequiredVerifierPackages;
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
     final @Nullable String mOptionalVerifierPackage;
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
     final @NonNull String mRequiredInstallerPackage;
     final @NonNull String mRequiredUninstallerPackage;
     final @NonNull String mRequiredPermissionControllerPackage;
@@ -1002,6 +1013,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
      * @hide
      */
     public static void boostPriorityForPackageManagerTracedLockedSection() {
+        PerfettoTrace.begin(BIG_LOCKS_V3, "pms_lock_acquire").emit();
         if (ENABLE_BOOST) {
             sThreadPriorityBooster.boost();
         }
@@ -1016,6 +1028,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         if (ENABLE_BOOST) {
             sThreadPriorityBooster.reset();
         }
+        PerfettoTrace.end(BIG_LOCKS_V3).emit();
     }
 
     /**
@@ -1145,6 +1158,37 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
      */
     @Nullable
     private final SnapshotStatistics mSnapshotStatistics;
+
+    /**
+     * Mock upgrade flag, read from settings.
+     */
+    private boolean mIsMockUpgrade;
+
+    /**
+     * Runnable to be called on system properties change.
+     */
+    private final Runnable mMockUpgradeCallback = new Runnable() {
+        @Override
+        public void run() {
+            // The system property allows testing ota flow when upgraded to the same image.
+            boolean isMockUpgrade = SystemProperties.getBoolean("persist.pm.mock-upgrade",
+                    false /* default */);
+            // mIsUpgrade is final, but isMockUpgrade can change, update the member and ASM
+            if (mIsMockUpgrade != isMockUpgrade) {
+                mIsMockUpgrade = isMockUpgrade;
+                updateAsmIsDeviceUpgrading();
+            }
+        }
+    };
+
+    /**
+     * Updates the Application Shared Memory isDeviceUpgrading flag accordingly.
+     */
+    private void updateAsmIsDeviceUpgrading() {
+        if (isDeviceUpgradingUsesSharedMemory()) {
+            ApplicationSharedMemory.getInstance().setIsDeviceUpgrading(isDeviceUpgrading());
+        }
+    }
 
     /**
      * Return the cached computer.  The method will rebuild the cached computer if necessary.
@@ -2151,14 +2195,18 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         mStorageEventHelper = new StorageEventHelper(this, mDeletePackageHelper,
                 mRemovePackageHelper);
 
+// QTI_BEGIN: 2025-02-12: Core: Add provision to disable applications for QSPA enabled targets
         t.traceBegin("readListOfTelephonyPackagesToBeDisabled");
         mInstallPackageHelper.readListOfTelephonyPackagesToBeDisabled();
         t.traceEnd();
 
+// QTI_END: 2025-02-12: Core: Add provision to disable applications for QSPA enabled targets
+// QTI_BEGIN: 2024-11-13: Telephony: Add provision to prevent installation of some apps
         t.traceBegin("readListOfPackagesToBeDisabled");
         mInstallPackageHelper.readListOfPackagesToBeDisabled();
         t.traceEnd();
 
+// QTI_END: 2024-11-13: Telephony: Add provision to prevent installation of some apps
         synchronized (mLock) {
             // Create the computer as soon as the state objects have been installed.  The
             // cached computer is the same as the live computer until the end of the
@@ -2254,6 +2302,11 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             }
 
             final VersionInfo ver = mSettings.getInternalVersion();
+
+            // Read isMockUpgrade for the first time.
+            mIsMockUpgrade = SystemProperties.getBoolean("persist.pm.mock-upgrade",
+                    false /* default */);
+
             mIsUpgrade =
                     !partitionsFingerprint.equals(ver.fingerprint);
             if (mIsUpgrade) {
@@ -2620,9 +2673,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
 
     public boolean isDeviceUpgrading() {
         // allow instant applications
-        // The system property allows testing ota flow when upgraded to the same image.
-        return mIsUpgrade || SystemProperties.getBoolean(
-                "persist.pm.mock-upgrade", false /* default */);
+        return mIsUpgrade || mIsMockUpgrade;
     }
 
     @NonNull
@@ -3190,6 +3241,35 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                 blocker.register();
                 mAmi.killApplicationSync(pkgName, appId, userId, reason, exitInfoReason);
                 blocker.waitAppProcessGone(mAmi, snapshotComputer(), mUserManager, pkgName);
+            } finally {
+                blocker.unregister();
+            }
+        }
+    }
+
+    void stopAndKillApplication(String pkgName, @AppIdInt int appId,
+            @CanBeALL @UserIdInt int userId, String reason, int exitInfoReason) {
+        ActivityManagerInternal ami = LocalServices.getService(ActivityManagerInternal.class);
+        ActivityTaskManagerInternal atmi =
+                LocalServices.getService(ActivityTaskManagerInternal.class);
+        if (Thread.holdsLock(mLock) || ami == null || atmi == null) {
+            // holds PM's lock, go back killApplication to avoid it run into watchdog reset.
+            Slog.e(TAG, "Holds PM's lock, unable kill application synchronized");
+            killApplication(pkgName, appId, userId, reason, exitInfoReason);
+        } else {
+            KillAppBlocker blocker = new KillAppBlocker(STOP_AND_KILL_APP_TIMEOUT_MS);
+            try {
+                blocker.register();
+                /* stopAndKillApp is non-blocking. It blocks, but only until it sends stop signal
+                 * to the application. After it returns, the stopping and killing happens in
+                 * async manner.
+                 *
+                 * Even for killApplicationSync method above, only the signal sent to application
+                 * is sync. The killing always happens in async manner, which is why we have
+                 * to wait for the process itself to be gone to be assured of its death.
+                 */
+                atmi.stopAndKillAppForUpdate(pkgName, userId, appId);
+                blocker.waitAppProcessGone(ami, snapshotComputer(), mUserManager, pkgName);
             } finally {
                 blocker.unregister();
             }
@@ -4343,7 +4423,15 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             }
             mReleaseOnSystemReady = null;
         }
+
         mSystemReady = true;
+
+        // Initialize Application Shared Memory isDeviceUpgrading flag, after mSystemReady is true.
+        updateAsmIsDeviceUpgrading();
+
+        // Register SystemProperties callback to update the ApplicationSharedMemory on change.
+        SystemProperties.addChangeCallback(mMockUpgradeCallback);
+
         ContentObserver co = new ContentObserver(mHandler) {
             @Override
             public void onChange(boolean selfChange) {
@@ -4478,7 +4566,9 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         }, overlayFilter);
 
         mModuleInfoProvider.systemReady();
+// QTI_BEGIN: 2020-04-03: Performance: Add support for UxPerformance to receive context information.
         new BoostFramework(mContext, true);
+// QTI_END: 2020-04-03: Performance: Add support for UxPerformance to receive context information.
 
         // Installer service might attempt to install some packages that have been staged for
         // installation on reboot. Make sure this is the last component to be call since the
@@ -6774,9 +6864,9 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         }
 
         @Override
-        public int getAppUidForPccUid(int pccUid) {
+        public int getAppUidForPrivateComputeCoreUid(int pccUid) {
             final int callerUid = Binder.getCallingUid();
-            if (!Process.isPccUid(pccUid)) {
+            if (!Process.isPrivateComputeCoreUid(pccUid)) {
                 return Process.INVALID_UID;
             }
 
@@ -7346,7 +7436,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                 return packageName.equals(mRequiredSdkSandboxPackage);
             }
             Computer snapshot = snapshot();
-            int uid = snapshot.getPackageUid(packageName, flags, userId);
+            int uid = snapshot.getPackageUid(packageName, flags, userId,
+                    Process.isPrivateComputeCoreUid(callingUid));
             return UserHandle.isSameApp(uid, callingUid);
         }
 
@@ -7443,6 +7534,15 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                 @Build.SdkIntFull int sdkVersionFull) {
             final boolean isUpgrading = mPriorSdkVersionFull != -1;
             return isUpgrading && (mPriorSdkVersionFull < sdkVersionFull);
+        }
+
+        @Override
+        public boolean isPackageAppLockEnabled(String packageName, int userId) {
+            if (!android.security.Flags.appLockApis()) {
+                return false;
+            }
+            final Computer snapshot = snapshotComputer();
+            return mAppLockPackageHelper.isPackageAppLockEnabled(snapshot, packageName, userId);
         }
     }
 

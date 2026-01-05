@@ -18,8 +18,8 @@
 use activitymanager_structured_aidl::aidl::android::app::IActivityManagerStructured::IActivityManagerStructured;
 use anyhow::{Context, Result};
 use binder::{BinderFeatures, ProcessState, Strong};
-use dlext_bindgen::android_set_application_target_sdk_version;
 use log::{error, info, warn, LevelFilter};
+use native_activity_thread_bindgen::android_set_application_target_sdk_version;
 use native_application_thread_aidl::aidl::android::app::INativeApplicationThread::BnNativeApplicationThread;
 use nix::sys::signal::{pthread_sigmask, SigSet, SigmaskHow, Signal};
 use rustutils::android::process::{android_mallopt, MalloptOpcode};
@@ -57,7 +57,9 @@ pub fn app_process_init(target_sdk_version: i32, runtime_flags: u32) {
         log::error!("Call to android_mallopt failed: Opcode = M_SET_ZYGOTE_CHILD");
     }
 
-    apply_runtime_flags(runtime_flags);
+    if let Err(e) = apply_runtime_flags(runtime_flags) {
+        panic!("Failed to apply runtime flags: {e}");
+    }
 
     let target = if target_sdk_version <= 0 { SDK_VERSION_UNSET } else { target_sdk_version };
     // SAFETY: target is a valid SDK version validated above.

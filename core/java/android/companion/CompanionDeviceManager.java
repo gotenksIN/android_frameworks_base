@@ -299,7 +299,7 @@ public final class CompanionDeviceManager {
             MESSAGE_ONEWAY_PING, MESSAGE_REQUEST_REMOTE_AUTHENTICATION,
             MESSAGE_REQUEST_CONTEXT_SYNC, MESSAGE_ONEWAY_TASK_CONTINUITY,
             MESSAGE_REQUEST_PERMISSION_RESTORE, MESSAGE_REQUEST_METADATA_UPDATE,
-            MESSAGE_ONEWAY_TO_WEARABLE})
+            MESSAGE_REQUEST_TRUSTED_DEVICE, MESSAGE_ONEWAY_TO_WEARABLE})
     public @interface MessageType {}
 
 
@@ -363,6 +363,12 @@ public final class CompanionDeviceManager {
      */
     @RequiresPermission(USE_COMPANION_TRANSPORTS)
     public static final int MESSAGE_REQUEST_METADATA_UPDATE = 0x63776885; // ?MDU
+    /**
+     * Message header assigned to the trusted devices verification request.
+     *
+     * @hide
+     */
+    public static final int MESSAGE_REQUEST_TRUSTED_DEVICE = 0x63846886; // ?TDV
     /**
      * Message header assigned to the one-way message sent from the wearable device.
      *
@@ -2320,6 +2326,7 @@ public final class CompanionDeviceManager {
      * @hide
      */
     @FlaggedApi(Flags.FLAG_ENABLE_DATA_SYNC)
+    @RequiresPermission(android.Manifest.permission.MANAGE_COMPANION_DEVICES)
     public void setLocalMetadata(@UserIdInt int userId, @NonNull @FeatureName String feature,
             @Nullable PersistableBundle value) {
         if (mService == null) {
@@ -2333,6 +2340,29 @@ public final class CompanionDeviceManager {
 
         try {
             mService.setLocalMetadata(userId, feature, value);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Queries the locally stored device metadata.
+     *
+     * @param userId The user id of the user whose metadata is being queried.
+     *
+     * @hide
+     */
+    @FlaggedApi(Flags.FLAG_ENABLE_DATA_SYNC)
+    @RequiresPermission(android.Manifest.permission.MANAGE_COMPANION_DEVICES)
+    @NonNull
+    public PersistableBundle getLocalMetadata(@UserIdInt int userId) {
+        if (mService == null) {
+            Log.w(TAG, "CompanionDeviceManager service is not available.");
+            return PersistableBundle.EMPTY;
+        }
+
+        try {
+            return mService.getLocalMetadata(userId);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -2437,6 +2467,32 @@ public final class CompanionDeviceManager {
         try {
             return mService.isSystemDataTransportAttached(associationId);
         }  catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Sets a test-only allow-list for the requestAction() API.
+     * When the provided allow-list is non-empty, all action requests will be blocked
+     * unless the requesting service's component name is present in the list.
+     * Passing a {@code null} list will deactivate this test mode and an empty list will block all
+     * the requests.
+     *
+     * @param allowList A list of service component names to allow, or {@code null} to disable.
+     * @hide
+     */
+    @TestApi
+    @FlaggedApi(Flags.FLAG_ENABLE_DATA_SYNC)
+    @RequiresPermission("android.Manifest.permission.USE_COMPANION_TRANSPORTS")
+    public void setRequestActionAllowList(@Nullable List<String> allowList) {
+        if (mService == null) {
+            Log.w(TAG, "CompanionDeviceManager service is not available.");
+            return;
+        }
+
+        try {
+            mService.setRequestActionAllowList(allowList);
+        } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
     }

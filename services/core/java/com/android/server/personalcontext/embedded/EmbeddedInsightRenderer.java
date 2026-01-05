@@ -78,6 +78,11 @@ public class EmbeddedInsightRenderer implements Renderer {
         mClientRegistry.removeClient(id);
     }
 
+    /** Gets the {@link RenderToken} for the given {@link InsightSurfaceClientInfo}. */
+    public RenderToken getRenderTokenForClient(InsightSurfaceClientInfo clientInfo) {
+        return mClientRegistry.getRenderTokenForClient(clientInfo);
+    }
+
     @Override
     public boolean isInterestedInInsight(ContextInsight insight) {
         // Embedded insights should be rendered due to a RenderToken, which bypasses this filter.
@@ -86,7 +91,7 @@ public class EmbeddedInsightRenderer implements Renderer {
     }
 
     @Override
-    public void render(@NonNull ContextInsight insight, boolean isFirst) {
+    public void render(@NonNull ContextInsight insight) {
         final InsightSurfaceClientInfo client = clientFromInsight(insight);
         if (client == null) {
             logDebug("no client found for insight [" + insight + "]");

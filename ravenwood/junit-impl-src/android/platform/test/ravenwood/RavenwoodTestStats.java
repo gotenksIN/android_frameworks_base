@@ -17,11 +17,16 @@ package android.platform.test.ravenwood;
 
 import static com.android.ravenwood.common.RavenwoodInternalUtils.RAVENWOOD_VERBOSE_LOGGING;
 
+import android.annotation.NonNull;
+import android.annotation.Nullable;
+import android.platform.test.annotations.internal.InnerRunner;
+import android.platform.test.ravenwood.RavenwoodEnablementChecker.DisabledOnRavenwoodAssumptionException;
 import android.util.Log;
 
 import com.android.ravenwood.common.RavenwoodInternalUtils;
 
 import org.junit.runner.Description;
+import org.junit.runner.RunWith;
 import org.junit.runner.notification.Failure;
 import org.junit.runner.notification.RunListener;
 import org.junit.runner.notification.RunNotifier;
@@ -29,6 +34,8 @@ import org.junit.runner.notification.RunNotifier;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.AnnotatedElement;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -36,8 +43,12 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.regex.Pattern;
 
@@ -54,8 +65,9 @@ import java.util.regex.Pattern;
 public class RavenwoodTestStats {
     private static final String TAG = RavenwoodInternalUtils.TAG;
     private static final String HEADER =
-            "Type,Module,Class,Method,RawMethodName,Reason,Passed,Failed,Skipped,DurationMillis";
-    private static final String FORMAT = "%s,%s,%s,%s,%s,%s,%d,%d,%d,%f\n";
+            "Type,Label,Module,Class,Method,RawMethodName,AtestTarget,Reason,Annotations,"
+            + "Source,Line,Passed,Failed,Skipped,DurationMillis";
+    private static final String FORMAT = "%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%d,%d,%d,%d,%f\n";
 
     private static RavenwoodTestStats sInstance;
 
@@ -83,7 +95,10 @@ public class RavenwoodTestStats {
         return caller.getClassName() + "#" + caller.getMethodName();
     }
 
-    record Outcome(Result result, Duration duration, Failure failure) {
+    record SourceLocation(Description testDescription, String filename, int line) {
+    }
+
+    record Outcome(Description testDescription, Result result, Duration duration, Failure failure) {
         /** @return 1 if {@link #result} is "passed". */
         public int passedCount() {
             return result == Result.Passed ? 1 : 0;
@@ -128,6 +143,13 @@ public class RavenwoodTestStats {
                             // The test hit a stub API
                             return getCaller(ex);
                         }
+                        if (ex instanceof AssertionError) {
+                            if (ex.getMessage() == null) {
+                                return "AssertionError: [No message]";
+                            } else {
+                                return "AssertionError: " + ex.getMessage();
+                            }
+                        }
                         // We don't actually know what's up, just report the exception class name.
                         return ex.getClass().getName();
                     } else {
@@ -137,12 +159,44 @@ public class RavenwoodTestStats {
             }
             return "-";
         }
+
+        /**
+         * If the result is a failure (skip or fail), return the source file information of
+         * the failed line in the test class file.
+         */
+        @NonNull
+        public SourceLocation failureSourceLocation() {
+            // Bail early if it doesn't have an exception.
+            if (failure == null || failure.getException() == null) {
+                return new SourceLocation(testDescription, "", 0);
+            }
+            var testClass = testDescription.getTestClass();
+            var testClassName = testClass.getName();
+
+            // Iterate over stack frames of the exception and its causes, and find the
+            // first frame from the test class.
+            for (var e = failure.getException(); e != null; e = e.getCause()) {
+                for (var frame : e.getStackTrace()) {
+                    if (frame.getClassName().equals(testClassName)) {
+                        // Test class found, return the filename and the line number.
+                        var pkg = testClass.getPackageName().replace('.', '/');
+                        return new SourceLocation(
+                                testDescription,
+                                pkg + "/" + frame.getFileName(),
+                                frame.getLineNumber());
+                    }
+                }
+            }
+
+            return new SourceLocation(testDescription, "[Unable to find source file]", 0);
+        }
     }
 
     private final String mTestModuleName;
     private final File mOutputSymlinkFile;
     private final PrintWriter mOutputWriter;
     private final Map<String, Map<String, Outcome>> mStats = new LinkedHashMap<>();
+    private final Set<Class<?>> mDisabledClasses = new HashSet<>();
 
     /** Ctor */
     public RavenwoodTestStats() {
@@ -182,14 +236,106 @@ public class RavenwoodTestStats {
     }
 
     private void addResult(String className, String methodName, Outcome outcome) {
-        mStats.computeIfAbsent(className, k -> new TreeMap<>()).putIfAbsent(methodName, outcome);
+        var outcomeMap = mStats.computeIfAbsent(className, k -> new TreeMap<>());
+
+        Outcome v = outcomeMap.get(methodName);
+        if (v == null) {
+            v = outcomeMap.put(methodName, outcome);
+
+            // We may call addResult multiple times for the same method, but we always use
+            // the first one.
+            dumpSingleTest(className, methodName, outcome);
+        }
+    }
+
+    /**
+     * Called by the test runner when skipping a whole test class to propagate when a test
+     * is skipped for @DisabledOnRavenwood via a side channel. (Because the normal notifier
+     * flow doesn't have a place for us to put this information.)
+     */
+    public void onTestDisabled(@NonNull Class<?> clazz) {
+        mDisabledClasses.add(clazz);
     }
 
     /**
      * Make sure the string properly escapes commas for CSV fields.
      */
-    private static String normalize(String s) {
+    private static String escape(@Nullable String s) {
+        if (s == null || s.isEmpty()) {
+            return "";
+        }
         return '"' + s.replace("\"", "\"\"") + '"';
+    }
+
+    private static String getAnnotations(@Nullable AnnotatedElement element) {
+        if (element == null) {
+            return "";
+        }
+        return annotationsToResult(Arrays.asList(element.getAnnotations()));
+    }
+
+    private static String getAnnotations(@Nullable Description description) {
+        if (description == null) {
+            return "";
+        }
+        return annotationsToResult(description.getAnnotations());
+    }
+
+    /**
+     * Convert annotations to a comma-separated string, ignoring uninteresting ones.
+     */
+    private static String annotationsToResult(@Nullable Collection<Annotation> annotations) {
+        StringBuilder sb = new StringBuilder();
+        var sep = "";
+        for (Annotation annot : annotations) {
+            var name = annot.annotationType().getName();
+            if (name.equals("org.junit.Test")) {
+                continue;
+            }
+            if (name.contains("HostStubGenProcessed")) {
+                continue;
+            }
+            sb.append(sep);
+            sb.append("@");
+            sb.append(getAnnotationTypeName(annot));
+            appendAnnotationValue(sb, annot);
+            sep = ",";
+        }
+
+        return sb.toString();
+    }
+
+    private static final String[] KNOWN_PACKAGES = {
+            "android.platform.test.annotations.internal.",
+            "android.platform.test.annotations.",
+            "org.junit.runner.",
+    };
+
+    private static String getAnnotationTypeName(Annotation annot) {
+        var name = annot.annotationType().getName();
+
+        for (var kp : KNOWN_PACKAGES) {
+            if (name.startsWith(kp)) {
+                name = name.substring(kp.length());
+                break;
+            }
+        }
+        return name;
+    }
+
+    private static void appendAnnotationValue(StringBuilder sb, Annotation annot) {
+        String value = null;
+        if (annot instanceof RunWith a) {
+            value = a.value().getCanonicalName();
+        } else if (annot instanceof InnerRunner a) {
+            value = a.value().getCanonicalName();
+        }
+        if (value == null) {
+            return;
+        }
+        sb.append("(");
+        sb.append(value);
+        sb.append(")");
     }
 
     /**
@@ -202,6 +348,7 @@ public class RavenwoodTestStats {
             int failed = 0;
             Duration totalDuration = Duration.ZERO;
 
+            Class<?> testClass = null;
             for (var entry : outcomes.entrySet()) {
                 var method = entry.getKey();
                 var outcome = entry.getValue();
@@ -211,22 +358,18 @@ public class RavenwoodTestStats {
                 failed += outcome.failedCount();
                 totalDuration = totalDuration.plus(outcome.duration);
 
-                var rawMethodName = extractMethodName(method);
-
-                mOutputWriter.printf(FORMAT,
-                        "m", // Type: method
-                        mTestModuleName, className,
-                        normalize(method), normalize(rawMethodName),
-                        normalize(outcome.reason()),
-                        outcome.passedCount(), outcome.failedCount(), outcome.skippedCount(),
-                        outcome.duration.toMillis() / 1000f);
+                testClass = outcome.testDescription.getTestClass();
             }
-
             mOutputWriter.printf(FORMAT,
                     "c", // Type: class
+                    buildClassLabel(testClass, passed, failed, skipped),
                     mTestModuleName, className,
-                    "-", "-", // method name / row method name.
+                    "-", // method name
+                    "-", // raw method name
+                    escape(buildAtestTarget(testClass, null)),
                     "-", // reason.
+                    escape(getAnnotations(testClass)),
+                    "", 0, // Source info
                     passed, failed, skipped,
                     totalDuration.toMillis() / 1000f);
         });
@@ -235,6 +378,88 @@ public class RavenwoodTestStats {
         Log.i(TAG, "Added result to stats file: file://" + mOutputSymlinkFile);
 
         copyToArtifactsDir();
+    }
+
+    private void dumpSingleTest(String className, String method, Outcome outcome) {
+        var rawMethodName = extractMethodName(method);
+        var testClass = outcome.testDescription.getTestClass();
+        var loc = outcome.failureSourceLocation();
+
+        mOutputWriter.printf(FORMAT,
+                "m", // Type: method
+                // Method label: "P"assed, "F"ailed, "S"kipped, "D"isabled
+                buildMethodLabel(outcome),
+                mTestModuleName, className,
+                escape(method), escape(rawMethodName),
+                escape(buildAtestTarget(testClass, method)),
+                escape(outcome.reason()),
+                escape(getAnnotations(outcome.testDescription)),
+                escape(loc.filename()),
+                loc.line(),
+                outcome.passedCount(), outcome.failedCount(), outcome.skippedCount(),
+                outcome.duration.toMillis() / 1000f);
+        mOutputWriter.flush();
+    }
+
+    /** Generate a label for a method row. */
+    private String buildMethodLabel(Outcome outcome) {
+        var label = "[Unknown]";
+        if (outcome.passedCount() > 0) {
+            label = "P"; // Passed
+        } else if (outcome.skippedCount() > 0) {
+            // Special case @DisabledOnRavenwood.
+            var isDisabledOnRavenwood =
+                    mDisabledClasses.contains(outcome.testDescription.getTestClass())
+                    || outcome.failure != null && outcome.failure.getException()
+                        instanceof DisabledOnRavenwoodAssumptionException;
+            if (isDisabledOnRavenwood) {
+                label = "D"; // Disabled (normally @DisabledOnRavenwood)
+            } else {
+                label = "S"; // Skipped (normally @Ignore or assumption failure)
+            }
+        } else if (outcome.failedCount() > 0) {
+            label = "F"; // Failed
+        }
+        return label;
+    }
+
+    /** Generate a label for a class row. */
+    private StringBuilder buildClassLabel(
+            @Nullable Class<?> clazz, int passed, int failed, int skipped) {
+        var label = new StringBuilder();
+        if (passed > 0) {
+            label.append("P"); // Passed
+        }
+        if (failed > 0) {
+            label.append("F"); // Failed
+        }
+        if (skipped > 0) {
+            if (mDisabledClasses.contains(clazz)) {
+                label.append("D"); // Disabled (normally @DisabledOnRavenwood)
+            } else {
+                label.append("S"); // Skipped (normally @Ignore)
+            }
+        }
+        // Fallback
+        if (label.isEmpty()) {
+            label.append("[Unknown]");
+        }
+        return label;
+    }
+
+    private String buildAtestTarget(@Nullable Class<?> clazz, @Nullable String method) {
+        if (clazz == null) { // Shouldn't happen, but just in case.
+            return mTestModuleName;
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append(mTestModuleName);
+        sb.append(":");
+        sb.append(clazz.getName());
+        if (method != null && !"<init>".equals(method)) {
+            sb.append("#");
+            sb.append(extractMethodName(method));
+        }
+        return sb.toString();
     }
 
     private void copyToArtifactsDir() {
@@ -312,7 +537,7 @@ public class RavenwoodTestStats {
             mStartTime = Instant.now();
         }
 
-        private Outcome createOutcome(Result result, Failure failure) {
+        private Outcome createOutcome(Description testDescription, Result result, Failure failure) {
             var endTime = Instant.now();
 
             // When a class is skipped, force set duration to 0.
@@ -321,11 +546,11 @@ public class RavenwoodTestStats {
             // things.)
             var duration = result == Result.Skipped ? Duration.ZERO
                     : Duration.between(mStartTime, endTime);
-            return new Outcome(result, duration, failure);
+            return new Outcome(testDescription, result, duration, failure);
         }
 
-        private Outcome createOutcome(Result result) {
-            return createOutcome(result, null);
+        private Outcome createOutcome(Description testDescription, Result result) {
+            return createOutcome(testDescription, result, null);
         }
 
         private void addResultWithLogging(
@@ -347,7 +572,7 @@ public class RavenwoodTestStats {
             // we already recorded a result to the same metho, we won't overwrite it.
             addResultWithLogging(description.getClassName(),
                     description.getMethodName(),
-                    createOutcome(Result.Passed),
+                    createOutcome(description, Result.Passed),
                     "  testFinished: ",
                     description);
         }
@@ -357,7 +582,7 @@ public class RavenwoodTestStats {
             var description = failure.getDescription();
             addResultWithLogging(description.getClassName(),
                     description.getMethodName(),
-                    createOutcome(Result.Failed, failure),
+                    createOutcome(description, Result.Failed, failure),
                     "  testFailure: ",
                     failure);
         }
@@ -367,7 +592,7 @@ public class RavenwoodTestStats {
             var description = failure.getDescription();
             addResultWithLogging(description.getClassName(),
                     description.getMethodName(),
-                    createOutcome(Result.Skipped),
+                    createOutcome(description, Result.Skipped, failure),
                     "  testAssumptionFailure: ",
                     failure);
         }
@@ -376,7 +601,7 @@ public class RavenwoodTestStats {
         public void testIgnored(Description description) {
             addResultWithLogging(description.getClassName(),
                     description.getMethodName(),
-                    createOutcome(Result.Skipped),
+                    createOutcome(description, Result.Skipped),
                     "  testIgnored: ",
                     description);
         }

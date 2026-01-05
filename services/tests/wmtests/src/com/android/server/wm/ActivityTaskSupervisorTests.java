@@ -19,6 +19,7 @@ package com.android.server.wm;
 import static android.app.ActivityManager.START_DELIVERED_TO_TOP;
 import static android.app.ActivityManager.START_TASK_TO_FRONT;
 import static android.app.ITaskStackListener.FORCED_RESIZEABLE_REASON_SECONDARY_DISPLAY;
+import static android.app.WindowConfiguration.ACTIVITY_TYPE_STANDARD;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN;
 import static android.app.WindowConfiguration.WINDOWING_MODE_MULTI_WINDOW;
@@ -226,11 +227,11 @@ public class ActivityTaskSupervisorTests extends WindowTestsBase {
         activity1.setVisible(false);
         activity1.finishing = true;
         activity1.setState(ActivityRecord.State.STOPPING, "test");
-        activity1.addToStopping(false /* scheduleIdle */, false /* idleDelayed */, "test");
+        activity1.addToStopping(false /* scheduleIdle */, "test");
         final ActivityRecord activity2 = new ActivityBuilder(mAtm).setCreateTask(true).build();
         activity2.setState(ActivityRecord.State.RESUMED, "test");
         // The state can happen from ActivityRecord#makeInvisible.
-        activity2.addToStopping(false /* scheduleIdle */, false /* idleDelayed */, "test");
+        activity2.addToStopping(false /* scheduleIdle */, "test");
         mSupervisor.removeTask(activity1.getTask(), true /* killProcess */,
                 true /* removeFromRecents */, "testRemoveTask");
         mSupervisor.removeTask(activity2.getTask(), true /* killProcess */,
@@ -453,6 +454,51 @@ public class ActivityTaskSupervisorTests extends WindowTestsBase {
         // Verify that the change is scheduled to the client after defer-resumed disabled
         mSupervisor.endDeferResume();
         verify(activity2).scheduleTopResumedActivityChanged(eq(false));
+    }
+
+    /**
+     * Verifies that a top-resumed state gain is scheduled after resume is no longer deferred.
+     */
+    @Test
+    public void testTopResumedActivity_deferResume_gainState() {
+        final ActivityRecord activity = new ActivityBuilder(mAtm).setCreateTask(true).build();
+        doReturn(true).when(activity).scheduleTopResumedActivityChanged(anyBoolean());
+
+        // Defer resume, then resume an activity.
+        mSupervisor.beginDeferResume();
+        activity.setState(ActivityRecord.State.RESUMED, "test");
+
+        // Verify that no top-resumed state change is sent while resume is deferred.
+        verify(activity, never()).scheduleTopResumedActivityChanged(anyBoolean());
+
+        // End deferring resume.
+        mSupervisor.endDeferResume();
+
+        // Verify that the top-resumed state gain is sent.
+        verify(activity).scheduleTopResumedActivityChanged(eq(true));
+    }
+
+    /**
+     * Verifies that top-resumed state loss is scheduled for a transiently visible activity.
+     */
+    @Test
+    public void testTopResumedStateLoss_transientlyVisible() {
+        final TransitionController transitionController =
+                mAtm.mWindowOrganizerController.getTransitionController();
+        spyOn(transitionController);
+        doReturn(true).when(transitionController).isTransientVisible(any());
+
+        final ActivityRecord activity1 = new ActivityBuilder(mAtm).setCreateTask(true).build();
+        doReturn(true).when(activity1).scheduleTopResumedActivityChanged(anyBoolean());
+        activity1.setState(ActivityRecord.State.RESUMED, "test");
+
+        // Resume another activity, which should trigger top resumed state loss for activity1.
+        final ActivityRecord activity2 = new ActivityBuilder(mAtm).setCreateTask(true).build();
+        activity2.setState(ActivityRecord.State.RESUMED, "test");
+
+        // TODO: b/275026461 - Remove this when this issue is resolved, we should not report
+        // state loss.
+        verify(activity1).scheduleTopResumedActivityChanged(eq(false));
     }
 
     /**
@@ -729,6 +775,51 @@ public class ActivityTaskSupervisorTests extends WindowTestsBase {
 
         assertThat(mSupervisor.mOpaqueContainerHelper.isOpaque(childTask)).isTrue();
     }
+
+    @Test
+    public void testOpaque_forceOpaque() {
+        final Task forceOpaqueRootTask = new TaskBuilder(mSupervisor)
+                .setActivityType(ACTIVITY_TYPE_STANDARD)
+                .setWindowingMode(WINDOWING_MODE_FULLSCREEN)
+                .setCreatedByOrganizer(true)
+                .setForceOpaque(true)
+                .build();
+        final Rect leftBounds = new Rect();
+        final Rect rightBounds = new Rect();
+        forceOpaqueRootTask.getBounds().splitVertically(leftBounds, rightBounds);
+        final Task adjacentTask = new TaskBuilder(mSupervisor)
+                .setParentTask(forceOpaqueRootTask)
+                .setActivityType(ACTIVITY_TYPE_STANDARD)
+                .setWindowingMode(WINDOWING_MODE_MULTI_WINDOW)
+                .setCreateActivity(true)
+                .build();
+        final Task adjacentEmptyTask = new TaskBuilder(mSupervisor)
+                .setParentTask(forceOpaqueRootTask)
+                .setActivityType(ACTIVITY_TYPE_STANDARD)
+                .setWindowingMode(WINDOWING_MODE_MULTI_WINDOW)
+                .setCreateActivity(false)
+                .build();
+        adjacentTask.setBounds(leftBounds);
+        adjacentEmptyTask.setBounds(rightBounds);
+        adjacentTask.setAdjacentTaskFragments(
+                new TaskFragment.AdjacentSet(adjacentTask, adjacentEmptyTask)
+        );
+
+        assertThat(mSupervisor.mOpaqueContainerHelper.isOpaque(forceOpaqueRootTask)).isTrue();
+
+        final Task forceOpaqueTaskWithTranslucentActivity = new TaskBuilder(mSupervisor)
+                .setCreatedByOrganizer(true)
+                .setForceOpaque(true)
+                .setCreateActivity(true)
+                .build();
+        final ActivityRecord activity = forceOpaqueTaskWithTranslucentActivity.getTopMostActivity();
+        activity.setOccludesParent(false);
+
+        assertThat(
+                mSupervisor.mOpaqueContainerHelper.isOpaque(forceOpaqueTaskWithTranslucentActivity)
+        ).isTrue();
+    }
+
 
     @NonNull
     private TaskFragment createChildTaskFragment(@NonNull Task parent,

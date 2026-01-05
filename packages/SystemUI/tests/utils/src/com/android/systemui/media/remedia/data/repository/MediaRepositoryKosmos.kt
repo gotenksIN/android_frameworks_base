@@ -20,6 +20,8 @@ import android.content.applicationContext
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.applicationCoroutineScope
 import com.android.systemui.kosmos.testDispatcher
+import com.android.systemui.media.controls.util.fakeMediaControllerFactory
+import com.android.systemui.statusbar.notification.collection.provider.visualStabilityProvider
 import com.android.systemui.util.settings.fakeSettings
 import com.android.systemui.util.time.systemClock
 
@@ -29,7 +31,9 @@ val Kosmos.mediaRepository by
             applicationContext = applicationContext,
             applicationScope = applicationCoroutineScope,
             backgroundDispatcher = testDispatcher,
+            visualStabilityProvider = visualStabilityProvider,
             systemClock = systemClock,
             secureSettings = fakeSettings,
+            mediaControllerFactory = fakeMediaControllerFactory,
         )
     }

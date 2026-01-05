@@ -127,6 +127,7 @@ public class PipTransition extends PipTransitionController implements
     private final PipDesktopState mPipDesktopState;
     private final Optional<DesktopPipTransitionController> mDesktopPipTransitionController;
     private final PipInteractionHandler mPipInteractionHandler;
+    private final PipDisplayTransferHandler mPipDisplayTransferHandler;
 
     //
     // Transition caches
@@ -175,7 +176,8 @@ public class PipTransition extends PipTransitionController implements
             Optional<SplitScreenController> splitScreenControllerOptional,
             PipDesktopState pipDesktopState,
             Optional<DesktopPipTransitionController> desktopPipTransitionController,
-            PipInteractionHandler pipInteractionHandler) {
+            PipInteractionHandler pipInteractionHandler,
+            PipDisplayTransferHandler pipDisplayTransferHandler) {
         super(shellInit, shellTaskOrganizer, transitions, pipBoundsState, pipMenuController,
                 pipBoundsAlgorithm);
 
@@ -193,6 +195,7 @@ public class PipTransition extends PipTransitionController implements
         mPipDesktopState = pipDesktopState;
         mDesktopPipTransitionController = desktopPipTransitionController;
         mPipInteractionHandler = pipInteractionHandler;
+        mPipDisplayTransferHandler = pipDisplayTransferHandler;
 
         mExpandHandler = new PipExpandHandler(mContext, mPipSurfaceTransactionHelper,
                 pipBoundsState, pipBoundsAlgorithm,
@@ -323,6 +326,12 @@ public class PipTransition extends PipTransitionController implements
             @NonNull SurfaceControl.Transaction finishT,
             @NonNull IBinder mergeTarget,
             @NonNull Transitions.TransitionFinishCallback finishCallback) {
+        // If we receive a closing transition for the PiP task while mid display-transfer, cancel
+        // the ongoing animation
+        if (mPipDisplayTransferHandler.isPipRemovedMidDisplayTransfer(info)) {
+            end();
+            return;
+        }
         if (info.getType() == TRANSIT_EXIT_PIP) {
             end();
         }
@@ -1184,17 +1193,30 @@ public class PipTransition extends PipTransitionController implements
                         && mPipTransitionState.getPinnedTaskLeash() != null;
 
                 Preconditions.checkState(hasValidTokenAndLeash,
-                        "Unexpected bundle for " + mPipTransitionState);
+                        "Unexpected state for " + mPipTransitionState);
                 mPipInteractionHandler.begin(mPipTransitionState.getPinnedTaskLeash(),
                         PipInteractionHandler.INTERACTION_ENTER_PIP);
                 break;
             case PipTransitionState.ENTERED_PIP:
                 mPipInteractionHandler.end();
                 break;
+
             case PipTransitionState.EXITED_PIP:
                 mPipTransitionState.setPinnedTaskLeash(null);
                 mPipTransitionState.setPipTaskInfo(null);
                 mPipTransitionState.setPipCandidateTaskInfo(null);
+                break;
+
+            case PipTransitionState.CHANGING_PIP_BOUNDS:
+                Preconditions.checkState(mPipTransitionState.getPinnedTaskLeash() != null,
+                        "Unexpected state for " + mPipTransitionState);
+                mPipInteractionHandler.begin(mPipTransitionState.getPinnedTaskLeash(),
+                        PipInteractionHandler.INTERACTION_BOUNDS_CHANGE_TRANSITION);
+                break;
+            case PipTransitionState.CHANGED_PIP_BOUNDS:
+                if (oldState == PipTransitionState.CHANGING_PIP_BOUNDS) {
+                    mPipInteractionHandler.end();
+                }
                 break;
         }
     }

@@ -76,6 +76,7 @@ import static com.android.internal.util.FrameworkStatsLog.TIME_ZONE_DETECTOR_STA
 import static com.android.internal.util.FrameworkStatsLog.TIME_ZONE_DETECTOR_STATE__DETECTION_MODE__MANUAL;
 import static com.android.internal.util.FrameworkStatsLog.TIME_ZONE_DETECTOR_STATE__DETECTION_MODE__TELEPHONY;
 import static com.android.internal.util.FrameworkStatsLog.TIME_ZONE_DETECTOR_STATE__DETECTION_MODE__UNKNOWN;
+import static com.android.server.stats.Flags.addAdaptiveSuspendStatsPuller;
 import static com.android.server.stats.Flags.addMobileBytesTransferByProcStatePuller;
 import static com.android.server.stats.Flags.addMemcgMemoryInformationPuller;
 import static com.android.server.stats.pull.netstats.NetworkStatsUtils.fromPublicNetworkStats;
@@ -107,6 +108,7 @@ import android.app.StatsManager.PullAtomMetadata;
 import android.app.usage.NetworkStatsManager;
 import android.bluetooth.BluetoothActivityEnergyInfo;
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothManager;
 import android.bluetooth.UidTraffic;
 import android.content.ContentResolver;
 import android.content.Context;
@@ -181,6 +183,7 @@ import android.security.metrics.StorageStats;
 import android.stats.storage.StorageEnums;
 import android.system.suspend.internal.AggregatedKernelWakelockInfo;
 import android.system.suspend.internal.ISuspendControlServiceInternal;
+import android.system.suspend.internal.SuspendInfo;
 import android.telephony.ModemActivityInfo;
 import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
@@ -480,6 +483,9 @@ public class StatsPullAtomService extends SystemService {
 
     private static final boolean ENABLE_AGGREGATED_KERNEL_WAKELOCK_STATS_PULLER =
                 kernelWakelockDuration();
+
+    private static final boolean ENABLE_ADAPTIVE_SUSPEND_STATS_PULLER =
+                addAdaptiveSuspendStatsPuller();
 
     private static final ArrayMap<String, Integer> mPreviousThermalThrottlingStatus =
             new ArrayMap<>();
@@ -864,6 +870,10 @@ public class StatsPullAtomService extends SystemService {
                         return pullMemcgProcessHighMemoryHighWatermark(atomTag, data);
                     case FrameworkStatsLog.MEMCG_MEMORY_STAT_SNAPSHOT:
                         return pullMemcgProcessStatSnapshot(atomTag, data);
+                    case FrameworkStatsLog.ADAPTIVE_SUSPEND_STATS:
+                        synchronized (mSuspendControlServiceInternalLock) {
+                            return pullAdaptiveSuspendStats(atomTag, data);
+                        }
                     default:
                         throw new UnsupportedOperationException("Unknown tagId=" + atomTag);
                 }
@@ -1070,6 +1080,9 @@ public class StatsPullAtomService extends SystemService {
             registerMemcgMemoryHighWaterMark();
         }
         registerMemcgMemoryStats();
+        if (ENABLE_ADAPTIVE_SUSPEND_STATS_PULLER) {
+            registerAdaptiveSuspendStats();
+        }
     }
 
     private void initMobileDataStatsPuller() {
@@ -2017,7 +2030,8 @@ public class StatsPullAtomService extends SystemService {
     }
 
     private BluetoothActivityEnergyInfo fetchBluetoothData() {
-        final BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
+        final BluetoothAdapter adapter =
+                mContext.getSystemService(BluetoothManager.class).getAdapter();
         if (adapter != null) {
             SynchronousResultReceiver bluetoothReceiver =
                     new SynchronousResultReceiver("bluetooth");
@@ -5373,6 +5387,57 @@ public class StatsPullAtomService extends SystemService {
             ));
         }
         return StatsManager.PULL_SUCCESS;
+    }
+
+    private void registerAdaptiveSuspendStats() {
+        int tagId = FrameworkStatsLog.ADAPTIVE_SUSPEND_STATS;
+        mStatsManager.setPullAtomCallback(
+                tagId, /* PullAtomMetadata */ null, DIRECT_EXECUTOR, mStatsCallbackImpl);
+    }
+
+    int pullAdaptiveSuspendStats(int atomTag, List<StatsEvent> pulledData) {
+        ISuspendControlServiceInternal suspendControlServiceInternal =
+                getISuspendControlServiceInternal();
+        if (suspendControlServiceInternal == null) {
+            return StatsManager.PULL_SKIP;
+        }
+        try {
+            SuspendInfo info = suspendControlServiceInternal.getSuspendStats();
+            pulledData.add(FrameworkStatsLog.buildStatsEvent(
+                    atomTag,
+                    (int) info.suspendAttemptCount,
+                    (int) info.failedSuspendCount,
+                    (int) info.shortSuspendCount,
+                    info.suspendTimeMillis,
+                    info.shortSuspendTimeMillis,
+                    (int) info.breakEvenMillis,
+                    info.suspendOverheadTimeMillis,
+                    info.failedSuspendOverheadTimeMillis,
+                    (int) info.newBackoffCount,
+                    (int) info.backoffContinueCount,
+                    info.sleepTimeMillis,
+                    toIntArray(info.suspendDurationMillisBins),
+                    toIntArray(info.consecutiveBadSuspendBins),
+                    (int) info.maxBackoffContinuations,
+                    (int) info.newBadSuspends,
+                    (int) info.earlyRecoveryBadSuspends
+            ));
+        } catch (RemoteException e) {
+            Slog.e(TAG, "Cannot pull adaptive suspend stats.", e);
+            return StatsManager.PULL_SKIP;
+        }
+        return StatsManager.PULL_SUCCESS;
+    }
+
+    private static int[] toIntArray(long[] longArray) {
+        if (longArray == null) {
+            return null;
+        }
+        int[] intArray = new int[longArray.length];
+        for (int i = 0; i < longArray.length; i++) {
+            intArray[i] = (int) longArray[i];
+        }
+        return intArray;
     }
 
     private int toProtoPsiResourceType(PsiData.ResourceType resourceType) {

@@ -1431,6 +1431,17 @@ public class BubbleController implements ConfigurationChangeListener,
                 mStackView.startMonitoringSwipeUpGesture();
             }
         }
+
+        if (com.android.wm.shell.Flags.fixBubbleSwipeUpDismissBubbleBar() && mLayerView != null
+                && mLayerView.isExpanded()) {
+            BubbleLog.d("BubbleController.onNotificationPanelExpandedChanged() expanded=%b",
+                    expanded);
+            if (expanded) {
+                mLayerView.stopMonitoringSwipeUpGesture();
+            } else {
+                mLayerView.startMonitoringSwipeUpGesture();
+            }
+        }
     }
 
     private void setSysuiProxy(Bubbles.SysuiProxy proxy) {
@@ -2613,7 +2624,9 @@ public class BubbleController implements ConfigurationChangeListener,
                         bubbleTransit.continueCollapse();
                     }
                     if (!mBubbleData.hasBubbles() && !isStackExpanded()) {
-                        mLayerView.setVisibility(INVISIBLE);
+                        if (mLayerView != null) {
+                            mLayerView.setVisibility(INVISIBLE);
+                        }
                         removeFromWindowManagerMaybe();
                     }
                 });
@@ -3899,7 +3912,7 @@ public class BubbleController implements ConfigurationChangeListener,
             boolean hideRootTask = false;
             if (!mBubbleData.isExpanded()) {
                 hideRootTask = true;
-            } else if (!mLayerView.isExpanded()) {
+            } else if (mLayerView != null && !mLayerView.isExpanded()) {
                 // When bubble is being dragged in launcher, layerView is collapsed while
                 // bubbleData is not
                 hideRootTask = true;
@@ -3922,6 +3935,11 @@ public class BubbleController implements ConfigurationChangeListener,
 
         @Override
         public void setTaskBounds(TaskViewTaskController taskView, Rect boundsOnScreen) {
+            if (mBubblePositioner.isPendingBubbleBarTopOnScreenUpdate()) {
+                BubbleLog.d(
+                        "BubbleController.setTaskBounds skipped due to stale bubble bar position");
+                return;
+            }
             mBaseTransitions.setTaskBounds(taskView, boundsOnScreen);
         }
     }

@@ -20,20 +20,23 @@ import android.content.ComponentName;
 import android.content.pm.ServiceInfo;
 import android.os.Binder;
 
-import com.android.server.am.OomAdjuster;
-
 import java.util.ArrayList;
 
 /**
  * Abstract base class for service records in the Activity Manager.
  * This class centralizes common service state fields that are essential for
- * process state management, particularly utilized by {@link com.android.server.am.OomAdjuster}.
+ * process state management, particularly utilized by {@link OomAdjuster}.
  * TODO(b/425766486): Make setter methods package-private once OomAdjuster is migrated to psc.
  */
 public abstract class ServiceRecordInternal extends Binder {
     /** The service component's per-instance name. */
     public final ComponentName instanceName;
+    /** whether this is a sdk sandbox service */
+    public final boolean isSdkSandbox;
     private final OomAdjuster.Constants mOomConstants;
+
+    /** where this service is running or null. */
+    private ProcessRecordInternal mHostProcess;
 
     /** Whether the service has been explicitly requested to start by an application. */
     private boolean mStartRequested;
@@ -64,9 +67,11 @@ public abstract class ServiceRecordInternal extends Binder {
      */
     private long mShortFgsStartTime = NO_SHORT_FGS_START_TIME;
 
-    public ServiceRecordInternal(ComponentName instanceName, OomAdjuster.Constants oomConstants,
+    public ServiceRecordInternal(ComponentName instanceName, final boolean isSdkSandbox,
+            OomAdjuster.Constants oomConstants,
             long lastActivity) {
         this.instanceName = instanceName;
+        this.isSdkSandbox = isSdkSandbox;
         mOomConstants = oomConstants;
         mLastActivity = lastActivity;
     }
@@ -123,12 +128,12 @@ public abstract class ServiceRecordInternal extends Binder {
         return mShortFgsStartTime;
     }
 
-    protected void setShortFgsStartTime(long uptimeNow) {
+    public void setShortFgsStartTime(long uptimeNow) {
         mShortFgsStartTime = uptimeNow;
     }
 
     /** Resets the start time for the short foreground service. */
-    protected void clearShortFgsStartTime() {
+    public void clearShortFgsStartTime() {
         mShortFgsStartTime = NO_SHORT_FGS_START_TIME;
     }
 
@@ -170,7 +175,13 @@ public abstract class ServiceRecordInternal extends Binder {
     public abstract ArrayList<? extends ConnectionRecordInternal> getConnectionAt(int index);
 
     /** Returns the host process that hosts this service. */
-    public abstract ProcessRecordInternal getHostProcess();
+    public ProcessRecordInternal getHostProcessInternal() {
+        return mHostProcess;
+    }
+
+    public void setHostProcess(ProcessRecordInternal process) {
+        mHostProcess = process;
+    }
 
     /** Returns the isolation host process (e.g., for isolated or SDK sandbox processes). */
     public abstract ProcessRecordInternal getIsolationHostProcess();

@@ -19,4 +19,7 @@ package com.android.systemui.accessibility.shortcutchooser.shared.model
 import com.android.internal.accessibility.common.ShortcutConstants.UserShortcutType
 
 /** The model to store the extended data for an Intent to launch shortcut chooser dialog. */
-data class DialogRequestModel(@param:UserShortcutType val shortcutType: Int, val displayId: Int)
+data class DialogRequestModel(
+    @param:UserShortcutType val shortcutType: Int,
+    val displayId: Int,
+)

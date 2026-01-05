@@ -12,10 +12,12 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License
+// QTI_BEGIN: 2025-03-13: Telephony: Introduce new values for Dual Video
  *
  * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
  * Copyright (c) 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
+// QTI_END: 2025-03-13: Telephony: Introduce new values for Dual Video
  */
 
 package android.telephony.ims;
@@ -129,11 +131,13 @@ public final class ImsCallProfile implements Parcelable {
      * VideoShare (video RX one way)
      */
     public static final int CALL_TYPE_VS_RX = 10;
+// QTI_BEGIN: 2018-08-24: Telephony: IMS: Add CALL_TYPE for audio and video inactive
     /**
      * Unknown (audio / video inactive)
      * @hide
      */
     public static final int CALL_TYPE_UNKNOWN = (-1);
+// QTI_END: 2018-08-24: Telephony: IMS: Add CALL_TYPE for audio and video inactive
 
     /**
      * Extra properties for IMS call.
@@ -278,7 +282,7 @@ public final class ImsCallProfile implements Parcelable {
     public static final String EXTRA_CALL_SUBJECT = "android.telephony.ims.extra.CALL_SUBJECT";
 
     /**
-     * Extra for the call composer call location, an {@Link android.location.Location} parcelable
+     * Extra for the call composer call location, an {@link android.location.Location} parcelable
      * class to represent the geolocation as a latitude and longitude pair. It can be set via
      * {@link #setCallExtraParcelable(String, Parcelable)}.
      *
@@ -458,20 +462,24 @@ public final class ImsCallProfile implements Parcelable {
      *  cna : Calling name
      *  ussd : For network-initiated USSD, MT only
      *  remote_uri : Connected user identity (it can be used for the conference)
+// QTI_BEGIN: 2015-07-06: Telephony: MWI,phantom call,Suppl services, error codes
      *  ChildNum: Child number info.
      *  Codec: Codec info.
      *  DisplayText: Display text for the call.
      *  AdditionalCallInfo: Additional call info.
+// QTI_END: 2015-07-06: Telephony: MWI,phantom call,Suppl services, error codes
      *  CallPull: Boolean value specifying if the call is a pulled call.
      */
     public static final String EXTRA_OI = "oi";
     public static final String EXTRA_CNA = "cna";
     public static final String EXTRA_USSD = "ussd";
     public static final String EXTRA_REMOTE_URI = "remote_uri";
+// QTI_BEGIN: 2015-07-06: Telephony: MWI,phantom call,Suppl services, error codes
     public static final String EXTRA_CHILD_NUMBER = "ChildNum";
     public static final String EXTRA_CODEC = "Codec";
     public static final String EXTRA_DISPLAY_TEXT = "DisplayText";
     public static final String EXTRA_ADDITIONAL_CALL_INFO = "AdditionalCallInfo";
+// QTI_END: 2015-07-06: Telephony: MWI,phantom call,Suppl services, error codes
     public static final String EXTRA_IS_CALL_PULL = "CallPull";
 
     /**
@@ -988,11 +996,15 @@ public final class ImsCallProfile implements Parcelable {
      * @param callProfile The call profile.
      * @return The video state.
      */
+// QTI_BEGIN: 2015-04-01: Telephony: IMS-VT: Upgrade/Downgrade change
     public static int getVideoStateFromImsCallProfile(ImsCallProfile callProfile) {
+// QTI_END: 2015-04-01: Telephony: IMS-VT: Upgrade/Downgrade change
         int videostate = getVideoStateFromCallType(callProfile.mCallType);
+// QTI_BEGIN: 2025-03-13: Telephony: Introduce new values for Dual Video
         int dualVtCallType = callProfile.getDualVtCallType(videostate);
 
         videostate = videostate | dualVtCallType;
+// QTI_END: 2025-03-13: Telephony: Introduce new values for Dual Video
         if (callProfile.isVideoPaused() && !VideoProfile.isAudioOnly(videostate)) {
             videostate |= VideoProfile.STATE_PAUSED;
         } else {
@@ -1011,21 +1023,33 @@ public final class ImsCallProfile implements Parcelable {
         switch (callType) {
             case CALL_TYPE_VT_TX:
                 videostate = VideoProfile.STATE_TX_ENABLED;
+// QTI_BEGIN: 2015-04-01: Telephony: IMS-VT: Upgrade/Downgrade change
                 break;
+// QTI_END: 2015-04-01: Telephony: IMS-VT: Upgrade/Downgrade change
             case CALL_TYPE_VT_RX:
                 videostate = VideoProfile.STATE_RX_ENABLED;
+// QTI_BEGIN: 2015-04-01: Telephony: IMS-VT: Upgrade/Downgrade change
                 break;
+// QTI_END: 2015-04-01: Telephony: IMS-VT: Upgrade/Downgrade change
             case CALL_TYPE_VT:
                 videostate = VideoProfile.STATE_BIDIRECTIONAL;
+// QTI_BEGIN: 2015-04-01: Telephony: IMS-VT: Upgrade/Downgrade change
                 break;
+// QTI_END: 2015-04-01: Telephony: IMS-VT: Upgrade/Downgrade change
             case CALL_TYPE_VOICE:
                 videostate = VideoProfile.STATE_AUDIO_ONLY;
+// QTI_BEGIN: 2015-04-01: Telephony: IMS-VT: Upgrade/Downgrade change
                 break;
+// QTI_END: 2015-04-01: Telephony: IMS-VT: Upgrade/Downgrade change
             default:
                 videostate = VideoProfile.STATE_AUDIO_ONLY;
+// QTI_BEGIN: 2015-04-01: Telephony: IMS-VT: Upgrade/Downgrade change
                 break;
+// QTI_END: 2015-04-01: Telephony: IMS-VT: Upgrade/Downgrade change
         }
+// QTI_BEGIN: 2015-04-01: Telephony: IMS-VT: Upgrade/Downgrade change
         return videostate;
+// QTI_END: 2015-04-01: Telephony: IMS-VT: Upgrade/Downgrade change
     }
 
     /**
@@ -1106,6 +1130,7 @@ public final class ImsCallProfile implements Parcelable {
         }
     }
 
+// QTI_BEGIN: 2015-04-01: Telephony: IMS-VT: Upgrade/Downgrade change
     /**
      * Checks if video call is paused
      * @return true if call is video paused
@@ -1114,6 +1139,7 @@ public final class ImsCallProfile implements Parcelable {
         return mMediaProfile.mVideoDirection == ImsStreamMediaProfile.DIRECTION_INACTIVE;
     }
 
+// QTI_END: 2015-04-01: Telephony: IMS-VT: Upgrade/Downgrade change
     /**
      * Determines if the {@link ImsCallProfile} represents a video call.
      *
@@ -1351,9 +1377,11 @@ public final class ImsCallProfile implements Parcelable {
         mAcceptedRtpHeaderExtensionTypes.clear();
         mAcceptedRtpHeaderExtensionTypes.addAll(rtpHeaderExtensions);
     }
+// QTI_BEGIN: 2025-03-13: Telephony: Introduce new values for Dual Video
 
     // helper function to retrieve dual VT call type from extras
     private int getDualVtCallType(int callType) {
         return getCallExtraInt("dualVtCallType", callType);
     }
+// QTI_END: 2025-03-13: Telephony: Introduce new values for Dual Video
 }

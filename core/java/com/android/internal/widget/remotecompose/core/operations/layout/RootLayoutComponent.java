@@ -63,6 +63,10 @@ public class RootLayoutComponent extends Component {
         super(parent, componentId, -1, x, y, width, height);
     }
 
+    public RootLayoutComponent(int componentId) {
+        super(null, componentId, 0, -1, 0, 0, 0);
+    }
+
     @NonNull
     @Override
     public String toString() {
@@ -138,6 +142,7 @@ public class RootLayoutComponent extends Component {
         if (!mNeedsMeasure) {
             return;
         }
+        mNeedsMeasure = false;
         context.mLastComponent = this;
         setWidth(context.mWidth);
         setHeight(context.mHeight);
@@ -151,7 +156,6 @@ public class RootLayoutComponent extends Component {
                 m.layout(context, measurePass);
             }
         }
-        mNeedsMeasure = false;
     }
 
     @Override

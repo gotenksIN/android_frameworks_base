@@ -11,13 +11,6 @@ flag {
 }
 
 flag {
-  name: "bluetooth_permission_use_module_protection_level"
-  namespace: "bluetooth"
-  description: "Flag for change to all the Bluetooth ROLE permissions to be provided by the module instead"
-  bug: "395709071"
-}
-
-flag {
     name: "voice_activation_permission_apis"
     is_exported: true
     namespace: "permissions"
@@ -32,6 +25,14 @@ flag {
     namespace: "permissions"
     description: "enable role controller in system server"
     bug: "302562590"
+}
+
+flag {
+    name: "read_media_documents_permission_enabled"
+    is_exported: true
+    namespace: "permissions"
+    description: "enable permission to read documents from shared storage"
+    bug: "442892237"
 }
 
 flag {
@@ -355,15 +356,6 @@ flag {
 }
 
 flag {
-    name: "record_all_runtime_appops_sqlite"
-    is_fixed_read_only: true
-    is_exported: true
-    namespace: "permissions"
-    description: "Enables recording of all runtime app ops into SQlite"
-    bug: "377584611"
-}
-
-flag {
     name: "ranging_permission_enabled"
     is_fixed_read_only: true
     is_exported: true
@@ -495,21 +487,6 @@ flag {
 }
 
 flag {
-    name: "app_ops_service_handler_fix"
-    is_fixed_read_only: true
-    namespace: "permissions"
-    description: "Use IoThread handler for AppOpsService background/IO work."
-    bug: "394380603"
-}
-
-flag {
-    name: "enforce_default_device_id_in_my_attribution_source"
-    namespace: "permissions"
-    description: "Force AttributionSource.myAttributionSource() to return a default device id"
-    bug: "343121936"
-}
-
-flag {
     name: "grant_read_blocked_numbers_to_system_ui_intelligence"
     is_exported: true
     is_fixed_read_only: true
@@ -555,7 +532,7 @@ flag {
 flag {
     name: "ppd_install_time_enabled"
     namespace: "permissions"
-    description: "This flag is used to enable the enforcement of install-time purpose guarded permissions and parsing of the specific purpose."
+    description: "This flag is used to enable the enforcement of install-time purpose guarded permissions and parsing of the purpose."
     bug: "418113890"
 }
 
@@ -563,7 +540,15 @@ flag {
     name: "ppd_manifest_enabled"
     is_exported: true
     namespace: "permissions"
-    description: "This flag is used to enable the parsing and system API fields in PackageInfo related to permission purpose declaration in Android Manifest. Specifically, this flag is related to the general purpose, specific purpose, and purpose string that will be used for runtime PPDs."
+    description: "This flag is used to enable the parsing and system API fields in PackageInfo related to permission purpose declaration in Android Manifest. Specifically, this flag controls the objects containing purpose info and the purpose string that will be used for runtime PPDs."
+    bug: "438463457"
+}
+
+flag {
+    name: "ppd_purpose_enabled"
+    is_exported: true
+    namespace: "permissions"
+    description: "This flag is used to enable the parsing and system API fields in PackageInfo related to purposes for permission purpose declaration in Android Manifest."
     bug: "438463457"
 }
 
@@ -708,3 +693,26 @@ flag {
     bug: "437416500"
 }
 
+flag {
+    name: "location_permission_new_radio_buttons_enabled"
+    is_exported: true
+    namespace: "permissions"
+    description: "When the flag is turned on, show new location permission radio buttons"
+    bug: "436314824"
+}
+
+flag {
+    name: "new_default_app_confirmation_dialog_enabled"
+    is_exported: true
+    namespace: "permissions"
+    description: "This flag controls whether to enable the new default app confirmation dialog"
+    bug: "440579404"
+}
+
+flag {
+    name: "manage_default_notes_role_package_enabled"
+    is_exported: true
+    namespace: "note"
+    description: "This flag controls role managers' ability to manage the notes role via RoleManager#getDefaultApplication and RoleManager#setDefaultApplication."
+    bug: "443222861"
+}

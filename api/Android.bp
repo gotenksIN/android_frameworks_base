@@ -147,6 +147,11 @@ combined_apis {
             "framework-uprobestats",
         ],
         default: [],
+    }) + select(release_flag("RELEASE_WEBAPP_MODULE"), {
+        true: [
+            "framework-webapp",
+        ],
+        default: [],
     }),
     system_server_classpath: [
         "service-art",
@@ -279,7 +284,7 @@ java_genrule {
         ":all-modules-public-stubs-source-exportable",
         ":api-stubs-docs-non-updatable{.exportable}",
     ],
-    visibility: ["//visibility:private"], // Used by make module in //development, mind
+    visibility: ["//development/build"],
 }
 
 // This produces the same annotations.zip as framework-doc-stubs, but by using
@@ -302,6 +307,7 @@ java_genrule {
         ":all-modules-public-annotations",
         ":android-non-updatable-doc-stubs{.exportable.annotations.zip}",
     ],
+    visibility: ["//development/build"],
 }
 
 java_genrule {
@@ -311,6 +317,7 @@ java_genrule {
         ":all-modules-system-annotations",
         ":android-non-updatable-doc-stubs-system{.exportable.annotations.zip}",
     ],
+    visibility: ["//development/build"],
 }
 
 java_genrule {
@@ -320,6 +327,7 @@ java_genrule {
         ":all-modules-module-lib-annotations",
         ":android-non-updatable-doc-stubs-module-lib{.exportable.annotations.zip}",
     ],
+    visibility: ["//development/build"],
 }
 
 java_genrule {
@@ -329,6 +337,7 @@ java_genrule {
         ":all-modules-system-server-annotations",
         ":android-non-updatable-doc-stubs-system-server{.exportable.annotations.zip}",
     ],
+    visibility: ["//development/build"],
 }
 
 java_genrule {
@@ -416,6 +425,7 @@ stubs_defaults {
             "hardware/interfaces/biometrics/fingerprint/aidl",
             "hardware/interfaces/common/aidl",
             "hardware/interfaces/common/fmq/aidl",
+            "hardware/interfaces/contexthub/aidl",
             "hardware/interfaces/graphics/common/aidl",
             "hardware/interfaces/keymaster/aidl",
             "hardware/interfaces/power/aidl",

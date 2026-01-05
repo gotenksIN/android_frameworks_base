@@ -26,12 +26,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
 import com.android.compose.PlatformButton
+import com.android.compose.dialog.AlertDialogContent
 import com.android.compose.theme.PlatformTheme
 import com.android.systemui.accessibility.shortcutchooser.shared.model.AccessibilityTargetModel
-import com.android.systemui.dialog.ui.composable.AlertDialogContent
 import com.android.systemui.res.R
 
 /**
@@ -61,17 +60,13 @@ fun QuickAccessDialogContent(
                 Text(text = stringResource(R.string.accessibility_quick_access_dialog_title))
             },
             content = {
-                ShortcutPickerList(
-                    targets,
-                    onTargetClick = onTargetClick,
-                    modifier = Modifier.heightIn(max = 450.dp),
-                )
+                ShortcutTargetsList(targets, modifier = Modifier.heightIn(max = 450.dp)) {
+                    ShortcutToggleRow(it, onClick = { onTargetClick(it) })
+                }
             },
             positiveButton = {
                 PlatformButton(onClick = onDoneClick, modifier = Modifier.testTag("done_button")) {
-                    Text(
-                        stringResource(R.string.accessibility_quick_access_dialog_done_button_text)
-                    )
+                    Text(stringResource(R.string.accessibility_shortcutchooser_done_button))
                 }
             },
             contentBottomPadding = 18.dp,

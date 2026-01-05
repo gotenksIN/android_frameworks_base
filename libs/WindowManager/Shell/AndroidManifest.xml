@@ -23,6 +23,7 @@
     <uses-permission android:name="android.permission.ROTATE_SURFACE_FLINGER" />
     <uses-permission android:name="android.permission.WAKEUP_SURFACE_FLINGER" />
     <uses-permission android:name="android.permission.READ_FRAME_BUFFER" />
+    <uses-permission android:name="android.permission.SET_WALLPAPER_DIM_AMOUNT" />
     <uses-permission android:name="android.permission.SUBSCRIBE_TO_KEYGUARD_LOCKED_STATE" />
     <uses-permission android:name="android.permission.UPDATE_DOMAIN_VERIFICATION_USER_SELECTION" />
     <uses-permission android:name="android.permission.MANAGE_KEY_GESTURES" />
@@ -37,5 +38,9 @@
             android:theme="@style/DesktopWallpaperTheme"
             android:taskAffinity="com.android.wm.shell.desktop_wallpaper"/>
 
+        <activity
+            android:name=".packageupdate.PackageUpdateActivity"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTop" />
     </application>
 </manifest>

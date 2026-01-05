@@ -644,7 +644,7 @@ public class ActivityInfo extends ComponentInfo implements Parcelable {
     /**
      * Bit in {@link #flags} indicating if the activity or the receiver should run in
      * the Private Compute Core sandbox.
-     * @see android.R.styleable#AndroidManifestPrivateCompute
+     * @see android.R.styleable#AndroidManifestActivity_isPrivateComputeCoreProcess
      * @hide
      */
     public static final int FLAG_RUN_IN_PCC_SANDBOX = 0x80000;
@@ -1738,6 +1738,25 @@ public class ActivityInfo extends ComponentInfo implements Parcelable {
     public static final long OVERRIDE_AUTO_RESTART_ON_DISPLAY_MOVE = 427878712L;
 
     /**
+     * This change id enables the virtual gamepad for game apps on foldable devices.
+     *
+     * <p>Some game apps don't work well on foldable devices. They misbehave upon device folding
+     * and unfolding when the display size changes. They also don't fully utilize the larger inner
+     * display space. In addition, even without compatibility issues, some games work better with
+     * a gamepad. Showing a system-provided virtual gamepad can improve the user experience.
+     *
+     * This is disabled by default, and can be enabled by device manufacturers on a per-application
+     * basis, controlled via
+     * <a href="https://developer.android.com/guide/practices/device-compatibility-mode#device_manufacturer_per-app_overrides">Device manufacturer per-app overrides</a>.
+     *
+     * @hide
+     */
+    @ChangeId
+    @Overridable
+    @Disabled
+    public static final long OVERRIDE_ENABLE_VIRTUAL_GAMEPAD = 447093535L;
+
+    /**
      * Optional set of a certificates identifying apps that are allowed to embed this activity. From
      * the "knownActivityEmbeddingCerts" attribute.
      */
@@ -2513,7 +2532,14 @@ public class ActivityInfo extends ComponentInfo implements Parcelable {
          * Width of activity in pixels.
          *
          * @attr ref android.R.styleable#AndroidManifestLayout_defaultWidth
+         * @deprecated This field contains the pixel value resolved at install time using the
+         * default device density. It does not reflect the actual constraint on displays with
+         * different densities (e.g. external monitors). The system automatically enforces the
+         * correct constraints at runtime based on the current display context. Do not use this
+         * value for manual layout calculations.
          */
+        @Deprecated
+        @FlaggedApi(Flags.FLAG_RUNTIME_DENSITY_RESOLUTION_FOR_WINDOW_LAYOUT)
         public final int width;
 
         /**
@@ -2528,7 +2554,14 @@ public class ActivityInfo extends ComponentInfo implements Parcelable {
          * Height of activity in pixels.
          *
          * @attr ref android.R.styleable#AndroidManifestLayout_defaultHeight
+         * @deprecated This field contains the pixel value resolved at install time using the
+         * default device density. It does not reflect the actual constraint on displays with
+         * different densities (e.g. external monitors). The system automatically enforces the
+         * correct constraints at runtime based on the current display context. Do not use this
+         * value for manual layout calculations.
          */
+        @Deprecated
+        @FlaggedApi(Flags.FLAG_RUNTIME_DENSITY_RESOLUTION_FOR_WINDOW_LAYOUT)
         public final int height;
 
         /**
@@ -2557,7 +2590,14 @@ public class ActivityInfo extends ComponentInfo implements Parcelable {
          * task. It will also ignore any other minimal width attributes of non-root activities.
          *
          * @attr ref android.R.styleable#AndroidManifestLayout_minWidth
+         * @deprecated This field contains the pixel value resolved at install time using the
+         * default device density. It does not reflect the actual constraint on displays with
+         * different densities (e.g. external monitors). The system automatically enforces the
+         * correct constraints at runtime based on the current display context. Do not use this
+         * value for manual layout calculations.
          */
+        @Deprecated
+        @FlaggedApi(Flags.FLAG_RUNTIME_DENSITY_RESOLUTION_FOR_WINDOW_LAYOUT)
         public final int minWidth;
 
         /**
@@ -2569,7 +2609,14 @@ public class ActivityInfo extends ComponentInfo implements Parcelable {
          * task. It will also ignore any other minimal height attributes of non-root activities.
          *
          * @attr ref android.R.styleable#AndroidManifestLayout_minHeight
+         * @deprecated This field contains the pixel value resolved at install time using the
+         * default device density. It does not reflect the actual constraint on displays with
+         * different densities (e.g. external monitors). The system automatically enforces the
+         * correct constraints at runtime based on the current display context. Do not use this
+         * value for manual layout calculations.
          */
+        @Deprecated
+        @FlaggedApi(Flags.FLAG_RUNTIME_DENSITY_RESOLUTION_FOR_WINDOW_LAYOUT)
         public final int minHeight;
 
         /**

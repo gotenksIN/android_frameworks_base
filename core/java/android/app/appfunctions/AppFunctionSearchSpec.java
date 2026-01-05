@@ -21,6 +21,7 @@ import static android.app.appfunctions.flags.Flags.FLAG_ENABLE_DYNAMIC_APP_FUNCT
 import android.annotation.FlaggedApi;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.SuppressLint;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.text.TextUtils;
@@ -32,8 +33,6 @@ import java.util.Objects;
 /**
  * Specifies the query parameters for finding app functions. A search will be performed using a
  * logical AND operation across all provided criteria.
- *
- * @hide
  */
 @FlaggedApi(FLAG_ENABLE_DYNAMIC_APP_FUNCTIONS)
 public final class AppFunctionSearchSpec implements Parcelable {
@@ -80,6 +79,37 @@ public final class AppFunctionSearchSpec implements Parcelable {
         mMinSchemaVersion = in.readLong();
     }
 
+    /** Returns the list of package names to filter by. */
+    @SuppressLint("NullableCollection")
+    @Nullable
+    public List<String> getPackageNames() {
+        return mPackageNames;
+    }
+
+    /** Returns the list of {@link AppFunctionName} to filter by. */
+    @SuppressLint("NullableCollection")
+    @Nullable
+    public List<AppFunctionName> getFunctionNames() {
+        return mFunctionNames;
+    }
+
+    /** Returns the schema category to filter by. */
+    @Nullable
+    public String getSchemaCategory() {
+        return mSchemaCategory;
+    }
+
+    /** Returns the schema name to filter by. */
+    @Nullable
+    public String getSchemaName() {
+        return mSchemaName;
+    }
+
+    /** Returns the minimum schema category to filter by. */
+    public long getMinSchemaVersion() {
+        return mMinSchemaVersion;
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
@@ -97,6 +127,22 @@ public final class AppFunctionSearchSpec implements Parcelable {
     public int hashCode() {
         return Objects.hash(
                 mPackageNames, mFunctionNames, mSchemaCategory, mSchemaName, mMinSchemaVersion);
+    }
+
+    @Override
+    public String toString() {
+        return "AppFunctionSearchSpec("
+                + "packageNames="
+                + mPackageNames
+                + ", functionNames="
+                + mFunctionNames
+                + ", schemaCategory="
+                + mSchemaCategory
+                + ", schemaName="
+                + mSchemaName
+                + ", minSchemaVersion="
+                + mMinSchemaVersion
+                + ")";
     }
 
     /**
@@ -170,6 +216,20 @@ public final class AppFunctionSearchSpec implements Parcelable {
         public Builder() {}
 
         /**
+         * Creates a new instance of {@link AppFunctionSearchSpec.Builder} based on {@code
+         * searchSpec}.
+         *
+         * @hide
+         */
+        public Builder(@NonNull AppFunctionSearchSpec searchSpec) {
+            this.mPackageNames = searchSpec.mPackageNames;
+            this.mFunctionNames = searchSpec.mFunctionNames;
+            this.mSchemaCategory = searchSpec.mSchemaCategory;
+            this.mSchemaName = searchSpec.mSchemaName;
+            this.mMinSchemaVersion = searchSpec.mMinSchemaVersion;
+        }
+
+        /**
          * Constructs the final, immutable {@link AppFunctionSearchSpec} object.
          *
          * @return A new AppFunctionSearchSpec instance.
@@ -236,7 +296,7 @@ public final class AppFunctionSearchSpec implements Parcelable {
         }
 
         /**
-         * Sets the schema version to filter by.
+         * Sets the minimum schema version to filter by.
          *
          * @param minSchemaVersion the minimum schema version to filter by. A value of 0 will skip
          *     this filter.

@@ -278,6 +278,7 @@
     <string name="global_action_restart" msgid="4678451019561687074">"ಮರುಪ್ರಾರಂಭಿಸಿ"</string>
     <string name="global_action_emergency" msgid="1387617624177105088">"ತುರ್ತು"</string>
     <string name="global_action_bug_report" msgid="5127867163044170003">"ದೋಷದ ವರದಿ"</string>
+    <string name="global_action_feedback" msgid="3480836834202300036">"ಫೀಡ್‌ಬ್ಯಾಕ್"</string>
     <string name="global_action_logout" msgid="6093581310002476511">"ಸೆಷನ್ ಅಂತ್ಯಗೊಳಿಸಿ"</string>
     <string name="global_action_screenshot" msgid="2610053466156478564">"ಸ್ಕ್ರೀನ್‌ಶಾಟ್"</string>
     <string name="global_action_standby" msgid="6786920589970257642">"ಸ್ಟ್ಯಾಂಡ್‌ಬೈ"</string>
@@ -326,8 +327,7 @@
     <string name="notification_channel_accessibility_hearing_device" msgid="7816963856388758952">"ಹಿಯರಿಂಗ್ ಸಾಧನ"</string>
     <string name="notification_channel_accessibility_security_policy" msgid="1727787021725251912">"ಪ್ರವೇಶಿಸುವಿಕೆಯ ಬಳಕೆ"</string>
     <string name="notification_channel_display" msgid="6905032605735615090">"ಡಿಸ್‌ಪ್ಲೇ"</string>
-    <!-- no translation found for notification_channel_parental_controls (2963963315750128538) -->
-    <skip />
+    <string name="notification_channel_parental_controls" msgid="2963963315750128538">"ಪೋಷಕ ನಿಯಂತ್ರಣಗಳು"</string>
     <string name="foreground_service_app_in_background" msgid="1439289699671273555">"<xliff:g id="APP_NAME">%1$s</xliff:g> ಆ್ಯಪ್, ಬ್ಯಾಟರಿಯನ್ನು ಬಳಸುತ್ತಿದೆ"</string>
     <string name="foreground_service_apps_in_background" msgid="7340037176412387863">"<xliff:g id="NUMBER">%1$d</xliff:g> ಅಪ್ಲಿಕೇಶನ್‌ಗಳು ಬ್ಯಾಟರಿ ಬಳಸುತ್ತಿವೆ"</string>
     <string name="foreground_service_tap_for_details" msgid="9078123626015586751">"ಬ್ಯಾಟರಿ,ಡೇಟಾ ಬಳಕೆಯ ವಿವರಗಳಿಗಾಗಿ ಟ್ಯಾಪ್ ಮಾಡಿ"</string>
@@ -645,6 +645,10 @@
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"ಸ್ಥಳೀಯ ನೆಟ್‌ವರ್ಕ್ ಸಾಧನಗಳನ್ನು ಆ್ಯಕ್ಸೆಸ್ ಮಾಡಲು ಆ್ಯಪ್‌ಗೆ ಅನುಮತಿಸುತ್ತದೆ"</string>
     <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"ಲೂಪ್‌ಬ್ಯಾಕ್ ಇಂಟರ್‌ಫೇಸ್ ಅನ್ನು ಬಳಸಿ"</string>
     <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"ಲೂಪ್‌ಬ್ಯಾಕ್ ಇಂಟರ್‌ಫೇಸ್ ಮೂಲಕ ಇತರ ಆ್ಯಪ್‌ಗಳ ಜೊತೆ ಸಂವಹನ ನಡೆಸಲು ಆ್ಯಪ್‌ಗೆ ಅನುಮತಿಸುತ್ತದೆ"</string>
+    <!-- no translation found for permlab_force_use_loopback_interface (1319727311706416481) -->
+    <skip />
+    <!-- no translation found for permdesc_force_use_loopback_interface (5829032514048681980) -->
+    <skip />
     <string name="permlab_ranging" msgid="2854543350668593390">"ಸಮೀಪದ ಸಾಧನಗಳ ನಡುವಿನ ಸಂಬಂಧಿತ ಸ್ಥಾನವನ್ನು ನಿರ್ಧರಿಸಿ"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"ಸಮೀಪದಲ್ಲಿರುವ ಸಾಧನಗಳ ನಡುವಿನ ಸಂಬಂಧಿತ ಸ್ಥಾನವನ್ನು ನಿರ್ಧರಿಸಲು ಆ್ಯಪ್‌ಗೆ ಅನುಮತಿಸಿ"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"ಆದ್ಯತೆಯ NFC ಪಾವತಿ ಸೇವಾ ಮಾಹಿತಿ"</string>
@@ -825,6 +829,8 @@
     <string name="permdesc_readMediaVideo" msgid="3846400073770403528">"ನಿಮ್ಮ ಹಂಚಿಕೊಂಡ ಸಂಗ್ರಹಣೆಯಿಂದ ವೀಡಿಯೊ ಫೈಲ್‌ಗಳನ್ನು ಓದಲು ಆ್ಯಪ್‌ಗೆ ಅನುಮತಿಸುತ್ತದೆ."</string>
     <string name="permlab_readMediaImages" msgid="4057590631020986789">"ಹಂಚಿಕೊಂಡ ಸಂಗ್ರಹಣೆಯಿಂದ ಚಿತ್ರದ ಫೈಲ್‌ಗಳನ್ನು ಓದಿ"</string>
     <string name="permdesc_readMediaImages" msgid="5836219373138469259">"ನಿಮ್ಮ ಹಂಚಿಕೊಂಡ ಸಂಗ್ರಹಣೆಯಿಂದ ಚಿತ್ರದ ಫೈಲ್‌ಗಳನ್ನು ಓದಲು ಆ್ಯಪ್‌ಗೆ ಅನುಮತಿಸುತ್ತದೆ."</string>
+    <string name="permlab_readMediaDocuments" msgid="5716810755602938263">"ಹಂಚಿಕೊಂಡ ಸಂಗ್ರಹಣೆಯಿಂದ ಡಾಕ್ಯುಮೆಂಟ್ ಫೈಲ್‌ಗಳನ್ನು ಓದಿರಿ"</string>
+    <string name="permdesc_readMediaDocuments" msgid="5665930210237304120">"ನಿಮ್ಮ ಹಂಚಿಕೊಂಡ ಸಂಗ್ರಹಣೆಯಿಂದ ಡಾಕ್ಯುಮೆಂಟ್ ಫೈಲ್‌ಗಳನ್ನು ಓದಲು ಆ್ಯಪ್‌ಗೆ ಅನುಮತಿಸುತ್ತದೆ."</string>
     <string name="permlab_readVisualUserSelect" msgid="5516204215354667586">"ಹಂಚಿಕೊಂಡ ಸಂಗ್ರಹಣೆಯಿಂದ ಬಳಕೆದಾರರು ಆಯ್ಕೆಮಾಡಿದ ಚಿತ್ರ ಮತ್ತು ವೀಡಿಯೊ ಫೈಲ್‌ಗಳನ್ನು ಓದಿರಿ"</string>
     <string name="permdesc_readVisualUserSelect" msgid="8027174717714968217">"ನಿಮ್ಮ ಹಂಚಿಕೊಂಡ ಸಂಗ್ರಹಣೆಯಿಂದ ನೀವು ಆಯ್ಕೆಮಾಡಿದ ಚಿತ್ರ ಮತ್ತು ವೀಡಿಯೊ ಫೈಲ್‌ಗಳನ್ನು ಓದಲು ಆ್ಯಪ್‌ಗೆ ಅನುಮತಿಸುತ್ತದೆ."</string>
     <string name="permlab_sdcardWrite" msgid="4863021819671416668">"ನಿಮ್ಮ ಹಂಚಿಕೊಂಡ ಸಂಗ್ರಹಣೆಯ ವಿಷಯಗಳನ್ನು ಮಾರ್ಪಡಿಸಿ ಅಥವಾ ಅಳಿಸಿ"</string>
@@ -1047,6 +1053,7 @@
     <string name="keyguard_password_enter_pin_password_code" msgid="7792964196473964340">"ಅನ್‌ಲಾಕ್‌ ಮಾಡಲು ಪಿನ್‌ ಟೈಪ್‌ ಮಾಡಿ"</string>
     <string name="keyguard_password_wrong_pin_code" msgid="8583732939138432793">"ತಪ್ಪಾದ ಪಿನ್‌ ಕೋಡ್."</string>
     <string name="keyguard_label_text" msgid="3841953694564168384">"ಅನ್‌ಲಾಕ್ ಮಾಡಲು, ಮೆನು ನಂತರ 0 ಒತ್ತಿರಿ."</string>
+    <string name="emergency_call_dialog_number_for_display" msgid="2978165477085612673">"ತುರ್ತು ಸಂಖ್ಯೆ"</string>
     <string name="lockscreen_carrier_default" msgid="6192313772955399160">"ಯಾವುದೇ ಸೇವೆಯಿಲ್ಲ"</string>
     <string name="lockscreen_screen_locked" msgid="7364905540516041817">"ಸ್ಕ್ರೀನ್ ಲಾಕ್ ಆಗಿದೆ."</string>
     <string name="lockscreen_instructions_when_pattern_enabled" msgid="7982445492532123308">"ಅನ್‌ಲಾಕ್ ಮಾಡಲು ಮೆನು ಒತ್ತಿರಿ ಇಲ್ಲವೇ ತುರ್ತು ಕರೆಯನ್ನು ಮಾಡಿ."</string>
@@ -2176,13 +2183,21 @@
     <string name="autofill_picker_no_suggestions" msgid="1076022650427481509">"ಸ್ವಯಂಭರ್ತಿ ಸಲಹೆಗಳಿಲ್ಲ"</string>
     <string name="autofill_picker_some_suggestions" msgid="5560549696296202701">"{count,plural, =1{ಒಂದು ಸ್ವಯಂ ಭರ್ತಿ ಸಲಹೆಯಿದೆ}one{# ಸ್ವಯಂ ಭರ್ತಿ ಸಲಹೆಗಳಿವೆ}other{# ಸ್ವಯಂ ಭರ್ತಿ ಸಲಹೆಗಳಿವೆ}}"</string>
     <string name="autofill_save_title" msgid="7719802414283739775"><b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>" ನಲ್ಲಿ ಉಳಿಸುವುದೇ?"</string>
+    <string name="autofill_save_title_expressive" msgid="2665408870424848558">"ಮಾಹಿತಿಯನ್ನು "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>" ಗೆ ಸೇವ್ ಮಾಡಿ"</string>
     <string name="autofill_save_title_with_type" msgid="3002460014579799605">"<xliff:g id="TYPE">%1$s</xliff:g> ಅನ್ನು "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>" ನಲ್ಲಿ ಉಳಿಸುವುದೇ?"</string>
+    <string name="autofill_save_title_with_type_expressive" msgid="6063660551496235255">"<xliff:g id="TYPE">%1$s</xliff:g> ಅನ್ನು "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>" ನಲ್ಲಿ ಸೇವ್ ಮಾಡಿ"</string>
     <string name="autofill_save_title_with_2types" msgid="3783270967447869241">"<xliff:g id="TYPE_0">%1$s</xliff:g> ಮತ್ತು <xliff:g id="TYPE_1">%2$s</xliff:g> ಅನ್ನು "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>" ನಲ್ಲಿ ಉಳಿಸುವುದೇ?"</string>
+    <string name="autofill_save_title_with_2types_expressive" msgid="2996687022212666293">"<xliff:g id="TYPE_0">%1$s</xliff:g> ಮತ್ತು <xliff:g id="TYPE_1">%2$s</xliff:g> ಅನ್ನು "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>" ನಲ್ಲಿ ಸೇವ್ ಮಾಡಿ"</string>
     <string name="autofill_save_title_with_3types" msgid="6598228952100102578">"<xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g> ಮತ್ತು <xliff:g id="TYPE_2">%3$s</xliff:g> ಅನ್ನು "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>" ನಲ್ಲಿ ಉಳಿಸುವುದೇ?"</string>
+    <string name="autofill_save_title_with_3types_expressive" msgid="3301676215501214049">"<xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g> ಮತ್ತು <xliff:g id="TYPE_2">%3$s</xliff:g> ಅನ್ನು "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>" ನಲ್ಲಿ ಸೇವ್ ಮಾಡಿ"</string>
     <string name="autofill_update_title" msgid="3630695947047069136"><b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>" ನಲ್ಲಿ ಅಪ್‌ಡೇಟ್ ಮಾಡಬೇಕೆ?"</string>
+    <string name="autofill_update_title_expressive" msgid="7660582214109012920"><b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>" ನಲ್ಲಿ ಮಾಹಿತಿಯನ್ನು ಅಪ್‌ಡೇಟ್ ಮಾಡಿ"</string>
     <string name="autofill_update_title_with_type" msgid="5264152633488495704">"<xliff:g id="TYPE">%1$s</xliff:g> ಅನ್ನು "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>" ನಲ್ಲಿ ಅಪ್‌ಡೇಟ್ ಮಾಡಬೇಕೆ?"</string>
+    <string name="autofill_update_title_with_type_expressive" msgid="6162413585161767846">"<xliff:g id="TYPE">%1$s</xliff:g> ಅನ್ನು "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>" ನಲ್ಲಿ ಅಪ್‌ಡೇಟ್ ಮಾಡಿ"</string>
     <string name="autofill_update_title_with_2types" msgid="1797514386321086273">"<xliff:g id="TYPE_0">%1$s</xliff:g> ಮತ್ತು <xliff:g id="TYPE_1">%2$s</xliff:g> ಅನ್ನು "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>" ನಲ್ಲಿ ಅಪ್‌ಡೇಟ್ ಮಾಡಬೇಕೆ?"</string>
+    <string name="autofill_update_title_with_2types_expressive" msgid="1911825941498393471">"<xliff:g id="TYPE_0">%1$s</xliff:g> ಮತ್ತು <xliff:g id="TYPE_1">%2$s</xliff:g> ಅನ್ನು "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>" ನಲ್ಲಿ ಅಪ್‌ಡೇಟ್ ಮಾಡಿ"</string>
     <string name="autofill_update_title_with_3types" msgid="8285767070604652626">"ಈ ಮುಂದಿನ ಐಟಂಗಳನ್ನು "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>" ನಲ್ಲಿ ಅಪ್‌ಡೇಟ್ ಮಾಡಬೇಕೆ: <xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g> ಮತ್ತು <xliff:g id="TYPE_2">%3$s</xliff:g>?"</string>
+    <string name="autofill_update_title_with_3types_expressive" msgid="6040725201378429027">"ಈ ಮುಂದಿನ ಐಟಂಗಳನ್ನು "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>" ನಲ್ಲಿ ಅಪ್‌ಡೇಟ್ ಮಾಡಿ: <xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g> ಮತ್ತು <xliff:g id="TYPE_2">%3$s</xliff:g>"</string>
     <string name="autofill_save_yes" msgid="8035743017382012850">"ಸೇವ್ ಮಾಡಿ"</string>
     <string name="autofill_save_no" msgid="9212826374207023544">"ಬೇಡ"</string>
     <string name="autofill_save_notnow" msgid="2853932672029024195">"ಸದ್ಯಕ್ಕೆ ಬೇಡ"</string>
@@ -2611,10 +2626,7 @@
     <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"ಸಿಸ್ಟಮ್ ಸಂಪನ್ಮೂಲಕ್ಕೆ ಸಂಬಂಧಿಸಿದ ಎಚ್ಚರಿಕೆಗಳು"</string>
     <string name="tv_watchdog_notification_title" msgid="195239206215922517">"ಸಂಪನ್ಮೂಲಗಳನ್ನು ಮಿತಿಮೀರಿ ಬಳಸಲಾಗುತ್ತಿದೆ"</string>
     <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"ಆ್ಯಪ್ \'<xliff:g id="APP_NAME">%1$s</xliff:g> ತೀರಾ ಹೆಚ್ಚಿನ ಸಂಪನ್ಮೂಲಗಳನ್ನು ಬಳಸುತ್ತಿದೆ.\""</string>
-    <!-- no translation found for supervision_blocked_app_title (5546803865875383588) -->
-    <skip />
-    <!-- no translation found for supervision_blocked_app_content (4125452996088641559) -->
-    <skip />
-    <!-- no translation found for supervision_unblocked_app_content (8282985265957852278) -->
-    <skip />
+    <string name="supervision_blocked_app_title" msgid="5546803865875383588">"ನಿಮ್ಮ ಪೋಷಕರಿಂದ ಬಂದ ಅಪ್‌ಡೇಟ್"</string>
+    <string name="supervision_blocked_app_content" msgid="4125452996088641559">"<xliff:g id="APP_NAME">%1$s</xliff:g> ಅನ್ನು ಸದ್ಯಕ್ಕೆ ತೆಗೆದುಹಾಕಲಾಗಿದೆ"</string>
+    <string name="supervision_unblocked_app_content" msgid="8282985265957852278">"<xliff:g id="APP_NAME">%1$s</xliff:g> ಈಗ ಲಭ್ಯವಿದೆ"</string>
 </resources>

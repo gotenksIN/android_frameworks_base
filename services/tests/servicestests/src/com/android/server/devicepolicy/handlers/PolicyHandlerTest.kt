@@ -16,13 +16,13 @@
 
 package com.android.server.devicepolicy.handlers
 
-import android.app.admin.DevicePolicyManager.DEFAULT_DEVICE_OWNER
+import android.app.admin.DevicePolicyManager.DEVICE_OWNER
 import android.app.admin.DevicePolicyManager.FINANCED_DEVICE_OWNER
 import android.app.admin.DevicePolicyManager.NOT_A_DPC
 import android.app.admin.DevicePolicyManager.POLICY_SCOPE_DEVICE
 import android.app.admin.DevicePolicyManager.POLICY_SCOPE_PARENT_USER
 import android.app.admin.DevicePolicyManager.POLICY_SCOPE_USER
-import android.app.admin.DevicePolicyManager.PROFILE_OWNER
+import android.app.admin.DevicePolicyManager.MANAGED_PROFILE_OWNER_OF_PERSONAL_OWNED_DEVICE
 import android.app.admin.DevicePolicyManager.RESOURCE_PER_USER
 import android.app.admin.IntegerPolicyValue
 import android.app.admin.NoArgsPolicyKey
@@ -47,13 +47,11 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.kotlin.any
 import org.mockito.kotlin.doReturn
-import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.stub
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
-import org.mockito.kotlin.verifyNoMoreInteractions
 
 // Helper that can be used as a policy enforcer callback when creating a PolicyDefinition.
 class NoOpPolicyEnforcerCallback<T> :
@@ -84,8 +82,8 @@ open class PolicyHandlerTest {
                 key,
                 /*allowedScopes=*/ setOf(POLICY_SCOPE_USER, POLICY_SCOPE_DEVICE),
                 /*affectedResource=*/ RESOURCE_PER_USER,
-                /*requiredPermission=*/ null,
-                /*requiredCrossUserPermission=*/ null,
+                /*requiredPermission=*/ "testPermission",
+                /*requiredCrossUserPermission=*/ "testCrossUserPermission",
                 /*allowedDpcTypes=*/ setOf(),
                 /*allowedValues=*/ setOf(VALUE_1),
             )
@@ -101,11 +99,31 @@ open class PolicyHandlerTest {
             )
     }
 
-    val mockPermissionChecker: IPermissionChecker = mock<IPermissionChecker> {}
+    data class EnforceArguments(val permission: String, val caller: CallerIdentity)
+
+    private val permissionChecker = object : IPermissionChecker {
+        val enforceCalls = mutableListOf<EnforceArguments>()
+
+        override fun enforce(
+            permission: String,
+            caller: CallerIdentity
+        ) {
+            enforceCalls.add(EnforceArguments(permission, caller))
+        }
+
+        fun assertEnforcesPermissions(caller: CallerIdentity, vararg permission: String) {
+            assertThat(enforceCalls).isEqualTo(
+                permission.map {
+                    EnforceArguments(it, caller)
+                }
+            )
+        }
+    }
+
     val mockDelegate: PolicyHandler.Delegate =
         mock<PolicyHandler.Delegate> {
             on { getDpcType(any()) } doReturn NOT_A_DPC
-            on { getPermissionChecker() } doReturn mockPermissionChecker
+            on { getPermissionChecker() } doReturn permissionChecker
         }
 
     fun copyOf(
@@ -135,15 +153,12 @@ open class PolicyHandlerTest {
     ) = PolicyHandler<Int>(key, metadata, definition, delegate)
 
     @Test
-    fun setPolicy_shouldCallAllMethodsInOrder() {
+    fun setPolicyUnchecked_shouldCallMethodsInOrder() {
         val methodCalls = mutableListOf<String>()
         val handler =
             object :
                 PolicyHandler<Int>(Policy.key, Policy.metadata, Policy.definition, mockDelegate) {
-                override fun convertValue(
-                    caller: CallerIdentity,
-                    transportValue: PolicyValueTransport?,
-                ): Int? {
+                override fun convertValue(transportValue: PolicyValueTransport?): Int? {
                     methodCalls.add("convertValue")
                     return 5
                 }
@@ -166,16 +181,16 @@ open class PolicyHandlerTest {
                 }
             }
 
-        handler.setPolicy(anyCaller, anyScope, Policy.anyTransportValue)
+        handler.setPolicyUnchecked(anyCaller, anyScope, Policy.anyTransportValue)
 
         assertThat(methodCalls)
             .isEqualTo(
-                listOf("convertValue", "checkPermissions", "validateValue", "storePolicyValue")
+                listOf("convertValue", "validateValue", "storePolicyValue")
             )
     }
 
     @Test
-    fun setPolicy_shouldValidateAllowedScope() {
+    fun setPolicyUnchecked_shouldValidateAllowedScope() {
         val allAllowedScopes = setOf(POLICY_SCOPE_DEVICE, POLICY_SCOPE_PARENT_USER)
         val someDisallowedScopes = setOf(POLICY_SCOPE_USER, 111, 666)
         val metadata = copyOf(Policy.metadata, allowedScopes = allAllowedScopes)
@@ -183,140 +198,26 @@ open class PolicyHandlerTest {
 
         // This should not throw exceptions
         for (scope in allAllowedScopes) {
-            handler.setPolicy(anyCaller, scope, Policy.anyTransportValue)
+            handler.setPolicyUnchecked(anyCaller, scope, Policy.anyTransportValue)
         }
 
         // This should throw exceptions
         for (scope in someDisallowedScopes) {
             assertFailsWith<IllegalArgumentException> {
-                handler.setPolicy(anyCaller, scope, Policy.anyTransportValue)
+                handler.setPolicyUnchecked(anyCaller, scope, Policy.anyTransportValue)
             }
         }
     }
 
     @Test
-    fun setPolicy_scopeUser_shouldCheckPermission() {
-        val metadata =
-            copyOf(
-                Policy.metadata,
-                allowedScopes = setOf(POLICY_SCOPE_USER),
-                requiredPermission = "thePermission",
-                requiredCrossUserPermission = "shouldNotBeChecked",
-            )
-        val handler = createHandler(metadata = metadata)
-        val theCaller = anyCaller
-
-        handler.setPolicy(theCaller, POLICY_SCOPE_USER, Policy.anyTransportValue)
-
-        verify(mockPermissionChecker).enforce("thePermission", theCaller)
-        verifyNoMoreInteractions(mockPermissionChecker)
-    }
-
-    @Test
-    fun setPolicy_scopeGlobal_shouldCheckPermissionAndCrossUserPermission() {
-        val metadata =
-            copyOf(
-                Policy.metadata,
-                allowedScopes = setOf(POLICY_SCOPE_DEVICE),
-                requiredPermission = "thePermission",
-                requiredCrossUserPermission = "theCrossUserPermission",
-            )
-        val handler = createHandler(metadata = metadata)
-        val theCaller = anyCaller
-
-        handler.setPolicy(theCaller, POLICY_SCOPE_DEVICE, Policy.anyTransportValue)
-
-        verify(mockPermissionChecker).enforce("thePermission", theCaller)
-        verify(mockPermissionChecker).enforce("theCrossUserPermission", theCaller)
-        verifyNoMoreInteractions(mockPermissionChecker)
-    }
-
-    @Test
-    fun setPolicy_scopeParent_shouldCheckPermissionAndCrossUserPermission() {
-        val metadata =
-            copyOf(
-                Policy.metadata,
-                allowedScopes = setOf(POLICY_SCOPE_PARENT_USER),
-                requiredPermission = "permission",
-                requiredCrossUserPermission = "crossUserPermission",
-            )
-        val handler = createHandler(metadata = metadata)
-        val theCaller = anyCaller
-
-        handler.setPolicy(theCaller, POLICY_SCOPE_PARENT_USER, Policy.anyTransportValue)
-
-        verify(mockPermissionChecker).enforce("permission", theCaller)
-        verify(mockPermissionChecker).enforce("crossUserPermission", theCaller)
-        verifyNoMoreInteractions(mockPermissionChecker)
-    }
-
-    @Test
-    fun setPolicy_acceptedDpcTypes_shouldNotCheckPermissionIfDpcTypeIsAccepted() {
-        val metadata =
-            copyOf(
-                Policy.metadata,
-                requiredPermission = "thePermissionThatShallNotBeChecked",
-                allowedDpcTypes = setOf(DEFAULT_DEVICE_OWNER, PROFILE_OWNER),
-            )
-        val handler = createHandler(metadata = metadata)
-
-        mockDelegate.stub { on { getDpcType(any()) } doReturn DEFAULT_DEVICE_OWNER }
-
-        handler.setPolicy(anyCaller, anyScope, Policy.anyTransportValue)
-
-        verify(mockPermissionChecker, never()).enforce(any(), any())
-        verifyNoMoreInteractions(mockPermissionChecker)
-    }
-
-    @Test
-    fun setPolicy_acceptedDpcTypes_shouldCheckPermissionIfDpcTypeIsNotAccepted() {
-        val metadata =
-            copyOf(
-                Policy.metadata,
-                requiredPermission = "thePermissionThatShallBeChecked",
-                allowedDpcTypes = setOf(DEFAULT_DEVICE_OWNER, PROFILE_OWNER),
-            )
-        val handler = createHandler(metadata = metadata)
-
-        mockDelegate.stub { on { getDpcType(any()) } doReturn FINANCED_DEVICE_OWNER }
-
-        handler.setPolicy(anyCaller, anyScope, Policy.anyTransportValue)
-
-        verify(mockPermissionChecker).enforce(eq("thePermissionThatShallBeChecked"), any())
-        verifyNoMoreInteractions(mockPermissionChecker)
-    }
-
-    @Test
-    fun setPolicy_acceptedDpcTypes_shouldStillCheckCrossUserPermissionIfDpcTypeIsAccepted() {
-        val metadata =
-            copyOf(
-                Policy.metadata,
-                allowedScopes = setOf(POLICY_SCOPE_DEVICE),
-                requiredPermission = "thePermissionThatShallNotBeChecked",
-                requiredCrossUserPermission = "theCrossUserPermissionThatShallBeChecked",
-                allowedDpcTypes = setOf(DEFAULT_DEVICE_OWNER),
-            )
-        val handler = createHandler(metadata = metadata)
-
-        mockDelegate.stub { on { getDpcType(any()) } doReturn DEFAULT_DEVICE_OWNER }
-
-        handler.setPolicy(anyCaller, POLICY_SCOPE_DEVICE, Policy.anyTransportValue)
-
-        verify(mockPermissionChecker, never())
-            .enforce(eq("thePermissionThatShallNotBeChecked"), any())
-        verify(mockPermissionChecker).enforce(eq("theCrossUserPermissionThatShallBeChecked"), any())
-        verifyNoMoreInteractions(mockPermissionChecker)
-    }
-
-    @Test
-    fun setPolicy_shouldStorePolicy() {
+    fun setPolicyUnchecked_shouldStorePolicy() {
         val handler = createHandler(metadata = copyOf(Policy.metadata, allowedScopes = allScopes))
         val theCaller = anyCaller
         val theValue = Policy.VALUE_1
         val theKey = Policy.definition
 
         for (scope in allScopes) {
-            handler.setPolicy(theCaller, scope, PolicyValueTransport.integerField(theValue))
+            handler.setPolicyUnchecked(theCaller, scope, PolicyValueTransport.integerField(theValue))
 
             verify(mockDelegate, times(1))
                 .storePolicy(theCaller, theKey, scope, IntegerPolicyValue(theValue))
@@ -327,7 +228,7 @@ open class PolicyHandlerTest {
     }
 
     @Test
-    fun setPolicy_shouldClearNullPolicy() {
+    fun setPolicyUnchecked_shouldClearNullPolicy() {
         val handler =
             createHandler(
                 metadata = copyOf(Policy.metadata, allowedScopes = allScopes),
@@ -337,7 +238,7 @@ open class PolicyHandlerTest {
         val theKey = Policy.definition
 
         for (scope in allScopes) {
-            handler.setPolicy(theCaller, scope, null)
+            handler.setPolicyUnchecked(theCaller, scope, null)
 
             verify(mockDelegate, times(1)).clearPolicy(theCaller, theKey, scope)
         }
@@ -347,15 +248,129 @@ open class PolicyHandlerTest {
     }
 
     @Test
-    fun getPolicy_shouldCallAllMethodsInOrder() {
+    fun checkPermissions_scopeUser_shouldCheckPermission() {
+        val metadata =
+            copyOf(
+                Policy.metadata,
+                allowedScopes = setOf(POLICY_SCOPE_USER),
+                requiredPermission = "thePermission",
+                requiredCrossUserPermission = "shouldNotBeChecked",
+            )
+        val handler = createHandler(metadata = metadata)
+        val theCaller = anyCaller
+
+        handler.checkPermissions(theCaller, POLICY_SCOPE_USER)
+
+        permissionChecker.assertEnforcesPermissions(theCaller, "thePermission")
+    }
+
+    @Test
+    fun checkPermissions_scopeGlobal_shouldCheckPermissionAndCrossUserPermission() {
+        val metadata =
+            copyOf(
+                Policy.metadata,
+                allowedScopes = setOf(POLICY_SCOPE_DEVICE),
+                requiredPermission = "thePermission",
+                requiredCrossUserPermission = "theCrossUserPermission",
+            )
+        val handler = createHandler(metadata = metadata)
+        val theCaller = anyCaller
+
+        handler.checkPermissions(theCaller, POLICY_SCOPE_DEVICE)
+
+        permissionChecker.assertEnforcesPermissions(
+            theCaller, "thePermission", "theCrossUserPermission"
+        )
+    }
+
+    @Test
+    fun checkPermissions_scopeParent_shouldCheckPermissionAndCrossUserPermission() {
+        val metadata =
+            copyOf(
+                Policy.metadata,
+                allowedScopes = setOf(POLICY_SCOPE_PARENT_USER),
+                requiredPermission = "permission",
+                requiredCrossUserPermission = "crossUserPermission",
+            )
+        val handler = createHandler(metadata = metadata)
+        val theCaller = anyCaller
+
+        handler.checkPermissions(theCaller, POLICY_SCOPE_PARENT_USER)
+
+        permissionChecker.assertEnforcesPermissions(
+            theCaller, "permission", "crossUserPermission"
+        )
+    }
+
+    @Test
+    fun checkPermissions_acceptedDpcTypes_shouldNotCheckPermissionIfDpcTypeIsAccepted() {
+        val metadata =
+            copyOf(
+                Policy.metadata,
+                requiredPermission = "thePermissionThatShallNotBeChecked",
+                allowedDpcTypes = setOf(
+                    DEVICE_OWNER,
+                    MANAGED_PROFILE_OWNER_OF_PERSONAL_OWNED_DEVICE
+                ),
+            )
+        val handler = createHandler(metadata = metadata)
+
+        mockDelegate.stub { on { getDpcType(any()) } doReturn DEVICE_OWNER }
+
+        handler.checkPermissions(anyCaller, anyScope)
+
+        assertThat(permissionChecker.enforceCalls).isEmpty()
+    }
+
+    @Test
+    fun checkPermissions_acceptedDpcTypes_shouldCheckPermissionIfDpcTypeIsNotAccepted() {
+        val metadata =
+            copyOf(
+                Policy.metadata,
+                requiredPermission = "thePermissionThatShallBeChecked",
+                allowedDpcTypes = setOf(DEVICE_OWNER, MANAGED_PROFILE_OWNER_OF_PERSONAL_OWNED_DEVICE),
+            )
+        val handler = createHandler(metadata = metadata)
+        val theCaller = anyCaller
+
+        mockDelegate.stub { on { getDpcType(any()) } doReturn FINANCED_DEVICE_OWNER }
+
+        handler.checkPermissions(theCaller, anyScope)
+
+        permissionChecker.assertEnforcesPermissions(
+            theCaller, "thePermissionThatShallBeChecked"
+        )
+    }
+
+    @Test
+    fun checkPermissions_acceptedDpcTypes_shouldStillCheckCrossUserPermissionIfDpcTypeIsAccepted() {
+        val metadata =
+            copyOf(
+                Policy.metadata,
+                allowedScopes = setOf(POLICY_SCOPE_DEVICE),
+                requiredPermission = "thePermissionThatShallNotBeChecked",
+                requiredCrossUserPermission = "theCrossUserPermissionThatShallBeChecked",
+                allowedDpcTypes = setOf(DEVICE_OWNER),
+            )
+        val handler = createHandler(metadata = metadata)
+        val theCaller = anyCaller
+
+        mockDelegate.stub { on { getDpcType(any()) } doReturn DEVICE_OWNER }
+
+        handler.checkPermissions(theCaller, POLICY_SCOPE_DEVICE)
+
+        permissionChecker.assertEnforcesPermissions(
+            theCaller, "theCrossUserPermissionThatShallBeChecked"
+        )
+    }
+
+    @Test
+    fun getPolicyUnchecked_shouldCallMethodsInOrder() {
         val methodCalls = mutableListOf<String>()
         val handler =
             object :
                 PolicyHandler<Int>(Policy.key, Policy.metadata, Policy.definition, mockDelegate) {
-                override fun convertValue(
-                    caller: CallerIdentity,
-                    transportValue: PolicyValueTransport?,
-                ): Int? {
+                override fun convertValue(transportValue: PolicyValueTransport?): Int? {
                     methodCalls.add("convertValue")
                     return 5
                 }
@@ -378,151 +393,81 @@ open class PolicyHandlerTest {
                 }
             }
 
-        handler.getPolicy(anyCaller, anyScope)
+        handler.getPolicyUnchecked(anyCaller, anyScope)
 
-        assertThat(methodCalls).isEqualTo(listOf("checkPermissions", "getPolicyValue"))
+        assertThat(methodCalls).isEqualTo(listOf("getPolicyValue"))
     }
 
     @Test
-    fun getPolicy_shouldAcceptAllowedScopes() {
+    fun getPolicyUnchecked_shouldAcceptAllowedScopes() {
         val allAllowedScopes = setOf(POLICY_SCOPE_DEVICE, POLICY_SCOPE_PARENT_USER)
         val metadata = copyOf(Policy.metadata, allowedScopes = allAllowedScopes)
         val handler = createHandler(metadata = metadata)
 
         // This should not throw exceptions
         for (scope in allAllowedScopes) {
-            handler.getPolicy(anyCaller, scope)
+            handler.getPolicyUnchecked(anyCaller, scope)
         }
     }
 
     @Test
-    fun getPolicy_shouldRejectDisallowedScopes() {
+    fun getPolicyUnchecked_shouldRejectDisallowedScopes() {
         val allAllowedScopes = setOf(POLICY_SCOPE_DEVICE, POLICY_SCOPE_PARENT_USER)
         val someDisallowedScopes = setOf(POLICY_SCOPE_USER, 111, 666)
         val metadata = copyOf(Policy.metadata, allowedScopes = allAllowedScopes)
         val handler = createHandler(metadata = metadata)
 
         for (scope in someDisallowedScopes) {
-            assertFailsWith<IllegalArgumentException> { handler.getPolicy(anyCaller, scope) }
+            assertFailsWith<IllegalArgumentException> { handler.getPolicyUnchecked(anyCaller, scope) }
         }
     }
 
     @Test
-    fun getPolicy_scopeUser_shouldCheckPermission() {
-        val metadata =
-            copyOf(
-                Policy.metadata,
-                allowedScopes = setOf(POLICY_SCOPE_USER),
-                requiredPermission = "thePermission",
-                requiredCrossUserPermission = "shouldNotBeChecked",
-            )
+    fun checkPermissions_missingRequiredPermission_throwsException() {
+        val metadata = EnumPolicyMetadata(
+            Policy.key,
+            /* allowedScopes= */ setOf(POLICY_SCOPE_USER),
+            /* affectedResource= */ RESOURCE_PER_USER,
+            /* requiredPermission= */ null,
+            /* requiredCrossUserPermission= */ "testCrossUserPermission",
+            /* allowedDpcTypes= */ setOf(),
+            /* allowedValues= */ setOf(Policy.VALUE_1),
+        )
+
         val handler = createHandler(metadata = metadata)
         val theCaller = anyCaller
 
-        handler.getPolicy(theCaller, POLICY_SCOPE_USER)
+        val error = assertFailsWith<IllegalStateException> {
+            handler.checkPermissions(theCaller, POLICY_SCOPE_USER)
+        }
 
-        verify(mockPermissionChecker).enforce("thePermission", theCaller)
-        verifyNoMoreInteractions(mockPermissionChecker)
+        assertThat(error).hasMessageThat().contains("no requiredPermission")
+        assertThat(permissionChecker.enforceCalls).isEmpty()
     }
 
     @Test
-    fun getPolicy_scopeGlobal_shouldCheckPermissionAndCrossUserPermission() {
+    fun checkPermissions_missingRequiredCrossUserPermission_throwsException() {
         val metadata =
-            copyOf(
-                Policy.metadata,
-                allowedScopes = setOf(POLICY_SCOPE_DEVICE),
-                requiredPermission = "thePermission",
-                requiredCrossUserPermission = "theCrossUserPermission",
+            EnumPolicyMetadata(
+                Policy.key,
+                /* allowedScopes= */ setOf(POLICY_SCOPE_DEVICE),
+                /* affectedResource= */ RESOURCE_PER_USER,
+                /* requiredPermission= */ "thePermission",
+                /* requiredCrossUserPermission= */ null,
+                /* allowedDpcTypes= */ setOf(),
+                /* allowedValues= */ setOf(Policy.VALUE_1),
             )
+
         val handler = createHandler(metadata = metadata)
         val theCaller = anyCaller
 
-        handler.getPolicy(theCaller, POLICY_SCOPE_DEVICE)
+        handler.checkPermissions(theCaller, POLICY_SCOPE_DEVICE)
 
-        verify(mockPermissionChecker).enforce("thePermission", theCaller)
-        verify(mockPermissionChecker).enforce("theCrossUserPermission", theCaller)
-        verifyNoMoreInteractions(mockPermissionChecker)
+        permissionChecker.assertEnforcesPermissions(theCaller, "thePermission")
     }
 
     @Test
-    fun getPolicy_scopeParent_shouldCheckPermissionAndCrossUserPermission() {
-        val metadata =
-            copyOf(
-                Policy.metadata,
-                allowedScopes = setOf(POLICY_SCOPE_PARENT_USER),
-                requiredPermission = "permission",
-                requiredCrossUserPermission = "crossUserPermission",
-            )
-        val handler = createHandler(metadata = metadata)
-        val theCaller = anyCaller
-
-        handler.getPolicy(theCaller, POLICY_SCOPE_PARENT_USER)
-
-        verify(mockPermissionChecker).enforce("permission", theCaller)
-        verify(mockPermissionChecker).enforce("crossUserPermission", theCaller)
-        verifyNoMoreInteractions(mockPermissionChecker)
-    }
-
-    @Test
-    fun getPolicy_acceptedDpcTypes_shouldNotCheckPermissionIfDpcTypeIsAccepted() {
-        val metadata =
-            copyOf(
-                Policy.metadata,
-                requiredPermission = "thePermissionThatShallNotBeChecked",
-                allowedDpcTypes = setOf(DEFAULT_DEVICE_OWNER, PROFILE_OWNER),
-            )
-        val handler = createHandler(metadata = metadata)
-
-        mockDelegate.stub { on { getDpcType(any()) } doReturn DEFAULT_DEVICE_OWNER }
-
-        handler.getPolicy(anyCaller, anyScope)
-
-        verify(mockPermissionChecker, never()).enforce(any(), any())
-        verifyNoMoreInteractions(mockPermissionChecker)
-    }
-
-    @Test
-    fun getPolicy_acceptedDpcTypes_shouldCheckPermissionIfDpcTypeIsNotAccepted() {
-        val metadata =
-            copyOf(
-                Policy.metadata,
-                requiredPermission = "thePermissionThatShallBeChecked",
-                allowedDpcTypes = setOf(DEFAULT_DEVICE_OWNER, PROFILE_OWNER),
-            )
-        val handler = createHandler(metadata = metadata)
-
-        mockDelegate.stub { on { getDpcType(any()) } doReturn FINANCED_DEVICE_OWNER }
-
-        handler.getPolicy(anyCaller, anyScope)
-
-        verify(mockPermissionChecker).enforce(eq("thePermissionThatShallBeChecked"), any())
-        verifyNoMoreInteractions(mockPermissionChecker)
-    }
-
-    @Test
-    fun getPolicy_acceptedDpcTypes_shouldStillCheckCrossUserPermissionIfDpcTypeIsAccepted() {
-        val metadata =
-            copyOf(
-                Policy.metadata,
-                allowedScopes = setOf(POLICY_SCOPE_DEVICE),
-                requiredPermission = "thePermissionThatShallNotBeChecked",
-                requiredCrossUserPermission = "theCrossUserPermissionThatShallBeChecked",
-                allowedDpcTypes = setOf(DEFAULT_DEVICE_OWNER),
-            )
-        val handler = createHandler(metadata = metadata)
-
-        mockDelegate.stub { on { getDpcType(any()) } doReturn DEFAULT_DEVICE_OWNER }
-
-        handler.getPolicy(anyCaller, POLICY_SCOPE_DEVICE)
-
-        verify(mockPermissionChecker, never())
-            .enforce(eq("thePermissionThatShallNotBeChecked"), any())
-        verify(mockPermissionChecker).enforce(eq("theCrossUserPermissionThatShallBeChecked"), any())
-        verifyNoMoreInteractions(mockPermissionChecker)
-    }
-
-    @Test
-    fun getPolicy_getStoredPolicy() {
+    fun getPolicyUnchecked_getStoredPolicy() {
         val handler = createHandler(metadata = copyOf(Policy.metadata, allowedScopes = allScopes))
         val theCaller = anyCaller
         val storedValue = Policy.VALUE_1
@@ -531,7 +476,7 @@ open class PolicyHandlerTest {
         mockDelegate.stub { on { getPolicySetByAdmin<Int>(any(), any(), any()) } doReturn storedValue }
 
         for (scope in allScopes) {
-            val returnedValue = handler.getPolicy(theCaller, scope)
+            val returnedValue = handler.getPolicyUnchecked(theCaller, scope)
 
             assertThat(returnedValue).isNotNull()
             assertThat(returnedValue?.tag).isEqualTo(PolicyValueTransport.integerField)
@@ -541,7 +486,7 @@ open class PolicyHandlerTest {
     }
 
     @Test
-    fun getPolicy_shouldBeAbleToHandleUnsetPolicies() {
+    fun getPolicyUnchecked_shouldBeAbleToHandleUnsetPolicies() {
         val handler =
             createHandler(
                 metadata = copyOf(Policy.metadata, allowedScopes = allScopes),
@@ -553,7 +498,7 @@ open class PolicyHandlerTest {
         mockDelegate.stub { on { getPolicySetByAdmin<Int>(any(), any(), any()) } doReturn null }
 
         for (scope in allScopes) {
-            val returnedValue = handler.getPolicy(theCaller, scope)
+            val returnedValue = handler.getPolicyUnchecked(theCaller, scope)
 
             assertThat(returnedValue).isNull()
             verify(mockDelegate, times(1)).getPolicySetByAdmin(theCaller, theKey, scope)

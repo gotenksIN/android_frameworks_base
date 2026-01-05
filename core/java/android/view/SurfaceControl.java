@@ -224,8 +224,8 @@ public final class SurfaceControl implements Parcelable {
             boolean enable, int componentMask, int maxFrames);
     private static native DisplayedContentSample nativeGetDisplayedContentSample(
             IBinder displayToken, long numFrames, long timestamp);
-    private static native boolean nativeSetDesiredDisplayModeSpecs(IBinder displayToken,
-            DesiredDisplayModeSpecs desiredDisplayModeSpecs);
+    private static native boolean nativeSetDesiredDisplayModeSpecs(
+            DesiredDisplayModeSpecs[] desiredDisplayModeSpecs);
     private static native DesiredDisplayModeSpecs
             nativeGetDesiredDisplayModeSpecs(IBinder displayToken);
     private static native DisplayPrimaries nativeGetDisplayNativePrimaries(
@@ -511,7 +511,8 @@ public final class SurfaceControl implements Parcelable {
         public static final int JANK_OTHER = 1 << 2;
 
         private final long mFrameVsyncId;
-        private final @JankType int mJankType;
+        private final @JankType int mJankTypeLegacy;
+        private final @JankType int mJankTypeExperimental;
         private final @DurationNanosLong long mFrameIntervalNs;
         private final @DurationNanosLong long mScheduledAppFrameTimeNs;
         private final @DurationNanosLong long mActualAppFrameTimeNs;
@@ -520,10 +521,12 @@ public final class SurfaceControl implements Parcelable {
         /**
          * @hide
          */
-        public JankData(long frameVsyncId, @JankType int jankType, long frameIntervalNs,
+        public JankData(long frameVsyncId, @JankType int jankTypeLegacy,
+                @JankType int jankTypeExperimental, long frameIntervalNs,
                 long scheduledAppFrameTimeNs, long actualAppFrameTimeNs, long presentDelayNs) {
             mFrameVsyncId = frameVsyncId;
-            mJankType = jankType;
+            mJankTypeLegacy = jankTypeLegacy;
+            mJankTypeExperimental = jankTypeExperimental;
             mFrameIntervalNs = frameIntervalNs;
             mScheduledAppFrameTimeNs = scheduledAppFrameTimeNs;
             mActualAppFrameTimeNs = actualAppFrameTimeNs;
@@ -548,7 +551,32 @@ public final class SurfaceControl implements Parcelable {
          * @return the jank type bitmask
          */
         public @JankType int getJankType() {
-            return mJankType;
+            if (com.android.graphics.surfaceflinger.flags.Flags
+                    .useExperimentalJankClassification()) {
+                return mJankTypeExperimental;
+            }
+            return mJankTypeLegacy;
+        }
+
+        /**
+         * Returns the bitmask indicating the types of jank observed using legacy classification.
+         *
+         * @return the jank type bitmask
+         * @hide
+         */
+        public @JankType int getJankTypeLegacy() {
+            return mJankTypeLegacy;
+        }
+
+        /**
+         * Returns the bitmask indicating the types of jank observed using experimental
+         * classification.
+         *
+         * @return the jank type bitmask
+         * @hide
+         */
+        public @JankType int getJankTypeExperimental() {
+            return mJankTypeExperimental;
         }
 
         /**
@@ -597,7 +625,8 @@ public final class SurfaceControl implements Parcelable {
         @Override
         public String toString() {
             return "JankData{vsync=" + mFrameVsyncId
-                    + ", jankType=0x" + Integer.toHexString(mJankType)
+                    + ", jankTypeLegacy=0x" + Integer.toHexString(mJankTypeLegacy)
+                    + ", jankTypeExperimental=0x" + Integer.toHexString(mJankTypeExperimental)
                     + ", frameInterval=" + mFrameIntervalNs + "ns"
                     + ", scheduledAppTime=" + mScheduledAppFrameTimeNs + "ns"
                     + ", actualAppTime=" + mActualAppFrameTimeNs + "ns}";
@@ -2456,6 +2485,51 @@ public final class SurfaceControl implements Parcelable {
         }
     }
 
+    /**
+     * Contains information on the late, early, and app work durations. May change due to the device
+     * being in low power mode or thermal throttling.
+     *
+     * @hide
+     */
+    public static class WorkDuration {
+        public final long minSfDurationNanos;
+        public final long maxSfDurationNanos;
+        public final long appDurationNanos;
+
+        public WorkDuration(@NonNull WorkDuration other) {
+            this(other.minSfDurationNanos, other.maxSfDurationNanos, other.appDurationNanos);
+        }
+
+        public WorkDuration(long minSfDurationNanos, long maxSfDurationNanos,
+                            long appDurationNanos) {
+            this.minSfDurationNanos = minSfDurationNanos;
+            this.maxSfDurationNanos = maxSfDurationNanos;
+            this.appDurationNanos = appDurationNanos;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(minSfDurationNanos, maxSfDurationNanos, appDurationNanos);
+        }
+
+        @Override
+        public boolean equals(Object o) {
+            if (!(o instanceof WorkDuration other)) return false;
+            return (this.minSfDurationNanos == other.minSfDurationNanos)
+                    && (this.maxSfDurationNanos == other.maxSfDurationNanos)
+                    && (this.appDurationNanos == other.appDurationNanos);
+        }
+
+        @Override
+        public String toString() {
+            return "WorkDuration{"
+                    + "minSfDurationNanos=" + minSfDurationNanos
+                    + ", maxSfDurationNanos=" + maxSfDurationNanos
+                    + ", appWorkDurationNanos=" + appDurationNanos
+                    + "}";
+        }
+    }
+
 
     /**
      * Contains information about desired display configuration.
@@ -2463,7 +2537,11 @@ public final class SurfaceControl implements Parcelable {
      * @hide
      */
     public static final class DesiredDisplayModeSpecs {
+        public IBinder displayToken;
+        public IBinder applyToken;
+
         public int defaultMode;
+
         /**
          * If true this will allow switching between modes in different display configuration
          * groups. This way the user may see visual interruptions when the display mode changes.
@@ -2498,6 +2576,13 @@ public final class SurfaceControl implements Parcelable {
         @Nullable
         public IdleScreenRefreshRateConfig idleScreenRefreshRateConfig;
 
+        /**
+         * Contains late, early, and app work durations depending on low power mode, thermal
+         * throttling, or none.
+         */
+        @Nullable
+        public WorkDuration workDuration = null;
+
         public DesiredDisplayModeSpecs() {
             this.primaryRanges = new RefreshRateRanges();
             this.appRequestRanges = new RefreshRateRanges();
@@ -2509,9 +2594,13 @@ public final class SurfaceControl implements Parcelable {
             copyFrom(other);
         }
 
-        public DesiredDisplayModeSpecs(int defaultMode, boolean allowGroupSwitching,
+        public DesiredDisplayModeSpecs(IBinder displayToken, IBinder applyToken,
+                int defaultMode, boolean allowGroupSwitching,
                 RefreshRateRanges primaryRanges, RefreshRateRanges appRequestRanges,
-                @Nullable IdleScreenRefreshRateConfig idleScreenRefreshRateConfig) {
+                @Nullable IdleScreenRefreshRateConfig idleScreenRefreshRateConfig,
+                @Nullable WorkDuration workDuration) {
+            this.displayToken = displayToken;
+            this.applyToken = applyToken;
             this.defaultMode = defaultMode;
             this.allowGroupSwitching = allowGroupSwitching;
             this.primaryRanges =
@@ -2521,6 +2610,7 @@ public final class SurfaceControl implements Parcelable {
             this.idleScreenRefreshRateConfig =
                     (idleScreenRefreshRateConfig == null) ? null : new IdleScreenRefreshRateConfig(
                             idleScreenRefreshRateConfig.timeoutMillis);
+            this.workDuration = (workDuration == null) ? null : new WorkDuration(workDuration);
         }
 
         @Override
@@ -2532,12 +2622,15 @@ public final class SurfaceControl implements Parcelable {
          * Tests for equality.
          */
         public boolean equals(DesiredDisplayModeSpecs other) {
-            return other != null && defaultMode == other.defaultMode
+            return other != null && displayToken == other.displayToken
+                    && applyToken == other.applyToken
+                    && defaultMode == other.defaultMode
                     && allowGroupSwitching == other.allowGroupSwitching
                     && primaryRanges.equals(other.primaryRanges)
                     && appRequestRanges.equals(other.appRequestRanges)
                     && Objects.equals(
-                    idleScreenRefreshRateConfig, other.idleScreenRefreshRateConfig);
+                    idleScreenRefreshRateConfig, other.idleScreenRefreshRateConfig)
+                    && Objects.equals(workDuration, other.workDuration);
         }
 
         @Override
@@ -2549,20 +2642,27 @@ public final class SurfaceControl implements Parcelable {
          * Copies the supplied object's values to this object.
          */
         public void copyFrom(DesiredDisplayModeSpecs other) {
+            displayToken = other.displayToken;
+            applyToken = other.applyToken;
             defaultMode = other.defaultMode;
             allowGroupSwitching = other.allowGroupSwitching;
             primaryRanges.copyFrom(other.primaryRanges);
             appRequestRanges.copyFrom(other.appRequestRanges);
             copyIdleScreenRefreshRateConfig(other.idleScreenRefreshRateConfig);
+            workDuration = other.workDuration == null ? null
+                    : new WorkDuration(other.workDuration);
         }
 
         @Override
         public String toString() {
-            return "defaultMode=" + defaultMode
+            return "displayToken=" + displayToken
+                    + "applyToken=" + applyToken
+                    + "defaultMode=" + defaultMode
                     + " allowGroupSwitching=" + allowGroupSwitching
                     + " primaryRanges=" + primaryRanges
                     + " appRequestRanges=" + appRequestRanges
-                    + " idleScreenRefreshRate=" + String.valueOf(idleScreenRefreshRateConfig);
+                    + " idleScreenRefreshRate=" + String.valueOf(idleScreenRefreshRateConfig)
+                    + " workDuration=" + workDuration;
         }
 
         private void copyIdleScreenRefreshRateConfig(IdleScreenRefreshRateConfig other) {
@@ -2580,21 +2680,38 @@ public final class SurfaceControl implements Parcelable {
     }
 
     /**
+     * Specifies the desired display mode(s) that should be applied atomically.
+     *
+     * The `applyToken` is for synchronization. To change the resolution, the client must first
+     * request the `DisplayModeSpecs#defaultMode` for the new resolution, then commit a display
+     * transaction with the same `applyToken`. The `DisplayModeSpecs` and transaction will then
+     * be applied atomically. To atomically change modes for multiple displays, the client must
+     * pass multiple `DesiredDisplayModeSpecs` and pass the same `applyToken` in the subsequent
+     * display transaction that commits all displays.
+     *
      * @hide
      */
-    public static boolean setDesiredDisplayModeSpecs(IBinder displayToken,
-            DesiredDisplayModeSpecs desiredDisplayModeSpecs) {
-        if (displayToken == null) {
-            throw new IllegalArgumentException("displayToken must not be null");
-        }
-        if (desiredDisplayModeSpecs == null) {
-            throw new IllegalArgumentException("desiredDisplayModeSpecs must not be null");
-        }
-        if (desiredDisplayModeSpecs.defaultMode < 0) {
-            throw new IllegalArgumentException("defaultMode must be non-negative");
+    public static boolean setDesiredDisplayModeSpecs(
+            DesiredDisplayModeSpecs[] desiredDisplayModeSpecs) {
+        if (desiredDisplayModeSpecs == null || desiredDisplayModeSpecs.length == 0) {
+            throw new IllegalArgumentException("desiredDisplayModeSpecs must not be null or empty");
         }
 
-        return nativeSetDesiredDisplayModeSpecs(displayToken, desiredDisplayModeSpecs);
+        for (DesiredDisplayModeSpecs specs : desiredDisplayModeSpecs) {
+            if (specs == null) {
+                throw new IllegalArgumentException("desiredDisplayModeSpecs[i] must not be null");
+            }
+            if (specs.displayToken == null) {
+                throw new IllegalArgumentException(
+                        "desiredDisplayModeSpecs[i].displayToken must not be null");
+            }
+            if (specs.defaultMode < 0) {
+                throw new IllegalArgumentException(
+                        "desiredDisplayModeSpecs[i].defaultMode must be non-negative");
+            }
+        }
+
+        return nativeSetDesiredDisplayModeSpecs(desiredDisplayModeSpecs);
     }
 
     /**

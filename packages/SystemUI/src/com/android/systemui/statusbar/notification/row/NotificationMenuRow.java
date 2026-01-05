@@ -86,7 +86,6 @@ public class NotificationMenuRow implements NotificationMenuRowPlugin, View.OnCl
     private Context mContext;
     private FrameLayout mMenuContainer;
     private NotificationMenuItem mInfoItem;
-    private MenuItem mFeedbackItem;
     private MenuItem mSnoozeItem;
     private ArrayList<MenuItem> mLeftMenuItems;
     private ArrayList<MenuItem> mRightMenuItems;
@@ -149,11 +148,6 @@ public class NotificationMenuRow implements NotificationMenuRowPlugin, View.OnCl
     @Override
     public MenuItem getLongpressMenuItem(Context context) {
         return mInfoItem;
-    }
-
-    @Override
-    public MenuItem getFeedbackMenuItem(Context context) {
-        return mFeedbackItem;
     }
 
     @Override
@@ -276,7 +270,6 @@ public class NotificationMenuRow implements NotificationMenuRowPlugin, View.OnCl
             // Only show snooze for non-foreground notifications, and if the setting is on
             mSnoozeItem = createSnoozeItem(mContext);
         }
-        mFeedbackItem = createFeedbackItem(mContext);
         int personNotifType = NotificationBundleUi.isEnabled()
                 ? mParent.getEntryAdapter().getPeopleNotificationType()
                 : mPeopleNotificationIdentifier.getPeopleNotificationType(mParent.getEntryLegacy());
@@ -289,12 +282,14 @@ public class NotificationMenuRow implements NotificationMenuRowPlugin, View.OnCl
         boolean isBundled = NotificationBundleUi.isEnabled()
                 ? mParent.getEntryAdapter().isBundled()
                 : mParent.getEntryLegacy().isBundled();
-        if (personNotifType == PeopleNotificationIdentifier.TYPE_PERSON) {
+        if (android.app.Flags.bridgedNotifications()
+                && sbn.getNotification().getBridgedNotificationMetadata() != null) {
+            mInfoItem = createBridgedNotificationItem(mContext);
+        } else if (personNotifType == PeopleNotificationIdentifier.TYPE_PERSON) {
             mInfoItem = createPartialConversationItem(mContext);
         } else if (personNotifType >= PeopleNotificationIdentifier.TYPE_FULL_PERSON) {
             mInfoItem = createConversationItem(mContext);
-        } else if (Flags.permissionHelperUiRichOngoing()
-                && (sbn != null && sbn.getNotification().isPromotedOngoing())) {
+        } else if (sbn != null && sbn.getNotification().isPromotedOngoing()) {
             mInfoItem = createPromotedItem(mContext);
         } else if ((NotificationClassificationUiFlag.isEnabled()
                 || NotificationBundleUi.isEnabled()) && isBundled) {
@@ -309,7 +304,6 @@ public class NotificationMenuRow implements NotificationMenuRowPlugin, View.OnCl
             mRightMenuItems.add(mSnoozeItem);
         }
         mRightMenuItems.add(mInfoItem);
-        mRightMenuItems.add(mFeedbackItem);
         boolean isPromotedOngoing = NotificationBundleUi.isEnabled()
                 ? mParent.getEntryAdapter().isPromotedOngoing()
                 : mParent.getEntryLegacy().isPromotedOngoing();
@@ -830,6 +824,17 @@ public class NotificationMenuRow implements NotificationMenuRowPlugin, View.OnCl
         mNotificationActivityStarter.startNotificationGutsIntent(intent, appUid, row);
     }
 
+    private NotificationMenuItem createBridgedNotificationItem(Context context) {
+        Resources res = context.getResources();
+        String infoDescription = res.getString(R.string.notification_menu_gear_description);
+        int layoutId = R.layout.notification_bridged_info;
+        BridgedNotificationInfo infoContent =
+                (BridgedNotificationInfo) LayoutInflater.from(context).inflate(
+                        layoutId, null, false);
+        return new NotificationMenuItem(context, infoDescription, infoContent,
+                NotificationMenuItem.OMIT_FROM_SWIPE_MENU);
+    }
+
     static NotificationMenuItem createInfoItem(Context context) {
         Resources res = context.getResources();
         String infoDescription = res.getString(R.string.notification_menu_gear_description);
@@ -840,14 +845,6 @@ public class NotificationMenuRow implements NotificationMenuRowPlugin, View.OnCl
                 layoutId, null, false);
         return new NotificationMenuItem(context, infoDescription, infoContent,
                 NotificationMenuItem.OMIT_FROM_SWIPE_MENU);
-    }
-
-    static MenuItem createFeedbackItem(Context context) {
-        FeedbackInfo feedbackContent = (FeedbackInfo) LayoutInflater.from(context).inflate(
-                R.layout.feedback_info, null, false);
-        MenuItem info = new NotificationMenuItem(context, null, feedbackContent,
-                NotificationMenuItem.OMIT_FROM_SWIPE_MENU);
-        return info;
     }
 
     private void addMenuView(MenuItem item, ViewGroup parent) {

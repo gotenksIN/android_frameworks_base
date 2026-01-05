@@ -370,11 +370,10 @@ class ScreenCaptureAppContentRepositoryImplTest : SysuiTestCase() {
                 )
             val fakeAppContentProjectionCallback = FakeAppContentProjectionCallback(mockedContext)
             val fakeAppContent =
-                MediaProjectionAppContent(
-                    /* thumbnail= */ createBitmap(200, 100),
-                    /* title= */ "FakeContent",
-                    /* id= */ 123,
-                )
+                MediaProjectionAppContent.Builder(123)
+                    .setTitle("FakeContent")
+                    .setThumbnail(createBitmap(200, 100))
+                    .build()
             val fakeResultBundle =
                 Bundle().apply {
                     putParcelableArray(
@@ -526,6 +525,7 @@ private class FakeAppContentProjectionCallback(context: Context) :
     override fun onLoopbackProjectionStarted(
         session: IAppContentProjectionSession?,
         contentId: Int,
+        isAudioRequested: Boolean,
     ) {
         onLoopbackProjectionStarted_enforcePermission()
     }

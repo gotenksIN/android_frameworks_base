@@ -15,13 +15,9 @@
  */
 package android.app;
 
-import static android.platform.test.ravenwood.RavenwoodProxyHelper.sNotImplementedHandler;
-
 import static org.junit.Assert.fail;
 
 import android.annotation.NonNull;
-import android.annotation.Nullable;
-import android.content.AttributionSource;
 import android.content.ContentProvider;
 import android.content.Context;
 import android.content.IContentProvider;
@@ -31,9 +27,10 @@ import android.os.ServiceManager;
 import android.os.ServiceManager.ServiceNotFoundException;
 import android.platform.test.ravenwood.RavenwoodDriver;
 import android.platform.test.ravenwood.RavenwoodEnvironment;
+import android.platform.test.ravenwood.RavenwoodErrorHandler;
 import android.platform.test.ravenwood.RavenwoodProxyHelper;
+import android.platform.test.ravenwood.RavenwoodSettingsProvider;
 import android.platform.test.ravenwood.RavenwoodSystemServer;
-import android.platform.test.ravenwood.RavenwoodUnsupportedApiException;
 import android.platform.test.ravenwood.RavenwoodUtils;
 import android.provider.Settings;
 import android.util.Log;
@@ -44,8 +41,6 @@ import com.android.internal.annotations.GuardedBy;
 import com.android.ravenwood.common.SneakyThrow;
 import com.android.server.compat.PlatformCompat;
 
-import java.lang.reflect.InvocationHandler;
-import java.lang.reflect.Method;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
@@ -99,7 +94,7 @@ public final class RavenwoodAppDriver {
 
     private final Instrumentation mInstrumentation;
 
-    private final RavenwoodActivityDriver mActivityDriver = RavenwoodActivityDriver.getInstance();
+    private final RavenwoodSettingsProvider mSettingsProvider;
 
     /**
      * All the known compat-IDs. We use it to ensure no unknown compat-IDs may be used.
@@ -171,6 +166,12 @@ public final class RavenwoodAppDriver {
                 // That's what ActivityThread does in handleBindApplication() too.
                 /*instrumentation=*/ null
         );
+        // AndroidX's test runner will override the default handler, in makeApplication(),
+        // so we override it again.
+        // We could have HostStubGen redirect `Thread.setDefaultUncaughtExceptionHandler()`,
+        // but currently we exclude all androidx.* classes from HSG processing, and
+        // changing that could impact the build time, so let's just go with this hacky solution.
+        RavenwoodErrorHandler.setDefaultUncaughtExceptionHandler();
 
         mActivityThread.mInitialApplication = application;
         mTargetContext = appContext;
@@ -179,49 +180,16 @@ public final class RavenwoodAppDriver {
         mInstrumentation.callApplicationOnCreate(application);
 
         // Register a stub settings provider that always return nothing
+        mSettingsProvider = new RavenwoodSettingsProvider();
         var mockSettings = RavenwoodProxyHelper.newProxy(
                 IContentProvider.class,
                 IContentProvider.descriptor,
-                new RavenwoodEmptySettingsProvider(), false);
+                mSettingsProvider, false);
         synchronized (mProviders) {
             mProviders.put(Settings.AUTHORITY, mockSettings);
         }
 
         reset();
-    }
-
-    /**
-     * Minimum implementation to support "empty" settings provider.
-     * See b/457840588 for the details.
-     */
-    private static class RavenwoodEmptySettingsProvider implements InvocationHandler {
-        @Override
-        public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-            if ("call".equals(method.getName())) {
-                return call(
-                        (AttributionSource) args[0],
-                        (String) args[1],
-                        (String) args[2],
-                        (String) args[3],
-                        (Bundle) args[4]
-                );
-            } else {
-                return sNotImplementedHandler.invoke(proxy, method, args);
-            }
-        }
-
-        private Bundle call(@NonNull AttributionSource attributionSource, String authority,
-                String method, @Nullable String arg, @Nullable Bundle extras) {
-            final String[] commands = method.split("_", 2);
-            final String op = commands[0];
-            return switch (op) {
-                case "GET" -> Bundle.EMPTY;
-                case "PUT", "RESET" ->
-                        throw new RavenwoodUnsupportedApiException()
-                                .setReason("SettingsProvider#call(" + method + ")");
-                default -> throw new UnsupportedOperationException("Unknown command " + method);
-            };
-        }
     }
 
     private void initializeCompatIds() {
@@ -380,5 +348,6 @@ public final class RavenwoodAppDriver {
      */
     public void reset() {
         InstrumentationRegistry.registerInstance(mInstrumentation, Bundle.EMPTY);
+        mSettingsProvider.reset();
     }
 }

@@ -386,10 +386,10 @@ class ContextImpl extends Context {
     @UnsupportedAppUsage
     final Object[] mServiceCache = SystemServiceRegistry.createServiceCache();
 
-    static final int STATE_UNINITIALIZED = 0;
-    static final int STATE_INITIALIZING = 1;
-    static final int STATE_READY = 2;
-    static final int STATE_NOT_FOUND = 3;
+    static final byte STATE_UNINITIALIZED = 0;
+    static final byte STATE_INITIALIZING = 1;
+    static final byte STATE_READY = 2;
+    static final byte STATE_NOT_FOUND = 3;
 
     /** @hide */
     @IntDef(prefix = { "STATE_" }, value = {
@@ -406,7 +406,7 @@ class ContextImpl extends Context {
      * {@link #STATE_INITIALIZING} or {@link #STATE_READY},
      */
     @ServiceInitializationState
-    final int[] mServiceInitializationStateArray = new int[mServiceCache.length];
+    final byte[] mServiceInitializationStateArray = new byte[mServiceCache.length];
 
     private final Object mDeviceIdListenerLock = new Object();
     /**
@@ -613,6 +613,7 @@ class ContextImpl extends Context {
     }
 
     @Override
+    @RavenwoodKeep
     public SharedPreferences getSharedPreferences(String name, int mode) {
         // At least one application in the world actually passes in a null
         // name.  This happened to work because when we generated the file name
@@ -639,6 +640,7 @@ class ContextImpl extends Context {
     }
 
     @Override
+    @RavenwoodKeep
     public SharedPreferences getSharedPreferences(File file, int mode) {
         SharedPreferencesImpl sp;
         synchronized (ContextImpl.class) {
@@ -646,21 +648,7 @@ class ContextImpl extends Context {
             sp = cache.get(file);
             if (sp == null) {
                 checkMode(mode);
-                if (getApplicationInfo().targetSdkVersion >= android.os.Build.VERSION_CODES.O) {
-                    if (isCredentialProtectedStorage()) {
-                        final UserManager um = getSystemService(UserManager.class);
-                        if (um == null) {
-                            throw new IllegalStateException("SharedPreferences cannot be accessed "
-                                    + "if UserManager is not available. "
-                                    + "(e.g. from inside an isolated process)");
-                        }
-                        if (!um.isUserUnlockingOrUnlocked(UserHandle.myUserId())) {
-                            throw new IllegalStateException("SharedPreferences in "
-                                    + "credential encrypted storage are not available until after "
-                                    + "user (id " + UserHandle.myUserId() + ") is unlocked");
-                        }
-                    }
-                }
+                credentialProtectedStorageCheck();
                 sp = new SharedPreferencesImpl(file, mode);
                 cache.put(file, sp);
                 return sp;
@@ -676,7 +664,27 @@ class ContextImpl extends Context {
         return sp;
     }
 
+    @RavenwoodIgnore(blockedBy = UserManager.class)
+    private void credentialProtectedStorageCheck() {
+        if (getApplicationInfo().targetSdkVersion >= android.os.Build.VERSION_CODES.O) {
+            if (isCredentialProtectedStorage()) {
+                final UserManager um = getSystemService(UserManager.class);
+                if (um == null) {
+                    throw new IllegalStateException("SharedPreferences cannot be accessed "
+                            + "if UserManager is not available. "
+                            + "(e.g. from inside an isolated process)");
+                }
+                if (!um.isUserUnlockingOrUnlocked(UserHandle.myUserId())) {
+                    throw new IllegalStateException("SharedPreferences in "
+                            + "credential encrypted storage are not available until after "
+                            + "user (id " + UserHandle.myUserId() + ") is unlocked");
+                }
+            }
+        }
+    }
+
     @GuardedBy("ContextImpl.class")
+    @RavenwoodKeep
     private ArrayMap<File, SharedPreferencesImpl> getSharedPreferencesCacheLocked() {
         if (sSharedPrefsCache == null) {
             sSharedPrefsCache = new ArrayMap<>();
@@ -786,6 +794,7 @@ class ContextImpl extends Context {
     }
 
     @UnsupportedAppUsage
+    @RavenwoodKeep
     private File getPreferencesDir() {
         synchronized (mPreferencesDirLock) {
             if (mPreferencesDir == null) {
@@ -2326,10 +2335,9 @@ class ContextImpl extends Context {
     }
 
     @Override
-    public void updateServiceBindings(@NonNull List<UpdateBindingParams> params) {
+    public void updateServiceBindings(@NonNull Collection<UpdateBindingParams> params) {
         final ArrayList<BindUpdateInfo> updates = new ArrayList<>(params.size());
-        for (int i = 0, size = params.size(); i < size; i++) {
-            final UpdateBindingParams param = params.get(i);
+        for (UpdateBindingParams param : params) {
             final ServiceConnection conn = param.getConnection();
             if (conn == null) {
                 throw new IllegalArgumentException("connection is null");
@@ -3060,7 +3068,7 @@ class ContextImpl extends Context {
     private void setDisplay(Display display) {
         mDisplay = display;
         if (display != null) {
-            updateDeviceIdIfChanged(display.getDisplayId());
+            updateDeviceIdIfChanged(display);
         }
         updateResourceOverlayConstraints();
     }
@@ -3341,10 +3349,12 @@ class ContextImpl extends Context {
         }
     }
 
-    private void updateDeviceIdIfChanged(int displayId) {
+    private void updateDeviceIdIfChanged(Display display) {
         if (mIsExplicitDeviceId) {
             return;
         }
+
+        int displayId = display.getDisplayId();
 
         if ((displayId == Display.DEFAULT_DISPLAY || displayId == Display.INVALID_DISPLAY)
                 && mDeviceId == DEVICE_ID_DEFAULT) {
@@ -3353,15 +3363,19 @@ class ContextImpl extends Context {
             return;
         }
 
-        VirtualDeviceManager vdm = getSystemService(VirtualDeviceManager.class);
-        if (vdm != null) {
-            int deviceId = vdm.getDeviceIdForDisplayId(displayId);
-            if (deviceId != mDeviceId) {
-                mDeviceId = deviceId;
-                mAttributionSource =
-                        createAttributionSourceWithDeviceId(mAttributionSource, mDeviceId);
-                notifyOnDeviceChangedListeners(mDeviceId);
+        int deviceId = DEVICE_ID_DEFAULT;
+        if (display.getType() == Display.TYPE_VIRTUAL) {
+            VirtualDeviceManager vdm = getSystemService(VirtualDeviceManager.class);
+            if (vdm != null) {
+                deviceId = vdm.getDeviceIdForDisplayId(displayId);
             }
+        }
+
+        if (deviceId != mDeviceId) {
+            mDeviceId = deviceId;
+            mAttributionSource =
+                    createAttributionSourceWithDeviceId(mAttributionSource, mDeviceId);
+            notifyOnDeviceChangedListeners(mDeviceId);
         }
     }
 
@@ -3801,8 +3815,7 @@ class ContextImpl extends Context {
 
         if (r != null) {
             // only do this if the user already has more than one preferred locale
-            if (android.content.res.Flags.defaultLocale()
-                    && r.getConfiguration().getLocales().size() > 1) {
+            if (r.getConfiguration().getLocales().size() > 1) {
                 LocaleConfig lc = LocaleConfig.fromContextIgnoringOverride(this);
                 mResources.setLocaleConfig(lc);
             }

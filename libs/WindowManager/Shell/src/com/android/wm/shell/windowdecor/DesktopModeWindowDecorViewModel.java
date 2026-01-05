@@ -218,7 +218,7 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
     private final DesksOrganizer mDesksOrganizer;
     private final ShellDesktopState mShellDesktopState;
     private final DesktopConfig mDesktopConfig;
-    private final PinnedLayerController mPinnedLayerController;
+    private final @Nullable PinnedLayerController mPinnedLayerController;
     private boolean mTransitionDragActive;
 
     private SparseArray<EventReceiver> mEventReceiversByDisplay = new SparseArray<>();
@@ -551,6 +551,11 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
                 new DesktopModeOnTaskResizeAnimationListener());
         mDesktopTasksController.setOnTaskRepositionAnimationListener(
                 new DesktopModeOnTaskRepositionAnimationListener());
+        if (mPinnedLayerController != null) {
+            mPinnedLayerController.setOnTaskRepositionAnimationListener(
+                    new DesktopModeOnTaskRepositionAnimationListener()
+            );
+        }
         mRecentsTransitionHandler.addTransitionStateListener(
                 new DesktopModeRecentsTransitionStateListener());
         mDisplayController.addDisplayChangingController(mOnDisplayChangingListener);
@@ -1030,21 +1035,11 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
             }
             // TODO(b/337903443): Fix this returning null for freeform tasks.
             try {
-                TaskSnapshot screenshot;
-                if (com.android.window.flags.Flags.reduceTaskSnapshotMemoryUsage()) {
-                    screenshot = TaskSnapshotManager.getInstance().getTaskSnapshot(
-                            info.taskId, TaskSnapshotManager.RESOLUTION_HIGH);
-                    if (screenshot == null) {
-                        screenshot = TaskSnapshotManager.getInstance().takeTaskSnapshot(
-                                info.taskId, false /* updateCache */);
-                    }
-                } else {
-                    screenshot = activityTaskManagerService
-                            .getTaskSnapshot(info.taskId, false);
-                    if (screenshot == null) {
-                        screenshot = activityTaskManagerService
-                                .takeTaskSnapshot(info.taskId, false);
-                    }
+                TaskSnapshot screenshot = TaskSnapshotManager.getInstance().getTaskSnapshot(
+                        info.taskId, TaskSnapshotManager.RESOLUTION_HIGH);
+                if (screenshot == null) {
+                    screenshot = TaskSnapshotManager.getInstance().takeTaskSnapshot(
+                            info.taskId, false /* updateCache */);
                 }
                 snapshotList.add(new Pair(info.taskId, screenshot));
             } catch (RemoteException e) {
@@ -1792,6 +1787,7 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
                     mWindowDecorationActions,
                     mAppToWebRepository,
                     mCaptionVisibilityHelper,
+                    mFocusTransitionObserver,
                     mLockTaskChangeListener,
                     mPinnedLayerController);
             windowDecoration =
@@ -1831,7 +1827,8 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
                             mShellDesktopState,
                             mDesktopConfig,
                             mWindowDecorationActions,
-                            mLockTaskChangeListener);
+                            mLockTaskChangeListener,
+                            mFocusTransitionObserver);
             windowDecoration = mWindowDecoratioWrapperFactory
                     .fromDesktopDecoration(desktopModeWindowDecoration);
         }
@@ -1860,7 +1857,8 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
                         new InputPilfererImpl(mInputManager), mInputManager,
                         mFocusTransitionObserver, mShellDesktopState,
                         mMultiDisplayDragMoveIndicatorController, mTransactionFactory,
-                        mCaptionTouchStatusListener, mAppHandleMotionEventHandler);
+                        mCaptionTouchStatusListener, mAppHandleMotionEventHandler,
+                        mPinnedLayerController);
         windowDecoration.setCaptionListeners(
                 touchEventListener, touchEventListener, touchEventListener, touchEventListener);
         windowDecoration.setExclusionRegionListener(mExclusionRegionListener);
@@ -2090,9 +2088,7 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
                 if (decor == null) {
                     continue;
                 }
-                if (decor.getTaskInfo().displayId == displayId
-                        && DesktopModeFlags
-                        .ENABLE_DESKTOP_WINDOWING_IMMERSIVE_HANDLE_HIDING.isTrue()) {
+                if (decor.getTaskInfo().displayId == displayId) {
                     decor.onInsetsStateChanged(insetsState);
                 }
                 if (!DesktopModeFlags.ENABLE_HANDLE_INPUT_FIX.isTrue()) {
@@ -2200,6 +2196,12 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
         @Override
         public void onOpenInBrowser(int taskId, @NonNull Intent intent) {
             mViewModel.openInBrowser(taskId, intent);
+        }
+
+        @Override
+        public void onSwitchToBrowser(@NonNull RunningTaskInfo taskInfo, @NonNull Intent intent) {
+            onOpenInBrowser(taskInfo.taskId, intent);
+            onClose(taskInfo);
         }
 
         @Override

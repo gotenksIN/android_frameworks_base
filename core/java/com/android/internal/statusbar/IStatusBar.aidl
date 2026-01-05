@@ -17,6 +17,7 @@
 package com.android.internal.statusbar;
 
 import android.app.ITransientNotificationCallback;
+import android.app.motioncues.MotionCuesSettings;
 import android.content.ComponentName;
 import android.graphics.drawable.Icon;
 import android.graphics.Rect;
@@ -61,9 +62,10 @@ oneway interface IStatusBar
      * @param displayId The id of the display to which the IME is bound.
      * @param vis The IME window visibility.
      * @param backDisposition The IME back disposition mode.
-     * @param showImeSwitcher Whether the IME Switcher button should be shown.
+     * @param showImeSwitcherButton Whether the IME Switcher button should be shown.
      */
-    void setImeWindowStatus(int displayId, int vis, int backDisposition, boolean showImeSwitcher);
+    void setImeWindowStatus(int displayId, int vis, int backDisposition,
+            boolean showImeSwitcherButton);
     void setWindowState(int display, int window, int state);
 
     void showRecentApps(boolean triggeredFromAltTab);
@@ -153,9 +155,14 @@ oneway interface IStatusBar
     void showPictureInPictureMenu();
 
     /**
-     * Shows the global actions menu.
+     * Shows the global actions menu. Will not hide it if already showing.
      */
     void showGlobalActionsMenu();
+
+    /**
+     * Shows the global actions menu if not showing. Hides it if already showing
+     */
+    void showOrHideGlobalActionsMenu();
 
     /**
      * Notifies the status bar that a new rotation suggestion is available.
@@ -385,14 +392,6 @@ oneway interface IStatusBar
     void moveFocusedTaskToFullscreen(int displayId);
 
     /**
-     * Enters stage split from a current running app.
-     *
-     * @param displayId the id of the current display.
-     * @param leftOrTop indicates where the stage split is.
-     */
-    void moveFocusedTaskToStageSplit(int displayId, boolean leftOrTop);
-
-    /**
      * Set the split screen focus to the left / top app or the right / bottom app based on
      * {@param leftOrTop}.
      */
@@ -413,4 +412,14 @@ oneway interface IStatusBar
     * @param displayId the id of the current display.
     */
     void moveFocusedTaskToDesktop(int displayId);
+
+    /** Directs the system to bind to the given component and start a motion cues session.
+    *
+    * @param componentName the component to bind to.
+    * @param motionCuesSettings the initial settings for motion cues.
+    */
+    void startMotionCuesSession(in ComponentName componentName, in MotionCuesSettings motionCuesSettings);
+
+    /** Terminates the started motion cues session */
+    void endMotionCuesSession();
 }

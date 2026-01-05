@@ -34,6 +34,7 @@ import android.content.res.Configuration;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.os.RemoteException;
+import android.os.UserHandle;
 import android.text.TextUtils;
 import android.util.EventLog;
 import android.util.Slog;
@@ -230,9 +231,11 @@ public class DisplayImeController implements DisplayController.OnDisplaysChanged
         PerDisplay pd = mImePerDisplay.get(displayId);
         InsetsSourceControl imeSourceControl = pd.getImeSourceControl();
         if (imeSourceControl != null) {
+            // TODO (b/459507475): find correct userId argument for onStart
             final var statsToken = ImeTracker.forLogging().onStart(ImeTracker.TYPE_HIDE,
-                    ImeTracker.ORIGIN_WM_SHELL,
-                    SoftInputShowHideReason.HIDE_FOR_BUBBLES_WHEN_LOCKED, false /* fromUser */);
+                    ImeTracker.ORIGIN_SHELL,
+                    SoftInputShowHideReason.HIDE_FOR_BUBBLES_WHEN_LOCKED, false /* fromUser */,
+                    UserHandle.USER_NULL, displayId);
             pd.setImeInputTargetRequestedVisibility(false, statsToken);
         }
     }
@@ -411,7 +414,7 @@ public class DisplayImeController implements DisplayController.OnDisplaysChanged
                     "Input target requested visibility, visible=%b statsToken=%s",
                     visible, statsToken);
             ImeTracker.forLogging().onProgress(statsToken,
-                    ImeTracker.PHASE_WM_DISPLAY_IME_CONTROLLER_SET_IME_REQUESTED_VISIBLE);
+                    ImeTracker.PHASE_SHELL_DISPLAY_IME_CONTROLLER_SET_IME_REQUESTED_VISIBLE);
             mImeRequestedVisible = visible;
             dispatchImeRequested(mDisplayId, mImeRequestedVisible);
 
@@ -505,9 +508,11 @@ public class DisplayImeController implements DisplayController.OnDisplaysChanged
             if (mImeSourceControl.getImeStatsToken() != null) {
                 statsToken = mImeSourceControl.getImeStatsToken();
             } else {
+                // TODO (b/459507475): find correct userId argument for onStart
                 statsToken = ImeTracker.forLogging().onStart(
                         show ? ImeTracker.TYPE_SHOW : ImeTracker.TYPE_HIDE,
-                        ImeTracker.ORIGIN_WM_SHELL, reason, false /* fromUser */);
+                        ImeTracker.ORIGIN_SHELL, reason, false /* fromUser */,
+                        UserHandle.USER_NULL, mDisplayId);
             }
             startAnimation(show, forceRestart, statsToken);
         }
@@ -527,7 +532,8 @@ public class DisplayImeController implements DisplayController.OnDisplaysChanged
             }
             final InsetsSource imeSource = mInsetsState.peekSource(InsetsSource.ID_IME);
             if (imeSource == null) {
-                ImeTracker.forLogging().onFailed(statsToken, ImeTracker.PHASE_WM_ANIMATION_CREATE);
+                ImeTracker.forLogging().onFailed(statsToken,
+                        ImeTracker.PHASE_SHELL_ANIMATION_CREATE);
                 return;
             }
             final Rect newFrame = imeSource.getFrame();
@@ -553,7 +559,7 @@ public class DisplayImeController implements DisplayController.OnDisplaysChanged
             if ((!forceRestart && (mAnimationDirection == DIRECTION_SHOW && show))
                     || (mAnimationDirection == DIRECTION_HIDE && !show)) {
                 ImeTracker.forLogging().onCancelled(
-                        statsToken, ImeTracker.PHASE_WM_ANIMATION_CREATE);
+                        statsToken, ImeTracker.PHASE_SHELL_ANIMATION_CREATE);
                 return;
             }
             boolean seek = false;
@@ -611,7 +617,7 @@ public class DisplayImeController implements DisplayController.OnDisplaysChanged
                 mTransactionPool.release(t);
             });
             mAnimation.setInterpolator(INTERPOLATOR);
-            ImeTracker.forLogging().onProgress(statsToken, ImeTracker.PHASE_WM_ANIMATION_CREATE);
+            ImeTracker.forLogging().onProgress(statsToken, ImeTracker.PHASE_SHELL_ANIMATION_CREATE);
             mAnimation.addListener(new AnimatorListenerAdapter() {
                 private boolean mCancelled = false;
                 @NonNull
@@ -642,7 +648,7 @@ public class DisplayImeController implements DisplayController.OnDisplaysChanged
                     t.setAlpha(animatingLeash, alpha);
                     if (mAnimationDirection == DIRECTION_SHOW) {
                         ImeTracker.forLogging().onProgress(mStatsToken,
-                                ImeTracker.PHASE_WM_ANIMATION_RUNNING);
+                                ImeTracker.PHASE_SHELL_ANIMATION_RUNNING);
                         t.show(animatingLeash);
                     }
                     if (DEBUG_IME_VISIBILITY) {
@@ -687,7 +693,7 @@ public class DisplayImeController implements DisplayController.OnDisplaysChanged
                     }
                     if (mAnimationDirection == DIRECTION_HIDE && !mCancelled) {
                         ImeTracker.forLogging().onProgress(mStatsToken,
-                                ImeTracker.PHASE_WM_ANIMATION_RUNNING);
+                                ImeTracker.PHASE_SHELL_ANIMATION_RUNNING);
                         t.hide(animatingLeash);
                         // Updating the client visibility will not hide the IME, unless it is
                         // not animating anymore. Thus, not sending a statsToken here, but
@@ -699,7 +705,7 @@ public class DisplayImeController implements DisplayController.OnDisplaysChanged
                         ImeTracker.forLogging().onShown(mStatsToken);
                     } else if (mCancelled) {
                         ImeTracker.forLogging().onCancelled(mStatsToken,
-                                ImeTracker.PHASE_WM_ANIMATION_RUNNING);
+                                ImeTracker.PHASE_SHELL_ANIMATION_RUNNING);
                     }
                     // In split screen, we also set {@link
                     // WindowContainer#mExcludeInsetsTypes} but this should only happen after

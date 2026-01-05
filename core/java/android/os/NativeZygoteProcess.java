@@ -56,8 +56,20 @@ public class NativeZygoteProcess implements IZygoteProcess {
         mSocketAddress = socketAddress;
     }
 
-    private void connectToZygote() throws IOException {
+    private static native void nativePrewarmNativeZygote();
+
+    /** Prewarm the native zygote daemon before actually using it. */
+    public static void prewarmNativeZygote() {
+        nativePrewarmNativeZygote();
+    }
+
+    private static native boolean nativeEnsureNativeZygoteReadyBlocking();
+
+    private synchronized void connectToZygote() throws IOException {
         if (mSocket == null) {
+            if (!nativeEnsureNativeZygoteReadyBlocking()) {
+                throw new IOException("Timed out to start zygote_next");
+            }
             mSocket = new LocalSocket(LocalSocket.SOCKET_SEQPACKET);
             try {
                 mSocket.connect(mSocketAddress);
@@ -70,13 +82,15 @@ public class NativeZygoteProcess implements IZygoteProcess {
 
     private static native int nativeStartNativeProcess(
             FileDescriptor fd, int uid, int gid, long startSeq, String packageName, String niceName,
-            int targetSdkVersion, boolean startChildZygote, int runtimeFlags, String seInfo);
+            int targetSdkVersion, boolean startChildZygote, int runtimeFlags, String seInfo)
+            throws IOException;
 
     private static native int nativeStartNativeChildZygote(
             FileDescriptor parentFd, int uid, int gid, String niceName, String seInfo,
             int targetSdkVersion, int runtimeFlags, String serverAddress, int uidRangeStart,
-            int uidRangeEnd, String allowedLibPath, String librarySearchPaths, String libraryPath,
-            String preloadFunc);
+            int uidRangeEnd, String allowedLibPath, String librarySearchPaths, boolean isShared,
+            String zipPath, String nativeSharedLibPath, String libraryPath, String preloadFunc)
+            throws IOException;
 
     @Override
     public final Process.ProcessStartResult start(@NonNull final String processClass,
@@ -102,16 +116,17 @@ public class NativeZygoteProcess implements IZygoteProcess {
                                                   boolean bindOverrideSysprops,
                                                   long startSeq,
                                                   @Nullable String[] zygoteArgs) {
+        int pid;
         try {
             connectToZygote();
+            pid = nativeStartNativeProcess(mSocket.getFileDescriptor(), uid, gid, startSeq,
+                    packageName, niceName, targetSdkVersion, /*startChildZygote=*/false,
+                    runtimeFlags, seInfo);
+            if (pid == -1) {
+                throw new RuntimeException("Failed to fork a native process");
+            }
         } catch (IOException e) {
-            throw new RuntimeException("Failed to connect to socket");
-        }
-        int pid = nativeStartNativeProcess(mSocket.getFileDescriptor(), uid, gid, startSeq,
-                packageName, niceName, targetSdkVersion, /*startChildZygote=*/false, runtimeFlags,
-                seInfo);
-        if (pid == -1) {
-            throw new RuntimeException("Failed to fork a native process");
+            throw new RuntimeException("Failed to start a native process", e);
         }
         Process.ProcessStartResult result = new Process.ProcessStartResult();
         result.pid = pid;
@@ -140,18 +155,19 @@ public class NativeZygoteProcess implements IZygoteProcess {
 
         LoadedApk.LinkerNamespaceParams params = LoadedApk.createLinkerNamespaceParams(appInfo);
 
+        int pid;
         try {
             connectToZygote();
+            pid = nativeStartNativeChildZygote(mSocket.getFileDescriptor(), uid, gid, niceName,
+                    seInfo, appInfo.targetSdkVersion, runtimeFlags, serverAddressForNative,
+                    uidRangeStart, uidRangeEnd, params.permittedLibsDir, params.libPath,
+                    params.isShared, params.zipPath, params.nativeSharedLibs,
+                    appInfo.zygotePreloadNativeLib, appInfo.zygotePreloadNativeFunc);
+            if (pid == -1) {
+                throw new RuntimeException("Failed to fork a Native Child Zygote process");
+            }
         } catch (IOException e) {
-            throw new RuntimeException("Failed to connect to socket", e);
-        }
-
-        int pid = nativeStartNativeChildZygote(mSocket.getFileDescriptor(), uid, gid, niceName,
-                seInfo, appInfo.targetSdkVersion, runtimeFlags, serverAddressForNative,
-                uidRangeStart, uidRangeEnd, params.permittedLibsDir, params.libPath,
-                appInfo.zygotePreloadNativeLib, appInfo.zygotePreloadNativeFunc);
-        if (pid == -1) {
-            throw new RuntimeException("Failed to fork a native process");
+            throw new RuntimeException("Failed to start a Native Child Zygote process", e);
         }
         return ChildZygoteProcess.createNativeChildZygoteProcess(
                 new LocalSocketAddress(serverAddress), pid, uid);

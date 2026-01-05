@@ -18,11 +18,14 @@ package com.android.systemui.keyguard.ui.viewmodel
 
 import androidx.compose.runtime.getValue
 import com.android.app.tracing.coroutines.launchTraced as launch
+import com.android.systemui.desktop.domain.interactor.DesktopInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardClockInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
+import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor
 import com.android.systemui.keyguard.shared.model.ClockSize
 import com.android.systemui.keyguard.shared.model.ClockSizeSetting
-import com.android.systemui.keyguard.ui.composable.layout.UnfoldTranslations
+import com.android.systemui.keyguard.shared.model.KeyguardState
+import com.android.systemui.keyguard.ui.composable.elements.UnfoldTranslations
 import com.android.systemui.lifecycle.ExclusiveActivatable
 import com.android.systemui.lifecycle.Hydrator
 import com.android.systemui.shade.domain.interactor.ShadeModeInteractor
@@ -34,6 +37,7 @@ import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.map
 
 class LockscreenUpperRegionViewModel
 @AssistedInject
@@ -45,7 +49,11 @@ constructor(
     private val headsUpNotificationInteractor: HeadsUpNotificationInteractor,
     private val keyguardMediaViewModelFactory: KeyguardMediaViewModel.Factory,
     private val activeNotificationsInteractor: ActiveNotificationsInteractor,
+    private val desktopInteractor: DesktopInteractor,
+    private val transitionInteractor: KeyguardTransitionInteractor,
 ) : ExclusiveActivatable() {
+    data class Decision<T>(val choice: T, val reason: String)
+
     private val hydrator = Hydrator("LockscreenUpperRegionViewModel.hydrator")
     private val keyguardMediaViewModel: KeyguardMediaViewModel by lazy {
         keyguardMediaViewModelFactory.create()
@@ -54,8 +62,8 @@ constructor(
     val isDozing: Boolean by
         hydrator.hydratedStateOf(traceName = "isDozing", source = keyguardInteractor.isDozing)
 
-    val isMediaActive: Boolean
-        get() = keyguardMediaViewModel.isMediaActive
+    val isMediaVisible: Boolean
+        get() = keyguardMediaViewModel.isMediaVisible
 
     val isNotificationStackActive: Boolean by
         hydrator.hydratedStateOf(
@@ -98,6 +106,13 @@ constructor(
     val shadeMode: ShadeMode by
         hydrator.hydratedStateOf(traceName = "shadeMode", source = shadeModeInteractor.shadeMode)
 
+    val useDesktopStatusBar: Boolean by
+        hydrator.hydratedStateOf(
+            traceName = "useDesktopStatusBar",
+            initialValue = desktopInteractor.useDesktopStatusBar.value,
+            source = desktopInteractor.useDesktopStatusBar,
+        )
+
     private val forcedClockSize: ClockSize? by
         hydrator.hydratedStateOf(
             traceName = "forcedClockSize",
@@ -111,10 +126,20 @@ constructor(
             source = clockInteractor.selectedClockSize,
         )
 
-    fun evaluateClockSize(evaluateDynamicSize: () -> ClockSize): ClockSize {
-        return forcedClockSize
+    val shouldSkipTransition: Boolean by
+        hydrator.hydratedStateOf(
+            traceName = "shouldSkipTransition",
+            source =
+                transitionInteractor.transitionState.map { state ->
+                    state.from == KeyguardState.OFF || state.from == KeyguardState.DOZING
+                },
+            initialValue = false,
+        )
+
+    fun evaluateClockSize(evaluateDynamicSize: () -> Decision<ClockSize>): Decision<ClockSize> {
+        return forcedClockSize?.let { Decision(it, "forcedClockSize") }
             ?: when (clockSizeSetting) {
-                ClockSizeSetting.SMALL -> ClockSize.SMALL
+                ClockSizeSetting.SMALL -> Decision(ClockSize.SMALL, "clockSizeSetting == SMALL")
                 ClockSizeSetting.DYNAMIC -> evaluateDynamicSize()
             }
     }

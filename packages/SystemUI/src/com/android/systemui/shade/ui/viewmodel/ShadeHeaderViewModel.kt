@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-@file:OptIn(ExperimentalKairosApi::class)
-
 package com.android.systemui.shade.ui.viewmodel
 
 import android.app.ActivityManager
@@ -29,12 +27,11 @@ import com.android.app.tracing.coroutines.launchTraced as launch
 import com.android.systemui.battery.BatteryMeterViewController
 import com.android.systemui.clock.domain.interactor.ClockInteractor
 import com.android.systemui.desktop.domain.interactor.DesktopInteractor
-import com.android.systemui.kairos.ExperimentalKairosApi
 import com.android.systemui.kairos.KairosNetwork
 import com.android.systemui.lifecycle.ExclusiveActivatable
 import com.android.systemui.lifecycle.Hydrator
 import com.android.systemui.plugins.ActivityStarter
-import com.android.systemui.privacy.OngoingPrivacyChip
+import com.android.systemui.privacy.AbstractOngoingPrivacyChip
 import com.android.systemui.privacy.PrivacyItem
 import com.android.systemui.scene.domain.interactor.DualShadeEducationInteractor
 import com.android.systemui.scene.domain.interactor.SceneInteractor
@@ -52,6 +49,7 @@ import com.android.systemui.statusbar.phone.domain.interactor.IsAreaDark
 import com.android.systemui.statusbar.phone.domain.interactor.ShadeDarkIconInteractor
 import com.android.systemui.statusbar.phone.ui.StatusBarIconController
 import com.android.systemui.statusbar.pipeline.battery.ui.viewmodel.BatteryViewModel
+import com.android.systemui.statusbar.pipeline.mobile.domain.interactor.CarrierTextInteractor
 import com.android.systemui.statusbar.pipeline.mobile.domain.interactor.MobileIconsInteractor
 import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.MobileIconsViewModel
 import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.MobileIconsViewModelKairos
@@ -72,6 +70,7 @@ constructor(
     private val activityStarter: ActivityStarter,
     private val sceneInteractor: SceneInteractor,
     private val shadeInteractor: ShadeInteractor,
+    private val carrierTextInteractor: CarrierTextInteractor,
     private val shadeModeInteractor: ShadeModeInteractor,
     shadeDarkIconInteractor: ShadeDarkIconInteractor,
     mobileIconsInteractor: MobileIconsInteractor,
@@ -120,6 +119,12 @@ constructor(
                 mobileIconsInteractor.filteredSubscriptions.map { list ->
                     list.map { it.subscriptionId }
                 },
+        )
+
+    val carrierText: CharSequence? by
+        hydrator.hydratedStateOf(
+            traceName = "carrierText",
+            source = carrierTextInteractor.carrierText,
         )
 
     /** The list of PrivacyItems to be displayed by the privacy chip. */
@@ -225,7 +230,7 @@ constructor(
     }
 
     /** Notifies that the privacy chip was clicked. */
-    fun onPrivacyChipClicked(privacyChip: OngoingPrivacyChip) {
+    fun onPrivacyChipClicked(privacyChip: AbstractOngoingPrivacyChip) {
         privacyChipInteractor.onPrivacyChipClicked(privacyChip)
     }
 

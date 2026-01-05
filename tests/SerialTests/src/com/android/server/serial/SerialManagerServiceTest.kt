@@ -16,17 +16,13 @@
 
 package com.android.server.serial
 
+import android.Manifest
 import android.content.Context
-import android.content.pm.PackageManager.PERMISSION_DENIED
-import android.content.pm.PackageManager.PERMISSION_GRANTED
 import android.hardware.serial.ISerialPortListener
 import android.hardware.serial.ISerialPortResponseCallback
 import android.hardware.serial.ISerialPortResponseCallback.ErrorCode
 import android.hardware.serial.SerialPort
 import android.hardware.serial.SerialPortInfo
-import android.hardware.serialservice.ISerialPortListener as NativeSerialPortListener
-import android.hardware.serialservice.ISerialManager as NativeSerialManager
-import android.hardware.serialservice.SerialPortInfo as NativeSerialPortInfo
 import android.os.IBinder
 import android.os.ParcelFileDescriptor
 import android.os.RemoteException
@@ -47,10 +43,15 @@ import org.mockito.ArgumentCaptor
 import org.mockito.Mock
 import org.mockito.junit.MockitoJUnit
 import org.mockito.kotlin.any
+import org.mockito.kotlin.doThrow
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import org.mockito.stubbing.Answer
+import android.hardware.serialservice.ISerialManager as NativeSerialManager
+import android.hardware.serialservice.ISerialPortListener as NativeSerialPortListener
+import android.hardware.serialservice.SerialPortInfo as NativeSerialPortInfo
 
 /**
  * Tests for serial manager service.
@@ -67,6 +68,9 @@ class SerialManagerServiceTest {
 
     @Mock
     private lateinit var callback: ISerialPortResponseCallback
+
+    @Mock
+    private lateinit var accessManager: SerialUserAccessManagerInterface
 
     @Mock
     private lateinit var context: Context
@@ -93,8 +97,8 @@ class SerialManagerServiceTest {
     @Test
     fun testGetSerialPorts_success() {
         val service = SerialManagerService(
-            context, arrayOf<String>(), serialDeviceFilter, nativeServiceSupplier
-        )
+            context, arrayOf<String>(), "", serialDeviceFilter, nativeServiceSupplier,
+            { _, _, _ -> accessManager })
         whenever(nativeService.serialPorts).thenReturn(listOf(NATIVE_SERIAL_PORT_INFO))
 
         val serialPorts = service.serialPorts
@@ -107,8 +111,8 @@ class SerialManagerServiceTest {
     @Test
     fun testGetSerialPorts_failure() {
         val service = SerialManagerService(
-            context, arrayOf<String>(), serialDeviceFilter, nativeServiceSupplier
-        )
+            context, arrayOf<String>(), "", serialDeviceFilter, nativeServiceSupplier,
+            { _, _, _ -> accessManager })
         whenever(nativeService.serialPorts).thenThrow(RemoteException())
 
         val serialPorts = service.serialPorts
@@ -120,7 +124,8 @@ class SerialManagerServiceTest {
     @Test
     fun testRegisterSerialPortListener_connected() {
         val service = SerialManagerService(
-            context, arrayOf<String>(), serialDeviceFilter, nativeServiceSupplier
+            context, arrayOf<String>(), "", serialDeviceFilter, nativeServiceSupplier,
+            { _, _, _ -> accessManager }
         )
         val binder: IBinder = mock()
         val listener: ISerialPortListener = mock()
@@ -140,7 +145,8 @@ class SerialManagerServiceTest {
     @Test
     fun testRegisterSerialPortListener_disconnected() {
         val service = SerialManagerService(
-            context, arrayOf<String>(), serialDeviceFilter, nativeServiceSupplier
+            context, arrayOf<String>(), "", serialDeviceFilter, nativeServiceSupplier,
+            { _, _, _ -> accessManager }
         )
         val binder: IBinder = mock()
         val listener: ISerialPortListener = mock()
@@ -161,7 +167,8 @@ class SerialManagerServiceTest {
     @Test
     fun testUnregisterSerialPortListener() {
         val service = SerialManagerService(
-            context, arrayOf<String>(), serialDeviceFilter, nativeServiceSupplier
+            context, arrayOf<String>(), "", serialDeviceFilter, nativeServiceSupplier,
+            { _, _, _ -> accessManager }
         )
         val binder: IBinder = mock()
         val listener: ISerialPortListener = mock()
@@ -180,10 +187,13 @@ class SerialManagerServiceTest {
     @Test
     fun testRequestOpen_success() {
         val service = SerialManagerService(
-            context, arrayOf(PORT_PATH), serialDeviceFilter, nativeServiceSupplier
+            context, arrayOf(PORT_PATH), "", serialDeviceFilter, nativeServiceSupplier,
+            { _, _, _ -> accessManager }
         )
         whenever(nativeService.serialPorts).thenReturn(listOf(NATIVE_SERIAL_PORT_INFO))
-        whenever(context.checkPermission(any(), any(), any())).thenReturn(PERMISSION_GRANTED)
+        whenever(accessManager.requestAccess(any(), any(), any(), any(), any())).thenAnswer(
+            answerAccessToPortGranted(true)
+        )
         val pfd: ParcelFileDescriptor = mock()
         whenever(nativeService.requestOpen(any(), any(), any())).thenReturn(pfd)
         val flags = SerialPort.OPEN_FLAG_READ_WRITE or SerialPort.OPEN_FLAG_NONBLOCK
@@ -212,10 +222,13 @@ class SerialManagerServiceTest {
     @Test
     fun testRequestOpen_portInConfigWithoutPrefix() {
         val service = SerialManagerService(
-            context, arrayOf(PORT_NAME), serialDeviceFilter, nativeServiceSupplier
+            context, arrayOf(PORT_NAME), "", serialDeviceFilter, nativeServiceSupplier,
+            { _, _, _ -> accessManager }
+        )
+        whenever(accessManager.requestAccess(any(), any(), any(), any(), any())).thenAnswer(
+            answerAccessToPortGranted(false)
         )
         whenever(nativeService.serialPorts).thenReturn(listOf(NATIVE_SERIAL_PORT_INFO))
-        whenever(context.checkPermission(any(), any(), any())).thenReturn(PERMISSION_GRANTED)
         val flags = SerialPort.OPEN_FLAG_READ_WRITE
 
         service.requestOpen(PORT_NAME, flags, /*exclusive=*/ false, "package", callback)
@@ -228,10 +241,13 @@ class SerialManagerServiceTest {
     @Test
     fun testRequestOpen_portNotFound() {
         val service = SerialManagerService(
-            context, arrayOf(PORT_PATH), serialDeviceFilter, nativeServiceSupplier
+            context, arrayOf(PORT_PATH), "", serialDeviceFilter, nativeServiceSupplier,
+            { _, _, _ -> accessManager }
         )
         whenever(nativeService.serialPorts).thenReturn(listOf())
-        whenever(context.checkPermission(any(), any(), any())).thenReturn(PERMISSION_GRANTED)
+        whenever(accessManager.requestAccess(any(), any(), any(), any(), any())).thenAnswer(
+            answerAccessToPortGranted(true)
+        )
         val flags = SerialPort.OPEN_FLAG_WRITE_ONLY
 
         service.requestOpen(PORT_NAME, flags, /*exclusive=*/ false, "package", callback)
@@ -244,10 +260,20 @@ class SerialManagerServiceTest {
     @Test
     fun testRequestOpen_noPermission() {
         val service = SerialManagerService(
-            context, arrayOf(PORT_PATH), serialDeviceFilter, nativeServiceSupplier
+            context, arrayOf(PORT_PATH), "", serialDeviceFilter, nativeServiceSupplier,
+            { _, _, _ -> accessManager }
         )
+        whenever(accessManager.requestAccess(any(), any(), any(), any(), any())).thenAnswer {
+            val port = it.getArgument<String>(0)
+            val pid = it.getArgument<Int>(1)
+            val uid = it.getArgument<Int>(2)
+            val callback = it.getArgument<AccessToPortDecidedCallback>(4)
+            callback.onAccessToPortDecided(port, pid, uid, /* granted */ false)
+        }
         whenever(nativeService.serialPorts).thenReturn(listOf(NATIVE_SERIAL_PORT_INFO))
-        whenever(context.checkPermission(any(), any(), any())).thenReturn(PERMISSION_DENIED)
+        whenever(accessManager.requestAccess(any(), any(), any(), any(), any())).thenAnswer(
+            answerAccessToPortGranted(false)
+        )
         val flags = SerialPort.OPEN_FLAG_READ_ONLY
 
         service.requestOpen(PORT_NAME, flags, /*exclusive=*/ false, "package", callback)
@@ -260,10 +286,13 @@ class SerialManagerServiceTest {
     @Test
     fun testRequestOpen_openFailed() {
         val service = SerialManagerService(
-            context, arrayOf(PORT_PATH), serialDeviceFilter, nativeServiceSupplier
+            context, arrayOf(PORT_PATH), "", serialDeviceFilter, nativeServiceSupplier,
+            { _, _, _ -> accessManager }
         )
         whenever(nativeService.serialPorts).thenReturn(listOf(NATIVE_SERIAL_PORT_INFO))
-        whenever(context.checkPermission(any(), any(), any())).thenReturn(PERMISSION_GRANTED)
+        whenever(accessManager.requestAccess(any(), any(), any(), any(), any())).thenAnswer(
+            answerAccessToPortGranted(true)
+        )
         whenever(nativeService.requestOpen(any(), any(), any())).thenThrow(RemoteException())
         val flags = SerialPort.OPEN_FLAG_READ_WRITE or SerialPort.OPEN_FLAG_DATA_SYNC
 
@@ -277,9 +306,12 @@ class SerialManagerServiceTest {
     @Test
     fun testToOsConstants_twoOpenModes() {
         val service = SerialManagerService(
-            context, arrayOf(PORT_PATH), serialDeviceFilter, nativeServiceSupplier
+            context, arrayOf(PORT_PATH), "", serialDeviceFilter, nativeServiceSupplier,
+            { _, _, _ -> accessManager }
         )
-        whenever(context.checkPermission(any(), any(), any())).thenReturn(PERMISSION_GRANTED)
+        whenever(accessManager.requestAccess(any(), any(), any(), any(), any())).thenAnswer(
+            answerAccessToPortGranted(true)
+        )
         whenever(nativeService.serialPorts).thenReturn(listOf(NATIVE_SERIAL_PORT_INFO))
         val flags = SerialPort.OPEN_FLAG_WRITE_ONLY or SerialPort.OPEN_FLAG_READ_WRITE
 
@@ -291,14 +323,119 @@ class SerialManagerServiceTest {
     @Test
     fun testToOsConstants_wrongBitInFlags() {
         val service = SerialManagerService(
-            context, arrayOf(PORT_PATH), serialDeviceFilter, nativeServiceSupplier
+            context, arrayOf(PORT_PATH), "", serialDeviceFilter, nativeServiceSupplier,
+            { _, _, _ -> accessManager }
         )
-        whenever(context.checkPermission(any(), any(), any())).thenReturn(PERMISSION_GRANTED)
+        whenever(accessManager.requestAccess(any(), any(), any(), any(), any())).thenAnswer(
+            answerAccessToPortGranted(true)
+        )
         whenever(nativeService.serialPorts).thenReturn(listOf(NATIVE_SERIAL_PORT_INFO))
         val flags = 1 shl 31
 
         assertThrows(IllegalArgumentException::class.java) {
             service.requestOpen(PORT_NAME, flags, /*exclusive=*/ false, "package", callback)
+        }
+    }
+
+    @Test
+    fun testGrantSerialPortAccess_permissionDenied() {
+        // Verifies that grantSerialPortAccess throws a SecurityException if the caller does not
+        // have the MANAGE_SERIAL_PORTS permission.
+        val service = SerialManagerService(
+            context, arrayOf(PORT_PATH), "", serialDeviceFilter, nativeServiceSupplier,
+            { _, _, _ -> accessManager }
+        )
+        whenever(context.enforceCallingPermission(
+            Manifest.permission.MANAGE_SERIAL_PORTS,
+            "The caller doesn't have MANAGE_SERIAL_PORTS permission."
+        )).doThrow(SecurityException("Permission denied"))
+
+        assertThrows(SecurityException::class.java) {
+            service.grantSerialPortAccess(PORT_NAME, 123, null)
+        }
+
+        // Verify that the access manager is not called when permission is denied.
+        verify(accessManager, never()).grantAccess(any(), any(), any())
+    }
+
+    @Test
+    fun testGrantSerialPortAccess_success() {
+        // Verifies that grantSerialPortAccess calls the access manager when the caller has the
+        // required permission.
+        val service = SerialManagerService(
+            context, arrayOf(PORT_PATH), "", serialDeviceFilter, nativeServiceSupplier,
+            { _, _, _ -> accessManager }
+        )
+        whenever(nativeService.serialPorts).thenReturn(listOf(NATIVE_SERIAL_PORT_INFO))
+        // This call is to ensure the access manager for the user is created.
+        service.requestOpen(PORT_NAME, SerialPort.OPEN_FLAG_READ_WRITE, false, "pkg", callback)
+
+        val token: IBinder = mock()
+        val uid = 10123 // some app uid for user 0
+        service.grantSerialPortAccess(PORT_NAME, uid, token)
+
+        // Verify that the permission is checked.
+        verify(context).enforceCallingPermission(
+            Manifest.permission.MANAGE_SERIAL_PORTS,
+            "The caller doesn't have MANAGE_SERIAL_PORTS permission."
+        )
+        // Verify that the access manager is called to grant access.
+        verify(accessManager).grantAccess(PORT_NAME, uid, token)
+    }
+
+    @Test
+    fun testRevokeSerialPortAccess_permissionDenied() {
+        // Verifies that revokeSerialPortAccess throws a SecurityException if the caller does not
+        // have the MANAGE_SERIAL_PORTS permission.
+        val service = SerialManagerService(
+            context, arrayOf(PORT_PATH), "", serialDeviceFilter, nativeServiceSupplier,
+            { _, _, _ -> accessManager }
+        )
+        whenever(context.enforceCallingPermission(
+            Manifest.permission.MANAGE_SERIAL_PORTS,
+            "The caller doesn't have MANAGE_SERIAL_PORTS permission."
+        )).doThrow(SecurityException("Permission denied"))
+
+        assertThrows(SecurityException::class.java) {
+            service.revokeSerialPortAccess(PORT_NAME, 123, null)
+        }
+
+        // Verify that the access manager is not called when permission is denied.
+        verify(accessManager, never()).revokeAccess(any(), any(), any())
+    }
+
+    @Test
+    fun testRevokeSerialPortAccess_success() {
+        // Verifies that revokeSerialPortAccess calls the access manager when the caller has the
+        // required permission.
+        val service = SerialManagerService(
+            context, arrayOf(PORT_PATH), "", serialDeviceFilter, nativeServiceSupplier,
+            { _, _, _ -> accessManager }
+        )
+        whenever(nativeService.serialPorts).thenReturn(listOf(NATIVE_SERIAL_PORT_INFO))
+        // This call is to ensure the access manager for the user is created.
+        service.requestOpen(PORT_NAME, SerialPort.OPEN_FLAG_READ_WRITE, false, "pkg", callback)
+
+        val token: IBinder = mock()
+        val uid = 10123 // some app uid for user 0
+        service.revokeSerialPortAccess(PORT_NAME, uid, token)
+
+        // Verify that the permission is checked.
+        verify(context).enforceCallingPermission(
+            Manifest.permission.MANAGE_SERIAL_PORTS,
+            "The caller doesn't have MANAGE_SERIAL_PORTS permission."
+        )
+        // Verify that the access manager is called to revoke access.
+        verify(accessManager).revokeAccess(PORT_NAME, uid, token)
+    }
+
+    private fun answerAccessToPortGranted(granted: Boolean): Answer<Unit> {
+        return Answer<Unit> {
+            val port = it.getArgument<String>(0)
+            val pid = it.getArgument<Int>(1)
+            val uid = it.getArgument<Int>(2)
+            val callback = it.getArgument<AccessToPortDecidedCallback>(4)
+            callback.onAccessToPortDecided(port, pid, uid, granted)
         }
     }
 }

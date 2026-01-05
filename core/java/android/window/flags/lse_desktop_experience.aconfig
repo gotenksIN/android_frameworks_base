@@ -3,6 +3,16 @@ container: "system"
 
 # go/keep-sorted start block=yes newline_separated=yes
 flag {
+    name: "better_desk_deactivation_in_recents_transition"
+    namespace: "lse_desktop_experience"
+    description: "Improves desk deactivation using real Overview state and better recents signaling"
+    bug: "410914723"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "close_fullscreen_and_splitscreen_keyboard_shortcut"
     namespace: "lse_desktop_experience"
     description: "Enable keyboard shortcut to close fullscreen and split screen tasks"
@@ -130,30 +140,10 @@ flag {
 }
 
 flag {
-    name: "enable_app_to_web_education_animation"
-    namespace: "lse_desktop_experience"
-    description: "Show the App-to-web education animation."
-    bug: "359226240"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "enable_auto_recovery_from_self_kill"
     namespace: "lse_desktop_experience"
     description: "Automatically recovers apps from killing themselves on display moves"
     bug: "446998828"
-}
-
-flag {
-    name: "enable_auto_restart_on_display_move"
-    namespace: "lse_desktop_experience"
-    description: "Automatically restarts apps upon display move to fix density issues"
-    bug: "427878712"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -164,21 +154,18 @@ flag {
 }
 
 flag {
+    name: "enable_back_navigation_desktop_app_no_minimize"
+    namespace: "lse_desktop_experience"
+    description: "Enables preventing minimization for predictive-back-enabled desktop apps when back navigation is triggered."
+    bug: "456302602"
+}
+
+flag {
     name: "enable_backup_and_restore_display_window_settings"
     namespace: "lse_desktop_experience"
     description: "Enables backup and restore for display window settings."
     bug: "346499008"
     is_fixed_read_only: true
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "enable_block_non_desktop_display_window_drag_bugfix"
-    namespace: "lse_desktop_experience"
-    description: "Block window drag to a non-desktop-mode display."
-    bug: "383069176"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -292,16 +279,6 @@ flag {
 }
 
 flag {
-    name: "enable_compat_ui_desktop_mode_synchronization_bugfix"
-    namespace: "lse_desktop_experience"
-    description: "Enables synchronization logic so that app-compat UI is properly synchronized with desktop mode state"
-    bug: "436418744"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "enable_connected_displays_dnd"
     namespace: "lse_desktop_experience"
     description: "Enable drag-and-drop between connected displays."
@@ -384,30 +361,10 @@ flag {
 }
 
 flag {
-    name: "enable_desktop_app_launch_bugfix"
-    namespace: "lse_desktop_experience"
-    description: "Enabling an umbrella flag for various bugfixes related to app launch transitions."
-    bug: "353651446"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "enable_desktop_app_launch_transitions"
     namespace: "lse_desktop_experience"
     description: "Enables custom transitions for app launches in Desktop Mode."
     bug: "375992828"
-}
-
-flag {
-    name: "enable_desktop_close_task_animation_in_dtc_bugfix"
-    namespace: "lse_desktop_experience"
-    description: "Enables bugfix to handle close task animation within DesktopTasksController."
-    bug: "403345083"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -462,6 +419,26 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Enables DesktopFirstListener for Shell/SysUI."
     bug: "415120289"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "enable_desktop_first_persisted_launch_params_bugfix"
+    namespace: "lse_desktop_experience"
+    description: "Fixes an issue where freeform windowing mode is unexpectedly persisted across launches."
+    bug: "461305925"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "enable_desktop_first_policy_fullscreen_decision_bugfix"
+    namespace: "lse_desktop_experience"
+    description: "Fix desktop-first policy bug for fullscreen tasks."
+    bug: "383617953"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -528,62 +505,12 @@ flag {
 }
 
 flag {
-    name: "enable_desktop_indicator_in_separate_thread_bugfix"
-    namespace: "lse_desktop_experience"
-    description: "Enables running visual indicator view operations in ShellDesktopThread."
-    bug: "366413536"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "enable_desktop_invisible_task_removal_cleanup_bugfix"
-    namespace: "lse_desktop_experience"
-    description: "Enables bugfix to properly clean up task data when an invisible task gets removed in desktop windowing."
-    bug: "427869488"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "enable_desktop_mode_through_dev_option"
     namespace: "lse_desktop_experience"
     description: "Enables support for desktop mode through developer options for devices eligible for desktop mode."
     bug: "382238347"
     metadata {
        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "enable_desktop_tab_tearing_launch_animation"
-    namespace: "lse_desktop_experience"
-    description: "Enables the animation that occurs when a new window is opened via tab tearing."
-    bug: "376389593"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "enable_desktop_tab_tearing_minimize_animation_bugfix"
-    namespace: "lse_desktop_experience"
-    description: "Enabling a minimize animation when a new window is opened via tab tearing and the Desktop Windowing open windows limit is reached."
-    bug: "376459606"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "enable_desktop_task_limit_separate_transition"
-    namespace: "lse_desktop_experience"
-    description: "Run task limit minimize transition separate from app launch transitions."
-    bug: "356337427"
-    metadata {
-        purpose: PURPOSE_BUGFIX
     }
 }
 
@@ -692,13 +619,6 @@ flag {
 }
 
 flag {
-    name: "enable_desktop_windowing_immersive_handle_hiding"
-    namespace: "lse_desktop_experience"
-    description: "Hides the App Handle when in fullscreen immersive mode"
-    bug: "336368019"
-}
-
-flag {
     name: "enable_desktop_windowing_mode"
     namespace: "lse_desktop_experience"
     description: "Enables desktop windowing"
@@ -713,13 +633,6 @@ flag {
     metadata {
         purpose: PURPOSE_BUGFIX
     }
-}
-
-flag {
-    name: "enable_desktop_windowing_multi_instance_features"
-    namespace: "lse_desktop_experience"
-    description: "Whether to enable multi-instance support in desktop windowing."
-    bug: "336289597"
 }
 
 flag {
@@ -857,16 +770,6 @@ flag {
 }
 
 flag {
-    name: "enable_empty_desk_on_minimize"
-    namespace: "lse_desktop_experience"
-    description: "Keep desktop open when the last window is minimized."
-    bug: "410493575"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "enable_enhanced_app_to_web_transition"
     namespace: "lse_desktop_experience"
     description: "Enables the enhanced app-to-web transition feature."
@@ -874,27 +777,14 @@ flag {
 }
 
 flag {
-    name: "enable_external_display_persistence_bugfix"
+    name: "enable_focus_transition_observer_cleanup"
     namespace: "lse_desktop_experience"
-    description: "Enables bugfix for desktop persistence on external displays."
-    bug: "437420625"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
+    description: "Enable migration from TaskInfo#isFocused to FocusTransitionObserver on per display focus use case"
+    bug: "460356020"
 }
 
 flag {
-    name: "enable_filter_removing_display_bugfix"
-    namespace: "lse_desktop_experience"
-    description: "Filter out removing display when reporting top display."
-    bug: "441826525"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "enable_freeform_box_shadows"
+    name: "enable_freeform_box_shadows_v2"
     namespace: "lse_desktop_experience"
     description: "Enables box shadows for freeform windows."
     bug: "367464660"
@@ -998,6 +888,13 @@ flag {
 }
 
 flag {
+    name: "enable_less_activity_recreation_on_config_change"
+    namespace: "lse_desktop_experience"
+    description: "Prevent activity recreation on less supported config changes."
+    bug: "454795633"
+}
+
+flag {
     name: "enable_mirror_display_no_activity"
     namespace: "lse_desktop_experience"
     description: "Prevent activity being launched on a mirroring display."
@@ -1012,16 +909,6 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Add new keyboard shortcut of moving a task into next display"
     bug: "364154795"
-}
-
-flag {
-    name: "enable_multi_display_home_focus_bug_fix"
-    namespace: "lse_desktop_experience"
-    description: "Fix home focus behavior in multi display environment"
-    bug: "371096166"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -1094,26 +981,6 @@ flag {
 }
 
 flag {
-    name: "enable_per_display_package_context_cache_in_statusbar_notif"
-    namespace: "lse_desktop_experience"
-    description: "Enables per-display package context caching in StatusBarNotification"
-    bug: "388886443"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "enable_per_display_window_decor_view_host_pool"
-    namespace: "lse_desktop_experience"
-    description: "Enables per-display WindowDecoration ViewHost pooling"
-    bug: "440247561"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "enable_persisting_display_size_for_connected_displays"
     namespace: "lse_desktop_experience"
     description: "Enables persisting display size on resolution change for connected displays."
@@ -1162,16 +1029,6 @@ flag {
 }
 
 flag {
-    name: "enable_quickswitch_desktop_split_bugfix"
-    namespace: "lse_desktop_experience"
-    description: "Enables splitting QuickSwitch between fullscreen apps and Desktop workspaces."
-    bug: "345296916"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "enable_reject_home_transition"
     namespace: "lse_desktop_experience"
     description: "Enable the reject home transition, which runs if home is invoked on a display which lacks a home."
@@ -1213,6 +1070,13 @@ flag {
     metadata {
         purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+    name: "enable_require_movable_task_api"
+    namespace: "lse_desktop_experience"
+    description: "Enables the API for apps to request movable tasks for new activities via ActivityOptions."
+    bug: "400407139"
 }
 
 flag {
@@ -1259,20 +1123,20 @@ flag {
 }
 
 flag {
+    name: "enable_shell_thread_lint_check"
+    namespace: "lse_desktop_experience"
+    description: "Enables annotation to check invoking thread in Shell."
+    bug: "463999903"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "enable_size_compat_mode_improvements_for_connected_displays"
     namespace: "lse_desktop_experience"
     description: "Enable some improvements in size compat mode for connected displays."
     bug: "399752440"
-}
-
-flag {
-    name: "enable_start_launch_transition_from_taskbar_bugfix"
-    namespace: "lse_desktop_experience"
-    description: "Enables starting a launch transition directly from the taskbar if desktop tasks are visible."
-    bug: "361366053"
-    metadata {
-       purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -1294,10 +1158,13 @@ flag {
 }
 
 flag {
-    name: "enable_task_resizing_keyboard_shortcuts"
+    name: "enable_task_positioner_refactor"
     namespace: "lse_desktop_experience"
-    description: "Enables keyboard shortcuts for resizing tasks in desktop mode."
-    bug: "335819608"
+    description: "Enables refactoring the TaskPositioner to separate task move and resize."
+    bug: "465979009"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -1319,16 +1186,6 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Show recent apps in the taskbar overflow."
     bug: "375627272"
-}
-
-flag {
-    name: "enable_taskbar_recent_tasks_throttle_bugfix"
-    namespace: "lse_desktop_experience"
-    description: "Throttle recent tasks reload operations for Taskbar."
-    bug: "415090968"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -1356,24 +1213,10 @@ flag {
 }
 
 flag {
-    name: "enable_top_visible_root_task_per_user_tracking"
+    name: "enable_transient_gesture_in_system_ui"
     namespace: "lse_desktop_experience"
-    description: "Enables tracking the top visible root tasks for a user."
-    bug: "381038076"
-    is_fixed_read_only: true
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "enable_upscaling_size_compat_on_exiting_desktop_bugfix"
-    namespace: "lse_desktop_experience"
-    description: "Enables upscaling of size-compat apps in fullscreen after they exit desktop mode."
-    bug: "432329483"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
+    description: "Enable transient gesture handling in system UI"
+    bug: "277290737"
 }
 
 flag {
@@ -1430,16 +1273,6 @@ flag {
 }
 
 flag {
-    name: "enable_windowing_task_stack_order_bugfix"
-    namespace: "lse_desktop_experience"
-    description: "Reverses the order of TaskStackListener updates."
-    bug: "414808458"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "enable_windowing_transition_handlers_observers"
     namespace: "lse_desktop_experience"
     description: "Whether to enable desktop windowing transition handler and observer instead of task listeners."
@@ -1482,6 +1315,16 @@ flag {
 }
 
 flag {
+    name: "fullscreen_key_ignores_bubble_bugfix"
+    namespace: "lse_desktop_experience"
+    description: "The fullscreen key does not apply the fullscreen state toggle if a a bubble is the focused task."
+    bug: "457296491"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "grant_manage_key_gestures_to_recents"
     namespace: "lse_desktop_experience"
     description: "Grant MANAGE_KEY_GESTURES permission to the recents holder."
@@ -1503,6 +1346,17 @@ flag {
 }
 
 flag {
+   name: "home_package_windowing_exemptions_bug_fix"
+    namespace: "lse_desktop_experience"
+    description: "Fixes issue with retrieving the home package during the windowing exemptions \n"
+                 "check."
+    bug: "447111827"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "include_top_transparent_fullscreen_task_in_desktop_heuristic"
     namespace: "lse_desktop_experience"
     description: "Whether to include any top transparent fullscreen task launched in desktop /n"
@@ -1514,10 +1368,30 @@ flag {
 }
 
 flag {
+    name: "keep_desk_active_on_keyguard_appear"
+    namespace: "lse_desktop_experience"
+    description: "Keeps the active desk active if keyguard appears"
+    bug: "428800310"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "keyboard_shortcuts_to_switch_desks"
     namespace: "lse_desktop_experience"
     description: "Enable switching the active desk with keyboard shortcuts"
     bug: "389957556"
+}
+
+flag {
+    name: "make_filling_bounds_change_effect_lifecycle"
+    namespace: "lse_desktop_experience"
+    description: "Flags bounds changes to/from filling as EFFECTS_LIFECYCLE"
+    bug: "452347446"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -1571,6 +1445,17 @@ flag {
 }
 
 flag {
+    name: "reparent_desk_leaf_tasks_if_relaunched"
+    namespace: "lse_desktop_experience"
+    description: "Reparents the leaf tasks of a desk to the task display area if they are /n"
+                 "relaunched outside of desktop."
+    bug: "452719159"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "reparent_window_token_api"
     namespace: "lse_desktop_experience"
     description: "Allows to reparent a window token to a different display"
@@ -1609,13 +1494,10 @@ flag {
 }
 
 flag {
-    name: "show_biometric_prompt_secondary_display_message"
+    name: "runtime_density_resolution_for_window_layout"
     namespace: "lse_desktop_experience"
-    description: "Shows a message on secondary screens to direct users to use their device to finish biometric authorization"
-    bug: "419799860"
-    metadata {
-         purpose: PURPOSE_BUGFIX
-    }
+    description: "Enable runtime density resolution for ActivityInfo.WindowLayout"
+    bug: "438420596"
 }
 
 flag {
@@ -1654,16 +1536,6 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Enables bugfix to skip DecorView relayout when the corresponding window is closing."
     bug: "394502142"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "taskbar_running_tasks_in_splitscreen_select"
-    namespace: "lse_desktop_experience"
-    description: "Enables bugfix to fix recent task icons behavior in taskbar during split screen selection."
-    bug: "393513479"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

@@ -27,6 +27,7 @@ import static android.view.WindowManagerPolicyConstants.NAV_BAR_MODE_2BUTTON;
 import static com.android.internal.widget.LockPatternUtils.StrongAuthTracker.SOME_AUTH_REQUIRED_AFTER_USER_REQUEST;
 import static com.android.internal.widget.LockPatternUtils.StrongAuthTracker.STRONG_AUTH_NOT_REQUIRED;
 import static com.android.internal.widget.LockPatternUtils.StrongAuthTracker.STRONG_AUTH_REQUIRED_AFTER_USER_LOCKDOWN;
+import static com.android.systemui.Flags.blurOnMoreSurfaces;
 import static com.android.systemui.util.kotlin.JavaAdapterKt.collectFlow;
 
 import android.animation.Animator;
@@ -41,10 +42,12 @@ import android.app.WallpaperManager;
 import android.app.trust.TrustManager;
 import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.ComponentName;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.content.pm.UserInfo;
 import android.content.res.ColorStateList;
 import android.content.res.Configuration;
@@ -108,6 +111,7 @@ import com.android.internal.colorextraction.ColorExtractor;
 import com.android.internal.colorextraction.ColorExtractor.GradientColors;
 import com.android.internal.jank.InteractionJankMonitor;
 import com.android.internal.logging.MetricsLogger;
+import com.android.internal.logging.UiEvent;
 import com.android.internal.logging.UiEventLogger;
 import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
 import com.android.internal.statusbar.IStatusBarService;
@@ -115,6 +119,7 @@ import com.android.internal.util.EmergencyAffordanceManager;
 import com.android.internal.util.ScreenshotHelper;
 import com.android.internal.widget.LockPatternUtils;
 import com.android.keyguard.KeyguardUpdateMonitor;
+import com.android.settingslib.Utils;
 import com.android.systemui.Flags;
 import com.android.systemui.FontStyles;
 import com.android.systemui.MultiListLayout.MultiListAdapter;
@@ -122,6 +127,7 @@ import com.android.systemui.animation.DialogCuj;
 import com.android.systemui.animation.DialogTransitionAnimator;
 import com.android.systemui.animation.Expandable;
 import com.android.systemui.broadcast.BroadcastDispatcher;
+import com.android.systemui.broadcast.BroadcastSender;
 import com.android.systemui.colorextraction.SysuiColorExtractor;
 import com.android.systemui.dagger.qualifiers.Background;
 import com.android.systemui.dagger.qualifiers.Main;
@@ -158,7 +164,9 @@ import com.android.systemui.window.domain.interactor.WindowRootViewBlurInteracto
 import dagger.Lazy;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.concurrent.Executor;
 
 import javax.inject.Inject;
@@ -183,6 +191,9 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
 
     private static final String INTERACTION_JANK_TAG = "global_actions";
 
+    @VisibleForTesting
+    protected  static final String GLOBAL_ACTION_KEY_FEEDBACK = "feedback";
+
     private static final boolean SHOW_SILENT_TOGGLE = true;
 
     // See NotificationManagerService#scheduleDurationReachedLocked
@@ -200,6 +211,7 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
     private final TelephonyListenerManager mTelephonyListenerManager;
     private final KeyguardStateController mKeyguardStateController;
     private final BroadcastDispatcher mBroadcastDispatcher;
+    private final BroadcastSender mBroadcastSender;
     protected final GlobalSettings mGlobalSettings;
     protected final SecureSettings mSecureSettings;
     protected final Resources mResources;
@@ -264,6 +276,7 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
     private final PowerManager mPowerManager;
     private final WindowRootViewBlurInteractor mBlurInteractor;
     private int mGlobalActionDialogTimeout;
+    private final PackageManager mPackageManager;
     private final Handler mHandler;
 
     private final UserTracker.Callback mOnUserSwitched = new UserTracker.Callback() {
@@ -273,7 +286,59 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
             // in a handler so it will be pretty quick.
             dismissDialog();
         }
+
+        @Override
+        public void onUserChanged(int newUser, Context userContext) {
+            updateFeedbackReceiverState();
+        }
     };
+
+    @VisibleForTesting
+    @Nullable
+    ComponentName mFirstFeedbackReceiver;
+    private static final Intent FEEDBACK_INTENT = new Intent(Settings.ACTION_REQUEST_FEEDBACK);
+    private boolean isFeedbackActionEnabled() {
+        return Flags.globalActionsFeedbackAction()
+                && Arrays.asList(getDefaultActions()).contains(GLOBAL_ACTION_KEY_FEEDBACK);
+    }
+
+    private void updateFeedbackReceiverState() {
+        if (!isFeedbackActionEnabled()) {
+            return;
+        }
+
+        mBackgroundExecutor.execute(
+                () -> {
+                    final List<ResolveInfo> receivers =
+                            mPackageManager.queryBroadcastReceiversAsUser(
+                                    FEEDBACK_INTENT,
+                                    PackageManager.MATCH_DIRECT_BOOT_AWARE
+                                            | PackageManager.MATCH_DIRECT_BOOT_UNAWARE,
+                                    mUserTracker.getUserId());
+                    Log.d(TAG, "send feedback receivers: " + receivers);
+
+                    final ComponentName firstReceiver;
+                    if (receivers.isEmpty()) {
+                        firstReceiver = null;
+                    } else {
+                        final ResolveInfo ri = receivers.get(0);
+                        firstReceiver = new ComponentName(ri.activityInfo.packageName,
+                                ri.activityInfo.name);
+                    }
+
+                    if (Objects.equals(mFirstFeedbackReceiver, firstReceiver)) {
+                        return;
+                    }
+                    mMainHandler.post(() -> {
+                        if (!Objects.equals(mFirstFeedbackReceiver, firstReceiver)) {
+                            mFirstFeedbackReceiver = firstReceiver;
+                            if (mDialog != null && mDialog.isShowing()) {
+                                mDialog.refreshDialog();
+                            }
+                        }
+                    });
+                });
+    }
 
     /**
      * @param context everything needs a context :(
@@ -318,7 +383,8 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
             GlobalActionsInteractor interactor,
             Lazy<DisplayWindowPropertiesRepository> displayWindowPropertiesRepository,
             PowerManager powerManager,
-            WindowRootViewBlurInteractor blurInteractor) {
+            WindowRootViewBlurInteractor blurInteractor,
+            BroadcastSender broadcastSender) {
         mContext = context;
         mWindowManagerFuncs = windowManagerFuncs;
         mAudioManager = audioManager;
@@ -326,6 +392,7 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
         mTelephonyListenerManager = telephonyListenerManager;
         mKeyguardStateController = keyguardStateController;
         mBroadcastDispatcher = broadcastDispatcher;
+        mBroadcastSender = broadcastSender;
         mGlobalSettings = globalSettings;
         mSecureSettings = secureSettings;
         mResources = resources;
@@ -358,6 +425,7 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
         mDisplayWindowPropertiesRepositoryLazy = displayWindowPropertiesRepository;
         mPowerManager = powerManager;
         mBlurInteractor = blurInteractor;
+        mPackageManager = packageManager;
 
         mHandler = new Handler(mMainHandler.getLooper()) {
             public void handleMessage(Message msg) {
@@ -395,6 +463,8 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
         mHasTelephonyCalling = packageManager.hasSystemFeature(
                 PackageManager.FEATURE_TELEPHONY_CALLING);
         mIsTv = packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK);
+
+        updateFeedbackReceiverState(); // Initial check
 
         // get notified of phone state changes
         mTelephonyListenerManager.addServiceStateListener(mPhoneStateListener);
@@ -473,6 +543,25 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
         }
     }
 
+    /**
+     * Show the global actions dialog (creating if necessary). Will do nothing if already showing
+     *
+     * @param keyguardShowing     True if keyguard is showing
+     * @param isDeviceProvisioned True if device is provisioned
+     * @param expandable          The expandable from which we should animate the dialog when
+     *                            showing it
+     * @param displayId           Display that should show the dialog
+     */
+    public void showDialog(boolean keyguardShowing, boolean isDeviceProvisioned,
+            @Nullable Expandable expandable, int displayId
+    ) {
+        mKeyguardShowing = keyguardShowing;
+        mDeviceProvisioned = isDeviceProvisioned;
+        if (mDialog == null || !mDialog.isShowing()) {
+            handleShow(expandable, displayId);
+        }
+    }
+
     protected boolean isKeyguardShowing() {
         return mKeyguardShowing;
     }
@@ -496,6 +585,11 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
         WindowManager.LayoutParams attrs = mDialog.getWindow().getAttributes();
         attrs.setTitle("GlobalActionsDialogLite");
         attrs.layoutInDisplayCutoutMode = LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
+        if (blurOnMoreSurfaces()) {
+            attrs.flags |= WindowManager.LayoutParams.FLAG_BLUR_BEHIND;
+            attrs.setBlurBehindRadius(mContext.getResources().getDimensionPixelSize(
+                    com.android.systemui.res.R.dimen.global_actions_blur_radius));
+        }
         mDialog.getWindow().setAttributes(attrs);
         // Don't acquire soft keyboard focus, to avoid destroying state when capturing bugreports
         mDialog.getWindow().addFlags(FLAG_ALT_FOCUSABLE_IM);
@@ -546,6 +640,11 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
         } else {
             mOverflowItems.add(action);
         }
+    }
+
+    @VisibleForTesting
+    protected String[] getDefaultActions() {
+        return mResources.getStringArray(R.array.config_globalActionsList);
     }
 
     private void addIfShouldShowAction(List<Action> actions, Action action) {
@@ -599,6 +698,11 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
                         addIfShouldShowAction(tempActions, new BugReportAction());
                     }
                     break;
+                case FEEDBACK:
+                    if (Flags.globalActionsFeedbackAction() && (mFirstFeedbackReceiver != null)) {
+                        addIfShouldShowAction(
+                                tempActions, new SendFeedbackAction(mFirstFeedbackReceiver));
+                    }
                 case SILENT:
                     if (mShowSilentToggle) {
                         addIfShouldShowAction(tempActions, mSilentModeAction);
@@ -1198,6 +1302,43 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
         }
     }
 
+    // TODO: b/457788378 - Remove VisibleForTesting once the test is fixed.
+    @VisibleForTesting
+    class SendFeedbackAction extends SinglePressAction {
+        private final ComponentName mReceiver;
+
+        SendFeedbackAction(ComponentName receiver) {
+            super(com.android.systemui.res.R.drawable.ic_send_feedback,
+                    R.string.global_action_feedback);
+            mReceiver = receiver;
+        }
+
+        @Override
+        public void onPress() {
+            mUiEventLogger.log(GlobalActionsEvent.GA_FEEDBACK_PRESS);
+            final Intent intent =
+                    new Intent(FEEDBACK_INTENT)
+                            .addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
+                            .setComponent(mReceiver);
+            mBroadcastSender.sendBroadcastAsUser(intent, getCurrentUser().getUserHandle());
+        }
+
+        @Override
+        public boolean showDuringKeyguard() {
+            return true;
+        }
+
+        @Override
+        public boolean showBeforeProvisioning() {
+            return true;
+        }
+
+        @Override
+        public boolean shouldShow() {
+            return true;
+        }
+    }
+
     @VisibleForTesting
     final class SystemUpdateAction extends SinglePressAction {
 
@@ -1370,8 +1511,6 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
 
         @Override
         public void onPress() {
-            mLockPatternUtils.requireStrongAuth(STRONG_AUTH_NOT_REQUIRED, UserHandle.USER_ALL);
-
             mUiEventLogger.log(GlobalActionsEvent.GA_LOCK_PRESS);
             try {
                 mIWindowManager.lockNow(null);
@@ -1438,7 +1577,7 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
         if (mUserManager.isUserSwitcherEnabled()) {
             List<UserInfo> users = mUserManager.getUsers();
             for (final UserInfo user : users) {
-                if (user.supportsSwitchToByUser()) {
+                if (user.isUiSwitchableHumanUser()) {
                     boolean isCurrentUser = currentUser == null
                             ? user.id == 0 : (currentUser.id == user.id);
                     Drawable icon = user.iconPath != null ? Drawable.createFromPath(user.iconPath)
@@ -1584,7 +1723,8 @@ public class GlobalActionsDialogLite implements DialogInterface.OnDismissListene
         @Override
         public View getView(int position, View convertView, ViewGroup parent) {
             Action action = getItem(position);
-            View view = action.create(mContext, convertView, parent, LayoutInflater.from(mContext));
+            Context context = parent.getContext();
+            View view = action.create(context, convertView, parent, LayoutInflater.from(context));
             view.setOnClickListener(v -> onClickItem(position));
             if (action instanceof LongPressAction) {
                 view.setOnLongClickListener(v -> onLongClickItem(position));

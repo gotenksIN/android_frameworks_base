@@ -20,6 +20,7 @@ import static android.net.NetworkPolicyManager.SUBSCRIPTION_OVERRIDE_CONGESTED;
 import static android.net.NetworkPolicyManager.SUBSCRIPTION_OVERRIDE_UNMETERED;
 
 import android.Manifest;
+import android.annotation.BroadcastBehavior;
 import android.annotation.CallbackExecutor;
 import android.annotation.ColorInt;
 import android.annotation.DurationMillisLong;
@@ -969,6 +970,13 @@ public class SubscriptionManager {
     public static final String IS_OPPORTUNISTIC = SimInfo.COLUMN_IS_OPPORTUNISTIC;
 
     /**
+     * TelephonyProvider column name for whether a subscription is for private network.
+     * <p>Type: INTEGER (int), 1 for private network or 0 for not.
+     * @hide
+     */
+    public static final String IS_PRIVATE_NETWORK = SimInfo.COLUMN_IS_PRIVATE_NETWORK;
+
+    /**
      * TelephonyProvider column name for group ID. Subscriptions with same group ID
      * are considered bundled together, and should behave as a single subscription at
      * certain scenarios.
@@ -1394,6 +1402,85 @@ public class SubscriptionManager {
             = "android.telephony.action.SUBSCRIPTION_PLANS_CHANGED";
 
     /**
+     * Activity Action: Display UI for enrollable subscription plans.
+     *
+     * <p> This action is used to launch a UI that displays enrollable subscription plans that the
+     * user can enroll in from their carrier. The UI should allow users to browse for offers and
+     * initiate the enrollment process.
+     *
+     * <p>This Intent should include the {@link #EXTRA_SUBSCRIPTION_INDEX} extra to indicate which
+     * subscription the action applies to.
+     *
+     * <p>Optionally, {@link #EXTRA_PLAN_TYPES} can be included to provide filter terms for the
+     * displayed plans or offers.
+     *
+     * <p>Optionally contains {@link #EXTRA_REFRESH_PLANS} to indicate whether the receiving
+     * application should refresh its plan data from the server.
+     *
+     * <p>Receivers should protect themselves by checking that the sender holds the
+     * {@code android.permission.MANAGE_SUBSCRIPTION_PLANS} permission.
+     *
+     * <p>Recommendation: It is recommended to send Intent when there are enrollable subscription
+     * plans available. This can be checked by calling {@link #getEnrollableSubscriptionPlans} and
+     * verifying that the returned list is not empty. This avoids launching UI when no enrollable
+     * offers are available from the carrier.
+     *
+     * @hide
+     */
+    @SystemApi
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    @FlaggedApi(Flags.FLAG_SUBSCRIPTION_PLAN_ENHANCEMENT)
+    public static final String ACTION_SHOW_ENROLLABLE_SUBSCRIPTION_PLANS =
+            "android.telephony.action.SHOW_ENROLLABLE_SUBSCRIPTION_PLANS";
+
+    /**
+     * Broadcast Action: Request a refresh of the enrollable subscription plans
+     * from the carrier for a specific subscriber.
+     * <p>
+     * Carrier apps are encouraged to implement this receiver, and the OS will
+     * provide an affordance to request a refresh. This affordance will only be
+     * shown when the carrier app is actively providing subscription plan
+     * information via {@link #setEnrollableSubscriptionPlans(int, List, long)}.
+     * <p>
+     * Contains {@link #EXTRA_SUBSCRIPTION_INDEX} to indicate which subscription
+     * the user is interested in.
+     * <p>
+     * Receivers should protect themselves by checking that the sender holds the
+     * {@code android.permission.MANAGE_SUBSCRIPTION_PLANS} permission.
+     *
+     * @hide
+     */
+    @SystemApi
+    @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
+    @BroadcastBehavior(protectedBroadcast = true)
+    @FlaggedApi(Flags.FLAG_SUBSCRIPTION_PLAN_ENHANCEMENT)
+    public static final String ACTION_REFRESH_ENROLLABLE_SUBSCRIPTION_PLANS =
+            "android.telephony.action.REFRESH_ENROLLABLE_SUBSCRIPTION_PLANS";
+
+    /**
+     * Broadcast Action: Indicates that the list of enrollable subscription plans has changed.
+     *
+     * <p>This intent is broadcast when an authorized application uses
+     * {@link #setEnrollableSubscriptionPlans(int, List, long)} to update the
+     * available plans for a given subscription ID.
+     *
+     * <p>The Intent will contain the following extra:
+     * <ul>
+     *   <li>{@link #EXTRA_SUBSCRIPTION_INDEX} The subscription ID for which the enrollable
+     *   plans have changed.
+     * </ul>
+     *
+     * @hide
+     */
+    @SystemApi
+    @SdkConstant(SdkConstant.SdkConstantType.BROADCAST_INTENT_ACTION)
+    @RequiresPermission(android.Manifest.permission.READ_SUBSCRIPTION_PLANS)
+    @BroadcastBehavior(protectedBroadcast = true)
+    @FlaggedApi(Flags.FLAG_SUBSCRIPTION_PLAN_ENHANCEMENT)
+    public static final String ACTION_ENROLLABLE_SUBSCRIPTION_PLANS_CHANGED =
+            "android.telephony.action.ENROLLABLE_SUBSCRIPTION_PLANS_CHANGED";
+
+    /**
      * Integer extra used with {@link #ACTION_DEFAULT_SUBSCRIPTION_CHANGED} and
      * {@link #ACTION_DEFAULT_SMS_SUBSCRIPTION_CHANGED} to indicate the subscription
      * which has changed.
@@ -1404,6 +1491,35 @@ public class SubscriptionManager {
      * Integer extra to specify SIM slot index.
      */
     public static final String EXTRA_SLOT_INDEX = "android.telephony.extra.SLOT_INDEX";
+
+    /**
+     * Optional Intent extra key to apply plan types for {@link
+     * SubscriptionManager#ACTION_MANAGE_SUBSCRIPTION_PLANS} and {@link
+     * SubscriptionManager#ACTION_SHOW_ENROLLABLE_SUBSCRIPTION_PLANS}
+     *
+     * <p>This extra should contain an integer array of plan type constants defined in
+     * {@link android.telephony.SubscriptionPlan.PlanType}. The UI can
+     * use these types to differentiate the content displayed, particularly when providing plans or
+     * offers.
+     *
+     * <p>If this extra is not provided, list all plans or offers.
+     *
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_SUBSCRIPTION_PLAN_ENHANCEMENT)
+    public static final String EXTRA_PLAN_TYPES = "android.telephony.extra.PLAN_TYPES";
+
+    /**
+     * Boolean extra used with {@link #ACTION_SHOW_ENROLLABLE_SUBSCRIPTION_PLANS} to indicate
+     * whether the receiving application should force a refresh of the subscription
+     * plan data from the server.
+     *
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_SUBSCRIPTION_PLAN_ENHANCEMENT)
+    public static final String EXTRA_REFRESH_PLANS = "android.telephony.extra.REFRESH_PLANS";
 
     /**
      * A source of phone number: the EF-MSISDN (see 3GPP TS 31.102),
@@ -1441,6 +1557,16 @@ public class SubscriptionManager {
      */
     public static final int PHONE_NUMBER_SOURCE_IMS = 3;
 
+    /**
+     * A source of phone number: provided by the Entitlement Server using the GSMA TS.43
+     * standard.
+     *
+     * <p>This source is used to retrieve the phone number (MSISDN) from the Entitlement
+     * Configuration Server as defined in GSMA TS.43.
+     */
+    @FlaggedApi(Flags.FLAG_GET_PHONE_NUMBER_TS43_API)
+    public static final int PHONE_NUMBER_SOURCE_TS43 = 4;
+
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
     @IntDef(prefix = {"PHONE_NUMBER_SOURCE"},
@@ -1448,6 +1574,7 @@ public class SubscriptionManager {
                     PHONE_NUMBER_SOURCE_UICC,
                     PHONE_NUMBER_SOURCE_CARRIER,
                     PHONE_NUMBER_SOURCE_IMS,
+                    PHONE_NUMBER_SOURCE_TS43,
             })
     public @interface PhoneNumberSource {}
 
@@ -3370,6 +3497,103 @@ public class SubscriptionManager {
     }
 
     /**
+     * Get the list of subscription plans that are available for the user to enroll.
+     * <p>
+     * This method is only accessible to the following apps:
+     * <ul>
+     * <li>The carrier app for this subscriptionId, as determined by
+     * {@link TelephonyManager#hasCarrierPrivileges()}.
+     * <li>An app that has been explicitly delegated access through
+     * {@link CarrierConfigManager#KEY_CONFIG_PLANS_PACKAGE_OVERRIDE_STRING}.
+     * </ul>
+     *
+     * @param subscriptionId the subscription ID for which to retrieve the enrollable plans.
+     * @return A list of {@link SubscriptionPlan} objects available to the user. Returns an empty
+     * list if no plans are available or if the information is not provided by the carrier.
+     * @throws SecurityException if the caller does not meet the requirements outlined above.
+     *
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_SUBSCRIPTION_PLAN_ENHANCEMENT)
+    @RequiresPermission(anyOf = {
+            Manifest.permission.MANAGE_SUBSCRIPTION_PLANS,
+            Manifest.permission.READ_SUBSCRIPTION_PLANS,
+            "carrier privileges",
+    })
+    @NonNull
+    public List<SubscriptionPlan> getEnrollableSubscriptionPlans(int subscriptionId) {
+        try {
+            ISub iSub = TelephonyManager.getSubscriptionService();
+            if (iSub != null) {
+                SubscriptionPlan[] enrollableSubscriptionPlans =
+                        iSub.getEnrollableSubscriptionPlans(
+                                subscriptionId, mContext.getOpPackageName());
+                return enrollableSubscriptionPlans == null
+                        ? Collections.emptyList() : Arrays.asList(enrollableSubscriptionPlans);
+            } else {
+                throw new IllegalStateException("subscription service unavailable.");
+            }
+        } catch (RemoteException ex) {
+            throw ex.rethrowAsRuntimeException();
+        }
+    }
+
+
+    /**
+     * Set the list of subscription plans that are available for the user to enroll in.
+     * <p>
+     * This is different from {@link #setSubscriptionPlans(int, List, long)}, which sets the
+     * user's currently active subscription plan(s). This method provides a list of plans that
+     * the user can switch to, which can be displayed in settings or other system UI to allow
+     * users to manage their mobile plan.
+     * <p>
+     * This method is only accessible to the following apps:
+     * <ul>
+     * <li>The carrier app for this subscriptionId, as determined by
+     * {@link TelephonyManager#hasCarrierPrivileges()}.
+     * <li>An app that has been explicitly delegated access through
+     * {@link CarrierConfigManager#KEY_CONFIG_PLANS_PACKAGE_OVERRIDE_STRING}.
+     * </ul>
+     *
+     * @param subscriptionId the subscriptionId ID this list of plans applies to. If the plans are
+     * not associated with any current subscriptions, use {@link #INVALID_SUBSCRIPTION_ID}.
+     * @param plans the list of enrollable plans. An empty list may be sent to clear any existing
+     * plans.
+     * @param expirationDurationMillis the duration after which the list of enrollable subscription
+     * plans will be automatically cleared. Use {@code 0} to leave the plans until they are
+     * explicitly cleared or until the next reboot, whichever happens first.
+     * @throws SecurityException if the caller does not meet the requirements outlined above.
+     * @throws IllegalArgumentException if the plans do not meet the requirements defined in
+     * {@link SubscriptionPlan}.
+     *
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_SUBSCRIPTION_PLAN_ENHANCEMENT)
+    @RequiresPermission(anyOf = {
+            Manifest.permission.MANAGE_SUBSCRIPTION_PLANS,
+            "carrier privileges",
+    })
+    public void setEnrollableSubscriptionPlans(int subscriptionId,
+            @NonNull List<SubscriptionPlan> plans,
+            @DurationMillisLong long expirationDurationMillis) {
+        try {
+            ISub iSub = TelephonyManager.getSubscriptionService();
+            if (iSub != null) {
+                iSub.setEnrollableSubscriptionPlans(subscriptionId,
+                        plans.toArray(new SubscriptionPlan[0]),
+                        expirationDurationMillis,
+                        mContext.getOpPackageName());
+            } else {
+                throw new IllegalStateException("subscription service unavailable.");
+            }
+        } catch (RemoteException ex) {
+            throw ex.rethrowAsRuntimeException();
+        }
+    }
+
+    /**
      * Temporarily override the billing relationship plan between a carrier and
      * a specific subscriber to be considered unmetered. This will be reflected
      * to apps via {@link NetworkCapabilities#NET_CAPABILITY_NOT_METERED}.
@@ -4451,8 +4675,9 @@ public class SubscriptionManager {
      * only one phone number. The multiple sources backup each other so hopefully at least one
      * is available. For example, for a carrier that doesn't typically set phone numbers
      * on {@link #PHONE_NUMBER_SOURCE_UICC UICC}, the source {@link #PHONE_NUMBER_SOURCE_IMS IMS}
-     * may provide one. Or, a carrier may decide to provide the phone number via source
-     * {@link #PHONE_NUMBER_SOURCE_CARRIER carrier} if neither source UICC nor IMS is available.
+     * or {@link #PHONE_NUMBER_SOURCE_TS43 TS43} may provide one. Or, a carrier may decide to
+     * provide the phone number via source {@link #PHONE_NUMBER_SOURCE_CARRIER carrier} if none of
+     * the other sources are available.
      *
      * <p>The availability and correctness of the phone number depends on the underlying source
      * and the network etc. Additional verification is needed to use this number for
@@ -4473,6 +4698,7 @@ public class SubscriptionManager {
      * @see #PHONE_NUMBER_SOURCE_UICC
      * @see #PHONE_NUMBER_SOURCE_CARRIER
      * @see #PHONE_NUMBER_SOURCE_IMS
+     * @see #PHONE_NUMBER_SOURCE_TS43
      */
     @RequiresPermission(anyOf = {
             android.Manifest.permission.READ_PHONE_NUMBERS,
@@ -4486,7 +4712,8 @@ public class SubscriptionManager {
         }
         if (source != PHONE_NUMBER_SOURCE_UICC
                 && source != PHONE_NUMBER_SOURCE_CARRIER
-                && source != PHONE_NUMBER_SOURCE_IMS) {
+                && source != PHONE_NUMBER_SOURCE_IMS
+                && (!Flags.getPhoneNumberTs43Api() || source != PHONE_NUMBER_SOURCE_TS43)) {
             throw new IllegalArgumentException("invalid source " + source);
         }
         try {
@@ -4512,7 +4739,8 @@ public class SubscriptionManager {
      *
      * <p>This API is built up on {@link #getPhoneNumber(int, int)}, but picks
      * from available sources in the following order: {@link #PHONE_NUMBER_SOURCE_CARRIER}
-     * > {@link #PHONE_NUMBER_SOURCE_UICC} > {@link #PHONE_NUMBER_SOURCE_IMS}.
+     * > {@link #PHONE_NUMBER_SOURCE_UICC} > {@link #PHONE_NUMBER_SOURCE_TS43}
+     * > {@link #PHONE_NUMBER_SOURCE_IMS}.
      *
      * <p>The API provides no guarantees of what format the number is in: the format can vary
      * depending on the underlying source and the network etc. Programmatic parsing should be done
@@ -4641,6 +4869,45 @@ public class SubscriptionManager {
     }
 
     /**
+     * Sets the phone number for the given {@code subId} for source
+     * {@link #PHONE_NUMBER_SOURCE_TS43 TS43}.
+     * Sets an empty string to remove the previously set phone number.
+     *
+     * <p>It's recommended that the phone number is formatted to well-known formats,
+     * for example, by {@link PhoneNumberUtils} {@code formatNumber*} methods.
+     *
+     * @param subscriptionId the subscription ID, or {@link #DEFAULT_SUBSCRIPTION_ID}
+     *                       for the default one.
+     * @param number the phone number, or an empty string to remove the previously set number.
+     * @throws IllegalStateException if the telephony process is not currently available.
+     * @throws NullPointerException if {@code number} is {@code null}.
+     * @throws SecurityException if the caller doesn't have permissions required.
+     * @throws UnsupportedOperationException If the device does not have
+     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
+     */
+    @RequiresPermission(Manifest.permission.MODIFY_PHONE_STATE)
+    @FlaggedApi(Flags.FLAG_GET_PHONE_NUMBER_TS43_API)
+    public void setTs43PhoneNumber(int subscriptionId, @NonNull String number) {
+        if (subscriptionId == DEFAULT_SUBSCRIPTION_ID) {
+            subscriptionId = getDefaultSubscriptionId();
+        }
+        if (number == null) {
+            throw new NullPointerException("invalid number null");
+        }
+        try {
+            ISub iSub = TelephonyManager.getSubscriptionService();
+            if (iSub != null) {
+                iSub.setPhoneNumber(subscriptionId, PHONE_NUMBER_SOURCE_TS43, number,
+                        mContext.getOpPackageName(), mContext.getAttributionTag());
+            } else {
+                throw new IllegalStateException("subscription service unavailable.");
+            }
+        } catch (RemoteException ex) {
+            throw ex.rethrowAsRuntimeException();
+        }
+    }
+
+    /**
      * Set the preferred usage setting.
      *
      * The cellular usage setting is a switch which controls the mode of operation for the cellular
@@ -4683,6 +4950,7 @@ public class SubscriptionManager {
             case SubscriptionManager.PHONE_NUMBER_SOURCE_UICC: return "UICC";
             case SubscriptionManager.PHONE_NUMBER_SOURCE_CARRIER: return "CARRIER";
             case SubscriptionManager.PHONE_NUMBER_SOURCE_IMS: return "IMS";
+            case SubscriptionManager.PHONE_NUMBER_SOURCE_TS43: return "TS43";
             default:
                 return "UNKNOWN(" + source + ")";
         }

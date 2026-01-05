@@ -280,6 +280,7 @@
     <string name="global_action_restart" msgid="4678451019561687074">"Перезапустить"</string>
     <string name="global_action_emergency" msgid="1387617624177105088">"Экстренный вызов"</string>
     <string name="global_action_bug_report" msgid="5127867163044170003">"Отчет об ошибке"</string>
+    <string name="global_action_feedback" msgid="3480836834202300036">"Отзыв"</string>
     <string name="global_action_logout" msgid="6093581310002476511">"Закончить сеанс"</string>
     <string name="global_action_screenshot" msgid="2610053466156478564">"Скриншот"</string>
     <string name="global_action_standby" msgid="6786920589970257642">"Режим ожидания"</string>
@@ -328,8 +329,7 @@
     <string name="notification_channel_accessibility_hearing_device" msgid="7816963856388758952">"Слуховой аппарат"</string>
     <string name="notification_channel_accessibility_security_policy" msgid="1727787021725251912">"Сервисы специальных возможностей"</string>
     <string name="notification_channel_display" msgid="6905032605735615090">"Экран"</string>
-    <!-- no translation found for notification_channel_parental_controls (2963963315750128538) -->
-    <skip />
+    <string name="notification_channel_parental_controls" msgid="2963963315750128538">"Родительский контроль"</string>
     <string name="foreground_service_app_in_background" msgid="1439289699671273555">"Приложение \"<xliff:g id="APP_NAME">%1$s</xliff:g>\" расходует заряд"</string>
     <string name="foreground_service_apps_in_background" msgid="7340037176412387863">"Несколько приложений (<xliff:g id="NUMBER">%1$d</xliff:g>) расходуют заряд"</string>
     <string name="foreground_service_tap_for_details" msgid="9078123626015586751">"Нажмите, чтобы проверить энергопотребление и трафик"</string>
@@ -647,6 +647,10 @@
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"Приложение получит доступ к устройствам в локальной сети."</string>
     <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"использование интерфейса замыкания на себя"</string>
     <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"Приложение сможет взаимодействовать с другими приложениями через интерфейс замыкания на себя."</string>
+    <!-- no translation found for permlab_force_use_loopback_interface (1319727311706416481) -->
+    <skip />
+    <!-- no translation found for permdesc_force_use_loopback_interface (5829032514048681980) -->
+    <skip />
     <string name="permlab_ranging" msgid="2854543350668593390">"относительное местоположение устройств поблизости"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"Приложение сможет определять относительное местоположение устройств поблизости."</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"Сведения о предпочтительном платежном сервисе NFC"</string>
@@ -827,6 +831,8 @@
     <string name="permdesc_readMediaVideo" msgid="3846400073770403528">"Приложение сможет считывать видеофайлы из общего хранилища."</string>
     <string name="permlab_readMediaImages" msgid="4057590631020986789">"считывание изображений из общего хранилища"</string>
     <string name="permdesc_readMediaImages" msgid="5836219373138469259">"Приложение сможет считывать изображения из общего хранилища."</string>
+    <string name="permlab_readMediaDocuments" msgid="5716810755602938263">"чтение документов из общего хранилища"</string>
+    <string name="permdesc_readMediaDocuments" msgid="5665930210237304120">"Приложение сможет читать документы из общего хранилища."</string>
     <string name="permlab_readVisualUserSelect" msgid="5516204215354667586">"считывание указанных пользователем изображений и видеофайлов из общего хранилища"</string>
     <string name="permdesc_readVisualUserSelect" msgid="8027174717714968217">"Приложение сможет считывать указанные вами изображения и видеофайлы из общего хранилища."</string>
     <string name="permlab_sdcardWrite" msgid="4863021819671416668">"Изменение или удаление данных на общем накопителе"</string>
@@ -1049,6 +1055,7 @@
     <string name="keyguard_password_enter_pin_password_code" msgid="7792964196473964340">"Введите PIN-код"</string>
     <string name="keyguard_password_wrong_pin_code" msgid="8583732939138432793">"Неверный PIN-код."</string>
     <string name="keyguard_label_text" msgid="3841953694564168384">"Для разблокировки нажмите \"Меню\", а затем 0."</string>
+    <string name="emergency_call_dialog_number_for_display" msgid="2978165477085612673">"Экстренная служба"</string>
     <string name="lockscreen_carrier_default" msgid="6192313772955399160">"Нет сигнала"</string>
     <string name="lockscreen_screen_locked" msgid="7364905540516041817">"Экран заблокирован."</string>
     <string name="lockscreen_instructions_when_pattern_enabled" msgid="7982445492532123308">"Нажмите \"Меню\", чтобы разблокировать экран или вызвать службу экстренной помощи."</string>
@@ -2178,13 +2185,21 @@
     <string name="autofill_picker_no_suggestions" msgid="1076022650427481509">"Нет вариантов автозаполнения"</string>
     <string name="autofill_picker_some_suggestions" msgid="5560549696296202701">"{count,plural, =1{1 вариант автозаполнения}one{# вариант автозаполнения}few{# варианта автозаполнения}many{# вариантов автозаполнения}other{# варианта автозаполнения}}"</string>
     <string name="autofill_save_title" msgid="7719802414283739775">"Сохранить в сервисе "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_save_title_expressive" msgid="2665408870424848558">"Сохраните данные в сервисе "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b></string>
     <string name="autofill_save_title_with_type" msgid="3002460014579799605">"Сохран. данные (<xliff:g id="TYPE">%1$s</xliff:g>) в сервисе "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_save_title_with_type_expressive" msgid="6063660551496235255">"Сохраните данные (<xliff:g id="TYPE">%1$s</xliff:g>) в сервисе "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b></string>
     <string name="autofill_save_title_with_2types" msgid="3783270967447869241">"Сохранить данные (<xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g>) в сервисе "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_save_title_with_2types_expressive" msgid="2996687022212666293">"Сохраните данные (<xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g>) в сервисе "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b></string>
     <string name="autofill_save_title_with_3types" msgid="6598228952100102578">"Сохранить данные (<xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g>, <xliff:g id="TYPE_2">%3$s</xliff:g>) в сервисе "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_save_title_with_3types_expressive" msgid="3301676215501214049">"Сохраните данные (<xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g>, <xliff:g id="TYPE_2">%3$s</xliff:g>) в сервисе "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b></string>
     <string name="autofill_update_title" msgid="3630695947047069136">"Обновить в сервисе "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_update_title_expressive" msgid="7660582214109012920">"Обновите данные в сервисе "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b></string>
     <string name="autofill_update_title_with_type" msgid="5264152633488495704">"Обновить данные (<xliff:g id="TYPE">%1$s</xliff:g>) в сервисе "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_update_title_with_type_expressive" msgid="6162413585161767846">"Обновите данные (<xliff:g id="TYPE">%1$s</xliff:g>) в сервисе "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b></string>
     <string name="autofill_update_title_with_2types" msgid="1797514386321086273">"Обновить данные (<xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g>) в сервисе "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_update_title_with_2types_expressive" msgid="1911825941498393471">"Обновите данные (<xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g>) в сервисе "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b></string>
     <string name="autofill_update_title_with_3types" msgid="8285767070604652626">"Обновить данные (<xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g>, <xliff:g id="TYPE_2">%3$s</xliff:g>) в сервисе "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_update_title_with_3types_expressive" msgid="6040725201378429027">"Обновите данные (<xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g>, <xliff:g id="TYPE_2">%3$s</xliff:g>) в сервисе "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b></string>
     <string name="autofill_save_yes" msgid="8035743017382012850">"Сохранить"</string>
     <string name="autofill_save_no" msgid="9212826374207023544">"Нет, спасибо"</string>
     <string name="autofill_save_notnow" msgid="2853932672029024195">"Не сейчас"</string>
@@ -2613,10 +2628,7 @@
     <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"Оповещения о системных ресурсах"</string>
     <string name="tv_watchdog_notification_title" msgid="195239206215922517">"Перерасход ресурсов"</string>
     <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"Приложение \"<xliff:g id="APP_NAME">%1$s</xliff:g>\" использует слишком много ресурсов."</string>
-    <!-- no translation found for supervision_blocked_app_title (5546803865875383588) -->
-    <skip />
-    <!-- no translation found for supervision_blocked_app_content (4125452996088641559) -->
-    <skip />
-    <!-- no translation found for supervision_unblocked_app_content (8282985265957852278) -->
-    <skip />
+    <string name="supervision_blocked_app_title" msgid="5546803865875383588">"Родитель изменил настройки"</string>
+    <string name="supervision_blocked_app_content" msgid="4125452996088641559">"Приложение \"<xliff:g id="APP_NAME">%1$s</xliff:g>\" удалено."</string>
+    <string name="supervision_unblocked_app_content" msgid="8282985265957852278">"Теперь тебе доступно приложение \"<xliff:g id="APP_NAME">%1$s</xliff:g>\"."</string>
 </resources>

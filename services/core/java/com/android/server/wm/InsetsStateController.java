@@ -229,14 +229,13 @@ class InsetsStateController {
         final var aboveInsetsState = new InsetsState();
         aboveInsetsState.set(mState,
                 displayCutout() | systemGestures() | mandatorySystemGestures());
-        final var localInsetsSourcesFromParent = new SparseArray<InsetsSource>();
         final var insetsChangedWindows = new ArraySet<WindowState>();
 
         // This method will iterate on the entire hierarchy in top to bottom z-order manner. The
         // aboveInsetsState will be modified as per the insets provided by the WindowState being
         // visited.
-        mDisplayContent.updateAboveInsetsState(aboveInsetsState, localInsetsSourcesFromParent,
-                insetsChangedWindows);
+        mDisplayContent.updateAboveInsetsState(aboveInsetsState,
+                null /* localInsetsSourcesFromParent */, insetsChangedWindows);
 
         if (notifyInsetsChange) {
             for (int i = insetsChangedWindows.size() - 1; i >= 0; i--) {
@@ -275,13 +274,13 @@ class InsetsStateController {
                         || (caller == provider.getFakeControlTarget());
             } else if (isImeProvider) {
                 ImeTracker.forLogging().onCancelled(statsToken,
-                        ImeTracker.PHASE_WM_SET_REMOTE_TARGET_IME_VISIBILITY);
+                        ImeTracker.PHASE_SERVER_SET_REMOTE_TARGET_IME_VISIBILITY);
             }
         }
         if ((WindowInsets.Type.ime() & changedTypes) != 0 && !hasImeProvider) {
             // The ImeInsetsSourceProvider was not created yet (e.g. no IME window was set).
             ImeTracker.forLogging().onFailed(statsToken,
-                    ImeTracker.PHASE_WM_SET_REMOTE_TARGET_IME_VISIBILITY);
+                    ImeTracker.PHASE_SERVER_SET_REMOTE_TARGET_IME_VISIBILITY);
         }
         if (changed) {
             notifyInsetsChanged();

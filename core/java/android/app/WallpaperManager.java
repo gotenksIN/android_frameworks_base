@@ -21,6 +21,7 @@ import static android.Manifest.permission.READ_WALLPAPER_INTERNAL;
 import static android.Manifest.permission.SET_WALLPAPER_DIM_AMOUNT;
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
 import static android.os.ParcelFileDescriptor.MODE_READ_ONLY;
+import static android.view.Display.INVALID_DISPLAY;
 
 import static com.android.server.backup.Flags.FLAG_ENABLE_CROSS_PLATFORM_TRANSFER;
 import static com.android.window.flags.Flags.FLAG_MULTI_CROP;
@@ -597,6 +598,7 @@ public class WallpaperManager {
             forgetLoadedWallpaper();
         }
 
+        @Override
         public void onWallpaperChanged() {
             /* The wallpaper has changed but we shouldn't eagerly load the
              * wallpaper as that would be inefficient. Reset the cached wallpaper
@@ -3047,7 +3049,8 @@ public class WallpaperManager {
             throw new RuntimeException(new DeadSystemException());
         }
         try {
-            sGlobals.mService.setWallpaperDimAmount(MathUtils.saturate(dimAmount));
+            sGlobals.mService.setWallpaperDimAmount(MathUtils.saturate(dimAmount), INVALID_DISPLAY,
+                    false);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }

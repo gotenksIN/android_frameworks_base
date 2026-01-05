@@ -88,11 +88,13 @@ import com.android.systemui.Flags
 import com.android.systemui.animation.Expandable
 import com.android.systemui.common.shared.model.Icon
 import com.android.systemui.haptics.msdl.qs.TileHapticsViewModel
-import com.android.systemui.haptics.msdl.qs.TileHapticsViewModelFactoryProvider
 import com.android.systemui.lifecycle.rememberViewModel
 import com.android.systemui.qs.flags.QsDetailedView
 import com.android.systemui.qs.panels.ui.compose.BounceableInfo
-import com.android.systemui.qs.panels.ui.compose.infinitegrid.CommonTileDefaults.InactiveCornerRadius
+import com.android.systemui.qs.panels.ui.compose.infinitegrid.CommonTileDefaults.ActiveIconCornerRadius
+import com.android.systemui.qs.panels.ui.compose.infinitegrid.CommonTileDefaults.ActiveTileCornerRadius
+import com.android.systemui.qs.panels.ui.compose.infinitegrid.CommonTileDefaults.InactiveIconCornerRadius
+import com.android.systemui.qs.panels.ui.compose.infinitegrid.CommonTileDefaults.InactiveTileCornerRadius
 import com.android.systemui.qs.panels.ui.compose.infinitegrid.CommonTileDefaults.TileHeight
 import com.android.systemui.qs.panels.ui.compose.infinitegrid.CommonTileDefaults.longPressLabelMoreDetails
 import com.android.systemui.qs.panels.ui.compose.infinitegrid.CommonTileDefaults.longPressLabelSettings
@@ -144,8 +146,8 @@ private val TileViewModel.traceName
  * @param squishiness The float value representing the current squishiness factor of the tile, used
  *   for animations.
  * @param coroutineScope The [CoroutineScope] to launch coroutines for animations.
- * @param tileHapticsViewModelFactoryProvider A provider for creating a [TileHapticsViewModel]
- *   instance, used for haptic feedback.
+ * @param tileHapticsViewModelFactory A factory for creating a [TileHapticsViewModel] instance, used
+ *   for haptic feedback.
  * @param interactionSourceFromParent An optional [MutableInteractionSource] to track user
  *   interactions with the tile, used by the parent composable to animate a bounce effect. Tiles may
  *   or may not use this interaction source to control whether they should bounce or not.
@@ -164,7 +166,7 @@ fun ContentScope.Tile(
     squishiness: () -> Float,
     coroutineScope: CoroutineScope,
     bounceableInfo: BounceableInfo?,
-    tileHapticsViewModelFactoryProvider: TileHapticsViewModelFactoryProvider,
+    tileHapticsViewModelFactory: TileHapticsViewModel.Factory,
     modifier: Modifier = Modifier,
     interactionSourceFromParent: MutableInteractionSource? = null,
     isVisible: () -> Boolean = { true },
@@ -193,9 +195,9 @@ fun ContentScope.Tile(
             }
 
         val colors = TileDefaults.getColorForState(uiState, iconOnly)
-        val hapticsViewModel: TileHapticsViewModel? =
+        val hapticsViewModel: TileHapticsViewModel =
             rememberViewModel(traceName = "TileHapticsViewModel") {
-                tileHapticsViewModelFactoryProvider.getHapticsViewModelFactory()?.create(tile)
+                tileHapticsViewModelFactory.create(tile)
             }
 
         // TODO(b/361789146): Draw the shapes instead of clipping
@@ -213,7 +215,7 @@ fun ContentScope.Tile(
 
             val animatedCornerRadius by animateDpAsState(TileDefaults.tileRadius(uiState))
 
-            val inactiveCornerRadius = InactiveCornerRadius
+            val inactiveCornerRadius = InactiveIconCornerRadius
             surfaceRevealModifier =
                 Modifier.verticalTactileSurfaceReveal(
                     deltaY = marginBottom,
@@ -260,14 +262,19 @@ fun ContentScope.Tile(
             val useLongClickToSettings = !(iconOnly && isDualTarget && isClickable)
             val longClick: (() -> Unit)? =
                 {
-                        hapticsViewModel?.setTileInteractionState(
+                        hapticsViewModel.setTileInteractionState(
                             TileHapticsViewModel.TileInteractionState.LONG_CLICKED
                         )
 
                         if (useLongClickToSettings) {
                             tile.settingsClick(expandable)
                         } else {
-                            tile.mainClick(expandable)
+                            val hasDetails =
+                                QsDetailedView.isEnabled &&
+                                    detailsViewModel?.onTileClicked(tile.spec) == true
+                            if (!hasDetails) {
+                                tile.mainClick(expandable)
+                            }
                         }
                     }
                     .takeIf { !useLongClickToSettings || uiState.handlesSettingsClick }
@@ -284,21 +291,21 @@ fun ContentScope.Tile(
                 onClick = onClick@{
                         if (!isClickable) return@onClick
 
-                        val hasDetails =
-                            QsDetailedView.isEnabled &&
-                                detailsViewModel?.onTileClicked(tile.spec) == true
-                        if (hasDetails) return@onClick
-
-                        // For those tile's who doesn't have a detailed view, process with
-                        // their `onClick` behavior.
                         if (iconOnly && isDualTarget) {
                             tile.toggleClick()
                         } else {
+                            val hasDetails =
+                                QsDetailedView.isEnabled &&
+                                    detailsViewModel?.onTileClicked(tile.spec) == true
+                            if (hasDetails) return@onClick
+
+                            // For those tile's who doesn't have a detailed view, process with
+                            // their `onClick` behavior.
                             tile.mainClick(expandable)
                         }
 
                         // Side effects of the click
-                        hapticsViewModel?.setTileInteractionState(
+                        hapticsViewModel.setTileInteractionState(
                             TileHapticsViewModel.TileInteractionState.CLICKED
                         )
 
@@ -333,7 +340,7 @@ fun ContentScope.Tile(
                     val iconShape by TileDefaults.animateIconShapeAsState(uiState)
                     val secondaryClick: (() -> Unit)? =
                         {
-                                hapticsViewModel?.setTileInteractionState(
+                                hapticsViewModel.setTileInteractionState(
                                     TileHapticsViewModel.TileInteractionState.CLICKED
                                 )
                                 tile.toggleClick()
@@ -520,9 +527,6 @@ data class TileColors(
 )
 
 private object TileDefaults {
-    val ActiveIconCornerRadius = 16.dp
-    val ActiveTileCornerRadius = 24.dp
-
     /** An active tile uses the active color as background */
     @Composable
     @ReadOnlyComposable
@@ -611,8 +615,8 @@ private object TileDefaults {
     fun iconRadius(uiState: TileUiState): Dp {
         return when (uiState.visualState) {
             STATE_ACTIVE -> ActiveIconCornerRadius
-            STATE_INACTIVE -> InactiveCornerRadius
-            else -> InactiveCornerRadius
+            STATE_INACTIVE -> InactiveIconCornerRadius
+            else -> InactiveIconCornerRadius
         }
     }
 
@@ -620,8 +624,8 @@ private object TileDefaults {
     fun tileRadius(uiState: TileUiState): Dp {
         return when (uiState.visualState) {
             STATE_ACTIVE -> ActiveTileCornerRadius
-            STATE_INACTIVE -> InactiveCornerRadius
-            else -> InactiveCornerRadius
+            STATE_INACTIVE -> InactiveTileCornerRadius
+            else -> InactiveTileCornerRadius
         }
     }
 

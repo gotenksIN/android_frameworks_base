@@ -202,7 +202,6 @@ class KeyguardController {
             updateDeferTransitionForAod(false /* waiting */);
         }
         if (!keyguardChanged && !aodChanged) {
-            setWakeTransitionReady();
             return;
         }
 
@@ -276,20 +275,25 @@ class KeyguardController {
         mRootWindowContainer.ensureActivitiesVisible();
         InputMethodManagerInternal.get().updateImeWindowStatus(false /* disableImeIcon */,
                 displayId);
-        setWakeTransitionReady();
+
+        boolean setReady = false;
         if (aodChanged) {
             // Ensure the new state takes effect.
             mWindowManager.mWindowPlacerLocked.performSurfacePlacement();
+            if (aodShowing) {
+                setReady = true;
+            }
         }
-        mService.mChainTracker.endPartial();
-    }
-
-    private void setWakeTransitionReady() {
-        if (mWindowManager.mAtmService.getTransitionController().getCollectingTransitionType()
-                == WindowManager.TRANSIT_WAKE) {
+        if (!Flags.removeSetWakeReadyImmediately()
+                && mWindowManager.mAtmService.getTransitionController()
+                        .getCollectingTransitionType() == WindowManager.TRANSIT_WAKE) {
+            setReady = true;
+        }
+        if (setReady) {
             mWindowManager.mAtmService.getTransitionController().setReady(
                     mRootWindowContainer.getDefaultDisplay());
         }
+        mService.mChainTracker.endPartial();
     }
 
     /**
@@ -480,8 +484,9 @@ class KeyguardController {
         final TransitionController tc = mRootWindowContainer.mTransitionController;
         final KeyguardDisplayState state = getDisplayState(displayId);
 
-        final boolean locked = isKeyguardLocked(displayId);
-        final boolean executeTransition = !tc.isShellTransitionsEnabled();
+        final boolean visibleChange = isKeyguardLocked(displayId)
+                && !(Display.isOffState(dc.getDisplayInfo().state)
+                        && Flags.commitKeyguardOcclusionBeforeWakingUp());
 
         final int transitType, transitFlags, notFlags;
         if (state.mOccluded) {
@@ -498,20 +503,18 @@ class KeyguardController {
         final ActionChain chain = mService.mChainTracker.startTransit("kgOccludeChg");
         mService.deferWindowLayout();
         try {
-            if (locked) {
-                if (tc.isShellTransitionsEnabled()) {
-                    final Task trigger = (state.mOccluded && topActivity != null)
-                            ? topActivity.getRootTask() : null;
-                    tc.requestTransitionIfNeeded(transitType, transitFlags, trigger, dc, chain);
-                    final Transition transition = chain.getTransition();
-                    if ((transition.getFlags() & notFlags) != 0) {
-                        transition.removeFlag(notFlags);
-                    } else {
-                        transition.addFlag(transitFlags);
-                    }
-                    if (trigger != null) {
-                        transition.collect(trigger);
-                    }
+            if (visibleChange && tc.isShellTransitionsEnabled()) {
+                final Task trigger = (state.mOccluded && topActivity != null)
+                        ? topActivity.getRootTask() : null;
+                tc.requestTransitionIfNeeded(transitType, transitFlags, trigger, dc, chain);
+                final Transition transition = chain.getTransition();
+                if ((transition.getFlags() & notFlags) != 0) {
+                    transition.removeFlag(notFlags);
+                } else {
+                    transition.addFlag(transitFlags);
+                }
+                if (trigger != null) {
+                    transition.collect(trigger);
                 }
             } else {
                 if (tc.inTransition()) {
@@ -521,7 +524,7 @@ class KeyguardController {
                 }
             }
             updateKeyguardSleepToken(dc);
-            if (executeTransition) {
+            if (!tc.isShellTransitionsEnabled()) {
                 dc.executeAppTransition();
             }
         } finally {

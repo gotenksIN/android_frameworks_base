@@ -27,9 +27,7 @@ import android.content.Intent
 import android.content.pm.LauncherApps
 import android.graphics.drawable.Drawable
 import android.os.UserHandle
-import android.provider.DeviceConfig
 import androidx.core.os.bundleOf
-import com.android.internal.config.sysui.SystemUiDeviceConfigFlags
 import com.android.internal.logging.MetricsLogger
 import com.android.internal.logging.UiEventLogger
 import com.android.internal.statusbar.IStatusBarService
@@ -82,7 +80,6 @@ import com.android.systemui.statusbar.notification.icon.IconManager
 import com.android.systemui.statusbar.notification.people.PeopleNotificationIdentifier
 import com.android.systemui.statusbar.notification.promoted.PromotedNotificationContentExtractorImpl
 import com.android.systemui.statusbar.notification.promoted.PromotedNotificationLogger
-import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow.CoordinateOnClickListener
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow.ExpandableNotificationRowLogger
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow.OnExpandClickListener
 import com.android.systemui.statusbar.notification.row.NotificationRowContentBinder.FLAG_CONTENT_VIEW_ALL
@@ -102,7 +99,6 @@ import com.android.systemui.statusbar.policy.SmartReplyInflaterImpl
 import com.android.systemui.statusbar.policy.SmartReplyStateInflaterImpl
 import com.android.systemui.statusbar.policy.dagger.RemoteInputViewSubcomponent
 import com.android.systemui.util.Assert.runWithCurrentThreadAsMainThread
-import com.android.systemui.util.DeviceConfigProxyFake
 import com.android.systemui.util.concurrency.FakeExecutor
 import com.android.systemui.util.time.FakeSystemClock
 import com.android.systemui.util.time.fakeSystemClock
@@ -149,7 +145,6 @@ class ExpandableNotificationRowBuilder(
     private val mHeadsUpStyleProvider: HeadsUpStyleProvider
 
     init {
-        featureFlags.setDefault(Flags.ENABLE_NOTIFICATIONS_SIMULATE_SLOW_MEASURE)
         featureFlags.setDefault(Flags.BIGPICTURE_NOTIFICATION_LAZY_LOADING)
 
         dependency.injectTestDependency(FeatureFlagsClassic::class.java, featureFlags)
@@ -179,31 +174,7 @@ class ExpandableNotificationRowBuilder(
                 context,
             )
 
-        mSmartReplyConstants =
-            SmartReplyConstants(
-                /* mainExecutor = */ mMainExecutor,
-                /* context = */ context,
-                /* deviceConfig = */ DeviceConfigProxyFake().apply {
-                    setProperty(
-                        DeviceConfig.NAMESPACE_SYSTEMUI,
-                        SystemUiDeviceConfigFlags.SSIN_SHOW_IN_HEADS_UP,
-                        "true",
-                        true,
-                    )
-                    setProperty(
-                        DeviceConfig.NAMESPACE_SYSTEMUI,
-                        SystemUiDeviceConfigFlags.SSIN_ENABLED,
-                        "true",
-                        true,
-                    )
-                    setProperty(
-                        DeviceConfig.NAMESPACE_SYSTEMUI,
-                        SystemUiDeviceConfigFlags.SSIN_REQUIRES_TARGETING_P,
-                        "false",
-                        true,
-                    )
-                },
-            )
+        mSmartReplyConstants = SmartReplyConstants(context)
         val remoteViewsFactories = getNotifRemoteViewsFactoryContainer(featureFlags)
         val remoteInputManager = Mockito.mock(NotificationRemoteInputManager::class.java, STUB_ONLY)
         val smartReplyStateInflater =
@@ -322,7 +293,7 @@ class ExpandableNotificationRowBuilder(
         )
     }
 
-    fun createRowGroup(childCount: Int = 4): ExpandableNotificationRow {
+    fun createRowGroup(childCount: Int = 4, channel: NotificationChannel? = null): ExpandableNotificationRow {
         val children = ArrayList<NotificationEntry>()
         for (i in 0..<childCount) {
             val childEntry =
@@ -330,6 +301,9 @@ class ExpandableNotificationRowBuilder(
                     Notification.Builder(context, "channel")
                         .setSmallIcon(R.drawable.ic_person)
                         .setGroup("group")
+                    channel?.let {
+                        setChannel(channel)
+                    }
                 }
             childEntry.row = kosmos.createRowWithEntry(childEntry)
             children.add(childEntry)
@@ -342,6 +316,9 @@ class ExpandableNotificationRowBuilder(
                         .setSmallIcon(R.drawable.ic_person)
                         .setGroupSummary(true)
                         .setGroup("group")
+                    channel?.let {
+                        setChannel(channel)
+                    }
                 },
             )
         summary.row = kosmos.createRowWithEntry(summary)
@@ -407,6 +384,7 @@ class ExpandableNotificationRowBuilder(
                 .setPostTime(System.currentTimeMillis())
                 .setChannel(channel)
                 .setFlag(context, Notification.FLAG_PROMOTED_ONGOING, promoted)
+                .setFlag(context, Notification.FLAG_CAN_COLORIZE, notification.isColorizedRequested)
                 .build()
 
         // it is for mitigating Rank building process.
@@ -453,7 +431,6 @@ class ExpandableNotificationRowBuilder(
             mHeadsUpManager,
             mBindStage,
             Mockito.mock(OnExpandClickListener::class.java, STUB_ONLY),
-            Mockito.mock(CoordinateOnClickListener::class.java, STUB_ONLY),
             FalsingManagerFake(),
             mStatusBarStateController,
             mPeopleNotificationIdentifier,

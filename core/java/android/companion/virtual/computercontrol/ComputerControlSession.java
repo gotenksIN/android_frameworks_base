@@ -52,6 +52,7 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -109,6 +110,7 @@ public final class ComputerControlSession extends IComputerControlLifecycleCallb
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
     @IntDef(prefix = "ERROR_", value = {
+            // Keep in sync with computercontrol_extension_atoms.proto
             ERROR_UNKNOWN,
             ERROR_SESSION_LIMIT_REACHED,
             ERROR_DEVICE_LOCKED,
@@ -148,6 +150,7 @@ public final class ComputerControlSession extends IComputerControlLifecycleCallb
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
     @IntDef(prefix = "CLOSE_REASON_", value = {
+            // Keep in sync with computercontrol_extension_atoms.proto
             CLOSE_REASON_UNKNOWN,
             CLOSE_REASON_CALLER_INITIATED,
             CLOSE_REASON_USER_INITIATED,
@@ -177,6 +180,7 @@ public final class ComputerControlSession extends IComputerControlLifecycleCallb
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
     @IntDef(prefix = "BLOCK_REASON_", value = {
+            // Keep in sync with computercontrol_extension_atoms.proto
             BLOCK_REASON_UNKNOWN,
             BLOCK_REASON_SECURE_CONTENT,
             BLOCK_REASON_DISALLOWED_ACTIVITY_LAUNCH})
@@ -192,6 +196,7 @@ public final class ComputerControlSession extends IComputerControlLifecycleCallb
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
     @IntDef(prefix = "ACTION_", value = {
+            // Keep in sync with computercontrol_extension_atoms.proto
             ACTION_GO_BACK,
     })
     @Target({ElementType.TYPE_PARAMETER, ElementType.TYPE_USE})
@@ -452,18 +457,24 @@ public final class ComputerControlSession extends IComputerControlLifecycleCallb
      * Sets a {@link StabilityListener} to be notified when the computer control session is
      * potentially stable.
      *
+     * @param duration {@link Duration} after which the session would be considered stable, upon any
+     *                                 action or any framework event
+     * @param executor {@link Executor} on which this listener would be invoked
+     * @param listener {@link StabilityListener} which would be invoked
+     *
      * @throws IllegalStateException if a listener was previously set.
      */
-    public void setStabilityListener(@NonNull @CallbackExecutor Executor executor,
-            @NonNull StabilityListener listener) {
+    public void setStabilityListener(@NonNull Duration duration,
+            @NonNull @CallbackExecutor Executor executor, @NonNull StabilityListener listener) {
+        Objects.requireNonNull(duration);
         Objects.requireNonNull(executor);
         Objects.requireNonNull(listener);
-        mAccessibilityProxy.setStabilityListener(executor, listener);
+        mAccessibilityProxy.setStabilityListener(duration.toMillis(), executor, listener);
     }
 
     /**
      * Clears any {@link StabilityListener} that was previously set using
-     * {@link #setStabilityListener(Executor, StabilityListener)}.
+     * {@link #setStabilityListener(Duration, Executor, StabilityListener)}.
      *
      * @throws IllegalStateException if a listener was not previously set.
      */

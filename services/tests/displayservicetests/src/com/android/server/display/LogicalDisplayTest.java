@@ -17,13 +17,13 @@
 package com.android.server.display;
 
 import static com.google.common.truth.Truth.assertThat;
+import static com.google.common.truth.Truth.assertWithMessage;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
@@ -35,6 +35,7 @@ import android.app.PropertyInvalidatedCache;
 import android.content.Context;
 import android.graphics.Point;
 import android.os.IBinder;
+import android.platform.test.annotations.EnableFlags;
 import android.platform.test.flag.junit.SetFlagsRule;
 import android.util.CopyOnWriteSparseArray;
 import android.util.SparseArray;
@@ -45,16 +46,16 @@ import android.view.SurfaceControl;
 
 import androidx.test.filters.SmallTest;
 
+import com.android.server.display.feature.flags.Flags;
 import com.android.server.display.layout.Layout;
-import com.android.server.display.mode.SyntheticModeManager;
 
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
-import org.mockito.AdditionalAnswers;
 
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.concurrent.Executor;
 
 @SmallTest
@@ -75,7 +76,6 @@ public class LogicalDisplayTest {
     private Context mContext;
     private IBinder mDisplayToken;
     private DisplayDeviceRepository mDeviceRepo;
-    private SyntheticModeManager mSyntheticModeManager;
     private final DisplayDeviceInfo mDisplayDeviceInfo = new DisplayDeviceInfo();
     private Executor mExecutor = mock(Executor.class);
     private CopyOnWriteSparseArray<LogicalDisplay.CachedDisplayInfo> mDisplayInfoCacheMocked =
@@ -89,7 +89,6 @@ public class LogicalDisplayTest {
         mDisplayAdapter = mock(DisplayAdapter.class);
         mContext = mock(Context.class);
         mDisplayToken = mock(IBinder.class);
-        mSyntheticModeManager = mock(SyntheticModeManager.class);
         mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice,
                 mDisplayInfoCacheMocked);
 
@@ -101,8 +100,10 @@ public class LogicalDisplayTest {
         mDisplayDeviceInfo.supportedModes = new Display.Mode[] {new Display.Mode(MODE_ID,
                 DISPLAY_WIDTH, DISPLAY_HEIGHT, /* refreshRate= */ 60)};
         when(mDisplayDevice.getDisplayDeviceInfoLocked()).thenReturn(mDisplayDeviceInfo);
-        when(mSyntheticModeManager.createAppSupportedModes(any(), any(), anyBoolean())).thenAnswer(
-                AdditionalAnswers.returnsSecondArg());
+
+        DisplayDeviceConfig mockDisplayDeviceConfig = mock(DisplayDeviceConfig.class);
+        when(mDisplayDevice.getDisplayDeviceConfig()).thenReturn(mockDisplayDeviceConfig);
+        when(mockDisplayDeviceConfig.getFrameRateVelocityMapping()).thenReturn(new ArrayList<>());
 
         // Disable binder caches in this process.
         PropertyInvalidatedCache.disableForTestMode();
@@ -124,7 +125,7 @@ public class LogicalDisplayTest {
                     public void finishWrite(OutputStream os, boolean success) {}
                 }), /* stableEdidsFlag= */ true);
         mDeviceRepo.onDisplayDeviceEvent(mDisplayDevice, DisplayAdapter.DISPLAY_DEVICE_EVENT_ADDED);
-        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
+        mLogicalDisplay.updateLocked(mDeviceRepo);
     }
 
     @Test
@@ -134,7 +135,7 @@ public class LogicalDisplayTest {
         mDisplayDeviceInfo.xDpi = 0.5f;
         mDisplayDeviceInfo.yDpi = 1.0f;
 
-        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
+        mLogicalDisplay.updateLocked(mDeviceRepo);
         var originalDisplayInfo = mLogicalDisplay.getDisplayInfoLocked();
         assertEquals(DISPLAY_WIDTH, originalDisplayInfo.logicalWidth);
         assertEquals(DISPLAY_HEIGHT, originalDisplayInfo.logicalHeight);
@@ -169,7 +170,7 @@ public class LogicalDisplayTest {
     public void testNoLetterbox_noAnisotropyCorrectionIfAnisotropicModesEnabled() {
         mDisplayDeviceInfo.type = Display.TYPE_EXTERNAL;
         mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice,
-                /*isSyncedResolutionSwitchEnabled=*/ true, true, false, mDisplayInfoCacheMocked);
+                /*isSyncedResolutionSwitchEnabled=*/ true, false, mDisplayInfoCacheMocked);
 
         // In case of Anisotropy of pixels, then the content should be rescaled so it would adjust
         // to using the whole screen. This is because display will rescale it back to fill the
@@ -177,7 +178,7 @@ public class LogicalDisplayTest {
         mDisplayDeviceInfo.xDpi = 0.5f;
         mDisplayDeviceInfo.yDpi = 1.0f;
 
-        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
+        mLogicalDisplay.updateLocked(mDeviceRepo);
         var originalDisplayInfo = mLogicalDisplay.getDisplayInfoLocked();
         // Content width not scaled
         assertEquals(DISPLAY_WIDTH, originalDisplayInfo.logicalWidth);
@@ -202,7 +203,7 @@ public class LogicalDisplayTest {
         displayInfo.logicalHeight = DISPLAY_HEIGHT;
         mDisplayDeviceInfo.flags = DisplayDeviceInfo.FLAG_ROTATES_WITH_CONTENT;
         mLogicalDisplay.setDisplayInfoOverrideFromWindowManagerLocked(displayInfo);
-        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
+        mLogicalDisplay.updateLocked(mDeviceRepo);
 
         var updatedDisplayInfo = mLogicalDisplay.getDisplayInfoLocked();
         assertEquals(Surface.ROTATION_90, updatedDisplayInfo.rotation);
@@ -236,7 +237,7 @@ public class LogicalDisplayTest {
 
         mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice,
                 mDisplayInfoCacheMocked);
-        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
+        mLogicalDisplay.updateLocked(mDeviceRepo);
 
         DisplayInfo info = mLogicalDisplay.getDisplayInfoLocked();
         assertThat(info.brightnessMinimum).isEqualTo(0.12f);
@@ -248,7 +249,7 @@ public class LogicalDisplayTest {
     @Test
     public void testGetDisplayPosition() {
         mDisplayDeviceInfo.type = Display.TYPE_EXTERNAL;
-        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
+        mLogicalDisplay.updateLocked(mDeviceRepo);
         Point expectedPosition = new Point();
 
         SurfaceControl.Transaction t = mock(SurfaceControl.Transaction.class);
@@ -275,7 +276,7 @@ public class LogicalDisplayTest {
 
         expectedPosition.set(40, -20);
         mDisplayDeviceInfo.flags = DisplayDeviceInfo.FLAG_ROTATES_WITH_CONTENT;
-        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
+        mLogicalDisplay.updateLocked(mDeviceRepo);
         displayInfo.logicalWidth = DISPLAY_HEIGHT;
         displayInfo.logicalHeight = DISPLAY_WIDTH;
         displayInfo.rotation = Surface.ROTATION_90;
@@ -287,8 +288,8 @@ public class LogicalDisplayTest {
     @Test
     public void testSetDisplaySizeIsCalledDuringConfigureDisplayLocked() {
         mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice,
-                /*isSyncedResolutionSwitchEnabled=*/ true, true, false, mDisplayInfoCacheMocked);
-        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
+                /*isSyncedResolutionSwitchEnabled=*/ true, false, mDisplayInfoCacheMocked);
+        mLogicalDisplay.updateLocked(mDeviceRepo);
         SurfaceControl.Transaction t = mock(SurfaceControl.Transaction.class);
         mLogicalDisplay.configureDisplayLocked(t, mDisplayDevice, false, mExecutor);
         verify(mDisplayDevice).configureDisplaySizeLocked(eq(t));
@@ -346,7 +347,7 @@ public class LogicalDisplayTest {
         // Update position and test to see that it's been updated to a rear, presentation display
         // that destroys content on removal
         mLogicalDisplay.setDevicePositionLocked(Layout.Display.POSITION_REAR);
-        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
+        mLogicalDisplay.updateLocked(mDeviceRepo);
         assertEquals(Display.FLAG_REAR | Display.FLAG_PRESENTATION,
                 mLogicalDisplay.getDisplayInfoLocked().flags);
         assertEquals(Display.REMOVE_MODE_DESTROY_CONTENT,
@@ -354,7 +355,7 @@ public class LogicalDisplayTest {
 
         // And then check the unsetting the position resets both
         mLogicalDisplay.setDevicePositionLocked(Layout.Display.POSITION_UNKNOWN);
-        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
+        mLogicalDisplay.updateLocked(mDeviceRepo);
         assertEquals(0, mLogicalDisplay.getDisplayInfoLocked().flags);
         assertEquals(Display.REMOVE_MODE_MOVE_CONTENT_TO_PRIMARY,
                 mLogicalDisplay.getDisplayInfoLocked().removeMode);
@@ -370,7 +371,7 @@ public class LogicalDisplayTest {
         // Display info should only be updated when updateLocked is called
         assertEquals(info2, info1);
 
-        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
+        mLogicalDisplay.updateLocked(mDeviceRepo);
         DisplayInfo info3 = mLogicalDisplay.getDisplayInfoLocked();
         assertNotEquals(info3, info2);
         assertEquals(layoutLimitedRefreshRate, info3.layoutLimitedRefreshRate);
@@ -385,7 +386,7 @@ public class LogicalDisplayTest {
         mLogicalDisplay.updateLayoutLimitedRefreshRateLocked(layoutLimitedRefreshRate);
         assertTrue(mLogicalDisplay.isDirtyLocked());
 
-        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
+        mLogicalDisplay.updateLocked(mDeviceRepo);
         assertFalse(mLogicalDisplay.isDirtyLocked());
     }
 
@@ -399,7 +400,7 @@ public class LogicalDisplayTest {
         // Display info should only be updated when updateLocked is called
         assertEquals(info2, info1);
 
-        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
+        mLogicalDisplay.updateLocked(mDeviceRepo);
         DisplayInfo info3 = mLogicalDisplay.getDisplayInfoLocked();
         assertNotEquals(info3, info2);
         assertTrue(refreshRanges.contentEquals(info3.thermalRefreshRateThrottling));
@@ -414,7 +415,7 @@ public class LogicalDisplayTest {
         mLogicalDisplay.updateThermalRefreshRateThrottling(refreshRanges);
         assertTrue(mLogicalDisplay.isDirtyLocked());
 
-        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
+        mLogicalDisplay.updateLocked(mDeviceRepo);
         assertFalse(mLogicalDisplay.isDirtyLocked());
     }
 
@@ -427,7 +428,7 @@ public class LogicalDisplayTest {
         // Display info should only be updated when updateLocked is called
         assertEquals(info2, info1);
 
-        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
+        mLogicalDisplay.updateLocked(mDeviceRepo);
         DisplayInfo info3 = mLogicalDisplay.getDisplayInfoLocked();
         assertNotEquals(info3, info2);
         assertEquals(newId, info3.displayGroupId);
@@ -440,7 +441,7 @@ public class LogicalDisplayTest {
         mLogicalDisplay.updateDisplayGroupIdLocked(99);
         assertTrue(mLogicalDisplay.isDirtyLocked());
 
-        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
+        mLogicalDisplay.updateLocked(mDeviceRepo);
         assertFalse(mLogicalDisplay.isDirtyLocked());
     }
 
@@ -453,7 +454,7 @@ public class LogicalDisplayTest {
         // Display info should only be updated when updateLocked is called
         assertEquals(info2, info1);
 
-        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
+        mLogicalDisplay.updateLocked(mDeviceRepo);
         DisplayInfo info3 = mLogicalDisplay.getDisplayInfoLocked();
         assertNotEquals(info3, info2);
         assertEquals(brightnessThrottlingDataId, info3.thermalBrightnessThrottlingDataId);
@@ -466,33 +467,18 @@ public class LogicalDisplayTest {
         mLogicalDisplay.setThermalBrightnessThrottlingDataIdLocked("99");
         assertTrue(mLogicalDisplay.isDirtyLocked());
 
-        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
+        mLogicalDisplay.updateLocked(mDeviceRepo);
         assertFalse(mLogicalDisplay.isDirtyLocked());
     }
 
     @Test
-    public void testGetsAppSupportedModesFromSyntheticModeManager() {
-        mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice, false,
-                false, false, mDisplayInfoCacheMocked);
-        Display.Mode[] appSupportedModes = new Display.Mode[] {new Display.Mode(OTHER_MODE_ID,
-                DISPLAY_WIDTH, DISPLAY_HEIGHT, /* refreshRate= */ 45)};
-        when(mSyntheticModeManager.createAppSupportedModes(
-                any(), eq(mDisplayDeviceInfo.supportedModes), anyBoolean()))
-                .thenReturn(appSupportedModes);
-
-        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
-        DisplayInfo info = mLogicalDisplay.getDisplayInfoLocked();
-        assertArrayEquals(appSupportedModes, info.appsSupportedModes);
-    }
-
-    @Test
-    public void testGetsAppSupportedModesFromSupportedModes() {
+    public void testGetsSupportedModesFromSupportedModes() {
         mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice,
                 mDisplayInfoCacheMocked);
 
-        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
+        mLogicalDisplay.updateLocked(mDeviceRepo);
         DisplayInfo info = mLogicalDisplay.getDisplayInfoLocked();
-        assertArrayEquals(mDisplayDeviceInfo.supportedModes, info.appsSupportedModes);
+        assertArrayEquals(mDisplayDeviceInfo.supportedModes, info.supportedModes);
     }
 
     @Test
@@ -509,6 +495,8 @@ public class LogicalDisplayTest {
 
     @Test
     public void testSetCanHostTasks_nonDefaultNormalDisplay() {
+        // create a non-default display that allows content mode switch
+        mDisplayDeviceInfo.flags = DisplayDeviceInfo.FLAG_ALLOWS_CONTENT_MODE_SWITCH;
         mLogicalDisplay =
                 new LogicalDisplay(Display.DEFAULT_DISPLAY + 1, LAYER_STACK, mDisplayDevice,
                         mDisplayInfoCacheMocked);
@@ -527,7 +515,7 @@ public class LogicalDisplayTest {
         mLogicalDisplay =
                 new LogicalDisplay(Display.DEFAULT_DISPLAY + 1, LAYER_STACK, mDisplayDevice,
                         mDisplayInfoCacheMocked);
-        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
+        mLogicalDisplay.updateLocked(mDeviceRepo);
 
         mLogicalDisplay.setCanHostTasksLocked(true);
         assertFalse(mLogicalDisplay.canHostTasksLocked());
@@ -585,7 +573,22 @@ public class LogicalDisplayTest {
         mLogicalDisplay =
                 new LogicalDisplay(Display.DEFAULT_DISPLAY + 1, LAYER_STACK, mDisplayDevice,
                         mDisplayInfoCacheMocked);
-        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
+        mLogicalDisplay.updateLocked(mDeviceRepo);
+
+        mLogicalDisplay.setCanHostTasksLocked(true);
+        assertTrue(mLogicalDisplay.canHostTasksLocked());
+
+        mLogicalDisplay.setCanHostTasksLocked(false);
+        assertTrue(mLogicalDisplay.canHostTasksLocked());
+    }
+
+    @Test
+    public void testSetCanHostTasks_doesNotAllowContentModeSwitch() {
+        // Disable FLAG_ALLOWS_CONTENT_MODE_SWITCH
+        mDisplayDeviceInfo.flags = 0;
+        mLogicalDisplay =
+                new LogicalDisplay(Display.DEFAULT_DISPLAY + 1, LAYER_STACK, mDisplayDevice,
+                        mDisplayInfoCacheMocked);
 
         mLogicalDisplay.setCanHostTasksLocked(true);
         assertTrue(mLogicalDisplay.canHostTasksLocked());
@@ -606,7 +609,7 @@ public class LogicalDisplayTest {
         mDisplayDeviceInfo.width = 1920;
         mDisplayDeviceInfo.height = 1080;
 
-        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
+        mLogicalDisplay.updateLocked(mDeviceRepo);
         DisplayInfo info = mLogicalDisplay.getDisplayInfoLocked();
 
         assertEquals(136, info.logicalDensityDpi);
@@ -623,7 +626,7 @@ public class LogicalDisplayTest {
         mDisplayDeviceInfo.width = 1920;
         mDisplayDeviceInfo.height = 1080;
 
-        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
+        mLogicalDisplay.updateLocked(mDeviceRepo);
         DisplayInfo info = mLogicalDisplay.getDisplayInfoLocked();
 
         assertEquals(100, info.logicalDensityDpi);
@@ -638,7 +641,7 @@ public class LogicalDisplayTest {
         mDisplayDeviceInfo.xDpi = 100f;
         mDisplayDeviceInfo.yDpi = 100f;
 
-        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
+        mLogicalDisplay.updateLocked(mDeviceRepo);
         DisplayInfo info = mLogicalDisplay.getDisplayInfoLocked();
 
         assertEquals(320, info.logicalDensityDpi);
@@ -655,7 +658,7 @@ public class LogicalDisplayTest {
         mDisplayDeviceInfo.width = 1920;
         mDisplayDeviceInfo.height = 1080;
 
-        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
+        mLogicalDisplay.updateLocked(mDeviceRepo);
         DisplayInfo info = mLogicalDisplay.getDisplayInfoLocked();
 
         assertEquals(125, info.logicalDensityDpi);
@@ -664,7 +667,7 @@ public class LogicalDisplayTest {
     @Test
     public void testUserPreferredModeWithSizeOverride_updatesResolution() {
         mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice, false,
-                false, true, mDisplayInfoCacheMocked);
+                true, mDisplayInfoCacheMocked);
         Display.Mode mode = new Display.Mode(OTHER_MODE_ID, -1, Display.Mode.FLAG_SIZE_OVERRIDE,
                 1000, 1000, 60f, 60f, new float[]{}, new int[]{});
         mDisplayDeviceInfo.supportedModes = new Display.Mode[] {mode};
@@ -674,7 +677,7 @@ public class LogicalDisplayTest {
         mDisplayDeviceInfo.yDpi = 100;
         mDisplayDeviceInfo.userPreferredModeId = OTHER_MODE_ID;
 
-        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
+        mLogicalDisplay.updateLocked(mDeviceRepo);
 
         assertThat(mLogicalDisplay.getDisplayInfoLocked().logicalWidth).isEqualTo(1000);
         assertThat(mLogicalDisplay.getDisplayInfoLocked().logicalHeight).isEqualTo(1000);
@@ -685,7 +688,7 @@ public class LogicalDisplayTest {
     @Test
     public void testUserPreferredModeWithoutSizeOverride_doesNotUpdateResolution() {
         mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice, false,
-                false, true, mDisplayInfoCacheMocked);
+                true, mDisplayInfoCacheMocked);
         Display.Mode mode = new Display.Mode(OTHER_MODE_ID, -1, 0,
                 1000, 1000, 60f, 60f, new float[]{}, new int[]{});
         mDisplayDeviceInfo.supportedModes = new Display.Mode[] {mode};
@@ -695,11 +698,140 @@ public class LogicalDisplayTest {
         mDisplayDeviceInfo.yDpi = 100;
         mDisplayDeviceInfo.userPreferredModeId = OTHER_MODE_ID;
 
-        mLogicalDisplay.updateLocked(mDeviceRepo, mSyntheticModeManager);
+        mLogicalDisplay.updateLocked(mDeviceRepo);
 
         assertThat(mLogicalDisplay.getDisplayInfoLocked().logicalWidth).isEqualTo(500);
         assertThat(mLogicalDisplay.getDisplayInfoLocked().logicalHeight).isEqualTo(500);
         assertThat(mLogicalDisplay.getDisplayInfoLocked().physicalXDpi).isEqualTo(100);
         assertThat(mLogicalDisplay.getDisplayInfoLocked().physicalYDpi).isEqualTo(100);
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ANISOTROPY_CORRECTED_MODE_BY_DEFAULT)
+    public void testAnisotropyCorrectedMode_selected() {
+        mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice, false,
+                true, mDisplayInfoCacheMocked);
+        Display.Mode anisotropicMode = new Display.Mode(MODE_ID, -1, 0,
+                1000, 1000, 60f, 60f, new float[]{}, new int[]{});
+        Display.Mode anisotropyCorrectedMode = new Display.Mode(OTHER_MODE_ID, MODE_ID,
+                Display.Mode.FLAG_ANISOTROPY_CORRECTION, 2000, 2000, 60f, 60f,
+                new float[]{}, new int[]{});
+
+        mDisplayDeviceInfo.type = Display.TYPE_EXTERNAL;
+        mDisplayDeviceInfo.supportedModes = new Display.Mode[] {
+                anisotropicMode, anisotropyCorrectedMode};
+        mDisplayDeviceInfo.modeId = MODE_ID;
+        mDisplayDeviceInfo.width = 500;
+        mDisplayDeviceInfo.height = 500;
+        mDisplayDeviceInfo.xDpi = 100;
+        mDisplayDeviceInfo.yDpi = 100;
+
+        mLogicalDisplay.updateLocked(mDeviceRepo);
+
+        assertWithMessage("logicalWidth is not matching")
+                .that(mLogicalDisplay.getDisplayInfoLocked().logicalWidth).isEqualTo(2000);
+        assertWithMessage("logicalHeight is not matching")
+                .that(mLogicalDisplay.getDisplayInfoLocked().logicalHeight).isEqualTo(2000);
+        assertWithMessage("physicalXDpi is not matching")
+                .that(mLogicalDisplay.getDisplayInfoLocked().physicalXDpi).isEqualTo(400);
+        assertWithMessage("physicalYDpi is not matching")
+                .that(mLogicalDisplay.getDisplayInfoLocked().physicalYDpi).isEqualTo(400);
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ANISOTROPY_CORRECTED_MODE_BY_DEFAULT)
+    public void testAnisotropyCorrectedMode_notSelectedNoMatchingMode() {
+        mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice, false,
+                true, mDisplayInfoCacheMocked);
+        Display.Mode anisotropicMode = new Display.Mode(MODE_ID, -1, 0,
+                1000, 1000, 60f, 60f, new float[]{}, new int[]{});
+        Display.Mode anisotropyCorrectedMode = new Display.Mode(OTHER_MODE_ID, 1000,
+                Display.Mode.FLAG_ANISOTROPY_CORRECTION, 2000, 2000, 60f, 60f,
+                new float[]{}, new int[]{});
+
+        mDisplayDeviceInfo.type = Display.TYPE_EXTERNAL;
+        mDisplayDeviceInfo.supportedModes = new Display.Mode[] {
+                anisotropicMode, anisotropyCorrectedMode};
+        mDisplayDeviceInfo.modeId = MODE_ID;
+        mDisplayDeviceInfo.width = 500;
+        mDisplayDeviceInfo.height = 500;
+        mDisplayDeviceInfo.xDpi = 100;
+        mDisplayDeviceInfo.yDpi = 100;
+
+        mLogicalDisplay.updateLocked(mDeviceRepo);
+
+        assertWithMessage("logicalWidth is not matching")
+                .that(mLogicalDisplay.getDisplayInfoLocked().logicalWidth).isEqualTo(500);
+        assertWithMessage("logicalHeight is not matching")
+                .that(mLogicalDisplay.getDisplayInfoLocked().logicalHeight).isEqualTo(500);
+        assertWithMessage("physicalXDpi is not matching")
+                .that(mLogicalDisplay.getDisplayInfoLocked().physicalXDpi).isEqualTo(100);
+        assertWithMessage("physicalYDpi is not matching")
+                .that(mLogicalDisplay.getDisplayInfoLocked().physicalYDpi).isEqualTo(100);
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ANISOTROPY_CORRECTED_MODE_BY_DEFAULT)
+    public void testAnisotropyCorrectedMode_notSelectedIntenalDisplay() {
+        mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice, false,
+                true, mDisplayInfoCacheMocked);
+        Display.Mode anisotropicMode = new Display.Mode(MODE_ID, -1, 0,
+                1000, 1000, 60f, 60f, new float[]{}, new int[]{});
+        Display.Mode anisotropyCorrectedMode = new Display.Mode(OTHER_MODE_ID, MODE_ID,
+                Display.Mode.FLAG_ANISOTROPY_CORRECTION, 2000, 2000, 60f, 60f,
+                new float[]{}, new int[]{});
+
+        mDisplayDeviceInfo.type = Display.TYPE_INTERNAL;
+        mDisplayDeviceInfo.supportedModes = new Display.Mode[] {
+                anisotropicMode, anisotropyCorrectedMode};
+        mDisplayDeviceInfo.modeId = MODE_ID;
+        mDisplayDeviceInfo.width = 500;
+        mDisplayDeviceInfo.height = 500;
+        mDisplayDeviceInfo.xDpi = 100;
+        mDisplayDeviceInfo.yDpi = 100;
+
+        mLogicalDisplay.updateLocked(mDeviceRepo);
+
+        assertWithMessage("logicalWidth is not matching")
+                .that(mLogicalDisplay.getDisplayInfoLocked().logicalWidth).isEqualTo(500);
+        assertWithMessage("logicalHeight is not matching")
+                .that(mLogicalDisplay.getDisplayInfoLocked().logicalHeight).isEqualTo(500);
+        assertWithMessage("physicalXDpi is not matching")
+                .that(mLogicalDisplay.getDisplayInfoLocked().physicalXDpi).isEqualTo(100);
+        assertWithMessage("physicalYDpi is not matching")
+                .that(mLogicalDisplay.getDisplayInfoLocked().physicalYDpi).isEqualTo(100);
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ANISOTROPY_CORRECTED_MODE_BY_DEFAULT)
+    public void testAnisotropyCorrectedMode_notSelectedUserPreferredModeSetAndSelected() {
+        mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice, false,
+                true, mDisplayInfoCacheMocked);
+        Display.Mode anisotropicMode = new Display.Mode(MODE_ID, -1, 0,
+                1000, 1000, 60f, 60f, new float[]{}, new int[]{});
+        Display.Mode anisotropyCorrectedMode = new Display.Mode(OTHER_MODE_ID, MODE_ID,
+                Display.Mode.FLAG_ANISOTROPY_CORRECTION, 2000, 2000, 60f, 60f,
+                new float[]{}, new int[]{});
+
+        mDisplayDeviceInfo.type = Display.TYPE_EXTERNAL;
+        mDisplayDeviceInfo.supportedModes = new Display.Mode[] {
+                anisotropicMode, anisotropyCorrectedMode};
+        mDisplayDeviceInfo.modeId = MODE_ID;
+        mDisplayDeviceInfo.userPreferredModeId = MODE_ID;
+        mDisplayDeviceInfo.width = 500;
+        mDisplayDeviceInfo.height = 500;
+        mDisplayDeviceInfo.xDpi = 100;
+        mDisplayDeviceInfo.yDpi = 100;
+
+        mLogicalDisplay.updateLocked(mDeviceRepo);
+
+        assertWithMessage("logicalWidth is not matching")
+                .that(mLogicalDisplay.getDisplayInfoLocked().logicalWidth).isEqualTo(500);
+        assertWithMessage("logicalHeight is not matching")
+                .that(mLogicalDisplay.getDisplayInfoLocked().logicalHeight).isEqualTo(500);
+        assertWithMessage("physicalXDpi is not matching")
+                .that(mLogicalDisplay.getDisplayInfoLocked().physicalXDpi).isEqualTo(100);
+        assertWithMessage("physicalYDpi is not matching")
+                .that(mLogicalDisplay.getDisplayInfoLocked().physicalYDpi).isEqualTo(100);
     }
 }

@@ -20,11 +20,17 @@ import static android.content.theming.FieldColorSource.VALUE_PRESET;
 
 import static com.google.common.truth.Truth.assertThat;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import android.app.ActivityManagerInternal;
 import android.app.WallpaperColors;
+import android.content.theming.IThemeChangedCallback;
 import android.content.theming.IThemeSettingsCallback;
 import android.content.theming.ThemeInfo;
 import android.content.theming.ThemeSettings;
@@ -45,6 +51,8 @@ import com.android.server.om.OverlayManagerInternal;
 import com.android.server.pm.UserManagerInternal;
 import com.android.server.wallpaper.WallpaperManagerInternal;
 
+import com.google.ux.material.libmonet.dynamiccolor.DynamicScheme;
+
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -58,9 +66,15 @@ public class ThemeManagerInternalTests {
     @Rule
     public final HardwareColorRule mHardwareColorRule = new HardwareColorRule();
 
-    private final IThemeSettingsCallback mCallback = new IThemeSettingsCallback.Stub() {
+    private final IThemeSettingsCallback mSettingsCallback = new IThemeSettingsCallback.Stub() {
         @Override
         public void onSettingsChanged(ThemeSettings oldSettings, ThemeSettings newSettings) {
+        }
+    };
+
+    private final IThemeChangedCallback mThemeChangedCallback = new IThemeChangedCallback.Stub() {
+        @Override
+        public void onThemeChanged(ThemeInfo newTheme) {
         }
     };
 
@@ -72,6 +86,8 @@ public class ThemeManagerInternalTests {
     private static final int TEST_SEED_COLOR = Color.BLUE;
     private static final float TEST_CONTRAST = 0.5f;
     private static final int TEST_STYLE = ThemeStyle.VIBRANT;
+    private static final String TEST_SPEC_VERSION = DynamicScheme.DEFAULT_SPEC_VERSION.name();
+    private static final String TEST_PLATFORM = DynamicScheme.DEFAULT_PLATFORM.name();
 
     @Mock
     private UserManagerInternal mUserManager;
@@ -79,6 +95,10 @@ public class ThemeManagerInternalTests {
     private OverlayManagerInternal mOverlayManager;
     @Mock
     private WallpaperManagerInternal mWallpaperManagerInternal;
+    @Mock
+    private ActivityManagerInternal mActivityManagerInternal;
+    @Mock
+    private ThemeOverlayHelper mOverlayHelper;
 
     private FakeScheduledExecutorService mSchedulerExecutor;
     private ThemeStateManager mStateManager;
@@ -90,10 +110,12 @@ public class ThemeManagerInternalTests {
         LocalServices.removeServiceForTest(OverlayManagerInternal.class);
         LocalServices.removeServiceForTest(UserManagerInternal.class);
         LocalServices.removeServiceForTest(WallpaperManagerInternal.class);
+        LocalServices.removeServiceForTest(ActivityManagerInternal.class);
 
         LocalServices.addService(OverlayManagerInternal.class, mOverlayManager);
         LocalServices.addService(UserManagerInternal.class, mUserManager);
         LocalServices.addService(WallpaperManagerInternal.class, mWallpaperManagerInternal);
+        LocalServices.addService(ActivityManagerInternal.class, mActivityManagerInternal);
 
         mContext = new TestableContext(InstrumentationRegistry.getTargetContext(), null);
         TestableResources testableResources = mContext.getOrCreateTestableResources();
@@ -103,12 +125,18 @@ public class ThemeManagerInternalTests {
                 Settings.Secure.THEME_CUSTOMIZATION_OVERLAY_PACKAGES, null, mUserId);
 
         when(mUserManager.getProfileParentId(eq(mUserId))).thenReturn(mUserId);
+        when(mUserManager.getProfileIds(anyInt(), anyBoolean())).thenAnswer(invocation -> {
+            int requestedUserId = invocation.getArgument(0);
+            return new int[]{requestedUserId};
+        });
 
-        mThemeSettingsManager = new ThemeSettingsManager(mWallpaperManagerInternal);
+        ThemeWallpaperManager themeWallpaperManager = new ThemeWallpaperManager(
+                mWallpaperManagerInternal);
+        mThemeSettingsManager = new ThemeSettingsManager(themeWallpaperManager);
         mSchedulerExecutor = new FakeScheduledExecutorService();
         mStateManager = new ThemeStateManager(mContext, mSchedulerExecutor);
         mUnderTest = new ThemeManagerInternal(mContext, mThemeSettingsManager,
-                mHardwareColorRule.sysPropReader, mStateManager);
+                mHardwareColorRule.sysPropReader, mStateManager, mOverlayHelper);
         mStateManager.onServicesReady();
     }
 
@@ -119,7 +147,7 @@ public class ThemeManagerInternalTests {
 
     @Test
     public void testRegisterThemeSettingsCallback_success() {
-        boolean result = mUnderTest.registerThemeSettingsCallback(mUserId, mCallback);
+        boolean result = mUnderTest.registerThemeSettingsCallback(mUserId, mSettingsCallback);
         assertThat(result).isTrue();
     }
 
@@ -131,15 +159,15 @@ public class ThemeManagerInternalTests {
 
     @Test
     public void testUnregisterThemeSettingsCallback_success() {
-        boolean didRegister = mUnderTest.registerThemeSettingsCallback(mUserId, mCallback);
+        boolean didRegister = mUnderTest.registerThemeSettingsCallback(mUserId, mSettingsCallback);
         assertThat(didRegister).isTrue();
-        boolean result = mUnderTest.unregisterThemeSettingsCallback(mUserId, mCallback);
+        boolean result = mUnderTest.unregisterThemeSettingsCallback(mUserId, mSettingsCallback);
         assertThat(result).isTrue();
     }
 
     @Test
     public void testUnregisterThemeSettingsCallback_callbackNotRegistered_returnsFalse() {
-        boolean result = mUnderTest.unregisterThemeSettingsCallback(mUserId, mCallback);
+        boolean result = mUnderTest.unregisterThemeSettingsCallback(mUserId, mSettingsCallback);
         assertThat(result).isFalse();
     }
 
@@ -150,7 +178,7 @@ public class ThemeManagerInternalTests {
     }
 
     @Test
-    public void testCallback_receivesNewValue() {
+    public void testSettingsCallback_receivesNewValue() {
         final Color testColor = Color.valueOf(Color.parseColor("#FF0000"));
         final ThemeSettings newPayload = new ThemeSettings.Builder()
                 .setThemeStyle(ThemeStyle.VIBRANT)
@@ -172,13 +200,13 @@ public class ThemeManagerInternalTests {
 
         assertThat(didRegister).isTrue();
         // When no theme is set, oldSettings should be null.
-        mUnderTest.notifySettingsChange(mUserId, newPayload);
+        mUnderTest.notifySettingsChange(mUserId, null, newPayload);
         assertThat(returnedOldSettings[0]).isNull();
         assertThat(returnedNewSettings[0]).isEqualTo(newPayload);
     }
 
     @Test
-    public void testCallback_receivesOldAndNewValue() {
+    public void testSettingsCallback_receivesOldAndNewValue() {
         final Color oldColor = Color.valueOf(Color.BLUE);
         final ThemeSettings oldPayload = new ThemeSettings.Builder()
                 .setThemeStyle(ThemeStyle.TONAL_SPOT)
@@ -211,7 +239,7 @@ public class ThemeManagerInternalTests {
         assertThat(didRegister).isTrue();
 
         // Notify with the new settings.
-        mUnderTest.notifySettingsChange(mUserId, newPayload);
+        mUnderTest.notifySettingsChange(mUserId, oldPayload, newPayload);
 
         // The callback should receive the new settings correctly.
         assertThat(returnedNewSettings[0]).isEqualTo(newPayload);
@@ -223,6 +251,33 @@ public class ThemeManagerInternalTests {
                 oldPayload.timeStamp().toEpochMilli());
         assertThat(returnedOldPreset.themeStyle()).isEqualTo(oldPayload.themeStyle());
         assertThat(returnedOldPreset.systemPalette()).isEqualTo(oldPayload.systemPalette());
+    }
+
+    @Test
+    public void testUnregisterThemeChangedCallback_success() {
+        mUnderTest.registerThemeChangedCallback(mUserId, mThemeChangedCallback);
+        mUnderTest.unregisterThemeChangedCallback(mUserId, mThemeChangedCallback);
+    }
+
+    @Test
+    public void testThemeChangedCallback_receivesNewValue() {
+        startUser(mUserId, true, TEST_SEED_COLOR, TEST_CONTRAST, TEST_STYLE);
+        final ThemeInfo[] returnedValue = {null};
+        mUnderTest.registerThemeChangedCallback(mUserId, new IThemeChangedCallback.Stub() {
+            @Override
+            public void onThemeChanged(ThemeInfo newTheme) {
+                returnedValue[0] = newTheme;
+            }
+        });
+
+        mUnderTest.notifyThemeChanged(mUserId);
+
+        assertThat(returnedValue[0]).isNotNull();
+        assertThat(returnedValue[0].seedColor.toArgb()).isEqualTo(TEST_SEED_COLOR);
+        assertThat(returnedValue[0].style).isEqualTo(TEST_STYLE);
+        assertThat(returnedValue[0].contrast).isEqualTo(TEST_CONTRAST);
+        assertThat(returnedValue[0].specVersion).isEqualTo(TEST_SPEC_VERSION);
+        assertThat(returnedValue[0].platform).isEqualTo(TEST_PLATFORM);
     }
 
     @Test
@@ -298,15 +353,28 @@ public class ThemeManagerInternalTests {
         ThemeInfo info = mUnderTest.getUserThemeInfo(mUserId);
 
         assertThat(info).isNotNull();
-        assertThat(info.seedColor).isEqualTo(TEST_SEED_COLOR);
+        assertThat(info.seedColor.toArgb()).isEqualTo(TEST_SEED_COLOR);
         assertThat(info.style).isEqualTo(TEST_STYLE);
         assertThat(info.contrast).isEqualTo(TEST_CONTRAST);
+        assertThat(info.specVersion).isEqualTo(TEST_SPEC_VERSION);
+        assertThat(info.platform).isEqualTo(TEST_PLATFORM);
     }
 
     @Test
     public void generateDynamicColorOverlay_withAllOptions_isNotNull() {
         startUser(mUserId, true, Color.RED, 0.0f, ThemeStyle.TONAL_SPOT);
-        ThemeInfo options = ThemeInfo.build(Color.valueOf(Color.GREEN), ThemeStyle.VIBRANT, 0.8f);
+        ThemeInfo options = new ThemeInfo.Builder()
+                .setSeedColor(Color.valueOf(Color.GREEN))
+                .setStyle(ThemeStyle.VIBRANT)
+                .setContrast(0.8f)
+                .build();
+
+        // Mock the overlay helper to return a dummy overlay
+        FabricatedOverlayInternal mockOverlay = new FabricatedOverlayInternal();
+        android.content.om.FabricatedOverlay mockFabricatedOverlay =
+                mock(android.content.om.FabricatedOverlay.class);
+        when(mockFabricatedOverlay.getInternal()).thenReturn(mockOverlay);
+        doReturn(mockFabricatedOverlay).when(mOverlayHelper).createDynamicOverlay(any(), any());
 
         FabricatedOverlayInternal overlay = mUnderTest.generateDynamicColorOverlay(mUserId,
                 options);
@@ -317,7 +385,14 @@ public class ThemeManagerInternalTests {
     @Test
     public void generateDynamicColorOverlay_withNullOptions_isNotNull() {
         startUser(mUserId, true, Color.RED, 0.0f, ThemeStyle.TONAL_SPOT);
-        ThemeInfo options = ThemeInfo.build(null, null, null);
+        ThemeInfo options = new ThemeInfo.Builder().build();
+
+        // Mock the overlay helper to return a dummy overlay
+        FabricatedOverlayInternal mockOverlay = new FabricatedOverlayInternal();
+        android.content.om.FabricatedOverlay mockFabricatedOverlay =
+                mock(android.content.om.FabricatedOverlay.class);
+        when(mockFabricatedOverlay.getInternal()).thenReturn(mockOverlay);
+        doReturn(mockFabricatedOverlay).when(mOverlayHelper).createDynamicOverlay(any(), any());
 
         FabricatedOverlayInternal overlay = mUnderTest.generateDynamicColorOverlay(mUserId,
                 options);
@@ -328,7 +403,17 @@ public class ThemeManagerInternalTests {
     @Test
     public void generateDynamicColorOverlay_withMixedOptions_isNotNull() {
         startUser(mUserId, true, Color.RED, 0.0f, ThemeStyle.TONAL_SPOT);
-        ThemeInfo options = ThemeInfo.build(Color.valueOf(Color.GREEN), null, 0.8f);
+        ThemeInfo options = new ThemeInfo.Builder()
+                .setSeedColor(Color.valueOf(Color.GREEN))
+                .setContrast(0.8f)
+                .build();
+
+        // Mock the overlay helper to return a dummy overlay
+        FabricatedOverlayInternal mockOverlay = new FabricatedOverlayInternal();
+        android.content.om.FabricatedOverlay mockFabricatedOverlay =
+                mock(android.content.om.FabricatedOverlay.class);
+        when(mockFabricatedOverlay.getInternal()).thenReturn(mockOverlay);
+        doReturn(mockFabricatedOverlay).when(mOverlayHelper).createDynamicOverlay(any(), any());
 
         FabricatedOverlayInternal overlay = mUnderTest.generateDynamicColorOverlay(mUserId,
                 options);

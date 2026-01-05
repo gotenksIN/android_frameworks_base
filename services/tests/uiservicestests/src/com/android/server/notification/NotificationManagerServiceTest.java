@@ -27,6 +27,8 @@ import static android.app.ActivityTaskManager.INVALID_TASK_ID;
 import static android.app.Flags.FLAG_NM_SUMMARIZATION;
 import static android.app.Flags.FLAG_NM_SUMMARIZATION_UI;
 import static android.app.Notification.EXTRA_ALLOW_DURING_SETUP;
+import static android.app.Notification.EXTRA_MESSAGES;
+import static android.app.Notification.EXTRA_MESSAGING_PERSON;
 import static android.app.Notification.EXTRA_PICTURE;
 import static android.app.Notification.EXTRA_PICTURE_ICON;
 import static android.app.Notification.EXTRA_PREFER_SMALL_ICON;
@@ -122,7 +124,6 @@ import static android.service.notification.Condition.SOURCE_CONTEXT;
 import static android.service.notification.Condition.SOURCE_USER_ACTION;
 import static android.service.notification.Condition.STATE_TRUE;
 import static android.service.notification.Flags.FLAG_NOTIFICATION_BITMAP_OFFLOADING;
-import static android.service.notification.Flags.FLAG_NOTIFICATION_CLASSIFICATION;
 import static android.service.notification.Flags.FLAG_NOTIFICATION_CONVERSATION_CHANNEL_DELETION;
 import static android.service.notification.Flags.FLAG_NOTIFICATION_CONVERSATION_CHANNEL_MANAGEMENT;
 import static android.service.notification.Flags.FLAG_NOTIFICATION_REGROUP_ON_CLASSIFICATION;
@@ -241,11 +242,13 @@ import android.companion.ICompanionDeviceManager;
 import android.compat.testing.PlatformCompatChangeRule;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
+import android.content.ContentProvider;
 import android.content.ContentUris;
 import android.content.Context;
 import android.content.IIntentSender;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.UriPermission;
 import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.IPackageManager;
@@ -262,6 +265,7 @@ import android.content.pm.VersionedPackage;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.graphics.Rect;
 import android.graphics.drawable.Icon;
 import android.media.AudioAttributes;
 import android.media.AudioManager;
@@ -356,6 +360,7 @@ import com.android.server.notification.NotificationManagerService.NotificationAs
 import com.android.server.notification.NotificationManagerService.NotificationListeners;
 import com.android.server.notification.NotificationManagerService.PostNotificationTracker;
 import com.android.server.notification.NotificationManagerService.PostNotificationTrackerFactory;
+import com.android.server.notification.ZenModeHelper.Callback;
 import com.android.server.personalcontext.PersonalContextManagerInternal;
 import com.android.server.pm.UserManagerInternal;
 import com.android.server.policy.PermissionPolicyInternal;
@@ -408,8 +413,8 @@ import java.util.concurrent.CountDownLatch;
 import java.util.function.Consumer;
 
 @SmallTest
-@RunWith(ParameterizedAndroidJunit4.class)
 @RunWithLooper
+@RunWith(ParameterizedAndroidJunit4.class)
 @SuppressLint("GuardedBy") // It's ok for this test to access guarded methods from the service.
 public class NotificationManagerServiceTest extends UiServiceTestCase {
     private static final String TEST_CHANNEL_ID = "NotificationManagerServiceTestChannelId";
@@ -638,7 +643,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
 
     @Parameters(name = "{0}")
     public static List<FlagsParameterization> getParams() {
-        return FlagsParameterization.allCombinationsOf(Flags.FLAG_SHOW_NOISY_BUNDLED_NOTIFICATIONS);
+        return FlagsParameterization.allCombinationsOf();
     }
 
     public NotificationManagerServiceTest(FlagsParameterization flags) {
@@ -1572,6 +1577,96 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     private void verifyToastShownForTestPackage(String text, int displayId) {
         verify(mStatusBar).showToast(eq(mUid), eq(PKG_P), any(), eq(text), any(),
                 eq(TOAST_DURATION), any(), eq(displayId));
+    }
+
+    @Test
+    public void testNoUriGrantsForBadMessagesList() throws RemoteException {
+        Uri targetUri = Uri.parse("content://com.android.contacts/display_photo/1");
+
+        // create message person
+        Person person = new Person.Builder()
+                .setName("Name")
+                .setIcon(Icon.createWithContentUri(targetUri))
+                .setKey("user_123")
+                .setBot(false)
+                .build();
+
+        // create MessagingStyle
+        Notification.MessagingStyle messagingStyle = new Notification.MessagingStyle(person)
+                .setConversationTitle("Bug discussion")
+                .setGroupConversation(true)
+                .addMessage("Hi，look my photo", System.currentTimeMillis() - 60000, person)
+                .addMessage("Oho, you used my contacts photo",
+                        System.currentTimeMillis() - 30000, "Friend");
+
+        // create Notification
+        Notification notification = new Notification.Builder(mContext, TEST_CHANNEL_ID)
+                .setSmallIcon(R.drawable.sym_def_app_icon)
+                .setContentTitle("")
+                .setContentText("")
+                .setAutoCancel(true)
+                .setStyle(messagingStyle)
+                .setCategory(Notification.CATEGORY_MESSAGE)
+                .setFlag(Notification.FLAG_GROUP_SUMMARY, true)
+                .build();
+        notification.contentIntent = createPendingIntent("open");
+
+        notification.extras.remove(EXTRA_MESSAGING_PERSON);
+
+        // add BadClipDescription to avoid visitUri check uris in EXTRA_MESSAGES value
+        ArrayList<Parcelable> parcelableArray =
+                new ArrayList<>(List.of(notification.extras.getParcelableArray(EXTRA_MESSAGES)));
+        parcelableArray.add(new MyParceledListSlice());
+        notification.extras.putParcelableArray(
+                EXTRA_MESSAGES, parcelableArray.toArray(new Parcelable[0]));
+        try {
+            mBinderService.enqueueNotificationWithTag(mPkg, mPkg,
+                    "testNoUriGrantsForBadMessagesList",
+                    1, notification, mContext.getUserId());
+            waitForIdle();
+            fail("should have failed to parse messages");
+        } catch (java.lang.ArrayStoreException e) {
+            verify(mUgmInternal, never()).checkGrantUriPermission(
+                    anyInt(), any(), eq(ContentProvider.getUriWithoutUserId(targetUri)),
+                    anyInt(), anyInt());
+        }
+    }
+
+    private class MyParceledListSlice extends Intent {
+        @Override
+        public void writeToParcel(Parcel dest, int i) {
+            Parcel test = Parcel.obtain();
+            test.writeString(this.getClass().getName());
+            int strLength = test.dataSize();
+            test.recycle();
+            dest.setDataPosition(dest.dataPosition() - strLength);
+            dest.writeString("android.content.pm.ParceledListSlice");
+
+            dest.writeInt(1);
+            dest.writeString(UriPermission.class.getName());
+            dest.writeInt(0); // use binder
+            dest.writeStrongBinder(new Binder() {
+                private int callingPid = -1;
+                @Override
+                public boolean onTransact(int code, Parcel data, Parcel reply, int flags)
+                        throws RemoteException {
+                    if (code == 1) {
+                        reply.writeNoException();
+                        reply.writeInt(1);
+                        if (getCallingUid() == 1000 && callingPid == -1) {
+                            reply.writeParcelable(new Rect(), 0);
+                            callingPid = getCallingPid();
+                        } else {
+                            reply.writeInt(-1);
+                            reply.writeInt(-1);
+                            reply.writeLong(0);
+                        }
+                        return true;
+                    }
+                    return super.onTransact(code, data, reply, flags);
+                }
+            });
+        }
     }
 
     @Test
@@ -2974,7 +3069,6 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     }
 
     @Test
-    @EnableFlags({Flags.FLAG_NOTIFICATION_FORCE_GROUP_SINGLETONS})
     public void testAggregateGroups_RemoveAppSummary() throws Exception {
         final String originalGroupName = "originalGroup";
         final NotificationRecord r =
@@ -3096,7 +3190,6 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     }
 
     @Test
-    @EnableFlags({Flags.FLAG_NOTIFICATION_FORCE_GROUP_SINGLETONS})
     public void testCancelGroupChildrenForCanceledSummary_singletonGroup() throws Exception {
         final String originalGroupName = "originalGroup";
         final int summaryId = Integer.MAX_VALUE;
@@ -3151,7 +3244,6 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     }
 
     @Test
-    @EnableFlags({Flags.FLAG_NOTIFICATION_FORCE_GROUP_SINGLETONS})
     public void testUpdateOverrideGroupKey_childUpdatedAfterUnAutogroupped() throws Exception {
         final String originalGroupName = "originalGroup";
 
@@ -6811,7 +6903,6 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_LIMIT_MANAGED_SERVICES_COUNT)
     public void testSetListenerAccessForUser_tooManyListeners_skipsFollowups() throws Exception {
         UserHandle user = UserHandle.of(mContext.getUserId() + 10);
         ComponentName c = ComponentName.unflattenFromString("package/Component");
@@ -9010,7 +9101,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         Bundle extras = new Bundle();
         extras.putParcelable(Notification.EXTRA_AUDIO_CONTENTS_URI, audioContents);
         extras.putString(Notification.EXTRA_BACKGROUND_IMAGE_URI, backgroundImage.toString());
-        extras.putParcelable(Notification.EXTRA_MESSAGING_PERSON, person1);
+        extras.putParcelable(EXTRA_MESSAGING_PERSON, person1);
         extras.putParcelableArrayList(Notification.EXTRA_PEOPLE_LIST,
                 new ArrayList<>(Arrays.asList(person2, person3)));
         extras.putParcelableArray(Notification.EXTRA_REMOTE_INPUT_HISTORY_ITEMS,
@@ -9148,13 +9239,13 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
                 .setSmallIcon(android.R.drawable.sym_def_app_icon);
 
         Bundle messagingExtras = new Bundle();
-        messagingExtras.putParcelable(Notification.EXTRA_MESSAGING_PERSON,
+        messagingExtras.putParcelable(EXTRA_MESSAGING_PERSON,
                 personWithIcon("content://user"));
         messagingExtras.putParcelableArray(Notification.EXTRA_HISTORIC_MESSAGES,
                 new Bundle[] { new Notification.MessagingStyle.Message("Heyhey!",
                         System.currentTimeMillis() - 100,
                         personWithIcon("content://historicalMessenger")).toBundle()});
-        messagingExtras.putParcelableArray(Notification.EXTRA_MESSAGES,
+        messagingExtras.putParcelableArray(EXTRA_MESSAGES,
                 new Bundle[] { new Notification.MessagingStyle.Message("Are you there?",
                         System.currentTimeMillis(),
                         personWithIcon("content://messenger")).toBundle()});
@@ -12418,6 +12509,111 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         verify(zenModeHelper).getAutomaticZenRules(eq(Binder.getCallingUserHandle()), anyInt());
     }
 
+    @Test
+    @EnableFlags(android.service.notification.Flags.FLAG_ENABLE_DND_SYNC)
+    public void internalService_getAutomaticZenRules() {
+        ZenModeHelper zenModeHelper = setUpMockZenTest();
+        UserHandle user = UserHandle.of(1);
+
+        mService.getInternalService().getAutomaticZenRules(user);
+
+        verify(zenModeHelper).getAutomaticZenRules(eq(user), anyInt());
+    }
+
+    @Test
+    @EnableFlags(android.service.notification.Flags.FLAG_ENABLE_DND_SYNC)
+    public void internalService_isAutomaticZenRuleActive() {
+        ZenModeHelper zenModeHelper = setUpMockZenTest();
+        UserHandle user = UserHandle.of(1);
+        String id = "id";
+
+        mService.getInternalService().isAutomaticZenRuleActive(user, id);
+
+        verify(zenModeHelper).getAutomaticZenRuleState(eq(user), eq(id), anyInt());
+    }
+
+    @Test
+    @EnableFlags(android.service.notification.Flags.FLAG_ENABLE_DND_SYNC)
+    public void internalService_isManualZenRuleActive() {
+        ZenModeHelper zenModeHelper = setUpMockZenTest();
+        UserHandle user = UserHandle.of(1);
+
+        mService.getInternalService().isManualZenRuleActive(user);
+
+        verify(zenModeHelper).getManualZenMode(user);
+    }
+
+    @Test
+    @EnableFlags(android.service.notification.Flags.FLAG_ENABLE_DND_SYNC)
+    public void internalService_setManualZenRuleActive() {
+        ZenModeHelper zenModeHelper = setUpMockZenTest();
+        UserHandle user = UserHandle.of(1);
+
+        mService.getInternalService().setManualZenRuleActive(user, true);
+
+        verify(zenModeHelper).setManualZenMode(
+                eq(user),
+                eq(ZEN_MODE_IMPORTANT_INTERRUPTIONS),
+                isNull(),
+                anyInt(),
+                anyString(),
+                isNull(),
+                anyInt());
+    }
+
+    @Test
+    @EnableFlags(android.service.notification.Flags.FLAG_ENABLE_DND_SYNC)
+    public void internalService_setAutomaticZenRuleActive() {
+        ZenModeHelper zenModeHelper = setUpMockZenTest();
+        UserHandle user = UserHandle.of(1);
+        String id = "id";
+        AutomaticZenRule rule =
+                new AutomaticZenRule(
+                        "name",
+                        /* owner= */ null,
+                        /* configurationActivity= */ null,
+                        /* conditionId= */ Uri.EMPTY,
+                        /* policy= */ null,
+                        /* interruptionFilter= */ NotificationManager
+                        .INTERRUPTION_FILTER_PRIORITY,
+                        /* enabled= */ true);
+        when(zenModeHelper.getAutomaticZenRule(eq(user), eq(id), anyInt())).thenReturn(rule);
+
+        mService.getInternalService().setAutomaticZenRuleActive(user, id, true);
+
+        // Verify that the condition is set to true.
+        ArgumentCaptor<Condition> conditionCaptor = ArgumentCaptor.forClass(Condition.class);
+        verify(zenModeHelper).setAutomaticZenRuleState(
+                eq(user),
+                eq(id),
+                conditionCaptor.capture(),
+                anyInt(),
+                anyInt());
+        assertThat(conditionCaptor.getValue().state).isEqualTo(STATE_TRUE);
+    }
+
+    @Test
+    @EnableFlags(android.service.notification.Flags.FLAG_ENABLE_DND_SYNC)
+    public void internalService_addCallback() {
+        ZenModeHelper zenModeHelper = setUpMockZenTest();
+        Callback callback = new Callback();
+
+        mService.getInternalService().addZenModeCallback(callback);
+
+        verify(zenModeHelper).addCallback(callback);
+    }
+
+    @Test
+    @EnableFlags(android.service.notification.Flags.FLAG_ENABLE_DND_SYNC)
+    public void internalService_hasZenModeConfig() {
+        ZenModeHelper zenModeHelper = setUpMockZenTest();
+        UserHandle user = UserHandle.of(1);
+
+        mService.getInternalService().hasZenModeConfig(user);
+
+        verify(zenModeHelper).hasZenModeConfig(user);
+    }
+
     /** Prepares for a zen-related test that uses a mocked {@link ZenModeHelper}. */
     private ZenModeHelper setUpMockZenTest() {
         ZenModeHelper zenModeHelper = mock(ZenModeHelper.class);
@@ -12566,8 +12762,8 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
     }
 
     @Test
-    public void onConfigChanged_sendsInternalZenChangedBroadcast() throws Exception {
-        mService.mZenModeHelper.getCallbacks().forEach(c -> c.onConfigChanged());
+    public void onConfigApplied_sendsInternalZenChangedBroadcast() throws Exception {
+        mService.mZenModeHelper.getCallbacks().forEach(c -> c.onConfigApplied());
 
         Intent expected = new Intent(NotificationManager.ACTION_ZEN_CONFIGURATION_CHANGED_INTERNAL)
                 .addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT);

@@ -278,6 +278,7 @@
     <string name="global_action_restart" msgid="4678451019561687074">"Start på nytt"</string>
     <string name="global_action_emergency" msgid="1387617624177105088">"Nødssituasjon"</string>
     <string name="global_action_bug_report" msgid="5127867163044170003">"Feilrapport"</string>
+    <string name="global_action_feedback" msgid="3480836834202300036">"Tilbakemelding"</string>
     <string name="global_action_logout" msgid="6093581310002476511">"Avslutt økten"</string>
     <string name="global_action_screenshot" msgid="2610053466156478564">"Skjermbilde"</string>
     <string name="global_action_standby" msgid="6786920589970257642">"Ventemodus"</string>
@@ -326,8 +327,7 @@
     <string name="notification_channel_accessibility_hearing_device" msgid="7816963856388758952">"Høreapparat"</string>
     <string name="notification_channel_accessibility_security_policy" msgid="1727787021725251912">"Bruk av Tilgjengelighet"</string>
     <string name="notification_channel_display" msgid="6905032605735615090">"Skjerm"</string>
-    <!-- no translation found for notification_channel_parental_controls (2963963315750128538) -->
-    <skip />
+    <string name="notification_channel_parental_controls" msgid="2963963315750128538">"Foreldrekontroll"</string>
     <string name="foreground_service_app_in_background" msgid="1439289699671273555">"<xliff:g id="APP_NAME">%1$s</xliff:g> bruker batteri"</string>
     <string name="foreground_service_apps_in_background" msgid="7340037176412387863">"<xliff:g id="NUMBER">%1$d</xliff:g> apper bruker batteri"</string>
     <string name="foreground_service_tap_for_details" msgid="9078123626015586751">"Trykk for detaljer om batteri- og databruk"</string>
@@ -645,6 +645,10 @@
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"Gir appen tilgang til enheter på det lokale nettverket"</string>
     <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"bruke loopback-grensesnittet"</string>
     <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"Lar appen bruke andre apper via loopback-grensesnittet"</string>
+    <!-- no translation found for permlab_force_use_loopback_interface (1319727311706416481) -->
+    <skip />
+    <!-- no translation found for permdesc_force_use_loopback_interface (5829032514048681980) -->
+    <skip />
     <string name="permlab_ranging" msgid="2854543350668593390">"Relativ posisjon mellom enheter i nærheten"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"Tillat at appen avgjør den relative posisjonen mellom enheter i nærheten"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"Informasjon om prioritert NFC-betalingstjeneste"</string>
@@ -825,6 +829,8 @@
     <string name="permdesc_readMediaVideo" msgid="3846400073770403528">"Lar appen lese videofiler fra den delte lagringsplassen din."</string>
     <string name="permlab_readMediaImages" msgid="4057590631020986789">"lese bildefiler fra delt lagringsplass"</string>
     <string name="permdesc_readMediaImages" msgid="5836219373138469259">"Lar appen lese bildefiler fra den delte lagringsplassen din."</string>
+    <string name="permlab_readMediaDocuments" msgid="5716810755602938263">"lese dokumentfiler fra delt lagringsplass"</string>
+    <string name="permdesc_readMediaDocuments" msgid="5665930210237304120">"Lar appen lese dokumentfiler fra den delte lagringsplassen din."</string>
     <string name="permlab_readVisualUserSelect" msgid="5516204215354667586">"lese brukervalgte bilde- og videofiler fra den delte lagringen"</string>
     <string name="permdesc_readVisualUserSelect" msgid="8027174717714968217">"lar appen lese bilde- og videofiler du velger fra den delte lagringen din"</string>
     <string name="permlab_sdcardWrite" msgid="4863021819671416668">"endre eller slette innholdet i den delte lagringen din"</string>
@@ -1047,6 +1053,7 @@
     <string name="keyguard_password_enter_pin_password_code" msgid="7792964196473964340">"Skriv inn PIN-kode for å låse opp"</string>
     <string name="keyguard_password_wrong_pin_code" msgid="8583732939138432793">"Feil personlig kode."</string>
     <string name="keyguard_label_text" msgid="3841953694564168384">"For å låse opp, trykk på menyknappen og deretter 0."</string>
+    <string name="emergency_call_dialog_number_for_display" msgid="2978165477085612673">"Nødnummer"</string>
     <string name="lockscreen_carrier_default" msgid="6192313772955399160">"Ingen dekning"</string>
     <string name="lockscreen_screen_locked" msgid="7364905540516041817">"Skjermen er låst"</string>
     <string name="lockscreen_instructions_when_pattern_enabled" msgid="7982445492532123308">"Trykk på menyknappen for å låse opp eller ringe et nødnummer."</string>
@@ -1827,7 +1834,7 @@
     <string name="done_accessibility_shortcut_menu_button" msgid="3668407723770815708">"Ferdig"</string>
     <string name="disable_accessibility_shortcut" msgid="5806091378745232383">"Slå av snarveien"</string>
     <string name="leave_accessibility_shortcut_on" msgid="6543362062336990814">"Bruk snarveien"</string>
-    <string name="color_inversion_feature_name" msgid="2672824491933264951">"Farge&amp;#173;invertering"</string>
+    <string name="color_inversion_feature_name" msgid="2672824491933264951">"Fargeinvertering"</string>
     <string name="color_correction_feature_name" msgid="7975133554160979214">"Fargekorrigering"</string>
     <string name="one_handed_mode_feature_name" msgid="2334330034828094891">"Enhåndsmodus"</string>
     <string name="reduce_bright_colors_feature_name" msgid="3222994553174604132">"Ekstra dimmet"</string>
@@ -2176,13 +2183,21 @@
     <string name="autofill_picker_no_suggestions" msgid="1076022650427481509">"Ingen forslag til autofyll"</string>
     <string name="autofill_picker_some_suggestions" msgid="5560549696296202701">"{count,plural, =1{Ett forslag til autofyll}other{# forslag til autofyll}}"</string>
     <string name="autofill_save_title" msgid="7719802414283739775">"Vil du lagre i "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_save_title_expressive" msgid="2665408870424848558">"Lagre informasjon i "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b></string>
     <string name="autofill_save_title_with_type" msgid="3002460014579799605">"Vil du lagre <xliff:g id="TYPE">%1$s</xliff:g> i "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_save_title_with_type_expressive" msgid="6063660551496235255">"Lagre <xliff:g id="TYPE">%1$s</xliff:g> i "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b></string>
     <string name="autofill_save_title_with_2types" msgid="3783270967447869241">"Vil du lagre <xliff:g id="TYPE_0">%1$s</xliff:g> og <xliff:g id="TYPE_1">%2$s</xliff:g> i "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_save_title_with_2types_expressive" msgid="2996687022212666293">"Lagre <xliff:g id="TYPE_0">%1$s</xliff:g> og <xliff:g id="TYPE_1">%2$s</xliff:g> i "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b></string>
     <string name="autofill_save_title_with_3types" msgid="6598228952100102578">"Vil du lagre <xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g> og <xliff:g id="TYPE_2">%3$s</xliff:g> i "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_save_title_with_3types_expressive" msgid="3301676215501214049">"Lagre <xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g> og <xliff:g id="TYPE_2">%3$s</xliff:g> i "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b></string>
     <string name="autofill_update_title" msgid="3630695947047069136">"Vil du oppdatere i "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_update_title_expressive" msgid="7660582214109012920">"Oppdater informasjon i "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b></string>
     <string name="autofill_update_title_with_type" msgid="5264152633488495704">"Vil du oppdatere <xliff:g id="TYPE">%1$s</xliff:g> i "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_update_title_with_type_expressive" msgid="6162413585161767846">"Oppdater <xliff:g id="TYPE">%1$s</xliff:g> i "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b></string>
     <string name="autofill_update_title_with_2types" msgid="1797514386321086273">"Vil du oppdatere <xliff:g id="TYPE_0">%1$s</xliff:g> og <xliff:g id="TYPE_1">%2$s</xliff:g> i "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_update_title_with_2types_expressive" msgid="1911825941498393471">"Oppdater <xliff:g id="TYPE_0">%1$s</xliff:g> og <xliff:g id="TYPE_1">%2$s</xliff:g> i "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b></string>
     <string name="autofill_update_title_with_3types" msgid="8285767070604652626">"Vil du oppdatere disse elementene i "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>": <xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g> og <xliff:g id="TYPE_2">%3$s</xliff:g>?"</string>
+    <string name="autofill_update_title_with_3types_expressive" msgid="6040725201378429027">"Oppdater disse elementene i "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>": <xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g> og <xliff:g id="TYPE_2">%3$s</xliff:g>"</string>
     <string name="autofill_save_yes" msgid="8035743017382012850">"Lagre"</string>
     <string name="autofill_save_no" msgid="9212826374207023544">"Nei takk"</string>
     <string name="autofill_save_notnow" msgid="2853932672029024195">"Ikke nå"</string>
@@ -2611,10 +2626,7 @@
     <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"Varsler om systemressurser"</string>
     <string name="tv_watchdog_notification_title" msgid="195239206215922517">"Overforbruk av ressurser"</string>
     <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"Appen «<xliff:g id="APP_NAME">%1$s</xliff:g>» bruker for mye ressurser."</string>
-    <!-- no translation found for supervision_blocked_app_title (5546803865875383588) -->
-    <skip />
-    <!-- no translation found for supervision_blocked_app_content (4125452996088641559) -->
-    <skip />
-    <!-- no translation found for supervision_unblocked_app_content (8282985265957852278) -->
-    <skip />
+    <string name="supervision_blocked_app_title" msgid="5546803865875383588">"Oppdatering fra forelderen din"</string>
+    <string name="supervision_blocked_app_content" msgid="4125452996088641559">"<xliff:g id="APP_NAME">%1$s</xliff:g> er fjernet inntil videre"</string>
+    <string name="supervision_unblocked_app_content" msgid="8282985265957852278">"<xliff:g id="APP_NAME">%1$s</xliff:g> er tilgjengelig nå"</string>
 </resources>

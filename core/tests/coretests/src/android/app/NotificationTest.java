@@ -37,6 +37,7 @@ import static android.app.Notification.EXTRA_PEOPLE_LIST;
 import static android.app.Notification.EXTRA_PICTURE;
 import static android.app.Notification.EXTRA_PICTURE_ICON;
 import static android.app.Notification.EXTRA_SUMMARY_TEXT;
+import static android.app.Notification.EXTRA_TEXT_LINES;
 import static android.app.Notification.EXTRA_TITLE;
 import static android.app.Notification.FLAG_CAN_COLORIZE;
 import static android.app.Notification.GROUP_ALERT_CHILDREN;
@@ -136,6 +137,7 @@ public class NotificationTest {
     private Context mContext;
 
     private RemoteViews mRemoteViews;
+    private Notification.Colors mDefaultColors;
 
     @Rule
     public TestRule compatChangeRule = new PlatformCompatChangeRule();
@@ -146,6 +148,11 @@ public class NotificationTest {
         mContext = InstrumentationRegistry.getContext();
         mRemoteViews = new RemoteViews(
                 mContext.getPackageName(), R.layout.notification_template_header);
+
+        mDefaultColors = new Notification.Colors();
+        boolean nightMode = (mContext.getResources().getConfiguration().uiMode
+                & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
+        mDefaultColors.resolvePalette(mContext, Notification.COLOR_DEFAULT, false, nightMode);
     }
 
     @Test
@@ -964,7 +971,7 @@ public class NotificationTest {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_BRIDGED_NOTIFICATIONS_API)
+    @EnableFlags(Flags.FLAG_BRIDGED_NOTIFICATIONS)
     public void testBuilder_setBridgedNotificationMetadata() {
         Icon icon = Icon.createWithBitmap(
                 Bitmap.createBitmap(300, 300, Bitmap.Config.ARGB_8888));
@@ -989,7 +996,7 @@ public class NotificationTest {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_BRIDGED_NOTIFICATIONS_API)
+    @EnableFlags(Flags.FLAG_BRIDGED_NOTIFICATIONS)
     public void testBuilder_dontSetBridgedMetadata() {
         Notification notification = new Notification.Builder(mContext, "whatever")
                 .build();
@@ -1022,7 +1029,7 @@ public class NotificationTest {
 
     @Test
     public void testBuilder_getFullLengthSpanColor_returnsNullForString() {
-        assertThat(Notification.Builder.getFullLengthSpanColor("String")).isNull();
+        assertThat(Notification.Builder.getFullLengthSpanColor("String", null)).isNull();
     }
 
     @Test
@@ -1031,7 +1038,7 @@ public class NotificationTest {
                 .append("text with ")
                 .append("some red", new ForegroundColorSpan(Color.RED),
                         Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        assertThat(Notification.Builder.getFullLengthSpanColor(text)).isNull();
+        assertThat(Notification.Builder.getFullLengthSpanColor(text, null)).isNull();
     }
 
     @Test
@@ -1039,7 +1046,7 @@ public class NotificationTest {
         CharSequence text = new SpannableStringBuilder()
                 .append("text that is all red", new ForegroundColorSpan(Color.RED),
                         Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        assertThat(Notification.Builder.getFullLengthSpanColor(text)).isEqualTo(Color.RED);
+        assertThat(Notification.Builder.getFullLengthSpanColor(text, null)).isEqualTo(Color.RED);
     }
 
     @Test
@@ -1051,7 +1058,7 @@ public class NotificationTest {
                 Spanned.SPAN_INCLUSIVE_INCLUSIVE);
         text.setSpan(new ForegroundColorSpan(Color.GREEN), 26, 31,
                 Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        assertThat(Notification.Builder.getFullLengthSpanColor(text)).isEqualTo(Color.BLUE);
+        assertThat(Notification.Builder.getFullLengthSpanColor(text, null)).isEqualTo(Color.BLUE);
     }
 
     @Test
@@ -1066,10 +1073,22 @@ public class NotificationTest {
                 Spanned.SPAN_INCLUSIVE_INCLUSIVE);
         text.setSpan(new ForegroundColorSpan(Color.GREEN), 26, 31,
                 Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        assertThat(Notification.Builder.getFullLengthSpanColor(text)).isEqualTo(expectedTextColor);
+        assertThat(Notification.Builder.getFullLengthSpanColor(text, null)).isEqualTo(
+                expectedTextColor);
     }
 
+    @Test
+    @EnableFlags(Flags.FLAG_API_NOTIFICATION_SEMANTIC_STYLE)
+    public void testBuilder_getFullLengthSpanColor_worksWithSemanticStyle() {
+        Spannable text = new SpannableString("text with semantic color");
+        text.setSpan(Notification.createSemanticStyleAnnotation(SEMANTIC_STYLE_DANGER), 0,
+                text.length(), Spanned.SPAN_INCLUSIVE_INCLUSIVE);
 
+        Integer fullLengthColor = Notification.Builder.getFullLengthSpanColor(text, mDefaultColors);
+
+        assertThat(fullLengthColor)
+                .isEqualTo(mDefaultColors.getSemanticColor(SEMANTIC_STYLE_DANGER));
+    }
 
     @Test
     public void testBuilder_ensureButtonFillContrast_adjustsDarker() {
@@ -1438,8 +1457,7 @@ public class NotificationTest {
             // When a color is provided, night mode should have no effect on the notification
             // Exception: ProtectionColor will not match, since it has different values for LT/DT
             assertEquals(cDay.getBackgroundColor(), cNight.getBackgroundColor());
-            assertEquals(cDay.getPrimaryTextColor(), cNight.getPrimaryTextColor());
-            assertEquals(cDay.getSecondaryTextColor(), cNight.getSecondaryTextColor());
+            assertEquals(cDay.getTextColor(), cNight.getTextColor());
             assertEquals(cDay.getPrimaryAccentColor(), cNight.getPrimaryAccentColor());
             assertEquals(cDay.getSecondaryAccentColor(), cNight.getSecondaryAccentColor());
             assertEquals(cDay.getTertiaryAccentColor(), cNight.getTertiaryAccentColor());
@@ -1630,6 +1648,22 @@ public class NotificationTest {
     }
 
     @Test
+    public void testProjectedExtender_invalidExtra_noCrash() {
+        Notification n = new Notification.Builder(mContext, "test")
+                .setSmallIcon(0)
+                .build();
+        Bundle projectedBundle = new Bundle();
+        projectedBundle.putParcelable(Notification.ProjectedExtender.KEY_CONTENT_INTENT,
+                new Bundle());
+        n.extras.putBundle(Notification.ProjectedExtender.EXTRA_PROJECTED_EXTENDER,
+                projectedBundle);
+
+        new Notification.ProjectedExtender(n);
+
+        // no crash, good
+    }
+
+    @Test
     public void testGetUnreadConversationFromBundle_invalidExtra_noCrash() {
         Bundle fakeTypes = new Bundle();
         fakeTypes.putParcelable(KEY_ON_READ, new Bundle());
@@ -1682,9 +1716,13 @@ public class NotificationTest {
     @Test
     public void testDoesNotStripsExtenders() {
         Notification.Builder nb = new Notification.Builder(mContext, "channel");
+        PendingIntent projectedContentIntent = PendingIntent.getActivity(
+                mContext, 0, new Intent(), PendingIntent.FLAG_IMMUTABLE);
         nb.extend(new Notification.CarExtender().setColor(Color.RED));
         nb.extend(new Notification.TvExtender().setChannelId("different channel"));
         nb.extend(new Notification.WearableExtender().setDismissalId("dismiss"));
+        nb.extend(new Notification.ProjectedExtender()
+                .setContentIntent(projectedContentIntent));
         Notification before = nb.build();
         Notification after = Notification.Builder.maybeCloneStrippedForDelivery(before);
 
@@ -1694,6 +1732,8 @@ public class NotificationTest {
                 new Notification.TvExtender(before).getChannelId());
         Assert.assertEquals(Color.RED, new Notification.CarExtender(before).getColor());
         Assert.assertEquals("dismiss", new Notification.WearableExtender(before).getDismissalId());
+        Assert.assertEquals("different content Intent", projectedContentIntent,
+                new Notification.ProjectedExtender(before).getContentIntent());
     }
 
     @Test
@@ -2953,12 +2993,36 @@ public class NotificationTest {
 
         assertThat(progressStyle1.isStyledByProgress()).isTrue();
     }
+
+    @Test
+    public void inboxStyle_addLine() {
+        Notification n = new Notification.Builder(mContext, "test")
+                .setSmallIcon(android.R.drawable.sym_def_app_icon)
+                .setStyle(new Notification.InboxStyle()
+                        .addLine("hello")
+                        .addLine("goodbye"))
+                .build();
+        assertThat(n.extras.getCharSequenceArray(EXTRA_TEXT_LINES)).asList()
+                .containsExactly("hello", "goodbye");
+    }
+
+    @Test
+    public void inboxStyle_clearLines() {
+        Notification n = new Notification.Builder(mContext, "test")
+                .setSmallIcon(android.R.drawable.sym_def_app_icon)
+                .setStyle(new Notification.InboxStyle()
+                        .addLine("hello")
+                        .addLine("goodbye")
+                        .clearLines())
+                .build();
+        assertThat(n.extras.getCharSequenceArray(EXTRA_TEXT_LINES)).asList().isEmpty();
+    }
+
     private void assertValid(Notification.Colors c) {
         // Assert that all colors are populated
         assertThat(c.getBackgroundColor()).isNotEqualTo(Notification.COLOR_INVALID);
         assertThat(c.getProtectionColor()).isNotEqualTo(Notification.COLOR_INVALID);
-        assertThat(c.getPrimaryTextColor()).isNotEqualTo(Notification.COLOR_INVALID);
-        assertThat(c.getSecondaryTextColor()).isNotEqualTo(Notification.COLOR_INVALID);
+        assertThat(c.getTextColor()).isNotEqualTo(Notification.COLOR_INVALID);
         assertThat(c.getPrimaryAccentColor()).isNotEqualTo(Notification.COLOR_INVALID);
         assertThat(c.getSecondaryAccentColor()).isNotEqualTo(Notification.COLOR_INVALID);
         assertThat(c.getTertiaryAccentColor()).isNotEqualTo(Notification.COLOR_INVALID);
@@ -2971,8 +3035,7 @@ public class NotificationTest {
         assertThat(c.getRippleAlpha()).isAtMost(0xff);
 
         // Assert that various colors have sufficient contrast with the background
-        assertContrastIsAtLeast(c.getPrimaryTextColor(), c.getBackgroundColor(), 4.5);
-        assertContrastIsAtLeast(c.getSecondaryTextColor(), c.getBackgroundColor(), 4.5);
+        assertContrastIsAtLeast(c.getTextColor(), c.getBackgroundColor(), 4.5);
         assertContrastIsAtLeast(c.getPrimaryAccentColor(), c.getBackgroundColor(), 4.5);
         assertContrastIsAtLeast(c.getErrorColor(), c.getBackgroundColor(), 4.5);
         assertContrastIsAtLeast(c.getContrastColor(), c.getBackgroundColor(), 4.5);

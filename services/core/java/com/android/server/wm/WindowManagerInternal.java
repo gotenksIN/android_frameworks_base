@@ -55,7 +55,6 @@ import android.window.ScreenCaptureInternal.ScreenshotHardwareBuffer;
 import com.android.internal.policy.KeyInterceptionInfo;
 import com.android.server.input.InputManagerService;
 import com.android.server.policy.WindowManagerPolicy;
-import com.android.server.wm.DisplayPolicy;
 import com.android.server.wm.SensitiveContentPackages.PackageInfo;
 
 import java.lang.annotation.Retention;
@@ -639,6 +638,18 @@ public abstract class WindowManagerInternal {
             @Nullable Bundle options);
 
     /**
+     * Adds an IME window token for a given display. This differs from
+     * {@link #addWindowToken(IBinder, int, int, Bundle)} with the addition of {@code targetUserId}.
+     *
+     * @param token The token to add.
+     * @param displayId The display to add the token to.
+     * @param targetUserId The user whose windows can be added to this token.
+     * @param options A bundle used to pass window-related options.
+     */
+    public abstract void addImeWindowToken(@NonNull android.os.IBinder token, int displayId,
+            @UserIdInt int targetUserId, @Nullable Bundle options);
+
+    /**
      * Removes a window token.
      *
      * @param token The toke to remove.
@@ -660,6 +671,14 @@ public abstract class WindowManagerInternal {
      */
     public abstract void removeWindowToken(android.os.IBinder token, boolean removeWindows,
             boolean animateExit, int displayId);
+
+    /**
+     * Sets the given window token as the current IME window token on the given display.
+     *
+     * @param token     The token to set.
+     * @param displayId The display to set the token on.
+     */
+    public abstract void setImeWindowToken(@Nullable android.os.IBinder token, int displayId);
 
     /**
      * Registers a listener to be notified about app transition events.
@@ -1251,11 +1270,25 @@ public abstract class WindowManagerInternal {
     public abstract void restoreDisplayWindowSettings(int userId, byte[] payload);
 
     /**
-     * Creates a mirror of the given display's root SurfaceControl.
+     * An abstraction of a SurfaceControl that mirrors a display. The mirror surface will
+     * successfully mirror the display's content until the display is removed or the mirror is
+     * {@link #close()}-ed.
+     */
+    public interface DisplayMirror extends AutoCloseable {
+        /**
+         * Get the mirror surface. The same SurfaceControl reference is returned throughout the
+         * lifecycle of this mirror. This SurfaceControl will be released automatically on
+         * {@link #close()}.
+         */
+        SurfaceControl getMirrorSurfaceControl();
+    }
+
+    /**
+     * Creates a mirror of the given display.
      *
      * @param displayId The display which should be mirrored.
-     * @return The mirror surface, or null if the display was not found.
+     * @return The display mirror, or null if mirroring was not successful.
      */
     @Nullable
-    public abstract SurfaceControl createMirrorForDisplayContent(int displayId);
+    public abstract DisplayMirror createMirrorForDisplayContent(int displayId);
 }

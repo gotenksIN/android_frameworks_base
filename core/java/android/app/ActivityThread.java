@@ -18,10 +18,10 @@ package android.app;
 
 import static android.app.ActivityManager.PROCESS_STATE_UNKNOWN;
 import static android.app.ConfigurationController.createNewConfigAndUpdateIfNotNull;
-import static android.app.Flags.earlyRenderThreadPriorityBoost;
 import static android.app.Flags.skipBgMemTrimOnFgApp;
 import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
 import static android.app.WindowConfiguration.WINDOWING_MODE_UNDEFINED;
+import static android.app.privatecompute.flags.Flags.enablePccFrameworkSupport;
 import static android.app.servertransaction.ActivityLifecycleItem.ON_CREATE;
 import static android.app.servertransaction.ActivityLifecycleItem.ON_DESTROY;
 import static android.app.servertransaction.ActivityLifecycleItem.ON_PAUSE;
@@ -30,6 +30,7 @@ import static android.app.servertransaction.ActivityLifecycleItem.ON_START;
 import static android.app.servertransaction.ActivityLifecycleItem.ON_STOP;
 import static android.app.servertransaction.ActivityLifecycleItem.PRE_ON_CREATE;
 import static android.content.pm.ActivityInfo.CONFIG_RESOURCES_UNUSED;
+import static android.content.pm.ActivityInfo.OVERRIDE_ENABLE_VIRTUAL_GAMEPAD;
 import static android.content.res.Configuration.UI_MODE_TYPE_DESK;
 import static android.content.res.Configuration.UI_MODE_TYPE_MASK;
 import static android.view.Display.DEFAULT_DISPLAY;
@@ -238,6 +239,7 @@ import android.window.SplashScreenView;
 import android.window.TaskFragmentTransaction;
 import android.window.TaskSnapshotManager;
 import android.window.WindowContextInfo;
+import android.window.WindowExtensionsHelper;
 import android.window.WindowProviderService;
 import android.window.WindowTokenClientController;
 
@@ -304,7 +306,6 @@ import java.util.TimeZone;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
-import java.util.stream.Collectors;
 
 /**
  * This manages the execution of the main thread in an
@@ -1185,34 +1186,38 @@ public final class ActivityThread extends ClientTransactionHandler
         @Override
         public boolean onTransact(int code, Parcel data, Parcel reply, int flags)
                 throws RemoteException {
-            boolean checkApplicationThreadCalledBySystem =
-                    android.security.Flags.checkApplicationThreadCalledBySystem();
-            if (Build.IS_DEBUGGABLE || checkApplicationThreadCalledBySystem) {
-                int callingUid = Binder.getCallingUid();
-                if (callingUid != Process.ROOT_UID && callingUid != Process.SYSTEM_UID) {
-                    String[] packagesForUid =
-                            getSystemContext().getPackageManager().getPackagesForUid(callingUid);
-                    String packageName;
+            int callingUid = Binder.getCallingUid();
+            if (callingUid != Process.ROOT_UID && callingUid != Process.SYSTEM_UID) {
+                String packageName;
+                if (callingUid == Process.SHELL_UID) {
+                    // save lookup, we know and expect this
+                    packageName = "com.android.shell";
+                } else {
+                    String[] packagesForUid = getPackageManager().getPackagesForUid(callingUid);
                     if (packagesForUid == null || packagesForUid.length == 0) {
                         packageName = "unknown";
                     } else if (packagesForUid.length == 1) {
                         packageName = packagesForUid[0];
                     } else {
-                        packageName = Arrays.asList(packagesForUid).stream().sorted().collect(
-                                Collectors.joining(", "));
+                        // shared UID - just use first package name and annotate it
+                        packageName = packagesForUid[0] + "*";
                     }
+                }
+                boolean fail = callingUid != Process.SHELL_UID;
+                if (Build.IS_DEBUGGABLE || fail) {
                     Slog.wtf(TAG, "ApplicationThread called by non-system process"
                             + " (callingUid: " + callingUid
                             + "; packageName: " + packageName
                             + "; code: " + code
                             + "; flags: " + flags
+                            + "; behavior: " + (fail ? "fail" : "log")
                             + ")");
-                    if (checkApplicationThreadCalledBySystem) {
-                        throw new SecurityException(
-                                "ApplicationThread called by non-system process"
-                                        + " (callingUid: " + callingUid
-                                        + "; packageName: " + packageName + ")");
-                    }
+                }
+                if (fail) {
+                    throw new SecurityException(
+                            "ApplicationThread called by non-system process"
+                                    + " (callingUid: " + callingUid
+                                    + "; packageName: " + packageName + ")");
                 }
             }
             return super.onTransact(code, data, reply, flags);
@@ -1964,10 +1969,8 @@ public final class ActivityThread extends ClientTransactionHandler
             }
 
             // Task Snapshot
-            if (com.android.window.flags.Flags.reduceTaskSnapshotMemoryUsage()) {
-                if (TaskSnapshotManager.isUsed()) {
-                    TaskSnapshotManager.getInstance().dump(pw);
-                }
+            if (TaskSnapshotManager.isUsed()) {
+                TaskSnapshotManager.getInstance().dump(pw);
             }
 
             // Unreachable native memory
@@ -3084,16 +3087,13 @@ public final class ActivityThread extends ClientTransactionHandler
 
     /** Backdoor to set private static fields */
     @RavenwoodReplace
-    static void staticInitForRavenwood(
-            ActivityThread instance
-    ) {
+    static void staticInitForRavenwood(ActivityThread instance) {
         throw new IllegalStateException(); // shouldn't be called on a real device.
     }
 
-    static void staticInitForRavenwood$ravenwood(
-            ActivityThread instance
-    ) {
+    static void staticInitForRavenwood$ravenwood(ActivityThread instance) {
         sCurrentActivityThread = instance;
+        sMainThreadHandler = instance.getHandler();
     }
 
     @UnsupportedAppUsage
@@ -4698,23 +4698,24 @@ public final class ActivityThread extends ClientTransactionHandler
         // Initialize before creating the activity
         if (ThreadedRenderer.sRendererEnabled
                 && (r.activityInfo.flags & ActivityInfo.FLAG_HARDWARE_ACCELERATED) != 0) {
-            if (earlyRenderThreadPriorityBoost()) {
-                final int tid = HardwareRenderer.preload();
-                // Adjust the RenderThread priority as soon as it's created.
-                if (tid > 0) {
-                    try {
-                        ActivityManager.getService().setRenderThread(tid);
-                    } catch (Throwable t) {
-                        Log.w(TAG, "Failed to set scheduler for RenderThread", t);
-                    }
+            final int tid = HardwareRenderer.preload();
+            // Adjust the RenderThread priority as soon as it's created.
+            if (tid > 0) {
+                try {
+                    ActivityManager.getService().setRenderThread(tid);
+                } catch (Throwable t) {
+                    Log.w(TAG, "Failed to set scheduler for RenderThread", t);
                 }
-            } else {
-                HardwareRenderer.preload();
             }
         }
 
-        if (android.tracing.Flags.surfaceControlRegistryProtolog()) {
-            ProtoLog.init();
+        if (android.tracing.Flags.surfaceControlRegistryProtolog()
+                || android.tracing.Flags.imetrackerProtolog()) {
+            if (android.tracing.Flags.protologAsyncInit()) {
+                ProtoLog.initAsync();
+            } else {
+                ProtoLog.init();
+            }
         }
 
         WindowManagerGlobal.initialize();
@@ -4749,7 +4750,7 @@ public final class ActivityThread extends ClientTransactionHandler
             // Size configurations of a destroyed activity is meaningless.
             return;
         }
-        Configuration[] configurations = r.activity.getResources().getSizeConfigurations();
+        Configuration[] configurations = r.activity.getResources().getResourceConfigurations();
         if (configurations == null) {
             return;
         }
@@ -4840,8 +4841,11 @@ public final class ActivityThread extends ClientTransactionHandler
                 r.activity.onProvideAssistData(data);
                 referrer = r.activity.onProvideReferrer();
             }
-            if (cmd.requestType == ActivityManager.ASSIST_CONTEXT_FULL || forAutofill
-                    || requestedOnlyContent) {
+            boolean requiresData =
+                    cmd.requestType == ActivityManager.ASSIST_CONTEXT_FULL
+                            || cmd.requestType
+                                    == ActivityManager.ASSIST_CONTEXT_SKIP_SCREEN_CONTENT;
+            if (requiresData || forAutofill || requestedOnlyContent) {
                 if (!requestedOnlyContent) {
                     structure = new AssistStructure(r.activity, forAutofill, cmd.flags);
                 }
@@ -7130,11 +7134,9 @@ public final class ActivityThread extends ClientTransactionHandler
             return true;
         }
 
-        if (android.content.res.Flags.handleAllConfigChanges()) {
-            if ((handledConfigChanges & CONFIG_RESOURCES_UNUSED) != 0) {
-                // Report the change if activities claim they do not use resources at all.
-                return true;
-            }
+        if ((handledConfigChanges & CONFIG_RESOURCES_UNUSED) != 0) {
+            // Report the change if activities claim they do not use resources at all.
+            return true;
         }
 
         final int diffWithBucket = SizeConfigurationBuckets.filterDiff(publicDiff, currentConfig,
@@ -7974,6 +7976,10 @@ public final class ActivityThread extends ClientTransactionHandler
                     data.sdkSandboxClientAppPackage);
         }
 
+        if (enablePccFrameworkSupport() && Process.isPrivateComputeCoreUid(Process.myUid())) {
+            data.info.setPccStorageDirPaths();
+        }
+
         if (agent != null) {
             handleAttachAgent(agent, data.info);
         }
@@ -7981,13 +7987,13 @@ public final class ActivityThread extends ClientTransactionHandler
         /**
          * Switch this process to density compatibility mode if needed.
          */
-// QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2018-02-20: Performance: Activity Trigger frameworks support
         if ((data.appInfo.flags & ApplicationInfo.FLAG_SUPPORTS_SCREEN_DENSITIES)
-// QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
+// QTI_END: 2018-02-20: Performance: Activity Trigger frameworks support
                 == 0) {
             mDensityCompatMode = true;
             Bitmap.setDefaultDensity(DisplayMetrics.DENSITY_DEFAULT);
-// QTI_BEGIN: 2018-02-20: Core: Performance: Activity Trigger frameworks support
+// QTI_BEGIN: 2018-02-20: Performance: Activity Trigger frameworks support
         } else {
             int overrideDensity = data.appInfo.getOverrideDensity();
             if(overrideDensity != 0) {
@@ -7995,7 +8001,7 @@ public final class ActivityThread extends ClientTransactionHandler
                 mDensityCompatMode = true;
                 Bitmap.setDefaultDensity(overrideDensity);
             }
-// QTI_END: 2018-02-20: Core: Performance: Activity Trigger frameworks support
+// QTI_END: 2018-02-20: Performance: Activity Trigger frameworks support
         }
         mConfigurationController.updateDefaultDensity(data.config.densityDpi);
 
@@ -8073,18 +8079,18 @@ public final class ActivityThread extends ClientTransactionHandler
 // QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
         if (!Process.isIsolated()) {
 // QTI_END: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
-// QTI_BEGIN: 2018-11-22: Core: framework: Adding temporary disk access for Boostframework
+// QTI_BEGIN: 2018-11-22: Performance: framework: Adding temporary disk access for Boostframework
             final int old_mask = StrictMode.allowThreadDiskWritesMask();
             try {
-// QTI_END: 2018-11-22: Core: framework: Adding temporary disk access for Boostframework
+// QTI_END: 2018-11-22: Performance: framework: Adding temporary disk access for Boostframework
 // QTI_BEGIN: 2018-12-02: Core: IOP/UXE: This change is related to IOP and UXE Feature.
                 ux_perf = new BoostFramework(appContext);
 // QTI_END: 2018-12-02: Core: IOP/UXE: This change is related to IOP and UXE Feature.
-// QTI_BEGIN: 2018-11-22: Core: framework: Adding temporary disk access for Boostframework
+// QTI_BEGIN: 2018-11-22: Performance: framework: Adding temporary disk access for Boostframework
             } finally {
                  StrictMode.setThreadPolicyMask(old_mask);
             }
-// QTI_END: 2018-11-22: Core: framework: Adding temporary disk access for Boostframework
+// QTI_END: 2018-11-22: Performance: framework: Adding temporary disk access for Boostframework
 // QTI_BEGIN: 2018-10-31: Core: IOP/UXE: This change is related to IOP and UXE Feature.
         }
 
@@ -8246,7 +8252,7 @@ public final class ActivityThread extends ClientTransactionHandler
         }
         if (ux_perf != null && !Process.isIsolated() && pkg_name != null) {
 // QTI_END: 2018-12-02: Core: IOP/UXE: This change is related to IOP and UXE Feature.
-// QTI_BEGIN: 2019-05-30: Core: Perf: Change for AGPE
+// QTI_BEGIN: 2019-05-30: Performance: Perf: Change for AGPE
             String pkgDir = null;
             try
             {
@@ -8257,7 +8263,7 @@ public final class ActivityThread extends ClientTransactionHandler
             {
                 Slog.e(TAG, "HeavyGameThread () : Exception_1 = " + e);
             }
-// QTI_END: 2019-05-30: Core: Perf: Change for AGPE
+// QTI_END: 2019-05-30: Performance: Perf: Change for AGPE
             if (ux_perf.board_first_api_lvl < BoostFramework.VENDOR_T_API_LEVEL &&
                 ux_perf.board_api_lvl < BoostFramework.VENDOR_T_API_LEVEL) {
                 ux_perf.perfUXEngine_events(BoostFramework.UXE_EVENT_BINDAPP, 0,
@@ -8278,22 +8284,26 @@ public final class ActivityThread extends ClientTransactionHandler
         }
 
         // Set binder transaction callback after finishing bindApplication
-        Binder.setTransactionCallback(new IBinderCallback() {
-            @Override
-            public void onTransactionError(int pid, int code, int flags, int err) {
-                final long now = SystemClock.uptimeMillis();
-                if (now < mBinderCallbackLast + BINDER_CALLBACK_THROTTLE) {
-                    Slog.d(TAG, "Too many transaction errors, throttling freezer binder callback.");
-                    return;
-                }
-                mBinderCallbackLast = now;
-                try {
-                    mgr.frozenBinderTransactionDetected(pid, code, flags, err);
-                } catch (RemoteException ex) {
-                    throw ex.rethrowFromSystemServer();
-                }
-            }
-        });
+        Binder.setTransactionCallback(
+                new IBinderCallback() {
+                    @Override
+                    public void onTransactionError(int pid, int code, int flags, int err) {
+                        final long now = SystemClock.uptimeMillis();
+                        if (now < mBinderCallbackLast + BINDER_CALLBACK_THROTTLE) {
+                            Slog.d(
+                                    TAG,
+                                    "Too many transaction errors, throttling transaction error"
+                                        + " callback.");
+                            return;
+                        }
+                        mBinderCallbackLast = now;
+                        try {
+                            mgr.frozenBinderTransactionDetected(pid, code, flags, err);
+                        } catch (RemoteException ex) {
+                            throw ex.rethrowFromSystemServer();
+                        }
+                    }
+                });
 
         // Register callback to report native memory metrics post GC cleanup
         // Note: we do not report memory metrics of isolated processes unless
@@ -8306,6 +8316,13 @@ public final class ActivityThread extends ClientTransactionHandler
                     MetricsLoggerWrapper.logPostGcMemorySnapshot();
                 }
             });
+        }
+
+        // Initialize embedding if needed.
+        if (com.android.window.flags.Flags.virtualGamepadOverride()
+                && CompatChanges.isChangeEnabled(OVERRIDE_ENABLE_VIRTUAL_GAMEPAD)
+                && !Process.isIsolated()) {
+            WindowExtensionsHelper.initEmbedding(app);
         }
     }
 

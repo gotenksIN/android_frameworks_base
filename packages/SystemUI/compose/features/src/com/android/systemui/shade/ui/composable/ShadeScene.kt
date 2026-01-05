@@ -40,6 +40,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -51,7 +52,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.HorizontalRuler
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.dimensionResource
@@ -67,7 +67,6 @@ import com.android.compose.animation.scene.UserActionResult
 import com.android.compose.animation.scene.animateContentFloatAsState
 import com.android.compose.animation.scene.rememberMutableSceneTransitionLayoutState
 import com.android.compose.animation.scene.transitions
-import com.android.compose.gesture.effect.rememberOffsetOverscrollEffect
 import com.android.compose.gesture.gesturesDisabled
 import com.android.compose.lifecycle.LaunchedEffectWithLifecycle
 import com.android.compose.modifiers.padding
@@ -111,16 +110,13 @@ import kotlinx.coroutines.flow.Flow
 
 object Shade {
     object Elements {
+        val ShadeElement = ElementKey("ShadeElement")
         val BackgroundScrim =
             ElementKey("ShadeBackgroundScrim", contentPicker = LowestZIndexContentPicker)
     }
 
     object Dimensions {
         val HorizontalPadding = 16.dp
-    }
-
-    object Rulers {
-        val SingleShadeNestedScrollLayoutBottom = HorizontalRuler()
     }
 }
 
@@ -161,17 +157,22 @@ constructor(
             }
         val notificationsPlaceholderViewModel =
             rememberViewModel("ShadeScene-notifPlaceholderViewModel") {
-                notificationsPlaceholderViewModelFactory.create()
+                notificationsPlaceholderViewModelFactory.create(Scenes.Shade)
             }
-        val isShadeBlurred = viewModel.isShadeBlurred
-        val shadeBlurRadius = with(LocalDensity.current) { viewModel.shadeBlurRadius.toDp() }
+        val targetBlur by
+            remember(layoutState) {
+                derivedStateOf { viewModel.calculateBlur(layoutState.transitionState) }
+            }
+        val animatedBlurRadiusPx: Float by
+            animateFloatAsState(targetValue = targetBlur, label = "Shade-blurRadius")
+        modifier.element(Shade.Elements.ShadeElement)
         ShadeScene(
             notificationStackScrollView.get(),
             viewModel = viewModel,
             headerViewModel = headerViewModel,
             notificationsPlaceholderViewModel = notificationsPlaceholderViewModel,
             jankMonitor = jankMonitor,
-            modifier = modifier.thenIf(isShadeBlurred) { Modifier.blur(shadeBlurRadius) },
+            modifier = modifier.blur(with(LocalDensity.current) { animatedBlurRadiusPx.toDp() }),
             shadeSession = shadeSession,
         )
     }
@@ -257,7 +258,7 @@ private fun ContentScope.SingleShade(
 
     LaunchedEffectWithLifecycle(Unit) { viewModel.detectShadeModeChanges() }
 
-    val shouldPunchHoleBehindScrim =
+    val onlyPunchHolesInThisScene =
         layoutState.isTransitioningBetween(Scenes.Gone, Scenes.Shade) ||
             layoutState.isTransitioning(from = Scenes.Lockscreen, to = Scenes.Shade)
     val mediaInRow = viewModel.showMediaInRow
@@ -269,9 +270,10 @@ private fun ContentScope.SingleShade(
 
     Box(
         modifier =
-            modifier.thenIf(shouldPunchHoleBehindScrim) {
+            modifier.thenIf(onlyPunchHolesInThisScene) {
                 // Render the scene to an offscreen buffer so that BlendMode.DstOut only clears this
-                // scene (and not the one under it) during a scene transition.
+                // scene (and not the one under it). It is used to saves the LS content from being
+                // cut out during the LS -> Shade transition.
                 Modifier.graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
             }
     ) {
@@ -282,7 +284,6 @@ private fun ContentScope.SingleShade(
             ) {
                 ScrollState(initial = 0)
             }
-        val scrimOverscrollEffect = rememberOffsetOverscrollEffect()
 
         ShadePanelScrim(viewModel.isTransparencyEnabled)
         SingleShadeNestedScrollLayout(
@@ -295,7 +296,6 @@ private fun ContentScope.SingleShade(
             shadeSession = shadeSession,
             viewModel = notificationsPlaceholderViewModel,
             scrollState = scrollState,
-            scrimOverScrollEffect = scrimOverscrollEffect,
             jankMonitor = jankMonitor,
             statusBarHeader = {
                 CollapsedShadeHeader(viewModel = headerViewModel, isSplitShade = false)
@@ -360,13 +360,13 @@ private fun ContentScope.SingleShade(
                     mediaInRow = mediaInRow,
                 )
             },
-            scrollableScrim = { onContentHeightChanged ->
+            scrollableScrim = { onContentHeightChanged, scrimOverscrollEffect ->
                 NestedScrollingNotificationPanel(
                     tag = "$tag.Single",
                     shadeSession = shadeSession,
                     stackScrollView = notificationStackScrollView,
                     viewModel = notificationsPlaceholderViewModel,
-                    shouldPunchHoleBehindScrim = shouldPunchHoleBehindScrim,
+                    shouldPunchHoleBehindScrim = true,
                     isTransparencyEnabled = viewModel.isTransparencyEnabled,
                     stackTopPadding = notificationStackPadding,
                     stackBottomPadding = navBarHeight,
@@ -471,13 +471,15 @@ private fun ContentScope.SplitShade(
         ShadePanelScrim(viewModel.isTransparencyEnabled)
 
         Column(modifier = Modifier.fillMaxSize()) {
-            val unfoldTranslationXForStartSide = viewModel.unfoldTranslationXForStartSide
-
             CollapsedShadeHeader(
                 viewModel = headerViewModel,
                 isSplitShade = true,
                 modifier =
-                    Modifier.padding(horizontal = { unfoldTranslationXForStartSide.roundToInt() }),
+                    // unfoldTranslationXForStartSide may be updated every frame, so only read value
+                    // in the layout phase by using lambda.
+                    Modifier.padding(
+                        horizontal = { viewModel.unfoldTranslationXForStartSide.roundToInt() }
+                    ),
             )
 
             Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
@@ -486,7 +488,11 @@ private fun ContentScope.SplitShade(
                         Modifier.element(SplitShadeQuickSettings)
                             .overscroll(verticalOverscrollEffect)
                             .weight(1f)
-                            .graphicsLayer { translationX = unfoldTranslationXForStartSide }
+                            // unfoldTranslationXForStartSide may be updated every frame, so only
+                            // read value in the draw phase.
+                            .graphicsLayer {
+                                translationX = viewModel.unfoldTranslationXForStartSide
+                            }
                             .fillMaxSize()
                             .padding(bottom = navBarBottomHeight)
                 ) {
@@ -511,6 +517,7 @@ private fun ContentScope.SplitShade(
                         NestedSceneTransitionLayout(
                             state = sceneState,
                             modifier = Modifier.fillMaxSize(),
+                            debugName = "SplitShade",
                         ) {
                             scene(QS) {
                                 val tileSquishiness by

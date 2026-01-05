@@ -81,12 +81,17 @@
     <string name="screenshot_saving_private_profile" msgid="8934706048497093297">"កំពុងរក្សាទុករូបថត​អេក្រង់ទៅក្នុងកម្រងព័ត៌មានឯកជន"</string>
     <string name="screenshot_saved_title" msgid="8893267638659083153">"បានរក្សាទុក​រូបថតអេក្រង់"</string>
     <string name="screenshot_failed_title" msgid="3259148215671936891">"មិន​អាច​រក្សាទុក​រូបថត​អេក្រង់បានទេ"</string>
+    <string name="screenshot_save_to" msgid="3294574417295882864">"រក្សា​ទុក​ទៅ"</string>
+    <string name="screenshot_select_folder" msgid="4770537414396025502">"ជ្រើស​ថត"</string>
+    <string name="screenshot_custom_uri_save_fail_title" msgid="1584124511048051054">"បានរក្សាទុកទៅថត %1$s"</string>
+    <string name="screenshot_custom_uri_save_fail_message" msgid="8548656555271518389">"មានអ្វីមួយខុសប្រក្រតី។ មិនអាចរក្សាទុកទៅថត \"%1$s\" បានទេ។"</string>
     <string name="screenshot_failed_external_display_indication" msgid="6555673132061101936">"ផ្ទាំង​អេក្រង់​ខាង​ក្រៅ"</string>
     <string name="screenshot_failed_to_save_user_locked_text" msgid="6156607948256936920">"ត្រូវតែ​ដោះសោ​ឧបករណ៍​ជាមុនសិន ទើបអាច​រក្សាទុក​រូបថតអេក្រង់​បាន"</string>
     <string name="screenshot_failed_to_save_unknown_text" msgid="1506621600548684129">"សាកល្បង​ថតរូបថត​អេក្រង់​ម្តងទៀត"</string>
     <string name="screenshot_failed_to_save_text" msgid="7232739948999195960">"មិនអាច​រក្សាទុករូបថត​អេក្រង់បានទេ"</string>
     <string name="screenshot_failed_to_capture_text" msgid="7818288545874407451">"ការថត​រូបអេក្រង់​មិនត្រូវ​បាន​អនុញ្ញាត​ដោយ​កម្មវិធី​នេះ ឬ​ស្ថាប័ន​របស់អ្នក"</string>
     <string name="screenshot_blocked_by_admin" msgid="5486757604822795797">"ការថតអេក្រង់ត្រូវបានទប់ស្កាត់ដោយអ្នកគ្រប់គ្រង​ផ្នែកព័ត៌មានវិទ្យារបស់អ្នក"</string>
+    <string name="screenshot_copy_description" msgid="2857172429942249976">"ចម្លងរូបថតអេក្រង់ទៅឃ្លីបបត"</string>
     <string name="screenshot_edit_label" msgid="8754981973544133050">"កែ"</string>
     <string name="screenshot_edit_description" msgid="7802378587672433507">"ប៊ូតុងកែរូបថត​អេក្រង់"</string>
     <string name="screenshot_share_label" msgid="1653061117238861559">"ចែករំលែក"</string>
@@ -171,12 +176,9 @@
     <string name="screen_share_audio_sharing_text" msgid="7829391478284315787">"ស្ដាប់សំឡេងរួមគ្នា"</string>
     <string name="screen_share_app_window_sharing_title" msgid="2063554880747318383">"បង្ហាញវិនដូកម្មវិធី"</string>
     <string name="screen_share_tab_sharing_title" msgid="1178046793832072728">"ចែករំលែកផ្ទាំង"</string>
-    <!-- no translation found for screen_share_entire_screen_sharing_title (9093580141248337998) -->
-    <skip />
-    <!-- no translation found for screen_share_disclaimer_app_sharing (4191319837838590771) -->
-    <skip />
-    <!-- no translation found for screen_share_disclaimer_full_screen_sharing (6445373139864031364) -->
-    <skip />
+    <string name="screen_share_entire_screen_sharing_title" msgid="9093580141248337998">"បង្ហាញអេក្រង់​ទាំង​មូល"</string>
+    <string name="screen_share_disclaimer_app_sharing" msgid="4191319837838590771">"ពេលអ្នកបង្ហាញកម្មវិធីណាមួយ [APP NAME] មើលឃើញអ្វីៗដែលបង្ហាញ ឬចាក់លើកម្មវិធីនោះ។ ដូច្នេះ សូមប្រុងប្រយ័ត្នចំពោះអ្វីៗ ដូចជាពាក្យសម្ងាត់ ព័ត៌មានទូទាត់ប្រាក់ សារ រូបថត ព្រមទាំងសំឡេង និងវីដេអូ។"</string>
+    <string name="screen_share_disclaimer_full_screen_sharing" msgid="6445373139864031364">"ពេលអ្នកបង្ហាញអេក្រង់ទាំងមូលរបស់អ្នក [APP NAME] មើលឃើញអ្វីៗនៅលើអេក្រង់របស់អ្នក។ ដូច្នេះ សូមប្រុងប្រយ័ត្នចំពោះអ្វីៗ ដូចជាពាក្យសម្ងាត់ ព័ត៌មានទូទាត់ប្រាក់ សារ រូបថត ព្រមទាំងសំឡេង និងវីដេអូ។"</string>
     <string name="screen_capture_toolbar_app_window_button_screenshot_a11y" msgid="1357560392667941303">"ថតរូបអេក្រង់វិនដូ"</string>
     <string name="screen_capture_toolbar_app_window_button_record_a11y" msgid="8984966592912823394">"ថត​វិនដូ"</string>
     <string name="screen_capture_toolbar_region_button_screenshot_a11y" msgid="2102262602357521192">"ថតរូបអេក្រង់នៃតំបន់ដែលបានជ្រើសរើស"</string>
@@ -709,6 +711,7 @@
     <string name="clear_all_notifications_text" msgid="348312370303046130">"សម្អាត​ទាំងអស់"</string>
     <string name="manage_notifications_text" msgid="6885645344647733116">"គ្រប់គ្រង"</string>
     <string name="manage_notifications_history_text" msgid="57055985396576230">"ប្រវត្តិ"</string>
+    <string name="notification_dismiss_button_text" msgid="2443352751894142153">"បិទ"</string>
     <string name="notification_settings_button_description" msgid="2441994740884163889">"ការ​កំណត់​ការ​ជូនដំណឹង"</string>
     <string name="notification_history_button_description" msgid="1578657591405033383">"ប្រវត្តិ​នៃការ​ជូន​ដំណឹង"</string>
     <string name="notification_section_header_incoming" msgid="850925217908095197">"ថ្មី"</string>
@@ -727,7 +730,8 @@
     <string name="adaptive_notification_edu_hun_text" msgid="7743367744129536610">"កម្រិតសំឡេង និងការជូនដំណឹងនៅលើឧបករណ៍របស់អ្នកត្រូវបានកាត់បន្ថយដោយស្វ័យប្រវត្តិរហូតដល់ 2 នាទី នៅពេលអ្នកទទួលបានការជូនដំណឹងច្រើនពេកក្នុងពេលតែមួយ។"</string>
     <string name="go_to_adaptive_notification_settings" msgid="2423690125178298479">"បិទ"</string>
     <string name="unlock_to_see_notif_text" msgid="7439033907167561227">"ដោះសោដើម្បីមើលការជូនដំណឹងចាស់ៗ"</string>
-    <string name="quick_settings_disclosure_parental_controls" msgid="2114102871438223600">"ឧបករណ៍​នេះ​ស្ថិត​ក្រោម​ការ​គ្រប់គ្រង​របស់មាតាបិតាអ្នក"</string>
+    <string name="quick_settings_disclosure_parental_controls" msgid="5560100935261229784">"ការកំណត់មួយចំនួនត្រូវបានគ្រប់គ្រងដោយមាតាបិតារបស់អ្នក"</string>
+    <string name="quick_settings_disclosure_parental_controls_legacy" msgid="4116797775361496057">"ឧបករណ៍នេះស្ថិតក្រោមការគ្រប់គ្រងរបស់មាតាបិតាអ្នក"</string>
     <string name="quick_settings_disclosure_pin_protection" msgid="9219481515114868267">"ការកំណត់ឧបករណ៍មួយចំនួនត្រូវបានការពារដោយកូដ PIN។"</string>
     <string name="quick_settings_disclosure_management_monitoring" msgid="8231336875820702180">"ស្ថាប័ន​របស់អ្នក​ជាម្ចាស់​ឧបករណ៍​នេះ ហើយ​អាចនឹង​តាមដាន​ចរាចរណ៍បណ្តាញ"</string>
     <string name="quick_settings_disclosure_named_management_monitoring" msgid="2831423806103479812">"<xliff:g id="ORGANIZATION_NAME">%1$s</xliff:g> ជាម្ចាស់​ឧបករណ៍​នេះ ហើយ​អាចនឹង​តាមដាន​ចរាចរណ៍​បណ្តាញ"</string>
@@ -832,6 +836,8 @@
     <string name="volume_stream_content_description_vibrate_a11y" msgid="2742330052979397471">"%1$s ។ ចុច​ដើម្បី​កំណត់​ឲ្យ​ញ័រ។"</string>
     <string name="volume_stream_content_description_mute_a11y" msgid="5743548478357238156">"%1$s ។ ចុច​ដើម្បី​បិទ​សំឡេង។"</string>
     <string name="volume_panel_noise_control_title" msgid="7413949943872304474">"ការគ្រប់គ្រង​សំឡេងរំខាន"</string>
+    <!-- no translation found for volume_panel_mic_noise_cancellation_title (2324838199042895036) -->
+    <skip />
     <string name="volume_panel_spatial_audio_title" msgid="3367048857932040660">"សំឡេងលំហ"</string>
     <string name="volume_panel_spatial_audio_off" msgid="4177490084606772989">"បិទ"</string>
     <string name="volume_panel_spatial_audio_fixed" msgid="3136080137827746046">"ថេរ"</string>
@@ -903,6 +909,7 @@
     <string name="tuner_toast" msgid="3812684836514766951">"សូមអបអរសាទរ! កម្មវិធីសម្រួល UI ប្រព័ន្ធត្រូវបានបន្ថែមទៅការកំណត់ហើយ"</string>
     <string name="remove_from_settings" msgid="633775561782209994">"យកចេញពីការកំណត់"</string>
     <string name="remove_from_settings_prompt" msgid="551565437265615426">"យកកម្មវិធីសម្រួល UI ប្រព័ន្ធចេញពីការកំណត់ ហើយឈប់ប្រើលក្ខណៈពិសេសរបស់វាទាំងអស់?"</string>
+    <string name="qs_customize_remove" msgid="1840904349092819026">"ដកចេញ"</string>
     <string name="enable_bluetooth_title" msgid="866883307336662596">"បើកប៊្លូធូសឬ?"</string>
     <string name="enable_bluetooth_message" msgid="6740938333772779717">"ដើម្បីភ្ជាប់ក្តារចុចរបស់អ្នកជាមួយនឹងថេប្លេតរបស់អ្នក អ្នកត្រូវតែបើកប៊្លូធូសជាមុនសិន។"</string>
     <string name="enable_bluetooth_confirmation_ok" msgid="2866408183324184876">"បើក"</string>
@@ -922,15 +929,23 @@
     <string name="inline_done_button" msgid="6043094985588909584">"រួចរាល់"</string>
     <string name="inline_ok_button" msgid="603075490581280343">"ប្រើ"</string>
     <string name="inline_turn_off_notifications" msgid="2653064779176881329">"បិទ"</string>
+    <string name="bridged_device_type_phone" msgid="7971199513068521770">"ទូរសព្ទ"</string>
+    <string name="bridged_device_type_tablet" msgid="7403330807933649592">"ថេប្លេត"</string>
+    <string name="bridged_device_type_laptop" msgid="8027976360936787349">"កុំព្យូទ័រ​យួរ​ដៃ"</string>
+    <string name="bridged_device_type_watch" msgid="2634106046119813073">"នាឡិកា"</string>
+    <string name="bridged_device_type_tv" msgid="5471822369478942796">"ទូរទស្សន៍"</string>
+    <string name="inline_bridged_open_associated_device_settings" msgid="6885442224230065508">"បើក​ការកំណត់<xliff:g id="DEVICE_TYPE">%1$s</xliff:g>"</string>
     <string name="notification_silence_title" msgid="8608090968400832335">"ស្ងាត់"</string>
     <string name="notification_alert_title" msgid="3656229781017543655">"លំនាំដើម"</string>
     <string name="notification_automatic_title" msgid="3745465364578762652">"ស្វ័យប្រវត្តិ"</string>
+    <string name="notification_bridged_title" msgid="4213554380230273828">"ការជូនដំណឹងនេះមកពី<xliff:g id="DEVICE_TYPE">%1$s</xliff:g>របស់អ្នក"</string>
     <string name="notification_channel_summary_low" msgid="4860617986908931158">"គ្មាន​សំឡេង ឬការញ័រទេ"</string>
     <string name="notification_conversation_summary_low" msgid="3855696451919728790">"មិនមានសំឡេង ឬការ​ញ័រទេ ប៉ុន្តែនៅតែបង្ហាញនៅក្នុងផ្នែកសន្ទនាដដែល"</string>
     <string name="notification_channel_summary_default" msgid="777294388712200605">"អាចរោទ៍ ឬញ័រ ដោយផ្អែកលើ​ការកំណត់ឧបករណ៍"</string>
     <string name="notification_channel_summary_default_with_bubbles" msgid="3482483084451555344">"អាចរោទ៍ ឬញ័រ ដោយផ្អែកលើ​ការកំណត់ឧបករណ៍។ ការសន្ទនា​ពីផ្ទាំងអណ្ដែត <xliff:g id="APP_NAME">%1$s</xliff:g> តាម​លំនាំដើម​។"</string>
     <string name="notification_channel_summary_automatic" msgid="5813109268050235275">"ឱ្យប្រព័ន្ធកំណត់ថាតើ​ការជូនដំណឹងនេះ​គួរតែបន្លឺសំឡេង ឬញ័រ"</string>
     <string name="notification_channel_summary_automatic_alerted" msgid="954166812246932240">"&lt;b&gt;ស្ថានភាព៖&lt;/b&gt; បានដំឡើងទៅ​លំនាំដើម"</string>
+    <string name="notification_channel_summary_bridged" msgid="6837698421232117637">"អាចកែតម្រូវការកំណត់ និងអាទិភាពនៃការជូនដំណឹងដែលបានធ្វើសមកាលកម្មនៅលើ <xliff:g id="DEVICE_NAME">%1$s</xliff:g> របស់អ្នក"</string>
     <string name="notification_channel_summary_automatic_silenced" msgid="7403004439649872047">"&lt;b&gt;ស្ថានភាព៖&lt;/b&gt; បានបញ្ចុះទៅស្ងាត់"</string>
     <string name="notification_channel_summary_automatic_promoted" msgid="1301710305149590426">"&lt;b&gt;ស្ថានភាព៖&lt;/b&gt; បានចាត់ថ្នាក់ខ្ពស់ជាងមុន"</string>
     <string name="notification_channel_summary_automatic_demoted" msgid="1831303964660807700">"&lt;b&gt;ស្ថានភាព៖&lt;/b&gt; បានចាត់ថ្នាក់ទាបជាងមុន"</string>
@@ -950,8 +965,7 @@
     <string name="notification_unblockable_call_desc" msgid="5907328164696532169">"មិនអាច​កែប្រែ​ការជូនដំណឹងអំពីការហៅទូរសព្ទបានទេ។"</string>
     <string name="notification_multichannel_desc" msgid="7414593090056236179">"មិនអាច​កំណត់​រចនាសម្ព័ន្ធ​ក្រុមការជូនដំណឹងនេះ​នៅទីនេះ​បានទេ"</string>
     <string name="notification_delegate_header" msgid="1264510071031479920">"ការជូនដំណឹង​ជា​ប្រូកស៊ី"</string>
-    <!-- no translation found for notification_summarization_header (511445254923268688) -->
-    <skip />
+    <string name="notification_summarization_header" msgid="511445254923268688">"បានសង្ខេបដោយ <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="notification_channel_dialog_title" msgid="6856514143093200019">"ការជូន​ដំណឹងទាំងអស់​ពី​<xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="see_more_title" msgid="7409317011708185729">"មើលច្រើនទៀត"</string>
     <string name="feedback_alerted" msgid="5192459808484271208">"ការជូនដំណឹងនេះ​ត្រូវបាន&lt;b&gt;ដំឡើង​ទៅលំនាំដើម&lt;/b&gt;ដោយប្រព័ន្ធ​ដោយស្វ័យប្រវត្តិ។"</string>
@@ -1258,6 +1272,7 @@
     <string name="privacy_type_location" msgid="7991481648444066703">"ទីតាំង"</string>
     <string name="privacy_type_microphone" msgid="9136763906797732428">"មីក្រូហ្វូន"</string>
     <string name="privacy_type_media_projection" msgid="8136723828804251547">"ការថតវីដេអូអេក្រង់"</string>
+    <string name="privacy_chip_container_leading_title" msgid="4911201935798986077">"ឯកជនភាព"</string>
     <string name="music_controls_no_title" msgid="4166497066552290938">"គ្មាន​ចំណងជើង"</string>
     <string name="inattentive_sleep_warning_title" msgid="3891371591713990373">"ផ្អាក​ដំណើរការ"</string>
     <string name="font_scaling_dialog_title" msgid="6273107303850248375">"ទំហំពុម្ពអក្សរ"</string>
@@ -1405,13 +1420,13 @@
     <string name="media_output_dialog_accessibility_title" msgid="4681741064190167888">"ឧបករណ៍​ដែលអាច​ប្រើបាន​សម្រាប់ឧបករណ៍​បញ្ចេញ​សំឡេង។"</string>
     <string name="media_output_dialog_accessibility_seekbar" msgid="5332843993805568978">"កម្រិតសំឡេង"</string>
     <string name="media_output_dialog_volume_percentage" msgid="1613984910585111798">"<xliff:g id="PERCENTAGE">%1$d</xliff:g>%%"</string>
+    <string name="media_output_dialog_missing_permissions_warning" msgid="1279351363821022727">"មិនអាចមើលឃើញឧបករណ៍មួយចំនួនទេ។ ធ្វើបច្ចុប្បន្នភាពការអនុញ្ញាតកម្មវិធីរបស់អ្នក"</string>
+    <string name="media_output_dialog_warning_button_fix" msgid="3324600211761037516">"កែ"</string>
     <string name="media_output_group_title_connected_speakers" msgid="3413876972919684479">"ឧបករណ៍បំពងសំឡេងតភ្ជាប់"</string>
     <string name="media_output_group_title_speakers_and_displays" msgid="7169712332365659820">"ឧបករណ៍បំពងសំឡេង និងផ្ទាំងអេក្រង់"</string>
     <string name="media_output_group_title_suggested" msgid="5097061363820410332">"បាន​ណែនាំ"</string>
     <string name="media_input_group_title" msgid="2057057473860783021">"ឧបករណ៍​បញ្ចូល"</string>
     <string name="media_output_group_title" msgid="6789001895863332576">"ឧបករណ៍បញ្ចេញ"</string>
-    <string name="media_output_end_session_dialog_summary" msgid="5954520685989877347">"បញ្ឈប់វគ្គដែលអ្នក​បានចែករំលែក ដើម្បីផ្លាស់ទីមេឌៀ​ទៅឧបករណ៍​ផ្សេងទៀត"</string>
-    <string name="media_output_end_session_dialog_stop" msgid="208189434474624412">"បញ្ឈប់"</string>
     <string name="media_output_dialog_button_stop_sharing" msgid="5043482739689716185">"ឈប់​ចែក​រំលែក"</string>
     <string name="media_output_dialog_button_sharing_audio" msgid="8312910741492835648">"កំពុងចែករំលែកសំឡេង"</string>
     <string name="media_output_dialog_button_share_audio" msgid="827604934548421520">"ចែករំលែកសំឡេង"</string>
@@ -1736,12 +1751,15 @@
     <string name="dual_shade_educational_tooltip_notifs" msgid="7666159428113013319">"អូសពីខាងឆ្វេងផ្នែកខាងលើដើម្បីបើកការជូនដំណឹង"</string>
     <string name="dual_shade_educational_tooltip_qs" msgid="3842355853737057332">"អូសពីខាងស្ដាំផ្នែកខាងលើដើម្បីបើកការកំណត់រហ័ស"</string>
     <string name="back_button_on_bouncer" msgid="809134628434396761">"ថយក្រោយ"</string>
-    <!-- no translation found for sign_in_button_on_bouncer (3595960142516902559) -->
-    <skip />
+    <string name="sign_in_button_on_bouncer" msgid="3595960142516902559">"ចូលគណនី"</string>
     <string name="accessibility_button_on_bouncer_description" msgid="9186344135931507168">"ភាពងាយស្រួល"</string>
     <string name="pager_dots_previous_content_description" msgid="26963508904918908">"មុន"</string>
     <string name="pager_dots_next_content_description" msgid="613943992626163120">"បន្ទាប់"</string>
     <string name="accessibility_pager_dots_navigate_to_next_page_action" msgid="7662720613169169465">"រុក​រក​ទៅ​ទំព័រ​បន្ទាប់"</string>
     <string name="ambient_cue_autofill_action" msgid="9213025887835308128">"បំពេញស្វ័យប្រវត្តិ"</string>
     <string name="ambient_cue_expand_action" msgid="6803711089932959312">"ពង្រីក"</string>
+    <string name="location_button_text_share_precise_location" msgid="5341882050169860712">"ចែករំលែកទីតាំងជាក់លាក់"</string>
+    <string name="location_button_text_use_precise_location" msgid="3499475231656390476">"ប្រើទីតាំងជាក់លាក់"</string>
+    <string name="location_button_text_near_precise_location" msgid="3607275724182981412">"នៅជិតទីតាំងជាក់លាក់"</string>
+    <string name="location_button_text_precise_location" msgid="4441259889842542799">"ទីតាំងជាក់លាក់"</string>
 </resources>

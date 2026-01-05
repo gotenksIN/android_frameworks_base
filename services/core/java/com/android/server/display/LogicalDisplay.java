@@ -18,6 +18,7 @@ package com.android.server.display;
 
 import static android.view.Display.Mode.INVALID_MODE_ID;
 
+import static com.android.server.display.DisplayDeviceInfo.FLAG_ALLOWS_CONTENT_MODE_SWITCH;
 import static com.android.server.display.DisplayDeviceInfo.TOUCH_NONE;
 import static com.android.server.display.layout.Layout.Display.POSITION_REAR;
 import static com.android.server.wm.utils.DisplayInfoOverrides.WM_OVERRIDE_FIELDS;
@@ -45,7 +46,6 @@ import android.view.SurfaceControl;
 import com.android.server.display.feature.flags.Flags;
 import com.android.server.display.layout.Layout;
 import com.android.server.display.mode.DisplayModeDirector;
-import com.android.server.display.mode.SyntheticModeManager;
 import com.android.server.display.utils.DebugUtils;
 import com.android.server.wm.utils.InsetUtils;
 
@@ -230,7 +230,6 @@ final class LogicalDisplay {
 
     private final boolean mSyncedResolutionSwitchEnabled;
 
-    private final boolean mSyntheticModesV2Enabled;
     private final boolean mSizeOverrideEnabled;
 
     private boolean mCanHostTasks;
@@ -238,13 +237,11 @@ final class LogicalDisplay {
 
     LogicalDisplay(int displayId, int layerStack, DisplayDevice primaryDisplayDevice,
             CopyOnWriteSparseArray<CachedDisplayInfo> displayInfoCache) {
-        this(displayId, layerStack, primaryDisplayDevice, false,
-                true, false, displayInfoCache);
+        this(displayId, layerStack, primaryDisplayDevice, false, false, displayInfoCache);
     }
 
     LogicalDisplay(int displayId, int layerStack, DisplayDevice primaryDisplayDevice,
-            boolean isSyncedResolutionSwitchEnabled, boolean syntheticModesV2Enabled,
-            boolean sizeOverrideEnabled,
+            boolean isSyncedResolutionSwitchEnabled, boolean sizeOverrideEnabled,
             CopyOnWriteSparseArray<CachedDisplayInfo> displayInfoCache) {
         mDisplayId = displayId;
         mLayerStack = layerStack;
@@ -257,7 +254,6 @@ final class LogicalDisplay {
         mPowerThrottlingDataId = DisplayDeviceConfig.DEFAULT_ID;
         mBaseDisplayInfo.thermalBrightnessThrottlingDataId = mThermalBrightnessThrottlingDataId;
         mSyncedResolutionSwitchEnabled = isSyncedResolutionSwitchEnabled;
-        mSyntheticModesV2Enabled = syntheticModesV2Enabled;
         mSizeOverrideEnabled = sizeOverrideEnabled;
         mDisplayInfoCache = displayInfoCache;
 
@@ -319,7 +315,8 @@ final class LogicalDisplay {
         copyDisplayInfoFields(info, mBaseDisplayInfo, mOverrideDisplayInfo,
                 WM_OVERRIDE_FIELDS);
         if (Flags.displayInfoCopyOnWriteCacheEnabled() && info.supportedModes.length > 0) {
-            mDisplayInfoCache.put(info.displayId, new CachedDisplayInfo(info, mFrameRateOverrides));
+            mDisplayInfoCache.put(info.displayId,
+                    new CachedDisplayInfo(mIsEnabled, info, mFrameRateOverrides));
         }
         return info;
     }
@@ -453,8 +450,7 @@ final class LogicalDisplay {
      *
      * @param deviceRepo Repository of active {@link DisplayDevice}s.
      */
-    public void updateLocked(DisplayDeviceRepository deviceRepo,
-            SyntheticModeManager syntheticModeManager) {
+    public void updateLocked(DisplayDeviceRepository deviceRepo) {
         // Nothing to update if already invalid.
         if (mPrimaryDisplayDevice == null) {
             return;
@@ -566,14 +562,11 @@ final class LogicalDisplay {
             mBaseDisplayInfo.frameRateCategoryRate = deviceInfo.frameRateCategoryRate;
             mBaseDisplayInfo.supportedRefreshRates = Arrays.copyOf(
                     deviceInfo.supportedRefreshRates, deviceInfo.supportedRefreshRates.length);
+            mBaseDisplayInfo.frameRateVelocityMapping = config.getFrameRateVelocityMapping();
             mBaseDisplayInfo.defaultModeId = deviceInfo.defaultModeId;
             mBaseDisplayInfo.userPreferredModeId = deviceInfo.userPreferredModeId;
             mBaseDisplayInfo.supportedModes = Arrays.copyOf(
                     deviceInfo.supportedModes, deviceInfo.supportedModes.length);
-            mBaseDisplayInfo.appsSupportedModes = mSyntheticModesV2Enabled
-                    ? Arrays.copyOf(deviceInfo.supportedModes, deviceInfo.supportedModes.length)
-                    : syntheticModeManager.createAppSupportedModes(config,
-                            mBaseDisplayInfo.supportedModes, mBaseDisplayInfo.hasArrSupport);
             mBaseDisplayInfo.colorMode = deviceInfo.colorMode;
             mBaseDisplayInfo.supportedColorModes = Arrays.copyOf(
                     deviceInfo.supportedColorModes,
@@ -661,6 +654,18 @@ final class LogicalDisplay {
         Display.Mode[] modes = deviceInfo.supportedModes;
         int selectedModeId = deviceInfo.modeId;
         int userPreferredModeId = deviceInfo.userPreferredModeId;
+
+        // external display with no userPreferredMode selected
+        if (Flags.anisotropyCorrectedModeByDefault() && userPreferredModeId == INVALID_MODE_ID
+                && deviceInfo.type == Display.TYPE_EXTERNAL) {
+            // we will try to find corresponding anisotropy corrected mode
+            for (Display.Mode mode : modes) {
+                if (selectedModeId == mode.getParentModeId()
+                        && (mode.getFlags() & Display.Mode.FLAG_ANISOTROPY_CORRECTION) != 0) {
+                    return mode;
+                }
+            }
+        }
 
         if (userPreferredModeId == INVALID_MODE_ID) {
             return null;
@@ -1122,6 +1127,12 @@ final class LogicalDisplay {
             return true;
         }
 
+        // The display doesn't allow dynamic content mode switch can always host tasks.
+        if ((mPrimaryDisplayDevice.getDisplayDeviceInfoLocked().flags
+                & FLAG_ALLOWS_CONTENT_MODE_SWITCH) == 0) {
+            return true;
+        }
+
         return canHostTasks;
     }
 
@@ -1320,6 +1331,7 @@ final class LogicalDisplay {
      */
     @SuppressWarnings("ArrayRecordComponent")
     public record CachedDisplayInfo(
+            boolean isEnabled,
             DisplayInfo info,
-            DisplayEventReceiver.FrameRateOverride[] frameRateOverrides) {}
+            DisplayEventReceiver.FrameRateOverride[] frameRateOverrides) { }
 }

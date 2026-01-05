@@ -174,6 +174,7 @@ public class CarrierConfigManager {
     public static final String ACTION_CARRIER_CONFIG_CHANGED =
             "android.telephony.action.CARRIER_CONFIG_CHANGED";
 
+// QTI_BEGIN: 2022-12-15: Telephony: Define action ESSENTIAL_RECORDS_LOADED
     /**
      * Intent action broadcasted when essential records are loaded.
      * requires permission "com.qti.permission.RECEIVE_ESSENTIAL_RECORDS_LOADED".
@@ -183,6 +184,7 @@ public class CarrierConfigManager {
     public static final String ACTION_ESSENTIAL_RECORDS_LOADED =
             "org.codeaurora.intent.action.ESSENTIAL_RECORDS_LOADED";
 
+// QTI_END: 2022-12-15: Telephony: Define action ESSENTIAL_RECORDS_LOADED
     // Below are the keys used in carrier config bundles. To add a new variable, define the key and
     // give it a default value in sDefaults. If you need to ship a per-network override in the
     // system image, that can be added in packages/apps/CarrierConfig.
@@ -262,6 +264,7 @@ public class CarrierConfigManager {
     public static final String KEY_CALL_FORWARDING_WHEN_BUSY_SUPPORTED_BOOL =
             "call_forwarding_when_busy_supported_bool";
 
+// QTI_BEGIN: 2021-10-25: Telephony: Add carrier config call_forwarding_when_not_logged_in_supported_bool
     /**
      * Boolean indicating if carrier supports call forwarding option "When not logged in".
      *
@@ -275,6 +278,7 @@ public class CarrierConfigManager {
     public static final String KEY_CALL_FORWARDING_WHEN_NOT_LOGGED_IN_SUPPORTED_BOOL =
             "call_forwarding_when_not_logged_in_supported_bool";
 
+// QTI_END: 2021-10-25: Telephony: Add carrier config call_forwarding_when_not_logged_in_supported_bool
     /**
      * Boolean indicating if the "Caller ID" item is visible in the Additional Settings menu.
      * true means visible. false means gone.
@@ -896,6 +900,7 @@ public class CarrierConfigManager {
      */
     public static final String KEY_VILTE_DATA_IS_METERED_BOOL = "vilte_data_is_metered_bool";
 
+// QTI_BEGIN: 2018-04-03: Telephony: IMS: Add flag to control reset UT capability
     /**
      * Flag indicating whether we should reset UT capability or not for IMS deregistration
      * and for IMS feature state not ready
@@ -904,6 +909,7 @@ public class CarrierConfigManager {
     public static final String KEY_IGNORE_RESET_UT_CAPABILITY_BOOL =
             "ignore_reset_ut_capability_bool";
 
+// QTI_END: 2018-04-03: Telephony: IMS: Add flag to control reset UT capability
     /**
      * Flag specifying whether WFC over IMS should be available for carrier: independent of
      * carrier provisioning. If false: hard disabled. If true: then depends on carrier
@@ -920,6 +926,7 @@ public class CarrierConfigManager {
     public static final String KEY_CARRIER_CROSS_SIM_IMS_AVAILABLE_BOOL =
             "carrier_cross_sim_ims_available_bool";
 
+// QTI_BEGIN: 2024-01-11: Telephony: Add config to show signal strength for MSIM CIWLAN
     /**
      * Flag specifying whether Cross SIM signal strength should be displayed on status bar.
      * When {@code true} DDS signal strength should be used to display non-DDS signal strength
@@ -931,6 +938,7 @@ public class CarrierConfigManager {
     public static final String KEY_CARRIER_CROSS_SIM_DISPLAY_SIGNAL_STRENGTH_BOOL =
             "carrier_cross_sim_display_signal_strength";
 
+// QTI_END: 2024-01-11: Telephony: Add config to show signal strength for MSIM CIWLAN
     /**
      * Flag specifying whether cross sim calling on opportunistic data is supported for carrier.
      * When {@code false} the carrier does not support cross sim calling on opportunistic data.
@@ -970,6 +978,7 @@ public class CarrierConfigManager {
     public static final String KEY_CARRIER_WFC_SUPPORTS_WIFI_ONLY_BOOL =
             "carrier_wfc_supports_wifi_only_bool";
 
+// QTI_BEGIN: 2019-12-31: Telephony: Ims: Add suppport for "Ims Preferred" WFC Preference
     /**
      * Flag specifying whether WFC over IMS supports the "ims preferred" option.  If false, the wifi
      * calling settings will not include an option for "ims preferred".  If true, the wifi calling
@@ -982,6 +991,7 @@ public class CarrierConfigManager {
             "carrier_wfc_supports_ims_preferred_bool";
 
 
+// QTI_END: 2019-12-31: Telephony: Ims: Add suppport for "Ims Preferred" WFC Preference
     /**
      * Default mode for WFC over IMS on home network:
      * <ul>
@@ -1124,6 +1134,7 @@ public class CarrierConfigManager {
     public static final String KEY_CARRIER_VOLTE_TTY_SUPPORTED_BOOL =
             "carrier_volte_tty_supported_bool";
 
+// QTI_BEGIN: 2020-09-08: Telephony: IMS: Allow VT calls when tty-on
      /**
      * Flag indicating whether VT tty is supported
      * @hide
@@ -1131,6 +1142,7 @@ public class CarrierConfigManager {
     public static final String KEY_CARRIER_VT_TTY_SUPPORT_BOOL =
             "carrier_vt_tty_support_bool";
 
+// QTI_END: 2020-09-08: Telephony: IMS: Allow VT calls when tty-on
     /** Flag specifying whether VoWIFI TTY is supported.
      * @hide
      */
@@ -1691,6 +1703,7 @@ public class CarrierConfigManager {
      */
     public static final String KEY_HIDE_ENHANCED_4G_LTE_BOOL = "hide_enhanced_4g_lte_bool";
 
+// QTI_BEGIN: 2020-04-06: Telephony: Add KEY_HIDE_ENABLED_5G_BOOL config
     /**
      * Determines whether the Enabled 5G toggle will be shown in the settings. When this
      * option is {@code true}, the toggle will be hidden regardless of whether the device and
@@ -1700,6 +1713,7 @@ public class CarrierConfigManager {
      */
     public static final String KEY_HIDE_ENABLED_5G_BOOL = "hide_enabled_5g_bool";
 
+// QTI_END: 2020-04-06: Telephony: Add KEY_HIDE_ENABLED_5G_BOOL config
     /**
      * Sets the default state for the "Enhanced 4G LTE" or "Advanced Calling" mode toggle set by the
      * user. When this is {@code true}, this mode by default is on, otherwise if {@code false},
@@ -4995,6 +5009,15 @@ public class CarrierConfigManager {
         "carrier_service_number_array";
 
     /**
+     * Determines if the carrier supports retrieving the phone number via the TS.43 protocol.
+     *
+     * Reference: GSMA TS.43-v11 section 13
+     */
+    @FlaggedApi(Flags.FLAG_GET_PHONE_NUMBER_TS43_API)
+    public static final String KEY_SUPPORT_PHONE_NUMBER_SOURCE_TS43_BOOL =
+            "support_phone_number_source_ts43_bool";
+
+    /**
      * Configs used by ImsServiceEntitlement.
      */
     public static final class ImsServiceEntitlement {
@@ -8207,6 +8230,17 @@ public class CarrierConfigManager {
                 KEY_PREFIX + "emergency_requires_volte_enabled_bool";
 
         /**
+         * Specifies if emergency call shall be attempted on IMS over NR network only when VoNR
+         * setting is enabled.
+         *
+         * The default value for this key is {@code false}.
+         * @hide
+         */
+        @FlaggedApi(Flags.FLAG_EMERGENCY_OVER_NR_REQUIRES_VONR_ENABLED)
+        public static final String KEY_EMERGENCY_REQUIRES_VONR_ENABLED_BOOL =
+                KEY_PREFIX + "emergency_requires_vonr_enabled_bool";
+
+        /**
          * This values indicates that the cross SIM redialing timer and maximum celluar search
          * timer shall be disabled.
          *
@@ -8356,6 +8390,7 @@ public class CarrierConfigManager {
             defaults.putBoolean(KEY_EMERGENCY_REQUIRES_IMS_REGISTRATION_BOOL, false);
             defaults.putBoolean(KEY_EMERGENCY_LTE_PREFERRED_AFTER_NR_FAILED_BOOL, false);
             defaults.putBoolean(KEY_EMERGENCY_REQUIRES_VOLTE_ENABLED_BOOL, false);
+            defaults.putBoolean(KEY_EMERGENCY_REQUIRES_VONR_ENABLED_BOOL, false);
             defaults.putStringArray(KEY_EMERGENCY_CDMA_PREFERRED_NUMBERS_STRING_ARRAY,
                     new String[0]);
             defaults.putInt(KEY_CROSS_STACK_REDIAL_TIMER_SEC_INT, 120);
@@ -10154,6 +10189,101 @@ public class CarrierConfigManager {
             "ntn_lte_rsrp_thresholds_int_array";
 
     /**
+     * This threshold is used when connected to a non-terrestrial NR network.
+     * List of 4 customized 5G SS reference signal received power (SSRSRP) thresholds.
+     * <p>
+     * Reference: 3GPP TS 38.215
+     * <p>
+     * 4 threshold integers must be within the boundaries [-140 dB, -44 dB], and the levels are:
+     * <UL>
+     *     <LI>"NONE: [-140, threshold1)"</LI>
+     *     <LI>"POOR: [threshold1, threshold2)"</LI>
+     *     <LI>"MODERATE: [threshold2, threshold3)"</LI>
+     *     <LI>"GOOD:  [threshold3, threshold4)"</LI>
+     *     <LI>"EXCELLENT:  [threshold4, -44]"</LI>
+     * </UL>
+     * <p>
+     * This key is considered invalid if the format is violated. If the key is invalid or
+     * not configured, a default value set will apply.
+     */
+    @FlaggedApi(Flags.FLAG_SATELLITE_26Q2_APIS)
+    public static final String KEY_NTN_5G_NR_SSRSRP_THRESHOLDS_INT_ARRAY =
+            "ntn_5g_nr_ssrsrp_thresholds_int_array";
+
+    /**
+     * This threshold is used when connected to a non-terrestrial NR network.
+     * List of 4 customized 5G SS reference signal received quality (SSRSRQ) thresholds.
+     * <p>
+     * Reference: 3GPP TS 38.215; 3GPP TS 38.133 section 10
+     * <p>
+     * 4 threshold integers must be within the boundaries [-43 dB, 20 dB], and the levels are:
+     * <UL>
+     *     <LI>"NONE: [-43, threshold1)"</LI>
+     *     <LI>"POOR: [threshold1, threshold2)"</LI>
+     *     <LI>"MODERATE: [threshold2, threshold3)"</LI>
+     *     <LI>"GOOD:  [threshold3, threshold4)"</LI>
+     *     <LI>"EXCELLENT:  [threshold4, 20]"</LI>
+     * </UL>
+     * <p>
+     * This key is considered invalid if the format is violated. If the key is invalid or
+     * not configured, a default value set will apply.
+     */
+    @FlaggedApi(Flags.FLAG_SATELLITE_26Q2_APIS)
+    public static final String KEY_NTN_5G_NR_SSRSRQ_THRESHOLDS_INT_ARRAY =
+            "ntn_5g_nr_ssrsrq_thresholds_int_array";
+
+    /**
+     * This threshold is used when connected to a non-terrestrial NR network.
+     * List of 4 customized 5G SS signal-to-noise and interference ratio (SSSINR) thresholds.
+     * <p>
+     * Reference: 3GPP TS 38.215,
+     *            3GPP TS 38.133 10.1.16.1
+     * <p>
+     * 4 threshold integers must be within the boundaries [-23 dB, 40 dB], and the levels are:
+     * <UL>
+     *     <LI>"NONE: [-23, threshold1)"</LI>
+     *     <LI>"POOR: [threshold1, threshold2)"</LI>
+     *     <LI>"MODERATE: [threshold2, threshold3)"</LI>
+     *     <LI>"GOOD:  [threshold3, threshold4)"</LI>
+     *     <LI>"EXCELLENT:  [threshold4, 40]"</LI>
+     * </UL>
+     * <p>
+     * This key is considered invalid if the format is violated. If the key is invalid or
+     * not configured, a default value set will apply.
+     */
+    @FlaggedApi(Flags.FLAG_SATELLITE_26Q2_APIS)
+    public static final String KEY_NTN_5G_NR_SSSINR_THRESHOLDS_INT_ARRAY =
+            "ntn_5g_nr_sssinr_thresholds_int_array";
+
+    /**
+     * Bit-field integer to determine whether to use SS reference signal received power (SSRSRP),
+     * SS reference signal received quality (SSRSRQ), or/and SS signal-to-noise and interference
+     * ratio (SSSINR) for the number of non-terrestrial 5G NR signal bars and
+     * signal criteria reporting enabling.
+     *
+     * <p> If a measure is not set, signal criteria reporting from modem will not be triggered and
+     * not be used for calculating signal level. If multiple measures are set bit, the parameter
+     * whose value is smallest is used to indicate the signal level.
+     * <UL>
+     *  <LI>SSRSRP = 1 << 0</LI>
+     *  <LI>SSRSRQ = 1 << 1</LI>
+     *  <LI>SSSINR = 1 << 2</LI>
+     * </UL>
+     *  The value of this key must be bitwise OR of {@link CellSignalStrengthNr#USE_SSRSRP},
+     *  {@link CellSignalStrengthNr#USE_SSRSRQ}, {@link CellSignalStrengthNr#USE_SSSINR}.
+     *
+     * <p> For example, if both SSRSRP and SSSINR are used, the value of key is 5 (1 << 0 | 1 << 2).
+     * If the key is invalid or not configured, a default value (SSRSRP = 1 << 0) will apply.
+     *
+     * <p> Reference: 3GPP TS 38.215,
+     *                3GPP TS 38.133 10.1.16.1
+     *
+     * @hide
+     */
+    public static final String KEY_PARAMETERS_USE_FOR_NTN_5G_NR_SIGNAL_BAR_INT =
+            "parameters_use_for_ntn_5g_nr_signal_bar_int";
+
+    /**
      * This threshold is used when connected to a non-terrestrial LTE network.
      * A list of 4 customized NTN LTE Reference Signal Received Quality (RSRQ) thresholds.
      *
@@ -10410,6 +10540,91 @@ public class CarrierConfigManager {
      */
     public static final String KEY_SATELLITE_ROAMING_P2P_SMS_SUPPORTED_BOOL =
             "satellite_roaming_p2p_sms_supported_bool";
+
+    /**
+     * Indicate whether carrier allows users to purchase satellite plan over the non-terrestrial or
+     * terrestrial network.
+     *
+     * <p>This value will be read by settings app to display satellite purchase button to the user.
+     *
+     * <p>The default value is {@code false}.
+     *
+     * @hide
+     */
+    public static final String KEY_CARRIER_ROAMING_SATELLITE_UPSELL_SUPPORTED_BOOL =
+            "carrier_roaming_satellite_upsell_supported_bool";
+
+    /**
+     * The carrier roaming satellite upsell notification hysteresis time in seconds.
+     *
+     * <p>If the carrier supports purchasing satellite plan which is defined by {@link
+     * CarrierConfigManager#KEY_CARRIER_ROAMING_SATELLITE_UPSELL_MODE_SUPPORTED_BOOL} and the device
+     * is in {@link ServiceState#STATE_OUT_OF_SERVICE}, not connected to Wi-Fi, then hysteresis
+     * timer defined by this key will start.
+     *
+     * <p>After the timer is expired, device is marked as eligible for purchasing satellite plan.
+     *
+     * <p>The default value is 900 seconds (15 minutes).
+     *
+     * @hide
+     */
+    public static final String
+            KEY_CARRIER_ROAMING_SATELLITE_UPSELL_NOTIFICATION_HYSTERESIS_SEC_INT =
+                    "carrier_roaming_satellite_upsell_notification_hysteresis_sec_int";
+
+    /**
+     * Satellite upsell notification display restriction reset time in seconds.
+     *
+     * <p>The device shows a notification to purchase satellite plan if device is in {@link
+     * ServiceState#STATE_OUT_OF_SERVICE} for {@link
+     * CarrierConfigManager#KEY_CARRIER_ROAMING_SATELLITE_UPSELL_NOTIFICATION_HYSTERESIS_SEC_INT} If
+     * the user interacts with the notification, it won't be shown again immediately. Instead, the
+     * notification will reappear after below key mentioned amount of time has passed.
+     *
+     * <p>The default value is 24 hours.
+     *
+     * @hide
+     */
+    public static final String
+            KEY_CARRIER_ROAMING_SATELLITE_UPSELL_NOTIFICATION_THROTTLE_HOURS_INT =
+                    "satellite_upsell_notification_throttle_hours_int";
+
+    /**
+     * The maximum number of times in a day that we display the satellite upsell notification. The
+     * carrier can set this key to -1 to remove the maximum daily limit.
+     *
+     * <p>The default value is 5 times.
+     *
+     * @hide
+     */
+    public static final String
+            KEY_CARRIER_ROAMING_SATELLITE_UPSELL_NOTIFICATION_MAXIMUM_DAILY_COUNT_INT =
+                    "carrier_roaming_satellite_upsell_notification_maximum_daily_count_int";
+
+    /**
+     * The maximum number of times in a month that we display the satellite upsell notification. The
+     * carrier can set this key to -1 to remove the maximum monthly limit.
+     *
+     * <p>The default value is 20 times.
+     *
+     * @hide
+     */
+    public static final String
+            KEY_CARRIER_ROAMING_SATELLITE_UPSELL_NOTIFICATION_MAXIMUM_MONTHLY_COUNT_INT =
+                    "carrier_roaming_satellite_upsell_notification_maximum_monthly_count_int";
+
+    /**
+     * The timeout in seconds for the satellite purchase mode.
+     *
+     * <p>If the user does not complete the purchase within this time, Telephony will exit purchase
+     * mode and tear down the internet connection.
+     *
+     * <p>The default value is 300 seconds (5 minutes).
+     *
+     * @hide
+     */
+    public static final String KEY_CARRIER_ROAMING_SATELLITE_PURCHASE_MODE_TIMEOUT_SEC_INT =
+            "carrier_roaming_satellite_purchase_mode_timeout_sec_int";
 
     /**
      * Defines the NIDD (Non-IP Data Delivery) APN to be used for carrier roaming to satellite
@@ -10952,6 +11167,7 @@ public class CarrierConfigManager {
     public static final String KEY_IWLAN_HANDOVER_POLICY_STRING_ARRAY =
             "iwlan_handover_policy_string_array";
 
+// QTI_BEGIN: 2020-03-01: Telephony: IMS: Add new Carrier Config.
      /**
      * Flag indicating whether carrier supports multianchor conference.
      * In multianchor conference, a participant of a conference can add
@@ -10962,6 +11178,8 @@ public class CarrierConfigManager {
     public static final String KEY_CARRIER_SUPPORTS_MULTIANCHOR_CONFERENCE =
             "carrier_supports_multianchor_conference";
 
+// QTI_END: 2020-03-01: Telephony: IMS: Add new Carrier Config.
+// QTI_BEGIN: 2021-02-25: Telephony: Configure same GID based APNs as per carrier requirements
     /**
      * String array of APN configurations of same MVNO type GID.
      * The entries should be of form "GID data:all supported apn types:devicecapability:apnname".
@@ -10979,6 +11197,8 @@ public class CarrierConfigManager {
     public static final String KEY_REQUIRE_APN_FILTERING_WITH_RADIO_CAPABILITY =
             "require_apn_filtering_with_radio_capability_bool";
 
+// QTI_END: 2021-02-25: Telephony: Configure same GID based APNs as per carrier requirements
+// QTI_BEGIN: 2021-03-02: AndroidCore: IMS: Add new carrier config.
     /**
      * Determines whether carrier supports Sms Callback Mode.
      * When {@code true}, modem can enter/exit SMS callback mode (SCBM) after sending e911 SMS.
@@ -10991,6 +11211,8 @@ public class CarrierConfigManager {
     public static final String KEY_USE_SMS_CALLBACK_MODE_BOOL =
             "use_sms_callback_mode_bool";
 
+// QTI_END: 2021-03-02: AndroidCore: IMS: Add new carrier config.
+// QTI_BEGIN: 2022-09-09: Telephony: Add 5G Ultra Wideband icon carrier config keys
     /**
      * Determines the SIB2 value for showing the 5G Ultra Wideband icon.
      * The rest of the NR Ultra Wideband configs will be considere only if this value is 1. A value
@@ -11066,6 +11288,8 @@ public class CarrierConfigManager {
     public static final String KEY_NR_ULTRA_WIDEBAND_ICON_SA_BAND_ARRAY =
             "5g_ultra_wideband_icon_sa_band_array";
 
+// QTI_END: 2022-09-09: Telephony: Add 5G Ultra Wideband icon carrier config keys
+// QTI_BEGIN: 2023-02-07: Telephony: Add CC key for CS SMS in C_IWLAN-only mode
     /**
      * Determines if CS SMS is allowed in C_IWLAN-only mode. True is allowed. False is disallowed.
      *
@@ -11073,6 +11297,7 @@ public class CarrierConfigManager {
      */
     public static final String KEY_CS_SMS_IN_CIWLAN_ONLY_MODE = "cs_sms_in_ciwlan_only_mode";
 
+// QTI_END: 2023-02-07: Telephony: Add CC key for CS SMS in C_IWLAN-only mode
     /**
      * Score table for {@link TelephonyManager#MOBILE_DATA_POLICY_AUTO_DATA_SWITCH}. The score is
      * used in conjunction with a tolerance value defined in resource config
@@ -11420,6 +11645,39 @@ public class CarrierConfigManager {
     public static final String KEY_LOW_BATTERY_ALERT_INTERVAL_INT =
             "low_battery_alert_interval_int";
 
+    /**
+     * Specifies whether a successful APN database match is mandatory to proceed with a data call
+     * setup.
+     *
+     * <p>When set to {@code true}, Telephony must find a matching APN in its database for the given
+     * network request. If a match is not found, the setup data call request will NOT happen. This
+     * setting is typically used when the modem cannot be relied upon to establish the connection
+     * without an Android-vetted APN, for example, if URSP rules from the carriers are not available
+     * or not applicable.
+     *
+     * <p>When set to {@code false}, Telephony will still attempt to find a matching APN in its
+     * database. However, even if no match is found, the setup data call request WILL be sent to the
+     * modem. This allows the modem to use its internal logic, such as URSP
+     * (UE Route Selection Policy) rules, to select the appropriate APN/slice and establish the
+     * connection. This mode is suitable when the carrier has deployed URSP rules for handling data
+     * network requests.
+     *
+     * <p>The default value is {@code true}. Set this to {@code false} only after carriers deploy
+     * URSP rules for connection capabilities.
+     *
+     * @hide
+     */
+    public static final String KEY_APN_MATCHED_REQUIRED = "apn_matched_required";
+
+    /**
+     * Controls whether the subscription is used exclusively for private networks.
+     *
+     * <p>If {@code true}, this subscription will be considered a private network subscription.
+     * System apps like Settings and SystemUI may adjust their behavior based on this flag.
+     */
+    @FlaggedApi(Flags.FLAG_ENABLE_IS_PRIVATE_NETWORK_API)
+    public static final String KEY_IS_PRIVATE_NETWORK_BOOL = "is_private_network_bool";
+
     /** The default value for every variable. */
     private static final PersistableBundle sDefaults;
 
@@ -11455,13 +11713,19 @@ public class CarrierConfigManager {
         sDefaults.putBoolean(KEY_CONFIG_TELEPHONY_USE_OWN_NUMBER_FOR_VOICEMAIL_BOOL, false);
         sDefaults.putBoolean(KEY_IGNORE_DATA_ENABLED_CHANGED_FOR_VIDEO_CALLS, true);
         sDefaults.putBoolean(KEY_VILTE_DATA_IS_METERED_BOOL, true);
+// QTI_BEGIN: 2018-04-03: Telephony: IMS: Add flag to control reset UT capability
         sDefaults.putBoolean(KEY_IGNORE_RESET_UT_CAPABILITY_BOOL, false);
+// QTI_END: 2018-04-03: Telephony: IMS: Add flag to control reset UT capability
         sDefaults.putBoolean(KEY_CARRIER_WFC_IMS_AVAILABLE_BOOL, false);
         sDefaults.putBoolean(KEY_CARRIER_CROSS_SIM_IMS_AVAILABLE_BOOL, false);
+// QTI_BEGIN: 2024-01-11: Telephony: Add config to show signal strength for MSIM CIWLAN
         sDefaults.putBoolean(KEY_CARRIER_CROSS_SIM_DISPLAY_SIGNAL_STRENGTH_BOOL, true);
+// QTI_END: 2024-01-11: Telephony: Add config to show signal strength for MSIM CIWLAN
         sDefaults.putBoolean(KEY_ENABLE_CROSS_SIM_CALLING_ON_OPPORTUNISTIC_DATA_BOOL, false);
         sDefaults.putBoolean(KEY_CARRIER_WFC_SUPPORTS_WIFI_ONLY_BOOL, false);
+// QTI_BEGIN: 2019-12-31: Telephony: Ims: Add suppport for "Ims Preferred" WFC Preference
         sDefaults.putBoolean(KEY_CARRIER_WFC_SUPPORTS_IMS_PREFERRED_BOOL, false);
+// QTI_END: 2019-12-31: Telephony: Ims: Add suppport for "Ims Preferred" WFC Preference
         sDefaults.putBoolean(KEY_CARRIER_DEFAULT_WFC_IMS_ENABLED_BOOL, false);
         sDefaults.putBoolean(KEY_CARRIER_DEFAULT_WFC_IMS_ROAMING_ENABLED_BOOL, false);
         sDefaults.putBoolean(KEY_CARRIER_PROMOTE_WFC_ON_CALL_FAIL_BOOL, false);
@@ -11474,7 +11738,9 @@ public class CarrierConfigManager {
         sDefaults.putBoolean(KEY_CARRIER_SUPPORTS_SS_OVER_UT_BOOL, false);
         sDefaults.putBoolean(KEY_CARRIER_VOLTE_OVERRIDE_WFC_PROVISIONING_BOOL, false);
         sDefaults.putBoolean(KEY_CARRIER_VOLTE_TTY_SUPPORTED_BOOL, true);
+// QTI_BEGIN: 2020-09-08: Telephony: IMS: Allow VT calls when tty-on
         sDefaults.putBoolean(KEY_CARRIER_VT_TTY_SUPPORT_BOOL, false);
+// QTI_END: 2020-09-08: Telephony: IMS: Allow VT calls when tty-on
         sDefaults.putBoolean(KEY_CARRIER_VOWIFI_TTY_SUPPORTED_BOOL, true);
         sDefaults.putBoolean(KEY_CARRIER_ALLOW_TURNOFF_IMS_BOOL, true);
         sDefaults.putBoolean(KEY_CARRIER_IMS_GBA_REQUIRED_BOOL, false);
@@ -11510,7 +11776,9 @@ public class CarrierConfigManager {
         sDefaults.putBoolean(KEY_HIDE_SIM_LOCK_SETTINGS_BOOL, false);
 
         sDefaults.putBoolean(KEY_CARRIER_VOLTE_PROVISIONED_BOOL, false);
+// QTI_BEGIN: 2018-03-27: Telephony: Enable Call Barring item to be visible in Call Settings menu.
         sDefaults.putBoolean(KEY_CALL_BARRING_VISIBILITY_BOOL, true);
+// QTI_END: 2018-03-27: Telephony: Enable Call Barring item to be visible in Call Settings menu.
         sDefaults.putBoolean(KEY_CALL_BARRING_SUPPORTS_PASSWORD_CHANGE_BOOL, true);
         sDefaults.putBoolean(KEY_CALL_BARRING_SUPPORTS_DEACTIVATE_ALL_BOOL, true);
         sDefaults.putInt(KEY_CALL_BARRING_DEFAULT_SERVICE_CLASS_INT, SERVICE_CLASS_VOICE);
@@ -11519,7 +11787,9 @@ public class CarrierConfigManager {
         sDefaults.putBoolean(KEY_CALL_FORWARDING_WHEN_UNREACHABLE_SUPPORTED_BOOL, true);
         sDefaults.putBoolean(KEY_CALL_FORWARDING_WHEN_UNANSWERED_SUPPORTED_BOOL, true);
         sDefaults.putBoolean(KEY_CALL_FORWARDING_WHEN_BUSY_SUPPORTED_BOOL, true);
+// QTI_BEGIN: 2022-01-24: Telephony: Disable call_forwarding_when_not_logged_in_supported_bool by default
         sDefaults.putBoolean(KEY_CALL_FORWARDING_WHEN_NOT_LOGGED_IN_SUPPORTED_BOOL, false);
+// QTI_END: 2022-01-24: Telephony: Disable call_forwarding_when_not_logged_in_supported_bool by default
         sDefaults.putBoolean(KEY_ADDITIONAL_SETTINGS_CALLER_ID_VISIBILITY_BOOL, true);
         sDefaults.putBoolean(KEY_ADDITIONAL_SETTINGS_CALL_WAITING_VISIBILITY_BOOL, true);
         sDefaults.putBoolean(KEY_DISABLE_SUPPLEMENTARY_SERVICES_IN_AIRPLANE_MODE_BOOL, false);
@@ -11629,7 +11899,9 @@ public class CarrierConfigManager {
         sDefaults.putBoolean(KEY_DISPLAY_HD_AUDIO_PROPERTY_BOOL, true);
         sDefaults.putBoolean(KEY_EDITABLE_ENHANCED_4G_LTE_BOOL, true);
         sDefaults.putBoolean(KEY_HIDE_ENHANCED_4G_LTE_BOOL, false);
+// QTI_BEGIN: 2020-04-06: Telephony: Add KEY_HIDE_ENABLED_5G_BOOL config
         sDefaults.putBoolean(KEY_HIDE_ENABLED_5G_BOOL, true);
+// QTI_END: 2020-04-06: Telephony: Add KEY_HIDE_ENABLED_5G_BOOL config
         sDefaults.putBoolean(KEY_ENHANCED_4G_LTE_ON_BY_DEFAULT_BOOL, true);
         sDefaults.putBoolean(KEY_HIDE_IMS_APN_BOOL, false);
         sDefaults.putBoolean(KEY_USE_DEFAULT_IMS_APN_WHEN_ABSENT_BOOL, true);
@@ -11929,6 +12201,8 @@ public class CarrierConfigManager {
         sDefaults.putInt(KEY_UTRAN_ECNO_HYSTERESIS_DB_INT, 2);
         sDefaults.putInt(KEY_PARAMETERS_USE_FOR_5G_NR_SIGNAL_BAR_INT,
                 CellSignalStrengthNr.USE_SSRSRP);
+        sDefaults.putInt(KEY_PARAMETERS_USE_FOR_NTN_5G_NR_SIGNAL_BAR_INT,
+                CellSignalStrengthNr.USE_SSRSRP);
         sDefaults.putBoolean(KEY_SIGNAL_STRENGTH_NR_NSA_USE_LTE_AS_PRIMARY_BOOL, true);
         sDefaults.putStringArray(KEY_BANDWIDTH_STRING_ARRAY, new String[]{
                 "GPRS:24,24", "EDGE:70,18", "UMTS:115,115", "CDMA:14,14",
@@ -12068,16 +12342,30 @@ public class CarrierConfigManager {
                 TimeUnit.DAYS.toMillis(1));
         sDefaults.putStringArray(KEY_MISSED_INCOMING_CALL_SMS_ORIGINATOR_STRING_ARRAY,
                 new String[0]);
+// QTI_BEGIN: 2022-09-14: Telephony: Fix default values for 5G Ultra Wideband icon carrier config keys
         sDefaults.putInt(KEY_NR_ULTRA_WIDEBAND_ICON_SIB2_VALUE, Integer.MAX_VALUE);
         sDefaults.putInt(KEY_NR_ULTRA_WIDEBAND_ICON_MIN_BANDWIDTH_VALUE, Integer.MAX_VALUE);
         sDefaults.putInt(KEY_NR_ULTRA_WIDEBAND_ICON_MIN_BANDWIDTH_MODE, Integer.MAX_VALUE);
+// QTI_END: 2022-09-14: Telephony: Fix default values for 5G Ultra Wideband icon carrier config keys
+// QTI_BEGIN: 2022-09-09: Telephony: Add 5G Ultra Wideband icon carrier config keys
         sDefaults.putPersistableBundle(KEY_NR_ULTRA_WIDEBAND_ICON_REFRESH_TIMER_MAP,
                 PersistableBundle.EMPTY);
+// QTI_END: 2022-09-09: Telephony: Add 5G Ultra Wideband icon carrier config keys
+// QTI_BEGIN: 2022-09-14: Telephony: Fix default values for 5G Ultra Wideband icon carrier config keys
         sDefaults.putInt(KEY_NR_ULTRA_WIDEBAND_ICON_NSA_BAND_MODE, Integer.MAX_VALUE);
+// QTI_END: 2022-09-14: Telephony: Fix default values for 5G Ultra Wideband icon carrier config keys
+// QTI_BEGIN: 2022-09-09: Telephony: Add 5G Ultra Wideband icon carrier config keys
         sDefaults.putIntArray(KEY_NR_ULTRA_WIDEBAND_ICON_SA_BAND_ARRAY, new int[]{});
+// QTI_END: 2022-09-09: Telephony: Add 5G Ultra Wideband icon carrier config keys
+// QTI_BEGIN: 2022-09-14: Telephony: Fix default values for 5G Ultra Wideband icon carrier config keys
         sDefaults.putInt(KEY_NR_ULTRA_WIDEBAND_ICON_SA_BAND_MODE, Integer.MAX_VALUE);
+// QTI_END: 2022-09-14: Telephony: Fix default values for 5G Ultra Wideband icon carrier config keys
+// QTI_BEGIN: 2022-09-09: Telephony: Add 5G Ultra Wideband icon carrier config keys
         sDefaults.putIntArray(KEY_NR_ULTRA_WIDEBAND_ICON_NSA_BAND_ARRAY, new int[]{});
+// QTI_END: 2022-09-09: Telephony: Add 5G Ultra Wideband icon carrier config keys
+// QTI_BEGIN: 2023-02-07: Telephony: Add CC key for CS SMS in C_IWLAN-only mode
         sDefaults.putBoolean(KEY_CS_SMS_IN_CIWLAN_ONLY_MODE, false);
+// QTI_END: 2023-02-07: Telephony: Add CC key for CS SMS in C_IWLAN-only mode
 
         // Do not modify the priority unless you know what you are doing. This will have significant
         // impacts on the order of data network setup.
@@ -12152,6 +12440,32 @@ public class CarrierConfigManager {
                         5,  /* SIGNAL_STRENGTH_GOOD */
                         13   /* SIGNAL_STRENGTH_GREAT */
                 });
+
+        sDefaults.putIntArray(KEY_NTN_5G_NR_SSRSRP_THRESHOLDS_INT_ARRAY,
+                // Boundaries: [-140 dB, -44 dB]
+                new int[] {
+                    -110, /* SIGNAL_STRENGTH_POOR */
+                    -90,  /* SIGNAL_STRENGTH_MODERATE */
+                    -80,  /* SIGNAL_STRENGTH_GOOD */
+                    -65,  /* SIGNAL_STRENGTH_GREAT */
+                });
+        sDefaults.putIntArray(KEY_NTN_5G_NR_SSRSRQ_THRESHOLDS_INT_ARRAY,
+                // Boundaries: [-43 dB, 20 dB]
+                new int[] {
+                    -31, /* SIGNAL_STRENGTH_POOR */
+                    -19, /* SIGNAL_STRENGTH_MODERATE */
+                    -7,  /* SIGNAL_STRENGTH_GOOD */
+                    6    /* SIGNAL_STRENGTH_GREAT */
+                });
+        sDefaults.putIntArray(KEY_NTN_5G_NR_SSSINR_THRESHOLDS_INT_ARRAY,
+                // Boundaries: [-23 dB, 40 dB]
+                new int[] {
+                    -5, /* SIGNAL_STRENGTH_POOR */
+                    5,  /* SIGNAL_STRENGTH_MODERATE */
+                    15, /* SIGNAL_STRENGTH_GOOD */
+                    30  /* SIGNAL_STRENGTH_GREAT */
+                });
+
         sDefaults.putInt(KEY_PARAMETERS_USED_FOR_NTN_LTE_SIGNAL_BAR_INT,
                 CellSignalStrengthLte.USE_RSRP);
         sDefaults.putBoolean(KEY_REMOVE_SATELLITE_PLMN_IN_MANUAL_NETWORK_SCAN_BOOL, true);
@@ -12179,6 +12493,14 @@ public class CarrierConfigManager {
                 KEY_CARRIER_ROAMING_SATELLITE_T911_TO_ESOS_HANDOVER_SUPPORTED_BOOL, false);
         sDefaults.putBoolean(KEY_SATELLITE_ESOS_SUPPORTED_BOOL, false);
         sDefaults.putBoolean(KEY_SATELLITE_ROAMING_P2P_SMS_SUPPORTED_BOOL, false);
+        sDefaults.putBoolean(KEY_CARRIER_ROAMING_SATELLITE_UPSELL_SUPPORTED_BOOL, false);
+        sDefaults.putInt(KEY_CARRIER_ROAMING_SATELLITE_UPSELL_NOTIFICATION_HYSTERESIS_SEC_INT, 900);
+        sDefaults.putInt(KEY_CARRIER_ROAMING_SATELLITE_UPSELL_NOTIFICATION_THROTTLE_HOURS_INT, 24);
+        sDefaults.putInt(
+                KEY_CARRIER_ROAMING_SATELLITE_UPSELL_NOTIFICATION_MAXIMUM_DAILY_COUNT_INT, 5);
+        sDefaults.putInt(
+                KEY_CARRIER_ROAMING_SATELLITE_UPSELL_NOTIFICATION_MAXIMUM_MONTHLY_COUNT_INT, 20);
+        sDefaults.putInt(KEY_CARRIER_ROAMING_SATELLITE_PURCHASE_MODE_TIMEOUT_SEC_INT, 300);
         sDefaults.putString(KEY_SATELLITE_NIDD_APN_NAME_STRING, "");
         sDefaults.putBoolean(KEY_SATELLITE_ROAMING_TURN_OFF_SESSION_FOR_EMERGENCY_CALL_BOOL, true);
         sDefaults.putInt(KEY_CARRIER_ROAMING_NTN_CONNECT_TYPE_INT, 0);
@@ -12212,6 +12534,7 @@ public class CarrierConfigManager {
         sDefaults.putBoolean(KEY_DISPLAY_NO_DATA_NOTIFICATION_ON_PERMANENT_FAILURE_BOOL, false);
         sDefaults.putBoolean(KEY_UNTHROTTLE_DATA_RETRY_WHEN_TAC_CHANGES_BOOL, false);
         sDefaults.putBoolean(KEY_CARRIER_SUPPORTS_MULTIANCHOR_CONFERENCE, false);
+// QTI_BEGIN: 2021-02-25: Telephony: Configure same GID based APNs as per carrier requirements
         sDefaults.putStringArray(KEY_MULTI_APN_ARRAY_FOR_SAME_GID, new String[] {
                 "52FF:mms,supl,hipri,default,fota:SA:nrphone",
                 "52FF:mms,supl,hipri,default,fota:NSA:nxtgenphone",
@@ -12231,7 +12554,10 @@ public class CarrierConfigManager {
                 "53FF:mms,supl,hipri,default,fota:1xRTT:nxtgenphone",
         });
         sDefaults.putBoolean(KEY_REQUIRE_APN_FILTERING_WITH_RADIO_CAPABILITY, false);
+// QTI_END: 2021-02-25: Telephony: Configure same GID based APNs as per carrier requirements
+// QTI_BEGIN: 2021-03-02: AndroidCore: IMS: Add new carrier config.
         sDefaults.putBoolean(KEY_USE_SMS_CALLBACK_MODE_BOOL, false);
+// QTI_END: 2021-03-02: AndroidCore: IMS: Add new carrier config.
         sDefaults.putBoolean(KEY_SUPPORTS_CUSTOMIZED_RINGING_SIGNAL_BOOL, false);
         sDefaults.putBoolean(KEY_VONR_SETTING_VISIBILITY_BOOL, true);
         sDefaults.putBoolean(KEY_VONR_ENABLED_BOOL, false);
@@ -12333,6 +12659,9 @@ public class CarrierConfigManager {
                 PhoneAccount.LOW_BATTERY_ALERT_DISABLED);
         sDefaults.putInt(KEY_LOW_BATTERY_ALERT_INTERVAL_INT,
                 PhoneAccount.LOW_BATTERY_ALERT_DISABLED);
+        sDefaults.putBoolean(KEY_SUPPORT_PHONE_NUMBER_SOURCE_TS43_BOOL, false);
+        sDefaults.putBoolean(KEY_APN_MATCHED_REQUIRED, true);
+        sDefaults.putBoolean(KEY_IS_PRIVATE_NETWORK_BOOL, false);
     }
 
     /**
@@ -12491,23 +12820,24 @@ public class CarrierConfigManager {
     /**
      * Overrides the carrier config of the provided subscription ID with the provided values.
      *
-     * Any further queries to carrier config from any process will return the overridden values
+     * <p>Any further queries to carrier config from any process will return the overridden values
      * after this method returns. The overrides are effective for the lifetime of the phone process
      * until the user passes in {@code null} for {@code overrideValues}. This removes all previous
      * overrides and sets the carrier config back to production values.
      *
-     * May throw an {@link IllegalArgumentException} if {@code overrideValues} contains invalid
+     * <p>May throw an {@link IllegalArgumentException} if {@code overrideValues} contains invalid
      * values for the specified config keys.
      *
-     * NOTE: This API is meant for testing purposes only.
+     * <p>NOTE: This API is meant for testing purposes only.
      *
      * @param subscriptionId The subscription ID for which the override should be done.
      * @param overrideValues Key-value pairs of the values that are to be overridden. If set to
-     *                       {@code null}, this will remove all previous overrides and set the
-     *                       carrier configuration back to production values.
+     *        {@code null}, this will remove all previous overrides and set the
+     *        carrier configuration back to production values.
      *
      * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
+     * {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
+     * @throws IllegalArgumentException if {@code subscriptionId} is invalid.
      * @hide
      */
     @RequiresPermission(Manifest.permission.MODIFY_PHONE_STATE)
@@ -12519,23 +12849,24 @@ public class CarrierConfigManager {
     /**
      * Overrides the carrier config of the provided subscription ID with the provided values.
      *
-     * Any further queries to carrier config from any process will return the overridden values
+     * <p>Any further queries to carrier config from any process will return the overridden values
      * after this method returns. The overrides are effective until the user passes in {@code null}
      * for {@code overrideValues}. This removes all previous overrides and sets the carrier config
      * back to production values.
      *
      * The overrides is stored persistently and will survive a reboot if {@code persistent} is true.
      *
-     * May throw an {@link IllegalArgumentException} if {@code overrideValues} contains invalid
+     * <p>May throw an {@link IllegalArgumentException} if {@code overrideValues} contains invalid
      * values for the specified config keys.
      *
-     * NOTE: This API is meant for testing purposes only.
+     * <p>NOTE: This API is meant for testing purposes only.
      *
      * @param subscriptionId The subscription ID for which the override should be done.
      * @param overrideValues Key-value pairs of the values that are to be overridden. If set to
      *                       {@code null}, this will remove all previous overrides and set the
      *                       carrier configuration back to production values.
      * @param persistent     Determines whether the override should be persistent.
+     * @throws IllegalArgumentException if {@code subscriptionId} is invalid.
      * @hide
      */
     @RequiresPermission(Manifest.permission.MODIFY_PHONE_STATE)
@@ -12659,7 +12990,8 @@ public class CarrierConfigManager {
      * android.service.carrier.CarrierService#onLoadConfig} will be called from an arbitrary thread.
      *
      * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
+     * {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
+     * @throws IllegalArgumentException if {@code subId} is invalid.
      */
     @SuppressAutoDoc // Blocked by b/72967236 - no support for carrier privileges
     @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE)
@@ -12698,7 +13030,9 @@ public class CarrierConfigManager {
                 return;
             }
             loader.updateConfigForPhoneId(phoneId, simState);
+// QTI_BEGIN: 2021-07-09: Telephony: Catch IllegalArgumentException for invalid phone id
         } catch (RemoteException | IllegalArgumentException ex) {
+// QTI_END: 2021-07-09: Telephony: Catch IllegalArgumentException for invalid phone id
             Rlog.e(TAG, "Error updating config for phoneId=" + phoneId + ": " + ex);
         }
     }

@@ -30,6 +30,7 @@ import static android.media.RoutingChangeInfo.SUGGESTION_PROVIDER_DEVICE_SUGGEST
 import static android.media.RoutingChangeInfo.SUGGESTION_PROVIDER_DEVICE_SUGGESTION_OTHER;
 import static android.media.RoutingChangeInfo.SUGGESTION_PROVIDER_RLP;
 import static android.media.RoutingChangeInfo.SuggestionProviderFlags;
+import static android.permission.flags.Flags.accessLocalNetworkPermissionEnabled;
 
 import static com.android.internal.util.function.pooled.PooledLambda.obtainMessage;
 import static com.android.server.media.MediaRouterMetricLogger.EVENT_TYPE_CREATE_SESSION;
@@ -59,6 +60,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.PermissionChecker;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.media.AppId;
 import android.media.AudioManager;
@@ -114,6 +116,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
@@ -448,22 +451,15 @@ class MediaRouter2ServiceImpl {
                 routeListingPreference != null
                         ? routeListingPreference.getLinkedItemComponentName()
                         : null;
-        if (linkedItemLandingComponent != null) {
-            int callingUid = Binder.getCallingUid();
-            MediaServerUtils.enforcePackageName(
-                    mContext, linkedItemLandingComponent.getPackageName(), callingUid);
-            if (!MediaServerUtils.isValidActivityComponentName(
-                    mContext,
-                    linkedItemLandingComponent,
-                    RouteListingPreference.ACTION_TRANSFER_MEDIA,
-                    Binder.getCallingUserHandle())) {
-                throw new IllegalArgumentException(
-                        "Unable to resolve "
-                                + linkedItemLandingComponent
-                                + " to a valid activity for "
-                                + RouteListingPreference.ACTION_TRANSFER_MEDIA);
-            }
-        }
+        verifyActivityComponentName(
+                linkedItemLandingComponent, RouteListingPreference.ACTION_TRANSFER_MEDIA);
+        ComponentName resolveMissingPermissionsComponent =
+                routeListingPreference != null
+                        ? routeListingPreference.getMissingPermissionsComponentName()
+                        : null;
+        verifyActivityComponentName(
+                resolveMissingPermissionsComponent,
+                RouteListingPreference.ACTION_RESOLVE_MISSING_PERMISSIONS);
 
         final long token = Binder.clearCallingIdentity();
         try {
@@ -1131,6 +1127,19 @@ class MediaRouter2ServiceImpl {
                 == PermissionChecker.PERMISSION_GRANTED;
     }
 
+    private void verifyActivityComponentName(@Nullable ComponentName componentName, String action) {
+        if (componentName == null) {
+            return;
+        }
+        int callingUid = Binder.getCallingUid();
+        MediaServerUtils.enforcePackageName(mContext, componentName.getPackageName(), callingUid);
+        if (!MediaServerUtils.isValidActivityComponentName(
+                mContext, componentName, action, Binder.getCallingUserHandle())) {
+            throw new IllegalArgumentException(
+                    "Unable to resolve " + componentName + " to a valid activity for " + action);
+        }
+    }
+
     @RequiresPermission(value = Manifest.permission.INTERACT_ACROSS_USERS)
     private boolean verifyPackageExistsForUser(
             @NonNull String clientPackageName, @NonNull UserHandle user) {
@@ -1573,7 +1582,7 @@ class MediaRouter2ServiceImpl {
                         requestId));
 
         UserHandler userHandler = routerRecord.mUserRecord.mHandler;
-        if (managerRequestId != MediaRoute2ProviderService.REQUEST_ID_NONE) {
+        if (managerRequestId != MediaRouter2Manager.REQUEST_ID_NONE) {
             ManagerRecord manager = userHandler.findManagerWithId(toRequesterId(managerRequestId));
             if (manager == null || manager.mLastSessionCreationRequest == null) {
                 Slog.w(TAG, "requestCreateSessionWithRouter2Locked: Ignoring unknown request.");
@@ -2522,6 +2531,89 @@ class MediaRouter2ServiceImpl {
         sInstance.set(this);
     }
 
+
+    /**
+     * Common permission check implementation for
+     * {@link #getMissingPermissions(MediaRoute2Info, int, String, Predicate)} and
+     * {@link #hasRequiredPermissions(MediaRoute2Info, int, String, Predicate)}.
+     *
+     * <p>Returns an empty set if permission checks pass, a non-empty set otherwise. If
+     * {@code collectAllMissingPermissions} is true the returned set contains all permissions
+     * mentioned by the route that the package does not have; otherwise its contents are not
+     * meaningful (but it is not empty).
+     */
+    @NonNull
+    private Set<String> doPermissionCheck(MediaRoute2Info route, int uid, String packageName,
+            Predicate<String> permissionChecker, boolean collectAllMissingPermissions) {
+        if (!Flags.enableRouteVisibilityControlApi()) {
+            return Collections.emptySet();
+        }
+        if (Flags.enableRouteVisibilityControlCompatFixes()
+                && route.getTemporaryVisibilityPackages().contains(packageName)) {
+            return Collections.emptySet();
+        }
+        List<Set<String>> permissionSets = route.getRequiredPermissions();
+        if (permissionSets.isEmpty()) {
+            return Collections.emptySet();
+        }
+        Set<String> missingPermissions = new ArraySet<>();
+        for (Set<String> permissionSet : permissionSets) {
+            boolean hasAllInSet = true;
+            for (String permission : permissionSet) {
+                if (!permissionChecker.test(permission)
+                        && !permissionAllowedForAppCompat(permission, uid, permissionChecker)) {
+                    missingPermissions.add(permission);
+                    hasAllInSet = false;
+                    if (!collectAllMissingPermissions) {
+                        break;
+                    }
+                }
+            }
+            if (hasAllInSet) {
+                return Collections.emptySet();
+            }
+        }
+        return missingPermissions;
+    }
+
+    private boolean hasRequiredPermissions(MediaRoute2Info route, int uid, String packageName,
+            Predicate<String> permissionChecker) {
+        return doPermissionCheck(route, uid, packageName, permissionChecker,
+                /* collectAllMissingPermissions= */ false).isEmpty();
+    }
+
+    private Set<String> getMissingPermissions(MediaRoute2Info route, int uid, String packageName,
+            Predicate<String> permissionChecker) {
+        return doPermissionCheck(route, uid, packageName, permissionChecker,
+                /* collectAllMissingPermissions= */ true);
+    }
+
+    /**
+     * Returns whether the given permission should be considered to be satisfied because of the
+     * app compatibility setting for local networking restrictions.
+     *
+     * TODO(b/386260596): This is a temporary workaround, which we hope to remove in the next
+     * release.
+     */
+    private boolean permissionAllowedForAppCompat(String permission, int uid,
+            Predicate<String> permissionChecker) {
+        if (!Flags.enableRouteVisibilityControlCompatFixes()) {
+            return false;
+        }
+        // TODO(b/386260596) - replace this string with a Manifest.permission constant once
+        // one is available.
+        if (TextUtils.equals(permission, "android.permission.ACCESS_LOCAL_NETWORK")) {
+            // TODO(b/386260596) - this id is defined as RESTRICT_LOCAL_NETWORK in the
+            //  connectivity module's ConnectivityCompatChanges.java - see if we can move it to
+            //  a shared location so we can avoid duplicating it here.
+            if (!CompatChanges.isChangeEnabled(365139289L, uid)) {
+                return true;
+            }
+            return permissionChecker.test(Manifest.permission.NEARBY_WIFI_DEVICES);
+        }
+        return false;
+    }
+
     final class UserRecord {
         public final UserHandle mUserHandle;
         //TODO: make records private for thread-safety
@@ -2955,32 +3047,9 @@ class MediaRouter2ServiceImpl {
          * @return whether this RouterRecord has the required permissions to see the given route.
          */
         private boolean hasPermissionsToSeeRoute(MediaRoute2Info route) {
-            if (!Flags.enableRouteVisibilityControlApi()) {
-                return true;
-            }
-            if (Flags.enableRouteVisibilityControlCompatFixes()
-                    && route.getTemporaryVisibilityPackages().contains(mPackageName)) {
-                return true;
-            }
-            List<Set<String>> permissionSets = route.getRequiredPermissions();
-            if (permissionSets.isEmpty()) {
-                return true;
-            }
-            for (Set<String> permissionSet : permissionSets) {
-                boolean hasAllInSet = true;
-                for (String permission : permissionSet) {
-                    if (mContext.checkPermission(permission, mPid, mUid)
-                            != PackageManager.PERMISSION_GRANTED
-                            && !permissionAllowedForAppCompat(permission)) {
-                        hasAllInSet = false;
-                        break;
-                    }
-                }
-                if (hasAllInSet) {
-                    return true;
-                }
-            }
-            return false;
+            return hasRequiredPermissions(route, mUid, mPackageName,
+                    permission -> mContext.checkPermission(permission, mPid, mUid)
+                            == PackageManager.PERMISSION_GRANTED);
         }
 
         /** Logs a {@link RemoteException} occurred during the execution of {@code operation}. */
@@ -2997,32 +3066,6 @@ class MediaRouter2ServiceImpl {
             return TextUtils.formatSimple(
                     "Router %s (id=%d,pid=%d,userId=%d,uid=%d)",
                     mPackageName, mRouterId, mPid, mUserRecord.mUserHandle.getIdentifier(), mUid);
-        }
-
-        /**
-         * Returns whether the given permission should be considered to be satisfied because of the
-         * app compatibility setting for local networking restrictions.
-         *
-         * TODO(b/386260596): This is a temporary workaround, which we hope to remove in the next
-         * release.
-         */
-        private boolean permissionAllowedForAppCompat(String permission) {
-            if (!Flags.enableRouteVisibilityControlCompatFixes()) {
-                return false;
-            }
-            // TODO(b/386260596) - replace this string with a Manifest.permission constant once
-            // one is available.
-            if (TextUtils.equals(permission, "android.permission.ACCESS_LOCAL_NETWORK")) {
-                // TODO(b/386260596) - this id is defined as RESTRICT_LOCAL_NETWORK in the
-                //  connectivity module's ConnectivityCompatChanges.java - see if we can move it to
-                //  a shared location so we can avoid duplicating it here.
-                if (!CompatChanges.isChangeEnabled(365139289L, mUid)) {
-                    return true;
-                }
-                return mContext.checkPermission(Manifest.permission.NEARBY_WIFI_DEVICES, mPid, mUid)
-                        == PackageManager.PERMISSION_GRANTED;
-            }
-            return false;
         }
     }
 
@@ -3048,6 +3091,8 @@ class MediaRouter2ServiceImpl {
 
         public @ScanningState int mScanningState = SCANNING_STATE_NOT_SCANNING;
 
+        @Nullable private final PackageManager mTargetPkgPm;
+
         ManagerRecord(
                 @NonNull UserRecord userRecord,
                 @NonNull IMediaRouter2Manager manager,
@@ -3068,6 +3113,23 @@ class MediaRouter2ServiceImpl {
             mManagerId = mNextRouterOrManagerId.getAndIncrement();
             mHasMediaRoutingControl = hasMediaRoutingControl;
             mHasMediaContentControl = hasMediaContentControl;
+            mTargetPkgPm = getTargetPackageManager();
+        }
+
+        @Nullable
+        private PackageManager getTargetPackageManager() {
+            if (mTargetPackageName == null) {
+                return null;
+            }
+            Context userContext;
+            try {
+                userContext = mContext.createContextAsUser(
+                        UserHandle.getUserHandleForUid(mTargetUid), 0);
+            } catch (IllegalStateException e) {
+                Log.e(TAG, "User or package removed while ManagerRecord is registered");
+                return null;
+            }
+            return userContext.getPackageManager();
         }
 
         public void dispose() {
@@ -3133,10 +3195,47 @@ class MediaRouter2ServiceImpl {
          * @param routes The routes available to the manager that corresponds to this record.
          */
         public void notifyRoutesUpdated(List<MediaRoute2Info> routes) {
+            List<MediaRoute2Info> visibleRoutes = getVisibleRoutes(routes);
+            ArraySet<String> missingPermissions = new ArraySet<>();
+            for (MediaRoute2Info route : visibleRoutes) {
+                if (mTargetPkgPm != null && accessLocalNetworkPermissionEnabled()) {
+                    missingPermissions.addAll(getTargetPkgMissingPermissions(route, mTargetPkgPm));
+                }
+            }
+            if (!missingPermissions.isEmpty()) {
+                Set<String> declaredPermissions = getTargetPackageDeclaredPermissions(mTargetPkgPm);
+                missingPermissions.removeIf(p -> !declaredPermissions.contains(p));
+            }
             try {
-                mManager.notifyRoutesUpdated(getVisibleRoutes(routes));
+                mManager.notifyRoutesUpdated(visibleRoutes, new ArrayList<>(missingPermissions));
             } catch (RemoteException ex) {
                 logRemoteException("notifyRoutesUpdated", ex);
+            }
+        }
+
+        /**
+         * @return whether this RouterRecord has the required permissions to see the given route.
+         */
+        private Set<String> getTargetPkgMissingPermissions(
+                MediaRoute2Info route, PackageManager pm) {
+            Predicate<String> permissionChecker = p ->
+                    pm.checkPermission(p, mTargetPackageName) == PackageManager.PERMISSION_GRANTED;
+            return MediaRouter2ServiceImpl.this.getMissingPermissions(route,
+                    mTargetUid, mTargetPackageName, permissionChecker);
+        }
+
+        /**
+         * @return whether this RouterRecord has requested the required permissions to see the given
+         *         route, although they may not be granted.
+         */
+        private Set<String> getTargetPackageDeclaredPermissions(PackageManager pm) {
+            try {
+                PackageInfo packageInfo = pm.getPackageInfo(
+                        mTargetPackageName, PackageManager.GET_PERMISSIONS);
+                return new ArraySet<>(packageInfo.requestedPermissions);
+            } catch (PackageManager.NameNotFoundException e) {
+                Log.e(TAG, "Package not found: " + mTargetPackageName, e);
+                return Collections.emptySet();
             }
         }
 
@@ -3709,7 +3808,7 @@ class MediaRouter2ServiceImpl {
             mSessionCreationRequests.add(request);
 
             int transferReason =
-                    managerRequestId != MediaRoute2ProviderService.REQUEST_ID_NONE
+                    managerRequestId != MediaRouter2Manager.REQUEST_ID_NONE
                             ? RoutingSessionInfo.TRANSFER_REASON_SYSTEM_REQUEST
                             : RoutingSessionInfo.TRANSFER_REASON_APP;
 
@@ -3935,9 +4034,10 @@ class MediaRouter2ServiceImpl {
                 }
             }
 
-            long managerRequestId = (matchingRequest == null)
-                    ? MediaRoute2ProviderService.REQUEST_ID_NONE
-                    : matchingRequest.mManagerRequestId;
+            long managerRequestId =
+                    (matchingRequest == null)
+                            ? MediaRouter2Manager.REQUEST_ID_NONE
+                            : matchingRequest.mManagerRequestId;
             notifySessionCreatedToManagers(managerRequestId, sessionInfo);
 
             if (matchingRequest == null) {

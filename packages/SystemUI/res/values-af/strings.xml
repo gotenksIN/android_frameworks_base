@@ -81,12 +81,17 @@
     <string name="screenshot_saving_private_profile" msgid="8934706048497093297">"Stoor tans skermskoot in privaat"</string>
     <string name="screenshot_saved_title" msgid="8893267638659083153">"Skermkiekie is gestoor"</string>
     <string name="screenshot_failed_title" msgid="3259148215671936891">"Kon nie skermkiekie stoor nie"</string>
+    <string name="screenshot_save_to" msgid="3294574417295882864">"Stoor na"</string>
+    <string name="screenshot_select_folder" msgid="4770537414396025502">"Kies vouer"</string>
+    <string name="screenshot_custom_uri_save_fail_title" msgid="1584124511048051054">"Gestoor in %1$s-vouer"</string>
+    <string name="screenshot_custom_uri_save_fail_message" msgid="8548656555271518389">"Iets het skeefgeloop. Kan nie in “%1$s”-vouer stoor nie."</string>
     <string name="screenshot_failed_external_display_indication" msgid="6555673132061101936">"Eksterne skerm"</string>
     <string name="screenshot_failed_to_save_user_locked_text" msgid="6156607948256936920">"Toestel moet ontsluit word voordat skermkiekie gestoor kan word"</string>
     <string name="screenshot_failed_to_save_unknown_text" msgid="1506621600548684129">"Probeer weer skermkiekie neem"</string>
     <string name="screenshot_failed_to_save_text" msgid="7232739948999195960">"Kan nie skermkiekie stoor nie"</string>
     <string name="screenshot_failed_to_capture_text" msgid="7818288545874407451">"Die app of jou organisasie laat nie toe dat skermkiekies geneem word nie"</string>
     <string name="screenshot_blocked_by_admin" msgid="5486757604822795797">"Die neem van skermskote word deur jou IT-admin geblokkeer"</string>
+    <string name="screenshot_copy_description" msgid="2857172429942249976">"Kopieer skermskoot na knipbord"</string>
     <string name="screenshot_edit_label" msgid="8754981973544133050">"Wysig"</string>
     <string name="screenshot_edit_description" msgid="7802378587672433507">"Wysig Skermskoot-knoppie"</string>
     <string name="screenshot_share_label" msgid="1653061117238861559">"Deel"</string>
@@ -171,12 +176,9 @@
     <string name="screen_share_audio_sharing_text" msgid="7829391478284315787">"Deel oudio"</string>
     <string name="screen_share_app_window_sharing_title" msgid="2063554880747318383">"Deel appvenster"</string>
     <string name="screen_share_tab_sharing_title" msgid="1178046793832072728">"Deel oortjie"</string>
-    <!-- no translation found for screen_share_entire_screen_sharing_title (9093580141248337998) -->
-    <skip />
-    <!-- no translation found for screen_share_disclaimer_app_sharing (4191319837838590771) -->
-    <skip />
-    <!-- no translation found for screen_share_disclaimer_full_screen_sharing (6445373139864031364) -->
-    <skip />
+    <string name="screen_share_entire_screen_sharing_title" msgid="9093580141248337998">"Deel hele skerm"</string>
+    <string name="screen_share_disclaimer_app_sharing" msgid="4191319837838590771">"Wanneer jy ’n app deel, is enigiets wat in die app wys of speel sigbaar aan [APP NAME]. Oppas dus met dinge soos wagwoorde, betalingbesonderhede, boodskappe, foto’s en oudio en video."</string>
+    <string name="screen_share_disclaimer_full_screen_sharing" msgid="6445373139864031364">"Wanneer jy jou hele skerm deel, is enigiets op jou skerm sigbaar aan [APP NAME]. Oppas dus met dinge soos wagwoorde, betalingbesonderhede, boodskappe, foto’s, en oudio en video."</string>
     <string name="screen_capture_toolbar_app_window_button_screenshot_a11y" msgid="1357560392667941303">"Neem skermskoot van venster"</string>
     <string name="screen_capture_toolbar_app_window_button_record_a11y" msgid="8984966592912823394">"Neem venster op"</string>
     <string name="screen_capture_toolbar_region_button_screenshot_a11y" msgid="2102262602357521192">"Neem ’n skermskoot van die geselekteerde area"</string>
@@ -709,6 +711,7 @@
     <string name="clear_all_notifications_text" msgid="348312370303046130">"Vee alles uit"</string>
     <string name="manage_notifications_text" msgid="6885645344647733116">"Bestuur"</string>
     <string name="manage_notifications_history_text" msgid="57055985396576230">"Geskiedenis"</string>
+    <string name="notification_dismiss_button_text" msgid="2443352751894142153">"Maak toe"</string>
     <string name="notification_settings_button_description" msgid="2441994740884163889">"Kennisgewinginstellings"</string>
     <string name="notification_history_button_description" msgid="1578657591405033383">"Kennisgewinggeskiedenis"</string>
     <string name="notification_section_header_incoming" msgid="850925217908095197">"Nuut"</string>
@@ -727,7 +730,8 @@
     <string name="adaptive_notification_edu_hun_text" msgid="7743367744129536610">"Jou toestelvolume en -waarskuwings word outomaties vir tot 2 minute lank verminder wanneer jy te veel kennisgewings op een slag kry."</string>
     <string name="go_to_adaptive_notification_settings" msgid="2423690125178298479">"Skakel af"</string>
     <string name="unlock_to_see_notif_text" msgid="7439033907167561227">"Ontsluit om ouer kennisgewings te sien"</string>
-    <string name="quick_settings_disclosure_parental_controls" msgid="2114102871438223600">"Hierdie toestel word deur jou ouer bestuur"</string>
+    <string name="quick_settings_disclosure_parental_controls" msgid="5560100935261229784">"Sommige instellings word deur jou ouer bestuur"</string>
+    <string name="quick_settings_disclosure_parental_controls_legacy" msgid="4116797775361496057">"Hierdie toestel word deur jou ouer bestuur"</string>
     <string name="quick_settings_disclosure_pin_protection" msgid="9219481515114868267">"Sekere toestelinstellings word deur ’n PIN beskerm."</string>
     <string name="quick_settings_disclosure_management_monitoring" msgid="8231336875820702180">"Jou organisasie besit hierdie toestel en kan netwerkverkeer monitor"</string>
     <string name="quick_settings_disclosure_named_management_monitoring" msgid="2831423806103479812">"<xliff:g id="ORGANIZATION_NAME">%1$s</xliff:g> besit hierdie toestel en kan netwerkverkeer monitor"</string>
@@ -832,6 +836,8 @@
     <string name="volume_stream_content_description_vibrate_a11y" msgid="2742330052979397471">"%1$s. Tik om op vibreer te stel."</string>
     <string name="volume_stream_content_description_mute_a11y" msgid="5743548478357238156">"%1$s. Tik om te demp."</string>
     <string name="volume_panel_noise_control_title" msgid="7413949943872304474">"Geraasbeheer"</string>
+    <!-- no translation found for volume_panel_mic_noise_cancellation_title (2324838199042895036) -->
+    <skip />
     <string name="volume_panel_spatial_audio_title" msgid="3367048857932040660">"Ruimtelike Oudio"</string>
     <string name="volume_panel_spatial_audio_off" msgid="4177490084606772989">"Af"</string>
     <string name="volume_panel_spatial_audio_fixed" msgid="3136080137827746046">"Vasgestel"</string>
@@ -903,6 +909,7 @@
     <string name="tuner_toast" msgid="3812684836514766951">"Geluk! Stelsel-UI-ontvanger is by Instellings gevoeg"</string>
     <string name="remove_from_settings" msgid="633775561782209994">"Verwyder uit Instellings"</string>
     <string name="remove_from_settings_prompt" msgid="551565437265615426">"Verwyder Stelsel-UI-ontvanger uit Instellings en staak die gebruik van al sy kenmerke?"</string>
+    <string name="qs_customize_remove" msgid="1840904349092819026">"Verwyder"</string>
     <string name="enable_bluetooth_title" msgid="866883307336662596">"Skakel Bluetooth aan?"</string>
     <string name="enable_bluetooth_message" msgid="6740938333772779717">"Jy moet Bluetooth aanskakel om jou sleutelbord aan jou tablet te koppel."</string>
     <string name="enable_bluetooth_confirmation_ok" msgid="2866408183324184876">"Skakel aan"</string>
@@ -922,15 +929,23 @@
     <string name="inline_done_button" msgid="6043094985588909584">"Klaar"</string>
     <string name="inline_ok_button" msgid="603075490581280343">"Pas toe"</string>
     <string name="inline_turn_off_notifications" msgid="2653064779176881329">"Skakel af"</string>
+    <string name="bridged_device_type_phone" msgid="7971199513068521770">"foon"</string>
+    <string name="bridged_device_type_tablet" msgid="7403330807933649592">"tablet"</string>
+    <string name="bridged_device_type_laptop" msgid="8027976360936787349">"skootrekenaar"</string>
+    <string name="bridged_device_type_watch" msgid="2634106046119813073">"horlosie"</string>
+    <string name="bridged_device_type_tv" msgid="5471822369478942796">"TV"</string>
+    <string name="inline_bridged_open_associated_device_settings" msgid="6885442224230065508">"Maak <xliff:g id="DEVICE_TYPE">%1$s</xliff:g>-instellings oop"</string>
     <string name="notification_silence_title" msgid="8608090968400832335">"Stil"</string>
     <string name="notification_alert_title" msgid="3656229781017543655">"Verstek"</string>
     <string name="notification_automatic_title" msgid="3745465364578762652">"Outomaties"</string>
+    <string name="notification_bridged_title" msgid="4213554380230273828">"Hierdie kennisgewing is van jou <xliff:g id="DEVICE_TYPE">%1$s</xliff:g> af"</string>
     <string name="notification_channel_summary_low" msgid="4860617986908931158">"Geen klank of vibrasie nie"</string>
     <string name="notification_conversation_summary_low" msgid="3855696451919728790">"Geen klank of vibrasie nie, maar verskyn steeds in die gesprekafdeling"</string>
     <string name="notification_channel_summary_default" msgid="777294388712200605">"Kan lui of vibreer op grond van toestelinstellings"</string>
     <string name="notification_channel_summary_default_with_bubbles" msgid="3482483084451555344">"Kan lui of vibreer op grond van toestelinstellings. Gesprekke van <xliff:g id="APP_NAME">%1$s</xliff:g> af verskyn by verstek in ’n borrel."</string>
     <string name="notification_channel_summary_automatic" msgid="5813109268050235275">"Laat die stelsel bepaal of hierdie kennisgewing \'n klank moet maak of vibreer"</string>
     <string name="notification_channel_summary_automatic_alerted" msgid="954166812246932240">"&lt;b&gt;Status:&lt;/b&gt; Bevorder na Verstek"</string>
+    <string name="notification_channel_summary_bridged" msgid="6837698421232117637">"Gesinkroniseerde kennisgewingprioriteit en -instellings kan op jou <xliff:g id="DEVICE_NAME">%1$s</xliff:g> aangepas word"</string>
     <string name="notification_channel_summary_automatic_silenced" msgid="7403004439649872047">"&lt;b&gt;Status:&lt;/b&gt; Gedegradeer na Stil"</string>
     <string name="notification_channel_summary_automatic_promoted" msgid="1301710305149590426">"&lt;b&gt;Status:&lt;/b&gt; Hoër gegradeer"</string>
     <string name="notification_channel_summary_automatic_demoted" msgid="1831303964660807700">"&lt;b&gt;Status:&lt;/b&gt; Laer gegradeer"</string>
@@ -950,8 +965,7 @@
     <string name="notification_unblockable_call_desc" msgid="5907328164696532169">"Oproepkennisgewings kan nie gewysig word nie."</string>
     <string name="notification_multichannel_desc" msgid="7414593090056236179">"Hierdie groep kennisgewings kan nie hier opgestel word nie"</string>
     <string name="notification_delegate_header" msgid="1264510071031479920">"Instaanbediener-kennisgewing"</string>
-    <!-- no translation found for notification_summarization_header (511445254923268688) -->
-    <skip />
+    <string name="notification_summarization_header" msgid="511445254923268688">"Opgesom deur <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="notification_channel_dialog_title" msgid="6856514143093200019">"Alle <xliff:g id="APP_NAME">%1$s</xliff:g>-kennisgewings"</string>
     <string name="see_more_title" msgid="7409317011708185729">"Sien meer"</string>
     <string name="feedback_alerted" msgid="5192459808484271208">"Hierdie kennisgewing is outomaties deur die stelsel &lt;b&gt;na Verstek bevorder&lt;/b&gt;."</string>
@@ -1258,6 +1272,7 @@
     <string name="privacy_type_location" msgid="7991481648444066703">"ligging"</string>
     <string name="privacy_type_microphone" msgid="9136763906797732428">"mikrofoon"</string>
     <string name="privacy_type_media_projection" msgid="8136723828804251547">"skermopname"</string>
+    <string name="privacy_chip_container_leading_title" msgid="4911201935798986077">"Privaatheid"</string>
     <string name="music_controls_no_title" msgid="4166497066552290938">"Titelloos"</string>
     <string name="inattentive_sleep_warning_title" msgid="3891371591713990373">"Bystandmodus"</string>
     <string name="font_scaling_dialog_title" msgid="6273107303850248375">"Lettergrootte"</string>
@@ -1405,13 +1420,13 @@
     <string name="media_output_dialog_accessibility_title" msgid="4681741064190167888">"Beskikbare toestelle vir oudio-uitsette."</string>
     <string name="media_output_dialog_accessibility_seekbar" msgid="5332843993805568978">"Volume"</string>
     <string name="media_output_dialog_volume_percentage" msgid="1613984910585111798">"<xliff:g id="PERCENTAGE">%1$d</xliff:g>%%"</string>
+    <string name="media_output_dialog_missing_permissions_warning" msgid="1279351363821022727">"Sommige toestelle is nie sigbaar nie. Dateer jou apptoestemmings op"</string>
+    <string name="media_output_dialog_warning_button_fix" msgid="3324600211761037516">"Maak reg"</string>
     <string name="media_output_group_title_connected_speakers" msgid="3413876972919684479">"Gekoppelde luidsprekers"</string>
     <string name="media_output_group_title_speakers_and_displays" msgid="7169712332365659820">"Luidsprekers en skerms"</string>
     <string name="media_output_group_title_suggested" msgid="5097061363820410332">"Voorgestel"</string>
     <string name="media_input_group_title" msgid="2057057473860783021">"Invoer"</string>
     <string name="media_output_group_title" msgid="6789001895863332576">"Uitvoer"</string>
-    <string name="media_output_end_session_dialog_summary" msgid="5954520685989877347">"Stop jou gedeelde sessie om media na ’n ander toestel toe te skuif"</string>
-    <string name="media_output_end_session_dialog_stop" msgid="208189434474624412">"Stop"</string>
     <string name="media_output_dialog_button_stop_sharing" msgid="5043482739689716185">"Hou op deel"</string>
     <string name="media_output_dialog_button_sharing_audio" msgid="8312910741492835648">"Deel tans oudio"</string>
     <string name="media_output_dialog_button_share_audio" msgid="827604934548421520">"Deel oudio"</string>
@@ -1736,12 +1751,15 @@
     <string name="dual_shade_educational_tooltip_notifs" msgid="7666159428113013319">"Swiep van bo links af om kennisgewings oop te maak"</string>
     <string name="dual_shade_educational_tooltip_qs" msgid="3842355853737057332">"Swiep van bo regs af om Kitsinstellings oop te maak"</string>
     <string name="back_button_on_bouncer" msgid="809134628434396761">"Terug"</string>
-    <!-- no translation found for sign_in_button_on_bouncer (3595960142516902559) -->
-    <skip />
+    <string name="sign_in_button_on_bouncer" msgid="3595960142516902559">"Meld aan"</string>
     <string name="accessibility_button_on_bouncer_description" msgid="9186344135931507168">"Toeganklikheid"</string>
     <string name="pager_dots_previous_content_description" msgid="26963508904918908">"Vorige"</string>
     <string name="pager_dots_next_content_description" msgid="613943992626163120">"Volgende"</string>
     <string name="accessibility_pager_dots_navigate_to_next_page_action" msgid="7662720613169169465">"navigeer na die volgende bladsy"</string>
     <string name="ambient_cue_autofill_action" msgid="9213025887835308128">"outovul"</string>
     <string name="ambient_cue_expand_action" msgid="6803711089932959312">"vou uit"</string>
+    <string name="location_button_text_share_precise_location" msgid="5341882050169860712">"Deel presiese ligging"</string>
+    <string name="location_button_text_use_precise_location" msgid="3499475231656390476">"Gebruik presiese ligging"</string>
+    <string name="location_button_text_near_precise_location" msgid="3607275724182981412">"Naby presiese ligging"</string>
+    <string name="location_button_text_precise_location" msgid="4441259889842542799">"Presiese ligging"</string>
 </resources>

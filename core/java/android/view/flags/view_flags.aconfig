@@ -2,15 +2,6 @@ package: "android.view.flags"
 container: "system"
 
 flag {
-    name: "enable_surface_native_alloc_registration_ro"
-    namespace: "toolkit"
-    description: "Feature flag for registering surfaces with the VM for faster"
-      " cleanup. Fixed readonly version."
-    bug: "306193257"
-    is_fixed_read_only: true
-}
-
-flag {
     name: "enable_use_measure_cache_during_force_layout"
     namespace: "toolkit"
     description: "Enables using the measure cache during a view force layout from the second "
@@ -115,6 +106,14 @@ flag {
 }
 
 flag {
+    name: "deprecate_is_credential_api"
+    namespace: "autofill"
+    description: "Deprecate isCredential api."
+    bug: "459677787"
+    is_exported: true
+}
+
+flag {
     name: "use_refactored_round_scrollbar"
     namespace: "wear_frameworks"
     description: "Use refactored round scrollbar."
@@ -149,9 +148,25 @@ flag {
 }
 
 flag {
+    name: "enable_windowless_window_focus_navigation"
+    namespace: "window_surfaces"
+    description: "Enable focus navigation for between embedded and host windows"
+    bug: "358638520"
+    is_fixed_read_only: false
+}
+
+flag {
   name: "redact_web_otp_sms_api"
   namespace: "telephony"
   description: "API flag for redacting WebOTP SMS messages from untrusted packages"
+  is_exported: true
+  bug: "437043173"
+}
+
+flag {
+  name: "sms_provider_redact_otp_app_compat_api"
+  namespace: "telephony"
+  description: "SmsProvider App Compat API flag for redacting OTP messages from untrusted packages"
   is_exported: true
   bug: "437043173"
 }

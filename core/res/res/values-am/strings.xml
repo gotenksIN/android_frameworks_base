@@ -278,6 +278,7 @@
     <string name="global_action_restart" msgid="4678451019561687074">"ዳግም አስነሳ"</string>
     <string name="global_action_emergency" msgid="1387617624177105088">"ድንገተኛ አደጋ"</string>
     <string name="global_action_bug_report" msgid="5127867163044170003">"የሳንካ ሪፖርት"</string>
+    <string name="global_action_feedback" msgid="3480836834202300036">"ግብረመልስ"</string>
     <string name="global_action_logout" msgid="6093581310002476511">"ክፍለ-ጊዜን አብቃ"</string>
     <string name="global_action_screenshot" msgid="2610053466156478564">"ቅጽበታዊ ገፅ ዕይታ"</string>
     <string name="global_action_standby" msgid="6786920589970257642">"ተጠባባቂ"</string>
@@ -326,8 +327,7 @@
     <string name="notification_channel_accessibility_hearing_device" msgid="7816963856388758952">"የመስማት ችሎታ መሣሪያ"</string>
     <string name="notification_channel_accessibility_security_policy" msgid="1727787021725251912">"የተደራሽነት አጠቃቀም"</string>
     <string name="notification_channel_display" msgid="6905032605735615090">"ማሳያ"</string>
-    <!-- no translation found for notification_channel_parental_controls (2963963315750128538) -->
-    <skip />
+    <string name="notification_channel_parental_controls" msgid="2963963315750128538">"የወላጅ መቆጣጠሪያዎች"</string>
     <string name="foreground_service_app_in_background" msgid="1439289699671273555">"<xliff:g id="APP_NAME">%1$s</xliff:g> ባትሪ እየተጠቀመ ነው"</string>
     <string name="foreground_service_apps_in_background" msgid="7340037176412387863">"<xliff:g id="NUMBER">%1$d</xliff:g> መተግበሪያዎች ባትሪ እየተጠቀሙ ነው"</string>
     <string name="foreground_service_tap_for_details" msgid="9078123626015586751">"በባትሪ እና ውሂብ አጠቃቀም ላይ ዝርዝሮችን ለማግኘት መታ ያድርጉ"</string>
@@ -645,6 +645,10 @@
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"መተግበሪያው የአካባቢ አውታረ መረብ መሣሪያዎችን እንዲደርስ ይፈቅዳል"</string>
     <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"የምልልስ በይነገጽን ይጠቀሙ"</string>
     <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"መተግበሪያው በምልልስ በይነገጽ ላይ ከሌሎች መተግበሪያዎች ጋር መስተጋብር እንዲፈጥር ይፈቅዳል"</string>
+    <!-- no translation found for permlab_force_use_loopback_interface (1319727311706416481) -->
+    <skip />
+    <!-- no translation found for permdesc_force_use_loopback_interface (5829032514048681980) -->
+    <skip />
     <string name="permlab_ranging" msgid="2854543350668593390">"በአቅራቢያ ባሉ መሣሪያዎች መካከል ያለውን አንጻራዊ አካባቢ ይወቁ"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"መተግበሪያው በአቅራቢያ ባሉ መሣሪያዎች መካከል ያለውን አንጻራዊ አካባቢ ለማወቅ እንዲችል ይፍቀዱለት"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"ተመራጭ NFC የክፍያ አገልግሎት መረጃ"</string>
@@ -825,6 +829,8 @@
     <string name="permdesc_readMediaVideo" msgid="3846400073770403528">"መተግበሪያው ከእርስዎ የተጋራ ማከማቻ የቪዲዮ ፋይሎችን እንዲያነብ ይፈቅድለታል።"</string>
     <string name="permlab_readMediaImages" msgid="4057590631020986789">"ከጋራ ማከማቻ የምስል ፋይሎችን አንብብ"</string>
     <string name="permdesc_readMediaImages" msgid="5836219373138469259">"መተግበሪያው ከእርስዎ የተጋራ ማከማቻ የምስል ፋይሎችን እንዲያነብ ይፈቅድለታል።"</string>
+    <string name="permlab_readMediaDocuments" msgid="5716810755602938263">"የሰነድ ፋይሎችን ከተጋራ ማከማቻ ያንብቡ"</string>
+    <string name="permdesc_readMediaDocuments" msgid="5665930210237304120">"መተግበሪያው ከእርስዎ የተጋራ ማከማቻ የሰነድ ፋይሎችን እንዲያነብ ይፈቅድለታል።"</string>
     <string name="permlab_readVisualUserSelect" msgid="5516204215354667586">"ከተጋራ ማከማቻው ውስጥ በተጠቃሚ የተመረጡ የምስል እና የቪድዮ ፋይሎችን አንብብ"</string>
     <string name="permdesc_readVisualUserSelect" msgid="8027174717714968217">"ከእርስዎ የተጋራ ማከማቻ እርስዎ የሚመርጧቸው የምስል እና የቪድዮ ፋይሎችን መተግበሪያው እንዲያነብ ይፈቅድለታል።"</string>
     <string name="permlab_sdcardWrite" msgid="4863021819671416668">"የተጋራ ማከማቻዎን ይዘቶች ይቀይሩ ወይም ይሰርዙ"</string>
@@ -1029,7 +1035,7 @@
     <string name="relationTypeMother" msgid="2331762740982699460">"እናት"</string>
     <string name="relationTypeParent" msgid="4177920938333039882">"ወላጅ"</string>
     <string name="relationTypePartner" msgid="4018017075116766194">"አጋር"</string>
-    <string name="relationTypeReferredBy" msgid="5285082289602849400">"በ ተጠቅሷል"</string>
+    <string name="relationTypeReferredBy" msgid="5285082289602849400">"የተጠቀሰው"</string>
     <string name="relationTypeRelative" msgid="3396498519818009134">"ዘመድ"</string>
     <string name="relationTypeSister" msgid="3721676005094140671">"እህት"</string>
     <string name="relationTypeSpouse" msgid="6916682664436031703">"የትዳር ጓደኛ"</string>
@@ -1047,6 +1053,7 @@
     <string name="keyguard_password_enter_pin_password_code" msgid="7792964196473964340">"ለመክፈት ፒን ተይብ"</string>
     <string name="keyguard_password_wrong_pin_code" msgid="8583732939138432793">"ትክክል ያልሆነ ፒን  ኮድ።"</string>
     <string name="keyguard_label_text" msgid="3841953694564168384">"ለመክፈት፣ምናሌ ተጫን ከዛ 0"</string>
+    <string name="emergency_call_dialog_number_for_display" msgid="2978165477085612673">"የአደጋ ጊዜቁጥር"</string>
     <string name="lockscreen_carrier_default" msgid="6192313772955399160">"ምንም አገልግሎት የለም"</string>
     <string name="lockscreen_screen_locked" msgid="7364905540516041817">"ማሳያ መቆለፊያ።"</string>
     <string name="lockscreen_instructions_when_pattern_enabled" msgid="7982445492532123308">"ለመክፈት ምናሌ ተጫንወይም የአደጋ ጊዜ ጥሪ አድርግ።"</string>
@@ -2176,13 +2183,21 @@
     <string name="autofill_picker_no_suggestions" msgid="1076022650427481509">"ራስ-ሙላ ጥቆማዎች የሉም"</string>
     <string name="autofill_picker_some_suggestions" msgid="5560549696296202701">"{count,plural, =1{አንድ የራስ-ሙላ አስተያየት}one{# የራስ-ሙላ አስተያየቶች}other{# የራስ-ሙላ አስተያየቶች}}"</string>
     <string name="autofill_save_title" msgid="7719802414283739775">"ወደ "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>" ይቀመጥ?"</string>
+    <string name="autofill_save_title_expressive" msgid="2665408870424848558">"መረጃን ወደ "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>" ያስቀምጡ"</string>
     <string name="autofill_save_title_with_type" msgid="3002460014579799605">"<xliff:g id="TYPE">%1$s</xliff:g> ወደ "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>" ይቀመጡ?"</string>
+    <string name="autofill_save_title_with_type_expressive" msgid="6063660551496235255">"<xliff:g id="TYPE">%1$s</xliff:g> ወደ "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>" ያስቀምጡ"</string>
     <string name="autofill_save_title_with_2types" msgid="3783270967447869241">"<xliff:g id="TYPE_0">%1$s</xliff:g> እና <xliff:g id="TYPE_1">%2$s</xliff:g> ወደ "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>" ይቀመጡ?"</string>
+    <string name="autofill_save_title_with_2types_expressive" msgid="2996687022212666293">"<xliff:g id="TYPE_0">%1$s</xliff:g> እና <xliff:g id="TYPE_1">%2$s</xliff:g> ወደ "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>" ይቀመጡ?"</string>
     <string name="autofill_save_title_with_3types" msgid="6598228952100102578">"<xliff:g id="TYPE_0">%1$s</xliff:g>፣ <xliff:g id="TYPE_1">%2$s</xliff:g> እና <xliff:g id="TYPE_2">%3$s</xliff:g> ወደ "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>" ይቀመጡ?"</string>
+    <string name="autofill_save_title_with_3types_expressive" msgid="3301676215501214049">"<xliff:g id="TYPE_0">%1$s</xliff:g>፣ <xliff:g id="TYPE_1">%2$s</xliff:g> እና <xliff:g id="TYPE_2">%3$s</xliff:g> ወደ "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>" ያስቀምጡ"</string>
     <string name="autofill_update_title" msgid="3630695947047069136">"በ"<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>" ውስጥ ይዘመን?"</string>
+    <string name="autofill_update_title_expressive" msgid="7660582214109012920">"መረጃን "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>" ውስጥ ያዘምኑ"</string>
     <string name="autofill_update_title_with_type" msgid="5264152633488495704">"<xliff:g id="TYPE">%1$s</xliff:g> በ"<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>" ውስጥ ይዘመን?"</string>
+    <string name="autofill_update_title_with_type_expressive" msgid="6162413585161767846">"<xliff:g id="TYPE">%1$s</xliff:g> በ"<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>" ውስጥ ያዘምኑ"</string>
     <string name="autofill_update_title_with_2types" msgid="1797514386321086273">"<xliff:g id="TYPE_0">%1$s</xliff:g> እና <xliff:g id="TYPE_1">%2$s</xliff:g> በ"<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>" ውስጥ ይዘመኑ?"</string>
+    <string name="autofill_update_title_with_2types_expressive" msgid="1911825941498393471">"<xliff:g id="TYPE_0">%1$s</xliff:g> እና <xliff:g id="TYPE_1">%2$s</xliff:g> በ"<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>" ውስጥ ያዘምኑ"</string>
     <string name="autofill_update_title_with_3types" msgid="8285767070604652626">"እነዚህ ንጥሎች በ"<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>" ውስጥ ይዘመኑ፦ <xliff:g id="TYPE_0">%1$s</xliff:g>፣ <xliff:g id="TYPE_1">%2$s</xliff:g> እና <xliff:g id="TYPE_2">%3$s</xliff:g>?"</string>
+    <string name="autofill_update_title_with_3types_expressive" msgid="6040725201378429027">"እነዚህን ንጥሎች በ"<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>" ውስጥ ያዘምኑ፦ <xliff:g id="TYPE_0">%1$s</xliff:g>፣ <xliff:g id="TYPE_1">%2$s</xliff:g> እና <xliff:g id="TYPE_2">%3$s</xliff:g>"</string>
     <string name="autofill_save_yes" msgid="8035743017382012850">"አስቀምጥ"</string>
     <string name="autofill_save_no" msgid="9212826374207023544">"አይ፣ አመሰግናለሁ"</string>
     <string name="autofill_save_notnow" msgid="2853932672029024195">"አሁን አይደለም"</string>
@@ -2611,10 +2626,7 @@
     <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"የሥርዓት መርጃ ማንቂያዎች"</string>
     <string name="tv_watchdog_notification_title" msgid="195239206215922517">"የመርጃ ከመጠን በላይ መጠቀም"</string>
     <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"መተግበሪያ «<xliff:g id="APP_NAME">%1$s</xliff:g> በጣም ብዙ መርጃዎችን እየተጠቀመ ነው።»"</string>
-    <!-- no translation found for supervision_blocked_app_title (5546803865875383588) -->
-    <skip />
-    <!-- no translation found for supervision_blocked_app_content (4125452996088641559) -->
-    <skip />
-    <!-- no translation found for supervision_unblocked_app_content (8282985265957852278) -->
-    <skip />
+    <string name="supervision_blocked_app_title" msgid="5546803865875383588">"ዝማኔ ከእርስዎ ወላጅ"</string>
+    <string name="supervision_blocked_app_content" msgid="4125452996088641559">"<xliff:g id="APP_NAME">%1$s</xliff:g> ለአሁን ተወግዷል"</string>
+    <string name="supervision_unblocked_app_content" msgid="8282985265957852278">"<xliff:g id="APP_NAME">%1$s</xliff:g> አሁን ይገኛል"</string>
 </resources>

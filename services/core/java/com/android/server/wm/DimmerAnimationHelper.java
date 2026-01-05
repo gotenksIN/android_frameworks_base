@@ -101,15 +101,11 @@ public class DimmerAnimationHelper {
 
     @NonNull
     private final SurfaceAnimationRunner mSurfaceAnimationRunner;
-    @NonNull
-    private final AnimationAdapterFactory mAnimationAdapterFactory;
     @Nullable
-    private AnimationAdapter mLocalAnimationAdapter;
+    private LocalAnimationAdapter mLocalAnimationAdapter;
 
-    DimmerAnimationHelper(@NonNull WindowContainer<?> host,
-            @NonNull AnimationAdapterFactory animationFactory) {
-        mAnimationAdapterFactory = animationFactory;
-        mSurfaceAnimationRunner = host.mWmService.mSurfaceAnimationRunner;
+    DimmerAnimationHelper(@NonNull SurfaceAnimationRunner surfaceAnimationRunner) {
+        mSurfaceAnimationRunner = surfaceAnimationRunner;
     }
 
     void setExitParameters() {
@@ -201,7 +197,7 @@ public class DimmerAnimationHelper {
             @NonNull Change from, @NonNull Change to) {
         ProtoLog.v(WM_DEBUG_DIMMER, "Starting animation on %s", dim);
         mAlphaAnimationSpec = getRequestedAnimationSpec(from, to);
-        mLocalAnimationAdapter = mAnimationAdapterFactory.get(mAlphaAnimationSpec,
+        mLocalAnimationAdapter = new LocalAnimationAdapter(mAlphaAnimationSpec,
                 mSurfaceAnimationRunner);
 
         float targetAlpha = to.mAlpha;
@@ -272,6 +268,29 @@ public class DimmerAnimationHelper {
 
     static void setBounds(@NonNull Dimmer.DimState dim, @NonNull WindowState relativeParent,
             @NonNull SurfaceControl.Transaction t) {
+        if (com.android.window.flags.Flags.refactorDimmerCrop()) {
+            final Rect rotatedBounds =
+                    relativeParent.mToken.getFixedRotationTransformDisplayBounds();
+            if (rotatedBounds != null) {
+                dim.mDimBounds.set(rotatedBounds);
+                // Fixed rotation token fills the display. Unset the crop so that the dim can cover
+                // the entire display when the orientation changes.
+                t.setCrop(dim.mDimSurface, null);
+            } else {
+                final Rect hostBounds = dim.mHostContainer.getBounds();
+                final TaskFragment taskFragment = relativeParent.getTaskFragment();
+                if (taskFragment != null) {
+                    taskFragment.getDimBounds(dim.mDimBounds);
+                } else {
+                    dim.mDimBounds.set(hostBounds);
+                }
+                final Rect dimCrop = relativeParent.mTmpRect;
+                dimCrop.set(dim.mDimBounds);
+                dimCrop.offset(-hostBounds.left, -hostBounds.top);
+                t.setCrop(dim.mDimSurface, dimCrop);
+            }
+            return;
+        }
         TaskFragment taskFragment = relativeParent.getTaskFragment();
         Rect taskFragmentBounds = taskFragment != null ? taskFragment.getBounds() : null;
         Task task = relativeParent.getTask();
@@ -405,14 +424,6 @@ public class DimmerAnimationHelper {
             proto.write(TO, mAlpha.mFinishValue);
             proto.write(DURATION_MS, mDuration);
             proto.end(token);
-        }
-    }
-
-    static class AnimationAdapterFactory {
-        @NonNull
-        public AnimationAdapter get(@NonNull LocalAnimationAdapter.AnimationSpec alphaAnimationSpec,
-                @NonNull SurfaceAnimationRunner runner) {
-            return new LocalAnimationAdapter(alphaAnimationSpec, runner);
         }
     }
 }

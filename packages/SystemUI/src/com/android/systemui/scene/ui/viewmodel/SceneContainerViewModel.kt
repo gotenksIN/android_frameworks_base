@@ -19,8 +19,10 @@ package com.android.systemui.scene.ui.viewmodel
 import android.content.res.Resources
 import android.os.Build
 import android.view.MotionEvent
+import android.view.WindowInsetsController
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowInsetsCompat
 import com.android.app.tracing.coroutines.launchTraced as launch
 import com.android.compose.animation.scene.ContentKey
 import com.android.compose.animation.scene.DefaultEdgeDetector
@@ -35,6 +37,8 @@ import com.android.systemui.classifier.domain.interactor.FalsingInteractor
 import com.android.systemui.desktop.domain.interactor.DesktopInteractor
 import com.android.systemui.deviceentry.domain.interactor.DeviceUnlockedInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
+import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor
+import com.android.systemui.keyguard.shared.model.KeyguardState
 import com.android.systemui.keyguard.ui.viewmodel.AodBurnInViewModel
 import com.android.systemui.keyguard.ui.viewmodel.KeyguardClockViewModel
 import com.android.systemui.keyguard.ui.viewmodel.LightRevealScrimViewModel
@@ -66,6 +70,7 @@ import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
 
 /** Models UI state for the scene container. */
 class SceneContainerViewModel
@@ -86,6 +91,7 @@ constructor(
     val lightRevealScrim: LightRevealScrimViewModel,
     val wallpaperViewModel: WallpaperViewModel,
     keyguardInteractor: KeyguardInteractor,
+    keyguardTransitionInteractor: KeyguardTransitionInteractor,
     val burnIn: AodBurnInViewModel,
     val clock: KeyguardClockViewModel,
     val dualShadeEducationalTooltipsViewModelFactory: DualShadeEducationalTooltipsViewModel.Factory,
@@ -105,6 +111,26 @@ constructor(
     val isVisible: Boolean by hydrator.hydratedStateOf("isVisible", sceneInteractor.isVisible)
 
     val hapticsViewModel: SceneContainerHapticsViewModel = hapticsViewModelFactory.create()
+
+    val isAodOrDozing: Boolean by
+        hydrator.hydratedStateOf(
+            false,
+            keyguardTransitionInteractor.startedKeyguardTransitionStep.map {
+                it.to == KeyguardState.DOZING || it.to == KeyguardState.AOD
+            },
+        )
+
+    /**
+     * Whether to reject the transition to this ContentKey because the FalsingManager believes the
+     * transition is from a false touch. If null, do not reject the current transition.
+     */
+    private var falsingCheckRejectsTransitionToContent: ContentKey? = null
+
+    /**
+     * Whether the last navigation bar visible request was to show navigation bars. If null, no
+     * request has been sent.
+     */
+    private var lastNavigationBarVisibleRequest: Boolean? = null
 
     private val dualShadeGestureSplitRatio =
         resources.getFloat(R.dimen.config_invocationGestureSplitRatio)
@@ -207,6 +233,27 @@ constructor(
             event.actionMasked == MotionEvent.ACTION_UP ||
                 event.actionMasked == MotionEvent.ACTION_CANCEL
         ) {
+            // If there's a current transition driven by user input, check falsing.
+            val toContent = sceneInteractor.transitioningTo.value
+            if (sceneInteractor.isTransitionUserInputOngoing.value && toContent != null) {
+                val isAllowedByFalsing = isInteractionAllowedByFalsing(toContent)
+                // Store the falsing check to be used in the near future by
+                // canChangeScene or canShowOrReplaceOverlay.
+                falsingCheckRejectsTransitionToContent =
+                    if (isAllowedByFalsing) {
+                        null
+                    } else {
+                        toContent
+                    }
+                logger.falsingCheckForContentChange(
+                    from = currentScene.value,
+                    to = toContent,
+                    isAllowedByFalsing = isAllowedByFalsing,
+                )
+            } else {
+                falsingCheckRejectsTransitionToContent = null
+            }
+
             sceneInteractor.onUserInputFinished()
         }
     }
@@ -278,31 +325,21 @@ constructor(
                 originalChangeReason = null,
                 rejectionReason = "Device not unlocked",
             )
-
             return false
         }
 
-        if (!isInteractionAllowedByFalsing(toScene)) {
-            showDebuggingToast("${toScene.debugName} rejected: false touch")
-            logger.logContentChangeRejection(
+        val canChangeScene = isFalsingAllowingContentChange(from = currentScene.value, to = toScene)
+        if (canChangeScene) {
+            // A scene change is guaranteed; log it.
+            logger.logSceneChanged(
                 from = currentScene.value,
                 to = toScene,
-                originalChangeReason = null,
-                rejectionReason = "Falsing: false touch detected",
+                keyguardState = null,
+                reason = "user interaction",
+                isInstant = false,
             )
-
-            return false
         }
-
-        // A scene change is guaranteed; log it.
-        logger.logSceneChanged(
-            from = currentScene.value,
-            to = toScene,
-            sceneState = null,
-            reason = "user interaction",
-            isInstant = false,
-        )
-        return true
+        return canChangeScene
     }
 
     /**
@@ -315,24 +352,16 @@ constructor(
         newlyShown: OverlayKey,
         beingReplaced: OverlayKey? = null,
     ): Boolean {
-        return if (isInteractionAllowedByFalsing(newlyShown)) {
+        val canShowOrReplaceOverlay = isFalsingAllowingContentChange(beingReplaced, newlyShown)
+        if (canShowOrReplaceOverlay) {
             // An overlay change is guaranteed; log it.
             logger.logOverlayChangeRequested(
                 from = beingReplaced,
                 to = newlyShown,
                 reason = "user interaction",
             )
-            true
-        } else {
-            showDebuggingToast("${newlyShown.debugName} rejected: false touch")
-            logger.logContentChangeRejection(
-                from = beingReplaced,
-                to = newlyShown,
-                originalChangeReason = null,
-                rejectionReason = "Falsing: false touch detected",
-            )
-            false
         }
+        return canShowOrReplaceOverlay
     }
 
     /**
@@ -395,9 +424,58 @@ constructor(
         return sceneInteractor.filteredUserActions(unfiltered)
     }
 
+    suspend fun updateNavigationBarVisibility(
+        windowInsetsController: WindowInsetsController?,
+        hasBackAction: Boolean,
+        sceneKey: SceneKey,
+        aodOrDozing: Boolean,
+    ) {
+        if (windowInsetsController == null) {
+            return
+        }
+        coroutineScope {
+            // We launch a new coroutine that will be processed on the main thread message queue
+            // after the frame to avoid blocking calls during frame rendering.
+            // Note: We cannot update windowInsetsController from a background thread because
+            // showing and hiding navigation bars must be called from the main thread.
+            launch {
+                val isNavigationBarVisible =
+                    hasBackAction ||
+                        sceneKey == Scenes.Gone ||
+                        sceneKey == Scenes.Communal ||
+                        (sceneKey == Scenes.Lockscreen && !aodOrDozing)
+                if (lastNavigationBarVisibleRequest != isNavigationBarVisible) {
+                    lastNavigationBarVisibleRequest = isNavigationBarVisible
+                    if (isNavigationBarVisible) {
+                        windowInsetsController.show(WindowInsetsCompat.Type.navigationBars())
+                    } else {
+                        windowInsetsController.hide(WindowInsetsCompat.Type.navigationBars())
+                    }
+                }
+            }
+        }
+    }
+
     /** Immediately changes the initial scene if necessary. */
     suspend fun onInitialComposition() {
         onBootTransitionInteractor.maybeChangeInitialScene()
+    }
+
+    private fun isFalsingAllowingContentChange(from: ContentKey?, to: ContentKey): Boolean {
+        // Only false if the falsing check was for this transition
+        if (falsingCheckRejectsTransitionToContent == to) {
+            showDebuggingToast("${to.debugName} rejected: false touch")
+            logger.logContentChangeRejection(
+                from = from,
+                to = to,
+                originalChangeReason = null,
+                rejectionReason = "Falsing: false touch detected",
+            )
+            falsingCheckRejectsTransitionToContent = null
+            return false
+        }
+        falsingCheckRejectsTransitionToContent = null
+        return true
     }
 
     /**
@@ -408,6 +486,7 @@ constructor(
         val interactionTypeOrNull =
             when (content) {
                 Overlays.Bouncer -> Classifier.BOUNCER_SWIPE
+                Scenes.Communal -> Classifier.GLANCEABLE_HUB_SWIPE
                 Scenes.Gone -> Classifier.UNLOCK
                 Scenes.Shade -> Classifier.SHADE_DRAG
                 Overlays.NotificationsShade -> Classifier.NOTIFICATION_DRAG_DOWN

@@ -19,10 +19,14 @@ package com.android.systemui.keyguard.ui.composable.elements
 import android.content.Context
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -74,13 +78,7 @@ constructor(
             val viewModel = rememberViewModel("LockscreenLowerRegion") { viewModelFactory.create() }
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier =
-                    Modifier.navigationBarsPadding()
-                        .fillMaxWidth()
-                        .padding(
-                            horizontal =
-                                dimensionResource(R.dimen.keyguard_affordance_horizontal_offset)
-                        ),
+                modifier = Modifier.fillMaxWidth().padding(),
             ) {
                 ShortcutElement(Shortcuts.Start, viewModel)
 
@@ -93,6 +91,17 @@ constructor(
 
                 ShortcutElement(Shortcuts.End, viewModel)
             }
+        }
+
+        @Composable
+        private fun Modifier.padding(): Modifier {
+            val horizontalPadding = dimensionResource(R.dimen.keyguard_affordance_horizontal_offset)
+            return padding(
+                    start = horizontalPadding,
+                    end = horizontalPadding,
+                    bottom = dimensionResource(R.dimen.keyguard_affordance_vertical_offset),
+                )
+                .windowInsetsPadding(WindowInsets.displayCutout.only(WindowInsetsSides.Bottom))
         }
 
         @Composable
@@ -117,23 +126,27 @@ constructor(
                 return
             }
 
-            val unfoldTranslations =
-                when (key) {
-                    Shortcuts.Start -> {
-                        viewModel.unfoldTranslations.start
-                    }
-
-                    Shortcuts.End -> {
-                        viewModel.unfoldTranslations.end
-                    }
-                    else -> {
-                        throw IllegalArgumentException("Invalid keyguard shortcut key: $key")
-                    }
-                }
-
             LockscreenElement(
                 key,
-                Modifier.graphicsLayer { translationX = unfoldTranslations }
+                Modifier.graphicsLayer {
+                        translationX =
+                            // unfoldTranslations may be updated every frame, so only read value
+                            // in the draw phase.
+                            when (key) {
+                                Shortcuts.Start -> {
+                                    viewModel.unfoldTranslations.start
+                                }
+
+                                Shortcuts.End -> {
+                                    viewModel.unfoldTranslations.end
+                                }
+                                else -> {
+                                    throw IllegalArgumentException(
+                                        "Invalid keyguard shortcut key: $key"
+                                    )
+                                }
+                            }
+                    }
                     .wrapContentHeight(Alignment.Bottom, unbounded = true)
                     .size(
                         height = dimensionResource(R.dimen.keyguard_affordance_fixed_height),

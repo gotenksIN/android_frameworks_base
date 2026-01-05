@@ -21,11 +21,15 @@
 #include <cutils/properties.h>
 #include <cutils/trace.h>
 #include <android_runtime/AndroidRuntime.h>
+// QTI_BEGIN: 2018-02-08: Android-Core: Skip start zygote when the phone on FFBM mode
 #include <android-base/properties.h>
+// QTI_END: 2018-02-08: Android-Core: Skip start zygote when the phone on FFBM mode
 #include <private/android_filesystem_config.h>  // for AID_SYSTEM
 
+// QTI_BEGIN: 2018-02-08: Android-Core: Skip start zygote when the phone on FFBM mode
 using android::base::GetProperty;
 
+// QTI_END: 2018-02-08: Android-Core: Skip start zygote when the phone on FFBM mode
 namespace android {
 
 static void app_usage()
@@ -175,6 +179,7 @@ static const char ZYGOTE_NICE_NAME[] = "zygote";
 
 int main(int argc, char* const argv[])
 {
+// QTI_BEGIN: 2018-02-08: Android-Core: Skip start zygote when the phone on FFBM mode
     std::string bootmode = GetProperty("ro.bootmode", "");
 
     if ((strncmp(bootmode.c_str(), "ffbm-00", 7) == 0)
@@ -182,6 +187,7 @@ int main(int argc, char* const argv[])
             return 0;
     }
 
+// QTI_END: 2018-02-08: Android-Core: Skip start zygote when the phone on FFBM mode
     if (!LOG_NDEBUG) {
       String8 argv_String;
       for (int i = 0; i < argc; ++i) {

@@ -81,12 +81,17 @@
     <string name="screenshot_saving_private_profile" msgid="8934706048497093297">"Екранната снимка се запазва в личния потребителски профил"</string>
     <string name="screenshot_saved_title" msgid="8893267638659083153">"Екранната снимка е запазена"</string>
     <string name="screenshot_failed_title" msgid="3259148215671936891">"Не можа да се запази екранна снимка"</string>
+    <string name="screenshot_save_to" msgid="3294574417295882864">"Запазване в(ъв)"</string>
+    <string name="screenshot_select_folder" msgid="4770537414396025502">"Избор на папка"</string>
+    <string name="screenshot_custom_uri_save_fail_title" msgid="1584124511048051054">"Запазено в папката „%1$s“"</string>
+    <string name="screenshot_custom_uri_save_fail_message" msgid="8548656555271518389">"Нещо се обърка. Запазването в папката „%1$s“ не е възможно."</string>
     <string name="screenshot_failed_external_display_indication" msgid="6555673132061101936">"Външен екран"</string>
     <string name="screenshot_failed_to_save_user_locked_text" msgid="6156607948256936920">"За да бъде запазена екранната снимка, устройството трябва да бъде отключено"</string>
     <string name="screenshot_failed_to_save_unknown_text" msgid="1506621600548684129">"Опитайте да направите екранна снимка отново"</string>
     <string name="screenshot_failed_to_save_text" msgid="7232739948999195960">"Екранната снимка не може да се запази"</string>
     <string name="screenshot_failed_to_capture_text" msgid="7818288545874407451">"Правенето на екранни снимки не е разрешено от приложението или организацията ви"</string>
     <string name="screenshot_blocked_by_admin" msgid="5486757604822795797">"Правенето на екранни снимки е блокирано от системния ви администратор"</string>
+    <string name="screenshot_copy_description" msgid="2857172429942249976">"Копиране на екранната снимка в буферната памет"</string>
     <string name="screenshot_edit_label" msgid="8754981973544133050">"Редактиране"</string>
     <string name="screenshot_edit_description" msgid="7802378587672433507">"Бутон за редактиране на екранната снимка"</string>
     <string name="screenshot_share_label" msgid="1653061117238861559">"Споделяне"</string>
@@ -171,12 +176,9 @@
     <string name="screen_share_audio_sharing_text" msgid="7829391478284315787">"Споделяне на звука"</string>
     <string name="screen_share_app_window_sharing_title" msgid="2063554880747318383">"Споделяне на прозореца на прилож."</string>
     <string name="screen_share_tab_sharing_title" msgid="1178046793832072728">"Споделяне на раздела"</string>
-    <!-- no translation found for screen_share_entire_screen_sharing_title (9093580141248337998) -->
-    <skip />
-    <!-- no translation found for screen_share_disclaimer_app_sharing (4191319837838590771) -->
-    <skip />
-    <!-- no translation found for screen_share_disclaimer_full_screen_sharing (6445373139864031364) -->
-    <skip />
+    <string name="screen_share_entire_screen_sharing_title" msgid="9093580141248337998">"Споделяне на целия екран"</string>
+    <string name="screen_share_disclaimer_app_sharing" msgid="4191319837838590771">"Когато споделяте дадено приложение, всичко, което се показва или възпроизвежда в него, е видимо за [APP NAME]. Затова внимавайте с неща като пароли, подробности за начини на плащане, съобщения, снимки, аудио и видео."</string>
+    <string name="screen_share_disclaimer_full_screen_sharing" msgid="6445373139864031364">"Когато споделяте целия екран, всичко, което се показва на него, е видимо за [APP NAME]. Затова внимавайте с неща като пароли, подробности за начини на плащане, съобщения, снимки, аудио и видео."</string>
     <string name="screen_capture_toolbar_app_window_button_screenshot_a11y" msgid="1357560392667941303">"Създаване на екранна снимка на прозореца"</string>
     <string name="screen_capture_toolbar_app_window_button_record_a11y" msgid="8984966592912823394">"Прозорец за записване"</string>
     <string name="screen_capture_toolbar_region_button_screenshot_a11y" msgid="2102262602357521192">"Създаване на екранна снимка на избраната област"</string>
@@ -321,7 +323,7 @@
     <string name="accessibility_bluetooth_device_settings_see_all" msgid="5260390270128256620">"Вижте всички устройства"</string>
     <string name="accessibility_bluetooth_device_settings_pair_new_device" msgid="7988547106800504256">"Сдвояване на ново устройство"</string>
     <string name="accessibility_battery_unknown" msgid="1807789554617976440">"Процентът на батерията е неизвестен."</string>
-    <string name="accessibility_bluetooth_name" msgid="7300973230214067678">"Има връзка с <xliff:g id="BLUETOOTH">%s</xliff:g>."</string>
+    <string name="accessibility_bluetooth_name" msgid="7300973230214067678">"Установена е връзка с/ъс <xliff:g id="BLUETOOTH">%s</xliff:g>."</string>
     <string name="accessibility_cast_name" msgid="7344437925388773685">"Установена е връзка с/ъс <xliff:g id="CAST">%s</xliff:g>."</string>
     <string name="accessibility_expand_group" msgid="521237935987978624">"Разгъване на групата."</string>
     <string name="accessibility_collapse_group" msgid="1842704016768329517">"Свиване на групата."</string>
@@ -709,6 +711,7 @@
     <string name="clear_all_notifications_text" msgid="348312370303046130">"Изчистване на всички"</string>
     <string name="manage_notifications_text" msgid="6885645344647733116">"Управление"</string>
     <string name="manage_notifications_history_text" msgid="57055985396576230">"История"</string>
+    <string name="notification_dismiss_button_text" msgid="2443352751894142153">"Затваряне"</string>
     <string name="notification_settings_button_description" msgid="2441994740884163889">"Настройки за известията"</string>
     <string name="notification_history_button_description" msgid="1578657591405033383">"История на известията"</string>
     <string name="notification_section_header_incoming" msgid="850925217908095197">"Нови"</string>
@@ -727,7 +730,8 @@
     <string name="adaptive_notification_edu_hun_text" msgid="7743367744129536610">"Силата на звука и сигналите на у-вото се намаляват за до 2 минути, когато получавате твърде много известия наведнъж."</string>
     <string name="go_to_adaptive_notification_settings" msgid="2423690125178298479">"Изключване"</string>
     <string name="unlock_to_see_notif_text" msgid="7439033907167561227">"Отключете за достъп до по-стари известия"</string>
-    <string name="quick_settings_disclosure_parental_controls" msgid="2114102871438223600">"Това устройство се управлява от родителя ви"</string>
+    <string name="quick_settings_disclosure_parental_controls" msgid="5560100935261229784">"Някои настройки се управляват от родителя ви"</string>
+    <string name="quick_settings_disclosure_parental_controls_legacy" msgid="4116797775361496057">"Това устройство се управлява от родителя ви"</string>
     <string name="quick_settings_disclosure_pin_protection" msgid="9219481515114868267">"Някои настройки на устройството са защитени с ПИН."</string>
     <string name="quick_settings_disclosure_management_monitoring" msgid="8231336875820702180">"Организацията ви притежава това устройство и може да наблюдава трафика в мрежата"</string>
     <string name="quick_settings_disclosure_named_management_monitoring" msgid="2831423806103479812">"<xliff:g id="ORGANIZATION_NAME">%1$s</xliff:g> притежава това устройство и може да наблюдава трафика в мрежата"</string>
@@ -832,6 +836,8 @@
     <string name="volume_stream_content_description_vibrate_a11y" msgid="2742330052979397471">"%1$s. Докоснете, за да зададете вибриране."</string>
     <string name="volume_stream_content_description_mute_a11y" msgid="5743548478357238156">"%1$s. Докоснете, за да заглушите звука."</string>
     <string name="volume_panel_noise_control_title" msgid="7413949943872304474">"Управление на шума"</string>
+    <!-- no translation found for volume_panel_mic_noise_cancellation_title (2324838199042895036) -->
+    <skip />
     <string name="volume_panel_spatial_audio_title" msgid="3367048857932040660">"Пространствено аудио"</string>
     <string name="volume_panel_spatial_audio_off" msgid="4177490084606772989">"Изкл."</string>
     <string name="volume_panel_spatial_audio_fixed" msgid="3136080137827746046">"Фиксирано"</string>
@@ -903,6 +909,7 @@
     <string name="tuner_toast" msgid="3812684836514766951">"Поздравления! Тунерът на системния потребителски интерфейс е добавен към „Настройки“"</string>
     <string name="remove_from_settings" msgid="633775561782209994">"Премахване от „Настройки“"</string>
     <string name="remove_from_settings_prompt" msgid="551565437265615426">"Да се премахне ли от „Настройки“ тунерът на системния потребителски интерфейс и да се спре ли използването на всичките му функции?"</string>
+    <string name="qs_customize_remove" msgid="1840904349092819026">"Премахване"</string>
     <string name="enable_bluetooth_title" msgid="866883307336662596">"Да се включи ли Bluetooth?"</string>
     <string name="enable_bluetooth_message" msgid="6740938333772779717">"За да свържете клавиатурата с таблета си, първо трябва да включите Bluetooth."</string>
     <string name="enable_bluetooth_confirmation_ok" msgid="2866408183324184876">"Включване"</string>
@@ -922,15 +929,23 @@
     <string name="inline_done_button" msgid="6043094985588909584">"Готово"</string>
     <string name="inline_ok_button" msgid="603075490581280343">"Прилагане"</string>
     <string name="inline_turn_off_notifications" msgid="2653064779176881329">"Изключване"</string>
+    <string name="bridged_device_type_phone" msgid="7971199513068521770">"телефона"</string>
+    <string name="bridged_device_type_tablet" msgid="7403330807933649592">"таблета"</string>
+    <string name="bridged_device_type_laptop" msgid="8027976360936787349">"лаптопа"</string>
+    <string name="bridged_device_type_watch" msgid="2634106046119813073">"часовника"</string>
+    <string name="bridged_device_type_tv" msgid="5471822369478942796">"телевизора"</string>
+    <string name="inline_bridged_open_associated_device_settings" msgid="6885442224230065508">"Отворете настройките на <xliff:g id="DEVICE_TYPE">%1$s</xliff:g>"</string>
     <string name="notification_silence_title" msgid="8608090968400832335">"Тих режим"</string>
     <string name="notification_alert_title" msgid="3656229781017543655">"Стандартно"</string>
     <string name="notification_automatic_title" msgid="3745465364578762652">"Автоматично"</string>
+    <string name="notification_bridged_title" msgid="4213554380230273828">"Това известие е от <xliff:g id="DEVICE_TYPE">%1$s</xliff:g> ви"</string>
     <string name="notification_channel_summary_low" msgid="4860617986908931158">"Без звук или вибриране"</string>
     <string name="notification_conversation_summary_low" msgid="3855696451919728790">"Без звук или вибриране, но пак ще се показва в секцията с разговори"</string>
     <string name="notification_channel_summary_default" msgid="777294388712200605">"Може да звъни или да вибрира въз основа на настройките на устройството"</string>
     <string name="notification_channel_summary_default_with_bubbles" msgid="3482483084451555344">"Може да звъни или да вибрира въз основа на настройките на устройството. Разговорите от <xliff:g id="APP_NAME">%1$s</xliff:g> се показват като балончета по подразбиране."</string>
     <string name="notification_channel_summary_automatic" msgid="5813109268050235275">"Нека системата да определя дали дадено известие да се придружава от звук, или вибриране"</string>
     <string name="notification_channel_summary_automatic_alerted" msgid="954166812246932240">"&lt;b&gt;Състояние:&lt;/b&gt; Повишено до основно"</string>
+    <string name="notification_channel_summary_bridged" msgid="6837698421232117637">"Приоритетът и настройките на синхронизираните известия могат да бъдат коригирани на <xliff:g id="DEVICE_NAME">%1$s</xliff:g> ви"</string>
     <string name="notification_channel_summary_automatic_silenced" msgid="7403004439649872047">"&lt;b&gt;Състояние:&lt;/b&gt; Понижено до беззвучно"</string>
     <string name="notification_channel_summary_automatic_promoted" msgid="1301710305149590426">"&lt;b&gt;Състояние:&lt;/b&gt; Класирано по-високо"</string>
     <string name="notification_channel_summary_automatic_demoted" msgid="1831303964660807700">"&lt;b&gt;Състояние:&lt;/b&gt; Класирано по-ниско"</string>
@@ -950,8 +965,7 @@
     <string name="notification_unblockable_call_desc" msgid="5907328164696532169">"Известията за обаждания не могат да бъдат променяни."</string>
     <string name="notification_multichannel_desc" msgid="7414593090056236179">"Тази група от известия не може да бъде конфигурирана тук"</string>
     <string name="notification_delegate_header" msgid="1264510071031479920">"Известие, получено чрез делегиране"</string>
-    <!-- no translation found for notification_summarization_header (511445254923268688) -->
-    <skip />
+    <string name="notification_summarization_header" msgid="511445254923268688">"Обобщено от <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="notification_channel_dialog_title" msgid="6856514143093200019">"Всички известия от <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="see_more_title" msgid="7409317011708185729">"Вижте още"</string>
     <string name="feedback_alerted" msgid="5192459808484271208">"Това известие автоматично бе &lt;b&gt;повишено до основно&lt;/b&gt; от системата."</string>
@@ -1165,7 +1179,7 @@
     <string name="accessibility_key_gesture_magnification_dialog_title" msgid="5770691510738701250">"Клавишната комбинация за <xliff:g id="ID_1">%1$s</xliff:g> е включена"</string>
     <string name="accessibility_key_gesture_magnification_dialog_content" msgid="1647246652170256645"><annotation id="action_key_icon">"Иконата"</annotation>" за <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> + <xliff:g id="ID_3">^3</xliff:g> е клавишната комбинация за използване на „<xliff:g id="ID_4">^4</xliff:g>“ – функция за достъпност. Това ви дава възможност бързо да приближавате екрана, за да уголемите съдържанието. След като функцията за увеличаване бъде включена, натиснете "<annotation id="action_key_icon">"иконата"</annotation>" за <xliff:g id="ID_5">^1</xliff:g> + <xliff:g id="ID_6">^2</xliff:g> и „+“ или „-“, за да коригирате мащаба."</string>
     <string name="accessibility_key_gesture_magnification_dialog_negative_button_text" msgid="8393469413785600834">"Изключване на прекия път"</string>
-    <string name="accessibility_key_gesture_magnification_dialog_positive_button_text" msgid="895076240681888057">"Без изключване"</string>
+    <string name="accessibility_key_gesture_magnification_dialog_positive_button_text" msgid="895076240681888057">"Да не се изключва"</string>
     <string name="accessibility_key_gesture_screen_reader_dialog_content" msgid="2322728522389883751"><annotation id="action_key_icon">"Иконата"</annotation>" за <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> + <xliff:g id="ID_3">^3</xliff:g> е клавишната комбинация за използване на <xliff:g id="ID_4">^4</xliff:g>. <xliff:g id="ID_5">^4</xliff:g> е екранен четец, който ви дава възможност да чувате гласово описание на елементите. Той може да е полезен за хора, които трудно виждат екрана. Това може да промени начина, по който работи устройството ви."</string>
     <string name="accessibility_key_gesture_screen_reader_dialog_warning_heading" msgid="5958960812509429136">"Ако включите клавишната комбинация, ще разрешите на TalkBack да има пълен контрол над устройството ви."</string>
     <string name="accessibility_key_gesture_screen_reader_dialog_warning_message" msgid="2026368922103788492">"Пълният контрол е подходящ за приложенията, които помагат на потребителите със специални нужди, но не и за повечето приложения."</string>
@@ -1258,6 +1272,7 @@
     <string name="privacy_type_location" msgid="7991481648444066703">"местополож."</string>
     <string name="privacy_type_microphone" msgid="9136763906797732428">"микрофона"</string>
     <string name="privacy_type_media_projection" msgid="8136723828804251547">"записване на екрана"</string>
+    <string name="privacy_chip_container_leading_title" msgid="4911201935798986077">"Поверителн."</string>
     <string name="music_controls_no_title" msgid="4166497066552290938">"Няма заглавие"</string>
     <string name="inattentive_sleep_warning_title" msgid="3891371591713990373">"Режим на готовност"</string>
     <string name="font_scaling_dialog_title" msgid="6273107303850248375">"Размер на шрифта"</string>
@@ -1405,13 +1420,13 @@
     <string name="media_output_dialog_accessibility_title" msgid="4681741064190167888">"Налични устройства за аудиоизход."</string>
     <string name="media_output_dialog_accessibility_seekbar" msgid="5332843993805568978">"Сила на звука"</string>
     <string name="media_output_dialog_volume_percentage" msgid="1613984910585111798">"<xliff:g id="PERCENTAGE">%1$d</xliff:g>%%"</string>
+    <string name="media_output_dialog_missing_permissions_warning" msgid="1279351363821022727">"Някои устройства не са видими. Актуализирайте разрешенията за приложението"</string>
+    <string name="media_output_dialog_warning_button_fix" msgid="3324600211761037516">"Коригиране"</string>
     <string name="media_output_group_title_connected_speakers" msgid="3413876972919684479">"Свързани високоговорители"</string>
     <string name="media_output_group_title_speakers_and_displays" msgid="7169712332365659820">"Високоговорители и екрани"</string>
     <string name="media_output_group_title_suggested" msgid="5097061363820410332">"Предложени"</string>
     <string name="media_input_group_title" msgid="2057057473860783021">"Вход"</string>
     <string name="media_output_group_title" msgid="6789001895863332576">"Изход"</string>
-    <string name="media_output_end_session_dialog_summary" msgid="5954520685989877347">"Спиране на споделената ви сесия с цел преместване на мултимедията на друго устройство"</string>
-    <string name="media_output_end_session_dialog_stop" msgid="208189434474624412">"Спиране"</string>
     <string name="media_output_dialog_button_stop_sharing" msgid="5043482739689716185">"Спиране на споделянето"</string>
     <string name="media_output_dialog_button_sharing_audio" msgid="8312910741492835648">"Звукът се споделя"</string>
     <string name="media_output_dialog_button_share_audio" msgid="827604934548421520">"Споделяне на звука"</string>
@@ -1736,12 +1751,15 @@
     <string name="dual_shade_educational_tooltip_notifs" msgid="7666159428113013319">"Прекарайте пръст от горния ляв ъгъл, за да отворите известията"</string>
     <string name="dual_shade_educational_tooltip_qs" msgid="3842355853737057332">"Прекарайте пръст от горния десен ъгъл, за да отворите бързите настройки"</string>
     <string name="back_button_on_bouncer" msgid="809134628434396761">"Назад"</string>
-    <!-- no translation found for sign_in_button_on_bouncer (3595960142516902559) -->
-    <skip />
+    <string name="sign_in_button_on_bouncer" msgid="3595960142516902559">"Вход"</string>
     <string name="accessibility_button_on_bouncer_description" msgid="9186344135931507168">"Достъпност"</string>
     <string name="pager_dots_previous_content_description" msgid="26963508904918908">"Назад"</string>
     <string name="pager_dots_next_content_description" msgid="613943992626163120">"Напред"</string>
     <string name="accessibility_pager_dots_navigate_to_next_page_action" msgid="7662720613169169465">"придвижване до следващата страница"</string>
     <string name="ambient_cue_autofill_action" msgid="9213025887835308128">"автоматично попълване"</string>
     <string name="ambient_cue_expand_action" msgid="6803711089932959312">"разгъване"</string>
+    <string name="location_button_text_share_precise_location" msgid="5341882050169860712">"Споделяне на точното местоположение"</string>
+    <string name="location_button_text_use_precise_location" msgid="3499475231656390476">"Използване на точното местоположение"</string>
+    <string name="location_button_text_near_precise_location" msgid="3607275724182981412">"Близо до точното местоположение"</string>
+    <string name="location_button_text_precise_location" msgid="4441259889842542799">"Точно местоположение"</string>
 </resources>

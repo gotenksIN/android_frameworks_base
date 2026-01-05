@@ -32,30 +32,42 @@ import android.platform.test.annotations.EnableFlags;
 import android.platform.test.flag.junit.SetFlagsRule;
 
 import androidx.test.platform.app.InstrumentationRegistry;
-import androidx.test.runner.AndroidJUnit4;
 
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.junit.runners.JUnit4;
 
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
-@RunWith(AndroidJUnit4.class)
+@RunWith(JUnit4.class)
 public class LskfResetManagerServiceTest {
     @Rule public final SetFlagsRule mSetFlagsRule = new SetFlagsRule();
 
     private static final UserHandle TEST_USER_0 = UserHandle.getUserHandleForUid(1000);
     private static final UserHandle TEST_USER_1 = UserHandle.getUserHandleForUid(1001);
 
+    private FakeScheduledExecutorService mExecutor;
+
     private Context mContext;
     private LskfResetManagerService mService;
 
+    private class TestInjector extends LskfResetManagerService.Injector {
+        @Override
+        ScheduledExecutorService getExecutor() {
+            return mExecutor;
+        }
+    }
+
     @Before
     public void setUp() {
+        mExecutor = new FakeScheduledExecutorService(Thread.currentThread());
         mContext = InstrumentationRegistry.getInstrumentation().getTargetContext();
-        mService = new LskfResetManagerService(mContext);
+        mService = new LskfResetManagerService(mContext, new TestInjector());
         mService.onStart();
     }
 
@@ -70,6 +82,7 @@ public class LskfResetManagerServiceTest {
     @EnableFlags(Flags.FLAG_ENABLE_LSKF_RESET_MANAGER)
     public void testCreateSession() throws Exception {
         ILskfResetManager manager = mService.getBinderService();
+
         ILskfResetSession session = manager.createLskfResetSession(TEST_USER_0);
         assertNotNull(session);
         assertTrue(mService.isSessionActive(session));
@@ -79,13 +92,16 @@ public class LskfResetManagerServiceTest {
     @EnableFlags(Flags.FLAG_ENABLE_LSKF_RESET_MANAGER)
     public void testCloseSession() throws Exception {
         ILskfResetManager manager = mService.getBinderService();
+
         ILskfResetSession session0 = manager.createLskfResetSession(TEST_USER_0);
         ILskfResetSession session1 = manager.createLskfResetSession(TEST_USER_1);
         assertTrue(mService.isSessionActive(session0));
         assertTrue(mService.isSessionActive(session1));
+
         session0.close();
         assertFalse(mService.isSessionActive(session0));
         assertTrue(mService.isSessionActive(session1));
+
         session1.close();
         assertFalse(mService.isSessionActive(session0));
         assertFalse(mService.isSessionActive(session1));
@@ -165,17 +181,87 @@ public class LskfResetManagerServiceTest {
             thread.start();
         }
         closeLatch.await();
-        assertEquals(successCount.get(), 1);
-        assertEquals(failureCount.get(), numThreads - 1);
+        assertEquals(1, successCount.get());
+        assertEquals(numThreads - 1, failureCount.get());
     }
 
     @Test
     @EnableFlags(Flags.FLAG_ENABLE_LSKF_RESET_MANAGER)
     public void testSessionDeath() throws Exception {
         ILskfResetManager manager = mService.getBinderService();
+
         ILskfResetSession session = manager.createLskfResetSession(TEST_USER_0);
         assertTrue(mService.isSessionActive(session));
+
         mService.killSession(session);
         assertFalse(mService.isSessionActive(session));
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_LSKF_RESET_MANAGER)
+    public void testSessionTimeout() throws Exception {
+        ILskfResetManager manager = mService.getBinderService();
+        ILskfResetSession session = manager.createLskfResetSession(TEST_USER_0);
+
+        // Session is active at the start.
+        assertTrue(mService.isSessionActive(session));
+        assertEquals(1, mExecutor.numTasks());
+
+        // Session should not time out after 30s.
+        assertEquals(0, mExecutor.fastForwardMillis(TimeUnit.SECONDS.toMillis(30)));
+        assertTrue(mService.isSessionActive(session));
+        assertEquals(1, mExecutor.numTasks(), 1);
+
+        // Session should time out after 65s.
+        assertEquals(1, mExecutor.fastForwardMillis(TimeUnit.SECONDS.toMillis(35)));
+        assertFalse(mService.isSessionActive(session));
+        assertEquals(0, mExecutor.numTasks());
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_LSKF_RESET_MANAGER)
+    public void testClosedSessionsDoNotTimeOut() throws Exception {
+        ILskfResetManager manager = mService.getBinderService();
+
+        ILskfResetSession session = manager.createLskfResetSession(TEST_USER_0);
+        assertTrue(mService.isSessionActive(session));
+        assertEquals(1, mExecutor.numTasks());
+
+        session.close();
+        assertFalse(mService.isSessionActive(session));
+        assertEquals(0, mExecutor.numTasks());
+
+        // Nothing should happen even after 65s.
+        assertEquals(0, mExecutor.fastForwardMillis(TimeUnit.SECONDS.toMillis(65)));
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_LSKF_RESET_MANAGER)
+    public void testSessionTimeoutsAreIndependent() throws Exception {
+        ILskfResetManager manager = mService.getBinderService();
+
+        // Start a first session
+        ILskfResetSession session0 = manager.createLskfResetSession(TEST_USER_0);
+        assertTrue(mService.isSessionActive(session0));
+        assertEquals(1, mExecutor.numTasks());
+
+        // Start a second session 30s later.
+        assertEquals(0, mExecutor.fastForwardMillis(TimeUnit.SECONDS.toMillis(30)));
+        ILskfResetSession session1 = manager.createLskfResetSession(TEST_USER_1);
+        assertTrue(mService.isSessionActive(session0));
+        assertTrue(mService.isSessionActive(session1));
+        assertEquals(2, mExecutor.numTasks());
+
+        // After 70s the first session should be timed out but not the second.
+        assertEquals(1, mExecutor.fastForwardMillis(TimeUnit.SECONDS.toMillis(40)));
+        assertFalse(mService.isSessionActive(session0));
+        assertTrue(mService.isSessionActive(session1));
+        assertEquals(1, mExecutor.numTasks());
+
+        // After 100s the second session should be timed out as well.
+        assertEquals(1, mExecutor.fastForwardMillis(TimeUnit.SECONDS.toMillis(30)));
+        assertFalse(mService.isSessionActive(session0));
+        assertFalse(mService.isSessionActive(session1));
+        assertEquals(0, mExecutor.numTasks());
     }
 }

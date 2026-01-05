@@ -137,7 +137,7 @@ constructor(
             rememberViewModel("QuickSettingsScene-viewModel") { contentViewModelFactory.create() }
         val notificationsPlaceholderViewModel =
             rememberViewModel("QuickSettingsScene-notifPlaceholderViewModel") {
-                notificationsPlaceholderViewModelFactory.create()
+                notificationsPlaceholderViewModelFactory.create(Scenes.QuickSettings)
             }
 
         val brightnessMirrorShowing =
@@ -240,7 +240,11 @@ private fun ContentScope.QuickSettingsScene(
             }
         }
 
-        NestedSceneTransitionLayout(state = sceneState, modifier = Modifier.fillMaxSize()) {
+        NestedSceneTransitionLayout(
+            state = sceneState,
+            debugName = "QuickSettingsScene",
+            modifier = Modifier.fillMaxSize(),
+        ) {
             scene(QS) {
                 Element(QS.rootElementKey, Modifier) {
                     QuickSettingsContent(
@@ -333,8 +337,7 @@ private fun ContentScope.QuickSettingsContent(
 
         // ############# NAV BAR paddings ###############
 
-        val navBarBottomHeight =
-            WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+        val navBarInsets = WindowInsets.navigationBars.asPaddingValues()
 
         // ############# Media ###############
         val mediaInRow = viewModel.qsContainerViewModel.showMediaInRow
@@ -342,14 +345,13 @@ private fun ContentScope.QuickSettingsContent(
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier =
-                Modifier.fillMaxSize()
-                    .overscroll(verticalOverscrollEffect)
-                    .padding(bottom = navBarBottomHeight.coerceAtLeast(0.dp)),
+                Modifier.fillMaxSize().overscroll(verticalOverscrollEffect).padding(navBarInsets),
         ) {
             Box(modifier = Modifier.fillMaxSize().weight(1f)) {
                 Column(
                     modifier =
-                        Modifier.verticalScroll(scrollState, enabled = isScrollable)
+                        Modifier.disableSwipesWhenScrolling()
+                            .verticalScroll(scrollState, enabled = isScrollable)
                             .clipScrollableContainer(Orientation.Horizontal)
                             .fillMaxWidth()
                             .wrapContentHeight(unbounded = true)
@@ -393,7 +395,6 @@ private fun ContentScope.QuickSettingsContent(
             tag = "QSScene",
             stackScrollView = notificationStackScrollView,
             viewModel = notificationsPlaceholderViewModel,
-            useHunBounds = { shouldUseQuickSettingsHunBounds(layoutState) },
             modifier =
                 Modifier.align(Alignment.BottomCenter)
                     .navigationBarsPadding()
@@ -419,8 +420,9 @@ private fun ContentScope.QuickSettingsContent(
             shouldPunchHoleBehindScrim = shouldPunchHoleBehindScrim,
             isTransparencyEnabled = viewModel.isTransparencyEnabled,
             stackTopPadding = notificationStackPadding,
-            stackBottomPadding = navBarBottomHeight,
+            stackBottomPadding = navBarInsets.calculateBottomPadding(),
             shouldIncludeHeadsUpSpace = false,
+            isActivated = false,
             modifier =
                 Modifier.fillMaxWidth()
                     // Match the screen height with the scrim, so it covers the whole screen,

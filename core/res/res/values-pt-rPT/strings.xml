@@ -279,6 +279,7 @@
     <string name="global_action_restart" msgid="4678451019561687074">"Reiniciar"</string>
     <string name="global_action_emergency" msgid="1387617624177105088">"Emergência"</string>
     <string name="global_action_bug_report" msgid="5127867163044170003">"Relatório de erros"</string>
+    <string name="global_action_feedback" msgid="3480836834202300036">"Feedback"</string>
     <string name="global_action_logout" msgid="6093581310002476511">"Terminar sessão"</string>
     <string name="global_action_screenshot" msgid="2610053466156478564">"Capt. ecrã"</string>
     <string name="global_action_standby" msgid="6786920589970257642">"Modo de espera"</string>
@@ -327,8 +328,7 @@
     <string name="notification_channel_accessibility_hearing_device" msgid="7816963856388758952">"Dispositivo auditivo"</string>
     <string name="notification_channel_accessibility_security_policy" msgid="1727787021725251912">"Utilização da acessibilidade"</string>
     <string name="notification_channel_display" msgid="6905032605735615090">"Ecrã"</string>
-    <!-- no translation found for notification_channel_parental_controls (2963963315750128538) -->
-    <skip />
+    <string name="notification_channel_parental_controls" msgid="2963963315750128538">"Controlos parentais"</string>
     <string name="foreground_service_app_in_background" msgid="1439289699671273555">"A app <xliff:g id="APP_NAME">%1$s</xliff:g> está a consumir bateria."</string>
     <string name="foreground_service_apps_in_background" msgid="7340037176412387863">"<xliff:g id="NUMBER">%1$d</xliff:g> aplicações estão a consumir bateria."</string>
     <string name="foreground_service_tap_for_details" msgid="9078123626015586751">"Toque para obter detalhes acerca da utilização da bateria e dos dados"</string>
@@ -646,6 +646,10 @@
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"Permite que a app aceda aos dispositivos da rede local"</string>
     <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"usar interface de loopback"</string>
     <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"Permite que a app interaja com outras apps através da interface de loopback"</string>
+    <!-- no translation found for permlab_force_use_loopback_interface (1319727311706416481) -->
+    <skip />
+    <!-- no translation found for permdesc_force_use_loopback_interface (5829032514048681980) -->
+    <skip />
     <string name="permlab_ranging" msgid="2854543350668593390">"determinar a posição relativa entre disp. próximos"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"Permita que a app determine a posição relativa entre os dispositivos próximos"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"Informações de serviços de pagamento com NFC preferenciais"</string>
@@ -826,6 +830,8 @@
     <string name="permdesc_readMediaVideo" msgid="3846400073770403528">"Permite que a app leia ficheiros de vídeo do armazenamento partilhado."</string>
     <string name="permlab_readMediaImages" msgid="4057590631020986789">"ler ficheiros de imagem do armazenamento partilhado"</string>
     <string name="permdesc_readMediaImages" msgid="5836219373138469259">"Permite que a app leia ficheiros de imagem do armazenamento partilhado."</string>
+    <string name="permlab_readMediaDocuments" msgid="5716810755602938263">"ler ficheiros de documentos do armazenamento partilhado"</string>
+    <string name="permdesc_readMediaDocuments" msgid="5665930210237304120">"Permite que a app leia ficheiros de documentos do armazenamento partilhado."</string>
     <string name="permlab_readVisualUserSelect" msgid="5516204215354667586">"ler ficheiros de imagem e vídeo do armazenamento partilhado selecionados pelo utilizador"</string>
     <string name="permdesc_readVisualUserSelect" msgid="8027174717714968217">"Permite que a app leia ficheiros de imagem e vídeo que selecionar no seu armazenamento partilhado."</string>
     <string name="permlab_sdcardWrite" msgid="4863021819671416668">"modif./elim. os conteúdos do armazenam. partilhado"</string>
@@ -1048,6 +1054,7 @@
     <string name="keyguard_password_enter_pin_password_code" msgid="7792964196473964340">"Escreva o PIN para desbloquear"</string>
     <string name="keyguard_password_wrong_pin_code" msgid="8583732939138432793">"Código PIN incorreto."</string>
     <string name="keyguard_label_text" msgid="3841953694564168384">"Para desbloquear, prima Menu e, em seguida, 0."</string>
+    <string name="emergency_call_dialog_number_for_display" msgid="2978165477085612673">"Número de emergência"</string>
     <string name="lockscreen_carrier_default" msgid="6192313772955399160">"Sem dados"</string>
     <string name="lockscreen_screen_locked" msgid="7364905540516041817">"Ecrã bloqueado."</string>
     <string name="lockscreen_instructions_when_pattern_enabled" msgid="7982445492532123308">"Prima Menu para desbloquear ou efectuar uma chamada de emergência."</string>
@@ -1113,7 +1120,7 @@
     <string name="lockscreen_access_pattern_cleared" msgid="7493849102641167049">"Sequência apagada"</string>
     <string name="lockscreen_access_pattern_cell_added" msgid="6746676335293144163">"Célula adicionada"</string>
     <string name="lockscreen_access_pattern_cell_added_verbose" msgid="2931364927622563465">"Célula <xliff:g id="CELL_INDEX">%1$s</xliff:g> adicionada"</string>
-    <string name="lockscreen_access_pattern_detected" msgid="3931150554035194012">"Sequência concluída"</string>
+    <string name="lockscreen_access_pattern_detected" msgid="3931150554035194012">"Padrão concluído"</string>
     <string name="lockscreen_access_pattern_area" msgid="1288780416685002841">"Área da sequência."</string>
     <string name="keyguard_accessibility_widget_changed" msgid="7298011259508200234">"%1$s. Widget %2$d de %3$d."</string>
     <string name="keyguard_accessibility_add_widget" msgid="8245795023551343672">"Adicionar widget."</string>
@@ -1436,7 +1443,7 @@
     <string name="sms_short_code_confirm_never_allow" msgid="2688828813521652079">"Nunca Permitir"</string>
     <string name="sim_removed_title" msgid="1349026474932481037">"SIM removido"</string>
     <string name="sim_removed_message" msgid="8469588437451533845">"A rede móvel vai estar indisponível até que reinicie o dispositivo com um SIM válido."</string>
-    <string name="sim_done_button" msgid="6464250841528410598">"Concluído"</string>
+    <string name="sim_done_button" msgid="6464250841528410598">"Concluir"</string>
     <string name="sim_added_title" msgid="2976783426741012468">"SIM adicionado"</string>
     <string name="sim_added_message" msgid="6602906609509958680">"Reinicie o aparelho para aceder à rede de telemóvel."</string>
     <string name="sim_restart_button" msgid="8481803851341190038">"Reiniciar"</string>
@@ -1618,7 +1625,7 @@
     <string name="no_matches" msgid="6472699895759164599">"Sem correspondências"</string>
     <string name="find_on_page" msgid="5400537367077438198">"Localizar na página"</string>
     <string name="matches_found" msgid="2296462299979507689">"{count,plural, =1{# correspondência}many{# de {total}}other{# de {total}}}"</string>
-    <string name="action_mode_done" msgid="2536182504764803222">"Concluído"</string>
+    <string name="action_mode_done" msgid="2536182504764803222">"Concluir"</string>
     <string name="progress_erasing" msgid="6891435992721028004">"A apagar o armazenamento partilhado…"</string>
     <string name="share" msgid="4157615043345227321">"Partilhar"</string>
     <string name="find" msgid="5015737188624767706">"Localizar"</string>
@@ -1692,7 +1699,7 @@
     <string name="data_usage_mobile_limit_snoozed_title" msgid="101888478915677895">"Acima do limite de dados móveis"</string>
     <string name="data_usage_wifi_limit_snoozed_title" msgid="1622359254521960508">"Acima do limite de dados Wi-Fi"</string>
     <string name="data_usage_limit_snoozed_body" msgid="545146591766765678">"Ultrapassou em <xliff:g id="SIZE">%s</xliff:g> o limite definido."</string>
-    <string name="data_usage_restricted_title" msgid="126711424380051268">"Dados em seg. plano restringidos"</string>
+    <string name="data_usage_restricted_title" msgid="126711424380051268">"Dados de seg. plano restringidos"</string>
     <string name="data_usage_restricted_body" msgid="5338694433686077733">"Toque para remover a restrição."</string>
     <string name="data_usage_rapid_title" msgid="2950192123248740375">"Utilização elevada de dados móveis"</string>
     <string name="data_usage_rapid_body" msgid="3886676853263693432">"As suas aplicações utilizaram mais dados do que o habitual."</string>
@@ -2177,13 +2184,21 @@
     <string name="autofill_picker_no_suggestions" msgid="1076022650427481509">"Sem sugestões do preenchimento automático"</string>
     <string name="autofill_picker_some_suggestions" msgid="5560549696296202701">"{count,plural, =1{Uma sugestão do preenchimento automático}many{# sugestões de preenchimento automático}other{# sugestões de preenchimento automático}}"</string>
     <string name="autofill_save_title" msgid="7719802414283739775">"Quer guardar em "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_save_title_expressive" msgid="2665408870424848558">"Guarde informações no serviço "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b></string>
     <string name="autofill_save_title_with_type" msgid="3002460014579799605">"Quer guardar <xliff:g id="TYPE">%1$s</xliff:g> em "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_save_title_with_type_expressive" msgid="6063660551496235255">"Guarde <xliff:g id="TYPE">%1$s</xliff:g> no serviço "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b></string>
     <string name="autofill_save_title_with_2types" msgid="3783270967447869241">"Quer guardar <xliff:g id="TYPE_0">%1$s</xliff:g> e <xliff:g id="TYPE_1">%2$s</xliff:g> em "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_save_title_with_2types_expressive" msgid="2996687022212666293">"Guarde <xliff:g id="TYPE_0">%1$s</xliff:g> e <xliff:g id="TYPE_1">%2$s</xliff:g> no serviço "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b></string>
     <string name="autofill_save_title_with_3types" msgid="6598228952100102578">"Quer guardar <xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g> e <xliff:g id="TYPE_2">%3$s</xliff:g> em "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_save_title_with_3types_expressive" msgid="3301676215501214049">"Guarde <xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g> e <xliff:g id="TYPE_2">%3$s</xliff:g> no serviço "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b></string>
     <string name="autofill_update_title" msgid="3630695947047069136">"Quer atualizar em "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_update_title_expressive" msgid="7660582214109012920">"Atualize as informações no serviço "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b></string>
     <string name="autofill_update_title_with_type" msgid="5264152633488495704">"Quer atualizar <xliff:g id="TYPE">%1$s</xliff:g> em "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_update_title_with_type_expressive" msgid="6162413585161767846">"Atualize <xliff:g id="TYPE">%1$s</xliff:g> no serviço "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b></string>
     <string name="autofill_update_title_with_2types" msgid="1797514386321086273">"Quer atualizar <xliff:g id="TYPE_0">%1$s</xliff:g> e <xliff:g id="TYPE_1">%2$s</xliff:g> em "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_update_title_with_2types_expressive" msgid="1911825941498393471">"Atualize <xliff:g id="TYPE_0">%1$s</xliff:g> e <xliff:g id="TYPE_1">%2$s</xliff:g> no serviço "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b></string>
     <string name="autofill_update_title_with_3types" msgid="8285767070604652626">"Atualizar estes itens no serviço "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>": <xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g> e <xliff:g id="TYPE_2">%3$s</xliff:g>?"</string>
+    <string name="autofill_update_title_with_3types_expressive" msgid="6040725201378429027">"Atualize estes itens no serviço "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>": <xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g> e <xliff:g id="TYPE_2">%3$s</xliff:g>"</string>
     <string name="autofill_save_yes" msgid="8035743017382012850">"Guardar"</string>
     <string name="autofill_save_no" msgid="9212826374207023544">"Não"</string>
     <string name="autofill_save_notnow" msgid="2853932672029024195">"Agora não"</string>

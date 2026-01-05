@@ -149,9 +149,15 @@ public class SystemSensorManager extends SensorManager {
 
     private Optional<Boolean> mHasHighSamplingRateSensorsPermission = Optional.empty();
 
-    private final ISensorClientListener mSensorClientListener = new ISensorClientListener.Stub() {
-        // This is an empty implementation, as the service only needs the Binder object.
-    };
+    private static ISensorClientListener sSensorClientListener;
+
+    static {
+        if (suspendSensorEventDeliveryOnFrozenPid()) {
+            sSensorClientListener = new ISensorClientListener.Stub() {
+                // This is an empty implementation, as the service only needs the Binder object.
+            };
+        }
+    }
 
     /** @hide */
     public SystemSensorManager(Context context, Looper mainLooper) {
@@ -170,7 +176,11 @@ public class SystemSensorManager extends SensorManager {
         mIsPackageDebuggable = (0 != (appInfo.flags & ApplicationInfo.FLAG_DEBUGGABLE));
 
         if (suspendSensorEventDeliveryOnFrozenPid()) {
-            nativeRegisterClientListener(mNativeInstance, mSensorClientListener.asBinder());
+            if (sSensorClientListener == null) {
+                Log.e(TAG, "sSensorClientListener is null when flag enabled");
+            } else {
+                nativeRegisterClientListener(mNativeInstance, sSensorClientListener.asBinder());
+            }
         }
        // initialize the sensor list
         if (getSensorPolicy(mContext.getDeviceId()) == DEVICE_POLICY_CUSTOM) {
@@ -267,9 +277,9 @@ public class SystemSensorManager extends SensorManager {
     @Override
     protected boolean registerListenerImpl(SensorEventListener listener, Sensor sensor,
             int delayUs, Handler handler, int maxBatchReportLatencyUs, int reservedFlags) {
-// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record_sensor_rate(381, sensor, delayUs);
-// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         if (listener == null || sensor == null) {
             Log.e(TAG, "sensor or listener is null");
             return false;
@@ -333,9 +343,9 @@ public class SystemSensorManager extends SensorManager {
     /** @hide */
     @Override
     protected void unregisterListenerImpl(SensorEventListener listener, Sensor sensor) {
-// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record_sensor(382, sensor);
-// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         // Trigger Sensors should use the cancelTriggerSensor call.
         if (sensor != null && sensor.getReportingMode() == Sensor.REPORTING_MODE_ONE_SHOT) {
             return;

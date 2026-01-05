@@ -817,6 +817,24 @@ public final class Settings {
             "android.settings.VPN_SETTINGS";
 
     /**
+     * Activity Action: Shows a settings screen to configure application exclusions for
+     * a platform VPN.
+     * <p>
+     * When this action is used to start an Activity, the system displays a user
+     * interface allowing the user to select applications that are excluded from the VPN
+     * provisioned through {@link android.net.VpnManager} by the calling package.
+     * <p>
+     * Input: Nothing.
+     * <p>
+     * Output: Nothing.
+     * @hide
+     */
+    @FlaggedApi(Flags.FLAG_EXPOSE_VPN_APP_EXCLUSION_SETTINGS)
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_VPN_APP_EXCLUSION_SETTINGS =
+            "android.settings.VPN_APP_EXCLUSION_SETTINGS";
+
+    /**
      * Activity Action: Show settings to allow configuration of Wi-Fi.
      * <p>
      * In some cases, a matching Activity may not exist, so ensure you
@@ -2979,6 +2997,7 @@ public final class Settings {
      *
      * @hide
      */
+    @SystemApi
     @FlaggedApi(FLAG_ENABLE_SUPERVISION_SETTINGS_UI_UPDATES)
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String MANAGE_SUPERVISION_APP_SETTINGS =
@@ -4491,9 +4510,9 @@ public final class Settings {
         @UnsupportedAppUsage
         public static String getStringForUser(ContentResolver resolver, String name,
                 @CanBeCURRENT @UserIdInt int userId) {
-// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
             android.util.SeempLog.record(android.util.SeempLog.getSeempGetApiIdFromValue(name));
-// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
             if (MOVED_TO_SECURE.contains(name)) {
                 Log.w(TAG, "Setting " + name + " has moved from android.provider.Settings.System"
                         + " to android.provider.Settings.Secure, returning read-only value.");
@@ -4581,9 +4600,9 @@ public final class Settings {
                 Log.v(TAG, "System.putString(name=" + name + ", value=" + value + ") for "
                         + userId);
             }
-// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
             android.util.SeempLog.record(android.util.SeempLog.getSeempPutApiIdFromValue(name));
-// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
             if (MOVED_TO_SECURE.contains(name)) {
                 Log.w(TAG, "Setting " + name + " has moved from android.provider.Settings.System"
                         + " to android.provider.Settings.Secure, value is unchanged.");
@@ -5403,15 +5422,6 @@ public final class Settings {
         public static final String DISPLAY_COLOR_MODE_VENDOR_HINT =
                 "display_color_mode_vendor_hint";
 
-// QTI_BEGIN: 2020-05-15: Core: FR30706: Add a playing tone setting.
-        /**
-         * Whether to play tone while outgoing call is accepted.
-         * The value 1 - vibrate, 0 - not
-         * @hide
-         */
-        public static final String CALL_CONNECTED_TONE_ENABLED = "call_connected_tone_enabled";
-
-// QTI_END: 2020-05-15: Core: FR30706: Add a playing tone setting.
         /**
          * The user selected min refresh rate in frames per second. If infinite, the user wants
          * the highest possible refresh rate.
@@ -6921,9 +6931,6 @@ public final class Settings {
             PRIVATE_SETTINGS.add(MOUSE_POINTER_ACCELERATION_ENABLED);
             PRIVATE_SETTINGS.add(PREFERRED_REGION);
             PRIVATE_SETTINGS.add(MOUSE_SCROLLING_ACCELERATION);
-// QTI_BEGIN: 2020-05-15: Core: FR30706: Add a playing tone setting.
-            PRIVATE_SETTINGS.add(CALL_CONNECTED_TONE_ENABLED);
-// QTI_END: 2020-05-15: Core: FR30706: Add a playing tone setting.
             PRIVATE_SETTINGS.add(MOUSE_SCROLLING_SPEED);
         }
 
@@ -7364,9 +7371,9 @@ public final class Settings {
             MOVED_TO_GLOBAL.add(Settings.Global.NITZ_UPDATE_SPACING);
             MOVED_TO_GLOBAL.add(Settings.Global.NTP_SERVER);
             MOVED_TO_GLOBAL.add(Settings.Global.NTP_TIMEOUT);
-// QTI_BEGIN: 2018-08-11: Core: base: Secondary NTP Server Settings
+// QTI_BEGIN: 2018-08-11: Frameworks: base: Secondary NTP Server Settings
             MOVED_TO_GLOBAL.add(Settings.Global.NTP_SERVER_2);
-// QTI_END: 2018-08-11: Core: base: Secondary NTP Server Settings
+// QTI_END: 2018-08-11: Frameworks: base: Secondary NTP Server Settings
             MOVED_TO_GLOBAL.add(Settings.Global.PDP_WATCHDOG_ERROR_POLL_COUNT);
             MOVED_TO_GLOBAL.add(Settings.Global.PDP_WATCHDOG_LONG_POLL_INTERVAL_MS);
             MOVED_TO_GLOBAL.add(Settings.Global.PDP_WATCHDOG_MAX_PDP_RESET_FAIL_COUNT);
@@ -11119,13 +11126,6 @@ public final class Settings {
         public static final int LOW_LIGHT_DISPLAY_BEHAVIOR_NONE = 0;
 
         /**
-         * The screen should turn completely off in low light.
-         *
-         * @hide
-         */
-        public static final int LOW_LIGHT_DISPLAY_BEHAVIOR_SCREEN_OFF = 1;
-
-        /**
          * The screen should switch to a low light clock dream if dreaming is enabled in low light.
          *
          * @hide
@@ -11143,7 +11143,6 @@ public final class Settings {
         @Retention(RetentionPolicy.SOURCE)
         @IntDef({
                 LOW_LIGHT_DISPLAY_BEHAVIOR_NONE,
-                LOW_LIGHT_DISPLAY_BEHAVIOR_SCREEN_OFF,
                 LOW_LIGHT_DISPLAY_BEHAVIOR_LOW_LIGHT_CLOCK_DREAM,
                 LOW_LIGHT_DISPLAY_BEHAVIOR_NO_DREAM,
         })
@@ -12243,6 +12242,15 @@ public final class Settings {
         public static final String ON_DEVICE_INTELLIGENCE_UNBIND_TIMEOUT_MS =
                 "on_device_intelligence_unbind_timeout_ms";
 
+        /**
+         * The Epoch Millisecond time of the first deployment of on-device models (via network
+         * download or copy from pre-installed model(s)).
+         * This value might be used to decide when to reclaim storage for pre-installed model(s).
+         *
+         * @hide
+         */
+        public static final String FIRST_ON_DEVICE_MODELS_DOWNLOADED_TIME =
+                "first_on_device_models_downloaded_time";
 
         /**
          * Timeout that represents maximum idle time before which a callback should be populated.
@@ -12261,6 +12269,63 @@ public final class Settings {
          */
         public static final String ON_DEVICE_INFERENCE_UNBIND_TIMEOUT_MS =
                 "on_device_inference_unbind_timeout_ms";
+
+        /**
+         * Timeout to be used for unbinding to the configured remote
+         * {@link android.service.contentsafety.ContentSafetyService} if there are no
+         * requests in the queue. A value of -1 represents to never unbind.
+         *
+         * @hide
+         */
+        public static final String CONTENT_SAFETY_UNBIND_TIMEOUT_MS =
+                "content_safety_unbind_timeout_ms";
+
+
+        /**
+         * Timeout that represents maximum idle time before which a callback should be populated.
+         *
+         * @hide
+         */
+        public static final String CONTENT_SAFETY_IDLE_TIMEOUT_MS =
+                "content_safety_idle_timeout_ms";
+
+
+        /**
+         * Timeout that represents maximum idle time before which a callback should be populated.
+         *
+         * @hide
+         */
+        public static final String CONTENT_SAFETY_SETTINGS_IDLE_TIMEOUT_MS =
+                "content_safety_settings_idle_timeout_ms";
+
+
+        /**
+         * Timeout that represents maximum idle time before which a callback should be populated.
+         *
+         * @hide
+         */
+        public static final String CONTENT_SAFETY_SANDBOXED_IDLE_TIMEOUT_MS =
+                "content_safety_sandboxed_idle_timeout_ms";
+
+        /**
+         * Timeout to be used for unbinding to the configured remote
+         * {@link android.service.contentsafety.ContentSafetySandboxedService} if there
+         * are no requests in the queue. A value of -1 represents to never unbind.
+         *
+         * @hide
+         */
+        public static final String CONTENT_SAFETY_SANDBOXED_UNBIND_TIMEOUT_MS =
+                "content_safety_sandboxed_unbind_timeout_ms";
+
+        /**
+         * Timeout to be used for unbinding to the configured remote
+         * {@link android.service.contentsafety.ContentSafetySettingsService} if there
+         * are no requests in the queue. A value of -1 represents to never unbind.
+         *
+         * @hide
+         */
+        public static final String CONTENT_SAFETY_SETTINGS_UNBIND_TIMEOUT_MS =
+                "content_safety_settings_unbind_timeout_ms";
 
         /**
          * Control whether Night display is currently activated.
@@ -13568,6 +13633,8 @@ public final class Settings {
         public static final int ACTION_CORNER_ACTION_QUICK_SETTINGS = 4;
         /** @hide */
         public static final int ACTION_CORNER_ACTION_LOCKSCREEN = 5;
+        /** @hide */
+        public static final int ACTION_CORNER_ACTION_NOTE = 6;
 
         /**
          * The different actions that can be used for action corners
@@ -13580,6 +13647,7 @@ public final class Settings {
                 ACTION_CORNER_ACTION_NOTIFICATIONS,
                 ACTION_CORNER_ACTION_QUICK_SETTINGS,
                 ACTION_CORNER_ACTION_LOCKSCREEN,
+                ACTION_CORNER_ACTION_NOTE,
         })
         @Retention(RetentionPolicy.SOURCE)
         public @interface ActionCornerActionType {
@@ -14295,6 +14363,17 @@ public final class Settings {
         public static final String TIME_ZONE_NOTIFICATIONS = "time_zone_notifications";
 
         /**
+         * Value to specify if the device should send notifications when the device's time zone
+         * offset changes (e.g. for daylight saving time).
+         *
+         * <p>1=yes, 0=no.
+         *
+         * @hide
+         */
+        public static final String TIME_ZONE_OFFSET_CHANGE_NOTIFICATIONS =
+                "time_zone_offset_change_notifications";
+
+        /**
          * URI for the car dock "in" event sound.
          * @hide
          */
@@ -14935,7 +15014,7 @@ public final class Settings {
         @Readable
         public static final String MOBILE_DATA_ALWAYS_ON = "mobile_data_always_on";
 
-// QTI_BEGIN: 2021-05-03: Core: Add smart DDS switch to Developer options
+// QTI_BEGIN: 2021-05-03: Telephony: Add smart DDS switch to Developer options
         /**
         * Whether to allow modem to intelligently switch DDS without user direction
         *
@@ -14945,7 +15024,7 @@ public final class Settings {
         @Readable
         public static final String SMART_DDS_SWITCH = "smart_dds_switch";
 
-// QTI_END: 2021-05-03: Core: Add smart DDS switch to Developer options
+// QTI_END: 2021-05-03: Telephony: Add smart DDS switch to Developer options
         /**
          * The duration in milliseconds of each action, separated by commas. Ex:
          *
@@ -19860,16 +19939,6 @@ public final class Settings {
         @Readable
         public static final String CELL_ON = "cell_on";
 
-// QTI_BEGIN: 2020-05-11: Core: Add vibrating for outgoing call accepted support
-        /**
-         * Whether to vibrate while outgoing call is accepted
-         * The value 1 - vibrate, 0 - not
-         * @hide
-         */
-        public static final String VIBRATING_FOR_OUTGOING_CALL_ACCEPTED =
-                "vibrating_for_outgoing_call_accepted";
-
-// QTI_END: 2020-05-11: Core: Add vibrating for outgoing call accepted support
         /**
          * Global settings which can be accessed by instant apps.
          * @hide
@@ -22604,6 +22673,19 @@ public final class Settings {
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
     public static final String ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT =
             "android.settings.MANAGE_APP_USE_FULL_SCREEN_INTENT";
+
+    /**
+     * Broadcast Action: A request to have the system feedback handler app collect and send
+     * feedback. This is a protected intent that can only be sent by the system.
+     * <p>
+     * Input: Nothing.
+     * <p>
+     * Output: Nothing.
+     * @hide
+     */
+    @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
+    public static final String ACTION_REQUEST_FEEDBACK =
+            "com.android.internal.intent.action.REQUEST_FEEDBACK";
 
     /**
      * Activity Action: For system or preinstalled apps to show their {@link Activity} embedded

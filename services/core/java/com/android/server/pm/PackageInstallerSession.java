@@ -13,11 +13,13 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+// QTI_BEGIN: 2025-02-10: Core: Add copyright markings am: d7be74277a am: d7be74277a
  /*
  * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
  * Copyright (c) 2025 Qualcomm Innovation Center, Inc. All rights reserved.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
+// QTI_END: 2025-02-10: Core: Add copyright markings am: d7be74277a am: d7be74277a
 
 package com.android.server.pm;
 
@@ -144,6 +146,7 @@ import android.content.pm.parsing.ApkLiteParseUtils;
 import android.content.pm.parsing.PackageLite;
 import android.content.pm.parsing.result.ParseResult;
 import android.content.pm.parsing.result.ParseTypeImpl;
+import android.content.pm.verify.developer.DeveloperVerificationSession;
 import android.content.pm.verify.developer.DeveloperVerificationStatus;
 import android.content.pm.verify.domain.DomainSet;
 import android.content.res.ApkAssets;
@@ -201,7 +204,9 @@ import android.util.MathUtils;
 import android.util.Slog;
 import android.util.SparseArray;
 import android.util.apk.ApkSignatureVerifier;
+// QTI_BEGIN: 2019-11-13: Performance: framework: add boost for package installation
 import android.util.BoostFramework;
+// QTI_END: 2019-11-13: Performance: framework: add boost for package installation
 
 import com.android.internal.R;
 import com.android.internal.annotations.GuardedBy;
@@ -464,6 +469,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     private final StagingManager mStagingManager;
     @NonNull
     private final DeveloperVerifierController mDeveloperVerifierController;
+// QTI_BEGIN: 2019-11-13: Performance: framework: add boost for package installation
     /*
     * @hide
     */
@@ -471,6 +477,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     private boolean mIsPerfLockAcquired = false;
     private final int MAX_INSTALL_DURATION = 20000;
 
+// QTI_END: 2019-11-13: Performance: framework: add boost for package installation
     private final InstallDependencyHelper mInstallDependencyHelper;
 
     final int sessionId;
@@ -1773,6 +1780,20 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     }
 
     @GuardedBy("mLock")
+    private List<String> getExistingArtManagedFilePathsLocked(PackageLite existing) {
+        List<String> result = new ArrayList<>();
+        File[] existingFiles = new File(existing.getBaseApkPath()).getParentFile().listFiles();
+        if (existingFiles != null) {
+            for (File file : existingFiles) {
+                if (sArtManagedFilter.accept(file)) {
+                    result.add(file.getPath());
+                }
+            }
+        }
+        return result;
+    }
+
+    @GuardedBy("mLock")
     private void enableFsVerityToAddedApksWithIdsig() throws PackageManagerException {
         try {
             long fsVerityEnabledApksSizeBytes = 0;
@@ -2075,6 +2096,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
     public ParcelFileDescriptor openWrite(String name, long offsetBytes, long lengthBytes) {
         assertCanWrite(false);
         try {
+// QTI_BEGIN: 2019-11-13: Performance: framework: add boost for package installation
             if (mPerfBoostInstall == null){
                 mPerfBoostInstall = new BoostFramework();
             }
@@ -2083,6 +2105,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                         null, MAX_INSTALL_DURATION, -1);
                 mIsPerfLockAcquired = true;
             }
+// QTI_END: 2019-11-13: Performance: framework: add boost for package installation
             return doWriteInternal(name, offsetBytes, lengthBytes, null);
         } catch (IOException e) {
             throw ExceptionUtils.wrap(e);
@@ -2340,10 +2363,12 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
 
     @Override
     public void commit(@NonNull IntentSender statusReceiver, boolean forTransfer) {
+// QTI_BEGIN: 2019-11-13: Performance: framework: add boost for package installation
         if (mIsPerfLockAcquired && mPerfBoostInstall != null) {
             mPerfBoostInstall.perfLockRelease();
             mIsPerfLockAcquired = false;
         }
+// QTI_END: 2019-11-13: Performance: framework: add boost for package installation
         assertNotChild("commit");
         boolean throwsExceptionCommitImmutableCheck = CompatChanges.isChangeEnabled(
                 THROW_EXCEPTION_COMMIT_WITH_IMMUTABLE_PENDING_INTENT, Binder.getCallingUid());
@@ -3088,7 +3113,8 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             // The system doesn't have a verifier specified.
             return false;
         }
-        if ((params.installFlags & PackageManager.INSTALL_FROM_ADB) != 0) {
+        // TODO(b/460818215): Remove this once adb check is handled by the verifier module.
+        if (isAdbInstall()) {
             // adb installs are exempted from verification unless explicitly requested
             if (!params.forceVerification) {
                 synchronized (mMetrics) {
@@ -3325,13 +3351,20 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             declaredLibraries =
                     mPackageLite == null ? null : mPackageLite.getDeclaredLibraries();
         }
+        int verificationFlags = 0;
+        if (Flags.verificationServiceAdb() && isAdbInstall()) {
+            verificationFlags |= DeveloperVerificationSession.FLAG_VERIFICATION_IS_ADB;
+            if (params.forceVerification) {
+                verificationFlags |= DeveloperVerificationSession.FLAG_VERIFICATION_FORCED_ON_ADB;
+            }
+        }
         if (!mDeveloperVerifierController.startVerificationSession(
                 mPm::snapshotComputer, userId, sessionId, packageName,
                 Uri.fromFile(stageDir), signingInfo,
                 declaredLibraries, mCurrentVerificationPolicy.get(),
                 /* extensionParams= */ params.extensionParams,
                 callback, this::onConnectionEstablished,
-                /* retry= */ retry)) {
+                /* retry= */ retry, verificationFlags)) {
             // A verifier is installed but cannot be connected. Maybe notify user.
             callback.onConnectionInfeasible();
         } else {
@@ -4340,8 +4373,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
         // anywhere; app stores already have a record of the installation and that's why reporting
         // it here is fine
         final String packageName = getPackageName();
-        final String packageNameToLog =
-                (params.installFlags & PackageManager.INSTALL_FROM_ADB) == 0 ? packageName : "";
+        final String packageNameToLog = isAdbInstall() ? "" : packageName;
         final long currentTimestamp = System.currentTimeMillis();
         final int packageUid;
         if (returnCode != INSTALL_SUCCEEDED) {
@@ -4542,7 +4574,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                     TextUtils.formatSimple("Session: %d. No packages staged in %s", sessionId,
                           stageDir.getAbsolutePath()));
         }
-        final List<String> artManagedFilePaths = getArtManagedFilePathsLocked();
+        List<String> artManagedFilePaths = getArtManagedFilePathsLocked();
 
         // Verify that all staged packages are internally consistent
         final ArraySet<String> stagedSplits = new ArraySet<>();
@@ -4763,6 +4795,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                 throw new PackageManagerException(INSTALL_FAILED_INVALID_APK,
                         "Existing signatures are inconsistent");
             }
+            artManagedFilePaths.addAll(getExistingArtManagedFilePathsLocked(existing));
 
             // Inherit base if not overridden.
             if (mResolvedBaseFile == null) {
@@ -5704,10 +5737,12 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
 
     @Override
     public void abandon() {
+// QTI_BEGIN: 2019-11-13: Performance: framework: add boost for package installation
         if (mIsPerfLockAcquired && mPerfBoostInstall != null) {
             mPerfBoostInstall.perfLockRelease();
             mIsPerfLockAcquired = false;
         }
+// QTI_END: 2019-11-13: Performance: framework: add boost for package installation
         final Runnable r;
         synchronized (mLock) {
             assertNotChild("abandon");
@@ -7012,6 +7047,10 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
                 || (isReady && !isApplied && !isFailed)
                 || (!isReady && isApplied && !isFailed)
                 || (!isReady && !isApplied && isFailed);
+    }
+
+    private boolean isAdbInstall() {
+        return (params.installFlags & PackageManager.INSTALL_FROM_ADB) != 0;
     }
 
     /**

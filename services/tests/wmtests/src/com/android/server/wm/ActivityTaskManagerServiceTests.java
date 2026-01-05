@@ -18,6 +18,7 @@ package com.android.server.wm;
 
 import static android.Manifest.permission.REPOSITION_SELF_WINDOWS;
 import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
+import static android.content.pm.ActivityInfo.PERSIST_ACROSS_REBOOTS;
 import static android.content.pm.ActivityInfo.RESIZE_MODE_RESIZEABLE;
 import static android.content.pm.ActivityInfo.RESIZE_MODE_UNRESIZEABLE;
 import static android.content.pm.PackageManager.PERMISSION_DENIED;
@@ -66,6 +67,8 @@ import android.annotation.Nullable;
 import android.app.Activity;
 import android.app.ActivityManager;
 import android.app.ActivityManager.TaskDescription;
+import android.app.ActivityManagerInternal;
+import android.app.ApplicationExitInfo;
 import android.app.HandoffActivityData;
 import android.app.HandoffActivityParams;
 import android.app.HandoffFailureCode;
@@ -97,6 +100,8 @@ import android.view.IDisplayWindowListener;
 import android.view.WindowManager;
 
 import androidx.test.filters.MediumTest;
+
+import com.android.server.wm.utils.StubOrganizer;
 
 import org.junit.Before;
 import org.junit.Test;
@@ -314,6 +319,7 @@ public class ActivityTaskManagerServiceTests extends WindowTestsBase {
     }
 
     @Test
+    @DisableFlags(android.companion.Flags.FLAG_TASK_CONTINUITY)
     public void testIsHandoffEnabledForTask_returnsFalseIfFlagDisabled() {
         final Task task = new TaskBuilder(mSupervisor).setCreateActivity(true).build();
         final ActivityRecord activity = task.getTopNonFinishingActivity();
@@ -405,6 +411,7 @@ public class ActivityTaskManagerServiceTests extends WindowTestsBase {
     }
 
     @Test
+    @DisableFlags(android.companion.Flags.FLAG_TASK_CONTINUITY)
     public void testRequestHandoffTaskData_failsIfFlagDisabled() {
         // Create a test task.
         final Task task = new TaskBuilder(mSupervisor).setCreateActivity(true).build();
@@ -1643,6 +1650,57 @@ public class ActivityTaskManagerServiceTests extends WindowTestsBase {
         // pre-existing record) if some config was previously set.
         assertTrue(packageConfigUpdater.setLocales(LocaleList.getEmptyLocaleList())
                 .setNightMode(Configuration.UI_MODE_NIGHT_UNDEFINED).commit());
+    }
+
+    @Test
+    @EnableFlags(com.android.window.flags.Flags.FLAG_ENABLE_APP_RESTART_AFTER_UPDATE)
+    public void testStopAndKillAppForUpdate_processWithActivities_callsOrganizer() {
+        class PackageUpdateOrganizer extends StubOrganizer {
+            List<ActivityManager.RunningTaskInfo> mUpdatingTaskInfos = new ArrayList<>();
+            @Override
+            public void onPackageUpdateRequested(
+                    List<ActivityManager.RunningTaskInfo> updatingTaskInfos) {
+                mUpdatingTaskInfos = updatingTaskInfos;
+            }
+        }
+        PackageUpdateOrganizer o = new PackageUpdateOrganizer();
+        mWm.mAtmService.mTaskOrganizerController.registerTaskOrganizer(o);
+        mAtm.mAmInternal = mock(ActivityManagerInternal.class);
+        final ActivityRecord activity = new ActivityBuilder(mAtm).setCreateTask(true).build();
+        activity.getTask().mHandlePackageUpdate = true;
+        activity.info.persistableMode = PERSIST_ACROSS_REBOOTS;
+        activity.app.addPackage(activity.packageName);
+        mAtm.mProcessMap.put(activity.app.getPid(), activity.app);
+        String packageName = activity.packageName;
+        int userId = activity.mUserId;
+        int appId = activity.app.mUid;
+        doReturn(true).when(mAtm).isCallerSystem(anyInt());
+
+        mAtm.mInternal.stopAndKillAppForUpdate(packageName, userId, appId);
+
+        assertEquals(o.mUpdatingTaskInfos.get(0).taskId, activity.getTask().mTaskId);
+    }
+
+    @Test
+    public void testStopAndKillAppForUpdate_noActiveProcesses_killsImmediately() {
+        final String packageName = "com.example.test";
+        final int uid = 10001;
+        final int appId = 20001;
+        WindowProcessController wpc = createWindowProcessController(packageName, uid);
+        mAtm.mAmInternal = mock(ActivityManagerInternal.class);
+        doReturn(true).when(mAtm).isCallerSystem(anyInt());
+        mAtm.mProcessMap.put(wpc.getPid(), wpc);
+
+        mAtm.mInternal.stopAndKillAppForUpdate(packageName, uid, appId);
+        waitHandlerIdle(mAtm.mH);
+
+        verify(mAtm.mAmInternal).killApplicationSync(
+                packageName,
+                appId,
+                uid,
+                "killDueToPackageUpdate",
+                ApplicationExitInfo.REASON_PACKAGE_UPDATED
+        );
     }
 
     private WindowProcessController createWindowProcessController(String packageName,

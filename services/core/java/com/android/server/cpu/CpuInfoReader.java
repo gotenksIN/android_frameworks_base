@@ -82,7 +82,9 @@ public final class CpuInfoReader {
 
     // TODO(b/242722241): Protect updatable variables with a local lock.
     private final long mMinReadIntervalMillis;
+// QTI_BEGIN: 2024-07-26: Performance: Reload cpuset configuration and fix deltaTime calculation
     private final Object mLock = new Object();
+// QTI_END: 2024-07-26: Performance: Reload cpuset configuration and fix deltaTime calculation
     private final SparseIntArray mCpusetCategoriesByCpus = new SparseIntArray();
     private final SparseArray<File> mCpuFreqPolicyDirsById = new SparseArray<>();
     private final SparseArray<StaticPolicyInfo> mStaticPolicyInfoById = new SparseArray<>();
@@ -97,8 +99,10 @@ public final class CpuInfoReader {
     private boolean mHasTimeInStateFile;
     private long mLastReadUptimeMillis;
     private SparseArray<CpuInfo> mLastReadCpuInfos;
+// QTI_BEGIN: 2024-07-26: Performance: Reload cpuset configuration and fix deltaTime calculation
     private int mCurrentTopCPUMask;
     private int mCurrentBackgroundCPUMask;
+// QTI_END: 2024-07-26: Performance: Reload cpuset configuration and fix deltaTime calculation
 
     public CpuInfoReader() {
         this(new File(CPUSET_DIR_PATH), new File(CPUFREQ_DIR_PATH), new File(PROC_STAT_FILE_PATH),
@@ -147,7 +151,9 @@ public final class CpuInfoReader {
             Slogf.e(TAG, "Missing proc stat file at %s", mProcStatFile.getAbsolutePath());
             return false;
         }
+// QTI_BEGIN: 2024-07-26: Performance: Reload cpuset configuration and fix deltaTime calculation
         synchronized (mLock) {
+// QTI_END: 2024-07-26: Performance: Reload cpuset configuration and fix deltaTime calculation
           if (!readCpusetCategories()) {
               Slogf.e(TAG, "Failed to read cpuset information from %s", mCpusetDir.getAbsolutePath());
               return false;
@@ -248,10 +254,12 @@ public final class CpuInfoReader {
                         continue;
                     }
                 }
+// QTI_BEGIN: 2024-07-26: Performance: Reload cpuset configuration and fix deltaTime calculation
                 int cpusetCategories;
                 synchronized (mLock) {
                     cpusetCategories = mCpusetCategoriesByCpus.get(relatedCpuCore, -1);
                 }
+// QTI_END: 2024-07-26: Performance: Reload cpuset configuration and fix deltaTime calculation
                 if (cpusetCategories < 0) {
                     Slogf.w(TAG, "Missing cpuset information for the CPU core %d",
                             relatedCpuCore);
@@ -300,11 +308,13 @@ public final class CpuInfoReader {
 
         writer.printf("Cpuset categories by CPU core:\n");
         writer.increaseIndent();
+// QTI_BEGIN: 2024-07-26: Performance: Reload cpuset configuration and fix deltaTime calculation
         synchronized (mLock) {
             for (int i = 0; i < mCpusetCategoriesByCpus.size(); i++) {
                 writer.printf("CPU core id = %d, %s\n", mCpusetCategoriesByCpus.keyAt(i),
                         toCpusetCategoriesStr(mCpusetCategoriesByCpus.valueAt(i)));
             }
+// QTI_END: 2024-07-26: Performance: Reload cpuset configuration and fix deltaTime calculation
         }
         writer.decreaseIndent();
 
@@ -425,6 +435,7 @@ public final class CpuInfoReader {
         }
     }
 
+// QTI_BEGIN: 2024-07-26: Performance: Reload cpuset configuration and fix deltaTime calculation
     public boolean isCpusetConfigurationChanged() {
         int prevTopCPUMask = mCurrentTopCPUMask;
         int prevBackgroundCPUMask = mCurrentBackgroundCPUMask;
@@ -433,6 +444,7 @@ public final class CpuInfoReader {
                 (prevBackgroundCPUMask != mCurrentBackgroundCPUMask);
     }
 
+// QTI_END: 2024-07-26: Performance: Reload cpuset configuration and fix deltaTime calculation
     /**
      * Reads cpuset categories by CPU.
      *
@@ -453,11 +465,13 @@ public final class CpuInfoReader {
             Slogf.e(TAG, "Missing cpuset directories at %s", mCpusetDir.getAbsolutePath());
             return false;
         }
+// QTI_BEGIN: 2024-07-26: Performance: Reload cpuset configuration and fix deltaTime calculation
         mCurrentTopCPUMask = 0;
         mCurrentBackgroundCPUMask = 0;
         synchronized (mLock) {
             mCpusetCategoriesByCpus.clear();
         }
+// QTI_END: 2024-07-26: Performance: Reload cpuset configuration and fix deltaTime calculation
         for (int i = 0; i < cpusetDirs.length; i++) {
             File dir = cpusetDirs[i];
             @CpusetCategory int cpusetCategory;
@@ -479,6 +493,7 @@ public final class CpuInfoReader {
                 Slogf.e(TAG, "Failed to read CPU cores from %s", cpuCoresFile.getAbsolutePath());
                 continue;
             }
+// QTI_BEGIN: 2024-07-26: Performance: Reload cpuset configuration and fix deltaTime calculation
             synchronized (mLock) {
                 for (int j = 0; j < cpuCores.size(); j++) {
                     int categories = mCpusetCategoriesByCpus.get(cpuCores.get(j));
@@ -493,6 +508,7 @@ public final class CpuInfoReader {
                     } else if (cpusetCategory == FLAG_CPUSET_CATEGORY_BACKGROUND) {
                         mCurrentBackgroundCPUMask |= 1<<cpuCores.get(j);
                     }
+// QTI_END: 2024-07-26: Performance: Reload cpuset configuration and fix deltaTime calculation
                 }
             }
         }
@@ -630,7 +646,9 @@ public final class CpuInfoReader {
             long freq = latestTimeInState.keyAt(i);
             long durationMillis = latestTimeInState.valueAt(i);
             long prevDurationMillis = prevTimeInState.get(freq);
+// QTI_BEGIN: 2024-07-26: Performance: Reload cpuset configuration and fix deltaTime calculation
             deltaTimeInState.put(freq, durationMillis >= prevDurationMillis
+// QTI_END: 2024-07-26: Performance: Reload cpuset configuration and fix deltaTime calculation
                     ? (durationMillis - prevDurationMillis) : durationMillis);
         }
         return deltaTimeInState;

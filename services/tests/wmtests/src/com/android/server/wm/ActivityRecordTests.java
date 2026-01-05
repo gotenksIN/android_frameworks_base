@@ -23,14 +23,15 @@ import static android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN;
 import static android.app.WindowConfiguration.WINDOWING_MODE_MULTI_WINDOW;
 import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
-import static android.app.WindowConfiguration.WINDOWING_MODE_UNDEFINED;
 import static android.content.pm.ActivityInfo.CONFIG_COLOR_MODE;
-import static android.content.pm.ActivityInfo.CONFIG_DENSITY;
+import static android.content.pm.ActivityInfo.CONFIG_KEYBOARD;
+import static android.content.pm.ActivityInfo.CONFIG_KEYBOARD_HIDDEN;
+import static android.content.pm.ActivityInfo.CONFIG_NAVIGATION;
+import static android.content.pm.ActivityInfo.CONFIG_TOUCHSCREEN;
 import static android.content.pm.ActivityInfo.CONFIG_ORIENTATION;
 import static android.content.pm.ActivityInfo.CONFIG_SCREEN_LAYOUT;
 import static android.content.pm.ActivityInfo.CONFIG_SCREEN_SIZE;
 import static android.content.pm.ActivityInfo.CONFIG_SMALLEST_SCREEN_SIZE;
-import static android.content.pm.ActivityInfo.CONFIG_TOUCHSCREEN;
 import static android.content.pm.ActivityInfo.FLAG_SUPPORTS_PICTURE_IN_PICTURE;
 import static android.content.pm.ActivityInfo.LOCK_TASK_LAUNCH_MODE_ALWAYS;
 import static android.content.pm.ActivityInfo.LOCK_TASK_LAUNCH_MODE_DEFAULT;
@@ -49,12 +50,8 @@ import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSET;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
 import static android.content.pm.ApplicationInfo.CATEGORY_GAME;
 import static android.content.pm.ApplicationInfo.CATEGORY_SOCIAL;
-import static android.content.res.Configuration.COLOR_MODE_WIDE_COLOR_GAMUT_NO;
-import static android.content.res.Configuration.COLOR_MODE_WIDE_COLOR_GAMUT_YES;
 import static android.content.res.Configuration.ORIENTATION_LANDSCAPE;
 import static android.content.res.Configuration.ORIENTATION_PORTRAIT;
-import static android.content.res.Configuration.TOUCHSCREEN_FINGER;
-import static android.content.res.Configuration.TOUCHSCREEN_NOTOUCH;
 import static android.content.res.Configuration.UI_MODE_TYPE_DESK;
 import static android.os.InputConstants.DEFAULT_DISPATCHING_TIMEOUT_MILLIS;
 import static android.os.Process.NOBODY_UID;
@@ -137,12 +134,14 @@ import android.content.pm.ApplicationInfo;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Rect;
+import android.net.Uri;
 import android.os.Binder;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.PersistableBundle;
 import android.os.Process;
 import android.os.RemoteException;
+import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.annotations.Presubmit;
 import android.provider.DeviceConfig;
@@ -1070,6 +1069,20 @@ public class ActivityRecordTests extends WindowTestsBase {
     }
 
     @Test
+    @EnableFlags(FLAG_ENABLE_APP_RESTART_AFTER_UPDATE)
+    public void onActivityStopped_shouldKillPackageAfterUpdateIsTrue_callsProcessToNotify() {
+        final ActivityRecord activity = createActivityWithTask();
+        final WindowProcessController wpc = mock(WindowProcessController.class);
+        activity.app = wpc;
+
+        // Set state to STOPPING, or ActivityRecord#activityStoppedLocked() call will be ignored.
+        activity.setState(STOPPING, "test");
+        activity.activityStopped(null, null, null, "desc");
+
+        verify(wpc).onActivityStopped(activity);
+    }
+
+    @Test
     public void testReadWindowStyle() {
         final ActivityRecord activity = new ActivityBuilder(mAtm).setActivityTheme(
                 com.android.frameworks.wmtests.R.style.ActivityWindowStyleTest).build();
@@ -1165,9 +1178,21 @@ public class ActivityRecordTests extends WindowTestsBase {
     }
 
     /**
-     * Verify that when finishing the top focused activity on top display, the root task order
-     * will be changed by adjusting focus.
+     * Verify that when finishing the top focused activity on top display, the focus is not
+     * adjusted immediately.
      */
+    @Test
+    public void testFinishActivityIfPossible_topFocusedActivityDoesNotAdjustFocus() {
+        final ActivityRecord activity = createActivityWithTask();
+        final Task task = activity.getTask();
+        activity.setState(RESUMED, "test");
+        doReturn(true).when(mRootWindowContainer).isTopDisplayFocusedRootTask(any());
+
+        activity.finishIfPossible("test", false /* oomAdj */);
+
+        verify(task, never()).adjustFocusToNextFocusableTask(anyString(), anyBoolean(),
+                anyBoolean());
+    }
 
     /**
      * Verify that resumed activity is paused due to finish request.
@@ -2796,6 +2821,7 @@ public class ActivityRecordTests extends WindowTestsBase {
         assertEquals(Configuration.ORIENTATION_LANDSCAPE, activityConfig.orientation);
     }
 
+    @DisableFlags(Flags.FLAG_REMOVE_LEGACY_ORIENTATION_REPORT)
     @Test
     public void testReportOrientationChange() {
         final Task task = new TaskBuilder(mSupervisor)
@@ -3479,103 +3505,64 @@ public class ActivityRecordTests extends WindowTestsBase {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_DRAGGING_PIP_ACROSS_DISPLAYS)
-    public void resolveOverrideConfiguration_inPipMode_keepsLastReportedConfigs() {
-        final ActivityRecord activity = createActivityWithTask();
-        final Configuration config = new Configuration();
-        config.touchscreen = TOUCHSCREEN_FINGER;
-        config.densityDpi = 100;
-        config.colorMode = COLOR_MODE_WIDE_COLOR_GAMUT_NO;
-        activity.setLastReportedConfiguration(new Configuration(), config);
-        activity.mLastReportedPictureInPictureMode = true;
+    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_APP_TO_WEB)
+    public void testCapturedLink() {
+        final ActivityRecord activity1 = createActivityWithTask();
+        final ActivityRecord activity2 = createActivityRecord(activity1.getTask());
+        activity2.intent.setAction(Intent.ACTION_VIEW);
+        activity2.intent.setData(Uri.parse("https://source.android.com/"));
+        activity2.setState(RESUMED, "test");
+        assertNotNull(activity1.getTask().getTaskInfo().capturedLink);
 
-        final Configuration newConfig = new Configuration();
-        newConfig.windowConfiguration.setWindowingMode(WINDOWING_MODE_PINNED);
-        newConfig.touchscreen = TOUCHSCREEN_NOTOUCH;
-        newConfig.densityDpi = 200;
-        newConfig.colorMode = COLOR_MODE_WIDE_COLOR_GAMUT_YES;
-        activity.resolveOverrideConfiguration(newConfig);
-
-        assertEquals(config.touchscreen, activity.getRequestedOverrideConfiguration().touchscreen);
-        assertEquals(config.densityDpi, activity.getRequestedOverrideConfiguration().densityDpi);
-        assertEquals(config.colorMode, activity.getRequestedOverrideConfiguration().colorMode);
+        activity2.makeFinishingLocked();
+        assertNull(activity1.getTask().getTaskInfo().capturedLink);
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_DRAGGING_PIP_ACROSS_DISPLAYS)
-    public void resolveOverrideConfiguration_pipActivityInfoHasConfigs_updatesOverrideConfigs() {
+    public void testConfigChange_doesNotRelaunch() {
         final ActivityRecord activity = createActivityWithTask();
-        final Configuration config = new Configuration();
-        config.touchscreen = TOUCHSCREEN_FINGER;
-        config.densityDpi = 100;
-        config.colorMode = COLOR_MODE_WIDE_COLOR_GAMUT_NO;
-        activity.setLastReportedConfiguration(new Configuration(), config);
-        activity.info.configChanges = CONFIG_TOUCHSCREEN | CONFIG_DENSITY | CONFIG_COLOR_MODE;
-        activity.mLastReportedPictureInPictureMode = true;
+        activity.info.configChanges = CONFIG_KEYBOARD | CONFIG_KEYBOARD_HIDDEN | CONFIG_NAVIGATION
+                | CONFIG_TOUCHSCREEN | CONFIG_COLOR_MODE;
+        // The activity will already be relaunching out of the gate, finish the relaunch so we can
+        // test properly.
+        activity.finishRelaunching();
+
+        final Task task = activity.getTask();
+        activity.setState(RESUMED, "Testing");
 
         final Configuration newConfig = new Configuration();
-        newConfig.windowConfiguration.setWindowingMode(WINDOWING_MODE_PINNED);
-        newConfig.touchscreen = TOUCHSCREEN_NOTOUCH;
-        newConfig.densityDpi = 200;
-        newConfig.colorMode = COLOR_MODE_WIDE_COLOR_GAMUT_YES;
-        activity.resolveOverrideConfiguration(newConfig);
+        newConfig.keyboard |= Configuration.KEYBOARD_QWERTY;
+        newConfig.keyboardHidden |= Configuration.KEYBOARDHIDDEN_NO;
+        newConfig.navigation |= Configuration.NAVIGATION_DPAD;
+        newConfig.touchscreen |= Configuration.TOUCHSCREEN_FINGER;
+        newConfig.colorMode |= Configuration.COLOR_MODE_WIDE_COLOR_GAMUT_YES;
+        task.onRequestedOverrideConfigurationChanged(newConfig);
+        ensureActivityConfiguration(activity);
 
-        assertEquals(Configuration.TOUCHSCREEN_UNDEFINED,
-                activity.getRequestedOverrideConfiguration().touchscreen);
-        assertEquals(Configuration.DENSITY_DPI_UNDEFINED,
-                activity.getRequestedOverrideConfiguration().densityDpi);
-        assertEquals(Configuration.COLOR_MODE_UNDEFINED,
-                activity.getRequestedOverrideConfiguration().colorMode);
+        assertFalse(activity.isRelaunching());
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_DRAGGING_PIP_ACROSS_DISPLAYS)
-    public void resolveOverrideConfiguration_notInPipMode_updatesOverrideConfigs() {
+    public void testKeyboardConfigChange_relaunchWithKeyboardResources() {
         final ActivityRecord activity = createActivityWithTask();
-        final Configuration config = new Configuration();
-        config.touchscreen = TOUCHSCREEN_FINGER;
-        config.densityDpi = 100;
-        config.colorMode = COLOR_MODE_WIDE_COLOR_GAMUT_NO;
-        activity.setLastReportedConfiguration(new Configuration(), config);
+        // The activity will already be relaunching out of the gate, finish the relaunch so we can
+        // test properly.
+        activity.finishRelaunching();
+
+        AppCompatRecreateOnConfigChangePolicy policy = activity.mAppCompatController
+                .getRecreateOnConfigChangePolicy();
+        spyOn(policy);
+        doReturn(ActivityInfo.CONFIG_KEYBOARD).when(policy).getRecreateConfigMask();
+
+        final Task task = activity.getTask();
+        activity.setState(RESUMED, "Testing");
 
         final Configuration newConfig = new Configuration();
-        newConfig.touchscreen = TOUCHSCREEN_NOTOUCH;
-        newConfig.densityDpi = 200;
-        newConfig.colorMode = COLOR_MODE_WIDE_COLOR_GAMUT_YES;
-        activity.resolveOverrideConfiguration(newConfig);
+        newConfig.keyboard |= Configuration.KEYBOARD_QWERTY;
+        task.onRequestedOverrideConfigurationChanged(newConfig);
+        ensureActivityConfiguration(activity);
 
-        assertEquals(Configuration.TOUCHSCREEN_UNDEFINED,
-                activity.getRequestedOverrideConfiguration().touchscreen);
-        assertEquals(Configuration.DENSITY_DPI_UNDEFINED,
-                activity.getRequestedOverrideConfiguration().densityDpi);
-        assertEquals(Configuration.COLOR_MODE_UNDEFINED,
-                activity.getRequestedOverrideConfiguration().colorMode);
-    }
-
-    @Test
-    @EnableFlags(Flags.FLAG_ENABLE_DENSITY_RESET_ON_CROSS_DISPLAYS_PIP_LAUNCH)
-    public void resolveOverrideConfiguration_exitingPipOnCrossDisplaysLaunch_resetsConfigs() {
-        final ActivityRecord activity = createActivityWithTask();
-        activity.mLastReportedPictureInPictureMode = true;
-        final Configuration config = new Configuration();
-        config.touchscreen = TOUCHSCREEN_FINGER;
-        config.densityDpi = 100;
-        config.colorMode = COLOR_MODE_WIDE_COLOR_GAMUT_NO;
-        activity.setLastReportedConfiguration(new Configuration(), config);
-
-        final Configuration newConfig = new Configuration();
-        newConfig.windowConfiguration.setWindowingMode(WINDOWING_MODE_UNDEFINED);
-        newConfig.touchscreen = TOUCHSCREEN_NOTOUCH;
-        newConfig.densityDpi = 200;
-        newConfig.colorMode = COLOR_MODE_WIDE_COLOR_GAMUT_YES;
-        activity.resolveOverrideConfiguration(newConfig);
-
-        assertEquals(Configuration.TOUCHSCREEN_UNDEFINED,
-                activity.getRequestedOverrideConfiguration().touchscreen);
-        assertEquals(Configuration.DENSITY_DPI_UNDEFINED,
-                activity.getRequestedOverrideConfiguration().densityDpi);
-        assertEquals(Configuration.COLOR_MODE_UNDEFINED,
-                activity.getRequestedOverrideConfiguration().colorMode);
+        assertTrue(activity.isRelaunching());
     }
 
     private ActivityRecord setupDisplayAndActivityForCameraCompat(boolean isCameraRunning,

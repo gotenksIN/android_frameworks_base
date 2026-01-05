@@ -281,6 +281,40 @@ class RootTaskDesksOrganizerTest : ShellTestCase() {
     }
 
     @Test
+    @EnableFlags(Flags.FLAG_REPARENT_DESK_LEAF_TASKS_IF_RELAUNCHED)
+    fun testCreateDeskRoot_reparentLeafTaskIfRelaunchSet() = runTest {
+        val desk = createDeskSuspending()
+
+        verify(mockShellTaskOrganizer)
+            .applyTransaction(
+                argThat { wct ->
+                    wct.hierarchyOps.any { hop ->
+                        hop.container == desk.deskRoot.token.asBinder() &&
+                            hop.isReparentLeafTaskIfRelaunch
+                    }
+                }
+            )
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_BACK_NAVIGATION_DESKTOP_APP_NO_MINIMIZE)
+    fun testCreateDeskRoot_interceptsBack() = runTest {
+        val desk = createDeskSuspending()
+
+        verify(mockShellTaskOrganizer)
+            .applyTransaction(
+                argThat { wct ->
+                    wct.changes.any { change ->
+                        change.key == desk.deskRoot.token.asBinder() &&
+                            (change.value.changeMask and Change.CHANGE_INTERCEPT_BACK_PRESSED !=
+                                0) &&
+                            change.value.interceptBackPressed
+                    }
+                }
+            )
+    }
+
+    @Test
     fun testCreateMinimizationRoot_marksHidden() = runTest {
         val desk = createDeskSuspending()
 
@@ -334,7 +368,6 @@ class RootTaskDesksOrganizerTest : ShellTestCase() {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_INVISIBLE_TASK_REMOVAL_CLEANUP_BUGFIX)
     fun testOnTaskVanished_removesChildTask_invokesNonTransitionTaskClosing() = runTest {
         val desk = createDeskSuspending()
         val child = createFreeformTask().apply { parentTaskId = desk.deskRoot.deskId }
@@ -1146,6 +1179,42 @@ class RootTaskDesksOrganizerTest : ShellTestCase() {
         assertThat(activityOpts.launchRootTask).isEqualTo(deskRoot.token)
     }
 
+    @Test
+    @EnableFlags(com.android.window.flags.Flags.FLAG_ENABLE_BACK_NAVIGATION_DESKTOP_APP_NO_MINIMIZE)
+    fun testOnBackPressedOnTaskRoot_notOptIn_invokesListener() = runTest {
+        val desk = createDeskSuspending()
+        val task = createFreeformTask().apply { parentTaskId = desk.deskRoot.deskId }
+        organizer.onTaskAppeared(task, SurfaceControl())
+        val listener = mock<(ActivityManager.RunningTaskInfo) -> Unit>()
+        organizer.setBackPressOnDeskListener(listener)
+
+        organizer.onBackPressedOnTaskRoot(
+            taskInfo = task,
+            isFromMoveActivityTaskToBack = false,
+            isOptInOnBackInvoked = false,
+        )
+
+        verify(listener).invoke(task)
+    }
+
+    @Test
+    @EnableFlags(com.android.window.flags.Flags.FLAG_ENABLE_BACK_NAVIGATION_DESKTOP_APP_NO_MINIMIZE)
+    fun testOnBackPressedOnTaskRoot_optIn_doesNothing() = runTest {
+        val desk = createDeskSuspending()
+        val task = createFreeformTask().apply { parentTaskId = desk.deskRoot.deskId }
+        organizer.onTaskAppeared(task, SurfaceControl())
+        val listener = mock<(ActivityManager.RunningTaskInfo) -> Unit>()
+        organizer.setBackPressOnDeskListener(listener)
+
+        organizer.onBackPressedOnTaskRoot(
+            taskInfo = task,
+            isFromMoveActivityTaskToBack = false,
+            isOptInOnBackInvoked = true,
+        )
+
+        verify(listener, never()).invoke(any())
+    }
+
     private data class DeskRoots(
         val deskRoot: DeskRoot,
         val minimizationRoot: DeskMinimizationRoot,
@@ -1173,10 +1242,12 @@ class RootTaskDesksOrganizerTest : ShellTestCase() {
             .thenAnswer { invocation ->
                 val listener = (invocation.arguments[1] as TaskListener)
                 listener.onTaskAppeared(freeformRootTask, SurfaceControl())
+                freeformRootTask.token
             }
             .thenAnswer { invocation ->
                 val listener = (invocation.arguments[1] as TaskListener)
                 listener.onTaskAppeared(minimizationRootTask, SurfaceControl())
+                minimizationRootTask.token
             }
         val deskId = organizer.createDeskSuspending(displayId, userId)
         val deskRoot = assertNotNull(organizer.deskRootsByDeskId.get(deskId))
@@ -1200,10 +1271,12 @@ class RootTaskDesksOrganizerTest : ShellTestCase() {
             .thenAnswer { invocation ->
                 val listener = (invocation.arguments[1] as TaskListener)
                 listener.onTaskAppeared(freeformRootTask, SurfaceControl())
+                freeformRootTask.token
             }
             .thenAnswer { invocation ->
                 val listener = (invocation.arguments[1] as TaskListener)
                 listener.onTaskAppeared(minimizationRootTask, SurfaceControl())
+                minimizationRootTask.token
             }
         organizer.warmUpDefaultDesk(displayId, userId)
     }

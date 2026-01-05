@@ -32,9 +32,7 @@ import com.android.wm.shell.windowdecor.common.WindowDecorTaskResourceLoader
 import java.util.function.Supplier
 import kotlinx.coroutines.CoroutineScope
 
-/**
- * Window manager for the open by default first-run prompt
- */
+/** Window manager for the open by default first-run prompt */
 internal class OpenByDefaultFirstRunPrompt(
     context: Context,
     userContext: Context,
@@ -47,25 +45,28 @@ internal class OpenByDefaultFirstRunPrompt(
     @ShellMainThread mainScope: CoroutineScope,
     listener: DialogLifecycleListener,
     private val onAckedCallback: () -> Unit,
-) : BaseOpenByDefaultDialog<OpenByDefaultFirstRunPromptView>(
-    context,
-    userContext,
-    transitions,
-    taskInfo,
-    taskSurface,
-    displayController,
-    taskResourceLoader,
-    surfaceControlTransactionSupplier,
-    mainScope,
-    listener
-) {
+    private val onSwitchToWeb: () -> Unit,
+) :
+    BaseOpenByDefaultDialog<OpenByDefaultFirstRunPromptView>(
+        context,
+        userContext,
+        transitions,
+        taskInfo,
+        taskSurface,
+        displayController,
+        taskResourceLoader,
+        surfaceControlTransactionSupplier,
+        mainScope,
+        listener,
+    ) {
 
     override val dialogName = TAG
 
     override fun createDialog() {
-        dialog = LayoutInflater.from(context).inflate(
-                R.layout.open_by_default_first_run_prompt, null /* root */
-            ) as OpenByDefaultFirstRunPromptView
+        dialog =
+            LayoutInflater.from(context)
+                .inflate(R.layout.open_by_default_first_run_prompt, null /* root */)
+                as OpenByDefaultFirstRunPromptView
 
         if (Flags.useInputReportedFocusForAccessibility()) {
             showDialogWindow()
@@ -83,10 +84,9 @@ internal class OpenByDefaultFirstRunPrompt(
             setDefaultLinkHandlingSetting(allowed = false)
             onAckedCallback()
             closeMenu()
+            onSwitchToWeb()
         }
-        dialog.setAskMeLaterButtonClickListener {
-            closeMenu()
-        }
+        dialog.setAskMeLaterButtonClickListener { closeMenu() }
     }
 
     override fun onAnimationEnded() {

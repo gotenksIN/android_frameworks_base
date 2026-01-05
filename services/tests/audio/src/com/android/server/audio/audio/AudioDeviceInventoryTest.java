@@ -15,8 +15,6 @@
  */
 package com.android.server.audio;
 
-import static com.android.media.audio.Flags.asDeviceConnectionFailure;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -32,6 +30,7 @@ import android.media.AudioDeviceAttributes;
 import android.media.AudioManager;
 import android.media.AudioSystem;
 import android.platform.test.annotations.Presubmit;
+import android.os.PowerManager;
 import android.util.Log;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
@@ -58,6 +57,7 @@ public class AudioDeviceInventoryTest {
     private AudioDeviceInventory mDevInventory;
     @Spy private AudioDeviceBroker mSpyAudioDeviceBroker;
     @Spy private AudioSystemAdapter mSpyAudioSystem;
+    @Mock private PowerManager.WakeLock mMockWakelock;
 
     private SystemServerAdapter mSystemServer;
 
@@ -72,7 +72,7 @@ public class AudioDeviceInventoryTest {
         mDevInventory = new AudioDeviceInventory(mSpyAudioSystem, new ArrayList<>());
         mSystemServer = new NoOpSystemServerAdapter();
         mSpyAudioDeviceBroker = spy(new AudioDeviceBroker(context, mMockAudioService, mDevInventory,
-                mSystemServer, mSpyAudioSystem));
+                mSystemServer, mSpyAudioSystem, mMockWakelock));
         mDevInventory.setDeviceBroker(mSpyAudioDeviceBroker);
 
         BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
@@ -102,17 +102,14 @@ public class AudioDeviceInventoryTest {
 
         // test that no device is added when AudioSystem returns AUDIO_STATUS_ERROR
         // when setDeviceConnectionState is called for the connection
-        // NOTE: for now this is only when flag asDeviceConnectionFailure is true
-        if (asDeviceConnectionFailure()) {
-            when(mSpyAudioSystem.setDeviceConnectionState(ada, AudioSystem.DEVICE_STATE_AVAILABLE,
-                    AudioSystem.AUDIO_FORMAT_DEFAULT, false /*deviceSwitch*/))
-                    .thenReturn(AudioSystem.AUDIO_STATUS_ERROR);
-            runWithBluetoothPrivilegedPermission(
-                    () ->  mDevInventory.onSetBtActiveDevice(/*btInfo*/ btInfo,
-                        /*codec*/ AudioSystem.AUDIO_FORMAT_DEFAULT, AudioManager.STREAM_MUSIC));
+        when(mSpyAudioSystem.setDeviceConnectionState(ada, AudioSystem.DEVICE_STATE_AVAILABLE,
+                AudioSystem.AUDIO_FORMAT_DEFAULT, false /*deviceSwitch*/))
+                .thenReturn(AudioSystem.AUDIO_STATUS_ERROR);
+        runWithBluetoothPrivilegedPermission(
+                () ->  mDevInventory.onSetBtActiveDevice(/*btInfo*/ btInfo,
+                    /*codec*/ AudioSystem.AUDIO_FORMAT_DEFAULT, AudioManager.STREAM_MUSIC));
 
-            assertEquals(0, mDevInventory.getConnectedDevices().size());
-        }
+        assertEquals(0, mDevInventory.getConnectedDevices().size());
 
         // test that the device is added when AudioSystem returns AUDIO_STATUS_OK
         // when setDeviceConnectionState is called for the connection

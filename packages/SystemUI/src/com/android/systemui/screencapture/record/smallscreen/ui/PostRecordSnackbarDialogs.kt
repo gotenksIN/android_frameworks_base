@@ -22,12 +22,25 @@ import android.os.Bundle
 import android.view.Gravity
 import android.view.WindowManager
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.coerceAtLeast
+import androidx.compose.ui.unit.dp
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.plugins.ActivityStarter
 import com.android.systemui.res.R
@@ -49,6 +62,7 @@ constructor(
     private val dialogFactory: SystemUIDialogFactory,
     private val drawableViewModel: DrawableLoaderViewModel,
     private val activityStarter: ActivityStarter,
+    private val screenCaptureRecordFeaturesInteractor: ScreenCaptureRecordFeaturesInteractor,
 ) {
 
     fun showVideoSaved() {
@@ -69,7 +83,7 @@ constructor(
                     actionLabel = context.getString(R.string.screen_record_undo),
                 ),
             onActionPerformed = {
-                if (!ScreenCaptureRecordFeaturesInteractor.isLargeScreenRecordingEnabled) {
+                if (!screenCaptureRecordFeaturesInteractor.isLargeScreenRecordingEnabled) {
                     activityStarter.startActivity(
                         SmallScreenPostRecordingActivity.showRecording(context, uri),
                         true,
@@ -90,7 +104,10 @@ constructor(
         dialogFactory
             .create(
                 theme = R.style.ScreenCapture_PostRecord_SnackbarDialog,
-                dialogDelegate = SnackbarDialogDelegate { actionHandler.notifyDismiss() },
+                dialogDelegate =
+                    SnackbarDialogDelegate(screenCaptureRecordFeaturesInteractor) {
+                        actionHandler.notifyDismiss()
+                    },
             ) { dialog ->
                 val snackbarHostState = remember { SnackbarHostState() }
                 LaunchedEffect(visuals, onActionPerformed) {
@@ -100,7 +117,13 @@ constructor(
                     }
                     dialog.dismissWithoutAnimation()
                 }
-                Box(contentAlignment = Alignment.Center) {
+                Box(
+                    contentAlignment = Alignment.Center,
+                    modifier =
+                        Modifier.padding(
+                            WindowInsets.safeDrawing.asPaddingValues().coerceAllAtLeast(24.dp)
+                        ),
+                ) {
                     SnackbarHost(hostState = snackbarHostState) { data ->
                         PostRecordSnackbar(viewModel = drawableViewModel, data = data)
                     }
@@ -109,6 +132,15 @@ constructor(
             .show()
     }
 }
+
+@Composable
+private fun PaddingValues.coerceAllAtLeast(min: Dp): PaddingValues =
+    PaddingValues(
+        start = calculateStartPadding(LocalLayoutDirection.current).coerceAtLeast(min),
+        top = calculateTopPadding().coerceAtLeast(min),
+        end = calculateEndPadding(LocalLayoutDirection.current).coerceAtLeast(min),
+        bottom = calculateBottomPadding().coerceAtLeast(min),
+    )
 
 /** Ensures that only either [onActionPerformed] or [onDismissed] is called */
 private class ActionHandler(
@@ -130,15 +162,17 @@ private class ActionHandler(
     }
 }
 
-private class SnackbarDialogDelegate(private val onDismissed: () -> Unit) :
-    DialogDelegate<SystemUIDialog> {
+private class SnackbarDialogDelegate(
+    private val featuresInteractor: ScreenCaptureRecordFeaturesInteractor,
+    private val onDismissed: () -> Unit,
+) : DialogDelegate<SystemUIDialog> {
 
     override fun onCreate(dialog: SystemUIDialog, savedInstanceState: Bundle?) {
         super.onCreate(dialog, savedInstanceState)
         dialog.setOnDismissListener { onDismissed() }
         with(dialog.window!!) {
             val windowGravity =
-                if (ScreenCaptureRecordFeaturesInteractor.isLargeScreenRecordingEnabled) {
+                if (featuresInteractor.isLargeScreenRecordingEnabled) {
                     Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
                 } else {
                     Gravity.TOP or Gravity.CENTER_HORIZONTAL

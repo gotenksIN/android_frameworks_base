@@ -17,7 +17,6 @@
 package com.android.systemui.statusbar.pipeline.mobile.data.repository.prod
 
 import com.android.systemui.kairos.BuildScope
-import com.android.systemui.kairos.ExperimentalKairosApi
 import com.android.systemui.kairos.util.nameTag
 import com.android.systemui.log.table.TableLogBuffer
 import com.android.systemui.statusbar.pipeline.mobile.data.model.DataConnectionState
@@ -36,7 +35,6 @@ import com.qti.extphone.NrIconType
 import android.telephony.ims.stub.ImsRegistrationImplBase.REGISTRATION_TECH_NONE
 // QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt VoWifi icon
 
-@ExperimentalKairosApi
 fun BuildScope.MobileConnectionRepositoryKairosAdapter(
     kairosRepo: MobileConnectionRepositoryKairos
 ): MobileConnectionRepositoryKairosAdapter =
@@ -185,7 +183,6 @@ fun BuildScope.MobileConnectionRepositoryKairosAdapter(
         isInEcmMode = { kairosNetwork.transact { kairosRepo.isInEcmMode.sample() } },
     )
 
-@ExperimentalKairosApi
 class MobileConnectionRepositoryKairosAdapter(
     private val underlyingRepo: MobileConnectionRepositoryKairos,
     override val subId: Int,

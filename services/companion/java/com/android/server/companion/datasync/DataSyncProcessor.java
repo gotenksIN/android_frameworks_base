@@ -26,10 +26,12 @@ import android.companion.IOnMessageReceivedListener;
 import android.companion.IOnTransportsChangedListener;
 import android.os.Binder;
 import android.os.PersistableBundle;
+import android.os.UserHandle;
 import android.util.Slog;
 import android.util.SparseArray;
 
 import com.android.internal.annotations.GuardedBy;
+import com.android.internal.annotations.VisibleForTesting;
 import com.android.server.companion.association.AssociationStore;
 import com.android.server.companion.transport.CompanionTransportManager;
 
@@ -85,8 +87,27 @@ public class DataSyncProcessor {
     /**
      * Get the cached local metadata for the user.
      */
+    @NonNull
     public PersistableBundle getLocalMetadata(@UserIdInt int userId) {
-        return mLocalMetadataStore.getMetadataForUser(userId);
+        PersistableBundle userMetadata = mLocalMetadataStore.getMetadataForUser(userId);
+        if (userId == UserHandle.USER_ALL) {
+            return userMetadata;
+        }
+
+        // Merge the user metadata into the device metadata.
+        // Prioritize the user metadata over the device metadata for each entry key conflict.
+        PersistableBundle metadata = mLocalMetadataStore.getMetadataForUser(UserHandle.USER_ALL);
+        for (String feature : userMetadata.keySet()) {
+            if (metadata.containsKey(feature)) {
+                PersistableBundle merged = metadata.getPersistableBundle(feature).deepCopy();
+                merged.putAll(userMetadata.getPersistableBundle(feature));
+                metadata.putPersistableBundle(feature, merged);
+            } else {
+                metadata.putPersistableBundle(feature, userMetadata.getPersistableBundle(feature));
+            }
+        }
+
+        return metadata;
     }
 
     /**
@@ -108,12 +129,33 @@ public class DataSyncProcessor {
         mLocalMetadataStore.setMetadataForUser(userId, localMetadata);
 
         // Isolate the associations with transport for the user to broadcast to.
-        List<AssociationInfo> associations = mTransportManager.getAssociationsWithTransport()
+        mTransportManager.getAssociationsWithTransport()
                 .stream()
-                .filter(association -> association.getUserId() == userId)
-                .collect(Collectors.toList());
-        sendMetadataUpdate(userId, associations);
+                .filter(association -> userId == UserHandle.USER_ALL
+                        || association.getUserId() == userId)
+                .collect(Collectors.groupingBy(AssociationInfo::getUserId))
+                .forEach(this::sendMetadataUpdate);
     }
+
+    /**
+     * Set the remote metadata for an association.
+     */
+    @VisibleForTesting
+    public void setRemoteMetadata(int associationId,
+            @NonNull PersistableBundle metadata) {
+        Slog.i(TAG, "Setting remote metadata for association id=[" + associationId
+                + "] value=[" + metadata + "]...");
+
+        AssociationInfo association =
+                mAssociationStore.getAssociationWithCallerChecks(associationId);
+
+        metadata.putLong(AssociationInfo.METADATA_TIMESTAMP, System.currentTimeMillis());
+        AssociationInfo updated = (new AssociationInfo.Builder(association))
+                .setMetadata(metadata)
+                .build();
+        mAssociationStore.updateAssociation(updated);
+    }
+
 
     private void broadcastMetadata(List<AssociationInfo> associations) {
         synchronized (mAssociationsWithTransport) {
@@ -141,14 +183,8 @@ public class DataSyncProcessor {
         } catch (IOException e) {
             throw new RuntimeException("Failed to parse received metadata", e);
         }
-        metadata.putLong(AssociationInfo.METADATA_TIMESTAMP, System.currentTimeMillis());
 
-        AssociationInfo association =
-                mAssociationStore.getAssociationWithCallerChecks(associationId);
-        AssociationInfo updated = (new AssociationInfo.Builder(association))
-                .setMetadata(metadata)
-                .build();
-        mAssociationStore.updateAssociation(updated);
+        setRemoteMetadata(associationId, metadata);
     }
 
     private void sendMetadataUpdate(@UserIdInt int userId,
@@ -163,7 +199,7 @@ public class DataSyncProcessor {
 
         try {
             // Get the local metadata for the user.
-            PersistableBundle localMetadata = mLocalMetadataStore.getMetadataForUser(userId);
+            PersistableBundle localMetadata = getLocalMetadata(userId);
             ByteArrayOutputStream outputStream = new ByteArrayOutputStream();
             localMetadata.writeToStream(outputStream);
 

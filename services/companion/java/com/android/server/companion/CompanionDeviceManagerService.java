@@ -89,6 +89,7 @@ import android.os.PersistableBundle;
 import android.os.PowerExemptionManager;
 import android.os.PowerManagerInternal;
 import android.os.RemoteException;
+import android.os.Trace;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.permission.flags.Flags;
@@ -119,6 +120,8 @@ import com.android.server.companion.devicepresence.CompanionAppBinder;
 import com.android.server.companion.devicepresence.DevicePresenceProcessor;
 import com.android.server.companion.devicepresence.ObservableUuid;
 import com.android.server.companion.devicepresence.ObservableUuidStore;
+import com.android.server.companion.devicetrust.TrustedDevicesManager;
+import com.android.server.companion.devicetrust.TrustedDevicesStore;
 import com.android.server.companion.transport.CompanionTransportManager;
 import com.android.server.wm.ActivityTaskManagerInternal;
 
@@ -140,6 +143,7 @@ public class CompanionDeviceManagerService extends SystemService {
     private final AssociationStore mAssociationStore;
     private final SystemDataTransferRequestStore mSystemDataTransferRequestStore;
     private final ObservableUuidStore mObservableUuidStore;
+    private final TrustedDevicesStore mTrustedDevicesStore;
 
     private final CompanionExemptionProcessor mCompanionExemptionProcessor;
     private final AssociationRequestsProcessor mAssociationRequestsProcessor;
@@ -152,6 +156,7 @@ public class CompanionDeviceManagerService extends SystemService {
     private final CrossDeviceSyncController mCrossDeviceSyncController;
     private final LocalMetadataStore mLocalMetadataStore;
     private final DataSyncProcessor mDataSyncProcessor;
+    private final TrustedDevicesManager mTrustedDevicesManager;
     private final ActionRequestProcessor mActionRequestProcessor;
     private final Object mPackageLock = new Object();
 
@@ -179,6 +184,7 @@ public class CompanionDeviceManagerService extends SystemService {
         mSystemDataTransferRequestStore = new SystemDataTransferRequestStore();
         mObservableUuidStore = new ObservableUuidStore();
         mLocalMetadataStore = new LocalMetadataStore();
+        mTrustedDevicesStore = new TrustedDevicesStore();
 
         // Init processors
         mAssociationRequestsProcessor = new AssociationRequestsProcessor(context,
@@ -205,7 +211,7 @@ public class CompanionDeviceManagerService extends SystemService {
         mDisassociationProcessor = new DisassociationProcessor(context, activityManager,
                 mAssociationStore, packageManagerInternal, mDevicePresenceProcessor,
                 mCompanionAppBinder, mSystemDataTransferRequestStore, mTransportManager,
-                notificationManager);
+                mTrustedDevicesStore, notificationManager);
 
         mSystemDataTransferProcessor = new SystemDataTransferProcessor(this,
                 packageManagerInternal, mAssociationStore,
@@ -213,6 +219,9 @@ public class CompanionDeviceManagerService extends SystemService {
 
         mDataSyncProcessor = new DataSyncProcessor(mAssociationStore, mLocalMetadataStore,
                 mTransportManager);
+
+        mTrustedDevicesManager = new TrustedDevicesManager(context, mAssociationStore,
+                mTrustedDevicesStore, mTransportManager);
 
         // TODO(b/279663946): move context sync to a dedicated system service
         mCrossDeviceSyncController = new CrossDeviceSyncController(getContext(), mTransportManager);
@@ -265,8 +274,13 @@ public class CompanionDeviceManagerService extends SystemService {
     @Override
     public void onUserUnlocked(@NonNull TargetUser user) {
         Slog.i(TAG, "onUserUnlocked() user=" + user);
+        final int userId = user.getUserIdentifier();
+
         // Notify and bind the app after the phone is unlocked.
-        mDevicePresenceProcessor.sendDevicePresenceEventOnUnlocked(user.getUserIdentifier());
+        mDevicePresenceProcessor.sendDevicePresenceEventOnUnlocked(userId);
+
+        // Load user's session keys from disk.
+        mTrustedDevicesStore.readSessionKeysForUser(userId);
 
         ExecutorService executor = Executors.newSingleThreadExecutor();
         executor.execute(() -> mCompanionExemptionProcessor.updateAutoRevokeExemptions(
@@ -725,8 +739,24 @@ public class CompanionDeviceManagerService extends SystemService {
                 @NonNull String serviceName, int[] associationIds) {
             requestAction_enforcePermission();
 
+            android.os.Trace.asyncTraceForTrackBegin(
+                    Trace.TRACE_TAG_SYSTEM_SERVER,
+                    "CompanionDeviceManager",
+                    "requestAction",
+                    request.hashCode()
+            );
+
             mActionRequestProcessor.requestAction(request, serviceName, associationIds);
         }
+
+        @Override
+        @EnforcePermission(USE_COMPANION_TRANSPORTS)
+        public void setRequestActionAllowList(List<String> allowList) {
+            setRequestActionAllowList_enforcePermission();
+
+            mActionRequestProcessor.setRequestActionAllowList(allowList);
+        }
+
         @Override
         public boolean isCompanionApplicationBound(String packageName, int userId) {
             return mCompanionAppBinder.isCompanionApplicationBound(userId, packageName);
@@ -808,10 +838,19 @@ public class CompanionDeviceManagerService extends SystemService {
         }
 
         @Override
+        @EnforcePermission(MANAGE_COMPANION_DEVICES)
         public void setLocalMetadata(int userId, String key, PersistableBundle value) {
-            enforceCallerIsSystem();
+            setLocalMetadata_enforcePermission();
 
             mDataSyncProcessor.setLocalMetadata(userId, key, value);
+        }
+
+        @Override
+        @EnforcePermission(MANAGE_COMPANION_DEVICES)
+        public PersistableBundle getLocalMetadata(int userId) {
+            getLocalMetadata_enforcePermission();
+
+            return mDataSyncProcessor.getLocalMetadata(userId);
         }
 
         @Override
@@ -826,11 +865,24 @@ public class CompanionDeviceManagerService extends SystemService {
         public void notifyDevicePresence(int associationId, @NonNull DevicePresenceEvent event) {
             notifyDevicePresence_enforcePermission();
 
+            android.os.Trace.asyncTraceForTrackBegin(
+                    Trace.TRACE_TAG_SYSTEM_SERVER,
+                    "CompanionDeviceManager",
+                    "notifyDevicePresence",
+                    event.hashCode()
+            );
+
             mDevicePresenceProcessor.processSelfManagedDevicePresenceEvent(associationId, event);
         }
 
         @Override
         public void notifyActionResult(int associationId, @NonNull ActionResult result) {
+            android.os.Trace.asyncTraceForTrackBegin(
+                    Trace.TRACE_TAG_SYSTEM_SERVER,
+                    "CompanionDeviceManager",
+                    "notifyActionResult",
+                    result.hashCode()
+            );
             mActionRequestProcessor.processActionResult(associationId, result);
         }
 

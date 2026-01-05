@@ -19,7 +19,8 @@ package com.android.server.appfunctions;
 import static com.android.server.appfunctions.AppFunctionExecutors.LOGGING_THREAD_EXECUTOR;
 
 import android.annotation.NonNull;
-import android.app.appfunctions.AppFunctionAttribution;
+import android.app.AppInteractionAttribution;
+import android.app.appfunctions.AppFunctionMetadata;
 import android.app.appfunctions.ExecuteAppFunctionAidlRequest;
 import android.app.appfunctions.ExecuteAppFunctionResponse;
 import android.content.Context;
@@ -43,6 +44,10 @@ public class AppFunctionsLoggerWrapper {
     @VisibleForTesting static final int INTERACTION_TYPE_USER_QUERY = 2;
     @VisibleForTesting static final int INTERACTION_TYPE_USER_SCHEDULED = 3;
 
+    @VisibleForTesting static final int FUNCTION_TYPE_UNSPECIFIED = 0;
+    @VisibleForTesting static final int FUNCTION_TYPE_STATIC = 1;
+    @VisibleForTesting static final int FUNCTION_TYPE_DYNAMIC = 2;
+
     private final PackageManager mPackageManager;
     private final Executor mLoggingExecutor;
     private final AppFunctionsLoggerClock mLoggerClock;
@@ -65,26 +70,30 @@ public class AppFunctionsLoggerWrapper {
             ExecuteAppFunctionAidlRequest request,
             ExecuteAppFunctionResponse response,
             int callingUid,
-            long executionStartTimeMillis) {
+            long executionStartTimeMillis,
+            @AppFunctionMetadata.AppFunctionType int functionType) {
         logAppFunctionsRequestReported(
                 request,
                 SUCCESS_RESPONSE_CODE,
                 response.getResponseDataSize(),
                 callingUid,
-                executionStartTimeMillis);
+                executionStartTimeMillis,
+                functionType);
     }
 
     void logAppFunctionError(
             ExecuteAppFunctionAidlRequest request,
             int errorCode,
             int callingUid,
-            long executionStartTimeMillis) {
+            long executionStartTimeMillis,
+            @AppFunctionMetadata.AppFunctionType int functionType) {
         logAppFunctionsRequestReported(
                 request,
                 errorCode,
                 /* responseSizeBytes= */ 0,
                 callingUid,
-                executionStartTimeMillis);
+                executionStartTimeMillis,
+                functionType);
     }
 
     private void logAppFunctionsRequestReported(
@@ -92,7 +101,8 @@ public class AppFunctionsLoggerWrapper {
             int errorCode,
             int responseSizeBytes,
             int callingUid,
-            long executionStartTimeMillis) {
+            long executionStartTimeMillis,
+            @AppFunctionMetadata.AppFunctionType int functionType) {
         final long e2eRequestLatencyMillis =
                 mLoggerClock.getCurrentTimeMillis() - request.getRequestTime();
         final long requestOverheadMillis =
@@ -112,7 +122,8 @@ public class AppFunctionsLoggerWrapper {
                                 /* responseSizeBytes= */ responseSizeBytes,
                                 /* requestDurationMs= */ e2eRequestLatencyMillis,
                                 /* requestOverheadMs= */ requestOverheadMillis,
-                                /* interactionType= */ getInteractionType(request)));
+                                /* interactionType= */ getInteractionType(request),
+                                /* functionType= */ getFunctionTypeForLogging(functionType)));
     }
 
     private int getPackageUid(String packageName) {
@@ -125,27 +136,32 @@ public class AppFunctionsLoggerWrapper {
     }
 
     private int getInteractionType(@NonNull ExecuteAppFunctionAidlRequest aidlRequest) {
-        if (!accessCheckFlagsEnabled()) {
+        if (!android.app.appfunctions.flags.Flags.enableAppInteractionApi()) {
             return INTERACTION_TYPE_UNSPECIFIED;
         }
 
-        final AppFunctionAttribution attribution = aidlRequest.getClientRequest().getAttribution();
+        final AppInteractionAttribution attribution =
+                aidlRequest.getClientRequest().getAttribution();
         if (attribution == null) {
             return INTERACTION_TYPE_UNSPECIFIED;
         }
         final int interactionType = attribution.getInteractionType();
         return switch (interactionType) {
-            case AppFunctionAttribution.INTERACTION_TYPE_OTHER -> INTERACTION_TYPE_OTHER;
-            case AppFunctionAttribution.INTERACTION_TYPE_USER_QUERY -> INTERACTION_TYPE_USER_QUERY;
-            case AppFunctionAttribution.INTERACTION_TYPE_USER_SCHEDULED ->
+            case AppInteractionAttribution.INTERACTION_TYPE_OTHER -> INTERACTION_TYPE_OTHER;
+            case AppInteractionAttribution.INTERACTION_TYPE_USER_QUERY ->
+                    INTERACTION_TYPE_USER_QUERY;
+            case AppInteractionAttribution.INTERACTION_TYPE_USER_SCHEDULED ->
                     INTERACTION_TYPE_USER_SCHEDULED;
             default -> INTERACTION_TYPE_UNSPECIFIED;
         };
     }
 
-    private boolean accessCheckFlagsEnabled() {
-        return android.permission.flags.Flags.appFunctionAccessApiEnabled()
-                && android.permission.flags.Flags.appFunctionAccessServiceEnabled();
+    private int getFunctionTypeForLogging(@AppFunctionMetadata.AppFunctionType int functionType) {
+        return switch (functionType) {
+            case AppFunctionMetadata.FUNCTION_TYPE_STATIC -> FUNCTION_TYPE_STATIC;
+            case AppFunctionMetadata.FUNCTION_TYPE_DYNAMIC -> FUNCTION_TYPE_DYNAMIC;
+            default -> FUNCTION_TYPE_UNSPECIFIED;
+        };
     }
 
     /** Wraps a custom clock for easier testing. */

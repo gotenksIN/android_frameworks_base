@@ -17,6 +17,7 @@
 package com.android.systemui.statusbar.notification.promoted
 
 import android.annotation.WorkerThread
+import android.app.Flags.apiNotificationActionCustom
 import android.app.Flags.notificationsRedesignTemplates
 import android.app.Notification
 import android.app.Notification.BigPictureStyle
@@ -67,6 +68,7 @@ import com.android.systemui.statusbar.notification.row.shared.ImageModelProvider
 import com.android.systemui.statusbar.notification.row.shared.ImageModelProvider.ImageSizeClass.MediumSquare
 import com.android.systemui.statusbar.notification.row.shared.ImageModelProvider.ImageSizeClass.SmallSquare
 import com.android.systemui.statusbar.notification.row.shared.SkeletonImageTransform
+import com.android.systemui.statusbar.notification.shared.NotificationChipFromCompactContent
 import com.android.systemui.util.time.SystemClock
 import javax.inject.Inject
 
@@ -246,7 +248,11 @@ constructor(
         contentBuilder.appName = notification.loadHeaderAppName(packageContext)
         contentBuilder.subText = notification.subText()
         contentBuilder.time = notification.extractWhen()
-        contentBuilder.shortCriticalText = notification.shortCriticalText()
+        if (NotificationChipFromCompactContent.isEnabled) {
+            contentBuilder.compactContent = notification.resolveCompactContent(packageContext)
+        } else {
+            contentBuilder.shortCriticalText = notification.shortCriticalText()
+        }
         contentBuilder.lastAudiblyAlertedMs = lastAudiblyAlertedMs
         contentBuilder.profileBadgeBitmap = Notification.getProfileBadge(packageContext)
         contentBuilder.title = notification.title(recoveredBuilder.style?.javaClass)
@@ -257,7 +263,7 @@ constructor(
         contentBuilder.colors =
             PromotedNotificationContentModel.Colors(
                 backgroundColor = colorsFromNotif.backgroundColor,
-                primaryTextColor = colorsFromNotif.primaryTextColor,
+                textColor = colorsFromNotif.textColor,
             )
 
         recoveredBuilder.extractStyleContent(
@@ -310,7 +316,11 @@ constructor(
                 Style.BigText -> R.layout.notification_2025_template_expanded_big_text
                 Style.Call -> R.layout.notification_2025_template_expanded_call
                 Style.CollapsedCall -> R.layout.notification_2025_template_collapsed_call
-                Style.Progress -> R.layout.notification_2025_template_expanded_progress
+                Style.Progress ->
+                    if (apiNotificationActionCustom())
+                        R.layout.notification_2025_template_promoted_progress
+                    else R.layout.notification_2025_template_expanded_progress
+
                 Style.Metric -> R.layout.notification_2025_template_expanded_metric
                 Style.MetricSingle -> R.layout.notification_2025_template_promoted_single_metric
                 Style.Ineligible -> null
@@ -375,7 +385,8 @@ constructor(
         } ?: text()
     }
 
-    private fun Notification.subText(): String? = getStringExtraUnlessEmpty(EXTRA_SUB_TEXT)
+    private fun Notification.subText(): CharSequence? =
+        getCharSequenceExtraUnlessEmpty(EXTRA_SUB_TEXT)
 
     private fun Notification.shortCriticalText(): String? {
         if (shortCriticalText != null) {
@@ -506,6 +517,7 @@ constructor(
                                     useAdaptiveFormat = useAdaptiveFormat,
                                     label = label,
                                 )
+
                             metricValue.zeroElapsedRealtime != null ->
                                 Metric.TimeDifference.ElapsedRealtime(
                                     zeroElapsedRealtime =
@@ -514,6 +526,7 @@ constructor(
                                     useAdaptiveFormat = useAdaptiveFormat,
                                     label = label,
                                 )
+
                             metricValue.pausedDuration != null ->
                                 Metric.TimeDifference.Paused(
                                     pausedDuration = checkNotNull(metricValue.pausedDuration),
@@ -521,9 +534,11 @@ constructor(
                                     useAdaptiveFormat = useAdaptiveFormat,
                                     label = label,
                                 )
+
                             else -> Metric.Text(valueString.text(), label)
                         }
                     }
+
                     else -> Metric.Text(valueString.text(), label)
                 }
             }

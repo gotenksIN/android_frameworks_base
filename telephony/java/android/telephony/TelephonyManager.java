@@ -101,6 +101,7 @@ import android.telephony.Annotation.TtyMode;
 import android.telephony.Annotation.UiccAppType;
 import android.telephony.Annotation.UiccAppTypeExt;
 import android.telephony.CallForwardingInfo.CallForwardingReason;
+import android.telephony.NetworkSecurityEvent.AlertCategory;
 import android.telephony.VisualVoicemailService.VisualVoicemailTask;
 import android.telephony.data.ApnSetting;
 import android.telephony.data.ApnSetting.MvnoType;
@@ -218,6 +219,14 @@ public class TelephonyManager {
      * @hide
      */
     public static final String PHONE_PROCESS_NAME = "com.android.phone";
+
+    /**
+     * The AOSP activity responsible for placing emergency calls from, for example, a locked
+     * keyguard.
+     * @hide
+     */
+    public static final ComponentName EMERGENCY_DIALER_COMPONENT =
+            ComponentName.createRelative(PHONE_PROCESS_NAME, ".EmergencyDialer");
 
     /**
      * The allowed states of Wi-Fi calling.
@@ -434,6 +443,16 @@ public class TelephonyManager {
     @ChangeId
     @EnabledSince(targetSdkVersion = Build.VERSION_CODES.VANILLA_ICE_CREAM)
     public static final long ENABLE_FEATURE_MAPPING = 297989574L;
+
+    /**
+     * Enable READ_PHONE_STATE protection on APIs querying and notifying call state, such as
+     * {@code TelecomManager#getCallState}, {@link TelephonyManager#getCallStateForSubscription()},
+     * and {@link android.telephony.TelephonyCallback.CallStateListener}.
+     * @hide
+     */
+    // this magic number is a bug ID
+    // if removing this ChangeId, remove this constant in TelecomManager as well
+    public static final long ENABLE_GET_CALL_STATE_PERMISSION_PROTECTION = 157233955L;
 
     private final Context mContext;
     private final int mSubId;
@@ -658,6 +677,7 @@ public class TelephonyManager {
         }
     }
 
+// QTI_BEGIN: 2021-07-13: Telephony: IMS: Define new property for multi sim voice capability
     /**
      * The allowed values for multi sim voice capability
      *
@@ -674,10 +694,16 @@ public class TelephonyManager {
         static final int PSEUDO_DSDA = 2;
         /** Concurrent calls on both subscriptions are possible */
         static final int DSDA = 3;
+// QTI_END: 2021-07-13: Telephony: IMS: Define new property for multi sim voice capability
+// QTI_BEGIN: 2025-01-22: Telephony: Introduce new MultiSimVoiceCapability value
         /** MultiSimVoiceCapability is unsupported/deprecated */
         static final int UNSUPPORTED = 4;
+// QTI_END: 2025-01-22: Telephony: Introduce new MultiSimVoiceCapability value
+// QTI_BEGIN: 2021-07-13: Telephony: IMS: Define new property for multi sim voice capability
     }
 
+// QTI_END: 2021-07-13: Telephony: IMS: Define new property for multi sim voice capability
+// QTI_BEGIN: 2023-03-16: Telephony: DSDA: Add APIs to support DSDA -> DSDS transition use cases
     /**
      * Returns true if on multisim devices, DSDA features are supported in non-DSDA modes
      * Returns false otherwise
@@ -687,6 +713,7 @@ public class TelephonyManager {
         return TelephonyProperties.dsds_transition_supported().orElse(false);
     }
 
+// QTI_END: 2023-03-16: Telephony: DSDA: Add APIs to support DSDA -> DSDS transition use cases
 
     /**
      * Returns the number of phones available.
@@ -1916,6 +1943,22 @@ public class TelephonyManager {
             "android.telephony.extra.SIM_COMBINATION_NAMES";
 
     /**
+     * A string value for {@link TelecomManager#EXTRA_CALL_DISCONNECT_MESSAGE}, indicates the call
+     * was dropped by lower layers
+     * @hide
+     */
+    public static final String CALL_AUTO_DISCONNECT_MESSAGE_STRING =
+            "Call dropped by lower layers";
+
+    /**
+     * Optional extra for incoming and outgoing calls containing a long which specifies the Epoch
+     * time the call was created.
+     * @hide
+     */
+    public static final String EXTRA_CALL_CREATED_EPOCH_TIME_MILLIS =
+            "android.telephony.extra.CALL_CREATED_EPOCH_TIME_MILLIS";
+
+    /**
      * <p>Broadcast Action: The emergency callback mode is changed.
      * <ul>
      *   <li><em>EXTRA_PHONE_IN_ECM_STATE</em> - A boolean value,true=phone in ECM,
@@ -2386,7 +2429,9 @@ public class TelephonyManager {
     @RequiresPermission(android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
     public String getDeviceId(int slotIndex) {
         // FIXME this assumes phoneId == slotIndex
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record_str(8, ""+slotIndex);
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         try {
             IPhoneSubInfo info = getSubscriberInfoService();
             if (info == null)
@@ -2675,7 +2720,9 @@ public class TelephonyManager {
     @RequiresPermission(android.Manifest.permission.ACCESS_FINE_LOCATION)
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_RADIO_ACCESS)
     public CellLocation getCellLocation() {
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(49);
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         try {
             ITelephony telephony = getITelephony();
             if (telephony == null) {
@@ -2714,7 +2761,9 @@ public class TelephonyManager {
     @RequiresPermission(android.Manifest.permission.ACCESS_COARSE_LOCATION)
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_RADIO_ACCESS)
     public List<NeighboringCellInfo> getNeighboringCellInfo() {
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record(50);
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         try {
             ITelephony telephony = getITelephony();
             if (telephony == null) return null;
@@ -4205,7 +4254,9 @@ public class TelephonyManager {
     @RequiresPermission(android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
     @UnsupportedAppUsage
     public String getSimSerialNumber(int subId) {
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record_str(388, ""+subId);
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         try {
             IPhoneSubInfo info = getSubscriberInfoService();
             if (info == null)
@@ -4650,7 +4701,9 @@ public class TelephonyManager {
     @RequiresPermission(android.Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P)
     public String getSubscriberId(int subId) {
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record_str(389, ""+subId);
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         try {
             IPhoneSubInfo info = getSubscriberInfoService();
             if (info == null)
@@ -5293,7 +5346,9 @@ public class TelephonyManager {
     })
     @UnsupportedAppUsage
     public String getLine1Number(int subId) {
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         android.util.SeempLog.record_str(9, ""+subId);
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
         String number = null;
         try {
             ITelephony telephony = getITelephony();
@@ -10942,7 +10997,7 @@ public class TelephonyManager {
      */
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_CALLING)
     @RequiresPermission(READ_PRIVILEGED_PHONE_STATE)
-    @FlaggedApi(com.android.server.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
     public @TtyMode int getCurrentTtyMode() {
         try {
             ITelephony telephony = getITelephony();
@@ -12395,14 +12450,14 @@ public class TelephonyManager {
     /**
      * TTY (teletypewriter) mode is off.
      */
-    @FlaggedApi(com.android.server.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
     public static final int TTY_MODE_OFF = 0;
 
     /**
      * TTY (teletypewriter) mode is on. The speaker is off and the microphone is muted. The user
      * will communicate with the remote party by sending and receiving text messages.
      */
-    @FlaggedApi(com.android.server.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
     public static final int TTY_MODE_FULL = 1;
 
     /**
@@ -12410,7 +12465,7 @@ public class TelephonyManager {
      * speaker is on. The user will communicate with the remote party by sending text messages and
      * hearing an audible reply.
      */
-    @FlaggedApi(com.android.server.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
     public static final int TTY_MODE_HCO = 2;
 
     /**
@@ -12418,7 +12473,7 @@ public class TelephonyManager {
      * microphone is still on. User will communicate with the remote party by speaking and receiving
      * text message replies.
      */
-    @FlaggedApi(com.android.server.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_MOVE_GET_TTY_MODE_TO_TELEPHONY_MANAGER)
     public static final int TTY_MODE_VCO = 3;
 
     /** @hide */
@@ -18117,6 +18172,23 @@ public class TelephonyManager {
     }
 
     /**
+     * Get the modem service name.
+     * @return the service name of the modem service which bind to.
+     * @hide
+     */
+    public String getModemService() {
+        try {
+            ITelephony telephony = getITelephony();
+            if (telephony != null) {
+                return telephony.getModemService();
+            }
+        } catch (RemoteException ex) {
+            Rlog.e(TAG, "getModemService RemoteException", ex);
+        }
+        return null;
+    }
+
+    /**
      * The unattended reboot was prepared successfully.
      * @hide
      */
@@ -18640,7 +18712,7 @@ public class TelephonyManager {
      * identity. If the device goes out of service the previous cell identity is cached and
      * will be returned. If the cache age of the Cell identity is more than 24 hours
      * it will be cleared and null will be returned.
-     * @return last known cell identity {@CellIdentity}.
+     * @return last known cell identity {@link CellIdentity}.
      * @hide
      */
     @SystemApi
@@ -19147,6 +19219,34 @@ public class TelephonyManager {
         return false;
     }
 
+    /**
+     * Get the supported network alert categories for the modem.
+     *
+     * @throws IllegalStateException if the Telephony process is not currently available
+     * @throws SecurityException if the caller does not have the required privileges
+     * @hide
+     */
+    @FlaggedApi(Flags.FLAG_NETWORK_SECURITY_EVENT_INDICATIONS)
+    @RequiresPermission(Manifest.permission.READ_PRIVILEGED_PHONE_STATE)
+    @SystemApi
+    public @NonNull @AlertCategory int[] getSupportedNetworkAlertCategories() {
+        try {
+            ITelephony telephony = getITelephony();
+            if (telephony != null) {
+                return telephony.getSupportedNetworkAlertCategories();
+            } else {
+                throw new IllegalStateException("telephony service is null.");
+            }
+        } catch (UnsupportedOperationException ex) {
+            Rlog.e(TAG, "getSupportedNetworkAlertCategories UnsupportedOperationException", ex);
+            return new int[0];
+        }
+         catch (RemoteException ex) {
+            Rlog.e(TAG, "getSupportedNetworkAlertCategories RemoteException", ex);
+            ex.rethrowFromSystemServer();
+        }
+        return new int[0];
+    }
 
     /**
      * Get current cell broadcast message identifier ranges.
@@ -19598,4 +19698,28 @@ public class TelephonyManager {
     @FlaggedApi(Flags.FLAG_SUPPORT_SLOT_SWITCHING_2PSIM_1ESIM_CONFIG)
     @SystemApi
     public static final int SIM_TYPE_EMBEDDED = 2;
+
+    /**
+     * Defines the emergency types of domain selection.
+     * @hide
+     */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef(prefix = {"DOMAIN_SELECTION_EMERGENCY_TYPE_"}, value = {
+            DOMAIN_SELECTION_EMERGENCY_TYPE_CALL,
+            DOMAIN_SELECTION_EMERGENCY_TYPE_SMS})
+    public @interface DomainSelectionEmergencyType {}
+
+    /**
+     * The emergency type of domain selection is for emergency call.
+     * @hide
+     */
+    @FlaggedApi(Flags.FLAG_DOMAIN_SELECTION_EMERGENCY_MODE_NOTIFICATION)
+    public static final int DOMAIN_SELECTION_EMERGENCY_TYPE_CALL = 1;
+
+    /**
+     * The emergency type of domain selection is for emergency SMS.
+     * @hide
+     */
+    @FlaggedApi(Flags.FLAG_DOMAIN_SELECTION_EMERGENCY_MODE_NOTIFICATION)
+    public static final int DOMAIN_SELECTION_EMERGENCY_TYPE_SMS = 2;
 }

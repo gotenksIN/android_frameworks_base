@@ -44,6 +44,7 @@ import com.android.modules.expresslog.Counter;
 
 import java.io.PrintWriter;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -60,7 +61,8 @@ public final class VirtualCameraController implements IBinder.DeathRecipient {
     private final Object mServiceLock = new Object();
 
     @GuardedBy("mServiceLock")
-    @Nullable private IVirtualCameraService mVirtualCameraService;
+    @Nullable
+    private IVirtualCameraService mVirtualCameraService;
     @DevicePolicy
     private final int mCameraPolicy;
     private final int mDeviceId;
@@ -73,7 +75,7 @@ public final class VirtualCameraController implements IBinder.DeathRecipient {
     }
 
     @VisibleForTesting
-    VirtualCameraController(IVirtualCameraService virtualCameraService,
+    VirtualCameraController(@Nullable IVirtualCameraService virtualCameraService,
             @DevicePolicy int cameraPolicy, int deviceId) {
         mVirtualCameraService = virtualCameraService;
         mCameraPolicy = cameraPolicy;
@@ -101,7 +103,6 @@ public final class VirtualCameraController implements IBinder.DeathRecipient {
                     mCameras.put(binder, cameraDescriptor);
                 }
             } else {
-                // TODO(b/310857519): Revisit this to find a better way of indicating failure.
                 throw new RuntimeException("Failed to register virtual camera.");
             }
         } catch (RemoteException e) {
@@ -149,10 +150,14 @@ public final class VirtualCameraController implements IBinder.DeathRecipient {
     public String getCameraId(@NonNull VirtualCameraConfig cameraConfig) {
         connectVirtualCameraServiceIfNeeded();
 
+        final IVirtualCameraService service;
+        synchronized (mServiceLock) {
+            service = mVirtualCameraService;
+        }
+
+        Objects.requireNonNull(service);
         try {
-            synchronized (mServiceLock) {
-                return mVirtualCameraService.getCameraId(cameraConfig.getCallback().asBinder());
-            }
+            return service.getCameraId(cameraConfig.getCallback().asBinder());
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -286,16 +291,24 @@ public final class VirtualCameraController implements IBinder.DeathRecipient {
 
     private boolean registerCameraWithService(VirtualCameraConfig config) throws RemoteException {
         VirtualCameraConfiguration serviceConfiguration = getServiceCameraConfiguration(config);
+        final IVirtualCameraService service;
+
         synchronized (mServiceLock) {
-            int ownerDeviceId = mDeviceId;
-
-            if (Flags.externalCameraDefaultPolicy() && mCameraPolicy == DEVICE_POLICY_DEFAULT) {
-                ownerDeviceId = Context.DEVICE_ID_DEFAULT;
+            // This case should already be prevented by connectVirtualCameraServiceIfNeeded()
+            // called in registerCamera()
+            if (mVirtualCameraService == null) {
+                throw new IllegalStateException("Virtual camera service is not connected.");
             }
-
-            return mVirtualCameraService.registerCamera(config.getCallback().asBinder(),
-                    serviceConfiguration, ownerDeviceId);
+            service = mVirtualCameraService;
         }
+
+        int ownerDeviceId = mDeviceId;
+        if (Flags.externalCameraDefaultPolicy() && mCameraPolicy == DEVICE_POLICY_DEFAULT) {
+            ownerDeviceId = Context.DEVICE_ID_DEFAULT;
+        }
+
+        return service.registerCamera(config.getCallback().asBinder(),
+                serviceConfiguration, ownerDeviceId);
     }
 
     private final class CameraDescriptor implements IBinder.DeathRecipient {

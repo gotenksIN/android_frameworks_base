@@ -98,14 +98,48 @@ constructor(
      * [Scenes.Gone].
      */
     fun replaceLockscreenSceneOnBackStack() {
+        replaceBottomScene(from = Scenes.Lockscreen, to = Scenes.Gone)
+    }
+
+    /**
+     * If the [Scenes.Gone] is on the bottom of the navigation backstack, replaces it with
+     * [Scenes.Lockscreen].
+     */
+    fun replaceGoneSceneOnBackStack() {
+        replaceBottomScene(from = Scenes.Gone, to = Scenes.Lockscreen)
+    }
+
+    /** Generic helper for simple 1:1 replacements at the bottom (end) of the stack. */
+    private fun replaceBottomScene(from: SceneKey, to: SceneKey) {
+        updateBackStackList { list ->
+            if (list.lastOrNull() == from) {
+                list[list.lastIndex] = to
+            }
+        }
+    }
+
+    /**
+     * Adds the [Scenes.Lockscreen] to the bottom of the navigation backstack.
+     *
+     * If the backstack is empty, the lockscreen is pushed onto the stack. Otherwise, if the last
+     * item on the stack is [Scenes.Gone] it is replaced with the lockscreen.
+     */
+    fun addLockscreenToBackStack() {
+        updateBackStackList { list ->
+            if (list.isEmpty()) {
+                list.add(Scenes.Lockscreen)
+            } else if (list.lastOrNull() == Scenes.Gone) {
+                list[list.lastIndex] = Scenes.Lockscreen
+            }
+        }
+    }
+
+    /** Utility to modify the back stack as a mutable list. */
+    private inline fun updateBackStackList(crossinline mutate: (MutableList<SceneKey>) -> Unit) {
         updateBackStack { stack ->
             val list = stack.asIterable().toMutableList()
-            if (list.lastOrNull() == Scenes.Lockscreen) {
-                list[list.size - 1] = Scenes.Gone
-                sceneStackOf(*list.toTypedArray())
-            } else {
-                stack
-            }
+            mutate(list)
+            sceneStackOf(*list.toTypedArray())
         }
     }
 

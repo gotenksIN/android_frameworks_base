@@ -17,9 +17,12 @@
 package com.android.systemui.screencapture.record.largescreen.ui.viewmodel
 
 import android.app.ActivityManager
+import android.app.WindowConfiguration
+import android.content.ComponentName
 import android.graphics.Bitmap
 import android.graphics.Point
 import android.graphics.Rect
+import android.net.Uri
 import android.view.WindowManager
 import android.view.WindowMetrics
 import android.view.windowManager
@@ -41,6 +44,7 @@ import com.android.systemui.screencapture.common.shared.model.ScreenCaptureUiPar
 import com.android.systemui.screencapture.common.shared.model.ScreenCaptureUiState
 import com.android.systemui.screencapture.common.shared.model.largeScreenCaptureUiParameters
 import com.android.systemui.screencapture.data.repository.screenCaptureUiRepository
+import com.android.systemui.screencapture.record.largescreen.domain.interactor.largeScreenCaptureParametersInteractor
 import com.android.systemui.screencapture.record.largescreen.shared.model.ScreenCaptureRegion
 import com.android.systemui.screencapture.record.largescreen.shared.model.ScreenCaptureType
 import com.android.systemui.screenrecord.ScreenRecordingAudioSource
@@ -74,27 +78,6 @@ class PreCaptureViewModelTest : SysuiTestCase() {
     private val screenBounds = Rect(0, 0, 100, 100)
     private val displayId = 1234
     private lateinit var viewModel: PreCaptureViewModel
-
-    private fun setupViewModel(uiParams: LargeScreenCaptureUiParameters? = null) {
-        if (uiParams != null) {
-            kosmos.largeScreenCaptureUiParameters = uiParams
-        }
-        viewModel = kosmos.preCaptureViewModelFactory.create(displayId)
-        viewModel.activateIn(kosmos.testScope)
-    }
-
-    private fun assertUiClosed() {
-        with(kosmos) {
-            val uiState by
-                collectLastValue(
-                    kosmos.screenCaptureUiRepository.uiState(
-                        com.android.systemui.screencapture.common.shared.model.ScreenCaptureType
-                            .RECORD
-                    )
-                )
-            assertThat(uiState).isEqualTo(ScreenCaptureUiState.Invisible)
-        }
-    }
 
     @Before
     fun setUp() {
@@ -448,16 +431,8 @@ class PreCaptureViewModelTest : SysuiTestCase() {
     @Test
     fun updateTaskSelectionFromHover_selectsCorrectTask() =
         kosmos.runTest {
-            val task1 =
-                ActivityManager.RunningTaskInfo().apply {
-                    taskId = 1
-                    configuration.windowConfiguration.setBounds(Rect(0, 0, 50, 50))
-                }
-            val task2 =
-                ActivityManager.RunningTaskInfo().apply {
-                    taskId = 2
-                    configuration.windowConfiguration.setBounds(Rect(60, 60, 100, 100))
-                }
+            val task1 = createRunningTaskInfo(taskId = 1, bounds = Rect(0, 0, 50, 50))
+            val task2 = createRunningTaskInfo(taskId = 2, bounds = Rect(60, 60, 100, 100))
             val runningTasks = listOf(task1, task2)
             whenever(activityTaskManager.getTasks(any())).thenReturn(runningTasks)
             setupViewModel()
@@ -487,17 +462,13 @@ class PreCaptureViewModelTest : SysuiTestCase() {
     @Test
     fun captureTaskAtPosition_requestsScreenshotForSingleTask() =
         kosmos.runTest {
-            val topTask =
-                ActivityManager.RunningTaskInfo().apply {
-                    taskId = 1
-                    configuration.windowConfiguration.setBounds(Rect(0, 0, 50, 50))
-                }
-            whenever(activityTaskManager.getTasks(1)).thenReturn(listOf(topTask))
+            val topTask = createRunningTaskInfo(taskId = 1, bounds = Rect(0, 0, 50, 50))
+            whenever(activityTaskManager.getTasks(Integer.MAX_VALUE)).thenReturn(listOf(topTask))
             setupViewModel()
             viewModel.updateCaptureRegion(ScreenCaptureRegion.APP_WINDOW)
             whenever(kosmos.mockImageCapture.captureTask(topTask.taskId)).thenReturn(mockBitmap)
 
-            viewModel.beginCapture()
+            viewModel.captureTaskAtPosition(Point(25, 25))
             runCurrent()
 
             val screenshotRequestCaptor = argumentCaptor<ScreenshotRequest>()
@@ -518,18 +489,8 @@ class PreCaptureViewModelTest : SysuiTestCase() {
     fun captureTaskAtPosition_requestsScreenshotForMultipleTasks() =
         kosmos.runTest {
             setupViewModel()
-            val task1 =
-                ActivityManager.RunningTaskInfo().apply {
-                    taskId = 1
-                    isVisible = true
-                    configuration.windowConfiguration.setBounds(Rect(0, 0, 50, 50))
-                }
-            val task2 =
-                ActivityManager.RunningTaskInfo().apply {
-                    taskId = 2
-                    isVisible = true
-                    configuration.windowConfiguration.setBounds(Rect(60, 60, 100, 100))
-                }
+            val task1 = createRunningTaskInfo(taskId = 1, bounds = Rect(0, 0, 50, 50))
+            val task2 = createRunningTaskInfo(taskId = 2, bounds = Rect(60, 60, 100, 100))
             val runningTasks = listOf(task1, task2)
 
             whenever(activityTaskManager.getTasks(Integer.MAX_VALUE)).thenReturn(runningTasks)
@@ -558,18 +519,8 @@ class PreCaptureViewModelTest : SysuiTestCase() {
     fun captureTaskAtPosition_requestsScreenshotForMultipleTasksWithOverlap() =
         kosmos.runTest {
             setupViewModel()
-            val task1 =
-                ActivityManager.RunningTaskInfo().apply {
-                    taskId = 1
-                    isVisible = true
-                    configuration.windowConfiguration.setBounds(Rect(0, 0, 50, 50))
-                }
-            val task2 =
-                ActivityManager.RunningTaskInfo().apply {
-                    taskId = 2
-                    isVisible = true
-                    configuration.windowConfiguration.setBounds(Rect(10, 10, 60, 60))
-                }
+            val task1 = createRunningTaskInfo(taskId = 1, bounds = Rect(0, 0, 50, 50))
+            val task2 = createRunningTaskInfo(taskId = 2, bounds = Rect(10, 10, 60, 60))
             // The list of tasks is ordered from top to bottom. task1 is on top of task2.
             val runningTasks = listOf(task1, task2)
 
@@ -600,12 +551,7 @@ class PreCaptureViewModelTest : SysuiTestCase() {
     fun captureTaskAtPosition_withInvalidPosition_doesNothing() =
         kosmos.runTest {
             setupViewModel()
-            val task1 =
-                ActivityManager.RunningTaskInfo().apply {
-                    taskId = 1
-                    isVisible = true
-                    configuration.windowConfiguration.setBounds(Rect(0, 0, 50, 50))
-                }
+            val task1 = createRunningTaskInfo(taskId = 1, bounds = Rect(0, 0, 50, 50))
             val runningTasks = listOf(task1)
 
             whenever(activityTaskManager.getTasks(Integer.MAX_VALUE)).thenReturn(runningTasks)
@@ -619,4 +565,254 @@ class PreCaptureViewModelTest : SysuiTestCase() {
 
             assertThat(viewModel.isShowingUi).isTrue()
         }
+
+    @Test
+    fun currentSaveLocationUri_whenCustomLocationNotSet_isNull() =
+        kosmos.runTest {
+            setupViewModel()
+            val toolbarViewModel = viewModel.toolbarViewModel
+
+            assertThat(toolbarViewModel.currentSaveLocationUri).isNull()
+        }
+
+    @Test
+    fun currentSaveLocationUri_whenCustomLocationNotSetAndMadeActive_remainsNull() =
+        kosmos.runTest {
+            setupViewModel()
+            val toolbarViewModel = viewModel.toolbarViewModel
+            toolbarViewModel.setCustomSaveLocationActiveStatus(true)
+
+            assertThat(toolbarViewModel.currentSaveLocationUri).isNull()
+        }
+
+    @Test
+    fun currentSaveLocationUri_whenCustomLocationSetAndActive_isNotNull() =
+        kosmos.runTest {
+            setupViewModel()
+            val toolbarViewModel = viewModel.toolbarViewModel
+            val customUri =
+                Uri.parse("content://com.android.externalstorage.documents/tree/primary%3ATest")
+
+            largeScreenCaptureParametersInteractor.setCustomSaveLocation(customUri)
+            toolbarViewModel.setCustomSaveLocationActiveStatus(true)
+
+            assertThat(toolbarViewModel.currentSaveLocationUri).isEqualTo(customUri)
+        }
+
+    @Test
+    fun currentSaveLocationUri_whenCustomLocationSetButInactive_isNull() =
+        kosmos.runTest {
+            setupViewModel()
+            val toolbarViewModel = viewModel.toolbarViewModel
+            val customUri =
+                Uri.parse("content://com.android.externalstorage.documents/tree/primary%3ATest")
+
+            largeScreenCaptureParametersInteractor.setCustomSaveLocation(customUri)
+            toolbarViewModel.setCustomSaveLocationActiveStatus(false)
+
+            assertThat(toolbarViewModel.currentSaveLocationUri).isNull()
+        }
+
+    @Test
+    fun getAppWindowTasks_filtersByDisplayId() =
+        kosmos.runTest {
+            val taskOnCorrectDisplay =
+                createRunningTaskInfo(taskId = 1, bounds = Rect(0, 0, 50, 50))
+            val taskOnOtherDisplay =
+                createRunningTaskInfo(taskId = 2, bounds = Rect(60, 60, 100, 100), displayId = 9999)
+            val runningTasks = listOf(taskOnCorrectDisplay, taskOnOtherDisplay)
+            whenever(activityTaskManager.getTasks(any())).thenReturn(runningTasks)
+            setupViewModel()
+            viewModel.updateCaptureRegion(ScreenCaptureRegion.APP_WINDOW)
+
+            // Hover over the task on the other display
+            viewModel.updateTaskSelectionFromHover(Point(75, 75))
+            assertThat(viewModel.topTask).isNull()
+
+            // Hover over the task on the correct display
+            viewModel.updateTaskSelectionFromHover(Point(25, 25))
+            assertThat(viewModel.topTask).isEqualTo(taskOnCorrectDisplay)
+        }
+
+    @Test
+    fun calculateVisibleArea_noOverlappingTasks() =
+        kosmos.runTest {
+            val task1 = createRunningTaskInfo(taskId = 1, bounds = Rect(0, 0, 50, 50))
+            val task2 = createRunningTaskInfo(taskId = 2, bounds = Rect(60, 60, 100, 100))
+            val runningTasks = listOf(task1, task2)
+            whenever(activityTaskManager.getTasks(any())).thenReturn(runningTasks)
+            setupViewModel()
+            viewModel.updateCaptureRegion(ScreenCaptureRegion.APP_WINDOW)
+
+            viewModel.updateTaskSelectionFromHover(Point(75, 75))
+            runCurrent()
+
+            val appWindowSelection = viewModel.appWindowSelection
+            assertThat(appWindowSelection?.taskBounds)
+                .isEqualTo(task2.configuration.windowConfiguration.bounds)
+            assertThat(appWindowSelection?.overlappingBounds).isEmpty()
+        }
+
+    @Test
+    fun calculateVisibleArea_oneFullyOverlappingTask() =
+        kosmos.runTest {
+            val topTask = createRunningTaskInfo(taskId = 1, bounds = Rect(10, 10, 40, 40))
+            val bottomTask = createRunningTaskInfo(taskId = 2, bounds = Rect(0, 0, 50, 50))
+            val runningTasks = listOf(topTask, bottomTask)
+            whenever(activityTaskManager.getTasks(any())).thenReturn(runningTasks)
+            setupViewModel()
+            viewModel.updateCaptureRegion(ScreenCaptureRegion.APP_WINDOW)
+
+            viewModel.updateTaskSelectionFromHover(Point(5, 5))
+            runCurrent()
+
+            val appWindowSelection = viewModel.appWindowSelection
+            assertThat(appWindowSelection?.taskBounds)
+                .isEqualTo(bottomTask.configuration.windowConfiguration.bounds)
+            assertThat(appWindowSelection?.overlappingBounds)
+                .containsExactly(topTask.configuration.windowConfiguration.bounds)
+        }
+
+    @Test
+    fun calculateVisibleArea_onePartiallyOverlappingTask() =
+        kosmos.runTest {
+            val topTask = createRunningTaskInfo(taskId = 1, bounds = Rect(30, 30, 70, 70))
+            val bottomTask = createRunningTaskInfo(taskId = 2, bounds = Rect(0, 0, 50, 50))
+            val runningTasks = listOf(topTask, bottomTask)
+            whenever(activityTaskManager.getTasks(any())).thenReturn(runningTasks)
+            setupViewModel()
+            viewModel.updateCaptureRegion(ScreenCaptureRegion.APP_WINDOW)
+
+            viewModel.updateTaskSelectionFromHover(Point(25, 25))
+            runCurrent()
+
+            val appWindowSelection = viewModel.appWindowSelection
+            assertThat(appWindowSelection?.taskBounds)
+                .isEqualTo(bottomTask.configuration.windowConfiguration.bounds)
+            assertThat(appWindowSelection?.overlappingBounds)
+                .containsExactly(topTask.configuration.windowConfiguration.bounds)
+        }
+
+    @Test
+    fun calculateVisibleArea_multipleOverlappingTasks() =
+        kosmos.runTest {
+            val topTask1 = createRunningTaskInfo(taskId = 1, bounds = Rect(10, 10, 20, 20))
+            val topTask2 = createRunningTaskInfo(taskId = 2, bounds = Rect(30, 30, 40, 40))
+            val nonOverlappingTask =
+                createRunningTaskInfo(taskId = 3, bounds = Rect(80, 80, 90, 90))
+            val bottomTask = createRunningTaskInfo(taskId = 4, bounds = Rect(0, 0, 50, 50))
+            val runningTasks = listOf(topTask1, topTask2, nonOverlappingTask, bottomTask)
+            whenever(activityTaskManager.getTasks(any())).thenReturn(runningTasks)
+            setupViewModel()
+            viewModel.updateCaptureRegion(ScreenCaptureRegion.APP_WINDOW)
+
+            viewModel.updateTaskSelectionFromHover(Point(25, 25))
+            runCurrent()
+
+            val appWindowSelection = viewModel.appWindowSelection
+            assertThat(appWindowSelection?.taskBounds)
+                .isEqualTo(bottomTask.configuration.windowConfiguration.bounds)
+            assertThat(appWindowSelection?.overlappingBounds)
+                .containsExactly(
+                    topTask1.configuration.windowConfiguration.bounds,
+                    topTask2.configuration.windowConfiguration.bounds,
+                )
+        }
+
+    @Test
+    fun calculateVisibleArea_nonVisibleTaskIsIgnored() =
+        kosmos.runTest {
+            val topTask =
+                createRunningTaskInfo(taskId = 1, bounds = Rect(10, 10, 40, 40), isVisible = false)
+            val bottomTask = createRunningTaskInfo(taskId = 2, bounds = Rect(0, 0, 50, 50))
+            val runningTasks = listOf(topTask, bottomTask)
+            whenever(activityTaskManager.getTasks(any())).thenReturn(runningTasks)
+            setupViewModel()
+            viewModel.updateCaptureRegion(ScreenCaptureRegion.APP_WINDOW)
+
+            viewModel.updateTaskSelectionFromHover(Point(25, 25))
+            runCurrent()
+
+            val appWindowSelection = viewModel.appWindowSelection
+            assertThat(appWindowSelection?.taskBounds)
+                .isEqualTo(bottomTask.configuration.windowConfiguration.bounds)
+            assertThat(appWindowSelection?.overlappingBounds).isEmpty()
+        }
+
+    @Test
+    fun calculateVisibleArea_taskBelowIsIgnored() =
+        kosmos.runTest {
+            val topTask = createRunningTaskInfo(taskId = 1, bounds = Rect(0, 0, 50, 50))
+            val bottomTask = createRunningTaskInfo(taskId = 2, bounds = Rect(30, 30, 70, 70))
+            val runningTasks = listOf(topTask, bottomTask)
+            whenever(activityTaskManager.getTasks(any())).thenReturn(runningTasks)
+            setupViewModel()
+            viewModel.updateCaptureRegion(ScreenCaptureRegion.APP_WINDOW)
+
+            viewModel.updateTaskSelectionFromHover(Point(25, 25))
+            runCurrent()
+
+            val appWindowSelection = viewModel.appWindowSelection
+            assertThat(appWindowSelection?.taskBounds)
+                .isEqualTo(topTask.configuration.windowConfiguration.bounds)
+            assertThat(appWindowSelection?.overlappingBounds).isEmpty()
+        }
+
+    @Test
+    fun calculateVisibleArea_nonIntersectingTaskIsIgnored() =
+        kosmos.runTest {
+            val topTask = createRunningTaskInfo(taskId = 1, bounds = Rect(60, 60, 100, 100))
+            val bottomTask = createRunningTaskInfo(taskId = 2, bounds = Rect(0, 0, 50, 50))
+            val runningTasks = listOf(topTask, bottomTask)
+            whenever(activityTaskManager.getTasks(any())).thenReturn(runningTasks)
+            setupViewModel()
+            viewModel.updateCaptureRegion(ScreenCaptureRegion.APP_WINDOW)
+
+            viewModel.updateTaskSelectionFromHover(Point(25, 25))
+            runCurrent()
+
+            val appWindowSelection = viewModel.appWindowSelection
+            assertThat(appWindowSelection?.taskBounds)
+                .isEqualTo(bottomTask.configuration.windowConfiguration.bounds)
+            assertThat(appWindowSelection?.overlappingBounds).isEmpty()
+        }
+
+    private fun setupViewModel(uiParams: LargeScreenCaptureUiParameters? = null) {
+        if (uiParams != null) {
+            kosmos.largeScreenCaptureUiParameters = uiParams
+        }
+        viewModel = kosmos.preCaptureViewModelFactory.create(displayId)
+        viewModel.activateIn(kosmos.testScope)
+    }
+
+    private fun assertUiClosed() {
+        with(kosmos) {
+            val uiState by
+                collectLastValue(
+                    kosmos.screenCaptureUiRepository.uiState(
+                        com.android.systemui.screencapture.common.shared.model.ScreenCaptureType
+                            .RECORD
+                    )
+                )
+            assertThat(uiState).isEqualTo(ScreenCaptureUiState.Invisible)
+        }
+    }
+
+    private fun createRunningTaskInfo(
+        taskId: Int,
+        bounds: Rect,
+        displayId: Int = this.displayId,
+        isVisible: Boolean = true,
+    ): ActivityManager.RunningTaskInfo {
+        return ActivityManager.RunningTaskInfo().apply {
+            this.taskId = taskId
+            this.isVisible = isVisible
+            this.displayId = displayId
+            this.topActivity = ComponentName("test.pkg", "test.class")
+            this.configuration.windowConfiguration.apply {
+                setBounds(bounds)
+                activityType = WindowConfiguration.ACTIVITY_TYPE_STANDARD
+            }
+        }
+    }
 }

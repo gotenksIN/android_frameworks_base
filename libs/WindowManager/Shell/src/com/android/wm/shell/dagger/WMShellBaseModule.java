@@ -93,8 +93,10 @@ import com.android.wm.shell.compatui.api.CompatUIComponentRepository;
 import com.android.wm.shell.compatui.api.CompatUIHandler;
 import com.android.wm.shell.compatui.api.CompatUIRepository;
 import com.android.wm.shell.compatui.api.CompatUISharedRepositoryCleanUp;
+import com.android.wm.shell.compatui.api.CompatUISharedStateHandler;
 import com.android.wm.shell.compatui.api.CompatUISharedStateRepository;
 import com.android.wm.shell.compatui.components.RestartButtonSpecKt;
+import com.android.wm.shell.compatui.impl.CompositeCompatUIHandler;
 import com.android.wm.shell.compatui.impl.DefaultCompatUIComponentFactory;
 import com.android.wm.shell.compatui.impl.DefaultCompatUIHandler;
 import com.android.wm.shell.compatui.impl.DefaultComponentIdGenerator;
@@ -120,6 +122,7 @@ import com.android.wm.shell.recents.TaskStackTransitionObserver;
 import com.android.wm.shell.shared.ShellTransitions;
 import com.android.wm.shell.shared.TransactionPool;
 import com.android.wm.shell.shared.annotations.ShellAnimationThread;
+import com.android.wm.shell.shared.annotations.ShellBackgroundThread;
 import com.android.wm.shell.shared.annotations.ShellMainThread;
 import com.android.wm.shell.shared.annotations.ShellSplashscreenThread;
 import com.android.wm.shell.shared.desktopmode.DesktopConfig;
@@ -330,6 +333,7 @@ public abstract class WMShellBaseModule {
             @NonNull CompatUISharedStateRepository sharedComponentRepository,
             @NonNull CompatUIComponentIdGenerator componentIdGenerator,
             @NonNull CompatUIComponentFactory compatUIComponentFactory,
+            @NonNull CompatUISharedStateRepository sharedStateRepository,
             CompatUIStatusManager compatUIStatusManager,
             DesktopState desktopState,
             Lazy<ActivityTransitionAnimator> activityTransitionAnimator,
@@ -339,9 +343,14 @@ public abstract class WMShellBaseModule {
         }
         if (Flags.appCompatUiFramework()) {
             return Optional.of(
-                    new DefaultCompatUIHandler(compatUIRepository, compatUIComponentRepository,
-                            sharedComponentRepository, componentIdGenerator,
-                            compatUIComponentFactory, mainExecutor));
+                    new CompositeCompatUIHandler(
+                            new CompatUISharedStateHandler(sharedStateRepository,
+                                    displayController),
+                            new DefaultCompatUIHandler(compatUIRepository,
+                                    compatUIComponentRepository,
+                                    sharedComponentRepository, componentIdGenerator,
+                                    compatUIComponentFactory, mainExecutor))
+            );
         }
         return Optional.of(
                 new CompatUIController(
@@ -997,10 +1006,10 @@ public abstract class WMShellBaseModule {
             @ShellSplashscreenThread ShellExecutor splashScreenExecutor,
             StartingWindowTypeAlgorithm startingWindowTypeAlgorithm, IconProvider iconProvider,
             TransactionPool pool, @ShellMainThread ShellExecutor mainExecutor,
-            Transitions transitions) {
+            Transitions transitions, @ShellBackgroundThread ShellExecutor bgExecutor) {
         return new StartingWindowController(context, shellInit, shellController, shellTaskOrganizer,
                 splashScreenExecutor, startingWindowTypeAlgorithm, iconProvider, pool, mainExecutor,
-                transitions);
+                transitions, bgExecutor);
     }
 
     // Workaround for dynamic overriding with a default implementation, see {@link DynamicOverride}

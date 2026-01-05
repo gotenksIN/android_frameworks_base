@@ -21,7 +21,6 @@ import static com.google.common.truth.Truth.assertWithMessage;
 import static org.junit.Assert.assertTrue;
 
 import android.os.Looper;
-import android.platform.test.annotations.NoRavenizer;
 import android.platform.test.ravenwood.RavenwoodAwareTestRunner;
 import android.platform.test.ravenwood.RavenwoodConfigPrivate;
 import android.platform.test.ravenwood.RavenwoodEnablementChecker;
@@ -30,6 +29,7 @@ import android.util.Log;
 
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
+
 import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.Description;
@@ -68,7 +68,6 @@ import java.util.function.BiConsumer;
  * junit-params.
  */
 @RunWith(JUnitParamsRunner.class)
-@NoRavenizer // This class shouldn't be executed with RavenwoodAwareTestRunner.
 public abstract class RavenwoodRunnerTestBase {
     private static final String TAG = "RavenwoodRunnerTestBase";
 
@@ -177,17 +176,17 @@ public abstract class RavenwoodRunnerTestBase {
             RavenwoodConfigPrivate.setCriticalErrorHandler(null);
         }
 
+        // Check the result.
+        assertWithMessage("Failure in test class [" + testClazz.getCanonicalName() + "]")
+                .that(listener.getResult())
+                .isEqualTo(stripMultiLines(expected.value()));
+
         var error = sError.get();
         if (error != null) {
             throw new RuntimeException("Failure detected in test [" + testClazz.getSimpleName()
                     + "], see the inner exception for details.",
                     error);
         }
-
-        // Check the result.
-        assertWithMessage("Failure in test class [" + testClazz.getCanonicalName() + "]")
-                .that(listener.getResult())
-                .isEqualTo(stripMultiLines(expected.value()));
 
         // After each test, make sure the main thread is alive.
         // (RavenwoodRunnerExecutionTest throws exceptions on the main thread, so we make sure

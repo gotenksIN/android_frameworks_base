@@ -46,6 +46,9 @@
 #include "hwui/Canvas.h"
 #include "pipeline/skia/SkiaCpuPipeline.h"
 #include "pipeline/skia/SkiaGpuPipeline.h"
+#ifdef __ANDROID__
+#include "pipeline/skia/SkiaIpcPipeline.h"
+#endif
 #include "pipeline/skia/SkiaOpenGLPipeline.h"
 #include "pipeline/skia/SkiaVulkanPipeline.h"
 #include "thread/CommonPool.h"
@@ -82,8 +85,16 @@ CanvasContext* ScopedActiveContext::sActiveContext = nullptr;
 
 CanvasContext* CanvasContext::create(RenderThread& thread, bool translucent,
                                      RenderNode* rootRenderNode, IContextFactory* contextFactory,
-                                     pid_t uiThreadId, pid_t renderThreadId) {
+                                     pid_t uiThreadId, pid_t renderThreadId, bool useIpcCanvas) {
     auto renderType = Properties::getRenderPipelineType();
+
+#ifdef __ANDROID__
+    if (useIpcCanvas) {
+        return new CanvasContext(thread, translucent, rootRenderNode, contextFactory,
+                                 std::make_unique<skiapipeline::SkiaIpcPipeline>(thread),
+                                 uiThreadId, renderThreadId);
+    }
+#endif
 
     switch (renderType) {
         case RenderPipelineType::SkiaGL:
@@ -263,6 +274,8 @@ void CanvasContext::setSurfaceControl(sp<SurfaceControl> surfaceControl) {
         TransactionCompletedListener::getInstance()->addSurfaceStatsListener(
                 this, reinterpret_cast<void*>(onSurfaceStatsAvailable), mSurfaceControl, callback);
     }
+
+    mRenderPipeline->setSurfaceControl(mSurfaceControl);
 #endif
 }
 
@@ -620,8 +633,8 @@ void CanvasContext::draw(bool solelyTextureViewUpdates) {
     mDamageAccumulator.finish(&dirty);
 
     // reset syncDelayDuration each time we draw
-    nsecs_t syncDelayDuration = mSyncDelayDuration;
-    nsecs_t idleDuration = mIdleDuration;
+    const nsecs_t syncDelayDuration = mSyncDelayDuration;
+    const nsecs_t idleDuration = mIdleDuration;
     mSyncDelayDuration = 0;
     mIdleDuration = 0;
 
@@ -691,6 +704,9 @@ void CanvasContext::draw(bool solelyTextureViewUpdates) {
             ATRACE_FORMAT(
                 "frameTimelineInfo(frameNumber=%llu, vsyncId=%lld, inputEventId=0x%" PRIx32 ")",
                 frameCompleteNr, vsyncId, inputEventId);
+            const auto lastDequeueDuration =
+                    syncDelayDuration +
+                    ANativeWindow_getLastDequeueDuration(mNativeSurface->getNativeWindow());
             const ANativeWindowFrameTimelineInfo ftl = {
                     .frameNumber = frameCompleteNr,
                     .frameTimelineVsyncId = vsyncId,
@@ -704,6 +720,7 @@ void CanvasContext::draw(bool solelyTextureViewUpdates) {
                     .vsyncResyncedJitterNanos =
                             mCurrentFrameInfo->get(FrameInfoIndex::Vsync) -
                             mCurrentFrameInfo->get(FrameInfoIndex::IntendedVsync),
+                    .dequeueBufferDurationNanos = lastDequeueDuration,
             };
             native_window_set_frame_timeline_info(mNativeSurface->getNativeWindow(), ftl);
         }

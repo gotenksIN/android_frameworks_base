@@ -303,6 +303,13 @@ flag {
 }
 
 flag {
+    name: "verification_service_adb"
+    namespace: "package_manager_service"
+    description: "Feature flag to add new ADB related APIs in the verification service"
+    bug: "460818215"
+}
+
+flag {
     name: "cache_query_intent_activities_in_client_side"
     namespace: "package_manager_service"
     description: "Feature flag to implement client side caching for queryIntentActivities."
@@ -342,4 +349,36 @@ flag {
     description: "Flag guard dependency installer service feature deprecation"
     is_exported: true
     bug: "452585730"
+}
+
+flag {
+    name: "app_lock_shortcut_removal"
+    namespace: "security"
+    description: "Flag for the removal of shortcuts when app lock is enabled."
+    bug: "447547850"
+}
+
+flag {
+    name: "enable_query_domain_verification"
+    is_exported: true
+    namespace: "package_manager_service"
+    description: "Enable apps to query domain verification status."
+    bug: "437043173"
+}
+
+flag {
+    name: "fix_enable_system_package_with_shared_uid"
+    namespace: "package_manager_service"
+    description: "Fix enable system package with shared uid after update uninstallation"
+    bug: "454062218"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "is_device_upgrading_uses_shared_memory"
+    namespace: "watch_software_performance"
+    description: "ApplicationPackageManager.isDeviceUpgrading() reads the value from shared memory"
+    bug: "452842853"
 }

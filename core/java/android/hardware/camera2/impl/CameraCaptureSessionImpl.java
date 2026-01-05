@@ -15,6 +15,8 @@
  */
 package android.hardware.camera2.impl;
 
+import android.annotation.FlaggedApi;
+import android.annotation.NonNull;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraDevice;
@@ -38,6 +40,8 @@ import java.util.concurrent.Executor;
 
 import static android.hardware.camera2.impl.CameraDeviceImpl.checkHandler;
 import static com.android.internal.util.Preconditions.*;
+
+import com.android.internal.camera.flags.Flags;
 
 public class CameraCaptureSessionImpl extends CameraCaptureSession
         implements CameraCaptureSessionCore {
@@ -133,6 +137,17 @@ public class CameraCaptureSessionImpl extends CameraCaptureSession
         }
     }
 
+
+    @FlaggedApi(Flags.FLAG_SEAMLESS_TRANSITIONS)
+    @Override
+    public void updateOutputConfigurations(@NonNull List<OutputConfiguration> configurations)
+            throws CameraAccessException {
+        synchronized (mDeviceImpl.mInterfaceLock) {
+            checkNotClosed();
+            mDeviceImpl.updateOutputConfigurations(configurations);
+        }
+    }
+
     @Override
     public CameraDevice getDevice() {
         return mDeviceImpl;
@@ -222,8 +237,10 @@ public class CameraCaptureSessionImpl extends CameraCaptureSession
         } else if (request.isReprocess() && !isReprocessable()) {
             throw new IllegalArgumentException("this capture session cannot handle reprocess " +
                     "requests");
+// QTI_BEGIN: 2018-03-10: Camera: Skip stream size check for whitelisted apps..
         } else if (!mDeviceImpl.isPrivilegedApp() &&
                 request.isReprocess() && request.getReprocessableSessionId() != mId) {
+// QTI_END: 2018-03-10: Camera: Skip stream size check for whitelisted apps..
             throw new IllegalArgumentException("capture request was created for another session");
         }
     }

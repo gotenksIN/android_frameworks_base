@@ -17,14 +17,19 @@
 package android.app.supervision;
 
 import android.annotation.FlaggedApi;
+import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SdkConstant;
 import android.annotation.SdkConstant.SdkConstantType;
 import android.annotation.SystemApi;
+import android.annotation.TestApi;
 import android.app.Service;
 import android.app.supervision.flags.Flags;
 import android.content.Intent;
 import android.os.IBinder;
+import android.os.Handler;
+import android.os.Looper;
+
 
 /**
  * Base class for a service that the holders of the {@link
@@ -44,7 +49,6 @@ import android.os.IBinder;
  * @hide
  */
 @SystemApi
-@FlaggedApi(Flags.FLAG_ENABLE_SUPERVISION_APP_SERVICE)
 public class SupervisionAppService extends Service {
     /**
      * Service Action: Action for a service that a supervision role holder must extend.
@@ -55,30 +59,47 @@ public class SupervisionAppService extends Service {
     public static final String ACTION_SUPERVISION_APP_SERVICE =
             "android.app.action.SUPERVISION_APP_SERVICE";
 
+    private final Handler mHandler = new Handler(Looper.getMainLooper()) {};
+
     private final ISupervisionListener mBinder =
             new ISupervisionListener.Stub() {
                 @Override
                 public void onSetSupervisionEnabled(int userId, boolean enabled) {
-                    if (enabled) {
-                        SupervisionAppService.this.onSupervisionEnabled();
-                    } else {
-                        SupervisionAppService.this.onSupervisionDisabled();
-                    }
+                    mHandler.post(() -> {
+                        if (enabled) {
+                            SupervisionAppService.this.onSupervisionEnabled();
+                        } else {
+                            SupervisionAppService.this.onSupervisionDisabled();
+                        }
+                    });
                 }
 
                 @Override
                 public void onPolicyChanged(Policy policy) {
-                    if (Flags.enableSupervisionManagerPolicyApis()) {
+                    mHandler.post(() -> {
                         SupervisionAppService.this.onPolicyChanged(policy);
-                    }
+                    });
                 }
             };
 
     @Nullable
     @Override
     public final IBinder onBind(@Nullable Intent intent) {
+        onServiceBound(intent);
         return mBinder.asBinder();
     }
+
+      /**
+      * Called when the service is bound.
+      *
+      * <p>Used for testing since {@code onBind} is final.</p>
+      *
+      * @hide
+      */
+    @TestApi
+    @SuppressWarnings("UnflaggedApi")
+    public void onServiceBound(@Nullable Intent intent) {}
+
 
     /**
      * Called when supervision is enabled.
@@ -101,8 +122,11 @@ public class SupervisionAppService extends Service {
     /**
      * Called when a policy is changed.
      *
+     * @param policy the {@link Policy} that was changed
+     * @see Policy
      * @hide
      */
+    @SystemApi
     @FlaggedApi(Flags.FLAG_ENABLE_SUPERVISION_MANAGER_POLICY_APIS)
-    public void onPolicyChanged(Policy policy) {}
+    public void onPolicyChanged(@NonNull Policy policy) {}
 }

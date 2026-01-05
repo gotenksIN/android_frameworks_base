@@ -23,8 +23,6 @@ import android.annotation.FlaggedApi;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.UserIdInt;
-import android.app.WallpaperColors;
-import android.app.WallpaperManager;
 import android.content.ContentResolver;
 import android.content.res.Resources;
 import android.content.theming.FieldColor;
@@ -36,10 +34,11 @@ import android.content.theming.ThemeStyle;
 import android.graphics.Color;
 import android.provider.Settings;
 import android.text.TextUtils;
-import android.util.Log;
 import android.util.Pair;
+import android.util.Slog;
+import android.util.SparseArray;
 
-import com.android.server.wallpaper.WallpaperManagerInternal;
+import com.android.internal.annotations.GuardedBy;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -50,9 +49,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Manages the loading and saving of theme settings. This class handles the persistence of theme
- * settings to and from the system settings. It utilizes a collection of {@link ThemeSettingsField}
- * objects to represent individual theme setting fields.
+ * Manages the loading, saving, and caching of theme settings.
+ * This class handles the persistence of theme settings to and from the system settings,
+ * and maintains an in-memory cache for quick access.
  *
  * @hide
  */
@@ -66,7 +65,7 @@ class ThemeSettingsManager {
     public static final String OVERLAY_CATEGORY_SYSTEM_PALETTE = KEY_PREFIX + "system_palette";
     public static final String OVERLAY_CATEGORY_THEME_STYLE = KEY_PREFIX + "theme_style";
     public static final String OVERLAY_COLOR_SOURCE = KEY_PREFIX + "color_source";
-    private final WallpaperManagerInternal mWallpaperManagerInternal;
+    private final ThemeWallpaperManager mWallpaperManager;
     private static final ThemeSettings HARDCODED_FALLBACK = new ThemeSettings.Builder()
             .setThemeStyle(ThemeStyle.TONAL_SPOT)
             .setColorSource(VALUE_PRESET)
@@ -79,48 +78,88 @@ class ThemeSettingsManager {
             Map.entry(OVERLAY_COLOR_SOURCE, new FieldColorSource()),
             Map.entry(OVERLAY_CATEGORY_THEME_STYLE, new FieldThemeStyle()));
 
-    ThemeSettingsManager(WallpaperManagerInternal wallpaperManagerInternal) {
-        mWallpaperManagerInternal = wallpaperManagerInternal;
+    private final Object mLock = new Object();
+
+    @GuardedBy("mLock")
+    private final SparseArray<ThemeSettings> mSettingsCache = new SparseArray<>();
+
+    ThemeSettingsManager(ThemeWallpaperManager wallpaperManager) {
+        mWallpaperManager = wallpaperManager;
     }
 
     /**
-     * Loads the theme settings for the specified user.
+     * Retrieves the theme settings for the specified user, utilizing an in-memory cache.
+     *
+     * @param userId          The ID of the user.
+     * @param contentResolver The content resolver to use if reading from disk is necessary.
+     * @return The {@link ThemeSettings} for the user, or null if none exist.
+     */
+    @Nullable
+    ThemeSettings getSettings(@UserIdInt int userId, @NonNull ContentResolver contentResolver) {
+        synchronized (mLock) {
+            int idx = mSettingsCache.indexOfKey(userId);
+            if (idx >= 0) {
+                return mSettingsCache.valueAt(idx);
+            }
+        }
+
+        // Read from disk outside the lock to avoid blocking other users if I/O is slow.
+        ThemeSettings settings = readFromDisk(userId, contentResolver);
+
+        synchronized (mLock) {
+            mSettingsCache.put(userId, settings);
+        }
+
+        return settings;
+    }
+
+    /**
+     * Saves the specified theme settings for the given user to persistent storage and updates
+     * the cache.
      *
      * @param userId          The ID of the user.
      * @param contentResolver The content resolver to use.
-     * @return The loaded {@link ThemeSettings}.
+     * @param newSettings     The {@link ThemeSettings} to save.
+     * @return true if the settings were successfully written to storage.
      */
+    boolean setSettings(@UserIdInt int userId, @NonNull ContentResolver contentResolver,
+            @NonNull ThemeSettings newSettings) {
+
+        boolean success = writeToDisk(userId, contentResolver, newSettings);
+
+        if (!success) return false;
+
+        // Update cache immediately so subsequent reads see the new value.
+        synchronized (mLock) {
+            mSettingsCache.put(userId, newSettings);
+        }
+
+        return true;
+    }
+
     @Nullable
-    ThemeSettings readSettings(@UserIdInt int userId, ContentResolver contentResolver) {
+    private ThemeSettings readFromDisk(@UserIdInt int userId, ContentResolver contentResolver) {
         try {
             final String jsonString = Settings.Secure.getStringForUser(contentResolver,
                     Settings.Secure.THEME_CUSTOMIZATION_OVERLAY_PACKAGES, userId);
             return fromJson(jsonString);
         } catch (Exception e) {
-            Log.w(TAG, "Error loading theme settings: " + e);
+            Slog.w(TAG, "Error loading theme settings for user " + userId + ": " + e);
             return null;
         }
     }
 
-    /**
-     * Saves the specified theme settings for the given user.
-     *
-     * @param userId          The ID of the user.
-     * @param contentResolver The content resolver to use.
-     * @param newSettings     The {@link ThemeSettings} to save.
-     */
-    boolean writeSettings(@UserIdInt int userId, ContentResolver contentResolver,
+    private boolean writeToDisk(@UserIdInt int userId, ContentResolver contentResolver,
             ThemeSettings newSettings) {
         try {
             final String oldJsonString = Settings.Secure.getStringForUser(contentResolver,
                     Settings.Secure.THEME_CUSTOMIZATION_OVERLAY_PACKAGES, userId);
             final String newJsonString = toJson(newSettings, oldJsonString);
-            Settings.Secure.putStringForUser(contentResolver,
+            return Settings.Secure.putStringForUser(contentResolver,
                     Settings.Secure.THEME_CUSTOMIZATION_OVERLAY_PACKAGES, newJsonString,
                     userId);
-            return true;
         } catch (Exception e) {
-            Log.w(TAG, "Error writings theme settings:" + e.getMessage());
+            Slog.w(TAG, "Error writing theme settings for user " + userId + ": " + e.getMessage());
             return false;
         }
     }
@@ -143,7 +182,7 @@ class ThemeSettingsManager {
                 themeMap.put(themeComponents[0],
                         new Pair<>(ThemeStyle.valueOf(themeComponents[1]), themeComponents[2]));
             } catch (IllegalArgumentException e) {
-                Log.w(TAG, "Invalid style in theming_defaults: " + themeComponents[1], e);
+                Slog.w(TAG, "Invalid style in theming_defaults: " + themeComponents[1], e);
             }
         }
 
@@ -157,7 +196,7 @@ class ThemeSettingsManager {
         String deviceColorPropertyValue = systemPropertiesReader.get(deviceColorProperty, "");
         Pair<Integer, String> styleAndSource = themeMap.get(deviceColorPropertyValue);
         if (styleAndSource == null) {
-            Log.d(TAG, "Sysprop `" + deviceColorProperty + "` of value '"
+            Slog.d(TAG, "Sysprop `" + deviceColorProperty + "` of value '"
                     + deviceColorPropertyValue
                     + "' not found in theming_defaults: " + Arrays.toString(themeData)
                     + ". Using wildcard fallback.");
@@ -167,11 +206,12 @@ class ThemeSettingsManager {
         try {
             return buildSettingsFromConfig(styleAndSource, userId);
         } catch (Exception e) {
-            Log.w(TAG, "Could not build theme from device config, falling back to wildcard.", e);
+            Slog.w(TAG, "Could not build theme from device config, falling back to wildcard.", e);
             try {
                 return buildSettingsFromConfig(fallbackTheme, userId);
             } catch (Exception e2) {
-                Log.e(TAG, "Wildcard fallback theme is also invalid! Using hardcoded default.", e2);
+                Slog.e(TAG, "Wildcard fallback theme is also invalid! Using hardcoded default.",
+                        e2);
                 return HARDCODED_FALLBACK;
             }
         }
@@ -185,12 +225,12 @@ class ThemeSettingsManager {
         String colorSource;
 
         if (colorSourceString.equals(VALUE_HOME_WALLPAPER)) {
-            WallpaperColors wallpaperColors = mWallpaperManagerInternal.getWallpaperColors(
-                    WallpaperManager.FLAG_SYSTEM, userId);
-            if (wallpaperColors == null) {
-                throw new IllegalStateException("Wallpaper colors could not be retrieved.");
+            Integer wallpaperSeed = mWallpaperManager.getSeedColor(userId);
+            if (wallpaperSeed == null) {
+                throw new IllegalStateException(
+                        "User's " + userId + " Wallpaper colors could not be retrieved.");
             }
-            seedColor = wallpaperColors.getPrimaryColor();
+            seedColor = Color.valueOf(wallpaperSeed);
             colorSource = VALUE_HOME_WALLPAPER;
         } else {
             seedColor = Color.valueOf(Color.parseColor(colorSourceString));
@@ -239,7 +279,7 @@ class ThemeSettingsManager {
         if (json.has(TIMESTAMP)) {
             timestamp = Instant.ofEpochMilli(json.getLong(TIMESTAMP));
         } else {
-            Log.w(TAG, "JSON missing timestamp, using current time as fallback.");
+            Slog.w(TAG, "JSON missing timestamp, using current time as fallback.");
             timestamp = Instant.EPOCH;
         }
 
@@ -259,11 +299,17 @@ class ThemeSettingsManager {
 
     @NonNull
     private String toJson(@NonNull ThemeSettings settings, @Nullable String oldJsonString) {
+        JSONObject json;
         try {
             // Start with the original JSON data to preserve unknown fields.
-            JSONObject json = TextUtils.isEmpty(oldJsonString)
+            json = TextUtils.isEmpty(oldJsonString)
                     ? new JSONObject() : new JSONObject(oldJsonString);
+        } catch (JSONException e) {
+            Slog.w(TAG, "Failed to parse existing settings, overwriting", e);
+            json = new JSONObject();
+        }
 
+        try {
             // Update the known fields with the current values.
             json.put(TIMESTAMP, settings.timeStamp().toEpochMilli());
             putSetting(json, OVERLAY_CATEGORY_THEME_STYLE, settings.themeStyle());

@@ -150,13 +150,6 @@ flag {
 }
 
 flag {
-    name: "enable_prevention_of_keep_alive_route_providers"
-    namespace: "media_solutions"
-    description: "Enables mechanisms to prevent route providers from keeping malicious apps alive."
-    bug: "263520343"
-}
-
-flag {
     name: "enable_privileged_routing_for_media_routing_control"
     is_exported: true
     namespace: "media_solutions"
@@ -245,6 +238,16 @@ flag {
     namespace: "media_better_together"
     description: "Add a preference for device suggestions in the media settings page"
     bug: "415096359"
+}
+
+flag {
+    name: "reduce_two_way_binder_calls_in_media_router2"
+    namespace: "media_better_together"
+    description: "Fix an issue of blocking binder calls for getting remote sessions in MediaRouter2."
+    bug: "330300516"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {

@@ -248,7 +248,7 @@ static jint android_media_AudioTrack_setup(JNIEnv *env, jobject thiz, jobject we
                                            jintArray jSession, jobject jAttributionSource,
                                            jlong nativeAudioTrack, jboolean offload,
                                            jint encapsulationMode, jobject tunerConfiguration,
-                                           jstring opPackageName) {
+                                           jstring opPackageName, jstring codecProvenance) {
     ALOGV("sampleRates=%p, channel mask=%x, index mask=%x, audioFormat(Java)=%d, buffSize=%d,"
           " nativeAudioTrack=0x%" PRIX64 ", offload=%d encapsulationMode=%d tuner=%p",
           jSampleRate, channelPositionMask, channelIndexMask, audioFormat, buffSizeInBytes,
@@ -298,8 +298,11 @@ static jint android_media_AudioTrack_setup(JNIEnv *env, jobject thiz, jobject we
         // Invalid channel representations are caught by !audio_is_output_channel() below.
         audio_channel_mask_t nativeChannelMask = nativeChannelMaskFromJavaChannelMasks(
                 channelPositionMask, channelIndexMask);
-        if (!audio_is_output_channel(nativeChannelMask)) {
-            ALOGE("Error creating AudioTrack: invalid native channel mask %#x.", nativeChannelMask);
+        audio_channel_mask_t audioOutputChannelMask =
+                (audio_channel_mask_t)((uint32_t)nativeChannelMask & ~AUDIO_CHANNEL_HAPTIC_ALL);
+        if (!audio_is_output_channel(audioOutputChannelMask)) {
+            ALOGE("Error creating AudioTrack: invalid native output audio channel mask %#x.",
+                  audioOutputChannelMask);
             return (jint) AUDIOTRACK_ERROR_SETUP_INVALIDCHANNELMASK;
         }
 
@@ -324,6 +327,7 @@ static jint android_media_AudioTrack_setup(JNIEnv *env, jobject thiz, jobject we
 
         // create the native AudioTrack object
         ScopedUtfChars opPackageNameStr(env, opPackageName);
+        ScopedUtfChars codecProvenanceStr(env, codecProvenance);
 
         android::content::AttributionSourceState attributionSource;
         attributionSource.readFromParcel(parcelForJavaObject(env, jAttributionSource));
@@ -383,7 +387,9 @@ static jint android_media_AudioTrack_setup(JNIEnv *env, jobject thiz, jobject we
                                           : AudioTrack::TRANSFER_SYNC,
                                   (offload || encapsulationMode) ? &offloadInfo : NULL,
                                   attributionSource, // Passed from Java
-                                  paa.get());
+                                  paa.get(),
+                                  codecProvenanceStr.c_str() != nullptr ? codecProvenanceStr.c_str()
+                                                                        : "");
             break;
 
         case MODE_STATIC:
@@ -1453,6 +1459,11 @@ static jint android_media_AudioTrack_setStartThresholdInFrames(JNIEnv *env, jobj
     return (jint)result; // this should be a positive value.
 }
 
+static jlong android_media_AudioTrack_flushFromFrame(JNIEnv * /*env*/, jobject /*thiz*/,
+                                                     jint /*accuracy*/, jlong positionInFrames) {
+    return positionInFrames;
+}
+
 // ----------------------------------------------------------------------------
 // ----------------------------------------------------------------------------
 static const JNINativeMethod gMethods[] = {
@@ -1465,7 +1476,7 @@ static const JNINativeMethod gMethods[] = {
         {"native_flush", "()V", (void *)android_media_AudioTrack_flush},
         {"native_setup",
          "(Ljava/lang/Object;Ljava/lang/Object;[IIIIII[ILandroid/os/Parcel;"
-         "JZILjava/lang/Object;Ljava/lang/String;)I",
+         "JZILjava/lang/Object;Ljava/lang/String;Ljava/lang/String;)I",
          (void *)android_media_AudioTrack_setup},
         {"native_finalize", "()V", (void *)android_media_AudioTrack_finalize},
         {"native_release", "()V", (void *)android_media_AudioTrack_release},
@@ -1538,6 +1549,7 @@ static const JNINativeMethod gMethods[] = {
          (void *)android_media_AudioTrack_setStartThresholdInFrames},
         {"native_getStartThresholdInFrames", "()I",
          (void *)android_media_AudioTrack_getStartThresholdInFrames},
+        {"native_flushFromFrame", "(IJ)J", (void *)android_media_AudioTrack_flushFromFrame},
 };
 
 // field names found in android/media/AudioTrack.java

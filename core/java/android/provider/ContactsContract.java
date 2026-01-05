@@ -1692,9 +1692,9 @@ public final class ContactsContract {
          *            {@link #CONTENT_LOOKUP_URI} to attempt refreshing.
          */
         public static Uri getLookupUri(ContentResolver resolver, Uri contactUri) {
-// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
             android.util.SeempLog.record(86);
-// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
             final Cursor c = resolver.query(contactUri, new String[] {
                     Contacts.LOOKUP_KEY, Contacts._ID
             }, null, null, null);
@@ -1722,9 +1722,9 @@ public final class ContactsContract {
          * provided parameters.
          */
         public static Uri getLookupUri(long contactId, String lookupKey) {
-// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
             android.util.SeempLog.record(86);
-// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
             if (TextUtils.isEmpty(lookupKey)) {
                 return null;
             }
@@ -1738,9 +1738,9 @@ public final class ContactsContract {
          * Returns null if the contact cannot be found.
          */
         public static Uri lookupContact(ContentResolver resolver, Uri lookupUri) {
-// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
             android.util.SeempLog.record(87);
-// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
             if (lookupUri == null) {
                 return null;
             }
@@ -1890,6 +1890,50 @@ public final class ContactsContract {
         public static boolean isEnterpriseContactId(long contactId) {
             return (contactId >= ENTERPRISE_CONTACT_ID_BASE) && (contactId < Profile.MIN_ID);
         }
+
+        /**
+        * Query parameter key used to specify a comma-separated list of mimetypes for filtering.
+        * Used with URIs that support mimetype-based filtering.
+        * This is supported by com.android.contacts/contacts_data and
+        * com.android.contacts/contacts_data/filter uris.
+        *
+        * <p>
+        * Example uri:
+        * <pre>
+        * Uri uri = Contacts.CONTACTS_DATA.buildUpon()
+        *          .appendQueryParameter(Contacts.REQUESTED_MIMETYPES_PARAM_KEY,
+        *              "vnd.android.cursor.item/email_v2,vnd.android.cursor.item/phone_v2")
+        *          .build();
+        * </pre>
+        * </p>
+        *
+        * @hide
+        */
+        public static final String REQUESTED_MIMETYPES_PARAM_KEY = "requested_mimetypes";
+
+        /**
+        * Query parameter key used to specify if *all* provided mimetypes must be present for a
+        * contact to be included in the results. If "true", only contacts having data for all
+        * specified mimetypes are returned. If "false" or absent, contacts having data for *any*
+        * of the specified mimetypes are returned.
+        * Used in conjunction with {@link #REQUESTED_MIMETYPES_PARAM_KEY} and is supported by
+        * com.android.contacts/contacts_data and com.android.contacts/contacts_data/filter uris.
+        *
+        * <p>
+        * Example uri:
+        * <pre>
+        * Uri uri = Contacts.CONTACTS_DATA.buildUpon()
+        *          .appendQueryParameter(Contacts.REQUESTED_MIMETYPES_PARAM_KEY,
+        *              "vnd.android.cursor.item/email_v2,vnd.android.cursor.item/phone_v2")
+        *          .appendQueryParameter(Contacts.MATCH_ALL_MIMETYPES_PARAM_KEY, "true")
+        *          .build();
+        * // This returning cursor will contain contacts that have BOTH an email and a phone number.
+        * </pre>
+        * </p>
+        *
+        * @hide
+        */
+        public static final String MATCH_ALL_MIMETYPES_PARAM_KEY = "match_all_mimetypes";
 
         /**
          * A sub-directory of a single contact that contains all of the constituent raw contact
@@ -2234,9 +2278,9 @@ public final class ContactsContract {
          */
         public static InputStream openContactPhotoInputStream(ContentResolver cr, Uri contactUri,
                 boolean preferHighres) {
-// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
             android.util.SeempLog.record(88);
-// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
             if (preferHighres) {
                 final Uri displayPhotoUri = Uri.withAppendedPath(contactUri,
                         Contacts.Photo.DISPLAY_PHOTO);
@@ -2285,9 +2329,9 @@ public final class ContactsContract {
          * of the thumbnail the high-res picture is preferred
          */
         public static InputStream openContactPhotoInputStream(ContentResolver cr, Uri contactUri) {
-// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
             android.util.SeempLog.record(88);
-// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
             return openContactPhotoInputStream(cr, contactUri, false);
         }
 
@@ -2990,9 +3034,9 @@ public final class ContactsContract {
          * entry of the given {@link RawContacts} entry.
          */
         public static Uri getContactLookupUri(ContentResolver resolver, Uri rawContactUri) {
-// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
             android.util.SeempLog.record(89);
-// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
             // TODO: use a lighter query by joining rawcontacts with contacts in provider
             final Uri dataUri = Uri.withAppendedPath(rawContactUri, Data.CONTENT_DIRECTORY);
             final Cursor cursor = resolver.query(dataUri, new String[] {
@@ -3055,7 +3099,6 @@ public final class ContactsContract {
          * New raw contacts requested to be inserted without a specified {@link Account} will be
          * saved in the default account.
          */
-        @FlaggedApi(Flags.FLAG_NEW_DEFAULT_ACCOUNT_API_ENABLED)
         public static final class DefaultAccount {
             /**
              * no public constructor since this is a utility class
@@ -3133,7 +3176,6 @@ public final class ContactsContract {
              * saved in this SIM account. </li>
              * </ul>
              */
-            @FlaggedApi(Flags.FLAG_NEW_DEFAULT_ACCOUNT_API_ENABLED)
             public static final class DefaultAccountAndState {
                 /** A state indicating that default account is not set. */
                 public static final int DEFAULT_ACCOUNT_STATE_NOT_SET = 1;
@@ -3323,7 +3365,6 @@ public final class ContactsContract {
              * @throws RuntimeException if failed to look up the default account.
              * @throws IllegalStateException if the default account is in an invalid state.
              */
-            @FlaggedApi(Flags.FLAG_NEW_DEFAULT_ACCOUNT_API_ENABLED)
             public static @NonNull DefaultAccountAndState getDefaultAccountForNewContacts(
                     @NonNull ContentResolver resolver) {
                 Bundle response = nullSafeCall(resolver, ContactsContract.AUTHORITY_URI,
@@ -3380,7 +3421,6 @@ public final class ContactsContract {
              * @hide
              */
             @RequiresPermission(android.Manifest.permission.SET_DEFAULT_ACCOUNT_FOR_CONTACTS)
-            @FlaggedApi(Flags.FLAG_NEW_DEFAULT_ACCOUNT_API_ENABLED)
             @SystemApi
             public static void setDefaultAccountForNewContacts(@NonNull ContentResolver resolver,
                     @NonNull DefaultAccountAndState defaultAccountAndState) {
@@ -3410,7 +3450,6 @@ public final class ContactsContract {
              * @hide
              */
             @RequiresPermission(android.Manifest.permission.SET_DEFAULT_ACCOUNT_FOR_CONTACTS)
-            @FlaggedApi(Flags.FLAG_NEW_DEFAULT_ACCOUNT_API_ENABLED)
             @SystemApi
             public static @NonNull List<Account> getEligibleCloudAccounts(
                     @NonNull ContentResolver resolver) {
@@ -3444,7 +3483,6 @@ public final class ContactsContract {
              * @hide
              */
             @SystemApi
-            @FlaggedApi(Flags.FLAG_NEW_DEFAULT_ACCOUNT_API_ENABLED)
             @RequiresPermission(allOf = {android.Manifest.permission.WRITE_CONTACTS,
                     android.Manifest.permission.SET_DEFAULT_ACCOUNT_FOR_CONTACTS})
             public static void moveLocalContactsToCloudDefaultAccount(
@@ -3477,7 +3515,6 @@ public final class ContactsContract {
              * @hide
              */
             @SystemApi
-            @FlaggedApi(Flags.FLAG_NEW_DEFAULT_ACCOUNT_API_ENABLED)
             @RequiresPermission(allOf = {android.Manifest.permission.WRITE_CONTACTS,
                     android.Manifest.permission.SET_DEFAULT_ACCOUNT_FOR_CONTACTS})
             public static void moveSimContactsToCloudDefaultAccount(
@@ -3519,7 +3556,6 @@ public final class ContactsContract {
              * @hide
              */
             @SystemApi
-            @FlaggedApi(Flags.FLAG_NEW_DEFAULT_ACCOUNT_API_ENABLED)
             @RequiresPermission(allOf = {android.Manifest.permission.READ_CONTACTS,
                     android.Manifest.permission.SET_DEFAULT_ACCOUNT_FOR_CONTACTS})
             public static int getNumberOfMovableLocalContacts(
@@ -3563,7 +3599,6 @@ public final class ContactsContract {
              * @hide
              */
             @SystemApi
-            @FlaggedApi(Flags.FLAG_NEW_DEFAULT_ACCOUNT_API_ENABLED)
             @RequiresPermission(allOf = {android.Manifest.permission.READ_CONTACTS,
                     android.Manifest.permission.SET_DEFAULT_ACCOUNT_FOR_CONTACTS})
             public static int getNumberOfMovableSimContacts(
@@ -5595,9 +5630,9 @@ public final class ContactsContract {
          * </p>
          */
         public static Uri getContactLookupUri(ContentResolver resolver, Uri dataUri) {
-// QTI_BEGIN: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
+// QTI_BEGIN: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
             android.util.SeempLog.record(89);
-// QTI_END: 2018-04-09: Core: SEEMP: framework instrumentation and AppProtect features
+// QTI_END: 2018-04-09: Secure Systems: SEEMP: framework instrumentation and AppProtect features
             final Cursor cursor = resolver.query(dataUri, new String[] {
                     RawContacts.CONTACT_ID, Contacts.LOOKUP_KEY
             }, null, null, null);
@@ -9464,7 +9499,6 @@ public final class ContactsContract {
          * should be used.
          */
         @Deprecated
-        @FlaggedApi(Flags.FLAG_NEW_DEFAULT_ACCOUNT_API_ENABLED)
         @Nullable
         public static Account getDefaultAccount(@NonNull ContentResolver resolver) {
             Bundle response = resolver.call(ContactsContract.AUTHORITY_URI,
@@ -9491,7 +9525,6 @@ public final class ContactsContract {
          * should be used.
          */
         @Deprecated
-        @FlaggedApi(Flags.FLAG_NEW_DEFAULT_ACCOUNT_API_ENABLED)
         @SystemApi
         @RequiresPermission(android.Manifest.permission.SET_DEFAULT_ACCOUNT_FOR_CONTACTS)
         public static void setDefaultAccount(@NonNull ContentResolver resolver,

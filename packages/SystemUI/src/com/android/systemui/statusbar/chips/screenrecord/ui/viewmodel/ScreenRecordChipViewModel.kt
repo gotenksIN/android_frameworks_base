@@ -18,7 +18,6 @@ package com.android.systemui.statusbar.chips.screenrecord.ui.viewmodel
 
 import android.app.ActivityManager
 import android.content.Context
-import android.view.View
 import androidx.annotation.DrawableRes
 import com.android.internal.jank.Cuj
 import com.android.systemui.animation.DialogCuj
@@ -42,7 +41,9 @@ import com.android.systemui.statusbar.chips.screenrecord.domain.interactor.Scree
 import com.android.systemui.statusbar.chips.screenrecord.domain.model.ScreenRecordChipModel
 import com.android.systemui.statusbar.chips.screenrecord.ui.view.EndScreenRecordingDialogDelegate
 import com.android.systemui.statusbar.chips.sharetoapp.ui.viewmodel.ShareToAppChipViewModel
+import com.android.systemui.statusbar.chips.ui.model.Chronometer
 import com.android.systemui.statusbar.chips.ui.model.ColorsModel
+import com.android.systemui.statusbar.chips.ui.model.EventTime
 import com.android.systemui.statusbar.chips.ui.model.OngoingActivityChipModel
 import com.android.systemui.statusbar.chips.ui.viewmodel.ChipTransitionHelper
 import com.android.systemui.statusbar.chips.ui.viewmodel.OngoingActivityChipViewModel
@@ -72,6 +73,7 @@ constructor(
     private val uiEventLogger: StatusBarChipsUiEventLogger,
     private val screenCaptureUiInteractor: ScreenCaptureUiInteractor,
     private val activityStarter: ActivityStarter,
+    private val screenCaptureRecordFeaturesInteractor: ScreenCaptureRecordFeaturesInteractor,
 ) : OngoingActivityChipViewModel {
     private val instanceId = uiEventLogger.createNewInstanceId()
 
@@ -113,14 +115,18 @@ constructor(
                                 ),
                             content =
                                 OngoingActivityChipModel.Content.Timer(
-                                    startTimeMs = systemClock.elapsedRealtime()
+                                    value =
+                                        Chronometer.Running(
+                                            EventTime.ElapsedRealtime(systemClock.elapsedRealtime())
+                                        ),
+                                    timeSource = systemClock,
                                 ),
                             colors = ColorsModel.Red,
                             clickBehavior =
                                 OngoingActivityChipModel.ClickBehavior.ExpandAction(
                                     if (
-                                        ScreenCaptureRecordFeaturesInteractor
-                                            .isNewScreenRecordToolbarEnabled
+                                        screenCaptureRecordFeaturesInteractor
+                                            .shouldShowNewRecordingToolbar
                                     ) {
                                         { showScreenRecordingToolbar() }
                                     } else {
@@ -161,7 +167,7 @@ constructor(
                         new is OngoingActivityChipModel.Active &&
                         new.content is OngoingActivityChipModel.Content.Timer
                 ) {
-                    new.copy(content = new.content.copy(startTimeMs = old.content.startTimeMs))
+                    new.copy(content = new.content.copy(value = old.content.value))
                 } else {
                     new
                 }

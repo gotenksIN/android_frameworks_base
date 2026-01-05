@@ -17,6 +17,8 @@
 package com.android.server.appwidget;
 
 import static android.appwidget.AppWidgetProviderInfo.WIDGET_FEATURE_CONFIGURATION_OPTIONAL;
+import static android.appwidget.flags.Flags.appLockWidgetRemoval;
+import static android.appwidget.flags.Flags.limitIconMemory;
 import static android.appwidget.flags.Flags.remoteAdapterConversion;
 import static android.appwidget.flags.Flags.remoteViewsProto;
 import static android.appwidget.flags.Flags.removeAppWidgetServiceIoFromCriticalPath;
@@ -148,6 +150,7 @@ import com.android.internal.app.UnlaunchableAppActivity;
 import com.android.internal.appwidget.IAppWidgetHost;
 import com.android.internal.appwidget.IAppWidgetService;
 import com.android.internal.config.sysui.SystemUiDeviceConfigFlags;
+import com.android.internal.content.PackageMonitor;
 import com.android.internal.infra.AndroidFuture;
 import com.android.internal.os.BackgroundThread;
 import com.android.internal.os.SomeArgs;
@@ -353,8 +356,6 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
     // and package events, as well as various internal events within
     // AppWidgetService.
     private Handler mCallbackHandler;
-    // ServiceThread on which the callback handler runs
-    private ServiceThread mServiceThread;
     // Map of user id to the next app widget id (monotonically increasing integer)
     // that can be allocated for a new app widget.
     // See {@link AppWidgetHost#allocateAppWidgetId}.
@@ -376,6 +377,40 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
     private ApiCounter mGeneratedPreviewsApiCounter;
     // Current bucket interval for reporting widget interaction events to UsageStatsManager.
     private long mWidgetEventsReportIntervalMs;
+    // ServiceThread on which the callback handler runs
+    @VisibleForTesting
+    ServiceThread mServiceThread;
+
+    @VisibleForTesting
+    final PackageMonitor mPackageMonitor = new PackageMonitor() {
+        @Override
+        public void onPackageAppLockEnabled(String pkgName) {
+            int userId = getChangingUserId();
+            if(DEBUG) {
+                Slog.i(TAG, "onPackageAppLockEnabled: " + pkgName + " on user " + userId);
+            }
+            synchronized (mLock) {
+                boolean componentsModified = updateProvidersForPackageLocked(pkgName, userId, null);
+                if (componentsModified) {
+                    onProvidersChangedLocked(userId);
+                }
+            }
+        }
+
+        @Override
+        public void onPackageAppLockDisabled(String pkgName) {
+            int userId = getChangingUserId();
+            if(DEBUG) {
+                Slog.i(TAG, "onPackageAppLockDisabled: " + pkgName + " on user " + userId);
+            }
+            synchronized (mLock) {
+                boolean componentsModified = updateProvidersForPackageLocked(pkgName, userId, null);
+                if (componentsModified) {
+                    onProvidersChangedLocked(userId);
+                }
+            }
+        }
+    };
 
     AppWidgetServiceImpl(Context context) {
         mContext = context;
@@ -436,6 +471,9 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
         registerBroadcastReceiver();
         registerOnCrossProfileProvidersChangedListener();
         registerSettingsObserver();
+        if(appLockWidgetRemoval()) {
+            mPackageMonitor.register(mContext, mServiceThread.getLooper(), UserHandle.ALL, true);
+        }
 
         LocalServices.addService(AppWidgetManagerInternal.class, new AppWidgetManagerLocal());
     }
@@ -763,14 +801,24 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
             }
 
             if (componentsModified) {
-                saveGroupStateAsync(userId);
-
-                // If the set of providers has been modified, notify each active AppWidgetHost
-                scheduleNotifyGroupHostsForProvidersChangedLocked(userId);
-                // Possibly notify any new components of widget id changes
-                mBackupRestoreController.widgetComponentsChanged(userId);
+                onProvidersChangedLocked(userId);
             }
         }
+    }
+
+    /**
+     * Called when the set of available widget providers has changed for a given user.
+     * This method should be called while holding {@link #mLock}.
+     *
+     * @param userId The user ID for which the providers have changed.
+     */
+    @GuardedBy("mLock")
+    private void onProvidersChangedLocked(int userId) {
+        saveGroupStateAsync(userId);
+        // If the set of providers has been modified, notify each active AppWidgetHost
+        scheduleNotifyGroupHostsForProvidersChangedLocked(userId);
+        // Possibly notify any new components of widget id changes
+        mBackupRestoreController.widgetComponentsChanged(userId);
     }
 
     /**
@@ -2541,7 +2589,7 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
      * (typically means adding widgets into home screen).
      */
     @Override
-    public boolean isRequestPinAppWidgetSupported() {
+    public boolean isRequestPinAppWidgetSupported(String callingPackage) {
         synchronized (mLock) {
             if (mSecurityPolicy.isCallerInstantAppLocked()) {
                 Slog.w(TAG, "Instant uid " + Binder.getCallingUid()
@@ -2549,8 +2597,11 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
                 return false;
             }
         }
+        // Make sure the package runs under the caller uid.
+        mSecurityPolicy.enforceCallFromPackage(callingPackage);
+
         return LocalServices.getService(ShortcutServiceInternal.class)
-                .isRequestPinItemSupported(UserHandle.getCallingUserId(),
+                .isRequestPinItemSupported(callingPackage, UserHandle.getCallingUserId(),
                         LauncherApps.PinItemRequest.REQUEST_TYPE_APPWIDGET);
     }
 
@@ -3043,18 +3094,42 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
                 // For a full update we replace the RemoteViews completely.
                 widget.views = views;
             }
-            long memoryUsage;
-            if ((UserHandle.getAppId(Binder.getCallingUid()) != Process.SYSTEM_UID) &&
-                    (widget.views != null) &&
-                    ((memoryUsage = widget.views.estimateMemoryUsage()) > mMaxWidgetBitmapMemory)) {
-                widget.views = null;
-                throw new IllegalArgumentException("RemoteViews for widget update exceeds"
-                        + " maximum bitmap memory usage (used: " + memoryUsage
-                        + ", max: " + mMaxWidgetBitmapMemory + ")");
-            }
+            ensureWidgetViewsMemoryLimitLocked(widget);
             scheduleNotifyUpdateAppWidgetLocked(widget, widget.getEffectiveViewsLocked());
         }
     }
+
+    @VisibleForTesting
+    void ensureWidgetViewsMemoryLimitLocked(Widget widget) {
+        if ((UserHandle.getAppId(Binder.getCallingUid()) == Process.SYSTEM_UID)
+                || (widget.views == null)) {
+            return;
+        }
+        long bitmapCacheMemoryUsage = widget.views.estimateMemoryUsage();
+        long totalMemoryUsage = bitmapCacheMemoryUsage + widget.views.estimateIconMemoryUsage();
+        int targetSdk = getWidgetTargetSdkLocked(widget);
+        long memoryUsage =
+                (targetSdk > 37 && limitIconMemory()) ? totalMemoryUsage : bitmapCacheMemoryUsage;
+        if (memoryUsage > mMaxWidgetBitmapMemory) {
+            widget.views = null;
+            throw new IllegalArgumentException("RemoteViews for widget update exceeds"
+                    + " maximum bitmap memory usage (used: " + memoryUsage
+                    + ", max: " + mMaxWidgetBitmapMemory + ")");
+        } else if (targetSdk <= 37 && totalMemoryUsage > mMaxWidgetBitmapMemory) {
+            Slog.w(TAG, "RemoteViews for widget update exceeds maximum Bitmap and Icon "
+                    + "memory usage (used: " + totalMemoryUsage + ", max: "
+                    + mMaxWidgetBitmapMemory + "). This will throw an exception for "
+                    + "targetSdk > 37");
+        }
+    }
+
+    private int getWidgetTargetSdkLocked(Widget widget) {
+        if (widget.provider != null && widget.provider.info != null) {
+            return widget.provider.info.getActivityInfo().applicationInfo.targetSdkVersion;
+        }
+        return -1;
+    }
+
     private void scheduleNotifyAppWidgetViewDataChanged(Widget widget, int viewId) {
         if (viewId == ID_VIEWS_UPDATE || viewId == ID_PROVIDER_CHANGED) {
             // A view id should never collide with these constants but a developer can call this
@@ -3478,6 +3553,10 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
             }
         }
 
+        if (isPackageAppLockEnabled(providerId)) {
+            return false;
+        }
+
         if (info != null) {
             if (existing != null) {
                 if (existing.zombie && !mSafeMode) {
@@ -3504,6 +3583,16 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
         }
 
         return false;
+    }
+
+    private boolean isPackageAppLockEnabled(ProviderId providerId) {
+        try {
+            return appLockWidgetRemoval() && mPackageManager
+                .isPackageAppLockEnabled(providerId.componentName.getPackageName(),
+                UserHandle.getUserId(providerId.uid));
+        } catch (Exception e){
+            return false;
+        }
     }
 
     // Remove widgets for provider that are hosted in userId.
@@ -4871,7 +4960,7 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
                 } else {
                     AppWidgetProviderInfo info =
                             createPartialProviderInfo(providerId, ri, provider);
-                    if (info != null) {
+                    if (info != null && !isPackageAppLockEnabled(providerId)) {
                         keep.add(providerId);
                         // Use the new AppWidgetProviderInfo.
                         provider.setPartialInfoLocked(info);
@@ -5066,8 +5155,7 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
                 }
 
                 if (providersChanged || removedCount > 0) {
-                    saveGroupStateAsync(userId);
-                    scheduleNotifyGroupHostsForProvidersChangedLocked(userId);
+                    onProvidersChangedLocked(userId);
                 }
             }
         }
@@ -6552,7 +6640,8 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
     private static final int ID_VIEWS_UPDATE = 0;
     private static final int ID_PROVIDER_CHANGED = 1;
 
-    private static final class Widget {
+    @VisibleForTesting
+    static final class Widget {
         int appWidgetId;
         int restoredId;  // tracking & remapping any restored state
         Provider provider;

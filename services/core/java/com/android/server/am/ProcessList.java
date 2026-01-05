@@ -126,6 +126,7 @@ import android.os.Binder;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.DropBoxManager;
+import android.os.Environment;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
@@ -467,10 +468,12 @@ public final class ProcessList extends ProcessListInternal
 
     ActivityManagerGlobalLock mProcLock;
 
+// QTI_BEGIN: 2019-08-16: Performance: BoostFramework: Q Upgrade - Add Kill, Update Hints.
     /**
      * BoostFramework Object
      */
     public static BoostFramework mPerfServiceStartHint = new BoostFramework();
+// QTI_END: 2019-08-16: Performance: BoostFramework: Q Upgrade - Add Kill, Update Hints.
 
     private static final String PROPERTY_APPLY_SDK_SANDBOX_AUDIT_RESTRICTIONS =
             "apply_sdk_sandbox_audit_restrictions";
@@ -1476,6 +1479,7 @@ public final class ProcessList extends ProcessListInternal
         }
     }
 
+// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
     /**
      * Set the out-of-memory badness adjustment for a process.
      * If {@code pid <= 0}, this method will be a no-op.
@@ -1512,6 +1516,7 @@ public final class ProcessList extends ProcessListInternal
         }
     }
 
+// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
 
     // The max size for PROCS_PRIO cmd in LMKD
     private static final int MAX_PROCS_PRIO_PACKET_SIZE = 3;
@@ -1551,6 +1556,7 @@ public final class ProcessList extends ProcessListInternal
             buf.putInt(uid);
             buf.putInt(amt);
             buf.putInt(0);  // Default proc type to PROC_TYPE_APP
+// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             total_procs_in_buf++;
         }
         writeLmkd(buf, null);
@@ -1563,7 +1569,9 @@ public final class ProcessList extends ProcessListInternal
      *
      * {@hide}
      */
+// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
     public static void batchSetOomAdjExt(ArrayList<ProcessRecordInternal> apps) {
+// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
         final int totalApps = apps.size();
         if (totalApps == 0) {
             return;
@@ -1574,10 +1582,12 @@ public final class ProcessList extends ProcessListInternal
         int total_procs_in_buf = 0;
         buf.putInt(LMK_PROCS_PRIO);
         for (int i = 0; i < totalApps; i++) {
+// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             final ProcessRecord app = (ProcessRecord) apps.get(i);
             final int pid = app.getPid();
             final int amt = app.getCurAdj();
             final int uid = app.uid;
+// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             if (pid <= 0 || amt == UNKNOWN_ADJ) continue;
             if (total_procs_in_buf >= MAX_PROCS_PRIO_PACKET_SIZE) {
                 writeLmkd(buf, null);
@@ -1586,14 +1596,18 @@ public final class ProcessList extends ProcessListInternal
                 buf.allocate(MAX_OOM_ADJ_BATCH_LENGTH);
                 buf.putInt(LMK_PROCS_PRIO);
             }
+// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             String packageName = app.info.packageName;
             String processName = app.processName;
+// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             int isMainProc = 0;
             int isSystemApp = 0;
             if (packageName.equals(processName)) {
                 isMainProc = 1;
             }
+// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             if (app.info.isSystemApp()) {
+// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
                 isSystemApp = 1;
             }
             buf.putInt(pid);
@@ -1602,6 +1616,7 @@ public final class ProcessList extends ProcessListInternal
             buf.putInt(isSystemApp);
             buf.putInt(isMainProc);
             buf.putInt(0);  // Default proc type to PROC_TYPE_APP
+// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             total_procs_in_buf++;
         }
         writeLmkd(buf, null);
@@ -2399,7 +2414,19 @@ public final class ProcessList extends ProcessListInternal
                 Slog.w(TAG, packageName + " inode == 0 or app uninstalled with keep-data");
                 return null;
             }
-            result.put(packageName, Pair.create(volumeUuid, inode));
+
+            final long finalInode;
+            final String finalPackageName;
+            if (Process.isPrivateComputeCoreUid(uid)) {
+                // Currently, we do not anticipate PCC apps needing to start before device unlock so
+                // it's safe to pass 0 as the inode value.
+                finalInode = 0L;
+                finalPackageName = packageName + Environment.PCC_DATA_DIRECTORY_SUFFIX;
+            } else {
+                finalInode = inode;
+                finalPackageName = packageName;
+            }
+            result.put(finalPackageName, Pair.create(volumeUuid, finalInode));
         }
 
         return result;
@@ -2439,7 +2466,7 @@ public final class ProcessList extends ProcessListInternal
             boolean bindMountAppStorageDirs = false;
             boolean bindMountAppsData = mAppDataIsolationEnabled
                     && (UserHandle.isApp(app.uid) || UserHandle.isIsolated(app.uid)
-                        || app.isSdkSandbox)
+                        || app.isSdkSandbox || Process.isPrivateComputeCoreUid(uid))
                     && mPlatformCompat.isChangeEnabled(APP_DATA_DIRECTORY_ISOLATION, app.info);
 
             // Get all packages belongs to the same shared uid. sharedPackages is empty array
@@ -2607,16 +2634,24 @@ public final class ProcessList extends ProcessListInternal
                 storageManagerInternal.prepareStorageDirs(userId, pkgDataInfoMap.keySet(),
                         app.processName);
             }
+// QTI_BEGIN: 2019-08-16: Performance: BoostFramework: Q Upgrade - Add Kill, Update Hints.
             if (mPerfServiceStartHint != null) {
+// QTI_END: 2019-08-16: Performance: BoostFramework: Q Upgrade - Add Kill, Update Hints.
+// QTI_BEGIN: 2021-01-29: Performance: Boostframework: Call perfHint with new hostingType when application starts.
                 if ((hostingRecord.getType() != null)
+// QTI_END: 2021-01-29: Performance: Boostframework: Call perfHint with new hostingType when application starts.
                        && (hostingRecord.getType().equals(HostingRecord.HOSTING_TYPE_NEXT_ACTIVITY)
                                || hostingRecord.getType().equals(HostingRecord.HOSTING_TYPE_NEXT_TOP_ACTIVITY))) {
+// QTI_BEGIN: 2021-01-29: Performance: Boostframework: Call perfHint with new hostingType when application starts.
                                    //TODO: not acting on pre-activity
+// QTI_END: 2021-01-29: Performance: Boostframework: Call perfHint with new hostingType when application starts.
+// QTI_BEGIN: 2019-08-16: Performance: BoostFramework: Q Upgrade - Add Kill, Update Hints.
                     if (startResult != null) {
                         mPerfServiceStartHint.perfHint(BoostFramework.VENDOR_HINT_FIRST_LAUNCH_BOOST, app.processName, startResult.pid, BoostFramework.Launch.TYPE_START_PROC);
                     }
                 }
             }
+// QTI_END: 2019-08-16: Performance: BoostFramework: Q Upgrade - Add Kill, Update Hints.
             checkSlow(startTime, "startProcess: returned from zygote!");
             return startResult;
         } finally {
@@ -2940,7 +2975,8 @@ public final class ProcessList extends ProcessListInternal
 
     @GuardedBy("mService")
     @Override
-    public void removeLruProcessLocked(ProcessRecord app) {
+    public void removeLruProcessLocked(ProcessRecordInternal appInternal) {
+        final ProcessRecord app = (ProcessRecord) appInternal;
         int lrui = mLruProcesses.lastIndexOf(app);
         if (lrui >= 0) {
             synchronized (mProcLock) {
@@ -3972,8 +4008,10 @@ public final class ProcessList extends ProcessListInternal
 
     @GuardedBy("mService")
     @Override
-    public void updateLruProcessLocked(ProcessRecord app, boolean activityChange,
-            ProcessRecord client) {
+    public void updateLruProcessLocked(ProcessRecordInternal appInternal, boolean activityChange,
+            ProcessRecordInternal clientInternal) {
+        final ProcessRecord app = (ProcessRecord) appInternal;
+        final ProcessRecord client = (ProcessRecord) clientInternal;
         final ProcessServiceRecord psr = app.mServices;
         final boolean hasActivity = app.hasActivitiesOrRecentTasks() || psr.hasClientActivities()
                 || psr.isTreatLikeActivity();
@@ -4180,27 +4218,28 @@ public final class ProcessList extends ProcessListInternal
         for (int j = psr.numberOfConnections() - 1; j >= 0; j--) {
             ConnectionRecord cr = psr.getConnectionAt(j);
             if (cr.binding != null && !cr.serviceDead && cr.binding.service != null
-                    && cr.binding.service.app != null
-                    && cr.binding.service.app.getLruSeq() != getLruSeqLOSP()
+                    && cr.binding.service.getHostProcess() != null
+                    && cr.binding.service.getHostProcess().getLruSeq() != getLruSeqLOSP()
                     && cr.notHasFlag(Context.BIND_REDUCTION_FLAGS)
-                    && !cr.binding.service.app.isPersistent()) {
-                if (cr.binding.service.app.mServices.hasClientActivities()) {
+                    && !cr.binding.service.getHostProcess().isPersistent()) {
+                if (cr.binding.service.getHostProcess().mServices.hasClientActivities()) {
                     if (nextActivityIndex >= 0) {
-                        indices.append(offerLruProcessInternalLSP(cr.binding.service.app, now,
+                        indices.append(offerLruProcessInternalLSP(
+                                cr.binding.service.getHostProcess(), now,
                                 "service connection", cr, app), true);
                     }
                 } else {
-                    indices.append(offerLruProcessInternalLSP(cr.binding.service.app, now,
-                            "service connection", cr, app), false);
+                    indices.append(offerLruProcessInternalLSP(cr.binding.service.getHostProcess(),
+                            now, "service connection", cr, app), false);
                 }
             }
         }
         final ProcessProviderRecord ppr = app.getProviders();
         for (int j = ppr.numberOfProviderConnections() - 1; j >= 0; j--) {
             ContentProviderRecord cpr = ppr.getProviderConnectionAt(j).provider;
-            if (cpr.proc != null && cpr.proc.getLruSeq() != getLruSeqLOSP()
-                    && !cpr.proc.isPersistent()) {
-                indices.append(offerLruProcessInternalLSP(cpr.proc, now,
+            if (cpr.mProc != null && cpr.mProc.getLruSeq() != getLruSeqLOSP()
+                    && !cpr.mProc.isPersistent()) {
+                indices.append(offerLruProcessInternalLSP(cpr.mProc, now,
                         "provider reference", cpr, app), false);
             }
         }
@@ -5413,7 +5452,8 @@ public final class ProcessList extends ProcessListInternal
      * sequence has been incremented.
      * <p>This method checks if any UID is transitioning between background and foreground states
      * and, if so, notifies the corresponding application if network access might be blocked.
-     * This logic is triggered via a callback from the {@link OomAdjuster}.
+     * This logic is triggered via a callback from the
+     * {@link com.android.server.am.psc.OomAdjuster}.
      *
      * @param activeUids The set of UIDs whose proc state sequence was just incremented.
      */
@@ -5699,11 +5739,28 @@ public final class ProcessList extends ProcessListInternal
     }
 
     /**
-     * Called by ActivityManagerService when it decides to kill an application process.
+     * Called by ActivityManagerService when it decides to kill an application process except ANR.
      */
     @GuardedBy("mService")
-    void noteAppKill(final ProcessRecord app, final @Reason int reason,
-            final @SubReason int subReason, final String msg) {
+    void noteAppKill(
+            final ProcessRecord app,
+            final @Reason int reason,
+            final @SubReason int subReason,
+            final String msg) {
+        noteAppKill(app, reason, subReason, msg, /* anrInfo= */ null);
+    }
+
+    /**
+     * Called by ActivityManagerService when it decides to kill an application process if reason is
+     * ANR.
+     */
+    @GuardedBy("mService")
+    void noteAppKill(
+            final ProcessRecord app,
+            final @Reason int reason,
+            final @SubReason int subReason,
+            final String msg,
+            @Nullable ApplicationExitInfo.AnrInfo anrInfo) {
         if (DEBUG_PROCESSES) {
             Slog.i(TAG, "note: " + app + " is being killed, reason: "
                     + ApplicationExitInfo.reasonCodeToString(reason) + ", sub-reason: "
@@ -5714,7 +5771,7 @@ public final class ProcessList extends ProcessListInternal
             mDyingProcesses.put(app.processName, app.uid, app);
             app.setDyingPid(app.getPid());
         }
-        mAppExitInfoTracker.scheduleNoteAppKill(app, reason, subReason, msg);
+        mAppExitInfoTracker.scheduleNoteAppKill(app, reason, subReason, msg, anrInfo);
     }
 
     @GuardedBy("mService")

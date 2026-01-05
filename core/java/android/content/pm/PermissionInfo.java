@@ -28,6 +28,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Parcel;
 import android.os.Parcelable;
+import android.permission.flags.Flags;
 import android.text.TextUtils;
 
 import com.android.internal.util.CollectionUtils;
@@ -436,6 +437,14 @@ public class PermissionInfo extends PackageItemInfo implements Parcelable {
     public static final int FLAG_IMMUTABLY_RESTRICTED = 1<<4;
 
     /**
+     * Flag for {@link #flags}, corresponding to <code>allowedInPrivateComputeCore</code>
+     * Determines whether this permission can be obtained by components
+     * running in the Private Compute Core restricted environment.
+     */
+    @FlaggedApi(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    public static final int FLAG_ALLOWED_IN_PRIVATE_COMPUTE_CORE = 1 << 5;
+
+    /**
      * Flag for {@link #flags}, indicating that this permission has been
      * installed into the system's globally defined permissions.
      */
@@ -448,6 +457,7 @@ public class PermissionInfo extends PackageItemInfo implements Parcelable {
             FLAG_HARD_RESTRICTED,
             FLAG_SOFT_RESTRICTED,
             FLAG_IMMUTABLY_RESTRICTED,
+            FLAG_ALLOWED_IN_PRIVATE_COMPUTE_CORE,
             FLAG_INSTALLED
     })
     @Retention(RetentionPolicy.SOURCE)
@@ -513,20 +523,6 @@ public class PermissionInfo extends PackageItemInfo implements Parcelable {
     public @NonNull Set<String> knownCerts = Collections.emptySet();
 
     /**
-     * A boolean to signify if purposes are required to be declared in order to use the permission.
-     *
-     * @hide
-     */
-    public boolean requiresPurpose;
-
-    /**
-     * Specifies the minimum target SDK version for which purpose validation should be enforced.
-     *
-     * @hide
-     */
-    public int requiresPurposeTargetSdkVersion;
-
-    /**
      * Value that indicates no value specified for a field for target SDK version, e.g.
      * {@link #requiresGeneralPurposeTargetSdkVersion}.
      *
@@ -535,6 +531,18 @@ public class PermissionInfo extends PackageItemInfo implements Parcelable {
     @SystemApi
     @FlaggedApi(android.permission.flags.Flags.FLAG_PPD_MANIFEST_ENABLED)
     public static final int NO_TARGET_SDK_VERSION = Integer.MAX_VALUE;
+
+    /**
+     * Specifies the minimum target SDK version for which a purpose should be provided.
+     * If {@link #NO_TARGET_SDK_VERSION}, purpose is not required.
+     *
+     * @hide
+     */
+    // Following pattern that most other fields in this class are also mutable.
+    @SuppressLint("MutableBareField")
+    @SystemApi
+    @FlaggedApi(android.permission.flags.Flags.FLAG_PPD_PURPOSE_ENABLED)
+    public int requiresPurposeTargetSdkVersion = NO_TARGET_SDK_VERSION;
 
     /**
      * Specifies the minimum target SDK version for which a general purpose should be provided.
@@ -566,6 +574,10 @@ public class PermissionInfo extends PackageItemInfo implements Parcelable {
      *
      * @hide
      */
+    // Following pattern that most other fields in this class are also mutable.
+    @SuppressLint("MutableBareField")
+    @SystemApi
+    @FlaggedApi(android.permission.flags.Flags.FLAG_PPD_PURPOSE_ENABLED)
     public @NonNull Map<String, ValidPurposeInfo> validPurposes = Collections.emptyMap();
 
     /**
@@ -710,6 +722,9 @@ public class PermissionInfo extends PackageItemInfo implements Parcelable {
                 case PermissionInfo.FLAG_IMMUTABLY_RESTRICTED:
                     sb.append("immutablyRestricted");
                     break;
+                case PermissionInfo.FLAG_ALLOWED_IN_PRIVATE_COMPUTE_CORE:
+                    sb.append("allowedInPrivateComputeCore");
+                    break;
                 case PermissionInfo.FLAG_INSTALLED:
                     sb.append("installed");
                     break;
@@ -752,7 +767,6 @@ public class PermissionInfo extends PackageItemInfo implements Parcelable {
         nonLocalizedDescription = orig.nonLocalizedDescription;
         // Note that knownCerts wasn't properly copied before Android U.
         knownCerts = orig.knownCerts;
-        requiresPurpose = orig.requiresPurpose;
         requiresPurposeTargetSdkVersion = orig.requiresPurposeTargetSdkVersion;
         requiresGeneralPurposeTargetSdkVersion = orig.requiresGeneralPurposeTargetSdkVersion;
         requiresPurposeStringTargetSdkVersion = orig.requiresPurposeStringTargetSdkVersion;
@@ -823,7 +837,6 @@ public class PermissionInfo extends PackageItemInfo implements Parcelable {
         dest.writeInt(requestRes);
         TextUtils.writeToParcel(nonLocalizedDescription, dest, parcelableFlags);
         sForStringSet.parcel(knownCerts, dest, parcelableFlags);
-        dest.writeBoolean(requiresPurpose);
         dest.writeInt(requiresPurposeTargetSdkVersion);
         writeValidPurposes(dest);
         dest.writeInt(requiresGeneralPurposeTargetSdkVersion);
@@ -859,6 +872,11 @@ public class PermissionInfo extends PackageItemInfo implements Parcelable {
     }
 
     /** @hide */
+    public boolean isAllowedInPrivateComputeCore() {
+        return (flags & PermissionInfo.FLAG_ALLOWED_IN_PRIVATE_COMPUTE_CORE) != 0;
+    }
+
+    /** @hide */
     public boolean isAppOp() {
         return (protectionLevel & PermissionInfo.PROTECTION_FLAG_APPOP) != 0;
     }
@@ -890,7 +908,6 @@ public class PermissionInfo extends PackageItemInfo implements Parcelable {
         requestRes = source.readInt();
         nonLocalizedDescription = TextUtils.CHAR_SEQUENCE_CREATOR.createFromParcel(source);
         knownCerts = sForStringSet.unparcel(source);
-        requiresPurpose = source.readBoolean();
         requiresPurposeTargetSdkVersion = source.readInt();
         readValidPurposes(source);
         requiresGeneralPurposeTargetSdkVersion = source.readInt();

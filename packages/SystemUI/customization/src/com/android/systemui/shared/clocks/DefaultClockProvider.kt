@@ -33,8 +33,9 @@ import com.android.systemui.plugins.keyguard.ui.clocks.ClockMetadata
 import com.android.systemui.plugins.keyguard.ui.clocks.ClockPickerConfig
 import com.android.systemui.plugins.keyguard.ui.clocks.ClockProvider
 import com.android.systemui.plugins.keyguard.ui.clocks.ClockSettings
-import com.android.systemui.shared.clocks.FlexClockController.Companion.buildPresetGroup
-import com.android.systemui.shared.clocks.FlexClockController.Companion.getDefaultAxes
+import com.android.systemui.shared.clocks.controller.FlexClockController
+import com.android.systemui.shared.clocks.controller.FlexClockController.Companion.buildPresetGroup
+import com.android.systemui.shared.clocks.controller.FlexClockController.Companion.getDefaultAxes
 
 private val TAG = DefaultClockProvider::class.simpleName
 const val DEFAULT_CLOCK_ID = "DEFAULT"
@@ -71,19 +72,21 @@ constructor(
         val fontAxes = getDefaultAxes(settings).merge(settings.axes)
         val clockSettings = settings.copy(axes = ClockAxisStyle(fontAxes))
         val typefaceCache =
-            TypefaceCache(buffers.infraMessageBuffer, NUM_CLOCK_FONT_ANIMATION_STEPS) {
+            TypefaceCache<Unit>(buffers.infraMessageBuffer, NUM_CLOCK_FONT_ANIMATION_STEPS) {
                 FLEX_TYPEFACE
             }
         return FlexClockController(
-            ClockContextImpl(
-                ctx,
-                resources,
-                clockSettings,
+            FlexClockContext(
                 typefaceCache,
-                buffers.infraMessageBuffer,
-                vibrator,
-                timeKeeperFactory(),
-                isAnimationEnabled = true,
+                ClockContextImpl(
+                    ctx,
+                    resources,
+                    clockSettings,
+                    buffers.infraMessageBuffer,
+                    vibrator,
+                    timeKeeperFactory(),
+                    isAnimationEnabled = true,
+                ),
             ),
             buffers,
         )

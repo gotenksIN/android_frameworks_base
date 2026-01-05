@@ -279,6 +279,7 @@
     <string name="global_action_restart" msgid="4678451019561687074">"Рестартуј"</string>
     <string name="global_action_emergency" msgid="1387617624177105088">"Хитан позив"</string>
     <string name="global_action_bug_report" msgid="5127867163044170003">"Јави грешку"</string>
+    <string name="global_action_feedback" msgid="3480836834202300036">"Повратне информације"</string>
     <string name="global_action_logout" msgid="6093581310002476511">"Заврши сесију"</string>
     <string name="global_action_screenshot" msgid="2610053466156478564">"Снимак екрана"</string>
     <string name="global_action_standby" msgid="6786920589970257642">"Стање приправности"</string>
@@ -327,8 +328,7 @@
     <string name="notification_channel_accessibility_hearing_device" msgid="7816963856388758952">"Слушни апарат"</string>
     <string name="notification_channel_accessibility_security_policy" msgid="1727787021725251912">"Коришћење Приступачности"</string>
     <string name="notification_channel_display" msgid="6905032605735615090">"Екран"</string>
-    <!-- no translation found for notification_channel_parental_controls (2963963315750128538) -->
-    <skip />
+    <string name="notification_channel_parental_controls" msgid="2963963315750128538">"Родитељски надзор"</string>
     <string name="foreground_service_app_in_background" msgid="1439289699671273555">"<xliff:g id="APP_NAME">%1$s</xliff:g> користи батерију"</string>
     <string name="foreground_service_apps_in_background" msgid="7340037176412387863">"Апликације (<xliff:g id="NUMBER">%1$d</xliff:g>) користе батерију"</string>
     <string name="foreground_service_tap_for_details" msgid="9078123626015586751">"Додирните за детаље о батерији и потрошњи података"</string>
@@ -646,6 +646,10 @@
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"Дозвољава апликацији да приступа уређајима на локалној мрежи"</string>
     <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"коришћење интерфејса повратне петље"</string>
     <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"Дозвољава апликацији да остварује интеракцију са другим апликацијама преко интерфејса повратне петље"</string>
+    <!-- no translation found for permlab_force_use_loopback_interface (1319727311706416481) -->
+    <skip />
+    <!-- no translation found for permdesc_force_use_loopback_interface (5829032514048681980) -->
+    <skip />
     <string name="permlab_ranging" msgid="2854543350668593390">"одређивање раздаљине између уређаја у близини"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"Дозволите апликацији да одређује релативну раздаљину између уређаја у близини"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"Информације о жељеној NFC услузи за плаћање"</string>
@@ -826,6 +830,8 @@
     <string name="permdesc_readMediaVideo" msgid="3846400073770403528">"Омогућава апликацији да чита видео фајлове из дељеног меморијског простора."</string>
     <string name="permlab_readMediaImages" msgid="4057590631020986789">"читање фајлова слика из дељеног меморијског простора"</string>
     <string name="permdesc_readMediaImages" msgid="5836219373138469259">"Омогућава апликацији да чита фајлове слика из дељеног меморијског простора."</string>
+    <string name="permlab_readMediaDocuments" msgid="5716810755602938263">"читање фајлова докумената из дељеног меморијског простора"</string>
+    <string name="permdesc_readMediaDocuments" msgid="5665930210237304120">"Омогућава апликацији да чита фајлове докумената из дељеног меморијског простора."</string>
     <string name="permlab_readVisualUserSelect" msgid="5516204215354667586">"читање фајлова слика и видеа које корисник бира из дељеног меморијског простора"</string>
     <string name="permdesc_readVisualUserSelect" msgid="8027174717714968217">"Омогућава апликацији да чита фајлове слика и видеа које изаберете из дељеног меморијског простора."</string>
     <string name="permlab_sdcardWrite" msgid="4863021819671416668">"мењање или брисање садржаја дељеног меморијског простора"</string>
@@ -1048,6 +1054,7 @@
     <string name="keyguard_password_enter_pin_password_code" msgid="7792964196473964340">"Унесите PIN за откључавање"</string>
     <string name="keyguard_password_wrong_pin_code" msgid="8583732939138432793">"PIN кôд је нетачан."</string>
     <string name="keyguard_label_text" msgid="3841953694564168384">"Да бисте откључали, притисните „Мени“, а затим 0."</string>
+    <string name="emergency_call_dialog_number_for_display" msgid="2978165477085612673">"Број за хитне случајеве"</string>
     <string name="lockscreen_carrier_default" msgid="6192313772955399160">"Мобилна мрежа није доступна"</string>
     <string name="lockscreen_screen_locked" msgid="7364905540516041817">"Екран је закључан."</string>
     <string name="lockscreen_instructions_when_pattern_enabled" msgid="7982445492532123308">"Притисните „Мени“ да бисте откључали телефон или упутите хитан позив."</string>
@@ -1831,7 +1838,7 @@
     <string name="color_inversion_feature_name" msgid="2672824491933264951">"Инверзија боја"</string>
     <string name="color_correction_feature_name" msgid="7975133554160979214">"Корекција боја"</string>
     <string name="one_handed_mode_feature_name" msgid="2334330034828094891">"Режим једном руком"</string>
-    <string name="reduce_bright_colors_feature_name" msgid="3222994553174604132">"Додатно затамни"</string>
+    <string name="reduce_bright_colors_feature_name" msgid="3222994553174604132">"Додатно затамњено"</string>
     <string name="hearing_aids_feature_name" msgid="1125892105105852542">"Слушни апарати"</string>
     <string name="autoclick_feature_name" msgid="4056260617171267864">"Аутоматски клик (време задржавања)"</string>
     <string name="mouse_keys_feature_name" msgid="3362643216513384542">"Тастери миша"</string>
@@ -2177,13 +2184,21 @@
     <string name="autofill_picker_no_suggestions" msgid="1076022650427481509">"Нема аутоматски попуњених предлога"</string>
     <string name="autofill_picker_some_suggestions" msgid="5560549696296202701">"{count,plural, =1{Један аутоматски попуњен предлог}one{# аутоматски попуњен предлог}few{# аутоматски попуњена предлога}other{# аутоматски попуњених предлога}}"</string>
     <string name="autofill_save_title" msgid="7719802414283739775">"Желите ли да сачувате у услузи "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_save_title_expressive" msgid="2665408870424848558">"Сачувајте информације у: "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b></string>
     <string name="autofill_save_title_with_type" msgid="3002460014579799605">"Желите ли да сачувате ставку <xliff:g id="TYPE">%1$s</xliff:g> у услузи "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_save_title_with_type_expressive" msgid="6063660551496235255">"Сачувајте ставку <xliff:g id="TYPE">%1$s</xliff:g> у: "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b></string>
     <string name="autofill_save_title_with_2types" msgid="3783270967447869241">"Желите ли да сачувате ставке <xliff:g id="TYPE_0">%1$s</xliff:g> и <xliff:g id="TYPE_1">%2$s</xliff:g> у услузи "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_save_title_with_2types_expressive" msgid="2996687022212666293">"Сачувајте ставке <xliff:g id="TYPE_0">%1$s</xliff:g> и <xliff:g id="TYPE_1">%2$s</xliff:g> у: "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b></string>
     <string name="autofill_save_title_with_3types" msgid="6598228952100102578">"Желите ли да сачувате ставке <xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g> и <xliff:g id="TYPE_2">%3$s</xliff:g> у услузи "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_save_title_with_3types_expressive" msgid="3301676215501214049">"Сачувајте ставке <xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g> и <xliff:g id="TYPE_2">%3$s</xliff:g> у: "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b></string>
     <string name="autofill_update_title" msgid="3630695947047069136">"Желите ли да ажурирате у услузи "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_update_title_expressive" msgid="7660582214109012920">"Ажурирајте информације у: "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b></string>
     <string name="autofill_update_title_with_type" msgid="5264152633488495704">"Желите ли да ажурирате ставку <xliff:g id="TYPE">%1$s</xliff:g> у услузи "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_update_title_with_type_expressive" msgid="6162413585161767846">"Ажурирајте <xliff:g id="TYPE">%1$s</xliff:g> у: "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b></string>
     <string name="autofill_update_title_with_2types" msgid="1797514386321086273">"Желите ли да ажурирате ставке <xliff:g id="TYPE_0">%1$s</xliff:g> и <xliff:g id="TYPE_1">%2$s</xliff:g> у услузи "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>"?"</string>
+    <string name="autofill_update_title_with_2types_expressive" msgid="1911825941498393471">"Ажурирајте ставке <xliff:g id="TYPE_0">%1$s</xliff:g> и <xliff:g id="TYPE_1">%2$s</xliff:g> у: "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b></string>
     <string name="autofill_update_title_with_3types" msgid="8285767070604652626">"Желите ли да ажурирате ове ставке у услузи "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>": <xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g> и <xliff:g id="TYPE_2">%3$s</xliff:g>?"</string>
+    <string name="autofill_update_title_with_3types_expressive" msgid="6040725201378429027">"Ажурирајте ове ставке у "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>": <xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g> и <xliff:g id="TYPE_2">%3$s</xliff:g>"</string>
     <string name="autofill_save_yes" msgid="8035743017382012850">"Сачувај"</string>
     <string name="autofill_save_no" msgid="9212826374207023544">"Не, хвала"</string>
     <string name="autofill_save_notnow" msgid="2853932672029024195">"Не сада"</string>
@@ -2612,10 +2627,7 @@
     <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"Упозорења о ресурсима система"</string>
     <string name="tv_watchdog_notification_title" msgid="195239206215922517">"Прекомерно коришћење ресурса"</string>
     <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"Апликација <xliff:g id="APP_NAME">%1$s</xliff:g> користи превише ресурса."</string>
-    <!-- no translation found for supervision_blocked_app_title (5546803865875383588) -->
-    <skip />
-    <!-- no translation found for supervision_blocked_app_content (4125452996088641559) -->
-    <skip />
-    <!-- no translation found for supervision_unblocked_app_content (8282985265957852278) -->
-    <skip />
+    <string name="supervision_blocked_app_title" msgid="5546803865875383588">"Новости од родитеља"</string>
+    <string name="supervision_blocked_app_content" msgid="4125452996088641559">"Апликација <xliff:g id="APP_NAME">%1$s</xliff:g> је за сад уклоњена"</string>
+    <string name="supervision_unblocked_app_content" msgid="8282985265957852278">"Апликација <xliff:g id="APP_NAME">%1$s</xliff:g> је сада доступна"</string>
 </resources>

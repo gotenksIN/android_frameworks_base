@@ -20,25 +20,35 @@ import static java.util.Objects.requireNonNull;
 import android.annotation.FlaggedApi;
 import android.os.Bundle;
 import android.service.personalcontext.Flags;
+import android.service.personalcontext.Token;
+import android.text.TextUtils;
 import android.view.textclassifier.TextClassification;
 
 import androidx.annotation.NonNull;
+
+import java.util.Objects;
 
 /** A hint that contains a text classification request from selected text */
 @FlaggedApi(Flags.FLAG_ENABLE_PERSONAL_CONTEXT_SERVICE)
 public class TextClassificationHint extends ContextHint {
     @NonNull private final TextClassification.Request mTextClassificationRequest;
+    @NonNull private final String mTextClassificationSessionId;
 
     static final String KEY_TEXT_CLASSIFICATION_REQUEST = "key_text_classification_request";
+    static final String KEY_TEXT_CLASSIFICATION_SESSION_ID = "key_text_classification_session_id";
 
     /**
      * Creates a new {@link TextClassificationHint}
      *
      * @hide
      */
-    TextClassificationHint(@NonNull TextClassification.Request textClassificationRequest) {
-        super();
+    TextClassificationHint(
+            @NonNull ConstructorParams baseParams,
+            @NonNull TextClassification.Request textClassificationRequest,
+            @NonNull String textClassificationSessionId) {
+        super(baseParams);
         mTextClassificationRequest = textClassificationRequest;
+        mTextClassificationSessionId = textClassificationSessionId;
     }
 
     /**
@@ -46,15 +56,17 @@ public class TextClassificationHint extends ContextHint {
      *
      * @hide
      */
-    TextClassificationHint(@NonNull Bundle bundle) {
-        super(bundle);
-        final Bundle hintData = bundle.getBundle(KEY_HINT_DATA);
-        requireNonNull(hintData, "Bundle must contain hint data");
-        TextClassification.Request classificationRequest =
-                hintData.getParcelable(
-                        KEY_TEXT_CLASSIFICATION_REQUEST, TextClassification.Request.class);
-        requireNonNull(classificationRequest, "Bundle must contain classification request");
-        mTextClassificationRequest = classificationRequest;
+    TextClassificationHint(@NonNull ConstructorParams baseParams, @NonNull Bundle bundle) {
+        super(baseParams);
+        mTextClassificationSessionId =
+                requireNonNull(
+                        bundle.getString(KEY_TEXT_CLASSIFICATION_SESSION_ID),
+                        "Bundle must contain classification session id");
+        mTextClassificationRequest =
+                requireNonNull(
+                        bundle.getParcelable(
+                                KEY_TEXT_CLASSIFICATION_REQUEST, TextClassification.Request.class),
+                        "Bundle must contain classification request");
     }
 
     /** @hide */
@@ -69,7 +81,23 @@ public class TextClassificationHint extends ContextHint {
     Bundle toBundleImpl() {
         Bundle bundle = new Bundle();
         bundle.putParcelable(KEY_TEXT_CLASSIFICATION_REQUEST, mTextClassificationRequest);
+        bundle.putString(KEY_TEXT_CLASSIFICATION_SESSION_ID, mTextClassificationSessionId);
         return bundle;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof TextClassificationHint that)) return false;
+        return super.equals(o)
+                && Objects.deepEquals(
+                        this.mTextClassificationRequest, that.mTextClassificationRequest)
+                && TextUtils.equals(
+                        this.mTextClassificationSessionId, that.mTextClassificationSessionId);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(mTextClassificationRequest, mTextClassificationSessionId);
     }
 
     /** Get the {@link TextClassification.Request} contained in this hint. */
@@ -78,25 +106,55 @@ public class TextClassificationHint extends ContextHint {
         return mTextClassificationRequest;
     }
 
+    /**
+     * Get the TextClassification sessionId. Used to trace back to the session the {@link
+     * TextClassification.Request} originated from.
+     */
+    @NonNull
+    public String getSessionId() {
+        return mTextClassificationSessionId;
+    }
+
     /** Builder used to create a {@link TextClassificationHint}. */
     @FlaggedApi(Flags.FLAG_ENABLE_PERSONAL_CONTEXT_SERVICE)
     public static final class Builder {
+        private final ConstructorParams.Builder mBaseBuilder = new ConstructorParams.Builder();
         private final TextClassification.Request mTextClassificationRequest;
+        private final String mTextClassificationSessionId;
 
         /**
          * Creates an instance of {@link TextClassificationHint.Builder} with the {@link
          * TextClassification.Request} contained in the hint.
          */
-        public Builder(@NonNull TextClassification.Request textClassificationRequest) {
-            requireNonNull(
-                    textClassificationRequest, "TextClassification request must be provided");
-            mTextClassificationRequest = textClassificationRequest;
+        public Builder(
+                @NonNull TextClassification.Request textClassificationRequest,
+                @NonNull String textClassificationSessionId) {
+            mTextClassificationRequest =
+                    requireNonNull(
+                            textClassificationRequest,
+                            "TextClassification request must be provided");
+            mTextClassificationSessionId =
+                    requireNonNull(
+                            textClassificationSessionId,
+                            "TextClassification session id must be provided");
+        }
+
+        /**
+         * Adds a token to the resulting {@link TextClassificationHint}.
+         *
+         * @param token the token to add
+         */
+        @NonNull
+        public Builder addToken(@NonNull Token token) {
+            mBaseBuilder.addToken(token);
+            return this;
         }
 
         /** Returns the built {@link TextClassificationHint}. */
         @NonNull
         public TextClassificationHint build() {
-            return new TextClassificationHint(mTextClassificationRequest);
+            return new TextClassificationHint(
+                    mBaseBuilder.build(), mTextClassificationRequest, mTextClassificationSessionId);
         }
     }
 }

@@ -85,8 +85,10 @@ import com.android.wm.shell.sysui.ShellController;
 import com.android.wm.shell.sysui.ShellInit;
 
 import java.io.PrintWriter;
-import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 
 /**
@@ -100,8 +102,7 @@ public class PipController implements ConfigurationChangeListener,
     private static final String TAG = PipController.class.getSimpleName();
     private static final String SWIPE_TO_PIP_APP_BOUNDS = "pip_app_bounds";
     private static final String SWIPE_TO_PIP_OVERLAY = "swipe_to_pip_overlay";
-    private static final String DISPLAY_CHANGE_PIP_BOUNDS_UPDATE =
-            "display_change_pip_bounds_update";
+    private static final String DISPLAY_CHANGE_PIP_BOUNDS = "display_change_pip_bounds";
 
     private Context mContext;
     private final ShellCommandHandler mShellCommandHandler;
@@ -123,7 +124,8 @@ public class PipController implements ConfigurationChangeListener,
     private final PipUiEventLogger mPipUiEventLogger;
     private final ShellExecutor mMainExecutor;
     private final PipImpl mImpl;
-    private final List<Consumer<Boolean>> mOnIsInPipStateChangedListeners = new ArrayList<>();
+    private final Map<Consumer<Boolean>, Executor> mOnIsInPipStateChangedListeners =
+            new HashMap<>();
     private final PipMediaController mMediaController;
 
     // Wrapper for making Binder calls into PiP animation listener hosted in launcher's Recents.
@@ -150,8 +152,7 @@ public class PipController implements ConfigurationChangeListener,
          * Notifies the listener about PiP resource dimensions changed.
          * Listener can expect an immediate callback the first time they attach.
          *
-         * @param cornerRadius the pixel value of the corner radius, zero means it's disabled.
-         * @param shadowRadius the pixel value of the shadow radius, zero means it's disabled.
+         * @param res {@code PipResources} instances contains shadow and corner radius
          */
         void onPipResourceDimensionsChanged(PipResources res);
 
@@ -332,7 +333,8 @@ public class PipController implements ConfigurationChangeListener,
                         || isPipLaunchingOnDifferentDisplay) {
                     return;
                 }
-                mPipScheduler.scheduleExitPipViaExpand(wasVisible);
+                mPipScheduler.scheduleExitPipViaExpand(wasVisible,
+                        mPipDisplayLayoutState.getDisplayId());
             }
         });
 
@@ -419,7 +421,7 @@ public class PipController implements ConfigurationChangeListener,
     @Override
     public void onThemeChanged() {
         setDisplayLayout(new DisplayLayout(mContext, mContext.getDisplay()));
-        if (Flags.enablePipBoxShadows()) {
+        if (Flags.enablePipBoxShadowsV2()) {
             if (mPipTransitionState.isInPip()) {
                 SurfaceControl pipLeash = mPipTransitionState.getPinnedTaskLeash();
                 if (pipLeash == null) {
@@ -517,9 +519,10 @@ public class PipController implements ConfigurationChangeListener,
         if (mPipTransitionState.getPipTaskToken() == null) {
             Log.d(TAG, "PipController.onDisplayChange no PiP task token"
                     + " state=" + mPipTransitionState.getState());
+            final Rect toBounds = mPipBoundsState.getBounds();
             mPipTransitionState.setOnIdlePipTransitionStateRunnable(() -> {
                 final Bundle extra = new Bundle();
-                extra.putBoolean(DISPLAY_CHANGE_PIP_BOUNDS_UPDATE, true);
+                extra.putParcelable(DISPLAY_CHANGE_PIP_BOUNDS, toBounds);
                 mPipTransitionState.setState(PipTransitionState.SCHEDULED_BOUNDS_CHANGE, extra);
             });
         } else {
@@ -711,26 +714,24 @@ public class PipController implements ConfigurationChangeListener,
                 } else {
                     mPipUiEventLogger.log(PipUiEventLogger.PipUiEventEnum.PICTURE_IN_PICTURE_ENTER);
                 }
-                for (Consumer<Boolean> listener : mOnIsInPipStateChangedListeners) {
-                    listener.accept(true /* inPip */);
-                }
+                mOnIsInPipStateChangedListeners.forEach(
+                        (listener, executor) -> executor.execute(() -> listener.accept(true)));
                 break;
             case PipTransitionState.EXITED_PIP:
                 mPipAppOpsListener.onActivityUnpinned();
                 mPipUiEventLogger.setTaskInfo(null);
-                for (Consumer<Boolean> listener : mOnIsInPipStateChangedListeners) {
-                    listener.accept(false /* inPip */);
-                }
+                mOnIsInPipStateChangedListeners.forEach(
+                        (listener, executor) -> executor.execute(() -> listener.accept(false)));
                 break;
             case PipTransitionState.SCHEDULED_BOUNDS_CHANGE:
-                mWaitingToPlayDisplayChangeBoundsUpdate =
-                        extra.getBoolean(DISPLAY_CHANGE_PIP_BOUNDS_UPDATE);
+                final Rect toBounds = extra.getParcelable(DISPLAY_CHANGE_PIP_BOUNDS, Rect.class);
+                mWaitingToPlayDisplayChangeBoundsUpdate = toBounds != null;
                 if (mWaitingToPlayDisplayChangeBoundsUpdate) {
                     // If we reach this point, it means display change did not send through a WCT to
                     // update the pinned task bounds in Core. Instead, the local Shell-side
                     // PiP-relevant bounds state and movement bounds were updated.
                     // So schedule a jumpcut animation to those bounds now.
-                    mPipScheduler.scheduleAnimateResizePip(mPipBoundsState.getBounds());
+                    mPipScheduler.scheduleAnimateResizePip(toBounds);
                 }
                 break;
             case PipTransitionState.CHANGING_PIP_BOUNDS:
@@ -797,10 +798,12 @@ public class PipController implements ConfigurationChangeListener,
         mPipTransitionState.dump(pw, innerPrefix);
     }
 
-    private void addOnIsInPipStateChangedListener(@NonNull Consumer<Boolean> callback) {
+    private void addOnIsInPipStateChangedListener(
+            @NonNull Executor executor,
+            @NonNull Consumer<Boolean> callback) {
         if (callback != null) {
-            mOnIsInPipStateChangedListeners.add(callback);
-            callback.accept(mPipTransitionState.isInPip());
+            mOnIsInPipStateChangedListeners.put(callback, executor);
+            executor.execute(() -> callback.accept(mPipTransitionState.isInPip()));
         }
     }
 
@@ -825,25 +828,26 @@ public class PipController implements ConfigurationChangeListener,
         public void onSystemUiStateChanged(boolean isSysUiStateValid, long flag) {}
 
         @Override
-        public void addOnIsInPipStateChangedListener(@NonNull Consumer<Boolean> callback) {
-            mMainExecutor.execute(() -> {
-                PipController.this.addOnIsInPipStateChangedListener(callback);
-            });
+        public void addOnIsInPipStateChangedListener(
+                @NonNull Executor executor,
+                @NonNull Consumer<Boolean> callback) {
+            mMainExecutor.execute(
+                    () -> PipController.this.addOnIsInPipStateChangedListener(executor, callback));
         }
 
         @Override
         public void removeOnIsInPipStateChangedListener(@NonNull Consumer<Boolean> callback) {
-            mMainExecutor.execute(() -> {
-                PipController.this.removeOnIsInPipStateChangedListener(callback);
-            });
+            mMainExecutor.execute(
+                    () -> PipController.this.removeOnIsInPipStateChangedListener(callback));
         }
 
         @Override
-        public void addPipExclusionBoundsChangeListener(Consumer<Rect> listener) {
+        public void addPipExclusionBoundsChangeListener(
+                Executor executor, Consumer<Rect> listener) {
             mMainExecutor.execute(() -> {
                 ProtoLog.d(ShellProtoLogGroup.WM_SHELL_PICTURE_IN_PICTURE,
                         "addPipExclusionBoundsChangeListener: %s", listener);
-                mPipBoundsState.addPipExclusionBoundsChangeCallback(listener);
+                mPipBoundsState.addPipExclusionBoundsChangeCallback(executor, listener);
             });
         }
 

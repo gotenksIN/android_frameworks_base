@@ -40,6 +40,7 @@ import com.android.systemui.deviceentry.data.repository.fakeDeviceEntryRepositor
 import com.android.systemui.deviceentry.domain.interactor.deviceEntryInteractor
 import com.android.systemui.flags.EnableSceneContainer
 import com.android.systemui.keyguard.KeyguardViewMediator
+import com.android.systemui.keyguard.data.repository.fakeKeyguardRepository
 import com.android.systemui.keyguard.ui.viewmodel.lockscreenUserActionsViewModel
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.collectLastValue
@@ -70,10 +71,8 @@ import com.android.telecom.mockTelecomManager
 import com.google.common.truth.Truth.assertThat
 import com.google.common.truth.Truth.assertWithMessage
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
 import org.junit.Before
 import org.junit.Test
@@ -105,7 +104,6 @@ import org.junit.runner.RunWith
 class SceneFrameworkIntegrationTest : SysuiTestCase() {
 
     private val kosmos = testKosmos()
-    private var bouncerOverlayJob: Job? = null
 
     @Before
     fun setUp() =
@@ -332,7 +330,7 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
             assertThat(upDestinationOverlayKey).isEqualTo(Overlays.Bouncer)
             emulateUserDrivenOverlayTransition(show = upDestinationOverlayKey)
 
-            val bouncerActionButton by collectLastValue(bouncerOverlayContentViewModel.actionButton)
+            val bouncerActionButton = bouncerOverlayContentViewModel.actionButton
             assertWithMessage("Bouncer action button not visible")
                 .that(bouncerActionButton)
                 .isNotNull()
@@ -352,7 +350,7 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
             assertThat(upDestinationOverlayKey).isEqualTo(Overlays.Bouncer)
             emulateUserDrivenOverlayTransition(show = upDestinationOverlayKey)
 
-            val bouncerActionButton by collectLastValue(bouncerOverlayContentViewModel.actionButton)
+            val bouncerActionButton = bouncerOverlayContentViewModel.actionButton
             assertWithMessage("Bouncer action button not visible during call")
                 .that(bouncerActionButton)
                 .isNotNull()
@@ -471,6 +469,9 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
         // is not an observable that can trigger a new evaluation.
         fakeDeviceEntryRepository.setLockscreenEnabled(enableLockscreen)
         fakeAuthenticationRepository.setAuthenticationMethod(authMethod)
+
+        // TODO(b/466145787): Merge this state with the one in DeviceEntryRepository.
+        fakeKeyguardRepository.setKeyguardEnabled(enableLockscreen)
     }
 
     /** Emulates a phone call in progress. */
@@ -576,18 +577,6 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
             .isEqualTo(expectedVisible)
         assertThat(currentValue(sceneContainerViewModel.currentScene)).isEqualTo(toScene)
         assertThat(currentValue(sceneInteractor.currentOverlays)).isEqualTo(toOverlays)
-
-        bouncerOverlayJob =
-            if (Overlays.Bouncer in addedOverlays) {
-                testScope.backgroundScope.launch {
-                    bouncerOverlayContentViewModel.authMethodViewModel.collect {
-                        // Do nothing. Need this to turn this otherwise cold flow, hot.
-                    }
-                }
-            } else {
-                bouncerOverlayJob?.cancel()
-                null
-            }
     }
 
     /**
@@ -677,13 +666,12 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
         assertWithMessage("Cannot enter PIN when Bouncer not showing!")
             .that(currentOverlays)
             .contains(Overlays.Bouncer)
-        val authMethodViewModel by
-            collectLastValue(bouncerOverlayContentViewModel.authMethodViewModel)
         assertWithMessage("Cannot enter PIN when not using a PIN authentication method!")
-            .that(authMethodViewModel)
+            .that(bouncerOverlayContentViewModel.authMethodViewModel)
             .isInstanceOf(PinBouncerViewModel::class.java)
 
-        val pinBouncerViewModel = authMethodViewModel as PinBouncerViewModel
+        val pinBouncerViewModel =
+            bouncerOverlayContentViewModel.authMethodViewModel as PinBouncerViewModel
         FakeAuthenticationRepository.DEFAULT_PIN.forEach { digit ->
             pinBouncerViewModel.onPinButtonClicked(digit)
         }
@@ -706,13 +694,12 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
         assertWithMessage("Cannot enter PIN when Bouncer not showing!")
             .that(currentOverlays)
             .contains(Overlays.Bouncer)
-        val authMethodViewModel by
-            collectLastValue(bouncerOverlayContentViewModel.authMethodViewModel)
         assertWithMessage("Cannot enter PIN when not using a PIN authentication method!")
-            .that(authMethodViewModel)
+            .that(bouncerOverlayContentViewModel.authMethodViewModel)
             .isInstanceOf(PinBouncerViewModel::class.java)
 
-        val pinBouncerViewModel = authMethodViewModel as PinBouncerViewModel
+        val pinBouncerViewModel =
+            bouncerOverlayContentViewModel.authMethodViewModel as PinBouncerViewModel
         FakeAuthenticationRepository.DEFAULT_PIN.forEach { digit ->
             pinBouncerViewModel.onPinButtonClicked(digit)
         }
@@ -754,8 +741,8 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
 
     /** Emulates the dismissal of the IME (soft keyboard). */
     private fun Kosmos.dismissIme() {
-        val authViewModel = bouncerOverlayContentViewModel.authMethodViewModel
-        (currentValue(authViewModel) as? PasswordBouncerViewModel)?.onImeDismissed()
+        (bouncerOverlayContentViewModel.authMethodViewModel as? PasswordBouncerViewModel)
+            ?.onImeDismissed()
     }
 
     private fun Kosmos.introduceLockedSim() {

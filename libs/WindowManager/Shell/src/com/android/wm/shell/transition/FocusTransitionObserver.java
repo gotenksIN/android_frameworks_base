@@ -155,11 +155,23 @@ public class FocusTransitionObserver {
     private void updateFocusedTaskPerDisplay(RunningTaskInfo task, int displayId) {
         final RunningTaskInfo lastFocusedTaskOnDisplay =
                 mFocusedTaskOnDisplay.get(displayId);
+        mFocusedTaskOnDisplay.put(displayId, task);
+
+        final int lastFocusedId = lastFocusedTaskOnDisplay != null
+                ? lastFocusedTaskOnDisplay.taskId : INVALID_TASK_ID;
+        if (lastFocusedId == task.taskId) {
+            Slog.d(
+                    TAG,
+                    String.format(
+                            "Task id=%d is already focused on displayId=%d. Skip notifying.",
+                            task.taskId, displayId));
+            return;
+        }
+
         if (lastFocusedTaskOnDisplay != null) {
             mTmpTasksToBeNotified.add(lastFocusedTaskOnDisplay);
         }
         mTmpTasksToBeNotified.add(task);
-        mFocusedTaskOnDisplay.put(displayId, task);
     }
 
     private void updateFocusedDisplay(int endDisplayId) {
@@ -245,7 +257,8 @@ public class FocusTransitionObserver {
         }
     }
 
-    private boolean isFocusedOnDisplay(@NonNull RunningTaskInfo task) {
+    /** Returns if the given RunningTaskInfo is focused */
+    public boolean isFocusedOnDisplay(@NonNull RunningTaskInfo task) {
         if (!ENABLE_DISPLAY_FOCUS_IN_SHELL_TRANSITIONS.isTrue()) {
             return task.isFocused;
         }

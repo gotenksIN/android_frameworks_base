@@ -81,12 +81,17 @@
     <string name="screenshot_saving_private_profile" msgid="8934706048497093297">"Sine-save ang screenshot sa pribado"</string>
     <string name="screenshot_saved_title" msgid="8893267638659083153">"Na-save ang screenshot"</string>
     <string name="screenshot_failed_title" msgid="3259148215671936891">"Hindi ma-save ang screenshot"</string>
+    <string name="screenshot_save_to" msgid="3294574417295882864">"I-save sa"</string>
+    <string name="screenshot_select_folder" msgid="4770537414396025502">"Piliin ang folder"</string>
+    <string name="screenshot_custom_uri_save_fail_title" msgid="1584124511048051054">"Na-save sa folder na %1$s"</string>
+    <string name="screenshot_custom_uri_save_fail_message" msgid="8548656555271518389">"Nagkaproblema. Hindi ma-save sa folder na \"%1$s.\""</string>
     <string name="screenshot_failed_external_display_indication" msgid="6555673132061101936">"External na Display"</string>
     <string name="screenshot_failed_to_save_user_locked_text" msgid="6156607948256936920">"Dapat naka-unlock ang device bago ma-save ang screenshot"</string>
     <string name="screenshot_failed_to_save_unknown_text" msgid="1506621600548684129">"Subukang kumuhang muli ng screenshot"</string>
     <string name="screenshot_failed_to_save_text" msgid="7232739948999195960">"Hindi ma-save ang screenshot"</string>
     <string name="screenshot_failed_to_capture_text" msgid="7818288545874407451">"Hindi pinahihintulutan ng app o ng iyong organisasyon ang pagkuha ng mga screenshot"</string>
     <string name="screenshot_blocked_by_admin" msgid="5486757604822795797">"Na-block ng iyong IT admin ang pagkuha ng mga screenshot"</string>
+    <string name="screenshot_copy_description" msgid="2857172429942249976">"Kopyahin ang screenshot sa clipboard"</string>
     <string name="screenshot_edit_label" msgid="8754981973544133050">"I-edit"</string>
     <string name="screenshot_edit_description" msgid="7802378587672433507">"Button na I-edit ang screenshot"</string>
     <string name="screenshot_share_label" msgid="1653061117238861559">"Ibahagi"</string>
@@ -171,12 +176,9 @@
     <string name="screen_share_audio_sharing_text" msgid="7829391478284315787">"I-share ang audio"</string>
     <string name="screen_share_app_window_sharing_title" msgid="2063554880747318383">"I-share ang window ng app"</string>
     <string name="screen_share_tab_sharing_title" msgid="1178046793832072728">"I-share ang tab"</string>
-    <!-- no translation found for screen_share_entire_screen_sharing_title (9093580141248337998) -->
-    <skip />
-    <!-- no translation found for screen_share_disclaimer_app_sharing (4191319837838590771) -->
-    <skip />
-    <!-- no translation found for screen_share_disclaimer_full_screen_sharing (6445373139864031364) -->
-    <skip />
+    <string name="screen_share_entire_screen_sharing_title" msgid="9093580141248337998">"I-share ang buong screen"</string>
+    <string name="screen_share_disclaimer_app_sharing" msgid="4191319837838590771">"Kapag nagbabahagi ng app, makikita ng [APP NAME] ang ipinapakita o pine-play sa app. Mag-ingat sa mga bagay tulad ng password, detalye ng pagbabayad, mensahe, larawan, at audio at video."</string>
+    <string name="screen_share_disclaimer_full_screen_sharing" msgid="6445373139864031364">"Kapag ibinahagi mo ang iyong buong screen, makikita ng [APP NAME] ang kahit anong nasa screen mo. Kaya mag-ingat sa mga bagay tulad ng mga password, detalye ng pagbabayad, mensahe, larawan, at audio at video."</string>
     <string name="screen_capture_toolbar_app_window_button_screenshot_a11y" msgid="1357560392667941303">"Kunan ng screenshot ang window"</string>
     <string name="screen_capture_toolbar_app_window_button_record_a11y" msgid="8984966592912823394">"I-record ang window"</string>
     <string name="screen_capture_toolbar_region_button_screenshot_a11y" msgid="2102262602357521192">"Kunan ng screenshot ang napiling bahagi"</string>
@@ -709,6 +711,7 @@
     <string name="clear_all_notifications_text" msgid="348312370303046130">"I-clear lahat"</string>
     <string name="manage_notifications_text" msgid="6885645344647733116">"Pamahalaan"</string>
     <string name="manage_notifications_history_text" msgid="57055985396576230">"History"</string>
+    <string name="notification_dismiss_button_text" msgid="2443352751894142153">"Isara"</string>
     <string name="notification_settings_button_description" msgid="2441994740884163889">"Mga setting ng notification"</string>
     <string name="notification_history_button_description" msgid="1578657591405033383">"History ng notification"</string>
     <string name="notification_section_header_incoming" msgid="850925217908095197">"Bago"</string>
@@ -727,7 +730,8 @@
     <string name="adaptive_notification_edu_hun_text" msgid="7743367744129536610">"Babawasan ang volume at alerto nang hanggang 2 minuto kapag nakatanggap ng maraming notification."</string>
     <string name="go_to_adaptive_notification_settings" msgid="2423690125178298479">"I-off"</string>
     <string name="unlock_to_see_notif_text" msgid="7439033907167561227">"I-unlock para makita ang mga mas lumang notification"</string>
-    <string name="quick_settings_disclosure_parental_controls" msgid="2114102871438223600">"Pinapamahalaan ng magulang mo itong device"</string>
+    <string name="quick_settings_disclosure_parental_controls" msgid="5560100935261229784">"Pinapamahalaan ng iyong magulang ang ilang setting"</string>
+    <string name="quick_settings_disclosure_parental_controls_legacy" msgid="4116797775361496057">"Pinapamahalaan ng magulang mo itong device"</string>
     <string name="quick_settings_disclosure_pin_protection" msgid="9219481515114868267">"Pinoprotektahan ng PIN ang ilang setting ng device."</string>
     <string name="quick_settings_disclosure_management_monitoring" msgid="8231336875820702180">"Pagmamay-ari ng organisasyon mo ang device na ito at puwede nitong subaybayan ang trapiko sa network"</string>
     <string name="quick_settings_disclosure_named_management_monitoring" msgid="2831423806103479812">"Pagmamay-ari ng <xliff:g id="ORGANIZATION_NAME">%1$s</xliff:g> ang device na ito at puwede nitong subaybayan ang trapiko sa network"</string>
@@ -832,6 +836,8 @@
     <string name="volume_stream_content_description_vibrate_a11y" msgid="2742330052979397471">"%1$s. I-tap upang itakda na mag-vibrate."</string>
     <string name="volume_stream_content_description_mute_a11y" msgid="5743548478357238156">"%1$s. I-tap upang i-mute."</string>
     <string name="volume_panel_noise_control_title" msgid="7413949943872304474">"Pagkontrol sa Ingay"</string>
+    <!-- no translation found for volume_panel_mic_noise_cancellation_title (2324838199042895036) -->
+    <skip />
     <string name="volume_panel_spatial_audio_title" msgid="3367048857932040660">"Spatial Audio"</string>
     <string name="volume_panel_spatial_audio_off" msgid="4177490084606772989">"Naka-off"</string>
     <string name="volume_panel_spatial_audio_fixed" msgid="3136080137827746046">"Nakapirmi"</string>
@@ -903,6 +909,7 @@
     <string name="tuner_toast" msgid="3812684836514766951">"Binabati kita! Naidagdag na ang Tuner ng System UI sa Mga Setting"</string>
     <string name="remove_from_settings" msgid="633775561782209994">"Alisin sa Mga Setting"</string>
     <string name="remove_from_settings_prompt" msgid="551565437265615426">"Alisin ang Tuner ng System UI sa Mga Setting at ihinto ang paggamit ng lahat ng feature nito?"</string>
+    <string name="qs_customize_remove" msgid="1840904349092819026">"Alisin"</string>
     <string name="enable_bluetooth_title" msgid="866883307336662596">"I-on ang Bluetooth?"</string>
     <string name="enable_bluetooth_message" msgid="6740938333772779717">"Upang ikonekta ang iyong keyboard sa iyong tablet, kailangan mo munang i-on ang Bluetooth."</string>
     <string name="enable_bluetooth_confirmation_ok" msgid="2866408183324184876">"I-on"</string>
@@ -922,15 +929,23 @@
     <string name="inline_done_button" msgid="6043094985588909584">"Tapos na"</string>
     <string name="inline_ok_button" msgid="603075490581280343">"Ilapat"</string>
     <string name="inline_turn_off_notifications" msgid="2653064779176881329">"I-off"</string>
+    <string name="bridged_device_type_phone" msgid="7971199513068521770">"telepono"</string>
+    <string name="bridged_device_type_tablet" msgid="7403330807933649592">"tablet"</string>
+    <string name="bridged_device_type_laptop" msgid="8027976360936787349">"laptop"</string>
+    <string name="bridged_device_type_watch" msgid="2634106046119813073">"relo"</string>
+    <string name="bridged_device_type_tv" msgid="5471822369478942796">"TV"</string>
+    <string name="inline_bridged_open_associated_device_settings" msgid="6885442224230065508">"Buksan ang mga setting ng <xliff:g id="DEVICE_TYPE">%1$s</xliff:g>"</string>
     <string name="notification_silence_title" msgid="8608090968400832335">"Naka-silent"</string>
     <string name="notification_alert_title" msgid="3656229781017543655">"Default"</string>
     <string name="notification_automatic_title" msgid="3745465364578762652">"Awtomatiko"</string>
+    <string name="notification_bridged_title" msgid="4213554380230273828">"Mula sa iyong <xliff:g id="DEVICE_TYPE">%1$s</xliff:g> ang notification na ito"</string>
     <string name="notification_channel_summary_low" msgid="4860617986908931158">"Walang tunog o pag-vibrate"</string>
     <string name="notification_conversation_summary_low" msgid="3855696451919728790">"Walang tunog o pag-vibrate, pero lumalabas pa rin sa seksyon ng pag-uusap"</string>
     <string name="notification_channel_summary_default" msgid="777294388712200605">"Puwedeng mag-ring o mag-vibrate batay sa mga setting ng device"</string>
     <string name="notification_channel_summary_default_with_bubbles" msgid="3482483084451555344">"Puwedeng mag-ring o mag-vibrate batay sa mga setting ng device. Mga pag-uusap mula sa <xliff:g id="APP_NAME">%1$s</xliff:g> bubble bilang default."</string>
     <string name="notification_channel_summary_automatic" msgid="5813109268050235275">"Ipatukoy sa system kung dapat gumawa ng tunog o pag-vibrate ang notification na ito"</string>
     <string name="notification_channel_summary_automatic_alerted" msgid="954166812246932240">"&lt;b&gt;Status:&lt;/b&gt; Na-promote sa Default"</string>
+    <string name="notification_channel_summary_bridged" msgid="6837698421232117637">"Puwedeng i-adjust ang priyoridad at mga setting ng naka-sync na notification sa iyong <xliff:g id="DEVICE_NAME">%1$s</xliff:g>"</string>
     <string name="notification_channel_summary_automatic_silenced" msgid="7403004439649872047">"&lt;b&gt;Status:&lt;/b&gt; Na-demote sa Naka-silent"</string>
     <string name="notification_channel_summary_automatic_promoted" msgid="1301710305149590426">"&lt;b&gt;Status:&lt;/b&gt; Ranked nang Mas Mataas"</string>
     <string name="notification_channel_summary_automatic_demoted" msgid="1831303964660807700">"&lt;b&gt;Status:&lt;/b&gt; Na-rank nang Mas Mababa"</string>
@@ -950,8 +965,7 @@
     <string name="notification_unblockable_call_desc" msgid="5907328164696532169">"Hindi mabago ang mga notification ng tawag."</string>
     <string name="notification_multichannel_desc" msgid="7414593090056236179">"Hindi mako-configure dito ang pangkat na ito ng mga notification"</string>
     <string name="notification_delegate_header" msgid="1264510071031479920">"Na-proxy na notification"</string>
-    <!-- no translation found for notification_summarization_header (511445254923268688) -->
-    <skip />
+    <string name="notification_summarization_header" msgid="511445254923268688">"Binuod ng <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="notification_channel_dialog_title" msgid="6856514143093200019">"Lahat ng notification ng <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="see_more_title" msgid="7409317011708185729">"Tumingin pa"</string>
     <string name="feedback_alerted" msgid="5192459808484271208">"Awtomatikong &lt;b&gt;na-promote sa Default&lt;/b&gt; ng system ang notification na ito."</string>
@@ -1258,6 +1272,7 @@
     <string name="privacy_type_location" msgid="7991481648444066703">"lokasyon"</string>
     <string name="privacy_type_microphone" msgid="9136763906797732428">"mikropono"</string>
     <string name="privacy_type_media_projection" msgid="8136723828804251547">"pag-record ng screen"</string>
+    <string name="privacy_chip_container_leading_title" msgid="4911201935798986077">"Privacy"</string>
     <string name="music_controls_no_title" msgid="4166497066552290938">"Walang pamagat"</string>
     <string name="inattentive_sleep_warning_title" msgid="3891371591713990373">"Naka-standby"</string>
     <string name="font_scaling_dialog_title" msgid="6273107303850248375">"Laki ng Font"</string>
@@ -1405,13 +1420,13 @@
     <string name="media_output_dialog_accessibility_title" msgid="4681741064190167888">"Mga available na device para sa audio output."</string>
     <string name="media_output_dialog_accessibility_seekbar" msgid="5332843993805568978">"Volume"</string>
     <string name="media_output_dialog_volume_percentage" msgid="1613984910585111798">"<xliff:g id="PERCENTAGE">%1$d</xliff:g>%%"</string>
+    <string name="media_output_dialog_missing_permissions_warning" msgid="1279351363821022727">"Hindi nakikita ang ilang device. I-update ang mga pahintulot sa app mo"</string>
+    <string name="media_output_dialog_warning_button_fix" msgid="3324600211761037516">"Ayusin"</string>
     <string name="media_output_group_title_connected_speakers" msgid="3413876972919684479">"Mga nakakonektang speaker"</string>
     <string name="media_output_group_title_speakers_and_displays" msgid="7169712332365659820">"Mga Speaker at Display"</string>
     <string name="media_output_group_title_suggested" msgid="5097061363820410332">"Iminumungkahi"</string>
     <string name="media_input_group_title" msgid="2057057473860783021">"Input"</string>
     <string name="media_output_group_title" msgid="6789001895863332576">"Output"</string>
-    <string name="media_output_end_session_dialog_summary" msgid="5954520685989877347">"Ihinto ang iyong nakabahaging session para maglipat ng media sa ibang device"</string>
-    <string name="media_output_end_session_dialog_stop" msgid="208189434474624412">"Ihinto"</string>
     <string name="media_output_dialog_button_stop_sharing" msgid="5043482739689716185">"Ihinto ang pag-share"</string>
     <string name="media_output_dialog_button_sharing_audio" msgid="8312910741492835648">"Sine-share ang audio"</string>
     <string name="media_output_dialog_button_share_audio" msgid="827604934548421520">"I-share ang audio"</string>
@@ -1743,4 +1758,8 @@
     <string name="accessibility_pager_dots_navigate_to_next_page_action" msgid="7662720613169169465">"mag-navigate sa susunod na page"</string>
     <string name="ambient_cue_autofill_action" msgid="9213025887835308128">"autofill"</string>
     <string name="ambient_cue_expand_action" msgid="6803711089932959312">"i-expand"</string>
+    <string name="location_button_text_share_precise_location" msgid="5341882050169860712">"I-share ang eksaktong lokasyon"</string>
+    <string name="location_button_text_use_precise_location" msgid="3499475231656390476">"Gamitin ang eksaktong lokasyon"</string>
+    <string name="location_button_text_near_precise_location" msgid="3607275724182981412">"Malapit sa eksaktong lokasyon"</string>
+    <string name="location_button_text_precise_location" msgid="4441259889842542799">"Eksaktong lokasyon"</string>
 </resources>

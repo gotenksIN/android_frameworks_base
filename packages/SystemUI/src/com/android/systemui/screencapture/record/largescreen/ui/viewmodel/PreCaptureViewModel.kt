@@ -17,19 +17,23 @@
 package com.android.systemui.screencapture.record.largescreen.ui.viewmodel
 
 import android.app.ActivityManager
+import android.app.ActivityOptions.LaunchCookie
 import android.app.ActivityTaskManager
+import android.app.WindowConfiguration
 import android.graphics.Point
 import android.graphics.Rect
 import android.view.WindowManager
 import com.android.internal.logging.UiEventLogger
 import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.lifecycle.HydratedActivatable
+import com.android.systemui.mediaprojection.MediaProjectionCaptureTarget
 import com.android.systemui.screencapture.ScreenCaptureEvent
 import com.android.systemui.screencapture.common.ScreenCapture
 import com.android.systemui.screencapture.common.shared.model.ScreenCaptureUiParameters
 import com.android.systemui.screencapture.common.ui.viewmodel.DrawableLoaderViewModel
 import com.android.systemui.screencapture.domain.interactor.ScreenCaptureUiInteractor
 import com.android.systemui.screencapture.record.largescreen.domain.interactor.ScreenshotInteractor
+import com.android.systemui.screencapture.record.largescreen.shared.model.AppWindowModel
 import com.android.systemui.screencapture.record.largescreen.shared.model.ScreenCaptureRegion
 import com.android.systemui.screencapture.record.largescreen.shared.model.ScreenCaptureType
 import com.android.systemui.screenrecord.ScreenRecordingAudioSource
@@ -73,9 +77,12 @@ constructor(
             recordingParameters.largeScreenParameters?.defaultCaptureRegion
                 ?: ScreenCaptureRegion.FULLSCREEN
         )
-    private val topTaskSource = MutableStateFlow<ActivityManager.RunningTaskInfo?>(null)
     private val regionBoxSource = MutableStateFlow<Rect?>(null)
+
     private var runningTasks: List<ActivityManager.RunningTaskInfo> = emptyList()
+    private val topTaskSource = MutableStateFlow<ActivityManager.RunningTaskInfo?>(null)
+    private val appWindowSelectionSource = MutableStateFlow<AppWindowModel?>(null)
+    val appWindowSelection: AppWindowModel? by appWindowSelectionSource.hydratedStateOf()
 
     val toolbarViewModel = toolbarViewModelFactory.create()
 
@@ -114,7 +121,7 @@ constructor(
             )
         }
         if (selectedRegion == ScreenCaptureRegion.APP_WINDOW) {
-            runningTasks = activityTaskManager.getTasks(Integer.MAX_VALUE)
+            runningTasks = getAppWindowTasks()
         }
         captureRegionSource.value = selectedRegion
         uiEventLogger.log(
@@ -131,6 +138,37 @@ constructor(
                 )
             }
         topTaskSource.value = task
+
+        if (task != null) {
+            appWindowSelectionSource.value = calculateVisibleArea(task)
+        } else {
+            appWindowSelectionSource.value = null
+        }
+    }
+
+    private fun calculateVisibleArea(
+        selectedTask: ActivityManager.RunningTaskInfo
+    ): AppWindowModel {
+        val selectedTaskIndex = runningTasks.indexOf(selectedTask)
+        val selectedTaskBounds = selectedTask.configuration.windowConfiguration.bounds
+        val overlappingBounds = mutableListOf<Rect>()
+
+        if (selectedTaskIndex > 0) {
+            for (i in 0 until selectedTaskIndex) {
+                val overlayingTask = runningTasks[i]
+                if (overlayingTask.isVisible) {
+                    val overlayingTaskBounds =
+                        overlayingTask.configuration.windowConfiguration.bounds
+                    if (Rect.intersects(selectedTaskBounds, overlayingTaskBounds)) {
+                        overlappingBounds.add(overlayingTaskBounds)
+                    }
+                }
+            }
+        }
+        return AppWindowModel(
+            taskBounds = selectedTaskBounds,
+            overlappingBounds = overlappingBounds,
+        )
     }
 
     fun updateRegionBoxBounds(bounds: Rect) {
@@ -149,7 +187,7 @@ constructor(
         when (captureRegionSource.value) {
             ScreenCaptureRegion.FULLSCREEN -> beginFullscreenScreenshot()
             ScreenCaptureRegion.PARTIAL -> beginPartialScreenshot()
-            ScreenCaptureRegion.APP_WINDOW -> topTask?.taskId?.let { beginAppWindowScreenshot(it) }
+            ScreenCaptureRegion.APP_WINDOW -> topTask?.let { beginAppWindowScreenshot(it.taskId) }
         }
     }
 
@@ -161,7 +199,10 @@ constructor(
             // TODO(b/435225255) Implement a more reliable way to ensure the UI is hidden prior to
             // taking the screenshot.
             delay(100)
-            screenshotInteractor.requestFullscreenScreenshot(displayId)
+            screenshotInteractor.requestFullscreenScreenshot(
+                displayId = displayId,
+                customSaveUri = toolbarViewModel.currentSaveLocationUri,
+            )
         }
         closeUi()
     }
@@ -176,26 +217,30 @@ constructor(
             // TODO(b/435225255) Implement a more reliable way to ensure the UI is hidden prior to
             // taking the screenshot.
             delay(100)
-            screenshotInteractor.requestPartialScreenshot(regionBoxRect, displayId)
+            screenshotInteractor.requestPartialScreenshot(
+                regionBounds = regionBoxRect,
+                displayId = displayId,
+                customSaveUri = toolbarViewModel.currentSaveLocationUri,
+            )
         }
         closeUi()
     }
 
     fun captureTaskAtPosition(pointerPosition: Point) {
         val task =
-            activityTaskManager
-                .getTasks(Integer.MAX_VALUE)
-                .filter { it.isVisible }
-                .firstOrNull {
-                    it.configuration.windowConfiguration.bounds.contains(
-                        pointerPosition.x,
-                        pointerPosition.y,
-                    )
-                }
+            getAppWindowTasks().firstOrNull {
+                it.configuration.windowConfiguration.bounds.contains(
+                    pointerPosition.x,
+                    pointerPosition.y,
+                )
+            }
         if (task == null) {
             return
         }
-        beginAppWindowScreenshot(task.taskId)
+        when (captureTypeSource.value) {
+            ScreenCaptureType.SCREENSHOT -> beginAppWindowScreenshot(task.taskId)
+            ScreenCaptureType.RECORDING -> startAppWindowRecording(task.taskId)
+        }
     }
 
     private fun beginAppWindowScreenshot(taskId: Int) {
@@ -206,11 +251,21 @@ constructor(
         closeUi()
     }
 
+    private fun getAppWindowTasks(): List<ActivityManager.RunningTaskInfo> {
+        return activityTaskManager.getTasks(Integer.MAX_VALUE).filter {
+            it.topActivity != null &&
+                it.isVisible &&
+                it.displayId == displayId &&
+                it.configuration.windowConfiguration.activityType ==
+                    WindowConfiguration.ACTIVITY_TYPE_STANDARD
+        }
+    }
+
     private fun startRecording() {
         when (captureRegionSource.value) {
             ScreenCaptureRegion.FULLSCREEN -> startFullscreenRecording()
             ScreenCaptureRegion.PARTIAL -> {}
-            ScreenCaptureRegion.APP_WINDOW -> {}
+            ScreenCaptureRegion.APP_WINDOW -> topTask?.let { startAppWindowRecording(it.taskId) }
         }
     }
 
@@ -218,6 +273,20 @@ constructor(
         require(captureTypeSource.value == ScreenCaptureType.RECORDING)
         require(captureRegionSource.value == ScreenCaptureRegion.FULLSCREEN)
 
+        beginRecording(recordingTarget = null)
+    }
+
+    private fun startAppWindowRecording(taskId: Int) {
+        require(captureTypeSource.value == ScreenCaptureType.RECORDING)
+        require(captureRegionSource.value == ScreenCaptureRegion.APP_WINDOW)
+
+        beginRecording(
+            recordingTarget =
+                MediaProjectionCaptureTarget(LaunchCookie("media_projection_launch_token"), taskId)
+        )
+    }
+
+    private fun beginRecording(recordingTarget: MediaProjectionCaptureTarget?) {
         // Hide the pre-capture UI before starting the recording.
         // TODO(b/437970158): Show the countdown before starting recording.
         hideUi()
@@ -227,7 +296,7 @@ constructor(
             screenRecordingServiceInteractor.startRecordingDelayed(
                 // TODO(b/437971334): Get options from the UI.
                 ScreenRecordingParameters(
-                    captureTarget = null, // Fullscreen.
+                    captureTarget = recordingTarget,
                     audioSource =
                         toolbarViewModel.recordParametersViewModel.audioSource
                             ?: ScreenRecordingAudioSource.NONE,
@@ -259,7 +328,9 @@ constructor(
         coroutineScope {
             launch { toolbarViewModel.activate() }
             launch { initializeRegionBox() }
-            launch { topTaskSource.value = activityTaskManager.getTasks(1).firstOrNull() }
+            if (captureRegion == ScreenCaptureRegion.APP_WINDOW) {
+                launch { runningTasks = getAppWindowTasks() }
+            }
         }
     }
 

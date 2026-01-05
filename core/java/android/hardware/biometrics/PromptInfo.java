@@ -33,11 +33,11 @@ import java.util.List;
  * @hide
  */
 public class PromptInfo implements Parcelable {
-
     @DrawableRes private int mLogoRes;
     @Nullable private Bitmap mLogoBitmap;
     @Nullable private String mLogoDescription;
     @NonNull private CharSequence mTitle;
+    @NonNull private IdentityCheckInfo mIdentityCheckInfo = new IdentityCheckInfo();
     private boolean mUseDefaultTitle;
     @Nullable private CharSequence mSubtitle;
     private boolean mUseDefaultSubtitle;
@@ -50,7 +50,6 @@ public class PromptInfo implements Parcelable {
     private List<FallbackOption> mFallbackOptions = new ArrayList<>();
     private boolean mConfirmationRequested = true; // default to true
     private boolean mDeviceCredentialAllowed;
-    private boolean mIdentityCheckActive = false;
     private @BiometricManager.Authenticators.Types int mAuthenticators;
     private boolean mDisallowBiometricsIfPolicyExists;
     private boolean mReceiveSystemEvents;
@@ -62,9 +61,9 @@ public class PromptInfo implements Parcelable {
     private boolean mUseParentProfileForDeviceCredential = false;
     private ComponentName mRealCallerForConfirmDeviceCredentialActivity = null;
     private String mClassNameIfItIsConfirmDeviceCredentialActivity = null;
+    private boolean mIsSystemCaller = false;
 
     public PromptInfo() {
-
     }
 
     PromptInfo(Parcel in) {
@@ -84,7 +83,6 @@ public class PromptInfo implements Parcelable {
         mNegativeButtonText = in.readCharSequence();
         mConfirmationRequested = in.readBoolean();
         mDeviceCredentialAllowed = in.readBoolean();
-        mIdentityCheckActive = in.readBoolean();
         mAuthenticators = in.readInt();
         mDisallowBiometricsIfPolicyExists = in.readBoolean();
         mReceiveSystemEvents = in.readBoolean();
@@ -103,6 +101,9 @@ public class PromptInfo implements Parcelable {
             in.readTypedList(options, FallbackOption.CREATOR);
             mFallbackOptions = options;
         }
+        mIsSystemCaller = in.readBoolean();
+        mIdentityCheckInfo = in.readParcelable(IdentityCheckInfo.class.getClassLoader(),
+                IdentityCheckInfo.class);
     }
 
     public static final Creator<PromptInfo> CREATOR = new Creator<PromptInfo>() {
@@ -139,7 +140,6 @@ public class PromptInfo implements Parcelable {
         dest.writeCharSequence(mNegativeButtonText);
         dest.writeBoolean(mConfirmationRequested);
         dest.writeBoolean(mDeviceCredentialAllowed);
-        dest.writeBoolean(mIdentityCheckActive);
         dest.writeInt(mAuthenticators);
         dest.writeBoolean(mDisallowBiometricsIfPolicyExists);
         dest.writeBoolean(mReceiveSystemEvents);
@@ -154,6 +154,8 @@ public class PromptInfo implements Parcelable {
         if (Flags.addFallback()) {
             dest.writeTypedList(mFallbackOptions);
         }
+        dest.writeBoolean(mIsSystemCaller);
+        dest.writeParcelable(mIdentityCheckInfo, 0 /* parcelableFlags */);
     }
 
     // LINT.IfChange
@@ -213,6 +215,8 @@ public class PromptInfo implements Parcelable {
         } else if (mContentView != null && isContentViewMoreOptionsButtonUsed()) {
             return true;
         } else if ((mAuthenticators & BiometricManager.Authenticators.IDENTITY_CHECK) != 0) {
+            return true;
+        } else if (mIdentityCheckInfo.isClearIdentityCheckFallbackOption()) {
             return true;
         }
         return false;
@@ -302,7 +306,12 @@ public class PromptInfo implements Parcelable {
     }
 
     public void setIdentityCheckActive(boolean identityCheckActive) {
-        mIdentityCheckActive = identityCheckActive;
+        mIdentityCheckInfo.setIdentityCheckActive(identityCheckActive);
+    }
+
+    public void setIdentityCheckInactiveReason(
+            @IdentityCheckInfo.IdentityCheckInactiveReason int identityCheckInactiveReason) {
+        mIdentityCheckInfo.setIdentityCheckInactiveReason(identityCheckInactiveReason);
     }
 
     public void setAuthenticators(int authenticators) {
@@ -349,11 +358,19 @@ public class PromptInfo implements Parcelable {
         mUseParentProfileForDeviceCredential = useParentProfileForDeviceCredential;
     }
 
+    public void clearIdentityCheckFallbackOption() {
+        mIdentityCheckInfo.clearIdentityCheckFallbackOption();
+    }
+
     /**
      * Set the class name of ConfirmDeviceCredentialActivity.
      */
     void setClassNameIfItIsConfirmDeviceCredentialActivity(String className) {
         mClassNameIfItIsConfirmDeviceCredentialActivity = className;
+    }
+
+    public void setIsSystemCaller(boolean isSystemCaller) {
+        mIsSystemCaller = isSystemCaller;
     }
 
 
@@ -432,6 +449,10 @@ public class PromptInfo implements Parcelable {
         return mNegativeButtonText;
     }
 
+    public boolean isClearIdentityCheckFallbackOption() {
+        return mIdentityCheckInfo.isClearIdentityCheckFallbackOption();
+    }
+
     public boolean isConfirmationRequested() {
         return mConfirmationRequested;
     }
@@ -448,7 +469,11 @@ public class PromptInfo implements Parcelable {
     }
 
     public boolean isIdentityCheckActive() {
-        return mIdentityCheckActive;
+        return mIdentityCheckInfo.isIdentityCheckActive();
+    }
+
+    public int getIdentityCheckInactiveReason() {
+        return mIdentityCheckInfo.getIdentityCheckInactiveReason();
     }
 
     public int getAuthenticators() {
@@ -494,6 +519,10 @@ public class PromptInfo implements Parcelable {
      */
     public String getClassNameIfItIsConfirmDeviceCredentialActivity() {
        return mClassNameIfItIsConfirmDeviceCredentialActivity;
+    }
+
+    public boolean isSystemCaller() {
+        return mIsSystemCaller;
     }
 
     public List<FallbackOption> getFallbackOptions() {

@@ -508,6 +508,21 @@ public class LockPatternUtils {
     }
 
     /**
+     * Sends a hint to the system server to prepare for verifying a credential within the next 5
+     * seconds. The hint is processed asynchronously, and implementations may choose to ignore it.
+     *
+     * @param userId The user whose credential is going to be checked
+     */
+    public void prepareToVerifyCredential(int userId) {
+        try {
+            getLockSettings().prepareToVerifyCredential(userId);
+        } catch (RemoteException e) {
+            // Do not re-throw, as this is just a hint.
+            Log.e(TAG, "Error while preparing to verify credential: " + e);
+        }
+    }
+
+    /**
      * Check to see if a credential matches the saved one.
      *
      * @param credential The credential to check.
@@ -795,7 +810,7 @@ public class LockPatternUtils {
         return true;
     }
 
-// QTI_BEGIN: 2018-05-29: Core: frameworks: base: Port password retention feature
+// QTI_BEGIN: 2018-05-29: SecureSystems: frameworks: base: Port password retention feature
     /**
      * clears stored password.
      */
@@ -807,7 +822,7 @@ public class LockPatternUtils {
         }
     }
 
-// QTI_END: 2018-05-29: Core: frameworks: base: Port password retention feature
+// QTI_END: 2018-05-29: SecureSystems: frameworks: base: Port password retention feature
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
     public void setOwnerInfo(String info, int userId) {
         setString(LOCK_SCREEN_OWNER_INFO, info, userId);
@@ -907,39 +922,50 @@ public class LockPatternUtils {
     }
 
     /**
-     * Returns true if {@code userHandle} is a profile with separate challenge.
+     * Returns true if {@code userHandle} is a profile whose credential is shareable with its parent
+     * user but the "Use one lock" setting is disabled. Otherwise, returns false.
      * <p>
-     * Returns false if {@code userHandle} is a profile with unified challenge, a profile whose
-     * credential is not shareable with its parent, or a non-profile user.
+     * The "Use one lock" setting being disabled causes sharing to not be active. The profile's
+     * credential, if it has one, is separate from and possibly different from the parent user's
+     * credential.
      */
     public boolean isSeparateProfileChallengeEnabled(int userHandle) {
-        return isCredentialShareableWithParent(userHandle) && hasSeparateChallenge(userHandle);
+        return isCredentialShareableWithParent(userHandle)
+                && !isUseOneLockSettingEnabled(userHandle);
     }
 
     /**
-     * Returns true if {@code userHandle} is a profile with unified challenge.
-     * <p>
-     * Returns false if {@code userHandle} is a profile with separate challenge, a profile whose
-     * credential is not shareable with its parent, or a non-profile user.
+     * Returns true if {@code userHandle} is a profile whose credential is shareable with its parent
+     * and the "Use one lock" setting is enabled. If this returns true then there are two cases.
+     * Either:
+     * <ul>
+     *     <li>the parent has a credential and the profile has a "unified profile password"
+     *     credential.</li>
+     *     <li>neither the parent nor the profile has a credential.</li>
+     * </ul>
+     * Note that the latter state is also possible with "Use one lock" disabled, the difference just
+     * being the state of "Use one lock" itself which matters if a credential is set again later.
      */
     public boolean isProfileWithUnifiedChallenge(int userHandle) {
-        return isCredentialShareableWithParent(userHandle) && !hasSeparateChallenge(userHandle);
+        return isCredentialShareableWithParent(userHandle)
+                && isUseOneLockSettingEnabled(userHandle);
     }
 
     /**
-     * Returns true if {@code userHandle} is a managed profile with unified challenge.
+     * Returns true if {@code userHandle} is a managed profile with unified challenge, i.e. the "Use
+     * one lock" setting is enabled.
      */
     public boolean isManagedProfileWithUnifiedChallenge(int userHandle) {
-        return isManagedProfile(userHandle) && !hasSeparateChallenge(userHandle);
+        return isManagedProfile(userHandle) && isUseOneLockSettingEnabled(userHandle);
     }
 
-    private boolean hasSeparateChallenge(int userHandle) {
+    private boolean isUseOneLockSettingEnabled(int userHandle) {
         try {
-            return getLockSettings().getSeparateProfileChallengeEnabled(userHandle);
+            return getLockSettings().isUseOneLockSettingEnabled(userHandle);
         } catch (RemoteException e) {
-            Log.e(TAG, "Couldn't get separate profile challenge enabled");
-            // Default value is false
-            return false;
+            Log.e(TAG, "Couldn't get isUseOneLockSettingEnabled");
+            // Default value is true
+            return true;
         }
     }
 

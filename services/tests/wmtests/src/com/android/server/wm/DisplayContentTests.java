@@ -34,6 +34,7 @@ import static android.view.Display.FLAG_ALLOWS_CONTENT_MODE_SWITCH;
 import static android.view.Display.FLAG_PRIVATE;
 import static android.view.Display.FLAG_SHOULD_SHOW_SYSTEM_DECORATIONS;
 import static android.view.Display.FLAG_TRUSTED;
+import static android.view.DisplayAdjustments.DEFAULT_DISPLAY_ADJUSTMENTS;
 import static android.view.DisplayCutout.BOUNDS_POSITION_TOP;
 import static android.view.DisplayCutout.fromBoundingRect;
 import static android.view.Surface.ROTATION_0;
@@ -108,12 +109,14 @@ import static org.junit.Assume.assumeTrue;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
+import static org.mockito.ArgumentMatchers.notNull;
 import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import android.annotation.NonNull;
@@ -126,6 +129,7 @@ import android.graphics.Insets;
 import android.graphics.Rect;
 import android.graphics.Region;
 import android.hardware.HardwareBuffer;
+import android.hardware.display.DisplayManagerGlobal;
 import android.metrics.LogMaker;
 import android.os.Binder;
 import android.os.RemoteException;
@@ -1211,6 +1215,33 @@ public class DisplayContentTests extends WindowTestsBase {
     }
 
     @Test
+    public void testUnspecifiedOrientationTranslucentTop() {
+        mDisplayContent.setIgnoreOrientationRequest(false);
+        final ActivityRecord bottom = new ActivityBuilder(mAtm).setVisible(false)
+                .setCreateTask(true)
+                .setScreenOrientation(getRotatedOrientation(mDisplayContent)).build();
+        final ActivityRecord translucentTop = new ActivityBuilder(mAtm).setVisible(false)
+                .setTask(bottom.getTask())
+                .setActivityTheme(android.R.style.Theme_Translucent)
+                .setScreenOrientation(SCREEN_ORIENTATION_UNSPECIFIED).build();
+        requestTransition(translucentTop, WindowManager.TRANSIT_OPEN);
+        doCallRealMethod().when(mRootWindowContainer).ensureActivitiesVisible(
+                any() /* starting */, anyBoolean() /* notifyClients */);
+        // Make 'translucentTop' and 'bottom' visible with updating orientation.
+        mRootWindowContainer.ensureVisibilityAndConfig(translucentTop, mDisplayContent,
+                false /* deferResume */);
+
+        assertEquals("The orientation source is the bottom because a translucent activity"
+                        + " with unspecified orientation won't affect parent orientation",
+                bottom, mDisplayContent.getLastOrientationSource());
+        assertTrue("The translucent activity doesn't provide orientation, so it uses the"
+                        + " orientation from the bottom which provides a rotated orientation",
+                translucentTop.hasFixedRotationTransform());
+        assertTrue("The non-top visible activity shares the same transform",
+                bottom.hasFixedRotationTransform(translucentTop));
+    }
+
+    @Test
     public void testFixedToUserRotationChanged() {
         final DisplayContent dc = createNewDisplay();
         dc.setIgnoreOrientationRequest(false);
@@ -1454,6 +1485,28 @@ public class DisplayContentTests extends WindowTestsBase {
             dc.unregisterSystemGestureExclusionListener(verifier);
         }
         assertTrue("SystemGestureExclusionListener was not invoked", invoked[0]);
+    }
+
+    /**
+     * Verifies that unregistering a system gesture exclusion listener after the display has been
+     * removed does not cause a crash.
+     */
+    @Test
+    public void testUnregisterSystemGestureExclusionListenerAfterDisplayRemoval() {
+        final DisplayContent dc = createNewDisplay();
+        final var listener = new ISystemGestureExclusionListener.Stub() {
+            @Override
+            public void onSystemGestureExclusionChanged(int displayId, Region actual,
+                    Region unrestricted) {
+            }
+        };
+        dc.registerSystemGestureExclusionListener(listener);
+
+        // Remove the display, which should kill the listeners.
+        dc.removeImmediately();
+
+        // Unregistering after removal should not crash.
+        dc.unregisterSystemGestureExclusionListener(listener);
     }
 
     @Test
@@ -2208,6 +2261,69 @@ public class DisplayContentTests extends WindowTestsBase {
     }
 
     @Test
+    public void testCreateMirrorForDisplay_createsMirror() {
+        when(SurfaceControl.mirrorSurface(any())).then((inv) -> new SurfaceControl());
+        final var mirror = mDisplayContent.createMirrorForDisplay();
+
+        assertNotNull(mirror.getMirrorSurfaceControl());
+        verify(mTransaction).reparent(notNull(), eq(mirror.getMirrorSurfaceControl()));
+        verify(mTransaction).show(mirror.getMirrorSurfaceControl());
+    }
+
+    @Test
+    public void testCloseMirror_closesMirror() throws Exception {
+        when(SurfaceControl.mirrorSurface(any())).then((inv) -> new SurfaceControl());
+        final var mirror = mDisplayContent.createMirrorForDisplay();
+        assertNotNull(mirror.getMirrorSurfaceControl());
+        final var mirrorChildCaptor = ArgumentCaptor.forClass(SurfaceControl.class);
+        verify(mTransaction).reparent(mirrorChildCaptor.capture(),
+                eq(mirror.getMirrorSurfaceControl()));
+        clearInvocations(mTransaction);
+
+        mirror.close();
+
+        verify(mTransaction).remove(mirror.getMirrorSurfaceControl());
+        verify(mTransaction).remove(mirrorChildCaptor.getValue());
+    }
+
+    @Test
+    public void testDuplicateCloseMirrorCalls_doesNothing() throws Exception {
+        when(SurfaceControl.mirrorSurface(any())).then((inv) -> new SurfaceControl());
+        final var mirror = mDisplayContent.createMirrorForDisplay();
+        assertNotNull(mirror.getMirrorSurfaceControl());
+        final var mirrorChildCaptor = ArgumentCaptor.forClass(SurfaceControl.class);
+        verify(mTransaction).reparent(mirrorChildCaptor.capture(),
+                eq(mirror.getMirrorSurfaceControl()));
+        mirror.close();
+        clearInvocations(mTransaction);
+
+        mirror.close();
+        mirror.close();
+
+        verifyNoInteractions(mTransaction);
+    }
+
+    @Test
+    public void testMigrateToNewSurfaceControl_updatesMirrors() {
+        when(SurfaceControl.mirrorSurface(any())).then((inv) -> new SurfaceControl());
+        final var mirror = mDisplayContent.createMirrorForDisplay();
+        assertNotNull(mirror.getMirrorSurfaceControl());
+        final var mirrorChildCaptor = ArgumentCaptor.forClass(SurfaceControl.class);
+        verify(mTransaction).reparent(mirrorChildCaptor.capture(),
+                eq(mirror.getMirrorSurfaceControl()));
+        clearInvocations(mTransaction);
+
+        mDisplayContent.migrateToNewSurfaceControl(mTransaction);
+
+        verify(mTransaction).remove(mirrorChildCaptor.getValue());
+        final var newMirrorChildCaptor = ArgumentCaptor.forClass(SurfaceControl.class);
+        verify(mTransaction).reparent(newMirrorChildCaptor.capture(),
+                eq(mirror.getMirrorSurfaceControl()));
+        verify(mTransaction).show(newMirrorChildCaptor.getValue());
+        assertNotEquals(mirrorChildCaptor.getValue(), newMirrorChildCaptor.getValue());
+    }
+
+    @Test
     public void testFindScrollCaptureTargetWindow_behindWindow() {
         final DisplayContent dc = createNewDisplay();
         final Task rootTask = createTask(dc);
@@ -2304,6 +2420,7 @@ public class DisplayContentTests extends WindowTestsBase {
     }
 
     @Test
+    @DisableFlags(FLAG_ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT)
     public void testIsPublicSecondaryDisplayWithDesktopModeForceEnabled() {
         mWm.mForceDesktopModeOnExternalDisplays = true;
         // Not applicable for default display
@@ -2323,6 +2440,54 @@ public class DisplayContentTests extends WindowTestsBase {
         // Make sure forceDesktopMode() is false when the force config is disabled.
         mWm.mForceDesktopModeOnExternalDisplays = false;
         assertFalse(publicDc.isPublicSecondaryDisplayWithDesktopModeForceEnabled());
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT)
+    public void testIsNotPublicSecondaryDisplayWithDesktopModeForceEnabledAndContentModeMngmnt() {
+        mWm.mForceDesktopModeOnExternalDisplays = true;
+        // Not applicable for default display
+        assertFalse(mDefaultDisplay.isPublicSecondaryDisplayWithDesktopModeForceEnabled());
+
+        // Not applicable for private secondary display.
+        final DisplayInfo displayInfo = new DisplayInfo();
+        displayInfo.copyFrom(mDisplayInfo);
+        displayInfo.flags = FLAG_PRIVATE;
+        final DisplayContent privateDc = createNewDisplay(displayInfo);
+        assertFalse(privateDc.isPublicSecondaryDisplayWithDesktopModeForceEnabled());
+
+        // Still not applicable for public secondary display, as content mode management is enabled.
+        final DisplayContent publicDc = createNewDisplay();
+        assertFalse(publicDc.isPublicSecondaryDisplayWithDesktopModeForceEnabled());
+
+        // Make sure forceDesktopMode() is false when the force config is disabled.
+        mWm.mForceDesktopModeOnExternalDisplays = false;
+        assertFalse(publicDc.isPublicSecondaryDisplayWithDesktopModeForceEnabled());
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT)
+    public void testDisplayCanHostTaskCanHaveSystemDecor() {
+        DisplayWindowSettings.SettingsProvider.SettingsEntry entry =
+                new DisplayWindowSettings.SettingsProvider.SettingsEntry();
+        entry.mShouldShowSystemDecors = true;
+
+        DisplayContent dc = constructDisplayContentWithSavedSettings(/*canHostTasks=*/ true, entry);
+
+        assertTrue(mAtm.mWindowManager.mDisplayWindowSettings.shouldShowSystemDecorsLocked(dc));
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT)
+    public void testDisplayCannotHostTaskCannotHaveSystemDecor() {
+        DisplayWindowSettings.SettingsProvider.SettingsEntry entry =
+                new DisplayWindowSettings.SettingsProvider.SettingsEntry();
+        entry.mShouldShowSystemDecors = true;
+
+        DisplayContent dc = constructDisplayContentWithSavedSettings(/*canHostTasks=*/ false,
+                entry);
+
+        assertFalse(mAtm.mWindowManager.mDisplayWindowSettings.shouldShowSystemDecorsLocked(dc));
     }
 
     @Test
@@ -3386,6 +3551,29 @@ public class DisplayContentTests extends WindowTestsBase {
         final DisplayContent dc = createNewDisplay();
         doNothing().when(dc).updateDisplayInfo(any(DisplayInfo.class));
         return dc;
+    }
+
+    /** Create a display content with saved settings. Only call the constructor. */
+    @NonNull
+    private DisplayContent constructDisplayContentWithSavedSettings(
+            boolean canHostTasks,
+            DisplayWindowSettings.SettingsProvider.SettingsEntry savedSettingsEntry
+    ) {
+        final DisplayInfo displayInfo = new DisplayInfo();
+        displayInfo.copyFrom(mDisplayInfo);
+        final int displayId = SystemServicesTestRule.sNextDisplayId++;
+        displayInfo.displayId = displayId;
+        displayInfo.uniqueId = "TEST_DISPLAY_ID-" + System.currentTimeMillis();
+        final Display display = new Display(DisplayManagerGlobal.getInstance(), displayId,
+                displayInfo, DEFAULT_DISPLAY_ADJUSTMENTS);
+        mAtm.mWindowManager.mDisplayWindowSettingsProvider
+                .updateOverrideSettings(displayInfo, savedSettingsEntry);
+        spyOn(display);
+        doReturn(canHostTasks).when(display).canHostTasks();
+        doReturn(true).when(display).isValid();
+
+        return new TestDisplayContent.Builder(mAtm, displayInfo, /*generateUniqueId=*/ false)
+                .createInternal(display);
     }
 
     private void assertForAllWindowsOrder(@NonNull List<WindowState> expectedWindowsBottomToTop) {

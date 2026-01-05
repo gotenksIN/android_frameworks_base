@@ -108,6 +108,9 @@ interface PromptSelectorInteractor {
     /** Fingerprint sensor type */
     val fingerprintSensorType: Flow<FingerprintSensorType>
 
+    /** If Identity Check fallback needs to be cleared */
+    val clearIdentityCheckFallback: Flow<Boolean>
+
     /** The current [BiometricPromptView] shown in the prompt */
     val currentView: Flow<BiometricPromptView>
 
@@ -215,6 +218,11 @@ constructor(
             .map { info -> info?.isIdentityCheckActive ?: false }
             .distinctUntilChanged()
 
+    override val clearIdentityCheckFallback: Flow<Boolean> =
+        promptRepository.promptInfo
+            .map { info -> info?.isClearIdentityCheckFallbackOption() ?: false }
+            .distinctUntilChanged()
+
     override val watchRangingState: Flow<WatchRangingState> =
         callbackFlow {
                 val updateWatchRangingState = { state: Int ->
@@ -309,7 +317,27 @@ constructor(
             isLandscape = false,
         )
 
-        logEvent(SysUiStatsLog.BIOMETRIC_PROMPT_EVENT__EVENT__EVENT_TYPE_CREDENTIAL_VIEW_SHOWN)
+        when (promptKind.value) {
+            PromptKind.Password ->
+                logEvent(
+                    SysUiStatsLog
+                        .BIOMETRIC_PROMPT_EVENT__EVENT__EVENT_TYPE_CREDENTIAL_PASSWORD_VIEW_SHOWN
+                )
+            PromptKind.Pattern ->
+                logEvent(
+                    SysUiStatsLog
+                        .BIOMETRIC_PROMPT_EVENT__EVENT__EVENT_TYPE_CREDENTIAL_PATTERN_VIEW_SHOWN
+                )
+            PromptKind.Pin ->
+                logEvent(
+                    SysUiStatsLog
+                        .BIOMETRIC_PROMPT_EVENT__EVENT__EVENT_TYPE_CREDENTIAL_PIN_VIEW_SHOWN
+                )
+            else ->
+                logEvent(
+                    SysUiStatsLog.BIOMETRIC_PROMPT_EVENT__EVENT__EVENT_TYPE_CREDENTIAL_VIEW_SHOWN
+                )
+        }
     }
 
     override fun onSwitchToAuth() {

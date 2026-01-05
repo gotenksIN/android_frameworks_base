@@ -16,6 +16,9 @@
 
 package com.android.systemui.screencapture.record.smallscreen.ui.compose
 
+import android.graphics.Region
+import android.view.ViewTreeObserver.InternalInsetsInfo
+import android.view.Window
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
@@ -53,6 +56,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -61,21 +65,27 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.android.compose.PlatformIconButton
 import com.android.compose.modifiers.thenIf
 import com.android.systemui.lifecycle.rememberViewModel
 import com.android.systemui.res.R
+import com.android.systemui.screencapture.common.ScreenCaptureUi
 import com.android.systemui.screencapture.common.ScreenCaptureUiScope
 import com.android.systemui.screencapture.common.ui.compose.LoadingIcon
 import com.android.systemui.screencapture.common.ui.compose.PrimaryButton
 import com.android.systemui.screencapture.common.ui.compose.ScreenCaptureContent
 import com.android.systemui.screencapture.common.ui.compose.loadIcon
 import com.android.systemui.screencapture.common.ui.viewmodel.DrawableLoaderViewModel
-import com.android.systemui.screencapture.record.smallscreen.ui.viewmodel.RecordDetailsPopupType
+import com.android.systemui.screencapture.record.smallscreen.shared.model.RecordDetailsPopupType
 import com.android.systemui.screencapture.record.smallscreen.ui.viewmodel.SmallScreenCaptureRecordViewModel
+import com.android.systemui.util.view.listenToComputeInternalInsets
 import javax.inject.Inject
+import kotlin.math.roundToInt
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
@@ -83,8 +93,10 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 class SmallScreenCaptureRecordContent
 @Inject
-constructor(private val viewModelFactory: SmallScreenCaptureRecordViewModel.Factory) :
-    ScreenCaptureContent {
+constructor(
+    @ScreenCaptureUi private val window: Window?,
+    private val viewModelFactory: SmallScreenCaptureRecordViewModel.Factory,
+) : ScreenCaptureContent {
 
     @Composable
     override fun Content() {
@@ -92,6 +104,17 @@ constructor(private val viewModelFactory: SmallScreenCaptureRecordViewModel.Fact
             rememberViewModel("SmallScreenCaptureRecordContent#viewModel") {
                 viewModelFactory.create()
             }
+
+        val viewTreeObserver = window?.decorView?.viewTreeObserver
+        val toolbarBounds = remember { Region.obtain() }
+        val settingsBounds = remember { Region.obtain() }
+        LaunchedEffect(viewTreeObserver) {
+            viewTreeObserver?.listenToComputeInternalInsets {
+                setTouchableInsets(InternalInsetsInfo.TOUCHABLE_INSETS_REGION)
+                touchableRegion.op(toolbarBounds, Region.Op.UNION)
+                touchableRegion.op(settingsBounds, Region.Op.UNION)
+            }
+        }
 
         Column(
             verticalArrangement = Arrangement.spacedBy(4.dp),
@@ -110,6 +133,11 @@ constructor(private val viewModelFactory: SmallScreenCaptureRecordViewModel.Fact
                 shape = FloatingToolbarDefaults.ContainerShape,
                 color = MaterialTheme.colorScheme.surface,
                 shadowElevation = 6.dp,
+                modifier =
+                    Modifier.fillBoundsInWindowIf(
+                        region = toolbarBounds,
+                        condition = viewTreeObserver != null,
+                    ),
             ) {
                 Row(
                     modifier = Modifier.height(64.dp).padding(horizontal = 12.dp),
@@ -127,8 +155,14 @@ constructor(private val viewModelFactory: SmallScreenCaptureRecordViewModel.Fact
                     )
                     AnimatedVisibility(visible = viewModel.shouldShowSettingsButton) {
                         ToggleToolbarButton(
-                            checked = viewModel.shouldShowDetails,
-                            onCheckedChanged = { viewModel.shouldShowSettings(it) },
+                            checked = viewModel.detailsPopup == RecordDetailsPopupType.Settings,
+                            onCheckedChanged = {
+                                if (it) {
+                                    viewModel.showSettings()
+                                } else {
+                                    viewModel.resetDetailsPopup()
+                                }
+                            },
                             icon = {
                                 LoadingIcon(
                                     icon =
@@ -161,6 +195,34 @@ constructor(private val viewModelFactory: SmallScreenCaptureRecordViewModel.Fact
                             },
                         )
                     }
+                    AnimatedVisibility(
+                        visible =
+                            viewModel.shouldShowMarkupButton && viewModel.markupEnabled == true
+                    ) {
+                        ToggleToolbarButton(
+                            checked =
+                                viewModel.detailsPopup ==
+                                    RecordDetailsPopupType.MarkupColorSelector,
+                            onCheckedChanged = {
+                                if (it) {
+                                    viewModel.showMarkupColorSelector()
+                                } else {
+                                    viewModel.resetDetailsPopup()
+                                }
+                            },
+                            icon = {
+                                val colorInt =
+                                    viewModel.recordDetailsMarkupColorPickerViewModel.color
+                                        ?: return@ToggleToolbarButton
+                                MarkupColorItem(
+                                    color = Color(colorInt),
+                                    selected = false,
+                                    modifier = Modifier.size(20.dp),
+                                )
+                            },
+                        )
+                    }
+
                     Spacer(Modifier.width(12.dp))
 
                     val coroutineScope = rememberCoroutineScope()
@@ -183,9 +245,14 @@ constructor(private val viewModelFactory: SmallScreenCaptureRecordViewModel.Fact
             }
 
             AnimatedVisibility(
-                visible = viewModel.shouldShowDetails,
+                visible = viewModel.detailsPopup != RecordDetailsPopupType.Invisible,
                 enter = fadeIn(),
                 exit = fadeOut(),
+                modifier =
+                    Modifier.fillBoundsInWindowIf(
+                        region = settingsBounds,
+                        condition = viewTreeObserver != null,
+                    ),
             ) {
                 Surface(
                     color = MaterialTheme.colorScheme.surface,
@@ -210,7 +277,6 @@ constructor(private val viewModelFactory: SmallScreenCaptureRecordViewModel.Fact
                                     onAppSelectorClicked = { viewModel.showAppSelector() },
                                     modifier = contentModifier,
                                 )
-
                             RecordDetailsPopupType.AppSelector ->
                                 RecordDetailsAppSelector(
                                     viewModel = viewModel.recordDetailsAppSelectorViewModel,
@@ -221,15 +287,35 @@ constructor(private val viewModelFactory: SmallScreenCaptureRecordViewModel.Fact
                                     },
                                     modifier = contentModifier,
                                 )
-
                             RecordDetailsPopupType.MarkupColorSelector ->
-                                RecordDetailsMarkupColorSelector(modifier = contentModifier)
+                                RecordDetailsMarkupColorPicker(
+                                    viewModel = viewModel.recordDetailsMarkupColorPickerViewModel,
+                                    modifier = contentModifier,
+                                )
+                            RecordDetailsPopupType.Invisible -> {
+                                /* do nothing */
+                            }
                         }
                     }
                 }
             }
         }
     }
+
+    @Composable
+    private fun Modifier.fillBoundsInWindowIf(region: Region, condition: Boolean): Modifier =
+        thenIf(condition) {
+            Modifier.onGloballyPositioned { layoutCoordinates ->
+                with(layoutCoordinates.boundsInWindow()) {
+                    region.set(
+                        left.roundToInt(),
+                        top.roundToInt(),
+                        right.roundToInt(),
+                        bottom.roundToInt(),
+                    )
+                }
+            }
+        }
 }
 
 @Composable

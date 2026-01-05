@@ -228,7 +228,11 @@ public class PackageParser {
      * @hide
      */
     private static final int RECREATE_ON_CONFIG_CHANGES_MASK =
-            ActivityInfo.CONFIG_MCC | ActivityInfo.CONFIG_MNC;
+            com.android.window.flags.Flags.enableLessActivityRecreationOnConfigChange() ?
+                    ActivityInfo.CONFIG_MCC | ActivityInfo.CONFIG_MNC | ActivityInfo.CONFIG_KEYBOARD
+                            | ActivityInfo.CONFIG_KEYBOARD_HIDDEN | ActivityInfo.CONFIG_NAVIGATION
+                            | ActivityInfo.CONFIG_TOUCHSCREEN | ActivityInfo.CONFIG_COLOR_MODE
+                    : ActivityInfo.CONFIG_MCC | ActivityInfo.CONFIG_MNC;
 
     // These are the tags supported by child packages
     public static final Set<String> CHILD_PACKAGE_TAGS = new ArraySet<>();
@@ -5746,6 +5750,19 @@ public class PackageParser {
             Slog.wtf(TAG, "Could not parse public key: DSA KeyFactory not included in build");
         } catch (InvalidKeySpecException e) {
             // Not a DSA public key.
+        }
+
+        if (android.security.Flags.apkPqcHybridSigning()) {
+            /* Now try it as an ML-DSA key. */
+            try {
+                final KeyFactory keyFactory = KeyFactory.getInstance("ML-DSA");
+                return keyFactory.generatePublic(keySpec);
+            } catch (NoSuchAlgorithmException e) {
+                Slog.wtf(TAG,
+                        "Cound not parse public key: ML-DSA KeyFactory not included in build");
+            } catch (InvalidKeySpecException e) {
+                // Not an ML-DSA public key.
+            }
         }
 
         /* Not a supported key type */

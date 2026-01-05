@@ -44,6 +44,7 @@ import com.android.systemui.flags.DisableSceneContainer
 import com.android.systemui.flags.EnableSceneContainer
 import com.android.systemui.flags.andSceneContainer
 import com.android.systemui.keyguard.data.repository.fakeDeviceEntryFaceAuthRepository
+import com.android.systemui.keyguard.data.repository.fakeKeyguardRepository
 import com.android.systemui.keyguard.data.repository.fakeKeyguardTransitionRepository
 import com.android.systemui.keyguard.data.repository.keyguardOcclusionRepository
 import com.android.systemui.keyguard.domain.interactor.keyguardInteractor
@@ -108,8 +109,10 @@ import com.android.systemui.statusbar.pipeline.shared.domain.interactor.setHomeS
 import com.android.systemui.statusbar.pipeline.shared.domain.interactor.setHomeStatusBarInteractorShowOperatorName
 import com.android.systemui.statusbar.pipeline.shared.ui.model.VisibilityModel
 import com.android.systemui.statusbar.policy.configurationController
+import com.android.systemui.statusbar.policy.data.repository.fakeDeviceProvisioningRepository
 import com.android.systemui.statusbar.window.shared.model.StatusBarWindowState
 import com.android.systemui.testKosmos
+import com.android.systemui.user.data.repository.fakeUserRepository
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.runBlocking
@@ -1420,7 +1423,7 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
         }
 
     @Test
-    @EnableFlags(StatusBarShowIconsInSecureCamera.FLAG_NAME, Flags.FLAG_DISABLE_FLAGS_PER_DISPLAY)
+    @EnableFlags(StatusBarShowIconsInSecureCamera.FLAG_NAME)
     fun secureCamera_noStatusBarViewsShown_duringAnyPartOfLaunch() =
         kosmos.runTest {
             setStatusBarWindowState(StatusBarWindowState.Showing)
@@ -1443,7 +1446,7 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
         }
 
     @Test
-    @EnableFlags(StatusBarShowIconsInSecureCamera.FLAG_NAME, Flags.FLAG_DISABLE_FLAGS_PER_DISPLAY)
+    @EnableFlags(StatusBarShowIconsInSecureCamera.FLAG_NAME)
     fun secureCamera_statusBarViewsShown_ifWindowShowing() =
         kosmos.runTest {
             setStatusBarWindowState(StatusBarWindowState.Showing)
@@ -1676,7 +1679,8 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
                 ObservableTransitionState.Idle(
                     sceneInteractor.currentScene.value,
                     checkNotNull(currentOverlays),
-                )
+                ),
+                skipChangeScene = true,
             )
             assertThat(currentOverlays).containsExactly(Overlays.QuickSettingsShade)
 
@@ -1711,7 +1715,8 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
                 ObservableTransitionState.Idle(
                     checkNotNull(currentScene),
                     checkNotNull(currentOverlays),
-                )
+                ),
+                skipChangeScene = true,
             )
             assertThat(currentOverlays).contains(Overlays.NotificationsShade)
 
@@ -1758,6 +1763,89 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
             underTest.onShadeExpansionIntent(eventX, statusBarWidth)
             assertThat(displayId).isEqualTo(EXTERNAL_DISPLAY)
         }
+
+    @Test
+    fun deviceNotProvisioned_quickSettingsChipNotClickable() =
+        kosmos.runTest {
+            fakeDeviceProvisioningRepository.setDeviceProvisioned(false)
+
+            assertThat(underTest.isQuickSettingsChipClickable).isFalse()
+        }
+
+    @Test
+    fun deviceProvisioned_quickSettingsChipClickable() =
+        kosmos.runTest {
+            fakeDeviceProvisioningRepository.setDeviceProvisioned(true)
+
+            assertThat(underTest.isQuickSettingsChipClickable).isTrue()
+        }
+
+    @Test
+    fun deviceNotProvisioned_notificationsChipNotClickable() =
+        kosmos.runTest {
+            fakeDeviceProvisioningRepository.setDeviceProvisioned(false)
+
+            assertThat(underTest.isNotificationsChipClickable).isFalse()
+        }
+
+    @Test
+    fun deviceProvisioned_notificationsChipClickable() =
+        kosmos.runTest {
+            fakeDeviceProvisioningRepository.setDeviceProvisioned(true)
+
+            assertThat(underTest.isNotificationsChipClickable).isTrue()
+        }
+
+    @Test
+    @EnableFlags(Flags.FLAG_SIGN_OUT_BUTTON_ON_KEYGUARD_STATUS_BAR)
+    fun signOutButton_isVisible_whenUserManagerLogoutIsEnabled() {
+        kosmos.runTest {
+            fakeKeyguardRepository.setIsSignOutButtonOnStatusBarEnabledInConfig(true)
+            fakeUserRepository.setUserManagerLogoutEnabled(true)
+            fakeUserRepository.setPolicyManagerLogoutEnabled(false)
+
+            assertThat(underTest.isSignOutButtonVisible).isTrue()
+        }
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_SIGN_OUT_BUTTON_ON_KEYGUARD_STATUS_BAR)
+    fun signOutButton_isNotVisible_whenUserManagerLogoutIsDisabled() {
+        kosmos.runTest {
+            fakeKeyguardRepository.setIsSignOutButtonOnStatusBarEnabledInConfig(true)
+            fakeUserRepository.setUserManagerLogoutEnabled(false)
+            fakeUserRepository.setPolicyManagerLogoutEnabled(true)
+
+            assertThat(underTest.isSignOutButtonVisible).isFalse()
+        }
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_SIGN_OUT_BUTTON_ON_KEYGUARD_STATUS_BAR)
+    fun signOutButton_isNotVisible_whenDisabledInConfig() {
+        kosmos.runTest {
+            fakeKeyguardRepository.setIsSignOutButtonOnStatusBarEnabledInConfig(false)
+            fakeUserRepository.setUserManagerLogoutEnabled(true)
+            fakeUserRepository.setPolicyManagerLogoutEnabled(false)
+
+            assertThat(underTest.isSignOutButtonVisible).isFalse()
+        }
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_SIGN_OUT_BUTTON_ON_KEYGUARD_STATUS_BAR)
+    fun onSignOut_logsOutWithUserManager_whenUserManagerLogoutIsEnabled() {
+        kosmos.runTest {
+            fakeKeyguardRepository.setIsSignOutButtonOnStatusBarEnabledInConfig(true)
+            val logoutToSystemUserCount = fakeUserRepository.logOutWithUserManagerCallCount
+            fakeUserRepository.setUserManagerLogoutEnabled(true)
+            fakeUserRepository.setPolicyManagerLogoutEnabled(false)
+            underTest.onSignOut()
+
+            assertThat(fakeUserRepository.logOutWithUserManagerCallCount)
+                .isEqualTo(logoutToSystemUserCount + 1)
+        }
+    }
 
     private fun activeNotificationsStore(notifications: List<ActiveNotificationModel>) =
         ActiveNotificationsStore.Builder()

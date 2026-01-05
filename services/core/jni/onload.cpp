@@ -54,6 +54,7 @@ int register_android_server_am_OomConnection(JNIEnv* env);
 int register_android_server_am_CachedAppOptimizer(JNIEnv* env);
 int register_android_server_am_Freezer(JNIEnv* env);
 int register_android_server_am_LowMemDetector(JNIEnv* env);
+int register_android_server_am_MemoryLimiter(JNIEnv* env);
 int register_android_server_utils_AnrTimer(JNIEnv *env);
 int register_android_server_utils_LazyJniRegistrar(JNIEnv* env);
 int register_com_android_server_soundtrigger_middleware_AudioSessionProviderImpl(JNIEnv* env);
@@ -69,7 +70,9 @@ int register_com_android_server_wm_TaskFpsCallbackController(JNIEnv* env);
 int register_com_android_server_display_DisplayControl(JNIEnv* env);
 int register_com_android_server_SystemClockTime(JNIEnv* env);
 int register_android_server_display_smallAreaDetectionController(JNIEnv* env);
+// QTI_BEGIN: 2019-11-13: Core: Add mechanism to improve consistancy of notification
 int register_android_server_ActivityTriggerService(JNIEnv* env);
+// QTI_END: 2019-11-13: Core: Add mechanism to improve consistancy of notification
 int register_com_android_server_accessibility_BrailleDisplayConnection(JNIEnv* env);
 int register_android_server_am_PhantomProcessList(JNIEnv* env);
 int register_android_server_utils_LongMethodTracer(JNIEnv* env);
@@ -122,6 +125,7 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void* /* reserved */)
     register_android_server_am_CachedAppOptimizer(env);
     register_android_server_am_Freezer(env);
     register_android_server_am_LowMemDetector(env);
+    register_android_server_am_MemoryLimiter(env);
     register_android_server_utils_AnrTimer(env);
     register_android_server_utils_LazyJniRegistrar(env);
     register_com_android_server_soundtrigger_middleware_AudioSessionProviderImpl(env);
@@ -137,7 +141,9 @@ extern "C" jint JNI_OnLoad(JavaVM* vm, void* /* reserved */)
     register_com_android_server_display_DisplayControl(env);
     register_com_android_server_SystemClockTime(env);
     register_android_server_display_smallAreaDetectionController(env);
+// QTI_BEGIN: 2019-11-13: Core: Add mechanism to improve consistancy of notification
     register_android_server_ActivityTriggerService(env);
+// QTI_END: 2019-11-13: Core: Add mechanism to improve consistancy of notification
     register_com_android_server_accessibility_BrailleDisplayConnection(env);
     register_android_server_am_PhantomProcessList(env);
     register_android_server_utils_LongMethodTracer(env);

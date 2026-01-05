@@ -31,7 +31,6 @@ import static android.window.TransitionInfo.FLAG_SHOW_WALLPAPER;
 
 import static com.android.internal.jank.InteractionJankMonitor.CUJ_PREDICTIVE_BACK_HOME;
 import static com.android.window.flags.Flags.predictiveBackQuickDoubleBackSwipes;
-import static com.android.window.flags.Flags.predictiveBackStopKeycodeBackForwarding;
 import static com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_BACK_PREVIEW;
 
 import android.animation.ValueAnimator;
@@ -111,6 +110,7 @@ public class BackAnimationController implements RemoteCallable<BackAnimationCont
      * Max duration to wait for an animation to finish before triggering the real back.
      */
     private static final long MAX_ANIMATION_DURATION = 2000;
+    private NonGestureStartHandler mLatestOnNonGestureStarted;
     private long mMaxAnimationDuration = MAX_ANIMATION_DURATION;
     // Note: Must keep a reference when register to ValueAnimator.
     private final ValueAnimator.DurationScaleChangeListener mAnimationScaleChangeListener;
@@ -545,12 +545,28 @@ public class BackAnimationController implements RemoteCallable<BackAnimationCont
         if (keyAction == MotionEvent.ACTION_DOWN) {
             if (!mBackGestureStarted) {
                 if (swipeEdge == EDGE_NONE) {
-                    // start animation immediately for non-gestural sources (without ACTION_MOVE
-                    // events)
-                    mPointersPilfered = true;
-                    onGestureStarted(touchX, touchY, swipeEdge);
-                    onThresholdCrossed();
-                    mShouldStartOnNextMoveEvent = false;
+                    if (!com.android.window.flags.Flags.simulateTouchDisplayFromNavigationBack()) {
+                        // start animation immediately for non-gestural sources (without ACTION_MOVE
+                        // events)
+                        mPointersPilfered = true;
+                        onGestureStarted(touchX, touchY, swipeEdge);
+                        onThresholdCrossed();
+                        mShouldStartOnNextMoveEvent = false;
+                    } else {
+                        // Simulate inject key event to system server.
+                        try {
+                            mActivityTaskManager.simulateTouchDisplay(displayId);
+                        } catch (RemoteException remoteException) {
+                            Log.e(TAG, "Failed to simulateBackInject", remoteException);
+                        }
+                        // simulateTouchDisplay can potentially trigger a display change transition.
+                        // To prevent the upcoming transition from being blocked on the Shell's main
+                        // thread, post the onGestureStart event to the next run cycle after
+                        // transition is idle.
+                        mLatestOnNonGestureStarted = new NonGestureStartHandler();
+                        mShellExecutor.executeDelayed(() -> mTransitions.runOnIdle(
+                                mLatestOnNonGestureStarted), 0);
+                    }
                 } else {
                     mShouldStartOnNextMoveEvent = true;
                 }
@@ -565,12 +581,48 @@ public class BackAnimationController implements RemoteCallable<BackAnimationCont
             }
             onMove(swipeEdge);
         } else if (keyAction == MotionEvent.ACTION_UP || keyAction == MotionEvent.ACTION_CANCEL) {
-            ProtoLog.d(WM_SHELL_BACK_PREVIEW,
-                    "Finishing gesture with event action: %d", keyAction);
-            if (keyAction == MotionEvent.ACTION_CANCEL) {
-                setTriggerBack(false);
+            if (mLatestOnNonGestureStarted != null) {
+                mLatestOnNonGestureStarted.mLatestKeyAction = keyAction;
+                return;
             }
-            onGestureFinished();
+            handleFinishKeyAction(keyAction);
+        }
+    }
+
+    private void handleFinishKeyAction(int keyAction) {
+        ProtoLog.d(WM_SHELL_BACK_PREVIEW,
+                "Finishing gesture with event action: %d", keyAction);
+        if (keyAction == MotionEvent.ACTION_CANCEL) {
+            setTriggerBack(false);
+        }
+        onGestureFinished();
+    }
+
+    private class NonGestureStartHandler implements Runnable {
+        private Boolean mSetTriggerBack;
+        private int mLatestKeyAction;
+
+        @Override
+        public void run() {
+            if (mLatestOnNonGestureStarted == this) {
+                mLatestOnNonGestureStarted = null;
+            }
+            mPointersPilfered = true;
+            onGestureStarted(0, 0, EDGE_NONE);
+            onThresholdCrossed();
+            mShouldStartOnNextMoveEvent = false;
+
+            if (mSetTriggerBack != null) {
+                BackAnimationController.this.setTriggerBack(mSetTriggerBack);
+            }
+            if (mLatestKeyAction == MotionEvent.ACTION_UP
+                    || mLatestKeyAction == MotionEvent.ACTION_CANCEL) {
+                handleFinishKeyAction(mLatestKeyAction);
+            }
+        }
+
+        void setTriggerBack(boolean triggerBack) {
+            mSetTriggerBack = Boolean.valueOf(triggerBack);
         }
     }
 
@@ -829,6 +881,10 @@ public class BackAnimationController implements RemoteCallable<BackAnimationCont
      * Sets to true when the back gesture has passed the triggering threshold, false otherwise.
      */
     public void setTriggerBack(boolean triggerBack) {
+        if (mLatestOnNonGestureStarted != null) {
+            mLatestOnNonGestureStarted.setTriggerBack(triggerBack);
+            return;
+        }
         if (mActiveCallback != null) {
             try {
                 mActiveCallback.setTriggerBack(triggerBack);
@@ -1138,14 +1194,10 @@ public class BackAnimationController implements RemoteCallable<BackAnimationCont
         if (mApps.length >= 1) {
             BackMotionEvent startEvent = mCurrentTracker.createStartEvent();
             dispatchOnBackStarted(mActiveCallback, startEvent);
-            if (predictiveBackStopKeycodeBackForwarding()
-                    || startEvent.getSwipeEdge() == EDGE_NONE) {
-                // onBackStarted is dispatched here so that WindowOnBackInvokedDispatcher knows
-                // about the back navigation and can intercept touch events while it's active. This
-                // is used for 3-button-nav predictive back cases. This is also needed, so that any
-                // observer callbacks can be invoked
-                dispatchOnBackStarted(mBackNavigationInfo.getOnBackInvokedCallback(), startEvent);
-            }
+            // onBackStarted is dispatched here so that WindowOnBackInvokedDispatcher knows
+            // about the back navigation and can intercept touch events while it's active.
+            // This is also needed, so that any observer callbacks can be invoked
+            dispatchOnBackStarted(mBackNavigationInfo.getOnBackInvokedCallback(), startEvent);
         }
     }
 

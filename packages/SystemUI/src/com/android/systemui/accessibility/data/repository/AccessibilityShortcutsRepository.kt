@@ -28,7 +28,6 @@ import android.text.BidiFormatter
 import android.text.TextUtils
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityManager
-import com.android.hardware.input.Flags
 import com.android.internal.accessibility.common.ShortcutConstants.UserShortcutType
 import com.android.internal.accessibility.dialog.AccessibilityTarget
 import com.android.internal.accessibility.dialog.AccessibilityTargetHelper
@@ -145,14 +144,6 @@ constructor(
     // Action key
     private val MODIFIER_KEY = KeyEvent.META_META_ON
 
-    private val keyCodeMap =
-        mapOf(
-            KeyEvent.KEYCODE_M to "M",
-            KeyEvent.KEYCODE_T to "T",
-            KeyEvent.KEYCODE_S to "S",
-            KeyEvent.KEYCODE_V to "V",
-        )
-
     override suspend fun getKeyGestureConfirmInfo(
         keyGestureType: Int,
         metaState: Int,
@@ -163,7 +154,7 @@ constructor(
         // TODO: b/419026315 - Update the secondary modifier key label.
         val secondaryModifierLabel =
             ShortcutHelperKeys.modifierLabels[MODIFIER_KEY xor metaState] ?: return null
-        val keyCodeLabel = keyCodeMap[keyCode] ?: return null
+        val keyCodeLabel = ShortcutUtils.getLabelFromKeyCode(keyCode) ?: return null
 
         val actionKeyLabel = resources.getText(R.string.shortcut_helper_customizer_action_key_text)
         when (keyGestureType) {
@@ -223,6 +214,7 @@ constructor(
                     ttsText,
                 )
             }
+            KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_DISPLAY_COLOR_INVERSION,
             KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_MAGNIFICATION,
             KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_VOICE_ACCESS -> {
                 val featureName = getFeatureName(keyGestureType, targetName) ?: return null
@@ -360,7 +352,13 @@ constructor(
                     .toMutableSet()
                     // This observes targets being assigned/unassigned to the shortcut.
                     .apply { add(ShortcutUtils.convertToKey(shortcutType)) }
-                    .map { key -> secureSettings.registerContentObserverAsync(key, observer) }
+                    .map { key ->
+                        secureSettings.registerContentObserverForUserAsync(
+                            key,
+                            observer,
+                            userTracker.userId,
+                        )
+                    }
                     .joinAll()
 
                 // Emits the initial state of the list of accessibility targets.
@@ -387,6 +385,10 @@ constructor(
 
     private suspend fun getFeatureName(keyGestureType: Int, targetName: String): CharSequence? {
         return when (keyGestureType) {
+            KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_DISPLAY_COLOR_INVERSION ->
+                resources.getString(
+                    R.string.quick_settings_inversion_label
+                )
             KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_MAGNIFICATION ->
                 resources.getString(
                     com.android.settingslib.R.string.accessibility_screen_magnification_title
@@ -409,18 +411,12 @@ constructor(
     private suspend fun getDialogTitle(keyGestureType: Int, featureName: CharSequence): String? {
         return when (keyGestureType) {
             KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_MAGNIFICATION -> {
-                if (Flags.enableMagnifyMagnificationKeyGestureDialog()) {
-                    resources.getString(
-                        R.string.accessibility_key_gesture_magnification_dialog_title,
-                        featureName,
-                    )
-                } else {
-                    resources.getString(
-                        R.string.accessibility_key_gesture_shortcut_not_yet_enabled_dialog_title,
-                        featureName,
-                    )
-                }
+                resources.getString(
+                    R.string.accessibility_key_gesture_magnification_dialog_title,
+                    featureName,
+                )
             }
+            KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_DISPLAY_COLOR_INVERSION,
             KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_SCREEN_READER,
             KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_VOICE_ACCESS -> {
                 resources.getString(
@@ -441,6 +437,8 @@ constructor(
     ): CharSequence? {
         val contentTemplateResId: Int? =
             when (keyGestureType) {
+                KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_DISPLAY_COLOR_INVERSION ->
+                    R.string.accessibility_key_gesture_color_inversion_dialog_content
                 KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_MAGNIFICATION ->
                     R.string.accessibility_key_gesture_magnification_dialog_content
                 KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_SCREEN_READER ->

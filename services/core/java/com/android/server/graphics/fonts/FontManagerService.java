@@ -103,23 +103,20 @@ public final class FontManagerService extends IFontManager.Stub {
 
     @RequiresPermission(Manifest.permission.UPDATE_FONTS)
     @Override
-    public int insertFontFamilyBefore(@NonNull List<FontUpdateRequest> requests,
-            String fontFamilyNameToInsertBefore, int baseVersion) {
+    public int updateFontFallbacks(@NonNull List<FontUpdateRequest> fallbackRequests) {
         try {
-            Preconditions.checkArgumentNonnegative(baseVersion);
-            Objects.requireNonNull(fontFamilyNameToInsertBefore);
-            Objects.requireNonNull(requests);
+            Objects.requireNonNull(fallbackRequests);
             getContext().enforceCallingPermission(Manifest.permission.UPDATE_FONTS,
                     "UPDATE_FONTS permission required.");
             try {
-                insert(baseVersion, fontFamilyNameToInsertBefore, requests);
+                updateFallbacks(fallbackRequests);
                 return FontManager.RESULT_SUCCESS;
             } catch (SystemFontException e) {
-                Slog.e(TAG, "Failed to insert font family", e);
+                Slog.e(TAG, "Failed to update font fallbacks", e);
                 return e.getErrorCode();
             }
         } finally {
-            closeFileDescriptors(requests);
+            closeFileDescriptors(fallbackRequests);
         }
     }
 
@@ -377,22 +374,15 @@ public final class FontManagerService extends IFontManager.Stub {
         }
     }
 
-    /* package */ void insert(int baseVersion, String fontFamilyNameToInsertBefore,
-                              List<FontUpdateRequest> requests) throws SystemFontException {
+    /* package */ void updateFallbacks(List<FontUpdateRequest> fallbackRequests)
+            throws SystemFontException {
         synchronized (mUpdatableFontDirLock) {
             if (mUpdatableFontDir == null) {
                 throw new SystemFontException(
                         FontManager.RESULT_ERROR_FONT_UPDATER_DISABLED,
                         "The font updater is disabled.");
             }
-            // baseVersion == -1 only happens from shell command. This is filtered and treated as
-            // error from SystemApi call.
-            if (baseVersion != -1 && mUpdatableFontDir.getConfigVersion() != baseVersion) {
-                throw new SystemFontException(
-                        FontManager.RESULT_ERROR_VERSION_MISMATCH,
-                        "The base config version is older than current.");
-            }
-            mUpdatableFontDir.insert(requests, fontFamilyNameToInsertBefore);
+            mUpdatableFontDir.updateFontFallbacks(fallbackRequests);
             updateSerializedFontMap();
         }
     }

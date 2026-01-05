@@ -59,6 +59,7 @@ import android.util.Log;
 import android.util.Pair;
 import android.util.Slog;
 import android.util.SparseArray;
+import android.util.SparseIntArray;
 import android.view.Display;
 import android.view.DisplayAdjustments;
 import android.view.DisplayInfo;
@@ -73,10 +74,8 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.Executor;
 import java.util.concurrent.atomic.AtomicLong;
@@ -146,7 +145,8 @@ public final class DisplayManagerGlobal {
             INTERNAL_EVENT_FLAG_DISPLAY_COMMITTED_STATE_CHANGED,
             INTERNAL_EVENT_FLAG_DISPLAY_HDR_SDR_RATIO_CHANGED,
             INTERNAL_EVENT_FLAG_DISPLAY_BRIGHTNESS_CHANGED,
-            INTERNAL_EVENT_FLAG_DISPLAY_REMOVED
+            INTERNAL_EVENT_FLAG_DISPLAY_REMOVED,
+            INTERNAL_EVENT_FLAG_DISPLAY_SNAPSHOT
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface InternalEventFlag {}
@@ -161,6 +161,7 @@ public final class DisplayManagerGlobal {
     public static final long INTERNAL_EVENT_FLAG_DISPLAY_HDR_SDR_RATIO_CHANGED = 1L << 7;
     public static final long INTERNAL_EVENT_FLAG_DISPLAY_BRIGHTNESS_CHANGED = 1L << 8;
     public static final long INTERNAL_EVENT_FLAG_DISPLAY_REMOVED = 1L << 9;
+    public static final long INTERNAL_EVENT_FLAG_DISPLAY_SNAPSHOT = 1L << 10;
 
     @UnsupportedAppUsage
     private static DisplayManagerGlobal sInstance;
@@ -196,12 +197,18 @@ public final class DisplayManagerGlobal {
     private boolean mShouldImplicitlyRegisterAdded = false;
     // Guarded by mLock
     private boolean mShouldImplicitlyRegisterConnected = false;
-
+    // Guarded by mLock
     private final DisplayIdsCache mDisplayIdsCache;
 
     @VisibleForTesting
     public DisplayManagerGlobal(IDisplayManager dm) {
-        mDisplayIdsCache = Flags.displayListenerSnapshot() ? new DisplayIdsCache() : null;
+        if (Process.myUid() != Process.SYSTEM_UID // cache display IDs for non-system processes
+                && (Flags.displayListenerSnapshot() || Flags.displayIdsCache())) {
+            mDisplayIdsCache = new DisplayIdsCache();
+        } else {
+            mDisplayIdsCache = null;
+        }
+
         mDm = dm;
         if (Flags.displayInfoCopyOnWriteCacheEnabled() && Process.myUid() == Process.SYSTEM_UID) {
             mDmInternal = LocalServices.getService(DisplayManagerInternal.class);
@@ -334,11 +341,18 @@ public final class DisplayManagerGlobal {
      * @return An array containing all display ids.
      */
     public int[] getDisplayIds(boolean includeDisabled) {
+        if (mDmInternal != null) {
+            if (DEBUG) {
+                Log.d(TAG, "getDisplayIds: includeDisabled=" + includeDisabled
+                        + ", using internal service");
+            }
+            return mDmInternal.getDisplayIds(includeDisabled);
+        }
         try {
             synchronized (mLock) {
                 if (mDisplayIdsCache != null) {
                     // If caching is not enabled for the requested type of display IDs,
-                    // we implicitly register for the corresponding events.
+                    // then implicitly register for the corresponding events.
                     // This allows the cache to be enabled and populated when the first snapshot
                     // arrives, even if no explicit display listener was registered for these
                     // specific event types yet.
@@ -728,7 +742,10 @@ public final class DisplayManagerGlobal {
                 }
             }
             if (mDisplayIdsCache != null) {
-                mDisplayIdsCache.updateCacheLocked(displayId, eventMask);
+                eventMask = mDisplayIdsCache.updateCacheLocked(displayId, eventMask);
+                if (eventMask == 0) {
+                    return;
+                }
             }
         }
 
@@ -1026,6 +1043,16 @@ public final class DisplayManagerGlobal {
             }
             return null;
         }
+        if (mDisplayIdsCache != null) {
+            synchronized (mLock) {
+                // This virtual display is created synchronously, so we assume that
+                // the display has already been created when we get here.
+                // It is important to add the display id in the cache even before we receive
+                // the onDisplayAdded callback, because some apps may expect the display to be
+                // available through {@link DisplayManager#getDisplays} immediately after creation.
+                mDisplayIdsCache.injectLocked(displayId);
+            }
+        }
         return new VirtualDisplay(this, display, callbackWrapper,
                 virtualDisplayConfig.getSurface());
     }
@@ -1047,9 +1074,17 @@ public final class DisplayManagerGlobal {
         }
     }
 
-    public void releaseVirtualDisplay(IVirtualDisplayCallback token) {
+    /**
+     * Releases virtual display identified token and displayId.
+     */
+    public void releaseVirtualDisplay(IVirtualDisplayCallback token, int displayId) {
         try {
             mDm.releaseVirtualDisplay(token);
+            if (mDisplayIdsCache != null) {
+                synchronized (mLock) {
+                    mDisplayIdsCache.evictLocked(displayId);
+                }
+            }
         } catch (RemoteException ex) {
             throw ex.rethrowFromSystemServer();
         }
@@ -1743,6 +1778,7 @@ public final class DisplayManagerGlobal {
                 Slog.i(TAG, "Sending Display Events: " + eventsToString(eventMask));
             }
             if (Flags.displayListenerSnapshot()
+                    && (internalEventFlagsMask & INTERNAL_EVENT_FLAG_DISPLAY_SNAPSHOT) != 0
                     && (mIsConnectedSnapshotExpected || mIsAddedSnapshotExpected)
                     && mAddedSnapshotReceived == SnapshotReceived.NEVER
                     && mConnectedSnapshotReceived == SnapshotReceived.NEVER) {
@@ -1762,6 +1798,13 @@ public final class DisplayManagerGlobal {
         }
 
         void sendDisplaySnapshot(@Nullable int[] connected, @Nullable int[] added) {
+            if ((internalEventFlagsMask & INTERNAL_EVENT_FLAG_DISPLAY_SNAPSHOT) == 0) {
+                if (DEBUG) {
+                    Slog.d(TAG, "Snapshot is not requested by the client"
+                            + " package=" + ActivityThread.currentPackageName());
+                }
+                return;
+            }
             if ((connected == null || connected.length == 0) && mIsConnectedSnapshotExpected
                     && mConnectedSnapshotReceived != SnapshotReceived.LATEST) {
                 if (DEBUG) {
@@ -2254,6 +2297,12 @@ public final class DisplayManagerGlobal {
             baseEventMask |= INTERNAL_EVENT_FLAG_DISPLAY_BRIGHTNESS_CHANGED;
         }
 
+        if (Flags.displayListenerSnapshot()) {
+            if ((eventFlags & DisplayManager.EVENT_TYPE_DISPLAY_SNAPSHOT) != 0) {
+                baseEventMask |= INTERNAL_EVENT_FLAG_DISPLAY_SNAPSHOT;
+            }
+        }
+
         return baseEventMask;
     }
 
@@ -2269,70 +2318,160 @@ public final class DisplayManagerGlobal {
      * The cache must be first initialized with {@link #updateCacheLocked}.
      * The cache is possible to init only if it is enabled with
      * {@link #setConnectedCachingEnabledLocked} or {@link #setAddedCachingEnabledLocked}.
+     *
+     * @hide
      */
+    @VisibleForTesting
     public static class DisplayIdsCache {
-        private volatile boolean mIsConnectedCachingEnabled;
-        private volatile boolean mIsAddedCachingEnabled;
-        private volatile boolean mIsConnectedCacheValid;
-        private volatile boolean mIsAddedCacheValid;
-        private final HashSet<Integer> mConnectedDisplayIdsCache = new HashSet<>();
-        private final HashSet<Integer> mAddedDisplayIdsCache = new HashSet<>();
+        // Mark a display id as controlled by the current process, but not yet received via
+        // onDisplayAdded or onDisplayRemoved events from the system server. This is used to
+        // avoid throwing an exception when duplicate display events are
+        // received for these displays, but also prevent races when display id gets added
+        // and/or removed on this process much quicker than onDisplayAdded/Removed are
+        // received from the system server
+        private static final int FLAG_LOCALLY_CONTROLLED = 1;
+        // Mark a display id as CONNECTED
+        private static final int FLAG_CONNECTED = 1 << 1;
+        // Mark a display id as ADDED, must be set together with CONNECTED, because
+        // a display id is always ADDED after it is CONNECTED.
+        private static final int FLAG_ADDED = 1 << 2;
 
-        void updateCacheLocked(int[] connected, int[] added) {
+        private static final boolean mIsValidationEnabled = Flags.displayIdsCacheValidation();
+
+        private boolean mIsConnectedCachingEnabled;
+        private boolean mIsAddedCachingEnabled;
+        private boolean mIsConnectedCacheValid;
+        private boolean mIsAddedCacheValid;
+        private final SparseIntArray mIdsCache = new SparseIntArray();
+
+        @Nullable
+        private int[] mConnectedIdsCacheArray = null;
+        @Nullable
+        private int[] mAddedIdsCacheArray = null;
+
+        /**
+         * This is used to speed up the discovery of the displays controlled by the current process,
+         * so that current application could call getDisplays() and see these displays immediately.
+         */
+        @VisibleForTesting
+        public void injectLocked(int displayId) {
+            if (mIsAddedCachingEnabled || mIsConnectedCachingEnabled) {
+                mIdsCache.put(displayId, FLAG_LOCALLY_CONTROLLED | FLAG_CONNECTED | FLAG_ADDED);
+                invalidateArrayCaches();
+            }
+        }
+
+        /**
+         * This is used to speed up the removal of the displays controlled by the current process,
+         * so that current application could call getDisplays() and no longer see these displays
+         * immediately.
+         */
+        @VisibleForTesting
+        public void evictLocked(int displayId) {
+            if (mIsAddedCachingEnabled || mIsConnectedCachingEnabled) {
+                int index = mIdsCache.indexOfKey(displayId);
+                if (index < 0) {
+                    return;
+                }
+                mIdsCache.setValueAt(index, FLAG_LOCALLY_CONTROLLED);
+                invalidateArrayCaches();
+            }
+        }
+
+        /**
+         * Initialize the cache given the snapshot of connected and/or added displayIds.
+         */
+        @VisibleForTesting
+        public void updateCacheLocked(int[] connected, int[] added) {
             if (DEBUG) {
                 Log.d(TAG, "updateCacheLocked"
                         + " package=" + ActivityThread.currentPackageName()
                         + " connectedCaching=" + mIsConnectedCachingEnabled
                         + " addedCaching=" + mIsAddedCachingEnabled
+                        + " connectedCacheValid=" + mIsConnectedCacheValid
+                        + " addedCacheValid=" + mIsAddedCacheValid
                         + " connected=" + Arrays.toString(connected)
                         + " added=" + Arrays.toString(added));
             }
-            if (mIsConnectedCachingEnabled && connected.length > 0) {
-                mConnectedDisplayIdsCache.clear();
-                for (int i = 0; i < connected.length; i++) {
-                    mConnectedDisplayIdsCache.add(connected[i]);
-                }
-                mIsConnectedCacheValid = true;
-            }
             if (mIsAddedCachingEnabled && added.length > 0) {
-                mAddedDisplayIdsCache.clear();
+                clearIdsByFlags(FLAG_CONNECTED | FLAG_ADDED);
                 for (int i = 0; i < added.length; i++) {
-                    mAddedDisplayIdsCache.add(added[i]);
+                    mIdsCache.put(added[i], FLAG_CONNECTED | FLAG_ADDED);
                 }
                 mIsAddedCacheValid = true;
             }
+            if (mIsConnectedCachingEnabled && connected.length > 0) {
+                clearIdsByFlags(FLAG_CONNECTED);
+                for (int i = 0; i < connected.length; i++) {
+                    if ((mIdsCache.get(connected[i], 0) & FLAG_ADDED) == 0) {
+                        mIdsCache.put(connected[i], FLAG_CONNECTED);
+                    }
+                }
+                mIsConnectedCacheValid = true;
+            }
+            invalidateArrayCaches();
         }
 
         /**
          * Sets whether caching is enabled.
          */
-        void setConnectedCachingEnabledLocked(boolean isCachingEnabled) {
+        @VisibleForTesting
+        public void setConnectedCachingEnabledLocked(boolean isCachingEnabled) {
             mIsConnectedCachingEnabled = isCachingEnabled;
             // If caching is no longer enabled, then the cache is no longer valid either.
             if (DEBUG && mIsConnectedCacheValid && !isCachingEnabled) {
                 Log.d(TAG, "setConnectedCachingEnabledLocked disabling cache"
                         + " package=" + ActivityThread.currentPackageName());
             }
-            mIsConnectedCacheValid &= isCachingEnabled;
+            if (!isCachingEnabled) {
+                if (!mIsAddedCacheValid) {
+                    mIdsCache.clear();
+                } else {
+                    clearIdsByFlags(FLAG_CONNECTED);
+                }
+                mIsConnectedCacheValid = false;
+            }
         }
 
         /**
          * Sets whether caching is enabled.
          */
-        void setAddedCachingEnabledLocked(boolean isCachingEnabled) {
+        @VisibleForTesting
+        public void setAddedCachingEnabledLocked(boolean isCachingEnabled) {
             mIsAddedCachingEnabled = isCachingEnabled;
             // If caching is no longer enabled, then the cache is no longer valid either.
             if (DEBUG && mIsAddedCacheValid && !isCachingEnabled) {
                 Log.d(TAG, "setAddedCachingEnabledLocked disabling cache"
                         + " package=" + ActivityThread.currentPackageName());
             }
-            mIsAddedCacheValid &= isCachingEnabled;
+            if (!isCachingEnabled) {
+                if (!mIsConnectedCacheValid) {
+                    mIdsCache.clear();
+                }
+                mIsAddedCacheValid = false;
+            }
         }
 
-        void updateCacheLocked(int displayId, int eventMask) {
+        /**
+         * Incrementally update the cache given displayId, and the event(s).
+         *
+         * System server sends REMOVED and DISCONNECTED events for all displays, even those to which
+         * this uid never had access to before.
+         * For example virtual displays which the current UID has no access to. System server
+         * may not have information about UIDs which have access to this display id by the time of
+         * sending these events, so will send these events anyway (b/458435043).
+         * This method uses currently cached display ids to avoid sending
+         * display events to the current process, in case it is not supposed to have access to
+         * the displayId.
+         *
+         * @return eventMask, with potentially skipped REMOVED and DISCONNECTED events.
+         */
+        @VisibleForTesting
+        public int updateCacheLocked(int displayId, int eventMask) {
             if (!mIsConnectedCacheValid && !mIsAddedCacheValid) {
-                return;
+                return eventMask;
             }
+            int outEventMask = eventMask;
             // Given that the cache is valid:
             // This event can NOT be a duplicate of the snapshot which might have been
             // recently received by the listener. This is because EVENT and SNAPSHOT message
@@ -2343,79 +2482,163 @@ public final class DisplayManagerGlobal {
             // Local mDisplayIdsCache gets updated IN ORDER due to binder execution guarantees,
             // which ensures that there is NO WAY of having a duplicated event, such as ADDED
             // while it is already present in the cache (received in the snapshot a moment ago).
-            if (mIsConnectedCacheValid && (eventMask & EVENT_DISPLAY_CONNECTED) != 0) {
-                if (mConnectedDisplayIdsCache.contains(displayId)) {
-                    throw new IllegalStateException("DisplayId " + displayId
-                            + " is already present in the mConnectedDisplayIdsCache!");
-                }
-                mConnectedDisplayIdsCache.add(displayId);
-            }
-
             if (mIsAddedCacheValid && (eventMask & EVENT_DISPLAY_ADDED) != 0) {
-                if (mAddedDisplayIdsCache.contains(displayId)) {
-                    throw new IllegalStateException("DisplayId " + displayId
-                            + " is already present in the mAddedDisplayIdsCache!");
+                int index = getIndexAndValidateNotAdded(displayId);
+                if (index < 0) {
+                    mIdsCache.put(displayId, FLAG_CONNECTED | FLAG_ADDED);
+                } else if (mIdsCache.valueAt(index) != FLAG_LOCALLY_CONTROLLED) {
+                    // If value is found - it must be not just locally controlled.
+                    mIdsCache.setValueAt(index, FLAG_CONNECTED | FLAG_ADDED);
+                } else {
+                    // otherwise if it has just FLAG_LOCALLY_CONTROLLED - it is already removed,
+                    // so don't add it.
+                    outEventMask &= ~(EVENT_DISPLAY_CONNECTED | EVENT_DISPLAY_ADDED);
                 }
-                mAddedDisplayIdsCache.add(displayId);
+                invalidateArrayCaches();
+            } else if (mIsConnectedCacheValid && (eventMask & EVENT_DISPLAY_CONNECTED) != 0) {
+                int index = getIndexAndValidateNotConnected(displayId);
+                if (index < 0) {
+                    mIdsCache.put(displayId, FLAG_CONNECTED);
+                } else if (mIdsCache.valueAt(index) != FLAG_LOCALLY_CONTROLLED) {
+                    // If value is found - it must be not just locally controlled.
+                    mIdsCache.setValueAt(index, FLAG_CONNECTED);
+                } else {
+                    // otherwise if it has just FLAG_LOCALLY_CONTROLLED - it is already removed,
+                    // so don't store it.
+                    outEventMask &= ~(EVENT_DISPLAY_CONNECTED | EVENT_DISPLAY_ADDED);
+                }
+                invalidateArrayCaches();
             }
 
-            if (mIsAddedCacheValid && (eventMask & EVENT_DISPLAY_REMOVED) != 0) {
-                if (!mAddedDisplayIdsCache.contains(displayId)) {
-                    throw new IllegalStateException("DisplayId " + displayId
-                            + " is NOT present in the mAddedDisplayIdsCache!");
+            if ((mIsConnectedCacheValid && (eventMask & EVENT_DISPLAY_DISCONNECTED) != 0)
+                    || (mIsAddedCacheValid && (eventMask & EVENT_DISPLAY_REMOVED) != 0)) {
+                int index = mIdsCache.indexOfKey(displayId);
+                if (index < 0) {
+                    // Unknown display id, don't send these events to the listener.
+                    outEventMask &= ~(EVENT_DISPLAY_DISCONNECTED | EVENT_DISPLAY_REMOVED);
+                } else {
+                    mIdsCache.removeAt(index);
+                    invalidateArrayCaches();
                 }
-                mAddedDisplayIdsCache.remove(displayId);
             }
 
-            if (mIsConnectedCacheValid && (eventMask & EVENT_DISPLAY_DISCONNECTED) != 0) {
-                if (!mConnectedDisplayIdsCache.contains(displayId)) {
-                    throw new IllegalStateException("DisplayId " + displayId
-                            + " is NOT present in the mConnectedDisplayIdsCache!");
-                }
-                mConnectedDisplayIdsCache.remove(displayId);
-            }
+            endLocalControl(displayId);
+            return outEventMask;
         }
 
         boolean isCachingEnabledLocked(boolean includeDisabled) {
-            if (includeDisabled) {
-                return mIsConnectedCachingEnabled;
-            } else {
-                return mIsAddedCachingEnabled;
-            }
+            return includeDisabled ? mIsConnectedCachingEnabled : mIsAddedCachingEnabled;
         }
 
         boolean isCacheValidLocked(boolean includeDisabled) {
-            if (includeDisabled) {
-                return mIsConnectedCacheValid;
-            } else {
-                return mIsAddedCacheValid;
-            }
+            return includeDisabled ? mIsConnectedCacheValid : mIsAddedCacheValid;
         }
 
+        /**
+         * Returns current cache of connected display ids or null if cache is invalid.
+         */
+        @VisibleForTesting
         @Nullable
-        int[] getConnectedLocked() {
+        public int[] getConnectedLocked() {
             if (!mIsConnectedCacheValid) {
                 return null;
             }
-            return convertToArray(mConnectedDisplayIdsCache);
+            if (mConnectedIdsCacheArray == null) {
+                mConnectedIdsCacheArray = filterIdsMatchingFlag(FLAG_CONNECTED);
+            }
+            return mConnectedIdsCacheArray;
         }
 
+        /**
+         * Returns current cache of added displays or null if cache is invalid.
+         */
+        @VisibleForTesting
         @Nullable
-        int[] getAddedLocked() {
+        public int[] getAddedLocked() {
             if (!mIsAddedCacheValid) {
                 return null;
             }
-            return convertToArray(mAddedDisplayIdsCache);
+            if (mAddedIdsCacheArray == null) {
+                mAddedIdsCacheArray = filterIdsMatchingFlag(FLAG_ADDED);
+            }
+            return mAddedIdsCacheArray;
         }
 
-        private static int[] convertToArray(Set<Integer> s) {
-            int[] res = new int[s.size()];
-            int i = 0;
-            for (Integer v : s) {
-                res[i++] = v;
+        /**
+         * Helper to invalidate the cached arrays on any write operation.
+         */
+        private void invalidateArrayCaches() {
+            mConnectedIdsCacheArray = null;
+            mAddedIdsCacheArray = null;
+        }
+
+        private int getIndexAndValidateNotConnected(int displayId) {
+            int index = mIdsCache.indexOfKey(displayId);
+            if (!mIsValidationEnabled || index < 0) {
+                return index;
+            }
+            int value = mIdsCache.valueAt(index);
+            if ((value & FLAG_LOCALLY_CONTROLLED) == 0 // Not controlled
+                    && (value & FLAG_CONNECTED) != 0) { // Already connected
+                throw new IllegalStateException("DisplayId " + displayId
+                        + " is already present in the connected ids!");
+            }
+            return index;
+        }
+
+        private int getIndexAndValidateNotAdded(int displayId) {
+            int index = mIdsCache.indexOfKey(displayId);
+            if (!mIsValidationEnabled || index < 0) {
+                return index;
+            }
+            int value = mIdsCache.valueAt(index);
+            if ((value & FLAG_LOCALLY_CONTROLLED) == 0 // Not controlled
+                    && (value & FLAG_ADDED) != 0) { // Already added
+                throw new IllegalStateException("DisplayId " + displayId
+                        + " is already present in the added ids!");
+            }
+            return index;
+        }
+
+        private void endLocalControl(int displayId) {
+            int index = mIdsCache.indexOfKey(displayId);
+            if (index < 0) {
+                return;
+            }
+            int value = mIdsCache.valueAt(index);
+            if (value == FLAG_LOCALLY_CONTROLLED) {
+                mIdsCache.removeAt(index);
+            } else if (value != 0) {
+                mIdsCache.setValueAt(index, value & (~FLAG_LOCALLY_CONTROLLED));
+            }
+        }
+
+        private void clearIdsByFlags(int flags) {
+            for (int i = mIdsCache.size() - 1; i >= 0; i--) {
+                // Only consider entries that contain precisely the flags being cleared
+                if (mIdsCache.valueAt(i) == flags) {
+                    mIdsCache.removeAt(i);
+                }
+            }
+        }
+
+        private int[] filterIdsMatchingFlag(int flag) {
+            int idsToReturn = 0;
+            for (int i = 0; i < mIdsCache.size(); i++) {
+                int value = mIdsCache.valueAt(i);
+                if ((value & flag) != 0) {
+                    idsToReturn++;
+                }
+            }
+            int[] res = new int[idsToReturn];
+            int j = 0;
+            for (int i = 0; i < mIdsCache.size(); i++) {
+                int value = mIdsCache.valueAt(i);
+                if ((value & flag) != 0) {
+                    res[j++] = mIdsCache.keyAt(i);
+                }
             }
             return res;
         }
-
     }
 }

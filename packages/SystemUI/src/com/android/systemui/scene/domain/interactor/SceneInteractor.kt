@@ -28,7 +28,10 @@ import com.android.systemui.authentication.domain.interactor.AuthenticationInter
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.deviceentry.domain.interactor.DeviceUnlockedInteractor
+import com.android.systemui.deviceentry.domain.interactor.RestrictedModeInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardEnabledInteractor
+import com.android.systemui.keyguard.domain.interactor.scenetransition.LockscreenSceneTransitionInteractor
+import com.android.systemui.keyguard.shared.model.KeyguardState
 import com.android.systemui.log.table.Diffable
 import com.android.systemui.log.table.TableLogBuffer
 import com.android.systemui.log.table.TableRowLogger
@@ -75,22 +78,12 @@ constructor(
     private val sceneFamilyResolvers: Lazy<Map<SceneKey, @JvmSuppressWildcards SceneResolver>>,
     private val deviceUnlockedInteractor: Lazy<DeviceUnlockedInteractor>,
     private val keyguardEnabledInteractor: Lazy<KeyguardEnabledInteractor>,
+    private val restrictedModeInteractor: Lazy<RestrictedModeInteractor>,
     private val disabledContentInteractor: DisabledContentInteractor,
     private val shadeModeInteractor: ShadeModeInteractor,
     private val authenticationInteractor: Lazy<AuthenticationInteractor>,
+    private val lockscreenSceneTransitionInteractor: Lazy<LockscreenSceneTransitionInteractor>,
 ) {
-
-    interface OnSceneAboutToChangeListener {
-
-        /**
-         * Notifies that the scene is about to change to [toScene].
-         *
-         * The implementation can choose to consume the [sceneState] to prepare the incoming scene.
-         */
-        fun onSceneAboutToChange(toScene: SceneKey, sceneState: Any?)
-    }
-
-    private val onSceneAboutToChangeListener = mutableSetOf<OnSceneAboutToChangeListener>()
 
     /**
      * The keys of all scenes and overlays in the container.
@@ -152,7 +145,7 @@ constructor(
             .stateInTraced(
                 name = "transitioningTo",
                 scope = applicationScope,
-                started = SharingStarted.WhileSubscribed(),
+                started = SharingStarted.Eagerly,
                 initialValue = null,
             )
 
@@ -172,7 +165,7 @@ constructor(
             .stateInTraced(
                 name = "isTransitionUserInputOngoing",
                 scope = applicationScope,
-                started = SharingStarted.WhileSubscribed(),
+                started = SharingStarted.Eagerly,
                 initialValue = false,
             )
 
@@ -237,16 +230,15 @@ constructor(
         }
     }
 
-    fun registerSceneStateProcessor(processor: OnSceneAboutToChangeListener) {
-        onSceneAboutToChangeListener.add(processor)
-    }
-
     /**
      * Requests a scene change to the given scene.
      *
      * The change is animated. Therefore, it will be some time before the UI will switch to the
      * desired scene. Once enough of the transition has occurred, the [currentScene] will become
      * [toScene] (unless the transition is canceled by user action or another call to this method).
+     *
+     * If [keyguardState] is provided, we'll notify KeyguardTransitionRepository to transition to
+     * that state as part of this scene change.
      *
      * If [forceSettleToTargetScene] is `true` and the target scene is the same as the current
      * scene, any current transition will be canceled and an animation to the target scene will be
@@ -260,18 +252,19 @@ constructor(
         toScene: SceneKey,
         loggingReason: String,
         transitionKey: TransitionKey? = null,
-        sceneState: Any? = null,
+        keyguardState: KeyguardState? = null,
         forceSettleToTargetScene: Boolean = false,
         hideAllOverlays: Boolean = true,
     ) {
+        if (keyguardState != null) {
+            lockscreenSceneTransitionInteractor.get().setNextLockscreenTargetState(keyguardState)
+        }
+
         val currentSceneKey = currentScene.value
         val resolvedScene = sceneFamilyResolvers.get()[toScene]?.resolvedScene?.value ?: toScene
 
         if (resolvedScene == currentSceneKey && forceSettleToTargetScene) {
-            logger.logSceneChangeCancellation(scene = resolvedScene, sceneState = sceneState)
-            onSceneAboutToChangeListener.forEach {
-                it.onSceneAboutToChange(resolvedScene, sceneState)
-            }
+            logger.logSceneChangeCancellation(scene = resolvedScene, keyguardState = keyguardState)
             repository.freezeAndAnimateToCurrentState()
         }
 
@@ -291,12 +284,10 @@ constructor(
             return
         }
 
-        onSceneAboutToChangeListener.forEach { it.onSceneAboutToChange(resolvedScene, sceneState) }
-
         logger.logSceneChanged(
             from = currentSceneKey,
             to = resolvedScene,
-            sceneState = sceneState,
+            keyguardState = keyguardState,
             reason = loggingReason,
             isInstant = false,
         )
@@ -310,19 +301,24 @@ constructor(
      * The change is instantaneous and not animated; it will be observable in the next frame and
      * there will be no transition animation.
      *
+     * If [keyguardState] is provided, we'll notify KeyguardTransitionRepository to transition to
+     * that state as part of this scene change.
+     *
      * If [hideAllOverlays] is `true`, any visible overlays will be instantly hidden, even if the
      * scene change is rejected.
      */
-    fun snapToScene(toScene: SceneKey, loggingReason: String, hideAllOverlays: Boolean = true) {
+    fun snapToScene(
+        toScene: SceneKey,
+        loggingReason: String,
+        hideAllOverlays: Boolean = true,
+        keyguardState: KeyguardState? = null,
+    ) {
+        if (keyguardState != null) {
+            lockscreenSceneTransitionInteractor.get().setNextLockscreenTargetState(keyguardState)
+        }
+
         val currentSceneKey = currentScene.value
-        val resolvedScene =
-            sceneFamilyResolvers.get()[toScene]?.let { familyResolver ->
-                if (familyResolver.includesScene(currentSceneKey)) {
-                    return
-                } else {
-                    familyResolver.resolvedScene.value
-                }
-            } ?: toScene
+        val resolvedScene = sceneFamilyResolvers.get()[toScene]?.resolvedScene?.value ?: toScene
         if (
             !validateSceneChange(
                 from = currentSceneKey,
@@ -339,7 +335,7 @@ constructor(
         logger.logSceneChanged(
             from = currentSceneKey,
             to = resolvedScene,
-            sceneState = null,
+            keyguardState = keyguardState,
             reason = loggingReason,
             isInstant = true,
         )
@@ -599,6 +595,18 @@ constructor(
             return false
         }
 
+        if (!restrictedModeInteractor.get().isSceneChangeAllowed(toScene = to)) {
+            logger.logContentChangeRejection(
+                from = from,
+                to = to,
+                originalChangeReason = loggingReason,
+                rejectionReason =
+                    "Only scene changes to Lockscreen and Occluded are allowed " +
+                        "when the device is in restricted mode",
+            )
+            return false
+        }
+
         val inMidTransitionFromGone =
             (transitionState.value as? ObservableTransitionState.Transition)?.fromContent ==
                 Scenes.Gone
@@ -706,6 +714,17 @@ constructor(
                 false
             }
 
+            !restrictedModeInteractor.get().isOverlayChangeAllowed(to) -> {
+                logger.logContentChangeRejection(
+                    from = from,
+                    to = to,
+                    originalChangeReason = loggingReason,
+                    rejectionReason =
+                        "Cannot show any other overlays when device is in restricted mode.",
+                )
+                false
+            }
+
             else -> true
         }
     }
@@ -717,7 +736,9 @@ constructor(
     fun filteredUserActions(
         unfiltered: Flow<Map<UserAction, UserActionResult>>
     ): Flow<Map<UserAction, UserActionResult>> {
-        return disabledContentInteractor.filteredUserActions(unfiltered)
+        return restrictedModeInteractor
+            .get()
+            .filteredUserActions(disabledContentInteractor.filteredUserActions(unfiltered))
     }
 
     /**

@@ -150,8 +150,10 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
 
     private static final String USB_STATE_MATCH =
             "DEVPATH=/devices/virtual/android_usb/android0";
+// QTI_BEGIN: 2018-08-22: Core: Add support to observe uevents from secondary gadget instance
     private static final String USB_STATE_MATCH_SEC =
             "DEVPATH=/devices/virtual/android_usb/android1";
+// QTI_END: 2018-08-22: Core: Add support to observe uevents from secondary gadget instance
     private static final String ACCESSORY_START_MATCH =
             "DEVPATH=/devices/virtual/misc/usb_accessory";
     private static final String UDC_SUBSYS_MATCH =
@@ -195,6 +197,7 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
     private static final int MSG_UPDATE_USB_SPEED = 22;
     private static final int MSG_UPDATE_HAL_VERSION = 23;
     private static final int MSG_USER_UNLOCKED_AFTER_BOOT = 24;
+    private static final long FUNCTION_CTRL = 1 << 8;
 
     // Delay for debouncing USB disconnects.
     // We often get rapid connect/disconnect events when enabling USB functions,
@@ -245,7 +248,11 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
     private String mUdcName = "";
 
     private static final String DEVICE_UAOA_ENABLED_PROPERTY = "ro.usb.userspace.aoa.enabled";
+    private static final String KERNEL_AOA_ENABLED_PATH =
+            "/sys/module/libcomposite/parameters/android_kernel_aoa_enabled";
     private boolean mEnableAoaUserspaceImplementation = false;
+
+    private static final Pattern KERNEL_VERSION_PATTERN = Pattern.compile("^(\\d+)\\.(\\d+).*");
 
     /**
      * Counter for tracking UsbOperation operations.
@@ -380,7 +387,7 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
                 && deviceEnabledUserspaceAoa
                 && checkAccessoryFfsDirectories;
 
-        Slog.i(TAG, "Enabling userspace AOA: " + mEnableAoaUserspaceImplementation);
+        Slog.i(TAG, "Initial userspace AOA enablement: " + mEnableAoaUserspaceImplementation);
 
         int openControlResult = UsbStatsEnums.UNSPECIFIED;
         if (mEnableAoaUserspaceImplementation) {
@@ -389,8 +396,44 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
             if (UsbStatsEnums.SUCCESS != openControlResult) {
                 Slog.e(TAG, "Failed to open control for accessory, disabling userspace AOA");
                 mEnableAoaUserspaceImplementation = false;
+            } else {
+                // nativeOpenAccessoryControl was successful. Now, check kernel version
+                // and disable kernel AOA if necessary.
+                Boolean isKernelOld = isKernelVersionLessThan(6, 6);
+
+                // isKernelOld can be true, false, or null.
+                // We need to disable the kernel driver if the kernel is old (true)
+                // or if we can't determine the version (null), just in case it's old.
+                // We do nothing if we know the kernel is new (false).
+                if (isKernelOld == null || isKernelOld) { // Covers true and null cases
+                    if (isKernelOld == null) {
+                        Slog.w(TAG, "Can't determine kernel version. Assuming it's old for "
+                                + "safety.");
+                    }
+
+                    File kernelAoaEnabledFile = new File(KERNEL_AOA_ENABLED_PATH);
+                    if (kernelAoaEnabledFile.exists()) {
+                        try {
+                            Slog.d(TAG, "Disabling kernel AOA");
+                            FileUtils.stringToFile(KERNEL_AOA_ENABLED_PATH, "0");
+                        } catch (IOException e) {
+                            Slog.e(TAG, "Failed to write to android_kernel_aoa_enabled, "
+                                    + "disabling userspace AOA.", e);
+                            mEnableAoaUserspaceImplementation = false;
+                        }
+                    } else {
+                        // If we have made it this far, the device has explicitly enabled uaoa, so
+                        // only consider a missing toggle an error if we are sure the kernel is old.
+                        if (Boolean.TRUE.equals(isKernelOld)) {
+                            Slog.e(TAG, "android_kernel_aoa_enabled not found on kernel < 6.6");
+                            mEnableAoaUserspaceImplementation = false;
+                        }
+                    }
+                }
             }
         }
+
+        Slog.i(TAG, "Userspace AOA enabled: " + mEnableAoaUserspaceImplementation);
 
         int userspaceAoaState = mEnableAoaUserspaceImplementation
                 ? UsbStatsEnums.USERSPACE_AOA_STATE_ENABLED :
@@ -401,7 +444,8 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
                 userspaceAoaState,
                 featureEnabledUserspaceAoa,
                 checkAccessoryFfsDirectories,
-                openControlResult
+                openControlResult,
+                deviceEnabledUserspaceAoa
         );
 
         if (mUsbGadgetHal == null) {
@@ -490,7 +534,9 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
 
         // Watch for USB configuration changes
         mUEventObserver = new UsbUEventObserver();
+// QTI_BEGIN: 2018-08-22: Core: Add support to observe uevents from secondary gadget instance
         mUEventObserver.startObserving(USB_STATE_MATCH_SEC);
+// QTI_END: 2018-08-22: Core: Add support to observe uevents from secondary gadget instance
         mUEventObserver.startObserving(ACCESSORY_START_MATCH);
 
         mEnableUdcSysfsUsbStateUpdate =
@@ -520,6 +566,7 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
 
         sEventLogger = new EventLogger(DUMPSYS_LOG_BUFFER, "UsbDeviceManager activity");
     }
+
     UsbProfileGroupSettingsManager getCurrentSettings() {
         synchronized (mLock) {
             return mCurrentSettings;
@@ -579,11 +626,7 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
 
         int operationId = sUsbOperationCount.incrementAndGet();
 
-        if (mEnableAoaUserspaceImplementation) {
-            mAccessoryStrings = nativeGetAccessoryStringsFromFfs();
-        } else {
-            mAccessoryStrings = nativeGetAccessoryStrings();
-        }
+        mAccessoryStrings = nativeGetAccessoryStrings();
 
         // don't start accessory mode if our mandatory strings have not been set
         boolean enableAccessory = (mAccessoryStrings != null &&
@@ -641,6 +684,27 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
         if (pw != null) {
             pw.println(msg + e);
         }
+    }
+
+    private static Boolean isKernelVersionLessThan(int major, int minor) {
+        String kernelVersion = System.getProperty("os.version");
+        if (TextUtils.isEmpty(kernelVersion)) {
+            Slog.e(TAG, "os.version is null or empty");
+            return null;
+        }
+        Matcher matcher = KERNEL_VERSION_PATTERN.matcher(kernelVersion);
+        if (matcher.find()) {
+            try {
+                int kernelMajor = Integer.parseInt(matcher.group(1));
+                int kernelMinor = Integer.parseInt(matcher.group(2));
+                return kernelMajor < major || (kernelMajor == major && kernelMinor < minor);
+            } catch (NumberFormatException e) {
+                Slog.e(TAG, "Failed to parse kernel version string: " + kernelVersion, e);
+            }
+        } else {
+            Slog.e(TAG, "Could not parse kernel version from os.version: " + kernelVersion);
+        }
+        return null;
     }
 
     abstract static class UsbHandler extends Handler {
@@ -2176,10 +2240,14 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
             mCurrentFunctions = usbFunctions;
             if (functions == null || applyAdbFunction(functions)
                     .equals(UsbManager.USB_FUNCTION_NONE)) {
+// QTI_BEGIN: 2018-02-13: Core: PPR1.180206.003_AOSP_Merge
                 functions = getSystemProperty(getPersistProp(true),
+// QTI_END: 2018-02-13: Core: PPR1.180206.003_AOSP_Merge
+// QTI_BEGIN: 2018-02-08: Core: Fix sys.usb.config problem
                             UsbManager.USB_FUNCTION_NONE);
 
                 if (functions.equals(UsbManager.USB_FUNCTION_NONE))
+// QTI_END: 2018-02-08: Core: Fix sys.usb.config problem
                 functions = UsbManager.usbFunctionsToString(getChargingFunctions());
             }
             functions = applyAdbFunction(functions);
@@ -2432,6 +2500,11 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
                         Slog.i(TAG, "updating mCurrentFunctions");
                         // Mask out adb, since it is stored in mAdbEnabled
                         mCurrentFunctions = ((Long) msg.obj) & ~UsbManager.FUNCTION_ADB;
+                        if (mUsbDeviceManager.mEnableAoaUserspaceImplementation) {
+                            // Mask out ctrl, since it is always applied
+                            if (DEBUG) Slog.d(TAG, "Masking out CTRL in mCurrentFunctions");
+                            mCurrentFunctions = mCurrentFunctions & ~FUNCTION_CTRL;
+                        }
                         Slog.i(TAG,
                                 "mCurrentFunctions:" + mCurrentFunctions + "applied:" + msg.arg1);
                         mCurrentFunctionsApplied = msg.arg1 == 1;
@@ -2609,6 +2682,10 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
                 boolean chargingFunctions = functions == UsbManager.FUNCTION_NONE;
                 functions = getAppliedFunctions(functions);
 
+                if (mUsbDeviceManager.mEnableAoaUserspaceImplementation) {
+                    // Always add CTRL if userspace aoa is enabled
+                    functions = functions | FUNCTION_CTRL;
+                }
                 // Set the new USB configuration.
                 setUsbConfig(functions, chargingFunctions, operationId);
 
@@ -2875,8 +2952,6 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
     }
 
     private native String[] nativeGetAccessoryStrings();
-
-    private native String[] nativeGetAccessoryStringsFromFfs();
 
     private native int nativeGetMaxPacketSize();
 

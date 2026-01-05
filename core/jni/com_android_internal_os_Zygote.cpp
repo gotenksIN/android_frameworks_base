@@ -29,6 +29,7 @@
 #include <async_safe/log.h>
 #include <bionic/malloc.h>
 #include <bionic/mte.h>
+#include <com_android_base_core_jni_flags.h>
 #include <cutils/fs.h>
 #include <cutils/multiuser.h>
 #include <cutils/properties.h>
@@ -70,9 +71,9 @@
 #include <unistd.h>
 #include <utils/String8.h>
 #include <utils/Trace.h>
-// QTI_BEGIN: 2020-07-29: Core: Add beluga function
+// QTI_BEGIN: 2020-07-29: Performance: Add beluga function
 #include <dlfcn.h>
-// QTI_END: 2020-07-29: Core: Add beluga function
+// QTI_END: 2020-07-29: Performance: Add beluga function
 
 #include <algorithm>
 #include <array>
@@ -109,6 +110,8 @@ using android::base::StringAppendF;
 using android::base::StringPrintf;
 using android::base::WriteStringToFile;
 using android::base::GetBoolProperty;
+
+using ::com::android::base::core::jni::flags::zygote_set_no_swap_system_server;
 
 using android::zygote::ZygoteFailure;
 
@@ -662,7 +665,7 @@ static void PreApplicationInit() {
 
   // Set the jemalloc decay time to 1.
   mallopt(M_DECAY_TIME, 1);
-// QTI_BEGIN: 2020-07-29: Core: Add beluga function
+// QTI_BEGIN: 2020-07-29: Performance: Add beluga function
 
   void *mBelugaHandle = nullptr;
   void (*mBeluga)() = nullptr;
@@ -676,7 +679,7 @@ static void PreApplicationInit() {
       mBeluga();
     dlclose(mBelugaHandle);
   }
-// QTI_END: 2020-07-29: Core: Add beluga function
+// QTI_END: 2020-07-29: Performance: Add beluga function
 }
 
 static void SetUpSeccompFilter(uid_t uid, bool is_child_zygote) {
@@ -1689,7 +1692,8 @@ static void isolateJitProfile(JNIEnv* env, jobjectArray pkg_data_info_list,
   // Sandbox processes do not have JIT profile, so no data needs to be bind mounted. However, it
   // should still not have access to JIT profile, so tmpfs is mounted.
   appid_t appId = multiuser_get_app_id(uid);
-  if (appId >= AID_SDK_SANDBOX_PROCESS_START && appId <= AID_SDK_SANDBOX_PROCESS_END) {
+  if ((appId >= AID_SDK_SANDBOX_PROCESS_START && appId <= AID_SDK_SANDBOX_PROCESS_END) ||
+      (appId >= AID_PCC_COMPONENT_PROCESS_START && appId <= AID_PCC_COMPONENT_PROCESS_END)) {
       return;
   }
 
@@ -1995,6 +1999,7 @@ static void SpecializeCommon(JNIEnv* env, uid_t uid, gid_t gid, jintArray gids, 
         }
         isolateAppData(env, pkg_data_info_list, allowlisted_data_info_list, uid, process_name,
                        managed_nice_name, fail_fn);
+
         isolateJitProfile(env, pkg_data_info_list, uid, process_name, managed_nice_name, fail_fn);
     }
     // MOUNT_EXTERNAL_INSTALLER, MOUNT_EXTERNAL_PASS_THROUGH, MOUNT_EXTERNAL_ANDROID_WRITABLE apps
@@ -2021,12 +2026,19 @@ static void SpecializeCommon(JNIEnv* env, uid_t uid, gid_t gid, jintArray gids, 
                                                 /* pid= */ 0, strerror(-rc)));
         }
 
-        if (is_system_server && UsePerAppMemcg()) {
-            // Assign system_server to the correct memory cgroup.
-            // Not all devices mount memcg so check if it is mounted first
+        if (is_system_server) {
+            // Not all devices mount memcgv1 so check if it is mounted first
             // to avoid unnecessarily printing errors and denials in the logs.
-            if (!SetTaskProfiles(getpid(), std::vector<std::string>{"SystemMemoryProcess"})) {
-                ALOGE("couldn't add process %d into system memcg group", getpid());
+            if (UsePerAppMemcg()) {
+                // Assign system_server to the correct memory cgroup.
+                if (!SetTaskProfiles(getpid(), std::vector<std::string>{"SystemMemoryProcess"})) {
+                    ALOGE("couldn't add process %d into system memcg group", getpid());
+                }
+            }
+
+            if (zygote_set_no_swap_system_server() &&
+                !SetTaskProfiles(getpid(), std::vector<std::string>{"NoSwapUsage"})) {
+                ALOGE("couldn't apply NoSwapUsage on process %d ", getpid());
             }
         }
     }
@@ -2152,7 +2164,9 @@ static void SpecializeCommon(JNIEnv* env, uid_t uid, gid_t gid, jintArray gids, 
     // the shared objects and mark them readable.
 #ifdef BUILD_EXECUTE_ONLY_MEMORY
     if (!(runtime_flags & RuntimeFlags::ENABLE_EXECUTE_ONLY_MEMORY)) {
+        ZYGOTE_TRACE_BEGIN("disable_execute_only");
         dl_iterate_phdr(disable_execute_only, nullptr);
+        ZYGOTE_TRACE_END("disable_execute_only");
     }
 #endif
     // Now that we've used the flag, clear it so that we don't pass unknown flags to the ART

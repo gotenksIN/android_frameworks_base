@@ -346,14 +346,14 @@ public abstract class PackageManager {
      * &lt;service android:isolatedProcess="true"
                    android:nativeService="true"&gt;
      *   &lt;property
-     *     android:name="android.app.PROPERTY_NATIVE_SERVICE_LIB_NAME"
+     *     android:name="android.app.PROPERTY_NATIVE_SERVICE_LIBRARY_NAME"
      *     android:value="libnativeservice.so"/&gt;
      * &lt;/service&gt;
      * </pre>
      */
     @FlaggedApi(android.os.Flags.FLAG_NATIVE_FRAMEWORK_PROTOTYPE)
-    public static final String PROPERTY_NATIVE_SERVICE_LIB_NAME =
-            "android.app.PROPERTY_NATIVE_SERVICE_LIB_NAME";
+    public static final String PROPERTY_NATIVE_SERVICE_LIBRARY_NAME =
+            "android.app.PROPERTY_NATIVE_SERVICE_LIBRARY_NAME";
 
     /**
      * Service level {@link android.content.pm.PackageManager.Property} tag for native services
@@ -365,14 +365,14 @@ public abstract class PackageManager {
      * &lt;service android:isolatedProcess="true"
                    android:nativeService="true"&gt;
      *   &lt;property
-     *     android:name="android.app.PROPERTY_NATIVE_SERVICE_FUNC_NAME"
+     *     android:name="android.app.PROPERTY_NATIVE_SERVICE_FUNCTION_NAME"
      *     android:value="native_service_createService"/&gt;
      * &lt;/service&gt;
      * </pre>
      */
     @FlaggedApi(android.os.Flags.FLAG_NATIVE_FRAMEWORK_PROTOTYPE)
-    public static final String PROPERTY_NATIVE_SERVICE_FUNC_NAME =
-            "android.app.PROPERTY_NATIVE_SERVICE_FUNC_NAME";
+    public static final String PROPERTY_NATIVE_SERVICE_FUNCTION_NAME =
+            "android.app.PROPERTY_NATIVE_SERVICE_FUNCTION_NAME";
 
     /**
      * A property value set within the manifest.
@@ -1456,7 +1456,8 @@ public abstract class PackageManager {
      * {@link ApplicationInfo}, {@link ComponentInfo}, and {@link ResolveInfo} flag: return the
      * {@link ApplicationInfo#isAppLockSupported} and {@link ApplicationInfo#isAppLockEnabled}
      * associated with an application. The caller should have the
-     * {@link Manifest.permission.LOCK_APPS} permission, or the data will not be returned.
+     * {@link Manifest.permission.LOCK_APPS} permission, or a {@link SecurityException} will be
+     * thrown.
      */
     @FlaggedApi(android.security.Flags.FLAG_APP_LOCK_APIS)
     public static final long GET_APP_LOCK_INFO = 1L << 35;
@@ -4181,6 +4182,15 @@ public abstract class PackageManager {
 
     /**
      * Feature for {@link #getSystemAvailableFeatures} and
+     * {@link #hasSystemFeature}: The device supports connecting to USB hosts
+     * as the USB device.
+     */
+    @SdkConstant(SdkConstantType.FEATURE)
+    @FlaggedApi(android.hardware.usb.flags.Flags.FLAG_ENABLE_FEATURE_USB_DEVICE)
+    public static final String FEATURE_USB_DEVICE = "android.hardware.usb.device";
+
+    /**
+     * Feature for {@link #getSystemAvailableFeatures} and
      * {@link #hasSystemFeature}: The device supports connecting to USB accessories.
      */
     @SdkConstant(SdkConstantType.FEATURE)
@@ -4808,11 +4818,13 @@ public abstract class PackageManager {
 
     /**
      * Feature for {@link #getSystemAvailableFeatures} and {@link #hasSystemFeature}:
-     * The device has a Keymaster implementation that supports Device ID attestation.
+     * The device has a KeyMint (or Keymaster) implementation that supports device ID attestation.
+     * See <a href="https://source.android.com/docs/security/features/keystore/attestation#id-attestation">the public documentation</a>
+     * for more information about device ID attestation.
      *
      * @see DevicePolicyManager#isDeviceIdAttestationSupported
-     * @hide
      */
+    @FlaggedApi(android.security.keystore2.Flags.FLAG_MAKE_ID_ATTESTATION_FEATURE_PUBLIC)
     @SdkConstant(SdkConstantType.FEATURE)
     public static final String FEATURE_DEVICE_ID_ATTESTATION =
             "android.software.device_id_attestation";
@@ -5085,6 +5097,17 @@ public abstract class PackageManager {
     @SdkConstant(SdkConstantType.FEATURE)
     public static final String FEATURE_XR_API_SPATIAL =
         "android.software.xr.api.spatial";
+
+    /**
+     * Feature for {@link #getSystemAvailableFeatures} and {@link #hasSystemFeature}: This device
+     * has protected virtual machine for AI applications processing personal data.
+     *
+     * @hide
+     */
+    @FlaggedApi(android.aiseal.Flags.FLAG_AISEAL_HOST_APIS)
+    @SystemApi
+    @SdkConstant(SdkConstantType.FEATURE)
+    public static final String FEATURE_AISEAL = "android.software.aiseal";
 
     /**
      * Feature for {@link #getSystemAvailableFeatures} and {@link #hasSystemFeature}: This device
@@ -12327,10 +12350,10 @@ public abstract class PackageManager {
      * @param pccUid The PCC UID to map.
      * @return The corresponding application UID, or {@link Process#INVALID_UID} if the
      *         provided UID is not a valid PCC UID or no mapping exists.
-     * @hide
      */
-    public int getAppUidForPccUid(int pccUid) {
+    @FlaggedApi(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    public int getAppUidForPrivateComputeCoreUid(int pccUid) {
         throw new UnsupportedOperationException(
-                "getAppUidForPccUid not implemented in subclass");
+                "getAppUidForPrivateComputeCoreUid not implemented in subclass");
     }
 }

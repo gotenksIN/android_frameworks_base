@@ -17,8 +17,8 @@
 package com.android.wm.shell.dagger;
 
 import static android.window.DesktopExperienceFlags.ENABLE_INORDER_TRANSITION_CALLBACKS_FOR_DESKTOP;
-import static android.window.DesktopExperienceFlags.ENABLE_MULTI_DISPLAY_HOME_FOCUS_BUG_FIX;
 import static android.window.DesktopExperienceFlags.ENABLE_WINDOWING_TRANSITION_HANDLERS_OBSERVERS;
+
 import static com.android.systemui.Flags.enableViewCaptureTracing;
 
 import android.annotation.NonNull;
@@ -37,7 +37,6 @@ import android.view.IWindowManager;
 import android.view.SurfaceControl;
 import android.view.WindowManager;
 import android.window.DesktopExperienceFlags;
-import android.window.DesktopModeFlags;
 import android.window.TaskSnapshotManager;
 
 import androidx.annotation.OptIn;
@@ -85,6 +84,7 @@ import com.android.wm.shell.bubbles.logging.BubbleSessionTrackerImpl;
 import com.android.wm.shell.bubbles.storage.BubblePersistentRepository;
 import com.android.wm.shell.bubbles.user.data.BubbleUserResolver;
 import com.android.wm.shell.bubbles.user.data.UserManagerBubbleUserResolver;
+import com.android.wm.shell.common.ClientFullscreenRequestController;
 import com.android.wm.shell.common.DisplayController;
 import com.android.wm.shell.common.DisplayImeController;
 import com.android.wm.shell.common.DisplayInsetsController;
@@ -102,6 +102,7 @@ import com.android.wm.shell.common.SyncTransactionQueue;
 import com.android.wm.shell.common.TaskStackListenerImpl;
 import com.android.wm.shell.common.UserProfileContexts;
 import com.android.wm.shell.common.split.SplitState;
+import com.android.wm.shell.common.transition.TransitionStateHolder;
 import com.android.wm.shell.compatui.api.CompatUIHandler;
 import com.android.wm.shell.compatui.api.CompatUISharedRepositoryCleanUp;
 import com.android.wm.shell.compatui.letterbox.DelegateLetterboxTransitionObserver;
@@ -137,7 +138,6 @@ import com.android.wm.shell.desktopmode.DesktopTasksLimiter;
 import com.android.wm.shell.desktopmode.DesktopTasksTransitionObserver;
 import com.android.wm.shell.desktopmode.DesktopUserRepositories;
 import com.android.wm.shell.desktopmode.DisplayDisconnectTransitionHandler;
-import com.android.wm.shell.desktopmode.DisplayFocusResolver;
 import com.android.wm.shell.desktopmode.DragToDesktopTransitionHandler;
 import com.android.wm.shell.desktopmode.EnterDesktopTaskTransitionHandler;
 import com.android.wm.shell.desktopmode.ExitDesktopTaskTransitionHandler;
@@ -152,7 +152,7 @@ import com.android.wm.shell.desktopmode.ToggleResizeDesktopTaskTransitionHandler
 import com.android.wm.shell.desktopmode.VisualIndicatorUpdateScheduler;
 import com.android.wm.shell.desktopmode.WindowDecorCaptionRepository;
 import com.android.wm.shell.desktopmode.WindowDragTransitionHandler;
-import com.android.wm.shell.desktopmode.clientfullscreenrequest.ClientFullscreenRequestTransitionHandler;
+import com.android.wm.shell.desktopmode.clientfullscreenrequest.DesktopFullscreenRequestHandler;
 import com.android.wm.shell.desktopmode.compatui.SystemModalsTransitionHandler;
 import com.android.wm.shell.desktopmode.data.DesktopRepositoryInitializer;
 import com.android.wm.shell.desktopmode.data.DesktopRepositoryInitializerImpl;
@@ -181,6 +181,7 @@ import com.android.wm.shell.freeform.FreeformTaskTransitionStarterInitializer;
 import com.android.wm.shell.freeform.TaskChangeListener;
 import com.android.wm.shell.keyguard.KeyguardTransitionHandler;
 import com.android.wm.shell.onehanded.OneHandedController;
+import com.android.wm.shell.packageupdate.PackageUpdateController;
 import com.android.wm.shell.pinnedlayer.phone.PinnedLayerController;
 import com.android.wm.shell.pinnedlayer.phone.PinnedLayerFlags;
 import com.android.wm.shell.pinnedlayer.phone.PinnedLayerHandler;
@@ -258,11 +259,11 @@ import java.util.Optional;
  */
 @Module(
         includes = {
-            WMShellBaseModule.class,
-            PipModule.class,
-            ShellBackAnimationModule.class,
-            LetterboxModule.class,
-            PinnedLayerModule.class
+                WMShellBaseModule.class,
+                PipModule.class,
+                ShellBackAnimationModule.class,
+                LetterboxModule.class,
+                PinnedLayerModule.class
         })
 public abstract class WMShellModule {
 
@@ -767,7 +768,9 @@ public abstract class WMShellModule {
             DesktopState desktopState,
             IActivityTaskManager activityTaskManager,
             MSDLPlayer msdlPlayer,
-            Optional<BubbleController> bubbleController) {
+            Optional<BubbleController> bubbleController,
+            FocusTransitionObserver focusTransitionObserver,
+            InputManager inputManager) {
         return new SplitScreenController(
                 context,
                 shellInit,
@@ -797,7 +800,9 @@ public abstract class WMShellModule {
                 desktopState,
                 activityTaskManager,
                 msdlPlayer,
-                bubbleController);
+                bubbleController,
+                focusTransitionObserver,
+                inputManager);
     }
 
     //
@@ -812,6 +817,7 @@ public abstract class WMShellModule {
             Optional<SplitScreenController> splitScreenOptional,
             @Nullable PipTransitionController pipTransitionController,
             PipScheduler pipScheduler,
+            Optional<NormalAppLayerHandler> normalAppLayerHandler,
             Optional<PinnedLayerHandler> pinnedLayerHandler,
             Optional<RecentsTransitionHandler> recentsTransitionHandler,
             KeyguardTransitionHandler keyguardTransitionHandler,
@@ -827,6 +833,7 @@ public abstract class WMShellModule {
                 splitScreenOptional,
                 pipTransitionController,
                 PipFlags.isPip2ExperimentEnabled() ? Optional.of(pipScheduler) : Optional.empty(),
+                normalAppLayerHandler.orElse(null),
                 pinnedLayerHandler.orElse(null),
                 recentsTransitionHandler,
                 keyguardTransitionHandler,
@@ -1005,7 +1012,7 @@ public abstract class WMShellModule {
             @DynamicOverride DesktopUserRepositories desktopUserRepositories,
             DesktopRepositoryInitializer desktopRepositoryInitializer,
             Optional<DesktopImmersiveController> desktopImmersiveController,
-            ClientFullscreenRequestTransitionHandler clientFullscreenRequestTransitionHandler,
+            DesktopFullscreenRequestHandler desktopFullscreenRequestHandler,
             DesktopModeLoggerTransitionObserver desktopModeLoggerTransitionObserver,
             LaunchAdjacentController launchAdjacentController,
             RecentsTransitionHandler recentsTransitionHandler,
@@ -1040,7 +1047,8 @@ public abstract class WMShellModule {
             TransactionPool transactionPool,
             PipTransitionState pipTransitionState,
             LockTaskChangeListener lockTaskChangeListener,
-            LauncherApps launcherApps) {
+            LauncherApps launcherApps,
+            TransitionStateHolder transitionStateHolder) {
         return new DesktopTasksController(
                 context,
                 shellInit,
@@ -1061,7 +1069,7 @@ public abstract class WMShellModule {
                 toggleResizeDesktopTaskTransitionHandler,
                 dragToDesktopTransitionHandler,
                 desktopImmersiveController.get(),
-                clientFullscreenRequestTransitionHandler,
+                desktopFullscreenRequestHandler,
                 desktopUserRepositories,
                 desktopRepositoryInitializer,
                 recentsTransitionHandler,
@@ -1096,7 +1104,8 @@ public abstract class WMShellModule {
                 PipFlags.isPip2ExperimentEnabled() ? Optional.of(pipTransitionState)
                         : Optional.empty(),
                 lockTaskChangeListener,
-                launcherApps);
+                launcherApps,
+                transitionStateHolder);
     }
 
     @WMSingleton
@@ -1177,8 +1186,7 @@ public abstract class WMShellModule {
             DesktopState desktopState,
             Optional<DesktopImeHandler> desktopImeHandler,
             Optional<DesktopBackNavTransitionObserver> desktopBackNavTransitionObserver,
-            DesktopModeLoggerTransitionObserver desktopModeLoggerTransitionObserver,
-            Optional<DisplayFocusResolver> displayFocusResolver) {
+            DesktopModeLoggerTransitionObserver desktopModeLoggerTransitionObserver) {
         if (ENABLE_INORDER_TRANSITION_CALLBACKS_FOR_DESKTOP.isTrue()
                 && ENABLE_WINDOWING_TRANSITION_HANDLERS_OBSERVERS.isTrue()
                 && desktopState.canEnterDesktopMode()) {
@@ -1188,8 +1196,7 @@ public abstract class WMShellModule {
                     desksTransitionObserver,
                     desktopImeHandler,
                     desktopBackNavTransitionObserver,
-                    desktopModeLoggerTransitionObserver,
-                    displayFocusResolver));
+                    desktopModeLoggerTransitionObserver));
         }
         return Optional.empty();
     }
@@ -1258,10 +1265,12 @@ public abstract class WMShellModule {
             @DynamicOverride DesktopUserRepositories desktopUserRepositories,
             InteractionJankMonitor interactionJankMonitor,
             Optional<BubbleController> bubbleController,
-            DesktopState desktopState) {
+            DesktopState desktopState,
+            DesktopConfig desktopConfig) {
         return new SpringDragToDesktopTransitionHandler(
                 context, transitions, rootTaskDisplayAreaOrganizer, desksOrganizer,
-                desktopUserRepositories, interactionJankMonitor, bubbleController, desktopState);
+                desktopUserRepositories, interactionJankMonitor, bubbleController, desktopState,
+                desktopConfig);
     }
 
     @WMSingleton
@@ -1336,9 +1345,7 @@ public abstract class WMShellModule {
             @ShellMainThread ShellExecutor mainExecutor,
             DisplayController displayController,
             DesktopState desktopState) {
-        if (desktopState.canEnterDesktopMode()
-                && (DesktopExperienceFlags.ENABLE_MOVE_TO_NEXT_DISPLAY_SHORTCUT.isTrue()
-                || DesktopModeFlags.ENABLE_TASK_RESIZING_KEYBOARD_SHORTCUTS.isTrue())) {
+        if (desktopState.canEnterDesktopMode()) {
             return Optional.of(new DesktopModeKeyGestureHandler(context,
                     desktopModeWindowDecorViewModel, desktopTasksController,
                     desktopUserRepositories,
@@ -1459,7 +1466,7 @@ public abstract class WMShellModule {
     @WMSingleton
     @Provides
     static MultiDisplayDragMoveIndicatorSurface.Factory
-            providesMultiDisplayDragMoveIndicatorSurfaceFactory() {
+                providesMultiDisplayDragMoveIndicatorSurfaceFactory() {
         return new MultiDisplayDragMoveIndicatorSurface.Factory();
     }
 
@@ -1662,32 +1669,6 @@ public abstract class WMShellModule {
                                         desktopState,
                                         shellInit)));
     }
-
-    @WMSingleton
-    @Provides
-    static Optional<DisplayFocusResolver> provideDisplayFocusResolver(
-            Transitions transitions,
-            ShellTaskOrganizer shellTaskOrganizer,
-            FocusTransitionObserver focusTransitionObserver,
-            DesktopState desktopState,
-            Optional<DesktopUserRepositories> desktopUserRepositories,
-            Optional<DesktopTasksController> desktopTasksController,
-            ShellInit shellInit) {
-        if (desktopUserRepositories.isPresent()
-                && desktopTasksController.isPresent()
-                && desktopState.canEnterDesktopMode()
-                && ENABLE_MULTI_DISPLAY_HOME_FOCUS_BUG_FIX.isTrue()) {
-            return Optional.of(
-                    new DisplayFocusResolver(
-                            transitions,
-                            shellTaskOrganizer,
-                            focusTransitionObserver,
-                            desktopUserRepositories.get(),
-                            desktopTasksController.get()));
-        }
-        return Optional.empty();
-    }
-
     @WMSingleton
     @Provides
     static Optional<DesktopBackNavTransitionObserver> provideDesktopBackNavTransitionObserver(
@@ -1720,28 +1701,33 @@ public abstract class WMShellModule {
             @NonNull DesktopWallpaperActivityTokenProvider desktopWallpaperActivityTokenProvider,
             @NonNull @ShellMainThread CoroutineScope mainScope,
             DesktopState desktopState,
-            @NonNull DesktopModeEventLogger desktopModeEventLogger
+            @NonNull DesktopModeEventLogger desktopModeEventLogger,
+            @NonNull ShellController shellController,
+            @NonNull DisplayController displayController
     ) {
         if (desktopState.canEnterDesktopModeOrShowAppHandle()) {
             return Optional.of(
                     new DesksTransitionObserver(desktopUserRepositories, desksOrganizer,
                             transitions, desktopWallpaperActivityTokenProvider, mainScope,
-                            desktopModeEventLogger));
+                            desktopModeEventLogger, shellController, displayController));
         }
         return Optional.empty();
     }
 
     @WMSingleton
     @Provides
-    static ClientFullscreenRequestTransitionHandler provideClientFullscreenRequestTransitionHandler(
+    static DesktopFullscreenRequestHandler provideDesktopFullscreenRequestHandler(
+            ShellInit shellInit,
             Context context,
             @DynamicOverride DesktopUserRepositories desktopUserRepositories,
             DesksOrganizer desksOrganizer,
             DesktopWallpaperActivityTokenProvider desktopWallpaperActivityTokenProvider,
-            DisplayController displayController
+            DisplayController displayController,
+            Optional<ClientFullscreenRequestController> clientFullscreenRequestController
     ) {
-        return new ClientFullscreenRequestTransitionHandler(context, desktopUserRepositories,
-                desksOrganizer, desktopWallpaperActivityTokenProvider, displayController);
+        return new DesktopFullscreenRequestHandler(shellInit, context,
+                desktopUserRepositories, desksOrganizer, desktopWallpaperActivityTokenProvider,
+                displayController, clientFullscreenRequestController);
     }
 
     @WMSingleton
@@ -1752,7 +1738,7 @@ public abstract class WMShellModule {
             @DynamicOverride DesktopUserRepositories desktopUserRepositories,
             FreeformTaskTransitionHandler freeformTaskTransitionHandler,
             CloseDesktopTaskTransitionHandler closeDesktopTaskTransitionHandler,
-            ClientFullscreenRequestTransitionHandler clientFullscreenRequestTransitionHandler,
+            DesktopFullscreenRequestHandler desktopFullscreenRequestHandler,
             Optional<DesktopImmersiveController> desktopImmersiveController,
             DesktopMinimizationTransitionHandler desktopMinimizationTransitionHandler,
             DesktopModeDragAndDropTransitionHandler desktopModeDragAndDropTransitionHandler,
@@ -1777,7 +1763,7 @@ public abstract class WMShellModule {
                         freeformTaskTransitionHandler,
                         closeDesktopTaskTransitionHandler,
                         desktopImmersiveController.get(),
-                        clientFullscreenRequestTransitionHandler,
+                        desktopFullscreenRequestHandler,
                         desktopMinimizationTransitionHandler,
                         desktopModeDragAndDropTransitionHandler,
                         systemModalsTransitionHandler,
@@ -1961,10 +1947,12 @@ public abstract class WMShellModule {
     static AppToWebEducationFilter provideAppToWebEducationFilter(
             Context context,
             AppToWebEducationDatastoreRepository appToWebEducationDatastoreRepository,
-            AppToWebRepository appToWebRepository
+            AppToWebRepository appToWebRepository,
+            FocusTransitionObserver focusTransitionObserver
     ) {
         return new AppToWebEducationFilter(
-                context, appToWebEducationDatastoreRepository, appToWebRepository);
+                context, appToWebEducationDatastoreRepository, appToWebRepository,
+                focusTransitionObserver);
     }
 
     @OptIn(markerClass = ExperimentalCoroutinesApi.class)
@@ -2089,12 +2077,14 @@ public abstract class WMShellModule {
     @WMSingleton
     @Provides
     static Optional<NormalAppLayerHandler> provideNormalAppLayerHandler(
-            Optional<NormalAppLayerController> normalAppLayerController,
-            Optional<DesktopUserRepositories> desktopUserRepositoriesOptional) {
+            ShellInit shellInit,
+            Transitions transitions,
+            Optional<NormalAppLayerController> normalAppLayerController) {
         if (PinnedLayerFlags.isPinnedLayerEnabled()) {
             return Optional.of(
                     new NormalAppLayerHandler(
-                            normalAppLayerController.get(), desktopUserRepositoriesOptional.get()));
+                            shellInit, transitions, normalAppLayerController.get()));
+
         }
         return Optional.empty();
     }
@@ -2111,9 +2101,40 @@ public abstract class WMShellModule {
         if (PinnedLayerFlags.isPinnedLayerEnabled()) {
             return Optional.of(
                     new NormalAppLayerController(
-                            shellInit, transitions, desktopUserRepositoriesOptional.get(),
-                            desktopTasksController.get(), pinnedLayerController.get(),
+                            shellInit, transitions, desktopUserRepositoriesOptional.orElse(null),
+                            desktopTasksController.orElse(null), pinnedLayerController.get(),
                             desktopState));
+        }
+        return Optional.empty();
+    }
+
+    @WMSingleton
+    @Provides
+    static Optional<ClientFullscreenRequestController> provideClientFullscreenRequestController(
+            ShellInit shellInit,
+            Transitions transitions) {
+        if (com.android.window.flags.Flags.delegateRequestFullscreenHandlingToShell()) {
+            return Optional.of(new ClientFullscreenRequestController(shellInit, transitions));
+        }
+        return Optional.empty();
+    }
+
+    //
+    // Package Update
+    //
+
+    @WMSingleton
+    @Provides
+    static Optional<PackageUpdateController> providePackageUpdateController(
+            Transitions transitions,
+            ShellTaskOrganizer shellTaskOrganizer,
+            ShellInit shellInit,
+            UserProfileContexts userProfileContexts
+    ) {
+        if (com.android.window.flags.Flags.enableAppRestartAfterUpdate()) {
+            return Optional.of(
+                    new PackageUpdateController(transitions, shellTaskOrganizer,
+                            shellInit, userProfileContexts));
         }
         return Optional.empty();
     }
@@ -2202,6 +2223,7 @@ public abstract class WMShellModule {
             @NonNull LetterboxTaskListenerAdapter letterboxTaskListenerAdapter,
             @NonNull LetterboxCleanupAdapter letterboxCleanupAdapter,
             @NonNull Optional<CompatUISharedRepositoryCleanUp> compatUISharedStateManager,
+            Optional<ClientFullscreenRequestController> clientFullscreenRequestController,
             Optional<DesktopTasksTransitionObserver> desktopTasksTransitionObserverOptional,
             Optional<DesktopDisplayEventHandler> desktopDisplayEventHandler,
             Optional<DesktopModeKeyGestureHandler> desktopModeKeyGestureHandler,

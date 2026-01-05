@@ -95,6 +95,7 @@ import static com.android.hardware.input.Flags.enableNew25q2Keycodes;
 import static com.android.hardware.input.Flags.useEventDisplayIdForKeyWakeup;
 import static com.android.internal.policy.IKeyguardService.SCREEN_TURNING_ON_REASON_DISPLAY_SWITCH;
 import static com.android.internal.policy.IKeyguardService.SCREEN_TURNING_ON_REASON_UNKNOWN;
+import static com.android.server.policy.Flags.wearKeyguardDrawnTimeoutOnBootConfig;
 import static com.android.server.policy.SingleKeyGestureEvent.ACTION_CANCEL;
 import static com.android.server.policy.SingleKeyGestureEvent.ACTION_COMPLETE;
 import static com.android.server.policy.SingleKeyGestureEvent.ACTION_START;
@@ -110,7 +111,7 @@ import static com.android.server.policy.WindowManagerPolicy.WindowManagerFuncs.L
 import static com.android.server.policy.WindowManagerPolicy.WindowManagerFuncs.LID_CLOSED;
 import static com.android.server.policy.WindowManagerPolicy.WindowManagerFuncs.LID_OPEN;
 import static com.android.server.power.feature.flags.Flags.interactiveDozeExperience;
-import static com.android.systemui.shared.Flags.enableLppAssistInvocationEffect;
+import static com.android.window.flags.Flags.commitKeyguardOcclusionBeforeWakingUp;
 
 import android.accessibilityservice.AccessibilityService;
 import android.annotation.NonNull;
@@ -720,7 +721,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     private boolean mLockNowPending = false;
 
     // Timeout for showing the keyguard after the screen is on, in case no "ready" is received.
-    private int mKeyguardDrawnTimeout = 1000;
+    private int mKeyguardDrawnTimeoutMs = 1000;
+    // Timeout for showing the keyguard after the device is booted, in case no "ready" is received.
+    private int mKeyguardDrawnTimeoutOnBootMs = 5000;
 
     // Whether or not the device supports interactive doze.
     private boolean mInteractiveDozeEnabled;
@@ -843,6 +846,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
     };
 
+// QTI_BEGIN: 2021-04-28: Display: HDMI/DP pluggin notification changes
     private UEventObserver mHDMISwitchObserver = new UEventObserver() {
         @Override
         public void onUEvent(UEventObserver.UEvent event) {
@@ -850,6 +854,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
     };
 
+// QTI_END: 2021-04-28: Display: HDMI/DP pluggin notification changes
+// QTI_BEGIN: 2019-06-24: Display: frameworks/base: Add HDMI hotplug handling
     private UEventObserver mExtEventObserver = new UEventObserver() {
         @Override
         public void onUEvent(UEventObserver.UEvent event) {
@@ -859,6 +865,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
     };
 
+// QTI_END: 2019-06-24: Display: frameworks/base: Add HDMI hotplug handling
     class SettingsObserver extends ContentObserver {
         SettingsObserver(Handler handler) {
             super(handler);
@@ -1524,10 +1531,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 break;
             case LONG_PRESS_POWER_ASSISTANT:
                 mPowerKeyHandled = true;
-                if (!enableLppAssistInvocationEffect()) {
-                    performHapticFeedback(HapticFeedbackConstants.ASSISTANT_BUTTON,
-                            "Power - Long Press - Go To Assistant");
-                }
                 final int powerKeyDeviceId = INVALID_INPUT_DEVICE_ID;
                 launchAssistAction(null, powerKeyDeviceId, eventTime,
                         AssistUtils.INVOCATION_TYPE_POWER_BUTTON_LONG_PRESS);
@@ -1898,12 +1901,14 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 && dreamManagerInternal.isDreaming()
                 && !skipDreamWakeForInteractiveDoze()) {
             dreamManagerInternal.stopDream(false /*immediate*/, "short press on home" /*reason*/);
-            if (mHasFeatureLeanback) {
-                if (localLOGV) Log.v(TAG, "TV will launch home after stopping dream");
+
+            final boolean launchHomeAfterDreamStopForWear =
+                    mHasFeatureWatch && com.android.server.policy.Flags.wearKeyGestureHandling();
+            if (mHasFeatureLeanback || launchHomeAfterDreamStopForWear) {
+                if (localLOGV) Log.v(TAG, "TV and Wear will launch home after stopping dream");
             } else {
                 return;
             }
-
         }
 
         // Go home!
@@ -2529,8 +2534,12 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         };
         mWindowManagerInternal.registerAppTransitionListener(transitionListener);
 
-        mKeyguardDrawnTimeout = mContext.getResources().getInteger(
+        mKeyguardDrawnTimeoutMs = mContext.getResources().getInteger(
                 com.android.internal.R.integer.config_keyguardDrawnTimeout);
+        if (wearKeyguardDrawnTimeoutOnBootConfig()) {
+            mKeyguardDrawnTimeoutOnBootMs = mContext.getResources().getInteger(
+                    com.android.internal.R.integer.config_keyguardDrawnTimeoutOnBoot);
+        }
         mKeyguardDelegate = injector.getKeyguardServiceDelegate();
         mTalkbackShortcutController = injector.getTalkbackShortcutController();
         mWindowWakeUpPolicy = injector.getWindowWakeUpPolicy();
@@ -2623,12 +2632,10 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             // This is done to allow Assistant launch animation in SysUI. Will extend
             // this to all single key gestures after moving Single key gestures to
             // KeyGestureController.
-            if (enableLppAssistInvocationEffect()) {
-                if (getResolvedLongPressOnPowerBehavior() == LONG_PRESS_POWER_ASSISTANT) {
-                    handleSingleKeyGestureInKeyGestureController(
-                            KeyGestureEvent.KEY_GESTURE_TYPE_LAUNCH_ASSISTANT, event);
-                    return;
-                }
+            if (getResolvedLongPressOnPowerBehavior() == LONG_PRESS_POWER_ASSISTANT) {
+                handleSingleKeyGestureInKeyGestureController(
+                        KeyGestureEvent.KEY_GESTURE_TYPE_LAUNCH_ASSISTANT, event);
+                return;
             }
             if (event.getAction() == ACTION_COMPLETE) {
                 powerLongPress(event.getStartTime());
@@ -3502,8 +3509,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 KeyGestureEvent.KEY_GESTURE_TYPE_TRIGGER_BUG_REPORT,
                 KeyGestureEvent.KEY_GESTURE_TYPE_MULTI_WINDOW_NAVIGATION,
                 KeyGestureEvent.KEY_GESTURE_TYPE_DESKTOP_MODE,
-                KeyGestureEvent.KEY_GESTURE_TYPE_SPLIT_SCREEN_NAVIGATION_LEFT,
-                KeyGestureEvent.KEY_GESTURE_TYPE_SPLIT_SCREEN_NAVIGATION_RIGHT,
                 KeyGestureEvent.KEY_GESTURE_TYPE_OPEN_SHORTCUT_HELPER,
                 KeyGestureEvent.KEY_GESTURE_TYPE_BRIGHTNESS_UP,
                 KeyGestureEvent.KEY_GESTURE_TYPE_BRIGHTNESS_DOWN,
@@ -3588,6 +3593,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             case KeyGestureEvent.KEY_GESTURE_TYPE_LOCK_SCREEN:
                 if (complete) {
                     lockNow(null /* options */);
+                    dismissKeyboardShortcutsMenu();
                 }
                 break;
             case KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_NOTIFICATION_PANEL:
@@ -3628,18 +3634,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                         statusbar.moveFocusedTaskToDesktop(
                                 getTargetDisplayIdForKeyGestureEvent(event));
                     }
-                }
-                break;
-            case KeyGestureEvent.KEY_GESTURE_TYPE_SPLIT_SCREEN_NAVIGATION_LEFT:
-                if (complete) {
-                    moveFocusedTaskToStageSplit(getTargetDisplayIdForKeyGestureEvent(event),
-                            true /* leftOrTop */);
-                }
-                break;
-            case KeyGestureEvent.KEY_GESTURE_TYPE_SPLIT_SCREEN_NAVIGATION_RIGHT:
-                if (complete) {
-                    moveFocusedTaskToStageSplit(getTargetDisplayIdForKeyGestureEvent(event),
-                            false /* leftOrTop */);
                 }
                 break;
             case KeyGestureEvent.KEY_GESTURE_TYPE_OPEN_SHORTCUT_HELPER:
@@ -4235,13 +4229,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
     }
 
-    private void moveFocusedTaskToStageSplit(int displayId, boolean leftOrTop) {
-        StatusBarManagerInternal statusbar = getStatusBarManagerInternal();
-        if (statusbar != null) {
-            statusbar.moveFocusedTaskToStageSplit(displayId, leftOrTop);
-        }
-    }
-
     private boolean skipDreamWakeForInteractiveDoze() {
         return mInteractiveDozeEnabled && mDefaultDisplay.getState() == Display.STATE_ON;
     }
@@ -4328,7 +4315,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         if (DEBUG_KEYGUARD) Slog.d(TAG, "setKeyguardOccluded occluded=" + isOccluded);
         mKeyguardOccludedChanged = false;
         mPendingKeyguardOccluded = isOccluded;
-        mKeyguardDelegate.setOccluded(isOccluded, true /* notify */);
+        mKeyguardDelegate.setOccluded(isOccluded);
         return mKeyguardDelegate.isShowing();
     }
 
@@ -4389,9 +4376,13 @@ public class PhoneWindowManager implements WindowManagerPolicy {
 
     void initializeHdmiStateInternal() {
         boolean plugged = false;
+// QTI_BEGIN: 2019-06-24: Display: frameworks/base: Add HDMI hotplug handling
         mExtEventObserver.startObserving("mdss_mdp/drm/card");
+// QTI_END: 2019-06-24: Display: frameworks/base: Add HDMI hotplug handling
         // watch for HDMI plug messages if the hdmi switch exists
+// QTI_BEGIN: 2021-04-28: Display: HDMI/DP pluggin notification changes
         mHDMISwitchObserver.startObserving("change@/devices/virtual/graphics/fb2");
+// QTI_END: 2021-04-28: Display: HDMI/DP pluggin notification changes
         if (new File("/sys/devices/virtual/switch/hdmi/state").exists()) {
             mHDMIObserver.startObserving("DEVPATH=/devices/virtual/switch/hdmi");
 
@@ -5529,6 +5520,9 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         mDefaultDisplayRotation.updateOrientationListener();
 
         if (mKeyguardDelegate != null) {
+            if (commitKeyguardOcclusionBeforeWakingUp()) {
+                applyKeyguardOcclusionChange();
+            }
             mKeyguardDelegate.onStartedWakingUp(pmWakeReason, mPowerButtonLaunchGestureTriggered);
         }
 
@@ -5652,7 +5646,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         final boolean bootCompleted =
                 LocalServices.getService(SystemServiceManager.class).isBootCompleted();
         // Set longer timeout if it has not booted yet to prevent showing empty window.
-        return bootCompleted ? mKeyguardDrawnTimeout : 5000;
+        return bootCompleted ? mKeyguardDrawnTimeoutMs : mKeyguardDrawnTimeoutOnBootMs;
     }
 
     @Nullable

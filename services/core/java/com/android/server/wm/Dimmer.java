@@ -27,6 +27,7 @@ import android.view.SurfaceControl;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.protolog.ProtoLog;
+import com.android.window.flags.Flags;
 
 
 /**
@@ -46,8 +47,6 @@ class Dimmer {
 
     @Nullable
     DimState mDimState;
-    @NonNull
-    final DimmerAnimationHelper.AnimationAdapterFactory mAnimationAdapterFactory;
 
     /**
      * Controls the dim behaviour
@@ -66,13 +65,13 @@ class Dimmer {
         boolean mAnimateExit = true;
         /** Surface visibility and bounds */
         private boolean mIsVisible = false;
-        // TODO(b/64816140): Remove after confirming dimmer layer always matches its container.
+        /** The bounds in screen coordinates, used for proto dump. */
         @NonNull
         final Rect mDimBounds = new Rect();
 
         DimState() {
             mHostContainer = mHost;
-            mAnimationHelper = new DimmerAnimationHelper(mHost, mAnimationAdapterFactory);
+            mAnimationHelper = new DimmerAnimationHelper(mHost.mWmService.mSurfaceAnimationRunner);
             try {
                 mDimSurface = makeDimLayer();
                 EventLogTags.writeWmDimCreated(mHost.getName(), mDimSurface.getLayerId());
@@ -159,7 +158,9 @@ class Dimmer {
          * Whether anyone is currently requesting the dim
          */
         boolean isDimming() {
-            return mLastDimmingWindow != null && mHostContainer.isVisibleRequested();
+            return mLastDimmingWindow != null
+                    && (Flags.avoidRecreatingDimSurfaceDuringActivityTransition()
+                    ? mHostContainer.isVisible() : mHostContainer.isVisibleRequested());
         }
 
         @NonNull
@@ -174,14 +175,7 @@ class Dimmer {
     }
 
     protected Dimmer(@NonNull WindowContainer<?> host) {
-        this(host, new DimmerAnimationHelper.AnimationAdapterFactory());
-    }
-
-    @VisibleForTesting
-    Dimmer(@NonNull WindowContainer<?> host,
-            @NonNull DimmerAnimationHelper.AnimationAdapterFactory animationFactory) {
         mHost = host;
-        mAnimationAdapterFactory = animationFactory;
     }
 
     public boolean hostIsTask() {
@@ -216,7 +210,8 @@ class Dimmer {
      */
     protected void adjustAppearance(@NonNull WindowState dimmingContainer,
             float alpha, int blurRadius) {
-        if (!mHost.isVisibleRequested()) {
+        if (Flags.avoidRecreatingDimSurfaceDuringActivityTransition()
+                ? !mHost.isVisible() : !mHost.isVisibleRequested()) {
             // If the host is already going away, there is no point in keeping dimming
             return;
         }
@@ -298,6 +293,7 @@ class Dimmer {
         return mDimState != null ? mDimState.mDimSurface : null;
     }
 
+    /** Returns the bounds on screen. */
     @Nullable
     Rect getDimBounds() {
         return mDimState != null ? mDimState.mDimBounds : null;

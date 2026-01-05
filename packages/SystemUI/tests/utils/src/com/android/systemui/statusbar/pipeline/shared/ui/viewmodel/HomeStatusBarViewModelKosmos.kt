@@ -25,6 +25,7 @@ import com.android.systemui.keyguard.domain.interactor.keyguardTransitionInterac
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.backgroundScope
 import com.android.systemui.kosmos.testDispatcher
+import com.android.systemui.log.logBufferFactory
 import com.android.systemui.log.table.tableLogBufferFactory
 import com.android.systemui.scene.domain.interactor.sceneInteractor
 import com.android.systemui.shade.display.domain.interactor.shadeExpansionTargetDisplayInteractor
@@ -34,7 +35,6 @@ import com.android.systemui.statusbar.chips.sharetoapp.ui.viewmodel.shareToAppCh
 import com.android.systemui.statusbar.chips.ui.viewmodel.ongoingActivityChipsViewModel
 import com.android.systemui.statusbar.chips.uievents.statusBarChipsUiEventLogger
 import com.android.systemui.statusbar.events.domain.interactor.systemStatusEventAnimationInteractor
-import com.android.systemui.statusbar.featurepods.popups.ui.viewmodel.statusBarPopupChipsViewModelFactory
 import com.android.systemui.statusbar.layout.ui.viewmodel.appHandlesViewModelFactory
 import com.android.systemui.statusbar.layout.ui.viewmodel.multiDisplayStatusBarContentInsetsViewModelStore
 import com.android.systemui.statusbar.layout.ui.viewmodel.statusBarBoundsViewModelFactory
@@ -48,7 +48,10 @@ import com.android.systemui.statusbar.pipeline.shared.domain.interactor.homeStat
 import com.android.systemui.statusbar.pipeline.shared.domain.interactor.homeStatusBarInteractor
 import com.android.systemui.statusbar.pipeline.shared.ui.binder.HomeStatusBarViewBinder
 import com.android.systemui.statusbar.pipeline.shared.ui.binder.HomeStatusBarViewBinderImpl
+import com.android.systemui.statusbar.policy.domain.interactor.deviceProvisioningInteractor
+import com.android.systemui.statusbar.quickactions.popups.ui.viewmodel.statusBarPopupChipsViewModelFactory
 import com.android.systemui.statusbar.systemstatusicons.ui.viewmodel.systemStatusIconsViewModelFactory
+import com.android.systemui.user.domain.interactor.userLogoutInteractor
 
 var Kosmos.homeStatusBarViewBinder: HomeStatusBarViewBinder by
     Kosmos.Fixture { HomeStatusBarViewBinderImpl() }
@@ -76,6 +79,7 @@ var Kosmos.homeStatusBarViewModelFactory: (Int) -> HomeStatusBarViewModel by
                 systemStatusIconsViewModelFactory,
                 statusBarBoundsViewModelFactory,
                 appHandlesViewModelFactory,
+                logBufferFactory,
                 tableLogBufferFactory,
                 mainResources,
                 homeStatusBarInteractor,
@@ -101,6 +105,8 @@ var Kosmos.homeStatusBarViewModelFactory: (Int) -> HomeStatusBarViewModel by
                 testDispatcher,
                 { shadeDisplaysInteractor },
                 uiEventLogger = statusBarChipsUiEventLogger,
+                deviceProvisioningInteractor = deviceProvisioningInteractor,
+                userLogoutInteractor = userLogoutInteractor,
             )
         }
     }

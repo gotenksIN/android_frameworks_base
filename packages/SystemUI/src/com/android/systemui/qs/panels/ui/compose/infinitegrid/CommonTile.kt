@@ -92,7 +92,6 @@ import com.android.compose.modifiers.size
 import com.android.compose.modifiers.thenIf
 import com.android.compose.ui.graphics.painter.rememberDrawablePainter
 import com.android.systemui.Flags
-import com.android.systemui.Flags.iconRefresh2025
 import com.android.systemui.common.shared.model.Icon
 import com.android.systemui.common.ui.compose.Icon
 import com.android.systemui.common.ui.compose.load
@@ -127,7 +126,7 @@ fun LargeTileContent(
     modifier: Modifier = Modifier,
     isVisible: () -> Boolean = { true },
     accessibilityUiState: AccessibilityUiState? = null,
-    iconShape: RoundedCornerShape = RoundedCornerShape(CommonTileDefaults.InactiveCornerRadius),
+    iconShape: RoundedCornerShape = RoundedCornerShape(CommonTileDefaults.InactiveIconCornerRadius),
     textScale: () -> Float = { 1f },
     toggleClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
@@ -248,9 +247,10 @@ fun SmallTileContent(
     val icon = iconProvider(context)
     val animatedColor by animateColorAsState(color, label = "QSTileIconColor")
     val sizeValue = size()
-    val iconModifier = modifier
-        .size({ sizeValue.roundToPx() }, { sizeValue.roundToPx() })
-        .sysuiResTag(TEST_TAG_TILE_ICON)
+    val iconModifier =
+        modifier
+            .size({ sizeValue.roundToPx() }, { sizeValue.roundToPx() })
+            .sysuiResTag(TEST_TAG_TILE_ICON)
 
     val loadedDrawable =
         remember(icon, context) {
@@ -296,22 +296,13 @@ fun SmallTileContent(
                 }
             }
 
-        if (iconRefresh2025()) {
-            NonClippedImage(
-                painter = painter,
-                contentDescription = icon.contentDescription?.load(),
-                colorFilter = ColorFilter.tint(color = animatedColor),
-                modifier = iconModifier,
-                contentScale = ContentScale.Crop,
-            )
-        } else {
-            Image(
-                painter = painter,
-                contentDescription = icon.contentDescription?.load(),
-                colorFilter = ColorFilter.tint(color = animatedColor),
-                modifier = iconModifier,
-            )
-        }
+        NonClippedImage(
+            painter = painter,
+            contentDescription = icon.contentDescription?.load(),
+            colorFilter = ColorFilter.tint(color = animatedColor),
+            modifier = iconModifier,
+            contentScale = ContentScale.Crop,
+        )
     } else {
         Icon(icon = icon, tint = animatedColor, modifier = iconModifier)
     }
@@ -417,6 +408,16 @@ object TileBounceMotionTestKeys {
 }
 
 object CommonTileDefaults {
+    val ActiveIconCornerRadius: Dp
+        @Composable
+        @ReadOnlyComposable
+        get() = dimensionResource(id = R.dimen.common_tile_default_active_icon_corner_radius)
+
+    val ActiveTileCornerRadius: Dp
+        @Composable
+        @ReadOnlyComposable
+        get() = dimensionResource(id = R.dimen.common_tile_default_active_tile_corner_radius)
+
     val DualTargetEndPadding: Dp
         @Composable
         @ReadOnlyComposable
@@ -427,10 +428,15 @@ object CommonTileDefaults {
         @ReadOnlyComposable
         get() = dimensionResource(id = R.dimen.common_tile_default_icon_size)
 
-    val InactiveCornerRadius: Dp
+    val InactiveIconCornerRadius: Dp
         @Composable
         @ReadOnlyComposable
-        get() = dimensionResource(id = R.dimen.common_tile_default_inactive_corner_radius)
+        get() = dimensionResource(id = R.dimen.common_tile_default_inactive_icon_corner_radius)
+
+    val InactiveTileCornerRadius: Dp
+        @Composable
+        @ReadOnlyComposable
+        get() = dimensionResource(id = R.dimen.common_tile_default_inactive_tile_corner_radius)
 
     val LargeTileIconSize: Dp
         @Composable

@@ -16,11 +16,6 @@
 
 package com.android.server.wm;
 
-import static android.app.CameraCompatTaskInfo.CAMERA_COMPAT_LANDSCAPE_DEVICE_IN_LANDSCAPE;
-import static android.app.CameraCompatTaskInfo.CAMERA_COMPAT_LANDSCAPE_DEVICE_IN_PORTRAIT;
-import static android.app.CameraCompatTaskInfo.CAMERA_COMPAT_NONE;
-import static android.app.CameraCompatTaskInfo.CAMERA_COMPAT_PORTRAIT_DEVICE_IN_LANDSCAPE;
-import static android.app.CameraCompatTaskInfo.CAMERA_COMPAT_PORTRAIT_DEVICE_IN_PORTRAIT;
 import static android.app.WindowConfiguration.ROTATION_UNDEFINED;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LOCKED;
@@ -34,13 +29,13 @@ import static android.view.Surface.ROTATION_180;
 import static android.view.Surface.ROTATION_270;
 import static android.view.Surface.ROTATION_90;
 
+import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_CAMERA_COMPAT;
 import static com.android.server.wm.AppCompatConfiguration.MIN_FIXED_ORIENTATION_LETTERBOX_ASPECT_RATIO;
 import static com.android.server.wm.WindowManagerDebugConfig.TAG_WITH_CLASS_NAME;
 import static com.android.server.wm.WindowManagerDebugConfig.TAG_WM;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
-import android.app.CameraCompatTaskInfo;
 import android.content.res.CameraCompatibilityInfo;
 import android.content.res.CompatibilityInfo;
 import android.os.RemoteException;
@@ -50,7 +45,6 @@ import android.window.DesktopModeFlags;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.protolog.ProtoLog;
-import com.android.internal.protolog.WmProtoLogGroups;
 import com.android.window.flags.Flags;
 
 /**
@@ -152,10 +146,10 @@ final class AppCompatCameraSimReqOrientationPolicy implements AppCompatCameraSta
         }
 
         if (isActivityForCameraIdRefreshing(topActivity, cameraId)) {
-            ProtoLog.v(WmProtoLogGroups.WM_DEBUG_STATES,
-                    "Display id=%d is notified that Camera %s is closed but activity is"
+            ProtoLog.v(WM_DEBUG_CAMERA_COMPAT,
+                    "%s: Display id=%d is notified that Camera %s is closed but activity is"
                             + " still refreshing. Rescheduling an update.",
-                    topActivity.getDisplayContent().mDisplayId, cameraId);
+                    TAG, topActivity.getDisplayContent().mDisplayId, cameraId);
             return false;
         }
         return true;
@@ -173,9 +167,6 @@ final class AppCompatCameraSimReqOrientationPolicy implements AppCompatCameraSta
         final ActivityRecord activity = getTopActivityFromCameraTask(task);
         if (activity != null) {
             activity.recomputeConfiguration();
-        }
-        if (task != null) {
-            task.dispatchTaskInfoChangedIfNeeded(/* force= */ true);
         }
         if (app != null) {
             final boolean refreshNeeded = updateCompatibilityInfo(app, activity);
@@ -203,15 +194,15 @@ final class AppCompatCameraSimReqOrientationPolicy implements AppCompatCameraSta
                 .compatibilityInfoForPackageLocked(app.mInfo);
         compatibilityInfo.cameraCompatibilityInfo = getCameraCompatibilityInfo(activityRecord);
         try {
-            ProtoLog.i(WmProtoLogGroups.WM_DEBUG_STATES, "Updating CameraCompatibilityInfo"
+            ProtoLog.i(WM_DEBUG_CAMERA_COMPAT, "%s: Updating CameraCompatibilityInfo"
                     + " for package: %s to: %s.", app.mInfo.packageName,
-                    compatibilityInfo.cameraCompatibilityInfo);
+                    TAG, compatibilityInfo.cameraCompatibilityInfo);
             // TODO(b/380840084): Consider using a ClientTransaction for this update.
             app.getThread().updatePackageCompatibilityInfo(app.mInfo.packageName,
                     compatibilityInfo);
         } catch (RemoteException e) {
-            ProtoLog.w(WmProtoLogGroups.WM_DEBUG_STATES,
-                    "Unable to update CompatibilityInfo for app %s", app);
+            ProtoLog.w(WM_DEBUG_CAMERA_COMPAT,
+                    "%s: Unable to update CompatibilityInfo for app %s", TAG, app);
             return false;
         }
 
@@ -360,6 +351,7 @@ final class AppCompatCameraSimReqOrientationPolicy implements AppCompatCameraSta
         return Flags.cameraCompatLandscapeCameraSupport()
                 && !mCameraDisplayRotationProvider.isCameraDeviceNaturalOrientationPortrait();
     }
+
     /**
      * Returns true if letterboxing should be allowed for camera apps, even if otherwise it isn't.
      *
@@ -405,40 +397,6 @@ final class AppCompatCameraSimReqOrientationPolicy implements AppCompatCameraSta
         }
 
         return MIN_FIXED_ORIENTATION_LETTERBOX_ASPECT_RATIO;
-    }
-
-    @CameraCompatTaskInfo.CameraCompatMode
-    int getCameraCompatMode(@NonNull ActivityRecord topActivity) {
-        if (!isCompatibilityTreatmentEnabledForActivity(topActivity,
-                /* checkOrientation= */ true)) {
-            return CAMERA_COMPAT_NONE;
-        }
-
-        // This treatment targets only devices with portrait natural orientation, which most tablets
-        // have.
-        if (!mCameraDisplayRotationProvider.isCameraDeviceNaturalOrientationPortrait()) {
-            // TODO(b/365725400): handle landscape natural orientation.
-            return CAMERA_COMPAT_NONE;
-        }
-
-        final int appOrientation = topActivity.getRequestedConfigurationOrientation();
-        final boolean isDisplayRotationPortrait = mCameraDisplayRotationProvider
-                .isCameraDeviceOrientationPortrait();
-        if (appOrientation == ORIENTATION_PORTRAIT) {
-            if (isDisplayRotationPortrait) {
-                return CAMERA_COMPAT_PORTRAIT_DEVICE_IN_PORTRAIT;
-            } else {
-                return CAMERA_COMPAT_PORTRAIT_DEVICE_IN_LANDSCAPE;
-            }
-        } else if (appOrientation == ORIENTATION_LANDSCAPE) {
-            if (isDisplayRotationPortrait) {
-                return CAMERA_COMPAT_LANDSCAPE_DEVICE_IN_PORTRAIT;
-            } else {
-                return CAMERA_COMPAT_LANDSCAPE_DEVICE_IN_LANDSCAPE;
-            }
-        }
-
-        return CAMERA_COMPAT_NONE;
     }
 
     /**

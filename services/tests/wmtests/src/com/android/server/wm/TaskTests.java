@@ -16,7 +16,6 @@
 
 package com.android.server.wm;
 
-
 import static android.app.ActivityTaskManager.INVALID_TASK_ID;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_HOME;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_STANDARD;
@@ -28,6 +27,7 @@ import static android.app.WindowConfiguration.WINDOWING_MODE_UNDEFINED;
 import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
 import static android.content.Intent.FLAG_ACTIVITY_TASK_ON_HOME;
 import static android.content.pm.ActivityInfo.FLAG_RELINQUISH_TASK_IDENTITY;
+import static android.content.pm.ActivityInfo.PERSIST_ACROSS_REBOOTS;
 import static android.content.pm.ActivityInfo.RESIZE_MODE_RESIZEABLE;
 import static android.content.pm.ActivityInfo.RESIZE_MODE_UNRESIZEABLE;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE;
@@ -46,6 +46,7 @@ import static com.android.dx.mockito.inline.extended.ExtendedMockito.times;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.verify;
 import static com.android.server.policy.WindowManagerPolicy.USER_ROTATION_FREE;
 import static com.android.server.wm.ActivityRecord.State.RESUMED;
+import static com.android.server.wm.ActivityRecord.State.STOPPED;
 import static com.android.server.wm.Task.FLAG_FORCE_HIDDEN_FOR_TASK_ORG;
 import static com.android.server.wm.TaskFragment.EMBEDDED_DIM_AREA_PARENT_TASK;
 import static com.android.server.wm.TaskFragment.TASK_FRAGMENT_VISIBILITY_VISIBLE_BEHIND_TRANSLUCENT;
@@ -72,6 +73,7 @@ import static org.mockito.Mockito.atLeast;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.when;
 
 import android.app.ActivityManager;
 import android.app.ActivityOptions;
@@ -82,11 +84,14 @@ import android.content.ComponentName;
 import android.content.Intent;
 import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageManagerInternal;
 import android.content.res.Configuration;
 import android.graphics.Color;
 import android.graphics.Point;
 import android.graphics.Rect;
 import android.os.IBinder;
+import android.os.UserHandle;
+import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.annotations.Presubmit;
 import android.util.DisplayMetrics;
@@ -94,12 +99,14 @@ import android.util.Xml;
 import android.view.DisplayInfo;
 import android.view.SurfaceControl;
 import android.view.WindowInsetsController;
+import android.window.ITaskOrganizer;
 import android.window.TaskFragmentOrganizer;
 
 import androidx.test.filters.MediumTest;
 
 import com.android.modules.utils.TypedXmlPullParser;
 import com.android.modules.utils.TypedXmlSerializer;
+import com.android.server.LocalServices;
 import com.android.window.flags.Flags;
 
 import org.junit.Assert;
@@ -135,11 +142,13 @@ public class TaskTests extends WindowTestsBase {
     private static final String TASK_TAG = "task";
 
     private Rect mParentBounds;
+    private PackageManagerInternal mMockPmInternal;
 
     @Before
     public void setUp() throws Exception {
         mParentBounds = new Rect(10 /*left*/, 30 /*top*/, 80 /*right*/, 60 /*bottom*/);
         removeGlobalMinSizeRestriction();
+        mMockPmInternal = LocalServices.getService(PackageManagerInternal.class);
     }
 
     @Test
@@ -337,7 +346,7 @@ public class TaskTests extends WindowTestsBase {
         final ActivityRecord activityA = new ActivityBuilder(mAtm).setTask(task).build();
         final ActivityRecord activityB = new ActivityBuilder(mAtm).setTask(task).build();
         final ActivityRecord activityC = new ActivityBuilder(mAtm).setTask(task).build();
-        activityA.setState(ActivityRecord.State.STOPPED, "test");
+        activityA.setState(STOPPED, "test");
         activityB.setState(ActivityRecord.State.PAUSED, "test");
         activityC.setState(ActivityRecord.State.RESUMED, "test");
         doReturn(true).when(activityB).shouldBeVisibleUnchecked();
@@ -1772,6 +1781,26 @@ public class TaskTests extends WindowTestsBase {
     }
 
     @Test
+    public void testSetReparentLeafTaskIfRelaunchFromHome_organizedTask_setsFlag() {
+        final Task task = getTestTask();
+        task.mCreatedByOrganizer = true;
+        task.mTaskOrganizer = mock(ITaskOrganizer.class);
+
+        task.setReparentLeafTaskIfRelaunchFromHome(true);
+        assertTrue(task.mReparentLeafTaskIfRelaunchFromHome);
+
+        task.setReparentLeafTaskIfRelaunchFromHome(false);
+        assertFalse(task.mReparentLeafTaskIfRelaunchFromHome);
+    }
+
+    @Test
+    public void testSetReparentLeafTaskIfRelaunchFromHome_nonOrganizedTask_doesNothing() {
+        final Task task = getTestTask();
+        task.setReparentLeafTaskIfRelaunchFromHome(true);
+        assertFalse(task.mReparentLeafTaskIfRelaunchFromHome);
+    }
+
+    @Test
     public void testBoostDimmingTaskFragmentOnTask() {
         final TaskFragmentOrganizer organizer = new TaskFragmentOrganizer(Runnable::run);
         final Task task = createTask(mDisplayContent);
@@ -2311,6 +2340,189 @@ public class TaskTests extends WindowTestsBase {
         assertEquals(originalParent, task.getParent());
         // Verify the windowing mode was still restored.
         assertEquals(WINDOWING_MODE_FREEFORM, task.getWindowingMode());
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_APP_RESTART_AFTER_UPDATE)
+    public void testContinuePackageUpdateHandled_handlePackageUpdateFalse_doesNothing() {
+        final Task task = getTestTask();
+        final ActivityRecord activity = task.getTopMostActivity();
+        spyOn(activity);
+        activity.app = mock(WindowProcessController.class);
+        task.mHandlePackageUpdate = false;
+
+        task.continuePackageUpdate();
+
+        verify(activity.app, never()).onTaskPackageUpdateHandled(any());
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_APP_RESTART_AFTER_UPDATE)
+    public void testContinuePackageUpdate_noRootActivity_doesNothing() {
+        final Task task = new TaskBuilder(mSupervisor).setCreateActivity(false).build();
+        task.mHandlePackageUpdate = true;
+
+        // Should not crash
+        task.continuePackageUpdate();
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_APP_RESTART_AFTER_UPDATE)
+    public void testOnPackageUpdateHandled_callsContinueTask() {
+        final Task task = getTestTask();
+        final ActivityRecord activity = task.getTopMostActivity();
+        task.mHandlePackageUpdate = true;
+        activity.app = mock(WindowProcessController.class);
+
+        task.continuePackageUpdate();
+
+        verify(activity.app).onTaskPackageUpdateHandled(task);
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_APP_RESTART_AFTER_UPDATE)
+    public void testContinuePackageUpdate_resumedActivityNotPersistable_callsHandled() {
+        final Task task = getTestTask();
+        final ActivityRecord activity = task.getTopMostActivity();
+        activity.app = mock(WindowProcessController.class);
+        spyOn(activity);
+        task.mHandlePackageUpdate = true;
+        activity.info.persistableMode = 0; // Not persistable
+        doReturn(true).when(activity).isRootOfTask();
+        activity.setState(RESUMED, "test");
+
+        task.continuePackageUpdate();
+
+        verify(activity.app).onTaskPackageUpdateHandled(task);
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_APP_RESTART_AFTER_UPDATE)
+    public void testContinuePackageUpdate_resumedRootPersistableActivity_callsHandled() {
+        final Task task = getTestTask();
+        final ActivityRecord activity = task.getTopMostActivity();
+        spyOn(activity);
+        task.mHandlePackageUpdate = true;
+        activity.info.persistableMode = PERSIST_ACROSS_REBOOTS;
+        activity.setState(RESUMED, "test");
+        doReturn(true).when(activity).isRootOfTask();
+        activity.app = mock(WindowProcessController.class);
+
+        task.continuePackageUpdate();
+
+        verify(activity.app).onTaskPackageUpdateHandled(task);
+    }
+
+    @DisableFlags(android.security.Flags.FLAG_APP_LOCK_CORE)
+    @Test
+    public void testRealActivityAppLockEnabled_appLockFlagIsOff_appLockEnabled_disabled() {
+        internalTestRealActivityAppLockEnabled(
+                /* mockPackageName= */ DEFAULT_COMPONENT_PACKAGE_NAME,
+                /* mockUserId= */ 0,
+                /* mockReturnValue= */ true,
+                /* taskPackageName= */ DEFAULT_COMPONENT_PACKAGE_NAME,
+                /* taskUserId= */ 0,
+                /* expectedResult= */ false);
+    }
+
+    @DisableFlags(android.security.Flags.FLAG_APP_LOCK_CORE)
+    @Test
+    public void testRealActivityAppLockEnabled_appLockFlagIsOff_appLockDisabled_disabled() {
+        internalTestRealActivityAppLockEnabled(
+                /* mockPackageName= */ DEFAULT_COMPONENT_PACKAGE_NAME,
+                /* mockUserId= */ 0,
+                /* mockReturnValue= */ false,
+                /* taskPackageName= */ DEFAULT_COMPONENT_PACKAGE_NAME,
+                /* taskUserId= */ 0,
+                /* expectedResult= */ false);
+    }
+
+    @EnableFlags(android.security.Flags.FLAG_APP_LOCK_CORE)
+    @Test
+    public void testRealActivityAppLockEnabled_appLockEnabled_enabled() {
+        internalTestRealActivityAppLockEnabled(
+                /* mockPackageName= */ DEFAULT_COMPONENT_PACKAGE_NAME,
+                /* mockUserId= */ 0,
+                /* mockReturnValue= */ true,
+                /* taskPackageName= */ DEFAULT_COMPONENT_PACKAGE_NAME,
+                /* taskUserId= */ 0,
+                /* expectedResult= */ true);
+    }
+
+    @EnableFlags(android.security.Flags.FLAG_APP_LOCK_CORE)
+    @Test
+    public void testRealActivityAppLockEnabled_appLockDisabled_disabled() {
+        internalTestRealActivityAppLockEnabled(
+                /* mockPackageName= */ DEFAULT_COMPONENT_PACKAGE_NAME,
+                /* mockUserId= */ 0,
+                /* mockReturnValue= */ false,
+                /* taskPackageName= */ DEFAULT_COMPONENT_PACKAGE_NAME,
+                /* taskUserId= */ 0,
+                /* expectedResult= */ false);
+    }
+
+    @EnableFlags(android.security.Flags.FLAG_APP_LOCK_CORE)
+    @Test
+    public void testRealActivityAppLockEnabled_appLockEnabledOnDifferentUserId_disabled() {
+        internalTestRealActivityAppLockEnabled(
+                /* mockPackageName= */ DEFAULT_COMPONENT_PACKAGE_NAME,
+                /* mockUserId= */ 0,
+                /* mockReturnValue= */ true,
+                /* taskPackageName= */ DEFAULT_COMPONENT_PACKAGE_NAME,
+                /* taskUserId= */ 1,
+                /* expectedResult= */ false);
+    }
+
+    @EnableFlags(android.security.Flags.FLAG_APP_LOCK_CORE)
+    @Test
+    public void testRealActivityAppLockEnabled_appLockEnabledOnDifferentPackage_disabled() {
+        internalTestRealActivityAppLockEnabled(
+                /* mockPackageName= */ DEFAULT_COMPONENT_PACKAGE_NAME,
+                /* mockUserId= */ 0,
+                /* mockReturnValue= */ true,
+                /* taskPackageName= */ "other.package.name",
+                /* taskUserId= */ 0,
+                /* expectedResult= */ false);
+    }
+
+    private void internalTestRealActivityAppLockEnabled(String mockPackageName, int mockUserId,
+            boolean mockReturnValue, String taskPackageName, int taskUserId,
+            boolean expectedResult) {
+        when(mMockPmInternal.isPackageAppLockEnabled(eq(mockPackageName), eq(mockUserId)))
+                .thenReturn(mockReturnValue);
+
+        final ActivityInfo aInfo = new ActivityInfo();
+        aInfo.applicationInfo = new ApplicationInfo();
+        aInfo.applicationInfo.uid = UserHandle.getUid(taskUserId,
+                UserHandle.getAppId(mAtm.mContext.getApplicationInfo().uid));
+        aInfo.packageName = taskPackageName;
+        final Task task = new TaskBuilder(mSupervisor)
+                .setActivityInfo(aInfo)
+                .setComponent(getUniqueComponentName(taskPackageName))
+                .setUserId(taskUserId)
+                .build();
+
+        assertEquals(expectedResult, task.mRealActivityAppLockEnabled);
+    }
+
+    @Test
+    public void testRealActivityAppLockEnabled_restoreEnabled() throws Exception {
+        final Task task = getTestTask();
+        task.mRealActivityAppLockEnabled = true;
+
+        final byte[] bytes = serializeToBytes(task);
+        final Task restored = restoreFromBytes(bytes);
+        assertTrue(restored.mRealActivityAppLockEnabled);
+    }
+
+    @Test
+    public void testRealActivityAppLockEnabled_restoreDisabled() throws Exception {
+        final Task task = getTestTask();
+        task.mRealActivityAppLockEnabled = false;
+
+        final byte[] bytes = serializeToBytes(task);
+        final Task restored = restoreFromBytes(bytes);
+        assertFalse(restored.mRealActivityAppLockEnabled);
     }
 
     private Task getTestTask() {

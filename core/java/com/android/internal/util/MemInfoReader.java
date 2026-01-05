@@ -137,10 +137,8 @@ public final class MemInfoReader {
      */
     public long getKernelUsedSizeKb() {
         long size = mInfos[Debug.MEMINFO_SHMEM] + mInfos[Debug.MEMINFO_SLAB_UNRECLAIMABLE]
-// QTI_BEGIN: 2025-07-01: Core: Account SecPageTables as kernel used
                 + mInfos[Debug.MEMINFO_VM_ALLOC_USED] + mInfos[Debug.MEMINFO_PAGE_TABLES]
                 + mInfos[Debug.MEMINFO_SEC_PAGE_TABLES] + mInfos[Debug.MEMINFO_PERCPU];
-// QTI_END: 2025-07-01: Core: Account SecPageTables as kernel used
         if (!Debug.isVmapStack()) {
             size += mInfos[Debug.MEMINFO_KERNEL_STACK];
         }

@@ -16,20 +16,20 @@
 
 package com.android.systemui.accessibility.shortcutchooser.ui.startable
 
-import android.util.Log
-import androidx.annotation.VisibleForTesting
-import androidx.compose.foundation.layout.size
-import androidx.compose.runtime.MutableState
+import android.view.accessibility.Flags as AccessibilityFlags
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import com.android.internal.accessibility.common.ShortcutConstants.UserShortcutType
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.android.app.tracing.coroutines.launchTraced
 import com.android.systemui.CoreStartable
-import com.android.systemui.accessibility.shortcutchooser.domain.interactor.ShortcutChooserDialogInteractor
-import com.android.systemui.accessibility.shortcutchooser.shared.model.DialogRequestModel
+import com.android.systemui.Flags as SystemUIFlags
+import com.android.systemui.accessibility.shortcutchooser.ui.composable.QuickAccessDialogContent
 import com.android.systemui.accessibility.shortcutchooser.ui.composable.ShortcutEditorDialogContent
 import com.android.systemui.accessibility.shortcutchooser.ui.composable.ShortcutPickerDialogContent
 import com.android.systemui.accessibility.shortcutchooser.ui.composable.TopRowKeyTutorialDialogContent
+import com.android.systemui.accessibility.shortcutchooser.ui.viewmodel.ShortcutChooserDialogViewModel
+import com.android.systemui.accessibility.shortcutchooser.ui.viewmodel.ShortcutChooserDialogViewModel.DialogType
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.statusbar.phone.ComponentSystemUIDialog
@@ -37,146 +37,127 @@ import com.android.systemui.statusbar.phone.SystemUIDialogFactory
 import com.android.systemui.statusbar.phone.create
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.launch
 
 @SysUISingleton
 class ShortcutChooserDialogStartable
 @Inject
 constructor(
-    private val interactor: ShortcutChooserDialogInteractor,
+    private val viewModelFactory: ShortcutChooserDialogViewModel.Factory,
     private val dialogFactory: SystemUIDialogFactory,
-    @param:Application private val mainScope: CoroutineScope,
+    @param:Application private val applicationScope: CoroutineScope,
 ) : CoreStartable {
-    @VisibleForTesting var currentDialog: ComponentSystemUIDialog? = null
 
-    @VisibleForTesting var currentScreenState: MutableState<DialogScreen>? = null
+    private val viewModel = viewModelFactory.create()
+
+    private var dialogInstance: ComponentSystemUIDialog? = null
 
     override fun start() {
-        if (!android.view.accessibility.Flags.enableA11yTopRowShortcut()) {
+        if (
+            !AccessibilityFlags.enableA11yTopRowShortcut() &&
+                !SystemUIFlags.launchAccessibilityQuickAccessDialogPermission()
+        ) {
             return
         }
 
-        mainScope.launch {
-            interactor.dialogRequest.collectLatest { dialogRequestModel ->
-                createDialog(dialogRequestModel)
+        with(applicationScope) {
+            launchTraced { observeDialogState() }
+            launchTraced { viewModel.activate() }
+        }
+    }
+
+    private suspend fun observeDialogState() {
+        viewModel.dialogType.collect { dialogType ->
+            if (dialogType == DialogType.NONE) {
+                dialogInstance?.dismiss()
+                dialogInstance = null
+            } else if (dialogInstance == null) {
+                createDialog()
             }
         }
     }
 
-    private fun createDialog(dialogRequestModel: DialogRequestModel?) {
-        // Only one dialog shown up.
-        if (currentDialog != null) {
-            return
-        }
+    private fun createDialog() {
+        dialogInstance =
+            dialogFactory
+                .create { dialog ->
+                    val dialogType by viewModel.dialogType.collectAsStateWithLifecycle()
+                    val dialogRequest = viewModel.dialogRequest
+                    val shortcutType = dialogRequest.shortcutType
+                    val displayId = dialogRequest.displayId
 
-        if (dialogRequestModel == null) {
-            return
-        }
-
-        val selectedTargetsList =
-            interactor.getSelectedAccessibilityTargetsInfo(dialogRequestModel.shortcutType)
-
-        // We shouldn't receive the request if only one target is selected, it will directly toggle
-        // the feature for the target in [AccessibilityManagerService].
-        if (selectedTargetsList.size == 1) {
-            Log.d(
-                TAG,
-                "Dialog is not displayed because selected targets size is 1: $selectedTargetsList",
-            )
-            return
-        }
-
-        val shortcutType = dialogRequestModel.shortcutType
-        if (
-            selectedTargetsList.isEmpty() &&
-                dialogRequestModel.shortcutType != UserShortcutType.TOP_ROW_KEY
-        ) {
-            Log.d(
-                TAG,
-                "Dialog is not displayed because selected targets is empty and shortcut type is $shortcutType",
-            )
-            return
-        }
-
-        val startScreen =
-            if (selectedTargetsList.isEmpty()) {
-                DialogScreen.INITIAL
-            } else {
-                DialogScreen.TOGGLE_TARGETS
-            }
-        currentScreenState = mutableStateOf(startScreen)
-        currentDialog =
-            dialogFactory.create { dialogController ->
-                currentScreenState?.let { state ->
-                    var currentScreen by state
-
-                    when (currentScreen) {
-                        DialogScreen.INITIAL -> {
+                    when (dialogType) {
+                        DialogType.TUTORIAL -> {
                             TopRowKeyTutorialDialogContent(
-                                onAddFeaturesClick = { currentScreen = DialogScreen.EDIT_TARGETS },
-                                onCancelClick = { dialogController.dismiss() },
+                                onAddFeaturesClick = viewModel::showEditDialog,
+                                onCancelClick = viewModel::dismissDialog,
                             )
                         }
-                        DialogScreen.EDIT_TARGETS -> {
+                        DialogType.EDIT_TARGETS -> {
+                            val allTargets by
+                                remember(shortcutType) {
+                                        viewModel.getAllAccessibilityTargets(shortcutType)
+                                    }
+                                    .collectAsStateWithLifecycle(emptyList())
                             ShortcutEditorDialogContent(
                                 shortcutType,
-                                infoList = interactor.getAllAccessibilityTargetsInfo(shortcutType),
-                                onDoneClick = {
-                                    val newSelectedList =
-                                        interactor.getSelectedAccessibilityTargetsInfo(shortcutType)
-                                    if (newSelectedList.size < 2) {
-                                        dialogController.dismiss()
-                                    } else {
-                                        currentScreen = DialogScreen.TOGGLE_TARGETS
-                                    }
-                                },
-                                onTargetToggled = { targetName, isEnabled ->
-                                    interactor.enableShortcutForTargets(
-                                        isEnabled,
+                                targets = allTargets,
+                                onDoneClick = { viewModel.onEditTargetsDoneClick(shortcutType) },
+                                onTargetToggled = { target ->
+                                    viewModel.enableShortcutForTarget(
+                                        !target.isAssigned,
                                         shortcutType,
-                                        targetName,
+                                        target.targetName,
                                     )
                                 },
                             )
                         }
-                        DialogScreen.TOGGLE_TARGETS -> {
+                        DialogType.TOGGLE_TARGETS -> {
+                            val assignedTargets by
+                                remember(shortcutType) {
+                                        viewModel.getAssignedAccessibilityTargets(shortcutType)
+                                    }
+                                    .collectAsStateWithLifecycle(emptyList())
+                            val isEditButtonVisible by
+                                viewModel.isEditButtonVisible.collectAsStateWithLifecycle(false)
                             ShortcutPickerDialogContent(
-                                infoList =
-                                    interactor.getSelectedAccessibilityTargetsInfo(shortcutType),
-                                onEditClick = { currentScreen = DialogScreen.EDIT_TARGETS },
-                                onDoneClick = { dialogController.dismiss() },
+                                targets = assignedTargets,
+                                showEditButton = isEditButtonVisible,
+                                onEditClick = viewModel::showEditDialog,
+                                onDoneClick = viewModel::dismissDialog,
                                 onTargetClick = {
-                                    interactor.performAccessibilityShortcut(
-                                        dialogRequestModel.displayId,
+                                    viewModel.performAccessibilityShortcut(
+                                        displayId,
                                         shortcutType,
                                         it.targetName,
                                     )
-                                    dialogController.dismiss()
+                                    viewModel.dismissDialog()
                                 },
                             )
                         }
+                        DialogType.QUICK_ACCESS -> {
+                            val allTargets by
+                                remember(shortcutType) {
+                                        viewModel.getAllAccessibilityTargets(shortcutType)
+                                    }
+                                    .collectAsStateWithLifecycle(emptyList())
+                            QuickAccessDialogContent(
+                                onDoneClick = { viewModel.dismissDialog() },
+                                onTargetClick = {
+                                    viewModel.performAccessibilityShortcut(
+                                        displayId,
+                                        shortcutType,
+                                        it.targetName,
+                                    )
+                                },
+                                targets = allTargets,
+                            )
+                        }
+                        else -> {}
                     }
                 }
-            }
-
-        currentDialog?.let { dialog ->
-            dialog.show()
-            dialog.setOnDismissListener {
-                currentDialog = null
-                currentScreenState = null
-            }
-        }
-    }
-
-    @VisibleForTesting
-    enum class DialogScreen {
-        INITIAL,
-        EDIT_TARGETS,
-        TOGGLE_TARGETS,
-    }
-
-    companion object {
-        private val TAG = ShortcutChooserDialogStartable::class.simpleName
+                .apply {
+                    setOnDismissListener { viewModel.dismissDialog() }
+                    show()
+                }
     }
 }

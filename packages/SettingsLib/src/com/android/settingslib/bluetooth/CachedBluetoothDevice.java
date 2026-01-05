@@ -16,10 +16,9 @@
 
 package com.android.settingslib.bluetooth;
 
-import static com.android.settingslib.media.flags.Flags.enableTvMediaOutputDialog;
-
 import android.annotation.CallbackExecutor;
 import android.annotation.StringRes;
+import android.app.UiModeManager;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothClass;
 import android.bluetooth.BluetoothCsipSetCoordinator;
@@ -1911,7 +1910,7 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
                 || stringRes == R.string.bluetooth_active_battery_level_untethered_left
                 || stringRes == R.string.bluetooth_active_battery_level_untethered_right
                 || stringRes == R.string.bluetooth_battery_level_untethered;
-        if (isTvSummary && summaryIncludesBatteryLevel && enableTvMediaOutputDialog()) {
+        if (isTvSummary && summaryIncludesBatteryLevel) {
             return getTvBatterySummary(
                     getMinBatteryLevelWithMemberDevices(),
                     leftBattery,
@@ -2794,6 +2793,14 @@ public class CachedBluetoothDevice implements Comparable<CachedBluetoothDevice> 
             }
         } catch (RuntimeException e) {
             Log.w(TAG, "Fail to check isAndroidAuto for " + this);
+        }
+        if (Flags.enableAndroidAutoCheckByUiModeManager()) {
+            UiModeManager uiModeManager = mContext.getSystemService(UiModeManager.class);
+            int projectionType = uiModeManager.getActiveProjectionTypes();
+            Log.d(TAG, "Check isAndroidAuto, android auto projection type = " + projectionType);
+            if (projectionType == UiModeManager.PROJECTION_TYPE_AUTOMOTIVE) {
+                return true;
+            }
         }
         return false;
     }

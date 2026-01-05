@@ -72,9 +72,11 @@
 #define ENCODING_EVRC_WB    104
 #define ENCODING_EVRC_NW    105
 // QTI_END: 2018-02-19: Audio: add support for extended formats
+// QTI_BEGIN: 2023-03-22: Audio: add AAC ADTS encodings for LC,HE V1,HE V2 formats
 #define ENCODING_AAC_ADTS_LC 106
 #define ENCODING_AAC_ADTS_HE_V1 107
 #define ENCODING_AAC_ADTS_HE_V2 108
+// QTI_END: 2023-03-22: Audio: add AAC ADTS encodings for LC,HE V1,HE V2 formats
 
 #define ENCODING_INVALID    0
 #define ENCODING_DEFAULT    1
@@ -190,12 +192,14 @@ static inline audio_format_t audioFormatToNative(int audioFormat)
         return AUDIO_FORMAT_IAMF_BASE_ENHANCED_FLAC;
     case ENCODING_IAMF_BASE_ENHANCED_PROFILE_PCM:
         return AUDIO_FORMAT_IAMF_BASE_ENHANCED_PCM;
+// QTI_BEGIN: 2023-03-22: Audio: add AAC ADTS encodings for LC,HE V1,HE V2 formats
     case ENCODING_AAC_ADTS_LC:
         return AUDIO_FORMAT_AAC_ADTS_LC;
     case ENCODING_AAC_ADTS_HE_V1:
         return AUDIO_FORMAT_AAC_ADTS_HE_V1;
     case ENCODING_AAC_ADTS_HE_V2:
         return AUDIO_FORMAT_AAC_ADTS_HE_V2;
+// QTI_END: 2023-03-22: Audio: add AAC ADTS encodings for LC,HE V1,HE V2 formats
     default:
         return AUDIO_FORMAT_INVALID;
     }
@@ -317,12 +321,14 @@ static inline int audioFormatFromNative(audio_format_t nativeFormat)
         return ENCODING_IAMF_BASE_ENHANCED_PROFILE_FLAC;
     case AUDIO_FORMAT_IAMF_BASE_ENHANCED_PCM:
         return ENCODING_IAMF_BASE_ENHANCED_PROFILE_PCM;
+// QTI_BEGIN: 2023-03-22: Audio: add AAC ADTS encodings for LC,HE V1,HE V2 formats
     case AUDIO_FORMAT_AAC_ADTS_LC:
         return ENCODING_AAC_ADTS_LC;
     case AUDIO_FORMAT_AAC_ADTS_HE_V1:
         return ENCODING_AAC_ADTS_HE_V1;
     case AUDIO_FORMAT_AAC_ADTS_HE_V2:
         return ENCODING_AAC_ADTS_HE_V2;
+// QTI_END: 2023-03-22: Audio: add AAC ADTS encodings for LC,HE V1,HE V2 formats
     default:
         return ENCODING_INVALID;
     }
@@ -330,6 +336,7 @@ static inline int audioFormatFromNative(audio_format_t nativeFormat)
 
 // This function converts Java channel masks to a native channel mask.
 // validity should be checked with audio_is_output_channel().
+// TODO(b/460465715): use channelMasksToNative instead, that takes isInput, and remove this.
 static inline audio_channel_mask_t nativeChannelMaskFromJavaChannelMasks(
         jint channelPositionMask, jint channelIndexMask)
 {
@@ -344,7 +351,9 @@ static inline audio_channel_mask_t nativeChannelMaskFromJavaChannelMasks(
     // To convert to a native channel mask, the Java channel position mask
     // requires a shift by 2 to skip the two deprecated channel
     // configurations "default" and "mono".
-    return (audio_channel_mask_t)((uint32_t)channelPositionMask >> 2);
+    uint32_t audioChannels = (channelPositionMask & ~AUDIO_CHANNEL_HAPTIC_ALL);
+    uint32_t hapticChannels = (channelPositionMask & AUDIO_CHANNEL_HAPTIC_ALL);
+    return (audio_channel_mask_t)((audioChannels >> 2) | hapticChannels);
 }
 
 static inline audio_channel_mask_t outChannelMaskToNative(int channelMask)
@@ -386,6 +395,26 @@ static inline int inChannelMaskFromNative(audio_channel_mask_t nativeMask)
         default:
             return (int)nativeMask;
     }
+}
+
+// This function converts Java channel masks to a native channel mask using a separate indicator.
+// This will prioritize the channelIndexMask, if set, or use [in|out]ChannelMaskToNative to convert
+// the channel mask based on the isInput value.
+static inline audio_channel_mask_t channelMasksToNative(jint channelPositionMask,
+                                                        jint channelIndexMask, jboolean isInput) {
+    // 0 is the java android.media.AudioFormat.CHANNEL_INVALID value
+    if (channelIndexMask != 0) { // channel index mask takes priority
+        // To convert to a native channel mask, the Java channel index mask
+        // requires adding the index representation.
+        return audio_channel_mask_from_representation_and_bits(AUDIO_CHANNEL_REPRESENTATION_INDEX,
+                                                               channelIndexMask);
+    }
+    // Haptic channels should be preserved between java and native masks.
+    uint32_t audioChannels = (channelPositionMask & ~AUDIO_CHANNEL_HAPTIC_ALL);
+    uint32_t hapticChannels = (channelPositionMask & AUDIO_CHANNEL_HAPTIC_ALL);
+    uint32_t convertedAudioChannels =
+            isInput ? inChannelMaskToNative(audioChannels) : outChannelMaskToNative(audioChannels);
+    return (audio_channel_mask_t)(convertedAudioChannels | hapticChannels);
 }
 
 #endif // ANDROID_MEDIA_AUDIOFORMAT_H

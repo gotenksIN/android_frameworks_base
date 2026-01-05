@@ -60,23 +60,18 @@ public class UnprocessedPerfettoProtoLogImplTest {
     @BeforeClass
     public static void setUp() throws Exception {
         sTestDataSource = new ProtoLogDataSource(TEST_PROTOLOG_DATASOURCE_NAME);
-        if (!android.tracing.Flags.protologAsyncInit()) {
-            DataSourceParams params =
-                    new DataSourceParams.Builder()
-                            .setBufferExhaustedPolicy(
-                                    DataSourceParams
-                                            .PERFETTO_DS_BUFFER_EXHAUSTED_POLICY_DROP)
-                            .build();
-            sTestDataSource.register(params);
-        }
+        DataSourceParams params =
+                new DataSourceParams.Builder()
+                        .setBufferExhaustedPolicy(
+                                DataSourceParams
+                                        .PERFETTO_DS_BUFFER_EXHAUSTED_POLICY_DROP)
+                        .build();
+        sTestDataSource.register(params);
 
         sProtoLog = new UnprocessedPerfettoProtoLogImpl(sTestDataSource,
                 TestProtoLogGroup.values());
         sProtoLog.enable();
 
-        if (android.tracing.Flags.protologAsyncInit()) {
-            sProtoLog.mSingleThreadedExecutor.submit(() -> {}).get();
-        }
         busyWaitForDataSourceRegistration(TEST_PROTOLOG_DATASOURCE_NAME);
     }
 
@@ -144,16 +139,14 @@ public class UnprocessedPerfettoProtoLogImplTest {
     }
 
     private enum TestProtoLogGroup implements IProtoLogGroup {
-        TEST_GROUP(true, true, false, "TEST_TAG");
+        TEST_GROUP(true, false, "TEST_TAG");
 
         private final boolean mEnabled;
-        private volatile boolean mLogToProto;
         private volatile boolean mLogToLogcat;
         private final String mTag;
 
-        TestProtoLogGroup(boolean enabled, boolean logToProto, boolean logToLogcat, String tag) {
+        TestProtoLogGroup(boolean enabled, boolean logToLogcat, String tag) {
             this.mEnabled = enabled;
-            this.mLogToProto = logToProto;
             this.mLogToLogcat = logToLogcat;
             this.mTag = tag;
         }

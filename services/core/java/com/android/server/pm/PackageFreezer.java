@@ -62,20 +62,29 @@ final class PackageFreezer implements AutoCloseable {
     }
 
     PackageFreezer(String packageName, @CanBeALL @UserIdInt int userId, String killReason,
+            PackageManagerService pm, int exitInfoReason, @Nullable InstallRequest request,
+            boolean waitAppKilled) {
+        this(packageName, userId, killReason, pm, exitInfoReason, request, waitAppKilled, false);
+    }
+
+    PackageFreezer(String packageName, @CanBeALL @UserIdInt int userId, String killReason,
             PackageManagerService pm, int exitInfoReason, @Nullable InstallRequest request) {
-        this(packageName, userId, killReason, pm, exitInfoReason, request, false);
+        this(packageName, userId, killReason, pm, exitInfoReason, request, false, false);
     }
 
     PackageFreezer(String packageName, @CanBeALL @UserIdInt int userId, String killReason,
             PackageManagerService pm, int exitInfoReason, @Nullable InstallRequest request,
-            boolean waitAppKilled) {
+            boolean waitAppKilled, boolean waitAppStopped) {
         mPm = pm;
         mPackageName = packageName;
         mInstallRequest = request;
         final PackageSetting ps;
-        // We only focus on the install Freeze metrics now
+        // We only focus on the metrics for STEP_FREEZE_INSTALL and its sub-steps.
         if (mInstallRequest != null) {
             mInstallRequest.onFreezeStarted();
+            if (waitAppStopped) {
+                mInstallRequest.onStopAndKillStarted();
+            }
         }
         synchronized (mPm.mLock) {
             final int refCounts = mPm.mFrozenPackages
@@ -84,7 +93,10 @@ final class PackageFreezer implements AutoCloseable {
             ps = mPm.mSettings.getPackageLPr(mPackageName);
         }
         if (ps != null) {
-            if (waitAppKilled) {
+            if (waitAppStopped) {
+                mPm.stopAndKillApplication(ps.getPackageName(), ps.getAppId(), userId, killReason,
+                        exitInfoReason);
+            } else if (waitAppKilled) {
                 mPm.killApplicationSync(ps.getPackageName(), ps.getAppId(), userId, killReason,
                         exitInfoReason);
             } else {

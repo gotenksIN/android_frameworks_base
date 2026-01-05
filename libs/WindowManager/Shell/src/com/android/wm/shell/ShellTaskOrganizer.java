@@ -55,6 +55,7 @@ import android.window.TaskAppearedInfo;
 import android.window.TaskOrganizer;
 import android.window.TransitionInfo;
 import android.window.TransitionRequestInfo;
+import android.window.WindowContainerToken;
 import android.window.WindowContainerTransaction;
 import android.window.WindowContainerTransactionCallback;
 
@@ -66,6 +67,7 @@ import com.android.wm.shell.common.ShellExecutor;
 import com.android.wm.shell.compatui.CompatUIController;
 import com.android.wm.shell.compatui.api.CompatUIHandler;
 import com.android.wm.shell.compatui.api.CompatUIInfo;
+import com.android.wm.shell.compatui.api.CompatUITypeUtils;
 import com.android.wm.shell.compatui.impl.CompatUIEvents.SizeCompatRestartButtonAppeared;
 import com.android.wm.shell.compatui.impl.CompatUIEvents.SizeCompatRestartButtonClicked;
 import com.android.wm.shell.recents.RecentTasksController;
@@ -119,8 +121,13 @@ public class ShellTaskOrganizer extends TaskOrganizer {
          * organized, there will be no callback.
          *
          * @param taskInfo The RunningTaskInfo for the Task which received back event.
+         * @param isFromMoveActivityTaskToBack {@code true} if this is from an app calling
+         *                                     Activity#moveTaskToBack(), {@code false} if this is
+         *                                     from back button press.
+         * @param isOptInOnBackInvoked {@code true} if the app opts in enableOnBackInvokedCallback.
          */
-        default void onBackPressedOnTaskRoot(RunningTaskInfo taskInfo) {}
+        default void onBackPressedOnTaskRoot(RunningTaskInfo taskInfo,
+                boolean isFromMoveActivityTaskToBack, boolean isOptInOnBackInvoked) {}
         /** Whether this task listener supports compat UI. */
         default boolean supportCompatUI() {
             // All TaskListeners should support compat UI except PIP and StageCoordinator.
@@ -217,6 +224,15 @@ public class ShellTaskOrganizer extends TaskOrganizer {
     }
 
     /**
+     * Callbacks for events on tasks that are going through package update.
+     */
+    public interface PackageUpdateListener {
+        /**
+         * Notifies when a package update is requested for a list of tasks.
+         */
+        void onPackageUpdateRequested(List<RunningTaskInfo> updatingTasks);
+    }
+    /**
      * Keys map from either a task id or {@link TaskListenerType}.
      * @see #addListenerForTaskId
      * @see #addListenerForType
@@ -254,6 +270,10 @@ public class ShellTaskOrganizer extends TaskOrganizer {
 
     // Listeners that should be notified when a task is updated
     private final CopyOnWriteArrayList<TaskInfoChangedListener> mTaskInfoChangedListeners =
+            new CopyOnWriteArrayList<>();
+
+    // Listeners that should be notified when a task is updated
+    private final CopyOnWriteArrayList<PackageUpdateListener> mPackageUpdateListeners =
             new CopyOnWriteArrayList<>();
 
     private final Object mLock = new Object();
@@ -344,15 +364,17 @@ public class ShellTaskOrganizer extends TaskOrganizer {
         mShellCommandHandler.addDumpCallback(this::dump, this);
         if (mCompatUI != null) {
             mCompatUI.setCallback(compatUIEvent -> {
-                switch(compatUIEvent.getEventId()) {
+                switch (compatUIEvent.getEventId()) {
                     case SIZE_COMPAT_RESTART_BUTTON_APPEARED:
-                        onSizeCompatRestartButtonAppeared(compatUIEvent.asType());
+                        onSizeCompatRestartButtonAppeared(
+                                CompatUITypeUtils.asTypeJava(compatUIEvent,
+                                        SizeCompatRestartButtonAppeared.class));
                         break;
                     case SIZE_COMPAT_RESTART_BUTTON_CLICKED:
-                        onSizeCompatRestartButtonClicked(compatUIEvent.asType());
+                        onSizeCompatRestartButtonClicked(CompatUITypeUtils.asTypeJava(compatUIEvent,
+                                SizeCompatRestartButtonClicked.class));
                         break;
                     default:
-
                 }
             });
         }
@@ -469,16 +491,19 @@ public class ShellTaskOrganizer extends TaskOrganizer {
      * Creates a persistent root task in WM for a particular windowing-mode.
      * @param request The data for this request
      * @param listener The listener to get the created task callback.
+     * @return the WindowContainerToken of the newly created root task.
      *
      * @hide
      */
-    public void createRootTask(@NonNull CreateRootTaskRequest request, TaskListener listener) {
+    @Nullable
+    public WindowContainerToken createRootTask(@NonNull CreateRootTaskRequest request,
+            TaskListener listener) {
         ProtoLog.v(WM_SHELL_TASK_ORG, "createRootTask() displayId=%d winMode=%d listener=%s" ,
                 request.displayId, request.windowingMode, listener.toString());
         final IBinder cookie = new Binder();
         request.setLaunchCookie(cookie);
         setPendingLaunchCookieListener(cookie, listener);
-        super.createRootTask(request);
+        return super.createRootTask(request);
     }
 
     /**
@@ -708,6 +733,24 @@ public class ShellTaskOrganizer extends TaskOrganizer {
     }
 
     /**
+     * Adds a listener to be notified about package updates in tasks.
+     */
+    public void addPackageUpdateListener(PackageUpdateListener listener) {
+        synchronized (mLock) {
+            mPackageUpdateListeners.add(listener);
+        }
+    }
+
+    /**
+     * Removes a package-update listener.
+     */
+    public void removePackageUpdateListener(PackageUpdateListener listener) {
+        synchronized (mLock) {
+            mPackageUpdateListeners.remove(listener);
+        }
+    }
+
+    /**
      * Returns a surface which can be used to attach overview overlays above home root task
      */
     @Nullable
@@ -907,12 +950,16 @@ public class ShellTaskOrganizer extends TaskOrganizer {
     }
 
     @Override
-    public void onBackPressedOnTaskRoot(RunningTaskInfo taskInfo) {
+    public void onBackPressedOnTaskRoot(RunningTaskInfo taskInfo,
+            boolean isFromMoveActivityTaskToBack, boolean isOptInOnBackInvoked) {
         synchronized (mLock) {
-            ProtoLog.v(WM_SHELL_TASK_ORG, "Task root back pressed taskId=%d", taskInfo.taskId);
+            ProtoLog.v(WM_SHELL_TASK_ORG, "Task root back pressed taskId=%d "
+                    + "isFromMoveActivityTaskToBack=%b isOptInOnBackInvoked=%b",
+                    taskInfo.taskId, isFromMoveActivityTaskToBack, isOptInOnBackInvoked);
             final TaskListener listener = getTaskListener(taskInfo);
             if (listener != null) {
-                listener.onBackPressedOnTaskRoot(taskInfo);
+                listener.onBackPressedOnTaskRoot(taskInfo, isFromMoveActivityTaskToBack,
+                        isOptInOnBackInvoked);
             }
         }
     }
@@ -1302,6 +1349,15 @@ public class ShellTaskOrganizer extends TaskOrganizer {
             throw new IllegalStateException("No transition player registered!");
         }
         mTransitions.requestStartTransition(iBinder, request);
+    }
+
+    @Override
+    public void onPackageUpdateRequested(@NonNull List<RunningTaskInfo> updatingTasks) {
+        synchronized (mLock) {
+            for (PackageUpdateListener listener : mPackageUpdateListeners) {
+                listener.onPackageUpdateRequested(updatingTasks);
+            }
+        }
     }
 
     public void dump(@NonNull PrintWriter pw, String prefix) {

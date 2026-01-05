@@ -162,16 +162,6 @@ flag {
 }
 
 flag {
-  name: "internal_log_event_listener"
-  namespace: "enterprise"
-  description: "Allow internal listeners to see unfiltered event stream"
-  bug: "385730709"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
     name: "allow_querying_profile_type"
     is_exported: true
     namespace: "enterprise"
@@ -347,16 +337,6 @@ flag {
     namespace: "enterprise"
     description: "Add provisioningContext to store metadata about when the admin was set"
     bug: "326525847"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "active_admin_cleanup"
-    namespace: "enterprise"
-    description: "Remove ActiveAdmin from EnforcingAdmin and related cleanups"
-    bug: "335663055"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -580,6 +560,16 @@ flag {
 }
 
 flag {
+  name: "fix_usb_data_signaling_restriction_after_reboot"
+  namespace: "enterprise"
+  bug: "451575023"
+  description: "'DevicePolicyManager.setUsbDataSignalingEnabled(false)' is not working after device reboot."
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
   name: "secure_adb_role_bypassing"
   namespace: "enterprise"
   description: "Making sure that the existing `adb shell cmd role set-bypassing-role-qualification` command is protected against abuse on MUM devices."
@@ -591,4 +581,30 @@ flag {
   namespace: "enterprise"
   description: "Add a generic provisioning error for forward compatibility."
   bug: "458352522"
+}
+
+flag {
+  name: "multi_user_management_user_provisioning"
+  is_exported: true
+  namespace: "enterprise"
+  description: "Enable the multi user management user provisioning APIs."
+  bug: "390162247"
+}
+
+flag {
+  name: "policy_transparency_refactor_v2"
+  namespace: "enterprise"
+  description: "Refactor policy transparency to use new API during the rollout of policy_transparency_refactor_enabled."
+  bug: "445889973"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+  name: "lockscreen_info_coexistence"
+  namespace: "enterprise"
+  description: "Enables coexistence support for setDeviceOwnerLockScreenInfo"
+  bug: "457343029"
+  is_exported: true
 }

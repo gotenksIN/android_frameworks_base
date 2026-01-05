@@ -16,6 +16,7 @@
 package com.android.wm.shell.desktopmode.multidesks
 
 import android.app.ActivityTaskManager.INVALID_TASK_ID
+import android.graphics.Rect
 import android.os.IBinder
 import android.os.Trace
 import android.view.Display.INVALID_DISPLAY
@@ -28,14 +29,18 @@ import android.window.TransitionInfo.FLAG_MOVED_TO_TOP
 import android.window.WindowContainerTransaction
 import com.android.app.tracing.traceSection
 import com.android.internal.protolog.ProtoLog
+import com.android.window.flags.Flags
+import com.android.wm.shell.common.DisplayController
 import com.android.wm.shell.desktopmode.DesktopModeEventLogger
 import com.android.wm.shell.desktopmode.DesktopModeEventLogger.Companion.EnterReason
 import com.android.wm.shell.desktopmode.DesktopModeEventLogger.Companion.ExitReason
 import com.android.wm.shell.desktopmode.DesktopUserRepositories
 import com.android.wm.shell.desktopmode.desktopwallpaperactivity.DesktopWallpaperActivityTokenProvider
+import com.android.wm.shell.keyguard.KeyguardTransitionHandler.isKeyguardAppearing
 import com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_DESKTOP_MODE
 import com.android.wm.shell.shared.TransitionUtil
 import com.android.wm.shell.shared.annotations.ShellMainThread
+import com.android.wm.shell.sysui.ShellController
 import com.android.wm.shell.transition.Transitions
 import com.android.wm.shell.transition.Transitions.TRANSIT_END_RECENTS_TRANSITION
 import com.android.wm.shell.transition.Transitions.TRANSIT_START_RECENTS_TRANSITION
@@ -53,6 +58,8 @@ class DesksTransitionObserver(
     private val desktopWallpaperActivityTokenProvider: DesktopWallpaperActivityTokenProvider,
     @ShellMainThread private val mainScope: CoroutineScope,
     private val desktopModeEventLogger: DesktopModeEventLogger,
+    private val shellController: ShellController,
+    private val displayController: DisplayController,
 ) {
     // Tracks the desk transitions used to keep track of the desk state. This is usually removed
     // when the transition is ready. This map represents what a single shell transition is causing
@@ -315,12 +322,14 @@ class DesksTransitionObserver(
     private fun handleIndependentDeskTransitionIfNeeded(info: TransitionInfo) {
         val deskChanges = info.deskChanges()
         val desktopWallpaperChanges = info.desktopWallpaperChanges()
+        val fullImmersiveDesktopTaskChanges = info.desktopTaskInFullImmersiveChanges()
         if (deskChanges.isEmpty() && desktopWallpaperChanges.isEmpty()) return
         logD(
             "handleIndependentDeskTransitionIfNeeded %d desk related change(s) found with " +
-                "%d desktop wallpaper change(s)",
+                "%d desktop wallpaper change(s) and %d full-immersive task change(s)",
             deskChanges.size,
             desktopWallpaperChanges.size,
+            fullImmersiveDesktopTaskChanges.size,
         )
         if (info.isRecentsType()) {
             // Recents related changes are transient, so desk activation state should not change.
@@ -347,9 +356,16 @@ class DesksTransitionObserver(
                 logD("Not desk or wallpaper, skipping")
                 continue
             }
-            val changeUserId = taskInfo.userId
+            // The [change] userId can't be used here because the type of tasks being handled
+            // won't actually report the userId they're being used for right now (the current user)
+            // - DesktopWallpaperActivity is |showForAllUsers|, so its |userId| is that of the user
+            // that created it.
+            // - Desk root tasks are shared across users, so its |userId| is also that of the user
+            // that created it.
+            // Use the current user id instead.
+            val userId = shellController.currentUserId
             if (change in desktopWallpaperChanges) {
-                logD("Desktop wallpaper change")
+                logD("Desktop wallpaper change, userId=%d", userId)
                 if (hasSeenDesk) {
                     logD("Saw desk change before desktop wallpaper change, skipping")
                     continue
@@ -357,29 +373,67 @@ class DesksTransitionObserver(
                 when {
                     change.isToBack() -> {
                         // The desktop wallpaper is moving to back without seeing a desk first.
-                        val userId = changeUserId
                         val repository = desktopUserRepositories.getProfile(userId)
                         val activeDeskId = repository.getActiveDeskId(change.endDisplayId)
                         if (activeDeskId != null) {
+                            val hasFullImmersiveTask =
+                                fullImmersiveDesktopTaskChanges.any { c ->
+                                    desksOrganizer.getDeskAtEnd(c) == activeDeskId
+                                }
+
+                            // Even though the desk/wallpaper was moved to the back, we'd like it
+                            // to remain active sometimes.
+                            val deactivateDeskInRepo =
+                                when {
+                                    // (1) When keyguard is appearing, so that we return to the
+                                    // active desk when it unlocks.
+                                    Flags.keepDeskActiveOnKeyguardAppear() &&
+                                        isKeyguardAppearing(info) -> false
+                                    // (2) When a task is going full-immersive, this task is
+                                    // considered "in" the desk, it just happens to occlude/stop
+                                    // everything behind it.
+                                    Flags.makeFillingBoundsChangeEffectLifecycle() &&
+                                        hasFullImmersiveTask -> false
+                                    // Otherwise deactivate.
+                                    else -> true
+                                }
+                            // Usually the we make the organizer deactivate the desk when we're
+                            // deactivating it in the repository, but there are some cases where we
+                            // want to make the organizer deactivate it (move to back and disable
+                            // the launch root) despite wanting it to keep it active from the
+                            // repository pov.
+                            val deactivateDeskInOrganizer =
+                                when {
+                                    // Always disable on deactivation.
+                                    deactivateDeskInRepo -> true
+                                    // Disable if keyguard is appearing, the desk remains active so
+                                    // that we can return to it, but we also don't want things
+                                    // to launch in it while the keyguard is showing.
+                                    Flags.keepDeskActiveOnKeyguardAppear() &&
+                                        isKeyguardAppearing(info) -> true
+                                    else -> false
+                                }
+
                             logD(
-                                "Desktop wallpaper of user=%d moved to back without visible desk" +
-                                    ", will let the organizer deactivate " +
-                                    "and the repository will deactivate",
-                                userId,
+                                "Desktop wallpaper of user=%d moved to back without a visible " +
+                                    "desk (hasFullImmersiveTask=%b isKeyguardAppearing=%b) - " +
+                                    "deactivateDeskInRepo=%b deactivateDeskInOrganizer=%b",
+                                hasFullImmersiveTask,
+                                isKeyguardAppearing(info),
+                                deactivateDeskInRepo,
+                                deactivateDeskInOrganizer,
                             )
-                            // Always let the organizer deactivate to clear the launch root.
-                            desksOrganizer.deactivateDesk(wct, activeDeskId, skipReorder = true)
-                            desktopModeEventLogger.logPendingSessionExit(
-                                activeDeskId,
-                                ExitReason.UNKNOWN_EXIT,
-                            )
-                            repository.setDeskInactive(activeDeskId)
-                        } else {
-                            logD(
-                                "Desktop wallpaper of user=%d moved to back with no active desk" +
-                                    ", skipping",
-                                userId,
-                            )
+
+                            if (deactivateDeskInOrganizer) {
+                                desksOrganizer.deactivateDesk(wct, activeDeskId, skipReorder = true)
+                            }
+                            if (deactivateDeskInRepo) {
+                                desktopModeEventLogger.logPendingSessionExit(
+                                    activeDeskId,
+                                    ExitReason.UNKNOWN_EXIT,
+                                )
+                                repository.setDeskInactive(activeDeskId)
+                            }
                         }
                     }
                     change.isToTop() -> {
@@ -388,12 +442,12 @@ class DesksTransitionObserver(
                         // This is valid state, but since we don't expect desks to activate
                         // without user action, check that the desk was supposed to be active, and
                         // if not, deactivate it.
-                        val repository = desktopUserRepositories.getProfile(changeUserId)
+                        val repository = desktopUserRepositories.getProfile(userId)
                         val activeDeskId = repository.getActiveDeskId(change.endDisplayId)
                         logD(
                             "Found desktop wallpaper without a desk in front for userId=%d " +
                                 "activeDeskId=%d",
-                            changeUserId,
+                            userId,
                             activeDeskId,
                         )
                         if (activeDeskId != null) {
@@ -427,7 +481,12 @@ class DesksTransitionObserver(
                 continue
             }
             val displayId = change.endDisplayId
-            logD("Handle desk change for desk=%d in display=%d", deskId, displayId)
+            logD(
+                "Handle desk change for desk=%d in display=%d for userId=%d",
+                deskId,
+                displayId,
+                userId,
+            )
             when {
                 change.isToBack() -> {
                     if (
@@ -443,10 +502,7 @@ class DesksTransitionObserver(
                         logD("desk=%d moved to back but nothing moved to front, skipping", deskId)
                         continue
                     }
-                    if (
-                        desksToActivate.contains(deskId) &&
-                            DesktopExperienceFlags.ENABLE_EMPTY_DESK_ON_MINIMIZE.isTrue
-                    ) {
+                    if (desksToActivate.contains(deskId)) {
                         // In cases such as back-navigating the last app, where we want to remain
                         // in an empty desk, WM core may forcefully move the desktop wallpaper to
                         // front and the desk root to back because the next focusable activity is
@@ -456,7 +512,6 @@ class DesksTransitionObserver(
                         logD("desk=%d moved to back but is scheduled to activate, skipping", deskId)
                         continue
                     }
-                    val userId = changeUserId
                     val repository = desktopUserRepositories.getProfile(userId)
                     logD(
                         "desk=%d of user=%d moved to back, will let the organizer deactivate and " +
@@ -486,12 +541,12 @@ class DesksTransitionObserver(
                         logD("Pending display change found; skipping.")
                         continue
                     }
-                    val repository = desktopUserRepositories.getProfile(changeUserId)
+                    val repository = desktopUserRepositories.getProfile(userId)
                     logD(
                         "desk=%d of user=%d moved to front, " +
                             "will let the organizer and repository activate",
                         deskId,
-                        changeUserId,
+                        userId,
                     )
                     desksOrganizer.activateDesk(wct, deskId, skipReorder = true)
                     repository.setActiveDesk(displayId, deskId)
@@ -594,6 +649,20 @@ class DesksTransitionObserver(
             val taskId = c.taskInfo?.taskId
             taskId != null && taskId != INVALID_TASK_ID
         }
+
+    private fun TransitionInfo.desktopTaskInFullImmersiveChanges(): List<TransitionInfo.Change> {
+        return changes
+            .filter { c -> c.taskInfo != null }
+            .filter { c -> desksOrganizer.getDeskAtEnd(c) != null }
+            .filter { c -> c.mode == TRANSIT_CHANGE }
+            .filter { c ->
+                val displayBounds =
+                    displayController.getDisplayLayout(c.endDisplayId)?.let {
+                        Rect(0, 0, it.width(), it.height())
+                    }
+                return@filter displayBounds != null && c.endAbsBounds == displayBounds
+            }
+    }
 
     private fun TransitionInfo.deskChanges(): List<TransitionInfo.Change> =
         changes.filter { c -> desksOrganizer.isDeskChange(c) }

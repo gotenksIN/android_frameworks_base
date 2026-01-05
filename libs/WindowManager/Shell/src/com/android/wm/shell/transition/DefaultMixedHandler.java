@@ -27,6 +27,8 @@ import static android.window.TransitionInfo.FLAG_IN_TASK_WITH_EMBEDDED_ACTIVITY;
 
 import static com.android.wm.shell.shared.TransitionUtil.isOpeningType;
 import static com.android.wm.shell.shared.split.SplitScreenConstants.SPLIT_POSITION_UNDEFINED;
+import static com.android.wm.shell.transition.MixedTransitionHelper.getTopSplitStageToKeep;
+import static com.android.wm.shell.transition.Transitions.TRANSIT_SPLIT_DISMISS;
 
 import android.annotation.IntDef;
 import android.annotation.NonNull;
@@ -55,6 +57,7 @@ import com.android.wm.shell.bubbles.BubbleHelper;
 import com.android.wm.shell.bubbles.BubbleTransitions;
 import com.android.wm.shell.common.ComponentUtils;
 import com.android.wm.shell.desktopmode.DesktopTasksController;
+import com.android.wm.shell.desktopmode.NormalAppLayerHandler;
 import com.android.wm.shell.shared.desktopmode.DesktopModeStatus;
 import com.android.wm.shell.keyguard.KeyguardTransitionHandler;
 import com.android.wm.shell.pinnedlayer.phone.PinnedLayerHandler;
@@ -65,6 +68,7 @@ import com.android.wm.shell.recents.RecentsTransitionHandler;
 import com.android.wm.shell.shared.TransitionUtil;
 import com.android.wm.shell.shared.bubbles.BubbleAnythingFlagHelper;
 import com.android.wm.shell.shared.pip.PipFlags;
+import com.android.wm.shell.splitscreen.SplitScreen;
 import com.android.wm.shell.splitscreen.SplitScreenController;
 import com.android.wm.shell.splitscreen.StageCoordinator;
 import com.android.wm.shell.sysui.ShellInit;
@@ -99,6 +103,7 @@ public class DefaultMixedHandler implements MixedTransitionHandler,
     private UnfoldTransitionHandler mUnfoldHandler;
     private ActivityEmbeddingController mActivityEmbeddingController;
     private @Nullable PinnedLayerHandler mPinnedLayerHandler;
+    private @Nullable NormalAppLayerHandler mNormalAppLayerHandler;
 
     abstract static class MixedTransition {
 
@@ -335,9 +340,7 @@ public class DefaultMixedHandler implements MixedTransitionHandler,
                 return true;
             }
             if (MixedTransition.isAppBubbleTypeTransition(mType)) {
-                if (com.android.window.flags.Flags.fixBubbleTrampolineLaunchTwice()) {
-                    return mBubbleTransitions.canAnimateTransition(transition, info);
-                }
+                return mBubbleTransitions.canAnimateTransition(transition, info);
             } else {
                 // The previously resolved mixed handler is no longer relevant, and we can replace
                 // it entirely because there are only opening bubble tasks in the changes.
@@ -346,7 +349,6 @@ public class DefaultMixedHandler implements MixedTransitionHandler,
                 return openingAppBubbleChangeIndexes.isEmpty()
                         || openingAppBubbleChangeIndexes.size() != info.getChanges().size();
             }
-            return true;
         }
     }
 
@@ -359,6 +361,7 @@ public class DefaultMixedHandler implements MixedTransitionHandler,
             Optional<SplitScreenController> splitScreenControllerOptional,
             @Nullable PipTransitionController pipTransitionController,
             @Nullable Optional<PipScheduler> pipScheduler,
+            @Nullable NormalAppLayerHandler normalAppLayerHandler,
             @Nullable PinnedLayerHandler pinnedLayerHandler,
             Optional<RecentsTransitionHandler> recentsHandlerOptional,
             KeyguardTransitionHandler keyguardHandler,
@@ -376,6 +379,7 @@ public class DefaultMixedHandler implements MixedTransitionHandler,
                 mPipHandler.setMixedHandler(this);
             }
             mPipScheduler = pipScheduler.orElse(null);
+            mNormalAppLayerHandler = normalAppLayerHandler;
             mPinnedLayerHandler = pinnedLayerHandler;
             mSplitHandler = splitScreenControllerOptional.map(
                     SplitScreenController::getTransitionHandler).orElse(null);
@@ -604,7 +608,7 @@ public class DefaultMixedHandler implements MixedTransitionHandler,
             // dismissing pinned layer if pip is opening
             if (requestHasPipEnter(request) && mPinnedLayerHandler.hasActivePinnedTask()) {
                 mActiveTransitions.add(createDefaultMixedTransition(
-                    MixedTransition.TYPE_ENTER_PIP_WITH_PINNED_LAYER_DISMISS, transition));
+                        MixedTransition.TYPE_ENTER_PIP_WITH_PINNED_LAYER_DISMISS, transition));
                 final WindowContainerTransaction out = new WindowContainerTransaction();
                 mPipHandler.augmentRequest(transition, request, out);
                 mPinnedLayerHandler.augmentRequestDismissPinnedTask(transition, request, out);
@@ -1009,8 +1013,10 @@ public class DefaultMixedHandler implements MixedTransitionHandler,
         return mixed.startSubAnimation(keyguardHandler, info, startTransaction, finishTransaction);
     }
 
-    /** Use to when split use intent to enter, check if this enter transition should be mixed or
-     * not.*/
+    /**
+     * Use to when split use intent to enter, check if this enter transition should be mixed or
+     * not.
+     */
     public boolean isIntentInPip(PendingIntent intent) {
         // Check if this intent package is same as pip one or not, if true we want let the pip
         // task enter split.
@@ -1021,8 +1027,10 @@ public class DefaultMixedHandler implements MixedTransitionHandler,
         return false;
     }
 
-   /** Use to when split use taskId to enter, check if this enter transition should be mixed or
-     * not.*/
+    /**
+     * Use to when split use taskId to enter, check if this enter transition should be mixed or
+     * not.
+     */
     public boolean isTaskInPip(int taskId, ShellTaskOrganizer shellTaskOrganizer) {
         // Check if this intent package is same as pip one or not, if true we want let the pip
         // task enter split.
@@ -1104,9 +1112,6 @@ public class DefaultMixedHandler implements MixedTransitionHandler,
             return null;
         }
         final TransitionInfo.Change change = mBubbleHelper.getEnterBubbleTask(info);
-        if (!com.android.wm.shell.Flags.fixTaskViewRotationAnimation()) {
-            return change;
-        }
         return change != null && TransitionUtil.isOpeningMode(change.getMode()) ? change : null;
     }
 
@@ -1136,12 +1141,34 @@ public class DefaultMixedHandler implements MixedTransitionHandler,
             if (mActiveTransitions.get(i).mTransition != mergeTarget) continue;
 
             MixedTransition mixed = mActiveTransitions.get(i);
-            if (mixed.mInFlightSubAnimations <= 0) {
+            if (mixed.mInFlightSubAnimations <= 0
+                    // The split-to-bubble trampoline transition also splits to two transitions.
+                    // Also merge these two transitions here.
+                    && !shouldMergeSplitToBubbleTrampolineTransition(mixed, info)) {
                 // Already done, so no need to end it.
                 return;
             }
             mixed.mergeAnimation(transition, info, startT, finishT, mergeTarget, finishCallback);
         }
+    }
+
+    private boolean shouldMergeSplitToBubbleTrampolineTransition(@NonNull MixedTransition mixed,
+            @NonNull TransitionInfo info) {
+        return com.android.window.flags.Flags.enableForceOpaque()
+                && isSplitToBubbleTrampolineTransition(mixed, info);
+    }
+
+    /**
+     * Returns whether the given transition is a split-to-bubble trampoline transition,
+     * which includes one launch-or-convert-to-bubble transition with one split dismiss transition.
+     */
+    private boolean isSplitToBubbleTrampolineTransition(@NonNull MixedTransition mixed,
+            @NonNull TransitionInfo info) {
+        return mixed.mType == MixedTransition.TYPE_LAUNCH_OR_CONVERT_TO_BUBBLE
+                && info.getType() == TRANSIT_SPLIT_DISMISS
+                && getTopSplitStageToKeep(
+                        info.getChanges(), mSplitHandler, null /* bubblingTask */)
+                                != SplitScreen.STAGE_TYPE_UNDEFINED;
     }
 
     @Override

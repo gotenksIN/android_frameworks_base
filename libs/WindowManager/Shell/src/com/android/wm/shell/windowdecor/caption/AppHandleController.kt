@@ -32,7 +32,6 @@ import android.view.MotionEvent
 import android.view.SurfaceControl
 import android.view.View
 import android.window.DesktopExperienceFlags
-import android.window.DesktopModeFlags
 import android.window.TaskSnapshot
 import android.window.WindowContainerTransaction
 import com.android.app.tracing.traceSection
@@ -128,8 +127,6 @@ class AppHandleController(
         windowDecorViewHostSupplier,
         taskOrganizer,
         bgScope,
-        surfaceControlBuilderSupplier,
-        surfaceControlViewHostFactory,
     ),
     HandleMenuController,
     ManageWindowsMenuController {
@@ -397,8 +394,8 @@ class AppHandleController(
         val supportsMultiInstance =
             multiInstanceHelper.supportsMultiInstanceSplit(
                 taskInfo.baseActivity,
-                taskInfo.userId,
-            ) && DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_MULTI_INSTANCE_FEATURES.isTrue
+                taskInfo.userId
+            )
         val shouldShowManageWindowsButton = supportsMultiInstance && minimumInstancesFound
         val shouldShowChangeAspectRatioButton = shouldShowChangeAspectRatioButton(taskInfo)
         val shouldShowRestartButton = shouldShowRestartButton(taskInfo)

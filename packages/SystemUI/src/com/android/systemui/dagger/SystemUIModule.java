@@ -48,7 +48,6 @@ import com.android.systemui.biometrics.domain.BiometricsDomainLayerModule;
 import com.android.systemui.bouncer.data.repository.BouncerRepositoryModule;
 import com.android.systemui.bouncer.domain.interactor.BouncerInteractorModule;
 import com.android.systemui.bouncer.ui.BouncerViewModule;
-import com.android.systemui.brightness.dagger.ScreenBrightnessModule;
 import com.android.systemui.brightness.impl.BrightnessModule;
 import com.android.systemui.classifier.FalsingModule;
 import com.android.systemui.clipboardoverlay.dagger.ClipboardOverlayModule;
@@ -136,12 +135,9 @@ import com.android.systemui.statusbar.NotificationShadeWindowController;
 import com.android.systemui.statusbar.chips.StatusBarChipsModule;
 import com.android.systemui.statusbar.connectivity.ConnectivityModule;
 import com.android.systemui.statusbar.dagger.StatusBarModule;
-import com.android.systemui.statusbar.disableflags.dagger.DisableFlagsModule;
 import com.android.systemui.statusbar.domain.interactor.StatusBarRegionSamplingInteractorModule;
 import com.android.systemui.statusbar.events.StatusBarEventsModule;
 import com.android.systemui.statusbar.events.SystemStatusAnimationScheduler;
-import com.android.systemui.statusbar.featurepods.av.AvControlsChipModule;
-import com.android.systemui.statusbar.featurepods.dagger.StatusBarFeaturePodsModule;
 import com.android.systemui.statusbar.notification.NotifPipelineFlags;
 import com.android.systemui.statusbar.notification.collection.NotifPipeline;
 import com.android.systemui.statusbar.notification.collection.inflation.NotificationRowBinder;
@@ -166,6 +162,8 @@ import com.android.systemui.statusbar.policy.SensitiveNotificationProtectionCont
 import com.android.systemui.statusbar.policy.ZenModeController;
 import com.android.systemui.statusbar.policy.dagger.SmartRepliesInflationModule;
 import com.android.systemui.statusbar.policy.dagger.StatusBarPolicyModule;
+import com.android.systemui.statusbar.quickactions.av.AvControlsChipModule;
+import com.android.systemui.statusbar.quickactions.dagger.StatusBarFeaturePodsModule;
 import com.android.systemui.statusbar.systemstatusicons.SystemStatusIconsModule;
 import com.android.systemui.statusbar.ui.binder.StatusBarViewBinderModule;
 import com.android.systemui.statusbar.window.StatusBarWindowModule;
@@ -249,7 +247,6 @@ import javax.inject.Named;
         DemoModeModule.class,
         DesktopModule.class,
         DeviceEntryModule.class,
-        DisableFlagsModule.class,
         DisplayModule.class,
         RootDozeModule.class,
         DreamModule.class,
@@ -286,7 +283,6 @@ import javax.inject.Named;
         ReferenceModule.class,
         RetailModeModule.class,
         RotationModule.class,
-        ScreenBrightnessModule.class,
         ScreenshotModule.class,
         SecureLockDeviceModule.class,
         SensorModule.class,

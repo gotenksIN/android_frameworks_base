@@ -39,7 +39,7 @@
     <string name="passwordIncorrect" msgid="917087532676155877">"गलत पासवर्ड"</string>
     <string name="mmiComplete" msgid="6341884570892520140">"MMI पूरा हुआ."</string>
     <string name="badPin" msgid="888372071306274355">"  लिखा गया पुराना पिन सही नहीं है."</string>
-    <string name="badPuk" msgid="4232069163733147376">"  लिखा गया PUK सही नहीं है."</string>
+    <string name="badPuk" msgid="4232069163733147376">"लिखा गया PUK सही नहीं है."</string>
     <string name="mismatchPin" msgid="2929611853228707473">"आपने जो पिन लिखे हैं उसका मिलान नहीं होता."</string>
     <string name="invalidPin" msgid="7542498253319440408">"कोई ऐसा पिन लिखें, जिसमें 4 से 8 अंक हों."</string>
     <string name="invalidPuk" msgid="8831151490931907083">"ऐसा PUK लिखें जो 8 अंकों या ज़्यादा का हो."</string>
@@ -278,6 +278,7 @@
     <string name="global_action_restart" msgid="4678451019561687074">"रीस्टार्ट करें"</string>
     <string name="global_action_emergency" msgid="1387617624177105088">"आपातकालीन सुविधाएं देखें"</string>
     <string name="global_action_bug_report" msgid="5127867163044170003">"गड़बड़ी की रिपोर्ट"</string>
+    <string name="global_action_feedback" msgid="3480836834202300036">"सुझाव/राय/शिकायत वाला ऐप"</string>
     <string name="global_action_logout" msgid="6093581310002476511">"सत्र खत्म करें"</string>
     <string name="global_action_screenshot" msgid="2610053466156478564">"स्क्रीनशॉट"</string>
     <string name="global_action_standby" msgid="6786920589970257642">"स्टैंडबाय"</string>
@@ -326,8 +327,7 @@
     <string name="notification_channel_accessibility_hearing_device" msgid="7816963856388758952">"कान की मशीन"</string>
     <string name="notification_channel_accessibility_security_policy" msgid="1727787021725251912">"सुलभता सुविधाओं का इस्तेमाल"</string>
     <string name="notification_channel_display" msgid="6905032605735615090">"डिसप्ले"</string>
-    <!-- no translation found for notification_channel_parental_controls (2963963315750128538) -->
-    <skip />
+    <string name="notification_channel_parental_controls" msgid="2963963315750128538">"माता-पिता के कंट्रोल"</string>
     <string name="foreground_service_app_in_background" msgid="1439289699671273555">"<xliff:g id="APP_NAME">%1$s</xliff:g> बैटरी का इस्तेमाल कर रहा है"</string>
     <string name="foreground_service_apps_in_background" msgid="7340037176412387863">"<xliff:g id="NUMBER">%1$d</xliff:g> ऐप बैटरी का इस्तेमाल कर रहे हैं"</string>
     <string name="foreground_service_tap_for_details" msgid="9078123626015586751">"बैटरी और डेटा खर्च की जानकारी के लिए छूएं"</string>
@@ -645,6 +645,10 @@
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"ऐप्लिकेशन को आपके लोकल नेटवर्क से कनेक्ट किए गए डिवाइसों का ऐक्सेस मिलता है"</string>
     <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"लूपबैक इंटरफ़ेस का इस्तेमाल करें"</string>
     <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"इससे ऐप्लिकेशन को लूपबैक इंटरफ़ेस के ज़रिए अन्य ऐप्लिकेशन के साथ इंटरैक्ट करने की अनुमति मिलती है"</string>
+    <!-- no translation found for permlab_force_use_loopback_interface (1319727311706416481) -->
+    <skip />
+    <!-- no translation found for permdesc_force_use_loopback_interface (5829032514048681980) -->
+    <skip />
     <string name="permlab_ranging" msgid="2854543350668593390">"आस-पास मौजूद डिवाइसों के बीच की दूरी का पता लगाएं"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"ऐप्लिकेशन को, आस-पास मौजूद डिवाइसों के बीच की दूरी का पता लगाने की अनुमति दें"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"NFC का इस्तेमाल करने वाली पैसे चुकाने की पसंदीदा सेवा की जानकारी"</string>
@@ -825,6 +829,8 @@
     <string name="permdesc_readMediaVideo" msgid="3846400073770403528">"अपने डिवाइस के शेयर किए गए स्टोरेज से, ऐप्लिकेशन को वीडियो फ़ाइलें पढ़ने की अनुमति दें."</string>
     <string name="permlab_readMediaImages" msgid="4057590631020986789">"डिवाइस के शेयर किए गए स्टोरेज से, इमेज फ़ाइलें देखने की अनुमति"</string>
     <string name="permdesc_readMediaImages" msgid="5836219373138469259">"अपने डिवाइस के शेयर किए गए स्टोरेज से, ऐप्लिकेशन को इमेज फ़ाइलें देखने की अनुमति दें."</string>
+    <string name="permlab_readMediaDocuments" msgid="5716810755602938263">"शेयर किए गए स्टोरेज से दस्तावेज़ वाली फ़ाइलें पढ़ने की अनुमति"</string>
+    <string name="permdesc_readMediaDocuments" msgid="5665930210237304120">"इससे ऐप्लिकेशन, शेयर किए गए स्टोरेज से दस्तावेज़ वाली फ़ाइलें देख पाता है."</string>
     <string name="permlab_readVisualUserSelect" msgid="5516204215354667586">"डिवाइस के शेयर किए गए स्टोरेज से चुनी गई इमेज और वीडियो फ़ाइलों को देखने की अनुमति दें"</string>
     <string name="permdesc_readVisualUserSelect" msgid="8027174717714968217">"इससे ऐप्लिकेशन को, डिवाइस के शेयर किए गए स्टोरेज से चुनी गई इमेज और वीडियो फ़ाइलों को देखने की अनुमति मिलती है."</string>
     <string name="permlab_sdcardWrite" msgid="4863021819671416668">"आपकी शेयर की गई मेमोरी की सामग्री में बदलाव करना या उसे मिटाना"</string>
@@ -1047,6 +1053,7 @@
     <string name="keyguard_password_enter_pin_password_code" msgid="7792964196473964340">"अनलॉक करने के लिए पिन लिखें"</string>
     <string name="keyguard_password_wrong_pin_code" msgid="8583732939138432793">"गलत पिन कोड."</string>
     <string name="keyguard_label_text" msgid="3841953694564168384">"लॉक खोलने के लिए, मेन्यू दबाएं और फिर 0 दबाएं."</string>
+    <string name="emergency_call_dialog_number_for_display" msgid="2978165477085612673">"आपातकालीन नंबर"</string>
     <string name="lockscreen_carrier_default" msgid="6192313772955399160">"कोई सेवा नहीं"</string>
     <string name="lockscreen_screen_locked" msgid="7364905540516041817">"स्‍क्रीन लॉक की गई है."</string>
     <string name="lockscreen_instructions_when_pattern_enabled" msgid="7982445492532123308">"लॉक खोलने के लिए मेन्यू दबाएं या आपातलकालीन कॉल करें."</string>
@@ -2176,13 +2183,21 @@
     <string name="autofill_picker_no_suggestions" msgid="1076022650427481509">"ऑटोमैटिक भरने का कोई सुझाव नहीं"</string>
     <string name="autofill_picker_some_suggestions" msgid="5560549696296202701">"{count,plural, =1{जानकारी अपने-आप भरने के लिए एक सुझाव}one{जानकारी अपने-आप भरने के लिए # सुझाव}other{जानकारी अपने-आप भरने के लिए # सुझाव}}"</string>
     <string name="autofill_save_title" msgid="7719802414283739775">"क्या आप "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>" में सेव करना चाहते हैं?"</string>
+    <string name="autofill_save_title_expressive" msgid="2665408870424848558">"जानकारी को "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>" में सेव करें"</string>
     <string name="autofill_save_title_with_type" msgid="3002460014579799605">"क्या आप "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>" में <xliff:g id="TYPE">%1$s</xliff:g> सेव करना चाहते हैं?"</string>
+    <string name="autofill_save_title_with_type_expressive" msgid="6063660551496235255">"<xliff:g id="TYPE">%1$s</xliff:g> को "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>" में सेव करें"</string>
     <string name="autofill_save_title_with_2types" msgid="3783270967447869241">"क्या आप "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>" में <xliff:g id="TYPE_0">%1$s</xliff:g> और <xliff:g id="TYPE_1">%2$s</xliff:g> सेव करना चाहते हैं?"</string>
+    <string name="autofill_save_title_with_2types_expressive" msgid="2996687022212666293">"<xliff:g id="TYPE_0">%1$s</xliff:g> और <xliff:g id="TYPE_1">%2$s</xliff:g> को "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>" में सेव करें"</string>
     <string name="autofill_save_title_with_3types" msgid="6598228952100102578">"क्या आप "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>" में <xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g>, और <xliff:g id="TYPE_2">%3$s</xliff:g> सेव करना चाहते हैं?"</string>
+    <string name="autofill_save_title_with_3types_expressive" msgid="3301676215501214049">"<xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g>, और <xliff:g id="TYPE_2">%3$s</xliff:g> को "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>" में सेव करें"</string>
     <string name="autofill_update_title" msgid="3630695947047069136">"क्या आप "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>" में अपडेट करना चाहते हैं?"</string>
+    <string name="autofill_update_title_expressive" msgid="7660582214109012920"><b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>" में जानकारी अपडेट करें"</string>
     <string name="autofill_update_title_with_type" msgid="5264152633488495704">"क्या आप "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>" में <xliff:g id="TYPE">%1$s</xliff:g> अपडेट करना चाहते हैं?"</string>
+    <string name="autofill_update_title_with_type_expressive" msgid="6162413585161767846">"<xliff:g id="TYPE">%1$s</xliff:g> को "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>" में अपडेट करें"</string>
     <string name="autofill_update_title_with_2types" msgid="1797514386321086273">"क्या आप "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>" में <xliff:g id="TYPE_0">%1$s</xliff:g> और <xliff:g id="TYPE_1">%2$s</xliff:g> अपडेट करना चाहते हैं?"</string>
+    <string name="autofill_update_title_with_2types_expressive" msgid="1911825941498393471">"<xliff:g id="TYPE_0">%1$s</xliff:g> और <xliff:g id="TYPE_1">%2$s</xliff:g> को "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>" में अपडेट करें"</string>
     <string name="autofill_update_title_with_3types" msgid="8285767070604652626">"क्या आपको "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>" में इन आइटम को अपडेट करना है: <xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g>, और <xliff:g id="TYPE_2">%3$s</xliff:g>?"</string>
+    <string name="autofill_update_title_with_3types_expressive" msgid="6040725201378429027"><b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>" में ये आइटम अपडेट करें: <xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g>, और <xliff:g id="TYPE_2">%3$s</xliff:g>"</string>
     <string name="autofill_save_yes" msgid="8035743017382012850">"सेव करें"</string>
     <string name="autofill_save_no" msgid="9212826374207023544">"नहीं, धन्यवाद"</string>
     <string name="autofill_save_notnow" msgid="2853932672029024195">"अभी नहीं"</string>
@@ -2611,10 +2626,7 @@
     <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"सिस्टम के संसाधन से जुड़ी सूचनाएं"</string>
     <string name="tv_watchdog_notification_title" msgid="195239206215922517">"संसाधन का ज़्यादा इस्तेमाल"</string>
     <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"<xliff:g id="APP_NAME">%1$s</xliff:g> ऐप्लिकेशन बहुत ज़्यादा संसाधन इस्तेमाल कर रहा है."</string>
-    <!-- no translation found for supervision_blocked_app_title (5546803865875383588) -->
-    <skip />
-    <!-- no translation found for supervision_blocked_app_content (4125452996088641559) -->
-    <skip />
-    <!-- no translation found for supervision_unblocked_app_content (8282985265957852278) -->
-    <skip />
+    <string name="supervision_blocked_app_title" msgid="5546803865875383588">"माता-पिता की ओर से किया गया अपडेट"</string>
+    <string name="supervision_blocked_app_content" msgid="4125452996088641559">"<xliff:g id="APP_NAME">%1$s</xliff:g> को फ़िलहाल हटा दिया गया है"</string>
+    <string name="supervision_unblocked_app_content" msgid="8282985265957852278">"<xliff:g id="APP_NAME">%1$s</xliff:g> अब उपलब्ध है"</string>
 </resources>

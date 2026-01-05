@@ -143,7 +143,7 @@ class AppCompatActivityRobot {
     }
     void createActivityWithComponentInNewTaskAndDisplay(int displayType) {
         createActivityWithComponentInNewTask(/* inNewTask */ true, /* inNewDisplay */ true,
-                displayType);
+                /* inSecondaryDisplay */ false, displayType);
     }
 
     void configureTopActivity(float minAspect, float maxAspect, int screenOrientation,
@@ -210,8 +210,11 @@ class AppCompatActivityRobot {
         mTaskStack.top().setWindowingMode(windowingMode);
     }
 
-    void moveTaskToSecondaryDisplay() {
-        mTaskStack.top().reparent(mSecondaryDisplayContent.getDefaultTaskDisplayArea(),
+    void moveTaskBetweenDisplays() {
+        final DisplayContent newDisplay =
+                mTaskStack.top().getDisplayId() == mDisplayContent.getDisplayId()
+                        ? mSecondaryDisplayContent : mDisplayContent;
+        mTaskStack.top().reparent(newDisplay.getDefaultTaskDisplayArea(),
                 true /* onTop */);
         mActivityStack.top().ensureActivityConfiguration();
     }
@@ -350,7 +353,7 @@ class AppCompatActivityRobot {
     }
 
     void setTopActivityResumed() {
-        doReturn(RESUMED).when(mActivityStack.top()).getState();
+        mActivityStack.top().setState(RESUMED, "test");
         doReturn(true).when(mActivityStack.top()).isVisibleRequested();
         doReturn(true).when(mActivityStack.top()).isVisible();
         mActivityStack.top().mAppCompatController.getSizeCompatModePolicy()
@@ -374,20 +377,38 @@ class AppCompatActivityRobot {
         mActivityStack.top().removeImmediately();
     }
 
+    void finishTopActivity() {
+        mActivityStack.top().finishIfPossible("test", false);
+    }
+
+    void removeTopTask() {
+        final ActivityRecord r = mActivityStack.top();
+        mSupervisor.removeTask(r.getTask(), false /*killProcess*/, true, "test", r.getUid(),
+                r.getPid(), r.info.name);
+    }
+
+    void exitAppProcess() {
+        mActivityStack.top().handleAppDied();
+    }
+
     void destroyActivity(int fromTop) {
         mActivityStack.applyTo(/* fromTop */ fromTop, ActivityRecord::removeImmediately);
     }
 
     void createNewDisplay() {
-        createNewDisplay(TYPE_INTERNAL);
+        createNewDisplay(TYPE_INTERNAL, false /* asSecondaryDisplay */);
     }
-    void createNewDisplay(int type) {
-        mDisplayContent = new TestDisplayContent.Builder(mAtm, mDisplayWidth, mDisplayHeight)
-                .setType(type)
-                .build();
-        // Skip WAKE transition when adding a task to the empty display.
-        mDisplayContent.setIsSleeping(false);
-        onPostDisplayContentCreation(mDisplayContent);
+    void createNewDisplay(int type, boolean asSecondaryDisplay) {
+        if (asSecondaryDisplay) {
+            createSecondaryDisplay();
+        } else {
+            mDisplayContent = new TestDisplayContent.Builder(mAtm, mDisplayWidth, mDisplayHeight)
+                    .setType(type)
+                    .build();
+            // Skip WAKE transition when adding a task to the empty display.
+            mDisplayContent.setIsSleeping(false);
+            onPostDisplayContentCreation(mDisplayContent);
+        }
     }
 
     /**
@@ -599,14 +620,20 @@ class AppCompatActivityRobot {
         }
     }
 
+    void createActivityWithComponentInSecondaryDisplay() {
+        createActivityWithComponentInNewTask(true /* inNewTask */, true /* inNewTask */,
+                true /* inSecondaryDisplay */, Display.TYPE_EXTERNAL);
+    }
+
     private void createActivityWithComponentInNewTask(boolean inNewTask, boolean inNewDisplay) {
-        createActivityWithComponentInNewTask(inNewTask, inNewDisplay, TYPE_INTERNAL);
+        createActivityWithComponentInNewTask(inNewTask, inNewDisplay,
+                false  /* inSecondaryDisplay */, TYPE_INTERNAL);
     }
 
     private void createActivityWithComponentInNewTask(boolean inNewTask, boolean inNewDisplay,
-            int displayType) {
+            boolean inSecondaryDisplay, int displayType) {
         if (inNewDisplay) {
-            createNewDisplay(displayType);
+            createNewDisplay(displayType, inSecondaryDisplay);
         }
         if (inNewTask) {
             createNewTask();

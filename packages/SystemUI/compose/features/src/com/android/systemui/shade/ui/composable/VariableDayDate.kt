@@ -7,7 +7,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.Placeable
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.Constraints
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -19,33 +21,54 @@ fun VariableDayDate(
     textStyle: TextStyle = MaterialTheme.typography.bodyMediumEmphasized,
 ) {
     Layout(
-        contents =
-            listOf(
-                { Text(text = longerDateText, style = textStyle, color = textColor, maxLines = 1) },
-                { Text(text = shorterDateText, style = textStyle, color = textColor, maxLines = 1) },
-            ),
+        content = {
+            Text(
+                text = longerDateText,
+                style = textStyle,
+                color = textColor,
+                softWrap = false,
+                maxLines = 1,
+            )
+            Text(
+                text = shorterDateText,
+                style = textStyle,
+                color = textColor,
+                softWrap = false,
+                maxLines = 1,
+            )
+        },
         modifier = modifier,
-    ) { measureables, constraints ->
-        check(measureables.size == 2)
-        check(measureables[0].size == 1)
-        check(measureables[1].size == 1)
+    ) { measurables, constraints ->
+        check(measurables.size == 2)
 
-        val longerMeasurable = measureables[0][0]
-        val shorterMeasurable = measureables[1][0]
+        // 1. Measure with infinite constraint to determine the natural desired width of the text.
+        val unconstrained = Constraints(maxHeight = constraints.maxHeight)
 
-        val longerPlaceable = longerMeasurable.measure(constraints)
-        val shorterPlaceable = shorterMeasurable.measure(constraints)
+        // We MUST measure both measurables even if the first one fits.
+        // Conditional measurement causes issues with LookaheadScope: if logic diverges between the
+        // lookahead pass and the approach pass (e.g. during animations), both measurables need to
+        // have been measured to avoid crashes or layout bugs (see b/463395847).
+        val longer = measurables[0].measure(unconstrained)
+        val shorter = measurables[1].measure(unconstrained)
 
-        // If width < maxWidth (and not <=), we can assume that the text fits.
-        val placeable =
+        // 2. Decide which placeable to use.
+        val selectedPlaceable =
             when {
-                longerPlaceable.width < constraints.maxWidth &&
-                    longerPlaceable.height <= constraints.maxHeight -> longerPlaceable
-                shorterPlaceable.width < constraints.maxWidth &&
-                    shorterPlaceable.height <= constraints.maxHeight -> shorterPlaceable
+                longer.fitsWithin(constraints) -> longer
+                shorter.fitsWithin(constraints) -> shorter
                 else -> null
             }
 
-        layout(placeable?.width ?: 0, placeable?.height ?: 0) { placeable?.placeRelative(0, 0) }
+        if (selectedPlaceable == null) {
+            // Neither fits, render nothing.
+            layout(0, 0) {}
+        } else {
+            layout(selectedPlaceable.width, selectedPlaceable.height) {
+                selectedPlaceable.placeRelative(0, 0)
+            }
+        }
     }
 }
+
+private fun Placeable.fitsWithin(constraints: Constraints): Boolean =
+    width <= constraints.maxWidth && height <= constraints.maxHeight

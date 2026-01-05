@@ -144,11 +144,87 @@ public class FusedTimeZoneDetectorImplTest {
     }
 
     @Test
+    public void onTelephonyTimeZoneDetected_resistsDisagreeingLocationSuggestion() {
+        String initialZoneId = "America/New_York";
+        String disagreeingZoneId = "Europe/London";
+
+        // 1. Set initial time zone via location.
+        LocationAlgorithmEvent locationEvent = createLocationEvent(initialZoneId);
+        mScript.simulateLocationEvent(locationEvent).verifyTimeZoneSuggested(initialZoneId);
+
+        // 2. Send an agreeing telephony suggestion. The time zone should not change.
+        // This internally strengthens the current time zone by adding a second origin.
+        QualifiedTelephonyTimeZoneSuggestion telephonySuggestion =
+                createTelephonySuggestion(initialZoneId, TELEPHONY_SCORE_HIGH, "310", "us");
+        mScript.simulateTelephonySuggestion(telephonySuggestion).verifyTimeZoneNotChanged();
+
+        // 3. Send a disagreeing location suggestion. Because the current zone is supported by
+        // both location and telephony, it should not be immediately overridden. A disagreement
+        // process should start instead.
+        mScript.simulateLocationEvent(createLocationEvent(disagreeingZoneId))
+                .verifyTimeZoneNotChanged();
+    }
+
+    @Test
     public void onLocationTimeZoneDetected_setsInitialTimeZone() {
         String timeZoneId = "Europe/London";
         LocationAlgorithmEvent event = createLocationEvent(timeZoneId);
 
         mScript.simulateLocationEvent(event).verifyTimeZoneSuggested(timeZoneId);
+    }
+
+    @Test
+    public void onLocationTimeZoneDetected_ignoredWhenGeoDetectionIsEffectivelyDisabled() {
+        String initialZoneId = "America/New_York";
+        String newZoneId = "Europe/London";
+
+        // Set initial time zone via location.
+        LocationAlgorithmEvent locationEvent = createLocationEvent(initialZoneId);
+        mScript.simulateLocationEvent(locationEvent).verifyTimeZoneSuggested(initialZoneId);
+
+        // A base configuration that enables everything.
+        ConfigurationInternal.Builder baseConfigBuilder =
+                new ConfigurationInternal.Builder(
+                        ConfigInternalForTests.CONFIG_AUTO_ENABLED_GEO_ENABLED);
+
+        // Test case 1: isGeoDetectionSupported() is false.
+        ConfigurationInternal geoUnsupportedConfig =
+                baseConfigBuilder.setGeoDetectionFeatureSupported(false).build();
+        mFakeServiceConfigAccessor.simulateCurrentUserConfigurationInternalChange(
+                geoUnsupportedConfig);
+        mScript.simulateLocationEvent(createLocationEvent(newZoneId)).verifyTimeZoneNotChanged();
+
+        // Test case 2: getGeoDetectionEnabledSetting() is false.
+        // This only matters when telephony detection is also supported.
+        ConfigurationInternal geoDisabledConfig =
+                new ConfigurationInternal.Builder(
+                                ConfigInternalForTests.CONFIG_AUTO_ENABLED_GEO_ENABLED)
+                        .setGeoDetectionEnabledSetting(false)
+                        .build();
+        mFakeServiceConfigAccessor.simulateCurrentUserConfigurationInternalChange(
+                geoDisabledConfig);
+        mScript.simulateLocationEvent(createLocationEvent(newZoneId)).verifyTimeZoneNotChanged();
+
+        // Test case 3: getLocationEnabledSetting() is false.
+        ConfigurationInternal locationDisabledConfig =
+                new ConfigurationInternal.Builder(
+                                ConfigInternalForTests.CONFIG_AUTO_ENABLED_GEO_ENABLED)
+                        .setLocationEnabledSetting(false)
+                        .build();
+        mFakeServiceConfigAccessor.simulateCurrentUserConfigurationInternalChange(
+                locationDisabledConfig);
+        mScript.simulateLocationEvent(createLocationEvent(newZoneId)).verifyTimeZoneNotChanged();
+
+        // Test case 4: Not ignored when only geo is supported and auto detection is on.
+        ConfigurationInternal geoOnlyConfig =
+                new ConfigurationInternal.Builder(
+                                ConfigInternalForTests.CONFIG_AUTO_ENABLED_GEO_ENABLED)
+                        .setTelephonyDetectionFeatureSupported(false)
+                        .setGeoDetectionEnabledSetting(false)
+                        .build();
+        mFakeServiceConfigAccessor.simulateCurrentUserConfigurationInternalChange(geoOnlyConfig);
+        mScript.simulateLocationEvent(createLocationEvent(newZoneId))
+                .verifyTimeZoneSuggested(newZoneId);
     }
 
     @Test

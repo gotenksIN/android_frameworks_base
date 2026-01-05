@@ -41,7 +41,7 @@ import com.android.internal.widget.remotecompose.core.operations.Header;
 import com.android.internal.widget.remotecompose.core.operations.RootContentBehavior;
 import com.android.internal.widget.remotecompose.core.operations.Theme;
 import com.android.internal.widget.remotecompose.core.operations.Utils;
-import com.android.internal.widget.remotecompose.player.RemoteComposeDocument;
+import com.android.internal.widget.remotecompose.player.RemoteDocument;
 
 import java.time.Clock;
 import java.util.Map;
@@ -63,8 +63,8 @@ public class RemoteComposeView extends FrameLayout implements View.OnAttachState
 
     Clock mClock;
 
-    RemoteComposeDocument mDocument = null;
-    int mTheme = Theme.LIGHT;
+    RemoteDocument mDocument = null;
+    int mTheme = Theme.SYSTEM;
     boolean mInActionDown = false;
     int mDebug = 0;
     boolean mHasClickAreas = false;
@@ -176,13 +176,13 @@ public class RemoteComposeView extends FrameLayout implements View.OnAttachState
     }
 
     /**
-     * Sets the {@link RemoteComposeDocument} for the view to render. This will also reset the clock
-     * and frame rate, initialize the context, and update click areas.
+     * Sets the {@link RemoteDocument} for the view to render. This will also reset the clock and
+     * frame rate, initialize the context, and update click areas.
      *
-     * @param value The {@link RemoteComposeDocument} to set.
+     * @param value The {@link RemoteDocument} to set.
      */
     @SuppressWarnings("ReferenceEquality") // newClock != mClock
-    public void setDocument(@NonNull RemoteComposeDocument value) {
+    public void setDocument(@NonNull RemoteDocument value) {
         Clock newClock = value.getClock();
         if (newClock != mClock) {
             mClock = newClock;
@@ -331,7 +331,7 @@ public class RemoteComposeView extends FrameLayout implements View.OnAttachState
      *
      * @return the document
      */
-    public RemoteComposeDocument getDocument() {
+    public RemoteDocument getDocument() {
         return mDocument;
     }
 
@@ -524,7 +524,7 @@ public class RemoteComposeView extends FrameLayout implements View.OnAttachState
      *
      * @param document document containing updates
      */
-    public void applyUpdate(RemoteComposeDocument document) {
+    public void applyUpdate(RemoteDocument document) {
         mDocument.getDocument().applyUpdate(document.getDocument());
     }
 
@@ -701,7 +701,7 @@ public class RemoteComposeView extends FrameLayout implements View.OnAttachState
     private boolean mDisable = false;
 
     /**
-     * This returns the amount of time in ms the player used to evalueate a pass it is averaged over
+     * This returns the amount of time in ms the player used to evaluate a pass it is averaged over
      * a number of evaluations.
      *
      * @return time in ms
@@ -729,6 +729,16 @@ public class RemoteComposeView extends FrameLayout implements View.OnAttachState
             drawDisable(canvas, mErrorMessage);
             return;
         }
+        int theme = (mTheme == Theme.SYSTEM) ? Theme.LIGHT : mTheme;
+
+        if (mTheme == Theme.SYSTEM) {
+            int mode =
+                    getResources().getConfiguration().isNightModeActive()
+                            ? Theme.DARK
+                            : Theme.LIGHT;
+            theme = mode;
+        }
+
         try {
             long nanoStart = nanoTime(mClock);
             long start = mEvalTime ? nanoStart : 0; // measure execution of commands
@@ -745,7 +755,7 @@ public class RemoteComposeView extends FrameLayout implements View.OnAttachState
             mARContext.useCanvas(canvas);
             mARContext.mWidth = getWidth();
             mARContext.mHeight = getHeight();
-            mDocument.paint(mARContext, mTheme);
+            mDocument.paint(mARContext, theme);
             if (mDebug == 1) {
                 mCount++;
                 long nanoEnd = nanoTime(mClock);
@@ -835,9 +845,11 @@ public class RemoteComposeView extends FrameLayout implements View.OnAttachState
         canvas.drawText(str, x, y, paint);
         paint.setTextSize(48f);
         y += rect.height();
-        paint.getTextBounds(message, 0, message.length(), rect);
-        x = w / 2f - rect.width() / 2f - rect.left;
-        canvas.drawText(message, x, y, paint);
+        if (message != null) {
+            paint.getTextBounds(message, 0, message.length(), rect);
+            x = w / 2f - rect.width() / 2f - rect.left;
+            canvas.drawText(message, x, y, paint);
+        }
     }
 
     private float getDefaultTextSize() {

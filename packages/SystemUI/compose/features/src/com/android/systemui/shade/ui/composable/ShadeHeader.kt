@@ -21,6 +21,7 @@ import android.content.res.Configuration.ORIENTATION_PORTRAIT
 import android.view.ContextThemeWrapper
 import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup.LayoutParams.MATCH_PARENT
 import androidx.annotation.ColorInt
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.CubicBezierEasing
@@ -42,6 +43,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.ReadOnlyComposable
@@ -62,11 +64,16 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.DeviceFontFamilyName
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.max
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -78,14 +85,16 @@ import com.android.compose.animation.scene.ValueKey
 import com.android.compose.animation.scene.animateElementFloatAsState
 import com.android.compose.animation.scene.content.state.TransitionState
 import com.android.compose.modifiers.thenIf
+import com.android.systemui.Flags.groupedPrivacyChip
 import com.android.systemui.common.ui.compose.windowinsets.CutoutLocation
 import com.android.systemui.common.ui.compose.windowinsets.LocalDisplayCutout
 import com.android.systemui.common.ui.compose.windowinsets.LocalScreenCornerRadius
 import com.android.systemui.compose.modifiers.sysuiResTag
-import com.android.systemui.kairos.ExperimentalKairosApi
 import com.android.systemui.kairos.util.nameTag
+import com.android.systemui.privacy.AbstractOngoingPrivacyChip
 import com.android.systemui.privacy.OngoingPrivacyChip
 import com.android.systemui.privacy.PrivacyItem
+import com.android.systemui.privacy.ui.view.ComposeOngoingPrivacyChip
 import com.android.systemui.res.R
 import com.android.systemui.scene.shared.model.DualShadeEducationElement
 import com.android.systemui.scene.shared.model.Scenes
@@ -95,7 +104,9 @@ import com.android.systemui.statusbar.phone.StatusBarLocation
 import com.android.systemui.statusbar.phone.domain.interactor.IsAreaDark
 import com.android.systemui.statusbar.pipeline.battery.ui.composable.BatteryWithEstimate
 import com.android.systemui.statusbar.pipeline.mobile.StatusBarMobileIconKairos
+import com.android.systemui.statusbar.pipeline.mobile.ui.MobileViewLogger
 import com.android.systemui.statusbar.pipeline.mobile.ui.view.ModernShadeCarrierGroupMobileView
+import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.MobileIconViewModelKairos
 import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.MobileIconsViewModelKairosComposeWrapper
 import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.ShadeCarrierGroupMobileIconViewModel
 import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.ShadeCarrierGroupMobileIconViewModelKairos
@@ -408,7 +419,7 @@ fun ContentScope.OverlayShadeHeader(
                         chipHighlightModel = quickSettingsHighlight,
                     )
                 }
-                if (viewModel.isPrivacyChipVisible) {
+                if (!groupedPrivacyChip() && viewModel.isPrivacyChipVisible) {
                     Box(modifier = Modifier.fillMaxSize().padding(horizontal = horizontalPadding)) {
                         PrivacyChip(
                             privacyList = viewModel.privacyItems,
@@ -432,6 +443,23 @@ fun QuickSettingsOverlayHeader(viewModel: ShadeHeaderViewModel, modifier: Modifi
     ) {
         ShadeCarrierGroup(viewModel = viewModel)
         BatteryInfo(viewModel = viewModel, showIcon = false, useExpandedFormat = true)
+    }
+}
+
+@Composable
+fun ContentScope.QuickSettingsOverlayPrivacyChip(
+    viewModel: ShadeHeaderViewModel,
+    modifier: Modifier = Modifier,
+) {
+    if (groupedPrivacyChip() && viewModel.isPrivacyChipVisible) {
+        Box(modifier = modifier.height(48.dp).fillMaxWidth()) {
+            PrivacyChip(
+                privacyList = viewModel.privacyItems,
+                onClick = viewModel::onPrivacyChipClicked,
+                showPrivacyText = true,
+                modifier = Modifier.align(Alignment.Center),
+            )
+        }
     }
 }
 
@@ -577,7 +605,51 @@ private fun BatteryInfo(
     )
 }
 
-@OptIn(ExperimentalKairosApi::class)
+@Composable
+private fun CarrierTextWithSubscriptionId(
+    viewModel: ShadeHeaderViewModel,
+    subId: Int,
+    textColor: Color,
+    inverseTextColor: Color,
+) {
+    AndroidView(
+        factory = { context ->
+            ModernShadeCarrierGroupMobileView.constructAndBind(
+                    context = context,
+                    logger = viewModel.mobileIconsViewModel.logger,
+                    slot = "mobile_carrier_shade_group",
+                    viewModel =
+                        (viewModel.mobileIconsViewModel.viewModelForSub(
+                            subId,
+                            StatusBarLocation.SHADE_CARRIER_GROUP,
+                        ) as ShadeCarrierGroupMobileIconViewModel),
+                )
+                .also { it.setOnClickListener { viewModel.onShadeCarrierGroupClicked() } }
+        },
+        update = { view ->
+            view.setStyleAndTint(
+                R.style.TextAppearance_QS_Status,
+                textColor.toArgb(),
+                inverseTextColor.toArgb(),
+            )
+        },
+    )
+}
+
+@Composable
+private fun CarrierTextNoSubscriptionId(viewModel: ShadeHeaderViewModel) {
+    Text(
+        text = viewModel.carrierText.toString(),
+        color = ShadeHeader.Colors.textColor,
+        style =
+            TextStyle(
+                fontFamily =
+                    FontFamily(Font(DeviceFontFamilyName("variable-body-medium-emphasized"))),
+                letterSpacing = 0.01.em,
+            ),
+    )
+}
+
 @Composable
 private fun ShadeCarrierGroup(viewModel: ShadeHeaderViewModel, modifier: Modifier = Modifier) {
     if (StatusBarMobileIconKairos.isEnabled) {
@@ -587,35 +659,19 @@ private fun ShadeCarrierGroup(viewModel: ShadeHeaderViewModel, modifier: Modifie
 
     val textColor = ShadeHeader.Colors.textColor
     val inverseTextColor = ShadeHeader.Colors.inverseTextColor
+    val mobileSubIds = viewModel.mobileSubIds
+
     Row(modifier = modifier, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-        for (subId in viewModel.mobileSubIds) {
-            AndroidView(
-                factory = { context ->
-                    ModernShadeCarrierGroupMobileView.constructAndBind(
-                            context = context,
-                            logger = viewModel.mobileIconsViewModel.logger,
-                            slot = "mobile_carrier_shade_group",
-                            viewModel =
-                                (viewModel.mobileIconsViewModel.viewModelForSub(
-                                    subId,
-                                    StatusBarLocation.SHADE_CARRIER_GROUP,
-                                ) as ShadeCarrierGroupMobileIconViewModel),
-                        )
-                        .also { it.setOnClickListener { viewModel.onShadeCarrierGroupClicked() } }
-                },
-                update = { view ->
-                    view.setStyleAndTint(
-                        R.style.TextAppearance_QS_Status,
-                        textColor.toArgb(),
-                        inverseTextColor.toArgb(),
-                    )
-                },
-            )
+        if (mobileSubIds.isEmpty()) {
+            CarrierTextNoSubscriptionId(viewModel)
+        } else {
+            for (subId in mobileSubIds) {
+                CarrierTextWithSubscriptionId(viewModel, subId, textColor, inverseTextColor)
+            }
         }
     }
 }
 
-@ExperimentalKairosApi
 @Composable
 private fun ShadeCarrierGroupKairos(
     viewModel: ShadeHeaderViewModel,
@@ -629,38 +685,19 @@ private fun ShadeCarrierGroupKairos(
             kairosNetwork = viewModel.kairosNetwork,
             name = nameTag("ShadeCarrierGroupKairos"),
         ) { iconsViewModel: MobileIconsViewModelKairosComposeWrapper ->
-            for ((subId, icon) in iconsViewModel.icons) {
-                Spacer(modifier = Modifier.width(5.dp))
-                val scope = rememberCoroutineScope()
-                AndroidView(
-                    factory = { context ->
-                        ModernShadeCarrierGroupMobileView.constructAndBindKairos(
-                                context = context,
-                                logger = iconsViewModel.logger,
-                                slot = "mobile_carrier_shade_group",
-                                viewModel =
-                                    ShadeCarrierGroupMobileIconViewModelKairos(
-                                        icon,
-                                        icon.iconInteractor,
-                                    ),
-                                scope = scope,
-                                subscriptionId = subId,
-                                location = StatusBarLocation.SHADE_CARRIER_GROUP,
-                                kairosNetwork = viewModel.kairosNetwork,
-                            )
-                            .first
-                            .also {
-                                it.setOnClickListener { viewModel.onShadeCarrierGroupClicked() }
-                            }
-                    },
-                    update = { view ->
-                        view.setStyleAndTint(
-                            R.style.TextAppearance_QS_Status,
-                            textColor.toArgb(),
-                            inverseTextColor.toArgb(),
-                        )
-                    },
-                )
+            if (iconsViewModel.icons.isEmpty()) {
+                CarrierTextNoSubscriptionId(viewModel)
+            } else {
+                for ((subId, icon) in iconsViewModel.icons) {
+                    CarrierTextWithSubscriptionIdKairos(
+                        viewModel,
+                        subId,
+                        icon,
+                        iconsViewModel.logger,
+                        textColor,
+                        inverseTextColor,
+                    )
+                }
             }
         }
     }
@@ -708,21 +745,72 @@ private fun ContentScope.StatusIcons(
 }
 
 @Composable
+private fun CarrierTextWithSubscriptionIdKairos(
+    viewModel: ShadeHeaderViewModel,
+    subId: Int,
+    icon: MobileIconViewModelKairos,
+    logger: MobileViewLogger,
+    textColor: Color,
+    inverseTextColor: Color,
+) {
+    Spacer(modifier = Modifier.width(5.dp))
+    val scope = rememberCoroutineScope()
+    AndroidView(
+        factory = { context ->
+            ModernShadeCarrierGroupMobileView.constructAndBindKairos(
+                    context = context,
+                    logger = logger,
+                    slot = "mobile_carrier_shade_group",
+                    viewModel =
+                        ShadeCarrierGroupMobileIconViewModelKairos(icon, icon.iconInteractor),
+                    scope = scope,
+                    subscriptionId = subId,
+                    location = StatusBarLocation.SHADE_CARRIER_GROUP,
+                    kairosNetwork = viewModel.kairosNetwork,
+                )
+                .first
+                .also { it.setOnClickListener { viewModel.onShadeCarrierGroupClicked() } }
+        },
+        update = { view ->
+            view.setStyleAndTint(
+                R.style.TextAppearance_QS_Status,
+                textColor.toArgb(),
+                inverseTextColor.toArgb(),
+            )
+        },
+    )
+}
+
+@Composable
 private fun ContentScope.PrivacyChip(
     privacyList: List<PrivacyItem>,
-    onClick: (OngoingPrivacyChip) -> Unit,
+    onClick: (AbstractOngoingPrivacyChip) -> Unit,
     modifier: Modifier = Modifier,
+    showPrivacyText: Boolean = false,
 ) {
     AndroidView(
         factory = { context ->
             val view =
-                OngoingPrivacyChip(context, null).also { privacyChip ->
-                    privacyChip.privacyList = privacyList
-                    privacyChip.setOnClickListener { onClick(privacyChip) }
-                }
+                if (groupedPrivacyChip()) {
+                        ComposeOngoingPrivacyChip(context).apply {
+                            this.showPrivacyText = showPrivacyText
+                            layoutParams.apply { height = MATCH_PARENT }
+                        }
+                    } else {
+                        OngoingPrivacyChip(context, null)
+                    }
+                    .also { privacyChip: AbstractOngoingPrivacyChip ->
+                        privacyChip.privacyList = privacyList
+                        privacyChip.setOnClickListener { onClick(privacyChip) }
+                    }
             view
         },
-        update = { it.privacyList = privacyList },
+        update = {
+            it.privacyList = privacyList
+            if (groupedPrivacyChip()) {
+                (it as ComposeOngoingPrivacyChip).apply { this.showPrivacyText = showPrivacyText }
+            }
+        },
         modifier = modifier.element(ShadeHeader.Elements.PrivacyChip),
     )
 }

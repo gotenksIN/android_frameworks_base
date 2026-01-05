@@ -27,17 +27,20 @@ import android.service.personalcontext.IPersonalContextManager;
 import android.service.personalcontext.PersonalContextManager;
 import android.service.personalcontext.RenderToken;
 import android.service.personalcontext.RenderToken.RenderTokenBuilder;
+import android.service.personalcontext.Token;
 import android.service.personalcontext.embedded.InsightSurfaceClientInfo;
 import android.service.personalcontext.hint.ContextHint;
 import android.service.personalcontext.hint.ContextHintWithSignature;
 import android.service.personalcontext.hint.ContextHintWrapper;
 import android.service.personalcontext.hint.NotificationEvent;
 import android.service.personalcontext.hint.NotificationHint;
+import android.service.personalcontext.hint.TextClassificationHint;
 import android.service.personalcontext.insight.ContextInsight;
 import android.service.personalcontext.insight.ContextInsightWrapper;
 import android.util.Log;
 import android.util.Slog;
 import android.util.SparseArray;
+import android.view.textclassifier.TextClassification;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -47,7 +50,10 @@ import com.android.internal.util.DumpUtils;
 import com.android.server.SystemService;
 import com.android.server.notification.NotificationManagerInternal;
 import com.android.server.personalcontext.embedded.EmbeddedInsightRenderer;
+import com.android.server.personalcontext.notifications.ContextActionResolver;
+import com.android.server.personalcontext.notifications.NotificationActionFactory;
 import com.android.server.personalcontext.notifications.NotificationActionRenderer;
+import com.android.server.personalcontext.textclassifier.TextClassificationActionRenderer;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -89,7 +95,8 @@ public class PersonalContextManagerService extends SystemService {
             @NonNull ContextComponentManager componentManager,
             @NonNull ContextComponentMonitor monitor,
             @NonNull NotificationActionRenderer notificationActionRenderer,
-            @NonNull EmbeddedInsightRenderer embeddedInsightRenderer) {
+            @NonNull EmbeddedInsightRenderer embeddedInsightRenderer,
+            @Nullable TextClassificationActionRenderer textClassificationActionRenderer) {
         /** Unregisters the monitor, cleaning up the user state. */
         void cleanup() {
             monitor.unregister();
@@ -129,6 +136,32 @@ public class PersonalContextManagerService extends SystemService {
 
                     startRefinerWorkflow(user.getIdentifier(), hints, renderToken);
                 }
+
+                @Override
+                public void onTextClassifyRequest(
+                        int userId, String sessionId, @NonNull TextClassification.Request request) {
+                    final UserState userState = getUserStateSynchronized(userId);
+                    if (userState == null) {
+                        Slog.e(TAG, "No user state for user " + userId);
+                        return;
+                    }
+                    if (userState.textClassificationActionRenderer == null) {
+                        Slog.e(TAG, "No text classification renderer defined");
+                        return;
+                    }
+
+                    final Set<ContextHint> hints =
+                            Set.of(new TextClassificationHint.Builder(request, sessionId).build());
+                    final RenderToken renderToken =
+                            new RenderTokenBuilder()
+                                    .setRendererComponentId(
+                                            userState
+                                                    .textClassificationActionRenderer()
+                                                    .getComponentId())
+                                    .build();
+
+                    startRefinerWorkflow(userId, hints, renderToken);
+                }
             };
 
     public PersonalContextManagerService(Context context) {
@@ -160,16 +193,23 @@ public class PersonalContextManagerService extends SystemService {
             final ContextComponentMonitor monitor = new ContextComponentMonitor(componentManager);
             final NotificationActionRenderer notificationActionRenderer =
                     new NotificationActionRenderer(
-                            userContext,
                             getLocalService(NotificationManagerInternal.class),
-                            userContext.getPackageManager());
+                            new NotificationActionFactory(
+                                    userContext,
+                                    userContext.getPackageManager(),
+                                    new ContextActionResolver(userContext)));
             final EmbeddedInsightRenderer embeddedInsightRenderer = new EmbeddedInsightRenderer();
-            mUserStates.put(userId,
+
+            TextClassificationActionRenderer textClassificationActionRenderer =
+                    new TextClassificationActionRenderer();
+            mUserStates.put(
+                    userId,
                     new UserState(
                             componentManager,
                             monitor,
                             notificationActionRenderer,
-                            embeddedInsightRenderer));
+                            embeddedInsightRenderer,
+                            textClassificationActionRenderer));
         }
     }
 
@@ -195,6 +235,7 @@ public class PersonalContextManagerService extends SystemService {
         }
         componentManager.register(userState.notificationActionRenderer());
         componentManager.register(userState.embeddedInsightRenderer());
+        componentManager.register(userState.textClassificationActionRenderer());
 
         if (Log.isLoggable(TAG, Log.DEBUG)) {
             Slog.d(TAG, "Registering external components for user " + userId);
@@ -245,12 +286,7 @@ public class PersonalContextManagerService extends SystemService {
         }
 
         RefinerWorkflow.start(
-                componentManager,
-                hints,
-                renderToken,
-                HINT_SIGNING_KEY,
-                mLogger,
-                mExecutor);
+                componentManager, hints, renderToken, HINT_SIGNING_KEY, mLogger, mExecutor);
     }
 
     private void startInsightWorkflow(@UserIdInt int userId, Set<ContextInsight> insights) {
@@ -260,12 +296,7 @@ public class PersonalContextManagerService extends SystemService {
             return;
         }
 
-        RendererWorkflow.start(
-                componentManager,
-                insights,
-                HINT_SIGNING_KEY,
-                mLogger,
-                mExecutor);
+        RendererWorkflow.start(componentManager, insights, HINT_SIGNING_KEY, mLogger, mExecutor);
     }
 
     /** Returns the component manager for the given user, for testing purposes. */
@@ -297,6 +328,24 @@ public class PersonalContextManagerService extends SystemService {
         if (userState != null) {
             userState.embeddedInsightRenderer().unregisterInsightSurfaceClient(id);
         }
+    }
+
+    private void publishInsightSurfaceHints(
+            int userId, Set<ContextHint> hints, InsightSurfaceClientInfo clientInfo) {
+        final UserState userState = getUserStateSynchronized(userId);
+        if (userState == null) {
+            Slog.e(TAG, "No user state when publishing insight surface hints");
+            return;
+        }
+
+        final RenderToken renderToken =
+                userState.embeddedInsightRenderer.getRenderTokenForClient(clientInfo);
+        if (renderToken == null) {
+            Slog.e(TAG, "No render token for client " + clientInfo.getId());
+            return;
+        }
+
+        startRefinerWorkflow(userId, hints, renderToken);
     }
 
     private UserState getUserStateSynchronized(int userId) {
@@ -359,11 +408,12 @@ public class PersonalContextManagerService extends SystemService {
 
             // TODO(b/450547433): Add security checks.
             Binder.withCleanCallingIdentity(
-                    () -> getService()
-                            .startInsightWorkflow(
-                                    userId,
-                                    ContextInsightWrapper.unwrapInto(
-                                            insights, new HashSet<>())));
+                    () ->
+                            getService()
+                                    .startInsightWorkflow(
+                                            userId,
+                                            ContextInsightWrapper.unwrapInto(
+                                                    insights, new HashSet<>())));
         }
 
         @PermissionManuallyEnforced
@@ -376,10 +426,19 @@ public class PersonalContextManagerService extends SystemService {
 
             // TODO(b/450547433): Add security checks.
             Binder.withCleanCallingIdentity(
-                    () -> getService().registerInsightSurfaceClient(
-                            userId,
-                            ContextHintWrapper.unwrapInto(clientHints, new HashSet<>()),
-                            clientInfo));
+                    () ->
+                            getService()
+                                    .registerInsightSurfaceClient(
+                                            userId,
+                                            ContextHintWrapper.unwrapInto(
+                                                    clientHints, new HashSet<>()),
+                                            clientInfo));
+        }
+
+        @PermissionManuallyEnforced
+        @Override
+        public Token mintToken() {
+            return new Token();
         }
 
         @PermissionManuallyEnforced
@@ -390,6 +449,20 @@ public class PersonalContextManagerService extends SystemService {
             // TODO(b/450547433): Add security checks.
             Binder.withCleanCallingIdentity(
                     () -> getService().unregisterInsightSurfaceClient(userId, id.getUuid()));
+        }
+
+        @PermissionManuallyEnforced
+        @Override
+        public void publishInsightSurfaceHints(
+                List<ContextHintWrapper> hints, InsightSurfaceClientInfo clientInfo, int userId) {
+            verifyUser(userId);
+
+            // TODO(b/450547433): Add security checks.
+            Binder.withCleanCallingIdentity(
+                    () -> getService().publishInsightSurfaceHints(
+                            userId,
+                            ContextHintWrapper.unwrapInto(hints, new HashSet<>()),
+                            clientInfo));
         }
 
         @PermissionManuallyEnforced

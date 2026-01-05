@@ -29,18 +29,18 @@ import android.util.Range;
 import android.util.Size;
 import android.view.Surface;
 
-import com.android.internal.camera.flags.Flags;
-
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 
+// QTI_BEGIN: 2018-06-12: Camera: Skip HFR checks for privileged apps.
 import android.app.ActivityThread;
 import android.os.SystemProperties;
 import android.text.TextUtils;
 
 
+// QTI_END: 2018-06-12: Camera: Skip HFR checks for privileged apps.
 /**
  * Various Surface utilities.
  */
@@ -171,11 +171,6 @@ public class SurfaceUtils {
      */
     public static int getOverrideFormat(int format, long usage) {
         if (format >= PixelFormat.RGBA_8888 && format <= BGRA_8888) {
-            if (!Flags.surfaceFormatFix()) {
-                // Maintain existing behavior
-                return ImageFormat.PRIVATE;
-            }
-
             // Only override to PRIVATE if the usage has only hardware
             // bits.
             if (((usage & USAGE_HW_MASK) != 0)
@@ -268,11 +263,13 @@ public class SurfaceUtils {
                     + " the size must be 1 or 2");
         }
 
+// QTI_BEGIN: 2018-06-12: Camera: Skip HFR checks for privileged apps.
         if (isPrivilegedApp()) {
             //skip checks for privileged apps
             return;
         }
 
+// QTI_END: 2018-06-12: Camera: Skip HFR checks for privileged apps.
         List<Size> highSpeedSizes = null;
 
         if (fpsRange == null) {
@@ -337,6 +334,7 @@ public class SurfaceUtils {
 
     private static native long nativeGetSurfaceId(Surface surface);
 
+// QTI_BEGIN: 2018-06-12: Camera: Skip HFR checks for privileged apps.
     private static boolean isPrivilegedApp() {
         String packageName = ActivityThread.currentOpPackageName();
         String packageList = SystemProperties.get("persist.camera.privapp.list");
@@ -353,4 +351,5 @@ public class SurfaceUtils {
 
         return false;
     }
+// QTI_END: 2018-06-12: Camera: Skip HFR checks for privileged apps.
 }

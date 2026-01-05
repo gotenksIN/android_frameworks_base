@@ -179,14 +179,14 @@ class LogContextInteractorImplTest : SysuiTestCase() {
                     kosmos.deviceUnlockedInteractor.deviceUnlockStatus.map { it.isUnlocked }
                 )
             kosmos.biometricUnlockInteractor.setBiometricUnlockState(
-                unlockStateInt = BiometricUnlockController.MODE_UNLOCK_COLLAPSING,
+                unlockStateInt = BiometricUnlockController.MODE_DISMISS,
                 biometricUnlockSource = BiometricUnlockSource.FINGERPRINT_SENSOR,
             )
             runCurrent()
             assertThat(isDeviceUnlocked).isTrue()
             kosmos.sceneInteractor.snapToScene(Scenes.Gone, "")
 
-            keyguardTransitionRepository.startTransitionTo(KeyguardState.GONE)
+            keyguardTransitionRepository.startTransitionTo(KeyguardState.UNDEFINED)
             assertThat(displayState()).isEqualTo(AuthenticateOptions.DISPLAY_STATE_UNKNOWN)
 
             keyguardTransitionRepository.startTransitionTo(KeyguardState.UNDEFINED)

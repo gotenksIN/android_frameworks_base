@@ -28,9 +28,6 @@ import android.graphics.drawable.ColorDrawable
 import android.hardware.input.KeyGestureEvent
 import android.os.Build
 import android.os.fakeExecutorHandler
-import android.platform.test.annotations.DisableFlags
-import android.platform.test.annotations.EnableFlags
-import android.platform.test.flag.junit.SetFlagsRule
 import android.provider.Settings
 import android.text.Annotation
 import android.text.Spanned
@@ -40,7 +37,7 @@ import android.view.accessibility.AccessibilityManager
 import android.view.accessibility.accessibilityManager
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
-import com.android.hardware.input.Flags
+import com.android.internal.accessibility.AccessibilityShortcutController.COLOR_INVERSION_COMPONENT_NAME
 import com.android.internal.accessibility.AccessibilityShortcutController.MAGNIFICATION_CONTROLLER_NAME
 import com.android.internal.accessibility.common.ShortcutConstants.UserShortcutType
 import com.android.internal.accessibility.util.ShortcutUtils
@@ -59,7 +56,6 @@ import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import org.junit.Before
-import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.ArgumentMatchers.anyInt
@@ -76,8 +72,6 @@ import org.mockito.kotlin.whenever
 @RunWith(AndroidJUnit4::class)
 class AccessibilityShortcutsRepositoryImplTest : SysuiTestCase() {
     private val kosmos = testKosmosNew()
-
-    @get:Rule val setFlagsRule = SetFlagsRule()
 
     private val Kosmos.underTest by
         Kosmos.Fixture {
@@ -119,9 +113,36 @@ class AccessibilityShortcutsRepositoryImplTest : SysuiTestCase() {
             assertThat(info).isNull()
         }
 
-    @EnableFlags(Flags.FLAG_ENABLE_MAGNIFY_MAGNIFICATION_KEY_GESTURE_DIALOG)
     @Test
-    fun getKeyGestureConfirmInfo_onMagnificationTypeReceived_doNotEnableShortcut_getExpectedInfo() =
+    fun getKeyGestureConfirmInfo_onColorInversionTypeReceived_getExpectedInfo() =
+        kosmos.runTest {
+            val metaState = KeyEvent.META_META_ON or KeyEvent.META_ALT_ON
+            val type = KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_DISPLAY_COLOR_INVERSION
+
+            val info =
+                underTest.getKeyGestureConfirmInfo(
+                    type,
+                    metaState,
+                    KeyEvent.KEYCODE_I,
+                    getTargetNameByType(type),
+                    DEFAULT_DISPLAY,
+                )
+
+            assertThat(info).isNotNull()
+            assertThat(info!!.title).isEqualTo("Turn on Color inversion keyboard shortcut?")
+            val contentText = info.contentText
+            assertThat(hasExpectedAnnotation(contentText)).isTrue()
+            // `contentText` here is an instance of SpannableStringBuilder, so we only need to
+            // compare its value here.
+            assertThat(contentText.toString())
+                .isEqualTo(
+                    "Action icon + Alt + I is the keyboard shortcut to use color inversion. Color" +
+                        " inversion turns light screens dark. It also turns dark screens light."
+                )
+        }
+
+    @Test
+    fun getKeyGestureConfirmInfo_onMagnificationTypeReceived_getExpectedInfo() =
         kosmos.runTest {
             val metaState = KeyEvent.META_META_ON or KeyEvent.META_ALT_ON
 
@@ -136,36 +157,6 @@ class AccessibilityShortcutsRepositoryImplTest : SysuiTestCase() {
 
             assertThat(info).isNotNull()
             assertThat(info!!.title).isEqualTo("Magnification keyboard shortcut turned on")
-            val contentText = info.contentText
-            assertThat(hasExpectedAnnotation(contentText)).isTrue()
-            // `contentText` here is an instance of SpannableStringBuilder, so we only need to
-            // compare its value here.
-            assertThat(contentText.toString())
-                .isEqualTo(
-                    "Action icon + Alt + M is the keyboard shortcut to use Magnification, an" +
-                        " accessibility feature. This allows you to quickly zoom in on the screen" +
-                        " to make content larger. Once magnification is on, press Action icon +" +
-                        " Alt and \"+\" or \"-\" to adjust zoom."
-                )
-        }
-
-    @DisableFlags(Flags.FLAG_ENABLE_MAGNIFY_MAGNIFICATION_KEY_GESTURE_DIALOG)
-    @Test
-    fun getKeyGestureConfirmInfo_onMagnificationTypeReceived_enableShortcut_getExpectedInfo() =
-        kosmos.runTest {
-            val metaState = KeyEvent.META_META_ON or KeyEvent.META_ALT_ON
-
-            val info =
-                underTest.getKeyGestureConfirmInfo(
-                    KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_MAGNIFICATION,
-                    metaState,
-                    KeyEvent.KEYCODE_M,
-                    getTargetNameByType(KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_MAGNIFICATION),
-                    DEFAULT_DISPLAY,
-                )
-
-            assertThat(info).isNotNull()
-            assertThat(info!!.title).isEqualTo("Turn on Magnification keyboard shortcut?")
             val contentText = info.contentText
             assertThat(hasExpectedAnnotation(contentText)).isTrue()
             // `contentText` here is an instance of SpannableStringBuilder, so we only need to
@@ -463,7 +454,7 @@ class AccessibilityShortcutsRepositoryImplTest : SysuiTestCase() {
             val getContentObservers = {
                 fakeSettings.getContentObservers(
                     fakeSettings.getUriFor(mouseKeysSettingsKey),
-                    fakeSettings.userId,
+                    userTracker.userId,
                 )
             }
 
@@ -483,7 +474,7 @@ class AccessibilityShortcutsRepositoryImplTest : SysuiTestCase() {
             assertThat(getContentObservers()).hasSize(1)
 
             // Simulate a settings change.
-            fakeSettings.putBool(mouseKeysSettingsKey, true)
+            fakeSettings.putBoolForUser(mouseKeysSettingsKey, true, userTracker.userId)
             kosmos.fakeExecutor.runAllReady()
             advanceUntilIdle()
 
@@ -503,7 +494,7 @@ class AccessibilityShortcutsRepositoryImplTest : SysuiTestCase() {
             val getContentObservers = {
                 fakeSettings.getContentObservers(
                     fakeSettings.getUriFor(quickAccessTargetsSettingsKey),
-                    fakeSettings.userId,
+                    userTracker.userId,
                 )
             }
 
@@ -529,7 +520,11 @@ class AccessibilityShortcutsRepositoryImplTest : SysuiTestCase() {
                     )
                 )
                 .thenReturn(listOf(MAGNIFICATION_CONTROLLER_NAME))
-            fakeSettings.putString(quickAccessTargetsSettingsKey, MAGNIFICATION_CONTROLLER_NAME)
+            fakeSettings.putStringForUser(
+                quickAccessTargetsSettingsKey,
+                MAGNIFICATION_CONTROLLER_NAME,
+                userTracker.userId,
+            )
             kosmos.fakeExecutor.runAllReady()
             advanceUntilIdle()
 
@@ -573,6 +568,8 @@ class AccessibilityShortcutsRepositoryImplTest : SysuiTestCase() {
 
     private fun Kosmos.getTargetNameByType(keyGestureType: Int): String =
         when (keyGestureType) {
+            KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_DISPLAY_COLOR_INVERSION ->
+                COLOR_INVERSION_COMPONENT_NAME.flattenToString()
             KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_MAGNIFICATION -> MAGNIFICATION_CONTROLLER_NAME
             KeyGestureEvent.KEY_GESTURE_TYPE_ACTIVATE_SELECT_TO_SPEAK ->
                 mainResources.getString(

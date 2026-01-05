@@ -294,7 +294,7 @@ public class TaskViewTransitionStartAnimationTest extends ShellTestCase {
 
         assertWithMessage("Handler should have consumed transition")
                 .that(handled).isTrue();
-        verify(mTaskViewTaskController).prepareCloseAnimation();
+        verify(mTaskViewTaskController).prepareCloseAnimation(mTaskLeash, mStartTransaction);
     }
 
     @Test
@@ -435,8 +435,6 @@ public class TaskViewTransitionStartAnimationTest extends ShellTestCase {
 
     @Test
     public void testMergeAnimation_dispatchDisplayTransition() {
-        assumeTrue(com.android.wm.shell.Flags.fixTaskViewRotationAnimation());
-
         final TransitionInfo.Change displayChange = new TransitionInfo.Change(
                 /* container= */ null, new SurfaceControl());
         displayChange.setStartAbsBounds(new Rect(0, 0, 500, 1000));
@@ -468,7 +466,7 @@ public class TaskViewTransitionStartAnimationTest extends ShellTestCase {
                 mStartTransaction, mFinishTransaction, setTaskBoundsTransition, mFinishCallback);
 
         verify(mStartTransaction).setWindowCrop(eq(boundsChange.getLeash()),
-                eq(newBounds.width()), eq(newBounds.height()));
+                eq(BOUNDS.width()), eq(BOUNDS.height()));
         verify(mTransitions).dispatchTransition(eq(displayTransition), eq(displayChangeInfo),
                 eq(mStartTransaction), eq(mFinishTransaction),
                 eq(mFinishCallback), eq(mTaskViewTransitions));
@@ -506,7 +504,7 @@ public class TaskViewTransitionStartAnimationTest extends ShellTestCase {
 
         assertWithMessage("Handler should have consumed transition")
                 .that(handled).isTrue();
-        verify(mTaskViewTaskController, never()).prepareCloseAnimation();
+        verify(mTaskViewTaskController, never()).prepareCloseAnimation(any(), any());
     }
 
     @Test

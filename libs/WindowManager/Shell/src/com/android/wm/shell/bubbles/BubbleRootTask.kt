@@ -80,19 +80,18 @@ class BubbleRootTask(
 
         val wct = WindowContainerTransaction()
         wct.reorder(taskInfo.token, false /* onTop */)
-        wct.setInterceptBackPressedOnTaskRoot(
+        wct.setReparentLeafTaskIfRelaunchFromHome(
             taskInfo.token,
-            true /* interceptBackPressed */
+            true, /* reparentLeafTaskIfRelaunchFromHome */
         )
-        wct.setTaskForceExcludedFromRecents(
+        wct.setDisallowOverrideWindowingModeForChildren(
             taskInfo.token,
-            true /* forceExcluded */
+            true, /* disallowOverrideWindowingModeForChildren */
         )
+        wct.setInterceptBackPressedOnTaskRoot(taskInfo.token, true /* interceptBackPressed */)
+        wct.setTaskForceExcludedFromRecents(taskInfo.token, true /* forceExcluded */)
         wct.setDisablePip(taskInfo.token, true /* disablePip */)
-        wct.setDisableLaunchAdjacent(
-            taskInfo.token,
-            true /* disableLaunchAdjacent */
-        )
+        wct.setDisableLaunchAdjacent(taskInfo.token, true /* disableLaunchAdjacent */)
         wct.setForceTranslucent(taskInfo.token, true /* forceTranslucent */)
         taskOrganizer.applyTransaction(wct)
     }

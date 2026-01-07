@@ -4058,6 +4058,8 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="accessibility_status_bar_satellite_available">Satellite, connection available</string>
+    <!-- Accessibility label for the SAT symbol on the status bar [CHAR LIMIT=NONE] -->
+    <string name="accessibility_status_bar_satellite_symbol">Satellite</string>
 
     <!-- Text displayed indicating that the user is connected to a satellite signal. -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -6517,6 +6519,8 @@
     <string name="qs_tile_request_dialog_small_format_content_description">Small format</string>
     <!-- Content description for the tile's large format. [CHAR LIMIT=20] -->
     <string name="qs_tile_request_dialog_large_format_content_description">Large format</string>
+    <!-- Label for available satellite connection on quick settings internet and bobile data tiles [CHAR LIMIT=NONE] -->
+    <string name="qs_tile_satellite_label">SAT</string>
 
     <!-- Title for User Switch dialog. [CHAR LIMIT=20] -->
     <string name="qs_user_switch_dialog_title">Select user</string>

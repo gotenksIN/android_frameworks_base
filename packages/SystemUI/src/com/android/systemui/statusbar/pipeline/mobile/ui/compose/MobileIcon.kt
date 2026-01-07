@@ -68,7 +68,7 @@ fun MobileIcon(viewModel: MobileIconViewModelCommon, modifier: Modifier = Modifi
     if (!isVisible) return
 
     val icon by viewModel.icon.collectAsStateWithLifecycle(initialValue = SignalIconModel.DEFAULT)
-    if (icon !is SignalIconModel.Cellular) return
+    if (icon !is SignalIconModel.CellularTypeIconModel.Cellular) return
 
     val contentDescription by
         viewModel.contentDescription.collectAsStateWithLifecycle(initialValue = null)
@@ -136,7 +136,10 @@ fun MobileIcon(viewModel: MobileIconViewModelCommon, modifier: Modifier = Modifi
         Spacer(Modifier.size(spacing))
 
         if (showSignalStrengthIcon) {
-            MobileSignalIcon(viewModel = icon as SignalIconModel.Cellular, color = contentColor)
+        MobileSignalIcon(
+            viewModel = icon as SignalIconModel.CellularTypeIconModel.Cellular,
+            color = contentColor,
+        )
 
             Spacer(Modifier.size(spacing))
         }
@@ -199,7 +202,7 @@ fun ActivityIndicators(
 /** Composable for rendering the mobile signal strength */
 @Composable
 private fun MobileSignalIcon(
-    viewModel: SignalIconModel.Cellular,
+    viewModel: SignalIconModel.CellularTypeIconModel.Cellular,
     color: Color,
     modifier: Modifier = Modifier,
 ) {

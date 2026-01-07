@@ -26,10 +26,12 @@ import com.android.systemui.dagger.SysUISingleton;
 // QTI_END: 2022-12-13: Android_UI: SystemUI: Display combined carrier names
 import com.android.systemui.res.R;
 // QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
-import com.android.systemui.statusbar.pipeline.mobile.data.model.MobileIconCustomizationMode;
 import com.android.systemui.statusbar.policy.FiveGServiceClient;
 import com.google.android.collect.Lists;
 import com.qti.extphone.NrIconType;
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+import com.qti.extphone.RadioIconType;
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
 // QTI_END: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
 
 // QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
@@ -229,12 +231,16 @@ public class CarrierNameCustomization {
 // QTI_BEGIN: 2024-12-12: Android_UI: SystemUI: Fixed NPE in CarrierNameCustomization
         if (sub == null) {
             return getNetWorkName(dataNetworkType, voiceNetworkType, isInService,
-                    NrIconType.INVALID);
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+                    RadioIconType.TYPE_NONE);
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
         } else {
             FiveGServiceClient.FiveGServiceState fiveGServiceState =
                     mFiveGServiceClient.getCurrentServiceState(sub.getSimSlotIndex());
             return getNetWorkName(dataNetworkType, voiceNetworkType, isInService,
-                    fiveGServiceState.getNrIconType());
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+                    fiveGServiceState.getRadioIconType());
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
         }
 // QTI_END: 2024-12-12: Android_UI: SystemUI: Fixed NPE in CarrierNameCustomization
 // QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
@@ -242,7 +248,9 @@ public class CarrierNameCustomization {
 
     public String getCustomizeCarrierNameModern(int subId, String originCarrierName,
                                                 boolean showNetworkType,
-                                                int nrIconType,
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+                                                int radioIconType,
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
                                                 int dataNetworkType,
                                                 int voiceNetworkType,
                                                 boolean isInService) {
@@ -251,7 +259,9 @@ public class CarrierNameCustomization {
                 originCarrierName = getRoamingCarrierName(subId);
             } else if (showNetworkType) {
                 String networkClass = getNetWorkName(dataNetworkType, voiceNetworkType, isInService,
-                        nrIconType);
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+                        radioIconType);
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
                 originCarrierName = getCustomizeCarrierNameInternal(originCarrierName,
                         networkClass);
             } else {
@@ -290,10 +300,14 @@ public class CarrierNameCustomization {
 
     private String getNetWorkName(int dataNetworkType,
                                   int voiceNetworkType,
-                                  boolean isInService, int nrIconType) {
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+                                  boolean isInService, int radioIconType) {
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
         int networkType = getNetworkType(dataNetworkType, voiceNetworkType, isInService);
-        String fiveGNetworkClass = get5GNetworkClass(dataNetworkType, networkType, nrIconType);
-        return (fiveGNetworkClass != null) ? fiveGNetworkClass : networkTypeToString(networkType);
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+        String radioNetworkClass = getRadioNetworkClass(dataNetworkType, networkType, radioIconType);
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+        return (radioNetworkClass != null) ? radioNetworkClass : networkTypeToString(networkType);
     }
 
     private int getNetworkType(int dataNetworkType,
@@ -322,14 +336,20 @@ public class CarrierNameCustomization {
         return mContext.getResources().getString(classId);
     }
 
-    private String get5GNetworkClass(int dataType, int networkType, int nrIconType) {
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+    private String getRadioNetworkClass(int dataType, int networkType, int radioIconType) {
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
         if ((networkType == TelephonyManager.NETWORK_TYPE_NR)
-                || (nrIconType != NrIconType.INVALID
-                && nrIconType != NrIconType.TYPE_NONE
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+                || (radioIconType != NrIconType.INVALID
+                && radioIconType != RadioIconType.TYPE_NONE
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
                 && isDataRegisteredOnLte(dataType))) {
 // QTI_END: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
 // QTI_BEGIN: 2024-05-22: Android_UI: SystemUI: Display 5GA icon for 3CC
-            if (nrIconType == NrIconType.TYPE_5G_UWB
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+            if (radioIconType == RadioIconType.TYPE_5G_UWB
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
 // QTI_END: 2024-05-22: Android_UI: SystemUI: Display 5GA icon for 3CC
 // QTI_BEGIN: 2025-03-27: Android_UI: SystemUI: Enhance Network Description
                     && mShow5GAIcon) {
@@ -338,6 +358,13 @@ public class CarrierNameCustomization {
                 return mContext.getResources().getString(
                         com.android.settingslib.R.string.data_connection_5g_a);
             }
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+            if (radioIconType == RadioIconType.TYPE_LTE_NB_IOT) {
+                return mContext.getResources().getString(
+                        com.android.settingslib.R.string.data_connection_nb_iot);
+            }
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+
 // QTI_END: 2024-05-22: Android_UI: SystemUI: Display 5GA icon for 3CC
 // QTI_BEGIN: 2024-03-10: Android_UI: SystemUI: Carrier name customization enhancement
             return mContext.getResources().getString(

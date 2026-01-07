@@ -59,6 +59,8 @@ SPDX-License-Identifier: BSD-3-Clause-Clear
     <!-- Content description of the data connection type 5GA. [CHAR LIMIT=NONE] -->
     <string name="data_connection_5g_a" translate="false">5GA</string>
 
+    <!-- Content description of the data connection type NB-IOT. [CHAR LIMIT=NONE] -->
+    <string name="data_connection_nb_iot" translate="false">NB-IOT</string>
     <!--
     The customization for last puk prompt
     The format of array item:

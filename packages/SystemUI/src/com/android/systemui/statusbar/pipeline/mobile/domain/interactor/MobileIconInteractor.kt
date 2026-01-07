@@ -25,7 +25,6 @@
 package com.android.systemui.statusbar.pipeline.mobile.domain.interactor
 import android.content.Context
 // QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
-import android.telephony.CarrierConfigManager
 import android.telephony.ims.stub.ImsRegistrationImplBase.REGISTRATION_TECH_CROSS_SIM
 import android.telephony.ims.stub.ImsRegistrationImplBase.REGISTRATION_TECH_IWLAN
 import android.telephony.TelephonyDisplayInfo
@@ -284,13 +283,19 @@ class MobileIconInteractorImpl(
     override val customizedCarrierName =
         combine(
             carrierName,
-            connectionRepository.nrIconType,
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+            connectionRepository.radioIconType,
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
             connectionRepository.dataNetworkType,
             connectionRepository.voiceNetworkType,
             connectionRepository.isInService,
-        ) { carrierName, nrIconType, dataNetworkType, voiceNetworkType, isInService ->
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+        ) { carrierName, radioIconType, dataNetworkType, voiceNetworkType, isInService ->
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
             carrierNameCustomization.getCustomizeCarrierNameModern(connectionRepository.subId,
-                carrierName, true, nrIconType, dataNetworkType, voiceNetworkType, isInService)
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+                carrierName, true, radioIconType, dataNetworkType, voiceNetworkType, isInService)
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
         }
         .stateIn(
             scope,
@@ -366,16 +371,22 @@ class MobileIconInteractorImpl(
     private val mobileIconCustomization: StateFlow<MobileIconCustomizationMode> =
         combine(
             signalStrengthCustomization,
-            connectionRepository.nrIconType,
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+            connectionRepository.radioIconType,
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
             connectionRepository.is6Rx,
             networkTypeIconCustomization,
             connectionRepository.originNetworkType,
-        ) { signalStrengthCustomization, nrIconType, is6Rx, networkTypeIconCustomization,
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+        ) { signalStrengthCustomization, radioIconType, is6Rx, networkTypeIconCustomization,
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
             originNetworkType ->
             MobileIconCustomizationMode(
                 dataNetworkType = signalStrengthCustomization.dataNetworkType,
                 voiceNetworkType = signalStrengthCustomization.voiceNetworkType,
-                fiveGServiceState = FiveGServiceState(nrIconType, is6Rx, context),
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+                fiveGServiceState = FiveGServiceState(radioIconType, is6Rx, context),
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
                 isRatCustomization = networkTypeIconCustomization.isRatCustomization,
                 alwaysShowNetworkTypeIcon =
                     networkTypeIconCustomization.alwaysShowNetworkTypeIcon,
@@ -554,7 +565,9 @@ class MobileIconInteractorImpl(
     private fun getMobileIconGroup(resolvedNetworkType: ResolvedNetworkType,
                                    customizationInfo: MobileIconCustomizationMode,
                                    mapping: Map<String, MobileIconGroup>): MobileIconGroup ?{
-        return if (customizationInfo.fiveGServiceState.isNrIconTypeValid) {
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+        return if (customizationInfo.fiveGServiceState.isRadioIconTypeValid) {
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
             customizationInfo.fiveGServiceState.iconGroup
         } else {
             when (resolvedNetworkType) {

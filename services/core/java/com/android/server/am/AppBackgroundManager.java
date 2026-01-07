@@ -21,6 +21,7 @@ import android.os.Trace;
 import android.os.IBinder;
 import android.os.Process;
 import android.os.Handler;
+import android.os.UserHandle;
 import android.util.Slog;
 import android.util.ArrayMap;
 import android.util.SparseArray;
@@ -33,6 +34,8 @@ import android.content.pm.ApplicationInfo;
 import android.content.ContentResolver;
 // QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
 import android.content.pm.PackageManager;
+import android.content.BroadcastReceiver;
+import android.content.IntentFilter;
 // QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
 import android.provider.Settings;
 // QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
@@ -144,6 +147,25 @@ public class AppBackgroundManager {
         }
     }
 
+    private void syncAppFreezerStateWithUiFluencyMode() {
+        final String targetState = mUseUiFluencyMode ? "disabled" : "enabled";
+        final String currentState = Settings.Global.getString(
+                mContentResolver, Settings.Global.CACHED_APPS_FREEZER_ENABLED);
+
+        if (!targetState.equals(currentState)) {
+            try {
+                Settings.Global.putString(mContentResolver,
+                        Settings.Global.CACHED_APPS_FREEZER_ENABLED, targetState);
+
+                Slog.i(TAG, "UI Fluency Mode " + (mUseUiFluencyMode ? "ENABLED" : "DISABLED") +
+                    " - Default app freezer transitioning from " +
+                    (currentState != null ? currentState : "null") + " to " + targetState);
+            } catch (Exception e) {
+                Slog.e(TAG, "Failed to update default app freezer setting", e);
+            }
+        }
+    }
+
     public class UiFluencyModeMonitor {
         public UiFluencyModeMonitor() {
             if (mContentResolver == null) {
@@ -172,6 +194,7 @@ public class AppBackgroundManager {
                     handleUIFluencyModeDisabled();
                 }
                 updateLmkLazyKillFLag(newValue);
+                syncAppFreezerStateWithUiFluencyMode();
             } catch (Exception e) {
                 // If setting doesn't exist, assume it's disabled for ui fluency mode
                 mUseUiFluencyMode = false;
@@ -193,11 +216,86 @@ public class AppBackgroundManager {
         }
     }
 
+    private final BroadcastReceiver mPackageRemovedReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (Intent.ACTION_PACKAGE_REMOVED.equals(intent.getAction())) {
+                final String packageName = intent.getData() != null ?
+                        intent.getData().getSchemeSpecificPart() : null;
+                if (packageName == null) {
+                    Slog.w(TAG, "Received package removed intent with null package name");
+                    return;
+                }
+
+                final boolean isReplacing = intent.getBooleanExtra(Intent.EXTRA_REPLACING, false);
+                if (isReplacing) {
+                    if (mUseDebug) {
+                        Slog.d(TAG,
+                            "Package " + packageName + " is being updated, not uninstalled");
+                    }
+                    return;
+                }
+
+                final int userId =
+                    intent.getIntExtra(Intent.EXTRA_USER_HANDLE, UserHandle.USER_NULL);
+
+                if (mUseDebug) {
+                    Slog.d(TAG, "Package uninstalled: " + packageName + ", user=" + userId);
+                }
+
+                handlePackageUninstalled(packageName, userId);
+            }
+        }
+    };
+
+    private void handlePackageUninstalled(String packageName, int userId) {
+        if (mUsePackageLevelFreezer) {
+            mPackageFreezerManager.removeAppPids(packageName);
+            mPackageFreezerManager.removePendingList(packageName);
+        }
+
+        if (mUseRestrictBgAutoStart) {
+            mAutoStartManagement.removePackageAutoStartState(packageName);
+        }
+
+        cleanupUninstalledAppResources(packageName, userId);
+    }
+
+    private void cleanupUninstalledAppResources(String packageName, int userId) {
+        try {
+            String[] keys = {
+                SETTINGS_AUTO_START_PREFIX + packageName,
+                SETTINGS_FREEZE_PREFIX + packageName,
+                SETTINGS_KEEPALIVE_PREFIX + packageName
+            };
+
+            for (String key : keys) {
+                mContentResolver.delete(
+                    Settings.Global.CONTENT_URI,
+                    Settings.NameValueTable.NAME + " = ?",
+                    new String[]{key}
+                );
+            }
+
+            if (mUseDebug) {
+                Slog.d(TAG, "Cleared policy settings for uninstalled package: " + packageName);
+            }
+        } catch (Exception e) {
+            Slog.e(TAG, "Failed to clear policy settings for " + packageName, e);
+        }
+    }
+
     public void setAMS(ActivityManagerService am) {
         if (mAm == null) {
             mAm = am;
             mContentResolver = mAm.mContext.getContentResolver();
             mUiFluencyModeMonitor = new UiFluencyModeMonitor();
+
+            IntentFilter packageFilter = new IntentFilter();
+            packageFilter.addAction(Intent.ACTION_PACKAGE_REMOVED);
+            packageFilter.addDataScheme("package");
+            mAm.mContext.registerReceiverAsUser(mPackageRemovedReceiver,
+                    UserHandle.ALL, packageFilter, null, null);
         } else {
             Slog.e(TAG, "ActivityManagerService is already set");
         }
@@ -1511,6 +1609,12 @@ public class AppBackgroundManager {
         public void clearAutoStartMap() {
             synchronized (mLock) {
                 mMainProcState.clear();
+            }
+        }
+
+        public void removePackageAutoStartState(String packageName) {
+            synchronized (mLock) {
+                mMainProcState.remove(packageName);
             }
         }
 

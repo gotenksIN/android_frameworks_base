@@ -9927,7 +9927,8 @@ public final class ViewRootImpl implements ViewParent,
                         requestedWidth, requestedHeight, viewVisibility,
                         insetsPending ? WindowManagerGlobal.RELAYOUT_INSETS_PENDING : 0,
                         mRelayoutSeq, seqId, surfaceControl);
-                if (surfaceControl != null && viewVisibilityChanged) {
+                if (surfaceControl != null && viewVisibilityChanged
+                        && !mWindowLayout.isLocallyManaged()) {
                     relayoutResult |= RELAYOUT_RES_FIRST_TIME;
                 }
             } else {

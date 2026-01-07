@@ -6021,8 +6021,8 @@ public final class ActivityRecord extends WindowToken {
         mDisplayContent.mUnknownAppVisibilityController.notifyLaunched(this);
     }
 
-    /** @return {@code true} if this activity should be made visible. */
-    private boolean shouldBeVisible(boolean behindOccludedContainer, boolean ignoringKeyguard) {
+    /** Updates and returns whether this activity should be made visible. */
+    boolean updateAndCheckVisibility(boolean behindOccludedContainer, boolean ignoringKeyguard) {
         updateVisibilityIgnoringKeyguard(behindOccludedContainer);
 
         if (ignoringKeyguard) {
@@ -6032,6 +6032,10 @@ public final class ActivityRecord extends WindowToken {
         return shouldBeVisibleUnchecked();
     }
 
+    /**
+     * Returns the previous updated value of whether this activity should be made visible.
+     * Uses {@link #shouldBeVisible} to get the latest.
+     */
     boolean shouldBeVisibleUnchecked() {
         final Task rootTask = getRootTask();
         if (rootTask == null || !visibleIgnoringKeyguard) {
@@ -6098,14 +6102,7 @@ public final class ActivityRecord extends WindowToken {
     }
 
     boolean shouldBeVisible(boolean ignoringKeyguard) {
-        final Task task = getTask();
-        if (task == null) {
-            return false;
-        }
-
-        final boolean behindOccludedContainer = !task.shouldBeVisible(null /* starting */)
-                || task.getOccludingActivityAbove(this) != null;
-        return shouldBeVisible(behindOccludedContainer, ignoringKeyguard);
+        return mAtmService.mVisibilityHelper.shouldActivityBeVisible(this, ignoringKeyguard);
     }
 
     void makeVisibleIfNeeded(ActivityRecord starting, boolean reportToClient) {

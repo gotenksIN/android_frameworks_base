@@ -4642,7 +4642,8 @@ public final class ViewRootImpl implements ViewParent,
         mWasLastDrawCanceled = cancelAndRedraw;
         mLastTraversalWasVisible = isViewVisible;
 
-        if (mAttachInfo.mContentCaptureEvents != null) {
+        if (mAttachInfo.mContentCaptureEvents != null ||
+            mAttachInfo.mContentCaptureInteractionEvents != null) {
             notifyContentCaptureEvents();
         }
 
@@ -4884,15 +4885,26 @@ public final class ViewRootImpl implements ViewParent,
                 Log.d(mTag, "notifyContentCaptureEvents while disabled");
             }
             mAttachInfo.mContentCaptureEvents = null;
+            mAttachInfo.mContentCaptureInteractionEvents = null;
             return;
         }
 
         final ContentCaptureManager manager = mAttachInfo.mContentCaptureManager;
-        if (manager != null && mAttachInfo.mContentCaptureEvents != null) {
+        if (manager != null && (mAttachInfo.mContentCaptureEvents != null ||
+                mAttachInfo.mContentCaptureInteractionEvents != null)) {
             final ContentCaptureSession session = manager.getMainContentCaptureSession();
-            session.notifyContentCaptureEvents(mAttachInfo.mContentCaptureEvents);
+            // Notify the interaction events first as the flush event will be sent only after the
+            // content capture events.
+            if (mAttachInfo.mContentCaptureInteractionEvents != null) {
+                session.notifyContentCaptureInteractionEvents(
+                        mAttachInfo.mContentCaptureInteractionEvents);
+            }
+            if (mAttachInfo.mContentCaptureEvents != null) {
+                session.notifyContentCaptureEvents(mAttachInfo.mContentCaptureEvents);
+            }
         }
         mAttachInfo.mContentCaptureEvents = null;
+        mAttachInfo.mContentCaptureInteractionEvents = null;
     }
 
     private void notifyHolderSurfaceDestroyed() {
@@ -9773,7 +9785,7 @@ public final class ViewRootImpl implements ViewParent,
                 & WindowManager.LayoutParams.PRIVATE_FLAG_IS_ROUNDED_CORNERS_OVERLAY) != 0) {
             surfaceFlags |= SurfaceControl.SKIP_SCREENSHOT;
         }
-        return new SurfaceControl.Builder()
+        final SurfaceControl.Builder builder = new SurfaceControl.Builder()
                 .setCallsite("ViewRootImpl.createSurfaceControl")
                 .setName("VRI-" + getTitle())
                 .setFlags(surfaceFlags)
@@ -9781,7 +9793,14 @@ public final class ViewRootImpl implements ViewParent,
                         & WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED) != 0
                         ? PixelFormat.TRANSLUCENT : mWindowAttributes.format)
                 .setMetadata(SurfaceControl.METADATA_WINDOW_TYPE, mWindowAttributes.type)
-                .setBLASTLayer().build();
+                .setBLASTLayer();
+        try {
+            return builder.build();
+        } catch (OutOfResourcesException e) {
+            Slog.w(mTag, "OutOfResourcesException creating surface", e);
+            // Return an invalid surface as a fallback to skip drawing.
+            return new SurfaceControl();
+        }
     }
 
     private int updateSurfaceControl(int viewVisibility) {

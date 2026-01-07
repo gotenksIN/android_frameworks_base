@@ -84,7 +84,7 @@ import platform.test.screenshot.Displays.Phone
 @LargeTest
 @RunWithLooper
 @EnableSceneContainer
-class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
+class QuickSettingsSceneToShadeSceneTest : SysuiTestCase() {
     private val kosmos = testKosmos()
     private val deviceSpec = DeviceEmulationSpec(Phone)
     @get:Rule val motionTestRule = createSysUiComposeMotionTestRule(kosmos, deviceSpec)
@@ -124,7 +124,7 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
 
     @Test
     @DisableFlags(Flags.FLAG_STATUS_BAR_MOBILE_ICON_KAIROS)
-    fun swipeDownFromShadeToQSScene_recordingQSPanelPosition() {
+    fun swipeUpFromQSToShadeScene_recordingQSPanelPosition() {
         motionTestRule.runTest(60.seconds) {
             kosmos.usingMediaInComposeFragment = true
             kosmos.populateQuickSettings(tileCount = 10)
@@ -143,13 +143,10 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
                             ) {
                                 performTouchInputAsync(onRoot()) {
                                     swipe(
-                                        start = Offset(x = centerX, y = top),
-                                        end = Offset(x = centerX, y = bottom),
+                                        start = Offset(x = centerX, y = bottom * 0.75f),
+                                        end = Offset(x = centerX, y = top),
                                         durationMillis = 500,
                                     )
-                                }
-                                awaitCondition {
-                                    kosmos.sceneInteractor.transitionState.value.isIdle()
                                 }
                             }
                         ) {
@@ -157,7 +154,6 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
                                 hasTestTag(Elements.QuickSettingsContent.testTag),
                                 positionInRoot,
                                 "quick_settings_panel_position",
-                                useUnmergedTree = true,
                             )
                         },
                 )
@@ -167,7 +163,7 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
 
     @Test
     @DisableFlags(Flags.FLAG_STATUS_BAR_MOBILE_ICON_KAIROS)
-    fun swipeDownFromShadeToQSScene_recordingQSEditModeButtonPosition() {
+    fun swipeUpFromQSToShadeScene_recordingQSEditModeButtonPosition() {
         motionTestRule.runTest(60.seconds) {
             kosmos.usingMediaInComposeFragment = true
             kosmos.populateQuickSettings(tileCount = 10)
@@ -186,13 +182,10 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
                             ) {
                                 performTouchInputAsync(onRoot()) {
                                     swipe(
-                                        start = Offset(x = centerX, y = top),
-                                        end = Offset(x = centerX, y = bottom),
+                                        start = Offset(x = centerX, y = bottom * 0.75f),
+                                        end = Offset(x = centerX, y = top),
                                         durationMillis = 500,
                                     )
-                                }
-                                awaitCondition {
-                                    kosmos.sceneInteractor.transitionState.value.isIdle()
                                 }
                             }
                         ) {
@@ -200,7 +193,6 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
                                 hasTestTag(resIdToTestTag("qs_edit_mode_button")),
                                 positionInRoot,
                                 "qs_edit_mode_button_position",
-                                useUnmergedTree = true,
                             )
                         },
                 )
@@ -210,7 +202,7 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
 
     @Test
     @DisableFlags(Flags.FLAG_STATUS_BAR_MOBILE_ICON_KAIROS)
-    fun swipeDownFromShadeToQSScene_recordingSettingButtonContainerPosition() {
+    fun swipeUpFromQSToShadeScene_recordingSettingButtonContainerPosition() {
         motionTestRule.runTest(60.seconds) {
             kosmos.usingMediaInComposeFragment = true
             kosmos.populateQuickSettings(tileCount = 10)
@@ -229,13 +221,10 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
                             ) {
                                 performTouchInputAsync(onRoot()) {
                                     swipe(
-                                        start = Offset(x = centerX, y = top),
-                                        end = Offset(x = centerX, y = bottom),
+                                        start = Offset(x = centerX, y = bottom * 0.75f),
+                                        end = Offset(x = centerX, y = top),
                                         durationMillis = 500,
                                     )
-                                }
-                                awaitCondition {
-                                    kosmos.sceneInteractor.transitionState.value.isIdle()
                                 }
                             }
                         ) {
@@ -243,7 +232,6 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
                                 hasTestTag(resIdToTestTag("settings_button_container")),
                                 positionInRoot,
                                 "settings_button_container_position",
-                                useUnmergedTree = true,
                             )
                         },
                 )
@@ -253,7 +241,7 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
 
     @Test
     @DisableFlags(Flags.FLAG_STATUS_BAR_MOBILE_ICON_KAIROS)
-    fun swipeDownFromShadeToQSScene_recordingExpandedHeaderClockPosition() {
+    fun swipeUpFromQSToShadeScene_recordingExpandedHeaderClockPosition() {
         motionTestRule.runTest(60.seconds) {
             kosmos.usingMediaInComposeFragment = true
             kosmos.populateQuickSettings(tileCount = 10)
@@ -272,13 +260,10 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
                             ) {
                                 performTouchInputAsync(onRoot()) {
                                     swipe(
-                                        start = Offset(x = centerX, y = top),
-                                        end = Offset(x = centerX, y = bottom),
+                                        start = Offset(x = centerX, y = bottom * 0.75f),
+                                        end = Offset(x = centerX, y = top),
                                         durationMillis = 500,
                                     )
-                                }
-                                awaitCondition {
-                                    kosmos.sceneInteractor.transitionState.value.isIdle()
                                 }
                             }
                         ) {
@@ -288,48 +273,6 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
                                     .fetchSemanticsNodes()
                             val position = nodes.last().positionInRoot
                             feature("expanded_header_clock_position") { position.asDataPoint() }
-                        },
-                )
-            assertThat(motion).timeSeriesMatchesGolden()
-        }
-    }
-
-    @Test
-    @DisableFlags(Flags.FLAG_STATUS_BAR_MOBILE_ICON_KAIROS)
-    fun swipeDownFromShadeToQSScene_recordingDayDatePosition() {
-        motionTestRule.runTest(60.seconds) {
-            kosmos.usingMediaInComposeFragment = true
-            kosmos.populateQuickSettings(tileCount = 10)
-            kosmos.enableSingleShade()
-            val motion =
-                recordMotion(
-                    content = { ShadeSceneToQSSceneContainer() },
-                    recordingSpec =
-                        ComposeRecordingSpec(
-                            MotionControl(
-                                delayRecording = {
-                                    awaitCondition {
-                                        kosmos.sceneInteractor.transitionState.value.isIdle()
-                                    }
-                                }
-                            ) {
-                                performTouchInputAsync(onRoot()) {
-                                    swipe(
-                                        start = Offset(x = centerX, y = top),
-                                        end = Offset(x = centerX, y = bottom),
-                                        durationMillis = 500,
-                                    )
-                                }
-                                awaitCondition {
-                                    kosmos.sceneInteractor.transitionState.value.isIdle()
-                                }
-                            }
-                        ) {
-                            feature(
-                                hasTestTag(resIdToTestTag("expanded_shade_header_day_date")),
-                                positionInRoot,
-                                "expanded_shade_header_day_date_position",
-                            )
                         },
                 )
             assertThat(motion).timeSeriesMatchesGolden()
@@ -359,7 +302,7 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
                                 Scenes.Shade to shadeScene,
                                 Scenes.QuickSettings to quickSettingsScene,
                             ),
-                        initialSceneKey = Scenes.Shade,
+                        initialSceneKey = Scenes.QuickSettings,
                         transitionsBuilder = kosmos.sceneContainerTransitions,
                         overlayByKey = mapOf(),
                         dataSourceDelegator = kosmos.sceneDataSourceDelegator,

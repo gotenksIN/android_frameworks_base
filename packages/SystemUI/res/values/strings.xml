@@ -408,10 +408,12 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screenshot_blocked_by_admin">Taking screenshots is blocked by your IT admin</string>
+    <!-- Label for UI element which allows copying the screenshot to clipboard [CHAR LIMIT=NONE] -->
+    <string name="screenshot_copy_label">Copy</string>
     <!-- Content description indicating that tapping the element will allow copying the screenshot to clipboard [CHAR LIMIT=NONE] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
-    <string name="screenshot_copy_description">Copy screenshot to clipboard</string>
+    <string name="screenshot_copy_description">Copy screenshot to clipboard button</string>
     <!-- Label for UI element which allows editing the screenshot [CHAR LIMIT=30] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->

@@ -9607,7 +9607,7 @@ public final class ActivityRecord extends WindowToken {
     }
 
     @Override
-    public void writeIdentifierToProto(ProtoOutputStream proto, long fieldId) {
+    void writeIdentifierToProto(ProtoOutputStream proto, long fieldId) {
         final long token = proto.start(fieldId);
         proto.write(HASH_CODE, System.identityHashCode(this));
         proto.write(USER_ID, mUserId);

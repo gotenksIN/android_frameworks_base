@@ -438,6 +438,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     final Object mGlobalLockWithoutBoost = mGlobalLock;
     public ActivityTaskSupervisor mTaskSupervisor;
     ActivityClientController mActivityClientController;
+    WindowContainerVisibilityHelper mVisibilityHelper;
     RootWindowContainer mRootWindowContainer;
     WindowManagerService mWindowManager;
     private UserManagerService mUserManager;
@@ -1065,6 +1066,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         mActivityStateUpdater = processStateController.createActivityStateAsyncUpdater(looper);
         mTaskSupervisor = createTaskSupervisor();
         mActivityClientController = new ActivityClientController(this);
+        mVisibilityHelper = new WindowContainerVisibilityHelperImpl(this);
 
         mTaskChangeNotificationController =
                 new TaskChangeNotificationController(mTaskSupervisor, mH);

@@ -482,6 +482,12 @@ class Task extends TaskFragment {
     boolean mInRemoveTask;
 
     /**
+     * When set, the leaf task should be kept in the current root task if the relaunch originates
+     * from other source task.
+     */
+    boolean mPreserveLeafTaskIfRelaunch;
+
+    /**
      * When set, disassociate the leaf task if relaunched and reparented it to TDA as root task if
      * possible.
      */
@@ -3958,6 +3964,9 @@ class Task extends TaskFragment {
         if (mReparentLeafTaskIfRelaunchFromHome) {
             pw.println(prefix + "mReparentLeafTaskIfRelaunchFromHome=true");
         }
+        if (mPreserveLeafTaskIfRelaunch) {
+            pw.println(prefix + "mPreserveLeafTaskIfRelaunch=true");
+        }
         pw.println(prefix + "mSelfMovable=" + mSelfMovable);
     }
 
@@ -6544,6 +6553,12 @@ class Task extends TaskFragment {
         }
     }
 
+    void setPreserveLeafTaskIfRelaunch(boolean preserveLeafTaskIfRelaunch) {
+        if (isOrganized()) {
+            mPreserveLeafTaskIfRelaunch = preserveLeafTaskIfRelaunch;
+        }
+    }
+
     void setReparentLeafTaskIfRelaunch(boolean reparentLeafTaskIfRelaunch) {
         if (isOrganized()) {
             mReparentLeafTaskIfRelaunch = reparentLeafTaskIfRelaunch;
@@ -6723,7 +6738,7 @@ class Task extends TaskFragment {
      *
      * @see #getVisibility(ActivityRecord)
      * @see #hasFillingContent()
-     * @see ActivityTaskSupervisor.OpaqueContainerHelper#isOpaque
+     * @see WindowContainerVisibilityHelper#isOpaque
      */
     boolean isForceOpaque() {
         return mIsForceOpaque && mCreatedByOrganizer

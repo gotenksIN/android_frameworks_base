@@ -164,13 +164,6 @@ flag {
 }
 
 flag {
-    name: "clock_fidget_animation"
-    namespace: "systemui"
-    description: "Enables the clock fidget animation"
-    bug: "364664389"
-}
-
-flag {
     name: "clock_modernization"
     namespace: "systemui"
     description: "Implement the status bar/shade header clock in the recommended architecture"
@@ -1364,6 +1357,16 @@ flag {
    namespace: "systemui"
    description: "Enable the task switcher feature for partial screen sharing"
    bug: "317208379"
+}
+
+flag {
+    name: "qr_code_scanner_intent_action"
+    namespace: "systemui"
+    description: "Adds an intent action to the intent used to launch the QR code scanner from the quick settings tile."
+    bug: "461701811"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {

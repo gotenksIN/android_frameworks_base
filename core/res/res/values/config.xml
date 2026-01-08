@@ -3516,14 +3516,15 @@
 
     <!-- Controls if local secondary displays should be private or not. Value specified in the array
          represents physical port address of each display and display in this list will be marked
-         as private. {@see android.view.Display#FLAG_PRIVATE} -->
+         as private.
+	 @see android.view.Display#FLAG_PRIVATE -->
     <integer-array translatable="false" name="config_localPrivateDisplayPorts"></integer-array>
 
     <!-- Controls if local secondary displays should be able to steal focus and become top display.
          Value specified in the array represents physical port address of each display and displays
          in this list due to flag dependencies will be marked with the following flags:
-         {@see android.view.Display#FLAG_STEAL_TOP_FOCUS_DISABLED}
-         {@see android.view.Display#FLAG_OWN_FOCUS} -->
+         @see android.view.Display#FLAG_STEAL_TOP_FOCUS_DISABLED
+         @see android.view.Display#FLAG_OWN_FOCUS -->
     <integer-array translatable="false" name="config_localNotStealTopFocusDisplayPorts">
     </integer-array>
 
@@ -3803,6 +3804,10 @@
          from the IME startup prevention behavior that is enabled by
          config_preventImeStartupUnlessTextEditor. -->
     <string-array name="config_nonPreemptibleInputMethods" translatable="false" />
+
+    <!-- These apps are exempt from the IME startup prevention behaviour that is enabled by
+         config_preventImeStartupUnlessTextEditor. -->
+    <string-array name="config_preventImeStartupBypassedApps" translatable="false" />
 
     <!-- Flag indicating that enhanced confirmation mode is enabled. -->
     <bool name="config_enhancedConfirmationModeEnabled">true</bool>
@@ -5672,7 +5677,7 @@
          support system decorations.
          This launcher package must have an activity that supports multiple instances and has
          corresponding launch mode set in AndroidManifest.
-         {@see android.view.Display#FLAG_SHOULD_SHOW_SYSTEM_DECORATIONS} -->
+         @see android.view.Display#FLAG_SHOULD_SHOW_SYSTEM_DECORATIONS -->
     <string name="config_secondaryHomePackage" translatable="false">com.android.launcher3</string>
 
     <!-- Force secondary home launcher specified in config_secondaryHomePackage always. If this is
@@ -7306,6 +7311,9 @@
     <!-- Default component for QR code scanner -->
     <string name="config_defaultQrCodeComponent"></string>
 
+    <!-- Intent action of the default QR code scanner component  -->
+    <string name="config_defaultQrCodeComponentIntentAction"></string>
+
     <!-- Whether Low Power Standby is supported and can be enabled. -->
     <bool name="config_lowPowerStandbySupported">false</bool>
 
@@ -7941,8 +7949,6 @@
 
     <!-- Whether contextual mode (e.g. Do Not Disturb Mode) sync is supported by this device. -->
     <bool name="config_supportContextualModeSync">true</bool>
-    <!-- If supported, should contextual mode sync be enabled by default. -->
-    <bool name="config_enableContextualModeSyncByDefault">true</bool>
 
     <!-- The number of top UID I/O usage summaries to report on TV watchdog I/O usage
          summary atom pull. -->

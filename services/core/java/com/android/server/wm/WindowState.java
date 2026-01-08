@@ -631,6 +631,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
 
     final WindowStateAnimator mWinAnimator;
 
+    /** Whether the client surface is attached to this WindowState. */
     boolean mHasSurface = false;
 
     // Whether this window is being moved via the resize API
@@ -5940,6 +5941,8 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             Slog.i(TAG, "finishDrawing of orientation change: " + this + " " + duration + "ms");
             mOrientationChangeRedrawRequestTime = 0;
         } else if (mActivityRecord != null && mActivityRecord.mRelaunchStartTime != 0
+                && (!Flags.improveFluidResizingPerformance()
+                        || mActivityRecord.mPendingRelaunchCount == 0)
                 && mActivityRecord.findMainWindow(false /* includeStartingApp */) == this) {
             final long duration =
                     SystemClock.elapsedRealtime() - mActivityRecord.mRelaunchStartTime;
@@ -6174,6 +6177,12 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         mDrawHandlers.removeAll(consumedHandlers);
         mWmService.mH.removeMessages(WINDOW_STATE_BLAST_SYNC_TIMEOUT, this);
         if (applyHere) {
+            if (WindowManager.useClientSurface() && !mHasSurface && mSurfaceControl != null) {
+                // This is consuming draw handlers when destroying client surface (from
+                // destroySurfaceUnchecked). Hide the container surface immediately to prevent old
+                // content from showing if the window becomes visible in a short time.
+                t.hide(mSurfaceControl);
+            }
             t.apply();
         }
         return true;

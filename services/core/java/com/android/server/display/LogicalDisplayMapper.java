@@ -1113,15 +1113,14 @@ class LogicalDisplayMapper implements DisplayDeviceRepository.Listener {
                 mDisplaysEnabledCache.delete(id);
             }
 
-            mListener.onLogicalDisplayEventLocked(display, eventsToDispatch);
-
             if ((eventsToDispatch & LOGICAL_DISPLAY_EVENT_DISCONNECTED) != 0) {
                 mLogicalDisplays.delete(id);
-                if (Flags.displayInfoCopyOnWriteCacheEnabled()
-                        && id != Display.DEFAULT_DISPLAY) {
+                if (Flags.displayInfoCopyOnWriteCacheEnabled() && id != Display.DEFAULT_DISPLAY) {
                     mDisplayInfoCache.remove(id);
                 }
             }
+
+            mListener.onLogicalDisplayEventLocked(display, eventsToDispatch);
         }
     }
 

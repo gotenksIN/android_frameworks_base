@@ -69,6 +69,7 @@ import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.ActivityOptions;
+import android.app.WindowConfiguration;
 import android.content.ComponentName;
 import android.content.ContentResolver;
 import android.content.Context;
@@ -114,6 +115,7 @@ import android.window.ITaskFragmentOrganizer;
 import android.window.ITransitionPlayer;
 import android.window.StartingWindowInfo;
 import android.window.StartingWindowRemovalInfo;
+import android.window.TaskCreationParams;
 import android.window.TaskFragmentOrganizer;
 import android.window.TransitionInfo;
 import android.window.TransitionRequestInfo;
@@ -743,6 +745,20 @@ public class WindowTestsBase extends SystemServiceTestsBase {
                 .setUserId(userId)
                 .setParentTask(rootTask)
                 .build();
+        return task;
+    }
+
+    /** Creates a {@link Task} with an activity and adds to the given root {@link Task}. */
+    Task createLeafTaskWithActivity(Task rootTask,
+            @WindowConfiguration.WindowingMode int windowingMode, boolean opaque, boolean filling) {
+        final ActivityRecord activity = new ActivityBuilder(mAtm)
+                .setCreateTask(true)
+                .setParentTask(rootTask)
+                .build();
+        activity.setOccludesParent(opaque);
+        final Task task = activity.getTask();
+        task.setWindowingMode(windowingMode);
+        task.setBounds(filling ? new Rect() : new Rect(100, 100, 200, 200));
         return task;
     }
 
@@ -1949,10 +1965,16 @@ public class WindowTestsBase extends SystemServiceTestsBase {
             mDefaultTDA = display.getDefaultTaskDisplayArea();
             mDisplayId = display.mDisplayId;
             mService.mTaskOrganizerController.registerTaskOrganizer(this);
-            mPrimary = mService.mTaskOrganizerController.createRootTask(
-                    display, WINDOWING_MODE_MULTI_WINDOW, null);
-            mSecondary = mService.mTaskOrganizerController.createRootTask(
-                    display, WINDOWING_MODE_MULTI_WINDOW, null);
+            mPrimary = mService.mTaskOrganizerController.createTaskInner(
+                    new TaskCreationParams.Builder()
+                            .setDisplayId(mDisplayId)
+                            .setWindowingMode(WINDOWING_MODE_MULTI_WINDOW)
+                            .build());
+            mSecondary = mService.mTaskOrganizerController.createTaskInner(
+                    new TaskCreationParams.Builder()
+                            .setDisplayId(mDisplayId)
+                            .setWindowingMode(WINDOWING_MODE_MULTI_WINDOW)
+                            .build());
 
             mPrimary.setAdjacentTaskFragments(new TaskFragment.AdjacentSet(mPrimary, mSecondary));
             display.getDefaultTaskDisplayArea().setLaunchAdjacentFlagRootTask(mSecondary);
@@ -2025,8 +2047,11 @@ public class WindowTestsBase extends SystemServiceTestsBase {
         }
 
         public Task createTask(Rect bounds) {
-            Task task = mService.mTaskOrganizerController.createRootTask(
-                    mDisplay, WINDOWING_MODE_FREEFORM, null);
+            Task task = mService.mTaskOrganizerController.createTaskInner(
+                    new TaskCreationParams.Builder()
+                            .setDisplayId(mDisplay.getDisplayId())
+                            .setWindowingMode(WINDOWING_MODE_FREEFORM)
+                            .build());
             task.setBounds(bounds);
             mTasks.add(task);
             spyOn(task);

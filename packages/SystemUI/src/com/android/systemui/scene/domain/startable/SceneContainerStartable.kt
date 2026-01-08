@@ -17,6 +17,7 @@
 package com.android.systemui.scene.domain.startable
 
 import android.app.StatusBarManager
+import android.os.PowerManager
 import android.view.Display
 import android.view.SurfaceControl
 import com.android.compose.animation.scene.ObservableTransitionState
@@ -208,6 +209,7 @@ constructor(
             lockWhenDeviceBecomesUntrusted()
             lockWhenKeyguardShowWhenAwake()
             hydrateLockScreenUserManager()
+            wakeFromDozingOnContentChange()
         } else {
             sceneLogger.logFrameworkEnabled(isEnabled = false)
         }
@@ -762,16 +764,10 @@ constructor(
                     )
                 } else {
                     if (wakeDirectlyToGoneInteractor.canWakeDirectlyToGone.value) {
-                        val isTransitioningToLockscreen =
-                            sceneInteractor.transitioningTo.value == Scenes.Lockscreen
-                        if (!isTransitioningToLockscreen) {
-                            switchToScene(
-                                targetSceneKey = Scenes.Gone,
-                                loggingReason =
-                                    "device is waking up while we can wake directly to gone, and " +
-                                        "is not already en route to lockscreen",
-                            )
-                        }
+                        switchToScene(
+                            targetSceneKey = Scenes.Gone,
+                            loggingReason = "device is waking up while we can wake directly to gone",
+                        )
                     } else if (
                         authenticationInteractor.get().authenticationMethod.value ==
                             AuthenticationMethodModel.Sim
@@ -1279,11 +1275,15 @@ constructor(
                         it == ShowWhileAwakeReason.KEYGUARD_REENABLED
                 }
                 .collect {
-                    // If keyguard is enabled, lock and switch to Lockscreen scene. If it's not
-                    // enabled, it'll be re-shown when it's enabled again.
+                    // If keyguard is enabled, lock and switch to Lockscreen scene if needed.
+                    // If it's not enabled, it'll be re-shown when it's enabled again.
                     if (keyguardEnabledInteractor.isKeyguardEnabled.value) {
                         deviceEntryInteractor.lockNow("Screen timed out or WM#lockNow() called")
-                        switchToScene(Scenes.Lockscreen, "Keyguard re-enabled")
+
+                        // If we're dreaming, DreamStartable will take us to Scenes.Dream.
+                        if (!keyguardInteractor.isDreamingNotDozing.value) {
+                            switchToScene(Scenes.Lockscreen, "Not dreaming, and $it")
+                        }
                     }
                 }
         }
@@ -1304,6 +1304,29 @@ constructor(
                         lockscreenUserManager.updatePublicMode()
                     }
                 }
+        }
+    }
+
+    /**
+     * Wake up the device if we're dozing and no longer displaying the lockscreen Scene. This
+     * includes both Scene and Overlay transitions.
+     */
+    private fun wakeFromDozingOnContentChange() {
+        applicationScope.launch {
+            launch {
+                sceneInteractor.transitionState
+                    .filter {
+                        it.isTransitioning(from = Scenes.Lockscreen) ||
+                            !it.isIdle(Scenes.Lockscreen)
+                    }
+                    .distinctUntilChanged()
+                    .collect {
+                        powerInteractor.wakeUpIfDozing(
+                            "Wake-up from dozing. Transitioning away from Scenes.Lockscreen",
+                            PowerManager.WAKE_REASON_GESTURE,
+                        )
+                    }
+            }
         }
     }
 

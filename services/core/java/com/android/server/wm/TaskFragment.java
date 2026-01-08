@@ -18,8 +18,6 @@ package com.android.server.wm;
 
 import static android.Manifest.permission.EMBED_ANY_APP_IN_UNTRUSTED_MODE;
 import static android.Manifest.permission.MANAGE_ACTIVITY_TASKS;
-import static android.app.ActivityManager.LOCK_TASK_MODE_LOCKED;
-import static android.app.ActivityManager.LOCK_TASK_MODE_PINNED;
 import static android.app.ActivityTaskManager.INVALID_TASK_ID;
 import static android.app.FullscreenRequestHandler.REQUEST_ALLOW_MODE_INHERIT;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_ASSISTANT;
@@ -75,7 +73,6 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.ActivityOptions;
 import android.app.FullscreenRequestHandler;
-import android.app.FullscreenRequestHandler.RequestAllowMode;
 import android.app.IApplicationThread;
 import android.app.ResultInfo;
 import android.app.WindowConfiguration;
@@ -101,7 +98,6 @@ import android.util.Slog;
 import android.util.proto.ProtoOutputStream;
 import android.view.DisplayInfo;
 import android.view.SurfaceControl;
-import android.window.DesktopExperienceFlags;
 import android.window.ITaskFragmentOrganizer;
 import android.window.TaskFragmentAnimationParams;
 import android.window.TaskFragmentInfo;
@@ -207,7 +203,6 @@ class TaskFragment extends WindowContainer<WindowContainer> {
     final ActivityTaskSupervisor mTaskSupervisor;
     final RootWindowContainer mRootWindowContainer;
     private final TaskFragmentOrganizerController mTaskFragmentOrganizerController;
-    private final LockTaskController mLockTaskController;
 
 // QTI_BEGIN: 2021-11-22: Performance: perf: Refactor Animation Boost
     public BoostFramework mPerf = null;
@@ -450,9 +445,6 @@ class TaskFragment extends WindowContainer<WindowContainer> {
     private final EnsureActivitiesVisibleHelper mEnsureActivitiesVisibleHelper =
             new EnsureActivitiesVisibleHelper(this);
 
-    private final boolean mEnableSeeThroughTaskFragments =
-            DesktopExperienceFlags.ENABLE_SEE_THROUGH_TASK_FRAGMENTS.isTrue();
-
     /** Creates an embedded task fragment. */
     TaskFragment(ActivityTaskManagerService atmService, IBinder fragmentToken,
             boolean createdByOrganizer) {
@@ -471,7 +463,6 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         mRelativeEmbeddedBounds = isEmbedded ? new Rect() : null;
         mTaskFragmentOrganizerController =
                 mAtmService.mWindowOrganizerController.mTaskFragmentOrganizerController;
-        mLockTaskController = mAtmService.getLockTaskController();
         mFragmentToken = fragmentToken;
         mRemoteToken = new RemoteToken(this);
         setFullscreenRequestAllowMode(REQUEST_ALLOW_MODE_INHERIT);
@@ -1194,7 +1185,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         if (!isAttached() || isForceHidden() || isForceTranslucent()) {
             return true;
         }
-        return !mTaskSupervisor.mOpaqueContainerHelper.isOpaque(
+        return !mAtmService.mVisibilityHelper.isOpaque(
                 this, starting, true /* ignoringKeyguard */, true /* ignoringInvisibleActivity */);
     }
 
@@ -1208,7 +1199,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
             return true;
         }
         // Including finishing Activity if the TaskFragment is becoming invisible in the transition.
-        return !mTaskSupervisor.mOpaqueContainerHelper.isOpaque(this);
+        return !mAtmService.mVisibilityHelper.isOpaque(this);
     }
 
     /**
@@ -1219,7 +1210,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         if (!isAttached() || isForceHidden() || isForceTranslucent()) {
             return true;
         }
-        return !mTaskSupervisor.mOpaqueContainerHelper.isOpaque(this, /* starting */ null,
+        return !mAtmService.mVisibilityHelper.isOpaque(this, /* starting */ null,
                 false /* ignoringKeyguard */, true /* ignoringInvisibleActivity */);
     }
 
@@ -1338,222 +1329,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
      */
     @TaskFragmentVisibility
     int getVisibility(ActivityRecord starting) {
-        if (!isAttached() || isForceHidden()) {
-            return TASK_FRAGMENT_VISIBILITY_INVISIBLE;
-        }
-
-        if (isTopActivityLaunchedBehind()) {
-            return TASK_FRAGMENT_VISIBILITY_VISIBLE;
-        }
-        final WindowContainer<?> parent = getParent();
-        final Task thisTask = asTask();
-        if (thisTask != null && parent.asTask() == null
-                && mTransitionController.isTransientVisible(thisTask)) {
-            // Keep transient-hide root tasks visible. Non-root tasks still follow standard rule.
-            return TASK_FRAGMENT_VISIBILITY_VISIBLE;
-        }
-
-        if (thisTask != null && !isPermittedInLockTask(thisTask)) {
-            return TASK_FRAGMENT_VISIBILITY_INVISIBLE;
-        }
-
-        boolean gotTranslucentFullscreen = false;
-        boolean gotTranslucentAdjacent = false;
-        boolean shouldBeVisible = true;
-
-        // This TaskFragment is only considered visible if all its parent TaskFragments are
-        // considered visible, so check the visibility of all ancestor TaskFragment first.
-        if (parent.asTaskFragment() != null) {
-            final int parentVisibility = parent.asTaskFragment().getVisibility(starting);
-            if (parentVisibility == TASK_FRAGMENT_VISIBILITY_INVISIBLE) {
-                // Can't be visible if parent isn't visible
-                return TASK_FRAGMENT_VISIBILITY_INVISIBLE;
-            } else if (parentVisibility == TASK_FRAGMENT_VISIBILITY_VISIBLE_BEHIND_TRANSLUCENT) {
-                // Parent is behind a translucent container so the highest visibility this container
-                // can get is that.
-                gotTranslucentFullscreen = true;
-            }
-        }
-
-        TaskFragment.AdjacentVisibilityHelper adjacentVisibilityHelper = null;
-        final List<TaskFragment> adjacentTaskFragments = new ArrayList<>();
-        for (int i = parent.getChildCount() - 1; i >= 0; --i) {
-            final WindowContainer other = parent.getChildAt(i);
-            if (other == null) continue;
-
-            final boolean hasRunningActivities = hasRunningActivity(other);
-            if (other == this) {
-                if (com.android.window.flags.Flags.fixTfAdjacentVisibility()) {
-                    if (adjacentVisibilityHelper != null
-                            && !adjacentVisibilityHelper.isUnprocessedAdjacentTaskFragment(this)) {
-                        if (!adjacentVisibilityHelper.isBehindTranslucentTaskFragment(this)) {
-                            return TASK_FRAGMENT_VISIBILITY_INVISIBLE;
-                        } else {
-                            gotTranslucentFullscreen = true;
-                        }
-                    }
-                } else {
-                    if (!adjacentTaskFragments.isEmpty() && !gotTranslucentAdjacent) {
-                        // The z-order of this TaskFragment is in middle of two adjacent
-                        // TaskFragments and it cannot be visible if the TaskFragment on top is
-                        // not translucent and is occluding this one.
-                        mTmpRect.set(getBounds());
-                        for (int j = adjacentTaskFragments.size() - 1; j >= 0; --j) {
-                            final TaskFragment taskFragment = adjacentTaskFragments.get(j);
-                            if (taskFragment.isAdjacentTo(this)) {
-                                continue;
-                            }
-                            final boolean isOccluding = mTmpRect.intersect(taskFragment.getBounds())
-                                    || taskFragment.forOtherAdjacentTaskFragments(adjacentTf -> {
-                                        return mTmpRect.intersect(adjacentTf.getBounds());
-                                    });
-                            if (isOccluding) {
-                                return TASK_FRAGMENT_VISIBILITY_INVISIBLE;
-                            }
-                        }
-                    }
-                }
-                // Should be visible if there is no other fragment occluding it, unless it doesn't
-                // have any running activities, not starting one and not home stack.
-                shouldBeVisible = hasRunningActivities
-                        || (starting != null && starting.isDescendantOf(this))
-                        || (isActivityTypeHome() && !isEmbedded());
-                break;
-            }
-
-            if (!hasRunningActivities) {
-                continue;
-            }
-
-            // Must fill the parent to affect visibility.
-            boolean affectsSiblingVisibility = other.fillsParentBounds();
-            if (mEnableSeeThroughTaskFragments) {
-                // It also must have filling content itself, to prevent empty or only partially
-                // occluding containers from affecting visibility.
-                affectsSiblingVisibility &= other.hasFillingContent();
-            }
-            if (affectsSiblingVisibility) {
-                // This task fragment is fully covered by |other|.
-                if (isTranslucent(other, starting)) {
-                    // Can be visible behind a translucent TaskFragment.
-                    gotTranslucentFullscreen = true;
-                    continue;
-                }
-                return TASK_FRAGMENT_VISIBILITY_INVISIBLE;
-            }
-
-            final TaskFragment otherTaskFrag = other.asTaskFragment();
-            if (otherTaskFrag != null) {
-                // For adjacent TaskFragments, we have assumptions that:
-                // 1. A set of adjacent TaskFragments always cover the entire Task window, so that
-                // if this TaskFragment is behind a set of opaque TaskFragments, then this
-                // TaskFragment is invisible.
-                // 2. Adjacent TaskFragments do not overlap, so that if this TaskFragment is behind
-                // any translucent TaskFragment in the adjacent set, then this TaskFragment is
-                // visible behind translucent.
-                if (com.android.window.flags.Flags.fixTfAdjacentVisibility()) {
-                    if (otherTaskFrag.hasAdjacentTaskFragment()
-                            && (adjacentVisibilityHelper == null
-                            || adjacentVisibilityHelper.isAllAdjacentTaskFragmentProcessed())) {
-                        // Same as above. The TaskFragment must have filling content itself,
-                        // otherwise it cannot affect the visibility.
-                        adjacentVisibilityHelper =
-                                otherTaskFrag.getAdjacentTaskFragments().getVisibilityHelper(
-                                        t -> t.hasFillingContent() && !isTranslucent(t, starting));
-                    }
-
-                    if (adjacentVisibilityHelper != null) {
-                        adjacentVisibilityHelper.process(otherTaskFrag);
-                        if (adjacentVisibilityHelper.isAllAdjacentTaskFragmentProcessed()) {
-                            if (adjacentVisibilityHelper.occludesParent()) {
-                                // Can not be visible behind adjacent TaskFragments.
-                                return TASK_FRAGMENT_VISIBILITY_INVISIBLE;
-                            }
-                            // Can be visible behind a translucent adjacent TaskFragments.
-                            gotTranslucentFullscreen = true;
-                        }
-                    }
-                } else if (otherTaskFrag.hasAdjacentTaskFragment()) {
-                    final boolean hasTraversedAdj = otherTaskFrag.forOtherAdjacentTaskFragments(
-                            adjacentTaskFragments::contains);
-                    if (hasTraversedAdj) {
-                        final boolean isTranslucent =
-                                isBehindTransparentTaskFragment(otherTaskFrag, starting)
-                                        || otherTaskFrag.forOtherAdjacentTaskFragments(
-                                        (Predicate<TaskFragment>) tf ->
-                                                isBehindTransparentTaskFragment(tf, starting));
-                        if (isTranslucent) {
-                            // Can be visible behind a translucent adjacent TaskFragments.
-                            gotTranslucentFullscreen = true;
-                            gotTranslucentAdjacent = true;
-                            continue;
-                        }
-                        // Can not be visible behind adjacent TaskFragments.
-                        return TASK_FRAGMENT_VISIBILITY_INVISIBLE;
-                    }
-                    adjacentTaskFragments.add(otherTaskFrag);
-                }
-            }
-
-        }
-
-        if (!shouldBeVisible) {
-            return TASK_FRAGMENT_VISIBILITY_INVISIBLE;
-        }
-
-        // Lastly - check if there is a translucent fullscreen TaskFragment on top.
-        return gotTranslucentFullscreen
-                ? TASK_FRAGMENT_VISIBILITY_VISIBLE_BEHIND_TRANSLUCENT
-                : TASK_FRAGMENT_VISIBILITY_VISIBLE;
-    }
-
-    private boolean isBehindTransparentTaskFragment(
-            @NonNull TaskFragment otherTf, @Nullable ActivityRecord starting) {
-        return otherTf.isTranslucent(starting) && getBounds().intersect(otherTf.getBounds());
-    }
-
-    private static boolean hasRunningActivity(WindowContainer wc) {
-        if (wc.asTaskFragment() != null) {
-            return wc.asTaskFragment().topRunningActivity() != null;
-        }
-        return wc.asActivityRecord() != null && !wc.asActivityRecord().finishing;
-    }
-
-    private static boolean isTranslucent(WindowContainer wc, ActivityRecord starting) {
-        if (wc.asTaskFragment() != null) {
-            return wc.asTaskFragment().isTranslucent(starting);
-        } else if (wc.asActivityRecord() != null) {
-            return !wc.asActivityRecord().occludesParent();
-        }
-        return false;
-    }
-
-
-    private boolean isTopActivityLaunchedBehind() {
-        final ActivityRecord top = topRunningActivity();
-        return top != null && top.mLaunchTaskBehind;
-    }
-
-    /**
-     * Checks if a task is allowed to run in the lock task mode.
-     *
-     * <p>Returns {@code true} if the device is not currently in lock task.
-     *
-     * <p>A task is permitted if it's a leaf task that is allowed by the lock task admin policy, or
-     * if any of its descendant leaf tasks are permitted by the policy.
-     *
-     * @param task The task to evaluate.
-     * @return {@code true} if the task is allowed to run, {@code false} otherwise.
-     */
-    private boolean isPermittedInLockTask(@NonNull Task task) {
-        final int lockTaskState = mLockTaskController.getLockTaskModeState();
-        final boolean isInLockTask =
-                lockTaskState == LOCK_TASK_MODE_LOCKED || lockTaskState == LOCK_TASK_MODE_PINNED;
-        if (!isInLockTask) {
-            return true;
-        }
-        return task.forAllTasks(
-                leafTask -> !mLockTaskController.isLockTaskModeViolation(leafTask));
+        return mAtmService.mVisibilityHelper.getTaskFragmentVisibility(this, starting);
     }
 
     final void updateActivityVisibilities(@Nullable ActivityRecord starting,
@@ -3704,10 +3480,10 @@ class TaskFragment extends WindowContainer<WindowContainer> {
             return false;
         }
 
+        /** Gets a copy of the adjacent {@link TaskFragment}s. */
         @NonNull
-        AdjacentVisibilityHelper getVisibilityHelper(
-                @NonNull Predicate<TaskFragment> occludingCallback) {
-            return new AdjacentVisibilityHelper(mAdjacentSet, occludingCallback);
+        ArraySet<TaskFragment> getTaskFragments() {
+            return new ArraySet<>(mAdjacentSet);
         }
 
         int size() {
@@ -3738,95 +3514,6 @@ class TaskFragment extends WindowContainer<WindowContainer> {
             }
             sb.append("}");
             return sb.toString();
-        }
-    }
-
-    /**
-     * The helper class to calculate the visibility of the adjacent TaskFragments.
-     * </p>
-     * For a complex case as below, the adjacent TaskFragments contain a translucent TaskFragment.
-     * In that case, the TaskFragment B should be visible, but Task#1 should not be visible if
-     * TaskFragment B occludes the whole area of the translucent TaskFragment C.
-     * Task#2
-     *    - TaskFragment C (adjacent to A, translucent)
-     *    - TaskFragment B
-     *    - TaskFragment A (adjacent to C)
-     * Task#1
-     * </p>
-     * The visibility calculation should be done by processing the TaskFragments from top to
-     * bottom, by calling {@link #process(TaskFragment)}.
-     */
-    static class AdjacentVisibilityHelper {
-        final ArraySet<TaskFragment> mUnprocessedAdjacentTaskFragments;
-        final ArraySet<TaskFragment> mTranslucentTaskFragments = new ArraySet<>();
-        final Predicate<TaskFragment> mOccludingCallback;
-
-        AdjacentVisibilityHelper(@NonNull ArraySet<TaskFragment> adjacentTaskFragments,
-                @NonNull Predicate<TaskFragment> occludingCallback) {
-            mUnprocessedAdjacentTaskFragments = new ArraySet<>(adjacentTaskFragments);
-            mOccludingCallback = occludingCallback;
-        }
-
-        /**
-         * Process the given TaskFragment. The TaskFragment should be one of the adjacent
-         * TaskFragments or the TaskFragments in between the adjacent TFs.
-         */
-        public void process(@NonNull TaskFragment taskFragment) {
-            if (mUnprocessedAdjacentTaskFragments.contains(taskFragment)) {
-                mUnprocessedAdjacentTaskFragments.remove(taskFragment);
-            }
-
-            if (mOccludingCallback.test(taskFragment)) {
-                // Remove the translucent TaskFragments if it can be fully occluded by this
-                // TaskFragment.
-                mTranslucentTaskFragments.removeIf(
-                        t -> taskFragment.getBounds().contains(t.getBounds()));
-            } else {
-                mTranslucentTaskFragments.add(taskFragment);
-            }
-        }
-
-        /**
-         * Returns {@code true} if the process is done, i.e. the adjacent TaskFragments are all
-         * processed.
-         */
-        public boolean isAllAdjacentTaskFragmentProcessed() {
-            return mUnprocessedAdjacentTaskFragments.isEmpty();
-        }
-
-        /**
-         * Returns {@code true} if the given TaskFragment is one of the adjacent TaskFragment
-         * that's not yet processed.
-         */
-        public boolean isUnprocessedAdjacentTaskFragment(TaskFragment tf) {
-            return mUnprocessedAdjacentTaskFragments.contains(tf);
-        }
-
-        /**
-         * Returns {@code true} if the adjacent TaskFragments (and the TaskFragments in between)
-         * can occlude parent container. Must be called after all adjacent TFs are processed.
-         */
-        public boolean occludesParent() {
-            return mTranslucentTaskFragments.isEmpty();
-        }
-
-        /**
-         * Return {@code true} if the given TaskFragment is behind any of the translucent
-         * TaskFragments
-         */
-        public boolean isBehindTranslucentTaskFragment(@NonNull TaskFragment tf) {
-            if (mUnprocessedAdjacentTaskFragments.contains(tf)) {
-                return false;
-            }
-
-            final Rect bounds = tf.getBounds();
-            for (int i = mTranslucentTaskFragments.size() - 1; i >= 0; i--) {
-                final TaskFragment taskFragment = mTranslucentTaskFragments.valueAt(i);
-                if (bounds.intersect(taskFragment.getBounds())) {
-                    return true;
-                }
-            }
-            return false;
         }
     }
 }

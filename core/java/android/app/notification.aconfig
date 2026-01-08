@@ -14,13 +14,6 @@ flag {
 }
 
 flag {
-  name: "notifications_redesign_templates"
-  namespace: "systemui"
-  description: "Notifications Redesign: Update notification templates"
-  bug: "378660052"
-}
-
-flag {
   name: "headline_prototypes"
   namespace: "notifications"
   description: "This flag adds static control for enabling prototypes for the headline project"
@@ -88,13 +81,6 @@ flag {
   namespace: "systemui"
   description: "Adds logging for notification/modes backup and restore events"
   bug: "289524803"
-}
-
-flag {
-  name: "notification_classification_ui"
-  namespace: "systemui"
-  description: "Adds UI for NAS classification of notifications"
-  bug: "367996732"
 }
 
 flag {
@@ -218,6 +204,16 @@ flag {
 }
 
 flag {
+  name: "nm_remove_must_have_flags"
+  namespace: "notifications"
+  description: "This controls the removal of the internal method parameter 'mustHaveFlags' which was used inconsistently"
+  bug: "440125528"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
   name: "hide_status_bar_notification"
   namespace: "systemui"
   description: "Allows an application running a foreground service to hide the notification icon from the status bar"
@@ -286,6 +282,14 @@ flag {
   namespace: "notifications"
   description: "Guards new android.app.Notification.ProjectedExtender api"
   bug: "455909258"
+  is_exported: true
+}
+
+flag {
+  name: "prefer_small_icon"
+  namespace: "notifications"
+  description: "Makes prefer small icon fully public"
+  bug: "469460575"
   is_exported: true
 }
 

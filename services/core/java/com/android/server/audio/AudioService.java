@@ -97,7 +97,6 @@ import static com.android.media.audio.Flags.ringMyCar;
 import static com.android.media.audio.Flags.ringerModeAffectsAlarm;
 import static com.android.media.audio.Flags.stereoSpatializationBinauralTransaural;
 import static com.android.media.audio.Flags.streamAssistantNotAliasedToMusic;
-import static com.android.media.audio.Flags.updatePreferredDevicesForStrategy;
 import static com.android.media.flags.Flags.enableAudioInputDeviceRoutingAndVolumeControl;
 import static com.android.server.audio.SoundDoseHelper.ACTION_CHECK_MUSIC_ACTIVE;
 import static com.android.server.utils.EventLogger.Event.ALOGE;
@@ -5722,8 +5721,6 @@ public class AudioService extends IAudioService.Stub
                 + unifyAbsoluteVolumeManagement());
         pw.println("\tandroid.media.audio.Flags.registerVolumeCallbackApiHardening:"
                 + registerVolumeCallbackApiHardening());
-        pw.println("\tcom.android.media.audio.Flags.updatePreferredDevicesForStrategy:"
-                + updatePreferredDevicesForStrategy());
         pw.println("\tandroid.media.audiopolicy.Flags.multi_zone_audio:"
                 + multiZoneAudio());
         pw.println("\tcom.android.media.audio.Flags.stereoSpatializationBinauralTransaural:"
@@ -12334,8 +12331,7 @@ public class AudioService extends IAudioService.Stub
             //TODO move inside HardeningEnforcer after refactor that moves permission checks
             //     in the blockFocusMethod
             if (permissionOverridesCheck) {
-                mHardeningEnforcer.metricsLogFocusReq(/*blocked*/ false, focusReqType, uid,
-                        /*unblockedBySdk*/ false);
+                mHardeningEnforcer.metricsLogFocusReq(/*blocked*/ false, focusReqType, uid);
             }
             if (!permissionOverridesCheck && mHardeningEnforcer.blockFocusMethod(uid,
                     HardeningEnforcer.METHOD_AUDIO_MANAGER_REQUEST_AUDIO_FOCUS,

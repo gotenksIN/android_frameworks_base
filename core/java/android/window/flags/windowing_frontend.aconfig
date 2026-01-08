@@ -64,16 +64,6 @@ flag {
 }
 
 flag {
-  name: "rank_task_layer_with_window_layout"
-  namespace: "windowing_frontend"
-  description: "Reduce lock contention of display thread"
-  bug: "445591466"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
   name: "no_alpha_rotation_enter_animation"
   namespace: "windowing_frontend"
   description: "Remove alpha effect of rotation enter animation"
@@ -463,16 +453,6 @@ flag {
 }
 
 flag {
-    name: "promote_existence_changed_state_to_parent"
-    namespace: "windowing_frontend"
-    description: "Always promote existenceChanged state to parent."
-    bug: "452214913"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "virtual_display_can_create_system_application_overlay"
     namespace: "windowing_frontend"
     description: "Virtual display owners can create system application overlays"
@@ -540,4 +520,11 @@ flag {
     metadata {
       purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+    name: "improve_fluid_resizing_performance"
+    namespace: "windowing_frontend"
+    description: "Improve the performance during fluid resizing."
+    bug: "429960813"
 }

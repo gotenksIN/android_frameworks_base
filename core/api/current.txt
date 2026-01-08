@@ -261,7 +261,6 @@ package android {
     field public static final String PROVIDE_REMOTE_CREDENTIALS = "android.permission.PROVIDE_REMOTE_CREDENTIALS";
     field public static final String QUERY_ADVANCED_PROTECTION_MODE = "android.permission.QUERY_ADVANCED_PROTECTION_MODE";
     field public static final String QUERY_ALL_PACKAGES = "android.permission.QUERY_ALL_PACKAGES";
-    field @FlaggedApi("android.media.audio.guard_stream_volume_apis") public static final String QUERY_AUDIO_VOLUME = "android.permission.QUERY_AUDIO_VOLUME";
     field @FlaggedApi("android.permission.flags.ranging_permission_enabled") public static final String RANGING = "android.permission.RANGING";
     field public static final String READ_ASSISTANT_APP_SEARCH_DATA = "android.permission.READ_ASSISTANT_APP_SEARCH_DATA";
     field @FlaggedApi("android.permission.flags.restrict_assist_structure_screen_content_enabled") public static final String READ_ASSIST_STRUCTURE_SCREEN_CONTENT = "android.permission.READ_ASSIST_STRUCTURE_SCREEN_CONTENT";
@@ -5040,6 +5039,7 @@ package android.app {
     method public int getPendingIntentCreatorBackgroundActivityStartMode();
     method public int getSplashScreenStyle();
     method @FlaggedApi("com.android.window.flags.touch_pass_through_opt_in") public boolean isAllowPassThroughOnTouchOutside();
+    method @FlaggedApi("com.android.window.flags.enable_require_movable_task_api") public boolean isMovableTaskRequired();
     method @Deprecated public boolean isPendingIntentBackgroundActivityLaunchAllowed();
     method public boolean isShareIdentityEnabled();
     method public static android.app.ActivityOptions makeBasic();
@@ -5058,6 +5058,7 @@ package android.app {
     method public android.app.ActivityOptions setLaunchBounds(@Nullable android.graphics.Rect);
     method public android.app.ActivityOptions setLaunchDisplayId(int);
     method public android.app.ActivityOptions setLockTaskEnabled(boolean);
+    method @FlaggedApi("com.android.window.flags.enable_require_movable_task_api") @NonNull @RequiresPermission(android.Manifest.permission.REPOSITION_SELF_WINDOWS) public android.app.ActivityOptions setMovableTaskRequired(boolean);
     method @Deprecated public void setPendingIntentBackgroundActivityLaunchAllowed(boolean);
     method @NonNull public android.app.ActivityOptions setPendingIntentBackgroundActivityStartMode(int);
     method @NonNull public android.app.ActivityOptions setPendingIntentCreatorBackgroundActivityStartMode(int);
@@ -6302,6 +6303,9 @@ package android.app {
     method @NonNull public android.app.HandoffActivityParams.Builder setAllowHandoffWithoutPackageInstalled(boolean);
   }
 
+  @FlaggedApi("com.android.window.flags.enable_require_movable_task_api") public class InfeasibleActivityOptionsException extends android.util.AndroidRuntimeException {
+  }
+
   public class Instrumentation {
     ctor public Instrumentation();
     method public android.os.TestLooperManager acquireLooperManager(android.os.Looper);
@@ -6632,6 +6636,7 @@ package android.app {
     method @FlaggedApi("android.app.opt_in_rich_ongoing") public boolean isRequestPromotedOngoing();
     method @FlaggedApi("android.app.api_notification_chip") @NonNull public android.app.Notification.ResolvedCompactContent resolveCompactContent(@NonNull android.content.Context);
     method public void writeToParcel(android.os.Parcel, int);
+    field @FlaggedApi("android.app.bridged_notifications") public static final String ACTION_BRIDGED_NOTIFICATION_PREFERENCES = "android.app.action.BRIDGED_NOTIFICATION_PREFERENCES";
     field public static final android.media.AudioAttributes AUDIO_ATTRIBUTES_DEFAULT;
     field public static final int BADGE_ICON_LARGE = 2; // 0x2
     field public static final int BADGE_ICON_NONE = 0; // 0x0
@@ -6695,6 +6700,7 @@ package android.app {
     field public static final String EXTRA_PICTURE = "android.picture";
     field public static final String EXTRA_PICTURE_CONTENT_DESCRIPTION = "android.pictureContentDescription";
     field public static final String EXTRA_PICTURE_ICON = "android.pictureIcon";
+    field @FlaggedApi("android.app.prefer_small_icon") public static final String EXTRA_PREFER_SMALL_ICON = "android.app.preferSmallIcon";
     field public static final String EXTRA_PROGRESS = "android.progress";
     field public static final String EXTRA_PROGRESS_INDETERMINATE = "android.progressIndeterminate";
     field public static final String EXTRA_PROGRESS_MAX = "android.progressMax";
@@ -8437,6 +8443,7 @@ package android.app.admin {
     field @FlaggedApi("android.view.contentprotection.flags.manage_device_policy_enabled") public static final String CONTENT_PROTECTION_POLICY = "contentProtection";
     field @FlaggedApi("android.app.admin.flags.cross_profile_widget_provider_bulk_apis") public static final String CROSS_PROFILE_WIDGET_PROVIDER_POLICY = "crossProfileWidgetProvider";
     field public static final String KEYGUARD_DISABLED_FEATURES_POLICY = "keyguardDisabledFeatures";
+    field @FlaggedApi("android.app.admin.flags.lockscreen_info_coexistence") public static final String LOCKSCREEN_INFO_POLICY = "lockScreenInfo";
     field public static final String LOCK_TASK_POLICY = "lockTask";
     field @FlaggedApi("android.app.admin.flags.set_mte_policy_coexistence") public static final String MEMORY_TAGGING_POLICY = "memoryTagging";
     field public static final String PACKAGES_SUSPENDED_POLICY = "packagesSuspended";
@@ -8667,7 +8674,7 @@ package android.app.admin {
     method public void setDefaultDialerApplication(@NonNull String);
     method @RequiresPermission(value=android.Manifest.permission.MANAGE_DEVICE_POLICY_DEFAULT_SMS, conditional=true) public void setDefaultSmsApplication(@Nullable android.content.ComponentName, @NonNull String);
     method public void setDelegatedScopes(@NonNull android.content.ComponentName, @NonNull String, @NonNull java.util.List<java.lang.String>);
-    method public void setDeviceOwnerLockScreenInfo(@NonNull android.content.ComponentName, CharSequence);
+    method public void setDeviceOwnerLockScreenInfo(@Nullable android.content.ComponentName, CharSequence);
     method public void setEndUserSessionMessage(@NonNull android.content.ComponentName, @Nullable CharSequence);
     method @RequiresPermission(value=android.Manifest.permission.MANAGE_DEVICE_POLICY_FACTORY_RESET, conditional=true) public void setFactoryResetProtectionPolicy(@Nullable android.content.ComponentName, @Nullable android.app.admin.FactoryResetProtectionPolicy);
     method public int setGlobalPrivateDnsModeOpportunistic(@NonNull android.content.ComponentName);
@@ -9355,7 +9362,7 @@ package android.app.appfunctions {
     field @NonNull public static final String SERVICE_INTERFACE = "android.app.appfunctions.AppFunctionService";
   }
 
-  @FlaggedApi("android.permission.flags.app_function_access_api_enabled") public final class AppFunctionUriGrant implements android.os.Parcelable {
+  @FlaggedApi("android.app.appfunctions.flags.enable_app_function_permission_v2") public final class AppFunctionUriGrant implements android.os.Parcelable {
     ctor public AppFunctionUriGrant(@NonNull android.net.Uri, int);
     method public int describeContents();
     method public int getModeFlags();
@@ -9386,11 +9393,11 @@ package android.app.appfunctions {
   @FlaggedApi("android.app.appfunctions.flags.enable_app_function_manager") public final class ExecuteAppFunctionResponse implements android.os.Parcelable {
     ctor public ExecuteAppFunctionResponse(@NonNull android.app.appsearch.GenericDocument);
     ctor public ExecuteAppFunctionResponse(@NonNull android.app.appsearch.GenericDocument, @NonNull android.os.Bundle);
-    ctor @FlaggedApi("android.permission.flags.app_function_access_api_enabled") public ExecuteAppFunctionResponse(@NonNull android.app.appsearch.GenericDocument, @NonNull android.os.Bundle, @NonNull java.util.List<android.app.appfunctions.AppFunctionUriGrant>);
+    ctor @FlaggedApi("android.app.appfunctions.flags.enable_app_function_permission_v2") public ExecuteAppFunctionResponse(@NonNull android.app.appsearch.GenericDocument, @NonNull android.os.Bundle, @NonNull java.util.List<android.app.appfunctions.AppFunctionUriGrant>);
     method public int describeContents();
     method @NonNull public android.os.Bundle getExtras();
     method @NonNull public android.app.appsearch.GenericDocument getResultDocument();
-    method @FlaggedApi("android.permission.flags.app_function_access_api_enabled") @NonNull public java.util.List<android.app.appfunctions.AppFunctionUriGrant> getUriGrants();
+    method @FlaggedApi("android.app.appfunctions.flags.enable_app_function_permission_v2") @NonNull public java.util.List<android.app.appfunctions.AppFunctionUriGrant> getUriGrants();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.app.appfunctions.ExecuteAppFunctionResponse> CREATOR;
     field public static final String PROPERTY_RETURN_VALUE = "androidAppfunctionsReturnValue";
@@ -10004,7 +10011,7 @@ package android.app.permissionui {
   }
 
   @FlaggedApi("android.permission.flags.location_button_enabled") public interface LocationButtonProvider {
-    method public void openSession(@NonNull android.os.IBinder, int, @NonNull android.app.permissionui.LocationButtonRequest, @NonNull java.util.concurrent.Executor, @NonNull android.app.permissionui.LocationButtonClient);
+    method public void openSession(@NonNull android.app.Activity, @NonNull android.os.IBinder, int, @NonNull android.app.permissionui.LocationButtonRequest, @NonNull java.util.concurrent.Executor, @NonNull android.app.permissionui.LocationButtonClient);
   }
 
   @FlaggedApi("android.permission.flags.location_button_enabled") public class LocationButtonProviderFactory {
@@ -10376,8 +10383,12 @@ package android.app.usage {
 package android.app.voiceinteraction {
 
   @FlaggedApi("android.permission.flags.assist_settings_privacy_improvements_enabled") public final class VoiceInteractionManager {
-    method @FlaggedApi("android.permission.flags.assist_settings_privacy_improvements_enabled") public boolean canReadAssistStructure();
-    method @FlaggedApi("android.permission.flags.assist_settings_privacy_improvements_enabled") @NonNull public android.content.Intent createRequestAssistStructureIntent();
+    method @FlaggedApi("android.permission.flags.assist_settings_privacy_improvements_enabled") public boolean canReadScreenContext();
+    method @FlaggedApi("android.permission.flags.assist_settings_privacy_improvements_enabled") @NonNull public android.content.Intent createRequestReadScreenContextIntent();
+    method @FlaggedApi("android.permission.flags.assist_settings_privacy_improvements_enabled") @CheckResult public int getReadScreenContextRequestState();
+    field @FlaggedApi("android.permission.flags.assist_settings_privacy_improvements_enabled") public static final int READ_SCREEN_CONTEXT_REQUEST_STATE_GRANTED = 0; // 0x0
+    field @FlaggedApi("android.permission.flags.assist_settings_privacy_improvements_enabled") public static final int READ_SCREEN_CONTEXT_REQUEST_STATE_REQUESTABLE = 1; // 0x1
+    field @FlaggedApi("android.permission.flags.assist_settings_privacy_improvements_enabled") public static final int READ_SCREEN_CONTEXT_REQUEST_STATE_UNREQUESTABLE = 2; // 0x2
   }
 
 }
@@ -10736,7 +10747,7 @@ package android.companion {
     method @NonNull public java.util.List<android.companion.AssociationInfo> getMyAssociations();
     method @Deprecated public boolean hasNotificationAccess(android.content.ComponentName);
     method @FlaggedApi("android.companion.perm_sync_user_consent") public boolean isPermissionTransferUserConsented(int);
-    method @FlaggedApi("android.companion.enable_data_sync") public boolean isSystemDataTransportAttached(int);
+    method @FlaggedApi("android.companion.enable_data_sync") @RequiresPermission(value="android.permission.ACCESS_COMPANION_MESSAGE_PCC", conditional=true) public boolean isSystemDataTransportAttached(int);
     method @FlaggedApi("android.companion.enable_data_sync") public void notifyActionResult(int, @NonNull android.companion.ActionResult);
     method @FlaggedApi("android.companion.unpair_associated_device") @RequiresPermission(android.Manifest.permission.BLUETOOTH_CONNECT) public boolean removeBond(int);
     method public void requestNotificationAccess(android.content.ComponentName);
@@ -22542,6 +22553,8 @@ package android.media {
     method public boolean isSource();
     field public static final int TYPE_AUX_LINE = 19; // 0x13
     field public static final int TYPE_BLE_BROADCAST = 30; // 0x1e
+    field @FlaggedApi("android.media.audio.ble_peripheral_devices") public static final int TYPE_BLE_CENTRAL = 34; // 0x22
+    field @FlaggedApi("android.media.audio.ble_peripheral_devices") public static final int TYPE_BLE_CENTRAL_BROADCAST = 35; // 0x23
     field public static final int TYPE_BLE_HEADSET = 26; // 0x1a
     field @FlaggedApi("android.media.audio.ble_hearing_aid_device") public static final int TYPE_BLE_HEARING_AID = 33; // 0x21
     field public static final int TYPE_BLE_SPEAKER = 27; // 0x1b
@@ -37434,6 +37447,7 @@ package android.print {
     method @NonNull public android.print.PrinterInfo.Builder setIconResourceId(@DrawableRes int);
     method @NonNull public android.print.PrinterInfo.Builder setInfoIntent(@NonNull android.app.PendingIntent);
     method @NonNull public android.print.PrinterInfo.Builder setName(@NonNull String);
+    method @FlaggedApi("android.print.flags.enable_setup_activity") @NonNull public android.print.PrinterInfo.Builder setSetupIntent(@NonNull android.app.PendingIntent);
     method @NonNull public android.print.PrinterInfo.Builder setStatus(int);
   }
 
@@ -53232,6 +53246,7 @@ package android.view {
     field public static final int KEYCODE_8 = 15; // 0xf
     field public static final int KEYCODE_9 = 16; // 0x10
     field public static final int KEYCODE_A = 29; // 0x1d
+    field @FlaggedApi("com.android.hardware.input.enable_new_26q2_keycodes") public static final int KEYCODE_ACCESSIBILITY = 338; // 0x152
     field public static final int KEYCODE_ALL_APPS = 284; // 0x11c
     field public static final int KEYCODE_ALT_LEFT = 57; // 0x39
     field public static final int KEYCODE_ALT_RIGHT = 58; // 0x3a
@@ -62578,6 +62593,7 @@ package android.widget {
     method public void setViewOutlinePreferredRadiusAttr(@IdRes int, @AttrRes int);
     method public void setViewOutlinePreferredRadiusDimen(@IdRes int, @DimenRes int);
     method public void setViewPadding(@IdRes int, @Px int, @Px int, @Px int, @Px int);
+    method @FlaggedApi("android.appwidget.flags.widget_display_changes") public void setViewPadding(@IdRes int, float, float, float, float, int);
     method public void setViewVisibility(@IdRes int, int);
     method @Deprecated public void showNext(@IdRes int);
     method @Deprecated public void showPrevious(@IdRes int);

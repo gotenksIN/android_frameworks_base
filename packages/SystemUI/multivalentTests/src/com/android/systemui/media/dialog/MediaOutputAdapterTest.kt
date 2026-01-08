@@ -40,8 +40,9 @@ import com.android.settingslib.media.MediaDevice.SelectionBehavior.SELECTION_BEH
 import com.android.settingslib.media.MediaDevice.SelectionBehavior.SELECTION_BEHAVIOR_NONE
 import com.android.settingslib.media.MediaDevice.SelectionBehavior.SELECTION_BEHAVIOR_TRANSFER
 import com.android.systemui.SysuiTestCase
-import com.android.systemui.media.dialog.MediaItem.MediaItemType
-import com.android.systemui.media.dialog.MediaItem.createDeviceMediaItem
+import com.android.systemui.media.dialog.MediaItem.DeviceGroupMediaItem
+import com.android.systemui.media.dialog.MediaItem.DeviceMediaItem
+import com.android.systemui.media.dialog.MediaItem.GroupDividerMediaItem
 import com.android.systemui.media.dialog.MediaOutputAdapter.MediaDeviceViewHolder
 import com.android.systemui.media.dialog.MediaOutputAdapter.MediaGroupDividerViewHolder
 import com.android.systemui.res.R
@@ -50,13 +51,10 @@ import com.google.common.truth.Truth.assertThat
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.mockito.ArgumentMatchers
 import org.mockito.kotlin.any
-import org.mockito.kotlin.doNothing
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
-import org.mockito.kotlin.spy
 import org.mockito.kotlin.stub
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
@@ -78,18 +76,22 @@ class MediaOutputAdapterTest : SysuiTestCase() {
         mMediaSwitchingController.stub {
             on { getMediaItemList() } doReturn mMediaItems
             on { hasAdjustVolumeUserRestriction() } doReturn false
-            on { isAnyDeviceTransferring } doReturn false
-            on { currentConnectedMediaDevice } doReturn mMediaDevice1
-            on { connectedSpeakersExpandableGroupDivider }
+            on { isAnyDeviceTransferring() } doReturn false
+            on { getCurrentConnectedMediaDevice() } doReturn mMediaDevice1
+            on { getConnectedSpeakersExpandableGroupDivider() }
                 .doReturn(
-                    MediaItem.createExpandableGroupDividerMediaItem(
-                        mContext.getString(R.string.media_output_group_title_connected_speakers)
+                    GroupDividerMediaItem(
+                        title =
+                            mContext.getString(
+                                R.string.media_output_group_title_connected_speakers
+                            ),
+                        isExpandable = true,
                     )
                 )
-            on { sessionVolumeMax } doReturn TEST_MAX_VOLUME
-            on { sessionVolume } doReturn TEST_CURRENT_VOLUME
-            on { sessionName } doReturn TEST_SESSION_NAME
-            on { colorScheme } doReturn mock<MediaOutputColorScheme>()
+            on { getSessionVolumeMax() } doReturn TEST_MAX_VOLUME
+            on { getSessionVolume() } doReturn TEST_CURRENT_VOLUME
+            on { getSessionName() } doReturn TEST_SESSION_NAME
+            on { getColorScheme() } doReturn mock<MediaOutputColorScheme>()
         }
 
         mIconCompat.stub { on { toIcon(mContext) } doReturn mIcon }
@@ -127,12 +129,12 @@ class MediaOutputAdapterTest : SysuiTestCase() {
         updateAdapterWithDevices(listOf(mMediaDevice1, mMediaDevice2))
 
         assertThat(mMediaOutputAdapter.getItemId(0))
-            .isEqualTo(mMediaItems[0].mediaDevice.get().id.hashCode())
+            .isEqualTo((mMediaItems[0] as DeviceMediaItem).mediaDevice.id.hashCode())
     }
 
     @Test
     fun getItemId_forGroupSeparator_returnsTitleHashCode() {
-        mMediaItems.add(MediaItem.createGroupDividerMediaItem("Suggested Devices"))
+        mMediaItems.add(GroupDividerMediaItem(title = "Suggested Devices"))
         mMediaOutputAdapter.updateItems()
 
         assertThat(mMediaOutputAdapter.getItemId(0)).isEqualTo("Suggested Devices".hashCode())
@@ -143,7 +145,7 @@ class MediaOutputAdapterTest : SysuiTestCase() {
         initializeGroupSessionCollapsed()
 
         assertThat(mMediaOutputAdapter.getItemId(1))
-            .isEqualTo(MediaItemType.TYPE_DEVICE_GROUP.toLong())
+            .isEqualTo(MediaOutputAdapter.TYPE_DEVICE_GROUP.toLong())
     }
 
     @Test
@@ -189,7 +191,7 @@ class MediaOutputAdapterTest : SysuiTestCase() {
             on { isMutingExpectedDevice } doReturn true
             on { state } doReturn STATE_DISCONNECTED
         }
-        mMediaSwitchingController.stub { on { isCurrentConnectedDeviceRemote } doReturn false }
+        mMediaSwitchingController.stub { on { isCurrentConnectedDeviceRemote() } doReturn false }
         updateAdapterWithDevices(listOf(mMediaDevice1))
 
         createAndBindDeviceViewHolder(position = 0).apply {
@@ -209,7 +211,7 @@ class MediaOutputAdapterTest : SysuiTestCase() {
         }
         mMediaSwitchingController.stub {
             on { hasMutingExpectedDevice() } doReturn true
-            on { isCurrentConnectedDeviceRemote } doReturn false
+            on { isCurrentConnectedDeviceRemote() } doReturn false
         }
         updateAdapterWithDevices(listOf(mMediaDevice1))
 
@@ -251,7 +253,7 @@ class MediaOutputAdapterTest : SysuiTestCase() {
         val viewHolder =
             mMediaOutputAdapter.onCreateViewHolder(
                 LinearLayout(mContext),
-                MediaItemType.TYPE_DEVICE,
+                MediaOutputAdapter.TYPE_DEVICE,
             ) as MediaDeviceViewHolder
 
         var sliderChangeListener: Slider.OnChangeListener? = null
@@ -274,13 +276,13 @@ class MediaOutputAdapterTest : SysuiTestCase() {
                 on { maxVolume } doReturn TEST_MAX_VOLUME
                 on { currentVolume } doReturn TEST_CURRENT_VOLUME
             }
-            .also { mMediaItems.add(createDeviceMediaItem(it)) }
+            .also { mMediaItems.add(DeviceMediaItem(mediaDevice = it)) }
         updateAdapterWithDevices(listOf(mMediaDevice1))
 
         val viewHolder =
             mMediaOutputAdapter.onCreateViewHolder(
                 LinearLayout(mContext),
-                MediaItemType.TYPE_DEVICE,
+                MediaOutputAdapter.TYPE_DEVICE,
             ) as MediaDeviceViewHolder
 
         var sliderTouchListener: Slider.OnSliderTouchListener? = null
@@ -323,8 +325,8 @@ class MediaOutputAdapterTest : SysuiTestCase() {
     @Test
     fun onBindViewHolder_inputDeviceWithOtherGroupDevices_hasNoGroupCheckbox() {
         mMediaSwitchingController.stub {
-            on { isGroupListCollapsed } doReturn false
-            on { isVolumeControlEnabledForSession } doReturn true
+            on { isGroupListCollapsed() } doReturn false
+            on { isVolumeControlEnabledForSession() } doReturn true
             on { hasGroupPlayback() } doReturn true
         }
         mMediaDevice1.stub {
@@ -363,8 +365,8 @@ class MediaOutputAdapterTest : SysuiTestCase() {
     @Test
     fun onBindViewHolder_bindDeselectableDevice_verifyView() {
         mMediaSwitchingController.stub {
-            on { isGroupListCollapsed } doReturn false
-            on { isVolumeControlEnabledForSession } doReturn true
+            on { isGroupListCollapsed() } doReturn false
+            on { isVolumeControlEnabledForSession() } doReturn true
             on { hasGroupPlayback() } doReturn true
         }
         mMediaDevice1.stub {
@@ -606,7 +608,7 @@ class MediaOutputAdapterTest : SysuiTestCase() {
             on { isDeselectable() } doReturn true
         }
         mMediaDevice2.stub { on { isSelectable() } doReturn true }
-        mMediaSwitchingController.stub { on { isCurrentConnectedDeviceRemote } doReturn true }
+        mMediaSwitchingController.stub { on { isCurrentConnectedDeviceRemote() } doReturn true }
         updateAdapterWithDevices(listOf(mMediaDevice1, mMediaDevice2))
 
         createAndBindDeviceViewHolder(position = 0).apply { mGroupButton.performClick() }
@@ -616,7 +618,7 @@ class MediaOutputAdapterTest : SysuiTestCase() {
     @Test
     fun onBindViewHolder_hasVolumeAdjustmentRestriction_verifySeekbarDisabled() {
         mMediaSwitchingController.stub {
-            on { isCurrentConnectedDeviceRemote } doReturn true
+            on { isCurrentConnectedDeviceRemote() } doReturn true
             on { hasAdjustVolumeUserRestriction() } doReturn true
         }
         mMediaDevice1.stub { on { state } doReturn STATE_CONNECTED }
@@ -657,7 +659,7 @@ class MediaOutputAdapterTest : SysuiTestCase() {
     fun updateItems_controllerItemsUpdated_notUpdatesInAdapterUntilUpdateItems() {
         mMediaOutputAdapter.updateItems()
         val updatedList: MutableList<MediaItem> = ArrayList()
-        updatedList.add(MediaItem.createDeviceGroupMediaItem())
+        updatedList.add(DeviceGroupMediaItem)
         whenever(mMediaSwitchingController.getMediaItemList()).doReturn(updatedList)
         assertThat(mMediaOutputAdapter.itemCount).isEqualTo(mMediaItems.size)
 
@@ -668,27 +670,27 @@ class MediaOutputAdapterTest : SysuiTestCase() {
     @Test
     fun multipleSelectedDevices_listCollapsed_verifyItemTypes() {
         mMediaSwitchingController.stub {
-            on { isGroupListCollapsed } doReturn true
-            on { isVolumeControlEnabledForSession } doReturn true
+            on { isGroupListCollapsed() } doReturn true
+            on { isVolumeControlEnabledForSession() } doReturn true
         }
 
-        mMediaItems.add(MediaItem.createGroupDividerMediaItem("Connected Speakers"))
-        mMediaItems.add(MediaItem.createDeviceGroupMediaItem())
+        mMediaItems.add(GroupDividerMediaItem(title = "Connected Speakers"))
+        mMediaItems.add(DeviceGroupMediaItem)
 
         mMediaOutputAdapter = MediaOutputAdapter(mMediaSwitchingController)
         mMediaOutputAdapter.updateItems()
 
         with(mMediaOutputAdapter) {
             assertThat(itemCount).isEqualTo(2)
-            assertThat(getItemViewType(0)).isEqualTo(MediaItemType.TYPE_GROUP_DIVIDER)
-            assertThat(getItemViewType(1)).isEqualTo(MediaItemType.TYPE_DEVICE_GROUP)
+            assertThat(getItemViewType(0)).isEqualTo(MediaOutputAdapter.TYPE_GROUP_DIVIDER)
+            assertThat(getItemViewType(1)).isEqualTo(MediaOutputAdapter.TYPE_DEVICE_GROUP)
         }
     }
 
     @Test
     @EnableFlags(Flags.FLAG_ENABLE_OUTPUT_SWITCHER_PERSONAL_AUDIO_SHARING)
     fun multipleSelectedDevices_listCollapsed_verifySessionControl() {
-        mMediaSwitchingController.stub { on { isVolumeControlEnabledForSession } doReturn true }
+        mMediaSwitchingController.stub { on { isVolumeControlEnabledForSession() } doReturn true }
         initializeGroupSessionCollapsed()
 
         createAndBindDeviceViewHolder(position = 1).apply {
@@ -702,7 +704,7 @@ class MediaOutputAdapterTest : SysuiTestCase() {
         val viewHolder =
             mMediaOutputAdapter.onCreateViewHolder(
                 LinearLayout(mContext),
-                MediaItemType.TYPE_DEVICE_GROUP,
+                MediaOutputAdapter.TYPE_DEVICE_GROUP,
             ) as MediaDeviceViewHolder
 
         var sliderChangeListener: Slider.OnChangeListener? = null
@@ -720,7 +722,7 @@ class MediaOutputAdapterTest : SysuiTestCase() {
 
     @Test
     fun multipleSelectedDevices_listExpanded_verifyIndividualDevices() {
-        mMediaSwitchingController.stub { on { isVolumeControlEnabledForSession } doReturn true }
+        mMediaSwitchingController.stub { on { isVolumeControlEnabledForSession() } doReturn true }
         initializeGroupSessionExpanded()
 
         createAndBindDeviceViewHolder(position = 1).apply {
@@ -741,15 +743,15 @@ class MediaOutputAdapterTest : SysuiTestCase() {
     @Test
     fun multipleSelectedDevices_expandIconClicked_setGroupListCollapsed() {
         mMediaSwitchingController.stub {
-            on { isGroupListCollapsed } doReturn true
-            on { isVolumeControlEnabledForSession } doReturn true
+            on { isGroupListCollapsed() } doReturn true
+            on { isVolumeControlEnabledForSession() } doReturn true
         }
         initializeGroupSessionCollapsed()
 
         val groupDividerViewHolder =
             mMediaOutputAdapter.onCreateViewHolder(
                 LinearLayout(mContext),
-                MediaItemType.TYPE_GROUP_DIVIDER,
+                MediaOutputAdapter.TYPE_GROUP_DIVIDER,
             ) as MediaGroupDividerViewHolder
         mMediaOutputAdapter.onBindViewHolder(groupDividerViewHolder, 0)
 
@@ -766,7 +768,7 @@ class MediaOutputAdapterTest : SysuiTestCase() {
 
     private fun updateAdapterWithDevices(deviceList: List<MediaDevice>) {
         for (device in deviceList) {
-            mMediaItems.add(createDeviceMediaItem(device))
+            mMediaItems.add(DeviceMediaItem(mediaDevice = device))
         }
         mMediaOutputAdapter.updateItems()
     }
@@ -787,16 +789,17 @@ class MediaOutputAdapterTest : SysuiTestCase() {
 
     private fun initializeGroupSessionCollapsed() {
         mMediaSwitchingController.stub {
-            on { isGroupListCollapsed } doReturn true
+            on { isGroupListCollapsed() } doReturn true
             on { hasGroupPlayback() } doReturn true
         }
 
         mMediaItems.add(
-            MediaItem.createExpandableGroupDividerMediaItem(
-                mContext.getString(R.string.media_output_group_title_connected_speakers)
+            GroupDividerMediaItem(
+                title = mContext.getString(R.string.media_output_group_title_connected_speakers),
+                isExpandable = true,
             )
         )
-        mMediaItems.add(MediaItem.createDeviceGroupMediaItem())
+        mMediaItems.add(DeviceGroupMediaItem)
 
         mMediaOutputAdapter = MediaOutputAdapter(mMediaSwitchingController)
         mMediaOutputAdapter.updateItems()
@@ -804,13 +807,14 @@ class MediaOutputAdapterTest : SysuiTestCase() {
 
     private fun initializeGroupSessionExpanded() {
         mMediaSwitchingController.stub {
-            on { isGroupListCollapsed } doReturn false
+            on { isGroupListCollapsed() } doReturn false
             on { hasGroupPlayback() } doReturn true
         }
 
         mMediaItems.add(
-            MediaItem.createExpandableGroupDividerMediaItem(
-                mContext.getString(R.string.media_output_group_title_connected_speakers)
+            GroupDividerMediaItem(
+                title = mContext.getString(R.string.media_output_group_title_connected_speakers),
+                isExpandable = true,
             )
         )
         mMediaDevice1.stub {

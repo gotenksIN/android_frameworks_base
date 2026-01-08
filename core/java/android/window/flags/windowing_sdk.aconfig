@@ -41,17 +41,6 @@ flag {
 
 flag {
     namespace: "windowing_sdk"
-    name: "rear_display_disable_force_desktop_system_decorations"
-    description: "Block system decorations from being added to a rear display when desktop mode is forced"
-    bug: "346103150"
-    is_fixed_read_only: true
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    namespace: "windowing_sdk"
     name: "touch_pass_through_opt_in"
     description: "Requires apps to opt-in to overlay pass through touches and provide APIs to opt-in"
     bug: "358129114"
@@ -88,9 +77,9 @@ flag {
 
 flag {
     namespace: "windowing_sdk"
-    name: "fix_bubble_back_gesture"
-    description: "Fix no responsive back gesture on some Bubbled apps"
-    bug: "416330151"
+    name: "visibility_management_in_bubble_root"
+    description: "Visibility management improvement within Bubble root Task"
+    bug: "456051408"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -151,16 +140,6 @@ flag {
 }
 
 flag {
-    name: "move_user_display_settings_to_de_storage"
-    namespace: "windowing_sdk"
-    description: "Moves non-system user display settings from CE to DE storage to resolve early user setup access issues."
-    bug: "442757820"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "pause_invisible_activity"
     namespace: "windowing_sdk"
     description: "Pause the invisible activity vs. stopping it after idle."
@@ -217,6 +196,16 @@ flag {
     name: "use_caller_token_in_launcher_apps"
     description: "Pass caller's activity token in LauncherApps to fix task property inheritance (e.g. launcher shortcut move bubbled task to fullscreen)"
     bug: "389810202"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    namespace: "windowing_sdk"
+    name: "enable_preserve_leaf_task_if_relaunch"
+    description: "Enable preserving the leaf task in the current root task if the relaunch originates from other source task"
+    bug: "432604687"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

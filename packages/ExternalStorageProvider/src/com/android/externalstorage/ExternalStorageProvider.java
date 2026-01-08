@@ -44,6 +44,7 @@ import android.provider.DocumentsContract;
 import android.provider.DocumentsContract.Document;
 import android.provider.DocumentsContract.Path;
 import android.provider.DocumentsContract.Root;
+import android.provider.MediaStore;
 import android.provider.Settings;
 import android.system.ErrnoException;
 import android.system.Os;
@@ -109,6 +110,24 @@ public class ExternalStorageProvider extends FileSystemProvider {
             Document.COLUMN_LAST_MODIFIED, Document.COLUMN_FLAGS, Document.COLUMN_SIZE,
     };
 
+    // Note: If you change this list, you may also need to change
+    // packages/providers/MediaProvider/src/com/android/providers/media/util/FileUtils.java
+    private static final List<String> DEFAULT_TOP_LEVEL_DIRECTORIES = Arrays.asList(
+            Environment.DIRECTORY_MUSIC,
+            Environment.DIRECTORY_PODCASTS,
+            Environment.DIRECTORY_RINGTONES,
+            Environment.DIRECTORY_ALARMS,
+            Environment.DIRECTORY_NOTIFICATIONS,
+            Environment.DIRECTORY_PICTURES,
+            Environment.DIRECTORY_MOVIES,
+            Environment.DIRECTORY_DOWNLOADS,
+            Environment.DIRECTORY_DCIM,
+            Environment.DIRECTORY_DOCUMENTS,
+            Environment.DIRECTORY_AUDIOBOOKS,
+            Environment.DIRECTORY_RECORDINGS,
+            Environment.DIR_ANDROID,
+            DIRECTORY_TRASH_STORAGE);
+
     private static class RootInfo {
         public String rootId;
         public String volumeId;
@@ -120,6 +139,7 @@ public class ExternalStorageProvider extends FileSystemProvider {
         public File path;
         // TODO (b/157033915): Make getFreeBytes() faster
         public boolean reportAvailableBytes = false;
+        public String volumeName;
     }
 
     private static final String ROOT_ID_PRIMARY_EMULATED =
@@ -195,11 +215,13 @@ public class ExternalStorageProvider extends FileSystemProvider {
             final String rootId;
             final String title;
             final UUID storageUuid;
+            final String volumeName;
             if (volume.getType() == VolumeInfo.TYPE_EMULATED) {
                 // We currently only support a single emulated volume per user mounted at
                 // a time, and it's always considered the primary
                 if (DEBUG) Log.d(TAG, "Found primary volume: " + volume);
                 rootId = ROOT_ID_PRIMARY_EMULATED;
+                volumeName = MediaStore.VOLUME_EXTERNAL_PRIMARY;
 
                 if (volume.isPrimaryEmulatedForUser(userId)) {
                     // This is basically the user's primary device storage.
@@ -225,6 +247,7 @@ public class ExternalStorageProvider extends FileSystemProvider {
             } else if (volume.getType() == VolumeInfo.TYPE_PUBLIC
                     || volume.getType() == VolumeInfo.TYPE_STUB) {
                 rootId = volume.getFsUuid();
+                volumeName = volume.getFsUuid();
                 title = mStorageManager.getBestVolumeDescription(volume);
                 storageUuid = null;
             } else {
@@ -246,6 +269,7 @@ public class ExternalStorageProvider extends FileSystemProvider {
 
             root.rootId = rootId;
             root.volumeId = volume.id;
+            root.volumeName = volumeName;
             root.storageUuid = storageUuid;
             root.flags = Root.FLAG_LOCAL_ONLY
                     | Root.FLAG_SUPPORTS_SEARCH
@@ -604,6 +628,21 @@ public class ExternalStorageProvider extends FileSystemProvider {
         return DocumentsContract.buildChildDocumentsUri(AUTHORITY, docId);
     }
 
+    @Nullable
+    @Override
+    protected Uri buildTrashNotificationUri(@NonNull String docId) {
+        if (!enableDocumentsTrashApi()) {
+            return null;
+        }
+
+        try {
+            RootInfo root = getRootFromDocId(docId);
+            return DocumentsContract.buildTrashDocumentsUri(AUTHORITY, root.rootId);
+        } catch (FileNotFoundException e) {
+            return null;
+        }
+    }
+
     @Override
     protected void onDocIdChanged(String docId) {
         try {
@@ -660,15 +699,25 @@ public class ExternalStorageProvider extends FileSystemProvider {
     }
 
     @Override
-    protected boolean isTrashSupported(File file) {
+    protected boolean isTrashSupported(@NonNull File file) {
         try {
             String documentId = getDocIdForFile(file);
-            // Trash not supported on USB devices
+            // Trash not supported on USB devices.
             if (isOnRemovableUsbStorage(documentId)) {
                 return false;
             }
 
+            // Top level default directories cannot be trashed.
+            if (isTopLevelDefaultDir(file)) {
+                return false;
+            }
+
             final RootInfo root = getRootFromDocId(documentId);
+            // Trash operation not supported for the files present in trash location.
+            if (isFileExistInTrashLocation(root, file)) {
+                return false;
+            }
+
             final String canonicalPath = getPathFromDocId(documentId);
             return !isRestrictedPath(root.rootId, canonicalPath);
         } catch (Exception e) {
@@ -693,12 +742,12 @@ public class ExternalStorageProvider extends FileSystemProvider {
         }
 
         RootInfo rootInfo = mRoots.get(rootId);
-        if (rootInfo == null || rootInfo.visiblePath == null) {
+        if (rootInfo == null || rootInfo.visiblePath == null || rootInfo.volumeName == null) {
             return null;
         }
 
         File trashDir = new File(rootInfo.visiblePath, DIRECTORY_TRASH_STORAGE);
-        return queryTrashDocuments(trashDir, projection);
+        return queryTrashDocuments(trashDir, rootInfo.volumeName, projection);
     }
 
     @Override
@@ -901,5 +950,34 @@ public class ExternalStorageProvider extends FileSystemProvider {
 
     private static boolean equalIgnoringCase(@NonNull String a, @NonNull String b) {
         return TextUtils.equals(a.toLowerCase(Locale.ROOT), b.toLowerCase(Locale.ROOT));
+    }
+
+    private boolean isTopLevelDefaultDir(File file) {
+        if (!file.isDirectory()) {
+            return false;
+        }
+
+        try {
+            final String relativePath = getRelativePathFromRoot(file.getAbsolutePath());
+            final String[] relativePathSegments = relativePath.split("/");
+            if (relativePathSegments.length == 1) {
+                final String dirName = file.getName();
+                for (String defaultDir : DEFAULT_TOP_LEVEL_DIRECTORIES) {
+                    if (dirName.equalsIgnoreCase(defaultDir)) {
+                        return true;
+                    }
+                }
+            }
+        } catch (IOException e) {
+            // If we can't get the relative path, we can't determine if it is a top-level
+            // directory.
+            return false;
+        }
+        return false;
+    }
+
+    private boolean isFileExistInTrashLocation(@NonNull RootInfo rootInfo, @NonNull File file) {
+        File trashDir = new File(rootInfo.visiblePath, DIRECTORY_TRASH_STORAGE);
+        return file.getAbsolutePath().startsWith(trashDir.getAbsolutePath());
     }
 }

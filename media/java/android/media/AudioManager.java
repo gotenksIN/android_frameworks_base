@@ -6577,6 +6577,13 @@ public class AudioManager {
     public static final int DEVICE_OUT_MULTICHANNEL_GROUP =
             AudioSystem.DEVICE_OUT_MULTICHANNEL_GROUP;
     /** @hide
+     * A device corresponding to the transmit path in an android implementation
+     * operating in a Bluetooth audio peripheral mode (LE Audio, A2DP or HFP profiles).
+     */
+    public static final int DEVICE_OUT_BLE_CENTRAL =
+            AudioSystem.DEVICE_OUT_BLE_CENTRAL;
+
+    /** @hide
      * This is not used as a returned value from {@link #getDevicesForStream}, but could be
      *  used in the future in a set method to select whatever default device is chosen by the
      *  platform-specific implementation.
@@ -6679,6 +6686,20 @@ public class AudioManager {
      * The audio input device code for a BLE audio hearing aid.
      */
     public static final int DEVICE_IN_BLE_HEARING_AID = AudioSystem.DEVICE_IN_BLE_HEARING_AID;
+
+    /** @hide
+     * A device corresponding to the receive path in an android implementation
+     * operating in a Bluetooth audio peripheral mode (LE Audio, A2DP or HFP profiles).
+     */
+    public static final int DEVICE_IN_BLE_CENTRAL =
+            AudioSystem.DEVICE_IN_BLE_CENTRAL;
+
+    /** @hide
+     * A device corresponding to the receive path in an android implementation
+     * operating in a Bluetooth LE audio peripheral mode in a broadcast group.
+     */
+    public static final int DEVICE_IN_BLE_CENTRAL_BROADCAST =
+            AudioSystem.DEVICE_IN_BLE_CENTRAL_BROADCAST;
 
     /**
      * Return true if the device code corresponds to an output device.
@@ -9125,7 +9146,7 @@ public class AudioManager {
      * @hide
      * Indicates whether the platform supports capturing content from the hotword recognition
      * pipeline. To capture content of this type, create an AudioRecord with
-     * {@link AudioRecord.Builder.setRequestHotwordStream(boolean, boolean)}.
+     * {@link AudioRecord.Builder#setRequestHotwordStream(boolean, boolean)}.
      * @param lookbackAudio Query if the hotword stream additionally supports providing buffered
      * audio prior to stream open.
      * @return True if the platform supports capturing hotword content, and if lookbackAudio
@@ -9153,7 +9174,7 @@ public class AudioManager {
      * application to start streaming data using these {@link AudioAttributes} on the selected
      * device by Audio Policy Engine.
      * @return a (possibly zero-length) array of
-     *         {@see android.media.audiopolicy.AudioProductStrategy} objects.
+     *         {@link android.media.audiopolicy.AudioProductStrategy} objects.
      */
     @SystemApi
     @NonNull
@@ -9177,7 +9198,7 @@ public class AudioManager {
      * When implementing {Car|Oem}AudioManager, use this method  to retrieve the collection of
      * audio volume groups.
      * @return a (possibly zero-length) List of
-     *         {@see android.media.audiopolicy.AudioVolumeGroup} objects.
+     *         {@link android.media.audiopolicy.AudioVolumeGroup} objects.
      */
     @SystemApi
     @NonNull

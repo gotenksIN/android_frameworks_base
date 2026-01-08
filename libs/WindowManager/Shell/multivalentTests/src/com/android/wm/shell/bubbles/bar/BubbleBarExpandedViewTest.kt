@@ -34,9 +34,9 @@ import com.android.internal.protolog.ProtoLog
 import com.android.wm.shell.R
 import com.android.wm.shell.bubbles.Bubble
 import com.android.wm.shell.bubbles.BubbleExpandedViewManager
+import com.android.wm.shell.bubbles.BubbleHelper
 import com.android.wm.shell.bubbles.BubblePositioner
 import com.android.wm.shell.bubbles.BubbleTaskView
-import com.android.wm.shell.bubbles.FakeBubbleExpandedViewManager
 import com.android.wm.shell.bubbles.FakeBubbleFactory
 import com.android.wm.shell.bubbles.FakeBubbleTaskViewFactory
 import com.android.wm.shell.bubbles.UiEventSubject.Companion.assertThat
@@ -67,18 +67,24 @@ class BubbleBarExpandedViewTest {
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val windowManager = context.getSystemService(WindowManager::class.java)
+    private val bubbleHelper = mock<BubbleHelper>()
+    private val bubblePolicyHelper = mock<BubblePolicyHelper>()
+    private val expandedViewManager =
+        mock<BubbleExpandedViewManager> {
+            on { isShowingAsBubbleBar() } doReturn true
+            on { isStackExpanded() } doReturn true
+            on { getBubbleHelper() } doReturn bubbleHelper
+        }
 
     private lateinit var mainExecutor: TestShellExecutor
     private lateinit var bgExecutor: TestShellExecutor
 
-    private lateinit var expandedViewManager: BubbleExpandedViewManager
     private lateinit var positioner: BubblePositioner
     private lateinit var bubbleTaskView: BubbleTaskView
     private lateinit var bubble: Bubble
     private lateinit var bubbleTaskViewFactory: FakeBubbleTaskViewFactory
 
     private lateinit var bubbleExpandedView: BubbleBarExpandedView
-    private lateinit var bubblePolicyHelper: BubblePolicyHelper
 
     private val uiEventLoggerFake = UiEventLoggerFake()
 
@@ -101,12 +107,10 @@ class BubbleBarExpandedViewTest {
             )
         positioner.update(deviceConfig)
 
-        expandedViewManager = FakeBubbleExpandedViewManager(bubbleBar = true, expanded = true)
         bubbleTaskViewFactory = FakeBubbleTaskViewFactory(context, mainExecutor)
 
         bubble = FakeBubbleFactory.createChatBubble(context)
         bubbleTaskView = bubbleTaskViewFactory.create()
-        bubblePolicyHelper = mock<BubblePolicyHelper>()
 
         bubbleExpandedView =
             LayoutInflater.from(context)
@@ -331,27 +335,25 @@ class BubbleBarExpandedViewTest {
     }
 
     @Test
-    fun onTaskInfoChanged_invalidTask_showsToastAndMovesOutOfBubble() {
+    fun onTaskInfoChanged_invalidTask_collapseStack() {
         val taskInfo = RunningTaskInfo()
         taskInfo.supportsMultiWindow = false
         bubblePolicyHelper.stub { on { isValidToBubble(taskInfo) } doReturn false }
 
         bubbleExpandedView.onTaskInfoChanged(taskInfo)
 
-        verify(bubblePolicyHelper).showBubbleNotSupportedErrorToast(context)
-        verify(bubblePolicyHelper).moveExistingTaskOutOfBubble(bubble, taskInfo)
+        verify(expandedViewManager).collapseStack()
     }
 
     @Test
-    fun onTaskInfoChanged_validTask_doesNotShowToastOrMovesOutOfBubble() {
+    fun onTaskInfoChanged_validTask_doesNotCollapseStack() {
         val taskInfo = RunningTaskInfo()
         taskInfo.supportsMultiWindow = true
         bubblePolicyHelper.stub { on { isValidToBubble(taskInfo) } doReturn true }
 
         bubbleExpandedView.onTaskInfoChanged(taskInfo)
 
-        verify(bubblePolicyHelper, never()).showBubbleNotSupportedErrorToast(context)
-        verify(bubblePolicyHelper, never()).moveExistingTaskOutOfBubble(bubble, taskInfo)
+        verify(expandedViewManager, never()).collapseStack()
     }
 
     private fun BubbleBarExpandedView.menuView(): BubbleBarMenuView {

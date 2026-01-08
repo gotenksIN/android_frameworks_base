@@ -268,7 +268,7 @@ public class BubbleStackView extends FrameLayout
     private FrameLayout mAnimatingOutSurfaceContainer;
 
     /** Animator for animating the alpha value of the animating out SurfaceView. */
-    private final ValueAnimator mAnimatingOutSurfaceAlphaAnimator = ValueAnimator.ofFloat(0f, 1f);
+    private final ValueAnimator mAnimatingOutSurfaceAlphaAnimator = ValueAnimator.ofFloat(1f, 0f);
 
     /**
      * Buffer containing a screenshot of the animating-out bubble. This is drawn into the
@@ -1984,6 +1984,15 @@ public class BubbleStackView extends FrameLayout
                             mPositioner.getAllowableStackPositionRegion(getBubbleCount())));
         }
         if (mIsExpanded) {
+            // when rotating the device with the IME open, TaskViewTransitions may calculate
+            // incorrect bounds, so pass the right bounds here so that WM state is correct.
+            // TODO: b/470369406 - we should be able to clean this up once Bubbles always passes the
+            // bounds on the transition request.
+            if (mExpandedBubble instanceof Bubble b && b.getTaskView() != null) {
+                Rect bounds = new Rect();
+                mPositioner.getTaskViewRestBounds(bounds);
+                b.getTaskView().onLocationChanged(bounds);
+            }
             updateExpandedView();
         }
         setUpManageMenu();
@@ -2575,7 +2584,7 @@ public class BubbleStackView extends FrameLayout
                 });
             } catch (Exception e) {
                 showNewlySelectedBubble(bubbleToSelect);
-                e.printStackTrace();
+                Log.e(TAG, "setSelectedBubble screenshot failed", e);
             }
         } else {
             showNewlySelectedBubble(bubbleToSelect);
@@ -3263,7 +3272,7 @@ public class BubbleStackView extends FrameLayout
         // it out (and then release the GraphicBuffer).
         PhysicsAnimator.getInstance(mAnimatingOutSurfaceContainer).cancel();
 
-        mAnimatingOutSurfaceAlphaAnimator.reverse();
+        mAnimatingOutSurfaceAlphaAnimator.start();
         mExpandedViewAlphaAnimator.start();
 
         if (mExpandedBubble != null) {

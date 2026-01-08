@@ -2699,8 +2699,8 @@ public final class Settings {
      * <p>
      * Type: Integer with a value from the one of the SUPERVISOR_VERIFICATION_* constants below.
      * <ul>
-     * <li>{@see #SUPERVISOR_VERIFICATION_SETTING_UNKNOWN}
-     * <li>{@see #SUPERVISOR_VERIFICATION_SETTING_BIOMETRICS}
+     * <li>{@link #SUPERVISOR_VERIFICATION_SETTING_UNKNOWN}
+     * <li>{@link #SUPERVISOR_VERIFICATION_SETTING_BIOMETRICS}
      * </ul>
      * </p>
      */
@@ -8318,6 +8318,13 @@ public final class Settings {
         @Readable
         public static final String VOICE_INTERACTION_SERVICE = "voice_interaction_service";
 
+        /**
+         * The count of denied read screen context requests by the current assistant.
+         * @hide
+         */
+        public static final String READ_SCREEN_CONTEXT_REQUEST_DENIED_COUNT =
+                "read_screen_context_request_denied_count";
+
 
         /**
          * The currently selected credential service(s) flattened ComponentName.
@@ -12092,6 +12099,12 @@ public final class Settings {
                 "mandatory_biometrics_requirements_satisfied";
 
         /**
+         * Number of trusted locations added by the user.
+         * @hide
+         */
+        public static final String TRUSTED_LOCATIONS_COUNT = "trusted_locations_count";
+
+        /**
          * Whether or not active unlock triggers on wake.
          * @hide
          */
@@ -13254,15 +13267,6 @@ public final class Settings {
                 "accessibility_magnification_joystick_enabled";
 
         /**
-         * Setting that specifies whether the display magnification is enabled via a system-wide
-         * two fingers triple tap gesture.
-         *
-         * @hide
-         */
-        public static final String ACCESSIBILITY_MAGNIFICATION_TWO_FINGER_TRIPLE_TAP_ENABLED =
-                "accessibility_magnification_two_finger_triple_tap_enabled";
-
-        /**
          * Whether to always expand notification bundles in the notification shade.
          * 1 = always expand, 0 = auto, -1 always collapse.
          * @hide
@@ -14078,7 +14082,7 @@ public final class Settings {
          * 1 = On, 0 = Off
          * @hide
          */
-        @FlaggedApi("com.android.systemui.split_show_passwords_to_touch_and_physical")
+        @FlaggedApi(com.android.text.flags.Flags.FLAG_SPLIT_SHOW_PASSWORDS_TO_TOUCH_AND_PHYSICAL)
         public static final String TEXT_SHOW_PASSWORD_TOUCH = "show_passwords_touch";
 
         /**
@@ -14086,7 +14090,7 @@ public final class Settings {
          * 1 = On, 0 = Off
          * @hide
          */
-        @FlaggedApi("com.android.systemui.split_show_passwords_to_touch_and_physical")
+        @FlaggedApi(com.android.text.flags.Flags.FLAG_SPLIT_SHOW_PASSWORDS_TO_TOUCH_AND_PHYSICAL)
         public static final String TEXT_SHOW_PASSWORD_PHYSICAL = "show_passwords_physical";
     }
 
@@ -20929,6 +20933,14 @@ public final class Settings {
             public static final String BEDTIME_HARD_MODE = "bedtime_hard_mode";
 
             /**
+             * Whether the Wear-specific charging experience is enabled, which applies a
+             * dedicated brightness curve and timeout.
+             * @hide
+             */
+            public static final String WEAR_CHARGING_EXPERIENCE_ENABLED =
+                    "wear_charging_experience_enabled";
+
+            /**
              * Whether the current watchface is decomposable.
              * @hide
              */
@@ -21663,6 +21675,13 @@ public final class Settings {
              * @hide
              */
             public static final String AUTO_BEDTIME_MODE = "auto_bedtime_mode";
+
+            /**
+             * Whether the Bedtime Mode watchface should be shown when Bedtime Mode is activated.
+             *
+             * @hide
+             */
+            public static final String BEDTIME_MODE_WATCHFACE = "bedtime_mode_watchface";
 
             /**
              * Indicates that all elements of the system status tray on wear should be rendered

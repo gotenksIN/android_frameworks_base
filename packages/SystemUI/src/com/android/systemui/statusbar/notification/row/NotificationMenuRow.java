@@ -16,8 +16,6 @@
 
 package com.android.systemui.statusbar.notification.row;
 
-import static android.app.Flags.notificationsRedesignTemplates;
-
 import static com.android.systemui.SwipeHelper.SWIPED_FAR_ENOUGH_SIZE_FRACTION;
 
 import android.animation.Animator;
@@ -51,7 +49,6 @@ import com.android.systemui.plugins.statusbar.NotificationMenuRowPlugin;
 import com.android.systemui.res.R;
 import com.android.systemui.statusbar.AlphaOptimizedImageView;
 import com.android.systemui.statusbar.notification.NotificationActivityStarter;
-import com.android.systemui.statusbar.notification.collection.NotificationClassificationUiFlag;
 import com.android.systemui.statusbar.notification.people.PeopleNotificationIdentifier;
 import com.android.systemui.statusbar.notification.row.NotificationGuts.GutsContent;
 import com.android.systemui.statusbar.notification.shared.NotificationBundleUi;
@@ -291,8 +288,7 @@ public class NotificationMenuRow implements NotificationMenuRowPlugin, View.OnCl
             mInfoItem = createConversationItem(mContext);
         } else if (sbn != null && sbn.getNotification().isPromotedOngoing()) {
             mInfoItem = createPromotedItem(mContext);
-        } else if ((NotificationClassificationUiFlag.isEnabled()
-                || NotificationBundleUi.isEnabled()) && isBundled) {
+        } else if (NotificationBundleUi.isEnabled() && isBundled) {
             mInfoItem = createBundledInfoItem(mContext);
         } else if (mParent.isBundle()) {
             mInfoItem = createBundleHeaderInfoItem();
@@ -724,9 +720,7 @@ public class NotificationMenuRow implements NotificationMenuRowPlugin, View.OnCl
     static NotificationMenuItem createConversationItem(Context context) {
         Resources res = context.getResources();
         String infoDescription = res.getString(R.string.notification_menu_gear_description);
-        int layoutId = notificationsRedesignTemplates()
-                ? R.layout.notification_2025_conversation_info
-                : R.layout.notification_conversation_info;
+        int layoutId = R.layout.notification_2025_conversation_info;
         NotificationConversationInfo infoContent =
                 (NotificationConversationInfo) LayoutInflater.from(context).inflate(
                         layoutId, null, false);
@@ -747,9 +741,7 @@ public class NotificationMenuRow implements NotificationMenuRowPlugin, View.OnCl
     static NotificationMenuItem createPartialConversationItem(Context context) {
         Resources res = context.getResources();
         String infoDescription = res.getString(R.string.notification_menu_gear_description);
-        int layoutId = notificationsRedesignTemplates()
-                ? R.layout.notification_2025_partial_conversation_info
-                : R.layout.partial_conversation_info;
+        int layoutId = R.layout.notification_2025_partial_conversation_info;
         PartialConversationInfo infoContent =
                 (PartialConversationInfo) LayoutInflater.from(context).inflate(
                         layoutId, null, false);
@@ -838,9 +830,7 @@ public class NotificationMenuRow implements NotificationMenuRowPlugin, View.OnCl
     static NotificationMenuItem createInfoItem(Context context) {
         Resources res = context.getResources();
         String infoDescription = res.getString(R.string.notification_menu_gear_description);
-        int layoutId = notificationsRedesignTemplates()
-                ? R.layout.notification_2025_info
-                : R.layout.notification_info;
+        int layoutId = R.layout.notification_2025_info;
         NotificationInfo infoContent = (NotificationInfo) LayoutInflater.from(context).inflate(
                 layoutId, null, false);
         return new NotificationMenuItem(context, infoDescription, infoContent,

@@ -158,6 +158,14 @@
     <string name="wfc_mode_wifi_preferred_summary" msgid="1035175836270943089">"Wi-Fi аркылуу чалуу"</string>
     <string name="wfc_mode_cellular_preferred_summary" msgid="4958965609212575619">"Мобилдик тармак аркылуу чалуу"</string>
     <string name="wfc_mode_wifi_only_summary" msgid="104951993894678665">"Wi-Fi гана"</string>
+    <!-- String.format failed for translation -->
+    <!-- no translation found for adaptive_low_frequency_less_than_one_minute (8869498183646028708) -->
+    <skip />
+    <!-- String.format failed for translation -->
+    <!-- no translation found for adaptive_low_frequency_neg_less_than_one_minute (2590062535985417056) -->
+    <skip />
+    <string name="elapsed_time_low_frequency_short_format_h_mm" msgid="6728141238066668781">"%1$d:%2$02d:--"</string>
+    <string name="elapsed_time_low_frequency_short_format_mm" msgid="2405181895215514414">"%1$02d:--"</string>
     <!-- no translation found for crossSimFormat_spn (9125246077491634262) -->
     <skip />
     <string name="crossSimFormat_spn_cross_sim_calling" msgid="5620807020002879057">"<xliff:g id="SPN">%s</xliff:g> Кошумча чалуу ыкмасы"</string>
@@ -642,7 +650,7 @@
     <string name="permlab_nearby_wifi_devices" msgid="392774237063608500">"Жакын жердеги Wi‑Fi түзмөктөрүнө байланышуу"</string>
     <string name="permdesc_nearby_wifi_devices" msgid="3054307728646332906">"Колдонмо жакын жердеги Wi-Fi түзмөктөргө туташып, алардын жайгашкан жерин аныктап, ар кандай нерселерди өткөрө алат."</string>
     <string name="permlab_access_local_network" msgid="3420360767259066877">"жергиликтүү тармактагы түзмөктөрдү көрүү"</string>
-    <string name="permdesc_access_local_network" msgid="6364679803386822638">"Колдонмого жергиликтүү тармактагы түзмөктөрдү көрүүгө уруксат берүү"</string>
+    <string name="permdesc_access_local_network" msgid="6364679803386822638">"Колдонмо жергиликтүү тармактагы түзмөктөргө мүмкүнчүлүк алат"</string>
     <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"Ички тармактык интерфейсти колдонуу"</string>
     <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"Колдонмого ички тармактык интерфейс аркылуу башка колдонмолор менен иштешүүгө уруксат берет"</string>
     <string name="permlab_force_use_loopback_interface" msgid="1319727311706416481">"ички тармактык интерфейсти колдонууга мажбурлоо"</string>
@@ -1830,6 +1838,7 @@
     <string name="accessibility_shortcut_label_gesture" msgid="7987298674836890931">"жаңсоо"</string>
     <string name="accessibility_shortcut_label_quick_settings" msgid="6851280333772213611">"ыкчам параметрлер"</string>
     <string name="accessibility_shortcut_label_triple_tap" msgid="9058975959054454796">"үч жолу баскылоо"</string>
+    <string name="accessibility_shortcut_label_top_row_key" msgid="1488840908672437180">"атайын мүмкүнчүлүктөр баскычы"</string>
     <string name="accessibility_uncheck_legacy_item_warning" msgid="8047830891064817447">"<xliff:g id="SERVICE_NAME">%s</xliff:g> өчүрүлдү"</string>
     <string name="edit_accessibility_shortcut_menu_button" msgid="8885752738733772935">"Кыска жолдорду түзөтүү"</string>
     <string name="done_accessibility_shortcut_menu_button" msgid="3668407723770815708">"Бүттү"</string>
@@ -2106,8 +2115,7 @@
     <string name="app_suspended_default_message" msgid="6451215678552004172">"<xliff:g id="APP_NAME_0">%1$s</xliff:g> колдонмосу учурда жеткиликсиз. Анын жеткиликтүүлүгү <xliff:g id="APP_NAME_1">%2$s</xliff:g> тарабынан башкарылат."</string>
     <string name="app_suspended_more_details" msgid="211260942831587014">"Кеңири маалымат"</string>
     <string name="app_suspended_unsuspend_message" msgid="1665438589450555459">"Колдонмону иштетүү"</string>
-    <!-- no translation found for locked_app_biometric_prompt_description (6853122652400451464) -->
-    <skip />
+    <string name="locked_app_biometric_prompt_description" msgid="6853122652400451464">"<xliff:g id="APP_NAME">%1$s</xliff:g> кулпуланды"</string>
     <string name="work_mode_off_title" msgid="6367463960165135829">"Жумуш колдонмолорун иштетесизби?"</string>
     <string name="work_mode_turn_on" msgid="5316648862401307800">"Иштетүү"</string>
     <string name="work_mode_emergency_call_button" msgid="6818855962881612322">"Шашылыш чалуу"</string>
@@ -2547,10 +2555,8 @@
     <string name="accessibility_label_clone_profile" msgid="7579118375042398784">"Клон"</string>
     <string name="accessibility_label_communal_profile" msgid="1437173163111334791">"Жалпы"</string>
     <string name="private_space_biometric_prompt_title" msgid="5777592909271728154">"Жеке мейкиндик"</string>
-    <!-- no translation found for app_locked_new_notification (4409730436247596215) -->
-    <skip />
-    <!-- no translation found for app_locked_notification_message (4576179600328065280) -->
-    <skip />
+    <string name="app_locked_new_notification" msgid="4409730436247596215">"Жаңы билдирме"</string>
+    <string name="app_locked_notification_message" msgid="4576179600328065280">"Жаңы билдирүү"</string>
     <string name="redacted_notification_message" msgid="1520587845842228816">"Купуя билдирменин мазмуну жашырылган"</string>
     <string name="redacted_notification_action_title" msgid="6942924973335920935"></string>
     <string name="screen_not_shared_sensitive_content" msgid="7058419185079565001">"Коопсуздук үчүн колдонмодогу контент бөлүшүлгөн экрандан жашырылды"</string>

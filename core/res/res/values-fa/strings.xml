@@ -158,6 +158,10 @@
     <string name="wfc_mode_wifi_preferred_summary" msgid="1035175836270943089">"‏تماس ازطریق Wi-Fi"</string>
     <string name="wfc_mode_cellular_preferred_summary" msgid="4958965609212575619">"تماس ازطریق شبکه تلفن همراه"</string>
     <string name="wfc_mode_wifi_only_summary" msgid="104951993894678665">"‏فقط Wi-Fi"</string>
+    <string name="adaptive_low_frequency_less_than_one_minute" msgid="8869498183646028708">"‪~ %s"</string>
+    <string name="adaptive_low_frequency_neg_less_than_one_minute" msgid="2590062535985417056">"‪~ −%s"</string>
+    <string name="elapsed_time_low_frequency_short_format_h_mm" msgid="6728141238066668781">"‪%1$d:%2$02d:--"</string>
+    <string name="elapsed_time_low_frequency_short_format_mm" msgid="2405181895215514414">"‪%1$02d:--"</string>
     <!-- no translation found for crossSimFormat_spn (9125246077491634262) -->
     <skip />
     <string name="crossSimFormat_spn_cross_sim_calling" msgid="5620807020002879057">"<xliff:g id="SPN">%s</xliff:g> تماس پشتیبان"</string>
@@ -641,8 +645,8 @@
     <string name="permdesc_uwb_ranging" msgid="2519723069604307055">"به برنامه اجازه داده می‌شود موقعیت نسبی بین دستگاه‌های «فراپهن‌باند» اطراف را مشخص کند"</string>
     <string name="permlab_nearby_wifi_devices" msgid="392774237063608500">"‏برقراری تعامل با دستگاه‌های Wi-Fi اطراف"</string>
     <string name="permdesc_nearby_wifi_devices" msgid="3054307728646332906">"‏به برنامه اجازه می‌دهد در دستگاه‌های Wi-Fi اطراف تبلیغ کند، به آن‌ها متصل شود، و موقعیت نسبی آن‌ها را تشخیص دهد"</string>
-    <string name="permlab_access_local_network" msgid="3420360767259066877">"به دستگاه های شبکه محلی دسترسی داشته باشید"</string>
-    <string name="permdesc_access_local_network" msgid="6364679803386822638">"به برنامه اجازه می دهد تا به دستگاه های شبکه محلی دسترسی پیدا کند"</string>
+    <string name="permlab_access_local_network" msgid="3420360767259066877">"دسترسی به دستگاه‌های شبکه محلی"</string>
+    <string name="permdesc_access_local_network" msgid="6364679803386822638">"به برنامه اجازه می‌دهد تا به دستگاه‌های شبکه محلی دسترسی پیدا کند"</string>
     <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"استفاده کردن از میانای حلقه بازگشتی"</string>
     <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"به برنامه اجازه می‌دهد ازطریق میانای حلقه بازگشتی با برنامه‌های دیگر تعامل داشته باشد"</string>
     <string name="permlab_force_use_loopback_interface" msgid="1319727311706416481">"اجباری کردن استفاده از میانای حلقه بازگشتی"</string>
@@ -935,7 +939,7 @@
     <item msgid="8150904584178569699">"نمابر محل کار"</item>
     <item msgid="4537253139152229577">"نمابر خانه"</item>
     <item msgid="6751245029698664340">"پی‌جو"</item>
-    <item msgid="1692790665884224905">"سایر موارد"</item>
+    <item msgid="1692790665884224905">"غیره"</item>
     <item msgid="6216981255272016212">"سفارشی"</item>
   </string-array>
   <string-array name="emailAddressTypes">
@@ -947,18 +951,18 @@
   <string-array name="postalAddressTypes">
     <item msgid="3861463339764243038">"خانه"</item>
     <item msgid="5472578890164979109">"محل کار"</item>
-    <item msgid="5718921296646594739">"سایر موارد"</item>
+    <item msgid="5718921296646594739">"غیره"</item>
     <item msgid="5523122236731783179">"سفارشی"</item>
   </string-array>
   <string-array name="imAddressTypes">
     <item msgid="588088543406993772">"خانه"</item>
     <item msgid="5503060422020476757">"کاری"</item>
-    <item msgid="2530391194653760297">"سایر موارد"</item>
+    <item msgid="2530391194653760297">"غیره"</item>
     <item msgid="7640927178025203330">"سفارشی"</item>
   </string-array>
   <string-array name="organizationTypes">
     <item msgid="6144047813304847762">"محل کار"</item>
-    <item msgid="7402720230065674193">"سایر موارد"</item>
+    <item msgid="7402720230065674193">"غیره"</item>
     <item msgid="808230403067569648">"سفارشی"</item>
   </string-array>
   <string-array name="imProtocols">
@@ -995,11 +999,11 @@
     <string name="eventTypeCustom" msgid="3257367158986466481">"سفارشی"</string>
     <string name="eventTypeBirthday" msgid="7770026752793912283">"تاریخ تولد"</string>
     <string name="eventTypeAnniversary" msgid="4684702412407916888">"سالگرد"</string>
-    <string name="eventTypeOther" msgid="530671238533887997">"سایر موارد"</string>
+    <string name="eventTypeOther" msgid="530671238533887997">"غیره"</string>
     <string name="emailTypeCustom" msgid="1809435350482181786">"سفارشی"</string>
     <string name="emailTypeHome" msgid="1597116303154775999">"خانه"</string>
     <string name="emailTypeWork" msgid="2020095414401882111">"کاری"</string>
-    <string name="emailTypeOther" msgid="5131130857030897465">"سایر موارد"</string>
+    <string name="emailTypeOther" msgid="5131130857030897465">"غیره"</string>
     <string name="emailTypeMobile" msgid="787155077375364230">"تلفن همراه"</string>
     <string name="postalTypeCustom" msgid="5645590470242939129">"سفارشی"</string>
     <string name="postalTypeHome" msgid="7562272480949727912">"خانه"</string>
@@ -1297,7 +1301,7 @@
     <string name="whichEditApplicationLabel" msgid="1463288652070140285">"ویرایش"</string>
     <string name="whichSendApplication" msgid="4143847974460792029">"هم‌رسانی"</string>
     <string name="whichSendApplicationNamed" msgid="4470386782693183461">"‏اشتراک‌گذاری با %1$s"</string>
-    <string name="whichSendApplicationLabel" msgid="7467813004769188515">"اشتراک‌گذاری"</string>
+    <string name="whichSendApplicationLabel" msgid="7467813004769188515">"هم‌رسانی"</string>
     <string name="whichSendToApplication" msgid="77101541959464018">"ارسال با استفاده از"</string>
     <string name="whichSendToApplicationNamed" msgid="3385686512014670003">"‏ارسال با استفاده از %1$s"</string>
     <string name="whichSendToApplicationLabel" msgid="3543240188816513303">"ارسال"</string>
@@ -1329,7 +1333,7 @@
     <string name="anr_application_process" msgid="4978772139461676184">"<xliff:g id="APPLICATION">%1$s</xliff:g> پاسخ نمی‌دهد"</string>
     <string name="anr_process" msgid="1664277165911816067">"فرآیند <xliff:g id="PROCESS">%1$s</xliff:g> پاسخ نمی‌دهد"</string>
     <string name="force_close" msgid="9035203496368973803">"تأیید"</string>
-    <string name="report" msgid="2149194372340349521">"گزارش"</string>
+    <string name="report" msgid="2149194372340349521">"گزارش کردن"</string>
     <string name="wait" msgid="7765985809494033348">"منتظر بمانید"</string>
     <string name="webpage_unresponsive" msgid="7850879412195273433">"این صفحه پاسخ نمی‌دهد.\n\nآیا می‌خواهید آن را ببندید؟"</string>
     <string name="launch_warning_title" msgid="6725456009564953595">"برنامه مجدداً هدایت شد"</string>
@@ -1452,7 +1456,7 @@
     <string name="carrier_app_notification_text" msgid="6567057546341958637">"برای تنظیم آن تک‌ضرب بزنید"</string>
     <string name="time_zone_change_notification_title" msgid="5232503069219193218">"منطقه زمانی‌تان تغییر کرد"</string>
     <string name="time_zone_change_notification_body" msgid="6135793674904665585">"درحال‌حاضر در <xliff:g id="TIME_ZONE_DISPLAY_NAME">%1$s</xliff:g> ‏(<xliff:g id="TIME_ZONE_OFFSET">%2$s</xliff:g>) هستید"</string>
-    <string name="time_zone_offset_change_notification_title" msgid="8232305835199459588">"تغییر دادن ساعت"</string>
+    <string name="time_zone_offset_change_notification_title" msgid="8232305835199459588">"تغییر ساعت رسمی"</string>
     <string name="time_zone_offset_change_notification_body_forward" msgid="1299493962341887576">"ساعت‌ها <xliff:g id="TIME_ZONE_OFFSET_DURATION">%1$s</xliff:g> به‌جلو کشیده شدند. درحال‌حاضر در <xliff:g id="TIME_ZONE_DISPLAY_NAME">%2$s</xliff:g> ‏(<xliff:g id="TIME_ZONE_OFFSET_0">%3$s</xliff:g>) هستید."</string>
     <string name="time_zone_offset_change_notification_body_backward" msgid="6643532078142642118">"ساعت‌ها <xliff:g id="TIME_ZONE_OFFSET_DURATION">%1$s</xliff:g> به‌عقب کشیده شدند. درحال‌حاضر در <xliff:g id="TIME_ZONE_DISPLAY_NAME">%2$s</xliff:g> ‏(<xliff:g id="TIME_ZONE_OFFSET_0">%3$s</xliff:g>) هستید."</string>
     <string name="time_picker_dialog_title" msgid="9053376764985220821">"تنظیم زمان"</string>
@@ -1498,7 +1502,7 @@
     <string name="share_remote_bugreport_notification_title" msgid="6708897723753334999">"گزارش اشکال به اشتراک گذاشته شود؟"</string>
     <string name="sharing_remote_bugreport_notification_title" msgid="3077385149217638550">"درحال اشتراک‌گذاری گزارش اشکال…‏"</string>
     <string name="share_remote_bugreport_notification_message_finished" msgid="7325635795739260135">"سرپرست سیستم شما برای کمک به عیب‌یابی این دستگاه، گزارش اشکال درخواست کرده است. ممکن است برنامه‌ها و داده‌ها به اشتراک گذاشته شوند."</string>
-    <string name="share_remote_bugreport_action" msgid="7630880678785123682">"اشتراک‌گذاری"</string>
+    <string name="share_remote_bugreport_action" msgid="7630880678785123682">"هم‌رسانی"</string>
     <string name="decline_remote_bugreport_action" msgid="4040894777519784346">"رد کردن"</string>
     <string name="select_input_method" msgid="3971267998568587025">"انتخاب روش ورودی"</string>
     <string name="input_method_language_settings" msgid="8069089418056819437">"تنظیمات زبان"</string>
@@ -1830,6 +1834,7 @@
     <string name="accessibility_shortcut_label_gesture" msgid="7987298674836890931">"اشاره"</string>
     <string name="accessibility_shortcut_label_quick_settings" msgid="6851280333772213611">"تنظیمات فوری"</string>
     <string name="accessibility_shortcut_label_triple_tap" msgid="9058975959054454796">"سه تک‌ضرب زدن"</string>
+    <string name="accessibility_shortcut_label_top_row_key" msgid="1488840908672437180">"کلید دسترس‌پذیری"</string>
     <string name="accessibility_uncheck_legacy_item_warning" msgid="8047830891064817447">"<xliff:g id="SERVICE_NAME">%s</xliff:g> خاموش شده است"</string>
     <string name="edit_accessibility_shortcut_menu_button" msgid="8885752738733772935">"ویرایش میان‌برها"</string>
     <string name="done_accessibility_shortcut_menu_button" msgid="3668407723770815708">"تمام"</string>
@@ -2106,8 +2111,7 @@
     <string name="app_suspended_default_message" msgid="6451215678552004172">"<xliff:g id="APP_NAME_0">%1$s</xliff:g> درحال‌حاضر در دسترس نیست. <xliff:g id="APP_NAME_1">%2$s</xliff:g> آن را مدیریت می‌کند."</string>
     <string name="app_suspended_more_details" msgid="211260942831587014">"بیشتر بدانید"</string>
     <string name="app_suspended_unsuspend_message" msgid="1665438589450555459">"لغو مکث برنامه"</string>
-    <!-- no translation found for locked_app_biometric_prompt_description (6853122652400451464) -->
-    <skip />
+    <string name="locked_app_biometric_prompt_description" msgid="6853122652400451464">"«<xliff:g id="APP_NAME">%1$s</xliff:g>» قفل است"</string>
     <string name="work_mode_off_title" msgid="6367463960165135829">"مکث برنامه‌های کاری لغو شود؟"</string>
     <string name="work_mode_turn_on" msgid="5316648862401307800">"لغو مکث"</string>
     <string name="work_mode_emergency_call_button" msgid="6818855962881612322">"اضطراری"</string>
@@ -2485,7 +2489,7 @@
     <string name="sensor_privacy_start_use_mic_notification_content_title" msgid="2420858361276370367">"لغو انسداد میکروفون دستگاه"</string>
     <string name="sensor_privacy_start_use_camera_notification_content_title" msgid="7287720213963466672">"لغو انسداد دوربین دستگاه"</string>
     <string name="sensor_privacy_start_use_notification_content_text" msgid="7595608891015777346">"‏برای &lt;b&gt;<xliff:g id="APP">%s</xliff:g>&lt;/b&gt; و همه برنامه‌ها و سرویس‌ها"</string>
-    <string name="sensor_privacy_start_use_dialog_turn_on_button" msgid="7089318886628390827">"لغو انسداد"</string>
+    <string name="sensor_privacy_start_use_dialog_turn_on_button" msgid="7089318886628390827">"رفع انسداد"</string>
     <string name="sensor_privacy_notification_channel_label" msgid="936036783155261349">"حریم خصوصی حسگر"</string>
     <string name="splash_screen_view_icon_description" msgid="180638751260598187">"نماد برنامه"</string>
     <string name="splash_screen_view_branding_description" msgid="7911129347402728216">"تصویر نمانام‌سازی برنامه"</string>
@@ -2547,10 +2551,8 @@
     <string name="accessibility_label_clone_profile" msgid="7579118375042398784">"همسانه‌سازی"</string>
     <string name="accessibility_label_communal_profile" msgid="1437173163111334791">"همگانی"</string>
     <string name="private_space_biometric_prompt_title" msgid="5777592909271728154">"فضای خصوصی"</string>
-    <!-- no translation found for app_locked_new_notification (4409730436247596215) -->
-    <skip />
-    <!-- no translation found for app_locked_notification_message (4576179600328065280) -->
-    <skip />
+    <string name="app_locked_new_notification" msgid="4409730436247596215">"اعلان جدید"</string>
+    <string name="app_locked_notification_message" msgid="4576179600328065280">"پیام جدید"</string>
     <string name="redacted_notification_message" msgid="1520587845842228816">"محتوای اعلان حساس پنهان شده است"</string>
     <string name="redacted_notification_action_title" msgid="6942924973335920935"></string>
     <string name="screen_not_shared_sensitive_content" msgid="7058419185079565001">"به‌دلایل امنیتی، محتوای برنامه پس‌از هم‌رسانی صفحه‌نمایش پنهان می‌شود"</string>

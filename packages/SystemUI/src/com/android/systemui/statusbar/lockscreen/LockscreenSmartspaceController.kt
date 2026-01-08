@@ -136,6 +136,7 @@ constructor(
     // Smartspace can be used on multiple displays, such as when the user casts their screen
     @VisibleForTesting var smartspaceViews = mutableSetOf<SmartspaceView>()
     private var regionSamplers = mutableMapOf<SmartspaceView, RegionSampler>()
+    private var dataListeners = mutableSetOf<SmartspaceTargetListener>()
 
     private val regionSamplingEnabled = featureFlags.isEnabled(Flags.REGION_SAMPLING)
     private var showNotifications = false
@@ -143,6 +144,8 @@ constructor(
     private var showSensitiveContentForManagedUser = false
     private var managedUserHandle: UserHandle? = null
     private var mSplitShadeEnabled = false
+    var mediaTarget: SmartspaceTarget? = null
+        private set
 
     private val refreshInvoker: () -> Unit = { session?.requestSmartspaceUpdate() }
 
@@ -160,6 +163,7 @@ constructor(
         object : View.OnAttachStateChangeListener {
             override fun onViewAttachedToWindow(v: View) {
                 (v as SmartspaceView).setSplitShadeEnabled(mSplitShadeEnabled)
+                (v as SmartspaceView).setMediaTarget(mediaTarget)
                 smartspaceViews.add(v as SmartspaceView)
 
                 connectSession()
@@ -469,7 +473,7 @@ constructor(
         }
         if (userSmartspaceManager == null) return
         if (datePlugin == null && weatherPlugin == null && plugin == null) return
-        if (session != null || smartspaceViews.isEmpty()) {
+        if (session != null || (smartspaceViews.isEmpty() && dataListeners.isEmpty())) {
             return
         }
 
@@ -535,9 +539,14 @@ constructor(
         session?.requestSmartspaceUpdate()
     }
 
+    fun setMediaTarget(target: SmartspaceTarget?) {
+        mediaTarget = target
+        smartspaceViews.forEach { it.setMediaTarget(target) }
+    }
+
     /** Disconnects the smartspace view from the smartspace service and cleans up any resources. */
     fun disconnect() {
-        if (!smartspaceViews.isEmpty()) return
+        if (!smartspaceViews.isEmpty() || !dataListeners.isEmpty()) return
         if (suppressDisconnects) return
 
         execution.assertIsMainThread()
@@ -576,11 +585,19 @@ constructor(
     fun addListener(listener: SmartspaceTargetListener) {
         execution.assertIsMainThread()
         plugin?.registerListener(listener)
+        if (SceneContainerFlag.isEnabled) {
+            dataListeners.add(listener)
+            connectSession()
+        }
     }
 
     fun removeListener(listener: SmartspaceTargetListener) {
         execution.assertIsMainThread()
         plugin?.unregisterListener(listener)
+        if (SceneContainerFlag.isEnabled) {
+            dataListeners.remove(listener)
+            disconnect()
+        }
     }
 
     fun isWithinSmartspaceBounds(x: Int, y: Int): Boolean {

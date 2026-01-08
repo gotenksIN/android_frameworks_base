@@ -37,7 +37,6 @@ import android.graphics.drawable.Drawable
 import android.os.RemoteException
 import android.os.UserHandle
 import android.os.testableLooper
-import android.platform.test.annotations.DisableFlags
 import android.platform.test.annotations.EnableFlags
 import android.print.PrintManager
 import android.service.notification.StatusBarNotification
@@ -123,7 +122,7 @@ class NotificationInfoTest : SysuiTestCase() {
 
         // Inflate the layout
         val inflater = LayoutInflater.from(mContext)
-        underTest = inflater.inflate(R.layout.notification_info, null) as NotificationInfo
+        underTest = inflater.inflate(R.layout.notification_2025_info, null) as NotificationInfo
 
         underTest.setGutsParent(mock<NotificationGuts>())
 
@@ -209,19 +208,7 @@ class NotificationInfoTest : SysuiTestCase() {
     }
 
     @Test
-    @DisableFlags(Flags.FLAG_NOTIFICATIONS_REDESIGN_TEMPLATES)
-    fun testBindNotification_SetsPackageIcon_flagOff() {
-        val iconDrawable = mock<Drawable>()
-        whenever(mockPackageManager.getApplicationIcon(any<ApplicationInfo>()))
-            .thenReturn(iconDrawable)
-        bindNotification()
-        val iconView = underTest.findViewById<ImageView>(R.id.pkg_icon)
-        assertThat(iconView.drawable).isEqualTo(iconDrawable)
-    }
-
-    @Test
-    @EnableFlags(Flags.FLAG_NOTIFICATIONS_REDESIGN_TEMPLATES)
-    fun testBindNotification_SetsPackageIcon_flagOn() {
+    fun testBindNotification_SetsPackageIcon() {
         val iconDrawable = mock<Drawable>()
         whenever(mockAppIconProvider.getOrFetchAppIcon(anyOrNull(), anyOrNull(), anyOrNull()))
             .thenReturn(iconDrawable)
@@ -241,8 +228,7 @@ class NotificationInfoTest : SysuiTestCase() {
     @Test
     @EnableFlags(android.app.Flags.FLAG_NM_SUMMARIZATION_ALL)
     fun testBindNotification_appSummarized() {
-        entry.sbn.notification.extras.putCharSequence(
-            Notification.EXTRA_APP_SUMMARIZATION, "hello")
+        entry.sbn.notification.extras.putCharSequence(Notification.EXTRA_APP_SUMMARIZATION, "hello")
 
         bindNotification()
         val v = underTest.findViewById<TextView>(R.id.summarized_by)
@@ -525,17 +511,6 @@ class NotificationInfoTest : SysuiTestCase() {
         bindNotification()
 
         underTest.findViewById<View>(R.id.silence).performClick()
-        testableLooper.processAllMessages()
-        verify(mockINotificationManager, never())
-            .updateNotificationChannelForPackage(anyString(), eq(TEST_UID), any())
-    }
-
-    @Test
-    fun testDoesNotUpdateNotificationChannelAfterImportanceChangedAutomatic() {
-        notificationChannel.importance = NotificationManager.IMPORTANCE_DEFAULT
-        bindNotification()
-
-        underTest.findViewById<View>(R.id.automatic).performClick()
         testableLooper.processAllMessages()
         verify(mockINotificationManager, never())
             .updateNotificationChannelForPackage(anyString(), eq(TEST_UID), any())
@@ -832,7 +807,6 @@ class NotificationInfoTest : SysuiTestCase() {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_NOTIFICATION_CLASSIFICATION_UI)
     @Throws(RemoteException::class)
     fun testBindNotification_SetsFeedbackLink_isReservedChannel() {
         entry.setRanking(

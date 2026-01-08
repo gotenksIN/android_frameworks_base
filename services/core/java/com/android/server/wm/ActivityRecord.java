@@ -215,7 +215,6 @@ import static com.android.server.wm.StartingData.AFTER_TRANSACTION_COPY_TO_CLIEN
 import static com.android.server.wm.StartingData.AFTER_TRANSACTION_IDLE;
 import static com.android.server.wm.StartingData.AFTER_TRANSACTION_REMOVE_DIRECTLY;
 import static com.android.server.wm.StartingData.AFTER_TRANSITION_FINISH;
-import static com.android.server.wm.SurfaceAnimator.ANIMATION_TYPE_APP_TRANSITION;
 import static com.android.server.wm.SurfaceAnimator.ANIMATION_TYPE_WINDOW_ANIMATION;
 import static com.android.server.wm.TaskFragment.TASK_FRAGMENT_VISIBILITY_VISIBLE;
 import static com.android.server.wm.TaskPersister.DEBUG;
@@ -650,6 +649,7 @@ public final class ActivityRecord extends WindowToken {
 // QTI_END: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
     boolean mVoiceInteraction;
 
+    int mPostponedRelaunchConfigChangesFlags;
     int mPendingRelaunchCount;
     long mRelaunchStartTime;
 
@@ -1548,9 +1548,8 @@ public final class ActivityRecord extends WindowToken {
 
     @Override
     boolean canStartChangeTransition() {
-        final Task task = getTask();
         // Skip change transition when the Task is drag resizing.
-        return task != null && !task.isDragResizing() && super.canStartChangeTransition();
+        return !isDragResizing() && super.canStartChangeTransition();
     }
 
     @Override
@@ -4306,6 +4305,7 @@ public final class ActivityRecord extends WindowToken {
     void finishOrAbortReplacingWindow() {
         mRelaunchStartTime = 0;
         mDisplayContent.getDisplayPolicy().removeRelaunchingApp(this);
+        resumePostponedRelaunch();
     }
 
     ActivityServiceConnectionsHolder getOrCreateServiceConnectionsHolder() {
@@ -5500,7 +5500,7 @@ public final class ActivityRecord extends WindowToken {
         boolean inFinishingTransition = false;
         if (mTransitionController.isShellTransitionsEnabled()) {
             if (mTransitionController.isCollecting()) {
-                if (Flags.promoteExistenceChangedStateToParent() && app == null) {
+                if (app == null) {
                     mTransitionController.collectExistenceChange(this);
                 } else {
                     mTransitionController.collect(this);
@@ -5747,20 +5747,11 @@ public final class ActivityRecord extends WindowToken {
         callServiceTrackeronActivityStatechange(state, false);
 
 // QTI_END: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
-        if (getTaskFragment() != null) {
-            getTaskFragment().onActivityStateChanged(this, state, reason);
+        final TaskFragment taskFragment = getTaskFragment();
+        if (taskFragment != null) {
+            taskFragment.onActivityStateChanged(this, state, reason);
         }
 
-        // The WindowManager interprets the app stopping signal as
-        // an indication that the Surface will eventually be destroyed.
-        // This however isn't necessarily true if we are going to sleep.
-        if (state == STOPPING && !isSleeping()) {
-            if (getParent() == null) {
-                Slog.w(TAG_WM, "Attempted to notify stopping on non-existing app token: "
-                        + token);
-                return;
-            }
-        }
         updateVisibleForServiceConnection();
         if (app != null) {
             mTaskSupervisor.onProcessActivityStateChanged(app, false /* forceBatch */);
@@ -6021,8 +6012,8 @@ public final class ActivityRecord extends WindowToken {
         mDisplayContent.mUnknownAppVisibilityController.notifyLaunched(this);
     }
 
-    /** @return {@code true} if this activity should be made visible. */
-    private boolean shouldBeVisible(boolean behindOccludedContainer, boolean ignoringKeyguard) {
+    /** Updates and returns whether this activity should be made visible. */
+    boolean updateAndCheckVisibility(boolean behindOccludedContainer, boolean ignoringKeyguard) {
         updateVisibilityIgnoringKeyguard(behindOccludedContainer);
 
         if (ignoringKeyguard) {
@@ -6032,6 +6023,10 @@ public final class ActivityRecord extends WindowToken {
         return shouldBeVisibleUnchecked();
     }
 
+    /**
+     * Returns the previous updated value of whether this activity should be made visible.
+     * Uses {@link #shouldBeVisible} to get the latest.
+     */
     boolean shouldBeVisibleUnchecked() {
         final Task rootTask = getRootTask();
         if (rootTask == null || !visibleIgnoringKeyguard) {
@@ -6098,14 +6093,7 @@ public final class ActivityRecord extends WindowToken {
     }
 
     boolean shouldBeVisible(boolean ignoringKeyguard) {
-        final Task task = getTask();
-        if (task == null) {
-            return false;
-        }
-
-        final boolean behindOccludedContainer = !task.shouldBeVisible(null /* starting */)
-                || task.getOccludingActivityAbove(this) != null;
-        return shouldBeVisible(behindOccludedContainer, ignoringKeyguard);
+        return mAtmService.mVisibilityHelper.shouldActivityBeVisible(this, ignoringKeyguard);
     }
 
     void makeVisibleIfNeeded(ActivityRecord starting, boolean reportToClient) {
@@ -9041,9 +9029,51 @@ public final class ActivityRecord extends WindowToken {
                 | CONFIG_SCREEN_LAYOUT)) != 0;
     }
 
+    private boolean isDragResizing() {
+        return task != null && task.isDragResizing();
+    }
+
+    @Override
+    void resetDragResizingChangeReported() {
+        super.resetDragResizingChangeReported();
+        if (!Flags.improveFluidResizingPerformance()) {
+            return;
+        }
+        if (!isDragResizing()) {
+            // Stop waiting for the intermediate frames but resume the postponed relaunch now.
+            resumePostponedRelaunch();
+        }
+    }
+
+    /**
+     * Resumes a postponed relaunch if there is any. A relaunch can be postponed if it's triggered
+     * while the activity is already in the process of relaunching or before the main window has
+     * been drawn.
+     */
+    void resumePostponedRelaunch() {
+        if (!Flags.improveFluidResizingPerformance()) {
+            return;
+        }
+        if (mPostponedRelaunchConfigChangesFlags != 0) {
+            relaunchActivityLocked(true /* preserveWindow */, 0 /* configChangeFlags */);
+        }
+    }
+
     void relaunchActivityLocked(boolean preserveWindow, int configChangeFlags) {
         if (mAtmService.mSuppressResizeConfigChanges && preserveWindow) {
             return;
+        }
+        if (Flags.improveFluidResizingPerformance()) {
+            if (isDragResizing() && preserveWindow
+                        && (mPendingRelaunchCount > 0 || mRelaunchStartTime > 0)) {
+                mPostponedRelaunchConfigChangesFlags |= configChangeFlags;
+                // Don't relaunch during relaunching (mPendingRelaunchCount > 0) or before the main
+                // window is drawn (mRelaunchStartTime > 0). This helps increase the frame rate
+                // during drag-resizing.
+                return;
+            }
+            configChangeFlags |= mPostponedRelaunchConfigChangesFlags;
+            mPostponedRelaunchConfigChangesFlags = 0;
         }
 
         // Notify that the activity is already relaunching, therefore there's no need to refresh
@@ -9562,8 +9592,7 @@ public final class ActivityRecord extends WindowToken {
         final long token = proto.start(fieldId);
         writeNameToProto(proto, NAME);
         super.dumpDebug(proto, WINDOW_TOKEN, logLevel);
-        proto.write(IS_ANIMATING, isAnimating(PARENTS | CHILDREN,
-                ANIMATION_TYPE_APP_TRANSITION | ANIMATION_TYPE_WINDOW_ANIMATION));
+        proto.write(IS_ANIMATING, isAnimating(PARENTS | CHILDREN, ANIMATION_TYPE_WINDOW_ANIMATION));
         proto.write(FILLS_PARENT, fillsParent());
         proto.write(APP_STOPPED, mAppStopped);
         proto.write(TRANSLUCENT, !occludesParent());

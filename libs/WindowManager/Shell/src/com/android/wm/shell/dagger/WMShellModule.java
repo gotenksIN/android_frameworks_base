@@ -16,7 +16,6 @@
 
 package com.android.wm.shell.dagger;
 
-import static android.window.DesktopExperienceFlags.ENABLE_INORDER_TRANSITION_CALLBACKS_FOR_DESKTOP;
 import static android.window.DesktopExperienceFlags.ENABLE_WINDOWING_TRANSITION_HANDLERS_OBSERVERS;
 
 import static com.android.systemui.Flags.enableViewCaptureTracing;
@@ -37,7 +36,6 @@ import android.view.IWindowManager;
 import android.view.SurfaceControl;
 import android.view.WindowManager;
 import android.window.DesktopExperienceFlags;
-import android.window.DesktopModeFlags;
 import android.window.TaskSnapshotManager;
 
 import androidx.annotation.OptIn;
@@ -119,7 +117,6 @@ import com.android.wm.shell.dagger.desktop.DesktopModule;
 import com.android.wm.shell.dagger.pinnedlayer.PinnedLayerModule;
 import com.android.wm.shell.dagger.pip.PipModule;
 import com.android.wm.shell.desktopmode.CloseDesktopTaskTransitionHandler;
-import com.android.wm.shell.desktopmode.DesksController;
 import com.android.wm.shell.desktopmode.DesktopActivityOrientationChangeHandler;
 import com.android.wm.shell.desktopmode.DesktopBackNavTransitionObserver;
 import com.android.wm.shell.desktopmode.DesktopDisplayEventHandler;
@@ -172,6 +169,7 @@ import com.android.wm.shell.desktopmode.education.AppToWebEducationFilter;
 import com.android.wm.shell.desktopmode.education.data.AppHandleEducationDatastoreRepository;
 import com.android.wm.shell.desktopmode.education.data.AppToWebEducationDatastoreRepository;
 import com.android.wm.shell.desktopmode.multidesks.DeskSwitchTransitionHandler;
+import com.android.wm.shell.desktopmode.multidesks.DesksController;
 import com.android.wm.shell.desktopmode.multidesks.DesksOrganizer;
 import com.android.wm.shell.desktopmode.multidesks.DesksTransitionObserver;
 import com.android.wm.shell.desktopmode.multidesks.RootTaskDesksOrganizer;
@@ -499,7 +497,8 @@ public abstract class WMShellModule {
             WindowDecorViewHostSupplier<WindowDecorViewHost> windowDecorViewHostSupplier,
             Optional<DesktopModeWindowDecorViewModel> desktopModeWindowDecorViewModel,
             DesktopState desktopState,
-            DesktopConfig desktopConfig) {
+            DesktopConfig desktopConfig,
+            InteractionJankMonitor interactionJankMonitor) {
         if (desktopModeWindowDecorViewModel.isPresent()) {
             return desktopModeWindowDecorViewModel.get();
         }
@@ -519,7 +518,8 @@ public abstract class WMShellModule {
                 focusTransitionObserver,
                 windowDecorViewHostSupplier,
                 desktopState,
-                desktopConfig);
+                desktopConfig,
+                interactionJankMonitor);
     }
 
     @WMSingleton
@@ -775,7 +775,8 @@ public abstract class WMShellModule {
             DesktopState desktopState,
             IActivityTaskManager activityTaskManager,
             MSDLPlayer msdlPlayer,
-            Optional<BubbleController> bubbleController) {
+            Optional<BubbleController> bubbleController,
+            Optional<ClientFullscreenRequestController> clientFullscreenRequestController) {
         return new SplitScreenController(
                 context,
                 shellInit,
@@ -805,7 +806,8 @@ public abstract class WMShellModule {
                 desktopState,
                 activityTaskManager,
                 msdlPlayer,
-                bubbleController);
+                bubbleController,
+                clientFullscreenRequestController);
     }
 
     //
@@ -1203,8 +1205,7 @@ public abstract class WMShellModule {
             Optional<DesktopImeHandler> desktopImeHandler,
             Optional<DesktopBackNavTransitionObserver> desktopBackNavTransitionObserver,
             DesktopModeLoggerTransitionObserver desktopModeLoggerTransitionObserver) {
-        if (ENABLE_INORDER_TRANSITION_CALLBACKS_FOR_DESKTOP.isTrue()
-                && ENABLE_WINDOWING_TRANSITION_HANDLERS_OBSERVERS.isTrue()
+        if (ENABLE_WINDOWING_TRANSITION_HANDLERS_OBSERVERS.isTrue()
                 && desktopState.canEnterDesktopMode()) {
             return Optional.of(new DesktopInOrderTransitionObserver(
                     desktopImmersiveController,
@@ -1737,13 +1738,15 @@ public abstract class WMShellModule {
             Context context,
             @DynamicOverride DesktopUserRepositories desktopUserRepositories,
             DesksOrganizer desksOrganizer,
+            DesksController desksController,
             DesktopWallpaperActivityTokenProvider desktopWallpaperActivityTokenProvider,
             DisplayController displayController,
             Optional<ClientFullscreenRequestController> clientFullscreenRequestController
     ) {
         return new DesktopFullscreenRequestHandler(shellInit, context,
-                desktopUserRepositories, desksOrganizer, desktopWallpaperActivityTokenProvider,
-                displayController, clientFullscreenRequestController);
+                desktopUserRepositories, desksOrganizer, desksController,
+                desktopWallpaperActivityTokenProvider, displayController,
+                clientFullscreenRequestController);
     }
 
     @WMSingleton

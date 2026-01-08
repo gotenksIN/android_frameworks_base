@@ -21,6 +21,7 @@ import static android.app.WindowConfiguration.ACTIVITY_TYPE_DREAM;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_HOME;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_RECENTS;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_STANDARD;
+import static android.app.WindowConfiguration.ACTIVITY_TYPE_UNDEFINED;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN;
 import static android.app.WindowConfiguration.WINDOWING_MODE_MULTI_WINDOW;
@@ -898,5 +899,63 @@ public class TaskDisplayAreaTests extends WindowTestsBase {
         // second TDA.
         assertThat(firstTda.getRootPinnedTask()).isNull();
         assertThat(secondTda.getRootPinnedTask()).isEqualTo(pinnedTask);
+    }
+
+    @Test
+    public void testGetLaunchRootTask_preserveLeafTaskDesktopRelaunch_returnsCandidateRoot() {
+        final Task sourceDeskRoot = createTask(
+                mDisplayContent, WINDOWING_MODE_FREEFORM, ACTIVITY_TYPE_STANDARD);
+        sourceDeskRoot.mCreatedByOrganizer = true;
+        final TaskDisplayArea tda = mDisplayContent.getDefaultTaskDisplayArea();
+        tda.setLaunchRootTask(sourceDeskRoot,
+                new int[]{WINDOWING_MODE_FREEFORM, WINDOWING_MODE_UNDEFINED} /* windowingModes */,
+                new int[]{ACTIVITY_TYPE_UNDEFINED, ACTIVITY_TYPE_STANDARD} /* activityTypes */);
+        final Task sourceTask = createTaskInRootTask(sourceDeskRoot, 0 /* userId */);
+
+        final Task candidateRoot = createTask(
+                mDisplayContent, WINDOWING_MODE_MULTI_WINDOW, ACTIVITY_TYPE_STANDARD);
+        candidateRoot.mCreatedByOrganizer = true;
+        candidateRoot.mPreserveLeafTaskIfRelaunch = true;
+        final Task candidateTask = createTaskInRootTask(candidateRoot, 0 /* userId */);
+
+        final Task launchRootTask = tda.getLaunchRootTask(WINDOWING_MODE_MULTI_WINDOW,
+                ACTIVITY_TYPE_STANDARD, null /* options */, sourceTask, 0 /* launchFlags */,
+                candidateTask);
+
+        if (com.android.window.flags.Flags.enablePreserveLeafTaskIfRelaunch()) {
+            assertThat(launchRootTask).isEqualTo(candidateRoot);
+        } else {
+            assertThat(launchRootTask).isEqualTo(sourceDeskRoot);
+        }
+    }
+
+    @Test
+    public void testGetLaunchRootTask_preserveLeafTaskSplitRelaunch_returnsCandidateRoot() {
+        final TaskDisplayArea tda = mDisplayContent.getDefaultTaskDisplayArea();
+        final Task sourceRoot = createTask(
+                mDisplayContent, WINDOWING_MODE_MULTI_WINDOW, ACTIVITY_TYPE_STANDARD);
+        sourceRoot.mCreatedByOrganizer = true;
+        final Task adjacentRoot = createTask(
+                mDisplayContent, WINDOWING_MODE_MULTI_WINDOW, ACTIVITY_TYPE_STANDARD);
+        adjacentRoot.mCreatedByOrganizer = true;
+        adjacentRoot.setAdjacentTaskFragments(
+                new TaskFragment.AdjacentSet(adjacentRoot, sourceRoot));
+        final Task sourceTask = createTaskInRootTask(sourceRoot, 0 /* userId */);
+
+        final Task candidateRoot = createTask(
+                mDisplayContent, WINDOWING_MODE_MULTI_WINDOW, ACTIVITY_TYPE_STANDARD);
+        candidateRoot.mCreatedByOrganizer = true;
+        candidateRoot.mPreserveLeafTaskIfRelaunch = true;
+        final Task candidateTask = createTaskInRootTask(candidateRoot, 0 /* userId */);
+
+        final Task launchRootTask = tda.getLaunchRootTask(WINDOWING_MODE_UNDEFINED,
+                ACTIVITY_TYPE_STANDARD, null /* options */, sourceTask, 0 /* launchFlags */,
+                candidateTask);
+
+        if (com.android.window.flags.Flags.enablePreserveLeafTaskIfRelaunch()) {
+            assertThat(launchRootTask).isEqualTo(candidateRoot);
+        } else {
+            assertThat(launchRootTask).isEqualTo(sourceRoot);
+        }
     }
 }

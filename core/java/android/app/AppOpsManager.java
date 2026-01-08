@@ -22,6 +22,7 @@ import static android.permission.flags.Flags.FLAG_OP_ENABLE_MOBILE_DATA_BY_USER;
 import static android.service.notification.Flags.FLAG_REDACT_SENSITIVE_NOTIFICATIONS_FROM_UNTRUSTED_LISTENERS;
 import static android.view.contentprotection.flags.Flags.FLAG_CREATE_ACCESSIBILITY_OVERLAY_APP_OP_ENABLED;
 import static android.view.contentprotection.flags.Flags.FLAG_RAPID_CLEAR_NOTIFICATIONS_BY_LISTENER_APP_OP_ENABLED;
+
 import static com.android.internal.telephony.flags.Flags.FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES;
 
 import static java.lang.Long.max;
@@ -1799,8 +1800,7 @@ public class AppOpsManager {
      *
      * @hide
      */
-    public static final int OP_VOICE_INTERACTION_ASSIST_STRUCTURE =
-            AppOpEnums.APP_OP_VOICE_INTERACTION_ASSIST_STRUCTURE;
+    public static final int OP_READ_SCREEN_CONTEXT = AppOpEnums.APP_OP_READ_SCREEN_CONTEXT;
 
     /**
      * Access to read restricted messages from telephony messaging database.
@@ -1999,7 +1999,7 @@ public class AppOpsManager {
             OPSTR_READ_RESPIRATORY_RATE,
             OPSTR_READ_VO2_MAX,
             OPSTR_CONTINUE_ACROSS_DEVICES,
-            OPSTR_VOICE_INTERACTION_ASSIST_STRUCTURE,
+            OPSTR_READ_SCREEN_CONTEXT,
             OPSTR_READ_RESTRICTED_MESSAGES,
             OPSTR_WRITE_RESTRICTED_MESSAGES,
     })
@@ -2877,8 +2877,7 @@ public class AppOpsManager {
     @SuppressLint("IntentName")
     @SystemApi
     @FlaggedApi(Flags.FLAG_ASSIST_SETTINGS_PRIVACY_IMPROVEMENTS_ENABLED)
-    public static final String OPSTR_VOICE_INTERACTION_ASSIST_STRUCTURE =
-            "android:voice_interaction_assist_structure";
+    public static final String OPSTR_READ_SCREEN_CONTEXT = "android:read_screen_context";
 
     /**
      * Access to read restricted messages stored in telephony database.
@@ -3620,8 +3619,8 @@ public class AppOpsManager {
         new AppOpInfo.Builder(OP_CONTINUE_ACROSS_DEVICES, OPSTR_CONTINUE_ACROSS_DEVICES,
                 "CONTINUE_ACROSS_DEVICES")
                 .setDefaultMode(AppOpsManager.MODE_ALLOWED).build(),
-        new AppOpInfo.Builder(OP_VOICE_INTERACTION_ASSIST_STRUCTURE,
-                OPSTR_VOICE_INTERACTION_ASSIST_STRUCTURE, "VOICE_INTERACTION_ASSIST_STRUCTURE")
+        new AppOpInfo.Builder(OP_READ_SCREEN_CONTEXT, OPSTR_READ_SCREEN_CONTEXT,
+                "READ_SCREEN_CONTEXT")
                 .setDefaultMode(AppOpsManager.MODE_IGNORED).build(),
         new AppOpInfo.Builder(OP_READ_RESTRICTED_MESSAGES, OPSTR_READ_RESTRICTED_MESSAGES,
                 "READ_RESTRICTED_MESSAGES")
@@ -9464,7 +9463,7 @@ public class AppOpsManager {
      * without an executor parameter.
      *
      * <p> Note that the listener will be called on the main thread using
-     * {@link Context.getMainThread()}. To specify the execution thread, use
+     * {@link Context#getMainThread()}. To specify the execution thread, use
      * {@link #startWatchingNoted(String[], Executor, OnOpNotedListener)}.
      *
      * @param ops      the ops to watch
@@ -11432,7 +11431,7 @@ public class AppOpsManager {
      * and 4.
      *
      * Note that even with {@link #OP_NOTED_CALLBACK_FLAG_IGNORE_ASYNC},
-     * {@link #OnOpNotedCallback.onAsyncNoted} may still be invoked. This happens for sync events
+     * {@link OnOpNotedCallback#onAsyncNoted} may still be invoked. This happens for sync events
      * that were collected before a callback is registered.
      *
      * @param asyncExecutor executor to execute {@link OnOpNotedCallback#onAsyncNoted} on, {@code

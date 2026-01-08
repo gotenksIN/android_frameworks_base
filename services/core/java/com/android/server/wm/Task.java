@@ -482,6 +482,12 @@ class Task extends TaskFragment {
     boolean mInRemoveTask;
 
     /**
+     * When set, the leaf task should be kept in the current root task if the relaunch originates
+     * from other source task.
+     */
+    boolean mPreserveLeafTaskIfRelaunch;
+
+    /**
      * When set, disassociate the leaf task if relaunched and reparented it to TDA as root task if
      * possible.
      */
@@ -3182,49 +3188,6 @@ class Task extends TaskFragment {
         mForceShowForAllUsers = forceShowForAllUsers;
     }
 
-    /** Returns the top-most activity that occludes the given one, or {@code null} if none. */
-    @Nullable
-    ActivityRecord getOccludingActivityAbove(ActivityRecord activity) {
-        final ActivityRecord top = getActivity(r -> {
-            if (r == activity) {
-                // Reached the given activity, return the activity to stop searching.
-                return true;
-            }
-
-            if (!r.occludesParent()) {
-                return false;
-            }
-
-            TaskFragment parent = r.getTaskFragment();
-            if (parent == activity.getTaskFragment()) {
-                // Found it. This activity on top of the given activity on the same TaskFragment.
-                return true;
-            }
-            if (parent != null && parent.asTask() != null) {
-                // Found it. This activity is the direct child of a leaf Task.
-                return true;
-            }
-            // The candidate activity is being embedded. Checking if the bounds of the containing
-            // TaskFragment equals to the outer TaskFragment.
-            TaskFragment grandParent = parent.getParent().asTaskFragment();
-            while (grandParent != null) {
-                if (!parent.getBounds().equals(grandParent.getBounds())) {
-                    // Not occluding the grandparent.
-                    break;
-                }
-                if (grandParent.asTask() != null) {
-                    // Found it. The activity occludes its parent TaskFragment and the parent
-                    // TaskFragment also occludes its parent all the way up.
-                    return true;
-                }
-                parent = grandParent;
-                grandParent = parent.getParent().asTaskFragment();
-            }
-            return false;
-        });
-        return top != activity ? top : null;
-    }
-
     @Override
     public SurfaceControl.Builder makeAnimationLeash() {
         return super.makeAnimationLeash().setMetadata(METADATA_TASK_ID, mTaskId);
@@ -3958,6 +3921,9 @@ class Task extends TaskFragment {
         if (mReparentLeafTaskIfRelaunchFromHome) {
             pw.println(prefix + "mReparentLeafTaskIfRelaunchFromHome=true");
         }
+        if (mPreserveLeafTaskIfRelaunch) {
+            pw.println(prefix + "mPreserveLeafTaskIfRelaunch=true");
+        }
         pw.println(prefix + "mSelfMovable=" + mSelfMovable);
     }
 
@@ -4604,10 +4570,7 @@ class Task extends TaskFragment {
     }
 
     void onPictureInPictureParamsChanged() {
-        if (inPinnedWindowingMode()
-                || DesktopExperienceFlags.ENABLE_DESKTOP_WINDOWING_PIP.isTrue()) {
-            dispatchTaskInfoChangedIfNeeded(true /* force */);
-        }
+        dispatchTaskInfoChangedIfNeeded(true /* force */);
     }
 
     void onShouldDockBigOverlaysChanged() {
@@ -6544,6 +6507,12 @@ class Task extends TaskFragment {
         }
     }
 
+    void setPreserveLeafTaskIfRelaunch(boolean preserveLeafTaskIfRelaunch) {
+        if (isOrganized()) {
+            mPreserveLeafTaskIfRelaunch = preserveLeafTaskIfRelaunch;
+        }
+    }
+
     void setReparentLeafTaskIfRelaunch(boolean reparentLeafTaskIfRelaunch) {
         if (isOrganized()) {
             mReparentLeafTaskIfRelaunch = reparentLeafTaskIfRelaunch;
@@ -6723,7 +6692,7 @@ class Task extends TaskFragment {
      *
      * @see #getVisibility(ActivityRecord)
      * @see #hasFillingContent()
-     * @see ActivityTaskSupervisor.OpaqueContainerHelper#isOpaque
+     * @see WindowContainerVisibilityHelper#isOpaque
      */
     boolean isForceOpaque() {
         return mIsForceOpaque && mCreatedByOrganizer
@@ -7301,6 +7270,33 @@ class Task extends TaskFragment {
             layer.release();
         }
         mExcludeLayersFromTaskSnapshot = null;
+    }
+
+    // TODO(b/464035997): remove this method once the long term solution is implemented.
+    /**
+     * Returns whether this task has a sibling task that is opaque. This is only relevant for
+     * non-root Tasks.
+     */
+    boolean hasOpaqueSibling() {
+        final WindowContainer parent = getParent();
+        if (parent == null) {
+            return false;
+        }
+        final Task parentTask = parent.asTask();
+        if (parentTask == null) {
+            return false;
+        }
+        for (int i = 0; i < parentTask.getChildCount(); i++) {
+            final WindowContainer child = parentTask.getChildAt(i);
+            // Skip the task being moved
+            if (child == this) {
+                continue;
+            }
+            if (mAtmService.mVisibilityHelper.isOpaque(child)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

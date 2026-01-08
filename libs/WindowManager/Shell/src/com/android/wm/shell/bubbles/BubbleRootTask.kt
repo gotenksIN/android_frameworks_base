@@ -21,7 +21,8 @@ import android.app.ActivityTaskManager.INVALID_TASK_ID
 import android.app.WindowConfiguration.WINDOWING_MODE_MULTI_WINDOW
 import android.content.Context
 import android.view.SurfaceControl
-import android.window.TaskOrganizer
+import android.window.TaskCreationParams
+import android.window.TaskPropertiesRequest
 import android.window.WindowContainerToken
 import android.window.WindowContainerTransaction
 import com.android.wm.shell.ShellTaskOrganizer
@@ -63,15 +64,16 @@ class BubbleRootTask(
         // it to fullscreen) if the bubble task is no longer be a leaf task under this leaf
         // task. Note that bubbles should ignore insets and should not show app compat rounded
         // corners for better UX (e.g. when landscape apps are letterboxed).
-        taskOrganizer.createRootTask(
-            TaskOrganizer.CreateRootTaskRequest()
+        val taskProperties =
+            TaskPropertiesRequest().setIgnoreInsets(true).setDisableAppCompatRoundedCorners(true)
+        val params =
+            TaskCreationParams.Builder()
                 .setName("Bubbles")
                 .setDisplayId(context.displayId)
                 .setWindowingMode(WINDOWING_MODE_MULTI_WINDOW)
-                .setShouldIgnoreInsets(true)
-                .setDisableAppCompatRoundedCorners(true),
-            this,
-        )
+                .setTaskPropertiesRequest(taskProperties)
+                .build()
+        taskOrganizer.createTask(params, this)
     }
 
     override fun onTaskAppeared(taskInfo: ActivityManager.RunningTaskInfo, leash: SurfaceControl) {
@@ -91,6 +93,8 @@ class BubbleRootTask(
             taskInfo.token,
             true, /* disallowOverrideWindowingModeForChildren */
         )
+        // Preserve bubble leaf tasks if relaunched from different windowing mode.
+        wct.setPreserveLeafTaskIfRelaunch(taskInfo.token, true /* preserveLeafTaskIfRelaunch */)
         wct.setInterceptBackPressedOnTaskRoot(taskInfo.token, true /* interceptBackPressed */)
         wct.setTaskForceExcludedFromRecents(taskInfo.token, true /* forceExcluded */)
         wct.setDisablePip(taskInfo.token, true /* disablePip */)

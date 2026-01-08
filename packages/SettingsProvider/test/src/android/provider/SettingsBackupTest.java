@@ -618,6 +618,7 @@ public class SettingsBackupTest {
                     Settings.Global.Wearable.COOLDOWN_MODE_ON,
                     Settings.Global.Wearable.BEDTIME_MODE,
                     Settings.Global.Wearable.BEDTIME_HARD_MODE,
+                    Settings.Global.Wearable.WEAR_CHARGING_EXPERIENCE_ENABLED,
                     Settings.Global.Wearable.VIBRATE_FOR_ACTIVE_UNLOCK,
                     Settings.Global.Wearable.LOCK_SCREEN_STATE,
                     Settings.Global.Wearable.DISABLE_AOD_WHILE_PLUGGED,
@@ -807,7 +808,9 @@ public class SettingsBackupTest {
                  Settings.Secure.SUGGESTED_THEME_FEATURE_ENABLED,
                  Settings.Secure.REDACT_OTP_NOTIFICATION_WHILE_CONNECTED_TO_WIFI,
                  Settings.Secure.OTP_NOTIFICATION_REDACTION_LOCK_TIME,
-                 Settings.Secure.APP_FUNCTION_ADDITIONAL_AGENT_ALLOWLIST);
+                 Settings.Secure.APP_FUNCTION_ADDITIONAL_AGENT_ALLOWLIST,
+                 Settings.Secure.READ_SCREEN_CONTEXT_REQUEST_DENIED_COUNT,
+                 Settings.Secure.TRUSTED_LOCATIONS_COUNT);
 
     @Test
     public void systemSettingsBackedUpOrDenied() {

@@ -62,11 +62,9 @@ import android.annotation.DurationMillisLong;
 import android.annotation.IntRange;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
-import android.annotation.PermissionManuallyEnforced;
 import android.annotation.RequiresNoPermission;
 import android.annotation.SpecialUsers.CanBeALL;
 import android.annotation.SpecialUsers.CanBeCURRENT;
-
 import android.annotation.UiThread;
 import android.annotation.UserIdInt;
 import android.annotation.WorkerThread;
@@ -291,8 +289,16 @@ public final class InputMethodManagerService implements IInputMethodManagerImpl.
      * {@link #mPreventImeStartupUnlessTextEditor}.
      */
     @SharedByAllUsersField
-    @NonNull
+    @Nullable
     private final String[] mNonPreemptibleInputMethods;
+
+     /**
+     * These apps are exempt from the IME startup prevention behaviour that is enabled by
+     * {@link #mPreventImeStartupUnlessTextEditor}.
+     */
+    @SharedByAllUsersField
+    @Nullable
+    private String[] mPreventImeStartupBypassedApps;
 
     /**
      * See {@link #shouldEnableConcurrentMultiUserMode(Context)} about when set to be {@code true}.
@@ -486,14 +492,18 @@ public final class InputMethodManagerService implements IInputMethodManagerImpl.
                     menuItem.imeName = item.mImeName;
                     menuItem.subtypeName = item.mSubtypeName;
                     menuItem.layoutName = item.mLayoutName;
-                    menuItem.imi = item.mImi;
+                    menuItem.imeId = item.mImi.getId();
                     menuItem.subtypeIndex = item.mSubtypeIndex;
                     menuItems.add(menuItem);
                 }
 
+                final InputMethodSettings settings = InputMethodSettingsRepository.get(userId);
+                final var selectedImi = settings.getMethodMap().get(selectedImeId);
+                final var selectedImeSettingsIntent = selectedImi != null
+                        ? selectedImi.createImeLanguageSettingsActivityIntent() : null;
                 try {
                     mIImeSwitcherMenu.show(menuItems, selectedImeId, selectedSubtypeIndex,
-                            isScreenLocked, displayId, userId);
+                            selectedImeSettingsIntent, isScreenLocked, displayId, userId);
                 } catch (RemoteException e) {
                     Slog.w(TAG, "Failed show IME Switcher Menu for user: " + userId
                             + " on display: " + displayId, e);
@@ -505,10 +515,9 @@ public final class InputMethodManagerService implements IInputMethodManagerImpl.
         public void hide(int displayId, @UserIdInt int userId) {
             if (mIImeSwitcherMenu != null) {
                 try {
-                    mIImeSwitcherMenu.hide(displayId, userId);
+                    mIImeSwitcherMenu.hide(userId);
                 } catch (RemoteException e) {
-                    Slog.w(TAG, "Failed to hide IME Switcher Menu for user: " + userId
-                            + " on display: " + displayId, e);
+                    Slog.w(TAG, "Failed to hide IME Switcher Menu for user: " + userId, e);
                 }
             }
         }
@@ -793,6 +802,10 @@ public final class InputMethodManagerService implements IInputMethodManagerImpl.
         public void onReceive(Context context, Intent intent) {
             final String action = intent.getAction();
             if (Intent.ACTION_CLOSE_SYSTEM_DIALOGS.equals(action)) {
+                if (Flags.imeSwitcherMenuSystemui()) {
+                    // Tracked by the IME Switcher Menu Controller.
+                    return;
+                }
                 final PendingResult pendingResult = getPendingResult();
                 if (pendingResult == null) {
                     return;
@@ -1408,8 +1421,14 @@ public final class InputMethodManagerService implements IInputMethodManagerImpl.
 
             mPreventImeStartupUnlessTextEditor = mRes.getBoolean(
                     com.android.internal.R.bool.config_preventImeStartupUnlessTextEditor);
-            mNonPreemptibleInputMethods = mRes.getStringArray(
-                    com.android.internal.R.array.config_nonPreemptibleInputMethods);
+            if (mPreventImeStartupUnlessTextEditor) {
+                mPreventImeStartupBypassedApps = mRes.getStringArray(
+                        com.android.internal.R.array.config_preventImeStartupBypassedApps);
+                mNonPreemptibleInputMethods = mRes.getStringArray(
+                        com.android.internal.R.array.config_nonPreemptibleInputMethods);
+            } else {
+                mNonPreemptibleInputMethods = null;
+            }
             Runnable discardDelegationTextRunnable = this::discardHandwritingDelegationText;
             mHwController = new HandwritingModeController(mContext, uiLooper,
                     new InkWindowInitializer(), discardDelegationTextRunnable);
@@ -2039,6 +2058,11 @@ public final class InputMethodManagerService implements IInputMethodManagerImpl.
         session.mIme.startInput(startInputToken, userData.mCurInputConnection,
                 userData.mCurEditorInfo, restarting, navButtonFlags,
                 userData.mCurImeBackCallbackReceiver);
+        // Calculating imeTargetStale can be done as a part of updateImeTargetWindow(), but it's
+        // only when optimizeImeInputTargetUpdate is enabled. For now, we perform separate calls.
+        final boolean imeTargetStale = Flags.forceHideForStaleWindow()
+                && focusedWindow != null
+                && mWindowManagerInternal.isImeInputTargetStaleForUpdate(focusedWindow);
         if (Flags.optimizeImeInputTargetUpdate()) {
             if (focusedWindow != null) {
                 mWindowManagerInternal.updateImeTargetWindow(focusedWindow);
@@ -2058,6 +2082,17 @@ public final class InputMethodManagerService implements IInputMethodManagerImpl.
             // need to enforce it, otherwise it would early return.
             final boolean imeBound = userData.mBindingController.getCurIme() != null;
             showCurrentInputInternal(focusedWindow, statsToken, imeBound /* forceShow */);
+        } else if (imeTargetStale) {
+            // TODO(b/429304155): come back to this and properly address the underlying issue.
+            // When attaching to a new input target that doesn't want the IME, we explicitly
+            // hide any currently showing IME. This prevents a stale IME surface from a previous
+            // target from remaining visible.
+            ProtoLog.d(IMMS_WITH_LOGCAT, "Attach new input but force hide");
+            // TODO(b/429304155): Use another ShowHideReason for this statsToken.
+            final var statsToken = createStatsTokenForFocusedClient(false /* show */,
+                    SoftInputShowHideReason.HIDE_SOFT_INPUT, userId);
+            hideCurrentInputLocked(focusedWindow, false /* updateTargetWindow */, statsToken,
+                    SoftInputShowHideReason.HIDE_SOFT_INPUT, userId);
         }
 
         final var curImeId = bindingController.getCurImeId();
@@ -2169,7 +2204,7 @@ public final class InputMethodManagerService implements IInputMethodManagerImpl.
 
         // If configured, we want to avoid starting up the IME if it is not supposed to be showing
         if (shouldPreventImeStartupLocked(selectedImeId, startInputFlags,
-                unverifiedTargetSdkVersion, userId)) {
+                unverifiedTargetSdkVersion, userId, editorInfo)) {
             ProtoLog.v(IMMS_DEBUG, "Avoiding IME startup and unbinding current input method.");
             bindingController.unbindIme();
             unbindCurrentClientLocked(UnbindReason.DISCONNECT_IME, userId);
@@ -2314,7 +2349,8 @@ public final class InputMethodManagerService implements IInputMethodManagerImpl.
             @NonNull String selectedImeId,
             @StartInputFlags int startInputFlags,
             int unverifiedTargetSdkVersion,
-            @UserIdInt int userId) {
+            @UserIdInt int userId,
+            @NonNull EditorInfo editorInfo) {
         // Fast-path for the majority of cases
         if (!mPreventImeStartupUnlessTextEditor) {
             return false;
@@ -2325,12 +2361,27 @@ public final class InputMethodManagerService implements IInputMethodManagerImpl.
         if (isSoftInputModeStateVisibleAllowed(unverifiedTargetSdkVersion, startInputFlags)) {
             return false;
         }
+        if (Flags.preventImeStartupBypassedApps() && ArrayUtils.contains(
+                mPreventImeStartupBypassedApps, editorInfo.packageName)) {
+            return false;
+        }
         final InputMethodInfo selectedImi = InputMethodSettingsRepository.get(userId).getMethodMap()
                 .get(selectedImeId);
         if (selectedImi == null) {
             return false;
         }
         return !ArrayUtils.contains(mNonPreemptibleInputMethods, selectedImi.getPackageName());
+    }
+
+    @Override
+    @IInputMethodManagerImpl.PermissionVerified(Manifest.permission.TEST_INPUT_METHOD)
+    public void setPreventImeStartupBypassedAppsForTest(@Nullable List<String> allowedPackages) {
+        if (allowedPackages == null) {
+            mPreventImeStartupBypassedApps = mContext.getResources().getStringArray(
+                    com.android.internal.R.array.config_preventImeStartupBypassedApps);
+        } else {
+            mPreventImeStartupBypassedApps = allowedPackages.toArray(new String[0]);
+        }
     }
 
     @GuardedBy("ImfLock.class")

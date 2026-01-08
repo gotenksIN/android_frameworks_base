@@ -427,10 +427,12 @@ class AccessibilityInputFilterInputTest {
     /**
      * Enable all a11y features and send a touchscreen event stream. In the middle of the gesture,
      * disable the a11y features.
-     * When the a11y features are disabled, the filter generates HOVER_EXIT without further input
-     * from the dispatcher.
+     * When the a11y features are disabled, the filter generates HOVER_EXIT for the injected
+     * stream and ACTION_CANCEL for the original stream, without further input from the
+     * dispatcher.
      */
     @Test
+    @EnableFlags(Flags.FLAG_SEND_A11Y_ACTION_CANCEL_ON_RESET)
     fun testSingleDeviceTouchEventsDisableFeaturesMidGesture() {
         enableFeatures(ALL_A11Y_FEATURES)
 
@@ -447,13 +449,20 @@ class AccessibilityInputFilterInputTest {
         verifier.assertNoEvents()
 
         enableFeatures(0)
+        // Consume the HOVER_EXIT from TouchExplorer cleanup
         verifier.assertReceivedMotion(
             allOf(
                 fromInjectedTouchScreen,
                 withMotionAction(ACTION_HOVER_EXIT)
             )
         )
-        verifier.assertNoEvents()
+        // Verify injected ACTION_CANCEL from AccessibilityInputFilter#resetStreamStateForDisplay()
+        verifier.assertReceivedMotion(
+            allOf(
+                withMotionAction(ACTION_CANCEL),
+                withDeviceId(touchDeviceId)
+            )
+        )
 
         sendTouchEvent(ACTION_MOVE, downTime, SystemClock.uptimeMillis())
         sendTouchEvent(ACTION_UP, downTime, SystemClock.uptimeMillis())
@@ -478,7 +487,7 @@ class AccessibilityInputFilterInputTest {
      * interleaved.
      */
     @Test
-    @EnableFlags(Flags.FLAG_HANDLE_MULTI_DEVICE_INPUT)
+    @EnableFlags(Flags.FLAG_HANDLE_MULTI_DEVICE_INPUT, Flags.FLAG_USE_STATE_FOR_ACTION_UP_INJECTION)
     fun testMultiDeviceEventsWithoutA11yFeatures() {
         enableFeatures(0)
 
@@ -523,7 +532,7 @@ class AccessibilityInputFilterInputTest {
      * interleaved.
      */
     @Test
-    @EnableFlags(Flags.FLAG_HANDLE_MULTI_DEVICE_INPUT)
+    @EnableFlags(Flags.FLAG_HANDLE_MULTI_DEVICE_INPUT, Flags.FLAG_USE_STATE_FOR_ACTION_UP_INJECTION)
     fun testMultiDeviceEventsWithAllA11yFeatures() {
         enableFeatures(ALL_A11Y_FEATURES)
 
@@ -601,7 +610,7 @@ class AccessibilityInputFilterInputTest {
      * while stylus is active. Check that the latest device is always given preference.
      */
     @Test
-    @EnableFlags(Flags.FLAG_HANDLE_MULTI_DEVICE_INPUT)
+    @EnableFlags(Flags.FLAG_HANDLE_MULTI_DEVICE_INPUT, Flags.FLAG_USE_STATE_FOR_ACTION_UP_INJECTION)
     fun testStylusWithTouchInTheMiddle() {
         enableFeatures(ALL_A11Y_FEATURES)
 

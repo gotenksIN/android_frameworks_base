@@ -31,6 +31,7 @@ import static com.android.server.notification.NotificationManagerService.private
 
 import android.annotation.FlaggedApi;
 import android.annotation.NonNull;
+import android.annotation.Nullable;
 import android.annotation.UserIdInt;
 import android.app.ActivityManager;
 import android.app.ActivityOptions;
@@ -445,6 +446,7 @@ abstract public class ManagedServices {
                 if (filter != null && !filter.matches(info.component)) continue;
                 pw.println("      " + info.component
                         + " (user " + info.userid + "): " + info.service
+                        + " (sc=" + info.getConnectionId() + ")"
                         + (info.isSystem ? " SYSTEM" : "")
                         + (info.isGuest(this) ? " GUEST" : ""));
             }
@@ -1192,33 +1194,16 @@ abstract public class ManagedServices {
                     }
                 }
 
-                if (Flags.fixManagedServicesDoubleBinding()) {
-                    if (uidList != null && uidList.length == pkgList.length) {
-                        @UserIdInt int userId = UserHandle.getUserId(uidList[i]);
-                        if (managedServicesConcurrentMultiuser()) {
-                            if (isComponentEnabledForPackage(pkgName, userId)) {
-                                anyServicesInvolved = true;
-                            }
-                        }
-                        if (isPackageAllowed(pkgName, userId)) {
+                if (uidList != null && uidList.length == pkgList.length) {
+                    @UserIdInt int userId = UserHandle.getUserId(uidList[i]);
+                    if (managedServicesConcurrentMultiuser()) {
+                        if (isComponentEnabledForPackage(pkgName, userId)) {
                             anyServicesInvolved = true;
-                            trimApprovedListsForInvalidServices(pkgName, userId);
                         }
                     }
-                } else {
-                    if (uidList != null && uidList.length > 0) {
-                        for (int uid : uidList) {
-                            @UserIdInt int userId = UserHandle.getUserId(uid);
-                            if (managedServicesConcurrentMultiuser()) {
-                                if (isComponentEnabledForPackage(pkgName, userId)) {
-                                    anyServicesInvolved = true;
-                                }
-                            }
-                            if (isPackageAllowed(pkgName, userId)) {
-                                anyServicesInvolved = true;
-                                trimApprovedListsForInvalidServices(pkgName, userId);
-                            }
-                        }
+                    if (isPackageAllowed(pkgName, userId)) {
+                        anyServicesInvolved = true;
+                        trimApprovedListsForInvalidServices(pkgName, userId);
                     }
                 }
             }
@@ -1281,6 +1266,18 @@ abstract public class ManagedServices {
     public void onUserUnlocked(int user) {
         if (DEBUG) Slog.d(TAG, "onUserUnlocked u=" + user);
         rebindServices(false, user);
+    }
+
+    @Nullable
+    private ManagedServiceInfo getService(ComponentName cn, @UserIdInt int userId) {
+        synchronized (mMutex) {
+            for (ManagedServiceInfo info : mServices) {
+                if (Objects.equals(info.component, cn) && info.userid == userId) {
+                    return info;
+                }
+            }
+            return null;
+        }
     }
 
     private ManagedServiceInfo getServiceFromTokenLocked(IInterface service) {
@@ -1849,16 +1846,6 @@ abstract public class ManagedServices {
     }
 
     @GuardedBy("mMutex")
-    private boolean isServiceBoundLocked(ManagedServiceInfo info) {
-        for (ManagedServiceInfo info2 : mServices) {
-            if (Objects.equals(info.component, info2.component) && info.userid == info2.userid) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    @GuardedBy("mMutex")
     private void registerServiceLocked(final ComponentName name, final int userid) {
         registerServiceLocked(name, userid, false /* isSystem */);
     }
@@ -1938,10 +1925,13 @@ abstract public class ManagedServices {
                             }
                             binder.linkToDeath(info, 0);
 
-                            if (Flags.fixManagedServicesDoubleBinding()
-                                    && isServiceBoundLocked(info)) {
-                                Slog.wtfStack(TAG, "Duplicate binding " + info);
+                            ManagedServiceInfo previousBinding = getService(name, userid);
+                            if (previousBinding != null) {
+                                Slog.wtfStack(TAG,
+                                        "Duplicate binding! previous=" + previousBinding
+                                                + "; current=" + info);
                             }
+
                             added = mServices.add(info);
                         } catch (RemoteException e) {
                             Slog.e(TAG, "Failed to linkToDeath, already dead", e);
@@ -1993,16 +1983,11 @@ abstract public class ManagedServices {
                     serviceConnection,
                     BindServiceFlags.of(getBindFlags()),
                     new UserHandle(userid))) {
-                if (!Flags.fixManagedServicesDoubleBinding()) {
-                    mServicesBound.remove(servicesBindingTag);
-                }
                 Slog.w(TAG, "Unable to bind " + getCaption() + " service: " + intent
                         + " in user " + userid);
                 // Need to call Context.unbindService() to dispose of the ServiceConnection even
                 // when bindService returns false.
-                if (Flags.fixManagedServicesDoubleBinding()) {
-                    unbindService(serviceConnection, name, userid);
-                }
+                unbindService(serviceConnection, name, userid);
             }
         } catch (SecurityException ex) {
             mServicesBound.remove(servicesBindingTag);
@@ -2091,13 +2076,9 @@ abstract public class ManagedServices {
     private ManagedServiceInfo registerServiceImpl(ManagedServiceInfo info) {
         synchronized (mMutex) {
             try {
-                if (Flags.fixManagedServicesDoubleBinding()) {
-                    if (!info.isGuest(this)) {
-                        // Guest services are already linkedToDeath in their hosts, and the host
-                        // will call unregisterService() to remove them from this.mServices.
-                        info.service.asBinder().linkToDeath(info, 0);
-                    }
-                } else {
+                if (!info.isGuest(this)) {
+                    // Guest services are already linkedToDeath in their hosts, and the host
+                    // will call unregisterService() to remove them from this.mServices.
                     info.service.asBinder().linkToDeath(info, 0);
                 }
                 mServices.add(info);
@@ -2246,10 +2227,19 @@ abstract public class ManagedServices {
                     .append(",userid=").append(userid)
                     .append(",isSystem=").append(isSystem)
                     .append(",targetSdkVersion=").append(targetSdkVersion)
-                    .append(",connection=").append(connection == null ? null : "<connection>")
+                    .append(",connection=").append(getConnectionId())
                     .append(",service=").append(service)
                     .append(",serviceAsBinder=").append(service != null ? service.asBinder() : null)
                     .append(']').toString();
+        }
+
+        /**
+         * Returns an id for the {@link #connection}, if present. Current implementation is just
+         * the hex string of the connection's hash code.
+         */
+        @Nullable
+        public String getConnectionId() {
+            return connection != null ? Integer.toHexString(connection.hashCode()) : null;
         }
 
         public void dumpDebug(ProtoOutputStream proto, long fieldId, ManagedServices host) {

@@ -59,17 +59,12 @@ public enum DesktopExperienceFlags {
     CLOSE_FULLSCREEN_AND_SPLITSCREEN_KEYBOARD_SHORTCUT(
             Flags::closeFullscreenAndSplitscreenKeyboardShortcut, false,
             Flags.FLAG_CLOSE_FULLSCREEN_AND_SPLITSCREEN_KEYBOARD_SHORTCUT),
-    CONNECTED_DISPLAYS_CURSOR(com.android.input.flags.Flags::connectedDisplaysCursor, true,
-            com.android.input.flags.Flags.FLAG_CONNECTED_DISPLAYS_CURSOR),
     DEFER_RESUME_FOCUS_IN_NON_FOCUSED_WINDOW(Flags::deferResumeFocusInNonFocusedWindow, false,
             Flags.FLAG_DEFER_RESUME_FOCUS_IN_NON_FOCUSED_WINDOW),
     DIMMING_WALLPAPER_FOR_MAXIMIZED_AND_TILED(Flags::dimmingWallpaperForMaximizedAndTiled, true,
             Flags.FLAG_DIMMING_WALLPAPER_FOR_MAXIMIZED_AND_TILED),
     DISPLAY_TOPOLOGY(com.android.server.display.feature.flags.Flags::displayTopology, true,
             com.android.server.display.feature.flags.Flags.FLAG_DISPLAY_TOPOLOGY),
-    ENABLE_ACTIVITY_EMBEDDING_SUPPORT_FOR_CONNECTED_DISPLAYS(
-            Flags::enableActivityEmbeddingSupportForConnectedDisplays, true,
-            Flags.FLAG_ENABLE_ACTIVITY_EMBEDDING_SUPPORT_FOR_CONNECTED_DISPLAYS),
     ENABLE_ADD_WINDOW_DECORATION_TO_ALL_TASKS(
             Flags::enableAddWindowDecorationToAllTasks, false,
             Flags.FLAG_ENABLE_ADD_WINDOW_DECORATION_TO_ALL_TASKS),
@@ -79,9 +74,6 @@ public enum DesktopExperienceFlags {
             Flags.FLAG_ENABLE_AUTO_RECOVERY_FROM_SELF_KILL),
     ENABLE_AUTO_ROTATE_ON_SLATE_STATE(Flags::enableAutoRotateOnSlateState, false,
             Flags.FLAG_ENABLE_AUTO_ROTATE_ON_SLATE_STATE),
-    ENABLE_BACKUP_AND_RESTORE_DISPLAY_WINDOW_SETTINGS(
-            Flags::enableBackupAndRestoreDisplayWindowSettings, false,
-            Flags.FLAG_ENABLE_BACKUP_AND_RESTORE_DISPLAY_WINDOW_SETTINGS),
     ENABLE_BOUNDS_RESTORING_ON_DRAG_EXIT(Flags::enableBoundsRestoringOnDragExit, false,
             Flags.FLAG_ENABLE_BOUNDS_RESTORING_ON_DRAG_EXIT),
     ENABLE_BUG_FIXES_FOR_SECONDARY_DISPLAY(Flags::enableBugFixesForSecondaryDisplay, true,
@@ -91,22 +83,15 @@ public enum DesktopExperienceFlags {
             Flags.FLAG_ENABLE_CAMERA_COMPAT_EXTERNAL_DISPLAY_ROTATION_BUGFIX),
     ENABLE_CONNECTED_DISPLAYS_DND(Flags::enableConnectedDisplaysDnd, true,
             Flags.FLAG_ENABLE_CONNECTED_DISPLAYS_DND),
-    ENABLE_CONNECTED_DISPLAYS_PIP(Flags::enableConnectedDisplaysPip, true,
-            Flags.FLAG_ENABLE_CONNECTED_DISPLAYS_PIP),
     ENABLE_CONNECTED_DISPLAYS_WALLPAPER(android.app.Flags::enableConnectedDisplaysWallpaper, true,
             android.app.Flags.FLAG_ENABLE_CONNECTED_DISPLAYS_WALLPAPER),
     ENABLE_CONNECTED_DISPLAYS_WINDOW_DRAG(Flags::enableConnectedDisplaysWindowDrag, true,
             Flags.FLAG_ENABLE_CONNECTED_DISPLAYS_WINDOW_DRAG),
-    ENABLE_CROSS_DISPLAYS_PIP_TASK_LAUNCH(Flags::enableCrossDisplaysPipTaskLaunch, false,
-            Flags.FLAG_ENABLE_CROSS_DISPLAYS_PIP_TASK_LAUNCH),
     ENABLE_DEFAULT_DESK_WITHOUT_WARMUP_MIGRATION(Flags::defaultDeskWithoutWarmupMigration, false,
             Flags.FLAG_DEFAULT_DESK_WITHOUT_WARMUP_MIGRATION),
     ENABLE_DEFAULT_DISPLAY_IN_TOPOLOGY_SWITCH(
             com.android.server.display.feature.flags.Flags::enableDefaultDisplayInTopologySwitch,
             true, FLAG_ENABLE_DEFAULT_DISPLAY_IN_TOPOLOGY_SWITCH),
-    ENABLE_DENSITY_RESET_ON_CROSS_DISPLAYS_PIP_LAUNCH(
-            Flags::enableDensityResetOnCrossDisplaysPipLaunch, false,
-            Flags.FLAG_ENABLE_DENSITY_RESET_ON_CROSS_DISPLAYS_PIP_LAUNCH),
     ENABLE_DESKTOP_FIRST_BASED_DEFAULT_TO_DESKTOP_BUGFIX(
             Flags::enableDesktopFirstBasedDefaultToDesktopBugfix, true,
             Flags.FLAG_ENABLE_DESKTOP_FIRST_BASED_DEFAULT_TO_DESKTOP_BUGFIX),
@@ -127,11 +112,6 @@ public enum DesktopExperienceFlags {
     ENABLE_DESKTOP_WINDOWING_APP_TO_WEB_EDUCATION_INTEGRATION(
             Flags::enableDesktopWindowingAppToWebEducationIntegration, true,
             Flags.FLAG_ENABLE_DESKTOP_WINDOWING_APP_TO_WEB_EDUCATION_INTEGRATION),
-    ENABLE_DESKTOP_WINDOWING_MULTI_ACTIVITY_PIP_KEEP_PARENT_OPEN(
-            Flags::enableDesktopWindowingMultiActivityPipKeepParentOpen, false,
-            Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MULTI_ACTIVITY_PIP_KEEP_PARENT_OPEN),
-    ENABLE_DESKTOP_WINDOWING_PIP(Flags::enableDesktopWindowingPip, true,
-            Flags.FLAG_ENABLE_DESKTOP_WINDOWING_PIP),
     ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT(
             com.android.server.display.feature.flags.Flags::enableDisplayContentModeManagement,
             true, FLAG_ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT),
@@ -146,8 +126,6 @@ public enum DesktopExperienceFlags {
             Flags.FLAG_ENABLE_DISPLAY_RECONNECT_INTERACTION),
     ENABLE_DISPLAY_WINDOWING_MODE_SWITCHING(Flags::enableDisplayWindowingModeSwitching, true,
             Flags.FLAG_ENABLE_DISPLAY_WINDOWING_MODE_SWITCHING),
-    ENABLE_DRAGGING_PIP_ACROSS_DISPLAYS(Flags::enableDraggingPipAcrossDisplays, false,
-            Flags.FLAG_ENABLE_DRAGGING_PIP_ACROSS_DISPLAYS),
     ENABLE_DRAG_TO_MAXIMIZE(Flags::enableDragToMaximize, true, Flags.FLAG_ENABLE_DRAG_TO_MAXIMIZE),
     ENABLE_DRAWING_APP_HANDLE(Flags::enableDrawingAppHandle, false,
             Flags.FLAG_ENABLE_DRAWING_APP_HANDLE),
@@ -157,9 +135,6 @@ public enum DesktopExperienceFlags {
             Flags.FLAG_ENABLE_FULLSCREEN_WINDOW_CONTROLS),
     ENABLE_GAME_CONTROLS_ENTRY_IN_HANDLE_MENU(Flags::enableGameControlsEntryInHandleMenu, false,
             Flags.FLAG_ENABLE_GAME_CONTROLS_ENTRY_IN_HANDLE_MENU),
-    ENABLE_INORDER_TRANSITION_CALLBACKS_FOR_DESKTOP(
-            Flags::enableInorderTransitionCallbacksForDesktop, false,
-            Flags.FLAG_ENABLE_INORDER_TRANSITION_CALLBACKS_FOR_DESKTOP),
     ENABLE_INTERACTION_DEPENDENT_TAB_TEARING_BOUNDS(
             Flags::enableInteractionDependentTabTearingBounds, false,
             Flags.FLAG_ENABLE_INTERACTION_DEPENDENT_TAB_TEARING_BOUNDS),
@@ -197,8 +172,6 @@ public enum DesktopExperienceFlags {
             Flags.FLAG_ENABLE_PRESENTATION_FOR_CONNECTED_DISPLAYS),
     ENABLE_PROJECTED_DISPLAY_DESKTOP_MODE(Flags::enableProjectedDisplayDesktopMode, true,
             Flags.FLAG_ENABLE_PROJECTED_DISPLAY_DESKTOP_MODE),
-    ENABLE_REENABLE_APP_HANDLE_ANIMATIONS(Flags::reenableAppHandleAnimations,
-            false, Flags.FLAG_REENABLE_APP_HANDLE_ANIMATIONS),
     ENABLE_REENABLE_APP_HANDLE_COLOR_ANIMATIONS(Flags::reenableAppHandleColorAnimations,
             false, Flags.FLAG_REENABLE_APP_HANDLE_COLOR_ANIMATIONS),
     ENABLE_REJECT_HOME_TRANSITION(
@@ -230,17 +203,12 @@ public enum DesktopExperienceFlags {
             Flags.FLAG_ENABLE_WINDOWING_TRANSITION_HANDLERS_OBSERVERS),
     ENABLE_WINDOW_DECORATION_REFACTOR(Flags::enableWindowDecorationRefactor, false,
             Flags.FLAG_ENABLE_WINDOW_DECORATION_REFACTOR),
-    ENABLE_WINDOW_DROP_SMOOTH_TRANSITION(Flags::enableWindowDropSmoothTransition, false,
-            Flags.FLAG_ENABLE_WINDOW_DROP_SMOOTH_TRANSITION),
     ENABLE_WINDOW_REPOSITIONING_API(Flags::enableWindowRepositioningApi, false,
             Flags.FLAG_ENABLE_WINDOW_REPOSITIONING_API),
     ENTER_DESKTOP_BY_DEFAULT_ON_FREEFORM_DISPLAYS(Flags::enterDesktopByDefaultOnFreeformDisplays,
             true, Flags.FLAG_ENTER_DESKTOP_BY_DEFAULT_ON_FREEFORM_DISPLAYS),
     EXCLUDE_DESK_ROOTS_FROM_DESKTOP_TASKS(Flags::excludeDeskRootsFromDesktopTasks,
             true, Flags.FLAG_EXCLUDE_DESK_ROOTS_FROM_DESKTOP_TASKS),
-    FORCE_CLOSE_TOP_TRANSPARENT_FULLSCREEN_TASK(
-            Flags::forceCloseTopTransparentFullscreenTask, true,
-            Flags.FLAG_FORCE_CLOSE_TOP_TRANSPARENT_FULLSCREEN_TASK),
     FORM_FACTOR_BASED_DESKTOP_FIRST_SWITCH(Flags::formFactorBasedDesktopFirstSwitch, true,
             Flags.FLAG_FORM_FACTOR_BASED_DESKTOP_FIRST_SWITCH),
     REPARENT_WINDOW_TOKEN_API(Flags::reparentWindowTokenApi, true,

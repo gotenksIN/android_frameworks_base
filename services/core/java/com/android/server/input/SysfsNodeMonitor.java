@@ -38,7 +38,7 @@ import java.util.Objects;
  * device is already added, with no way for the native code to detect any changes afterwards.
  */
 // To enable debug logs, run:
-// 'adb shell setprop log.tag.SysfsNodeMonitor DEBUG' (requires restart)
+// 'adb shell setprop log.tag.SysfsNodeMonitor DEBUG'
 final class SysfsNodeMonitor {
     private static final String TAG = SysfsNodeMonitor.class.getSimpleName();
 
@@ -90,6 +90,7 @@ final class SysfsNodeMonitor {
     private void startMonitoring(int deviceId) {
         final var inputDevice = mInputManager.getInputDevice(deviceId);
         if (inputDevice == null) {
+            Log.w(TAG, "Input device not found, skipping monitoring for deviceId: " + deviceId);
             return;
         }
         if (!inputDevice.isExternal()) {

@@ -47,6 +47,7 @@ import android.content.res.Resources;
 import android.os.Handler;
 import android.os.IBinder;
 import android.util.SparseArray;
+import android.view.DisplayCutout;
 import android.util.proto.ProtoOutputStream;
 import android.view.InsetsController;
 import android.view.InsetsFrameProvider;

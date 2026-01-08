@@ -35,7 +35,7 @@ import com.android.systemui.CameraProtectionModule;
 import com.android.systemui.CoreStartable;
 import com.android.systemui.KairosCoreStartableModule;
 import com.android.systemui.SystemUISecondaryUserService;
-import com.android.systemui.activity.ActivityManagerModule;
+import com.android.systemui.activity.ActivityModule;
 import com.android.systemui.ambient.dagger.AmbientModule;
 import com.android.systemui.appops.dagger.AppOpsModule;
 import com.android.systemui.assist.AssistModule;
@@ -149,6 +149,7 @@ import com.android.systemui.statusbar.notification.collection.render.Notificatio
 import com.android.systemui.statusbar.notification.headsup.HeadsUpManager;
 import com.android.systemui.statusbar.notification.interruption.VisualInterruptionDecisionProvider;
 import com.android.systemui.statusbar.notification.people.PeopleHubModule;
+import com.android.systemui.statusbar.notification.row.NotificationRowModule;
 import com.android.systemui.statusbar.notification.row.dagger.BundleRowComponent;
 import com.android.systemui.statusbar.notification.row.dagger.ExpandableNotificationRowComponent;
 import com.android.systemui.statusbar.notification.row.dagger.NotificationRowComponent;
@@ -220,7 +221,7 @@ import javax.inject.Named;
  * may not appreciate that.
  */
 @Module(includes = {
-        ActivityManagerModule.class,
+        ActivityModule.class,
         AmbientModule.class,
         AppOpsModule.class,
         AirplaneModeDataLayerModule.class,
@@ -274,6 +275,7 @@ import javax.inject.Named;
         MotionCuesModule.class,
         MotionToolModule.class,
         MSDLModule.class,
+        NotificationRowModule.class,
         PeopleHubModule.class,
         PeopleModule.class,
         PersonalContextModule.class,

@@ -24,6 +24,7 @@ import android.window.WindowContainerToken
 import android.window.WindowContainerTransaction
 import android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_DISALLOW_OVERRIDE_WINDOWING_MODE_FOR_CHILDREN
 import android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_REORDER
+import android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_SET_PRESERVE_LEAF_TASK_IF_RELAUNCH
 import android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_SET_REPARENT_LEAF_TASK_IF_RELAUNCH_FROM_HOME
 import androidx.test.filters.SmallTest
 import com.android.testing.wm.util.MockToken
@@ -68,7 +69,7 @@ class BubbleRootTaskTest : ShellTestCase() {
     @Test
     fun init_flagDisabled_doNothing() {
         verify(shellInit, never()).addInitCallback<BubbleRootTask>(any(), any())
-        verify(taskOrganizer, never()).createRootTask(any())
+        verify(taskOrganizer, never()).createTask(any())
     }
 
     @EnableFlags(FLAG_ENABLE_CREATE_ANY_BUBBLE, FLAG_ENABLE_BUBBLE_ROOT_TASK)
@@ -78,11 +79,11 @@ class BubbleRootTaskTest : ShellTestCase() {
             verify(shellInit).addInitCallback<BubbleRootTask>(initCallbackCaptor.capture(), any())
             initCallbackCaptor.firstValue
         }
-        verify(taskOrganizer, never()).createRootTask(any())
+        verify(taskOrganizer, never()).createTask(any())
 
         initCallback.run()
 
-        verify(taskOrganizer).createRootTask(any(), eq(bubbleRootTask))
+        verify(taskOrganizer).createTask(any(), eq(bubbleRootTask))
     }
 
     @Test
@@ -105,6 +106,7 @@ class BubbleRootTaskTest : ShellTestCase() {
             HIERARCHY_OP_TYPE_REORDER,
             HIERARCHY_OP_TYPE_SET_REPARENT_LEAF_TASK_IF_RELAUNCH_FROM_HOME,
             HIERARCHY_OP_TYPE_DISALLOW_OVERRIDE_WINDOWING_MODE_FOR_CHILDREN,
+            HIERARCHY_OP_TYPE_SET_PRESERVE_LEAF_TASK_IF_RELAUNCH,
         )
 
         // verify changes

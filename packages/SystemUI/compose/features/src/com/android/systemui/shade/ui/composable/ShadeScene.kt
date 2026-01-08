@@ -288,7 +288,8 @@ private fun ContentScope.SingleShade(
             ) {
                 ScrollState(initial = 0)
             }
-        val scrimOverscrollEffect = rememberOffsetOverscrollEffect()
+        val scrollingContentOverscrollEffect = rememberOffsetOverscrollEffect()
+        val shortContentOverscrollEffect = rememberOffsetOverscrollEffect()
 
         ShadePanelScrim(viewModel.isTransparencyEnabled)
         SingleShadeNestedScrollLayout(
@@ -301,7 +302,8 @@ private fun ContentScope.SingleShade(
             shadeSession = shadeSession,
             viewModel = notificationsPlaceholderViewModel,
             contentScrollState = scrollState,
-            contentOverScrollEffect = scrimOverscrollEffect,
+            scrollingContentOverscrollEffect = scrollingContentOverscrollEffect,
+            shortContentOverscrollEffect = shortContentOverscrollEffect,
             jankMonitor = jankMonitor,
             statusBarHeader = {
                 CollapsedShadeHeader(viewModel = headerViewModel, isSplitShade = false)
@@ -380,7 +382,8 @@ private fun ContentScope.SingleShade(
                     stackTopPadding = notificationStackPadding,
                     stackBottomPadding = navBarHeight,
                     contentScrollState = scrollState,
-                    contentOverscrollEffect = scrimOverscrollEffect,
+                    scrollingContentOverscrollEffect = scrollingContentOverscrollEffect,
+                    shortContentOverscrollEffect = shortContentOverscrollEffect,
                     onEmptySpaceClick =
                         viewModel::onEmptySpaceClicked.takeIf { viewModel.isEmptySpaceClickable },
                     modifier = Modifier.padding(horizontal = shadeHorizontalPadding),
@@ -477,7 +480,10 @@ private fun ContentScope.SplitShade(
         modifier =
             modifier
                 .fillMaxSize()
-                .graphicsLayer { alpha = contentAlpha }
+                .graphicsLayer {
+                    alpha = contentAlpha
+                    compositingStrategy = CompositingStrategy.ModulateAlpha
+                }
                 .thenIf(brightnessMirrorShowing) { Modifier.gesturesDisabled() }
     ) {
         ShadePanelScrim(viewModel.isTransparencyEnabled)
@@ -541,7 +547,7 @@ private fun ContentScope.SplitShade(
                                         )
                                     }
 
-                                LaunchedEffect(Unit) {
+                                LaunchedEffectWithLifecycle(Unit) {
                                     snapshotFlow { tileSquishiness }
                                         .collect { viewModel.setTileSquishiness(it) }
                                 }

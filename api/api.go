@@ -499,6 +499,7 @@ func createMergedTxts(
 	ctx android.LoadHookContext,
 	bootclasspath proptools.Configurable[[]string],
 	system_server_classpath proptools.Configurable[[]string],
+	configurableNonUpdatableModules proptools.Configurable[[]string],
 	baseTxtModulePrefix string,
 	exportableStubsType bool,
 	doDist bool,
@@ -538,6 +539,15 @@ func createMergedTxts(
 			ModuleTag:    "{.system" + tagSuffix[i],
 			Scope:        "system",
 		})
+		// Only non-updatable modules have test APIs.
+		textFiles = append(textFiles, MergedTxtDefinition{
+			TxtFilename:  checkedInPrefix + f,
+			DistFilename: distFilename[i],
+			BaseTxt:      ":" + baseTxtModulePrefix + "test-" + f,
+			Modules:      configurableNonUpdatableModules,
+			ModuleTag:    "{.test" + tagSuffix[i],
+			Scope:        "test",
+		})
 		textFiles = append(textFiles, MergedTxtDefinition{
 			TxtFilename:  checkedInPrefix + f,
 			DistFilename: distFilename[i],
@@ -569,9 +579,11 @@ func (a *CombinedApis) createInternalModules(ctx android.LoadHookContext) {
 
 	nonUpdatableModules := getNonUpdatableModules(ctx.Config())
 
-	createMergedTxts(ctx, bootclasspath, system_server_classpath, "non-updatable-", false, false, false)
-	createMergedTxts(ctx, bootclasspath, system_server_classpath, "non-updatable-", false, false, true)
-	createMergedTxts(ctx, bootclasspath, system_server_classpath, "non-updatable-exportable-", true, true, false)
+	configurableNonUpdatableModules := proptools.NewSimpleConfigurable(nonUpdatableModules)
+
+	createMergedTxts(ctx, bootclasspath, system_server_classpath, configurableNonUpdatableModules, "non-updatable-", false, false, false)
+	createMergedTxts(ctx, bootclasspath, system_server_classpath, configurableNonUpdatableModules, "non-updatable-", false, false, true)
+	createMergedTxts(ctx, bootclasspath, system_server_classpath, configurableNonUpdatableModules, "non-updatable-exportable-", true, true, false)
 
 	createMergedPublicStubs(ctx, bootclasspath)
 	createMergedSystemStubs(ctx, bootclasspath, nonUpdatableModules)

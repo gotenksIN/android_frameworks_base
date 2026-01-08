@@ -152,6 +152,16 @@ flag {
 }
 
 flag {
+    name: "show_confirmation_toast_on_user_deletion"
+    namespace: "multiuser"
+    description: "Show a toast to confirm that user deletion has been successful"
+    bug: "438126997"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "property_invalidated_cache_bypass_mismatched_uids"
     namespace: "multiuser"
     description: "Bypass the cache when the process UID does not match the binder UID."
@@ -419,6 +429,13 @@ flag {
 }
 
 flag {
+     name: "hsu_not_admin_for_bugreports"
+     namespace: "multiuser"
+     description: "If the Headless System User is not an Admin user, also don't hackingly treat it as one either for bugreports."
+     bug: "419105275"
+}
+
+flag {
      name: "disallow_removing_last_admin_user"
      namespace: "multiuser"
      description: "Disallow the removal of a user, if it is the last admin user"
@@ -441,9 +458,16 @@ flag {
 }
 
 flag {
+    name: "hsu_disable_notifications"
+    namespace: "multiuser"
+    description: "Disables notifications when the current user is the headless system user"
+    bug: "469851439"
+}
+
+flag {
     name: "hsu_allowlist_notifications"
     namespace: "multiuser"
-    description: "Adds an allowlist mechanism to device which notifications can be shown when the current user is the headless system user"
+    description: "Adds logging for which notifications are shown when the current user is the headless system user. Implementation will use a separate flag."
     bug: "412176703"
 }
 

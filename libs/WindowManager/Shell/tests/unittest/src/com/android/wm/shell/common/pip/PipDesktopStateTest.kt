@@ -26,10 +26,7 @@ import android.testing.TestableLooper.RunWithLooper
 import android.window.DisplayAreaInfo
 import android.window.WindowContainerToken
 import androidx.test.filters.SmallTest
-import com.android.window.flags.Flags.FLAG_ENABLE_CONNECTED_DISPLAYS_PIP
 import com.android.window.flags.Flags.FLAG_ENABLE_DESKTOP_WINDOWING_FREE_FLOATING_PIP
-import com.android.window.flags.Flags.FLAG_ENABLE_DESKTOP_WINDOWING_PIP
-import com.android.window.flags.Flags.FLAG_ENABLE_DRAGGING_PIP_ACROSS_DISPLAYS
 import com.android.window.flags.Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer
 import com.android.wm.shell.ShellTestCase
@@ -58,7 +55,6 @@ import org.mockito.kotlin.whenever
 @SmallTest
 @RunWithLooper
 @RunWith(AndroidTestingRunner::class)
-@EnableFlags(FLAG_ENABLE_DESKTOP_WINDOWING_PIP)
 class PipDesktopStateTest : ShellTestCase() {
     private val mockPipDisplayLayoutState = mock<PipDisplayLayoutState>()
     private val mockRecentsTransitionHandler = mock<RecentsTransitionHandler>()
@@ -107,16 +103,6 @@ class PipDesktopStateTest : ShellTestCase() {
     }
 
     @Test
-    @EnableFlags(FLAG_ENABLE_CONNECTED_DISPLAYS_PIP)
-    fun isConnectedDisplaysPipEnabled_returnsTrue() {
-        assertThat(pipDesktopState.isConnectedDisplaysPipEnabled()).isTrue()
-    }
-
-    @Test
-    @EnableFlags(
-        FLAG_ENABLE_CONNECTED_DISPLAYS_PIP,
-        FLAG_ENABLE_DRAGGING_PIP_ACROSS_DISPLAYS
-    )
     fun isDraggingPipAcrossDisplaysEnabled_returnsTrue() {
         assertThat(pipDesktopState.isDraggingPipAcrossDisplaysEnabled()).isTrue()
     }

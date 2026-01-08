@@ -202,26 +202,6 @@ flag {
 }
 
 flag {
-    name: "promote_audio_sharing_for_second_auto_connected_lea_device"
-    namespace: "cross_device_experiences"
-    description: "Show audio sharing promote notification or dialog when the second lea device is auto connected"
-    bug: "395786392"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "audio_stream_media_service_by_receive_state"
-    namespace: "cross_device_experiences"
-    description: "Start or update audio stream media service by receive state"
-    bug: "398700619"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "audio_stream_play_pause_by_modify_source"
     namespace: "cross_device_experiences"
     description: "Play pause the audio stream by modify source"
@@ -286,4 +266,18 @@ flag {
     metadata {
         purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+  name: "add_extra_external_display_density_stops"
+  namespace: "lse_desktop_experience"
+  description: "Add 200% and 300% display density adjustments for external display"
+  bug: "456530370"
+}
+
+flag {
+    name: "hearing_devices_granular_output_routing"
+    namespace: "accessibility"
+    description: "Enables separate routing controls for Notifications and Ringtones & Alarms"
+    bug: "417319636"
 }

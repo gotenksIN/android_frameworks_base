@@ -3033,15 +3033,6 @@ public final class SystemServer implements Dumpable {
 // QTI_END: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
             t.traceEnd();
 
-            boolean enableWristOrientationService =
-                    !android.server.Flags.migrateWristOrientation()
-                    && SystemProperties.getBoolean("config.enable_wristorientation", false);
-            if (enableWristOrientationService) {
-                t.traceBegin("StartWristOrientationService");
-                mSystemServiceManager.startService(WRIST_ORIENTATION_SERVICE_CLASS);
-                t.traceEnd();
-            }
-
             if (android.server.Flags.wearGestureApi()
                     && SystemProperties.getBoolean("config.enable_gesture_api", false)) {
                 t.traceBegin("StartWearGestureService");

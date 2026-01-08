@@ -158,6 +158,10 @@
     <string name="wfc_mode_wifi_preferred_summary" msgid="1035175836270943089">"Tumawag gamit ang Wi-Fi"</string>
     <string name="wfc_mode_cellular_preferred_summary" msgid="4958965609212575619">"Tumawag gamit ang mobile network"</string>
     <string name="wfc_mode_wifi_only_summary" msgid="104951993894678665">"Wi-Fi lang"</string>
+    <string name="adaptive_low_frequency_less_than_one_minute" msgid="8869498183646028708">"~ %s"</string>
+    <string name="adaptive_low_frequency_neg_less_than_one_minute" msgid="2590062535985417056">"~ −%s"</string>
+    <string name="elapsed_time_low_frequency_short_format_h_mm" msgid="6728141238066668781">"%1$d:%2$02d:--"</string>
+    <string name="elapsed_time_low_frequency_short_format_mm" msgid="2405181895215514414">"%1$02d:--"</string>
     <!-- no translation found for crossSimFormat_spn (9125246077491634262) -->
     <skip />
     <string name="crossSimFormat_spn_cross_sim_calling" msgid="5620807020002879057">"<xliff:g id="SPN">%s</xliff:g> Backup na Pagtawag"</string>
@@ -976,7 +980,7 @@
     <string name="phoneTypeMobile" msgid="1178852541462086735">"Mobile"</string>
     <string name="phoneTypeWork" msgid="6604967163358864607">"Trabaho"</string>
     <string name="phoneTypeFaxWork" msgid="6757519896109439123">"Fax sa Trabaho"</string>
-    <string name="phoneTypeFaxHome" msgid="6678559953115904345">"Fax sa Tahanan"</string>
+    <string name="phoneTypeFaxHome" msgid="6678559953115904345">"Home Fax"</string>
     <string name="phoneTypePager" msgid="576402072263522767">"Pager"</string>
     <string name="phoneTypeOther" msgid="6918196243648754715">"Iba pa"</string>
     <string name="phoneTypeCallback" msgid="3455781500844157767">"Callback"</string>
@@ -1830,6 +1834,7 @@
     <string name="accessibility_shortcut_label_gesture" msgid="7987298674836890931">"galaw"</string>
     <string name="accessibility_shortcut_label_quick_settings" msgid="6851280333772213611">"mga mabilisang setting"</string>
     <string name="accessibility_shortcut_label_triple_tap" msgid="9058975959054454796">"pag-triple tap"</string>
+    <string name="accessibility_shortcut_label_top_row_key" msgid="1488840908672437180">"accessibility key"</string>
     <string name="accessibility_uncheck_legacy_item_warning" msgid="8047830891064817447">"Na-off ang <xliff:g id="SERVICE_NAME">%s</xliff:g>"</string>
     <string name="edit_accessibility_shortcut_menu_button" msgid="8885752738733772935">"I-edit ang mga shortcut"</string>
     <string name="done_accessibility_shortcut_menu_button" msgid="3668407723770815708">"Tapos na"</string>
@@ -2106,8 +2111,7 @@
     <string name="app_suspended_default_message" msgid="6451215678552004172">"Hindi available ang <xliff:g id="APP_NAME_0">%1$s</xliff:g> sa ngayon. Pinamamahalaan ito ng <xliff:g id="APP_NAME_1">%2$s</xliff:g>."</string>
     <string name="app_suspended_more_details" msgid="211260942831587014">"Matuto pa"</string>
     <string name="app_suspended_unsuspend_message" msgid="1665438589450555459">"I-unpause ang app"</string>
-    <!-- no translation found for locked_app_biometric_prompt_description (6853122652400451464) -->
-    <skip />
+    <string name="locked_app_biometric_prompt_description" msgid="6853122652400451464">"Naka-lock ang <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="work_mode_off_title" msgid="6367463960165135829">"I-unpause ang mga work app?"</string>
     <string name="work_mode_turn_on" msgid="5316648862401307800">"I-unpause"</string>
     <string name="work_mode_emergency_call_button" msgid="6818855962881612322">"Emergency"</string>
@@ -2547,10 +2551,8 @@
     <string name="accessibility_label_clone_profile" msgid="7579118375042398784">"Clone"</string>
     <string name="accessibility_label_communal_profile" msgid="1437173163111334791">"Communal"</string>
     <string name="private_space_biometric_prompt_title" msgid="5777592909271728154">"Pribadong space"</string>
-    <!-- no translation found for app_locked_new_notification (4409730436247596215) -->
-    <skip />
-    <!-- no translation found for app_locked_notification_message (4576179600328065280) -->
-    <skip />
+    <string name="app_locked_new_notification" msgid="4409730436247596215">"Bagong notification"</string>
+    <string name="app_locked_notification_message" msgid="4576179600328065280">"Bagong mensahe"</string>
     <string name="redacted_notification_message" msgid="1520587845842228816">"Nakatago ang content ng sensitibong notification"</string>
     <string name="redacted_notification_action_title" msgid="6942924973335920935"></string>
     <string name="screen_not_shared_sensitive_content" msgid="7058419185079565001">"Nakatago ang content ng app mula sa pagbabahagi ng screen para sa seguridad"</string>

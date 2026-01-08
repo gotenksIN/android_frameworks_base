@@ -47,7 +47,6 @@ import static android.view.WindowManager.TRANSIT_TO_FRONT;
 import static android.view.WindowManager.TransitionFlags;
 import static android.view.WindowManager.TransitionType;
 import static android.view.WindowManager.transitTypeToString;
-import static android.window.DesktopExperienceFlags.ENABLE_DESKTOP_WINDOWING_PIP;
 import static android.window.DesktopExperienceFlags.ENABLE_DISPLAY_DISCONNECT_INTERACTION;
 import static android.window.DesktopExperienceFlags.ENABLE_DISPLAY_FOCUS_IN_SHELL_TRANSITIONS;
 import static android.window.DesktopExperienceFlags.ENABLE_INTERACTIVE_PICTURE_IN_PICTURE;
@@ -575,7 +574,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
                 final WindowContainer<?> sibling = rootParent.getChildAt(j);
                 if (sibling == transientRoot) break;
                 if (!sibling.getWindowConfiguration().isAlwaysOnTop() && mController.mAtm
-                        .mTaskSupervisor.mOpaqueContainerHelper.isOpaque(sibling)) {
+                        .mVisibilityHelper.isOpaque(sibling)) {
                     occludedCount++;
                     break;
                 }
@@ -1399,9 +1398,8 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             return false;
         }
 
-        // If PiP on Desktop Windowing is enabled and the task is freeform, we disable entering PiP.
-        if (ENABLE_DESKTOP_WINDOWING_PIP.isTrue()
-                && ar.getTask().getWindowingMode() == WINDOWING_MODE_FREEFORM) {
+        // If the task is freeform, we disable entering PiP.
+        if (ar.getTask().getWindowingMode() == WINDOWING_MODE_FREEFORM) {
             return false;
         }
 
@@ -3067,8 +3065,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             } else {
                 parentChange.mFlags |= ChangeInfo.FLAG_CHANGE_YES_ANIMATION;
             }
-            if (Flags.promoteExistenceChangedStateToParent() && targetChange.mExistenceChanged
-                    && parent.getChildCount() == 1
+            if (targetChange.mExistenceChanged && parent.getChildCount() == 1
                     // The creation and removal of an organizer-created container are independent
                     // of its children.
                     && (parent.asTaskFragment() == null

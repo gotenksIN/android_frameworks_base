@@ -623,6 +623,7 @@ class BubbleControllerTest(flags: FlagsParameterization) {
     fun convertExpandedBubbleToBar_startsConvertingToBar() {
         val bubble = createBubble("key")
         bubble.setShouldAutoExpand(true)
+        bubble.setIsTaskValidToBubbleOnSmallScreen(true)
         getInstrumentation().runOnMainSync {
             bubbleController.inflateAndAdd(
                 bubble,
@@ -650,6 +651,7 @@ class BubbleControllerTest(flags: FlagsParameterization) {
     fun convertExpandedBubbleToBar_updatesTaskViewParent() {
         val bubble = createBubble("key")
         bubble.setShouldAutoExpand(true)
+        bubble.setIsTaskValidToBubbleOnSmallScreen(true)
         getInstrumentation().runOnMainSync {
             bubbleController.inflateAndAdd(
                 bubble,
@@ -679,6 +681,7 @@ class BubbleControllerTest(flags: FlagsParameterization) {
     fun convertExpandedBubbleToBar_screenOff_doesNotCollapse() {
         val bubble = createBubble("key")
         bubble.setShouldAutoExpand(true)
+        bubble.setIsTaskValidToBubbleOnSmallScreen(true)
         getInstrumentation().runOnMainSync {
             bubbleController.inflateAndAdd(
                 bubble,
@@ -718,7 +721,7 @@ class BubbleControllerTest(flags: FlagsParameterization) {
 
         val bubble = createBubble("key")
         bubble.setShouldAutoExpand(true)
-        bubble.setIsTaskValidToBubble(true)
+        bubble.setIsTaskValidToBubbleOnSmallScreen(true)
         getInstrumentation().runOnMainSync {
             bubbleController.inflateAndAdd(
                 bubble,
@@ -764,7 +767,7 @@ class BubbleControllerTest(flags: FlagsParameterization) {
 
         val bubble = createBubble("key")
         bubble.setShouldAutoExpand(true)
-        bubble.setIsTaskValidToBubble(true)
+        bubble.setIsTaskValidToBubbleOnSmallScreen(true)
         getInstrumentation().runOnMainSync {
             bubbleController.inflateAndAdd(
                 bubble,
@@ -924,6 +927,43 @@ class BubbleControllerTest(flags: FlagsParameterization) {
 
         assertThat(layerView!!.visibility).isEqualTo(View.INVISIBLE)
         verify(windowManager).removeView(layerView)
+    }
+
+    @EnableFlags(FLAG_ENABLE_BUBBLE_BAR)
+    @Test
+    fun removeBubbleInBubbleBar_withRemainingBubbles_doesNotHideLayerView() {
+        // GIVEN bubble bar mode is active with two bubbles
+        bubblePositioner.update(deviceConfigUnfolded)
+        bubblePositioner.isShowingInBubbleBar = true
+        getInstrumentation().runOnMainSync {
+            bubbleController.setLauncherHasBubbleBar(true)
+            bubbleController.registerBubbleStateListener(FakeBubblesStateListener())
+        }
+
+        val bubble1 = createBubble("key1")
+        val bubble2 = createBubble("key2")
+        getInstrumentation().runOnMainSync {
+            bubbleController.inflateAndAdd(bubble1, true, true)
+            bubbleController.inflateAndAdd(bubble2, true, true)
+        }
+        val layerView = bubbleController.layerView
+        assertThat(layerView).isNotNull()
+        verify(windowManager).addView(eq(layerView), any())
+
+        // WHEN one bubble is dismissed
+        getInstrumentation().runOnMainSync {
+            bubbleController.dismissBubble("key1", DISMISS_USER_GESTURE)
+        }
+        assertThat(bubbleData.hasBubbles()).isTrue()
+
+        // THEN the layer view is not hidden and not removed from the window manager, because
+        // another bubble is still present. This exercises the animation callback where the new
+        // logging was added.
+        mainExecutor.flushAll()
+        bgExecutor.flushAll()
+
+        assertThat(layerView!!.visibility).isEqualTo(View.VISIBLE)
+        verify(windowManager, never()).removeView(any())
     }
 
     @Test

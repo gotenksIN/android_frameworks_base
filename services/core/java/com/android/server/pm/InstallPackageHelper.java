@@ -20,6 +20,7 @@
  */
 package com.android.server.pm;
 
+import static android.app.privatecompute.flags.Flags.enablePccFrameworkSupport;
 import static android.content.pm.Flags.allowUpdatedVersionBetterThanApkInApex;
 import static android.content.pm.Flags.disallowSdkLibsToBeApps;
 import static android.content.pm.PackageManager.APP_METADATA_SOURCE_APK;
@@ -1049,11 +1050,13 @@ final class InstallPackageHelper {
 
         final PackageSetting ps;
         int appId = -1;
+        int pccId = Process.INVALID_UID;
         long ceDataInode = -1;
         synchronized (mPm.mLock) {
             ps = mPm.mSettings.getPackageLPr(packageName);
             if (ps != null) {
                 appId = ps.getAppId();
+                pccId = enablePccFrameworkSupport() ? ps.getPccId() : Process.INVALID_UID;
                 ceDataInode = ps.getCeDataInode(userId);
                 // NOTE: We ignore the user specified in the InstallParam because we know this is
                 // an update, and hence need to restore data for all installed users.
@@ -1072,7 +1075,8 @@ final class InstallPackageHelper {
             final RollbackManagerInternal rollbackManager =
                     mInjector.getLocalService(RollbackManagerInternal.class);
             rollbackManager.snapshotAndRestoreUserData(packageName,
-                    UserHandle.toUserHandles(installedUsers), appId, ceDataInode, seInfo, token);
+                    UserHandle.toUserHandles(installedUsers), appId, pccId, ceDataInode, seInfo,
+                    token);
             return true;
         }
         return false;

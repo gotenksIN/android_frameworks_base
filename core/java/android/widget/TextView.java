@@ -3782,7 +3782,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      *
      * @see #setFirstBaselineToTopHeight(int)
      * @see #setLastBaselineToBottomHeight(int)
@@ -3802,7 +3802,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      *
      * @see #setFirstBaselineToTopHeight(int)
      * @see #setLastBaselineToBottomHeight(int)
@@ -4850,11 +4850,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         if (mFontWeightAdjustment != 0
                 && mFontWeightAdjustment != Configuration.FONT_WEIGHT_ADJUSTMENT_UNDEFINED) {
             if (tf == null) {
-                if (Flags.fixNullTypefaceBolding()) {
-                    tf = Typeface.DEFAULT_BOLD;
-                } else {
-                    tf = Typeface.DEFAULT;
-                }
+                tf = Typeface.DEFAULT_BOLD;
             } else {
                 int newWeight = Math.min(
                         Math.max(tf.getWeight() + mFontWeightAdjustment, FontStyle.FONT_WEIGHT_MIN),

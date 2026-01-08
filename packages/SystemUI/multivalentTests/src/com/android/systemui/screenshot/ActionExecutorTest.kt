@@ -27,14 +27,14 @@ import android.content.pm.UserInfo
 import android.net.Uri
 import android.os.Bundle
 import android.os.UserHandle
-import android.platform.test.annotations.EnableFlags
+import android.os.UserManager
 import android.view.Window
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
-import com.android.systemui.Flags.FLAG_SCREENSHOT_MULTIDISPLAY_FOCUS_CHANGE
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.clipboardoverlay.ClipboardListener.EXTRA_SUPPRESS_OVERLAY
 import com.android.systemui.user.data.repository.FakeUserRepository
+import com.android.systemui.user.data.repository.UserIconProvider
 import com.android.systemui.user.utils.UserScopedService
 import com.google.common.truth.Truth.assertThat
 import kotlin.test.Test
@@ -61,6 +61,7 @@ class ActionExecutorTest : SysuiTestCase() {
     private val testScope = TestScope(mainDispatcher)
 
     private val intentExecutor = mock<ActionIntentExecutor>()
+    private val userManager = mock<UserManager>()
     private lateinit var userRepository: FakeUserRepository
     private val clipboardManagerService = mock<UserScopedService<ClipboardManager>>()
     private val clipboardManager = mock<ClipboardManager>()
@@ -75,11 +76,10 @@ class ActionExecutorTest : SysuiTestCase() {
 
     @Before
     fun setUp() {
-        userRepository = FakeUserRepository()
+        userRepository = FakeUserRepository(UserIconProvider(context, userManager, mainDispatcher))
     }
 
     @Test
-    @EnableFlags(FLAG_SCREENSHOT_MULTIDISPLAY_FOCUS_CHANGE)
     fun startSharedTransition_callsLaunchIntent() = runTest {
         actionExecutor = createActionExecutor()
         whenever(fakeContext.displayId).thenReturn(17)

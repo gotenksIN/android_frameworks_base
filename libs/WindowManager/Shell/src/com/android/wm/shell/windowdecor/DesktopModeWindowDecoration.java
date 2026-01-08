@@ -556,8 +556,7 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
         // After this line, mTaskInfo is up-to-date and should be used instead of taskInfo
 
         if (!wct.isEmpty()) {
-            if (DesktopExperienceFlags.ENABLE_DESKTOP_WINDOWING_PIP.isTrue()
-                    && mRelayoutParams.mShouldSetAppBounds) {
+            if (mRelayoutParams.mShouldSetAppBounds) {
                 // When expanding from PiP to freeform, we need to start a Transition for applying
                 // the inset changes so that PiP receives the insets for the final bounds. This is
                 // because |mShouldSetAppBounds| applies the insets by modifying app bounds, which
@@ -584,9 +583,7 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
             return;
         }
 
-        if (DesktopModeFlags.SKIP_DECOR_VIEW_RELAYOUT_WHEN_CLOSING_BUGFIX.isTrue()
-                ? (oldRootView != mResult.mRootView && taskInfo.isVisibleRequested)
-                : oldRootView != mResult.mRootView) {
+        if (oldRootView != mResult.mRootView && taskInfo.isVisibleRequested) {
             disposeStatusBarInputLayer();
             mWindowDecorViewHolder = createViewHolder();
             // Load these only when first creating the view.

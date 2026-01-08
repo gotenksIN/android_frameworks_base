@@ -39,7 +39,6 @@ import android.util.SparseArray;
 import android.view.DisplayCutout;
 import android.view.InsetsState;
 import android.view.SurfaceControl;
-import android.window.DesktopExperienceFlags;
 import android.window.DisplayAreaInfo;
 import android.window.WindowContainerTransaction;
 
@@ -326,11 +325,8 @@ public class PipController implements ConfigurationChangeListener,
                                 + "pipDisplayLayoutState#displayId=%s",
                         task.topActivity, wasVisible, task.displayId,
                         mPipDisplayLayoutState.getDisplayId());
-                boolean isPipLaunchingOnDifferentDisplay =
-                        DesktopExperienceFlags.ENABLE_CROSS_DISPLAYS_PIP_TASK_LAUNCH.isTrue()
-                                && task.displayId != mPipDisplayLayoutState.getDisplayId();
                 if (task.getWindowingMode() != WINDOWING_MODE_PINNED
-                        || isPipLaunchingOnDifferentDisplay) {
+                        || task.displayId != mPipDisplayLayoutState.getDisplayId()) {
                     return;
                 }
                 mPipScheduler.scheduleExitPipViaExpand(wasVisible,
@@ -457,9 +453,7 @@ public class PipController implements ConfigurationChangeListener,
     public void onDisplayRemoved(int displayId) {
         // If PiP was active on an external display that is removed, clean up states and set
         // {@link PipDisplayLayoutState} to DEFAULT_DISPLAY.
-        if (DesktopExperienceFlags.ENABLE_CONNECTED_DISPLAYS_PIP.isTrue()
-                && mPipTransitionState.isInPip()
-                && displayId == mPipDisplayLayoutState.getDisplayId()
+        if (mPipTransitionState.isInPip() && displayId == mPipDisplayLayoutState.getDisplayId()
                 && displayId != DEFAULT_DISPLAY) {
             mPipTransitionState.setState(PipTransitionState.EXITING_PIP);
             mPipTransitionState.setState(PipTransitionState.EXITED_PIP);
@@ -468,6 +462,9 @@ public class PipController implements ConfigurationChangeListener,
             mPipDisplayLayoutState.setDisplayLayout(
                     mDisplayController.getDisplayLayout(DEFAULT_DISPLAY));
         }
+
+        // Avoid keeping track of insets listeners for the removed displays to prevent memory leaks.
+        mListenersPerDisplay.remove(displayId);
     }
 
     /**
@@ -607,14 +604,11 @@ public class PipController implements ConfigurationChangeListener,
             return null;
         }
 
-        // If PiP is enabled on Connected Displays, update PipDisplayLayoutState to have the correct
-        // display info that PiP is entering in.
-        if (DesktopExperienceFlags.ENABLE_CONNECTED_DISPLAYS_PIP.isTrue()) {
-            final DisplayLayout displayLayout = mDisplayController.getDisplayLayout(displayId);
-            if (displayLayout != null) {
-                mPipDisplayLayoutState.setDisplayId(displayId);
-                mPipDisplayLayoutState.setDisplayLayout(displayLayout);
-            }
+        // Update PipDisplayLayoutState to have the correct display info that PiP is entering in.
+        final DisplayLayout displayLayout = mDisplayController.getDisplayLayout(displayId);
+        if (displayLayout != null) {
+            mPipDisplayLayoutState.setDisplayId(displayId);
+            mPipDisplayLayoutState.setDisplayLayout(displayLayout);
         }
 
         // Preemptively add the keep clear area for Hotseat, so that it is taken into account

@@ -24,6 +24,7 @@ import static android.internal.perfetto.protos.Windowmanagerservice.DisplayConte
 import static android.view.InsetsSource.ID_IME;
 import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 import static android.view.WindowInsets.Type.captionBar;
+import static android.view.WindowInsets.Type.displayCutout;
 import static android.view.WindowInsets.Type.ime;
 import static android.view.WindowInsets.Type.navigationBars;
 import static android.view.WindowInsets.Type.statusBars;
@@ -56,6 +57,7 @@ import android.os.RemoteException;
 import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.annotations.Presubmit;
+import android.view.DisplayCutout;
 import android.util.proto.ProtoOutputStream;
 import android.view.IDisplayWindowInsetsController;
 import android.view.InsetsFrameProvider;

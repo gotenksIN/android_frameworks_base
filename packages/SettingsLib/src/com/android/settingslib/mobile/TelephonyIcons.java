@@ -63,9 +63,7 @@ public class TelephonyIcons {
     public static final int ICON_4G_LTE_PLUS =
             flagged(R.drawable.ic_4g_lte_plus_mobiledata,
                     R.drawable.ic_4g_lte_plus_mobiledata_updated);
-// QTI_BEGIN: 2025-12-9: Android_UI: SystemUI: Add NB-IOT icons support for NB-IOT
     public static final int ICON_4G_LTE_NB_IOT = R.drawable.ic_4g_lte_nb_iot_mobiledata;
-// QTI_END: 2025-12-9: Android_UI: SystemUI: Add NB-IOT support for NB-IOT
     public static final int ICON_5G_E =
             flagged(R.drawable.ic_5g_e_mobiledata, R.drawable.ic_5g_e_mobiledata_updated);
     public static final int ICON_1X =
@@ -310,12 +308,10 @@ public class TelephonyIcons {
 
 // QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
 
-// QTI_BEGIN: 2025-12-9: Android_UI: SystemUI: Add NB-IOT icons support for NB-IOT
     public static final MobileIconGroup FOURG_LTE_NB_IOT = new MobileIconGroup(
         "4G_LTE_NB_IOT",
         R.string.data_connection_nb_iot,
         TelephonyIcons.ICON_4G_LTE_NB_IOT);
-// QTI_END: 2025-12-9: Android_UI: SystemUI: Add NB-IOT support for NB-IOT
 
     /** Mapping icon name(lower case) to the icon object. */
     public static final Map<String, MobileIconGroup> ICON_NAME_TO_ICON;

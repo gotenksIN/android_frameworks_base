@@ -409,6 +409,8 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screenshot_blocked_by_admin">Taking screenshots is blocked by your IT admin</string>
     <!-- Label for UI element which allows copying the screenshot to clipboard [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screenshot_copy_label">Copy</string>
     <!-- Content description indicating that tapping the element will allow copying the screenshot to clipboard [CHAR LIMIT=NONE] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -650,6 +652,8 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_record_record_microphone_label">Record microphone</string>
     <!-- We show this warning to explain the recording mic or device audio can't be changed during the recording [CHAR LIMIT=100] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_record_record_audio_during_recording_warning">Can\'t change audio settings while recording</string>
     <!-- Screen recording should show selfie camera [CHAR LIMIT=35] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -4063,6 +4067,8 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="accessibility_status_bar_satellite_available">Satellite, connection available</string>
     <!-- Accessibility label for the SAT symbol on the status bar [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="accessibility_status_bar_satellite_symbol">Satellite</string>
 
     <!-- Text displayed indicating that the user is connected to a satellite signal. -->
@@ -4256,11 +4262,13 @@
     <string name="inline_turn_off_notifications">Turn off</string>
 
     <!-- Notification Inline controls: device type for button to open bridged notification settings on associated device [CHAR_LIMIT=20] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="bridged_device_type_unknown">device</string>
 
     <!-- Notification Inline controls: device type for button to open bridged notification settings on associated device [CHAR_LIMIT=20] -->
-    <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
-    <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="bridged_device_type_phone">phone</string>
 
     <!-- Notification Inline controls: device type for button to open bridged notification settings on associated device [CHAR_LIMIT=20] -->

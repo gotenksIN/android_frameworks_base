@@ -442,14 +442,6 @@ class Task extends TaskFragment {
     int mMultiWindowRestoreWindowingMode = INVALID_WINDOWING_MODE;
     WindowContainerToken mMultiWindowRestoreParent;
 
-    /**
-     * Last requested orientation reported to DisplayContent. This is different from {@link
-     * #mOrientation} in the sense that this takes activities' requested orientation into
-     * account. Start with {@link ActivityInfo#SCREEN_ORIENTATION_UNSPECIFIED} so that we don't need
-     * to notify for activities that don't specify any orientation.
-     */
-    int mLastReportedRequestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
-
     private final Rect mTmpRect = new Rect();
 
     // Resize mode of the task. See {@link ActivityInfo#resizeMode}
@@ -485,6 +477,7 @@ class Task extends TaskFragment {
      * When set, the leaf task should be kept in the current root task if the relaunch originates
      * from other source task.
      */
+    @VisibleForTesting(visibility = VisibleForTesting.Visibility.PRIVATE)
     boolean mPreserveLeafTaskIfRelaunch;
 
     /**
@@ -2535,7 +2528,7 @@ class Task extends TaskFragment {
     }
 
     @Override
-    public void writeIdentifierToProto(ProtoOutputStream proto, long fieldId) {
+    void writeIdentifierToProto(ProtoOutputStream proto, long fieldId) {
         final long token = proto.start(fieldId);
         proto.write(HASH_CODE, System.identityHashCode(this));
         proto.write(USER_ID, mUserId);
@@ -3490,7 +3483,13 @@ class Task extends TaskFragment {
         info.isTopActivityNoDisplay = top != null && top.isNoDisplay();
         info.isSleeping = shouldSleepActivities();
         info.isTopActivityTransparent = top != null && !top.fillsParent();
-        info.isActivityStackTransparent = !topTask.forAllActivities(r -> (r.occludesParent()));
+        if (Flags.improveOcclusionCalculation()) {
+            info.isActivityStackTransparent = !mAtmService.mVisibilityHelper.isOpaque(topTask,
+                    null /* starting */, true /* ignoringKeyguard */,
+                    false /* ignoringInvisibleActivity */, true /* ignoringFinishing */);
+        } else {
+            info.isActivityStackTransparent = !topTask.forAllActivities(r -> (r.occludesParent()));
+        }
         info.lastNonFullscreenBounds = topTask.mLastNonFullscreenBounds;
         info.leafTaskBoundsFromOptions = mLeafTaskBoundsFromOptions;
         final WindowState windowState = top != null
@@ -3671,6 +3670,12 @@ class Task extends TaskFragment {
     protected boolean onChildVisibleRequestedChanged(@Nullable WindowContainer child) {
         if (!super.onChildVisibleRequestedChanged(child)) return false;
         sendTaskFragmentParentInfoChangedIfNeeded();
+        if (mLayerRank != Task.LAYER_RANK_INVISIBLE && !mRootWindowContainer.mTaskLayersChanged
+                && !isVisibleRequested()) {
+            // ActivityRecord#setVisibleRequested will invoke onProcessActivityStateChanged
+            // to update the change to WindowProcessController#mActivityStateFlags.
+            mLayerRank = Task.LAYER_RANK_INVISIBLE;
+        }
         return true;
     }
 
@@ -6507,6 +6512,28 @@ class Task extends TaskFragment {
         }
     }
 
+    /**
+     * Returns the root task of this task if leaf preservation is enabled.
+     *
+     * <p>This method evaluates the root task of this task instance. If that root task exists and
+     * has {@code mPreserveLeafTaskIfRelaunch} set to true, it is returned. This allows
+     * the caller to prioritize the existing root structure over the source's, preventing leaf tasks
+     * from being unexpectedly reparented during a relaunch.
+     *
+     * @return the root task if it exists and leaf preservation is enabled; {@code null} otherwise.
+     */
+    @Nullable
+    Task getPreservedRootTaskIfEnabled() {
+        if (!com.android.window.flags.Flags.enablePreserveLeafTaskIfRelaunch()) {
+            return null;
+        }
+        final Task rootTask = getCreatedByOrganizerTask();
+        if (rootTask != null && rootTask.mPreserveLeafTaskIfRelaunch) {
+            return rootTask;
+        }
+        return null;
+    }
+
     void setPreserveLeafTaskIfRelaunch(boolean preserveLeafTaskIfRelaunch) {
         if (isOrganized()) {
             mPreserveLeafTaskIfRelaunch = preserveLeafTaskIfRelaunch;
@@ -7292,7 +7319,11 @@ class Task extends TaskFragment {
             if (child == this) {
                 continue;
             }
-            if (mAtmService.mVisibilityHelper.isOpaque(child)) {
+            if (mAtmService.mVisibilityHelper.isOpaque(child, null /* starting */,
+                    true /* ignoringKeyguard */, false /* ignoringInvisibleActivity */,
+                    true /* ignoringFinishing */)) {
+                // Also calculate siblings that are currently invisible (behind current), but not
+                // include finishing.
                 return true;
             }
         }

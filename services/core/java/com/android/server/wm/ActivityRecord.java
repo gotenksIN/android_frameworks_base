@@ -695,7 +695,7 @@ public final class ActivityRecord extends WindowToken {
     private boolean mCurrentLaunchCanTurnScreenOn = true;
 
     /**
-     * The activity is opaque and fills the entire space of this task.
+     * The activity is opaque and fills the entire space of its parent container.
      * @see #occludesParent()
      */
     private boolean mOccludesParent;
@@ -3098,8 +3098,10 @@ public final class ActivityRecord extends WindowToken {
         mNoDisplay = isNoDisplay;
     }
 
-    /** Returns true if this activity is not finishing, is opaque and fills the entire space of
-     * this task. */
+    /**
+     * Returns true if this activity is not finishing, is opaque and fills the entire space of
+     * its parent container.
+     */
     boolean occludesParent() {
         return occludesParent(false /* includingFinishing */);
     }
@@ -9636,7 +9638,7 @@ public final class ActivityRecord extends WindowToken {
     }
 
     @Override
-    public void writeIdentifierToProto(ProtoOutputStream proto, long fieldId) {
+    void writeIdentifierToProto(ProtoOutputStream proto, long fieldId) {
         final long token = proto.start(fieldId);
         proto.write(HASH_CODE, System.identityHashCode(this));
         proto.write(USER_ID, mUserId);

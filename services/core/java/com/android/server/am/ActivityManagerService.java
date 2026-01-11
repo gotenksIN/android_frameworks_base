@@ -272,6 +272,7 @@ import android.app.ContentProviderHolder;
 import android.app.ForegroundServiceDelegationOptions;
 import android.app.IActivityController;
 import android.app.IActivityManager;
+import android.app.IAnrWarningCallback;
 import android.app.IApplicationStartInfoCompleteListener;
 import android.app.IApplicationThread;
 import android.app.IForegroundServiceObserver;
@@ -1622,6 +1623,8 @@ public class ActivityManagerService extends IActivityManager.Stub
 
     final AnrHelper mAnrHelper = new AnrHelper(this);
 
+    private final AnrWarningController mAnrWarningController = new AnrWarningController();
+
     /** Set to true after the system has finished booting. */
     volatile boolean mBooted = false;
 
@@ -2400,17 +2403,13 @@ public class ActivityManagerService extends IActivityManager.Stub
         @Override
         public void onUserStopped(@NonNull TargetUser user) {
             mService.mBatteryStatsService.onCleanupUser(user.getUserIdentifier());
+            final UserManagerInternal umInternal =
+                    LocalServices.getService(UserManagerInternal.class);
+            UserInfo userInfo = umInternal.getUserInfo(user.getUserIdentifier());
 
-            if (android.os.Flags.allowPrivateProfile()
-                    && android.multiuser.Flags.enablePrivateSpaceFeatures()) {
-                final UserManagerInternal umInternal =
-                        LocalServices.getService(UserManagerInternal.class);
-                UserInfo userInfo = umInternal.getUserInfo(user.getUserIdentifier());
-
-                if (userInfo != null && userInfo.isPrivateProfile()) {
-                    synchronized (mService) {
-                        mService.mPrivateSpaceBootCompletedPackages.clear();
-                    }
+            if (userInfo != null && userInfo.isPrivateProfile()) {
+                synchronized (mService) {
+                    mService.mPrivateSpaceBootCompletedPackages.clear();
                 }
             }
         }
@@ -2775,8 +2774,8 @@ public class ActivityManagerService extends IActivityManager.Stub
     /**
      * Return a new limiter from the controller.
      */
-    MemoryLimiter.Limiter newMemoryLimiter() {
-        return mMemoryLimiter.newLimiter();
+    MemoryLimiter.Limiter newMemoryLimiter(@Nullable String pkg) {
+        return mMemoryLimiter.newLimiter(pkg);
     }
 
     /**
@@ -12721,7 +12720,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                 pw.println("  --checkin: dump data for a checkin");
                 pw.println("  --proto: dump data to proto");
                 pw.println("  --logstats: log native allocator statistics.");
-                pw.println("  --unreachable: dump unreachable native memory with libmemunreachable.");
+                pw.println(
+                        "  --unreachable: dump unreachable native memory with libmemunreachable.");
 // QTI_BEGIN: 2025-05-28: Performance: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
                 pw.println("  --dmabuf: dump dma buffer information.");
 // QTI_END: 2025-05-28: Performance: Introduce a param in the dumpsys meminfo command to retrieve dmabuf info
@@ -20821,5 +20821,31 @@ public class ActivityManagerService extends IActivityManager.Stub
             return;
         }
         r.getWindowProcessController().setOptimizationInfo(compilerFilter, compilationReason);
+    }
+
+    // uid indexed collection of lists of ANR warning callback.
+    @GuardedBy("mAnrWarningCallbacks")
+    private final SparseArray<List<IAnrWarningCallback>> mAnrWarningCallbacks = new SparseArray<>();
+
+    @Override
+    public void registerAnrWarningListener(IAnrWarningCallback callback) {
+        mAnrWarningController.registerAnrWarningListener(Binder.getCallingUid(), callback);
+    }
+
+    @Override
+    public void unregisterAnrWarningListener(IAnrWarningCallback callback) {
+        mAnrWarningController.unregisterAnrWarningListener(Binder.getCallingUid(), callback);
+    }
+
+    /** Notifies the app about a potential ANR. */
+    public void notifyAnrWarning(
+            int uid,
+            int anrId,
+            int anrType,
+            long consumedTimeMs,
+            long timeoutMs,
+            String description) {
+        mAnrWarningController.notifyAnrWarning(
+                uid, anrId, anrType, consumedTimeMs, timeoutMs, description);
     }
 }

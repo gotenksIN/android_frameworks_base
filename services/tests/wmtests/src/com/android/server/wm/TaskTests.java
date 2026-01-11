@@ -1817,6 +1817,38 @@ public class TaskTests extends WindowTestsBase {
     }
 
     @Test
+    public void getPreservedRootTaskIfEnabled_nonOrganizedTask_returnsNull() {
+        final Task task = getTestTask();
+        final Task preservedRootTask = task.getPreservedRootTaskIfEnabled();
+        assertNull(preservedRootTask);
+    }
+
+    @Test
+    public void getPreservedRootTaskIfEnabled_preservationNotRequested_returnsNull() {
+        final Task rootTask = createTask(mDisplayContent);
+        rootTask.mCreatedByOrganizer = true;
+        final Task leafTask = createTaskInRootTask(rootTask, 0 /* userId */);
+        final Task preservedRootTask = leafTask.getPreservedRootTaskIfEnabled();
+        assertNull(preservedRootTask);
+    }
+
+    @Test
+    public void getPreservedRootTaskIfEnabled_rootTaskEnablesLeafPreservation_returnsRootTask() {
+        final Task rootTask = createTask(mDisplayContent);
+        rootTask.mCreatedByOrganizer = true;
+        rootTask.mPreserveLeafTaskIfRelaunch = true;
+        final Task leafTask = createTaskInRootTask(rootTask, 0 /* userId */);
+
+        final Task preservedRootTask = leafTask.getPreservedRootTaskIfEnabled();
+
+        if (com.android.window.flags.Flags.enablePreserveLeafTaskIfRelaunch()) {
+            assertEquals(rootTask, preservedRootTask);
+        } else {
+            assertNull(preservedRootTask);
+        }
+    }
+
+    @Test
     public void testSetPreserveLeafTaskIfRelaunch_organizedTask_setsFlag() {
         final Task task = getTestTask();
         task.mCreatedByOrganizer = true;
@@ -2619,6 +2651,30 @@ public class TaskTests extends WindowTestsBase {
 
         assertTrue(task.shouldIgnoreInsets());
         assertTrue(task.disableAppCompatRoundedCorners());
+    }
+
+    @EnableFlags(Flags.FLAG_IMPROVE_OCCLUSION_CALCULATION)
+    @Test
+    public void testFillTestInfo_isActivityStackTransparent_withTransparentEmbeddedActivity() {
+        final Task task = createTask(mDisplayContent);
+        final TaskFragment primaryTf = createTaskFragmentWithActivity(task);
+        final TaskFragment secondaryTf = createTaskFragmentWithActivity(task);
+        final ActivityRecord primaryActivity = primaryTf.getTopMostActivity();
+        final ActivityRecord secondaryActivity = secondaryTf.getTopMostActivity();
+        primaryTf.setWindowingMode(WINDOWING_MODE_MULTI_WINDOW);
+        primaryTf.setBounds(new Rect(0, 0, 500, 1000));
+        secondaryTf.setWindowingMode(WINDOWING_MODE_MULTI_WINDOW);
+        secondaryTf.setBounds(new Rect(500, 0, 1000, 1000));
+        primaryTf.setAdjacentTaskFragments(
+                new TaskFragment.AdjacentSet(primaryTf, secondaryTf));
+
+        doReturn(true).when(primaryActivity).occludesParent(anyBoolean());
+        doReturn(false).when(secondaryActivity).occludesParent(anyBoolean());
+
+        final ActivityManager.RunningTaskInfo info = new ActivityManager.RunningTaskInfo();
+        task.fillTaskInfo(info);
+
+        assertTrue(info.isActivityStackTransparent);
     }
 
     private Task getTestTask() {

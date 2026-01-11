@@ -761,7 +761,7 @@ java_aconfig_library {
     name: "android.view.flags-aconfig-java-export",
     aconfig_declarations: "android.view.flags-aconfig",
     mode: "exported",
-    min_sdk_version: "31",
+    min_sdk_version: "30",
     apex_available: [
         "//apex_available:platform",
         "com.android.wifi",
@@ -1961,6 +1961,14 @@ java_aconfig_library {
     name: "android.provider.flags-aconfig-java",
     aconfig_declarations: "android.provider.flags-aconfig",
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
+    min_sdk_version: "30",
+}
+
+java_aconfig_library {
+    name: "android.provider.flags-aconfig-java-export",
+    aconfig_declarations: "android.provider.flags-aconfig",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+    mode: "exported",
     min_sdk_version: "30",
 }
 

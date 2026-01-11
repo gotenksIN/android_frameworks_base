@@ -1062,7 +1062,8 @@ final class TaskDisplayArea extends DisplayArea<WindowContainer> {
                     sourceTask.getWindowingMode(), sourceTask.getActivityType())) {
                 // Use the candidate's root task if it needs to preserve leaf tasks during a
                 // relaunch (e.g., Bubble relaunch from desktop).
-                final Task candidateRootTask = getPreservedRootTaskIfEnabled(candidateTask);
+                final Task candidateRootTask = candidateTask != null
+                        ? candidateTask.getPreservedRootTaskIfEnabled() : null;
                 if (candidateRootTask != null) {
                     return candidateRootTask;
                 }
@@ -1096,7 +1097,7 @@ final class TaskDisplayArea extends DisplayArea<WindowContainer> {
                 }
                 // Use the candidate's root task instead of the source's if it needs to preserve
                 // leaf tasks during a relaunch (e.g., Bubble relaunch from split-screen).
-                final Task candidateRootTask = getPreservedRootTaskIfEnabled(candidateTask);
+                final Task candidateRootTask = candidateTask.getPreservedRootTaskIfEnabled();
                 if (candidateRootTask != null) {
                     return candidateRootTask;
                 }
@@ -1104,30 +1105,13 @@ final class TaskDisplayArea extends DisplayArea<WindowContainer> {
             }
             if (com.android.window.flags.Flags.enableBubbleRootTask()) {
                 final Task parentTask = sourceTask.getParent().asTask();
-                if (parentTask != null && parentTask.mCreatedByOrganizer) {
+                if (parentTask != null && parentTask.mCreatedByOrganizer
+                        && parentTask.getTaskDisplayArea() == this) {
                     return parentTask;
                 }
             }
         }
 
-        return null;
-    }
-
-    /**
-     * Returns the root task of the given {@code task} if leaf preservation is enabled.
-     *
-     * <p>This method checks the root task of the given {@code task}. If that root
-     * exists and has {@code mPreserveLeafTaskIfRelaunch} set to true, it is returned.
-     * This allows the caller to prioritize the existing root structure over the source's,
-     * preventing leaf tasks from being unexpectedly reparented during a relaunch.
-     */
-    @Nullable
-    private static Task getPreservedRootTaskIfEnabled(@Nullable Task task) {
-        final Task rootTask = task != null ? task.getCreatedByOrganizerTask() : null;
-        if (com.android.window.flags.Flags.enablePreserveLeafTaskIfRelaunch()
-                && rootTask != null && rootTask.mPreserveLeafTaskIfRelaunch) {
-            return rootTask;
-        }
         return null;
     }
 

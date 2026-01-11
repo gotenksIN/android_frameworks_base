@@ -576,7 +576,7 @@ public final class DisplayManagerService extends SystemService {
 
     // Whether default display should be included in the display topology. Note that this should
     // only be used for the devices in projected mode.
-    private boolean mIncludeDefaultDisplayInTopology;
+    private boolean mIncludeDefaultDisplayInTopology = true;
     private final boolean mStableEdidsFlag;
 
     private final BroadcastReceiver mIdleModeReceiver = new BroadcastReceiver() {
@@ -950,11 +950,7 @@ public final class DisplayManagerService extends SystemService {
                 updateMirrorBuiltInDisplaySettingLocked(/*shouldSendDisplayChangeEvent=*/ false);
             }
 
-            if (mFlags.isDefaultDisplayInTopologySwitchEnabled()) {
-                mIncludeDefaultDisplayInTopology =
-                        mInjector.isDesktopModeSupportedOnInternalDisplay(mContext)
-                                || getIncludeDefaultDisplayInTopologySetting();
-            }
+            handleIncludeDefaultDisplayInTopologySettingChangeLocked();
             mUserManagerInternal = LocalServices.getService(UserManagerInternal.class);
             if (mUserManagerInternal != null) {
                 mUserManagerInternal.addUserLifecycleListener(
@@ -1328,12 +1324,8 @@ public final class DisplayManagerService extends SystemService {
             }
             if (Settings.Secure.getUriFor(INCLUDE_DEFAULT_DISPLAY_IN_TOPOLOGY).equals(uri)) {
                 synchronized (mSyncRoot) {
-                    if (mFlags.isDefaultDisplayInTopologySwitchEnabled()
-                            && !mInjector.isDesktopModeSupportedOnInternalDisplay(mContext)) {
-                        handleIncludeDefaultDisplayInTopologySettingChangeLocked();
-                    }
+                    handleIncludeDefaultDisplayInTopologySettingChangeLocked();
                 }
-                return;
             }
         }
     }
@@ -1385,6 +1377,11 @@ public final class DisplayManagerService extends SystemService {
     }
 
     private void handleIncludeDefaultDisplayInTopologySettingChangeLocked() {
+        if (!mFlags.isDefaultDisplayInTopologySwitchEnabled()
+                || mInjector.isDesktopModeSupportedOnInternalDisplay(mContext)) {
+            return;
+        }
+
         final boolean includeDefaultDisplayInTopology = getIncludeDefaultDisplayInTopologySetting();
 
         if (mIncludeDefaultDisplayInTopology == includeDefaultDisplayInTopology) {
@@ -4809,7 +4806,7 @@ public final class DisplayManagerService extends SystemService {
         private void sendSnapshotEventIfNeededLocked(
                 @InternalEventFlag long oldFlagsMask,
                 @InternalEventFlag long newFlagsMask) {
-            if (!Flags.displayListenerSnapshot() && !Flags.displayIdsCache()) {
+            if (!Flags.displayIdsCache()) {
                 return;
             }
 
@@ -4947,7 +4944,7 @@ public final class DisplayManagerService extends SystemService {
 
             // Access check, except for removed and disconnected events where the process is not
             // present on the display any more.
-            if ((Flags.displayListenerSnapshot() || Flags.displayIdsCache())
+            if (Flags.displayIdsCache()
                     && (eventMask & DisplayManagerGlobal.EVENT_DISPLAY_REMOVED) == 0
                     && (eventMask & DisplayManagerGlobal.EVENT_DISPLAY_DISCONNECTED) == 0
                     && getDisplayInfoInternal(displayId, mUid) == null) {

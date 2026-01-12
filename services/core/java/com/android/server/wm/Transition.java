@@ -574,7 +574,9 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
                 final WindowContainer<?> sibling = rootParent.getChildAt(j);
                 if (sibling == transientRoot) break;
                 if (!sibling.getWindowConfiguration().isAlwaysOnTop() && mController.mAtm
-                        .mVisibilityHelper.isOpaque(sibling)) {
+                        .mVisibilityHelper.isOpaque(sibling, null /* starting */,
+                                true /* ignoringKeyguard */, false /* ignoringInvisibleActivity */,
+                                false /* ignoringFinishing */)) {
                     occludedCount++;
                     break;
                 }
@@ -875,8 +877,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         if (mParticipants.contains(wc)) return;
         // Transient-hide may be hidden later, so no need to request redraw.
         // Also, recents transition can play without waiting for its host to draw.
-        if (!isInTransientHide(wc) && (!com.android.window.flags.Flags.skipAddRecentsToSyncSet()
-                || !isLaunchingRecents(wc))) {
+        if (!isInTransientHide(wc) && !isLaunchingRecents(wc)) {
             mSyncEngine.addToSyncSet(mSyncId, wc);
         }
         if (wc.asWindowToken() != null && wc.asWindowToken().mRoundedCornerOverlay) {

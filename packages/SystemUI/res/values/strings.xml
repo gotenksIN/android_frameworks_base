@@ -663,6 +663,10 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_record_capture_target_choose_app">Choose an app to record</string>
+    <!-- Header for the carousel to choose an app for screen recording. [CHAR LIMIT=NONE] -->
+    <string name="screen_record_settings">Screen recording settings</string>
+    <!-- Label for markup functionality in screen recording. [CHAR LIMIT=NONE] -->
+    <string name="screen_record_markup">Markup</string>
     <!-- Snackbar shows after the screen recording is saved [CHAR LIMIT=20] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->

@@ -11206,7 +11206,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         mBinderService.addAutomaticZenRule(rule, "com.android.settings", false);
 
         // verify that zen mode helper gets passed in a package name of "android"
-        verify(mockZenModeHelper).addAutomaticZenRule(any(), eq("android"), eq(rule),
+        verify(zenModeHelper).addAutomaticZenRule(any(), eq("android"), eq(rule),
                 eq(ZenModeConfig.ORIGIN_SYSTEM), anyString(), anyInt());
     }
 
@@ -11248,7 +11248,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         mBinderService.addAutomaticZenRule(rule, "another.package", false);
 
         // verify that zen mode helper gets passed in the package name from the arg, not the owner
-        verify(mockZenModeHelper).addAutomaticZenRule(any(), eq("another.package"), eq(rule),
+        verify(zenModeHelper).addAutomaticZenRule(any(), eq("another.package"), eq(rule),
                 eq(ZenModeConfig.ORIGIN_APP), anyString(),
                 anyInt());  // doesn't count as a system/systemui call
     }
@@ -17006,7 +17006,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
 
         mBinderService.getNotificationPolicy("package");
 
-        verify(zenHelper).getNotificationPolicyFromImplicitZenRule(any(), eq("package"));
+        verify(zenModeHelper).getNotificationPolicyFromImplicitZenRule(any(), eq("package"));
     }
 
     @Test
@@ -17020,7 +17020,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
 
         mBinderService.setInterruptionFilter("package", INTERRUPTION_FILTER_PRIORITY, false);
 
-        verify(zenHelper).applyGlobalZenModeAsImplicitZenRule(any(), eq("package"), anyInt(),
+        verify(zenModeHelper).applyGlobalZenModeAsImplicitZenRule(any(), eq("package"), anyInt(),
                 eq(ZEN_MODE_IMPORTANT_INTERRUPTIONS));
     }
 

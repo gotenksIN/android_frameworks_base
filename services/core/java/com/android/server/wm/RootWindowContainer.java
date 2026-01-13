@@ -2950,10 +2950,6 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             // Drop any cached DisplayInfos associated with this display id - the values are now
             // out of date given this display added event.
             mWmService.mPossibleDisplayInfoMapper.removePossibleDisplayInfos(displayId);
-
-            // We serve a map from display IDs to respective values, so we need to notify client
-            // when the display is added.
-            mService.onTaskMoveAllowedChanged();
         }
     }
 
@@ -3016,10 +3012,6 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             } else {
                 removeDisplayContent(displayContent);
             }
-
-            // We serve a map from display IDs to respective values, so we need to notify client
-            // when the display is removed.
-            mService.onTaskMoveAllowedChanged();
         }
     }
 

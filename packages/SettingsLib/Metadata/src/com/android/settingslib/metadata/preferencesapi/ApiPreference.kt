@@ -24,8 +24,8 @@ import com.android.settingslib.datastore.Permissions
 import com.android.settingslib.datastore.and
 import com.android.settingslib.metadata.PersistentPreference
 import com.android.settingslib.metadata.ReadWritePermit
-import com.android.settingslib.metadata.preferencesapi.ExceptionMessagesFormatter.getExceptionMessageMultipleDefines
-import com.android.settingslib.metadata.preferencesapi.ExceptionMessagesFormatter.getExceptionMessageWrongOrder
+import com.android.settingslib.metadata.preferencesapi.Utils.getExceptionMessageMultipleDefines
+import com.android.settingslib.metadata.preferencesapi.Utils.getExceptionMessageWrongOrder
 import com.android.settingslib.metadata.ValidatedKeyParameters
 import com.android.settingslib.metadata.preferencesapi.preconditions.Allowed
 import com.android.settingslib.metadata.preferencesapi.preconditions.ApiPreconditions
@@ -58,10 +58,29 @@ class PermissionsConfig(incomingPermissions: List<String>) {
 }
 
 /** Configuration of the [ApiPreference] preconditions. */
-class PreconditionsConfig(
-    @StringRes val description: Int,
+class PreconditionsConfig private constructor(
+    @StringRes val descriptionRes: Int?,
+    val description: String?,
     val check: suspend ApiOperationContext.() -> ApiPreconditions,
-)
+) {
+    init {
+        require(descriptionRes != null || description != null)
+    }
+
+    constructor(
+        @StringRes description: Int,
+        check: suspend ApiOperationContext.() -> ApiPreconditions
+    ) : this(descriptionRes = description, description = null, check = check)
+
+    constructor(
+        description: String,
+        check: suspend ApiOperationContext.() -> ApiPreconditions
+    ) : this(descriptionRes = null, description = description, check = check)
+
+    /** Get the description as a string using the provided context. */
+    fun getDescription(context: Context): String =
+        resolveString(context, descriptionRes, description)
+}
 
 /** Configuration of the [ApiPreference] get. */
 class GetConfig<V : Any>(
@@ -71,10 +90,29 @@ class GetConfig<V : Any>(
 )
 
 /** Configuration of the [ApiPreference] value preconditions. */
-class ValuePreconditionsConfig<V : Any>(
-    @StringRes val description: Int,
+class ValuePreconditionsConfig<V : Any> private constructor(
+    @StringRes val descriptionRes: Int?,
+    val description: String?,
     val check: suspend (ApiOperationContext.(V) -> ApiPreconditions),
-)
+) {
+    init {
+        require(descriptionRes != null || description != null)
+    }
+
+    constructor(
+        @StringRes description: Int,
+        check: suspend (ApiOperationContext.(V) -> ApiPreconditions),
+    ) : this(descriptionRes = description, description = null, check = check)
+
+    constructor(
+        description: String,
+        check: suspend (ApiOperationContext.(V) -> ApiPreconditions),
+    ) : this(descriptionRes = null, description = description, check = check)
+
+    /** Get the description as a string using the provided context. */
+    fun getDescription(context: Context): String =
+        resolveString(context, descriptionRes, description)
+}
 
 /** Configuration of the [ApiPreference] set. */
 class SetConfig<V : Any>(
@@ -219,9 +257,7 @@ abstract class ApiPreference<V : Any>(val isFlagEnabled: Boolean) : PersistentPr
                 when (valuePreconditionsCheck) {
                     Allowed -> set?.execute(operationContext, valueV)
                     is Disallowed -> error(
-                        context.getString(
-                            valuePreconditionsCheck.reason
-                        )
+                        valuePreconditionsCheck.getReason(operationContext.context)
                     )
                 }
             }
@@ -262,35 +298,6 @@ abstract class ApiPreference<V : Any>(val isFlagEnabled: Boolean) : PersistentPr
 @DslMarker
 internal annotation class ApiPreferenceDsl
 
-@ApiPreferenceDsl
-class FlagConfigBuilder(val lambda: () -> Boolean) {
-    internal fun build(): FlagConfig {
-        return FlagConfig(check = lambda)
-    }
-}
-
-@ApiPreferenceDsl
-class PermissionsConfigBuilder(val permissions: List<String>) {
-    internal fun build(): PermissionsConfig {
-        return PermissionsConfig(
-            incomingPermissions = permissions,
-        )
-    }
-}
-
-@ApiPreferenceDsl
-class PreconditionsConfigBuilder(
-    @StringRes val description: Int,
-    val lambda: suspend ApiOperationContext.() -> ApiPreconditions
-) {
-    internal fun build(): PreconditionsConfig {
-        return PreconditionsConfig(
-            description = description,
-            check = lambda,
-        )
-    }
-}
-
 /**
  * Get configuration builder for an [ApiPreference].
  *
@@ -322,8 +329,29 @@ class GetConfigBuilder<V : Any> {
         permissionsConfig = PermissionsConfig(permissionsList)
     }
 
-    /** Defines a precondition check that must pass for the get to be executed. */
-    fun preconditions(@StringRes description: Int, lambda: suspend ApiOperationContext.() -> ApiPreconditions) {
+    /**
+     * Defines a precondition check that must pass for the get to be executed, with a string
+     * resource description.
+     */
+    fun preconditions(
+        @StringRes description: Int,
+        lambda: suspend ApiOperationContext.() -> ApiPreconditions
+    ) {
+        setPreconditions(PreconditionsConfig(description, lambda))
+    }
+
+    /**
+     * Defines a precondition check that must pass for the get to be executed, with a string
+     * description.
+     */
+    fun preconditions(
+        description: String,
+        lambda: suspend ApiOperationContext.() -> ApiPreconditions
+    ) {
+        setPreconditions(PreconditionsConfig(description, lambda))
+    }
+
+    private fun setPreconditions(config: PreconditionsConfig) {
         if (preconditionsConfig != null) {
             error(getExceptionMessageMultipleDefines("preconditions"))
         }
@@ -332,7 +360,7 @@ class GetConfigBuilder<V : Any> {
             error(getExceptionMessageWrongOrder("preconditions"))
         }
 
-        preconditionsConfig = PreconditionsConfig(description, lambda)
+        preconditionsConfig = config
     }
 
     /** Declare the execute block of the get. */
@@ -385,8 +413,26 @@ class SetConfigBuilder<V : Any> {
         permissionsConfig = PermissionsConfig(permissionsList)
     }
 
-    /** Defines a precondition check that must pass for the set to be executed. */
-    fun preconditions(@StringRes description: Int, lambda: ApiOperationContext.() -> ApiPreconditions) {
+    /**
+     * Defines a precondition check that must pass for the set to be executed, with a string
+     * resource description.
+     */
+    fun preconditions(
+        @StringRes description: Int,
+        lambda: ApiOperationContext.() -> ApiPreconditions
+    ) {
+        setPreconditions(PreconditionsConfig(description, lambda))
+    }
+
+    /**
+     * Defines a precondition check that must pass for the set to be executed, with a string
+     * description.
+     */
+    fun preconditions(description: String, lambda: ApiOperationContext.() -> ApiPreconditions) {
+        setPreconditions(PreconditionsConfig(description, lambda))
+    }
+
+    private fun setPreconditions(config: PreconditionsConfig) {
         if (preconditionsConfig != null) {
             error(getExceptionMessageMultipleDefines("preconditions"))
         }
@@ -395,11 +441,32 @@ class SetConfigBuilder<V : Any> {
             error(getExceptionMessageWrongOrder("preconditions"))
         }
 
-        preconditionsConfig = PreconditionsConfig(description, lambda)
+        preconditionsConfig = config
     }
 
-    /** Defines a value precondition check that must pass for the set to be executed. */
-    fun valuePreconditions(@StringRes description: Int, lambda: suspend ApiOperationContext.(V) -> ApiPreconditions) {
+    /**
+     * Defines a value precondition check that must pass for the set to be executed, with a string
+     * resource description.
+     */
+    fun valuePreconditions(
+        @StringRes description: Int,
+        lambda: suspend ApiOperationContext.(V) -> ApiPreconditions
+    ) {
+        setValuePreconditions(ValuePreconditionsConfig(description, lambda))
+    }
+
+    /**
+     * Defines a value precondition check that must pass for the set to be executed, with a string
+     * description.
+     */
+    fun valuePreconditions(
+        description: String,
+        lambda: suspend ApiOperationContext.(V) -> ApiPreconditions
+    ) {
+        setValuePreconditions(ValuePreconditionsConfig(description, lambda))
+    }
+
+    private fun setValuePreconditions(config: ValuePreconditionsConfig<V>) {
         if (valuePreconditionsConfig != null) {
             error(getExceptionMessageMultipleDefines("valuePreconditions"))
         }
@@ -408,7 +475,7 @@ class SetConfigBuilder<V : Any> {
             error(getExceptionMessageWrongOrder("valuePreconditions"))
         }
 
-        valuePreconditionsConfig = ValuePreconditionsConfig(description, lambda)
+        valuePreconditionsConfig = config
     }
 
     /** Declare the execute block of the set. */
@@ -448,7 +515,7 @@ class ApiPreferenceConfigBuilder<V : Any>(
     private var setConfig: SetConfig<V>? = null
 
     /**
-     * Build the [FlagConfig] from the given [FlagConfigBuilder] block.
+     * Build the [FlagConfig] from the given block.
      */
     fun flag(lambda: () -> Boolean) {
         if (flagConfig != null) {
@@ -459,11 +526,11 @@ class ApiPreferenceConfigBuilder<V : Any>(
             error(getExceptionMessageWrongOrder("flag"))
         }
 
-        flagConfig = FlagConfigBuilder(lambda).build()
+        flagConfig = FlagConfig(check = lambda)
     }
 
     /**
-     * Build the [PermissionsConfig] from the given [PermissionsConfigBuilder] block.
+     * Build the [PermissionsConfig] from the given permissions.
      */
     fun permissions(permissionsList: List<String>) {
         if (permissionsConfig != null) {
@@ -474,13 +541,28 @@ class ApiPreferenceConfigBuilder<V : Any>(
             error(getExceptionMessageWrongOrder("permissions"))
         }
 
-        permissionsConfig = PermissionsConfigBuilder(permissionsList).build()
+        permissionsConfig = PermissionsConfig(incomingPermissions = permissionsList)
     }
 
     /**
-     * Build the [PreconditionsConfig] from the given [PreconditionsConfigBuilder] block.
+     * Build the [PreconditionsConfig] from the given block, with a string resource description.
      */
-    fun preconditions(@StringRes description: Int, lambda: ApiOperationContext.() -> ApiPreconditions) {
+    fun preconditions(
+        @StringRes description: Int,
+        lambda: ApiOperationContext.() -> ApiPreconditions
+    ) {
+        setPreconditions(PreconditionsConfig(description = description, check = lambda))
+
+    }
+
+    /**
+     * Build the [PreconditionsConfig] from the given block, with a string description.
+     */
+    fun preconditions(description: String, lambda: ApiOperationContext.() -> ApiPreconditions) {
+        setPreconditions(PreconditionsConfig(description = description, check = lambda))
+    }
+
+    private fun setPreconditions(config: PreconditionsConfig) {
         if (preconditionsConfig != null) {
             error(getExceptionMessageMultipleDefines("preconditions"))
         }
@@ -489,7 +571,7 @@ class ApiPreferenceConfigBuilder<V : Any>(
             error(getExceptionMessageWrongOrder("preconditions"))
         }
 
-        preconditionsConfig = PreconditionsConfigBuilder(description, lambda).build()
+        preconditionsConfig = config
     }
 
     /**

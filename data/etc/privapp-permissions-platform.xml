@@ -706,6 +706,8 @@ applications that come with the platform
         <permission name="android.permission.MANAGE_SERIAL_PORTS"/>
         <!-- Permission required for CTS test - CtsMotionCuesTestCases -->
         <permission name="android.permission.DRAW_MOTION_CUES" />
+        <!-- Permission required for CTS test - CtsNetTestCases -->
+        <permission name="android.permission.CREATE_APP_SPECIFIC_NETWORK" />
     </privapp-permissions>
 
     <privapp-permissions package="com.android.soundpicker">
@@ -741,6 +743,7 @@ applications that come with the platform
         <permission name="android.permission.BIND_WALLPAPER"/>
         <permission name="android.permission.CUSTOMIZE_SYSTEM_UI"/>
         <permission name="android.permission.SET_WALLPAPER_DIM_AMOUNT"/>
+        <permission name="android.permission.UPDATE_THEME_SETTINGS"/>
     </privapp-permissions>
 
     <privapp-permissions package="com.android.dynsystem">

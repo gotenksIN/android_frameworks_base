@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * ​​​​​Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 package com.android.server.am;
@@ -292,6 +296,7 @@ public final class ProcessList extends ProcessListInternal
     // LMK_START_MONITORING
     // LMK_BOOT_COMPLETED
     // LMK_PROCS_PRIO
+    // LMK_UPDATE_LAZY_KILL_FLAG
     static final byte LMK_TARGET = 0;
     static final byte LMK_PROCPRIO = 1;
     static final byte LMK_PROCREMOVE = 2;
@@ -304,6 +309,7 @@ public final class ProcessList extends ProcessListInternal
     static final byte LMK_START_MONITORING = 9; // Start monitoring if delayed earlier
     static final byte LMK_BOOT_COMPLETED = 10;
     static final byte LMK_PROCS_PRIO = 11;  // Batch option for LMK_PROCPRIO
+    static final byte LMK_UPDATE_LAZY_KILL_FLAG = 12;
 
     // Low Memory Killer Daemon command codes.
     // These must be kept in sync with async_event_type definitions in lmkd.h
@@ -1535,7 +1541,6 @@ public final class ProcessList extends ProcessListInternal
         }
     }
 
-// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
     /**
      * Set the out-of-memory badness adjustment for a process.
      * If {@code pid <= 0}, this method will be a no-op.
@@ -1543,12 +1548,11 @@ public final class ProcessList extends ProcessListInternal
      * @param pid The process identifier to set.
      * @param uid The uid of the app
      * @param amt Adjustment value -- lmkd allows -1000 to +1000
-     * @param isSystemApp Whether the app is a system app or not.
-     * @param isMainProc Whether the app is a main process or not.
+     * @param weight Process weight
      *
      * {@hide}
      */
-    public static void setOomAdjExt(int pid, int uid, int amt, int isSystemApp, int isMainProc) {
+    public static void setOomAdjExt(int pid, int uid, int amt, int weight) {
         // This indicates that the process is not started yet and so no need to proceed further.
         if (pid <= 0) {
             return;
@@ -1557,13 +1561,12 @@ public final class ProcessList extends ProcessListInternal
             return;
 
         long start = SystemClock.elapsedRealtime();
-        ByteBuffer buf = ByteBuffer.allocate(4 * 6);
+        ByteBuffer buf = ByteBuffer.allocate(4 * 5);
         buf.putInt(LMK_PROCPRIO);
         buf.putInt(pid);
         buf.putInt(uid);
         buf.putInt(amt);
-        buf.putInt(isSystemApp);
-        buf.putInt(isMainProc);
+        buf.putInt(weight);
         writeLmkd(buf, null);
         long now = SystemClock.elapsedRealtime();
         if ((now-start) > 250) {
@@ -1571,8 +1574,6 @@ public final class ProcessList extends ProcessListInternal
                     + " = " + amt);
         }
     }
-
-// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
 
     // The max size for PROCS_PRIO cmd in LMKD
     private static final int MAX_PROCS_PRIO_PACKET_SIZE = 3;
@@ -1622,28 +1623,26 @@ public final class ProcessList extends ProcessListInternal
      * Set the out-of-memory badness adjustment for a list of processes.
      *
      * @param apps App list to adjust their respective oom score.
+     * @param weights App weights to be used for the lmkd.
      *
      * {@hide}
      */
-// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
-    public static void batchSetOomAdjExt(ArrayList<ProcessRecordInternal> apps) {
-// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
+    public static void batchSetOomAdjExt(ArrayList<ProcessRecordInternal> apps,
+                ArrayList<Integer> weights) {
         final int totalApps = apps.size();
         if (totalApps == 0) {
             return;
         }
 
-        final int MAX_OOM_ADJ_BATCH_LENGTH = ((4 * 6) * MAX_PROCS_PRIO_PACKET_SIZE) + 4;
+        final int MAX_OOM_ADJ_BATCH_LENGTH = ((4 * 5) * MAX_PROCS_PRIO_PACKET_SIZE) + 4;
         ByteBuffer buf = ByteBuffer.allocate(MAX_OOM_ADJ_BATCH_LENGTH);
         int total_procs_in_buf = 0;
         buf.putInt(LMK_PROCS_PRIO);
         for (int i = 0; i < totalApps; i++) {
-// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
-            final ProcessRecord app = (ProcessRecord) apps.get(i);
-            final int pid = app.getPid();
-            final int amt = app.getCurAdj();
-            final int uid = app.uid;
-// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
+            final int pid = apps.get(i).getPid();
+            final int amt = apps.get(i).getCurAdj();
+            final int uid = apps.get(i).uid;
+            final int weight = weights.get(i);
             if (pid <= 0 || amt == UNKNOWN_ADJ) continue;
             if (total_procs_in_buf >= MAX_PROCS_PRIO_PACKET_SIZE) {
                 writeLmkd(buf, null);
@@ -1652,27 +1651,11 @@ public final class ProcessList extends ProcessListInternal
                 buf.allocate(MAX_OOM_ADJ_BATCH_LENGTH);
                 buf.putInt(LMK_PROCS_PRIO);
             }
-// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
-            String packageName = app.info.packageName;
-            String processName = app.processName;
-// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
-            int isMainProc = 0;
-            int isSystemApp = 0;
-            if (packageName.equals(processName)) {
-                isMainProc = 1;
-            }
-// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
-            if (app.info.isSystemApp()) {
-// QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
-                isSystemApp = 1;
-            }
             buf.putInt(pid);
             buf.putInt(uid);
             buf.putInt(amt);
-            buf.putInt(isSystemApp);
-            buf.putInt(isMainProc);
+            buf.putInt(weight);
             buf.putInt(0);  // Default proc type to PROC_TYPE_APP
-// QTI_END: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             total_procs_in_buf++;
         }
         writeLmkd(buf, null);
@@ -1689,6 +1672,23 @@ public final class ProcessList extends ProcessListInternal
         ByteBuffer buf = ByteBuffer.allocate(4 * 2);
         buf.putInt(LMK_PROCREMOVE);
         buf.putInt(pid);
+        writeLmkd(buf, null);
+    }
+
+    /**
+     * Update the Lazy Kill flag for the Low Memory Killer (LMK) daemon.
+     * This function enables or disables the lazy kill mechanism that controls
+     * how aggressively the system terminates processes during memory pressure,
+     * specifically affecting UI process handling.
+     *
+     * @param enable true to enable lazy kill for UI processes, false to disable it
+     *
+     * {@hide}
+     */
+    public static void updateLmkLazyKillFLag(boolean enable) {
+        ByteBuffer buf = ByteBuffer.allocate(4 * 2);
+        buf.putInt(LMK_UPDATE_LAZY_KILL_FLAG);
+        buf.putInt(enable ? 1 : 0);
         writeLmkd(buf, null);
     }
 
@@ -2836,6 +2836,10 @@ public final class ProcessList extends ProcessListInternal
             int zygotePolicyFlags, boolean allowWhileBooting, boolean isolated, int isolatedUid,
             boolean isSdkSandbox, int sdkSandboxUid, String sdkSandboxClientAppPackage,
             String abiOverride, String entryPoint, String[] entryPointArgs, Runnable crashHandler) {
+        if (QtiBackgroundManager.getInstance().shouldPreventProcessStart(processName, info)) {
+                return null;
+        }
+
         long startTime = SystemClock.uptimeMillis();
         final long startTimeNs = SystemClock.elapsedRealtimeNanos();
         ProcessRecord app;

@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * ​​​​​Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 package android.os;
@@ -1936,4 +1940,14 @@ public class Process {
     }
 
     private static native int nativePidFdOpen(int pid, int flags) throws ErrnoException;
+
+    /**
+    * Set thread affinity to performance cores.
+    *
+    * @param tid The thread ID to set affinity for
+    * @param enable Whether to enable performance core affinity
+    *
+    * @hide
+    */
+    public static native boolean setPerfCoreAffinity(int tid, boolean enable);
 }

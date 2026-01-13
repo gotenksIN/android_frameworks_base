@@ -676,7 +676,6 @@ class MobileIconInteractorImpl(
                         ?: SatelliteIconModel.fromSignalStrength(0)!!,
             )
         }
-// QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
 
     private val satelliteIconV2: Flow<SignalIconModel.CellularTypeIconModel.SatelliteV2> =
         combine(satelliteShownLevelV2, numberOfLevels, showExclamationMarkForSatellite) {
@@ -691,11 +690,14 @@ class MobileIconInteractorImpl(
         }
 
     private val customizedCellularIcon : Flow<SignalIconModel.CellularTypeIconModel.Cellular> =
+// QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
         combine(
             cellularIcon,
             customizedIcon,
         ) { cellularIcon, customizedIcon ->
+// QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
             if (customizedIcon != null && customizedIcon is SignalIconModel.CellularTypeIconModel.Cellular) {
+// QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
                 customizedIcon
             } else {
                 cellularIcon

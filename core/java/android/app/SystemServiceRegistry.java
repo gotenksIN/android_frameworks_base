@@ -2131,6 +2131,7 @@ public final class SystemServiceRegistry {
             // flagcannot be added here.
             RangingFrameworkInitializer.registerServiceWrappers();
 
+            // When RELEASE_ANOMALY_DETECTOR is "false", this call is a no-op.
             AnomalyDetectorFrameworkInitializer.registerServiceWrappers();
             if (android.security.Flags.uprobestatsBridgeService()) {
                 UprobestatsFrameworkInitializer.registerServiceWrappers();

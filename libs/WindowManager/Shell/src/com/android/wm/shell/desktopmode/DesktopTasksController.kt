@@ -378,7 +378,7 @@ class DesktopTasksController(
     private val toDesktopAnimationDurationMs =
         context.resources.getInteger(SharedR.integer.to_desktop_animation_duration_ms)
     private val deskDeactivationFromOverviewScheduler =
-        DeskDeactivationFromOverviewScheduler(shellController, this)
+        DeskDeactivationFromOverviewScheduler(shellController, this, displayController)
 
     init {
         if (desktopState.canEnterDesktopMode) {
@@ -442,6 +442,7 @@ class DesktopTasksController(
     fun setOnTaskResizeAnimationListener(listener: OnTaskResizeAnimationListener) {
         toggleResizeDesktopTaskTransitionHandler.setOnTaskResizeAnimationListener(listener)
         enterDesktopTaskTransitionHandler.setOnTaskResizeAnimationListener(listener)
+        exitDesktopTaskTransitionHandler.setOnTaskResizeAnimationListener(listener)
         dragToDesktopTransitionHandler.onTaskResizeAnimationListener = listener
         desktopImmersiveController.onTaskResizeAnimationListener = listener
         desktopFullscreenRequestHandler.onTaskResizeAnimationListener = listener
@@ -723,6 +724,10 @@ class DesktopTasksController(
             } else {
                 DEFAULT_DISPLAY
             }
+        // If the display was disconnected, this Display will be null. In the event of a
+        // disconnect, return here as we don't need to worry about handling desk
+        // removal/deactivation.
+        if (displayController.getDisplay(displayId) == null) return
         // At this point the recents transition is either finishing to home, to another non-desktop
         // task or to a different desk than the one that was active when recents started. For all
         // of those the desk that was active needs to be deactivated.
@@ -2979,16 +2984,14 @@ class DesktopTasksController(
                     null
                 }
         }
-        if (DesktopExperienceFlags.ENABLE_DISPLAY_FOCUS_IN_SHELL_TRANSITIONS.isTrue) {
-            // Bring the destination display to top with includingParents=true, so that the
-            // destination display gains the display focus, which makes the top task in the display
-            // gains the global focus. This must be done after performDesktopExitCleanupIfNeeded.
-            // The method launches Launcher on the source display when the last task is moved, which
-            // brings the source display to the top. Calling reorder after
-            // performDesktopExitCleanupIfNeeded ensures that the destination display becomes the
-            // top (focused) display.
-            wct.reorder(task.token, /* onTop= */ true, /* includingParents= */ true)
-        }
+        // Bring the destination display to top with includingParents=true, so that the
+        // destination display gains the display focus, which makes the top task in the display
+        // gains the global focus. This must be done after performDesktopExitCleanupIfNeeded.
+        // The method launches Launcher on the source display when the last task is moved, which
+        // brings the source display to the top. Calling reorder after
+        // performDesktopExitCleanupIfNeeded ensures that the destination display becomes the
+        // top (focused) display.
+        wct.reorder(task.token, /* onTop= */ true, /* includingParents= */ true)
         val transition =
             transitions.startTransition(
                 TRANSIT_CHANGE,
@@ -7304,6 +7307,7 @@ class DesktopTasksController(
     private class DeskDeactivationFromOverviewScheduler(
         shellController: ShellController,
         private val controller: DesktopTasksController,
+        private val displayController: DisplayController,
     ) {
         private val displayIdToScheduledDeactivations = mutableMapOf<Int, MutableList<Request>>()
 
@@ -7312,13 +7316,24 @@ class DesktopTasksController(
                 shellController.addOverviewVisibilityChangeListener(
                     object : OverviewVisibilityChangeListener {
                         override fun onOverviewHidden(displayId: Int) {
+                            if (displayController.getDisplay(displayId) == null) {
+                                // If request was the result of disconnect, disconnect will handle
+                                // desk removal/deactivation; just clear the request below.
+                                logI(
+                                    "onOverviewHidden: deactivation request for displayId=%d" +
+                                        "ignored because display does not exist",
+                                    displayId,
+                                )
+                                displayIdToScheduledDeactivations[displayId]?.clear()
+                                return
+                            }
                             displayIdToScheduledDeactivations[displayId]?.forEach { request ->
                                 logV("onOverviewHidden: deactivating desk request=%s", request)
                                 controller.deactivateDesk(
                                     deskId = request.deskId,
                                     userId = request.userId,
-                                    // No need to clean up the wallpaper / home when coming from
-                                    // Overview.
+                                    // No need to clean up the wallpaper / home when coming
+                                    // from Overview.
                                     skipWallpaperAndHomeOrdering = true,
                                     exitReason = ExitReason.RETURN_HOME_OR_OVERVIEW,
                                 )
@@ -7349,6 +7364,10 @@ class DesktopTasksController(
 
         private fun logV(msg: String, vararg arguments: Any?) {
             ProtoLog.v(WM_SHELL_DESKTOP_MODE, "%s: $msg", TAG, *arguments)
+        }
+
+        private fun logI(msg: String, vararg arguments: Any?) {
+            ProtoLog.i(WM_SHELL_DESKTOP_MODE, "%s: $msg", TAG, *arguments)
         }
 
         private data class Request(val deskId: Int, val userId: Int)

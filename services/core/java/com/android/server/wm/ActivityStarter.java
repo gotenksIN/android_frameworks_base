@@ -1533,6 +1533,13 @@ class ActivityStarter {
                 .setSourceRecord(sourceRecord)
                 .build();
 
+        // Reset the launch-behind flag to avoid making it visible if the activity launch should
+        // be blocked.
+        if (r.mLaunchTaskBehind && balVerdict.blocks()) {
+            Slog.w(TAG, "Disallowed launching behind for a background launch");
+            r.mLaunchTaskBehind = false;
+        }
+
         mLastStartActivityRecord = r;
 
         if (r.appTimeTracker == null && sourceRecord != null) {
@@ -2032,8 +2039,7 @@ class ActivityStarter {
             }
             // When running transient transition, the transient launch target should keep on top.
             // So disallow the transient hide activity to move itself to front, e.g. trampoline.
-            if (!avoidMoveToFront() && (mService.mHomeProcess == null
-                    || mService.mHomeProcess.mUid != realCallingUid)
+            if (!avoidMoveToFront() && !r.launchedFromSystemSurface()
                     && (prevTopTask != null && prevTopTask.isActivityTypeHomeOrRecents())
                     && r.mTransitionController.isTransientHide(targetTask)) {
                 mCanMoveToFrontCode = MOVE_TO_FRONT_AVOID_LEGACY;

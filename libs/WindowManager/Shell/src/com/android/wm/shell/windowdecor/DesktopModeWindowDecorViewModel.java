@@ -25,7 +25,6 @@ import static android.view.MotionEvent.ACTION_CANCEL;
 import static android.view.MotionEvent.ACTION_MOVE;
 import static android.view.MotionEvent.ACTION_UP;
 import static android.view.WindowInsets.Type.statusBars;
-import static android.window.DesktopExperienceFlags.ENABLE_DISPLAY_FOCUS_IN_SHELL_TRANSITIONS;
 
 import static com.android.internal.jank.Cuj.CUJ_DESKTOP_MODE_ENTER_MODE_APP_HANDLE_MENU;
 import static com.android.internal.jank.Cuj.CUJ_DESKTOP_MODE_MOVE_FROM_SPLIT_SCREEN;
@@ -128,6 +127,7 @@ import com.android.wm.shell.desktopmode.data.DesktopRepository;
 import com.android.wm.shell.desktopmode.education.AppHandleEducationController;
 import com.android.wm.shell.desktopmode.multidesks.DesksOrganizer;
 import com.android.wm.shell.freeform.FreeformTaskTransitionStarter;
+import com.android.wm.shell.gamecontrols.GameControlsHelper;
 import com.android.wm.shell.pinnedlayer.phone.PinnedLayerController;
 import com.android.wm.shell.recents.RecentsTransitionHandler;
 import com.android.wm.shell.recents.RecentsTransitionStateListener;
@@ -628,13 +628,9 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
             removeTaskFromEventReceiver(oldTaskInfo.displayId);
             incrementEventReceiverTasks(taskInfo.displayId);
         }
-        if (ENABLE_DISPLAY_FOCUS_IN_SHELL_TRANSITIONS.isTrue()) {
-            // Pass the current global focus status to avoid updates outside of a ShellTransition.
-            decoration.relayout(
-                    taskInfo, decoration.getHasGlobalFocus(), decoration.getExclusionRegion());
-        } else {
-            decoration.relayout(taskInfo, taskInfo.isFocused, decoration.getExclusionRegion());
-        }
+        // Pass the current global focus status to avoid updates outside of a ShellTransition.
+        decoration.relayout(
+                taskInfo, decoration.getHasGlobalFocus(), decoration.getExclusionRegion());
         mActivityOrientationChangeHandler.ifPresent(handler ->
                 handler.handleActivityOrientationChange(oldTaskInfo, taskInfo));
     }
@@ -2233,6 +2229,11 @@ public class DesktopModeWindowDecorViewModel implements WindowDecorViewModel,
         @Override
         public void onChangeAspectRatio(@NonNull ActivityManager.RunningTaskInfo taskInfo) {
             CompatUIController.launchUserAspectRatioSettingsNoAnimation(mContext, taskInfo);
+        }
+
+        @Override
+        public void onLaunchGameControls(@NonNull ActivityManager.RunningTaskInfo taskInfo) {
+            GameControlsHelper.onLaunchGameControls(mContext, taskInfo);
         }
 
         @Override

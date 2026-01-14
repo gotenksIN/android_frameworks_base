@@ -146,6 +146,7 @@ package android.app {
   }
 
   public static class ActivityManager.TaskDescription implements android.os.Parcelable {
+    method @FlaggedApi("android.app.enable_dynamic_icons_and_badging") @Nullable public android.graphics.drawable.Icon getBadge();
     method public String getIconFilename();
     method public int getIconResource();
     method @Nullable public String getIconResourcePackage();
@@ -1973,15 +1974,6 @@ package android.hardware.display {
 
 }
 
-package android.hardware.fingerprint {
-
-  @Deprecated @RestrictedForEnvironment(environments=android.annotation.RestrictedForEnvironment.ENVIRONMENT_SDK_RUNTIME, from=android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) public class FingerprintManager {
-    method @Deprecated @NonNull @RequiresPermission(android.Manifest.permission.TEST_BIOMETRIC) public android.hardware.biometrics.BiometricTestSession createTestSession(int);
-    method @Deprecated @NonNull @RequiresPermission(android.Manifest.permission.TEST_BIOMETRIC) public java.util.List<android.hardware.biometrics.SensorProperties> getSensorProperties();
-  }
-
-}
-
 package android.hardware.hdmi {
 
   public final class HdmiControlServiceWrapper {
@@ -2809,7 +2801,7 @@ package android.os {
   }
 
   public class UserManager {
-    method @Deprecated @FlaggedApi("android.multiuser.consistent_max_users") @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_USERS, android.Manifest.permission.CREATE_USERS, android.Manifest.permission.QUERY_USERS}) public boolean canAddPrivateProfile();
+    method @Deprecated @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_USERS, android.Manifest.permission.CREATE_USERS, android.Manifest.permission.QUERY_USERS}) public boolean canAddPrivateProfile();
     method @Nullable @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_USERS, android.Manifest.permission.CREATE_USERS}) public android.content.pm.UserInfo createProfileForUser(@Nullable String, @NonNull String, int, int, @Nullable String[]);
     method @Nullable @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_USERS, android.Manifest.permission.CREATE_USERS}) public android.content.pm.UserInfo createRestrictedProfile(@Nullable String);
     method @Nullable @RequiresPermission(anyOf={android.Manifest.permission.MANAGE_USERS, android.Manifest.permission.CREATE_USERS}) public android.content.pm.UserInfo createUser(@Nullable String, @NonNull String, int);
@@ -3898,6 +3890,10 @@ package android.text {
     method public void onTextChanged(CharSequence, int, int, int);
   }
 
+  @FlaggedApi("com.android.text.flags.split_show_passwords_to_touch_and_physical") public class ShowSecretsSetting {
+    field public static final long SPLIT_SHOW_PASSWORDS_TO_TOUCH_AND_PHYSICAL = 417951523L; // 0x18e96f23L
+  }
+
 }
 
 package android.transition {
@@ -4409,8 +4405,6 @@ package android.view.inputmethod {
   }
 
   public final class InputMethodInfo implements android.os.Parcelable {
-    ctor public InputMethodInfo(@NonNull String, @NonNull String, @NonNull CharSequence, @NonNull String, boolean, @NonNull String);
-    ctor public InputMethodInfo(@NonNull String, @NonNull String, @NonNull CharSequence, @NonNull String, @NonNull String, boolean, @NonNull String);
     ctor @FlaggedApi("android.view.inputmethod.connectionless_handwriting") public InputMethodInfo(@NonNull String, @NonNull String, @NonNull CharSequence, @NonNull String, @NonNull String, boolean, boolean, @NonNull String);
     ctor public InputMethodInfo(@NonNull String, @NonNull String, @NonNull CharSequence, @NonNull String, int);
     field public static final int COMPONENT_NAME_MAX_LENGTH = 1000; // 0x3e8
@@ -4779,7 +4773,7 @@ package android.window {
     method @Nullable @RequiresPermission(android.Manifest.permission.MANAGE_ACTIVITY_TASKS) public android.window.WindowContainerToken getImeLayeringTarget(int);
     method @Nullable @RequiresPermission(android.Manifest.permission.MANAGE_ACTIVITY_TASKS) public java.util.List<android.app.ActivityManager.RunningTaskInfo> getRootTasks(int, @NonNull int[]);
     method @BinderThread public void onAppSplashScreenViewRemoved(int);
-    method @BinderThread public void onBackPressedOnTaskRoot(@NonNull android.app.ActivityManager.RunningTaskInfo, boolean, boolean, boolean);
+    method @BinderThread public void onBackOnTaskRoot(@NonNull android.app.ActivityManager.RunningTaskInfo, boolean, boolean, boolean);
     method @BinderThread public void onTaskAppeared(@NonNull android.app.ActivityManager.RunningTaskInfo, @NonNull android.view.SurfaceControl);
     method @BinderThread public void onTaskInfoChanged(@NonNull android.app.ActivityManager.RunningTaskInfo);
     method @BinderThread public void onTaskVanished(@NonNull android.app.ActivityManager.RunningTaskInfo);

@@ -95,6 +95,7 @@ import com.android.wm.shell.compatui.api.CompatUIRepository;
 import com.android.wm.shell.compatui.api.CompatUISharedRepositoryCleanUp;
 import com.android.wm.shell.compatui.api.CompatUISharedStateHandler;
 import com.android.wm.shell.compatui.api.CompatUISharedStateRepository;
+import com.android.wm.shell.compatui.api.events.CompatUIEventService;
 import com.android.wm.shell.compatui.components.RestartButtonSpecKt;
 import com.android.wm.shell.compatui.impl.CompositeCompatUIHandler;
 import com.android.wm.shell.compatui.impl.DefaultCompatUIComponentFactory;
@@ -395,6 +396,17 @@ public abstract class WMShellBaseModule {
             @NonNull DisplayController displayController) {
         return new DefaultCompatUIComponentFactory(context, syncQueue, displayController,
                 compatUIComponentRepository, sharedStateRepository);
+    }
+
+    @WMSingleton
+    @Provides
+    static Optional<CompatUIEventService> provideCompatUIEventService(
+            @NonNull @ShellMainThread ShellExecutor mainExecutor,
+            @NonNull @ShellBackgroundThread ShellExecutor backgroundExecutor) {
+        if (Flags.appCompatUiFramework()) {
+            return Optional.of(new CompatUIEventService(mainExecutor, backgroundExecutor));
+        }
+        return Optional.empty();
     }
 
     @WMSingleton
@@ -874,8 +886,9 @@ public abstract class WMShellBaseModule {
     @Provides
     static TaskViewTransitions provideTaskViewTransitions(Transitions transitions,
             TaskViewRepository repository, ShellTaskOrganizer organizer,
-            SyncTransactionQueue syncQueue, Optional<BubbleHelper> bubbleHelper) {
-        return new TaskViewTransitions(transitions, repository, organizer, syncQueue, bubbleHelper);
+            Optional<BubbleHelper> bubbleHelper) {
+        return new TaskViewTransitions(transitions, repository, organizer, bubbleHelper,
+                /* taskViewRootTask= */ Optional.empty());
     }
 
     @WMSingleton

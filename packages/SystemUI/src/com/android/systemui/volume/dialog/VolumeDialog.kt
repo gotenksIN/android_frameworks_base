@@ -69,7 +69,13 @@ constructor(
 
             val originalGravity = context.resources.getInteger(R.integer.volume_dialog_gravity)
             val isGravityLeft = (originalGravity and Gravity.LEFT) == Gravity.LEFT
-            val side = if (isGravityLeft) Gravity.START else Gravity.END
+            val side = if (isGravityLeft) Gravity.LEFT else Gravity.RIGHT
+
+            decorView.layoutDirection =
+                if (isGravityLeft)
+                    View.LAYOUT_DIRECTION_RTL
+                else
+                    View.LAYOUT_DIRECTION_LTR
 
             if (isVolumeDialogVertical) {
                 setLayout(

@@ -337,7 +337,7 @@ public class AppBackgroundManager {
         mUseUIAffinitySettings = Boolean.valueOf(mPerf.perfGetProp(
                 "ro.vendor.perf.app_bg_manager.enable_ui_affinity_settings", "true"));
         mUseAggressivePolicy = Boolean.valueOf(mPerf.perfGetProp(
-                "ro.vendor.perf.app_bg_manager.enable_aggressive_policy", "true"));
+                "ro.vendor.perf.app_bg_manager.enable_aggressive_policy", "false"));
         mUseCpuLoadMonitor = Boolean.valueOf(mPerf.perfGetProp(
                 "ro.vendor.perf.app_bg_manager.enable_cpu_load_monitor", "false"));
         mCpuUsageThreshold = Integer.valueOf(mPerf.perfGetProp(
@@ -696,6 +696,7 @@ public class AppBackgroundManager {
                                 break;
                             default:
                                 Slog.e(TAG, "Freeze failed for process: " + pr.processName);
+                                toRemove.add(pid);
                                 break;
                         }
                     }
@@ -704,7 +705,9 @@ public class AppBackgroundManager {
                         pids.remove(toRemove.get(i));
                     }
 
-                    mPackageFreezerManager.addAppPids(packageName, pids);
+                    if (pids.size() > 0) {
+                        mPackageFreezerManager.addAppPids(packageName, pids);
+                    }
 
                     if (mUseDebug) {
                         Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);

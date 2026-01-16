@@ -5308,7 +5308,8 @@ public class AudioManager {
             throw new NullPointerException("Illegal null AudioFocusRequest");
         }
         // this can only be checked now, not during the creation of the AudioFocusRequest instance
-        if (afr.locksFocus() && ap == null) {
+        if (afr.locksFocus() && ap == null && !"com.android.server.telecom".equals(
+                mApplicationContext.getOpPackageName())) {
             throw new IllegalArgumentException(
                     "Illegal null audio policy when locking audio focus");
         }
@@ -9125,9 +9126,9 @@ public class AudioManager {
      * and recording of 20kHz~ sounds. If platform supports Ultrasound, then the
      * usage will be
      * To start the Ultrasound playback:
-     *     - Create an AudioTrack with {@link AudioAttributes.CONTENT_TYPE_ULTRASOUND}.
+     *     - Create an AudioTrack with {@link AudioAttributes#CONTENT_TYPE_ULTRASOUND}.
      * To start the Ultrasound capture:
-     *     - Create an AudioRecord with {@link MediaRecorder.AudioSource.ULTRASOUND}.
+     *     - Create an AudioRecord with {@link MediaRecorder.AudioSource#ULTRASOUND}.
      *
      * @return whether the ultrasound feature is supported, true when platform supports both
      * Ultrasound playback and capture, false otherwise.

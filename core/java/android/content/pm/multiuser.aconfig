@@ -202,14 +202,6 @@ flag {
   is_fixed_read_only: true
 }
 
-# This flag guards the private space feature and all its implementations excluding the APIs. APIs are guarded by android.os.Flags.allow_private_profile.
-flag {
-    name: "enable_private_space_features"
-    namespace: "profile_experiences"
-    description: "Enable the support for private space and all its sub-features"
-    bug: "286418785"
-}
-
 flag {
     name: "enable_permission_to_access_hidden_profiles"
     is_exported: true
@@ -312,12 +304,7 @@ flag {
     is_exported: true
 }
 
-flag {
-    name: "allow_supervising_profile"
-    namespace: "supervision"
-    description: "Enables support for new supervising user type"
-    bug: "389712089"
-}
+
 
 flag {
      name: "profiles_for_all"
@@ -398,13 +385,6 @@ flag {
      namespace: "multiuser"
      description: "If the Headless System User is not an Admin user, also don't hackingly treat it as one either for bugreports."
      bug: "419105275"
-}
-
-flag {
-     name: "disallow_removing_last_admin_user"
-     namespace: "multiuser"
-     description: "Disallow the removal of a user, if it is the last admin user"
-     bug: "394970894"
 }
 
 flag {

@@ -696,6 +696,8 @@ applications that come with the platform
         <permission name="android.permission.CONFIGURE_ANOMALY_DETECTOR"/>
         <!-- Permission required for CTS test - CtsNpuManagerTestCases -->
         <permission name="android.permission.ACCESS_NPU_MODEL_MANAGER_API"/>
+        <!-- Permission required for CTS test - CtsNpuManagerTestCases -->
+        <permission name="android.permission.ATTRIBUTE_WORK_TO_OTHER_APPS"/>
         <!-- Permission required for CTS test - CtsProviderUiTestCases -->
         <permission name="android.permission.MANAGE_DOCUMENTS"/>
         <!-- Permission required for CTS test - StatusBarManagerTest -->
@@ -708,6 +710,8 @@ applications that come with the platform
         <permission name="android.permission.DRAW_MOTION_CUES" />
         <!-- Permission required for CTS test - CtsNetTestCases -->
         <permission name="android.permission.CREATE_APP_SPECIFIC_NETWORK" />
+        <!-- Permission required for CTS test - CtsTelephonyTestCases -->
+        <permission name="android.permission.BIND_MESSAGE_PROMOTION_SERVICE"/>
     </privapp-permissions>
 
     <privapp-permissions package="com.android.soundpicker">

@@ -184,6 +184,7 @@ import com.android.server.StorageManagerInternal;
 import com.android.server.SystemService;
 import com.android.server.am.UserState;
 import com.android.server.locksettings.LockSettingsInternal;
+import com.android.server.pm.GenericAllowlist.AllowlistStatus;
 import com.android.server.pm.UserFilter.DeathPredictor;
 import com.android.server.pm.UserManagerInternal.UserLifecycleListener;
 import com.android.server.pm.UserManagerInternal.UserRestrictionsListener;
@@ -6278,6 +6279,7 @@ public class UserManagerService extends IUserManager.Stub {
         // If new user is of type CLONE, check if creation of clone profile is allowed
         // If new user is of type MANAGED, check if creation of managed profile is allowed
         // If new user is of type PRIVATE, check if creation of private profile is allowed
+        // If new user is of type GUEST, check if creation of guest profile is allowed
         String restriction = UserManager.DISALLOW_ADD_USER;
         if (UserManager.isUserTypeCloneProfile(userType)) {
             restriction = UserManager.DISALLOW_ADD_CLONE_PROFILE;
@@ -6285,6 +6287,8 @@ public class UserManagerService extends IUserManager.Stub {
             restriction = UserManager.DISALLOW_ADD_MANAGED_PROFILE;
         } else if (UserManager.isUserTypePrivateProfile(userType)) {
             restriction = UserManager.DISALLOW_ADD_PRIVATE_PROFILE;
+        } else if (UserManager.isUserTypeGuest(userType)) {
+            restriction = UserManager.DISALLOW_ADD_GUEST;
         }
 
         enforceUserRestriction(restriction, UserHandle.getCallingUserId(),
@@ -9082,7 +9086,7 @@ public class UserManagerService extends IUserManager.Stub {
         }
 
         @Override
-        public UserActivitiesAllowlist getActivitiesAllowlist(int userId) {
+        public UserActivitiesAllowlist getActivitiesAllowlist(@UserIdInt int userId) {
             return UserManagerService.this.getActivitiesAllowlist(userId);
         }
 
@@ -9097,7 +9101,42 @@ public class UserManagerService extends IUserManager.Stub {
         }
 
         @Override
+        public void logActivityLaunchStatus(ComponentName activity, @UserIdInt int userId,
+                @AllowlistStatus int status) {
+            // TODO(b/414326600): proper implementation once metrics is designed
+            if (userId != UserHandle.USER_SYSTEM) {
+                Slogf.w(LOG_TAG, "logActivityLaunchStatus(%s, %d, %s): only supported for "
+                        + "USER_SYSTEM", ComponentName.flattenToShortString(activity), userId,
+                        GenericAllowlist.statusToString(status));
+                return;
+            }
+            if (GenericAllowlist.isAllowed(status)) {
+                mNonComplianceLogger.logLaunchedHsuActivity(activity);
+            } else {
+                mNonComplianceLogger.logBlockedHsuActivity(activity);
+            }
+        }
+
+        @Override
         public void logShownHsuNotification(StatusBarNotification sbn) {
+            mNonComplianceLogger.logShownHsuNotification(sbn);
+        }
+
+        @Override
+        public void logNotificationShownStatus(StatusBarNotification sbn, @UserIdInt int userId,
+                @AllowlistStatus int status) {
+            // TODO(b/414326600): proper implementation once metrics is designed
+            if (userId != UserHandle.USER_SYSTEM) {
+                Slogf.w(LOG_TAG, "logNotificationShownStatus(%s, %d, %s): only supported for "
+                        + "USER_SYSTEM", sbn, userId, GenericAllowlist.statusToString(status));
+                return;
+            }
+            if (!GenericAllowlist.isAllowed(status)) {
+                Slogf.w(LOG_TAG, "logNotificationShownStatus(%s, %d, %s): only supported for "
+                        + "allowed statuses", sbn,
+                        userId, GenericAllowlist.statusToString(status));
+                return;
+            }
             mNonComplianceLogger.logShownHsuNotification(sbn);
         }
 
@@ -9247,10 +9286,6 @@ public class UserManagerService extends IUserManager.Stub {
 
     @Override
     public @UserManager.RemoveResult int getUserRemovability(@UserIdInt int userId) {
-        if (!Flags.disallowRemovingLastAdminUser()) {
-            throw new UnsupportedOperationException(
-                    "aconfig flag android.multiuser.disallow_removing_last_admin_user not enabled");
-        }
         checkQueryOrCreateUsersPermission("get user removability");
         synchronized (mUsersLock) {
             return getUserRemovabilityLockedLU(userId);
@@ -9270,8 +9305,7 @@ public class UserManagerService extends IUserManager.Stub {
             // because the device can still be managed remotely without the last admin.
             return false;
         }
-        return android.multiuser.Flags.disallowRemovingLastAdminUser()
-                && getContextResources().getBoolean(R.bool.config_disallowRemovingLastAdminUser)
+        return getContextResources().getBoolean(R.bool.config_disallowRemovingLastAdminUser)
                 && isLastFullAdminUserLU(userInfo);
     }
 

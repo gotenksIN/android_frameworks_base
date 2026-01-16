@@ -4765,6 +4765,16 @@ public class Notification implements Parcelable
     }
 
     /**
+     * Returns the {@link RemoteInputHistoryItem}s provided to
+     * {@link Builder#setRemoteInputHistoryItems(RemoteInputHistoryItem[])}.
+     * @hide
+     */
+    public RemoteInputHistoryItem[] getRemoteInputHistoryItems() {
+        return getParcelableArrayFromBundle(extras, EXTRA_REMOTE_INPUT_HISTORY_ITEMS,
+                RemoteInputHistoryItem.class);
+    }
+
+    /**
      * Returns which type of notifications in a group are responsible for audibly alerting the
      * user.
      */
@@ -7481,8 +7491,7 @@ public class Notification implements Parcelable
         }
 
         private void displayRemoteInputHistory(RemoteViews contentView, StandardTemplateParams p) {
-            RemoteInputHistoryItem[] replyText = getParcelableArrayFromBundle(
-                    mN.extras, EXTRA_REMOTE_INPUT_HISTORY_ITEMS, RemoteInputHistoryItem.class);
+            RemoteInputHistoryItem[] replyText = mN.getRemoteInputHistoryItems();
             if (replyText != null && replyText.length > 0
                     && !TextUtils.isEmpty(replyText[0].getText())
                     && p.maxRemoteInputHistory > 0) {
@@ -7910,7 +7919,7 @@ public class Notification implements Parcelable
                             .allowTextWithProgress(true)
                             .fillTextsFrom(this);
                     if (richOngoingImprovements() && mN.isPromotedOngoing()) {
-                        p.useMinimalHeader();
+                        p.useMinimalHeader(isTimeInTheFuture());
                     }
                     result = applyStandardTemplateWithActions(getExpandedBaseLayoutResource(), p,
                             null /* result */);
@@ -7918,6 +7927,12 @@ public class Notification implements Parcelable
             }
             makeHeaderExpanded(result);
             return result;
+        }
+
+        private boolean isTimeInTheFuture() {
+            final Instant notifWhen = Instant.ofEpochMilli(mN.getWhen());
+            final Instant now = Instant.now();
+            return notifWhen.isAfter(now);
         }
 
         // This code is executed on behalf of other apps' notifications, sometimes even by 3p apps,
@@ -9806,7 +9821,7 @@ public class Notification implements Parcelable
 
             boolean promoted = mBuilder.mN.isPromotedOngoing();
             if (richOngoingImprovements() && promoted) {
-                p.useMinimalHeader();
+                p.useMinimalHeader(mBuilder.isTimeInTheFuture());
             }
 
             // Replace the text with the big text, but only if the big text is not empty.
@@ -11201,9 +11216,7 @@ public class Notification implements Parcelable
             if (mBuilder.mActions.size() > 0) {
                 maxRows--;
             }
-            RemoteInputHistoryItem[] remoteInputHistory = getParcelableArrayFromBundle(
-                    mBuilder.mN.extras, EXTRA_REMOTE_INPUT_HISTORY_ITEMS,
-                    RemoteInputHistoryItem.class);
+            RemoteInputHistoryItem[] remoteInputHistory = mBuilder.mN.getRemoteInputHistoryItems();
             if (remoteInputHistory != null
                     && remoteInputHistory.length > NUMBER_OF_HISTORY_ALLOWED_UNTIL_REDUCTION) {
                 // Let's remove some messages to make room for the remote input history.
@@ -12428,7 +12441,7 @@ public class Notification implements Parcelable
             if (Flags.richOngoingImprovements() && mBuilder.mN.isPromotedOngoing()) {
                 // Use the minimal header style when promoted, but keep the subtext in the top line
                 // (even if it may be cramped).
-                p.useMinimalHeader().subTextViewId(R.id.header_text);
+                p.useMinimalHeader(mBuilder.isTimeInTheFuture()).subTextViewId(R.id.header_text);
             }
 
             final int expandedLayoutRes;
@@ -14178,7 +14191,7 @@ public class Notification implements Parcelable
                     .fillTextsFrom(mBuilder);
 
             if (richOngoingImprovements() && mBuilder.mN.isPromotedOngoing()) {
-                p.useMinimalHeader();
+                p.useMinimalHeader(mBuilder.isTimeInTheFuture());
             }
 
             final int progressLayoutResId;
@@ -18426,12 +18439,12 @@ public class Notification implements Parcelable
          * Certain promoted notifications show a simplified version of the header. This also moves
          * the title to the top line.
          */
-        public StandardTemplateParams useMinimalHeader() {
+        public StandardTemplateParams useMinimalHeader(boolean isTimeInTheFuture) {
             if (Flags.richOngoingImprovements()) {
                 titleViewId(R.id.alt_title);
                 subTextViewId(R.id.alt_subtext);
                 hideAppName(true);
-                hideTime(true);
+                hideTime(!isTimeInTheFuture);
                 hideProfileBadge(true);
             }
             return this;

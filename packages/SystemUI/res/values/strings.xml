@@ -195,6 +195,12 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="title_usb_accessory">USB accessory</string>
 
+    <!-- Prompt for the USB dialog's allow only this time button [CHAR LIMIT=20] -->
+    <string name="usb_device_dialog_allow_only_this_time_button">Only this time</string>
+
+    <!-- Prompt for the USB dialog's cancel button [CHAR LIMIT=20] -->
+    <string name="usb_device_dialog_cancel_button">Cancel</string>
+
     <!-- View button label for USB dialogs.  [CHAR LIMIT=15] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -791,6 +797,8 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_share_disclaimer_full_screen_sharing">When you’re sharing your entire screen, anything on your screen is visible to [APP NAME]. So be careful with things like passwords, payment details, messages, photos, and audio &amp; video.</string>
+    <!-- Accessibility announcement for the screen share UI [CHAR LIMIT=NONE] -->
+    <string name="screen_share_a11y_announcement">Choose what to share. Select tab, app, or entire screen. Then press share.</string>
     <!-- Content description for the app window screenshot button in the toolbar, when the capture mode is set to "screenshot". [CHAR LIMIT=NONE] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -1643,7 +1651,7 @@
     <!-- Accessibility text describing the input method indicator chip in the status bar. [CHAR LIMIT=NONE] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
-    <string name="accessibility_status_bar_input_method_indicator">Input method</string>
+    <string name="accessibility_status_bar_input_method_indicator">Keyboard</string>
 
     <!-- The overflow indicator shown when a group has more notification inside the group than the visible ones. An example is "+ 3" [CHAR LIMIT=5] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->

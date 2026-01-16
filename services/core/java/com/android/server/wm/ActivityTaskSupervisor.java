@@ -454,7 +454,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
     }
 
     private boolean canPlaceEntityOnDisplay(int displayId, int callingPid, int callingUid,
-            Task task, ActivityInfo activityInfo) {
+            @Nullable Task task, @Nullable ActivityInfo activityInfo) {
         if (displayId == DEFAULT_DISPLAY) {
             // No restrictions for the default display.
             return true;
@@ -1361,7 +1361,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
 
     /** Check if caller is allowed to launch activities on specified display. */
     boolean isCallerAllowedToLaunchOnDisplay(int callingPid, int callingUid, int launchDisplayId,
-            ActivityInfo aInfo) {
+            @Nullable ActivityInfo aInfo) {
         ProtoLog.d(WM_DEBUG_TASKS, "Launch on display check: displayId=%d callingPid=%d "
                 + "callingUid=%d", launchDisplayId, callingPid, callingUid);
 
@@ -1372,7 +1372,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
 
         final DisplayContent displayContent =
                 mRootWindowContainer.getDisplayContentOrCreate(launchDisplayId);
-        if (displayContent == null || displayContent.isRemoved()) {
+        if (displayContent == null || displayContent.isRemovedOrInvalid()) {
             Slog.w(TAG, "Launch on display check: display not found");
             return false;
         }
@@ -1407,7 +1407,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
         if (!display.isTrusted()) {
             // Limit launching on untrusted displays because their contents can be read from Surface
             // by apps that created them.
-            if ((aInfo.flags & ActivityInfo.FLAG_ALLOW_EMBEDDED) == 0) {
+            if (aInfo == null || (aInfo.flags & ActivityInfo.FLAG_ALLOW_EMBEDDED) == 0) {
                 ProtoLog.d(WM_DEBUG_TASKS, "Launch on display check: disallow launch on "
                         + "virtual display for not-embedded activity.");
                 return false;

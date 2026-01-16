@@ -182,12 +182,14 @@ import com.android.wm.shell.freeform.FreeformTaskTransitionObserver;
 import com.android.wm.shell.freeform.FreeformTaskTransitionStarter;
 import com.android.wm.shell.freeform.FreeformTaskTransitionStarterInitializer;
 import com.android.wm.shell.freeform.TaskChangeListener;
+import com.android.wm.shell.fullscreen.FullscreenDisconnectHandler;
 import com.android.wm.shell.keyguard.KeyguardTransitionHandler;
 import com.android.wm.shell.onehanded.OneHandedController;
 import com.android.wm.shell.packageupdate.PackageUpdateController;
 import com.android.wm.shell.pinnedlayer.phone.PinnedLayerController;
 import com.android.wm.shell.pinnedlayer.phone.PinnedLayerFlags;
 import com.android.wm.shell.pinnedlayer.phone.PinnedLayerHandler;
+import com.android.wm.shell.pinnedlayer.phone.PinnedLayerUiState;
 import com.android.wm.shell.pip.PipTransitionController;
 import com.android.wm.shell.pip2.phone.PipScheduler;
 import com.android.wm.shell.pip2.phone.PipTransitionState;
@@ -1307,14 +1309,31 @@ public abstract class WMShellModule {
     static Optional<DisplayDisconnectTransitionHandler> provideDisplayDisconnectTransitionHandler(
             ShellInit shellInit, Transitions transitions,
             Optional<SplitScreenController> splitScreenOptional,
-            Optional<DesktopTasksController> desktopTasksController) {
+            Optional<DesktopTasksController> desktopTasksController,
+            Optional<FullscreenDisconnectHandler> fullscreenDisconnectHandler) {
         if (!DesktopExperienceFlags.ENABLE_DISPLAY_DISCONNECT_INTERACTION.isTrue()) {
             return Optional.empty();
         } else {
             return Optional.of(
                     new DisplayDisconnectTransitionHandler(transitions, shellInit,
-                            splitScreenOptional, desktopTasksController)
+                            splitScreenOptional, desktopTasksController,
+                            fullscreenDisconnectHandler)
             );
+        }
+    }
+
+    @WMSingleton
+    @Provides
+    static Optional<FullscreenDisconnectHandler> provideFullscreenDisconnectHandler(
+            ShellTaskOrganizer shellTaskOrganizer,
+            RootTaskDisplayAreaOrganizer rootTaskDisplayAreaOrganizer
+    ) {
+        if (!com.android.window.flags.Flags.enableDisplayDisconnectFullscreen()) {
+            return Optional.empty();
+        } else {
+            return Optional.of(
+                    new FullscreenDisconnectHandler(shellTaskOrganizer,
+                            rootTaskDisplayAreaOrganizer));
         }
     }
 
@@ -1433,7 +1452,8 @@ public abstract class WMShellModule {
             DesktopConfig desktopConfig,
             UserProfileContexts userProfileContexts,
             LockTaskChangeListener lockTaskChangeListener,
-            Optional<PinnedLayerController> pinnedLayerController
+            Optional<PinnedLayerController> pinnedLayerController,
+            Optional<PinnedLayerUiState> pinnedLayerUiState
     ) {
         if (!shelldesktopState.canEnterDesktopModeOrShowAppHandle()) {
             return Optional.empty();
@@ -1453,7 +1473,8 @@ public abstract class WMShellModule {
                 desktopModeCompatPolicy, desktopTilingDecorViewModel,
                 multiDisplayDragMoveIndicatorController, compatUI.orElse(null),
                 desksOrganizer, shelldesktopState, desktopConfig, userProfileContexts,
-                lockTaskChangeListener, pinnedLayerController.orElse(null)));
+                lockTaskChangeListener, pinnedLayerController.orElse(null),
+                pinnedLayerUiState.orElse(null)));
     }
 
     @WMSingleton
@@ -2250,7 +2271,8 @@ public abstract class WMShellModule {
             Optional<DesktopImeHandler> desktopImeHandler,
             ShellCrashHandler shellCrashHandler,
             AppToWebEducationController appToWebEducationController,
-            QuitFocusedAppKeyGestureHandler quitFocusedAppKeyGestureHandler) {
+            QuitFocusedAppKeyGestureHandler quitFocusedAppKeyGestureHandler,
+            BubbleRootTask bubbleRootTask) {
         return new Object();
     }
 

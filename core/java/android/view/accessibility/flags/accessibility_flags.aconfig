@@ -175,6 +175,16 @@ flag {
 }
 
 flag {
+    name: "fix_add_extra_data_to_accessibility_node_info_delegation"
+    namespace: "accessibility"
+    description: "Fix missing delegation to AccessibilityDelegate in View#addExtraDataToAccessibilityNodeInfo."
+    bug: "465180578"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "flash_notification_system_api"
     namespace: "accessibility"
     is_exported: true
@@ -219,16 +229,6 @@ flag {
     description: "Creates a way to create an INDETERMINATE RangeInfo"
     bug: "376108874"
     is_exported: true
-}
-
-flag {
-    name: "launcher_app_display_progress_update_on_visibility_change"
-    namespace: "accessibility"
-    description: "Forces update to navbar button positioning upon changes to visibility"
-    bug: "417894369"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {

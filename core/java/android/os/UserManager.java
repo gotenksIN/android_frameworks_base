@@ -225,7 +225,6 @@ public class UserManager {
      * actions; it does not represent the user to which restriction or management is applied.
      * @hide
      */
-    @FlaggedApi(android.multiuser.Flags.FLAG_ALLOW_SUPERVISING_PROFILE)
     @SystemApi
     public static final String USER_TYPE_PROFILE_SUPERVISING =
             "android.os.usertype.profile.SUPERVISING";
@@ -1060,6 +1059,24 @@ public class UserManager {
      * @see #getUserRestrictions()
      */
     public static final String DISALLOW_FACTORY_RESET = "no_factory_reset";
+
+    /**
+     * Specifies if a user is disallowed from adding new guests. The default value is
+     * <code>false</code>.
+     *
+     * <p>Holders of the permission
+     * {@link android.Manifest.permission#MANAGE_DEVICE_POLICY_MODIFY_USERS}
+     * can set this restriction using the DevicePolicyManager APIs mentioned below.
+     *
+     * <p>Key for user restrictions.
+     * <p>Type: Boolean
+     * @see DevicePolicyManager#addUserRestriction(ComponentName, String)
+     * @see DevicePolicyManager#clearUserRestriction(ComponentName, String)
+     * @see #getUserRestrictions()
+     * @hide
+     */
+    @FlaggedApi(android.os.Flags.FLAG_DISALLOW_ADD_GUEST)
+    public static final String DISALLOW_ADD_GUEST = "no_add_guest";
 
     /**
      * Specifies if a user is disallowed from adding new users. This can only be set by device
@@ -2134,6 +2151,7 @@ public class UserManager {
     @StringDef(value = {
             ALLOW_PARENT_PROFILE_APP_LINKING,
             DISALLOW_ADD_CLONE_PROFILE,
+            DISALLOW_ADD_GUEST,
             DISALLOW_ADD_MANAGED_PROFILE,
             DISALLOW_ADD_PRIVATE_PROFILE,
             DISALLOW_ADD_USER,
@@ -3392,7 +3410,6 @@ public class UserManager {
      *
      * @hide
      */
-    @FlaggedApi(android.multiuser.Flags.FLAG_ALLOW_SUPERVISING_PROFILE)
     @android.ravenwood.annotation.RavenwoodKeep
     public static boolean isUserTypeSupervisingProfile(@Nullable String userType) {
         return USER_TYPE_PROFILE_SUPERVISING.equals(userType);

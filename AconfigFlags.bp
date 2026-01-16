@@ -67,6 +67,7 @@ aconfig_declarations_group {
         "android.net.wifi.flags-aconfig-java",
         "android.nfc.flags-aconfig-java",
         "android.os.flags-aconfig-java",
+        "android.os.multisensory.flags-aconfig-java",
         "android.os.vibrator.flags-aconfig-java",
         "android.permission.flags-aconfig-java",
         "android.print.flags-aconfig-java",
@@ -389,6 +390,19 @@ java_aconfig_library {
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
 }
 
+java_aconfig_library {
+    name: "com.android.input.flags-aconfig-java-export",
+    aconfig_declarations: "com.android.input.flags-aconfig",
+    host_supported: true,
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+    mode: "exported",
+    min_sdk_version: "30",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.permission",
+    ],
+}
+
 aconfig_declarations {
     name: "com.android.internal.widget.flags-aconfig",
     package: "com.android.internal.widget.flags",
@@ -603,6 +617,7 @@ java_aconfig_library {
         "com.android.bt",
         "com.android.mediaprovider",
         "com.android.permission",
+        "com.android.neuralnetworks"
     ],
 }
 
@@ -711,6 +726,20 @@ java_aconfig_library {
     name: "android.view.inputmethod.flags-aconfig-java-host",
     aconfig_declarations: "android.view.inputmethod.flags-aconfig",
     host_supported: true,
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
+// Multisensory
+aconfig_declarations {
+    name: "android.os.multisensory.flags-aconfig",
+    package: "android.os.multisensory",
+    container: "system",
+    srcs: ["core/java/android/os/multisensory/*.aconfig"],
+}
+
+java_aconfig_library {
+    name: "android.os.multisensory.flags-aconfig-java",
+    aconfig_declarations: "android.os.multisensory.flags-aconfig",
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
 }
 
@@ -2450,6 +2479,18 @@ java_aconfig_library {
     aconfig_declarations: "android.app.privatecompute.flags-aconfig",
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
     host_supported: true,
+}
+
+java_aconfig_library {
+    name: "android.app.privatecompute.flags-aconfig-java-export",
+    aconfig_declarations: "android.app.privatecompute.flags-aconfig",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+    mode: "exported",
+    min_sdk_version: "30",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.appsearch",
+    ],
 }
 
 // AiSeal

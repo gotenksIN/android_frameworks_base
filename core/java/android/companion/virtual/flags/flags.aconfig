@@ -11,14 +11,6 @@ package: "android.companion.virtualdevice.flags"
 container: "system"
 
 flag {
-    name: "virtual_rotary"
-    is_exported: true
-    namespace: "virtual_devices"
-    description: "Enable virtual rotary input"
-    bug: "320328752"
-}
-
-flag {
     namespace: "virtual_devices"
     name: "virtual_display_rotation_api"
     description: "API for on-demand rotation of virtual displays"
@@ -121,14 +113,6 @@ flag {
     metadata {
         purpose: PURPOSE_BUGFIX
     }
-}
-
-flag {
-    name: "migrate_viewconfiguration_constants_to_resources"
-    namespace: "virtual_devices"
-    description: "Use resources instead of constants in ViewConfiguration"
-    is_fixed_read_only: true
-    bug: "370928384"
 }
 
 flag {
@@ -270,4 +254,14 @@ flag {
     namespace: "virtual_devices"
     description: "API for setting the view behavior for virtual input devices"
     bug: "434903682"
+}
+
+flag {
+    name: "audio_focus_environments"
+    namespace: "virtual_devices"
+    description: "Create separate audio focus environments per virtual device with custom audio policy"
+    bug: "433996961"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }

@@ -467,7 +467,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         // Go through the children in z-order starting at the top-most
         for (int i = mChildren.size() - 1; i >= 0; --i) {
             final DisplayContent dc = mChildren.get(i);
-            if ((dc.isRemoved() || dc.isRemoving())) {
+            if ((dc.isRemovedOrInvalid() || dc.isRemoving())) {
                 continue;
             }
             changed |= dc.updateFocusedWindowLocked(mode, updateInputWindows, topFocusedDisplayId);
@@ -1690,7 +1690,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         }
 
         final DisplayContent display = taskDisplayArea.getDisplayContent();
-        if (display == null || display.isRemoved() || !display.isHomeSupported()) {
+        if (display == null || display.isRemovedOrInvalid() || !display.isHomeSupported()) {
             // Can't launch home on display that doesn't support home.
             return false;
         }
@@ -3015,7 +3015,11 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         }
     }
 
-    private void removeDisplayContent(DisplayContent displayContent) {
+    /**
+     * Remove the DisplayContent; to be used when the Display is disconnected, hence why
+     * we ignore the DisplayContent validity.
+     */
+    void removeDisplayContent(DisplayContent displayContent) {
         if (displayContent.isRemoving() || displayContent.isRemoved()) {
             Slog.e(TAG, "DisplayContent already removed or removing.");
             return;

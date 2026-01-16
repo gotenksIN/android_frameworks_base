@@ -1444,7 +1444,7 @@ public abstract class PackageManager {
      * <p>
      * This flag is used only for query and not resolution, the default behaviour would be to
      * restrict querying across clone profile. This flag would be honored only if caller have
-     * permission {@link Manifest.permission.QUERY_CLONED_APPS}.
+     * permission {@link Manifest.permission#QUERY_CLONED_APPS}.
      *
      * @hide
      */
@@ -1456,7 +1456,7 @@ public abstract class PackageManager {
      * {@link ApplicationInfo}, {@link ComponentInfo}, and {@link ResolveInfo} flag: return the
      * {@link ApplicationInfo#isAppLockSupported} and {@link ApplicationInfo#isAppLockEnabled}
      * associated with an application. The caller should have the
-     * {@link Manifest.permission.LOCK_APPS} permission, or a {@link SecurityException} will be
+     * {@link Manifest.permission#LOCK_APPS} permission, or a {@link SecurityException} will be
      * thrown.
      */
     @FlaggedApi(android.security.Flags.FLAG_APP_LOCK_APIS)
@@ -5624,13 +5624,15 @@ public abstract class PackageManager {
     public static final int FLAG_PERMISSION_SELECTED_LOCATION_ACCURACY =  1 << 19;
 
     /**
-     * Permission flag: This location permission is granted by system provided location button.
+     * Permission flag: The user has consented to using a trusted system component in the
+     * application. When set, the system doesn't show the consent dialog for future
+     * interactions.
      *
      * @hide
      */
     @SystemApi
     @FlaggedApi(android.permission.flags.Flags.FLAG_LOCATION_BUTTON_ENABLED)
-    public static final int FLAG_PERMISSION_GRANTED_BY_LOCATION_BUTTON =  1 << 20;
+    public static final int FLAG_PERMISSION_CONSENTED_FOR_TRUSTED_UI =  1 << 20;
 
     /**
      * Permission flags: Reserved for use by the permission controller. The platform and any
@@ -5687,7 +5689,7 @@ public abstract class PackageManager {
             | FLAG_PERMISSION_ONE_TIME
             | FLAG_PERMISSION_AUTO_REVOKED
             | FLAG_PERMISSION_SELECTED_LOCATION_ACCURACY
-            | FLAG_PERMISSION_GRANTED_BY_LOCATION_BUTTON;
+            | FLAG_PERMISSION_CONSENTED_FOR_TRUSTED_UI;
 
     /**
      * Injected activity in app that forwards user to setting activity of that app.
@@ -7034,7 +7036,7 @@ public abstract class PackageManager {
             FLAG_PERMISSION_ONE_TIME,
             FLAG_PERMISSION_AUTO_REVOKED,
             FLAG_PERMISSION_SELECTED_LOCATION_ACCURACY,
-            FLAG_PERMISSION_GRANTED_BY_LOCATION_BUTTON
+            FLAG_PERMISSION_CONSENTED_FOR_TRUSTED_UI
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface PermissionFlags {}
@@ -11121,7 +11123,7 @@ public abstract class PackageManager {
             case FLAG_PERMISSION_ONE_TIME: return "ONE_TIME";
             case FLAG_PERMISSION_AUTO_REVOKED: return "AUTO_REVOKED";
             case FLAG_PERMISSION_SELECTED_LOCATION_ACCURACY: return "SELECTED_LOCATION_ACCURACY";
-            case FLAG_PERMISSION_GRANTED_BY_LOCATION_BUTTON: return "GRANTED_BY_LOCATION_BUTTON";
+            case FLAG_PERMISSION_CONSENTED_FOR_TRUSTED_UI: return "CONSENTED_FOR_TRUSTED_UI";
             default: return Integer.toString(flag);
         }
     }

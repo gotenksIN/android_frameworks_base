@@ -514,8 +514,11 @@ public class WindowManagerService extends IWindowManager.Stub
 
     private final List<OnWindowRemovedListener> mOnWindowRemovedListeners = new ArrayList<>();
 
-    /** Indicates whether the first keyguard locked state has been dispatched. */
-    private boolean mFirstKeyguardLockedStateDispatched = false;
+    /**
+     * Indicates whether the first keyguard state has been dispatched since the latest
+     * binding of KeyguardService.
+     */
+    private volatile boolean mDispatchedKeyguardStateSinceBind = false;
 
     /** The last dispatched keyguard locked state. */
     private boolean mDispatchedKeyguardLockedState = false;
@@ -3840,7 +3843,7 @@ public class WindowManagerService extends IWindowManager.Stub
         mH.post(() -> {
             final boolean isKeyguardLocked = mPolicy.isKeyguardShowing();
             // Ensure we don't skip the call for the first dispatch
-            if (mFirstKeyguardLockedStateDispatched
+            if (mDispatchedKeyguardStateSinceBind
                     && mDispatchedKeyguardLockedState == isKeyguardLocked) {
                 return;
             }
@@ -3855,7 +3858,7 @@ public class WindowManagerService extends IWindowManager.Stub
             }
             mKeyguardLockedStateListeners.finishBroadcast();
             mDispatchedKeyguardLockedState = isKeyguardLocked;
-            mFirstKeyguardLockedStateDispatched = true;
+            mDispatchedKeyguardStateSinceBind = true;
         });
     }
 
@@ -11144,6 +11147,11 @@ public class WindowManagerService extends IWindowManager.Stub
         } finally {
             Binder.restoreCallingIdentity(identity);
         }
+    }
+
+    @Override
+    public void resetFirstKeyguardLockedStateDispatched() {
+        mDispatchedKeyguardStateSinceBind = false;
     }
 
     @RequiresPermission(ACCESS_SURFACE_FLINGER)

@@ -19,15 +19,13 @@ package com.android.wm.shell.bubbles
 import android.app.ActivityManager.RunningTaskInfo
 import android.app.ActivityTaskManager.INVALID_TASK_ID
 import android.content.ComponentName
+import android.window.WindowContainerTransaction
 import androidx.annotation.VisibleForTesting
 import com.android.wm.shell.Flags
 import com.android.wm.shell.bubbles.util.BubbleUtils.isBubbleMovedToAnotherRootTask
 import com.android.wm.shell.bubbles.util.BubbleUtils.isBubbleToFullscreen
 import com.android.wm.shell.shared.bubbles.BubbleAnythingFlagHelper
-import com.android.wm.shell.splitscreen.SplitScreenController
 import com.android.wm.shell.taskview.TaskView
-import dagger.Lazy
-import java.util.Optional
 import java.util.concurrent.Executor
 
 /**
@@ -35,15 +33,10 @@ import java.util.concurrent.Executor
  *
  * [delegateListener] allows callers to change listeners after a task has been created.
  */
-class BubbleTaskView
-@JvmOverloads
-constructor(
+class BubbleTaskView(
     val taskView: TaskView,
     executor: Executor,
     val bubbleController: BubbleController,
-    private val splitScreenController: Lazy<Optional<SplitScreenController>> = Lazy {
-        Optional.empty()
-    },
 ) {
 
     /** Whether the task is already created. */
@@ -129,6 +122,10 @@ constructor(
      */
     fun cleanup() {
         val task = taskView.taskInfo
+        if (task != null && task.token != null && Flags.fixMarkTaskAsTrimmable()) {
+            markTaskAsTrimmable(task)
+        }
+
         if (BubbleAnythingFlagHelper.enableRootTaskForBubble()) {
             task?.let { t ->
                 val bubble = bubbleController.getBubble(t)
@@ -169,5 +166,12 @@ constructor(
         } else {
             taskView.removeTask()
         }
+    }
+
+    /** Ensures that the task is marked as trimmable from recents during cleanup */
+    private fun markTaskAsTrimmable(taskInfo: RunningTaskInfo) {
+        val wct = WindowContainerTransaction()
+        wct.setTaskTrimmableFromRecents(taskInfo.token, /* isTrimmableFromRecents */ true)
+        taskView.controller.taskOrganizer.applyTransaction(wct)
     }
 }

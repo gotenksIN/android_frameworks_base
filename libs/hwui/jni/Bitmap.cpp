@@ -47,7 +47,7 @@
 #include "perfetto/public/te_category_macros.h"
 #include "perfetto/public/te_macros.h"
 #include "perfetto/public/track_event.h"
-#include "tracing_perfetto.h"
+#include "trace_categories.h"
 
 #define DEBUG_PARCEL 0
 
@@ -199,15 +199,10 @@ static void traceSliceBeginWithGlobalFlow(const char* name, uint64_t bitmap_id, 
                                           int32_t width, int32_t height, int32_t density,
                                           int32_t config, bool is_mutable,
                                           int32_t pixel_storage_type, uint64_t parcel_id) {
-    struct PerfettoTeCategory* perfettoTeCategory =
-            tracing_perfetto::getPerfettoCategory(ATRACE_TAG_GRAPHICS);
-
-    if (perfettoTeCategory) {
-        PERFETTO_TE(*perfettoTeCategory, PERFETTO_TE_SLICE_BEGIN(name),
-                    PROTO_FIELDS(size, width, height, density, config, is_mutable,
-                                 pixel_storage_type, bitmap_id),
-                    PERFETTO_TE_FLOW(PerfettoTeGlobalFlow(parcel_id)));
-    }
+    PERFETTO_TE(tracing_perfetto::track_event_categories::bitmap, PERFETTO_TE_SLICE_BEGIN(name),
+                PROTO_FIELDS(size, width, height, density, config, is_mutable,
+                                pixel_storage_type, bitmap_id),
+                PERFETTO_TE_FLOW(PerfettoTeGlobalFlow(parcel_id)));
 }
 
 static void traceSliceBeginWithGlobalTerminatingFlow(const char* name, uint64_t bitmap_id,
@@ -215,37 +210,22 @@ static void traceSliceBeginWithGlobalTerminatingFlow(const char* name, uint64_t 
                                                      int32_t density, int32_t config,
                                                      bool is_mutable, int32_t pixel_storage_type,
                                                      uint64_t parcel_id) {
-    struct PerfettoTeCategory* perfettoTeCategory =
-            tracing_perfetto::getPerfettoCategory(ATRACE_TAG_GRAPHICS);
-
-    if (perfettoTeCategory) {
-        PERFETTO_TE(*perfettoTeCategory, PERFETTO_TE_SLICE_BEGIN(name),
-                    PROTO_FIELDS(size, width, height, density, config, is_mutable,
-                                 pixel_storage_type, bitmap_id),
-                    PERFETTO_TE_TERMINATING_FLOW(PerfettoTeGlobalFlow(parcel_id)));
-    }
+    PERFETTO_TE(tracing_perfetto::track_event_categories::bitmap, PERFETTO_TE_SLICE_BEGIN(name),
+                PROTO_FIELDS(size, width, height, density, config, is_mutable,
+                                pixel_storage_type, bitmap_id),
+                PERFETTO_TE_TERMINATING_FLOW(PerfettoTeGlobalFlow(parcel_id)));
 }
 
 static void traceSliceBegin(const char* name, uint64_t bitmap_id, int64_t size, int32_t width,
                             int32_t height, int32_t density, int32_t config, bool is_mutable,
                             int32_t pixel_storage_type) {
-    struct PerfettoTeCategory* perfettoTeCategory =
-            tracing_perfetto::getPerfettoCategory(ATRACE_TAG_GRAPHICS);
-
-    if (perfettoTeCategory) {
-        PERFETTO_TE(*perfettoTeCategory, PERFETTO_TE_SLICE_BEGIN(name),
-                    PROTO_FIELDS(size, width, height, density, config, is_mutable,
-                                 pixel_storage_type, bitmap_id));
-    }
+    PERFETTO_TE(tracing_perfetto::track_event_categories::bitmap, PERFETTO_TE_SLICE_BEGIN(name),
+                PROTO_FIELDS(size, width, height, density, config, is_mutable,
+                                pixel_storage_type, bitmap_id));
 }
 
 static void traceSliceEnd(void) {
-    struct PerfettoTeCategory* perfettoTeCategory =
-            tracing_perfetto::getPerfettoCategory(ATRACE_TAG_GRAPHICS);
-
-    if (perfettoTeCategory) {
-        PERFETTO_TE(*perfettoTeCategory, PERFETTO_TE_SLICE_END());
-    }
+    PERFETTO_TE(tracing_perfetto::track_event_categories::bitmap, PERFETTO_TE_SLICE_END());
 }
 
 // Assert that bitmap's SkAlphaType is consistent with isPremultiplied.
@@ -917,7 +897,8 @@ static jobject Bitmap_createFromParcel(JNIEnv* env, jobject, jobject parcel) {
             kRGBA_F16_SkColorType != colorType &&
             kRGB_565_SkColorType != colorType &&
             kARGB_4444_SkColorType != colorType &&
-            kAlpha_8_SkColorType != colorType) {
+            kAlpha_8_SkColorType != colorType &&
+            kRGBA_1010102_SkColorType != colorType) {
         jniThrowExceptionFmt(env, BadParcelableException,
                              "Bitmap_createFromParcel unknown colortype: %d\n", colorType);
         return NULL;

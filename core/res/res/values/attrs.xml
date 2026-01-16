@@ -4654,7 +4654,7 @@
         <!-- Whether this service should share the same AID routing priority as the role
              owner. This package and the role owner must have the same signature, and the
              role owner must opt into this behavior by using the property named by
-             {@link android.nfc.cardemulation.CardEmulation.PROPERTY_ALLOW_SHARED_ROLE_PRIORITY }
+             {@link android.nfc.cardemulation.CardEmulation#PROPERTY_ALLOW_SHARED_ROLE_PRIORITY }
              in the <code>&lt;application&rt;</code> tag. -->
         <attr name="wantsRoleHolderPriority" format="boolean"/>
     </declare-styleable>
@@ -10644,21 +10644,6 @@
         <attr name="spanCount" format="integer"/>
         <attr name="reverseLayout" format="boolean" />
         <attr name="stackFromEnd" format="boolean" />
-    </declare-styleable>
-
-    <!-- @hide -->
-    <declare-styleable name="NotificationTheme">
-        <attr name="notificationHeaderStyle" format="reference" />
-        <attr name="notificationHeaderTextAppearance" format="reference" />
-        <attr name="notificationHeaderIconSize" format="dimension" />
-        <attr name="notificationHeaderAppNameVisibility" format="enum">
-            <!-- Visible on screen; the default value. -->
-            <enum name="visible" value="0" />
-            <!-- Not displayed, but taken into account during layout (space is left for it). -->
-            <enum name="invisible" value="1" />
-            <!-- Completely hidden, as if the view had not been added. -->
-            <enum name="gone" value="2" />
-        </attr>
     </declare-styleable>
 
     <attr name="lockPatternStyle" format="reference" />

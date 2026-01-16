@@ -4,6 +4,7 @@ package android {
   public static final class Manifest.permission {
     field public static final String ACCESS_AMBIENT_CONTEXT_EVENT = "android.permission.ACCESS_AMBIENT_CONTEXT_EVENT";
     field public static final String ACCESS_AMBIENT_LIGHT_STATS = "android.permission.ACCESS_AMBIENT_LIGHT_STATS";
+    field @FlaggedApi("com.android.input.flags.enable_attention_service_apis") public static final String ACCESS_ATTENTION_LISTENER = "android.permission.ACCESS_ATTENTION_LISTENER";
     field public static final String ACCESS_BROADCAST_RADIO = "android.permission.ACCESS_BROADCAST_RADIO";
     field public static final String ACCESS_BROADCAST_RESPONSE_STATS = "android.permission.ACCESS_BROADCAST_RESPONSE_STATS";
     field public static final String ACCESS_CACHE_FILESYSTEM = "android.permission.ACCESS_CACHE_FILESYSTEM";
@@ -52,6 +53,7 @@ package android {
     field public static final String AMBIENT_WALLPAPER = "android.permission.AMBIENT_WALLPAPER";
     field public static final String APPROVE_INCIDENT_REPORTS = "android.permission.APPROVE_INCIDENT_REPORTS";
     field public static final String ASSOCIATE_COMPANION_DEVICES = "android.permission.ASSOCIATE_COMPANION_DEVICES";
+    field @FlaggedApi("com.android.npumanager.npumanager_enabled") public static final String ATTRIBUTE_WORK_TO_OTHER_APPS = "android.permission.ATTRIBUTE_WORK_TO_OTHER_APPS";
     field public static final String BACKGROUND_CAMERA = "android.permission.BACKGROUND_CAMERA";
     field public static final String BACKUP = "android.permission.BACKUP";
     field @FlaggedApi("android.permission.flags.health_connect_backup_restore_permission_enabled") public static final String BACKUP_HEALTH_CONNECT_DATA_AND_SETTINGS = "android.permission.BACKUP_HEALTH_CONNECT_DATA_AND_SETTINGS";
@@ -88,7 +90,7 @@ package android {
     field public static final String BIND_ON_DEVICE_INTELLIGENCE_SERVICE = "android.permission.BIND_ON_DEVICE_INTELLIGENCE_SERVICE";
     field public static final String BIND_ON_DEVICE_SANDBOXED_INFERENCE_SERVICE = "android.permission.BIND_ON_DEVICE_SANDBOXED_INFERENCE_SERVICE";
     field public static final String BIND_PHONE_ACCOUNT_SUGGESTION_SERVICE = "android.permission.BIND_PHONE_ACCOUNT_SUGGESTION_SERVICE";
-    field @FlaggedApi("android.location.flags.population_density_provider") public static final String BIND_POPULATION_DENSITY_PROVIDER_SERVICE = "android.permission.BIND_POPULATION_DENSITY_PROVIDER_SERVICE";
+    field public static final String BIND_POPULATION_DENSITY_PROVIDER_SERVICE = "android.permission.BIND_POPULATION_DENSITY_PROVIDER_SERVICE";
     field public static final String BIND_PRINT_RECOMMENDATION_SERVICE = "android.permission.BIND_PRINT_RECOMMENDATION_SERVICE";
     field public static final String BIND_REMOTE_LOCKSCREEN_VALIDATION_SERVICE = "android.permission.BIND_REMOTE_LOCKSCREEN_VALIDATION_SERVICE";
     field public static final String BIND_RESOLVER_RANKER_SERVICE = "android.permission.BIND_RESOLVER_RANKER_SERVICE";
@@ -1572,6 +1574,7 @@ package android.app.admin {
     field @FlaggedApi("android.app.admin.flags.multi_user_management_device_provisioning") public static final int STATUS_HEADLESS_SYSTEM_USER_MODE_REQUIRED = 19; // 0x13
     field public static final int STATUS_MANAGED_USERS_NOT_SUPPORTED = 9; // 0x9
     field public static final int STATUS_NONSYSTEM_USER_EXISTS = 5; // 0x5
+    field @FlaggedApi("android.app.admin.flags.secure_adb_role_bypassing") public static final int STATUS_NON_DEFAULT_DEVICE_POLICY_MANAGEMENT_ROLE_HOLDER_EXISTS = 23; // 0x17
     field @FlaggedApi("android.app.admin.flags.multi_user_management_user_provisioning") public static final int STATUS_NOT_FULL_USER = 21; // 0x15
     field public static final int STATUS_NOT_SYSTEM_USER = 7; // 0x7
     field public static final int STATUS_OK = 0; // 0x0
@@ -3931,7 +3934,7 @@ package android.companion.virtual {
     method @NonNull public android.hardware.input.VirtualMouse createVirtualMouse(@NonNull android.hardware.input.VirtualMouseConfig);
     method @Deprecated @NonNull public android.hardware.input.VirtualMouse createVirtualMouse(@NonNull android.hardware.display.VirtualDisplay, @NonNull String, int, int);
     method @NonNull public android.hardware.input.VirtualNavigationTouchpad createVirtualNavigationTouchpad(@NonNull android.hardware.input.VirtualNavigationTouchpadConfig);
-    method @FlaggedApi("android.companion.virtualdevice.flags.virtual_rotary") @NonNull public android.hardware.input.VirtualRotaryEncoder createVirtualRotaryEncoder(@NonNull android.hardware.input.VirtualRotaryEncoderConfig);
+    method @NonNull public android.hardware.input.VirtualRotaryEncoder createVirtualRotaryEncoder(@NonNull android.hardware.input.VirtualRotaryEncoderConfig);
     method @NonNull public android.hardware.input.VirtualStylus createVirtualStylus(@NonNull android.hardware.input.VirtualStylusConfig);
     method @NonNull public android.hardware.input.VirtualTouchscreen createVirtualTouchscreen(@NonNull android.hardware.input.VirtualTouchscreenConfig);
     method @Deprecated @NonNull public android.hardware.input.VirtualTouchscreen createVirtualTouchscreen(@NonNull android.hardware.display.VirtualDisplay, @NonNull String, int, int);
@@ -4846,8 +4849,8 @@ package android.content.pm {
     field public static final int FLAGS_PERMISSION_RESERVED_PERMISSION_CONTROLLER = -268435456; // 0xf0000000
     field public static final int FLAG_PERMISSION_APPLY_RESTRICTION = 16384; // 0x4000
     field public static final int FLAG_PERMISSION_AUTO_REVOKED = 131072; // 0x20000
+    field @FlaggedApi("android.permission.flags.location_button_enabled") public static final int FLAG_PERMISSION_CONSENTED_FOR_TRUSTED_UI = 1048576; // 0x100000
     field public static final int FLAG_PERMISSION_GRANTED_BY_DEFAULT = 32; // 0x20
-    field @FlaggedApi("android.permission.flags.location_button_enabled") public static final int FLAG_PERMISSION_GRANTED_BY_LOCATION_BUTTON = 1048576; // 0x100000
     field public static final int FLAG_PERMISSION_GRANTED_BY_ROLE = 32768; // 0x8000
     field public static final int FLAG_PERMISSION_ONE_TIME = 65536; // 0x10000
     field public static final int FLAG_PERMISSION_POLICY_FIXED = 4; // 0x4
@@ -6155,6 +6158,7 @@ package android.hardware.display {
     method @RequiresPermission(android.Manifest.permission.CONFIGURE_DISPLAY_BRIGHTNESS) public void setBrightnessConfiguration(android.hardware.display.BrightnessConfiguration);
     method @RequiresPermission(android.Manifest.permission.CONFIGURE_DISPLAY_BRIGHTNESS) public void setBrightnessConfigurationForDisplay(@NonNull android.hardware.display.BrightnessConfiguration, @NonNull String);
     method @Deprecated @RequiresPermission(android.Manifest.permission.CONTROL_DISPLAY_SATURATION) public void setSaturationLevel(float);
+    field @FlaggedApi("com.android.server.display.feature.flags.virtual_secondary_displays") public static final int VIRTUAL_DISPLAY_FLAG_ALLOWS_CONTENT_MODE_SWITCH = 131072; // 0x20000
     field public static final int VIRTUAL_DISPLAY_FLAG_ROTATES_WITH_CONTENT = 128; // 0x80
     field public static final int VIRTUAL_DISPLAY_FLAG_STEAL_TOP_FOCUS_DISABLED = 65536; // 0x10000
     field public static final int VIRTUAL_DISPLAY_FLAG_TRUSTED = 1024; // 0x400
@@ -6777,13 +6781,13 @@ package android.hardware.input {
     method @NonNull public android.hardware.input.VirtualNavigationTouchpadConfig build();
   }
 
-  @FlaggedApi("android.companion.virtualdevice.flags.virtual_rotary") public class VirtualRotaryEncoder implements java.io.Closeable {
+  public class VirtualRotaryEncoder implements java.io.Closeable {
     method public void close();
     method @FlaggedApi("com.android.hardware.input.create_virtual_keyboard_api") public int getInputDeviceId();
     method public void sendScrollEvent(@NonNull android.hardware.input.VirtualRotaryEncoderScrollEvent);
   }
 
-  @FlaggedApi("android.companion.virtualdevice.flags.virtual_rotary") public final class VirtualRotaryEncoderConfig extends android.hardware.input.VirtualInputDeviceConfig implements android.os.Parcelable {
+  public final class VirtualRotaryEncoderConfig extends android.hardware.input.VirtualInputDeviceConfig implements android.os.Parcelable {
     method public int describeContents();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.hardware.input.VirtualRotaryEncoderConfig> CREATOR;
@@ -6794,7 +6798,7 @@ package android.hardware.input {
     method @NonNull public android.hardware.input.VirtualRotaryEncoderConfig build();
   }
 
-  @FlaggedApi("android.companion.virtualdevice.flags.virtual_rotary") public final class VirtualRotaryEncoderScrollEvent implements android.os.Parcelable {
+  public final class VirtualRotaryEncoderScrollEvent implements android.os.Parcelable {
     method public int describeContents();
     method public long getEventTimeNanos();
     method @FloatRange(from=-1.0F, to=1.0f) public float getScrollAmount();
@@ -8023,10 +8027,10 @@ package android.hardware.usb {
 
   @RestrictedForEnvironment(environments=android.annotation.RestrictedForEnvironment.ENVIRONMENT_SDK_RUNTIME, from=android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) public class UsbManager {
     method @RequiresPermission(android.Manifest.permission.MANAGE_USB) public long getCurrentFunctions();
+    method @FlaggedApi("android.hardware.usb.flags.enable_pci_tunnel_control") @RequiresPermission(android.Manifest.permission.MANAGE_USB) public int getPciTunnelingControlAllowedStatus();
     method @NonNull @RequiresPermission(android.Manifest.permission.MANAGE_USB) public java.util.List<android.hardware.usb.UsbPort> getPorts();
     method @FlaggedApi("android.hardware.usb.flags.expose_usb_speed_system_api") @RequiresPermission(android.Manifest.permission.MANAGE_USB) public int getUsbBandwidthMbps();
     method @RequiresPermission(android.Manifest.permission.MANAGE_USB) public void grantPermission(android.hardware.usb.UsbDevice, String);
-    method @FlaggedApi("android.hardware.usb.flags.enable_pci_tunnel_control") @RequiresPermission(android.Manifest.permission.MANAGE_USB) public int isPciTunnelingControlAllowed();
     method @FlaggedApi("android.hardware.usb.flags.enable_pci_tunnel_control") @RequiresPermission(android.Manifest.permission.MANAGE_USB) public boolean isPciTunnelingEnabled();
     method public static boolean isUvcSupportEnabled();
     method @FlaggedApi("android.hardware.usb.flags.enable_power_profile_reporting") @RequiresPermission(android.Manifest.permission.MANAGE_USB) public void registerBc12TypeListener(@NonNull java.util.concurrent.Executor, @NonNull android.hardware.usb.UsbManager.Bc12TypeListener);
@@ -12708,7 +12712,7 @@ package android.os {
     field public static final String USER_TYPE_FULL_GUEST = "android.os.usertype.full.GUEST";
     field public static final String USER_TYPE_FULL_SECONDARY = "android.os.usertype.full.SECONDARY";
     field public static final String USER_TYPE_FULL_SYSTEM = "android.os.usertype.full.SYSTEM";
-    field @FlaggedApi("android.multiuser.allow_supervising_profile") public static final String USER_TYPE_PROFILE_SUPERVISING = "android.os.usertype.profile.SUPERVISING";
+    field public static final String USER_TYPE_PROFILE_SUPERVISING = "android.os.usertype.profile.SUPERVISING";
     field public static final String USER_TYPE_SYSTEM_HEADLESS = "android.os.usertype.system.HEADLESS";
   }
 
@@ -14661,6 +14665,7 @@ package android.service.personalcontext {
     method @NonNull public android.service.personalcontext.Token mintToken();
     method public void publishInsight(@NonNull java.util.List<android.service.personalcontext.insight.ContextInsight>);
     method public void publishTriggeringHint(@NonNull java.util.List<android.service.personalcontext.hint.ContextHint>, @Nullable android.service.personalcontext.RenderToken);
+    method @NonNull public android.service.personalcontext.hint.ContextHintWithSignature signHint(@NonNull android.service.personalcontext.hint.ContextHint);
     field public static final String PERSONAL_CONTEXT_SERVICE = "personal_context";
   }
 

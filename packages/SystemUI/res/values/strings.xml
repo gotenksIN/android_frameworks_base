@@ -195,6 +195,12 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="title_usb_accessory">USB accessory</string>
 
+    <!-- Prompt for the USB dialog's allow only this time button [CHAR LIMIT=20] -->
+    <string name="usb_device_dialog_allow_only_this_time_button">Only this time</string>
+
+    <!-- Prompt for the USB dialog's cancel button [CHAR LIMIT=20] -->
+    <string name="usb_device_dialog_cancel_button">Cancel</string>
+
     <!-- View button label for USB dialogs.  [CHAR LIMIT=15] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -668,8 +674,12 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_record_capture_target_choose_app">Choose an app to record</string>
     <!-- Header for the carousel to choose an app for screen recording. [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_record_settings">Screen recording settings</string>
     <!-- Label for markup functionality in screen recording. [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_record_markup">Markup</string>
     <!-- Snackbar shows after the screen recording is saved [CHAR LIMIT=20] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -723,6 +733,8 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_record_video_preview_elapsed_time_template" translatable="false">%s / %s</string>
     <!-- Video player time template for the voiceover. For example: 2 seconds of 4 seconds -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_record_video_preview_elapsed_time_a11y_template" formatted="false"><xliff:g example="2 seconds" id="elapsed_time">%1$s</xliff:g> of <xliff:g example="4 seconds" id="duration">%2$s</xliff:g></string>
 
     <!-- Notification text displayed when screen capture is blocked by an IT admin. [CHAR LIMIT=100] -->
@@ -785,6 +797,8 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_share_disclaimer_full_screen_sharing">When you’re sharing your entire screen, anything on your screen is visible to [APP NAME]. So be careful with things like passwords, payment details, messages, photos, and audio &amp; video.</string>
+    <!-- Accessibility announcement for the screen share UI [CHAR LIMIT=NONE] -->
+    <string name="screen_share_a11y_announcement">Choose what to share. Select tab, app, or entire screen. Then press share.</string>
     <!-- Content description for the app window screenshot button in the toolbar, when the capture mode is set to "screenshot". [CHAR LIMIT=NONE] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -1637,7 +1651,7 @@
     <!-- Accessibility text describing the input method indicator chip in the status bar. [CHAR LIMIT=NONE] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
-    <string name="accessibility_status_bar_input_method_indicator">Input method</string>
+    <string name="accessibility_status_bar_input_method_indicator">Keyboard</string>
 
     <!-- The overflow indicator shown when a group has more notification inside the group than the visible ones. An example is "+ 3" [CHAR LIMIT=5] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -4233,6 +4247,8 @@
     <string name="notification_onboarding_summaries_message">Your longer conversations can now be summarized to give you quick recaps</string>
 
     <!--  Notification summaries onboarding affordance message. OS and apps can summarize [CHAR LIMIT=NONE]-->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="notification_onboarding_summaries_message_with_apps">Your device and apps can now summarize longer conversations to give you quick recaps</string>
 
     <!--  Notification bundles onboarding affordance  [CHAR LIMIT=NONE]-->

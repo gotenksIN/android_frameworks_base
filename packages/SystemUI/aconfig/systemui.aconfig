@@ -253,14 +253,6 @@ flag {
 }
 
 flag {
-    name: "coroutine_tracing"
-    namespace: "systemui"
-    description: "Adds thread-local data to System UI's global coroutine scopes to "
-        "allow for tracing of coroutine continuations using System UI's tracinglib"
-    bug: "289353932"
-}
-
-flag {
     name: "decouple_view_controller_in_animlib"
     namespace: "systemui"
     description: "Decouple view and controller in AnimLib."
@@ -659,16 +651,6 @@ flag {
     namespace: "systemui"
     description: "Fix an issue where the Shade ends up in the wrong state if a launch animation controller receives the intent started callback after the animation is cancelled."
     bug: "461158751"
-    metadata {
-       purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "fix_cast_dialog_flicker"
-    namespace: "systemui"
-    description: "Fix a flicker in activity launch animations originating from the Cast QS dialog"
-    bug: "437996864"
     metadata {
        purpose: PURPOSE_BUGFIX
     }
@@ -1660,13 +1642,6 @@ flag {
 }
 
 flag {
-    name: "smartspace_viewpager2"
-    namespace: "systemui"
-    description: "Use viewpager2 in Smartspace"
-    bug: "259566300"
-}
-
-flag {
   name: "sounddose_customization"
   namespace: "systemui"
   description: "Enables custom actions for sounddose notifications"
@@ -1880,6 +1855,16 @@ flag {
    namespace: "systemui"
    description: "Does user switching on a background thread"
    bug: "284095720"
+}
+
+flag {
+    name: "synchronized_queue_cascade_notify"
+    namespace: "systemui"
+    description: "Cascade notify() in SynchornizedLinkedBlockingQueue to prevent waking up all threads unnecessarily"
+    bug: "470412661"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {

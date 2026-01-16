@@ -153,9 +153,8 @@ public final class UserManagerTest {
                     || user.isMain()) {
                 continue;
             }
-            if (android.multiuser.Flags.disallowRemovingLastAdminUser()
-                    && mUserManager.getUserRemovability(user.id)
-                            != UserManager.REMOVE_RESULT_USER_IS_REMOVABLE) {
+            if (mUserManager.getUserRemovability(user.id)
+                    != UserManager.REMOVE_RESULT_USER_IS_REMOVABLE) {
                 continue;
             }
             removeUser(user.id);
@@ -1398,6 +1397,23 @@ public final class UserManagerTest {
         } finally {
             mUserManager.setUserRestriction(UserManager.DISALLOW_ADD_CLONE_PROFILE, false,
                     mainUserHandle);
+        }
+    }
+
+    // Make sure createUser would fail if we have DISALLOW_ADD_GUEST.
+    @MediumTest
+    @Test
+    @RequiresFlagsEnabled(android.os.Flags.FLAG_DISALLOW_ADD_GUEST)
+    public void testCreateUser_disallowAddGuest() throws Exception {
+        final int creatorId = ActivityManager.getCurrentUser();
+        final UserHandle creatorHandle = asHandle(creatorId);
+        mUserManager.setUserRestriction(UserManager.DISALLOW_ADD_GUEST, true, creatorHandle);
+        try {
+            UserInfo createadInfo = createUser("GuestUser", /*flags=*/ UserInfo.FLAG_GUEST);
+            assertThat(createadInfo).isNull();
+        } finally {
+            mUserManager.setUserRestriction(UserManager.DISALLOW_ADD_GUEST, false,
+                    creatorHandle);
         }
     }
 

@@ -16913,7 +16913,7 @@ public class NotificationManagerServiceTest extends UiServiceTestCase {
         NotificationManager.Policy policy = new NotificationManager.Policy(0, 0, 0);
         mBinderService.setNotificationPolicy("package", policy, false);
 
-        verify(zenHelper).applyGlobalPolicyAsImplicitZenRule(any(), eq("package"), anyInt(),
+        verify(zenModeHelper).applyGlobalPolicyAsImplicitZenRule(any(), eq("package"), anyInt(),
                 eq(policy));
     }
 

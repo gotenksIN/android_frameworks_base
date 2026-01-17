@@ -18,6 +18,8 @@ package com.android.settingslib.metadata.preferencesapi
 
 import android.Manifest
 import android.content.Context
+import android.content.pm.PackageInfo
+import android.content.pm.PackageManager
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.android.settingslib.metadata.ValidatedKeyParameters
@@ -39,6 +41,7 @@ import com.android.settingslib.metadata.preferencesapi.types.AnyBoolean
 import com.android.settingslib.metadata.preferencesapi.types.AnyInt
 import com.android.settingslib.metadata.preferencesapi.types.GeneratedParameterType
 import com.android.settingslib.metadata.preferencesapi.types.GeneratedValue
+import com.android.settingslib.metadata.preferencesapi.types.InstalledPackageName
 import kotlinx.coroutines.test.runTest
 import com.android.settingslib.preference.PreferenceFragment
 import com.google.common.truth.Truth.assertThat
@@ -47,10 +50,18 @@ import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertThrows
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.robolectric.Shadows.shadowOf
+import org.robolectric.shadows.ShadowPackageManager
 
 @RunWith(AndroidJUnit4::class)
 class PreferencesApiScreenTest {
     private val context: Context = ApplicationProvider.getApplicationContext()
+
+    private fun buildPackageInfo(packageName: String): PackageInfo {
+        val packageInfo = PackageInfo()
+        packageInfo.packageName = packageName
+        return packageInfo
+    }
 
     @Test
     fun createPreferencesApiScreenWithoutGetter_throwsError() {
@@ -478,7 +489,7 @@ class PreferencesApiScreenTest {
                 purpose = R.string.preference_screen_purpose
             ) {
                 init {
-                    permissions(listOf(Manifest.permission.ACCESS_FINE_LOCATION))
+                    permissions(Manifest.permission.ACCESS_FINE_LOCATION)
 
                     flag { false }
 
@@ -570,7 +581,7 @@ class PreferencesApiScreenTest {
                         HardwareUnsupported(R.string.preconditions_hardware_unsupported_message)
                     }
 
-                    permissions(listOf(Manifest.permission.ACCESS_FINE_LOCATION))
+                    permissions(Manifest.permission.ACCESS_FINE_LOCATION)
 
                     preference(
                         key = preferenceKey,
@@ -761,6 +772,42 @@ class PreferencesApiScreenTest {
     }
 
     @Test
+    fun getAllPossibleParameters_onParameterizedScreenWithInstalledPackageName_returnsCorrectParameters() = runTest {
+        val screen = object : PreferencesApiScreen(
+            key = SCREEN_KEY,
+            topLevelSettingsCategory = Category.SYSTEM,
+            fragment = PreferenceFragment::class,
+            purpose = R.string.preference_screen_purpose
+        ) {
+            init {
+                parameters {
+                    parameter(
+                        "package",
+                        R.string.parameter_purpose1,
+                        true,
+                        InstalledPackageName(PackageManager.PackageInfoFlags.of(0))
+                    )
+                }
+            }
+        }
+        ShadowPackageManager.reset()
+        val packageManager = shadowOf(context.packageManager)
+        packageManager.installPackage(buildPackageInfo("a.b.package1"))
+        packageManager.installPackage(buildPackageInfo("a.d.package2"))
+
+        val allPossibleParameters = screen.getAllPossibleParameters(context).toList()
+        val possibleParameterPairs = allPossibleParameters.flatMap{it.values.entries}.map{it.key to it.value}
+
+        allPossibleParameters.forEach {
+            assertThat(it.values).hasSize(1)
+        }
+        assertThat(possibleParameterPairs).containsExactly(
+            "package" to "a.b.package1",
+            "package" to "a.d.package2"
+        )
+    }
+
+    @Test
     fun createPreferencesApiScreenMultiplePermissionsBlocks_fails() {
         val preferenceValue = false
         val preferenceKey = "ApiPreference"
@@ -773,8 +820,8 @@ class PreferencesApiScreenTest {
                 purpose = R.string.preference_screen_purpose
             ) {
                 init {
-                    permissions(listOf(Manifest.permission.ACCESS_FINE_LOCATION))
-                    permissions(listOf(Manifest.permission.WRITE_SETTINGS))
+                    permissions(Manifest.permission.ACCESS_FINE_LOCATION)
+                    permissions(Manifest.permission.WRITE_SETTINGS)
 
                     preference(
                         key = preferenceKey,
@@ -850,8 +897,8 @@ class PreferencesApiScreenTest {
                         purpose = R.string.preference_purpose1,
                         type = AnyBoolean
                     ) {
-                        permissions(listOf(Manifest.permission.ACCESS_FINE_LOCATION))
-                        permissions(listOf(Manifest.permission.WRITE_SETTINGS))
+                        permissions(Manifest.permission.ACCESS_FINE_LOCATION)
+                        permissions(Manifest.permission.WRITE_SETTINGS)
 
                         get {
                             execute {
@@ -1084,7 +1131,7 @@ class PreferencesApiScreenTest {
                             }
                         }
 
-                        permissions(listOf(Manifest.permission.ACCESS_FINE_LOCATION))
+                        permissions(Manifest.permission.ACCESS_FINE_LOCATION)
                         preconditions(R.string.preconditions_description1) {
                             HardwareUnsupported(R.string.preconditions_hardware_unsupported_message)
                         }
@@ -1121,7 +1168,7 @@ class PreferencesApiScreenTest {
                         type = AnyBoolean
                     ) {
                         get {
-                            permissions(listOf(Manifest.permission.ACCESS_FINE_LOCATION))
+                            permissions(Manifest.permission.ACCESS_FINE_LOCATION)
 
                             execute {
                                 preferenceValue
@@ -1158,8 +1205,8 @@ class PreferencesApiScreenTest {
                         type = AnyBoolean
                     ) {
                         get {
-                            permissions(listOf(Manifest.permission.ACCESS_FINE_LOCATION))
-                            permissions(listOf(Manifest.permission.WRITE_SETTINGS))
+                            permissions(Manifest.permission.ACCESS_FINE_LOCATION)
+                            permissions(Manifest.permission.WRITE_SETTINGS)
 
                             execute {
                                 preferenceValue
@@ -1265,7 +1312,7 @@ class PreferencesApiScreenTest {
                         type = AnyBoolean
                     ) {
                         set {
-                            permissions(listOf(Manifest.permission.ACCESS_FINE_LOCATION))
+                            permissions(Manifest.permission.ACCESS_FINE_LOCATION)
 
                             preconditions(R.string.preconditions_description1) {
                                 HardwareUnsupported(R.string.preconditions_hardware_unsupported_message)
@@ -1306,8 +1353,8 @@ class PreferencesApiScreenTest {
                         type = AnyBoolean
                     ) {
                         set {
-                            permissions(listOf(Manifest.permission.ACCESS_FINE_LOCATION))
-                            permissions(listOf(Manifest.permission.WRITE_SETTINGS))
+                            permissions(Manifest.permission.ACCESS_FINE_LOCATION)
+                            permissions(Manifest.permission.WRITE_SETTINGS)
 
                             execute { value ->
                                 preferenceValue = value

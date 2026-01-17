@@ -187,6 +187,9 @@ open class DesktopModeWindowDecorViewModelTestsBase : ShellTestCase() {
 
     protected val mockPinnedLayerController = mock<PinnedLayerController>()
     protected val mockPinnedLayerUiState = mock<PinnedLayerUiState>()
+    protected val mockFluidTaskResizer = mock<FluidTaskResizer>()
+    protected val mockVeiledTaskResizer = mock<VeiledTaskResizer>()
+    protected val mockMultiDisplayTaskMover = mock<MultiDisplayTaskMover>()
 
     private val transactionFactory =
         Supplier<SurfaceControl.Transaction> { SurfaceControl.Transaction() }
@@ -293,6 +296,9 @@ open class DesktopModeWindowDecorViewModelTestsBase : ShellTestCase() {
                 mockLockTaskChangeListener,
                 mockPinnedLayerController,
                 mockPinnedLayerUiState,
+                mockFluidTaskResizer,
+                mockVeiledTaskResizer,
+                mockMultiDisplayTaskMover,
             )
         desktopModeWindowDecorViewModel.setSplitScreenController(mockSplitScreenController)
         desktopModeWindowDecorViewModel.setFreeformTaskTransitionStarter(
@@ -315,14 +321,19 @@ open class DesktopModeWindowDecorViewModelTestsBase : ShellTestCase() {
                     any(),
                     any(),
                     any(),
+                    any(),
+                    any(),
+                    any(),
                 )
             )
             .thenReturn(mockTaskPositioner)
 
         // InputChannel cannot be mocked because it passes to InputEventReceiver.
-        val inputChannels = InputChannel.openInputChannelPair(TAG)
-        inputChannels.first().dispose()
-        whenever(mockInputMonitor.inputChannel).thenReturn(inputChannels[1])
+        whenever(mockInputMonitor.inputChannel).thenAnswer {
+            val inputChannels = InputChannel.openInputChannelPair(TAG)
+            inputChannels.first().dispose()
+            inputChannels.last()
+        }
 
         shellInit.init()
 

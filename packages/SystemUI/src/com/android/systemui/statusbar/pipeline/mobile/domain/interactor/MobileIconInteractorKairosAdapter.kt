@@ -26,7 +26,6 @@ import com.android.systemui.statusbar.pipeline.mobile.data.model.NetworkNameMode
 import com.android.systemui.statusbar.pipeline.mobile.domain.model.NetworkTypeIconModel
 import com.android.systemui.statusbar.pipeline.mobile.domain.model.SignalIconModel
 import com.android.systemui.statusbar.pipeline.shared.data.model.DataActivityModel
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 // QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -40,14 +39,14 @@ fun BuildScope.MobileIconInteractorKairosAdapter(
             subscriptionId = subscriptionId,
             tableLogBuffer = tableLogBuffer,
             activity =
-                activity.toSharedFlow(
+                activity.toStateFlow(
                     name =
                         nameTag {
                             "MobileIconInteractorKairosAdapter(subId=$subscriptionId).activity"
                         }
                 ),
             mobileIsDefault =
-                mobileIsDefault.toSharedFlow(
+                mobileIsDefault.toStateFlow(
                     name =
                         nameTag {
                             "MobileIconInteractorKairosAdapter(subId=$subscriptionId).mobileIsDefault"
@@ -130,7 +129,7 @@ fun BuildScope.MobileIconInteractorKairosAdapter(
                     nameTag { "MobileIconInteractorKairosAdapter(subId=$subscriptionId).isRoaming" }
                 ),
             isForceHidden =
-                isForceHidden.toSharedFlow(
+                isForceHidden.toStateFlow(
                     name =
                         nameTag {
                             "MobileIconInteractorKairosAdapter(subId=$subscriptionId).isForceHidden"
@@ -154,8 +153,8 @@ fun BuildScope.MobileIconInteractorKairosAdapter(
 private class MobileIconInteractorKairosAdapter(
     override val subscriptionId: Int,
     override val tableLogBuffer: TableLogBuffer,
-    override val activity: Flow<DataActivityModel>,
-    override val mobileIsDefault: Flow<Boolean>,
+    override val activity: StateFlow<DataActivityModel>,
+    override val mobileIsDefault: StateFlow<Boolean>,
     override val isDataConnected: StateFlow<Boolean>,
     override val isInService: StateFlow<Boolean>,
     override val isEmergencyOnly: StateFlow<Boolean>,
@@ -169,7 +168,7 @@ private class MobileIconInteractorKairosAdapter(
     override val carrierName: StateFlow<String>,
     override val isSingleCarrier: StateFlow<Boolean>,
     override val isRoaming: StateFlow<Boolean>,
-    override val isForceHidden: Flow<Boolean>,
+    override val isForceHidden: StateFlow<Boolean>,
     override val isAllowedDuringAirplaneMode: StateFlow<Boolean>,
     override val carrierNetworkChangeActive: StateFlow<Boolean>,
 // QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)

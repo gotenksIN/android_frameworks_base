@@ -6445,19 +6445,65 @@ public class ActivityManager {
         /**
          * The windowing layer is not specified. The system will use a
          * {@link #WINDOWING_LAYER_NORMAL_APP} layer.
-         * @hide
          */
+        @FlaggedApi(com.android.window.flags.Flags.FLAG_ENABLE_INTERACTIVE_PICTURE_IN_PICTURE)
         public static final int WINDOWING_LAYER_UNDEFINED = 0;
+
         /**
          * The windowing layer for normal application windows.
-         * @hide
+         *
+         * <p>If an application does not explicitly request a windowing layer for its task, it is
+         * considered to be in this layer.
+         *
+         * <p>Requesting this layer using {@link AppTask#requestWindowingLayer} is typically done
+         * to exit a previously requested layer.
+         *
+         * @see AppTask#requestWindowingLayer
          */
+        @FlaggedApi(com.android.window.flags.Flags.FLAG_ENABLE_INTERACTIVE_PICTURE_IN_PICTURE)
         public static final int WINDOWING_LAYER_NORMAL_APP = 1;
+
         /**
-         * The windowing layer for pinned windows, these windows are typically displayed above
+         * The windowing layer for pinned windows. These windows are typically displayed above
          * normal application windows.
-         * @hide
+         *
+         * <p>To ensure system integrity and a consistent user experience, the system imposes
+         * several restrictions on tasks using this layer. These may include, but are not limited
+         * to:
+         * <ul>
+         *  <li>Forcing the task to be completely opaque and display system decorations.</li>
+         *  <li>Strictly limiting the number of tasks in this layer (e.g., only one at a time).</li>
+         *  <li>Limiting the application's control over the task's size and position.</li>
+         *  <li>Limiting the maximum window size to which the user can resize the task.</li>
+         *  <li>Making the task non-movable programmatically (including restrictions on workarounds
+         *   like resizing).</li>
+         *  <li>Providing users with immediate settings access to disable the feature.</li>
+         *  <li>Providing users with a way to close the window.</li>
+         *  <li>The task may be finished by the system if it can no longer be hosted on this layer
+         *   due to windowing changes.</li>
+         *  <li>The available display modes may be limited for tasks on this layer. These may
+         *   include, but are not limited to: Picture-in-Picture mode, Split-screen mode, and
+         *   fullscreen.</li>
+         * </ul>
+         *
+         * <p>This layer might be shared with Picture-in-Picture (PiP) tasks; therefore, tasks on
+         * this layer might be dismissed when another enters PiP.
+         *
+         * <p>The task's window on this layer has the following requirements:
+         * <ul>
+         *  <li>Must be opaque.</li>
+         *  <li>Must have affordances to close the window and to allow users to disable
+         *   showing and running tasks on this layer, per app.</li>
+         *  <li>Must have a minimum size of 220dp according to <a
+         *   href="https://source.android.com/docs/compatibility/16/android-16-cdd#3814_multi-windows">
+         *   the established Multi-windows CDD</a> requirements.</li>
+         *  <li>The task cannot change to another layer unless requested by the app with a call to
+         *   {@link AppTask#requestWindowingLayer}.</li>
+         * </ul>
+         *
+         * @see AppTask#requestWindowingLayer
          */
+        @FlaggedApi(com.android.window.flags.Flags.FLAG_ENABLE_INTERACTIVE_PICTURE_IN_PICTURE)
         public static final int WINDOWING_LAYER_PINNED = 2;
 
         /**
@@ -6471,6 +6517,33 @@ public class ActivityManager {
         })
         @Retention(RetentionPolicy.SOURCE)
         public @interface WindowingLayer {
+        }
+
+        /**
+         * The request to change the windowing layer was granted.
+         */
+        @FlaggedApi(com.android.window.flags.Flags.FLAG_ENABLE_INTERACTIVE_PICTURE_IN_PICTURE)
+        public static final int WINDOWING_LAYER_REQUEST_GRANTED = 0;
+
+        /**
+         * The request to change the windowing layer was rejected.
+         *
+         * <p>This result implies the system is in a state where the request cannot be fulfilled,
+         * but the request itself was valid.
+         */
+        @FlaggedApi(com.android.window.flags.Flags.FLAG_ENABLE_INTERACTIVE_PICTURE_IN_PICTURE)
+        public static final int WINDOWING_LAYER_REQUEST_REJECTED = 1;
+
+        /**
+         * Defines the result of a windowing layer request.
+         * @hide
+         */
+        @IntDef(prefix = { "WINDOWING_LAYER_REQUEST_" }, value = {
+                WINDOWING_LAYER_REQUEST_GRANTED,
+                WINDOWING_LAYER_REQUEST_REJECTED,
+        })
+        @Retention(RetentionPolicy.SOURCE)
+        public @interface WindowingLayerResult {
         }
 
         private IAppTask mAppTaskImpl;
@@ -6627,19 +6700,39 @@ public class ActivityManager {
          * Requests the windowing layer for this task. This can be used to affect the Z-ordering
          * of the activity's window relative to other windows.
          *
-         * <p>
-         * The task will be moved to the requested layer if possible.
+         * <p>The task will be moved to the requested layer if possible. When the request is
+         * approved or rejected, the {@code callback} will be invoked. If rejected, the callback
+         * will receive an exception with a descriptive message accessible via
+         * {@link Exception#getMessage()}.
          *
-         * @param layer the {@link WindowingLayer} to move task to.
-         * @param executor an Executor used to invoke the callback
-         * @param callback a callback to receive the result of the request
-         * @hide
+         * <p>If the request is rejected due to a system state, the callback will receive
+         * {@link AppTask#WINDOWING_LAYER_REQUEST_REJECTED}. If the request is granted, the callback
+         * will receive {@link AppTask#WINDOWING_LAYER_REQUEST_GRANTED}.
+         *
+         * <p>To ensure system integrity and a consistent user experience, the system might impose
+         * restrictions on tasks requesting a specific layer. See
+         * {@link AppTask#WINDOWING_LAYER_PINNED} for implications when requesting the pinned layer.
+         *
+         * <p>If {@link AppTask#WINDOWING_LAYER_PINNED} is requested,
+         * {@link android.app.AppOpsManager#OPSTR_PICTURE_IN_PICTURE} must be allowed and the
+         * {@link android.Manifest.permission#USE_PINNED_WINDOWING_LAYER} permission must be
+         * granted.
+         *
+         * <p>If the request fails due to a developer error (such as missing permissions or
+         * invalid arguments), {@link OutcomeReceiver#onError} will be invoked with a
+         * {@link Exception} describing the error.
+         *
+         * @param layer The {@link WindowingLayer} to move the task to.
+         * @param executor An {@link Executor} used to invoke the callback.
+         * @param callback A callback to receive the result of the request.
          */
-        // TODO(b/442807136): Complete javadoc, add all requirements and detals needed
+        @FlaggedApi(com.android.window.flags.Flags.FLAG_ENABLE_INTERACTIVE_PICTURE_IN_PICTURE)
+        @RequiresPermission(value = Manifest.permission.USE_PINNED_WINDOWING_LAYER,
+                conditional = true)
         public void requestWindowingLayer(
                 @WindowingLayer int layer,
                 @NonNull @CallbackExecutor Executor executor,
-                @NonNull OutcomeReceiver<Void, Exception> callback) {
+                @NonNull OutcomeReceiver<Integer, Exception> callback) {
             Objects.requireNonNull(executor, "executor cannot be null");
             Objects.requireNonNull(callback, "callback cannot be null");
             TaskWindowingLayerRequestHandler.requestWindowingLayer(

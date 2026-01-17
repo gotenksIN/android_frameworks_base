@@ -20,6 +20,9 @@ import android.content.Context
 import android.os.Bundle
 import androidx.annotation.StringRes
 import androidx.fragment.app.Fragment
+import com.android.settingslib.datastore.Permissions
+import com.android.settingslib.datastore.and
+import com.android.settingslib.datastore.or
 import com.android.settingslib.metadata.KeyParametersSchema
 import com.android.settingslib.metadata.PreferenceHierarchy
 import com.android.settingslib.metadata.PreferenceScreenMetadata
@@ -31,9 +34,8 @@ import com.android.settingslib.metadata.preferencesapi.Utils.EXCEPTION_MESSAGE_N
 import com.android.settingslib.metadata.preferencesapi.Utils.getExceptionMessageMultipleParametersDefined
 import com.android.settingslib.metadata.preferencesapi.preconditions.ApiPreconditions
 import com.android.settingslib.metadata.preferencesapi.types.ApiType
-import com.android.settingslib.metadata.preferencesapi.types.GeneratedParameterType
-import com.android.settingslib.metadata.preferencesapi.types.GeneratedTypeContext
 import com.android.settingslib.metadata.preferenceHierarchy
+import com.android.settingslib.metadata.preferencesapi.types.FiniteOptionsType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
@@ -55,7 +57,7 @@ class ParameterizationConfig {
         val name: String,
         @StringRes val purpose: Int,
         val required: Boolean,
-        val type: GeneratedParameterType
+        val type: FiniteOptionsType<String>
     )
 
     internal val parameters = mutableMapOf<String, ApiParameterDefinition>()
@@ -75,7 +77,7 @@ class ParameterizationConfig {
         name: String,
         @StringRes purpose: Int,
         required: Boolean = false,
-        type: GeneratedParameterType
+        type: FiniteOptionsType<String>
     ) {
         if (parameters.containsKey(name)) {
             throw IllegalArgumentException("Parameter '$name' is already defined.")
@@ -142,7 +144,7 @@ abstract class PreferencesApiScreen(
 
     var flag: FlagConfig? = null
     var parametersSchema: KeyParametersSchema? = null
-    var screenPermissions: PermissionsConfig? = null
+    var screenPermissions: Permissions? = null
     var screenPreconditions: PreconditionsConfig? = null
 
     override val keyParameters: ValidatedKeyParameters?
@@ -184,7 +186,7 @@ abstract class PreferencesApiScreen(
      *     type = AnyString
      * ) {
      *     flag { Flags.FooBarFlag() }
-     *     permissions(listOf(Manifest.permission.PERMISSION))
+     *     permissions(Manifest.permission.PERMISSION)
      *     preconditions("My precondition description") { context ->
      *         if (conditionFoo(context)) {
      *             Allowed
@@ -194,7 +196,7 @@ abstract class PreferencesApiScreen(
      *     }
      *
      *     get {
-     *         permissions(listOf(Manifest.permission.PERMISSION_GET))
+     *         permissions(Manifest.permission.PERMISSION_GET)
      *         preconditions("My get precondition description") { context ->
      *             if (conditionBar(context)) {
      *                 Allowed
@@ -210,7 +212,7 @@ abstract class PreferencesApiScreen(
      *     }
      *
      *     set {
-     *         permissions(listOf(Manifest.permission.PERMISSION_SET))
+     *         permissions(Manifest.permission.PERMISSION_SET)
      *         preconditions("My set precondition description") { context ->
      *             if (conditionFooBar(context)) {
      *                 Allowed
@@ -333,9 +335,9 @@ abstract class PreferencesApiScreen(
             val parameterToUse = scope.parameters.values.first()
 
             this@PreferencesApiScreen.allPossibleParameters = { context ->
-                parameterToUse.type.lambda.invoke(GeneratedTypeContext(context)).map { parameterOption ->
+                parameterToUse.type.getOptions(context).map { parameterOption ->
                     this@PreferencesApiScreen.parametersSchema!!.prepare(
-                        parameterToUse.name to parameterOption.value
+                        parameterToUse.name to parameterOption.first
                     )
                 }
             }
@@ -344,7 +346,10 @@ abstract class PreferencesApiScreen(
         }
     }
 
-    protected fun permissions(permissions: List<String>) {
+    /**
+     * Declares the permissions for this preference screen.
+     */
+    protected fun permissions(permissions: Permissions) {
         if (screenPermissions != null) {
             error(getExceptionMessageMultipleDefines("permissions"))
         }
@@ -353,8 +358,27 @@ abstract class PreferencesApiScreen(
             error(getExceptionMessageWrongOrder("permissions"))
         }
 
-        screenPermissions = PermissionsConfig(permissions)
+        screenPermissions = permissions
     }
+
+    /**
+     * Declares the permissions for this preference screen.
+     */
+    protected fun permissions(permission: String) {
+        permissions(Permissions.allOf(permission))
+    }
+
+    /** Create a [Permissions] which requires two permissions. */
+    infix fun String.and(other: String): Permissions = Permissions.allOf(this, other)
+
+    /** Create a [Permissions] which requires either of two permissions. */
+    infix fun String.or(other: String): Permissions = Permissions.anyOf(this, other)
+
+    /** Create a [Permissions] which requires two permissions. */
+    infix fun String.and(other: Permissions): Permissions = Permissions.allOf(this) and other
+
+    /** Create a [Permissions] which requires either of two permissions. */
+    infix fun String.or(other: Permissions): Permissions = Permissions.anyOf(this) or other
 
     protected fun preconditions(
         @StringRes description: Int,

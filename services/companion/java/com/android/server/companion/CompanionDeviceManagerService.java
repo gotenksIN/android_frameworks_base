@@ -196,7 +196,7 @@ public class CompanionDeviceManagerService extends SystemService {
                 packageManagerInternal, mAssociationStore);
         mBackupRestoreProcessor = new BackupRestoreProcessor(context, packageManagerInternal,
                 mAssociationStore, associationDiskStore, mSystemDataTransferRequestStore,
-                mAssociationRequestsProcessor, mLocalMetadataStore);
+                mAssociationRequestsProcessor);
 
         mCompanionAppBinder = new CompanionAppBinder(context);
 
@@ -243,7 +243,7 @@ public class CompanionDeviceManagerService extends SystemService {
         }
 
         // Init UUID store
-        mObservableUuidStore.getObservableUuidsForUser(getContext().getUserId());
+        mObservableUuidStore.readObservableUuids(getContext().getUserId());
 
         // Publish "binder" service.
         final CompanionDeviceManagerImpl impl = new CompanionDeviceManagerImpl();
@@ -289,12 +289,11 @@ public class CompanionDeviceManagerService extends SystemService {
         // Notify and bind the app after the phone is unlocked.
         mDevicePresenceProcessor.sendDevicePresenceEventOnUnlocked(userId);
 
-        // Load user's session keys from disk.
-        mTrustedDevicesStore.readSessionKeysForUser(userId);
-
         ExecutorService executor = Executors.newSingleThreadExecutor();
-        executor.execute(() -> mCompanionExemptionProcessor.updateAutoRevokeExemptions(
-                user.getUserIdentifier()));
+        executor.execute(() -> {
+            mTrustedDevicesStore.readSessionKeysForUser(userId); // Load user's session keys.
+            mCompanionExemptionProcessor.updateAutoRevokeExemptions(userId);
+        });
     }
 
     private void onPackageRemoveOrDataClearedInternal(
@@ -313,9 +312,9 @@ public class CompanionDeviceManagerService extends SystemService {
 
         // Clear observable UUIDs for the package.
         final List<ObservableUuid> uuidsTobeObserved =
-                mObservableUuidStore.getObservableUuidsForPackage(userId, packageName);
+                mObservableUuidStore.readObservableUuidsForPackage(userId, packageName);
         for (ObservableUuid uuid : uuidsTobeObserved) {
-            mObservableUuidStore.removeObservableUuid(userId, uuid.getUuid(), packageName);
+            mObservableUuidStore.removeObservableUuid(userId, uuid.uuid(), packageName);
         }
     }
 

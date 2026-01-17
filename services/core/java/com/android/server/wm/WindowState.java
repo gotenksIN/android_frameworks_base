@@ -140,6 +140,7 @@ import static android.view.WindowManagerPolicyConstants.TYPE_LAYER_MULTIPLIER;
 import static android.view.WindowManagerPolicyConstants.TYPE_LAYER_OFFSET;
 import static android.window.DesktopExperienceFlags.ENABLE_PRESENTATION_FOR_CONNECTED_DISPLAYS;
 
+import static com.android.internal.policy.TransitionAnimation.MAX_ANIMATION_DURATION;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_ADD_REMOVE;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_ANIM;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_APP_TRANSITIONS;
@@ -173,7 +174,6 @@ import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_VISIBILITY;
 import static com.android.server.wm.WindowManagerDebugConfig.TAG_WITH_CLASS_NAME;
 import static com.android.server.wm.WindowManagerDebugConfig.TAG_WM;
 import static com.android.server.wm.WindowManagerService.H.WINDOW_STATE_BLAST_SYNC_TIMEOUT;
-import static com.android.server.wm.WindowManagerService.MAX_ANIMATION_DURATION;
 import static com.android.server.wm.WindowManagerService.MY_PID;
 import static com.android.server.wm.WindowManagerService.UPDATE_FOCUS_NORMAL;
 import static com.android.server.wm.WindowManagerService.UPDATE_FOCUS_REMOVING_FOCUS;
@@ -1143,6 +1143,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
                 mAttrs.packageName, s.mUid);
         updateGlobalScale();
         updateClientHardwareRendererOutputState(null, mDisplayContent);
+        updateClientRenderingLimitationsState(null, mDisplayContent);
 
         // Make sure we initial all fields before adding to parentWindow, to prevent exception
         // during onDisplayChanged.
@@ -1518,6 +1519,23 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         }
     }
 
+    private void updateClientRenderingLimitationsState(DisplayContent oldDisplay,
+            DisplayContent newDisplay) {
+        final boolean oldState =
+                oldDisplay != null && oldDisplay.areClientRenderingLimitationsEnabled();
+        final boolean newState =
+                newDisplay != null && newDisplay.areClientRenderingLimitationsEnabled();
+        if (oldState == newState) {
+            return;
+        }
+        var transaction = mWmService.mTransactionFactory.get();
+        try {
+            mClient.requestViewAnimationsDisabled(newState);
+        } catch (RemoteException e) {
+        }
+        transaction.apply();
+    }
+
     @Override
     void onDisplayChanged(DisplayContent dc) {
         if (mDisplayContent != null && dc != mDisplayContent) {
@@ -1545,6 +1563,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             }
         }
         updateClientHardwareRendererOutputState(mDisplayContent, dc);
+        updateClientRenderingLimitationsState(mDisplayContent, dc);
         super.onDisplayChanged(dc);
         // Window was not laid out for this display yet, so make sure mLayoutSeq does not match.
         if (dc != null && mInputWindowHandle.getDisplayId() != dc.getDisplayId()) {

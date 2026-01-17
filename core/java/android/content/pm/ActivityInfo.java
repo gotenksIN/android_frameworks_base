@@ -42,6 +42,7 @@ import android.util.ArraySet;
 import android.util.DisplayMetrics;
 import android.util.Printer;
 import android.util.TypedValue;
+import android.view.Gravity;
 import android.window.OnBackInvokedCallback;
 
 import com.android.internal.util.Parcelling;
@@ -2524,21 +2525,39 @@ public class ActivityInfo extends ComponentInfo implements Parcelable {
     public static final class WindowLayout {
 
         /**
+         * An empty {@link WindowLayout} instance with all values set to undefined.
+         * Useful for testing or as a fallback default.
+         *
+         * @hide
+         */
+        public static final WindowLayout EMPTY = new WindowLayout(
+                -1 /* width */, -1 /* complexWidth */, -1f /* widthFraction */,
+                -1 /* height */, -1 /* complexHeight */, -1f /* heightFraction */,
+                Gravity.NO_GRAVITY, -1 /* minWidth */, -1 /* complexMinWidth */,
+                -1 /* minHeight */, -1 /* complexMinHeight */, null /* windowLayoutAffinity */);
+
+        /**
          * Creates a new WindowLayout instance with the specified dimensions and constraints.
          *
          * @deprecated This constructor initializes the layout with pixel values resolved using the
          * default device density. It does not reflect the actual constraints on displays with
          * different densities (e.g. external monitors). The system automatically enforces the
          * correct constraints at runtime based on the current display context.
-         * Do not use this constructor for manual layout calculations.
+         * Do not use this constructor for manual layout calculations. Use {@link #EMPTY} instead
+         * if you need a default instance with no constraints.
          */
         @Deprecated
         @FlaggedApi(Flags.FLAG_RUNTIME_DENSITY_RESOLUTION_FOR_WINDOW_LAYOUT)
         public WindowLayout(int width, float widthFraction, int height, float heightFraction,
                 int gravity, int minWidth, int minHeight) {
-            this(width, -1 /* complexWidth */, widthFraction, height, -1 /* complexHeight */,
-                    heightFraction, gravity, minWidth, -1 /* complexMinWidth */, minHeight,
-                    -1 /* complexMinHeight */, null /* windowLayoutAffinity */);
+            this(width, TypedValue.createComplexDimension(width, TypedValue.COMPLEX_UNIT_PX),
+                    widthFraction, height,
+                    TypedValue.createComplexDimension(height, TypedValue.COMPLEX_UNIT_PX),
+                    heightFraction, gravity, minWidth,
+                    TypedValue.createComplexDimension(minWidth, TypedValue.COMPLEX_UNIT_PX),
+                    minHeight,
+                    TypedValue.createComplexDimension(minHeight, TypedValue.COMPLEX_UNIT_PX),
+                    null /* windowLayoutAffinity */);
         }
 
         /** @hide */
@@ -2730,10 +2749,7 @@ public class ActivityInfo extends ComponentInfo implements Parcelable {
                 return this.width;
             }
 
-            return TypedValue.complexToDimensionPixelSize(
-                    this.complexWidth,
-                    metrics
-            );
+            return complexToDimensionPixelSize(complexWidth, metrics);
         }
 
         /**
@@ -2748,10 +2764,7 @@ public class ActivityInfo extends ComponentInfo implements Parcelable {
                 return this.height;
             }
 
-            return TypedValue.complexToDimensionPixelSize(
-                    this.complexHeight,
-                    metrics
-            );
+            return complexToDimensionPixelSize(complexHeight, metrics);
         }
 
         /**
@@ -2766,10 +2779,7 @@ public class ActivityInfo extends ComponentInfo implements Parcelable {
                 return this.minWidth;
             }
 
-            return TypedValue.complexToDimensionPixelSize(
-                    this.complexMinWidth,
-                    metrics
-            );
+            return complexToDimensionPixelSize(complexMinWidth, metrics);
         }
 
         /**
@@ -2784,10 +2794,27 @@ public class ActivityInfo extends ComponentInfo implements Parcelable {
                 return this.minHeight;
             }
 
-            return TypedValue.complexToDimensionPixelSize(
-                    this.complexMinHeight,
-                    metrics
-            );
+            return complexToDimensionPixelSize(complexMinHeight, metrics);
+        }
+
+        /**
+         * Returns the minimum width of the window in complex format.
+         *
+         * @return The minimum width of the window in complex format.
+         * @hide
+         */
+        public int getComplexMinWidth() {
+            return complexMinWidth;
+        }
+
+        /**
+         * Returns the minimum height of the window in complex format.
+         *
+         * @return The minimum height of the window in complex format.
+         * @hide
+         */
+        public int getComplexMinHeight() {
+            return complexMinHeight;
         }
 
         private static int complexToDimensionPixelSize(int complex,

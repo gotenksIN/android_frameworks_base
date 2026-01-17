@@ -18,8 +18,11 @@
 #include <android/ipcrenderbuffer/IPCRecordingCanvas.h>
 #include <system/window.h>
 
+#include <cstddef>
+
 #include "DeviceInfo.h"
 #include "LightingInfo.h"
+#include "hwui/OutOfProcessRendering.h"
 #include "renderthread/Frame.h"
 #include "utils/Color.h"
 
@@ -29,8 +32,10 @@ namespace uirenderer {
 namespace skiapipeline {
 
 SkiaIpcPipeline::SkiaIpcPipeline(renderthread::RenderThread& thread) : SkiaPipeline(thread) {
-    mIPCRecordingCanvas = std::make_shared<IPCRecordingCanvas>(mResourceCache);
+    auto& cache = oopr::getIPCResourceCache();
+    mIPCRecordingCanvas = std::make_shared<IPCRecordingCanvas>(cache);
     mApplyToken = sp<BBinder>::make();
+    oopr::enableOutOfProcessRendering();
 }
 
 SkiaIpcPipeline::~SkiaIpcPipeline() {
@@ -56,6 +61,7 @@ SkiaIpcPipeline::~SkiaIpcPipeline() {
 void SkiaIpcPipeline::setSurfaceControl(const sp<SurfaceControl>& surfaceControl) {
     if (surfaceControl != nullptr && surfaceControl->isValid()) {
         SurfaceComposerClient::Transaction()
+                .setRenderResourceToken(surfaceControl, oopr::getDefaultRenderResourceToken())
                 .setRenderCommandBuffer(surfaceControl,
                                         mIPCRecordingCanvas->getRenderCommandBufferProducer())
                 .apply();
@@ -131,6 +137,10 @@ IRenderPipeline::DrawResult SkiaIpcPipeline::draw(
         mTransactionReadyCallback = nullptr;
     }
 
+
+    // Register any pending bitmaps (e.g. created during this frame)
+    oopr::registerPendingBitmaps();
+
     if (syncTransaction != nullptr) {
         syncTransaction->setRenderCommandBufferFrameId(mSurfaceControl, getFrameNumber());
         syncTransaction->merge(std::move(pendingTransactions));
@@ -138,7 +148,7 @@ IRenderPipeline::DrawResult SkiaIpcPipeline::draw(
     } else {
         SurfaceComposerClient::Transaction transaction;
         transaction.setRenderCommandBufferFrameId(mSurfaceControl, getFrameNumber());
-        syncTransaction->merge(std::move(pendingTransactions));
+        transaction.merge(std::move(pendingTransactions));
         transaction.setApplyToken(mApplyToken);
         transaction.apply(false, true);
     }

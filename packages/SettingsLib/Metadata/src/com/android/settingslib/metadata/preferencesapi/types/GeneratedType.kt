@@ -49,7 +49,7 @@ data class GeneratedValue<T>(
 class GeneratedType<T : Any> private constructor(
     @field:StringRes val descriptionRes: Int?,
     val description: String?,
-    val lambda: GeneratedTypeContext.() -> Collection<GeneratedValue<T>>
+    private val lambda: GeneratedTypeContext.() -> Collection<GeneratedValue<T>>
 ) : FiniteOptionsType<T> {
     init {
         require(descriptionRes != null || description != null)
@@ -66,7 +66,7 @@ class GeneratedType<T : Any> private constructor(
     ) : this(descriptionRes = null, description = description, lambda = lambda)
 
     /** Get the description as a string using the provided context. */
-    fun getDescription(context: Context): String =
+    override fun getDescription(context: Context): String =
         resolveString(context, descriptionRes, description)
 
     override fun getOptions(context: Context) = lambda(GeneratedTypeContext(context)).map{

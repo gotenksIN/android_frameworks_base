@@ -34,7 +34,6 @@ import com.android.systemui.statusbar.pipeline.mobile.data.model.NetworkNameMode
 import com.android.systemui.statusbar.pipeline.mobile.data.model.ResolvedNetworkType
 import com.android.systemui.statusbar.pipeline.mobile.data.repository.MobileConnectionRepository.Companion.DEFAULT_NUM_LEVELS
 import com.android.systemui.statusbar.pipeline.shared.data.model.DataActivityModel
-import com.qti.extphone.RadioIconType
 import kotlinx.coroutines.flow.MutableStateFlow
 
 // TODO(b/261632894): remove this in favor of the real impl or DemoMobileConnectionRepository
@@ -79,7 +78,7 @@ class FakeMobileConnectionRepository(
     override val voiceNetworkType = MutableStateFlow(0)
     override val dataNetworkType = MutableStateFlow(0)
 // QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
-   override val radioIconType = MutableStateFlow(RadioIconType.TYPE_NONE)
+   override val radioIconType = MutableStateFlow(0)
 // QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization
     override val dataRoamingEnabled = MutableStateFlow(true)
 // QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt network type icon customization

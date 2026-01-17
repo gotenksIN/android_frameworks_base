@@ -22,6 +22,7 @@ import static android.view.WindowManager.LayoutParams.TYPE_ACCESSIBILITY_MAGNIFI
 import static android.view.WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY;
 import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_ABOVE_SUB_PANEL;
 import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_ATTACHED_DIALOG;
+import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_CAPTION_BAR;
 import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_MEDIA;
 import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_MEDIA_OVERLAY;
 import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
@@ -97,6 +98,7 @@ import java.io.PrintWriter;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.List;
+import java.util.function.Consumer;
 
 /**
  * This interface supplies all UI-specific behavior of the window manager.  An
@@ -666,6 +668,7 @@ public interface WindowManagerPolicy extends WindowManagerPolicyConstants {
     default int getSubWindowLayerFromTypeLw(int type) {
         switch (type) {
             case TYPE_APPLICATION_PANEL:
+            case TYPE_APPLICATION_CAPTION_BAR:
             case TYPE_APPLICATION_ATTACHED_DIALOG:
                 return APPLICATION_PANEL_SUBLAYER;
             case TYPE_APPLICATION_MEDIA:
@@ -962,20 +965,13 @@ public interface WindowManagerPolicy extends WindowManagerPolicyConstants {
     public void enableKeyguard(boolean enabled);
 
     /**
-     * Callback used by {@link #exitKeyguardSecurely}
-     */
-    interface OnKeyguardExitResult {
-        void onKeyguardExitResult(boolean success);
-    }
-
-    /**
      * Tell the policy if anyone is requesting the keyguard to exit securely
      * (this would be called after the keyguard was disabled)
      * @param callback Callback to send the result back.
-     * @see android.app.KeyguardManager#exitKeyguardSecurely(android.app.KeyguardManager.OnKeyguardExitResult)
+     * @see android.app.KeyguardManager#exitKeyguardSecurely(java.util.function.Consumer)
      */
     @SuppressWarnings("javadoc")
-    void exitKeyguardSecurely(OnKeyguardExitResult callback);
+    void exitKeyguardSecurely(@NonNull Consumer<Boolean> callback);
 
     /**
      * isKeyguardLocked

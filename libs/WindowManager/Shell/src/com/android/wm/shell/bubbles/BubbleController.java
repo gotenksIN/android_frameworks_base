@@ -722,6 +722,9 @@ public class BubbleController implements ConfigurationChangeListener,
             }
             mIsPrevNavModeGestures = isCurrentNavModeGestures;
             BubbleBarUpdate update = mBubbleData.getInitialStateForBubbleBar();
+            if (Flags.sendBubbleRootTaskIdToLauncher()) {
+                update.bubbleRootTaskId = mBubbleHelper.getAppBubbleRootTaskId();
+            }
             mBubbleStateListener.onBubbleStateChange(update);
         }
     }
@@ -3085,10 +3088,8 @@ public class BubbleController implements ConfigurationChangeListener,
 
         mBubblePositioner.dump(pw);
 
-        if (Flags.enableBubbleEventHistoryLogs()) {
-            BubbleLog.dump(pw, prefix);
-            pw.println();
-        }
+        BubbleLog.dump(pw, prefix);
+        pw.println();
     }
 
     /**

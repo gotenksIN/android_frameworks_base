@@ -83,7 +83,8 @@ constructor(
                 name = nameTag("MobileIconsInteractorKairosAdapter.interactorsBySubIdK")
             )
     }
-    private val interactorsBySubId =
+
+    private val interactorsBySubId: StateFlow<Map<Int, MobileIconInteractor>> =
         interactorsBySubIdK
             .toColdConflatedFlow(
                 kairosNetwork,

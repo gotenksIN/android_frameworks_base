@@ -88,7 +88,6 @@ class AppHeaderViewHolder(
     private val context: Context,
     windowDecorationActions: WindowDecorationActions,
     onCaptionTouchListener: View.OnTouchListener,
-    onCaptionButtonClickListener: View.OnClickListener,
     private val onLongClickListener: OnLongClickListener,
     onCaptionGenericMotionListener: View.OnGenericMotionListener,
     onMaximizeHoverAnimationFinishedListener: () -> Unit,
@@ -166,16 +165,20 @@ class AppHeaderViewHolder(
         openMenuButton.setOnTouchListener(onCaptionTouchListener)
 
         closeWindowButton.throttleFirstClicks(CLICK_DELAY) { v ->
-            onCaptionButtonClickListener.onClick(v)
+            windowDecorationActions.onClose(currentTaskInfo)
         }
         maximizeWindowButton.throttleFirstClicks(CLICK_DELAY) { v ->
-            onCaptionButtonClickListener.onClick(v)
+            windowDecorationActions.onMaximizeOrRestore(
+                currentTaskInfo.taskId,
+                AmbiguousSource.HEADER_BUTTON,
+                InputMethod.MOUSE,
+            )
         }
         minimizeWindowButton.throttleFirstClicks(CLICK_DELAY) { v ->
-            onCaptionButtonClickListener.onClick(v)
+            windowDecorationActions.onMinimize(currentTaskInfo)
         }
         openMenuButton.throttleFirstClicks(CLICK_DELAY) { v ->
-            onCaptionButtonClickListener.onClick(v)
+            windowDecorationActions.onOpenHandleMenu(currentTaskInfo.taskId)
         }
 
         maximizeWindowButton.setOnGenericMotionListener(onCaptionGenericMotionListener)
@@ -493,18 +496,14 @@ class AppHeaderViewHolder(
     ) {
         logDisplayCompatRestartButtonEventReported(taskInfo)
         currentTaskInfo = taskInfo
-        if (DesktopModeFlags.ENABLE_THEMED_APP_HEADERS.isTrue) {
-            bindDataWithThemedHeaders(
-                taskInfo,
-                isTaskMaximized,
-                inFullImmersiveState,
-                hasGlobalFocus,
-                enableMaximizeLongClick,
-                isCaptionVisible,
-            )
-        } else {
-            bindDataLegacy(taskInfo, hasGlobalFocus, isCaptionVisible)
-        }
+        bindDataWithThemedHeaders(
+            taskInfo,
+            isTaskMaximized,
+            inFullImmersiveState,
+            hasGlobalFocus,
+            enableMaximizeLongClick,
+            isCaptionVisible,
+        )
     }
 
     fun logDisplayCompatRestartButtonEventReported(newTaskInfo: RunningTaskInfo) {
@@ -528,47 +527,6 @@ class AppHeaderViewHolder(
                 type,
             )
         }
-    }
-
-    private fun bindDataLegacy(
-        taskInfo: RunningTaskInfo,
-        hasGlobalFocus: Boolean,
-        isCaptionVisible: Boolean,
-    ) {
-        if (DesktopModeFlags.ENABLE_DESKTOP_APP_HANDLE_ANIMATION.isTrue()) {
-            setCaptionVisibility(isCaptionVisible)
-        }
-        captionView.setBackgroundColor(getCaptionBackgroundColor(taskInfo, hasGlobalFocus))
-        val color = getAppNameAndButtonColor(taskInfo, hasGlobalFocus)
-        val alpha = Color.alpha(color)
-        closeWindowButton.imageTintList = ColorStateList.valueOf(color)
-        maximizeWindowButton.imageTintList = ColorStateList.valueOf(color)
-        minimizeWindowButton.imageTintList = ColorStateList.valueOf(color)
-        expandMenuButton.imageTintList = ColorStateList.valueOf(color)
-        appNameTextView.isVisible = !taskInfo.isTransparentCaptionBarAppearance
-        appNameTextView.setTextColor(color)
-        appIconImageView.imageAlpha = alpha
-        maximizeWindowButton.imageAlpha = alpha
-        minimizeWindowButton.imageAlpha = alpha
-        closeWindowButton.imageAlpha = alpha
-        expandMenuButton.imageAlpha = alpha
-        expandMenuErrorImageView.imageAlpha = alpha
-        context.withStyledAttributes(
-            set = null,
-            attrs =
-                intArrayOf(
-                    android.R.attr.selectableItemBackground,
-                    android.R.attr.selectableItemBackgroundBorderless,
-                ),
-            defStyleAttr = 0,
-            defStyleRes = 0,
-        ) {
-            openMenuButton.background = getDrawable(0)
-            maximizeWindowButton.background = getDrawable(1)
-            closeWindowButton.background = getDrawable(1)
-            minimizeWindowButton.background = getDrawable(1)
-        }
-        maximizeButtonView.setAnimationTints(isDarkMode())
     }
 
     private fun bindDataWithThemedHeaders(
@@ -1000,7 +958,6 @@ class AppHeaderViewHolder(
             context: Context,
             windowDecorationActions: WindowDecorationActions,
             onCaptionTouchListener: View.OnTouchListener,
-            onCaptionButtonClickListener: View.OnClickListener,
             onLongClickListener: OnLongClickListener,
             onCaptionGenericMotionListener: View.OnGenericMotionListener,
             onMaximizeHoverAnimationFinishedListener: () -> Unit,
@@ -1017,7 +974,6 @@ class AppHeaderViewHolder(
             context: Context,
             windowDecorationActions: WindowDecorationActions,
             onCaptionTouchListener: View.OnTouchListener,
-            onCaptionButtonClickListener: View.OnClickListener,
             onLongClickListener: OnLongClickListener,
             onCaptionGenericMotionListener: View.OnGenericMotionListener,
             onMaximizeHoverAnimationFinishedListener: () -> Unit,
@@ -1030,7 +986,6 @@ class AppHeaderViewHolder(
                 context,
                 windowDecorationActions,
                 onCaptionTouchListener,
-                onCaptionButtonClickListener,
                 onLongClickListener,
                 onCaptionGenericMotionListener,
                 onMaximizeHoverAnimationFinishedListener,

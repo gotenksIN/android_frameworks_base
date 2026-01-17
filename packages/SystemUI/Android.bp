@@ -621,6 +621,7 @@ android_library {
         "SystemUI-core",
         "com.android.systemui.pods-api-aosp-handheld",
         "com.android.systemui.pods-impl-aosp-handheld",
+        "dagger2",
     ],
     enable_ksp: true,
     annotation_processor_flags: [
@@ -655,15 +656,6 @@ java_library {
 }
 
 filegroup {
-    name: "SystemUI-tests-utils-pods",
-    srcs: [
-        "pods/testFixtures/src/**/*.kt",
-        "pods/testFixtures/src/**/*.java",
-    ],
-    path: "pods/testFixtures/src",
-}
-
-filegroup {
     name: "SystemUI-tests-utils-monolith",
     srcs: [
         "tests/utils/src/**/*.java",
@@ -676,7 +668,7 @@ filegroup {
     name: "SystemUI-tests-utils",
     srcs: [
         ":SystemUI-tests-utils-monolith",
-        ":SystemUI-tests-utils-pods",
+        ":SystemUI_pod_fixtureFiles",
         ":kosmos-src",
     ],
 }
@@ -834,6 +826,7 @@ android_library {
         "kairos",
         "displaylib",
         "device_policy_aconfig_flags_lib",
+        "dynamiccolors",
         "SurfaceEffectsComposeLib",
     ],
 }
@@ -852,7 +845,6 @@ android_library {
         ":ReleaseJavaFiles",
         ":SystemUI-tests-multivalent-monolith",
         ":SystemUI-tests-multivalent-pods",
-        ":SystemUI-tests-utils",
         "compose/features/src/**/*.kt",
         "compose/facade/enabled/src/**/*.kt",
     ],
@@ -860,7 +852,9 @@ android_library {
         "//frameworks/libs/systemui:compilelib",
         "com.android.systemui.pods-api-aosp-handheld",
         "com.android.systemui.pods-impl-aosp-handheld",
+        "SystemUI_test_fixtures",
         "SystemUI-tests-base",
+        "SystemUI_pod_tests",
         "androidx.compose.ui_ui-test-junit4",
         "androidx.test.uiautomator_uiautomator",
         "androidx.core_core-animation-testing",
@@ -933,7 +927,6 @@ android_app {
         "SystemUI-tests-base",
         "androidx.compose.runtime_runtime",
         "SystemUI-application",
-        "SystemUI-core",
     ],
     libs: [
         "keepanno-annotations",
@@ -1001,6 +994,7 @@ android_robolectric_test {
         "RoboTestLibraries",
         "androidx.compose.runtime_runtime",
         "androidx.compose.ui_ui-test-junit4",
+        "SystemUI_pod_tests",
     ],
     libs: [
         "android.test.runner.impl",
@@ -1039,6 +1033,7 @@ android_robolectric_test {
         "RoboTestLibraries",
         "androidx.compose.runtime_runtime",
         "platform-compat-test-rules",
+        "SystemUI_pod_tests",
     ],
     libs: [
         "android.test.runner.impl",
@@ -1070,6 +1065,7 @@ android_ravenwood_test {
         "SystemUI-application",
         "SystemUI-core",
         "SystemUI-tests-base",
+        "SystemUI_pod_tests",
         "androidx.test.uiautomator_uiautomator",
         "androidx.core_core-animation-testing",
         "androidx.test.ext.junit",

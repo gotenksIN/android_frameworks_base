@@ -102,6 +102,7 @@ import com.android.internal.policy.IKeyguardService;
 import com.android.internal.util.test.LocalServiceKeeperRule;
 import com.android.internal.widget.LockPatternUtils;
 import com.android.server.SystemServiceManager;
+import com.android.server.UiThread;
 import com.android.server.input.InputManagerInternal;
 import com.android.server.pm.UserManagerInternal;
 import com.android.server.policy.WindowManagerPolicy.ScreenOnListener;
@@ -150,7 +151,6 @@ public class PhoneWindowManagerTests {
     @Mock private IBinder mInputToken;
     private OffsettableClock mOffsettableClock;
 
-    PhoneWindowManager mNonSpyPhoneWindowManager;
     PhoneWindowManager mPhoneWindowManager;
 
     @Mock
@@ -205,9 +205,10 @@ public class PhoneWindowManagerTests {
 
         mOffsettableClock = new OffsettableClock.Stopped();
 
-        mNonSpyPhoneWindowManager = new PhoneWindowManager();
-        mPhoneWindowManager = spy(mNonSpyPhoneWindowManager);
         spyOn(ActivityManager.getService());
+
+        mPhoneWindowManager = new PhoneWindowManager();
+        spyOn(mPhoneWindowManager);
 
         mLocalServiceKeeperRule.overrideLocalService(ActivityTaskManagerInternal.class,
                 mAtmInternal);
@@ -236,6 +237,7 @@ public class PhoneWindowManagerTests {
 
     @After
     public void tearDown() {
+        UiThread.dispose();
         reset(ActivityManager.getService());
         reset(mContext);
         mMockitoSession.finishMocking();
@@ -707,7 +709,7 @@ public class PhoneWindowManagerTests {
         doReturn(true).when(() -> SystemProperties.getBoolean(
                                 eq("bluetooth.power.suspend.hid_wake_up.enabled"), eq(false)));
 
-        initNonSpyPhoneWindowManager();
+        initPhoneWindowManager();
 
         final Intent intent = new Intent(ACTION_CONNECTION_STATE_CHANGED);
         intent.putExtra(BluetoothProfile.EXTRA_PREVIOUS_STATE, BluetoothProfile.STATE_DISCONNECTED);
@@ -783,8 +785,7 @@ public class PhoneWindowManagerTests {
         mPhoneWindowManager.screenTurningOn(DEFAULT_DISPLAY, mock(ScreenOnListener.class));
 
         verify(mKeyguardServiceDelegate).onScreenTurningOn(
-                /* reason= */ eq(SCREEN_TURNING_ON_REASON_DISPLAY_SWITCH),
-                /* drawnListener= */ any());
+                /* reason= */ eq(SCREEN_TURNING_ON_REASON_DISPLAY_SWITCH));
     }
 
     @Test
@@ -796,8 +797,7 @@ public class PhoneWindowManagerTests {
         mPhoneWindowManager.screenTurningOn(DEFAULT_DISPLAY, mock(ScreenOnListener.class));
 
         verify(mKeyguardServiceDelegate).onScreenTurningOn(
-                /* reason= */ eq(SCREEN_TURNING_ON_REASON_UNKNOWN),
-                /* drawnListener= */ any());
+                /* reason= */ eq(SCREEN_TURNING_ON_REASON_UNKNOWN));
     }
 
     @Test
@@ -889,13 +889,6 @@ public class PhoneWindowManagerTests {
         verify(mockCallback, times(2)).onKeyguardServiceConnected();
     }
 
-    private void initNonSpyPhoneWindowManager() {
-        mNonSpyPhoneWindowManager.mDefaultDisplayPolicy = mDisplayPolicy;
-        mNonSpyPhoneWindowManager.mDefaultDisplayRotation = mock(DisplayRotation.class);
-        mContext.getMainThreadHandler().runWithScissors(() -> mNonSpyPhoneWindowManager.init(
-                new TestInjector(mContext, mock(WindowManagerPolicy.WindowManagerFuncs.class))), 0);
-    }
-
     private void initPhoneWindowManager() {
         mPhoneWindowManager.mDefaultDisplayPolicy = mDisplayPolicy;
         mPhoneWindowManager.mDefaultDisplayRotation = mock(DisplayRotation.class);
@@ -919,7 +912,9 @@ public class PhoneWindowManagerTests {
             super(context, funcs);
         }
 
-        KeyguardServiceDelegate getKeyguardServiceDelegate() {
+        @Override
+        KeyguardServiceDelegate getKeyguardServiceDelegate(
+                KeyguardServiceDelegate.StateCallback callbacks) {
             return mKeyguardServiceDelegate;
         }
 

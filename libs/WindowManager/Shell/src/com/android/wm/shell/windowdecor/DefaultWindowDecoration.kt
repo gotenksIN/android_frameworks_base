@@ -35,7 +35,6 @@ import android.view.InsetsSource.FLAG_FORCE_CONSUMING
 import android.view.InsetsSource.FLAG_FORCE_CONSUMING_OPAQUE_CAPTION_BAR
 import android.view.MotionEvent
 import android.view.SurfaceControl
-import android.view.View.OnClickListener
 import android.view.View.OnGenericMotionListener
 import android.view.View.OnLongClickListener
 import android.view.View.OnTouchListener
@@ -165,7 +164,6 @@ constructor(
         mainScope,
         transitions,
     ) {
-    private lateinit var onClickListener: OnClickListener
     private lateinit var onTouchListener: OnTouchListener
     private lateinit var onLongClickListener: OnLongClickListener
     private lateinit var onGenericMotionListener: OnGenericMotionListener
@@ -256,12 +254,10 @@ constructor(
 
     /** Set the listeners for the decorations. */
     fun setListeners(
-        onClickListener: OnClickListener,
         onTouchListener: OnTouchListener,
         onLongClickListener: OnLongClickListener,
         onGenericMotionListener: OnGenericMotionListener,
     ) {
-        this.onClickListener = onClickListener
         this.onTouchListener = onTouchListener
         this.onLongClickListener = onLongClickListener
         this.onGenericMotionListener = onGenericMotionListener
@@ -523,7 +519,7 @@ constructor(
         // TODO: b/301119301 - consider moving the config data needed for diffs to relayout params
         // instead of using a whole Configuration as a parameter.
         val windowDecorConfig =
-            if (DesktopModeFlags.ENABLE_APP_HEADER_WITH_TASK_DENSITY.isTrue && isAppHeader) {
+            if (isAppHeader) {
                 // Should match the density of the task. The task may have had its density
                 // overridden
                 // to be different that SysUI's.
@@ -768,11 +764,7 @@ constructor(
                     decorWindowContext,
                     WindowManagerGlobal.getWindowSession(),
                     mainExecutor,
-                    if (DesktopModeFlags.ENABLE_DRAG_RESIZE_SET_UP_IN_BG_THREAD.isTrue) {
-                        bgExecutor
-                    } else {
-                        mainExecutor
-                    },
+                    bgExecutor,
                     taskInfo,
                     handler,
                     choreographer,
@@ -1049,7 +1041,6 @@ constructor(
                     windowDecorationActions = windowDecorationActions,
                     decorWindowContext = decorWindowContext,
                     onCaptionTouchListener = onTouchListener,
-                    onCaptionButtonClickListener = onClickListener,
                     onLongClickListener = onLongClickListener,
                     onCaptionGenericMotionListener = onGenericMotionListener,
                     appToWebRepository = appToWebRepository,
@@ -1085,7 +1076,6 @@ constructor(
                     windowDecorationActions,
                     decorWindowContext,
                     onTouchListener,
-                    onClickListener,
                     appToWebRepository,
                 )
             }

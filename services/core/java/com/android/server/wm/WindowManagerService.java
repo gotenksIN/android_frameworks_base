@@ -156,7 +156,6 @@ import static com.android.server.wm.WindowManagerDebugConfig.TAG_WITH_CLASS_NAME
 import static com.android.server.wm.WindowManagerDebugConfig.TAG_WM;
 import static com.android.server.wm.WindowManagerInternal.OnWindowRemovedListener;
 import static com.android.server.wm.WindowManagerInternal.WindowFocusChangeListener;
-import static com.android.window.flags.Flags.multiCrop;
 
 import android.Manifest;
 import android.Manifest.permission;
@@ -373,6 +372,7 @@ import com.android.server.pm.UserManagerInternal;
 import com.android.server.policy.WindowManagerPolicy;
 import com.android.server.policy.WindowManagerPolicy.ScreenOffListener;
 import com.android.server.power.ShutdownThread;
+import com.android.server.theming.ThemeManagerInternal;
 import com.android.server.utils.PriorityDump;
 // QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
 import com.android.server.am.ProcessFreezerManager;
@@ -425,12 +425,6 @@ public class WindowManagerService extends IWindowManager.Stub
     static WindowState mFocusingWindow;
     String mFocusingActivity;
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
-
-    /** The maximum length we will accept for a loaded animation duration:
-     * this is 10 seconds.
-     */
-    static final int MAX_ANIMATION_DURATION = 10 * 1000;
-
     /** Amount of time (in milliseconds) to delay before declaring a window freeze timeout. */
     static final int WINDOW_FREEZE_TIMEOUT_DURATION = 2000;
 
@@ -1567,7 +1561,8 @@ public class WindowManagerService extends IWindowManager.Stub
         mSystemPerformanceHinter = new SystemPerformanceHinter(mContext, displayId -> {
             synchronized (mGlobalLock) {
                 DisplayContent dc = mRoot.getDisplayContent(displayId);
-                return (dc == null) ? null : dc.getSurfaceControl();
+                return (dc != null && !dc.isSystemPerformanceHinterDisabled())
+                        ? dc.getSurfaceControl() : null;
             }
         }, mTransactionFactory);
         mSystemPerformanceHinter.mTraceTag = TRACE_TAG_WINDOW_MANAGER;
@@ -3755,23 +3750,21 @@ public class WindowManagerService extends IWindowManager.Stub
      * @see android.app.KeyguardManager#exitKeyguardSecurely
      */
     @Override
-    public void exitKeyguardSecurely(final IOnKeyguardExitResult callback) {
+    public void exitKeyguardSecurely(@NonNull final IOnKeyguardExitResult callback) {
         exitKeyguardSecurely_enforcePermission();
 
         if (callback == null) {
             throw new IllegalArgumentException("callback == null");
         }
 
-        mPolicy.exitKeyguardSecurely(new WindowManagerPolicy.OnKeyguardExitResult() {
-            @Override
-            public void onKeyguardExitResult(boolean success) {
-                try {
-                    callback.onKeyguardExitResult(success);
-                } catch (RemoteException e) {
-                    // Client has died, we don't care.
-                }
-            }
-        });
+        mPolicy.exitKeyguardSecurely(
+                success -> {
+                    try {
+                        callback.onKeyguardExitResult(success);
+                    } catch (RemoteException e) {
+                        // Client has died, we don't care.
+                    }
+                });
     }
 
     @Override
@@ -4345,6 +4338,15 @@ public class WindowManagerService extends IWindowManager.Stub
 
             if (!mBootAnimationStopped) {
                 Trace.asyncTraceBegin(TRACE_TAG_WINDOW_MANAGER, "Stop bootanim", 0);
+
+                // Notifies ThemeManagerService that the boot animation is being dismissed.
+                // No more color palette updates at boot.
+                ThemeManagerInternal themeService = LocalServices.getService(
+                        ThemeManagerInternal.class);
+                if (themeService != null) {
+                    themeService.onBootAnimationDismissing();
+                }
+
                 // stop boot animation
                 // formerly we would just kill the process, but we now ask it to exit so it
                 // can choose where to stop the animation.
@@ -8829,6 +8831,32 @@ public class WindowManagerService extends IWindowManager.Stub
         }
 
         @Override
+        public void disableSystemPerformanceHinter(int displayId) {
+            synchronized (mGlobalLock) {
+                final DisplayContent dc = mRoot.getDisplayContent(displayId);
+                if (dc == null) {
+                    Slog.e(TAG, "Failed to disable SystemPerformanceHinter"
+                            + " for display: " + displayId
+                            + " - DisplayContent not found.");
+                    return;
+                }
+                dc.disableSystemPerformanceHinter();
+            }
+        }
+
+        @Override
+        public void enableClientRenderingLimitationsOnDisplay(int displayId, boolean enable) {
+            final DisplayContent dc = mRoot.getDisplayContent(displayId);
+            if (dc == null) {
+                Slog.e(TAG, "Failed to change client rendering limitations"
+                        + " for display: " + displayId
+                        + " - DisplayContent not found.");
+                return;
+            }
+            dc.enableClientRenderingLimitations(enable);
+        }
+
+        @Override
         @ImeClientFocusResult
         public int hasInputMethodClientFocus(IBinder windowToken, int uid, int pid, int displayId) {
             if (displayId == Display.INVALID_DISPLAY) {
@@ -9949,7 +9977,7 @@ public class WindowManagerService extends IWindowManager.Stub
         final int sanitizedType = sanitizeWindowType(session, displayId, windowToken, type);
         final InputApplicationHandle applicationHandle;
         final String name;
-        InputChannel inputChannel = new InputChannel();
+        InputChannel inputChannel;
         Objects.requireNonNull(inputTransferToken);
 
         synchronized (mGlobalLock) {
@@ -9959,7 +9987,7 @@ public class WindowManagerService extends IWindowManager.Stub
                     new EmbeddedWindowController.EmbeddedWindow(session, this, clientToken,
                             hostWindowState, callingUid, callingPid, sanitizedType, displayId,
                             inputTransferToken, inputHandleName, (flags & FLAG_NOT_FOCUSABLE) == 0);
-            win.openInputChannel(inputChannel);
+            inputChannel = win.openInputChannel();
             mEmbeddedWindowController.add(inputChannel.getToken(), win);
             applicationHandle = win.getApplicationHandle();
             name = win.toString();
@@ -10419,8 +10447,7 @@ public class WindowManagerService extends IWindowManager.Stub
         final long origId = Binder.clearCallingIdentity();
         try {
             synchronized (mGlobalLock) {
-                if (!mAtmService.isCallerRecents(callingUid)
-                        && (!multiCrop() || callingUid != SYSTEM_UID)) {
+                if (!mAtmService.isCallerRecents(callingUid) && callingUid != SYSTEM_UID) {
                     Slog.e(TAG, "Unable to verify uid for getPossibleDisplayInfo"
                             + " on uid " + callingUid);
                     return new ArrayList<>();

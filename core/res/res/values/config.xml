@@ -3375,6 +3375,11 @@
          This config is only relevant on Headless System User Mode (HSUM) devices. -->
     <bool name="config_canSwitchToHeadlessSystemUser">false</bool>
 
+    <!-- Whether to automatically hide user switching UI during setup.
+         If it's true and the device setup is not complete, then the user switching dialog is
+         skipped. -->
+    <bool name="config_hideUserSwitchingUiDuringSetup">false</bool>
+
     <!-- Whether this device supports multiple switchable users.
          Note that, even if false, multiple users such as profiles can still be supported since
          they are not switchable.
@@ -6475,10 +6480,6 @@
     <!-- If true, the wallpaper will scale regardless of the value of shouldZoomOutWallpaper() -->
     <bool name="config_alwaysScaleWallpaper">false</bool>
 
-    <!-- Set to true to offset the wallpaper when using multiple displays so that it's centered
-         at the same position as in the largest display.-->
-    <bool name="config_offsetWallpaperToCenterOfLargestDisplay">false</bool>
-
     <!-- Package name that will receive an explicit manifest broadcast for
          android.os.action.POWER_SAVE_MODE_CHANGED. -->
     <string name="config_powerSaveModeChangedListenerPackage" translatable="false"></string>
@@ -7551,15 +7552,13 @@
          when user turned off mobile data or data roaming during CIWLAN -->
     <integer name="config_maximumDelayTimeToDeactivateDataCall">7000</integer>
 
-    <!-- Certificate digests for trusted apps that will be allowed to obtain the knownSigner
-         permission for computer control access. The digest should be computed over the
-         DER encoding of the trusted certificate using the SHA-256 digest algorithm. -->
-    <string-array name="config_accessComputerControlKnownSigners">
-    </string-array>
-
-    <!-- Package names for trusted apps that will be allowed to automate any app using
-         computer control on debuggable builds. They still need to hold the ACCESS_COMPUTER_CONTROL
-         permission. This must be empty in non-debuggable (i.e., user) builds. -->
+    <!-- Package names for trusted development / testing apps that will be allowed to automate any
+         app using computer control on debuggable builds. They do not need to hold the
+         ACCESS_COMPUTER_CONTROL privileged permission. This must be empty in non-debuggable
+         (i.e., user) builds.
+         Each entry must be in <package_name:certificate_digest> format, where the certificate
+         digest is computed over the DER encoding of the trusted certificate using the SHA-256
+         digest algorithm. -->
     <string-array name="config_computerControlKnownSuperAgents" translatable="false">
     </string-array>
 

@@ -99,17 +99,6 @@ flag {
 }
 
 flag {
-    name: "brightness_icons_refresh"
-    namespace: "systemui"
-    description: "Replaces the brightness slider icon for the rounded ones"
-    bug: "456222699"
-    is_fixed_read_only: true
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "brightness_slider_focus_state"
     namespace: "systemui"
     description: "enables new focus outline for the brightness slider when focused on with physical keyboard"
@@ -292,6 +281,16 @@ flag {
     namespace: "systemui"
     description: "Enables improved notification UX for Desktop."
     bug: "456554989"
+}
+
+flag {
+    name: "dialog_background_refresh"
+    namespace: "systemui"
+    description: "Enable refreshing the background of SystemUIDialogs when the theme changes between light and dark mode"
+    bug: "474600479"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -1342,16 +1341,6 @@ flag {
 }
 
 flag {
-    name: "qs_material_expressive_tiles"
-    namespace: "systemui"
-    description: "Uses the Material Expressive button groups for QS tiles."
-    bug: "419309247"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
    name: "qs_new_tiles"
    namespace: "systemui"
    description: "Use the new tiles in the Quick Settings. Should have no behavior changes."
@@ -1363,17 +1352,6 @@ flag {
    namespace: "systemui"
    description: "Use the new tiles in the Quick Settings that are still under development. This flag will not be used to gate release but to prevent tiles under development from reaching teamfood."
    bug: "311147395"
-}
-
-flag {
-    name: "qs_power_icon_refresh"
-    namespace: "systemui"
-    description: "Replaces the footer power icon with a heavier weight"
-    bug: "452644748"
-    is_fixed_read_only: true
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -1492,6 +1470,13 @@ flag {
 }
 
 flag {
+    name: "rich_aod_media"
+    namespace: "pixel_display"
+    description: "Enables Rich AOD media"
+    bug: "448453632"
+}
+
+flag {
    name: "run_fingerprint_detect_on_dismissible_keyguard"
    namespace: "systemui"
    description: "Run fingerprint detect instead of authenticate if the keyguard is dismissible."
@@ -1537,13 +1522,6 @@ flag {
     namespace: "systemui"
     description: "Only capture a single display when screenshotting"
     bug: "362720389"
-}
-
-flag {
-    name: "screenshot_policy_split_and_desktop_mode"
-    namespace: "systemui"
-    description: "Improves screenshot policy handling for split screen and desktop mode."
-    bug: "365597999"
 }
 
 flag {
@@ -1844,17 +1822,18 @@ flag {
 }
 
 flag {
+    name: "status_icons_in_compose_refresh"
+    namespace: "systemui"
+    description: "Build time flag for status icons in compose refresh"
+    bug: "391605373"
+    is_fixed_read_only: true
+}
+
+flag {
     name: "stl_user_action_gesture"
     namespace: "systemui"
     description: "Enables internal support for the UserActionGesture interface in STL"
     bug: "419520966"
-}
-
-flag {
-   name: "switch_user_on_bg"
-   namespace: "systemui"
-   description: "Does user switching on a background thread"
-   bug: "284095720"
 }
 
 flag {
@@ -1903,6 +1882,14 @@ flag {
 }
 
 flag {
+    name: "touchpad_gesture_tutorial_updates"
+    namespace: "systemui"
+    description: "Updates the touchpad gesture tutorial to reflect the latest gesture and "
+            "animation changes"
+    bug: "456784841"
+}
+
+flag {
     name: "update_user_switcher_background"
     namespace: "systemui"
     description: "Decide whether to update user switcher in background thread."
@@ -1910,6 +1897,13 @@ flag {
     metadata {
         purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+  name: "upright_charging_dreams_setup"
+  namespace: "systemui"
+  description: "Trigger a setup component based on the first time the user is upright + charging"
+  bug: "473859719"
 }
 
 flag {

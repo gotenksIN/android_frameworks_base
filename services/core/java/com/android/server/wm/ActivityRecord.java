@@ -3321,9 +3321,18 @@ public final class ActivityRecord extends WindowToken {
         }
 
         final ActivityInfo.WindowLayout windowLayout = info.windowLayout;
-        return windowLayout == null
-                || tda.supportsActivityMinWidthHeightMultiWindow(windowLayout.minWidth,
-                windowLayout.minHeight, info);
+        if (windowLayout == null) {
+            return true;
+        }
+        if (!Flags.runtimeDensityResolutionForWindowLayout()) {
+            return tda.supportsActivityMinWidthHeightMultiWindow(windowLayout.minWidth,
+                    windowLayout.minHeight, info);
+        }
+        final DisplayContent displayContent = tda.getDisplayContent();
+        return displayContent == null
+                || tda.supportsActivityMinWidthHeightMultiWindow(
+                        windowLayout.getMinWidth(displayContent.getDisplayMetrics()),
+                        windowLayout.getMinHeight(displayContent.getDisplayMetrics()), info);
     }
 
     /**
@@ -6278,6 +6287,12 @@ public final class ActivityRecord extends WindowToken {
      * and {@link #shouldPauseActivity(ActivityRecord)}.
      */
     private boolean shouldStartActivity() {
+        if (mWmService.mAppLockController != null
+                && mWmService.mAppLockController.isActivityLockedByAppLockLocked(this)) {
+            // The activity is locked by App Lock, so it cannot be moved to STARTED state.
+            ProtoLog.d(WM_DEBUG_STATES, "shouldStartActivity: %s is locked by App Lock", this);
+            return false;
+        }
         return mVisibleRequested && (isState(STOPPED) || isState(STOPPING));
     }
 
@@ -6303,6 +6318,13 @@ public final class ActivityRecord extends WindowToken {
         }
 
         if (this == activeActivity) {
+            return false;
+        }
+
+        if (mWmService.mAppLockController != null
+                && mWmService.mAppLockController.isActivityLockedByAppLockLocked(this)) {
+            // The activity is locked by App Lock, so it cannot be made active.
+            ProtoLog.d(WM_DEBUG_STATES, "shouldMakeActive: %s is locked by App Lock", this);
             return false;
         }
 
@@ -9737,12 +9759,19 @@ public final class ActivityRecord extends WindowToken {
     }
 
     @Nullable
-    Point getMinDimensions() {
+    Point getMinDimensions(@Nullable DisplayContent displayContent) {
         final ActivityInfo.WindowLayout windowLayout = info.windowLayout;
         if (windowLayout == null) {
             return null;
         }
-        return new Point(windowLayout.minWidth, windowLayout.minHeight);
+        if (!Flags.runtimeDensityResolutionForWindowLayout()) {
+            return new Point(windowLayout.minWidth, windowLayout.minHeight);
+        }
+        if (displayContent == null) {
+            return null;
+        }
+        return new Point(windowLayout.getMinWidth(displayContent.getDisplayMetrics()),
+                windowLayout.getMinHeight(displayContent.getDisplayMetrics()));
     }
 
     /**

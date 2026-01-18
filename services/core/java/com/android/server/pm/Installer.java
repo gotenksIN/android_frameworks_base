@@ -191,6 +191,8 @@ public class Installer extends SystemService {
         final CreateAppDataResult result = new CreateAppDataResult();
         result.ceDataInode = -1;
         result.deDataInode = -1;
+        result.pccCeDataInode = -1;
+        result.pccDeDataInode = -1;
         result.exceptionCode = 0;
         result.exceptionMessage = null;
         return result;
@@ -750,6 +752,17 @@ public class Installer extends SystemService {
         try {
             mInstalld.destroyAppDataSnapshot(null, pkg, userId, 0, snapshotId, storageFlags);
             return true;
+        } catch (Exception e) {
+            throw InstallerException.from(e);
+        }
+    }
+
+    /** Deletes PCC directories of the given package. */
+    public void destroyPccData(String uuid, String packageName, int userId, int flags,
+            long ceDataInode) throws InstallerException {
+        if (!checkBeforeRemote()) return;
+        try {
+            mInstalld.destroyPccData(uuid, packageName, userId, flags, ceDataInode);
         } catch (Exception e) {
             throw InstallerException.from(e);
         }

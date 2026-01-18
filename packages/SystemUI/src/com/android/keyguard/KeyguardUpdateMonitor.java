@@ -2628,7 +2628,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
                     mAlternateBouncerInteractor.get().isVisible(),
                     this::onAlternateBouncerVisibilityChange);
             mJavaAdapter.get().alwaysCollectFlow(
-                    mSceneInteractor.get().getTransitionState(),
+                    mSceneInteractor.get().getTransitionStateFlow(),
                     this::onTransitionStateChanged
             );
         }
@@ -3014,7 +3014,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
     private boolean isPrimaryBouncerShowingOrWillBeShowing() {
         if (SceneContainerFlag.isEnabled()) {
             return isPrimaryBouncerShowingOrWillBeShowing(
-                    mSceneInteractor.get().getTransitionState().getValue());
+                    mSceneInteractor.get().getTransitionStateFlow().getValue());
         } else {
             return mPrimaryBouncerIsOrWillBeShowing;
         }
@@ -3023,7 +3023,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
     private boolean isPrimaryBouncerFullyShown() {
         if (SceneContainerFlag.isEnabled()) {
             return isPrimaryBouncerFullyShown(
-                    mSceneInteractor.get().getTransitionState().getValue());
+                    mSceneInteractor.get().getTransitionStateFlow().getValue());
         } else {
             return mPrimaryBouncerFullyShown;
         }

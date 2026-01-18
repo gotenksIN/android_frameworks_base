@@ -256,6 +256,7 @@ import android.app.ActivityManagerInternal.OomAdjReason;
 import android.app.ActivityTaskManager.RootTaskInfo;
 import android.app.ActivityThread;
 import android.app.AnrController;
+import android.app.AnrTypes.AnrType;
 import android.app.AppGlobals;
 import android.app.AppLockInternal;
 import android.app.AppOpsManager;
@@ -9404,9 +9405,13 @@ public class ActivityManagerService extends IActivityManager.Stub
             final boolean skipKeyguardWhenSwitchingToUnlockedUsers = res.getBoolean(
                     com.android.internal.R.bool
                             .config_multiuserSkipKeyguardWhenSwitchingToUnlockedUsers);
+            final boolean hideUserSwitchingUiDuringSetup = res.getBoolean(
+                    com.android.internal.R.bool
+                            .config_hideUserSwitchingUiDuringSetup);
             mUserController.setInitialConfig(userSwitchUiEnabled, maxRunningUsers,
                     delayUserDataLocking, backgroundUserConsideredDispensableTimeSecs,
-                    skipKeyguardWhenSwitchingToUnlockedUsers);
+                    skipKeyguardWhenSwitchingToUnlockedUsers,
+                    hideUserSwitchingUiDuringSetup);
         }
         mAppErrors.loadAppsNotReportingCrashesFromConfig(res.getString(
                 com.android.internal.R.string.config_appsNotReportingCrashes));
@@ -16835,12 +16840,6 @@ public class ActivityManagerService extends IActivityManager.Stub
         synchronized (this) { }
     }
 
-    void onCoreSettingsChange(Bundle settings) {
-        synchronized (mProcLock) {
-            mProcessList.updateCoreSettingsLOSP(settings);
-        }
-    }
-
     /**
      * Called when core settings change for one or more users. This method receives the updated
      * settings and dispatches them to all relevant application processes.
@@ -16944,10 +16943,6 @@ public class ActivityManagerService extends IActivityManager.Stub
     @EnforcePermission(INTERACT_ACROSS_USERS_FULL)
     public boolean logoutUser(@UserIdInt int userId) {
         logoutUser_enforcePermission();
-        if (!android.multiuser.Flags.logoutUserApi()) {
-            throw new UnsupportedOperationException(
-                    "aconfig flag android.multiuser.logout_user_api not enabled");
-        }
         return mUserController.logoutUser(userId);
     }
 
@@ -18155,6 +18150,22 @@ public class ActivityManagerService extends IActivityManager.Stub
         @Override
         public void monitor() {
             ActivityManagerService.this.monitor();
+        }
+
+        @Override
+        public void inputDispatchingTimedOutWarning(
+                int uid,
+                int eventId,
+                @AnrType int anrType,
+                long elapsedDurationMs,
+                long timeoutDurationMs) {
+            ActivityManagerService.this.notifyAnrWarning(
+                    uid,
+                    eventId,
+                    anrType,
+                    elapsedDurationMs,
+                    timeoutDurationMs,
+                    /* description= */ "");
         }
 
         @Override
@@ -20064,7 +20075,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                                     + (hasImplicitCpuCapability ? "X" : "-")
                                     + (immediate ? "I" : "-")
                                     + (freezePolicy ? "Z" : "-")
-                                    + (Flags.cpuTimeCapabilityBasedFreezePolicy() ? "t" : "-")
+                                    + "t" // Bit for denoting CPU_TIME based freeze policy
                                     + (Flags.prototypeAggressiveFreezing() ? "a" : "-")
                                     + "/" + app.getPid()
                                     + "/" + app.getCurAdj()
@@ -20092,8 +20103,7 @@ public class ActivityManagerService extends IActivityManager.Stub
             }
 
             if (freezePolicy) {
-                if (Flags.cpuTimeCapabilityBasedFreezePolicy()
-                        && !com.android.server.notification.Flags.allowFreezingIdleNls()
+                if (!com.android.server.notification.Flags.allowFreezingIdleNls()
                         && app.getCurAdj() < CACHED_APP_MIN_ADJ) {
                     Slog.wtfStack(TAG, "Unexpected non-cached process may get frozen soon: "
                             + " name: " + app.processName

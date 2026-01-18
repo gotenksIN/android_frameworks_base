@@ -16,21 +16,25 @@
 
 package com.android.systemui.inputmethod
 
-import com.android.systemui.CoreStartable
+import com.android.systemui.inputmethod.data.repository.ImeSwitcherMenuRepositoryModule
 import com.android.systemui.inputmethod.data.repository.InputMethodRepositoryModule
-import dagger.Binds
+import com.android.systemui.inputmethod.ui.binder.ImeSwitcherMenuBinderModule
 import dagger.Module
-import dagger.multibindings.ClassKey
-import dagger.multibindings.IntoMap
 
-/** Module for providing objects exposed by the input method package. */
-@Module(includes = [InputMethodRepositoryModule::class])
-interface InputMethodModule {
-    /** Starts ImeSwitcherMenuController. */
-    @Binds
-    @IntoMap
-    @ClassKey(ImeSwitcherMenuController::class)
-    fun provideImeSwitcherMenuControllerStartable(
-        startable: ImeSwitcherMenuController
-    ): CoreStartable
-}
+/**
+ * Main dagger module for the input method package.
+ *
+ * Includes [ImeSwitcherMenuRepositoryModule] and [ImeSwitcherMenuBinderModule] to enforce that all
+ * SystemUI implementations provide a binding for
+ * [com.android.systemui.inputmethod.ui.ImeSwitcherMenuUi.Factory], which is required for proper IME
+ * Switcher Menu functionality (validated in CTS).
+ */
+@Module(
+    includes =
+        [
+            ImeSwitcherMenuBinderModule::class,
+            ImeSwitcherMenuRepositoryModule::class,
+            InputMethodRepositoryModule::class,
+        ]
+)
+object InputMethodModule

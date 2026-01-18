@@ -23,13 +23,10 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SuppressLint;
 import android.annotation.TestApi;
-import android.app.compat.CompatChanges;
 import android.app.ActivityThread;
-import android.app.Instrumentation;
+import android.app.compat.CompatChanges;
 import android.compat.annotation.ChangeId;
-import android.compat.annotation.Disabled;
 import android.compat.annotation.EnabledAfter;
-import android.compat.annotation.Overridable;
 import android.compat.annotation.UnsupportedAppUsage;
 import android.ravenwood.annotation.RavenwoodKeepWholeClass;
 import android.ravenwood.annotation.RavenwoodRedirect;
@@ -178,6 +175,11 @@ public final class MessageQueue {
             return useConcurrent;
         }
         return sUseConcurrent;
+    }
+
+    /** @hide */
+    public static void setUseDeliQueue(boolean enable) {
+        // No-op for ConcurrentMessageQueue.
     }
 
     /**
@@ -1150,7 +1152,6 @@ public final class MessageQueue {
     /**
      * Resets this queue's state and allows it to continue being used.
      *
-     * Caller must ensure that this doesn't race 'next' from the Looper thread.
      * @hide
      */
     public void resetForTest() {

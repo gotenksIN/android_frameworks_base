@@ -78,6 +78,7 @@ import android.os.IBinder;
 // QTI_END: 2018-02-17: Wigig: frameworks/base: Add WiGig support
 import android.os.Looper;
 import android.os.Message;
+import android.os.MessageQueue;
 import android.os.Parcel;
 import android.os.PowerManager;
 import android.os.Process;
@@ -948,6 +949,7 @@ public final class SystemServer implements Dumpable {
             // Prepare the main looper thread (this thread).
             android.os.Process.setThreadPriority(
                     android.os.Process.THREAD_PRIORITY_FOREGROUND);
+            MessageQueue.setUseDeliQueue(true);
             Looper.prepareMainLooper();
             Looper.getMainLooper().setSlowLogThresholdMs(
                     SLOW_DISPATCH_THRESHOLD_MS, SLOW_DELIVERY_THRESHOLD_MS);
@@ -2498,7 +2500,7 @@ public final class SystemServer implements Dumpable {
                 Slog.i(TAG, "Wallpaper service disabled by config");
             }
 
-            if (android.server.Flags.enableThemeService()) {
+            if (!isWatch && android.server.Flags.enableThemeService()) {
                 t.traceBegin("StartThemeService");
                 mSystemServiceManager.startService(ThemeManagerService.class);
                 t.traceEnd();
@@ -3875,8 +3877,14 @@ public final class SystemServer implements Dumpable {
     }
 
     private void startAttentionService(@NonNull Context context, @NonNull TimingsTraceAndSlog t) {
-        if (!AttentionManagerService.isServiceConfigured(context)) {
+        // We start service only if either AttentionManager service is configured on the device or
+        // InteractionProviderService is enabled.
+        if (!com.android.input.flags.Flags.enableAttentionServiceApis()
+                && !AttentionManagerService.isServiceConfigured(context)) {
             Slog.d(TAG, "AttentionService is not configured on this device");
+            return;
+        } else if (!AttentionManagerService.isInteractionProviderServiceEnabled(context)) {
+            Slog.d(TAG, "InteractionProviderService is not enabled on this device");
             return;
         }
 

@@ -21,7 +21,6 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.junit.Assume.assumeTrue;
 
 import android.app.ActivityManager;
 import android.app.ActivityManager.ProcessState;
@@ -29,7 +28,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.os.ParcelFileDescriptor;
-import android.os.Process;
 import android.platform.test.annotations.Presubmit;
 import android.platform.test.annotations.RequiresFlagsEnabled;
 import android.platform.test.flag.junit.CheckFlagsRule;
@@ -38,7 +36,7 @@ import android.util.Log;
 
 import androidx.test.core.app.ApplicationProvider;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
-import androidx.test.filters.SmallTest;
+import androidx.test.filters.LargeTest;
 import androidx.test.platform.app.InstrumentationRegistry;
 
 import com.android.server.am.MemoryLimiter.Configuration;
@@ -60,9 +58,9 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Build/Install/Run:
- *  atest FrameworksServicesTests:MemoryLimiterTest
+ *  atest MemoryLimiterTest
  */
-@SmallTest
+@LargeTest
 @Presubmit
 @RunWith(AndroidJUnit4.class)
 public class MemoryLimiterTest {
@@ -232,7 +230,7 @@ public class MemoryLimiterTest {
     // UID.  The UID is specific to the helper package, so there is no impact to any other
     // functions on the system.  This must be done every time the helper app is started because
     // the cgroup path disappears if there are no processes with the UID.
-    private static int prepareHelperCgroup(int pid, int uid) throws Exception {
+    private static long prepareHelperCgroup(int pid, int uid) throws Exception {
         String path = String.format("/sys/fs/cgroup/apps/uid_%d", uid);
         String r = shellCommand("chmod -R a+rw " + path);
         if (r != null && !r.trim().equals("")) {
@@ -242,17 +240,51 @@ public class MemoryLimiterTest {
         return currentMemory(pid, uid);
     }
 
+    // Prepare the helper app.  Start the process, get its pid, and prepare the cgroup.  Then
+    // return the pid.
+    private static int prepareHelper(int uid) throws Exception {
+        // -S stops any existing activity before starting new, ensuring cold start
+        final String cmd = String.format("am start-activity -S -W -n %s/.%s", HELPER, ACTIVITY);
+        shellCommand(cmd);
+
+        int pid = getHelperPid();
+        Log.i(TAG, String.format("helper at pid=%d uid=%d", pid, uid));
+
+        // Prepare the cgroup for testing.
+        prepareHelperCgroup(pid, uid);
+        return pid;
+    }
+
     // Disable the system MemoryLimiter for the UID under test.
     private static void blockSystemLimiter(int uid, boolean blocked) throws Exception {
         shellCommand("am memory-limiter ignore " + ((blocked) ? Integer.toString(uid) : "none"));
     }
 
     // Return the current memory of the helper app, as reported by memcg.
-    private static int currentMemory(int pid, int uid) throws Exception {
+    private static long currentMemory(int pid, int uid) throws Exception {
         String path = String.format("/sys/fs/cgroup/apps/uid_%d/pid_%d/memory.current", uid, pid);
         Path filePath = Paths.get(path);
         // Always specify the Charset, e.g., UTF_8.  This may throw: allow the test to fail.
-        return Integer.parseInt(Files.readString(filePath, StandardCharsets.UTF_8).trim());
+        String value = Files.readString(filePath, StandardCharsets.UTF_8).trim();
+
+        return Long.parseLong(value);
+    }
+
+    // Return the current memory.high limit of the helper app, as reported by memcg.
+    private static long currentLimit(int pid, int uid) throws Exception {
+        String path = String.format("/sys/fs/cgroup/apps/uid_%d/pid_%d/memory.high", uid, pid);
+        Path filePath = Paths.get(path);
+
+        // Always specify the Charset, e.g., UTF_8.  This may throw: allow the test to fail.
+        String value = Files.readString(filePath, StandardCharsets.UTF_8).trim();
+
+        // The limit can be the string "max"; if so, return -1.  Otherwise, the string must be a
+        // valid integer.
+        if (value.equals("max")) {
+            return sProcessMemoryMax;
+        } else {
+            return Long.parseLong(value);
+        }
     }
 
     // Send a request to the application to change its memory.
@@ -264,146 +296,95 @@ public class MemoryLimiterTest {
         mContext.sendBroadcast(intent);
     }
 
-    // Return true if the test can read its own memory.current file.  If it cannot, the rest of
-    // the tests cannot be run.
-    // TODO(b/469749822) Eliminate this function once the test environment has been corrected.
-    private boolean isValidEnvironment() {
-        int uid = Process.myUid();
-        int pid = Process.myPid();
-        String path = String.format("/sys/fs/cgroup/apps/uid_%d/pid_%d/memory.current", uid, pid);
-        Path filePath = Paths.get(path);
-        try {
-            // The actual value does not matter.  Only the fact that the value can be read and is
-            // an integer.
-            Integer.parseInt(Files.readString(filePath, StandardCharsets.UTF_8).trim());
-            return true;
-        } catch (Exception e) {
-            Log.w(TAG, "invalid environment: " + e);
-            return false;
-        }
-    }
-
     @RequiresFlagsEnabled(Flags.FLAG_MEMORY_LIMITER_ENABLE)
     @Test
     public void testLimiter() throws Exception {
-        assumeTrue(isValidEnvironment());
-        EventCounter counter = new EventCounter(1);
-        try (MemoryLimiter controller = new MemoryLimiter(counter)) {
-            MemoryLimiter.Limiter limiter = controller.newLimiter(HELPER);
+        try (EventCounter counter = new EventCounter(1)) {
+            try (MemoryLimiter controller = new MemoryLimiter(counter)) {
+                MemoryLimiter.Limiter limiter = controller.newLimiter(HELPER);
 
-            // -S stops any existing activity before starting new, ensuring cold start
-            String cmd = String.format("am start-activity -S -W -n %s/.%s", HELPER, ACTIVITY);
-            shellCommand(cmd);
+                int pid = prepareHelper(mUid);
+                limiter.setUid(mUid);
+                limiter.setPid(pid);
 
-            int pid = getHelperPid();
-            Log.i(TAG, String.format("helper at pid=%d uid=%d", pid, mUid));
+                // Set the limit, grow the app, and wait for the over-limit event.
+                limiter.onProcStateUpdated(PROCESS_STATE_100M);
+                appCommand(100);
+                assertTrue(counter.await(10));
 
-            // Prepare the cgroup for testing.
-            prepareHelperCgroup(pid, mUid);
-            limiter.setUid(mUid);
-            limiter.setPid(pid);
-
-            // Set the limit, grow the app, and wait for the over-limit event.
-            limiter.onProcStateUpdated(PROCESS_STATE_100M);
-            appCommand(100);
-            assertTrue(counter.await(10));
-
-            // There should be exactly one event in the counter.
-            assertThat(counter.eventCount()).isEqualTo(1);
-            counter.expect(0, pid, mUid, MemoryLimiter.MEMORY_LIMIT_TYPE, HELPER);
+                // There should be exactly one event in the counter.
+                assertThat(counter.eventCount()).isEqualTo(1);
+                counter.expect(0, pid, mUid, MemoryLimiter.MEMORY_LIMIT_TYPE, HELPER);
+            }
         }
     }
 
     @RequiresFlagsEnabled(Flags.FLAG_MEMORY_LIMITER_ENABLE)
     @Test
     public void testLimiterAfter() throws Exception {
-        assumeTrue(isValidEnvironment());
-        EventCounter counter = new EventCounter(1);
-        try (MemoryLimiter controller = new MemoryLimiter(counter)) {
-            MemoryLimiter.Limiter limiter = controller.newLimiter(HELPER);
+        try (EventCounter counter = new EventCounter(1)) {
+            try (MemoryLimiter controller = new MemoryLimiter(counter)) {
+                MemoryLimiter.Limiter limiter = controller.newLimiter(HELPER);
 
-            // -S stops any existing activity before starting new, ensuring cold start
-            String cmd = String.format("am start-activity -S -W -n %s/.%s", HELPER, ACTIVITY);
-            shellCommand(cmd);
+                int pid = prepareHelper(mUid);
+                limiter.setUid(mUid);
+                limiter.setPid(pid);
 
-            int pid = getHelperPid();
-            Log.i(TAG, String.format("helper at pid=%d uid=%d", pid, mUid));
+                // Grow the app by 100M, set the limit, and wait for the over-limit event.
+                appCommand(100);
+                limiter.onProcStateUpdated(PROCESS_STATE_100M);
+                assertTrue(counter.await(10));
 
-            // Prepare the cgroup for testing.
-            prepareHelperCgroup(pid, mUid);
-            limiter.setUid(mUid);
-            limiter.setPid(pid);
-
-            // Grow the app by 100M, set the limit, and wait for the over-limit event.
-            appCommand(100);
-            limiter.onProcStateUpdated(PROCESS_STATE_100M);
-            assertTrue(counter.await(10));
-
-            // There should be exactly one event in the counter.
-            assertThat(counter.eventCount()).isEqualTo(1);
-            counter.expect(0, pid, mUid, MemoryLimiter.MEMORY_LIMIT_TYPE, HELPER);
+                // There should be exactly one event in the counter.
+                assertThat(counter.eventCount()).isEqualTo(1);
+                counter.expect(0, pid, mUid, MemoryLimiter.MEMORY_LIMIT_TYPE, HELPER);
+            }
         }
     }
 
     @RequiresFlagsEnabled(Flags.FLAG_MEMORY_LIMITER_ENABLE)
     @Test
     public void testNullPackage() throws Exception {
-        assumeTrue(isValidEnvironment());
-        EventCounter counter = new EventCounter(1);
-        try (MemoryLimiter controller = new MemoryLimiter(counter)) {
-            MemoryLimiter.Limiter limiter = controller.newLimiter(null);
+        try (EventCounter counter = new EventCounter(1)) {
+            try (MemoryLimiter controller = new MemoryLimiter(counter)) {
+                MemoryLimiter.Limiter limiter = controller.newLimiter(null);
 
-            // -S stops any existing activity before starting new, ensuring cold start
-            String cmd = String.format("am start-activity -S -W -n %s/.%s", HELPER, ACTIVITY);
-            shellCommand(cmd);
+                int pid = prepareHelper(mUid);
+                limiter.setUid(mUid);
+                limiter.setPid(pid);
 
-            int pid = getHelperPid();
-            Log.i(TAG, String.format("helper at pid=%d uid=%d", pid, mUid));
+                // Set the limit, grow the app, and wait for the over-limit event.
+                limiter.onProcStateUpdated(PROCESS_STATE_100M);
+                appCommand(100);
+                assertTrue(counter.await(10));
 
-            // Prepare the cgroup for testing.
-            prepareHelperCgroup(pid, mUid);
-            limiter.setUid(mUid);
-            limiter.setPid(pid);
-
-            // Set the limit, grow the app, and wait for the over-limit event.
-            limiter.onProcStateUpdated(PROCESS_STATE_100M);
-            appCommand(100);
-            assertTrue(counter.await(10));
-
-            // There should be exactly one event in the counter.
-            assertThat(counter.eventCount()).isEqualTo(1);
-            counter.expect(0, pid, mUid, MemoryLimiter.MEMORY_LIMIT_TYPE, null);
+                // There should be exactly one event in the counter.
+                assertThat(counter.eventCount()).isEqualTo(1);
+                counter.expect(0, pid, mUid, MemoryLimiter.MEMORY_LIMIT_TYPE, null);
+            }
         }
     }
 
     @RequiresFlagsEnabled(Flags.FLAG_MEMORY_LIMITER_ENABLE)
     @Test
     public void testEmptyPackage() throws Exception {
-        assumeTrue(isValidEnvironment());
-        EventCounter counter = new EventCounter(1);
-        try (MemoryLimiter controller = new MemoryLimiter(counter)) {
-            MemoryLimiter.Limiter limiter = controller.newLimiter("");
+        try (EventCounter counter = new EventCounter(1)) {
+            try (MemoryLimiter controller = new MemoryLimiter(counter)) {
+                MemoryLimiter.Limiter limiter = controller.newLimiter("");
 
-            // -S stops any existing activity before starting new, ensuring cold start
-            String cmd = String.format("am start-activity -S -W -n %s/.%s", HELPER, ACTIVITY);
-            shellCommand(cmd);
+                int pid = prepareHelper(mUid);
+                limiter.setUid(mUid);
+                limiter.setPid(pid);
 
-            int pid = getHelperPid();
-            Log.i(TAG, String.format("helper at pid=%d uid=%d", pid, mUid));
+                // Set the limit, grow the app, and wait for the over-limit event.
+                limiter.onProcStateUpdated(PROCESS_STATE_100M);
+                appCommand(100);
+                assertTrue(counter.await(10));
 
-            // Prepare the cgroup for testing.
-            prepareHelperCgroup(pid, mUid);
-            limiter.setUid(mUid);
-            limiter.setPid(pid);
-
-            // Set the limit, grow the app, and wait for the over-limit event.
-            limiter.onProcStateUpdated(PROCESS_STATE_100M);
-            appCommand(100);
-            assertTrue(counter.await(10));
-
-            // There should be exactly one event in the counter.
-            assertThat(counter.eventCount()).isEqualTo(1);
-            counter.expect(0, pid, mUid, MemoryLimiter.MEMORY_LIMIT_TYPE, "");
+                // There should be exactly one event in the counter.
+                assertThat(counter.eventCount()).isEqualTo(1);
+                counter.expect(0, pid, mUid, MemoryLimiter.MEMORY_LIMIT_TYPE, "");
+            }
         }
     }
 
@@ -448,6 +429,31 @@ public class MemoryLimiterTest {
             fail("failed to detect XML parse error");
         } catch (IllegalArgumentException e) {
             // Success.
+        }
+    }
+
+    /**
+     * This test starts the test application but instead of taking control from ActivityManager,
+     * it verifies that the application's limits are set as expected. The test assumes that the
+     * test app is not moved out of a foreground (visible) procstate before the memory limit is
+     * checked.
+     */
+    @RequiresFlagsEnabled(Flags.FLAG_MEMORY_LIMITER_ENABLE)
+    @Test
+    public void testOperation() throws Exception {
+        // Start by enabling system_server control over the app.
+        blockSystemLimiter(mUid, false);
+
+        int pid = prepareHelper(mUid);
+
+        // Use the default "enabled" controller.  There is no need for a full MemoryLimiter.
+        try (MemoryLimiter.Controller controller = new MemoryLimiter.ControllerEnabled()) {
+            long expectedLimit = controller.getStateLimit(ActivityManager.PROCESS_STATE_TOP);
+            // Poll until the limit is set by system_server.
+            while (currentLimit(pid, mUid) != expectedLimit) {
+                Thread.sleep(100); // Wait a bit before polling again.
+            }
+            assertThat(currentLimit(pid, mUid)).isEqualTo(expectedLimit);
         }
     }
 

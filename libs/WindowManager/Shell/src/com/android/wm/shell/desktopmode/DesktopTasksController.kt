@@ -403,11 +403,6 @@ class DesktopTasksController(
         }
         shellCommandHandler.addDumpCallback(this::dump, this)
         shellCommandHandler.addCommandCallback("desktopmode", desktopModeShellCommandHandler, this)
-        shellController.addExternalInterface(
-            IDesktopMode.DESCRIPTOR,
-            { createExternalInterface() },
-            this,
-        )
         shellController.addUserChangeListener(this)
         // Update the current user id again because it might be updated between init and onInit().
         updateCurrentUser(ActivityManager.getCurrentUser())
@@ -1744,7 +1739,7 @@ class DesktopTasksController(
                     taskSurface,
                     handler,
                 )
-                .setTimeout(APP_HANDLE_DRAG_HOLD_CUJ_TIMEOUT_MS)
+                .setTimeout(APP_HANDLE_DRAG_CUJ_TIMEOUT_MS)
         interactionJankMonitor.begin(jankConfigBuilder)
         dragToDesktopTransitionHandler.startDragToDesktopTransition(
             taskInfo,
@@ -2736,6 +2731,11 @@ class DesktopTasksController(
         }
         if (taskInfo?.leafTaskBoundsFromOptions == true) {
             // ActivityOptions have a higher priority.
+            logV(
+                "calculateRememberedBounds: Not using remembered bounds for task#%d because " +
+                    "leafTaskBoundsFromOptions is true.",
+                taskInfo.taskId,
+            )
             return null
         }
         val packageName = componentName?.packageName ?: return null
@@ -2745,9 +2745,21 @@ class DesktopTasksController(
             }
         ) {
             // Do not use remembered bounds when another instance of the same package is active.
+            logV(
+                "calculateRememberedBounds: Not using remembered bounds for task#%d because " +
+                    "another instance of the same package (%s) is active.",
+                taskInfo?.taskId,
+                packageName,
+            )
             return null
         }
         val ratio = repository.getRememberedBoundsRatio(packageName) ?: return null
+        logV(
+            "calculateRememberedBounds: Use ratio=%s for %s (task#%d)",
+            ratio,
+            packageName,
+            taskInfo?.taskId,
+        )
         val stableBounds = Rect().also { displayLayout.getStableBoundsForDesktopMode(it) }
         return Rect().apply {
             left = (stableBounds.left + stableBounds.width() * ratio.left).toInt()
@@ -4289,13 +4301,9 @@ class DesktopTasksController(
 
         val repository = userRepositories.getProfile(task.userId)
         val deskId = repository.getDeskIdForTask(task.taskId)
-        if (
-            deskId == null ||
-                !repository.isDeskActive(deskId) ||
-                !repository.isVisibleTask(task.taskId)
-        ) {
+        if (deskId == null) {
             logV(
-                "handleTaskLocationRequest taskId=%d is not visible in an active desk, dropping " +
+                "handleTaskLocationRequest taskId=%d is not hosted by any desk, dropping " +
                     "the request",
                 task.taskId,
             )
@@ -4306,6 +4314,7 @@ class DesktopTasksController(
             task = task,
             transition = transition,
             targetDisplayId = requestedDisplayId,
+            suggestedTargetDeskId = if (requestedDisplayId == task.displayId) deskId else null,
             requestedTaskBounds = requestedTaskBounds,
             requestType = TRANSIT_CHANGE,
             enterReason = EnterReason.APP_SELF_REPOSITION,
@@ -4511,7 +4520,7 @@ class DesktopTasksController(
             // Moving to a new or different desk
             sourceDeskId != targetDeskId -> desksOrganizer.moveTaskToDesk(wct, targetDeskId, task)
             // Already in target desk, but minimized. Expand it.
-            repository.isMinimizedTask(task.taskId) ->
+            bringTaskToFront && repository.isMinimizedTask(task.taskId) ->
                 desksOrganizer.unminimizeTask(wct, targetDeskId, task)
             // Already expanded in target desk, move it to front if needed.
             bringTaskToFront -> desksOrganizer.reorderTaskToFront(wct, targetDeskId, task)
@@ -6217,8 +6226,9 @@ class DesktopTasksController(
 
     private fun getDefaultDensityDpi(): Int = context.resources.displayMetrics.densityDpi
 
+    // TODO: b/457313894 - remove this method once IDesktopModeImpl is moved to a separate class.
     /** Creates a new instance of the external interface to pass to another process. */
-    private fun createExternalInterface(): ExternalInterfaceBinder =
+    public fun createExternalInterface(): ExternalInterfaceBinder =
         IDesktopModeImpl(shellController, transitionStateHolder, this)
 
     /**
@@ -6575,13 +6585,13 @@ class DesktopTasksController(
                 } else {
                     // Start a new jank interaction for the drag release to desktop window
                     // animation.
-                    interactionJankMonitor.begin(
-                        taskSurface,
-                        context,
-                        handler,
+                    val jankConfigBuilder = InteractionJankMonitor.Configuration.Builder.withSurface(
                         CUJ_DESKTOP_MODE_ENTER_APP_HANDLE_DRAG_RELEASE,
-                        "to_desktop",
-                    )
+                        context,
+                        taskSurface,
+                        handler,
+                    ).setTimeout(APP_HANDLE_DRAG_CUJ_TIMEOUT_MS).setTag("to_desktop")
+                    interactionJankMonitor.begin(jankConfigBuilder)
                 }
                 desktopModeUiEventLogger.log(
                     taskInfo,
@@ -7275,9 +7285,9 @@ class DesktopTasksController(
     }
 
     companion object {
-        // Timeout used for CUJ_DESKTOP_MODE_ENTER_APP_HANDLE_DRAG_HOLD, this is longer than the
+        // Timeout used for CUJ_DESKTOP_MODE_ENTER_APP_HANDLE_DRAG_HOLD/RELEASE, this is longer than the
         // default timeout to avoid timing out in the middle of a drag action.
-        private val APP_HANDLE_DRAG_HOLD_CUJ_TIMEOUT_MS: Long = TimeUnit.SECONDS.toMillis(10L)
+        private val APP_HANDLE_DRAG_CUJ_TIMEOUT_MS: Long = TimeUnit.SECONDS.toMillis(10L)
 
         private const val TAG = "DesktopTasksController"
 

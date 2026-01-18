@@ -123,16 +123,6 @@ flag {
 }
 
 flag {
-    name: "cpu_time_capability_based_freeze_policy"
-    namespace: "backstage_power"
-    description: "Use PROCESS_CAPABILITY_CPU_TIME and PROCESS_CAPABILITY_IMPLICIT_CPU_TIME to control process freeze state."
-    bug: "370817323"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "prototype_aggressive_freezing"
     namespace: "backstage_power"
     description: "Grant PROCESS_CAPABILITY_CPU_TIME to as many valid states and aggressively freeze other states"
@@ -230,6 +220,16 @@ flag {
     namespace: "backstage_power"
     description: "Automatically trigger OomAdjuster updates from ProcessStateController on state change."
     bug: "399666866"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "rollout_pixel_faceauth"
+    namespace: "core_experiments_team_internal"
+    description: "Rolls out the pixel_faceauth namespace."
+    bug: "436480687"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -340,4 +340,14 @@ flag {
     namespace: "backstage_power"
     description: "Use SafeSetID to enforce UID policies instead of SELinux filters"
     bug: "414893665"
+}
+
+flag {
+    name: "error_dialog_for_visible_background_users"
+    namespace: "multiuser"
+    description: "Show Error dialog for visible background user on their assigned display"
+    bug: "442905483"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }

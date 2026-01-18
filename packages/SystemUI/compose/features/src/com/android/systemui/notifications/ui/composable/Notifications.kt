@@ -454,10 +454,13 @@ fun ContentScope.NestedScrollingNotificationPanel(
         modifier =
             modifier
                 .element(Notifications.Elements.NotificationScrim)
-                // Apply overscroll visuals (visuals only, no event handling):
-                .overscroll(verticalOverscrollEffect) // SceneContainer transitions
-                .overscroll(scrollingContentOverscrollEffect) // Content scrolling
-                .overscroll(shortContentOverscrollEffect) // Short/Empty content swipes
+                // Only apply visual effects when the background is drawn.
+                .thenIf(shouldDrawScrimBackground) {
+                    // Apply overscroll visuals (visuals only, no event handling):
+                    Modifier.overscroll(verticalOverscrollEffect) // SceneContainer transitions
+                        .overscroll(scrollingContentOverscrollEffect) // Content scrolling
+                        .overscroll(shortContentOverscrollEffect) // Short/Empty content swipes
+                }
                 .onGloballyPositioned { coordinates ->
                     val boundsInWindow = coordinates.boundsInWindow()
                     debugLog(viewModel) {
@@ -633,9 +636,15 @@ fun ContentScope.NestedScrollingNotificationPanel(
             val contentMeasurable = measurables[1][0]
 
             if (shouldScrimBackgroundFillMaxHeight) {
-                // Let the content match its constraints, but force the background to match the
-                // screen height to ensure it covers the full display area.
-                val content = contentMeasurable.measure(constraints)
+                // Fill the entire available space with the content, and force the background to
+                // match the screen height to ensure it covers the full display area.
+                val content =
+                    contentMeasurable.measure(
+                        Constraints.fixed(
+                            width = constraints.maxWidth,
+                            height = constraints.maxHeight,
+                        )
+                    )
                 val background =
                     backgroundMeasurable.measure(
                         Constraints.fixed(

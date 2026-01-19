@@ -696,7 +696,9 @@ public class AppBackgroundManager {
                                 break;
                             default:
                                 Slog.e(TAG, "Freeze failed for process: " + pr.processName);
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
                                 toRemove.add(pid);
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
                                 break;
                         }
                     }
@@ -705,9 +707,11 @@ public class AppBackgroundManager {
                         pids.remove(toRemove.get(i));
                     }
 
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
                     if (pids.size() > 0) {
                         mPackageFreezerManager.addAppPids(packageName, pids);
                     }
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
 
                     if (mUseDebug) {
                         Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);

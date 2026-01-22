@@ -306,6 +306,14 @@
     <!-- The overall height of the emphasized notification action -->
     <dimen name="notification_action_emphasized_height">48dp</dimen>
 
+    <!-- Horizontal inset of emphasized notification actions. -->
+    <dimen name="notification_action_emphasized_inset_horizontal">@dimen/button_inset_horizontal_material</dimen>
+
+    <!-- Vertical inset of emphasized notification actions. Actual "apparent" button height will be
+         "notification_action_emphasized_height - 2 * this". -->
+    <dimen name="notification_action_emphasized_inset_vertical" android:featureFlag="!android.app.api_notification_action_custom">@dimen/button_inset_vertical_material</dimen>
+    <dimen name="notification_action_emphasized_inset_vertical" android:featureFlag="android.app.api_notification_action_custom">4dp</dimen>
+
     <!-- The max width of a priority action button when it is collapsed to just the icon. -->
     <dimen name="notification_actions_collapsed_priority_width">60dp</dimen>
 
@@ -319,7 +327,8 @@
     <dimen name="notification_actions_icon_drawable_size">20dp</dimen>
 
     <!-- The corner radius if the emphasized action buttons in a notification -->
-    <dimen name="notification_action_button_radius">18dp</dimen>
+    <dimen name="notification_action_button_radius" android:featureFlag="!android.app.api_notification_action_custom">18dp</dimen>
+    <dimen name="notification_action_button_radius" android:featureFlag="android.app.api_notification_action_custom">20dp</dimen>
 
     <!-- Size of the stroke with for the emphasized notification button style -->
     <dimen name="emphasized_button_stroke_width">1dp</dimen>
@@ -1177,5 +1186,16 @@
     <dimen name="taskbar_stashed_size">24dp</dimen>
 
     <!-- App Lock -->
+    <!-- A large value to prevent the education dialog from collapsing. -->
+    <dimen name="app_lock_edu_dialog_max_collapsed_height">2000dp</dimen>
+    <dimen name="app_lock_icon_size_small">24dp</dimen>
+    <dimen name="app_lock_item_icon_size">42dp</dimen>
+    <dimen name="app_lock_item_margin">12dp</dimen>
+    <dimen name="app_lock_margin">16dp</dimen>
+    <dimen name="app_lock_padding_extra_small">8dp</dimen>
+    <dimen name="app_lock_padding_small">16dp</dimen>
+    <dimen name="app_lock_padding_large">32dp</dimen>
+    <dimen name="app_lock_padding_extra_large">40dp</dimen>
+    <dimen name="app_lock_permission_review_app_list_expanded_height">320dp</dimen>
     <dimen name="app_lock_pill_radius">100dp</dimen>
 </resources>

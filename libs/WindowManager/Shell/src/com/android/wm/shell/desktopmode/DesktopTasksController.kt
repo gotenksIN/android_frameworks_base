@@ -280,6 +280,7 @@ class DesktopTasksController(
     private val launcherApps: LauncherApps,
     private val transitionStateHolder: TransitionStateHolder,
     private val desksController: DesksController,
+    private val desktopTasksTransitionObserver: DesktopTasksTransitionObserver,
 ) :
     RemoteCallable<DesktopTasksController>,
     TransitionHandler,
@@ -391,13 +392,19 @@ class DesktopTasksController(
                 DeskRecreationFactory { deskUserId, destinationDisplayId, _ ->
                     // TODO: b/393978539 - One of the recreated desks may need to be activated by
                     //  default in desktop-first.
-                    createDeskRootSuspending(displayId = destinationDisplayId, userId = deskUserId)
+                    // TODO(b/467367552): Update client invocation to DesksController.
+                    desksController.createDeskRootSuspending(
+                        displayId = destinationDisplayId,
+                        userId = deskUserId,
+                    )
                 }
         }
     }
 
     private fun onInit() {
         logD("onInit")
+        // TODO(b/467367552): Remove when refactoring is completed.
+        desksController.setBackDependency(this)
         if (Flags.enableRememberedBounds()) {
             launcherApps.registerCallback(launcherAppsCallback)
         }
@@ -504,6 +511,7 @@ class DesktopTasksController(
         level = DeprecationLevel.WARNING,
     )
     fun isAnyDeskActive(displayId: Int, userId: Int = shellController.currentUserId): Boolean =
+        // TODO(b/467367552): Update client invocation to DesksController.
         desksController.isAnyDeskActive(displayId, userId)
 
     /** Returns the id of the active desk in [displayId]. */
@@ -514,6 +522,7 @@ class DesktopTasksController(
         level = DeprecationLevel.WARNING,
     )
     fun getActiveDeskId(displayId: Int, userId: Int = shellController.currentUserId): Int? =
+        // TODO(b/467367552): Update client invocation to DesksController.
         desksController.getActiveDeskId(displayId, userId)
 
     /**
@@ -769,12 +778,18 @@ class DesktopTasksController(
         level = DeprecationLevel.WARNING,
     )
     fun canCreateDesks(userId: Int = shellController.currentUserId): Boolean =
+        // TODO(b/467367552): Update client invocation to DesksController.
         desksController.canCreateDesks(userId)
 
     /**
      * Adds a new desk to the given display for the given user and invokes [onResult] once the desk
      * is created, but necessarily activated.
      */
+    @Deprecated(
+        message = "",
+        replaceWith = ReplaceWith("Use same method on DesksController instead."),
+        level = DeprecationLevel.WARNING,
+    )
     fun createDesk(
         displayId: Int,
         userId: Int = shellController.currentUserId,
@@ -783,32 +798,15 @@ class DesktopTasksController(
         enterReason: EnterReason = EnterReason.UNKNOWN_ENTER,
         onResult: ((Int) -> Unit) = {},
     ) {
-        logV(
-            "createDesk displayId=%d, userId=%d enforceDeskLimit=%b",
+        // TODO(b/467367552): Update client invocation to DesksController.
+        desksController.createDesk(
             displayId,
             userId,
             enforceDeskLimit,
+            activateDesk,
+            enterReason,
+            onResult,
         )
-        if (!desksController.canCreateDeskInDisplay(displayId, userId)) {
-            logW("createDesk new desk cannot be created, ignoring request")
-            return
-        }
-        val repository = userRepositories.getProfile(userId)
-        createDeskRoot(displayId, userId) { deskId ->
-            if (deskId == null) {
-                logW("Failed to add desk in displayId=%d for userId=%d", displayId, userId)
-            } else {
-                repository.addDesk(
-                    displayId = displayId,
-                    deskId = deskId,
-                    uniqueDisplayId = displayController.getDisplayUniqueId(displayId),
-                )
-                onResult(deskId)
-                if (activateDesk) {
-                    activateDesk(deskId = deskId, userId = userId, enterReason = enterReason)
-                }
-            }
-        }
     }
 
     @Deprecated("Use createDeskSuspending() instead.", ReplaceWith("createDeskSuspending()"))
@@ -845,34 +843,6 @@ class DesktopTasksController(
         }
     }
 
-    private fun createDeskRoot(displayId: Int, userId: Int, onResult: (Int?) -> Unit) {
-        if (displayId == INVALID_DISPLAY) {
-            logW("createDesk attempt with invalid displayId", displayId)
-            onResult(null)
-            return
-        }
-        if (!DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue) {
-            // In single-desk, the desk reuses the display id.
-            logD("createDesk reusing displayId=%d for single-desk", displayId)
-            onResult(displayId)
-            return
-        }
-        if (UserManager.isHeadlessSystemUserMode() && UserHandle.USER_SYSTEM == userId) {
-            logW("createDesk ignoring attempt for system user")
-            onResult(null)
-            return
-        }
-        desksOrganizer.createDesk(displayId, userId) { deskId ->
-            logD(
-                "createDesk obtained deskId=%d for displayId=%d and userId=%d",
-                deskId,
-                displayId,
-                userId,
-            )
-            onResult(deskId)
-        }
-    }
-
     @Deprecated(
         "Use createDeskRootSuspending() instead.",
         ReplaceWith("createDeskRootSuspending()"),
@@ -893,11 +863,6 @@ class DesktopTasksController(
         }
         return desksOrganizer.createDeskImmediate(displayId, userId)
     }
-
-    private suspend fun createDeskRootSuspending(displayId: Int, userId: Int): Int? =
-        suspendCoroutine { cont ->
-            createDeskRoot(displayId, userId) { deskId -> cont.resumeWith(Result.success(deskId)) }
-        }
 
     /**
      * Returns a WindowContainerTransaction containing all the changes when a display is
@@ -2861,9 +2826,9 @@ class DesktopTasksController(
         transitionHandler: TransitionHandler? = null,
         enterReason: EnterReason,
         captionInsets: Int = 0,
-    ) {
+    ): IBinder? {
         val wct = WindowContainerTransaction()
-        addMoveToDisplayChanges(
+        return addMoveToDisplayChanges(
                 wct = wct,
                 task = task,
                 displayId = displayId,
@@ -2879,6 +2844,7 @@ class DesktopTasksController(
                         transitionHandler ?: moveToDisplayTransitionHandler,
                     )
                 runOnTransitStart.invoke(transition)
+                return transition
             }
     }
 
@@ -3166,6 +3132,7 @@ class DesktopTasksController(
         toggleResizeDesktopTaskTransitionHandler.startTransition(
             wct,
             interaction.animationStartBounds,
+            isUserResize = true,
         )
     }
 
@@ -3338,7 +3305,11 @@ class DesktopTasksController(
         updateTaskBarAndWallpaperDim(taskInfo.displayId, true)
         val wct = WindowContainerTransaction().setBounds(taskInfo.token, destinationBounds)
 
-        toggleResizeDesktopTaskTransitionHandler.startTransition(wct, currentDragBounds)
+        toggleResizeDesktopTaskTransitionHandler.startTransition(
+            wct,
+            currentDragBounds,
+            isUserResize = true,
+        )
     }
 
     /**
@@ -5104,7 +5075,9 @@ class DesktopTasksController(
         val displayId = repository.getDisplayForDesk(deskId)
         val displayContext = displayController.getDisplayContext(displayId) ?: context
         val captionInsets =
-            if (desktopModeCompatPolicy.shouldExcludeCaptionFromAppBounds(taskInfo)) {
+            if (Flags.refactorCaptionSandboxingToCore()) {
+                taskInfo.freeformCaptionInsets(displayLayout)
+            } else if (desktopModeCompatPolicy.shouldExcludeCaptionFromAppBounds(taskInfo)) {
                 getDesktopViewAppHeaderHeightPx(displayContext)
             } else {
                 0
@@ -6254,17 +6227,6 @@ class DesktopTasksController(
     ) {
         if (taskInfo.windowingMode != WINDOWING_MODE_FREEFORM) return
         snapEventHandler.removeTaskIfTiled(taskInfo.displayId, taskInfo.taskId)
-        if (!DesktopExperienceFlags.ENABLE_CONNECTED_DISPLAYS_WINDOW_DRAG.isTrue) {
-            updateVisualIndicator(
-                taskInfo,
-                taskSurface,
-                displayId,
-                inputX,
-                taskBounds.top.toFloat(),
-                DragStartState.FROM_FREEFORM,
-            )
-            return
-        }
 
         val indicator =
             getOrCreateVisualIndicator(taskInfo, taskSurface, DragStartState.FROM_FREEFORM)
@@ -6446,9 +6408,7 @@ class DesktopTasksController(
                 val newDisplayId = motionEvent.displayId
                 val displayAreaInfo = rootTaskDisplayAreaOrganizer.getDisplayAreaInfo(newDisplayId)
                 val isCrossDisplayDrag =
-                    DesktopExperienceFlags.ENABLE_CONNECTED_DISPLAYS_WINDOW_DRAG.isTrue &&
-                        newDisplayId != taskInfo.getDisplayId() &&
-                        displayAreaInfo != null
+                    newDisplayId != taskInfo.getDisplayId() && displayAreaInfo != null
 
                 if (!isCrossDisplayDrag && destinationBounds == dragStartBounds) {
                     // There's no actual difference between the start and end bounds, so while a
@@ -6480,13 +6440,13 @@ class DesktopTasksController(
                     return true
                 }
 
-                val prevCaptionInsets = taskInfo.freeformCaptionInsets
+                val prevDisplayLayout = displayController.getDisplayLayout(taskInfo.getDisplayId())
+                val prevCaptionInsets =
+                    prevDisplayLayout?.let { taskInfo.freeformCaptionInsets(prevDisplayLayout) }
+                        ?: 0
+                var transition: IBinder? = null
                 if (isCrossDisplayDrag) {
-                    val captionInsetsDp =
-                        displayController
-                            .getDisplayLayout(taskInfo.getDisplayId())
-                            ?.pxToDp(prevCaptionInsets)
-                            ?.toInt() ?: 0
+                    val captionInsetsDp = prevDisplayLayout?.pxToDp(prevCaptionInsets)?.toInt() ?: 0
                     val destDisplayLayout = displayController.getDisplayLayout(newDisplayId)
                     val captionInsets = destDisplayLayout?.dpToPx(captionInsetsDp)?.toInt() ?: 0
                     val constrainedBounds =
@@ -6498,14 +6458,15 @@ class DesktopTasksController(
                             captionInsets,
                         )
 
-                    moveToDisplay(
-                        taskInfo,
-                        newDisplayId,
-                        constrainedBounds,
-                        windowDragTransitionHandler,
-                        enterReason = EnterReason.APP_HANDLE_DRAG,
-                        captionInsets = captionInsets,
-                    )
+                    transition =
+                        moveToDisplay(
+                            taskInfo,
+                            newDisplayId,
+                            constrainedBounds,
+                            windowDragTransitionHandler,
+                            enterReason = EnterReason.APP_HANDLE_DRAG,
+                            captionInsets = captionInsets,
+                        )
                 } else {
                     // Update task bounds so that the task position will match the position of its
                     // leash
@@ -6516,7 +6477,15 @@ class DesktopTasksController(
                             Rect(destinationBounds).apply { this.top += prevCaptionInsets }
                         wct.setAppBounds(taskInfo.token, appBounds)
                     }
-                    transitions.startTransition(TRANSIT_CHANGE, wct, windowDragTransitionHandler)
+                    transition =
+                        transitions.startTransition(
+                            TRANSIT_CHANGE,
+                            wct,
+                            windowDragTransitionHandler,
+                        )
+                }
+                transition?.let {
+                    desktopTasksTransitionObserver.addPendingUserBoundsChangeTransition(it)
                 }
                 releaseVisualIndicator()
                 needDragIndicatorCleanup = false
@@ -6585,12 +6554,15 @@ class DesktopTasksController(
                 } else {
                     // Start a new jank interaction for the drag release to desktop window
                     // animation.
-                    val jankConfigBuilder = InteractionJankMonitor.Configuration.Builder.withSurface(
-                        CUJ_DESKTOP_MODE_ENTER_APP_HANDLE_DRAG_RELEASE,
-                        context,
-                        taskSurface,
-                        handler,
-                    ).setTimeout(APP_HANDLE_DRAG_CUJ_TIMEOUT_MS).setTag("to_desktop")
+                    val jankConfigBuilder =
+                        InteractionJankMonitor.Configuration.Builder.withSurface(
+                                CUJ_DESKTOP_MODE_ENTER_APP_HANDLE_DRAG_RELEASE,
+                                context,
+                                taskSurface,
+                                handler,
+                            )
+                            .setTimeout(APP_HANDLE_DRAG_CUJ_TIMEOUT_MS)
+                            .setTag("to_desktop")
                     interactionJankMonitor.begin(jankConfigBuilder)
                 }
                 desktopModeUiEventLogger.log(
@@ -6629,6 +6601,15 @@ class DesktopTasksController(
             }
         }
         return indicatorType
+    }
+
+    /**
+     * Notifies the controller that a transition for a drag resize operation has started.
+     *
+     * @param transition the transition of a drag resize operation.
+     */
+    fun onDragResizeTransitionStarted(transition: IBinder) {
+        desktopTasksTransitionObserver.addPendingUserBoundsChangeTransition(transition)
     }
 
     /** Update the exclusion region for a specified task */
@@ -7285,7 +7266,8 @@ class DesktopTasksController(
     }
 
     companion object {
-        // Timeout used for CUJ_DESKTOP_MODE_ENTER_APP_HANDLE_DRAG_HOLD/RELEASE, this is longer than the
+        // Timeout used for CUJ_DESKTOP_MODE_ENTER_APP_HANDLE_DRAG_HOLD/RELEASE, this is longer than
+        // the
         // default timeout to avoid timing out in the middle of a drag action.
         private val APP_HANDLE_DRAG_CUJ_TIMEOUT_MS: Long = TimeUnit.SECONDS.toMillis(10L)
 

@@ -16,6 +16,7 @@
 
 package com.android.systemui.statusbar.systemstatusicons.ui.viewmodel
 
+import com.android.internal.statusbar.StatusBarIcon
 import com.android.systemui.common.shared.model.Icon
 import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.MobileIconsViewModel
 import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.StackedMobileIconViewModel
@@ -39,5 +40,10 @@ sealed interface SystemStatusIconViewModel {
     interface MobileIcons : SystemStatusIconViewModel {
         val mobileIconsViewModel: MobileIconsViewModel
         val stackedMobileIconViewModel: StackedMobileIconViewModel
+    }
+
+    /** Used for icons that come from an external process. */
+    interface External : SystemStatusIconViewModel {
+        val statusBarIcon: StatusBarIcon
     }
 }

@@ -61,6 +61,7 @@ aconfig_declarations_group {
         "android.location.flags-aconfig-java",
         "android.media.codec-aconfig-java",
         "android.media.mediarecorder-aconfig-java",
+        "android.media.reliability-aconfig-java",
         "android.media.tv.flags-aconfig-java",
         "android.multiuser.flags-aconfig-java",
         "android.net.platform.flags-aconfig-java",
@@ -155,6 +156,7 @@ aconfig_declarations_group {
         "telecom_module_flags-export-java",
         "telephony_flags_core_java_lib",
         "timezone_flags_core_java_lib",
+        "uilatencystats_flags_core_java_lib",
         // !!! KEEP THIS LIST ALPHABETICAL !!!
     ],
 }
@@ -205,6 +207,13 @@ java_aconfig_library {
 java_aconfig_library {
     name: "camera_platform_flags_core_java_lib",
     aconfig_declarations: "camera_platform_flags",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
+// UiLatencyStats
+java_aconfig_library {
+    name: "uilatencystats_flags_core_java_lib",
+    aconfig_declarations: "uilatencystats_flags",
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
 }
 
@@ -1869,6 +1878,18 @@ java_aconfig_library {
     name: "android.app.supervision.flags-aconfig-java",
     aconfig_declarations: "android.app.supervision.flags-aconfig",
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
+java_aconfig_library {
+    name: "android.app.supervision.flags-aconfig-java-export",
+    aconfig_declarations: "android.app.supervision.flags-aconfig",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+    min_sdk_version: "30",
+    mode: "exported",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.permission",
+    ],
 }
 
 java_aconfig_library {

@@ -16,28 +16,38 @@
 
 package com.android.systemui.screencapture.record.camera.ui.viewmodel
 
+import android.graphics.Region
 import androidx.compose.foundation.gestures.TransformableState
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Matrix
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.asAndroidPath
+import androidx.compose.ui.graphics.asComposePath
 import androidx.compose.ui.graphics.copy
+import androidx.compose.ui.graphics.toAndroidRectF
+import androidx.core.graphics.toRegion
 import com.android.systemui.lifecycle.HydratedActivatable
 import com.android.systemui.screencapture.record.camera.domain.interactor.ScreenCaptureCameraTransformationInteractor
+import com.android.systemui.screencapture.record.camera.domain.interactor.ScreenRecordCameraInteractor
 import com.android.systemui.screenrecord.domain.interactor.ScreenRecordingServiceInteractor
 import com.android.systemui.screenrecord.shared.model.ScreenRecordingStatus
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
-import kotlin.properties.Delegates
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapNotNull
+import kotlinx.coroutines.flow.onEach
 
 class ScreenCaptureCameraTransformationViewModel
 @AssistedInject
 constructor(
     screenRecordingServiceInteractor: ScreenRecordingServiceInteractor,
-    private val interactor: ScreenCaptureCameraTransformationInteractor,
+    cameraInteractor: ScreenRecordCameraInteractor,
+    private val transformationInteractor: ScreenCaptureCameraTransformationInteractor,
 ) : HydratedActivatable() {
 
     val transformableByTouchAnywhere: Boolean by
@@ -48,23 +58,20 @@ constructor(
                 screenRecordingServiceInteractor.status.value.transformableByTouchAnywhere(),
             )
 
-    var bounds: Rect by
-        Delegates.observable(Rect.Zero) { _, _, new ->
-            boundsAsPath.reset()
-            boundsAsPath.addRect(new, Path.Direction.Clockwise)
-            recalculateTransformation()
-        }
-    val offsetX: Float
-        get() = interactor.offsetX
+    private var cameraScreenBounds: Rect = Rect.Zero
+    private val cameraSubjectBounds: Path by
+        cameraInteractor.cameraSubjectBounds
+            .mapNotNull { it?.boundaryPath?.asComposePath() ?: cameraScreenBounds.toPath() }
+            .onEach { recalculateTransformation(it) }
+            .hydratedStateOf(
+                "ScreenCaptureCameraViewModel#cameraSubjectBounds",
+                cameraScreenBounds.toPath(),
+            )
 
-    val offsetY: Float
-        get() = interactor.offsetY
-
-    val scale: Float
-        get() = interactor.scale
-
-    val rotation: Float
-        get() = interactor.rotation
+    val offsetX: Float by transformationInteractor::offsetX
+    val offsetY: Float by transformationInteractor::offsetY
+    val scale: Float by transformationInteractor::scale
+    val rotation: Float by transformationInteractor::rotation
 
     val state: TransformableState = TransformableState { _, zoomChange, panChange, rotationChange ->
         changeTransformation(
@@ -74,18 +81,23 @@ constructor(
         )
     }
 
-    private val transformation: Matrix by derivedStateOf { Matrix().apply {} }
+    private val transformation = Matrix()
+    private var transformedCameraSubjectBounds: Path = Path()
 
-    private val boundsAsPath = Path()
-    var transformedBounds = Path()
-        private set
+    override suspend fun onActivated() {
+        coroutineScope {
+            snapshotFlow { state.isTransformInProgress }
+                .onEach { transformationInteractor.isTransforming = it }
+                .launchIn(this)
+        }
+    }
 
     private fun changeTransformation(
         offsetChange: Offset,
         zoomChange: Float,
         rotationChange: Float,
     ) {
-        with(interactor) {
+        with(transformationInteractor) {
             scale *= zoomChange
             rotation += rotationChange
             offsetX += offsetChange.x
@@ -94,23 +106,39 @@ constructor(
         recalculateTransformation()
     }
 
-    fun onTransformationStarted() {
-        interactor.isTransforming = true
+    fun onCameraScreenBoundsUpdated(bounds: Rect) {
+        cameraScreenBounds = bounds
+
+        recalculateTransformation()
     }
 
-    fun onTransformationEnded() {
-        interactor.isTransforming = false
+    fun fillCameraInteractableRegion(outRegion: Region) {
+        if (transformableByTouchAnywhere) {
+            with(cameraScreenBounds) {
+                outRegion.set(left.toInt(), top.toInt(), right.toInt(), bottom.toInt())
+            }
+        } else {
+            outRegion.setPath(
+                transformedCameraSubjectBounds.asAndroidPath(),
+                cameraScreenBounds.toAndroidRectF().toRegion(),
+            )
+        }
     }
 
-    private fun recalculateTransformation() =
-        with(transformation) {
+    private fun recalculateTransformation(cameraTouchableBounds: Path = this.cameraSubjectBounds) {
+        transformation.apply {
             reset()
-            translate(x = bounds.center.x + offsetX, y = bounds.center.y + offsetY)
+            translate(
+                x = cameraScreenBounds.center.x + offsetX,
+                y = cameraScreenBounds.center.y + offsetY,
+            )
             rotateZ(degrees = rotation)
             scale(x = scale, y = scale)
-            translate(x = -bounds.center.x, y = -bounds.center.y)
-            transformedBounds = boundsAsPath.copy().apply { transform(transformation) }
+            translate(x = -cameraScreenBounds.center.x, y = -cameraScreenBounds.center.y)
         }
+        transformedCameraSubjectBounds =
+            cameraTouchableBounds.copy().apply { transform(transformation) }
+    }
 
     @AssistedFactory
     interface Factory {
@@ -120,3 +148,5 @@ constructor(
 
 private fun ScreenRecordingStatus.transformableByTouchAnywhere(): Boolean =
     this is ScreenRecordingStatus.Stopped
+
+private fun Rect.toPath(): Path = Path().apply { addRect(this@toPath, Path.Direction.Clockwise) }

@@ -411,6 +411,10 @@ class Task extends TaskFragment {
     String mCallingPackage;
     String mCallingFeatureId;
 
+    private boolean mIsCaptionInsetsExcluded;
+
+    private float mCompatAspectRatio;
+
     // Last non-fullscreen bounds the task was launched in or resized to.
     // The information is persisted and used to determine the appropriate root task to launch the
     // task into on restore.
@@ -1021,6 +1025,14 @@ class Task extends TaskFragment {
             mCallingFeatureId = r.launchedFromFeatureId;
             setIntent(intent != null ? intent : r.intent, info != null ? info : r.info);
             updateForceResizeOverrides(r);
+            mIsCaptionInsetsExcluded = r.mAppCompatController.getSandboxingPolicy()
+                    .isCaptionExcludedFromAppBounds(isResizeable());
+            final AppCompatDisplayInsets compatInsets = r.getAppCompatDisplayInsets();
+            if (compatInsets != null) {
+                mCompatAspectRatio = compatInsets.mAspectRatio;
+            } else {
+                mCompatAspectRatio = TaskInfo.PROPERTY_VALUE_UNSET;
+            }
         }
         setLockTaskAuth(r);
     }
@@ -1146,13 +1158,13 @@ class Task extends TaskFragment {
             complexMinHeight = INVALID_MIN_SIZE;
         }
 
-        if (!Flags.runtimeDensityResolutionForWindowLayout() && mMinWidth == minWidth
+        if (!Flags.runtimeDensityResolutionForWindowLayoutBugfix() && mMinWidth == minWidth
                 && mMinHeight == minHeight) {
             return false;
         }
 
-        if (Flags.runtimeDensityResolutionForWindowLayout() && mComplexMinWidth == complexMinWidth
-                && mComplexMinHeight == complexMinHeight) {
+        if (Flags.runtimeDensityResolutionForWindowLayoutBugfix()
+                && mComplexMinWidth == complexMinWidth && mComplexMinHeight == complexMinHeight) {
             return false;
         }
 
@@ -2296,7 +2308,7 @@ class Task extends TaskFragment {
 
         // TaskDescription's minWidth/minHeight are derived from density-dependent values,
         // so they must be updated when density changes.
-        if (Flags.runtimeDensityResolutionForWindowLayout()
+        if (Flags.runtimeDensityResolutionForWindowLayoutBugfix()
                 && getConfiguration().densityDpi != prevDensityDpi) {
             updateTaskDescription();
         }
@@ -3159,6 +3171,21 @@ class Task extends TaskFragment {
         return mResizeMode == RESIZE_MODE_FORCE_RESIZABLE_PORTRAIT_ONLY
                 || mResizeMode == RESIZE_MODE_FORCE_RESIZABLE_LANDSCAPE_ONLY
                 || mResizeMode == RESIZE_MODE_FORCE_RESIZABLE_PRESERVE_ORIENTATION;
+    }
+
+    /**
+     * @return true if the activity that started this task has caption insets excluded from its
+     * app bounds.
+     */
+    boolean getIsCaptionInsetsExcluded() {
+        return mIsCaptionInsetsExcluded;
+    }
+
+    /**
+     * @return the aspect ratio of the non-resizeable activity that started this task.
+     */
+    float getCompatAspectRatio() {
+        return mCompatAspectRatio;
     }
 
     boolean cropWindowsToRootTaskBounds() {

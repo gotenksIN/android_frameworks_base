@@ -275,6 +275,7 @@ package android {
     field public static final String MANAGE_SPEECH_RECOGNITION = "android.permission.MANAGE_SPEECH_RECOGNITION";
     field public static final String MANAGE_SUBSCRIPTION_PLANS = "android.permission.MANAGE_SUBSCRIPTION_PLANS";
     field public static final String MANAGE_SUBSCRIPTION_USER_ASSOCIATION = "android.permission.MANAGE_SUBSCRIPTION_USER_ASSOCIATION";
+    field @FlaggedApi("android.app.supervision.flags.enable_supervision_manager_policy_apis") public static final String MANAGE_SUPERVISION = "android.permission.MANAGE_SUPERVISION";
     field public static final String MANAGE_TEST_NETWORKS = "android.permission.MANAGE_TEST_NETWORKS";
     field public static final String MANAGE_TIME_AND_ZONE_DETECTION = "android.permission.MANAGE_TIME_AND_ZONE_DETECTION";
     field public static final String MANAGE_UI_TRANSLATION = "android.permission.MANAGE_UI_TRANSLATION";
@@ -2319,11 +2320,6 @@ package android.app.compat {
 
 package android.app.contentrestriction {
 
-  @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") public class ContentRestrictionAppService extends android.app.Service {
-    ctor public ContentRestrictionAppService();
-    method @Nullable public final android.os.IBinder onBind(@Nullable android.content.Intent);
-  }
-
   @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") public class ContentRestrictionManager {
   }
 
@@ -4077,25 +4073,26 @@ package android.companion.virtual.camera {
   }
 
   public interface VirtualCameraCallback {
-    method @FlaggedApi("android.companion.virtualdevice.flags.virtual_camera_metadata") public default void onConfigureSession(@NonNull android.companion.virtual.camera.VirtualCameraSessionConfig, @Nullable java.util.function.ObjLongConsumer<android.hardware.camera2.CaptureResult>);
+    method public default void onConfigureSession(@NonNull android.companion.virtual.camera.VirtualCameraSessionConfig, @Nullable java.util.function.ObjLongConsumer<android.hardware.camera2.CaptureResult>);
     method @FlaggedApi("android.companion.virtualdevice.flags.virtual_camera_on_open") public default void onOpenCamera();
     method public default void onProcessCaptureRequest(int, long);
-    method @FlaggedApi("android.companion.virtualdevice.flags.virtual_camera_metadata") public default void onProcessCaptureRequest(int, long, @Nullable android.hardware.camera2.CaptureRequest);
+    method public default void onProcessCaptureRequest(int, long, @Nullable android.hardware.camera2.CaptureRequest);
     method public void onStreamClosed(int);
     method public void onStreamConfigured(int, @NonNull android.view.Surface, @IntRange(from=1) int, @IntRange(from=1) int, int);
   }
 
   public final class VirtualCameraConfig implements android.os.Parcelable {
     method public int describeContents();
-    method @FlaggedApi("android.companion.virtualdevice.flags.virtual_camera_metadata") @Nullable public android.hardware.camera2.CameraCharacteristics getCameraCharacteristics();
+    method @Nullable public android.hardware.camera2.CameraCharacteristics getCameraCharacteristics();
     method public int getLensFacing();
     method @NonNull public String getName();
     method public int getSensorOrientation();
     method @NonNull public java.util.Set<android.companion.virtual.camera.VirtualCameraStreamConfig> getStreamConfigs();
-    method @FlaggedApi("android.companion.virtualdevice.flags.virtual_camera_metadata") public boolean isPerFrameCameraMetadataEnabled();
+    method @FlaggedApi("android.companion.virtualdevice.flags.camera_multiple_input_streams") public boolean isConcurrentStreamConfigSupported();
+    method public boolean isPerFrameCameraMetadataEnabled();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.companion.virtual.camera.VirtualCameraConfig> CREATOR;
-    field @FlaggedApi("android.companion.virtualdevice.flags.virtual_camera_metadata") public static final android.hardware.camera2.CameraCharacteristics DEFAULT_VIRTUAL_CAMERA_CHARACTERISTICS;
+    field public static final android.hardware.camera2.CameraCharacteristics DEFAULT_VIRTUAL_CAMERA_CHARACTERISTICS;
     field public static final int SENSOR_ORIENTATION_0 = 0; // 0x0
     field public static final int SENSOR_ORIENTATION_180 = 180; // 0xb4
     field public static final int SENSOR_ORIENTATION_270 = 270; // 0x10e
@@ -4106,14 +4103,15 @@ package android.companion.virtual.camera {
     ctor public VirtualCameraConfig.Builder(@NonNull String);
     method @NonNull public android.companion.virtual.camera.VirtualCameraConfig.Builder addStreamConfig(@IntRange(from=1) int, @IntRange(from=1) int, int, @IntRange(from=1) int);
     method @NonNull public android.companion.virtual.camera.VirtualCameraConfig build();
-    method @FlaggedApi("android.companion.virtualdevice.flags.virtual_camera_metadata") @NonNull public android.companion.virtual.camera.VirtualCameraConfig.Builder setCameraCharacteristics(@Nullable android.hardware.camera2.CameraCharacteristics);
+    method @NonNull public android.companion.virtual.camera.VirtualCameraConfig.Builder setCameraCharacteristics(@Nullable android.hardware.camera2.CameraCharacteristics);
+    method @FlaggedApi("android.companion.virtualdevice.flags.camera_multiple_input_streams") @NonNull public android.companion.virtual.camera.VirtualCameraConfig.Builder setConcurrentStreamConfigSupported(boolean);
     method @NonNull public android.companion.virtual.camera.VirtualCameraConfig.Builder setLensFacing(int);
-    method @FlaggedApi("android.companion.virtualdevice.flags.virtual_camera_metadata") @NonNull public android.companion.virtual.camera.VirtualCameraConfig.Builder setPerFrameCameraMetadataEnabled(boolean);
+    method @NonNull public android.companion.virtual.camera.VirtualCameraConfig.Builder setPerFrameCameraMetadataEnabled(boolean);
     method @NonNull public android.companion.virtual.camera.VirtualCameraConfig.Builder setSensorOrientation(int);
     method @NonNull public android.companion.virtual.camera.VirtualCameraConfig.Builder setVirtualCameraCallback(@NonNull java.util.concurrent.Executor, @NonNull android.companion.virtual.camera.VirtualCameraCallback);
   }
 
-  @FlaggedApi("android.companion.virtualdevice.flags.virtual_camera_metadata") public final class VirtualCameraSessionConfig implements android.os.Parcelable {
+  public final class VirtualCameraSessionConfig implements android.os.Parcelable {
     method public int describeContents();
     method @Nullable public android.hardware.camera2.CaptureRequest getSessionParameters();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
@@ -5618,7 +5616,7 @@ package android.hardware.camera2 {
     field @FlaggedApi("com.android.internal.camera.flags.camera_multi_client") @NonNull public static final android.hardware.camera2.CameraCharacteristics.Key<android.hardware.camera2.params.SharedSessionConfiguration> SHARED_SESSION_CONFIGURATION;
   }
 
-  @FlaggedApi("android.companion.virtualdevice.flags.virtual_camera_metadata") public static final class CameraCharacteristics.Builder {
+  public static final class CameraCharacteristics.Builder {
     ctor public CameraCharacteristics.Builder();
     ctor public CameraCharacteristics.Builder(@NonNull android.hardware.camera2.CameraCharacteristics);
     method @NonNull public android.hardware.camera2.CameraCharacteristics build();
@@ -5663,7 +5661,7 @@ package android.hardware.camera2 {
     method @FlaggedApi("com.android.internal.camera.flags.camera_multi_client") public abstract void stopStreaming() throws android.hardware.camera2.CameraAccessException;
   }
 
-  @FlaggedApi("android.companion.virtualdevice.flags.virtual_camera_metadata") public static final class CaptureResult.Builder {
+  public static final class CaptureResult.Builder {
     ctor public CaptureResult.Builder();
     ctor public CaptureResult.Builder(@NonNull android.hardware.camera2.CaptureResult);
     method @NonNull public android.hardware.camera2.CaptureResult build();
@@ -8812,7 +8810,9 @@ package android.media.audiopolicy {
     method public int attachMixes(@NonNull java.util.List<android.media.audiopolicy.AudioMix>);
     method @FlaggedApi("android.media.audiopolicy.enable_fade_manager_configuration") @RequiresPermission(android.Manifest.permission.MODIFY_AUDIO_SETTINGS_PRIVILEGED) public int clearFadeManagerConfigurationForFocusLoss();
     method public android.media.AudioRecord createAudioRecordSink(android.media.audiopolicy.AudioMix) throws java.lang.IllegalArgumentException;
+    method @FlaggedApi("android.media.audio.audio_policy_builders_api") @Nullable @RequiresPermission(android.Manifest.permission.RECORD_AUDIO) public android.media.AudioRecord createAudioRecordSink(@NonNull android.media.audiopolicy.AudioMix, @NonNull android.media.AudioRecord.Builder);
     method public android.media.AudioTrack createAudioTrackSource(android.media.audiopolicy.AudioMix) throws java.lang.IllegalArgumentException;
+    method @FlaggedApi("android.media.audio.audio_policy_builders_api") @Nullable public android.media.AudioTrack createAudioTrackSource(@NonNull android.media.audiopolicy.AudioMix, @NonNull android.media.AudioTrack.Builder);
     method public int detachMixes(@NonNull java.util.List<android.media.audiopolicy.AudioMix>);
     method @FlaggedApi("android.media.audiopolicy.enable_fade_manager_configuration") @NonNull @RequiresPermission(android.Manifest.permission.MODIFY_AUDIO_SETTINGS_PRIVILEGED) public android.media.FadeManagerConfiguration getFadeManagerConfigurationForFocusLoss();
     method public int getFocusDuckingBehavior();
@@ -11879,9 +11879,12 @@ package android.os {
     method @RequiresPermission(android.Manifest.permission.POWER_SAVER) public boolean setChargingStateUpdateDelayMillis(int);
     field @RequiresPermission(android.Manifest.permission.BATTERY_STATS) public static final int BATTERY_PROPERTY_CHARGING_POLICY = 9; // 0x9
     field @RequiresPermission(android.Manifest.permission.BATTERY_STATS) public static final int BATTERY_PROPERTY_FIRST_USAGE_DATE = 8; // 0x8
+    field @FlaggedApi("android.os.battery_manufacturer_diagnostics_api") @RequiresPermission(android.Manifest.permission.BATTERY_STATS) public static final int BATTERY_PROPERTY_MANUFACTURER = 13; // 0xd
     field @RequiresPermission(android.Manifest.permission.BATTERY_STATS) public static final int BATTERY_PROPERTY_MANUFACTURING_DATE = 7; // 0x7
+    field @FlaggedApi("android.os.battery_manufacturer_diagnostics_api") @RequiresPermission(android.Manifest.permission.BATTERY_STATS) public static final int BATTERY_PROPERTY_MODEL_NAME = 14; // 0xe
     field @FlaggedApi("android.os.battery_part_status_api") @RequiresPermission(android.Manifest.permission.BATTERY_STATS) public static final int BATTERY_PROPERTY_PART_STATUS = 12; // 0xc
     field @FlaggedApi("android.os.battery_part_status_api") @RequiresPermission(android.Manifest.permission.BATTERY_STATS) public static final int BATTERY_PROPERTY_SERIAL_NUMBER = 11; // 0xb
+    field @FlaggedApi("android.os.battery_manufacturer_diagnostics_api") @RequiresPermission(android.Manifest.permission.BATTERY_STATS) public static final int BATTERY_PROPERTY_VOLTAGE_MIN_DESIGN = 15; // 0xf
     field public static final int CHARGING_POLICY_ADAPTIVE_AC = 3; // 0x3
     field public static final int CHARGING_POLICY_ADAPTIVE_AON = 2; // 0x2
     field public static final int CHARGING_POLICY_ADAPTIVE_LONGLIFE = 4; // 0x4

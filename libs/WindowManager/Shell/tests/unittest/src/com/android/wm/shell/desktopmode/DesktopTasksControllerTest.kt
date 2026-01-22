@@ -163,6 +163,7 @@ import com.android.wm.shell.desktopmode.multidesks.PreserveDisplayRequestHandler
 import com.android.wm.shell.draganddrop.DragAndDropController
 import com.android.wm.shell.freeform.FreeformTaskTransitionStarter
 import com.android.wm.shell.fullscreen.FullscreenDisconnectHandler
+import com.android.wm.shell.pinnedlayer.phone.PinnedLayerController
 import com.android.wm.shell.pip2.phone.PipScheduler
 import com.android.wm.shell.pip2.phone.PipTransitionState
 import com.android.wm.shell.recents.RecentTasksController
@@ -331,6 +332,8 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     @Mock private lateinit var launcherApps: LauncherApps
     @Mock private lateinit var transitionStateHolder: TransitionStateHolder
     @Mock private lateinit var fullscreenDisconnectHandler: FullscreenDisconnectHandler
+    @Mock private lateinit var pinnedLayerController: PinnedLayerController
+    @Mock private lateinit var desktopTasksTransitionObserver: DesktopTasksTransitionObserver
 
     private lateinit var controller: DesktopTasksController
     private lateinit var shellInit: ShellInit
@@ -494,7 +497,14 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         whenever(splitScreenController.multiDisplayProvider).thenReturn(splitMultiDisplayProvider)
 
         desksController =
-            DesksController(shellController, userRepositories, desktopConfig, desktopState)
+            DesksController(
+                shellController,
+                userRepositories,
+                desktopConfig,
+                desktopState,
+                displayController,
+                desksOrganizer,
+            )
 
         controller = createController()
         controller.setSplitScreenController(splitScreenController)
@@ -508,6 +518,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
                 splitScreenController = Optional.of(splitScreenController),
                 desktopTasksController = Optional.of(controller),
                 fullscreenDisconnectHandler = Optional.of(fullscreenDisconnectHandler),
+                pinnedLayerController = Optional.of(pinnedLayerController),
             )
 
         shellInit.init()
@@ -588,6 +599,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
             launcherApps,
             transitionStateHolder,
             desksController,
+            desktopTasksTransitionObserver,
         )
 
     @After
@@ -8332,7 +8344,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_CONNECTED_DISPLAYS_WINDOW_DRAG)
     fun onDesktopDragMove_callVisualIndicatorUpdateScheduler() {
         val task = setUpFreeformTask()
         val spyController = spy(controller)
@@ -8482,7 +8493,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_CONNECTED_DISPLAYS_WINDOW_DRAG)
     @DisableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
     fun onDesktopDragEnd_noIndicatorAndMoveToNewDisplay_reparent() {
         val task = setUpFreeformTask()
@@ -8529,7 +8539,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_CONNECTED_DISPLAYS_WINDOW_DRAG)
     fun onDesktopDragEnd_noBoundsChangeAndMoveToNewDisplay_reparentWct() {
         val task = setUpFreeformTask()
         val spyController = spy(controller)
@@ -8726,7 +8735,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
 
         // Assert that task is NOT updated via WCT
         verify(toggleResizeDesktopTaskTransitionHandler, never())
-            .startTransition(any(), any(), any())
+            .startTransition(any(), any(), any(), any())
         // Assert that task leash is updated via Surface Animations
         verify(mReturnToDragStartAnimator)
             .start(
@@ -8849,7 +8858,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
 
         // Assert that task is NOT updated via WCT
         verify(toggleResizeDesktopTaskTransitionHandler, never())
-            .startTransition(any(), any(), any())
+            .startTransition(any(), any(), any(), any())
         // Assert that task leash is updated via Surface Animations
         verify(mReturnToDragStartAnimator)
             .start(
@@ -9403,7 +9412,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         )
         // Assert that task is NOT updated via WCT
         verify(toggleResizeDesktopTaskTransitionHandler, never())
-            .startTransition(any(), any(), any())
+            .startTransition(any(), any(), any(), any())
 
         // Assert that task leash is updated via Surface Animations
         verify(mReturnToDragStartAnimator)
@@ -9461,7 +9470,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
 
         // Assert that task is NOT updated via WCT
         verify(toggleResizeDesktopTaskTransitionHandler, never())
-            .startTransition(any(), any(), any())
+            .startTransition(any(), any(), any(), any())
         verify(mockToast).show()
     }
 
@@ -11982,6 +11991,34 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         verify(desksOrganizer, never()).removeDesk(wct, deskId = 0, task.userId)
     }
 
+    @Test
+    fun testToggleDesktopTaskSize_callsTransitionHandlerWithUserResize() {
+        val task = setUpFreeformTask()
+        controller.toggleDesktopTaskSize(
+            task,
+            ToggleTaskSizeInteraction(
+                ToggleTaskSizeInteraction.Direction.MAXIMIZE,
+                ToggleTaskSizeInteraction.Source.HEADER_BUTTON_TO_MAXIMIZE,
+                InputMethod.TOUCH,
+            ),
+        )
+
+        verify(toggleResizeDesktopTaskTransitionHandler)
+            .startTransition(
+                any(),
+                anyOrNull(),
+                anyOrNull(),
+                eq(true), // isUserResize
+            )
+    }
+
+    @Test
+    fun testOnDragResizeTransitionStarted_callsObserver() {
+        val transition = mock(IBinder::class.java)
+        controller.onDragResizeTransitionStarted(transition)
+        verify(desktopTasksTransitionObserver).addPendingUserBoundsChangeTransition(transition)
+    }
+
     private class RunOnStartTransitionCallback : ((IBinder) -> Unit) {
         var invocations = 0
             private set
@@ -12304,7 +12341,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     ): WindowContainerTransaction {
         val arg = argumentCaptor<WindowContainerTransaction>()
         verify(toggleResizeDesktopTaskTransitionHandler, atLeastOnce())
-            .startTransition(arg.capture(), eq(currentBounds), isNull())
+            .startTransition(arg.capture(), eq(currentBounds), isNull(), any())
         return arg.lastValue
     }
 

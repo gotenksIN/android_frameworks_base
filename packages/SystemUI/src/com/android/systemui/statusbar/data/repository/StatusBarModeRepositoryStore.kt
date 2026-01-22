@@ -16,20 +16,20 @@
 
 package com.android.systemui.statusbar.data.repository
 
+import com.android.app.displaylib.PerDisplayRepository
 import com.android.systemui.CoreStartable
 import com.android.systemui.dagger.SysUISingleton
+import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.dagger.qualifiers.DisplayId
+import com.android.systemui.display.dagger.SystemUIDisplaySubcomponent
 import com.android.systemui.display.data.repository.DisplayRepository
 import com.android.systemui.display.data.repository.PerDisplayStore
-import com.android.systemui.statusbar.core.StatusBarConnectedDisplays
 import com.android.systemui.statusbar.core.StatusBarInitializer
 import com.android.systemui.statusbar.phone.fragment.dagger.HomeStatusBarComponent
-import dagger.Lazy
+import dagger.Binds
 import dagger.Module
-import dagger.Provides
 import dagger.multibindings.ClassKey
-import dagger.multibindings.ElementsIntoSet
 import dagger.multibindings.IntoMap
 import java.io.PrintWriter
 import javax.inject.Inject
@@ -44,6 +44,7 @@ constructor(
     @Background backgroundApplicationScope: CoroutineScope,
     private val factory: StatusBarModePerDisplayRepositoryFactory,
     displayRepository: DisplayRepository,
+    private val displaySubcomponentRepo: PerDisplayRepository<SystemUIDisplaySubcomponent>,
 ) :
     StatusBarModeRepositoryStore,
     StatusBarPerDisplayStoreImpl<StatusBarModePerDisplayRepository>(
@@ -51,12 +52,11 @@ constructor(
         displayRepository,
     ) {
 
-    init {
-        StatusBarConnectedDisplays.unsafeAssertInNewMode()
-    }
-
-    override fun createInstanceForDisplay(displayId: Int): StatusBarModePerDisplayRepository {
-        return factory.create(displayId).also { it.start() }
+    override fun createInstanceForDisplay(displayId: Int): StatusBarModePerDisplayRepository? {
+        val displaySubcomponent = displaySubcomponentRepo[displayId] ?: return null
+        return factory.create(displaySubcomponent.displayCoroutineScope, displayId).also {
+            it.start()
+        }
     }
 
     override suspend fun onDisplayRemovalAction(instance: StatusBarModePerDisplayRepository) {
@@ -72,11 +72,12 @@ class StatusBarModeRepositoryImpl
 constructor(
     @DisplayId private val displayId: Int,
     factory: StatusBarModePerDisplayRepositoryFactory,
+    @Application applicationCoroutineScope: CoroutineScope,
 ) :
     StatusBarModeRepositoryStore,
     CoreStartable,
     StatusBarInitializer.StatusBarViewLifecycleListener {
-    override val defaultDisplay = factory.create(displayId)
+    override val defaultDisplay = factory.create(applicationCoroutineScope, displayId)
 
     override fun forDisplay(displayId: Int) = defaultDisplay
 
@@ -94,46 +95,15 @@ constructor(
 }
 
 @Module
-object StatusBarModeRepositoryModule {
-    @Provides
-    @ElementsIntoSet
-    fun bindViewInitListener(
-        impl: Lazy<StatusBarModeRepositoryImpl>
-    ): Set<StatusBarInitializer.StatusBarViewLifecycleListener> {
-        return if (StatusBarConnectedDisplays.isEnabled) {
-            // When the flag is enabled, the lifecycle calls will be made directly from
-            // StatusBarInitializer.
-            emptySet()
-        } else {
-            setOf(impl.get())
-        }
-    }
+interface StatusBarModeRepositoryModule {
 
-    @Provides
+    @Binds
     @SysUISingleton
     @IntoMap
     @ClassKey(StatusBarModeRepositoryStore::class)
-    fun storeAsCoreStartable(
-        singleDisplayLazy: Lazy<StatusBarModeRepositoryImpl>,
-        multiDisplayLazy: Lazy<MultiDisplayStatusBarModeRepositoryStore>,
-    ): CoreStartable {
-        return if (StatusBarConnectedDisplays.isEnabled) {
-            multiDisplayLazy.get()
-        } else {
-            singleDisplayLazy.get()
-        }
-    }
+    fun storeAsCoreStartable(store: MultiDisplayStatusBarModeRepositoryStore): CoreStartable
 
-    @Provides
+    @Binds
     @SysUISingleton
-    fun store(
-        singleDisplayLazy: Lazy<StatusBarModeRepositoryImpl>,
-        multiDisplayLazy: Lazy<MultiDisplayStatusBarModeRepositoryStore>,
-    ): StatusBarModeRepositoryStore {
-        return if (StatusBarConnectedDisplays.isEnabled) {
-            multiDisplayLazy.get()
-        } else {
-            singleDisplayLazy.get()
-        }
-    }
+    fun store(store: MultiDisplayStatusBarModeRepositoryStore): StatusBarModeRepositoryStore
 }

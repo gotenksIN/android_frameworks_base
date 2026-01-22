@@ -1738,15 +1738,6 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         }
         if (token.asActivityRecord() == null) {
             // Setting the mDisplayContent to the token is not needed: it is done by da.addChild
-            // below, that also calls onDisplayChanged once moved.
-            if (!Flags.reparentWindowTokenApi()) {
-                // Set displayContent for non-app token to prevent same token will add twice after
-                // onDisplayChanged.
-                // TODO: Check if it's fine that super.onDisplayChanged of WindowToken
-                //  (WindowsContainer#onDisplayChanged) may skipped when token.mDisplayContent
-                //  assigned.
-                token.mDisplayContent = this;
-            }
             // Add non-app token to container hierarchy on the display. App tokens are added through
             // the parent container managing them (e.g. Tasks).
             final DisplayArea.Tokens da = findAreaForToken(token).asTokens();
@@ -3100,8 +3091,20 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
             return true;
         }
         final int userId = UserHandle.getUserId(uid);
-        return userId == UserHandle.USER_SYSTEM
-                || mWmService.mUmInternal.isUserVisible(userId, mDisplayId);
+
+        // - The system user has access to all displays.
+        // - The current user has access to its assigned displays.
+        //   If the allow_current_user_access_unassigned_displays flag is true,
+        //   the current user has access to all unassigned displays.
+        // - A non-current non-system user has access to its assigned displays.
+        if (userId == UserHandle.USER_SYSTEM) {
+          return true;
+        }
+        if (Flags.currentUserAccessUnassignedDisplays()) {
+          // Note that getUserAssignedToDisplay returns the current user for unassigned displays.
+          return userId == mWmService.mUmInternal.getUserAssignedToDisplay(mDisplayId);
+        }
+        return mWmService.mUmInternal.isUserVisible(userId, mDisplayId);
     }
 
     boolean isPrivate() {

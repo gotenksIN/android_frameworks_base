@@ -5945,7 +5945,7 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             }
             mKeyguardBound = true;
         }
-        mKeyguardDelegate.bindService(mContext);
+        mKeyguardDelegate.bindService(mContext, mHandler);
     }
 
     @Override

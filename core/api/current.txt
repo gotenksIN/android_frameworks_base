@@ -9058,6 +9058,13 @@ package android.app.admin {
   }
 
   @FlaggedApi("android.app.admin.flags.policy_streamlining") public final class PolicyIdentifier<T> {
+    field @FlaggedApi("android.app.admin.flags.policy_streamlining_auto_time") @NonNull public static final android.app.admin.PolicyIdentifier<java.lang.Integer> AUTO_TIME;
+    field @FlaggedApi("android.app.admin.flags.policy_streamlining_auto_time") public static final int AUTO_TIME_DISABLED = 3; // 0x3
+    field @FlaggedApi("android.app.admin.flags.policy_streamlining_auto_time") public static final int AUTO_TIME_DISABLED_UNENFORCED = 1; // 0x1
+    field @FlaggedApi("android.app.admin.flags.policy_streamlining_auto_time") public static final int AUTO_TIME_ENABLED_UNENFORCED = 2; // 0x2
+    field @FlaggedApi("android.app.admin.flags.policy_streamlining_auto_time") public static final int AUTO_TIME_ENFORCED = 4; // 0x4
+    field @FlaggedApi("android.app.admin.flags.policy_streamlining_auto_time") public static final int AUTO_TIME_USER_CHOICE = 0; // 0x0
+    field @FlaggedApi("android.app.admin.flags.policy_streamlining") @NonNull public static final android.app.admin.PolicyIdentifier<java.lang.String> LOCKSCREEN_MESSAGE;
     field @FlaggedApi("android.app.admin.flags.policy_streamlining") @NonNull public static final android.app.admin.PolicyIdentifier<java.lang.Integer> SCREEN_CAPTURE;
     field @FlaggedApi("android.app.admin.flags.policy_streamlining") public static final int SCREEN_CAPTURE_ALLOWED = 2; // 0x2
     field @FlaggedApi("android.app.admin.flags.policy_streamlining") public static final int SCREEN_CAPTURE_DISALLOWED = 1; // 0x1
@@ -9281,11 +9288,11 @@ package android.app.appfunctions {
     method @FlaggedApi("android.permission.flags.app_function_access_ui_enabled") @NonNull public android.content.Intent createRequestAccessIntent(@NonNull String);
     method @RequiresPermission(value=android.Manifest.permission.EXECUTE_APP_FUNCTIONS, conditional=true) public void executeAppFunction(@NonNull android.app.appfunctions.ExecuteAppFunctionRequest, @NonNull java.util.concurrent.Executor, @NonNull android.os.CancellationSignal, @NonNull android.os.OutcomeReceiver<android.app.appfunctions.ExecuteAppFunctionResponse,android.app.appfunctions.AppFunctionException>);
     method @FlaggedApi("android.permission.flags.app_function_access_api_enabled") public int getAccessRequestState(@NonNull String);
-    method @RequiresPermission(value=android.Manifest.permission.EXECUTE_APP_FUNCTIONS, conditional=true) public void isAppFunctionEnabled(@NonNull String, @NonNull String, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Boolean,java.lang.Exception>);
+    method @FlaggedApi("android.app.appfunctions.flags.enable_app_function_permission_v2") @RequiresPermission(anyOf={android.Manifest.permission.EXECUTE_APP_FUNCTIONS, "android.permission.READ_APP_FUNCTION_METADATA"}, conditional=true) public void isAppFunctionEnabled(@NonNull String, @NonNull String, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Boolean,java.lang.Exception>);
     method public void isAppFunctionEnabled(@NonNull String, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Boolean,java.lang.Exception>);
     method @FlaggedApi("android.app.appfunctions.flags.enable_dynamic_app_functions") @NonNull public android.app.appfunctions.AppFunctionRegistration registerAppFunction(@NonNull String, @NonNull java.util.concurrent.Executor, @NonNull android.app.appfunctions.AppFunction);
     method @FlaggedApi("android.permission.flags.app_function_access_api_enabled") public void revokeSelfAccess(@NonNull String);
-    method @FlaggedApi("android.app.appfunctions.flags.enable_dynamic_app_functions") @RequiresPermission(value=android.Manifest.permission.EXECUTE_APP_FUNCTIONS, conditional=true) public void searchAppFunctions(@NonNull android.app.appfunctions.AppFunctionSearchSpec, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.util.List<android.app.appfunctions.AppFunctionMetadata>,java.lang.Exception>);
+    method @FlaggedApi("android.app.appfunctions.flags.enable_dynamic_app_functions") @RequiresPermission(anyOf={android.Manifest.permission.EXECUTE_APP_FUNCTIONS, "android.permission.READ_APP_FUNCTION_METADATA"}, conditional=true) public void searchAppFunctions(@NonNull android.app.appfunctions.AppFunctionSearchSpec, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.util.List<android.app.appfunctions.AppFunctionMetadata>,java.lang.Exception>);
     method public void setAppFunctionEnabled(@NonNull String, int, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Void,java.lang.Exception>);
     field @FlaggedApi("android.permission.flags.app_function_access_api_enabled") public static final int ACCESS_REQUEST_STATE_DENIED = 1; // 0x1
     field @FlaggedApi("android.permission.flags.app_function_access_api_enabled") public static final int ACCESS_REQUEST_STATE_GRANTED = 0; // 0x0
@@ -9678,6 +9685,49 @@ package android.app.blob {
     method public boolean isSameSignatureAccessAllowed() throws java.io.IOException;
     method @NonNull public android.os.ParcelFileDescriptor openRead() throws java.io.IOException;
     method @NonNull public android.os.ParcelFileDescriptor openWrite(long, long) throws java.io.IOException;
+  }
+
+}
+
+package android.app.contentrestriction {
+
+  @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") public final class Content implements android.os.Parcelable {
+    method public int describeContents();
+    method @Nullable public android.os.ParcelFileDescriptor getData();
+    method @NonNull public android.content.LocusId getId();
+    method @NonNull public String getMimeType();
+    method @Nullable public android.net.Uri getUri();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.app.contentrestriction.Content> CREATOR;
+  }
+
+  public static final class Content.Builder {
+    ctor public Content.Builder(@NonNull android.content.LocusId, @NonNull String);
+    method @NonNull public android.app.contentrestriction.Content build();
+    method @NonNull public android.app.contentrestriction.Content.Builder setData(@NonNull android.os.ParcelFileDescriptor);
+    method @NonNull public android.app.contentrestriction.Content.Builder setUri(@NonNull android.net.Uri);
+  }
+
+  @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") public final class ContentClassificationResult implements android.os.Parcelable {
+    ctor public ContentClassificationResult(@NonNull android.content.LocusId, int);
+    method public int describeContents();
+    method @NonNull public android.content.LocusId getLocusId();
+    method public int getType();
+    method public boolean isAllowed();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.app.contentrestriction.ContentClassificationResult> CREATOR;
+    field @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") public static final int TYPE_ALLOWED = 0; // 0x0
+    field @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") public static final int TYPE_BLOCKED = 1; // 0x1
+    field @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") public static final int TYPE_UNCLASSIFIED = 2; // 0x2
+  }
+
+  @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") public class ContentRestrictionAppService extends android.app.Service {
+    ctor public ContentRestrictionAppService();
+    method @Nullable public final android.os.IBinder onBind(@Nullable android.content.Intent);
+    method @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") @Nullable public android.app.contentrestriction.ContentClassificationResult onClassifyContent(@NonNull android.app.contentrestriction.Content);
+    method @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") public void onContentRestrictionDisabled();
+    method @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") public void onContentRestrictionEnabled();
+    field public static final String ACTION_CONTENT_RESTRICTION_APP_SERVICE = "android.app.action.CONTENT_RESTRICTION_SERVICE";
   }
 
 }
@@ -24485,6 +24535,8 @@ package android.media {
     field public static final int HEVCProfileMain10 = 2; // 0x2
     field public static final int HEVCProfileMain10HDR10 = 4096; // 0x1000
     field public static final int HEVCProfileMain10HDR10Plus = 8192; // 0x2000
+    field @FlaggedApi("android.media.codec.format_400_444_support") public static final int HEVCProfileMain400 = 8; // 0x8
+    field @FlaggedApi("android.media.codec.format_400_444_support") public static final int HEVCProfileMain444 = 16; // 0x10
     field public static final int HEVCProfileMainStill = 4; // 0x4
     field @FlaggedApi("android.media.audio.iamf_definitions_api") public static final int IAMFProfileBaseAac = 16908290; // 0x1020002
     field @FlaggedApi("android.media.audio.iamf_definitions_api") public static final int IAMFProfileBaseEnhancedAac = 17039362; // 0x1040002
@@ -27665,6 +27717,7 @@ package android.media.metrics {
   public final class EditingSession implements java.lang.AutoCloseable {
     method public void close();
     method @NonNull public android.media.metrics.LogSessionId getSessionId();
+    method @FlaggedApi("android.media.metrics.enable_extended_bundle_metrics") public void reportBundleMetrics(@NonNull android.os.PersistableBundle);
     method @FlaggedApi("com.android.media.editing.flags.add_media_metrics_editing") public void reportEditingEndedEvent(@NonNull android.media.metrics.EditingEndedEvent);
   }
 
@@ -27899,6 +27952,7 @@ package android.media.metrics {
   public final class PlaybackSession implements java.lang.AutoCloseable {
     method public void close();
     method @NonNull public android.media.metrics.LogSessionId getSessionId();
+    method @FlaggedApi("android.media.metrics.enable_extended_bundle_metrics") public void reportBundleMetrics(@NonNull android.os.PersistableBundle);
     method public void reportNetworkEvent(@NonNull android.media.metrics.NetworkEvent);
     method public void reportPlaybackErrorEvent(@NonNull android.media.metrics.PlaybackErrorEvent);
     method public void reportPlaybackMetrics(@NonNull android.media.metrics.PlaybackMetrics);
@@ -27939,6 +27993,7 @@ package android.media.metrics {
   public final class RecordingSession implements java.lang.AutoCloseable {
     method public void close();
     method @NonNull public android.media.metrics.LogSessionId getSessionId();
+    method @FlaggedApi("android.media.metrics.enable_extended_bundle_metrics") public void reportBundleMetrics(@NonNull android.os.PersistableBundle);
   }
 
   public final class TrackChangeEvent extends android.media.metrics.Event implements android.os.Parcelable {
@@ -27994,6 +28049,7 @@ package android.media.metrics {
   public final class TranscodingSession implements java.lang.AutoCloseable {
     method public void close();
     method @NonNull public android.media.metrics.LogSessionId getSessionId();
+    method @FlaggedApi("android.media.metrics.enable_extended_bundle_metrics") public void reportBundleMetrics(@NonNull android.os.PersistableBundle);
   }
 
 }
@@ -36280,10 +36336,10 @@ package android.os {
     method @NonNull public android.os.VibrationEffect.Composition addPrimitive(int);
     method @NonNull public android.os.VibrationEffect.Composition addPrimitive(int, @FloatRange(from=0.0f, to=1.0f) float);
     method @NonNull public android.os.VibrationEffect.Composition addPrimitive(int, @FloatRange(from=0.0f, to=1.0f) float, @IntRange(from=0) int);
-    method @FlaggedApi("android.os.vibrator.primitive_composition_absolute_delay") @NonNull public android.os.VibrationEffect.Composition addPrimitive(int, @FloatRange(from=0.0f, to=1.0f) float, @IntRange(from=0) int, int);
+    method @NonNull public android.os.VibrationEffect.Composition addPrimitive(int, @FloatRange(from=0.0f, to=1.0f) float, @IntRange(from=0) int, int);
     method @NonNull public android.os.VibrationEffect compose();
-    field @FlaggedApi("android.os.vibrator.primitive_composition_absolute_delay") public static final int DELAY_TYPE_PAUSE = 0; // 0x0
-    field @FlaggedApi("android.os.vibrator.primitive_composition_absolute_delay") public static final int DELAY_TYPE_RELATIVE_START_OFFSET = 1; // 0x1
+    field public static final int DELAY_TYPE_PAUSE = 0; // 0x0
+    field public static final int DELAY_TYPE_RELATIVE_START_OFFSET = 1; // 0x1
     field public static final int PRIMITIVE_CLICK = 1; // 0x1
     field public static final int PRIMITIVE_LOW_TICK = 8; // 0x8
     field public static final int PRIMITIVE_QUICK_FALL = 6; // 0x6
@@ -42441,6 +42497,7 @@ package android.service.autofill {
     field public static final int TYPE_DATASETS_SHOWN = 5; // 0x5
     field public static final int TYPE_DATASET_AUTHENTICATION_SELECTED = 1; // 0x1
     field public static final int TYPE_DATASET_SELECTED = 0; // 0x0
+    field @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final int TYPE_RESPONSE_DISCARDED = 7; // 0x7
     field public static final int TYPE_SAVE_SHOWN = 3; // 0x3
     field public static final int TYPE_VIEW_REQUESTED_AUTOFILL = 6; // 0x6
     field @FlaggedApi("android.service.autofill.autofill_w_metrics") public static final int UI_TYPE_CREDENTIAL_MANAGER = 4; // 0x4
@@ -55102,6 +55159,7 @@ package android.view {
     method public void postOnAnimation(Runnable);
     method public void postOnAnimationDelayed(Runnable, long);
     method public void refreshDrawableState();
+    method @FlaggedApi("android.view.flags.called_from_wrong_thread_listener_api") public static void registerCalledFromWrongThreadListener(@NonNull android.view.View.CalledFromWrongThreadListener);
     method public void releasePointerCapture();
     method public boolean removeCallbacks(Runnable);
     method public void removeOnAttachStateChangeListener(android.view.View.OnAttachStateChangeListener);
@@ -55321,6 +55379,7 @@ package android.view {
     method public void stopNestedScroll();
     method public void transformMatrixToGlobal(@NonNull android.graphics.Matrix);
     method public void transformMatrixToLocal(@NonNull android.graphics.Matrix);
+    method @FlaggedApi("android.view.flags.called_from_wrong_thread_listener_api") public static void unregisterCalledFromWrongThreadListener(@NonNull android.view.View.CalledFromWrongThreadListener);
     method public void unscheduleDrawable(@NonNull android.graphics.drawable.Drawable, @NonNull Runnable);
     method public void unscheduleDrawable(android.graphics.drawable.Drawable);
     method public final void updateDragShadow(android.view.View.DragShadowBuilder);
@@ -55545,6 +55604,10 @@ package android.view {
     ctor public View.BaseSavedState(android.os.Parcel, ClassLoader);
     ctor public View.BaseSavedState(android.os.Parcelable);
     field @NonNull public static final android.os.Parcelable.Creator<android.view.View.BaseSavedState> CREATOR;
+  }
+
+  @FlaggedApi("android.view.flags.called_from_wrong_thread_listener_api") public static interface View.CalledFromWrongThreadListener {
+    method public void onCalledFromWrongThread();
   }
 
   public static class View.DragShadowBuilder {

@@ -59,6 +59,13 @@ flag {
 }
 
 flag {
+    name: "desktop_ai_platform"
+    namespace: "lse_desktop_experience"
+    description: "Enables DesktopAI platform."
+    bug: "454857285"
+}
+
+flag {
     name: "dimming_wallpaper_for_maximized_and_tiled"
     namespace: "lse_desktop_experience"
     description: "Dim the wallpaper to make maximized and tiled window looks immersive."
@@ -268,13 +275,6 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Enables wallpaper presentations shown in connected displays."
     bug: "429395688"
-}
-
-flag {
-    name: "enable_connected_displays_window_drag"
-    namespace: "lse_desktop_experience"
-    description: "Enable window drag between connected displays."
-    bug: "381172172"
 }
 
 flag {
@@ -1256,14 +1256,6 @@ flag {
 }
 
 flag {
-    name: "reparent_window_token_api"
-    namespace: "lse_desktop_experience"
-    description: "Allows to reparent a window token to a different display"
-    is_fixed_read_only: true
-    bug: "381258683"
-}
-
-flag {
     name: "repository_based_persistence"
     namespace: "lse_desktop_experience"
     description: "Persists the whole repository instead of just persisting a single desk per event"
@@ -1286,8 +1278,18 @@ flag {
 flag {
     name: "runtime_density_resolution_for_window_layout"
     namespace: "lse_desktop_experience"
-    description: "Enable runtime density resolution for ActivityInfo.WindowLayout"
+    description: "Enable API changes for runtime density resolution for ActivityInfo.WindowLayout"
     bug: "438420596"
+}
+
+flag {
+    name: "runtime_density_resolution_for_window_layout_bugfix"
+    namespace: "lse_desktop_experience"
+    description: "Enable density-related internal bug fixes for ActivityInfo.WindowLayout"
+    bug: "476249569"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -1326,16 +1328,6 @@ flag {
     namespace: "lse_desktop_experience"
     description: "Toggles the focused task's fullscreen state when the fullscreen key is pressed."
     bug: "396483171"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "update_tdas_task_move_allowed_on_desktop_first_change"
-    namespace: "lse_desktop_experience"
-    description: "Updates the TaskMoveAllowed bit on the default TaskDisplayArea of a display whose desktop-first mode changes."
-    bug: "452049009"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

@@ -2394,8 +2394,7 @@ public class UserManagerService extends IUserManager.Stub {
     private void showConfirmCredentialToDisableQuietMode(
             @UserIdInt int userId, @Nullable IntentSender target, @Nullable String callingPackage) {
         if (android.app.admin.flags.Flags.quietModeCredentialBugFix()) {
-            if (!android.multiuser.Flags.restrictQuietModeCredentialBugFixToManagedProfiles()
-                    || getUserInfo(userId).isManagedProfile()) {
+            if (getUserInfo(userId).isManagedProfile()) {
                 // TODO (b/308121702) It may be brittle to rely on user states to check managed
                 //  profile state
                 int state;
@@ -9083,16 +9082,6 @@ public class UserManagerService extends IUserManager.Stub {
         }
 
         @Override
-        public void logLaunchedHsuActivity(ComponentName activity) {
-            mNonComplianceLogger.logLaunchedHsuActivity(activity);
-        }
-
-        @Override
-        public void logBlockedHsuActivity(ComponentName activity) {
-            mNonComplianceLogger.logBlockedHsuActivity(activity);
-        }
-
-        @Override
         public void logActivityLaunchStatus(ComponentName activity, @UserIdInt int userId,
                 @AllowlistStatus int status) {
             // TODO(b/414326600): proper implementation once metrics is designed
@@ -9107,11 +9096,6 @@ public class UserManagerService extends IUserManager.Stub {
             } else {
                 mNonComplianceLogger.logBlockedHsuActivity(activity);
             }
-        }
-
-        @Override
-        public void logShownHsuNotification(StatusBarNotification sbn) {
-            mNonComplianceLogger.logShownHsuNotification(sbn);
         }
 
         @Override

@@ -22,6 +22,24 @@ import static android.app.WindowConfiguration.WINDOWING_MODE_MULTI_WINDOW;
 import static android.content.pm.ActivityInfo.OVERRIDE_SANDBOX_VIEW_BOUNDS_APIS;
 import static android.graphics.HardwareRenderer.SYNC_CONTEXT_IS_STOPPED;
 import static android.graphics.HardwareRenderer.SYNC_LOST_SURFACE_REWARD_IF_FOUND;
+import static android.internal.perfetto.protos.Inputmethodeditor.InputMethodClientsTraceProto.ClientSideProto.IME_FOCUS_CONTROLLER;
+import static android.internal.perfetto.protos.Inputmethodeditor.InputMethodClientsTraceProto.ClientSideProto.INSETS_CONTROLLER;
+import static android.internal.perfetto.protos.Viewrootimpl.ViewRootImplProto.ADDED;
+import static android.internal.perfetto.protos.Viewrootimpl.ViewRootImplProto.APP_VISIBLE;
+import static android.internal.perfetto.protos.Viewrootimpl.ViewRootImplProto.CUR_SCROLL_Y;
+import static android.internal.perfetto.protos.Viewrootimpl.ViewRootImplProto.DISPLAY_ID;
+import static android.internal.perfetto.protos.Viewrootimpl.ViewRootImplProto.HEIGHT;
+import static android.internal.perfetto.protos.Viewrootimpl.ViewRootImplProto.IS_ANIMATING;
+import static android.internal.perfetto.protos.Viewrootimpl.ViewRootImplProto.IS_DRAWING;
+import static android.internal.perfetto.protos.Viewrootimpl.ViewRootImplProto.LAST_WINDOW_INSETS;
+import static android.internal.perfetto.protos.Viewrootimpl.ViewRootImplProto.REMOVED;
+import static android.internal.perfetto.protos.Viewrootimpl.ViewRootImplProto.SCROLL_Y;
+import static android.internal.perfetto.protos.Viewrootimpl.ViewRootImplProto.SOFT_INPUT_MODE;
+import static android.internal.perfetto.protos.Viewrootimpl.ViewRootImplProto.VIEW;
+import static android.internal.perfetto.protos.Viewrootimpl.ViewRootImplProto.VISIBLE_RECT;
+import static android.internal.perfetto.protos.Viewrootimpl.ViewRootImplProto.WIDTH;
+import static android.internal.perfetto.protos.Viewrootimpl.ViewRootImplProto.WINDOW_ATTRIBUTES;
+import static android.internal.perfetto.protos.Viewrootimpl.ViewRootImplProto.WIN_FRAME;
 import static android.os.Trace.TRACE_TAG_VIEW;
 import static android.util.SequenceUtils.getInitSeq;
 import static android.util.SequenceUtils.isIncomingSeqStale;
@@ -59,22 +77,6 @@ import static android.view.View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR;
 import static android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
 import static android.view.View.SYSTEM_UI_FLAG_LOW_PROFILE;
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
-import static android.internal.perfetto.protos.Viewrootimpl.ViewRootImplProto.ADDED;
-import static android.internal.perfetto.protos.Viewrootimpl.ViewRootImplProto.APP_VISIBLE;
-import static android.internal.perfetto.protos.Viewrootimpl.ViewRootImplProto.CUR_SCROLL_Y;
-import static android.internal.perfetto.protos.Viewrootimpl.ViewRootImplProto.DISPLAY_ID;
-import static android.internal.perfetto.protos.Viewrootimpl.ViewRootImplProto.HEIGHT;
-import static android.internal.perfetto.protos.Viewrootimpl.ViewRootImplProto.IS_ANIMATING;
-import static android.internal.perfetto.protos.Viewrootimpl.ViewRootImplProto.IS_DRAWING;
-import static android.internal.perfetto.protos.Viewrootimpl.ViewRootImplProto.LAST_WINDOW_INSETS;
-import static android.internal.perfetto.protos.Viewrootimpl.ViewRootImplProto.REMOVED;
-import static android.internal.perfetto.protos.Viewrootimpl.ViewRootImplProto.SCROLL_Y;
-import static android.internal.perfetto.protos.Viewrootimpl.ViewRootImplProto.SOFT_INPUT_MODE;
-import static android.internal.perfetto.protos.Viewrootimpl.ViewRootImplProto.VIEW;
-import static android.internal.perfetto.protos.Viewrootimpl.ViewRootImplProto.VISIBLE_RECT;
-import static android.internal.perfetto.protos.Viewrootimpl.ViewRootImplProto.WIDTH;
-import static android.internal.perfetto.protos.Viewrootimpl.ViewRootImplProto.WINDOW_ATTRIBUTES;
-import static android.internal.perfetto.protos.Viewrootimpl.ViewRootImplProto.WIN_FRAME;
 import static android.view.ViewTreeObserver.InternalInsetsInfo.TOUCHABLE_INSETS_REGION;
 import static android.view.WindowInsetsController.APPEARANCE_LIGHT_NAVIGATION_BARS;
 import static android.view.WindowInsetsController.APPEARANCE_LIGHT_STATUS_BARS;
@@ -130,10 +132,8 @@ import static android.view.flags.Flags.toolkitFrameRateTouchBoost25q1;
 import static android.view.flags.Flags.toolkitInitialTouchBoost;
 import static android.view.flags.Flags.toolkitMetricsForFrameRateDecision;
 import static android.view.flags.Flags.toolkitSetFrameRateReadOnly;
-import static android.internal.perfetto.protos.Inputmethodeditor.InputMethodClientsTraceProto.ClientSideProto.IME_FOCUS_CONTROLLER;
-import static android.internal.perfetto.protos.Inputmethodeditor.InputMethodClientsTraceProto.ClientSideProto.INSETS_CONTROLLER;
-import static android.window.DesktopModeFlags.ENABLE_CAPTION_COMPAT_INSET_FORCE_CONSUMPTION;
 import static android.window.DesktopExperienceFlags.DEFER_RESUME_FOCUS_IN_NON_FOCUSED_WINDOW;
+import static android.window.DesktopModeFlags.ENABLE_CAPTION_COMPAT_INSET_FORCE_CONSUMPTION;
 
 import static com.android.graphics.surfaceflinger.flags.Flags.setClientDrawnCornerRadii;
 import static com.android.internal.annotations.VisibleForTesting.Visibility.PACKAGE;
@@ -296,6 +296,8 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.graphics.drawable.BackgroundBlurDrawable;
 import com.android.internal.inputmethod.ImeTracing;
 import com.android.internal.inputmethod.InputMethodDebug;
+import com.android.internal.jank.Cuj;
+import com.android.internal.jank.InteractionJankMonitor;
 import com.android.internal.os.IResultReceiver;
 import com.android.internal.os.SomeArgs;
 import com.android.internal.policy.DecorView;
@@ -323,8 +325,10 @@ import java.util.List;
 import java.util.Objects;
 import java.util.OptionalInt;
 import java.util.Queue;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
@@ -475,6 +479,10 @@ public final class ViewRootImpl implements ViewParent,
 
     private static final long NANOS_PER_MILLI = 1_000_000;
 
+    // Timeout used for the drag-resizing CUJ, this is longer than the default timeout to avoid
+    // timing out in the middle of the action.
+    private static final long LONG_CUJ_TIMEOUT_MS = TimeUnit.SECONDS.toMillis(10L);
+
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
     static final ThreadLocal<HandlerActionQueue> sRunQueues = new ThreadLocal<HandlerActionQueue>();
 
@@ -508,6 +516,8 @@ public final class ViewRootImpl implements ViewParent,
     }
 
     private static final ArrayList<ConfigChangedCallback> sConfigCallbacks = new ArrayList<>();
+    static final CopyOnWriteArrayList<View.CalledFromWrongThreadListener>
+            sCalledFromWrongThreadListeners = new CopyOnWriteArrayList<>();
 
     /**
      * Callback for notifying activities.
@@ -668,6 +678,7 @@ public final class ViewRootImpl implements ViewParent,
     private boolean mUseMTRenderer;
     private boolean mPendingDragResizing;
     private boolean mDragResizing;
+    private boolean mDragResizingCujBegun;
     private boolean mInvalidateRootRequested;
     private int mCanvasOffsetX;
     private int mCanvasOffsetY;
@@ -899,14 +910,6 @@ public final class ViewRootImpl implements ViewParent,
      */
     @Nullable
     private SurfaceControl mCachedSurfaceControl;
-
-    /**
-     * Delay for releasing the buffer of an invisible surface. It is intended to allow enough time
-     * for the last buffer to be consumed by the display pipeline, preventing the release request
-     * from being ignored while the buffer is still in use.
-     * TODO(b/308662081): Use a deterministic signal instead of a heuristic delay.
-     */
-    private static final int INVISIBLE_SURFACE_BUFFER_RELEASE_DELAY_MS = 100;
 
     private BLASTBufferQueue mBlastBufferQueue;
     private IBinder mBbqApplyToken = new Binder();
@@ -1338,6 +1341,7 @@ public final class ViewRootImpl implements ViewParent,
     private boolean mChildBoundingInsetsChanged = false;
 
     private final boolean mDisableDrawWakeLock;
+    private boolean mEnforceThreadChecksCompat;
 
     private String mTag = TAG;
     private String mDrawTrace = "draw-" + mTag; // cache to avoid allocating on each frame
@@ -1358,8 +1362,6 @@ public final class ViewRootImpl implements ViewParent,
     private static boolean sToolkitSetFrameRateReadOnlyFlagValue;
     private static boolean sToolkitMetricsForFrameRateDecisionFlagValue;
 
-    private static boolean sToolkitEnableInvalidateCheckThreadFlagValue =
-            Flags.enableInvalidateCheckThread();
     private static final boolean sEnableVrr = ViewProperties.vrr_enabled().orElse(true);
     private static final boolean sToolkitInitialTouchBoostFlagValue = toolkitInitialTouchBoost();
     private static boolean sToolkitFrameRateDebugFlagValue =  toolkitFrameRateDebug();
@@ -1464,6 +1466,8 @@ public final class ViewRootImpl implements ViewParent,
         // Disable DRAW_WAKE_LOCK starting U.
         mDisableDrawWakeLock =
                 CompatChanges.isChangeEnabled(DISABLE_DRAW_WAKE_LOCK) && disableDrawWakeLock();
+        mEnforceThreadChecksCompat =
+                CompatChanges.isChangeEnabled(ENFORCE_THREAD_CHECKS_ON_VIEW_ROOT_IMPL_APIS);
         mIsSubscribeGranularDisplayEventsEnabled =
                 com.android.server.display.feature.flags.Flags.subscribeGranularDisplayEvents();
 
@@ -1787,9 +1791,7 @@ public final class ViewRootImpl implements ViewParent,
                         mInsetsController.getRequestedVisibleTypes(), 1f /* compactScale */,
                         mTmpFrames);
                 setFrame(mTmpFrames.frame, true /* withinRelayout */);
-                if (com.android.window.flags.Flags.relativeInsets()) {
-                    mInsetsController.onBoundsChanged(bounds);
-                }
+                mInsetsController.onBoundsChanged(bounds);
                 registerBackCallbackOnWindow();
                 if (DEBUG_LAYOUT) Log.v(mTag, "Added window " + mWindow);
                 if (res < WindowManagerGlobal.ADD_OKAY) {
@@ -2772,9 +2774,6 @@ public final class ViewRootImpl implements ViewParent,
 
     @Override
     public void onDescendantInvalidated(@NonNull View child, @NonNull View descendant) {
-        if (sToolkitEnableInvalidateCheckThreadFlagValue) {
-            checkThread();
-        }
         if ((descendant.mPrivateFlags & PFLAG_DRAW_ANIMATION) != 0) {
             mIsAnimating = true;
         }
@@ -6995,12 +6994,10 @@ public final class ViewRootImpl implements ViewParent,
             updateConfiguration(newDisplayId);
         }
 
-        if (com.android.window.flags.Flags.relativeInsets()) {
-            // Notify the insets controller about bounds change for insets calculation.
-            final Rect bounds = mergedConfiguration.getMergedConfiguration().windowConfiguration
-                    .getBounds();
-            mInsetsController.onBoundsChanged(bounds);
-        }
+        // Notify the insets controller about bounds change for insets calculation.
+        final Rect bounds = mergedConfiguration.getMergedConfiguration().windowConfiguration
+                .getBounds();
+        mInsetsController.onBoundsChanged(bounds);
 
         mForceNextConfigUpdate = false;
     }
@@ -9933,16 +9930,6 @@ public final class ViewRootImpl implements ViewParent,
         } else if (mSurfaceControl.isValid()) {
             if (viewVisibility == View.INVISIBLE) {
                 mCachedSurfaceControl = new SurfaceControl(mSurfaceControl, "VRI-cache");
-                mHandler.postDelayed(() -> {
-                    if (mCachedSurfaceControl != null && mCachedSurfaceControl.isValid()) {
-                        Trace.traceBegin(Trace.TRACE_TAG_VIEW, "releaseUnusedBuffer");
-                        final Transaction t = new Transaction();
-                        t.setBuffer(mCachedSurfaceControl, null /* buffer */, null /* fence */)
-                                .applyAsyncUnsafe();
-                        t.close();
-                        Trace.traceEnd(Trace.TRACE_TAG_VIEW);
-                    }
-                }, INVISIBLE_SURFACE_BUFFER_RELEASE_DELAY_MS);
             }
             mSurfaceControl.release();
         }
@@ -11915,12 +11902,13 @@ public final class ViewRootImpl implements ViewParent,
      * Checks if the current thread is the same as the thread that created the view hierarchy.
      *
      * <p>If the check fails, logs or throws an exception depending on the {@link
-     * ViewRootImpl#ENFORCE_THREAD_CHECKS_ON_VIEW_ROOT_IMPL_APIS} ChangeId.
+     * ViewRootImpl#ENFORCE_THREAD_CHECKS_ON_VIEW_ROOT_IMPL_APIS} ChangeId, or as determined by
+     * {@link #setEnforceThreadChecks(boolean)} if called.
      *
      * <p>If logging, logs at most once per process lifetime.
      *
-     * @return true if the caller may proceed to perform the action on the current thread.
-     *         false if the caller must post the work using {@link #executeOnCorrectThread}.
+     * @return true if the caller may proceed to perform the action on the current thread. false if
+     *     the caller must post the work using {@link #executeOnCorrectThread}.
      */
     // TODO(b/465527827): eventually delete this method, replace with plain checkThread()
     private void checkThreadCompat() {
@@ -11929,21 +11917,25 @@ public final class ViewRootImpl implements ViewParent,
             return;
         }
 
-        if (CompatChanges.isChangeEnabled(ENFORCE_THREAD_CHECKS_ON_VIEW_ROOT_IMPL_APIS)) {
-            throwCalledFromWrongThreadException();
+        for (View.CalledFromWrongThreadListener listener : sCalledFromWrongThreadListeners) {
+            listener.onCalledFromWrongThread();
         }
 
-        // Log the issue, but not too many times per process.
-        // Note that this counter is not atomic, so it's possible we log more than the requisite
-        // times per process lifetime. That's fine because the precise number of logs isn't
-        // important so long as we eventually stop logging.
-        if (++sCalledFromWrongThreadCount <= 10) {
-            final CalledFromWrongThreadException e = newCalledFromWrongThreadException();
-            Log.wtf(
-                    TAG,
-                    "Attempt to call method from wrong thread. "
-                            + "This will throw an exception in a future version.",
-                    e);
+        if (mEnforceThreadChecksCompat) {
+            throwCalledFromWrongThreadException();
+        } else {
+            // Log the issue, but not too many times per process.
+            // Note that this counter is not atomic, so it's possible we log more than the requisite
+            // times per process lifetime. That's fine because the precise number of logs isn't
+            // important so long as we eventually stop logging.
+            if (++sCalledFromWrongThreadCount <= 10) {
+                final CalledFromWrongThreadException e = newCalledFromWrongThreadException();
+                Log.wtf(
+                        TAG,
+                        "Attempt to call method from wrong thread. "
+                                + "This will throw an exception in a future version.",
+                        e);
+            }
         }
     }
 
@@ -12593,6 +12585,12 @@ public final class ViewRootImpl implements ViewParent,
     private void startDragResizing() {
         if (!mDragResizing) {
             mDragResizing = true;
+            if (mWindowAttributes.type == TYPE_BASE_APPLICATION && mView != null) {
+                mDragResizingCujBegun = InteractionJankMonitor.getInstance().begin(
+                        InteractionJankMonitor.Configuration.Builder
+                                .withView(Cuj.CUJ_CLIENT_DRAG_RESIZING, mView)
+                                .setTimeout(LONG_CUJ_TIMEOUT_MS));
+            }
             if (mUseMTRenderer) {
                 for (int i = mWindowCallbacks.size() - 1; i >= 0; i--) {
                     mWindowCallbacks.get(i).onWindowDragResizeStart();
@@ -12608,6 +12606,10 @@ public final class ViewRootImpl implements ViewParent,
     private void endDragResizing() {
         if (mDragResizing) {
             mDragResizing = false;
+            if (mDragResizingCujBegun) {
+                mDragResizingCujBegun = false;
+                InteractionJankMonitor.getInstance().end(Cuj.CUJ_CLIENT_DRAG_RESIZING);
+            }
             if (mUseMTRenderer) {
                 for (int i = mWindowCallbacks.size() - 1; i >= 0; i--) {
                     mWindowCallbacks.get(i).onWindowDragResizeEnd();

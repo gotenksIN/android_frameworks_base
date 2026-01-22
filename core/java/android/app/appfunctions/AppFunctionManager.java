@@ -24,6 +24,7 @@ import static android.app.appfunctions.AppFunctionManagerHelper.buildCancellatio
 import static android.app.appfunctions.AppFunctionManagerHelper.executionExceptionToErrorCode;
 import static android.app.appfunctions.flags.Flags.FLAG_ENABLE_APP_FUNCTION_MANAGER;
 import static android.app.appfunctions.flags.Flags.FLAG_ENABLE_DYNAMIC_APP_FUNCTIONS;
+import static android.app.appfunctions.flags.Flags.FLAG_ENABLE_APP_FUNCTION_PERMISSION_V2;
 import static android.permission.flags.Flags.FLAG_APP_FUNCTION_ACCESS_UI_ENABLED;
 import static android.permission.flags.Flags.allowlistServiceEnabled;
 
@@ -85,15 +86,15 @@ import java.util.concurrent.Executor;
  * <h3>Declaring App Functions</h3>
  *
  * <p>App functions can be declared in two ways in your {@code AndroidManifest.xml}:
- * <ul>
- *     <li><b>Application-level (for dynamic registration):</b> Declare these functions using a
- *         {@code <property>} tag within the {@code <application>} element. These functions
- *         <strong>must</strong> be registered at runtime using
- *         {@link AppFunctionManager#registerAppFunction} API to become executable.
  *
- *     <li><b>Service-level (for service binding):</b> Declare these functions within a
- *         {@code <service>} definition that extends {@link AppFunctionService}. The system
- *         automatically handles these functions by binding to the service for execution.
+ * <ul>
+ *   <li><b>Application-level (for dynamic registration):</b> Declare these functions using a {@code
+ *       <property>} tag within the {@code <application>} element. These functions
+ *       <strong>must</strong> be registered at runtime using {@link
+ *       AppFunctionManager#registerAppFunction} API to become executable.
+ *   <li><b>Service-level (for service binding):</b> Declare these functions within a {@code
+ *       <service>} definition that extends {@link AppFunctionService}. The system automatically
+ *       handles these functions by binding to the service for execution.
  * </ul>
  *
  * <h3>Discovering App Functions</h3>
@@ -471,8 +472,9 @@ public final class AppFunctionManager {
      *
      * <p>The calling app can search for:
      * <li>Functions in its own package (no permission required).
-     * <li>When holding the `android.permission.EXECUTE_APP_FUNCTIONS` permission - functions in
-     *     other packages that it is allowed to query via {@link
+     * <li>When holding the {@link Manifest.permission#EXECUTE_APP_FUNCTIONS} or {@link
+     *     Manifest.permission#READ_APP_FUNCTION_METADATA} permission - functions in other packages
+     *     that it is allowed to query via {@link
      *     android.content.pm.PackageManager#canPackageQuery}.
      *
      * @param searchSpec The spec of app functions to search for.
@@ -480,7 +482,12 @@ public final class AppFunctionManager {
      * @param callback The callback to receive the search results.
      */
     @FlaggedApi(FLAG_ENABLE_DYNAMIC_APP_FUNCTIONS)
-    @RequiresPermission(value = Manifest.permission.EXECUTE_APP_FUNCTIONS, conditional = true)
+    @RequiresPermission(
+            anyOf = {
+                Manifest.permission.EXECUTE_APP_FUNCTIONS,
+                Manifest.permission.READ_APP_FUNCTION_METADATA
+            },
+            conditional = true)
     @UserHandleAware
     public void searchAppFunctions(
             @NonNull AppFunctionSearchSpec searchSpec,
@@ -528,7 +535,8 @@ public final class AppFunctionManager {
      *
      * <p>This method can only check app functions owned by the caller, or those where the caller
      * has visibility to the owner package and holds the {@link
-     * Manifest.permission#EXECUTE_APP_FUNCTIONS} permission.
+     * Manifest.permission#EXECUTE_APP_FUNCTIONS} or {@link
+     * Manifest.permission#READ_APP_FUNCTION_METADATA} permission.
      *
      * <p>If the operation fails, the callback's {@link OutcomeReceiver#onError} is called with
      * errors:
@@ -545,7 +553,13 @@ public final class AppFunctionManager {
      * @param executor the executor to run the request
      * @param callback the callback to receive the function enabled check result
      */
-    @RequiresPermission(value = Manifest.permission.EXECUTE_APP_FUNCTIONS, conditional = true)
+    @FlaggedApi(FLAG_ENABLE_APP_FUNCTION_PERMISSION_V2)
+    @RequiresPermission(
+            anyOf = {
+                Manifest.permission.EXECUTE_APP_FUNCTIONS,
+                Manifest.permission.READ_APP_FUNCTION_METADATA
+            },
+            conditional = true)
     public void isAppFunctionEnabled(
             @NonNull String functionIdentifier,
             @NonNull String targetPackage,
@@ -557,10 +571,10 @@ public final class AppFunctionManager {
     /**
      * Registers an {@link AppFunction}.
      *
-     * <p>Use this method to provide a runtime implementation for an app function that is
-     * declared at the application level in your manifest's XML resources. This approach is
-     * designed for lightweight, in-process handling of function calls and requires the app to be
-     * running to execute.
+     * <p>Use this method to provide a runtime implementation for an app function that is declared
+     * at the application level in your manifest's XML resources. This approach is designed for
+     * lightweight, in-process handling of function calls and requires the app to be running to
+     * execute.
      *
      * <h3>Function Execution</h3>
      *
@@ -569,8 +583,8 @@ public final class AppFunctionManager {
      * to the {@link AppFunction} implementation provided here. The implementation will be invoked
      * on the provided {@link Executor}.
      *
-     * <p>If an application-level function is called but no implementation is currently
-     * registered, the execution will fail with {@link AppFunctionException#ERROR_DISABLED}.
+     * <p>If an application-level function is called but no implementation is currently registered,
+     * the execution will fail with {@link AppFunctionException#ERROR_DISABLED}.
      *
      * <h3>Lifecycle management</h3>
      *
@@ -588,12 +602,12 @@ public final class AppFunctionManager {
      * <h3>Error Handling</h3>
      *
      * <p>Only one implementation can be registered for a given {@code functionId} at a time.
-     * Attempting to register a new implementation without unregistering the existing one
-     * will throw an {@link IllegalStateException}.
+     * Attempting to register a new implementation without unregistering the existing one will throw
+     * an {@link IllegalStateException}.
      *
      * <p>The {@code functionId} must correspond to an app function declared in your app's
-     * application-level XML resources. If the ID is not found, this method will throw an
-     * {@link IllegalArgumentException}.
+     * application-level XML resources. If the ID is not found, this method will throw an {@link
+     * IllegalArgumentException}.
      *
      * @param functionId The unique identifier for the function, which must match an entry in the
      *     app's XML resource declarations.
@@ -603,8 +617,8 @@ public final class AppFunctionManager {
      * @return A {@link AppFunctionRegistration} object that can be used to unregister the function.
      * @throws IllegalStateException if a function with the same {@code functionId} is already
      *     registered by this app.
-     * @throws IllegalArgumentException if the provided {@code functionId} is not declared
-     *     in the app's application-level XML resources.
+     * @throws IllegalArgumentException if the provided {@code functionId} is not declared in the
+     *     app's application-level XML resources.
      */
     @NonNull
     @FlaggedApi(FLAG_ENABLE_DYNAMIC_APP_FUNCTIONS)
@@ -693,6 +707,11 @@ public final class AppFunctionManager {
         Objects.requireNonNull(targetPackage);
         Objects.requireNonNull(executor);
         Objects.requireNonNull(callback);
+        if (android.app.appfunctions.flags.Flags.enableDynamicAppFunctions()) {
+            isAppFunctionEnabledInternal2(functionIdentifier, targetPackage, executor, callback);
+            return;
+        }
+
         AppSearchManager appSearchManager = mContext.getSystemService(AppSearchManager.class);
         if (appSearchManager == null) {
             callback.onError(new IllegalStateException("Failed to get AppSearchManager."));
@@ -723,6 +742,46 @@ public final class AppFunctionManager {
                 appSearchManager,
                 executor,
                 callbackWithExceptionInterceptor);
+    }
+
+    private void isAppFunctionEnabledInternal2(
+            @NonNull String functionIdentifier,
+            @NonNull String targetPackage,
+            @NonNull Executor executor,
+            @NonNull OutcomeReceiver<Boolean, Exception> callback) {
+        Objects.requireNonNull(functionIdentifier);
+        Objects.requireNonNull(targetPackage);
+        Objects.requireNonNull(executor);
+        Objects.requireNonNull(callback);
+
+        try {
+            mService.isAppFunctionEnabled(
+                    mContext.getPackageName(),
+                    targetPackage,
+                    functionIdentifier,
+                    mContext.getUser(),
+                    new IIsAppFunctionEnabledCallback.Stub() {
+                        @Override
+                        public void onSuccess(boolean isEnabled) {
+                            callback.onResult(isEnabled);
+                        }
+
+                        @Override
+                        public void onError(ParcelableException exception) {
+                            Throwable cause =
+                                    (exception.getCause() == null)
+                                            ? exception
+                                            : exception.getCause();
+                            if (cause instanceof AppFunctionNotFoundException) {
+                                callback.onError(new IllegalArgumentException(cause));
+                            } else {
+                                callback.onError(new RuntimeException(cause));
+                            }
+                        }
+                    });
+        } catch (RemoteException re) {
+            re.rethrowFromSystemServer();
+        }
     }
 
     /**
@@ -1175,7 +1234,7 @@ public final class AppFunctionManager {
         }
     }
 
-    private static class CallbackWrapper extends IAppFunctionEnabledCallback.Stub {
+    private static class CallbackWrapper extends ISetAppFunctionEnabledCallback.Stub {
 
         private final OutcomeReceiver<Void, Exception> mCallback;
         private final Executor mExecutor;

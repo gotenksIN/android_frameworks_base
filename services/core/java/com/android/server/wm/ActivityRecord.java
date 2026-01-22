@@ -3324,7 +3324,7 @@ public final class ActivityRecord extends WindowToken {
         if (windowLayout == null) {
             return true;
         }
-        if (!Flags.runtimeDensityResolutionForWindowLayout()) {
+        if (!Flags.runtimeDensityResolutionForWindowLayoutBugfix()) {
             return tda.supportsActivityMinWidthHeightMultiWindow(windowLayout.minWidth,
                     windowLayout.minHeight, info);
         }
@@ -9764,7 +9764,7 @@ public final class ActivityRecord extends WindowToken {
         if (windowLayout == null) {
             return null;
         }
-        if (!Flags.runtimeDensityResolutionForWindowLayout()) {
+        if (!Flags.runtimeDensityResolutionForWindowLayoutBugfix()) {
             return new Point(windowLayout.minWidth, windowLayout.minHeight);
         }
         if (displayContent == null) {

@@ -107,6 +107,7 @@ import android.window.IRemoteTransition;
 import android.window.IRemoteTransitionFinishedCallback;
 import android.window.RemoteTransitionStub;
 import android.window.TransitionInfo;
+import android.window.WindowContainerTransaction;
 
 import androidx.annotation.IntDef;
 import androidx.annotation.NonNull;
@@ -4420,26 +4421,39 @@ public class KeyguardViewMediator implements CoreStartable,
             Trace.beginSection("ExitTransition.startAnimation#startKeyguardExitAnimation");
             mHelper.setUpAnimation(token, info, transaction, finishedCallback);
             transaction.apply();
+
             SurfaceTransition.Params params =
                     SurfaceTransition.Params.create(
                             0 /* startTime */, 0 /* fadeoutDuration */, token, info, transaction,
-                            finishedCallback);
-            startKeyguardExitAnimation(params);
+                            new IRemoteTransitionFinishedCallback.Stub() {
+                                @Override
+                                public void onTransitionFinished(
+                                        WindowContainerTransaction windowContainerTransaction,
+                                        Transaction transaction) {
+                                    mHelper.cleanUpAnimation(token, transaction);
+                                }
+                            });
+
+            boolean startAnimation = true;
             if (KeyguardWmStateRefactor.isEnabled()) {
-                mWmLockscreenVisibilityManager.get()
+                startAnimation = mWmLockscreenVisibilityManager.get()
                         .onKeyguardGoingAwayRemoteAnimationStart(params);
             }
+            if (startAnimation) {
+                startKeyguardExitAnimation(params);
+            }
+
             Trace.endSection();
         }
 
         @Override
         public void mergeAnimation(IBinder token, TransitionInfo info, Transaction transaction,
                 IBinder mergeTarget, IRemoteTransitionFinishedCallback finishedCallback) {
-            mHelper.cleanUpAnimation(token, transaction);
             cancelKeyguardExitAnimation();
             if (KeyguardWmStateRefactor.isEnabled()) {
                 mWmLockscreenVisibilityManager.get().onKeyguardGoingAwayRemoteAnimationCancelled();
             }
+            mHelper.mergeAnimation(info, transaction, mergeTarget);
         }
     }
 

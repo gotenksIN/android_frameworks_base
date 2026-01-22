@@ -58,6 +58,7 @@ import android.os.UserHandle;
 import android.provider.Settings;
 import android.service.autofill.AutofillService;
 import android.service.autofill.AutofillServiceInfo;
+import android.service.autofill.Dataset;
 import android.service.autofill.FieldClassification;
 import android.service.autofill.FieldClassification.Match;
 import android.service.autofill.FillEventHistory;
@@ -279,6 +280,15 @@ final class AutofillManagerServiceImpl
                             resultCallback);
         } catch (RemoteException e) {
             Slog.w(TAG, "autofillRemoteApp fail: " + e);
+        }
+    }
+
+    @GuardedBy("mLock")
+    void notifySystemInlineSuggestions(int sessionId, List<Dataset> inlineSuggestionsData) {
+        final RemoteAugmentedAutofillService remoteService =
+                getRemoteAugmentedAutofillServiceLocked();
+        if (remoteService != null) {
+            remoteService.notifySystemInlineSuggestions(sessionId, inlineSuggestionsData);
         }
     }
 
@@ -1283,7 +1293,18 @@ final class AutofillManagerServiceImpl
                     new Event(Event.TYPE_DATASETS_SHOWN, null, clientState, null, null, null,
                             null, null, null, null, null, NO_SAVE_UI_REASON_NONE,
                             UI_TYPE_INLINE, /* focusedId= */ null));
+        }
+    }
 
+    void logAugmentedAutofillResponseDiscarded(int sessionId, @Nullable Bundle clientState) {
+        synchronized (mLock) {
+            if (mAugmentedAutofillEventHistory == null
+                    || mAugmentedAutofillEventHistory.getSessionId() != sessionId) {
+                return;
+            }
+            mAugmentedAutofillEventHistory.addEvent(
+                    new Event(Event.TYPE_RESPONSE_DISCARDED, null, clientState, null, null,
+                            null, null, null, null, null, null, /* focusedId= */ null));
         }
     }
 
@@ -1721,6 +1742,12 @@ final class AutofillManagerServiceImpl
                                             sessionId, suggestionId, clientState);
                         }
 
+                        @Override
+                        public void logAugmentedAutofillResponseDiscarded(int sessionId,
+                                Bundle clientState) {
+                            AutofillManagerServiceImpl.this.logAugmentedAutofillResponseDiscarded(
+                                    sessionId, clientState);
+                        }
                         @Override
                         public void onServiceDied(@NonNull RemoteAugmentedAutofillService service) {
                             Slog.w(TAG, "remote augmented autofill service died");

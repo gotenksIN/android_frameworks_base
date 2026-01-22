@@ -3339,9 +3339,6 @@ public class WindowManagerService extends IWindowManager.Stub
     @Override
     public boolean reparentWindowContextToDisplayArea(
             @NonNull IApplicationThread appThread, @NonNull IBinder clientToken, int displayId) {
-        if (!Flags.reparentWindowTokenApi()) {
-            return false;
-        }
         Objects.requireNonNull(appThread);
         Objects.requireNonNull(clientToken);
         final boolean callerCanManageAppTokens = checkCallingPermission(MANAGE_APP_TOKENS,
@@ -3388,9 +3385,6 @@ public class WindowManagerService extends IWindowManager.Stub
             @NonNull DisplayContent display,
             int callingPid,
             int callingUid) {
-        if (!Flags.reparentWindowTokenApi()) {
-            return false;
-        }
         final WindowContainer<?> container = mWindowContextListenerController.getContainer(
                 clientToken);
 
@@ -6679,6 +6673,11 @@ public class WindowManagerService extends IWindowManager.Stub
     public void setForcedDisplayDensityForUser(int displayId, int density, int userId) {
         setForcedDisplayDensityForUser_enforcePermission();
 
+        String[] packages = mContext.getPackageManager().getPackagesForUid(Binder.getCallingUid());
+        String packageName = packages == null ? null : packages[0];
+        Slog.i(TAG,
+                "setForcedDisplayDensityForUser: displayId=" + displayId + ", density=" + density
+                        + ", userId=" + userId + ", packageName=" + packageName);
         final int targetUserId = ActivityManager.handleIncomingUser(Binder.getCallingPid(),
                 Binder.getCallingUid(), userId, false, true, "setForcedDisplayDensityForUser",
                 null);
@@ -6718,6 +6717,11 @@ public class WindowManagerService extends IWindowManager.Stub
     public void clearForcedDisplayDensityForUser(int displayId, int userId) {
         clearForcedDisplayDensityForUser_enforcePermission();
 
+        String[] packages = mContext.getPackageManager().getPackagesForUid(Binder.getCallingUid());
+        String packageName = packages == null ? null : packages[0];
+        Slog.i(TAG,
+                "clearForcedDisplayDensityForUser: displayId=" + displayId + ", userId=" + userId
+                        + ", packageName=" + packageName);
         final int callingUserId = ActivityManager.handleIncomingUser(Binder.getCallingPid(),
                 Binder.getCallingUid(), userId, false, true, "clearForcedDisplayDensityForUser",
                 null);
@@ -6754,6 +6758,10 @@ public class WindowManagerService extends IWindowManager.Stub
     @Override
     public void setForcedDisplayDensityRatio(int displayId, float ratio, int userId) {
         setForcedDisplayDensityRatio_enforcePermission();
+        String[] packages = mContext.getPackageManager().getPackagesForUid(Binder.getCallingUid());
+        String packageName = packages == null ? null : packages[0];
+        Slog.i(TAG, "setForcedDisplayDensityRatio: displayId=" + displayId + ", ratio=" + ratio
+                + ", userId=" + userId + ", packageName=" + packageName);
         final long ident = Binder.clearCallingIdentity();
         try {
             synchronized (mGlobalLock) {

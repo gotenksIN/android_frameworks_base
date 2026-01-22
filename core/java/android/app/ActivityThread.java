@@ -717,8 +717,7 @@ public final class ActivityThread extends ClientTransactionHandler
         boolean startsNotResumed;
         public final boolean isForward;
         int pendingConfigChanges;
-        // Whether we are in the process of performing on user leaving.
-        boolean mIsUserLeaving;
+        int mDisplayId;
 
         Window mPendingRemoveWindow;
         WindowManager mPendingRemoveWindowManager;
@@ -757,7 +756,7 @@ public final class ActivityThread extends ClientTransactionHandler
                 boolean isForward, ProfilerInfo profilerInfo, ClientTransactionHandler client,
                 IBinder assistToken, IBinder shareableActivityToken, boolean launchedFromBubble,
                 IBinder taskFragmentToken, IBinder initialCallerInfoAccessToken,
-                ActivityWindowInfo activityWindowInfo) {
+                ActivityWindowInfo activityWindowInfo, int displayId) {
             this.token = token;
             this.assistToken = assistToken;
             this.shareableActivityToken = shareableActivityToken;
@@ -779,6 +778,7 @@ public final class ActivityThread extends ClientTransactionHandler
             mLaunchedFromBubble = launchedFromBubble;
             mTaskFragmentToken = taskFragmentToken;
             mActivityWindowInfo.set(activityWindowInfo);
+            mDisplayId = displayId;
             init();
         }
 
@@ -4629,7 +4629,8 @@ public final class ActivityThread extends ClientTransactionHandler
     }
 
     private ContextImpl createBaseContextForActivity(ActivityClientRecord r) {
-        final int displayId = ActivityClient.getInstance().getDisplayId(r.token);
+        final int displayId = com.android.window.flags.Flags.useKnownDisplayIdForBaseContext()
+                ? r.mDisplayId : ActivityClient.getInstance().getDisplayId(r.token);
         ContextImpl appContext = ContextImpl.createActivityContext(
                 this, r.packageInfo, r.activityInfo, r.token, displayId, r.overrideConfig);
 
@@ -4675,7 +4676,8 @@ public final class ActivityThread extends ClientTransactionHandler
             return null;
         }
 
-        final int displayId = ActivityClient.getInstance().getDisplayId(r.token);
+        final int displayId = com.android.window.flags.Flags.useKnownDisplayIdForBaseContext()
+                ? r.mDisplayId : ActivityClient.getInstance().getDisplayId(r.token);
         final LoadedApk sdkApk = getPackageInfo(
                 contextInfo.getSdkApplicationInfo(),
                 r.packageInfo.getCompatibilityInfo(),
@@ -6691,7 +6693,7 @@ public final class ActivityThread extends ClientTransactionHandler
             @Nullable List<ResultInfo> pendingResults,
             @Nullable List<ReferrerIntent> pendingNewIntents, int configChanges,
             @NonNull MergedConfiguration config, boolean preserveWindow,
-            @NonNull ActivityWindowInfo activityWindowInfo) {
+            @NonNull ActivityWindowInfo activityWindowInfo, int displayId) {
         ActivityClientRecord target = null;
         boolean scheduleRelaunch = false;
 
@@ -6733,6 +6735,7 @@ public final class ActivityThread extends ClientTransactionHandler
             target.overrideConfig = config.getOverrideConfiguration();
             target.pendingConfigChanges |= configChanges;
             target.mActivityWindowInfo.set(activityWindowInfo);
+            target.mDisplayId = displayId;
         }
 
         return scheduleRelaunch ? target : null;
@@ -6821,7 +6824,7 @@ public final class ActivityThread extends ClientTransactionHandler
 
         handleRelaunchActivityInner(r, tmp.pendingResults, tmp.pendingIntents,
                 pendingActions, tmp.startsNotResumed, tmp.overrideConfig, tmp.mActivityWindowInfo,
-                "handleRelaunchActivity");
+                tmp.mDisplayId, "handleRelaunchActivity");
     }
 
     void scheduleRelaunchActivity(IBinder token) {
@@ -6893,7 +6896,7 @@ public final class ActivityThread extends ClientTransactionHandler
             @Nullable List<ReferrerIntent> pendingIntents,
             @NonNull PendingTransactionActions pendingActions, boolean startsNotResumed,
             @NonNull Configuration overrideConfig, @NonNull ActivityWindowInfo activityWindowInfo,
-            @NonNull String reason) {
+            int displayId, @NonNull String reason) {
         // Preserve last used intent, it may be set from Activity#setIntent().
         final Intent customIntent = r.activity.mIntent;
         // Need to ensure state is saved.
@@ -6927,6 +6930,7 @@ public final class ActivityThread extends ClientTransactionHandler
         r.startsNotResumed = startsNotResumed;
         r.overrideConfig = overrideConfig;
         r.mActivityWindowInfo.set(activityWindowInfo);
+        r.mDisplayId = displayId;
 
         handleLaunchActivity(r, pendingActions, mLastReportedDeviceId, customIntent);
     }
@@ -7548,6 +7552,7 @@ public final class ActivityThread extends ClientTransactionHandler
         // Perform updates.
         r.overrideConfig = overrideConfig;
         r.mActivityWindowInfo.set(activityWindowInfo);
+        r.mDisplayId = displayId;
 
         final ViewRootImpl viewRoot = r.activity.mDecor != null
             ? r.activity.mDecor.getViewRootImpl() : null;

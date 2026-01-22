@@ -28,6 +28,7 @@ import android.content.pm.PackageManager;
 import android.content.pm.PackageManagerInternal;
 import android.os.Binder;
 import android.util.ArraySet;
+import android.app.appfunctions.flags.Flags;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -46,6 +47,29 @@ public final class VisibilityHelperImpl implements VisibilityHelper {
         mPmInternal = Objects.requireNonNull(packageManagerInternal);
     }
 
+    @Override
+    public boolean isAppFunctionVisible(
+            @NonNull AppFunctionName appFunctionName,
+            @NonNull String callingPackage,
+            int callingUid,
+            int callingPid) {
+        if (callingPackage.equals(appFunctionName.getPackageName())) {
+            return true;
+        }
+
+        final long token = Binder.clearCallingIdentity();
+        try {
+            if (mContext.checkPermission(
+                            Manifest.permission.EXECUTE_APP_FUNCTIONS, callingPid, callingUid)
+                    != PackageManager.PERMISSION_GRANTED) {
+                return false;
+            }
+            return mPmInternal.canQueryPackage(callingUid, appFunctionName.getPackageName());
+        } finally {
+            Binder.restoreCallingIdentity(token);
+        }
+    }
+
     @Nullable
     @Override
     public AppFunctionSearchSpec applyVisiblePackageFilter(
@@ -58,11 +82,9 @@ public final class VisibilityHelperImpl implements VisibilityHelper {
 
         final long token = Binder.clearCallingIdentity();
         try {
-            // First base case, if the caller doesn't have EXECUTE_APP_FUNCTIONS permission, it
-            // can only sees the function from its own package
-            if (mContext.checkPermission(
-                            Manifest.permission.EXECUTE_APP_FUNCTIONS, callingPid, callingUid)
-                    != PackageManager.PERMISSION_GRANTED) {
+            // First base case, if the caller doesn't have permissions to view
+            // AppFunctionRuntimeMetadata, it can only see the function from its own package
+            if (!hasPermissionsToQueryRuntimeMetadata(callingUid, callingPid)) {
                 Set<String> visiblePackages = new ArraySet<>();
                 visiblePackages.add(aidlSearchSpec.getCallingPackageName());
                 List<String> filteredPackages =
@@ -102,6 +124,21 @@ public final class VisibilityHelperImpl implements VisibilityHelper {
                 .setPackageNames(filteredPackages)
                 .setFunctionNames(filteredFunctionNames)
                 .build();
+    }
+
+    private boolean hasPermissionsToQueryRuntimeMetadata(int callingUid, int callingPid) {
+        if (Flags.enableAppFunctionPermissionV2()
+                && mContext.checkPermission(
+                                Manifest.permission.READ_APP_FUNCTION_METADATA,
+                                callingPid,
+                                callingUid)
+                        == PackageManager.PERMISSION_GRANTED) {
+            return true;
+        }
+
+        return mContext.checkPermission(
+                        Manifest.permission.EXECUTE_APP_FUNCTIONS, callingPid, callingUid)
+                == PackageManager.PERMISSION_GRANTED;
     }
 
     @NonNull

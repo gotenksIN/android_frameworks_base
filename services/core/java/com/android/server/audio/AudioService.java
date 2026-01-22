@@ -181,6 +181,7 @@ import android.media.IAudioDeviceVolumeDispatcher;
 import android.media.IAudioFocusDispatcher;
 import android.media.IAudioManagerNative;
 import android.media.IAudioModeDispatcher;
+import android.media.IAudioPolicyService.HardeningOverride;
 import android.media.IAudioRoutesObserver;
 import android.media.IAudioServerStateDispatcher;
 import android.media.IAudioService;
@@ -1349,7 +1350,7 @@ public class AudioService extends IAudioService.Stub
     // Tracks the API/shell override of hardening enforcement used for debugging
     // When this is set to true, enforcement is on regardless of flag state and any specific
     // exemptions in place for compat purposes.
-    private final AtomicBoolean mShouldEnableAllHardening = new AtomicBoolean(false);
+    private final AtomicInteger mHardeningOverride = new AtomicInteger(HardeningOverride.DEFAULT);
 
     // Defines the format for the connection "address" for ALSA devices
     public static String makeAlsaAddressString(int card, int device) {
@@ -1493,7 +1494,7 @@ public class AudioService extends IAudioService.Stub
 
         mAudioPolicy = audioPolicy;
         mAudioPolicy.registerOnStartTask(() -> {
-            mAudioPolicy.setEnableHardening(mShouldEnableAllHardening.get());
+            mAudioPolicy.setHardeningOverride((byte) mHardeningOverride.get());
         });
         if (!mAudioPolicy.isServiceAvailable()) {
             Log.e(TAG, "AudioPolicy not available on AudioService start!");
@@ -1818,7 +1819,7 @@ public class AudioService extends IAudioService.Stub
         mMusicFxHelper = new MusicFxHelper(mContext, mAudioHandler);
 
         mHardeningEnforcer = new HardeningEnforcer(mContext, isPlatformAutomotive(),
-                mShouldEnableAllHardening,
+                mHardeningOverride,
                 mAppOps,
                 context.getPackageManager(),
                 mHardeningLogger);
@@ -10195,7 +10196,9 @@ public class AudioService extends IAudioService.Stub
                                  + ", User=" + getCurrentUserId());
                     }
                     mIndexMap.put(device, getValidIndex(index));
-                    mIsMuted = isMuted;
+                    if (isPlatformPc()) {
+                        mIsMuted = isMuted;
+                    }
                 }
             }
         }
@@ -10623,7 +10626,9 @@ public class AudioService extends IAudioService.Stub
 
                     mIndexMap.put(device, getValidIndex(10 * index,
                             true /*hasModifyAudioSettings*/));
-                    mIsMuted = isMuted;
+                    if (isPlatformPc()) {
+                        mIsMuted = isMuted;
+                    }
                 }
             }
         }
@@ -16167,10 +16172,11 @@ public class AudioService extends IAudioService.Stub
      * @see AudioManager#setEnableHardening(boolean)
      */
     @android.annotation.EnforcePermission(MODIFY_AUDIO_SETTINGS_PRIVILEGED)
-    public void setEnableHardening(boolean shouldEnable) {
+    public void setEnableHardening(boolean shouldHarden) {
         super.setEnableHardening_enforcePermission();
-        mShouldEnableAllHardening.set(shouldEnable);
-        mAudioPolicy.setEnableHardening(shouldEnable);
+        int hardeningOverride = shouldHarden ? HardeningOverride.ENABLE : HardeningOverride.DISABLE;
+        mHardeningOverride.set(hardeningOverride);
+        mAudioPolicy.setHardeningOverride((byte) hardeningOverride);
     }
 
     //======================

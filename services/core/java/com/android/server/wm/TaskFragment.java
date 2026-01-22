@@ -3027,7 +3027,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
     }
 
     int getMinWidth() {
-        if (!Flags.runtimeDensityResolutionForWindowLayout()) {
+        if (!Flags.runtimeDensityResolutionForWindowLayoutBugfix()) {
             return mMinWidth;
         }
         return getDisplayContent() == null
@@ -3039,7 +3039,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
     }
 
     int getMinHeight() {
-        if (!Flags.runtimeDensityResolutionForWindowLayout()) {
+        if (!Flags.runtimeDensityResolutionForWindowLayoutBugfix()) {
             return mMinHeight;
         }
         return getDisplayContent() == null

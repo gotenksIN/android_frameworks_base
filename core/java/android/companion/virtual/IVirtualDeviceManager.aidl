@@ -16,6 +16,7 @@
 
 package android.companion.virtual;
 
+import android.app.IApplicationThread;
 import android.companion.virtual.IVirtualDevice;
 import android.companion.virtual.IVirtualDeviceActivityListener;
 import android.companion.virtual.IVirtualDeviceListener;
@@ -59,8 +60,8 @@ interface IVirtualDeviceManager {
      */
     @EnforcePermission(allOf={"ACCESS_COMPUTER_CONTROL", "POST_NOTIFICATIONS"})
     void requestComputerControlSession(
-            in AttributionSource attributionSource, in ComputerControlSessionParams params,
-            in IComputerControlSessionCallback callback);
+            in IApplicationThread appThread, in AttributionSource attributionSource,
+            in ComputerControlSessionParams params, in IComputerControlSessionCallback callback);
 
     /**
      * Returns the details of all available virtual devices.
@@ -93,9 +94,9 @@ interface IVirtualDeviceManager {
     void unregisterAutomatedPackageListener(in IAutomatedPackageListener listener);
 
     /**
-     * Returns the intent to warn the user about launching an application that is being automated.
+     * Validates the intent to warn the user about launching an application that is being automated.
      */
-    Intent createAutomatedAppLaunchWarningIntent(in String packageName, int userId);
+    boolean validateAutomatedAppLaunchWarningIntent(in Intent intent);
 
     /**
      * Returns the ID of the device which owns the display with the given ID.

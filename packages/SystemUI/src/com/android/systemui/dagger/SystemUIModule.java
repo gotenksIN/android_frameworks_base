@@ -35,7 +35,7 @@ import com.android.systemui.CameraProtectionModule;
 import com.android.systemui.CoreStartable;
 import com.android.systemui.KairosCoreStartableModule;
 import com.android.systemui.SystemUISecondaryUserService;
-import com.android.systemui.activity.ActivityManagerModule;
+import com.android.systemui.activity.ActivityModule;
 import com.android.systemui.ambient.dagger.AmbientModule;
 import com.android.systemui.appops.dagger.AppOpsModule;
 import com.android.systemui.assist.AssistModule;
@@ -95,11 +95,13 @@ import com.android.systemui.mediaprojection.appselector.MediaProjectionActivitie
 import com.android.systemui.mediaprojection.taskswitcher.MediaProjectionTaskSwitcherModule;
 import com.android.systemui.mediarouter.MediaRouterModule;
 import com.android.systemui.model.SysUiState;
+import com.android.systemui.motioncues.MotionCuesModule;
 import com.android.systemui.motiontool.MotionToolModule;
 import com.android.systemui.navigationbar.NavigationBarComponent;
 import com.android.systemui.navigationbar.gestural.dagger.GestureModule;
 import com.android.systemui.notetask.NoteTaskModule;
 import com.android.systemui.people.PeopleModule;
+import com.android.systemui.personalcontext.SysuiVisualizerService;
 import com.android.systemui.personalcontext.dagger.PersonalContextModule;
 import com.android.systemui.plugins.BcSmartspaceConfigPlugin;
 import com.android.systemui.plugins.BcSmartspaceDataPlugin;
@@ -147,6 +149,7 @@ import com.android.systemui.statusbar.notification.collection.render.Notificatio
 import com.android.systemui.statusbar.notification.headsup.HeadsUpManager;
 import com.android.systemui.statusbar.notification.interruption.VisualInterruptionDecisionProvider;
 import com.android.systemui.statusbar.notification.people.PeopleHubModule;
+import com.android.systemui.statusbar.notification.row.NotificationRowModule;
 import com.android.systemui.statusbar.notification.row.dagger.BundleRowComponent;
 import com.android.systemui.statusbar.notification.row.dagger.ExpandableNotificationRowComponent;
 import com.android.systemui.statusbar.notification.row.dagger.NotificationRowComponent;
@@ -218,7 +221,7 @@ import javax.inject.Named;
  * may not appreciate that.
  */
 @Module(includes = {
-        ActivityManagerModule.class,
+        ActivityModule.class,
         AmbientModule.class,
         AppOpsModule.class,
         AirplaneModeDataLayerModule.class,
@@ -269,8 +272,10 @@ import javax.inject.Named;
         MediaProjectionModule.class,
         MediaProjectionTaskSwitcherModule.class,
         MediaRouterModule.class,
+        MotionCuesModule.class,
         MotionToolModule.class,
         MSDLModule.class,
+        NotificationRowModule.class,
         PeopleHubModule.class,
         PeopleModule.class,
         PersonalContextModule.class,
@@ -488,6 +493,11 @@ public abstract class SystemUIModule {
     @IntoMap
     @ClassKey(SystemUISecondaryUserService.class)
     abstract Service bindsSystemUISecondaryUserService(SystemUISecondaryUserService service);
+
+    @Binds
+    @IntoMap
+    @ClassKey(SysuiVisualizerService.class)
+    abstract Service bindSysuiVisualizerService(SysuiVisualizerService service);
 
     @Provides
     @SysUISingleton

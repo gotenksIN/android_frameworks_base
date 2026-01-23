@@ -31,8 +31,6 @@ import android.util.Slog;
 import android.util.SparseArray;
 import android.util.Xml;
 
-import com.android.server.supervision.SupervisionLog;
-
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.IndentingPrintWriter;
 import com.android.internal.util.XmlUtils;
@@ -55,6 +53,7 @@ import java.util.function.BiConsumer;
  * data and recovery info.
  */
 public class SupervisionSettings {
+    /** Current version of the supervision settings XML file. */
     public static final int VERSION = 1;
 
     private static SupervisionSettings sInstance;
@@ -388,6 +387,12 @@ public class SupervisionSettings {
         }
     }
 
+    /**
+     * Prepares for data migration by recording the current on-disk version.
+     *
+     * <p>The actual migration is triggered by {@link SupervisionService} after all required
+     * services are ready.
+     */
     private void maybePerformDataMigration() {
         if (mVersion < VERSION) {
             mPreviousVersion = mVersion;
@@ -448,10 +453,8 @@ public class SupervisionSettings {
             case Policy.PACKAGE_POLICY_IDENTIFIER -> {
                 String packageName = parser.getAttributeValue(null, KEY_PACKAGE_NAME);
                 int type = parser.getAttributeInt(null, KEY_PACKAGE_TYPE);
-                return new PackageUsagePolicy.Builder()
+                return new PackageUsagePolicy.Builder(packageName, type)
                         .setVersion(version)
-                        .setPackageName(packageName)
-                        .setType(type)
                         .build();
             }
             default -> {

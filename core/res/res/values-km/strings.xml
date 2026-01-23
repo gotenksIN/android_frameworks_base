@@ -158,6 +158,10 @@
     <string name="wfc_mode_wifi_preferred_summary" msgid="1035175836270943089">"ហៅទូរសព្ទ​តាមរយៈ Wi-Fi"</string>
     <string name="wfc_mode_cellular_preferred_summary" msgid="4958965609212575619">"ហៅទូរសព្ទ​តាមរយៈបណ្តាញ​ទូរសព្ទ​ចល័ត"</string>
     <string name="wfc_mode_wifi_only_summary" msgid="104951993894678665">"Wi-Fi តែប៉ុណ្ណោះ"</string>
+    <string name="adaptive_low_frequency_less_than_one_minute" msgid="8869498183646028708">"~ %s"</string>
+    <string name="adaptive_low_frequency_neg_less_than_one_minute" msgid="2590062535985417056">"~ −%s"</string>
+    <string name="elapsed_time_low_frequency_short_format_h_mm" msgid="6728141238066668781">"%1$d:%2$02d:--"</string>
+    <string name="elapsed_time_low_frequency_short_format_mm" msgid="2405181895215514414">"%1$02d:--"</string>
     <!-- no translation found for crossSimFormat_spn (9125246077491634262) -->
     <skip />
     <string name="crossSimFormat_spn_cross_sim_calling" msgid="5620807020002879057">"ការហៅទូរសព្ទ​បម្រុង <xliff:g id="SPN">%s</xliff:g>"</string>
@@ -645,10 +649,8 @@
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"អនុញ្ញាតឱ្យកម្មវិធីចូលប្រើឧបករណ៍បណ្ដាញមូលដ្ឋាន"</string>
     <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"ប្រើផ្ទៃបញ្ជូនត្រឡប់"</string>
     <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"អនុញ្ញាតឱ្យកម្មវិធីធ្វើអន្តរកម្មជាមួយកម្មវិធីផ្សេងទៀតតាមរយៈផ្ទៃបញ្ជូនត្រឡប់"</string>
-    <!-- no translation found for permlab_force_use_loopback_interface (1319727311706416481) -->
-    <skip />
-    <!-- no translation found for permdesc_force_use_loopback_interface (5829032514048681980) -->
-    <skip />
+    <string name="permlab_force_use_loopback_interface" msgid="1319727311706416481">"បង្ខំឱ្យប្រើផ្ទៃបញ្ជូនត្រឡប់"</string>
+    <string name="permdesc_force_use_loopback_interface" msgid="5829032514048681980">"អនុញ្ញាតឱ្យកម្មវិធីធ្វើអន្តរកម្មជាមួយកម្មវិធីផ្សេងតាមផ្ទៃបញ្ជូនត្រឡប់ដោយមិនតម្រូវឱ្យកម្មវិធីផ្សេងមានការអនុញ្ញាតបញ្ជូនត្រឡប់"</string>
     <string name="permlab_ranging" msgid="2854543350668593390">"កំណត់ទីតាំងធៀបរវាងឧបករណ៍នៅជិត"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"អនុញ្ញាតឱ្យកម្មវិធីកំណត់ទីតាំងធៀបរវាងឧបករណ៍នៅជិត"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"ព័ត៌មានអំពី​សេវាបង់ប្រាក់តាម NFC ជាអាទិភាព"</string>
@@ -774,7 +776,7 @@
     <string name="face_acquired_too_low" msgid="4075391872960840081">"រំកិល​ទូរសព្ទចុះក្រោម"</string>
     <string name="face_acquired_too_right" msgid="6245286514593540859">"រំកិលទូរសព្ទ​ទៅខាងឆ្វេង"</string>
     <string name="face_acquired_too_left" msgid="9201762240918405486">"រំកិលទូរសព្ទ​ទៅខាងស្ដាំ"</string>
-    <string name="face_acquired_poor_gaze" msgid="4427153558773628020">"សូមមើល​ឱ្យចំ​ឧបករណ៍​របស់អ្នក​ជាងមុន។"</string>
+    <string name="face_acquired_poor_gaze" msgid="6746437451436776485">"មើលឱ្យចំកាមេរ៉ារបស់អ្នកជាងនេះ"</string>
     <string name="face_acquired_not_detected" msgid="1057966913397548150">"មើលមិនឃើញ​មុខរបស់អ្នកទេ។ កាន់ទូរសព្ទរបស់អ្នក​ដាក់ត្រឹមភ្នែក។"</string>
     <string name="face_acquired_too_much_motion" msgid="8199691445085189528">"មាន​ចលនា​ខ្លាំងពេក។ សូមកាន់​ទូរសព្ទ​ឱ្យនឹង។"</string>
     <string name="face_acquired_recalibrate" msgid="8724013080976469746">"សូម​​ស្កេន​បញ្ចូល​មុខរបស់អ្នក​ម្ដងទៀត។"</string>
@@ -1454,6 +1456,9 @@
     <string name="carrier_app_notification_text" msgid="6567057546341958637">"ប៉ះដើម្បីដំឡើង"</string>
     <string name="time_zone_change_notification_title" msgid="5232503069219193218">"ល្វែងម៉ោងរបស់អ្នកបានផ្លាស់ប្ដូរ"</string>
     <string name="time_zone_change_notification_body" msgid="6135793674904665585">"ឥឡូវនេះ អ្នកស្ថិតនៅ <xliff:g id="TIME_ZONE_DISPLAY_NAME">%1$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET">%2$s</xliff:g>)"</string>
+    <string name="time_zone_offset_change_notification_title" msgid="8232305835199459588">"ការប្ដូរម៉ោងនាឡិកា"</string>
+    <string name="time_zone_offset_change_notification_body_forward" msgid="1299493962341887576">"បានប្ដូរម៉ោងនាឡិកាទៅមុខ <xliff:g id="TIME_ZONE_OFFSET_DURATION">%1$s</xliff:g>។ ឥឡូវនេះ អ្នកស្ថិតនៅ <xliff:g id="TIME_ZONE_DISPLAY_NAME">%2$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET_0">%3$s</xliff:g>)។"</string>
+    <string name="time_zone_offset_change_notification_body_backward" msgid="6643532078142642118">"បានប្ដូរម៉ោងនាឡិកាថយក្រោយ <xliff:g id="TIME_ZONE_OFFSET_DURATION">%1$s</xliff:g>។ ឥឡូវនេះ អ្នកស្ថិតនៅ <xliff:g id="TIME_ZONE_DISPLAY_NAME">%2$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET_0">%3$s</xliff:g>)។"</string>
     <string name="time_picker_dialog_title" msgid="9053376764985220821">"កំណត់​ម៉ោង​"</string>
     <string name="date_picker_dialog_title" msgid="5030520449243071926">"កំណត់​កាល​បរិច្ឆេទ​"</string>
     <string name="date_time_set" msgid="4603445265164486816">"កំណត់"</string>
@@ -1829,6 +1834,7 @@
     <string name="accessibility_shortcut_label_gesture" msgid="7987298674836890931">"ចលនា"</string>
     <string name="accessibility_shortcut_label_quick_settings" msgid="6851280333772213611">"ការកំណត់រហ័ស"</string>
     <string name="accessibility_shortcut_label_triple_tap" msgid="9058975959054454796">"ចុចបីដង"</string>
+    <string name="accessibility_shortcut_label_top_row_key" msgid="1488840908672437180">"គ្រាប់ចុចភាពងាយស្រួល"</string>
     <string name="accessibility_uncheck_legacy_item_warning" msgid="8047830891064817447">"បានបិទ <xliff:g id="SERVICE_NAME">%s</xliff:g>"</string>
     <string name="edit_accessibility_shortcut_menu_button" msgid="8885752738733772935">"កែ​ផ្លូវកាត់"</string>
     <string name="done_accessibility_shortcut_menu_button" msgid="3668407723770815708">"រួចរាល់"</string>
@@ -2105,6 +2111,7 @@
     <string name="app_suspended_default_message" msgid="6451215678552004172">"<xliff:g id="APP_NAME_0">%1$s</xliff:g> មិន​អាច​ប្រើ​បាន​ទេនៅពេលនេះ។ វា​ស្ថិត​ក្រោម​ការគ្រប់គ្រងរបស់ <xliff:g id="APP_NAME_1">%2$s</xliff:g> ។"</string>
     <string name="app_suspended_more_details" msgid="211260942831587014">"ស្វែងយល់បន្ថែម"</string>
     <string name="app_suspended_unsuspend_message" msgid="1665438589450555459">"ឈប់ផ្អាក​កម្មវិធី"</string>
+    <string name="locked_app_biometric_prompt_description" msgid="6853122652400451464">"<xliff:g id="APP_NAME">%1$s</xliff:g> ត្រូវបានចាក់សោ"</string>
     <string name="work_mode_off_title" msgid="6367463960165135829">"ឈប់ផ្អាកកម្មវិធីការងារឬ?"</string>
     <string name="work_mode_turn_on" msgid="5316648862401307800">"ឈប់ផ្អាក"</string>
     <string name="work_mode_emergency_call_button" msgid="6818855962881612322">"ពេលមានអាសន្ន"</string>
@@ -2544,6 +2551,8 @@
     <string name="accessibility_label_clone_profile" msgid="7579118375042398784">"ក្លូន"</string>
     <string name="accessibility_label_communal_profile" msgid="1437173163111334791">"ទូទៅ"</string>
     <string name="private_space_biometric_prompt_title" msgid="5777592909271728154">"លំហ​ឯកជន"</string>
+    <string name="app_locked_new_notification" msgid="4409730436247596215">"ការជូនដំណឹងថ្មី"</string>
+    <string name="app_locked_notification_message" msgid="4576179600328065280">"សារ​ថ្មី"</string>
     <string name="redacted_notification_message" msgid="1520587845842228816">"បានលាក់ខ្លឹមសារជូនដំណឹងដែលមានលក្ខណៈរសើប"</string>
     <string name="redacted_notification_action_title" msgid="6942924973335920935"></string>
     <string name="screen_not_shared_sensitive_content" msgid="7058419185079565001">"បានលាក់ខ្លឹមសារកម្មវិធីពីការបង្ហាញ​អេក្រង់ដើម្បីសុវត្ថិភាព"</string>

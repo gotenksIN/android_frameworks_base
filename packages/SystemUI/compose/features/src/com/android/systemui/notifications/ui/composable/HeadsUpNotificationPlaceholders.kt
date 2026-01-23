@@ -54,8 +54,8 @@ import com.android.compose.animation.scene.ContentScope
 import com.android.compose.modifiers.onUnplaced
 import com.android.compose.modifiers.thenIf
 import com.android.compose.modifiers.width
+import com.android.systemui.notifications.ui.YSpace
 import com.android.systemui.res.R
-import com.android.systemui.statusbar.notification.stack.ui.YSpace
 import com.android.systemui.statusbar.notification.stack.ui.view.NotificationScrollView
 import com.android.systemui.statusbar.notification.stack.ui.viewmodel.NotificationsPlaceholderViewModel
 import kotlin.math.roundToInt
@@ -200,23 +200,6 @@ fun ContentScope.SnoozableHeadsUpNotificationPlaceholder(
                                 stackScrollView.topHeadsUpHeight,
                             ),
                     )
-                }
-                // TODO(462706428) Make NSSL work with HeadsUpPlaceholder values only, and leave
-                // stack related updates strictly to the stack placeholders.
-                //
-                // Make sure NSSL needs to receive some valid stack bounds, even if the
-                // HeadsUpPlaceholder is displayed without the regular StackPlaceholder.
-                .onPlaced {
-                    val bounds = it.boundsInWindow()
-                    debugLog(viewModel) { "$tag.Snoozable onPlaced bounds:$bounds" }
-                    viewModel.setStackBounds(YSpace(bounds.top, bounds.bottom))
-                    // Use -headsUpInset to allow HUN translation outside bounds for snoozing.
-                    viewModel.setStackScrollTop(-headsUpInset)
-                }
-                .onUnplaced {
-                    debugLog(viewModel) { "$tag.Snoozable onUnplaced" }
-                    viewModel.resetStackBounds()
-                    viewModel.resetStackScrollTop()
                 }
                 .thenIf(isSnoozable) { Modifier.nestedScroll(snoozeScrollConnection) }
                 .scrollable(orientation = Orientation.Vertical, state = scrollableState),

@@ -20,9 +20,12 @@ import android.service.dream.dreamManager
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.systemui.SysuiTestCase
+import com.android.systemui.authentication.data.repository.fakeAuthenticationRepository
+import com.android.systemui.authentication.shared.model.AuthenticationMethodModel
 import com.android.systemui.deviceentry.data.repository.fakeDeviceEntryRepository
 import com.android.systemui.deviceentry.shared.model.DeviceUnlockStatus
 import com.android.systemui.flags.EnableSceneContainer
+import com.android.systemui.keyguard.KeyguardViewMediator.KEYGUARD_LOCK_AFTER_DELAY_DEFAULT
 import com.android.systemui.keyguard.data.repository.fakeDeviceEntryFingerprintAuthRepository
 import com.android.systemui.keyguard.data.repository.keyguardRepository
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
@@ -35,6 +38,8 @@ import com.android.systemui.kosmos.collectLastValue
 import com.android.systemui.kosmos.runCurrent
 import com.android.systemui.kosmos.runTest
 import com.android.systemui.kosmos.useUnconfinedTestDispatcher
+import com.android.systemui.scene.data.model.asIterable
+import com.android.systemui.scene.domain.interactor.sceneBackInteractor
 import com.android.systemui.scene.domain.interactor.sceneInteractor
 import com.android.systemui.scene.shared.model.Overlays
 import com.android.systemui.scene.shared.model.Scenes
@@ -42,6 +47,7 @@ import com.android.systemui.statusbar.phone.BiometricUnlockController
 import com.android.systemui.testKosmos
 import com.android.systemui.util.mockito.mock
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.test.advanceTimeBy
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -152,7 +158,7 @@ class DreamStartableTest : SysuiTestCase() {
             advanceTimeBy(DREAMING_DELAY_MS)
             runCurrent()
 
-            // The scene should now be Dream because isAbleToDream was true on start.
+            // The scene should now be Dream because isDreamingNotDozing was true on start.
             assertThat(currentScene).isEqualTo(Scenes.Dream)
 
             // Stop dreaming.
@@ -303,8 +309,58 @@ class DreamStartableTest : SysuiTestCase() {
             assertThat(currentScene).isEqualTo(Scenes.Dream)
         }
 
+    @EnableSceneContainer
+    @Test
+    fun switchFromDreamToLockscreen_whenDreamStops() =
+        kosmos.runTest {
+            val currentScene by collectLastValue(sceneInteractor.currentScene)
+
+            // GIVEN device is locked and dreaming
+            sceneInteractor.changeScene(Scenes.Lockscreen, "reason")
+            fakeDeviceEntryRepository.deviceUnlockStatus.value =
+                DeviceUnlockStatus(isUnlocked = false, deviceUnlockSource = null)
+            keyguardRepository.setDreaming(true)
+            advanceTimeBy(DREAMING_DELAY_MS)
+            runCurrent()
+            assertThat(currentScene).isEqualTo(Scenes.Dream)
+
+            // WHEN dreaming is stopped
+            keyguardRepository.setDreaming(false)
+            advanceTimeBy(DREAMING_DELAY_MS)
+            runCurrent()
+
+            // THEN scene changes to lockscreen
+            assertThat(currentScene).isEqualTo(Scenes.Lockscreen)
+        }
+
+    @EnableSceneContainer
+    @Test
+    fun addLockscreenToBackStackAfterDreamStartWhenUnsecured() =
+        kosmos.runTest {
+            val backStack by collectLastValue(sceneBackInteractor.backStack)
+
+            // GIVEN an unsecured authentication method
+            fakeAuthenticationRepository.setAuthenticationMethod(AuthenticationMethodModel.None)
+            runCurrent()
+
+            // WHEN dreaming is started
+            keyguardRepository.setDreaming(true)
+            advanceTimeBy(DREAMING_DELAY_MS)
+            runCurrent()
+
+            // THEN the back stack should be empty initially
+            assertThat(backStack?.asIterable()?.toList()).isEmpty()
+
+            // WHEN the delay passes
+            advanceTimeBy(KEYGUARD_LOCK_AFTER_DELAY_DEFAULT.toLong())
+            runCurrent()
+
+            // THEN the back stack should contain the Lockscreen scene
+            assertThat(backStack?.asIterable()?.toList()).containsExactly(Scenes.Lockscreen)
+        }
+
     private companion object {
         // A delay to move past the initial dreaming delay.
-        const val DREAMING_DELAY_MS = KeyguardInteractor.IS_ABLE_TO_DREAM_DELAY_MS + 100L
+        const val DREAMING_DELAY_MS = KeyguardInteractor.IS_DREAMING_NOT_DOZING_DELAY_MS + 100L
     }
 }

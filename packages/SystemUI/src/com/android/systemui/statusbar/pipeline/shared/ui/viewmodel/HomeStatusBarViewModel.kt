@@ -282,7 +282,7 @@ constructor(
     private val keyguardInteractor: KeyguardInteractor,
     statusBarNotificationIconsInteractor: StatusBarNotificationIconsInteractor,
     override val operatorNameViewModel: StatusBarOperatorNameViewModel,
-    private val sceneInteractor: SceneInteractor,
+    sceneInteractor: SceneInteractor,
     occlusionInteractor: KeyguardOcclusionInteractor,
     private val shadeInteractor: ShadeInteractor,
     private val shadeExpansionTargetDisplayInteractor: ShadeExpansionTargetDisplayInteractor,
@@ -302,7 +302,9 @@ constructor(
     val logger = loggerFactory.getOrCreate(logBufferName(thisDisplayId), 60)
     val tableLogger = tableLoggerFactory.getOrCreate(tableLogBufferName(thisDisplayId), 200)
 
-    private val statusBarPopupChips by lazy { statusBarPopupChipsViewModelFactory.create() }
+    private val statusBarPopupChips by lazy {
+        statusBarPopupChipsViewModelFactory.create(thisDisplayId)
+    }
 
     override val isTransitioningFromLockscreenToOccluded: StateFlow<Boolean> =
         if (SceneContainerFlag.isEnabled) {
@@ -748,13 +750,21 @@ constructor(
             ?: flowOf(Rect(0, 0, 0, 0)).flowOn(bgDispatcher)
 
     override val isSignOutButtonVisible: Boolean by
-        combine(userLogoutInteractor.isLogoutToSystemUserEnabled, sceneInteractor.currentScene) {
-                isLogoutToSystemUserEnabled,
-                currentScene ->
+        if (
                 Flags.signOutButtonOnKeyguardStatusBar() &&
-                    keyguardInteractor.isSignOutButtonOnStatusBarEnabled &&
+                    keyguardInteractor.isSignOutButtonOnStatusBarEnabled
+            ) {
+                combine(
+                    userLogoutInteractor.isLogoutToSystemUserEnabled,
+                    deviceProvisioningInteractor.isDeviceProvisioned,
+                    sceneInteractor.currentScene,
+                ) { isLogoutToSystemUserEnabled, isDeviceProvisioned, currentScene ->
                     isLogoutToSystemUserEnabled &&
-                    currentScene == Scenes.Lockscreen
+                        isDeviceProvisioned &&
+                        currentScene == Scenes.Lockscreen
+                }
+            } else {
+                flowOf(false)
             }
             .hydratedStateOf(traceName = "isSignOutButtonVisible", initialValue = false)
 

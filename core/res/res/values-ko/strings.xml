@@ -158,6 +158,10 @@
     <string name="wfc_mode_wifi_preferred_summary" msgid="1035175836270943089">"Wi-Fi를 통해 통화"</string>
     <string name="wfc_mode_cellular_preferred_summary" msgid="4958965609212575619">"모바일 네트워크를 통해 통화"</string>
     <string name="wfc_mode_wifi_only_summary" msgid="104951993894678665">"Wi-Fi에서만"</string>
+    <string name="adaptive_low_frequency_less_than_one_minute" msgid="8869498183646028708">"~%s"</string>
+    <string name="adaptive_low_frequency_neg_less_than_one_minute" msgid="2590062535985417056">"~−%s"</string>
+    <string name="elapsed_time_low_frequency_short_format_h_mm" msgid="6728141238066668781">"%1$d:%2$02d:--"</string>
+    <string name="elapsed_time_low_frequency_short_format_mm" msgid="2405181895215514414">"%1$02d:--"</string>
     <!-- no translation found for crossSimFormat_spn (9125246077491634262) -->
     <skip />
     <string name="crossSimFormat_spn_cross_sim_calling" msgid="5620807020002879057">"<xliff:g id="SPN">%s</xliff:g> 백업 전화"</string>
@@ -645,10 +649,8 @@
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"앱이 로컬 네트워크 기기에 액세스하도록 허용합니다."</string>
     <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"루프백 인터페이스 사용"</string>
     <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"앱이 루프백 인터페이스를 통해 다른 앱과 상호작용하도록 허용합니다."</string>
-    <!-- no translation found for permlab_force_use_loopback_interface (1319727311706416481) -->
-    <skip />
-    <!-- no translation found for permdesc_force_use_loopback_interface (5829032514048681980) -->
-    <skip />
+    <string name="permlab_force_use_loopback_interface" msgid="1319727311706416481">"루프백 인터페이스 강제 사용"</string>
+    <string name="permdesc_force_use_loopback_interface" msgid="5829032514048681980">"다른 앱에 루프백 권한이 없어도 앱이 루프백 인터페이스를 통해 다른 앱과 상호작용하도록 허용합니다."</string>
     <string name="permlab_ranging" msgid="2854543350668593390">"근처 기기 간 상대 위치 파악"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"앱이 근처 기기 간 상대 위치를 파악하도록 허용"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"기본 NFC 결제 서비스 정보"</string>
@@ -774,7 +776,7 @@
     <string name="face_acquired_too_low" msgid="4075391872960840081">"휴대전화를 아래쪽으로 움직이세요"</string>
     <string name="face_acquired_too_right" msgid="6245286514593540859">"휴대전화를 왼쪽으로 움직이세요"</string>
     <string name="face_acquired_too_left" msgid="9201762240918405486">"휴대전화를 오른쪽으로 움직이세요"</string>
-    <string name="face_acquired_poor_gaze" msgid="4427153558773628020">"기기에서 더 똑바로 바라보세요."</string>
+    <string name="face_acquired_poor_gaze" msgid="6746437451436776485">"카메라를 좀 더 똑바로 바라보세요."</string>
     <string name="face_acquired_not_detected" msgid="1057966913397548150">"얼굴이 보이지 않습니다. 눈높이에 맞춰 휴대전화를 들어 주세요"</string>
     <string name="face_acquired_too_much_motion" msgid="8199691445085189528">"너무 많이 움직였습니다. 휴대전화를 흔들리지 않게 잡으세요."</string>
     <string name="face_acquired_recalibrate" msgid="8724013080976469746">"얼굴을 다시 등록해 주세요."</string>
@@ -1454,6 +1456,9 @@
     <string name="carrier_app_notification_text" msgid="6567057546341958637">"탭하여 설정"</string>
     <string name="time_zone_change_notification_title" msgid="5232503069219193218">"시간대가 변경되었습니다"</string>
     <string name="time_zone_change_notification_body" msgid="6135793674904665585">"현재 시간대는 <xliff:g id="TIME_ZONE_DISPLAY_NAME">%1$s</xliff:g>(<xliff:g id="TIME_ZONE_OFFSET">%2$s</xliff:g>)입니다."</string>
+    <string name="time_zone_offset_change_notification_title" msgid="8232305835199459588">"시계 변경"</string>
+    <string name="time_zone_offset_change_notification_body_forward" msgid="1299493962341887576">"시계가 <xliff:g id="TIME_ZONE_OFFSET_DURATION">%1$s</xliff:g> 앞당겨졌습니다. 현재 시간대는 <xliff:g id="TIME_ZONE_DISPLAY_NAME">%2$s</xliff:g>(<xliff:g id="TIME_ZONE_OFFSET_0">%3$s</xliff:g>)입니다."</string>
+    <string name="time_zone_offset_change_notification_body_backward" msgid="6643532078142642118">"시계가 <xliff:g id="TIME_ZONE_OFFSET_DURATION">%1$s</xliff:g> 늦춰졌습니다. 현재 시간대는 <xliff:g id="TIME_ZONE_DISPLAY_NAME">%2$s</xliff:g>(<xliff:g id="TIME_ZONE_OFFSET_0">%3$s</xliff:g>)입니다."</string>
     <string name="time_picker_dialog_title" msgid="9053376764985220821">"시간 설정"</string>
     <string name="date_picker_dialog_title" msgid="5030520449243071926">"날짜 설정"</string>
     <string name="date_time_set" msgid="4603445265164486816">"설정"</string>
@@ -1829,6 +1834,7 @@
     <string name="accessibility_shortcut_label_gesture" msgid="7987298674836890931">"동작"</string>
     <string name="accessibility_shortcut_label_quick_settings" msgid="6851280333772213611">"빠른 설정"</string>
     <string name="accessibility_shortcut_label_triple_tap" msgid="9058975959054454796">"세 번 탭"</string>
+    <string name="accessibility_shortcut_label_top_row_key" msgid="1488840908672437180">"접근성 키"</string>
     <string name="accessibility_uncheck_legacy_item_warning" msgid="8047830891064817447">"<xliff:g id="SERVICE_NAME">%s</xliff:g>이(가) 사용 중지됨"</string>
     <string name="edit_accessibility_shortcut_menu_button" msgid="8885752738733772935">"단축키 수정"</string>
     <string name="done_accessibility_shortcut_menu_button" msgid="3668407723770815708">"완료"</string>
@@ -2105,6 +2111,7 @@
     <string name="app_suspended_default_message" msgid="6451215678552004172">"<xliff:g id="APP_NAME_0">%1$s</xliff:g>은(는) 현재 사용할 수 없습니다. <xliff:g id="APP_NAME_1">%2$s</xliff:g>에서 관리하는 앱입니다."</string>
     <string name="app_suspended_more_details" msgid="211260942831587014">"자세히 알아보기"</string>
     <string name="app_suspended_unsuspend_message" msgid="1665438589450555459">"앱 일시중지 해제"</string>
+    <string name="locked_app_biometric_prompt_description" msgid="6853122652400451464">"<xliff:g id="APP_NAME">%1$s</xliff:g> 잠김"</string>
     <string name="work_mode_off_title" msgid="6367463960165135829">"직장 앱 일시중지를 해제하시겠습니까?"</string>
     <string name="work_mode_turn_on" msgid="5316648862401307800">"일시중지 해제"</string>
     <string name="work_mode_emergency_call_button" msgid="6818855962881612322">"긴급 전화"</string>
@@ -2544,6 +2551,8 @@
     <string name="accessibility_label_clone_profile" msgid="7579118375042398784">"클론"</string>
     <string name="accessibility_label_communal_profile" msgid="1437173163111334791">"공동"</string>
     <string name="private_space_biometric_prompt_title" msgid="5777592909271728154">"비공개 스페이스"</string>
+    <string name="app_locked_new_notification" msgid="4409730436247596215">"새 알림"</string>
+    <string name="app_locked_notification_message" msgid="4576179600328065280">"새 메시지"</string>
     <string name="redacted_notification_message" msgid="1520587845842228816">"민감한 알림 콘텐츠 숨김"</string>
     <string name="redacted_notification_action_title" msgid="6942924973335920935"></string>
     <string name="screen_not_shared_sensitive_content" msgid="7058419185079565001">"보안을 위해 화면 공유에서 앱 콘텐츠가 숨겨집니다."</string>

@@ -900,16 +900,6 @@ public class CarrierConfigManager {
      */
     public static final String KEY_VILTE_DATA_IS_METERED_BOOL = "vilte_data_is_metered_bool";
 
-// QTI_BEGIN: 2018-04-03: Telephony: IMS: Add flag to control reset UT capability
-    /**
-     * Flag indicating whether we should reset UT capability or not for IMS deregistration
-     * and for IMS feature state not ready
-     * @hide
-     */
-    public static final String KEY_IGNORE_RESET_UT_CAPABILITY_BOOL =
-            "ignore_reset_ut_capability_bool";
-
-// QTI_END: 2018-04-03: Telephony: IMS: Add flag to control reset UT capability
     /**
      * Flag specifying whether WFC over IMS should be available for carrier: independent of
      * carrier provisioning. If false: hard disabled. If true: then depends on carrier
@@ -5408,7 +5398,7 @@ public class CarrierConfigManager {
      * {@link SubscriptionManager#USAGE_SETTING_DEFAULT default},
      * {@link SubscriptionManager#USAGE_SETTING_VOICE_CENTRIC voice-centric},
      * or {@link SubscriptionManager#USAGE_SETTING_DATA_CENTRIC data-centric}.
-     * {@see SubscriptionInfo#getUsageSetting}
+     * @see SubscriptionInfo#getUsageSetting
      *
      */
     public static final String KEY_CELLULAR_USAGE_SETTING_INT = "cellular_usage_setting_int";
@@ -10890,6 +10880,23 @@ public class CarrierConfigManager {
     public static final String KEY_HIDE_ENABLE_2G = "hide_enable_2g_bool";
 
     /**
+     * Boolean indicating whether 2G protection (disabling 2G) is enabled by default for the
+     * carrier.
+     *
+     * <p>When {@code true}, the device should default to not using 2G for security purposes,
+     * except where required for emergency calls. This setting is only for specifying the default
+     * state for a given carrier, and should not impact the user’s ability to change the 2G toggle
+     * state in their device settings.
+     *
+     * <p>The default value is {@code false}: "2G network protection toggle" setting is disabled by
+     * default (aka 2G is allowed by default).
+     *
+     * @hide
+     */
+    public static final String KEY_CARRIER_DEFAULT_2G_PROTECTION_ENABLED_BOOL =
+            "carrier_default_2g_protection_enabled_bool";
+
+    /**
      * Indicates the allowed APN types that can be used for LTE initial attach. The order of APN
      * types in the configuration is the order of APN types that will be used for initial attach.
      * Empty list indicates that no APN types are allowed for initial attach.
@@ -11713,9 +11720,6 @@ public class CarrierConfigManager {
         sDefaults.putBoolean(KEY_CONFIG_TELEPHONY_USE_OWN_NUMBER_FOR_VOICEMAIL_BOOL, false);
         sDefaults.putBoolean(KEY_IGNORE_DATA_ENABLED_CHANGED_FOR_VIDEO_CALLS, true);
         sDefaults.putBoolean(KEY_VILTE_DATA_IS_METERED_BOOL, true);
-// QTI_BEGIN: 2018-04-03: Telephony: IMS: Add flag to control reset UT capability
-        sDefaults.putBoolean(KEY_IGNORE_RESET_UT_CAPABILITY_BOOL, false);
-// QTI_END: 2018-04-03: Telephony: IMS: Add flag to control reset UT capability
         sDefaults.putBoolean(KEY_CARRIER_WFC_IMS_AVAILABLE_BOOL, false);
         sDefaults.putBoolean(KEY_CARRIER_CROSS_SIM_IMS_AVAILABLE_BOOL, false);
 // QTI_BEGIN: 2024-01-11: Telephony: Add config to show signal strength for MSIM CIWLAN
@@ -12525,6 +12529,7 @@ public class CarrierConfigManager {
         sDefaults.putInt(KEY_DEFAULT_RTT_MODE_INT, 0);
         sDefaults.putBoolean(KEY_STORE_SIM_PIN_FOR_UNATTENDED_REBOOT_BOOL, true);
         sDefaults.putBoolean(KEY_HIDE_ENABLE_2G, false);
+        sDefaults.putBoolean(KEY_CARRIER_DEFAULT_2G_PROTECTION_ENABLED_BOOL, false);
         sDefaults.putStringArray(KEY_ALLOWED_INITIAL_ATTACH_APN_TYPES_STRING_ARRAY,
                 new String[]{"ia", "default"});
         sDefaults.putBoolean(KEY_CARRIER_PROVISIONS_WIFI_MERGED_NETWORKS_BOOL, false);

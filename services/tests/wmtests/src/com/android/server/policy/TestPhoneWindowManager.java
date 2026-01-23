@@ -206,13 +206,13 @@ class TestPhoneWindowManager {
         }
 
         @Override
-        boolean toggleTalkback(int currentUserId) {
+        public boolean toggleTalkback(int currentUserId) {
             mIsTalkBackEnabled = !mIsTalkBackEnabled;
             return mIsTalkBackEnabled;
         }
 
         @Override
-        boolean isTalkBackShortcutGestureEnabled() {
+        public boolean isTalkBackShortcutGestureEnabled() {
             return mIsTalkBackShortcutGestureEnabled;
         }
     }
@@ -831,6 +831,11 @@ class TestPhoneWindowManager {
     void assertMoveFocusedTaskToFullscreen() {
         mTestLooper.dispatchAll();
         verify(mStatusBarManagerInternal).moveFocusedTaskToFullscreen(anyInt());
+    }
+
+    void assertMoveFocusedTaskToStageSplit(boolean leftOrTop) {
+        mTestLooper.dispatchAll();
+        verify(mStatusBarManagerInternal).moveFocusedTaskToStageSplit(anyInt(), eq(leftOrTop));
     }
 
     void assertStatusBarStartAssist() {

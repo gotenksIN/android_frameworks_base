@@ -16,10 +16,12 @@
 
 package com.android.systemui.screencapture.record.smallscreen.ui.viewmodel
 
+import android.app.ActivityOptions
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.provider.DocumentsContract
+import android.view.Display
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -46,6 +48,7 @@ class PostRecordingViewModel
 @AssistedInject
 constructor(
     @Assisted val videoUri: Uri,
+    @Assisted private val displayId: Int,
     private val context: Context,
     private val broadcastSender: BroadcastSender,
     private val userTracker: UserTracker,
@@ -130,7 +133,18 @@ constructor(
                 }
 
         broadcastSender.sendBroadcastAsUser(
-            intent = ActivityStartingReceiver.wrapIntent(context, intent),
+            intent =
+                ActivityStartingReceiver.wrapIntent(
+                    context,
+                    intent,
+                    displayId
+                        .takeIf { it != Display.INVALID_DISPLAY }
+                        ?.let { validDisplayId ->
+                            ActivityOptions.makeBasic()
+                                .apply { launchDisplayId = validDisplayId }
+                                .toBundle()
+                        },
+                ),
             userHandle = userTracker.userHandle,
         )
     }
@@ -138,6 +152,6 @@ constructor(
     @AssistedFactory
     interface Factory {
 
-        fun create(videoUri: Uri): PostRecordingViewModel
+        fun create(videoUri: Uri, displayId: Int): PostRecordingViewModel
     }
 }

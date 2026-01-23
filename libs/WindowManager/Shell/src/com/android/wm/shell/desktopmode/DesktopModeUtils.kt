@@ -190,10 +190,7 @@ fun calculateMaximizeBounds(displayLayout: DisplayLayout, taskInfo: RunningTaskI
     } else {
         // if non-resizable then calculate max bounds according to aspect ratio
         val activityAspectRatio = calculateAspectRatio(taskInfo)
-        val captionInsets =
-            taskInfo.configuration.windowConfiguration.appBounds?.let {
-                it.top - taskInfo.configuration.windowConfiguration.bounds.top
-            } ?: 0
+        val captionInsets = taskInfo.freeformCaptionInsets
         val newSize =
             maximizeSizeGivenAspectRatio(
                 taskInfo,
@@ -432,6 +429,7 @@ fun cascadeWindow(
     displayLayout: DisplayLayout,
     deskId: Int,
     stableBounds: Rect = Rect(),
+    isRememberedBounds: Boolean = false,
 ) {
     if (stableBounds.isEmpty) {
         displayLayout.getStableBoundsForDesktopMode(stableBounds)
@@ -447,7 +445,13 @@ fun cascadeWindow(
             taskInfo?.let {
                 val taskBounds = it.configuration.windowConfiguration.bounds
                 if (!taskBounds.isEmpty()) {
-                    cascadeWindow(context.resources, stableBounds, taskBounds, bounds)
+                    cascadeWindow(
+                        context.resources,
+                        stableBounds,
+                        taskBounds,
+                        bounds,
+                        isRememberedBounds,
+                    )
                     return@let
                 }
                 // RecentsTaskInfo might not have configuration bounds populated yet so use
@@ -456,7 +460,13 @@ fun cascadeWindow(
                 if (it is RecentTaskInfo) {
                     it.lastNonFullscreenBounds?.let {
                         if (!it.isEmpty()) {
-                            cascadeWindow(context.resources, stableBounds, it, bounds)
+                            cascadeWindow(
+                                context.resources,
+                                stableBounds,
+                                it,
+                                bounds,
+                                isRememberedBounds,
+                            )
                         }
                     }
                 }

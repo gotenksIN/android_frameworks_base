@@ -20,6 +20,7 @@ import static android.app.WindowConfiguration.ACTIVITY_TYPE_HOME;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_STANDARD;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN;
+import static android.app.WindowConfiguration.WINDOWING_MODE_MULTI_WINDOW;
 import static android.content.pm.ActivityInfo.FLAG_SHOW_WHEN_LOCKED;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_BEHIND;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE;
@@ -27,6 +28,7 @@ import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_NOSENSOR;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR;
 import static android.content.pm.ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED;
+import static android.internal.perfetto.protos.Windowmanagerservice.WindowContainerChildProto.DISPLAY_CONTENT;
 import static android.os.Build.VERSION_CODES.P;
 import static android.os.Build.VERSION_CODES.Q;
 import static android.view.Display.DEFAULT_DISPLAY;
@@ -89,12 +91,13 @@ import static com.android.server.wm.TransitionSubject.assertThat;
 import static com.android.server.wm.WindowContainer.AnimationFlags.PARENTS;
 import static com.android.server.wm.WindowContainer.POSITION_TOP;
 import static com.android.server.wm.WindowManagerService.UPDATE_FOCUS_NORMAL;
+import static com.android.server.wm.WindowTracingLogLevel.ALL;
 import static com.android.window.flags.Flags.FLAG_CAMERA_COMPAT_UNIFY_CAMERA_POLICIES;
 import static com.android.window.flags.Flags.FLAG_ENABLE_CAMERA_COMPAT_FOR_DESKTOP_WINDOWING;
 import static com.android.window.flags.Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE;
-import static com.android.window.flags.Flags.FLAG_ENABLE_PERSISTING_DISPLAY_SIZE_FOR_CONNECTED_DISPLAYS;
 import static com.android.window.flags.Flags.FLAG_ENABLE_TASK_MOVE_ALLOWED_LISTENER_API;
 import static com.android.window.flags.Flags.FLAG_ENABLE_WINDOW_REPOSITIONING_API;
+import static com.android.window.flags.Flags.FLAG_FIX_TF_ADJACENT_FOCUS;
 
 import static com.google.common.truth.Truth.assertThat;
 
@@ -139,6 +142,7 @@ import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.annotations.Presubmit;
 import android.platform.test.annotations.RequiresFlagsEnabled;
+import android.util.proto.ProtoOutputStream;
 import android.view.Display;
 import android.view.DisplayCutout;
 import android.view.DisplayInfo;
@@ -157,7 +161,9 @@ import android.view.WindowManager;
 import android.view.WindowManager.LayoutParams.WindowType;
 import android.window.DisplayAreaInfo;
 import android.window.IDisplayAreaOrganizer;
+import android.window.ITaskFragmentOrganizer;
 import android.window.ScreenCaptureInternal;
+import android.window.TaskFragmentOrganizer;
 import android.window.WindowContainerToken;
 import android.window.WindowContainerTransaction;
 
@@ -169,6 +175,8 @@ import com.android.server.LocalServices;
 import com.android.server.policy.WindowManagerPolicy;
 import com.android.server.wm.utils.WmDisplayCutout;
 import com.android.window.flags.Flags;
+
+import com.google.protobuf.InvalidProtocolBufferException;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -185,6 +193,10 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.function.BooleanSupplier;
+
+import perfetto.protos.Windowmanagerservice.DisplayContentProto;
+import perfetto.protos.Windowmanagerservice.DisplayFramesProto;
+import perfetto.protos.Windowmanagerservice.WindowContainerChildProto;
 
 /**
  * Tests for the {@link DisplayContent} class.
@@ -1239,6 +1251,19 @@ public class DisplayContentTests extends WindowTestsBase {
                 translucentTop.hasFixedRotationTransform());
         assertTrue("The non-top visible activity shares the same transform",
                 bottom.hasFixedRotationTransform(translucentTop));
+
+        // Verify that the 'bottom' orientation source should not apply its orientation to the
+        // launching activity, which has its own orientation (it may be put on top but not yet
+        // visible if the previous activity is pausing).
+        final ActivityRecord launchingTop = new ActivityBuilder(mAtm).setVisible(false)
+                .setCreateTask(true)
+                .setScreenOrientation(SCREEN_ORIENTATION_NOSENSOR).build();
+        launchingTop.mTransitionController.collect(launchingTop);
+        mDisplayContent.updateOrientation();
+
+        assertFalse(launchingTop.hasFixedRotationTransform());
+        assertEquals(launchingTop.getConfiguration().orientation,
+                mDisplayContent.getConfiguration().orientation);
     }
 
     @Test
@@ -3135,6 +3160,58 @@ public class DisplayContentTests extends WindowTestsBase {
         }
     }
 
+    @EnableFlags(FLAG_FIX_TF_ADJACENT_FOCUS)
+    @Test
+    public void testFindFocusedWindowWithAdjacentTaskFragment() {
+        final Task task = createTask(mDisplayContent);
+
+        final TaskFragmentOrganizer organizer = new TaskFragmentOrganizer(Runnable::run);
+        registerTaskFragmentOrganizer(
+                ITaskFragmentOrganizer.Stub.asInterface(organizer.getOrganizerToken().asBinder()));
+        final TaskFragment tf0 = new TaskFragmentBuilder(mAtm)
+                .setParentTask(task)
+                .createActivityCount(1)
+                .setOrganizer(organizer)
+                .setFragmentToken(new Binder())
+                .build();
+        final TaskFragment tf1 = new TaskFragmentBuilder(mAtm)
+                .setParentTask(task)
+                .createActivityCount(1)
+                .setOrganizer(organizer)
+                .setFragmentToken(new Binder())
+                .build();
+        tf0.setAdjacentTaskFragments(new TaskFragment.AdjacentSet(tf0, tf1));
+        tf0.setWindowingMode(WINDOWING_MODE_MULTI_WINDOW);
+        tf1.setWindowingMode(WINDOWING_MODE_MULTI_WINDOW);
+        task.setBounds(0, 0, 1200, 1000);
+        tf0.setBounds(0, 0, 600, 1000);
+        tf1.setBounds(600, 0, 1200, 1000);
+
+        final ActivityRecord activity0 = tf0.getTopMostActivity();
+        final ActivityRecord activity1 = tf1.getTopMostActivity();
+        final WindowState win0 = newWindowBuilder("win0", TYPE_BASE_APPLICATION)
+                .setWindowToken(activity0)
+                .build();
+        final WindowState win1 = newWindowBuilder("win1", TYPE_BASE_APPLICATION)
+                .setWindowToken(activity1)
+                .build();
+        activity0.setVisibleRequested(true);
+        activity1.setVisibleRequested(true);
+        win0.setVisibleRequested(true);
+        win1.setVisibleRequested(true);
+
+        mDisplayContent.setFocusedApp(activity1);
+
+        // The window in the focused activity should be the focused window.
+        assertEquals(win1, mDisplayContent.findFocusedWindow());
+
+        win1.mAttrs.flags |= WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+
+        // The window in the adjacent TaskFragment should be the focused window if the focused app
+        // doesn't have any focusable window.
+        assertEquals(win0, mDisplayContent.findFocusedWindow());
+    }
+
     @Test
     public void testKeepClearAreasMultipleWindows() {
         final var navBarWin = newWindowBuilder("navBarWin", TYPE_NAVIGATION_BAR).build();
@@ -3334,7 +3411,6 @@ public class DisplayContentTests extends WindowTestsBase {
         verify(displayPolicy, never()).notifyDisplayRemoveSystemDecorations();
     }
 
-    @EnableFlags(FLAG_ENABLE_PERSISTING_DISPLAY_SIZE_FOR_CONNECTED_DISPLAYS)
     @Test
     public void testForcedDensityRatioSet_persistDensityScaleFlagEnabled() {
         final DisplayInfo displayInfo = new DisplayInfo(mDisplayInfo);
@@ -3361,7 +3437,6 @@ public class DisplayContentTests extends WindowTestsBase {
         assertEquals(forcedDensity, dc.mBaseDisplayDensity);
     }
 
-    @EnableFlags(FLAG_ENABLE_PERSISTING_DISPLAY_SIZE_FOR_CONNECTED_DISPLAYS)
     @Test
     public void testForcedDensityUpdateWithRatio_persistDensityScaleFlagEnabled() {
         final DisplayInfo displayInfo = new DisplayInfo(mDisplayInfo);
@@ -3605,5 +3680,30 @@ public class DisplayContentTests extends WindowTestsBase {
         } catch (InterruptedException | ExecutionException | TimeoutException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @Test
+    public void testDumpDebug() throws InvalidProtocolBufferException {
+        final ProtoOutputStream proto = new ProtoOutputStream();
+
+        mDisplayContent.dumpDebug(proto, DISPLAY_CONTENT, ALL);
+        final DisplayFrames displayFrames = mDisplayContent.mDisplayFrames;
+
+        final DisplayContentProto displayContentProto =
+                WindowContainerChildProto.parseFrom(proto.getBytes()).getDisplayContent();
+        final DisplayFramesProto displayFramesProto = displayContentProto.getDisplayFrames();
+        assertEquals(mDisplayContent.getDisplayId(), displayContentProto.getId());
+        assertEquals(mDisplayContent.mBaseDisplayDensity, displayContentProto.getDpi());
+        assertEquals(displayFrames.mWidth, displayFramesProto.getWidth());
+        assertEquals(displayFrames.mHeight, displayFramesProto.getHeight());
+        assertEquals(displayFrames.mRotation, displayFramesProto.getRotation());
+        assertEquals(mDisplayContent.mMinSizeOfResizeableTaskDp,
+                displayContentProto.getMinSizeOfResizeableTaskDp());
+        assertEquals(mDisplayContent.isReady(), displayContentProto.getDisplayReady());
+        assertEquals(mDisplayContent.isSleeping(), displayContentProto.getIsSleeping());
+        assertEquals(0, displayContentProto.getSleepTokensCount());
+        assertEquals(mDisplayContent.getImePolicy(), displayContentProto.getImePolicy());
+        assertEquals(0, displayContentProto.getKeepClearAreasCount());
+        assertEquals(mDisplayContent.getEngagementMode(), displayContentProto.getEngagementMode());
     }
 }

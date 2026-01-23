@@ -438,6 +438,7 @@ class Task extends TaskFragment {
     // Id of the previous display the root task was on.
     int mPrevDisplayId = INVALID_DISPLAY;
 
+    // TODO: b/296268915 - clean these up with flag delegate_request_fullscreen_handling_to_shell
     int mMultiWindowRestoreWindowingMode = INVALID_WINDOWING_MODE;
     WindowContainerToken mMultiWindowRestoreParent;
 
@@ -479,6 +480,12 @@ class Task extends TaskFragment {
      * {@code true} to prevent double traversal of {@link #mChildren} in a loop.
      */
     boolean mInRemoveTask;
+
+    /**
+     * When set, the leaf task should be kept in the current root task if the relaunch originates
+     * from other source task.
+     */
+    boolean mPreserveLeafTaskIfRelaunch;
 
     /**
      * When set, disassociate the leaf task if relaunched and reparented it to TDA as root task if
@@ -670,7 +677,14 @@ class Task extends TaskFragment {
     /** @see #isDisablePip() */
     private boolean mDisablePip;
 
+    /** @see #isForceOpaque() */
     private final boolean mIsForceOpaque;
+
+    /** @see #shouldIgnoreInsets() */
+    private boolean mShouldIgnoreInsets;
+
+    /** @see #disableAppCompatRoundedCorners() */
+    private boolean mDisableAppCompatRoundedCorners;
 
     private Task(ActivityTaskManagerService atmService, int _taskId, Intent _intent,
             Intent _affinityIntent, String _affinity, String _rootAffinity,
@@ -684,7 +698,8 @@ class Task extends TaskFragment {
             @Nullable ActivityInfo info, @Nullable IVoiceInteractionSession _voiceSession,
             IVoiceInteractor _voiceInteractor, boolean _createdByOrganizer, IBinder _launchCookie,
             boolean _deferTaskAppear, boolean _removeWithTaskOrganizer,
-            boolean isForceOpaque, boolean _realActivityAppLockEnabled) {
+            boolean isForceOpaque, boolean shouldIgnoreInsets,
+            boolean disableAppCompatRoundedCorners, boolean _realActivityAppLockEnabled) {
         super(atmService, null /* fragmentToken */, _createdByOrganizer, false /* isEmbedded */);
 
         mTaskId = _taskId;
@@ -734,7 +749,13 @@ class Task extends TaskFragment {
         mRemoveWithTaskOrganizer = _removeWithTaskOrganizer;
         mIsTrimmableFromRecents = true;
         mIsForceOpaque = isForceOpaque;
+        mShouldIgnoreInsets = shouldIgnoreInsets;
+        mDisableAppCompatRoundedCorners = disableAppCompatRoundedCorners;
         EventLogTags.writeWmTaskCreated(mTaskId);
+
+        if (mWmService.mAppLockController != null) {
+            mWmService.mAppLockController.registerTask(this);
+        }
     }
 
     static Task fromWindowContainerToken(WindowContainerToken token) {
@@ -1723,7 +1744,7 @@ class Task extends TaskFragment {
 
     /**
      * @return whether or not there are ONLY task overlay activities in the task.
-     *         If {@param includeFinishing} is set, then don't ignore finishing activities in the
+     *         If {@code includeFinishing} is set, then don't ignore finishing activities in the
      *         check. If there are no task overlay activities, this call returns false.
      */
     boolean onlyHasTaskOverlayActivities(boolean includeFinishing) {
@@ -2514,7 +2535,7 @@ class Task extends TaskFragment {
     }
 
     @Override
-    void writeIdentifierToProto(ProtoOutputStream proto, long fieldId) {
+    public void writeIdentifierToProto(ProtoOutputStream proto, long fieldId) {
         final long token = proto.start(fieldId);
         proto.write(HASH_CODE, System.identityHashCode(this));
         proto.write(USER_ID, mUserId);
@@ -3167,49 +3188,6 @@ class Task extends TaskFragment {
         mForceShowForAllUsers = forceShowForAllUsers;
     }
 
-    /** Returns the top-most activity that occludes the given one, or {@code null} if none. */
-    @Nullable
-    ActivityRecord getOccludingActivityAbove(ActivityRecord activity) {
-        final ActivityRecord top = getActivity(r -> {
-            if (r == activity) {
-                // Reached the given activity, return the activity to stop searching.
-                return true;
-            }
-
-            if (!r.occludesParent()) {
-                return false;
-            }
-
-            TaskFragment parent = r.getTaskFragment();
-            if (parent == activity.getTaskFragment()) {
-                // Found it. This activity on top of the given activity on the same TaskFragment.
-                return true;
-            }
-            if (parent != null && parent.asTask() != null) {
-                // Found it. This activity is the direct child of a leaf Task.
-                return true;
-            }
-            // The candidate activity is being embedded. Checking if the bounds of the containing
-            // TaskFragment equals to the outer TaskFragment.
-            TaskFragment grandParent = parent.getParent().asTaskFragment();
-            while (grandParent != null) {
-                if (!parent.getBounds().equals(grandParent.getBounds())) {
-                    // Not occluding the grandparent.
-                    break;
-                }
-                if (grandParent.asTask() != null) {
-                    // Found it. The activity occludes its parent TaskFragment and the parent
-                    // TaskFragment also occludes its parent all the way up.
-                    return true;
-                }
-                parent = grandParent;
-                grandParent = parent.getParent().asTaskFragment();
-            }
-            return false;
-        });
-        return top != activity ? top : null;
-    }
-
     @Override
     public SurfaceControl.Builder makeAnimationLeash() {
         return super.makeAnimationLeash().setMetadata(METADATA_TASK_ID, mTaskId);
@@ -3285,9 +3263,9 @@ class Task extends TaskFragment {
         mWmService.mSnapshotController.notifySnapshotChanged(mTaskId, snapshot);
     }
 
-    void onSnapshotInvalidated() {
+    void onSnapshotReleased() {
         // No local listener.
-        mWmService.mSnapshotController.notifySnapshotInvalidate(mTaskId);
+        mWmService.mSnapshotController.notifySnapshotReleased(mTaskId);
     }
 
 
@@ -3943,6 +3921,9 @@ class Task extends TaskFragment {
         if (mReparentLeafTaskIfRelaunchFromHome) {
             pw.println(prefix + "mReparentLeafTaskIfRelaunchFromHome=true");
         }
+        if (mPreserveLeafTaskIfRelaunch) {
+            pw.println(prefix + "mPreserveLeafTaskIfRelaunch=true");
+        }
         pw.println(prefix + "mSelfMovable=" + mSelfMovable);
     }
 
@@ -4589,10 +4570,7 @@ class Task extends TaskFragment {
     }
 
     void onPictureInPictureParamsChanged() {
-        if (inPinnedWindowingMode()
-                || DesktopExperienceFlags.ENABLE_DESKTOP_WINDOWING_PIP.isTrue()) {
-            dispatchTaskInfoChangedIfNeeded(true /* force */);
-        }
+        dispatchTaskInfoChangedIfNeeded(true /* force */);
     }
 
     void onShouldDockBigOverlaysChanged() {
@@ -4642,7 +4620,7 @@ class Task extends TaskFragment {
     }
 
     /**
-     * Sets/unsets the forced-hidden state flag for this task depending on {@param set}.
+     * Sets/unsets the forced-hidden state flag for this task depending on {@code set}.
      * @return Whether the force hidden state changed
      */
     @Override
@@ -4764,6 +4742,7 @@ class Task extends TaskFragment {
      * the previous parent if parent has changed.
      */
     void restoreWindowingMode() {
+        if (Flags.delegateRequestFullscreenHandlingToShell()) return;
         if (mMultiWindowRestoreWindowingMode == INVALID_WINDOWING_MODE) {
             return;
         }
@@ -4791,7 +4770,9 @@ class Task extends TaskFragment {
         // Calling Task#setWindowingMode() for leaf task since this is a specialization of
         // {@link #setWindowingMode(int)} for root task.
         if (!isRootTask()) {
-            mMultiWindowRestoreWindowingMode = INVALID_WINDOWING_MODE;
+            if (!Flags.delegateRequestFullscreenHandlingToShell()) {
+                mMultiWindowRestoreWindowingMode = INVALID_WINDOWING_MODE;
+            }
             super.setWindowingMode(windowingMode);
             return;
         }
@@ -4847,8 +4828,10 @@ class Task extends TaskFragment {
             return;
         }
 
-        // Reset multi-window restore windowing mode.
-        mMultiWindowRestoreWindowingMode = INVALID_WINDOWING_MODE;
+        if (!Flags.delegateRequestFullscreenHandlingToShell()) {
+            // Reset multi-window restore windowing mode.
+            mMultiWindowRestoreWindowingMode = INVALID_WINDOWING_MODE;
+        }
 
         final ActivityRecord topActivity = getTopNonFinishingActivity();
 
@@ -5614,8 +5597,8 @@ class Task extends TaskFragment {
 
     /**
      * When switching to another Task, marks the currently PiP candidate activity as supporting to
-     * enter PiP while it is pausing (if supported). Only one of {@param toFrontTask} or
-     * {@param toFrontActivity} should be set.
+     * enter PiP while it is pausing (if supported). Only one of {@code toFrontTask} or
+     * {@code toFrontActivity} should be set.
      */
     static void enableEnterPipOnTaskSwitch(@Nullable ActivityRecord pipCandidate,
             @Nullable Task toFrontTask, @Nullable ActivityRecord toFrontActivity,
@@ -6524,6 +6507,12 @@ class Task extends TaskFragment {
         }
     }
 
+    void setPreserveLeafTaskIfRelaunch(boolean preserveLeafTaskIfRelaunch) {
+        if (isOrganized()) {
+            mPreserveLeafTaskIfRelaunch = preserveLeafTaskIfRelaunch;
+        }
+    }
+
     void setReparentLeafTaskIfRelaunch(boolean reparentLeafTaskIfRelaunch) {
         if (isOrganized()) {
             mReparentLeafTaskIfRelaunch = reparentLeafTaskIfRelaunch;
@@ -6703,7 +6692,7 @@ class Task extends TaskFragment {
      *
      * @see #getVisibility(ActivityRecord)
      * @see #hasFillingContent()
-     * @see ActivityTaskSupervisor.OpaqueContainerHelper#isOpaque
+     * @see WindowContainerVisibilityHelper#isOpaque
      */
     boolean isForceOpaque() {
         return mIsForceOpaque && mCreatedByOrganizer
@@ -6718,6 +6707,25 @@ class Task extends TaskFragment {
             return true;
         }
         return super.hasFillingContent();
+    }
+
+    /**
+     * Indicates whether this Task can float on top of insets, so it should report task bounds
+     * without checking insets, such as for metrics like smallestScreenWidthDp.
+     */
+    boolean shouldIgnoreInsets() {
+        // Only allow the explicit override behavior if this task is created by an organizer.
+        return mCreatedByOrganizer && mShouldIgnoreInsets;
+    }
+
+    /**
+     * Indicates whether this Task will disable showing rounded corners for app compat purposes
+     * around an activity (e.g. when a landscape app is letterboxed). Tasks can set this for better
+     * UX since sharp corners may look better in some cases like in a Bubble.
+     */
+    boolean disableAppCompatRoundedCorners() {
+        // Only allow the explicit override behavior if this task is created by an organizer.
+        return mCreatedByOrganizer && mDisableAppCompatRoundedCorners;
     }
 
     static class Builder {
@@ -6768,6 +6776,8 @@ class Task extends TaskFragment {
         private String mName;
 
         private boolean mIsForceOpaque;
+        private boolean mShouldIgnoreInsets = false;
+        private boolean mDisableAppCompatRoundedCorners = false;
 
         /**
          * Records the source task that requesting to build a new task, used to determine which of
@@ -6907,6 +6917,24 @@ class Task extends TaskFragment {
          */
         Builder setForceOpaque(boolean forceOpaque) {
             mIsForceOpaque = forceOpaque;
+            return this;
+        }
+
+        /**
+         * Sets whether the Task should ignore insets.
+         * @see Task#shouldIgnoreInsets()
+         */
+        Builder setShouldIgnoreInsets(boolean shouldIgnoreInsets) {
+            mShouldIgnoreInsets = shouldIgnoreInsets;
+            return this;
+        }
+
+        /**
+         * Sets whether the Task should disable showing app compat rounded corners.
+         * @see Task#disableAppCompatRoundedCorners()
+         */
+        Builder setDisableAppCompatRoundedCorners(boolean disableAppCompatRoundedCorners) {
+            mDisableAppCompatRoundedCorners = disableAppCompatRoundedCorners;
             return this;
         }
 
@@ -7151,7 +7179,8 @@ class Task extends TaskFragment {
                     mRealActivitySuspended, mUserSetupComplete, mMinWidth, mMinHeight,
                     mActivityInfo, mVoiceSession, mVoiceInteractor, mCreatedByOrganizer,
                     mLaunchCookie, mDeferTaskAppear, mRemoveWithTaskOrganizer,
-                    mIsForceOpaque, mRealActivityAppLockEnabled);
+                    mIsForceOpaque, mShouldIgnoreInsets, mDisableAppCompatRoundedCorners,
+                    mRealActivityAppLockEnabled);
         }
     }
 
@@ -7241,6 +7270,33 @@ class Task extends TaskFragment {
             layer.release();
         }
         mExcludeLayersFromTaskSnapshot = null;
+    }
+
+    // TODO(b/464035997): remove this method once the long term solution is implemented.
+    /**
+     * Returns whether this task has a sibling task that is opaque. This is only relevant for
+     * non-root Tasks.
+     */
+    boolean hasOpaqueSibling() {
+        final WindowContainer parent = getParent();
+        if (parent == null) {
+            return false;
+        }
+        final Task parentTask = parent.asTask();
+        if (parentTask == null) {
+            return false;
+        }
+        for (int i = 0; i < parentTask.getChildCount(); i++) {
+            final WindowContainer child = parentTask.getChildAt(i);
+            // Skip the task being moved
+            if (child == this) {
+                continue;
+            }
+            if (mAtmService.mVisibilityHelper.isOpaque(child)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

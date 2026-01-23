@@ -79,6 +79,7 @@ flag {
     namespace: "accessibility"
     description: "Enables new APIs for an app to get the nodes from a SelectionPosition without a direct node instance."
     bug: "362783892"
+    is_exported: true
 }
 
 flag {
@@ -260,16 +261,6 @@ flag {
     namespace: "accessibility"
     description: "Clear pending messages and callbacks of the handler in AccessibilityInteractionController when the ViewRootImpl is detached from Window to prevent leaking ViewRootImpl"
     bug: "320701910"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "prevent_volume_shortcut_ringtone_exhaustion"
-    namespace: "accessibility"
-    description: "Prevents audio resource exhaustion by stopping the previous ringtone before a new one is played when the accessibility shortcut is repeatedly triggered."
-    bug: "429376017"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

@@ -32,14 +32,6 @@ flag {
 }
 
 flag {
-    namespace: "window_surfaces"
-    name: "set_sc_properties_in_client"
-    description: "Set VRI SC properties in the client instead of system server"
-    is_fixed_read_only: true
-    bug: "308662081"
-}
-
-flag {
   name: "ignore_corner_radius_and_shadows"
   namespace: "window_surfaces"
   description: "Ignore the corner radius and shadows of a SurfaceControl"
@@ -137,3 +129,11 @@ flag {
     bug: "437391557"
     is_exported: true
 }
+
+flag {
+    name: "screen_capture_exclusion_flags"
+    namespace: "window_surfaces"
+    description: "Enable the capability of excluding windows in screen captures by checking the exclusion flags."
+    bug: "469847524"
+}
+

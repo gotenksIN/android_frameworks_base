@@ -632,7 +632,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     private boolean mHandleVolumeKeysInWM;
 
     private boolean mPendingKeyguardOccluded;
-    private boolean mKeyguardOccludedChanged;
 
     Intent mHomeIntent;
     Intent mCarDockIntent;
@@ -2907,14 +2906,16 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         // planed. So, we temporarily allow Wear device to override it. Such exempt will be
         // removed as soon as Wear's keycode remapping is done.
         // TODO(b/422274999): remove this temporary override exemption when remapping is done.
-        if (!mHasFeatureWatch || !com.android.server.policy.Flags.wearKeyGestureHandling()) {
+        final boolean useMigratedKeyGestureHandlingForWear =
+                mHasFeatureWatch && com.android.server.policy.Flags.wearKeyGestureHandling();
+        if (!useMigratedKeyGestureHandlingForWear) {
             mSingleKeyGestureDetector.addRule(new PowerKeyRule());
+            if (hasStemPrimaryBehavior()) {
+                mSingleKeyGestureDetector.addRule(new StemPrimaryKeyRule());
+            }
         }
         if (hasLongPressOnBackBehavior()) {
             mSingleKeyGestureDetector.addRule(new BackKeyRule());
-        }
-        if (hasStemPrimaryBehavior()) {
-            mSingleKeyGestureDetector.addRule(new StemPrimaryKeyRule());
         }
         mSingleKeyGestureDetector.addRule(new StylusTailButtonRule());
     }
@@ -3509,6 +3510,8 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                 KeyGestureEvent.KEY_GESTURE_TYPE_TRIGGER_BUG_REPORT,
                 KeyGestureEvent.KEY_GESTURE_TYPE_MULTI_WINDOW_NAVIGATION,
                 KeyGestureEvent.KEY_GESTURE_TYPE_DESKTOP_MODE,
+                KeyGestureEvent.KEY_GESTURE_TYPE_SPLIT_SCREEN_NAVIGATION_LEFT,
+                KeyGestureEvent.KEY_GESTURE_TYPE_SPLIT_SCREEN_NAVIGATION_RIGHT,
                 KeyGestureEvent.KEY_GESTURE_TYPE_OPEN_SHORTCUT_HELPER,
                 KeyGestureEvent.KEY_GESTURE_TYPE_BRIGHTNESS_UP,
                 KeyGestureEvent.KEY_GESTURE_TYPE_BRIGHTNESS_DOWN,
@@ -3634,6 +3637,18 @@ public class PhoneWindowManager implements WindowManagerPolicy {
                         statusbar.moveFocusedTaskToDesktop(
                                 getTargetDisplayIdForKeyGestureEvent(event));
                     }
+                }
+                break;
+            case KeyGestureEvent.KEY_GESTURE_TYPE_SPLIT_SCREEN_NAVIGATION_LEFT:
+                if (complete) {
+                    moveFocusedTaskToStageSplit(getTargetDisplayIdForKeyGestureEvent(event),
+                            true /* leftOrTop */);
+                }
+                break;
+            case KeyGestureEvent.KEY_GESTURE_TYPE_SPLIT_SCREEN_NAVIGATION_RIGHT:
+                if (complete) {
+                    moveFocusedTaskToStageSplit(getTargetDisplayIdForKeyGestureEvent(event),
+                            false /* leftOrTop */);
                 }
                 break;
             case KeyGestureEvent.KEY_GESTURE_TYPE_OPEN_SHORTCUT_HELPER:
@@ -3986,17 +4001,14 @@ public class PhoneWindowManager implements WindowManagerPolicy {
     public void onKeyguardOccludedChangedLw(boolean occluded) {
         if (mKeyguardDelegate != null) {
             mPendingKeyguardOccluded = occluded;
-            mKeyguardOccludedChanged = true;
         }
     }
 
     @Override
     public int applyKeyguardOcclusionChange() {
         if (DEBUG_KEYGUARD) Slog.d(TAG, "transition/occluded commit occluded="
-                + mPendingKeyguardOccluded + " changed=" + mKeyguardOccludedChanged);
+                + mPendingKeyguardOccluded);
 
-        // TODO(b/276433230): Explicitly save before/after for occlude state in each
-        // Transition so we don't need to update SysUI every time.
         if (setKeyguardOccludedLw(mPendingKeyguardOccluded)) {
             return FINISH_LAYOUT_REDO_LAYOUT | FINISH_LAYOUT_REDO_WALLPAPER;
         } else {
@@ -4072,13 +4084,11 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
         args.putLong(Intent.EXTRA_TIME, eventTime);
         args.putInt(AssistUtils.INVOCATION_TYPE_KEY, invocationType);
-        if (com.android.window.flags.Flags.supportGeminiOnMultiDisplay()) {
-            if (invocationType == AssistUtils.INVOCATION_TYPE_POWER_BUTTON_LONG_PRESS) {
-                args.putInt(Intent.EXTRA_ASSIST_DISPLAY_ID,
-                        displayId >= 0 ? displayId : DEFAULT_DISPLAY);
-            } else {
-                args.putInt(Intent.EXTRA_ASSIST_DISPLAY_ID, mTopFocusedDisplayId);
-            }
+        if (invocationType == AssistUtils.INVOCATION_TYPE_POWER_BUTTON_LONG_PRESS) {
+            args.putInt(Intent.EXTRA_ASSIST_DISPLAY_ID,
+                    displayId >= 0 ? displayId : DEFAULT_DISPLAY);
+        } else {
+            args.putInt(Intent.EXTRA_ASSIST_DISPLAY_ID, mTopFocusedDisplayId);
         }
 
         SearchManager searchManager = mContext.getSystemService(SearchManager.class);
@@ -4229,6 +4239,13 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         }
     }
 
+    private void moveFocusedTaskToStageSplit(int displayId, boolean leftOrTop) {
+        StatusBarManagerInternal statusbar = getStatusBarManagerInternal();
+        if (statusbar != null) {
+            statusbar.moveFocusedTaskToStageSplit(displayId, leftOrTop);
+        }
+    }
+
     private boolean skipDreamWakeForInteractiveDoze() {
         return mInteractiveDozeEnabled && mDefaultDisplay.getState() == Display.STATE_ON;
     }
@@ -4313,7 +4330,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
      */
     private boolean setKeyguardOccludedLw(boolean isOccluded) {
         if (DEBUG_KEYGUARD) Slog.d(TAG, "setKeyguardOccluded occluded=" + isOccluded);
-        mKeyguardOccludedChanged = false;
         mPendingKeyguardOccluded = isOccluded;
         mKeyguardDelegate.setOccluded(isOccluded);
         return mKeyguardDelegate.isShowing();
@@ -6515,7 +6531,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
         proto.write(WINDOW_MANAGER_DRAW_COMPLETE,
                 mDefaultDisplayPolicy.isWindowManagerDrawComplete());
         proto.write(KEYGUARD_OCCLUDED, isKeyguardOccluded());
-        proto.write(KEYGUARD_OCCLUDED_CHANGED, mKeyguardOccludedChanged);
         proto.write(KEYGUARD_OCCLUDED_PENDING, mPendingKeyguardOccluded);
         if (mKeyguardDelegate != null) {
             mKeyguardDelegate.dumpDebug(proto, KEYGUARD_DELEGATE);
@@ -6616,7 +6631,6 @@ public class PhoneWindowManager implements WindowManagerPolicy {
             pw.print(prefix); pw.print("  "); pw.println(mDisplayHomeButtonHandlers.get(key));
         }
         pw.print(prefix); pw.print("mKeyguardOccluded="); pw.print(isKeyguardOccluded());
-                pw.print(" mKeyguardOccludedChanged="); pw.print(mKeyguardOccludedChanged);
                 pw.print(" mPendingKeyguardOccluded="); pw.println(mPendingKeyguardOccluded);
         pw.print(prefix); pw.print("mAllowLockscreenWhenOnDisplays=");
                 pw.print(!mAllowLockscreenWhenOnDisplays.isEmpty());

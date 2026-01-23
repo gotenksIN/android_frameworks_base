@@ -34,7 +34,9 @@
         as a result. This is uncommon, but not rare.
 
     Finalizing a release's resources:
-        1. $ANDROID_BUILD_TOP/frameworks/base/tools/aapt2/tools/finalize_res.py \
+        1. lunch sdk-next-eng && \
+           m finalize_res && \
+           finalize_res \
            $ANDROID_BUILD_TOP/frameworks/base/core/res/res/values/public-staging.xml \
            $ANDROID_BUILD_TOP/frameworks/base/core/res/res/values/public-final.xml
         2. Rename "NEXT" in the new public-staging.xml resources header to the next platform short
@@ -118,7 +120,8 @@
     <public name="alternateLauncherLabels"/>
     <!-- @hide No longer needed. -->
     <public name="removed_runInPccSandbox"/>
-    <!-- @FlaggedApi(android.service.dreams.Flags.FLAG_USER_SELECTABLE_METADATA) -->
+    <!-- @FlaggedApi(android.service.dreams.Flags.FLAG_USER_SELECTABLE_METADATA)
+    @hide @SystemApi -->
     <public name="userSelectable"/>
     <!-- @FlaggedApi(android.os.Flags.FLAG_NATIVE_FRAMEWORK_PROTOTYPE) -->
     <public name="nativeService"/>
@@ -137,7 +140,7 @@
     <!-- @FlaggedApi(android.view.inputmethod.Flags.FLAG_IME_SUBTYPE_SHORT_LABEL) -->
     <public name="shortLabel"/>
     <!-- @FlaggedApi(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT) -->
-    <public name="isPrivateComputeCoreProcess"/>
+    <public name="privateComputeCore"/>
   </staging-public-group>
 
   <staging-public-group type="id" first-id="0x01a10000">

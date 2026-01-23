@@ -25,8 +25,11 @@ import android.testing.TestableLooper
 import androidx.test.filters.SmallTest
 import com.android.systemui.Flags
 import com.android.systemui.SysuiTestCase
+import com.android.systemui.broadcast.BroadcastDispatcherCustomExecutor
 import com.android.systemui.display.domain.interactor.ConnectedDisplayInteractor
 import com.android.systemui.display.domain.interactor.ConnectedDisplayInteractor.PendingDisplay
+import com.android.systemui.kosmos.mainCoroutineContext
+import com.android.systemui.kosmos.testScope
 import com.android.systemui.log.logcatLogBuffer
 import com.android.systemui.privacy.PrivacyApplication
 import com.android.systemui.privacy.PrivacyItem
@@ -34,13 +37,12 @@ import com.android.systemui.privacy.PrivacyItemController
 import com.android.systemui.privacy.PrivacyType
 import com.android.systemui.res.R
 import com.android.systemui.statusbar.policy.BatteryController
+import com.android.systemui.testKosmosNew
 import com.android.systemui.util.mockito.any
 import com.android.systemui.util.mockito.argThat
-import com.android.systemui.util.time.FakeSystemClock
+import com.android.systemui.util.time.fakeSystemClock
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.test.TestScope
-import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
@@ -58,9 +60,10 @@ import platform.test.runner.parameterized.Parameters
 @SmallTest
 @UsesFlags(Flags::class, android.location.flags.Flags::class)
 class SystemEventCoordinatorTest(flags: FlagsParameterization) : SysuiTestCase() {
+    private val kosmos = testKosmosNew()
 
-    private val fakeSystemClock = FakeSystemClock()
-    private val testScope = TestScope(UnconfinedTestDispatcher())
+    private val fakeSystemClock = kosmos.fakeSystemClock
+    private val testScope = kosmos.testScope
     private val connectedDisplayInteractor = FakeConnectedDisplayInteractor()
 
     @Mock lateinit var batteryController: BatteryController
@@ -73,7 +76,10 @@ class SystemEventCoordinatorTest(flags: FlagsParameterization) : SysuiTestCase()
         @JvmStatic
         @Parameters(name = "{0}")
         fun getParams(): List<FlagsParameterization> {
-            return FlagsParameterization.allCombinationsOf(FLAG_LOCATION_INDICATORS_ENABLED)
+            return FlagsParameterization.allCombinationsOf(
+                FLAG_LOCATION_INDICATORS_ENABLED,
+                BroadcastDispatcherCustomExecutor.FLAG_NAME,
+            )
         }
 
         private const val ADVANCE_TIME_WITHIN_DEBOUNCE_MS = DEBOUNCE_TIME_LOCATION - 100_000L
@@ -95,9 +101,10 @@ class SystemEventCoordinatorTest(flags: FlagsParameterization) : SysuiTestCase()
                     batteryController,
                     privacyController,
                     context,
-                    TestScope(UnconfinedTestDispatcher()),
+                    testScope.backgroundScope,
                     connectedDisplayInteractor,
                     logcatLogBuffer("SystemEventCoordinatorTest"),
+                    kosmos.mainCoroutineContext,
                 )
                 .apply { attachScheduler(scheduler) }
     }
@@ -483,10 +490,7 @@ class SystemEventCoordinatorTest(flags: FlagsParameterization) : SysuiTestCase()
         }
 
     @Test
-    @EnableFlags(
-        FLAG_LOCATION_INDICATORS_ENABLED,
-        FLAG_LOCATION_INDICATORS_ANIMATION,
-    )
+    @EnableFlags(FLAG_LOCATION_INDICATORS_ENABLED, FLAG_LOCATION_INDICATORS_ANIMATION)
     fun onPrivacyItemsChanged_locationThenMicForDefaultCamera_noAnimation() =
         testScope.runTest {
             val locationList =
@@ -555,10 +559,7 @@ class SystemEventCoordinatorTest(flags: FlagsParameterization) : SysuiTestCase()
         }
 
     @Test
-    @EnableFlags(
-        FLAG_LOCATION_INDICATORS_ENABLED,
-        FLAG_LOCATION_INDICATORS_ANIMATION,
-    )
+    @EnableFlags(FLAG_LOCATION_INDICATORS_ENABLED, FLAG_LOCATION_INDICATORS_ANIMATION)
     fun onPrivacyItemsChanged_micForDefaultCameraThenLocation_showsAnimationOnce() =
         testScope.runTest {
             val micList =
@@ -768,10 +769,13 @@ class SystemEventCoordinatorTest(flags: FlagsParameterization) : SysuiTestCase()
         suspend fun emit() = flow.emit(Unit)
 
         override val connectedDisplayState: Flow<ConnectedDisplayInteractor.State>
-            get() = MutableSharedFlow<ConnectedDisplayInteractor.State>()
+            get() = MutableSharedFlow()
 
         override val connectedDisplayAddition: Flow<Unit>
             get() = flow
+
+        override val connectedDisplayRemoval: Flow<Int>
+            get() = MutableSharedFlow()
 
         override val pendingDisplay: Flow<PendingDisplay?>
             get() = MutableSharedFlow<PendingDisplay>()

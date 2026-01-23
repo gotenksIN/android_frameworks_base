@@ -37,9 +37,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -61,9 +61,11 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.onLongClick
+import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -113,6 +115,7 @@ fun PinPad(viewModel: PinBouncerViewModel, verticalSpacing: Dp, modifier: Modifi
         columns = columns,
         verticalSpacing = verticalSpacing,
         horizontalSpacing = calculateHorizontalSpacingBetweenColumns(gridWidth = 300.dp),
+        placeRelative = false,
         modifier =
             modifier.focusRequester(focusRequester).sysuiResTag("pin_pad_grid").semantics {
                 isTraversalGroup = true
@@ -202,12 +205,10 @@ private fun DigitButton(
                 scaleY = scale
             },
     ) { contentColor ->
-        // TODO(b/281878426): once "color: () -> Color" (added to BasicText in aosp/2568972) makes
-        // it into Text, use that here, to animate more efficiently.
-        Text(
+        BasicText(
             text = digit.toString(),
             style = MaterialTheme.typography.displaySmallEmphasized,
-            color = contentColor(),
+            color = { contentColor() },
         )
     }
 }
@@ -340,6 +341,7 @@ private fun PinPadButton(
                     interactionSource = interactionSource,
                     indication = indication,
                 )
+                .semantics(mergeDescendants = true) { role = Role.Button }
                 .thenIf(elementId != null) { Modifier.sysuiResTag(elementId!!) },
     ) {
         content(contentColor::value)

@@ -646,6 +646,14 @@ flag {
     is_exported: true
 }
 
+flag {
+    name: "skin_temp_oxygen_saturation_health_services_pregrant_enabled"
+    namespace: "android_health_services"
+    description: "This flag enables adding skin temp and SPO2 permission pregrants to health services."
+    bug: "463449714"
+    is_exported: true
+}
+
 flag{
     name: "content_restriction_role_enabled"
     is_exported: true
@@ -702,6 +710,14 @@ flag {
 }
 
 flag {
+    name: "allowlist_service_enabled"
+    is_exported: true
+    namespace: "permissions"
+    description: "This flag controls the enabled state of the AllowlistService"
+    bug: "461828838"
+}
+
+flag {
     name: "new_default_app_confirmation_dialog_enabled"
     is_exported: true
     namespace: "permissions"
@@ -715,4 +731,12 @@ flag {
     namespace: "note"
     description: "This flag controls role managers' ability to manage the notes role via RoleManager#getDefaultApplication and RoleManager#setDefaultApplication."
     bug: "443222861"
+}
+
+flag {
+    name: "location_button_enabled"
+    namespace: "permissions"
+    is_exported: true
+    description: "Whether location button (rendered by a system process) APIs are enabled."
+    bug: "413293601"
 }

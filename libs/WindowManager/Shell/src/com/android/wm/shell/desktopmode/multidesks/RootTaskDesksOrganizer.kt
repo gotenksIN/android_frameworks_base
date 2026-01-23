@@ -20,6 +20,7 @@ import android.app.ActivityManager.RecentTaskInfo
 import android.app.ActivityManager.RunningTaskInfo
 import android.app.ActivityOptions
 import android.app.ActivityTaskManager.INVALID_TASK_ID
+import android.app.FullscreenRequestHandler.REQUEST_ALLOW_MODE_ENTER
 import android.app.TaskInfo
 import android.app.WindowConfiguration.ACTIVITY_TYPE_STANDARD
 import android.app.WindowConfiguration.ACTIVITY_TYPE_UNDEFINED
@@ -32,7 +33,8 @@ import android.util.SparseArray
 import android.view.SurfaceControl
 import android.view.WindowManager.TRANSIT_TO_FRONT
 import android.window.DesktopExperienceFlags
-import android.window.TaskOrganizer
+import android.window.TaskCreationParams
+import android.window.TaskPropertiesRequest
 import android.window.TransitionInfo
 import android.window.WindowContainerToken
 import android.window.WindowContainerTransaction
@@ -162,25 +164,32 @@ class RootTaskDesksOrganizer(
     private fun createDeskRoot(displayId: Int, userId: Int?, callback: OnCreateCallback) {
         logV("createDeskRoot in display: %d for user: %d", displayId, userId)
         createDeskRootRequests += CreateDeskRequest(displayId, userId, callback)
-        val token =
-            shellTaskOrganizer.createRootTask(
-                TaskOrganizer.CreateRootTaskRequest()
-                    .setName("Desk")
-                    .setDisplayId(displayId)
-                    .setWindowingMode(WINDOWING_MODE_FREEFORM)
-                    .setRemoveWithTaskOrganizer(true)
-                    .setReparentOnDisplayRemoval(
-                        DesktopExperienceFlags.ENABLE_DISPLAY_DISCONNECT_INTERACTION.isTrue
-                    ),
-                this,
-            )
+
+        val taskProperties =
+            TaskPropertiesRequest()
+                .setReparentOnDisplayRemoval(
+                    DesktopExperienceFlags.ENABLE_DISPLAY_DISCONNECT_INTERACTION.isTrue
+                )
+        val params =
+            TaskCreationParams.Builder()
+                .setName("Desk")
+                .setDisplayId(displayId)
+                .setWindowingMode(WINDOWING_MODE_FREEFORM)
+                .setTaskPropertiesRequest(taskProperties)
+                .build()
+        val token = shellTaskOrganizer.createTask(params, this)
+
         token?.let {
             val wct = WindowContainerTransaction()
-            if (Flags.reparentDeskLeafTasksIfRelaunched()) {
-                wct.setReparentLeafTaskIfRelaunch(token, /* reparentLeafTaskIfRelaunch */ true)
-            }
             if (Flags.enableBackNavigationDesktopAppNoMinimize()) {
                 wct.setInterceptBackPressedOnTaskRoot(token, /* interceptBackPressed= */ true)
+            }
+            if (Flags.delegateRequestFullscreenHandlingToShell()) {
+                // Let any desktop task request to enter fullscreen mode.
+                wct.setFullscreenRequestAllowMode(token, REQUEST_ALLOW_MODE_ENTER)
+            }
+            if (Flags.enableAppRestartAfterUpdate()) {
+                wct.setHandlePackageUpdateForRootContainer(token, /* handlePackageUpdate= */ true)
             }
             if (!wct.isEmpty) {
                 shellTaskOrganizer.applyTransaction(wct)
@@ -243,6 +252,9 @@ class RootTaskDesksOrganizer(
         if (!skipReorder) wct.reorder(root.token, /* onTop= */ true)
         updateLaunchRoot(wct, deskId, enabled = true)
         updateTaskMoveAllowed(wct, deskId, allowed = true)
+        if (Flags.reparentDeskLeafTasksIfRelaunched()) {
+            wct.setReparentLeafTaskIfRelaunch(root.token, /* reparentLeafTaskIfRelaunch */ false)
+        }
     }
 
     override fun deactivateDesk(
@@ -269,6 +281,9 @@ class RootTaskDesksOrganizer(
         if (!skipReorder) wct.reorder(root.taskInfo.token, /* onTop= */ false)
         updateLaunchRoot(wct, deskId, enabled = false)
         updateTaskMoveAllowed(wct, deskId, allowed = false)
+        if (Flags.reparentDeskLeafTasksIfRelaunched()) {
+            wct.setReparentLeafTaskIfRelaunch(root.token, /* reparentLeafTaskIfRelaunch */ true)
+        }
     }
 
     override fun addLaunchDeskToActivityOptions(activityOptions: ActivityOptions, deskId: Int) {
@@ -527,6 +542,7 @@ class RootTaskDesksOrganizer(
         taskInfo: RunningTaskInfo,
         isFromMoveActivityTaskToBack: Boolean,
         isOptInOnBackInvoked: Boolean,
+        hasOpaqueSibling: Boolean,
     ) {
         if (Flags.enableBackNavigationDesktopAppNoMinimize() && !isOptInOnBackInvoked) {
             backPressedOnDeskListener?.invoke(taskInfo)
@@ -738,17 +754,19 @@ class RootTaskDesksOrganizer(
                 deskId = deskId,
                 callback = callback,
             )
-        shellTaskOrganizer.createRootTask(
-            TaskOrganizer.CreateRootTaskRequest()
+        val taskProperties =
+            TaskPropertiesRequest()
+                .setReparentOnDisplayRemoval(
+                    DesktopExperienceFlags.ENABLE_DISPLAY_DISCONNECT_INTERACTION.isTrue
+                )
+        val params =
+            TaskCreationParams.Builder()
                 .setName("MinimizedDesk_$deskId")
                 .setDisplayId(displayId)
                 .setWindowingMode(WINDOWING_MODE_FREEFORM)
-                .setRemoveWithTaskOrganizer(true)
-                .setReparentOnDisplayRemoval(
-                    DesktopExperienceFlags.ENABLE_DISPLAY_DISCONNECT_INTERACTION.isTrue
-                ),
-            this,
-        )
+                .setTaskPropertiesRequest(taskProperties)
+                .build()
+        shellTaskOrganizer.createTask(params, this)
     }
 
     @SuppressLint("MissingPermission")

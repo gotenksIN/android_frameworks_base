@@ -32,6 +32,8 @@ import android.annotation.SuppressLint;
 import android.annotation.UserIdInt;
 import android.app.ActivityOptions;
 import android.app.AppOpsManager;
+import android.app.IApplicationThread;
+import android.app.KeyguardManager;
 import android.app.PendingIntent;
 import android.companion.virtual.VirtualDeviceManager;
 import android.companion.virtual.VirtualDeviceManager.VirtualDevice;
@@ -64,6 +66,7 @@ import android.hardware.input.VirtualTouchscreen;
 import android.hardware.input.VirtualTouchscreenConfig;
 import android.media.ImageReader;
 import android.os.Binder;
+import android.os.Bundle;
 import android.os.IBinder;
 import android.os.RemoteException;
 import android.os.UserHandle;
@@ -150,12 +153,14 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     @VisibleForTesting
     static final int PRODUCT_ID_TOUCHSCREEN = 0xCC03;
 
-    private final Context mContext;
     private final IBinder mAppToken;
     private final ComputerControlSessionParams mParams;
+    private final IApplicationThread mAppThread;
+    private final String mAttributionTag;
 
     private final UserHandle mOwnerUser;
     private final String mOwnerPackageName;
+    private final Context mOwnerContext;
 
     private final Consumer<ComputerControlSessionImpl> mOnClosedListener;
     private final VirtualDevice mVirtualDevice;
@@ -246,14 +251,18 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     @Nullable
     private Surface mClientSurface;
 
+    // Whether this is a session only intended for testing ComputerControl functionality.
+    private final boolean mIsTestSession;
+
     ComputerControlSessionImpl(Context context,
             ComputerControlAllowlistController allowlistController, IBinder appToken,
-            ComputerControlSessionParams params, AttributionSource attributionSource,
+            ComputerControlSessionParams params, IApplicationThread appThread,
+            AttributionSource attributionSource,
             ComputerControlSessionProcessor.VirtualDeviceFactory virtualDeviceFactory,
             Consumer<ComputerControlSessionImpl> onClosedListener) {
         this(context, DisplayManagerGlobal.getInstance(), allowlistController,
                 ViewConfiguration.get(context), DEFAULT_GLOBAL_SESSION_TIMEOUT_DURATION_MS,
-                SurfaceControl.Transaction::new, appToken, params, attributionSource,
+                SurfaceControl.Transaction::new, appToken, params, appThread, attributionSource,
                 virtualDeviceFactory, onClosedListener, FgThread.getExecutor());
     }
 
@@ -262,10 +271,10 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             ComputerControlAllowlistController allowlistController,
             ViewConfiguration viewConfiguration, long globalSessionTimeoutDurationMs,
             Supplier<SurfaceControl.Transaction> transactionSupplier, IBinder appToken,
-            ComputerControlSessionParams params, AttributionSource attributionSource,
+            ComputerControlSessionParams params, IApplicationThread appThread,
+            AttributionSource attributionSource,
             ComputerControlSessionProcessor.VirtualDeviceFactory virtualDeviceFactory,
             Consumer<ComputerControlSessionImpl> onClosedListener, Executor fgThreadExecutor) {
-        mContext = context;
         mFgThreadExecutor = fgThreadExecutor;
         mViewConfiguration = viewConfiguration;
         mGlobalSessionTimeoutDurationMs = globalSessionTimeoutDurationMs;
@@ -274,11 +283,16 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         mParams = params;
         mAllowlistController = allowlistController;
         mPreviewIntent = params.getPreviewIntent();
+        mAppThread = appThread;
+        mAttributionTag = attributionSource.getAttributionTag();
 
         mOwnerUser = UserHandle.getUserHandleForUid(attributionSource.getUid());
-        final Context ownerContext = context.createContextAsUser(mOwnerUser, /* flags = */ 0);
+        mOwnerContext = context.createContextAsUser(mOwnerUser, /* flags = */ 0);
         mOwnerPackageName = attributionSource.getPackageName();
-        mOwnerPackageManager = ownerContext.getPackageManager();
+        mOwnerPackageManager = mOwnerContext.getPackageManager();
+
+        mIsTestSession = mAllowlistController.isTestAgent(attributionSource.getUid(),
+                mOwnerPackageName, mOwnerPackageManager);
 
         mOnClosedListener = onClosedListener;
         mWindowManagerInternal = LocalServices.getService(WindowManagerInternal.class);
@@ -290,14 +304,14 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         mInputManagerInternal = LocalServices.getService(InputManagerInternal.class);
         mDisplayManagerGlobal = displayManagerGlobal;
         mStatsController = new ComputerControlStatsController(
-            mContext.getPackageManager(), attributionSource, params);
+                context.getPackageManager(), attributionSource, params);
         if (android.app.appfunctions.flags.Flags.enableAppInteractionApi()) {
             mAppInteractionService = LocalServices.getService(AppInteractionService.class);
         } else {
             mAppInteractionService = null;
         }
 
-        // TODO(b/440005498): Consider using the display from the app's context instead.
+        // TODO(b/469400179): Consider using the display from the app's context instead.
         mMainDisplayId = mUserManagerInternal.getMainDisplayAssignedToUser(
                 mOwnerUser.getIdentifier());
 
@@ -383,7 +397,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             throw e.rethrowFromSystemServer();
         }
 
-        mAppOpsManager = ownerContext.getSystemService(AppOpsManager.class);
+        mAppOpsManager = mOwnerContext.getSystemService(AppOpsManager.class);
         mAppOpsManager.startWatchingMode(AppOpsManager.OP_COMPUTER_CONTROL, mOwnerPackageName,
                 this);
     }
@@ -439,6 +453,18 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         }
     }
 
+    PackageManager getPackageManager() {
+        return mOwnerPackageManager;
+    }
+
+    KeyguardManager getKeyguardManager() {
+        return mOwnerContext.getSystemService(KeyguardManager.class);
+    }
+
+    boolean isTestSession() {
+        return mIsTestSession;
+    }
+
     @Override
     public void initialize(IComputerControlLifecycleCallback callback, Surface clientSurface) {
         if (mClientSurface != null) {
@@ -458,8 +484,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             throw new IllegalArgumentException(
                     "Could not find launcher activity for " + packageName + "/" + className);
         }
-        if (!mAllowlistController.isPackageAutomatable(
-                packageName, mOwnerPackageName, mOwnerPackageManager)) {
+        if (!mAllowlistController.isPackageAutomatable(packageName, this)) {
             throw new IllegalArgumentException(
                     "Trying to launch " + packageName + " which is not allowlisted");
         }
@@ -476,10 +501,11 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         // If we block input and screenshots in the blocked state, we simply allow all
         // activities to launch. We detect blocked state automatically when an activity
         // launch request comes in for a package that's not allowed to launch.
-        Binder.withCleanCallingIdentity(() ->
-                mContext.startActivityAsUser(intent,
-                        ActivityOptions.makeBasic()
-                                .setLaunchDisplayId(mVirtualDisplayId).toBundle(), mOwnerUser));
+        final Bundle options =
+                ActivityOptions.makeBasic().setLaunchDisplayId(mVirtualDisplayId).toBundle();
+        Binder.withCleanCallingIdentity(() -> mActivityTaskManagerInternal.startActivityAsUser(
+                mAppThread, mOwnerPackageName, mAttributionTag, intent, null,
+                Intent.FLAG_ACTIVITY_NEW_TASK, options, mOwnerUser.getIdentifier()));
         mStatsController.onApplicationLaunched(packageName);
     }
 
@@ -995,7 +1021,6 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
                                     componentName.getPackageName(),
                                     null, // TODO(b/454891648): get attribution from agent
                                     now,
-                                    0L, // TODO(b/454891648): remove unused duration
                                     userId);
                         });
             }

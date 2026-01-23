@@ -23,6 +23,7 @@ import static com.android.server.timezonedetector.NotifyingTimeZoneChangeListene
 import static com.android.server.timezonedetector.NotifyingTimeZoneChangeListener.STATUS_SUPERSEDED;
 import static com.android.server.timezonedetector.NotifyingTimeZoneChangeListener.STATUS_UNKNOWN;
 import static com.android.server.timezonedetector.NotifyingTimeZoneChangeListener.STATUS_UNTRACKED;
+import static com.android.server.timezonedetector.TimeZoneDetectorStrategy.ORIGIN_FUSED;
 import static com.android.server.timezonedetector.TimeZoneDetectorStrategy.ORIGIN_LOCATION;
 import static com.android.server.timezonedetector.TimeZoneDetectorStrategy.ORIGIN_MANUAL;
 import static com.android.server.timezonedetector.TimeZoneDetectorStrategy.ORIGIN_TELEPHONY;
@@ -53,7 +54,6 @@ import android.platform.test.flag.junit.SetFlagsRule;
 
 import androidx.test.platform.app.InstrumentationRegistry;
 
-import com.android.server.flags.Flags;
 import com.android.server.timezonedetector.NotifyingTimeZoneChangeListener.TimeZoneChangeRecord;
 import com.android.server.timezonedetector.TimeZoneChangeListener.TimeZoneChangeEvent;
 
@@ -78,7 +78,6 @@ import java.util.TimeZone;
 
 /** White-box unit tests for {@link NotifyingTimeZoneChangeListener}. */
 @RunWith(JUnitParamsRunner.class)
-@EnableFlags(Flags.FLAG_DATETIME_NOTIFICATIONS)
 public class NotifyingTimeZoneChangeListenerTest {
 
     @ClassRule public static final SetFlagsRule.ClassRule mClassRule = new SetFlagsRule.ClassRule();
@@ -90,7 +89,7 @@ public class NotifyingTimeZoneChangeListenerTest {
     public final MockitoRule mockito = MockitoJUnit.rule();
 
     public static List<@TimeZoneDetectorStrategy.Origin Integer> getDetectionOrigins() {
-        return List.of(ORIGIN_LOCATION, ORIGIN_TELEPHONY);
+        return List.of(ORIGIN_LOCATION, ORIGIN_TELEPHONY, ORIGIN_FUSED);
     }
 
     private static final String INTERACT_ACROSS_USERS_FULL_PERMISSION =
@@ -231,6 +230,8 @@ public class NotifyingTimeZoneChangeListenerTest {
             enableLocationTimeZoneDetection();
         } else if (origin == ORIGIN_TELEPHONY) {
             enableTelephonyTimeZoneDetection();
+        } else if (origin == ORIGIN_FUSED) {
+            enableAllTimeZoneDetectionAlgos();
         } else {
             throw new IllegalStateException(
                     "The given origin has not been implemented for this test: " + origin);
@@ -368,6 +369,8 @@ public class NotifyingTimeZoneChangeListenerTest {
             enableLocationTimeZoneDetection();
         } else if (origin == ORIGIN_TELEPHONY) {
             enableTelephonyTimeZoneDetection();
+        } else if (origin == ORIGIN_FUSED) {
+            enableAllTimeZoneDetectionAlgos();
         } else {
             throw new IllegalStateException(
                     "The given origin has not been implemented for this test: " + origin);
@@ -435,6 +438,8 @@ public class NotifyingTimeZoneChangeListenerTest {
             enableLocationTimeZoneDetection();
         } else if (origin == ORIGIN_TELEPHONY) {
             enableTelephonyTimeZoneDetection();
+        } else if (origin == ORIGIN_FUSED) {
+            enableAllTimeZoneDetectionAlgos();
         } else {
             throw new IllegalStateException(
                     "The given origin has not been implemented for this test: " + origin);
@@ -478,6 +483,8 @@ public class NotifyingTimeZoneChangeListenerTest {
             enableLocationTimeZoneDetection();
         } else if (origin == ORIGIN_TELEPHONY) {
             enableTelephonyTimeZoneDetection();
+        } else if (origin == ORIGIN_FUSED) {
+            enableAllTimeZoneDetectionAlgos();
         } else {
             throw new IllegalStateException(
                     "The given origin has not been implemented for this test: " + origin);
@@ -606,6 +613,21 @@ public class NotifyingTimeZoneChangeListenerTest {
                 toBuilder(oldConfiguration)
                         .setAutoDetectionEnabledSetting(true)
                         .setGeoDetectionEnabledSetting(false)
+                        .setTelephonyDetectionFeatureSupported(true)
+                        .setTelephonyFallbackSupported(true)
+                        .build();
+
+        mServiceConfigAccessor.simulateCurrentUserConfigurationInternalChange(newConfiguration);
+    }
+
+    private void enableAllTimeZoneDetectionAlgos() {
+        ConfigurationInternal oldConfiguration =
+                mServiceConfigAccessor.getCurrentUserConfigurationInternal();
+        ConfigurationInternal newConfiguration =
+                toBuilder(oldConfiguration)
+                        .setAutoDetectionEnabledSetting(true)
+                        .setGeoDetectionFeatureSupported(true)
+                        .setGeoDetectionEnabledSetting(true)
                         .setTelephonyDetectionFeatureSupported(true)
                         .setTelephonyFallbackSupported(true)
                         .build();

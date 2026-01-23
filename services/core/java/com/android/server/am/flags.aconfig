@@ -55,14 +55,6 @@ flag {
 }
 
 flag {
-    name: "logcat_longer_timeout"
-    namespace: "stability"
-    description: "Wait longer during the logcat gathering operation"
-    bug: "292533246"
-    is_fixed_read_only: true
-}
-
-flag {
     name: "push_global_state_to_oomadjuster"
     namespace: "backstage_power"
     description: "Migrate OomAdjuster pulled device state to a push model"
@@ -74,6 +66,13 @@ flag {
     namespace: "system_performance"
     description: "Enable the memory limiter"
     bug: "461546255"
+}
+
+flag {
+    name: "memory_limiter_default_app_limits"
+    namespace: "system_performance"
+    description: "Turn on default app limits"
+    bug: "467691174"
 }
 
 flag {
@@ -131,6 +130,16 @@ flag {
     namespace: "backstage_power"
     description: "Grant PROCESS_CAPABILITY_CPU_TIME to as many valid states and aggressively freeze other states"
     bug: "370798593"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "enable_capability_controller_computation"
+    namespace: "backstage_power"
+    description: "Enable capability controller computation with no side-effect"
+    bug: "466961280"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -260,16 +269,6 @@ flag {
 }
 
 flag {
-    name: "app_start_info_process_name_fix"
-    namespace: "system_performance"
-    description: "Use process name to lookup ProcessRecord."
-    bug: "443136429"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "service_check_calling_pkg"
     namespace: "backstage_power"
     description: "Throw security exception on service APIs if calling package doesn't match calling uid."
@@ -307,6 +306,7 @@ flag {
     name: "fgs_delegate_system_api"
     namespace: "backstage_power"
     description: "Whether to use new System APIs to start and stop FGS delegation."
+    is_exported: true
     bug: "303241170"
 }
 
@@ -316,4 +316,14 @@ flag {
     description: "Enable getting package names for a PID."
     is_exported: true
     bug: "456466241"
+}
+
+flag {
+    name: "battery_stats_log_combined_display_state"
+    namespace: "backstage_power"
+    description: "Logs atom for screen state for the most important display on device."
+    bug: "416368479"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }

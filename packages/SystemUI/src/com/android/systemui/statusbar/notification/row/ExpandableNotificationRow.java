@@ -16,7 +16,6 @@
 
 package com.android.systemui.statusbar.notification.row;
 
-import static android.app.Flags.notificationsRedesignTemplates;
 import static android.app.Notification.Action.SEMANTIC_ACTION_MARK_CONVERSATION_AS_PRIORITY;
 import static android.service.notification.NotificationListenerService.REASON_CANCEL;
 import static android.view.accessibility.AccessibilityEvent.CONTENT_CHANGE_TYPE_EXPANDED;
@@ -342,6 +341,11 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
      * If {@code true}, the header background will disappear when expanded.
      */
     private boolean mShowGroupBackgroundWhenExpanded;
+
+    /**
+     * Whether or not to enable expand the notification by default.
+     */
+    private boolean mEnablePinnedHunExpansion;
 
     /**
      * True if we always show the collapsed layout on lockscreen because vertical space is low.
@@ -818,6 +822,15 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
 
     @Override
     public boolean onInterceptHoverEvent(MotionEvent event) {
+        if (Flags.hunTimerPauseOnHover() && isHeadsUpState()) {
+            switch (event.getActionMasked()) {
+                case MotionEvent.ACTION_HOVER_ENTER ->
+                    mHeadsUpManager.setHeadsUpDismissTimerPaused(getKey(), /* paused= */ true);
+                case MotionEvent.ACTION_HOVER_EXIT ->
+                    mHeadsUpManager.setHeadsUpDismissTimerPaused(getKey(), /* paused= */ false);
+            }
+        }
+
         if (!NotificationAddXOnHoverToDismiss.isEnabled()) {
             return super.onInterceptHoverEvent(event);
         }
@@ -1331,9 +1344,17 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         if (intrinsicHeight != getIntrinsicHeight()) {
             notifyHeightChanged(/* needsAnimation= */ false, "ENR.setPinnedStatus");
         }
+
+        // Mark the notification as user-expanded if it was previously expanded while pinned, or
+        // if the `defaultHunExpansion` feature is enabled. This ensures it renders in its expanded
+        // state in the shade.
+        final boolean expandHun = mEnablePinnedHunExpansion && Flags.defaultHunExpansion();
         if (pinnedStatus.isPinned()) {
             setAnimationRunning(true);
-            mExpandedWhenPinned = false;
+            mExpandedWhenPinned = expandHun;
+            if (expandHun) {
+                setUserExpanded(true);
+            }
         } else if (mExpandedWhenPinned) {
             setUserExpanded(true);
         }
@@ -2322,13 +2343,8 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
                 R.dimen.notification_min_height_before_p);
         mMaxSmallHeightBeforeS = NotificationUtils.getFontScaledHeight(mContext,
                 R.dimen.notification_min_height_before_s);
-        if (notificationsRedesignTemplates()) {
-            mMaxSmallHeight = NotificationUtils.getFontScaledHeight(mContext,
-                    R.dimen.notification_2025_min_height);
-        } else {
-            mMaxSmallHeight = NotificationUtils.getFontScaledHeight(mContext,
-                    R.dimen.notification_min_height);
-        }
+        mMaxSmallHeight = NotificationUtils.getFontScaledHeight(mContext,
+                R.dimen.notification_2025_min_height);
         mMaxSmallHeightWithSummarization = NotificationUtils.getFontScaledHeight(mContext,
                 com.android.internal.R.dimen.notification_collapsed_height_with_summarization);
         mMaxExpandedHeight = NotificationUtils.getFontScaledHeight(mContext,
@@ -2349,6 +2365,8 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
                 res.getBoolean(R.bool.config_enableNonGroupedNotificationExpand);
         mShowGroupBackgroundWhenExpanded =
                 res.getBoolean(R.bool.config_showGroupNotificationBgWhenExpanded);
+        mEnablePinnedHunExpansion =
+                res.getBoolean(R.bool.config_enableHUNExpansion);
     }
 
     NotificationInlineImageResolver getImageResolver() {
@@ -3538,8 +3556,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
     }
 
     public void setSensitive(boolean sensitive, boolean hideSensitive) {
-        if (notificationsRedesignTemplates()
-                && sensitive == mSensitive && hideSensitive == mSensitiveHiddenInGeneral) {
+        if (sensitive == mSensitive && hideSensitive == mSensitiveHiddenInGeneral) {
             return; // nothing has changed
         }
 
@@ -3549,7 +3566,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
         int intrinsicAfter = getIntrinsicHeight();
         if (intrinsicBefore != intrinsicAfter) {
             notifyHeightChanged(/* needsAnimation= */ true, "ENR.setSensitive");
-        } else if (notificationsRedesignTemplates()) {
+        } else {
             // Just request the correct layout, even if the height hasn't changed
             getShowingLayout().requestSelectLayout(/* needsAnimation= */ true);
         }
@@ -4161,8 +4178,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
             }
         } else if (isChildInGroup()) {
             final int childColor = getShowingLayout().getBackgroundColorForExpansionState();
-            if ((Flags.notificationRowTransparency() || notificationsRedesignTemplates())
-                    && childColor == Color.TRANSPARENT) {
+            if (childColor == Color.TRANSPARENT) {
                 // If child is not customizing its background color, switch from the parent to
                 // the child background when the expansion finishes.
                 mShowNoBackground = !mNotificationParent.mShowNoBackground;
@@ -4639,6 +4655,7 @@ public class ExpandableNotificationRow extends ActivatableNotificationView
             pw.print(", isOnKeyguard: " + isOnKeyguard());
             pw.print(", isSummaryWithChildren: " + mIsSummaryWithChildren);
             pw.print(", enableNonGroupedExpand: " + mEnableNonGroupedNotificationExpand);
+            pw.print(", mEnablePinnedHunExpansion: " + mEnablePinnedHunExpansion);
             pw.print(", isPinned: " + isPinned());
             pw.print(", expandedWhenPinned: " + mExpandedWhenPinned);
             pw.print(", isMinimized: " + mIsMinimized);

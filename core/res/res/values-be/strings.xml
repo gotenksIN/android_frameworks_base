@@ -160,6 +160,10 @@
     <string name="wfc_mode_wifi_preferred_summary" msgid="1035175836270943089">"Выклікаць праз Wi-Fi"</string>
     <string name="wfc_mode_cellular_preferred_summary" msgid="4958965609212575619">"Выклікаць праз мабільную сетку"</string>
     <string name="wfc_mode_wifi_only_summary" msgid="104951993894678665">"Толькі Wi-Fi"</string>
+    <string name="adaptive_low_frequency_less_than_one_minute" msgid="8869498183646028708">"~ %s"</string>
+    <string name="adaptive_low_frequency_neg_less_than_one_minute" msgid="2590062535985417056">"~ −%s"</string>
+    <string name="elapsed_time_low_frequency_short_format_h_mm" msgid="6728141238066668781">"%1$d:%2$02d:--"</string>
+    <string name="elapsed_time_low_frequency_short_format_mm" msgid="2405181895215514414">"%1$02d:--"</string>
     <!-- no translation found for crossSimFormat_spn (9125246077491634262) -->
     <skip />
     <string name="crossSimFormat_spn_cross_sim_calling" msgid="5620807020002879057">"Рэзервовае капіраванне выклікаў праз аператара \"<xliff:g id="SPN">%s</xliff:g>\""</string>
@@ -563,7 +567,7 @@
     <string name="permdesc_callPhone" msgid="7892422187827695656">"Дазваляе праграме тэлефанаваць на тэлефонныя нумары без вашага ўдзелу. У выніку вы можаце пабачыць нечаканыя плацяжы і званкі. Аднак праграма не зможа рабіць выклікі на нумары экстранных службаў. Шкодныя праграмы могуць прыносіць выдаткі, робячы выклікі без вашага пацвярджэння, або набіраючы коды аператараў, з якімі ўваходныя выклікі аўтаматычна перанакіроўваюцца на іншы нумар."</string>
     <string name="permlab_accessImsCallService" msgid="442192920714863782">"атрымліваць доступ да сэрвісу выклікаў IMS"</string>
     <string name="permdesc_accessImsCallService" msgid="6328551241649687162">"Дазваляе праграмам выкарыстоўваць службу IMS, каб рабіць выклікі без вашага ўмяшання."</string>
-    <string name="permlab_readPhoneState" msgid="8138526903259297969">"чытанне статусу тэлефона і ідэнтыфікацыя"</string>
+    <string name="permlab_readPhoneState" msgid="8138526903259297969">"чытаць статус і ідэнтыфікацыйныя даныя тэлефона"</string>
     <string name="permdesc_readPhoneState" msgid="7229063553502788058">"Дазваляе прыкладанням атрымлiваць доступ да функцый тэлефона на прыладзе. Дзякуючы гэтаму дазволу прыкладанне можа вызначаць iдэнтыфiкатары нумару тэлефона i прылады, незалежна ад таго, цi актыўны выклiк, i аддалены нумар, на якi робiцца выклiк."</string>
     <string name="permlab_readBasicPhoneState" msgid="3214853233263871347">"счытваць даныя пра асноўны стан тэлефаніі і ідэнтыфікацыю"</string>
     <string name="permdesc_readBasicPhoneState" msgid="828185691675460520">"Дазваляе праграме мець доступ да асноўных функцый тэлефаніі на прыладзе."</string>
@@ -643,14 +647,12 @@
     <string name="permdesc_uwb_ranging" msgid="2519723069604307055">"Дазволіць праграме вызначаць адлегласць паміж прыладамі паблізу, якія выкарыстоўваюць звышшырокапалосную сувязь"</string>
     <string name="permlab_nearby_wifi_devices" msgid="392774237063608500">"узаемадзейнічаць з прыладамі з Wi‑Fi паблізу"</string>
     <string name="permdesc_nearby_wifi_devices" msgid="3054307728646332906">"Праграма зможа адпраўляць даныя на прылады Wi-Fi паблізу, падключацца да іх і вызначаць іх месцазнаходжанне"</string>
-    <string name="permlab_access_local_network" msgid="3420360767259066877">"доступ да прылад, падключаных да лакальнай сеткі"</string>
+    <string name="permlab_access_local_network" msgid="3420360767259066877">"атрымліваць доступ да прылад у лакальнай сетцы"</string>
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"Дазваляе праграме атрымліваць доступ да прылад, падключаных да лакальнай сеткі"</string>
     <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"выкарыстоўваць інтэрфейс зваротнай пятлі"</string>
     <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"Праграма зможа ўзаемадзейнічаць з іншымі праграмамі праз інтэрфейс зваротнай пятлі"</string>
-    <!-- no translation found for permlab_force_use_loopback_interface (1319727311706416481) -->
-    <skip />
-    <!-- no translation found for permdesc_force_use_loopback_interface (5829032514048681980) -->
-    <skip />
+    <string name="permlab_force_use_loopback_interface" msgid="1319727311706416481">"прымусовае выкарыстанне інтэрфейсу зваротнай пятлі"</string>
+    <string name="permdesc_force_use_loopback_interface" msgid="5829032514048681980">"Праграма зможа ўзаемадзейнічаць з іншымі праграмамі праз інтэрфейс зваротнай пятлі, нават калі ў іх няма дазволу на яго"</string>
     <string name="permlab_ranging" msgid="2854543350668593390">"вызначаць адноснае месцазнаходжанне прылад паблізу"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"Дазвольце праграме вызначаць адноснае месцазнаходжанне прылад паблізу"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"Інфармацыя пра прыярытэтны сэрвіс аплаты NFC"</string>
@@ -776,7 +778,7 @@
     <string name="face_acquired_too_low" msgid="4075391872960840081">"Перамясціце тэлефон ніжэй"</string>
     <string name="face_acquired_too_right" msgid="6245286514593540859">"Перамясціце тэлефон улева"</string>
     <string name="face_acquired_too_left" msgid="9201762240918405486">"Перамясціце тэлефон управа"</string>
-    <string name="face_acquired_poor_gaze" msgid="4427153558773628020">"Глядзіце прама на экран прылады."</string>
+    <string name="face_acquired_poor_gaze" msgid="6746437451436776485">"Глядзіце прама ў камеру"</string>
     <string name="face_acquired_not_detected" msgid="1057966913397548150">"Не відаць твару. Трымайце тэлефон на ўзроўні вачэй."</string>
     <string name="face_acquired_too_much_motion" msgid="8199691445085189528">"Трымайце прыладу нерухома. Трымайце тэлефон роўна."</string>
     <string name="face_acquired_recalibrate" msgid="8724013080976469746">"Паўтарыце рэгістрацыю твару."</string>
@@ -1456,6 +1458,9 @@
     <string name="carrier_app_notification_text" msgid="6567057546341958637">"Краніце, каб наладзіць"</string>
     <string name="time_zone_change_notification_title" msgid="5232503069219193218">"Ваш часавы пояс зменены"</string>
     <string name="time_zone_change_notification_body" msgid="6135793674904665585">"Ваш часавы пояс: <xliff:g id="TIME_ZONE_DISPLAY_NAME">%1$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET">%2$s</xliff:g>)"</string>
+    <string name="time_zone_offset_change_notification_title" msgid="8232305835199459588">"Перавод гадзінніка"</string>
+    <string name="time_zone_offset_change_notification_body_forward" msgid="1299493962341887576">"Гадзіннікі пераведзены наперад на <xliff:g id="TIME_ZONE_OFFSET_DURATION">%1$s</xliff:g>. Ваш часавы пояс: <xliff:g id="TIME_ZONE_DISPLAY_NAME">%2$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET_0">%3$s</xliff:g>)."</string>
+    <string name="time_zone_offset_change_notification_body_backward" msgid="6643532078142642118">"Гадзіннікі пераведзены назад на <xliff:g id="TIME_ZONE_OFFSET_DURATION">%1$s</xliff:g>. Ваш часавы пояс: <xliff:g id="TIME_ZONE_DISPLAY_NAME">%2$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET_0">%3$s</xliff:g>)."</string>
     <string name="time_picker_dialog_title" msgid="9053376764985220821">"Задаць час"</string>
     <string name="date_picker_dialog_title" msgid="5030520449243071926">"Задаць дату"</string>
     <string name="date_time_set" msgid="4603445265164486816">"Задаць"</string>
@@ -1831,6 +1836,7 @@
     <string name="accessibility_shortcut_label_gesture" msgid="7987298674836890931">"жэст"</string>
     <string name="accessibility_shortcut_label_quick_settings" msgid="6851280333772213611">"хуткія налады"</string>
     <string name="accessibility_shortcut_label_triple_tap" msgid="9058975959054454796">"трайны дотык"</string>
+    <string name="accessibility_shortcut_label_top_row_key" msgid="1488840908672437180">"клавіша спецыяльных магчымасцей"</string>
     <string name="accessibility_uncheck_legacy_item_warning" msgid="8047830891064817447">"Сэрвіс \"<xliff:g id="SERVICE_NAME">%s</xliff:g>\" выключаны"</string>
     <string name="edit_accessibility_shortcut_menu_button" msgid="8885752738733772935">"Змяніць ярлыкі"</string>
     <string name="done_accessibility_shortcut_menu_button" msgid="3668407723770815708">"Гатова"</string>
@@ -2107,6 +2113,7 @@
     <string name="app_suspended_default_message" msgid="6451215678552004172">"Праграма \"<xliff:g id="APP_NAME_0">%1$s</xliff:g>\" цяпер недаступная. Яна кіруецца праграмай \"<xliff:g id="APP_NAME_1">%2$s</xliff:g>\"."</string>
     <string name="app_suspended_more_details" msgid="211260942831587014">"Даведацца больш"</string>
     <string name="app_suspended_unsuspend_message" msgid="1665438589450555459">"Скасаваць прыпыненне для праграмы"</string>
+    <string name="locked_app_biometric_prompt_description" msgid="6853122652400451464">"Праграма \"<xliff:g id="APP_NAME">%1$s</xliff:g>\" заблакіравана"</string>
     <string name="work_mode_off_title" msgid="6367463960165135829">"Уключыць працоўныя праграмы?"</string>
     <string name="work_mode_turn_on" msgid="5316648862401307800">"Уключыць"</string>
     <string name="work_mode_emergency_call_button" msgid="6818855962881612322">"Экстранны выпадак"</string>
@@ -2546,6 +2553,8 @@
     <string name="accessibility_label_clone_profile" msgid="7579118375042398784">"Клон"</string>
     <string name="accessibility_label_communal_profile" msgid="1437173163111334791">"Супольны"</string>
     <string name="private_space_biometric_prompt_title" msgid="5777592909271728154">"Прыватная прастора"</string>
+    <string name="app_locked_new_notification" msgid="4409730436247596215">"Новае апавяшчэнне"</string>
+    <string name="app_locked_notification_message" msgid="4576179600328065280">"Новае паведамленне"</string>
     <string name="redacted_notification_message" msgid="1520587845842228816">"Канфідэнцыяльнае змесціва ў апавяшчэннях схавана"</string>
     <string name="redacted_notification_action_title" msgid="6942924973335920935"></string>
     <string name="screen_not_shared_sensitive_content" msgid="7058419185079565001">"Змесціва праграмы выключана з абагульвання экрана ў мэтах бяспекі"</string>

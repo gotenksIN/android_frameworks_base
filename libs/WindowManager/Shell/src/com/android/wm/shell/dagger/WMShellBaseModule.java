@@ -100,9 +100,9 @@ import com.android.wm.shell.compatui.impl.CompositeCompatUIHandler;
 import com.android.wm.shell.compatui.impl.DefaultCompatUIComponentFactory;
 import com.android.wm.shell.compatui.impl.DefaultCompatUIHandler;
 import com.android.wm.shell.compatui.impl.DefaultComponentIdGenerator;
-import com.android.wm.shell.desktopmode.DesktopMode;
 import com.android.wm.shell.desktopmode.DesktopTasksController;
 import com.android.wm.shell.desktopmode.DesktopUserRepositories;
+import com.android.wm.shell.desktopmode.api.DesktopMode;
 import com.android.wm.shell.desktopmode.common.DefaultHomePackageSupplier;
 import com.android.wm.shell.desktopmode.desktopwallpaperactivity.DesktopWallpaperActivityTokenProvider;
 import com.android.wm.shell.displayareahelper.DisplayAreaHelper;
@@ -114,6 +114,7 @@ import com.android.wm.shell.keyguard.KeyguardTransitionHandler;
 import com.android.wm.shell.keyguard.KeyguardTransitions;
 import com.android.wm.shell.onehanded.OneHanded;
 import com.android.wm.shell.onehanded.OneHandedController;
+import com.android.wm.shell.packageupdate.PackageUpdateController;
 import com.android.wm.shell.performance.PerfHintController;
 import com.android.wm.shell.recents.RecentTasks;
 import com.android.wm.shell.recents.RecentTasksController;
@@ -655,13 +656,14 @@ public abstract class WMShellBaseModule {
             Optional<RecentTasksController> recentTasksOptional,
             Optional<WindowDecorViewModel> windowDecorViewModelOptional,
             Optional<DesktopWallpaperActivityTokenProvider>
-                    desktopWallpaperActivityTokenProviderOptional) {
+                    desktopWallpaperActivityTokenProviderOptional,
+            Optional<PackageUpdateController> packageUpdateControllerOptional) {
         if (fullscreenTaskListener.isPresent()) {
             return fullscreenTaskListener.get();
         } else {
             return new FullscreenTaskListener(shellInit, shellTaskOrganizer, syncQueue,
                     recentTasksOptional, windowDecorViewModelOptional,
-                    desktopWallpaperActivityTokenProviderOptional);
+                    desktopWallpaperActivityTokenProviderOptional, packageUpdateControllerOptional);
         }
     }
 
@@ -1094,11 +1096,24 @@ public abstract class WMShellBaseModule {
     // Desktop mode (optional feature)
     //
 
+    @BindsOptionalOf
+    @DynamicOverride
+    abstract DesktopMode optionalDesktopMode();
+
     @WMSingleton
     @Provides
-    static Optional<DesktopMode> provideDesktopMode(
-            Optional<DesktopTasksController> desktopTasksController) {
-        return desktopTasksController.map(DesktopTasksController::asDesktopMode);
+    static Optional<DesktopMode> providesDesktopMode(
+            DesktopState desktopState,
+            @DynamicOverride Optional<Lazy<DesktopMode>> desktopMode) {
+        // Use optional-of-lazy for the dependency that this provider relies on.
+        // Lazy ensures that this provider will not be the cause the dependency is created
+        // when it will not be returned due to the condition below.
+        return desktopMode.flatMap((lazy) -> {
+            if (desktopState.canEnterDesktopModeOrShowAppHandle()) {
+                return Optional.of(lazy.get());
+            }
+            return Optional.empty();
+        });
     }
 
     @BindsOptionalOf
@@ -1143,6 +1158,26 @@ public abstract class WMShellBaseModule {
 
     @BindsOptionalOf
     abstract DesktopWallpaperActivityTokenProvider optionalDesktopWallpaperActivityTokenProvider();
+
+
+    @WMSingleton
+    @Provides
+    static Optional<PackageUpdateController> providePackageUpdateController(
+            @DynamicOverride Optional<Lazy<PackageUpdateController>> packageUpdateControllerLazy) {
+        // Use optional-of-lazy for the dependency that this provider relies on.
+        // Lazy ensures that this provider will not be the cause the dependency is created
+        // when it will not be returned due to the condition below.
+        return packageUpdateControllerLazy.flatMap((lazy) -> {
+            if (com.android.window.flags.Flags.enableAppRestartAfterUpdate()) {
+                return Optional.of(lazy.get());
+            }
+            return Optional.empty();
+        });
+    }
+
+    @BindsOptionalOf
+    @DynamicOverride
+    abstract PackageUpdateController optionalPackageUpdateController();
 
     //
     // App zoom out (optional feature)

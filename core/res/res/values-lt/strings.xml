@@ -160,6 +160,10 @@
     <string name="wfc_mode_wifi_preferred_summary" msgid="1035175836270943089">"Skambinimas naudojant „Wi-Fi“"</string>
     <string name="wfc_mode_cellular_preferred_summary" msgid="4958965609212575619">"Skambinimas naudojant mobiliojo ryšio tinklą"</string>
     <string name="wfc_mode_wifi_only_summary" msgid="104951993894678665">"Tik „Wi-Fi“"</string>
+    <string name="adaptive_low_frequency_less_than_one_minute" msgid="8869498183646028708">"~ %s"</string>
+    <string name="adaptive_low_frequency_neg_less_than_one_minute" msgid="2590062535985417056">"~ −%s"</string>
+    <string name="elapsed_time_low_frequency_short_format_h_mm" msgid="6728141238066668781">"%1$d:%2$02d:--"</string>
+    <string name="elapsed_time_low_frequency_short_format_mm" msgid="2405181895215514414">"%1$02d:--"</string>
     <!-- no translation found for crossSimFormat_spn (9125246077491634262) -->
     <skip />
     <string name="crossSimFormat_spn_cross_sim_calling" msgid="5620807020002879057">"<xliff:g id="SPN">%s</xliff:g> – atsarginis skambinimas"</string>
@@ -647,10 +651,8 @@
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"Leidžia programai pasiekti vietinio tinklo įrenginius"</string>
     <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"naudoti atgalinio ciklo sąsają"</string>
     <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"Programai leidžiama sąveikauti su kitomis programomis per atgalinio ciklo sąsają"</string>
-    <!-- no translation found for permlab_force_use_loopback_interface (1319727311706416481) -->
-    <skip />
-    <!-- no translation found for permdesc_force_use_loopback_interface (5829032514048681980) -->
-    <skip />
+    <string name="permlab_force_use_loopback_interface" msgid="1319727311706416481">"priverstinai naudoti atgalinio ciklo sąsają"</string>
+    <string name="permdesc_force_use_loopback_interface" msgid="5829032514048681980">"Programai leidžiama sąveikauti su kitomis programomis per atgalinio ciklo sąsają, nereikalaujant, kad kita programa turėtų atgalinio ciklo leidimus"</string>
     <string name="permlab_ranging" msgid="2854543350668593390">"nustatyti apytikslę netoliese esančių įrenginių poziciją"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"Leisti programai nustatyti apytikslę netoliese esančių įrenginių poziciją"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"Pageidaujama ARL mokėjimo paslaugos informacija"</string>
@@ -776,7 +778,7 @@
     <string name="face_acquired_too_low" msgid="4075391872960840081">"Laikykite telefoną žemiau"</string>
     <string name="face_acquired_too_right" msgid="6245286514593540859">"Laikykite telefoną kairiau"</string>
     <string name="face_acquired_too_left" msgid="9201762240918405486">"Laikykite telefoną dešiniau"</string>
-    <string name="face_acquired_poor_gaze" msgid="4427153558773628020">"Žiūrėkite tiesiai į įrenginį."</string>
+    <string name="face_acquired_poor_gaze" msgid="6746437451436776485">"Žiūrėkite tiesiai į fotoaparatą"</string>
     <string name="face_acquired_not_detected" msgid="1057966913397548150">"Nepavyko pamatyti jūsų veido. Laikykite telefoną akių lygyje."</string>
     <string name="face_acquired_too_much_motion" msgid="8199691445085189528">"Įrenginys per daug judinamas. Nejudink. telefono."</string>
     <string name="face_acquired_recalibrate" msgid="8724013080976469746">"Užregistruokite veidą iš naujo."</string>
@@ -1456,6 +1458,9 @@
     <string name="carrier_app_notification_text" msgid="6567057546341958637">"Jei norite tai nustatyti, palieskite"</string>
     <string name="time_zone_change_notification_title" msgid="5232503069219193218">"Jūsų laiko juosta pakeista"</string>
     <string name="time_zone_change_notification_body" msgid="6135793674904665585">"Dabar esate <xliff:g id="TIME_ZONE_DISPLAY_NAME">%1$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET">%2$s</xliff:g>)"</string>
+    <string name="time_zone_offset_change_notification_title" msgid="8232305835199459588">"Laikrodžio pakeitimas"</string>
+    <string name="time_zone_offset_change_notification_body_forward" msgid="1299493962341887576">"Laikrodžiai pasukti pirmyn <xliff:g id="TIME_ZONE_OFFSET_DURATION">%1$s</xliff:g> Dabar esate <xliff:g id="TIME_ZONE_DISPLAY_NAME">%2$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET_0">%3$s</xliff:g>)."</string>
+    <string name="time_zone_offset_change_notification_body_backward" msgid="6643532078142642118">"Laikrodžiai atsukti atgal <xliff:g id="TIME_ZONE_OFFSET_DURATION">%1$s</xliff:g> Dabar esate <xliff:g id="TIME_ZONE_DISPLAY_NAME">%2$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET_0">%3$s</xliff:g>)."</string>
     <string name="time_picker_dialog_title" msgid="9053376764985220821">"Nustatyti laiką"</string>
     <string name="date_picker_dialog_title" msgid="5030520449243071926">"Nustatyti datą"</string>
     <string name="date_time_set" msgid="4603445265164486816">"Nustatyti"</string>
@@ -1831,6 +1836,7 @@
     <string name="accessibility_shortcut_label_gesture" msgid="7987298674836890931">"gestas"</string>
     <string name="accessibility_shortcut_label_quick_settings" msgid="6851280333772213611">"spartieji nustatymai"</string>
     <string name="accessibility_shortcut_label_triple_tap" msgid="9058975959054454796">"palietimas tris kartus"</string>
+    <string name="accessibility_shortcut_label_top_row_key" msgid="1488840908672437180">"pritaikomumo klavišas"</string>
     <string name="accessibility_uncheck_legacy_item_warning" msgid="8047830891064817447">"Paslauga „<xliff:g id="SERVICE_NAME">%s</xliff:g>“ išjungta"</string>
     <string name="edit_accessibility_shortcut_menu_button" msgid="8885752738733772935">"Redaguoti sparčiuosius klavišus"</string>
     <string name="done_accessibility_shortcut_menu_button" msgid="3668407723770815708">"Atlikta"</string>
@@ -2107,6 +2113,7 @@
     <string name="app_suspended_default_message" msgid="6451215678552004172">"Programa „<xliff:g id="APP_NAME_0">%1$s</xliff:g>“ šiuo metu nepasiekiama. Tai tvarkoma naudojant programą „<xliff:g id="APP_NAME_1">%2$s</xliff:g>“."</string>
     <string name="app_suspended_more_details" msgid="211260942831587014">"Sužinoti daugiau"</string>
     <string name="app_suspended_unsuspend_message" msgid="1665438589450555459">"Atšaukti programos pristabdymą"</string>
+    <string name="locked_app_biometric_prompt_description" msgid="6853122652400451464">"„<xliff:g id="APP_NAME">%1$s</xliff:g>“ yra užrakinta"</string>
     <string name="work_mode_off_title" msgid="6367463960165135829">"Atš. darbo progr. pristabd.?"</string>
     <string name="work_mode_turn_on" msgid="5316648862401307800">"Atšaukti pristabdymą"</string>
     <string name="work_mode_emergency_call_button" msgid="6818855962881612322">"Pagalbos tarnyba"</string>
@@ -2546,6 +2553,8 @@
     <string name="accessibility_label_clone_profile" msgid="7579118375042398784">"Klonuoti"</string>
     <string name="accessibility_label_communal_profile" msgid="1437173163111334791">"Bendruomenės"</string>
     <string name="private_space_biometric_prompt_title" msgid="5777592909271728154">"Privati erdvė"</string>
+    <string name="app_locked_new_notification" msgid="4409730436247596215">"Naujas pranešimas"</string>
+    <string name="app_locked_notification_message" msgid="4576179600328065280">"Naujas pranešimas"</string>
     <string name="redacted_notification_message" msgid="1520587845842228816">"Neskelbtinos informacijos pranešimo turinys paslėptas"</string>
     <string name="redacted_notification_action_title" msgid="6942924973335920935"></string>
     <string name="screen_not_shared_sensitive_content" msgid="7058419185079565001">"Programos turinys paslėptas bendrinant ekraną saugumo sumetimais"</string>

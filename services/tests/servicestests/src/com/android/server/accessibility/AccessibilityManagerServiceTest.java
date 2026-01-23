@@ -30,6 +30,7 @@ import static android.view.WindowManagerPolicyConstants.NAV_BAR_MODE_3BUTTON;
 import static android.view.WindowManagerPolicyConstants.NAV_BAR_MODE_GESTURAL;
 import static android.view.accessibility.Flags.FLAG_ENABLE_TRUSTED_ACCESSIBILITY_SERVICE_API;
 
+import static com.android.hardware.input.Flags.enableColorInversionKeyGestures;
 import static com.android.internal.accessibility.AccessibilityShortcutController.ACCESSIBILITY_HEARING_AIDS_COMPONENT_NAME;
 import static com.android.internal.accessibility.AccessibilityShortcutController.MAGNIFICATION_CONTROLLER_NAME;
 import static com.android.internal.accessibility.common.ShortcutConstants.USER_SHORTCUT_TYPES;
@@ -38,11 +39,13 @@ import static com.android.internal.accessibility.common.ShortcutConstants.UserSh
 import static com.android.internal.accessibility.common.ShortcutConstants.UserShortcutType.KEY_GESTURE;
 import static com.android.internal.accessibility.common.ShortcutConstants.UserShortcutType.QUICK_SETTINGS;
 import static com.android.internal.accessibility.common.ShortcutConstants.UserShortcutType.SOFTWARE;
+import static com.android.internal.accessibility.common.ShortcutConstants.UserShortcutType.TOP_ROW_KEY;
 import static com.android.internal.accessibility.dialog.AccessibilityButtonChooserActivity.EXTRA_TYPE_TO_CHOOSE;
 import static com.android.server.accessibility.AccessibilityManagerService.ACTION_DISMISS_KEY_GESTURE_CONFIRM_DIALOG;
+import static com.android.server.accessibility.AccessibilityManagerService.ACTION_LAUNCH_ACCESSIBILITY_SHORTCUT_CHOOSER_DIALOG;
 import static com.android.server.accessibility.AccessibilityManagerService.ACTION_LAUNCH_HEARING_DEVICES_DIALOG;
 import static com.android.server.accessibility.AccessibilityManagerService.ACTION_LAUNCH_KEY_GESTURE_CONFIRM_DIALOG;
-import static com.android.hardware.input.Flags.enableColorInversionKeyGestures;
+
 import static com.google.common.truth.Truth.assertThat;
 
 import static org.junit.Assert.assertFalse;
@@ -631,7 +634,6 @@ public class AccessibilityManagerServiceTest {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_MAGNIFICATION_FOLLOWS_MOUSE_WITH_POINTER_MOTION_FILTER)
     public void testCursorFollowing_defaultContinuousAndThenCenter_propagateToA11yInputFilter() {
         final AccessibilityUserState userState = mA11yms.mUserStates.get(
                 mA11yms.getCurrentUserIdLocked());
@@ -800,43 +802,6 @@ public class AccessibilityManagerServiceTest {
 
     @SmallTest
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_MAGNIFICATION_MULTIPLE_FINGER_MULTIPLE_TAP_GESTURE)
-    public void testOnClientChange_magnificationTwoFingerTripleTapEnabled_requestConnection() {
-        when(mProxyManager.canRetrieveInteractiveWindowsLocked()).thenReturn(false);
-
-        final AccessibilityUserState userState = mA11yms.mUserStates.get(
-                mA11yms.getCurrentUserIdLocked());
-        userState.setMagnificationCapabilitiesLocked(
-                ACCESSIBILITY_MAGNIFICATION_MODE_ALL);
-        userState.setMagnificationTwoFingerTripleTapEnabledLocked(true);
-
-        // Invokes client change to trigger onUserStateChanged.
-        mA11yms.onClientChangeLocked(/* serviceInfoChanged= */false);
-
-        verify(mMockMagnificationConnectionManager).requestConnection(true);
-    }
-
-    @SmallTest
-    @Test
-    @EnableFlags(Flags.FLAG_ENABLE_MAGNIFICATION_MULTIPLE_FINGER_MULTIPLE_TAP_GESTURE)
-    public void testOnClientChange_magnificationTwoFingerTripleTapDisabled_requestDisconnection() {
-        when(mProxyManager.canRetrieveInteractiveWindowsLocked()).thenReturn(false);
-
-        final AccessibilityUserState userState = mA11yms.mUserStates.get(
-                mA11yms.getCurrentUserIdLocked());
-        userState.setMagnificationCapabilitiesLocked(
-                ACCESSIBILITY_MAGNIFICATION_MODE_ALL);
-        //userState.setMagnificationSingleFingerTripleTapEnabledLocked(false);
-        userState.setMagnificationTwoFingerTripleTapEnabledLocked(false);
-
-        // Invokes client change to trigger onUserStateChanged.
-        mA11yms.onClientChangeLocked(/* serviceInfoChanged= */false);
-
-        verify(mMockMagnificationConnectionManager).requestConnection(false);
-    }
-
-    @SmallTest
-    @Test
     public void testOnClientChange_boundServiceCanControlMagnification_requestConnection() {
         when(mProxyManager.canRetrieveInteractiveWindowsLocked()).thenReturn(false);
 
@@ -871,37 +836,6 @@ public class AccessibilityManagerServiceTest {
                 mA11yms.getCurrentUserIdLocked());
         userState.setMagnificationCapabilitiesLocked(ACCESSIBILITY_MAGNIFICATION_MODE_ALL);
         userState.setMagnificationSingleFingerTripleTapEnabledLocked(true);
-
-        // Invokes client change to trigger onUserStateChanged.
-        mA11yms.onClientChangeLocked(/* serviceInfoChanged= */false);
-
-        verify(mMockMagnificationConnectionManager, never()).removeMagnificationButton(anyInt());
-    }
-
-    @SmallTest
-    @Test
-    @EnableFlags(Flags.FLAG_ENABLE_MAGNIFICATION_MULTIPLE_FINGER_MULTIPLE_TAP_GESTURE)
-    public void onClientChange_magnificationTwoFingerTripleTapDisabled_removeMagnificationButton() {
-        final AccessibilityUserState userState = mA11yms.mUserStates.get(
-                mA11yms.getCurrentUserIdLocked());
-        userState.setMagnificationCapabilitiesLocked(ACCESSIBILITY_MAGNIFICATION_MODE_WINDOW);
-        userState.setMagnificationTwoFingerTripleTapEnabledLocked(false);
-
-        // Invokes client change to trigger onUserStateChanged.
-        mA11yms.onClientChangeLocked(/* serviceInfoChanged= */false);
-
-        verify(mMockMagnificationConnectionManager, atLeastOnce())
-                .removeMagnificationButton(anyInt());
-    }
-
-    @SmallTest
-    @Test
-    @EnableFlags(Flags.FLAG_ENABLE_MAGNIFICATION_MULTIPLE_FINGER_MULTIPLE_TAP_GESTURE)
-    public void onClientChange_magnificationTwoFingerTripleTapEnabled_keepMagnificationButton() {
-        final AccessibilityUserState userState = mA11yms.mUserStates.get(
-                mA11yms.getCurrentUserIdLocked());
-        userState.setMagnificationCapabilitiesLocked(ACCESSIBILITY_MAGNIFICATION_MODE_ALL);
-        userState.setMagnificationTwoFingerTripleTapEnabledLocked(true);
 
         // Invokes client change to trigger onUserStateChanged.
         mA11yms.onClientChangeLocked(/* serviceInfoChanged= */false);
@@ -1057,8 +991,7 @@ public class AccessibilityManagerServiceTest {
                 info_c.getComponentName().flattenToString());
 
         for (int shortcutType : USER_SHORTCUT_TYPES) {
-            if (shortcutType == UserShortcutType.TRIPLETAP
-                    || shortcutType == UserShortcutType.TWOFINGER_DOUBLETAP) {
+            if (shortcutType == UserShortcutType.TRIPLETAP) {
                 continue;
             }
             userState.updateShortcutTargetsLocked(shortcutTargets, shortcutType);
@@ -1078,8 +1011,7 @@ public class AccessibilityManagerServiceTest {
         //Assert shortcut settings
         Set<String> shortcutContainsAnyTargets = new ArraySet<>();
         for (int shortcutType : USER_SHORTCUT_TYPES) {
-            if (shortcutType == UserShortcutType.TRIPLETAP
-                    || shortcutType == UserShortcutType.TWOFINGER_DOUBLETAP) {
+            if (shortcutType == UserShortcutType.TRIPLETAP) {
                 continue;
             }
             shortcutContainsAnyTargets.addAll(
@@ -1500,44 +1432,6 @@ public class AccessibilityManagerServiceTest {
                 Settings.Secure.getInt(
                         mTestableContext.getContentResolver(),
                         Settings.Secure.ACCESSIBILITY_DISPLAY_MAGNIFICATION_ENABLED,
-                        AccessibilityUtils.State.OFF)
-        ).isEqualTo(AccessibilityUtils.State.OFF);
-    }
-
-    @Test
-    public void enableShortcutsForTargets_enableMultiFingerMultiTapsShortcut_settingUpdated() {
-        mFakePermissionEnforcer.grant(Manifest.permission.MANAGE_ACCESSIBILITY);
-
-        mA11yms.enableShortcutsForTargets(
-                /* enable= */ true,
-                UserShortcutType.TWOFINGER_DOUBLETAP,
-                List.of(TARGET_MAGNIFICATION),
-                mA11yms.getCurrentUserIdLocked());
-        mTestableLooper.processAllMessages();
-
-        assertThat(
-                Settings.Secure.getInt(
-                        mTestableContext.getContentResolver(),
-                        Settings.Secure.ACCESSIBILITY_MAGNIFICATION_TWO_FINGER_TRIPLE_TAP_ENABLED,
-                        AccessibilityUtils.State.OFF)
-        ).isEqualTo(AccessibilityUtils.State.ON);
-    }
-
-    @Test
-    public void enableShortcutsForTargets_disableMultiFingerMultiTapsShortcut_settingUpdated() {
-        enableShortcutsForTargets_enableMultiFingerMultiTapsShortcut_settingUpdated();
-
-        mA11yms.enableShortcutsForTargets(
-                /* enable= */ false,
-                UserShortcutType.TWOFINGER_DOUBLETAP,
-                List.of(TARGET_MAGNIFICATION),
-                mA11yms.getCurrentUserIdLocked());
-        mTestableLooper.processAllMessages();
-
-        assertThat(
-                Settings.Secure.getInt(
-                        mTestableContext.getContentResolver(),
-                        Settings.Secure.ACCESSIBILITY_MAGNIFICATION_TWO_FINGER_TRIPLE_TAP_ENABLED,
                         AccessibilityUtils.State.OFF)
         ).isEqualTo(AccessibilityUtils.State.OFF);
     }
@@ -2682,6 +2576,78 @@ public class AccessibilityManagerServiceTest {
                         .getValue()
                         .getIntExtra(KeyGestureEventConstants.KEY_GESTURE_TYPE, 0))
                 .isEqualTo(KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_DISPLAY_COLOR_INVERSION);
+    }
+
+    @Test
+    @EnableFlags(android.view.accessibility.Flags.FLAG_ENABLE_A11Y_TOP_ROW_SHORTCUT)
+    public void handleKeyGestureEvent_topRow_noAssignedFeature_sendBroadcastIntent() {
+        assertThat(
+                        ShortcutUtils.getShortcutTargetsFromSettings(
+                                mTestableContext, TOP_ROW_KEY, mA11yms.getCurrentUserIdLocked()))
+                .isEmpty();
+
+        sendKeyGestureEventComplete(
+                KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_TOP_ROW_ACCESSIBILITY_KEY,
+                /* modifierState= */ 0,
+                KeyEvent.KEYCODE_ACCESSIBILITY);
+
+        ArgumentCaptor<Intent> intentCaptor = ArgumentCaptor.forClass(Intent.class);
+        verify(mTestableContext.getMockContext())
+                .sendBroadcastAsUser(intentCaptor.capture(), eq(UserHandle.SYSTEM));
+        assertThat(intentCaptor.getValue().getAction())
+                .isEqualTo(ACTION_LAUNCH_ACCESSIBILITY_SHORTCUT_CHOOSER_DIALOG);
+    }
+
+    @Test
+    @EnableFlags(android.view.accessibility.Flags.FLAG_ENABLE_A11Y_TOP_ROW_SHORTCUT)
+    public void handleKeyGestureEvent_topRow_oneAssignedFeature_noBroadcast() {
+        mFakePermissionEnforcer.grant(Manifest.permission.MANAGE_ACCESSIBILITY);
+        final AccessibilityUserState userState = mA11yms.getCurrentUserState();
+        clearShortcutType(TOP_ROW_KEY, userState.mUserId);
+        setupShortcutTargetServices();
+        userState.updateShortcutTargetsLocked(Set.of(TARGET_MAGNIFICATION), TOP_ROW_KEY);
+        mTestableLooper.processAllMessages();
+        assertThat(
+                        mA11yms.getAccessibilityShortcutTargets(
+                                        TOP_ROW_KEY, mA11yms.getCurrentUserIdLocked())
+                                .size())
+                .isEqualTo(1);
+
+        sendKeyGestureEventComplete(
+                KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_TOP_ROW_ACCESSIBILITY_KEY,
+                /* modifierState= */ 0,
+                KeyEvent.KEYCODE_ACCESSIBILITY);
+
+        verify(mTestableContext.getMockContext(), never()).sendBroadcastAsUser(any(), any());
+        verify(mInputFilter, timeout(100)).notifyMagnificationShortcutTriggered(anyInt());
+    }
+
+    @Test
+    @EnableFlags(android.view.accessibility.Flags.FLAG_ENABLE_A11Y_TOP_ROW_SHORTCUT)
+    public void handleKeyGestureEvent_topRow_twoAssignedFeature_sendBroadcastIntent() {
+        mFakePermissionEnforcer.grant(Manifest.permission.MANAGE_ACCESSIBILITY);
+        final AccessibilityUserState userState = mA11yms.getCurrentUserState();
+        setupShortcutTargetServices(userState);
+        userState.updateShortcutTargetsLocked(
+                Set.of(TARGET_ALWAYS_ON_A11Y_SERVICE.flattenToString(), TARGET_MAGNIFICATION),
+                TOP_ROW_KEY);
+        mTestableLooper.processAllMessages();
+        assertThat(
+                        mA11yms.getAccessibilityShortcutTargets(
+                                        TOP_ROW_KEY, mA11yms.getCurrentUserIdLocked())
+                                .size())
+                .isEqualTo(2);
+
+        sendKeyGestureEventComplete(
+                KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_TOP_ROW_ACCESSIBILITY_KEY,
+                /* modifierState= */ 0,
+                KeyEvent.KEYCODE_ACCESSIBILITY);
+
+        ArgumentCaptor<Intent> intentCaptor = ArgumentCaptor.forClass(Intent.class);
+        verify(mTestableContext.getMockContext())
+                .sendBroadcastAsUser(intentCaptor.capture(), eq(UserHandle.SYSTEM));
+        assertThat(intentCaptor.getValue().getAction())
+                .isEqualTo(ACTION_LAUNCH_ACCESSIBILITY_SHORTCUT_CHOOSER_DIALOG);
     }
 
     @Test

@@ -22,6 +22,7 @@ import static android.app.PendingIntent.FLAG_UPDATE_CURRENT;
 import static android.content.Context.RECEIVER_NOT_EXPORTED;
 import static android.provider.Settings.ACTION_DATE_SETTINGS;
 
+import static com.android.server.timezonedetector.TimeZoneDetectorStrategy.ORIGIN_FUSED;
 import static com.android.server.timezonedetector.TimeZoneDetectorStrategy.ORIGIN_LOCATION;
 import static com.android.server.timezonedetector.TimeZoneDetectorStrategy.ORIGIN_MANUAL;
 import static com.android.server.timezonedetector.TimeZoneDetectorStrategy.ORIGIN_TELEPHONY;
@@ -57,8 +58,6 @@ import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.notification.SystemNotificationChannels;
 import com.android.server.LocalServices;
-import com.android.server.flags.Flags;
-
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
@@ -173,9 +172,11 @@ public class NotifyingTimeZoneChangeListener implements TimeZoneChangeListener {
     private int mAcceptedManualChanges;
     private int mAcceptedTelephonyChanges;
     private int mAcceptedLocationChanges;
+    private int mAcceptedFusedChanges;
     private int mAcceptedUnknownChanges;
     private int mRejectedTelephonyChanges;
     private int mRejectedLocationChanges;
+    private int mRejectedFusedChanges;
     private int mRejectedUnknownChanges;
 
     /** Create and initialise a new {@code TimeZoneChangeTrackerImpl} */
@@ -315,6 +316,9 @@ public class NotifyingTimeZoneChangeListener implements TimeZoneChangeListener {
                     case ORIGIN_LOCATION:
                         mAcceptedLocationChanges += 1;
                         break;
+                    case ORIGIN_FUSED:
+                        mAcceptedFusedChanges += 1;
+                        break;
                     default:
                         mAcceptedUnknownChanges += 1;
                         break;
@@ -361,6 +365,9 @@ public class NotifyingTimeZoneChangeListener implements TimeZoneChangeListener {
                     break;
                 case ORIGIN_LOCATION:
                     mRejectedLocationChanges += 1;
+                    break;
+                case ORIGIN_FUSED:
+                    mRejectedFusedChanges += 1;
                     break;
                 default:
                     mRejectedUnknownChanges += 1;
@@ -556,7 +563,7 @@ public class NotifyingTimeZoneChangeListener implements TimeZoneChangeListener {
             @UserIdInt int userId, TimeZoneChangeRecord trackedChangeEvent) {
         TimeZoneChangeEvent changeEvent = trackedChangeEvent.getEvent();
 
-        if (!Flags.datetimeNotifications() || !areNotificationsEnabled()) {
+        if (!areNotificationsEnabled()) {
             return;
         }
 
@@ -651,10 +658,12 @@ public class NotifyingTimeZoneChangeListener implements TimeZoneChangeListener {
                             + mConfigurationInternal.isManualChangeTrackingSupported());
         }
 
+        pw.println("mAcceptedFusedChanges=" + mAcceptedFusedChanges);
         pw.println("mAcceptedLocationChanges=" + mAcceptedLocationChanges);
         pw.println("mAcceptedManualChanges=" + mAcceptedManualChanges);
         pw.println("mAcceptedTelephonyChanges=" + mAcceptedTelephonyChanges);
         pw.println("mAcceptedUnknownChanges=" + mAcceptedUnknownChanges);
+        pw.println("mRejectedFusedChanges=" + mRejectedFusedChanges);
         pw.println("mRejectedLocationChanges=" + mRejectedLocationChanges);
         pw.println("mRejectedTelephonyChanges=" + mRejectedTelephonyChanges);
         pw.println("mRejectedUnknownChanges=" + mRejectedUnknownChanges);

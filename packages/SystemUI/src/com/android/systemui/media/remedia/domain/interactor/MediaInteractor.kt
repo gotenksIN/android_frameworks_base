@@ -36,6 +36,7 @@ import com.android.systemui.common.shared.model.Icon
 import com.android.systemui.common.shared.model.asIcon
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
+import com.android.systemui.deviceentry.domain.interactor.DeviceEntryInteractor
 import com.android.systemui.media.controls.domain.pipeline.MediaDataProcessor
 import com.android.systemui.media.controls.domain.pipeline.getNotificationActions
 import com.android.systemui.media.controls.shared.model.MediaAction
@@ -55,7 +56,9 @@ import com.android.systemui.statusbar.NotificationLockscreenUserManager
 import com.android.systemui.statusbar.policy.KeyguardStateController
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 
 /**
@@ -76,11 +79,22 @@ interface MediaInteractor {
     /** Whether guts state should show on carousel. */
     val isGutsVisible: Boolean
 
+    /** Are there any media notifications active? */
+    val hasActiveMedia: Boolean
+
+    /** Are there any media entries, including inactive ones? */
+    val hasAnyMedia: Boolean
+
+    val allowMediaOnLockscreen: Boolean
+
+    /** Is the device on lockscreen? */
+    val isOnLockscreen: Flow<Boolean>
+
     /** Seek to [to], in milliseconds on the media session with the given [sessionKey]. */
-    fun seek(sessionKey: Any, to: Long)
+    fun seek(sessionKey: InstanceId, to: Long)
 
     /** Hide the representation of the media session with the given [sessionKey]. */
-    fun hide(sessionKey: Any, delayMs: Long, userInitiated: Boolean)
+    fun hide(sessionKey: InstanceId, delayMs: Long, userInitiated: Boolean)
 
     /** Open media settings. */
     fun openMediaSettings()
@@ -107,6 +121,7 @@ constructor(
     private val activityIntentHelper: ActivityIntentHelper,
     private val lockscreenUserManager: NotificationLockscreenUserManager,
     private val mediaOutputDialogManager: MediaOutputDialogManager,
+    private val deviceEntryInteractor: DeviceEntryInteractor,
 ) : MediaInteractor {
 
     override val sessions: List<MediaSessionModel>
@@ -129,6 +144,19 @@ constructor(
     override val isGutsVisible: Boolean
         get() = repository.isGutsVisible
 
+    /** Are there any media notifications active? */
+    override val hasActiveMedia: Boolean
+        get() = repository.currentMedia.any { dataModel -> dataModel.isActive }
+
+    /** Are there any media entries, including inactive ones? */
+    override val hasAnyMedia: Boolean
+        get() = repository.currentMedia.isNotEmpty()
+
+    override val allowMediaOnLockscreen: Boolean
+        get() = repository.allowMediaOnLockscreen
+
+    override val isOnLockscreen: Flow<Boolean> = deviceEntryInteractor.isDeviceEntered.map { !it }
+
     init {
         repository.visualStabilityListenerFlow
             .onEach {
@@ -141,12 +169,12 @@ constructor(
             .launchIn(applicationScope)
     }
 
-    override fun seek(sessionKey: Any, to: Long) {
-        repository.seek(sessionKey as InstanceId, to)
+    override fun seek(sessionKey: InstanceId, to: Long) {
+        repository.seek(sessionKey, to)
     }
 
-    override fun hide(sessionKey: Any, delayMs: Long, userInitiated: Boolean) {
-        mediaDataProcessor.dismissMediaData(sessionKey as InstanceId, delayMs, userInitiated)
+    override fun hide(sessionKey: InstanceId, delayMs: Long, userInitiated: Boolean) {
+        mediaDataProcessor.dismissMediaData(sessionKey, delayMs, userInitiated)
     }
 
     override fun openMediaSettings() {
@@ -173,6 +201,12 @@ constructor(
         return object : MediaSessionModel {
             override val key
                 get() = dataModel.instanceId
+
+            override val uid: Int
+                get() = dataModel.appUid
+
+            override val packageName: String
+                get() = dataModel.packageName
 
             override val appName
                 get() = dataModel.appName
@@ -254,13 +288,14 @@ constructor(
 
             override val playPauseAction: MediaActionModel
                 get() =
-                    dataModel.playbackStateActions?.playOrPause?.getMediaActionModel()
-                        ?: MediaActionModel.None
+                    dataModel.playbackStateActions
+                        ?.playOrPause
+                        ?.getMediaActionModel(R.id.actionPlayPause) ?: MediaActionModel.None
 
             override val leftAction: MediaActionModel
                 get() =
                     dataModel.playbackStateActions?.let {
-                        it.prevOrCustom?.getMediaActionModel()
+                        it.prevOrCustom?.getMediaActionModel(R.id.actionPrev)
                             ?: if (it.reservePrev) {
                                 MediaActionModel.ReserveSpace
                             } else {
@@ -271,7 +306,7 @@ constructor(
             override val rightAction: MediaActionModel
                 get() =
                     dataModel.playbackStateActions?.let {
-                        it.nextOrCustom?.getMediaActionModel()
+                        it.nextOrCustom?.getMediaActionModel(R.id.actionNext)
                             ?: if (it.reserveNext) {
                                 MediaActionModel.ReserveSpace
                             } else {
@@ -283,9 +318,9 @@ constructor(
                 get() =
                     dataModel.playbackStateActions?.let { playbackActions ->
                         listOfNotNull(
-                            playbackActions.custom0?.getMediaActionModel()
+                            playbackActions.custom0?.getMediaActionModel(R.id.action0)
                                 as? MediaActionModel.Action,
-                            playbackActions.custom1?.getMediaActionModel()
+                            playbackActions.custom1?.getMediaActionModel(R.id.action1)
                                 as? MediaActionModel.Action,
                         )
                     }
@@ -294,9 +329,10 @@ constructor(
         }
     }
 
-    private fun MediaAction.getMediaActionModel(): MediaActionModel {
+    private fun MediaAction.getMediaActionModel(id: Int? = null): MediaActionModel {
         return icon?.let { drawable ->
             MediaActionModel.Action(
+                id = id ?: -1,
                 icon =
                     Icon.Loaded(
                         drawable = drawable,

@@ -84,6 +84,7 @@ import android.content.IntentFilter;
 import android.content.IntentSender;
 import android.content.IntentSender.SendIntentException;
 import android.content.pm.ActivityInfo;
+import android.content.pm.AllowComponentAccessPolicyInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.ArchivedPackageParcel;
 import android.content.pm.AuxiliaryResolveInfo;
@@ -196,6 +197,7 @@ import com.android.internal.os.ApplicationSharedMemory;
 import com.android.internal.pm.parsing.PackageParser2;
 import com.android.internal.pm.parsing.pkg.AndroidPackageInternal;
 import com.android.internal.pm.parsing.pkg.ParsedPackage;
+import com.android.internal.pm.pkg.component.ParsedAllowComponentAccessPolicy;
 import com.android.internal.pm.pkg.component.ParsedInstrumentation;
 import com.android.internal.pm.pkg.component.ParsedMainComponent;
 import com.android.internal.pm.pkg.parsing.ParsingPackageUtils;
@@ -604,6 +606,10 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     private final int mPriorSdkVersion;
     // If mIsUpgrade == true, contains the prior full SDK version, else -1.
     private final int mPriorSdkVersionFull;
+    /**
+     * Mock upgrade flag, read from persist.pm.mock-upgrade system property.
+     */
+    private final boolean mIsMockUpgrade;
 
     // Used for privilege escalation. MUST NOT BE CALLED WITH mPackages
     // LOCK HELD.  Can be called with mInstallLock held.
@@ -1013,12 +1019,10 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
      * @hide
      */
     public static void boostPriorityForPackageManagerTracedLockedSection() {
-        PerfettoTrace.begin(BIG_LOCKS_V3, "pms_lock_acquire").emit();
         if (ENABLE_BOOST) {
             sThreadPriorityBooster.boost();
         }
     }
-
 
     /**
      * Restore the priority of the thread after release the PM traced lock.
@@ -1028,6 +1032,26 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         if (ENABLE_BOOST) {
             sThreadPriorityBooster.reset();
         }
+    }
+
+    /**
+     * Emits a trace event indicating the start of an attempt to acquire the main PMS lock.
+     */
+    public static void traceBeforePmsLock() {
+        PerfettoTrace.instant(BIG_LOCKS_V3, "pms_lock_acquire").emit();
+    }
+
+    /**
+     * Emits a trace event indicating that the main PMS lock has been acquired and is now held.
+     */
+    public static void traceAfterPmsLock() {
+        PerfettoTrace.begin(BIG_LOCKS_V3, "pms_lock_held").emit();
+    }
+
+    /**
+     * Emits a trace event indicating the end of the critical section protected by the PMS lock.
+     */
+    public static void traceAfterPmsUnlock() {
         PerfettoTrace.end(BIG_LOCKS_V3).emit();
     }
 
@@ -1158,37 +1182,6 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
      */
     @Nullable
     private final SnapshotStatistics mSnapshotStatistics;
-
-    /**
-     * Mock upgrade flag, read from settings.
-     */
-    private boolean mIsMockUpgrade;
-
-    /**
-     * Runnable to be called on system properties change.
-     */
-    private final Runnable mMockUpgradeCallback = new Runnable() {
-        @Override
-        public void run() {
-            // The system property allows testing ota flow when upgraded to the same image.
-            boolean isMockUpgrade = SystemProperties.getBoolean("persist.pm.mock-upgrade",
-                    false /* default */);
-            // mIsUpgrade is final, but isMockUpgrade can change, update the member and ASM
-            if (mIsMockUpgrade != isMockUpgrade) {
-                mIsMockUpgrade = isMockUpgrade;
-                updateAsmIsDeviceUpgrading();
-            }
-        }
-    };
-
-    /**
-     * Updates the Application Shared Memory isDeviceUpgrading flag accordingly.
-     */
-    private void updateAsmIsDeviceUpgrading() {
-        if (isDeviceUpgradingUsesSharedMemory()) {
-            ApplicationSharedMemory.getInstance().setIsDeviceUpgrading(isDeviceUpgrading());
-        }
-    }
 
     /**
      * Return the cached computer.  The method will rebuild the cached computer if necessary.
@@ -2011,6 +2004,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         registerObservers(false);
         invalidatePackageInfoCache(
                 PackageMetrics.INVALIDATION_REASON_PACKAGE_MANAGER_SERVICE_INIT);
+        mIsMockUpgrade = false;
     }
 
     public PackageManagerService(PackageManagerServiceInjector injector, boolean factoryTest,
@@ -4426,11 +4420,10 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
 
         mSystemReady = true;
 
-        // Initialize Application Shared Memory isDeviceUpgrading flag, after mSystemReady is true.
-        updateAsmIsDeviceUpgrading();
-
-        // Register SystemProperties callback to update the ApplicationSharedMemory on change.
-        SystemProperties.addChangeCallback(mMockUpgradeCallback);
+        // Initialize Application Shared Memory isDeviceUpgrading flag.
+        if (isDeviceUpgradingUsesSharedMemory()) {
+            ApplicationSharedMemory.getInstance().setIsDeviceUpgrading(isDeviceUpgrading());
+        }
 
         ContentObserver co = new ContentObserver(mHandler) {
             @Override
@@ -4915,7 +4908,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                 }
             });
             // Send UNSTOPPED broadcast if necessary
-            if (wasStopped && Flags.stayStopped()) {
+            if (wasStopped) {
                 Trace.traceBegin(TRACE_TAG_PACKAGE_MANAGER, "unstoppedBroadcast");
                 final PackageManagerInternal pmi =
                         mInjector.getLocalService(PackageManagerInternal.class);
@@ -7477,23 +7470,15 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             final Bundle extras = new Bundle();
             extras.putInt(Intent.EXTRA_UID, uid);
             extras.putInt(Intent.EXTRA_USER_HANDLE, userId);
-            if (android.content.pm.Flags.stayStopped()) {
-                extras.putLong(Intent.EXTRA_TIME, SystemClock.elapsedRealtime());
-                // Sent async using the PM handler, to maintain ordering with PACKAGE_UNSTOPPED
-                mHandler.post(() -> {
-                    mBroadcastHelper.sendPackageBroadcast(Intent.ACTION_PACKAGE_RESTARTED,
-                            packageName, extras, flags, null /* targetPkg */,
-                            null /* finishedReceiver */, userIds, null /* instantUserIds */,
-                            broadcastAllowList, null /* filterExtrasForReceiver */,
-                            null /* bOptions */, null /* requiredPermissions */);
-                });
-            } else {
+            extras.putLong(Intent.EXTRA_TIME, SystemClock.elapsedRealtime());
+            // Sent async using the PM handler, to maintain ordering with PACKAGE_UNSTOPPED
+            mHandler.post(() -> {
                 mBroadcastHelper.sendPackageBroadcast(Intent.ACTION_PACKAGE_RESTARTED,
                         packageName, extras, flags, null /* targetPkg */,
                         null /* finishedReceiver */, userIds, null /* instantUserIds */,
-                        broadcastAllowList, null /* filterExtrasForReceiver */, null /* bOptions */,
-                        null /* requiredPermissions */);
-            }
+                        broadcastAllowList, null /* filterExtrasForReceiver */,
+                        null /* bOptions */, null /* requiredPermissions */);
+            });
             mPackageMonitorCallbackHelper.notifyPackageMonitor(Intent.ACTION_PACKAGE_RESTARTED,
                     packageName, extras, userIds, null /* instantUserIds */,
                     broadcastAllowList, mHandler, null /* filterExtras */);
@@ -7543,6 +7528,27 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             }
             final Computer snapshot = snapshotComputer();
             return mAppLockPackageHelper.isPackageAppLockEnabled(snapshot, packageName, userId);
+        }
+
+        @Nullable
+        @Override
+        public AllowComponentAccessPolicyInfo getAllowComponentAccessPolicyInfo(
+                @NonNull String packageName, @UserIdInt int userId) {
+            final Computer snapshot = snapshotComputer();
+            final PackageStateInternal ps = snapshot.getPackageStateInternal(packageName);
+            if (ps == null || ps.getPkg() == null || !ps.getUserStateOrDefault(
+                    userId).isInstalled()) {
+                Slog.w(TAG, "Package named '" + packageName + "' doesn't exist.");
+                return null;
+            }
+
+            ParsedAllowComponentAccessPolicy parsedPolicy =
+                    ps.getPkg().getParsedAllowComponentAccessPolicy();
+            if (parsedPolicy == null) {
+                return null;
+            }
+
+            return PackageInfoUtils.generateAllowComponentAccessPolicyInfo(parsedPolicy);
         }
     }
 
@@ -7827,8 +7833,9 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             Intent intent, @AppIdInt int recipientAppId, int visibleUid, boolean direct,
             boolean retainOnUpdate) {
         final AndroidPackage visiblePackage = snapshot.getPackage(visibleUid);
-        final int recipientUid = UserHandle.getUid(userId, recipientAppId);
-        if (visiblePackage == null || snapshot.getPackage(recipientUid) == null) {
+        int recipientUid = UserHandle.getUid(userId, recipientAppId);
+        final AndroidPackage recipientPackage = snapshot.getPackage(recipientUid);
+        if (visiblePackage == null || recipientPackage == null) {
             return;
         }
 
@@ -7845,6 +7852,14 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             accessGranted = mInstantAppRegistry.grantInstantAccess(userId, intent,
                     recipientAppId, UserHandle.getAppId(visibleUid) /*instantAppId*/);
         } else {
+            // pcc visibility always relies on the visibility of its own app uids
+            // so make sure that we grant impilict access on app uids rather than pcc uids
+            if (Process.isPrivateComputeCoreUid(recipientUid)) {
+                recipientUid = UserHandle.getUid(userId, recipientPackage.getUid());
+            }
+            if (Process.isPrivateComputeCoreUid(visibleUid)) {
+                visibleUid = UserHandle.getUid(userId, visiblePackage.getUid());
+            }
             accessGranted = mAppsFilter.grantImplicitAccess(recipientUid, visibleUid,
                     retainOnUpdate);
         }

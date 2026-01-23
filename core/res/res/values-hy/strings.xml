@@ -158,6 +158,10 @@
     <string name="wfc_mode_wifi_preferred_summary" msgid="1035175836270943089">"Զանգ Wi-Fi-ի միջոցով"</string>
     <string name="wfc_mode_cellular_preferred_summary" msgid="4958965609212575619">"Զանգ բջջային ցանցի միջոցով"</string>
     <string name="wfc_mode_wifi_only_summary" msgid="104951993894678665">"Միայն Wi-Fi"</string>
+    <string name="adaptive_low_frequency_less_than_one_minute" msgid="8869498183646028708">"~ %s"</string>
+    <string name="adaptive_low_frequency_neg_less_than_one_minute" msgid="2590062535985417056">"~ −%s"</string>
+    <string name="elapsed_time_low_frequency_short_format_h_mm" msgid="6728141238066668781">"%1$d:%2$02d:--"</string>
+    <string name="elapsed_time_low_frequency_short_format_mm" msgid="2405181895215514414">"%1$02d:--"</string>
     <!-- no translation found for crossSimFormat_spn (9125246077491634262) -->
     <skip />
     <string name="crossSimFormat_spn_cross_sim_calling" msgid="5620807020002879057">"<xliff:g id="SPN">%s</xliff:g> զանգելու պահեստային տարբերակ"</string>
@@ -645,10 +649,8 @@
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"Հավելվածին թույլ է տալիս օգտագործել լոկալ ցանցի սարքերը"</string>
     <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"օգտագործել loopback ինտերֆեյսը"</string>
     <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"Հավելվածին թույլ է տալիս փոխազդել այլ հավելվածների հետ loopback ինտերֆեյսի միջոցով"</string>
-    <!-- no translation found for permlab_force_use_loopback_interface (1319727311706416481) -->
-    <skip />
-    <!-- no translation found for permdesc_force_use_loopback_interface (5829032514048681980) -->
-    <skip />
+    <string name="permlab_force_use_loopback_interface" msgid="1319727311706416481">"հարկադրաբար օգտագործել loopback ինտերֆեյսը"</string>
+    <string name="permdesc_force_use_loopback_interface" msgid="5829032514048681980">"Հավելվածին թույլ է տալիս loopback ինտերֆեյսի միջոցով փոխազդել այլ հավելվածների հետ, որոնց հասանելի չէ loopback-ը"</string>
     <string name="permlab_ranging" msgid="2854543350668593390">"որոշել մոտակա սարքերի միջև հարաբերական դիրքավորումը"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"Թույլատրել հավելվածին որոշել մոտակա սարքերի միջև հարաբերական դիրքավորումը"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"Տեղեկություններ NFC վճարային ծառայության մասին"</string>
@@ -774,7 +776,7 @@
     <string name="face_acquired_too_low" msgid="4075391872960840081">"Հեռախոսը շարժեք ավելի ներքև"</string>
     <string name="face_acquired_too_right" msgid="6245286514593540859">"Հեռախոսը շարժեք դեպի ձախ"</string>
     <string name="face_acquired_too_left" msgid="9201762240918405486">"Հեռախոսը շարժեք դեպի աջ"</string>
-    <string name="face_acquired_poor_gaze" msgid="4427153558773628020">"Նայեք ուղիղ էկրանին։"</string>
+    <string name="face_acquired_poor_gaze" msgid="6746437451436776485">"Նայեք ուղիղ տեսախցիկին"</string>
     <string name="face_acquired_not_detected" msgid="1057966913397548150">"Դեմքը չի երևում։ Հեռախոսը պահեք աչքերի մա­­կարդակում։"</string>
     <string name="face_acquired_too_much_motion" msgid="8199691445085189528">"Շատ եք շարժում։ Հեռախոսն անշարժ պահեք։"</string>
     <string name="face_acquired_recalibrate" msgid="8724013080976469746">"Նորից փորձեք։"</string>
@@ -1454,6 +1456,9 @@
     <string name="carrier_app_notification_text" msgid="6567057546341958637">"Հպեք՝ կարգավորելու համար"</string>
     <string name="time_zone_change_notification_title" msgid="5232503069219193218">"Ձեր ժամային գոտին փոխվեց"</string>
     <string name="time_zone_change_notification_body" msgid="6135793674904665585">"Դուք այժմ <xliff:g id="TIME_ZONE_DISPLAY_NAME">%1$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET">%2$s</xliff:g>) ժամային գոտում եք"</string>
+    <string name="time_zone_offset_change_notification_title" msgid="8232305835199459588">"Անցում ամառային/ձմեռային ժամանակի"</string>
+    <string name="time_zone_offset_change_notification_body_forward" msgid="1299493962341887576">"Ժամերը <xliff:g id="TIME_ZONE_OFFSET_DURATION">%1$s</xliff:g> առաջ են տրվել։ Դուք այժմ <xliff:g id="TIME_ZONE_DISPLAY_NAME">%2$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET_0">%3$s</xliff:g>) ժամային գոտում եք։"</string>
+    <string name="time_zone_offset_change_notification_body_backward" msgid="6643532078142642118">"Ժամերը <xliff:g id="TIME_ZONE_OFFSET_DURATION">%1$s</xliff:g> հետ են տրվել։ Դուք այժմ <xliff:g id="TIME_ZONE_DISPLAY_NAME">%2$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET_0">%3$s</xliff:g>) ժամային գոտում եք։"</string>
     <string name="time_picker_dialog_title" msgid="9053376764985220821">"Սահմանել ժամը"</string>
     <string name="date_picker_dialog_title" msgid="5030520449243071926">"Սահմանել ամսաթիվը"</string>
     <string name="date_time_set" msgid="4603445265164486816">"Սահմանել"</string>
@@ -1829,6 +1834,7 @@
     <string name="accessibility_shortcut_label_gesture" msgid="7987298674836890931">"ժեստ"</string>
     <string name="accessibility_shortcut_label_quick_settings" msgid="6851280333772213611">"արագ կարգավորումներ"</string>
     <string name="accessibility_shortcut_label_triple_tap" msgid="9058975959054454796">"եռակի հպում"</string>
+    <string name="accessibility_shortcut_label_top_row_key" msgid="1488840908672437180">"հատուկ գործառույթների ստեղն"</string>
     <string name="accessibility_uncheck_legacy_item_warning" msgid="8047830891064817447">"<xliff:g id="SERVICE_NAME">%s</xliff:g> ծառայությունն անջատված է"</string>
     <string name="edit_accessibility_shortcut_menu_button" msgid="8885752738733772935">"Փոփոխել դյուրանցումները"</string>
     <string name="done_accessibility_shortcut_menu_button" msgid="3668407723770815708">"Պատրաստ է"</string>
@@ -2105,6 +2111,7 @@
     <string name="app_suspended_default_message" msgid="6451215678552004172">"<xliff:g id="APP_NAME_0">%1$s</xliff:g> հավելվածը հասանելի չէ։ Դրա աշխատանքը սահմանափակում է <xliff:g id="APP_NAME_1">%2$s</xliff:g> հավելվածը։"</string>
     <string name="app_suspended_more_details" msgid="211260942831587014">"Մանրամասն"</string>
     <string name="app_suspended_unsuspend_message" msgid="1665438589450555459">"Չեղարկել դադարեցումը"</string>
+    <string name="locked_app_biometric_prompt_description" msgid="6853122652400451464">"<xliff:g id="APP_NAME">%1$s</xliff:g> հավելվածը կողպված է"</string>
     <string name="work_mode_off_title" msgid="6367463960165135829">"Վերսկսե՞լ աշխ. հավելվածները"</string>
     <string name="work_mode_turn_on" msgid="5316648862401307800">"Վերսկսել"</string>
     <string name="work_mode_emergency_call_button" msgid="6818855962881612322">"Արտակարգ իրավիճակ"</string>
@@ -2544,6 +2551,8 @@
     <string name="accessibility_label_clone_profile" msgid="7579118375042398784">"Կլոն"</string>
     <string name="accessibility_label_communal_profile" msgid="1437173163111334791">"Ընդհանուր"</string>
     <string name="private_space_biometric_prompt_title" msgid="5777592909271728154">"Մասնավոր տարածք"</string>
+    <string name="app_locked_new_notification" msgid="4409730436247596215">"Նոր ծանուցում"</string>
+    <string name="app_locked_notification_message" msgid="4576179600328065280">"Նոր հաղորդագրություն"</string>
     <string name="redacted_notification_message" msgid="1520587845842228816">"Ծանուցման զգայուն բովանդակությունը թաքցված է"</string>
     <string name="redacted_notification_action_title" msgid="6942924973335920935"></string>
     <string name="screen_not_shared_sensitive_content" msgid="7058419185079565001">"Անվտանգության նկատառումներով՝ բովանդակությունը թաքցվել է ցուցադրումից"</string>

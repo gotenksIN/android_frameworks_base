@@ -47,7 +47,6 @@ import static android.view.WindowManager.TRANSIT_TO_FRONT;
 import static android.view.WindowManager.TransitionFlags;
 import static android.view.WindowManager.TransitionType;
 import static android.view.WindowManager.transitTypeToString;
-import static android.window.DesktopExperienceFlags.ENABLE_DESKTOP_WINDOWING_PIP;
 import static android.window.DesktopExperienceFlags.ENABLE_DISPLAY_DISCONNECT_INTERACTION;
 import static android.window.DesktopExperienceFlags.ENABLE_DISPLAY_FOCUS_IN_SHELL_TRANSITIONS;
 import static android.window.DesktopExperienceFlags.ENABLE_INTERACTIVE_PICTURE_IN_PICTURE;
@@ -320,6 +319,8 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
     /** @see #setCanPipOnFinish */
     private boolean mCanPipOnFinish = true;
 
+    private boolean mEnterAutoPip;
+
     private boolean mIsSeamlessRotation = false;
     private IContainerFreezer mContainerFreezer = null;
 
@@ -573,7 +574,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
                 final WindowContainer<?> sibling = rootParent.getChildAt(j);
                 if (sibling == transientRoot) break;
                 if (!sibling.getWindowConfiguration().isAlwaysOnTop() && mController.mAtm
-                        .mTaskSupervisor.mOpaqueContainerHelper.isOpaque(sibling)) {
+                        .mVisibilityHelper.isOpaque(sibling)) {
                     occludedCount++;
                     break;
                 }
@@ -1099,7 +1100,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
     }
 
     /**
-     * @return whether {@param r} is a source of actions in this transition.
+     * @return whether {@code r} is a source of actions in this transition.
      */
     boolean isSourceActivity(ActivityRecord r) {
         if (mSourceActivities == null) return false;
@@ -1392,14 +1393,13 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
      * @return true if we are *guaranteed* to enter-pip. This means we return false if there's
      *         a chance we won't thus legacy-entry (via pause+userLeaving) will return false.
      */
-    private boolean checkEnterPipOnFinish(@NonNull ActivityRecord ar) {
+    boolean checkEnterPipOnFinish(@NonNull ActivityRecord ar) {
         if (!mCanPipOnFinish || !ar.isVisible() || ar.getTask() == null || !ar.isState(RESUMED)) {
             return false;
         }
 
-        // If PiP on Desktop Windowing is enabled and the task is freeform, we disable entering PiP.
-        if (ENABLE_DESKTOP_WINDOWING_PIP.isTrue()
-                && ar.getTask().getWindowingMode() == WINDOWING_MODE_FREEFORM) {
+        // If the task is freeform, we disable entering PiP.
+        if (ar.getTask().getWindowingMode() == WINDOWING_MODE_FREEFORM) {
             return false;
         }
 
@@ -1429,6 +1429,10 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
                 // intermediate state which will cause flickering. The final PiP bounds in new
                 // rotation will be applied by PipTransition.
                 ar.mDisplayContent.mPinnedTaskController.setEnterPipWithRotatedTransientLaunch();
+            }
+            if (inPip) {
+                mEnterAutoPip = true;
+                mVisibleAtTransitionEndTokens.add(ar);
             }
             return inPip;
         }
@@ -1481,6 +1485,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             throw new IllegalStateException("Can't finish a non-playing transition " + mSyncId);
         }
         mController.mFinishingTransition = this;
+        mEnterAutoPip = false;
         if (mTransientHideTasks != null && !mTransientHideTasks.isEmpty()) {
             // The transient hide tasks could be occluded now, e.g. returning to home. So trigger
             // the update to make the activities in the tasks invisible-requested, then the next
@@ -1512,7 +1517,6 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         }
 
         boolean hasParticipatedDisplay = false;
-        boolean enterAutoPip = false;
         boolean committedSomeInvisible = false;
         // Commit all going-invisible containers
         for (int i = 0; i < mParticipants.size(); ++i) {
@@ -1569,8 +1573,6 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
                         ar.commitVisibility(false /* visible */, false /* performLayout */,
                                 true /* fromTransition */);
                         committedSomeInvisible = true;
-                    } else {
-                        enterAutoPip = true;
                     }
                 }
 
@@ -1644,7 +1646,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         final boolean hasVisibleTransientLaunch = handleVisibleTransientLaunchOnFinish();
         if (hasVisibleTransientLaunch) {
             // Notify the change about the transient-below task if entering auto-pip.
-            if (enterAutoPip) {
+            if (mEnterAutoPip) {
                 mController.mAtm.getTaskChangeNotificationController().notifyTaskStackChanged();
             }
             // The end of transient launch may not reorder task, so make sure to compute the latest
@@ -1911,7 +1913,15 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         mLogger.mAbortTimeNs = SystemClock.elapsedRealtimeNanos();
         mController.mTransitionTracer.logAbortedTransition(this);
         // Syncengine abort will call through to onTransactionReady()
-        mSyncEngine.abort(mSyncId);
+        try {
+            mSyncEngine.abort(mSyncId);
+        } catch (Exception e) {
+            if (mController.isFlushing()) {
+                Slog.wtf(TAG, "SyncEngine state mismatch during flush: #" + mSyncId, e);
+            } else {
+                throw e;
+            }
+        }
         mController.dispatchLegacyAppTransitionCancelled(mTargetDisplays);
         invokeTransitionEndedListeners();
     }
@@ -3055,8 +3065,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             } else {
                 parentChange.mFlags |= ChangeInfo.FLAG_CHANGE_YES_ANIMATION;
             }
-            if (Flags.promoteExistenceChangedStateToParent() && targetChange.mExistenceChanged
-                    && parent.getChildCount() == 1
+            if (targetChange.mExistenceChanged && parent.getChildCount() == 1
                     // The creation and removal of an organizer-created container are independent
                     // of its children.
                     && (parent.asTaskFragment() == null

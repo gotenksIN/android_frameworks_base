@@ -562,6 +562,17 @@ class PermissionService(private val service: AccessCheckingService) :
             return PackageManager.PERMISSION_DENIED
         }
 
+        if (
+            android.app.privatecompute.flags.Flags.enablePccFrameworkSupport() &&
+                Process.isPrivateComputeCoreUid(uid)
+        ) {
+            val permission =
+                service.getState { with(policy) { getPermissions()[permissionName] } }
+            if (permission?.isAllowedInPrivateComputeCore != true) {
+                return PackageManager.PERMISSION_DENIED
+            }
+        }
+
         // PackageManagerInternal.getPackage(int) already checks package visibility and enforces
         // that instant apps can't see shared UIDs. Note that on the contrary,
         // PackageManagerInternal.getPackage(String) doesn't perform any checks.
@@ -2925,19 +2936,18 @@ class PermissionService(private val service: AccessCheckingService) :
             ) {
                 return false
             }
-
             val userId = UserHandle.getUserId(uid)
-
-            val isInSetup = getSecureInt(Settings.Secure.USER_SETUP_COMPLETE, userId) == 0
-            if (isInSetup) return true
-
+            val isInSetup = getSecureSettingInt(Settings.Secure.USER_SETUP_COMPLETE, userId) == 0
+            if (isInSetup) {
+                return true
+            }
             val isInDeferredSetup =
-                getSecureInt(Settings.Secure.USER_SETUP_PERSONALIZATION_STATE, userId) ==
+                getSecureSettingInt(Settings.Secure.USER_SETUP_PERSONALIZATION_STATE, userId) ==
                     Settings.Secure.USER_SETUP_PERSONALIZATION_STARTED
             return isInDeferredSetup
         }
 
-        private fun getSecureInt(settingName: String, userId: Int): Int? =
+        private fun getSecureSettingInt(settingName: String, userId: Int): Int? =
             try {
                 Settings.Secure.getIntForUser(context.contentResolver, settingName, userId)
             } catch (e: Settings.SettingNotFoundException) {

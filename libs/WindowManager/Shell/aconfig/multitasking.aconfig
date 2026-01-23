@@ -172,41 +172,10 @@ flag {
 }
 
 flag {
-    name: "bug_rotation_button_cover_bubble"
-    namespace: "multitasking"
-    description: "Fixes a bug where clicking the rotation button would open the bubble."
-    bug: "424165276"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "fix_bubbles_add_same_bubble_being_removed"
     namespace: "multitasking"
     description: "Fixes a race condition where a bubble gets an update while being animated out"
     bug: "420487074"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "fix_bubbles_ime_focus_flicker"
-    namespace: "multitasking"
-    description: "Fixes an ime flicker due to non-bubbled activity gaining focus when switching bubbles"
-    bug: "416347012"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-
-flag {
-    name: "fix_bubble_stack_view_expanded_when_added"
-    namespace: "multitasking"
-    description: "Set BubbleStackView as collapsed if it's expanded when trying to be added"
-    bug: "417447385"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -313,6 +282,16 @@ flag {
     namespace: "multitasking"
     description: "Fix opening app bubble from notification on lock screen"
     bug: "416389130"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "fix_bubble_ime_clipping"
+    namespace: "multitasking"
+    description: "Fix a bug where the ime clipped all of bubbles view when it shouldn't"
+    bug: "459673299"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

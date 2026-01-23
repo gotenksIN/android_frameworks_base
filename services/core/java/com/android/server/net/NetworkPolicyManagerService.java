@@ -850,22 +850,37 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
     static class Dependencies {
         final Context mContext;
         final NetworkStatsManager mNetworkStatsManager;
+        final boolean mUseNetstatsPerQueryFlags;
+
         Dependencies(Context context) {
             mContext = context;
             mNetworkStatsManager = mContext.getSystemService(NetworkStatsManager.class);
+            mUseNetstatsPerQueryFlags = Flags.useNetstatsPerQueryFlags();
             // Query stats from NetworkStatsService will trigger a poll by default.
             // But since NPMS listens stats updated event, and will query stats
             // after the event. A polling -> updated -> query -> polling loop will be introduced
             // if polls on open. Hence, while NPMS manages it's poll requests explicitly, set
             // flag to false to prevent a polling loop.
-            mNetworkStatsManager.setPollOnOpen(false);
+            //
+            // This is the legacy path for disabling polling. When the flag is enabled, polling is
+            // disabled by passing the appropriate flags per-query.
+            if (!mUseNetstatsPerQueryFlags) {
+                mNetworkStatsManager.setPollOnOpen(false);
+            }
         }
 
         long getNetworkTotalBytes(NetworkTemplate template, long start, long end) {
             Trace.traceBegin(TRACE_TAG_NETWORK, "getNetworkTotalBytes");
             try {
-                final NetworkStats.Bucket ret = mNetworkStatsManager
-                        .querySummaryForDevice(template, start, end);
+                final NetworkStats.Bucket ret;
+                if (mUseNetstatsPerQueryFlags) {
+                    // Pass 0 as flags to avoid triggering a poll (FLAG_POLL_ON_OPEN),
+                    // which would cause a polling loop.
+                    ret = mNetworkStatsManager.querySummaryForDevice(
+                            template, start, end, 0 /* flags */);
+                } else {
+                    ret = mNetworkStatsManager.querySummaryForDevice(template, start, end);
+                }
                 return ret.getRxBytes() + ret.getTxBytes();
             } catch (RuntimeException e) {
                 Slog.w(TAG, "Failed to read network stats: " + e);
@@ -881,7 +896,14 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
             Trace.traceBegin(TRACE_TAG_NETWORK, "getNetworkUidBytes");
             final List<NetworkStats.Bucket> buckets = new ArrayList<>();
             try {
-                final NetworkStats stats = mNetworkStatsManager.querySummary(template, start, end);
+                final NetworkStats stats;
+                if (mUseNetstatsPerQueryFlags) {
+                    // Pass 0 as flags to avoid triggering a poll (FLAG_POLL_ON_OPEN),
+                    // which would cause a polling loop.
+                    stats = mNetworkStatsManager.querySummary(template, start, end, 0);
+                } else {
+                    stats = mNetworkStatsManager.querySummary(template, start, end);
+                }
                 while (stats.hasNextBucket()) {
                     final NetworkStats.Bucket bucket = new NetworkStats.Bucket();
                     stats.getNextBucket(bucket);
@@ -3941,6 +3963,31 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
                 mSubscriptionPlans.put(subId, plans);
                 mSubscriptionPlansOwner.put(subId, callingPackage);
 
+                if (com.android.internal.telephony.flags.Flags.subscriptionPlanEnhancement()) {
+                    int downlinkBandwidth = SubscriptionPlan.BITRATE_UNKNOWN;
+                    int uplinkBandwidth = SubscriptionPlan.BITRATE_UNKNOWN;
+                    if (plans.length > 0) {
+                        // For now we only support DL/UL bitrate from the master plan.
+                        downlinkBandwidth = plans[0].getStreamingAppMaxDownlinkKbps();
+                        uplinkBandwidth = plans[0].getStreamingAppMaxUplinkKbps();
+                    }
+
+                    // Write bandwidth information into SubscriptionInfo. This makes it available to
+                    // apps with READ_PHONE_STATE permission, which is less restrictive than the
+                    // permissions required to access the full SubscriptionPlan. This is acceptable
+                    // because bandwidth data is considered less privacy-sensitive.
+                    try {
+                        SubscriptionManager.setSubscriptionProperty(subId,
+                                SubscriptionManager.STREAMING_APP_MAX_DOWNLINK_KBPS,
+                                String.valueOf(downlinkBandwidth));
+                        SubscriptionManager.setSubscriptionProperty(subId,
+                                SubscriptionManager.STREAMING_APP_MAX_UPLINK_KBPS,
+                                String.valueOf(uplinkBandwidth));
+                    } catch (IllegalArgumentException e) {
+                        Log.w(TAG, "Subscription does not exist");
+                    }
+                }
+
                 final String subscriberId = mSubIdToSubscriberId.get(subId, null);
                 if (subscriberId != null) {
                     ensureActiveCarrierPolicyAL(subId, subscriberId);
@@ -4093,6 +4140,8 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
                         + mUseDifferentDelaysForBackgroundChain);
                 fout.println(Flags.FLAG_NEVER_APPLY_RULES_TO_CORE_UIDS + ": "
                         + mNeverApplyRulesToCoreUids);
+                fout.println(Flags.FLAG_USE_NETSTATS_PER_QUERY_FLAGS + ": "
+                        + mDeps.mUseNetstatsPerQueryFlags);
 
                 fout.println();
                 fout.println("mRestrictBackgroundLowPowerMode: " + mRestrictBackgroundLowPowerMode);
@@ -4818,7 +4867,7 @@ public class NetworkPolicyManagerService extends INetworkPolicyManager.Stub {
      * mode, and app idle).
      *
      * @param deviceIdleMode if true then we don't consider
-     *        {@link #mPowerSaveWhitelistExceptIdleAppIds} for checking if the {@param uid} is
+     *        {@link #mPowerSaveWhitelistExceptIdleAppIds} for checking if the {@code uid} is
      *        allowlisted.
      */
     @GuardedBy("mUidRulesFirstLock")

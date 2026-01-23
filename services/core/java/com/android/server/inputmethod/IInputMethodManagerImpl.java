@@ -41,6 +41,7 @@ import android.view.inputmethod.InputMethodSubtype;
 import com.android.internal.inputmethod.DirectBootAwareness;
 import com.android.internal.inputmethod.IBooleanListener;
 import com.android.internal.inputmethod.IConnectionlessHandwritingCallback;
+import com.android.internal.inputmethod.IImeSwitcherMenu;
 import com.android.internal.inputmethod.IImeTracker;
 import com.android.internal.inputmethod.IInputMethodClient;
 import com.android.internal.inputmethod.IRemoteAccessibilityInputConnection;
@@ -152,7 +153,7 @@ final class IInputMethodManagerImpl extends IInputMethodManager.Stub {
         void showInputMethodPickerFromSystem(int auxiliarySubtypeMode, int displayId);
 
         @PermissionVerified(Manifest.permission.TEST_INPUT_METHOD)
-        boolean isInputMethodPickerShownForTest();
+        boolean isInputMethodPickerShownForTest(@UserIdInt int userId);
 
         @PermissionVerified(allOf = {
                 Manifest.permission.INTERACT_ACROSS_USERS_FULL,
@@ -161,6 +162,13 @@ final class IInputMethodManagerImpl extends IInputMethodManager.Stub {
 
         @PermissionVerified(Manifest.permission.TEST_INPUT_METHOD)
         boolean shouldShowImeSwitcherButtonForTest();
+
+        @PermissionVerified(allOf = {
+                Manifest.permission.WRITE_SECURE_SETTINGS,
+                Manifest.permission.INTERACT_ACROSS_USERS_FULL,
+                Manifest.permission.STATUS_BAR_SERVICE,
+        })
+        void registerImeSwitcherMenu(@NonNull IImeSwitcherMenu imeSwitcherMenu);
 
         InputMethodSubtype getCurrentInputMethodSubtype(@UserIdInt int userId);
 
@@ -216,6 +224,9 @@ final class IInputMethodManagerImpl extends IInputMethodManager.Stub {
         @PermissionVerified(Manifest.permission.TEST_INPUT_METHOD)
         void setAllowedImesByPolicyForTest(
                 @NonNull IInputMethodClient client, @NonNull List<String> allowedPackages);
+
+        @PermissionVerified(Manifest.permission.TEST_INPUT_METHOD)
+        void setPreventImeStartupBypassedAppsForTest(@Nullable List<String> allowedPackages);
 
         IImeTracker getImeTrackerService();
 
@@ -363,10 +374,10 @@ final class IInputMethodManagerImpl extends IInputMethodManager.Stub {
 
     @EnforcePermission(Manifest.permission.TEST_INPUT_METHOD)
     @Override
-    public boolean isInputMethodPickerShownForTest() {
+    public boolean isInputMethodPickerShownForTest(@UserIdInt int userId) {
         super.isInputMethodPickerShownForTest_enforcePermission();
 
-        return mCallback.isInputMethodPickerShownForTest();
+        return mCallback.isInputMethodPickerShownForTest(userId);
     }
 
     @EnforcePermission(allOf = {
@@ -385,6 +396,18 @@ final class IInputMethodManagerImpl extends IInputMethodManager.Stub {
         super.shouldShowImeSwitcherButtonForTest_enforcePermission();
 
         return mCallback.shouldShowImeSwitcherButtonForTest();
+    }
+
+    @EnforcePermission(allOf = {
+            Manifest.permission.WRITE_SECURE_SETTINGS,
+            Manifest.permission.INTERACT_ACROSS_USERS_FULL,
+            Manifest.permission.STATUS_BAR_SERVICE,
+    })
+    @Override
+    public void registerImeSwitcherMenu(@NonNull IImeSwitcherMenu imeSwitcherMenu) {
+        super.registerImeSwitcherMenu_enforcePermission();
+
+        mCallback.registerImeSwitcherMenu(imeSwitcherMenu);
     }
 
     @Override
@@ -507,6 +530,14 @@ final class IInputMethodManagerImpl extends IInputMethodManager.Stub {
         super.setAllowedImesByPolicyForTest_enforcePermission();
 
         mCallback.setAllowedImesByPolicyForTest(client, allowedPackages);
+    }
+
+    @EnforcePermission(Manifest.permission.TEST_INPUT_METHOD)
+    @Override
+    public void setPreventImeStartupBypassedAppsForTest(@Nullable List<String> allowedPackages) {
+        super.setPreventImeStartupBypassedAppsForTest_enforcePermission();
+
+        mCallback.setPreventImeStartupBypassedAppsForTest(allowedPackages);
     }
 
     @Override

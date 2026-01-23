@@ -28,6 +28,7 @@ package com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel
 import android.telephony.TelephonyManager
 import com.android.settingslib.mobile.TelephonyIcons
 // QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
+import com.android.settingslib.R as settingsLibR
 import com.android.systemui.Flags.statusBarStaticInoutIndicators
 import com.android.systemui.common.shared.model.ContentDescription
 import com.android.systemui.common.shared.model.Icon
@@ -35,6 +36,7 @@ import com.android.systemui.log.table.logDiffsForTable
 import com.android.systemui.res.R
 import com.android.systemui.statusbar.core.NewStatusBarIcons
 import com.android.systemui.statusbar.pipeline.airplane.domain.interactor.AirplaneModeInteractor
+import com.android.systemui.statusbar.pipeline.mobile.NewSatelliteIcon
 // QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
 import com.android.systemui.statusbar.pipeline.mobile.data.model.MobileIconCustomizationMode
 // QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
@@ -44,6 +46,7 @@ import com.android.systemui.statusbar.pipeline.mobile.domain.model.SignalIconMod
 import com.android.systemui.statusbar.pipeline.mobile.ui.model.MobileContentDescription
 import com.android.systemui.statusbar.pipeline.shared.ConnectivityConstants
 import com.android.systemui.statusbar.pipeline.shared.data.model.DataActivityModel
+import com.android.systemui.util.kotlin.mapDirect
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -54,7 +57,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 /** Common interface for all of the location-based mobile icon view models. */
 interface MobileIconViewModelCommon {
@@ -119,7 +121,7 @@ class MobileIconViewModel(
      */
     private val vmProvider: Flow<MobileIconViewModelCommon> =
         iconInteractor.isNonTerrestrial
-            .mapLatest { nonTerrestrial ->
+            .mapDirect { nonTerrestrial ->
                 if (nonTerrestrial) {
                     satelliteProvider
                 } else {
@@ -168,9 +170,21 @@ private class CarrierBasedSatelliteViewModelImpl(
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
     override val icon: Flow<SignalIconModel> = interactor.signalLevelIcon
     override val contentDescription: Flow<MobileContentDescription?> = MutableStateFlow(null)
+
+    override val networkTypeIcon: Flow<Icon.Resource?> =
+        flowOf(
+            if (NewSatelliteIcon.isEnabled) {
+                Icon.Resource(
+                    settingsLibR.drawable.ic_sat_mobiledata,
+                    ContentDescription.Resource(R.string.accessibility_status_bar_satellite_symbol),
+                )
+            } else {
+                null
+            }
+        )
+
     /** These fields are not used for satellite icons currently */
     override val roaming: Flow<Boolean> = flowOf(false)
-    override val networkTypeIcon: Flow<Icon.Resource?> = flowOf(null)
     override val networkTypeBackground: StateFlow<Icon.Resource?> = MutableStateFlow(null)
     override val activityInVisible: Flow<Boolean> = flowOf(false)
     override val activityOutVisible: Flow<Boolean> = flowOf(false)
@@ -225,7 +239,7 @@ private class CellularIconViewModel(
     override val contentDescription: Flow<MobileContentDescription?> =
         combine(iconInteractor.signalLevelIcon, iconInteractor.networkName) { icon, nameModel ->
                 when (icon) {
-                    is SignalIconModel.Cellular ->
+                    is SignalIconModel.CellularTypeIconModel.Cellular ->
                         MobileContentDescription.Cellular(
                             nameModel.name,
                             icon.levelDescriptionRes(),
@@ -234,7 +248,7 @@ private class CellularIconViewModel(
                 }
             }
             .stateIn(scope, SharingStarted.WhileSubscribed(), null)
-    private fun SignalIconModel.Cellular.levelDescriptionRes() =
+    private fun SignalIconModel.CellularTypeIconModel.Cellular.levelDescriptionRes() =
         when (level) {
             0 -> R.string.accessibility_no_signal
             1 -> R.string.accessibility_one_bar

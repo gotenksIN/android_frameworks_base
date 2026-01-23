@@ -16,7 +16,7 @@
 
 package com.android.settingslib.display;
 
-import static android.window.DesktopExperienceFlags.ENABLE_PERSISTING_DISPLAY_SIZE_FOR_CONNECTED_DISPLAYS;
+import static com.android.settingslib.flags.Flags.addExtraExternalDisplayDensityStops;
 
 import android.content.Context;
 import android.content.res.Resources;
@@ -318,6 +318,42 @@ public class DisplayDensityUtils {
             }
         }
 
+        // For external displays, add specific large-density stops (200%, 300%). This doesn't follow
+        // the fixed interval set up to 150% density. This should still be within `maxDensity`
+        if (addExtraExternalDisplayDensityStops()
+                && currentDisplayInfo.type != Display.TYPE_INTERNAL) {
+            final float[] extraScales = {2.0f, 3.0f};
+            for (float scale : extraScales) {
+                // Save the float density value before rounding to be used to set the density ratio
+                // of overridden density to default density in WM.
+                final float densityFloat = defaultDensity * scale;
+                // Round down to a multiple of 2 by truncating the low bit.
+                // LINT.IfChange
+                final int density = ((int) densityFloat) & ~1;
+                // LINT.ThenChange(/services/core/java/com/android/server/wm/DisplayContent.java:getBaseDensityFromRatio)
+
+                // Ensure the custom scale is still within the display max density
+                if (density > maxDensity) {
+                    continue;
+                }
+                if (currentDensity == density) {
+                    currentDensityIndex = curIndex;
+                }
+
+                // Resize the arrays to accommodate the new value. There are only 2 extra scales,
+                // so resizing is fine
+                int newLength = values.length + 1;
+                values = Arrays.copyOf(values, newLength);
+                valuesFloat = Arrays.copyOf(valuesFloat, newLength);
+                entries = Arrays.copyOf(entries, newLength);
+
+                values[curIndex] = density;
+                valuesFloat[curIndex] = densityFloat;
+                entries[curIndex] = res.getString(SUMMARY_CUSTOM, density);
+                curIndex++;
+            }
+        }
+
         final int displayIndex;
         if (currentDensityIndex >= 0) {
             displayIndex = currentDensityIndex;
@@ -442,8 +478,7 @@ public class DisplayDensityUtils {
                     final IWindowManager wm = WindowManagerGlobal.getWindowManagerService();
                     // Only set the ratio for external displays as Settings uses
                     // ScreenResolutionFragment to handle density update for internal display.
-                    if (ENABLE_PERSISTING_DISPLAY_SIZE_FOR_CONNECTED_DISPLAYS.isTrue()
-                            && info.type == Display.TYPE_EXTERNAL) {
+                    if (info.type == Display.TYPE_EXTERNAL) {
                         wm.setForcedDisplayDensityRatio(displayId,
                                 mFloatValues[index] / mDefaultDensity, userId);
                     } else {

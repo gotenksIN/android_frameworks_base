@@ -16,7 +16,6 @@
 
 package com.android.systemui.statusbar.notification
 
-import android.app.Flags
 import android.app.Notification
 import android.app.Notification.EXTRA_SUMMARIZED_CONTENT
 import android.content.pm.LauncherApps
@@ -75,7 +74,7 @@ class ConversationNotificationProcessorTest : SysuiTestCase() {
     }
 
     @Test
-    @DisableFlags(Flags.FLAG_NM_SUMMARIZATION, Flags.FLAG_NM_SUMMARIZATION_UI)
+    @EnableFlags(NmSummarizationAllFlag.FLAG_NAME)
     fun processNotification_messagingStyleWithSummarization_flagOff() {
         val summarization = "hello"
         val entry = kosmos.makeEntryOfPeopleType()
@@ -88,7 +87,6 @@ class ConversationNotificationProcessorTest : SysuiTestCase() {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_NM_SUMMARIZATION)
     @DisableFlags(NmSummarizationAllFlag.FLAG_NAME)
     fun processNotification_messagingStyleWithSummarization() {
         val summarization = "hello"
@@ -114,7 +112,6 @@ class ConversationNotificationProcessorTest : SysuiTestCase() {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_NM_SUMMARIZATION)
     @DisableFlags(NmSummarizationAllFlag.FLAG_NAME)
     fun processNotification_messagingStyleUpdateSummarizationToNull() {
         val entry = kosmos.makeEntryOfPeopleType()
@@ -131,7 +128,6 @@ class ConversationNotificationProcessorTest : SysuiTestCase() {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_NM_SUMMARIZATION)
     @DisableFlags(NmSummarizationAllFlag.FLAG_NAME)
     fun processNotification_messagingStyleWithoutSummarization() {
         val entry = kosmos.makeEntryOfPeopleType()

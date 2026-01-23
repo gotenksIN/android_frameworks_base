@@ -42,6 +42,7 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.when;
 
 import android.content.Context;
+import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.graphics.Rect;
@@ -235,6 +236,7 @@ public class LocalDisplayAdapterTest {
         when(mMockedResources.getIntArray(
                 com.android.internal.R.array.config_autoBrightnessLcdBacklightValues))
                 .thenReturn(new int[]{});
+        when(mMockedResources.getConfiguration()).thenReturn(new Configuration());
 
         when(mMockedColorDisplayServiceInternal.fetchEvenDimmerSpline(3)).thenReturn(
                 new Spline.LinearSpline(
@@ -527,29 +529,10 @@ public class LocalDisplayAdapterTest {
     /**
      * Confirm that external display uses physical density.
      */
-    @Test
-    public void testDpiValues_baseDensityForExternalDisplaysDisabled() throws Exception {
-        // needs default one always
-        doReturn(false).when(mFlags).isBaseDensityForExternalDisplaysEnabled();
-        setUpDisplay(new FakeDisplay(PORT_A));
-        setUpDisplay(new FakeDisplay(PORT_B));
-        updateAvailableDisplays();
-        mAdapter.registerLocked();
-
-        waitForHandlerToComplete(mHandler, HANDLER_WAIT_MS);
-
-        assertDisplayDpi(
-                mListener.addedDisplays.get(0).getDisplayDeviceInfoLocked(), PORT_A, 100, 100,
-                16000);
-        assertDisplayDpi(
-                mListener.addedDisplays.get(1).getDisplayDeviceInfoLocked(), PORT_B, 100, 100,
-                16000);
-    }
 
     @Test
     public void testDpiValues_baseDensityForExternalDisplaysEnabled() throws Exception {
         // needs default one always
-        doReturn(true).when(mFlags).isBaseDensityForExternalDisplaysEnabled();
         setUpDisplay(new FakeDisplay(PORT_A));
         setUpDisplay(new FakeDisplay(PORT_B));
         updateAvailableDisplays();
@@ -1273,6 +1256,7 @@ public class LocalDisplayAdapterTest {
         SurfaceControl.DisplayMode[] modes =
                 new SurfaceControl.DisplayMode[]{displayMode1, displayMode2, displayMode3};
         FakeDisplay display = new FakeDisplay(PORT_A, modes, 0, 1);
+        display.info.isInternal = true;
         setUpDisplay(display);
         updateAvailableDisplays();
         mAdapter.registerLocked();
@@ -1766,14 +1750,13 @@ public class LocalDisplayAdapterTest {
         displayDeviceInfo = mListener.addedDisplays.get(
                 0).getDisplayDeviceInfoLocked();
         defaultMode = getModeById(displayDeviceInfo, displayDeviceInfo.defaultModeId);
-        assertThat(matches(defaultMode, displayMode3)).isTrue();
+        assertThat(matches(defaultMode, displayMode1)).isTrue();
     }
 
 
     @Test
-    public void testDefaultDisplayMode_withSizeOverrideFlag_defaultModeDoesNotChange()
+    public void testDefaultDisplayMode_sizeOverride_defaultModeDoesNotChange()
             throws Exception {
-        doReturn(true).when(mFlags).isSizeOverrideForExternalDisplaysEnabled();
         SurfaceControl.DisplayMode displayMode1 = createFakeDisplayMode(0, 1920, 1080, 60f);
         // system preferred mode
         SurfaceControl.DisplayMode displayMode2 = createFakeDisplayMode(1, 3840, 2160, 60f);

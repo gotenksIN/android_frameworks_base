@@ -48,11 +48,11 @@
 #include <ftl/enum.h>
 #include <include/gestures.h>
 #include <input/Input.h>
-#include <input/InputFlags.h>
 #include <input/PointerController.h>
 #include <input/PrintTools.h>
 #include <input/SpriteController.h>
 #include <inputflinger/InputManager.h>
+#include <jni.h>
 #include <limits.h>
 #include <nativehelper/ScopedLocalFrame.h>
 #include <nativehelper/ScopedLocalRef.h>
@@ -337,7 +337,6 @@ public:
     void setMinTimeBetweenUserActivityPokes(int64_t intervalMillis);
     void setInputDispatchMode(bool enabled, bool frozen);
     void setSystemUiLightsOut(bool lightsOut);
-    void setPointerDisplayId(ui::LogicalDisplayId displayId);
     int32_t getMousePointerSpeed();
     void setPointerSpeed(int32_t speed);
     void setMouseScalingEnabled(ui::LogicalDisplayId displayId, bool enabled);
@@ -406,9 +405,12 @@ public:
     void notifySwitch(nsecs_t when, uint32_t switchValues, uint32_t switchMask,
                       uint32_t policyFlags) override;
     // ANR-related callbacks -- start
-    void notifyNoFocusedWindowAnr(const std::shared_ptr<InputApplicationHandle>& handle) override;
+    void notifyNoFocusedWindowAnr(const std::shared_ptr<InputApplicationHandle>& handle,
+                                  int32_t eventId, nsecs_t eventTime,
+                                  std::chrono::milliseconds timeoutDuration) override;
     void notifyWindowUnresponsive(const sp<IBinder>& token, std::optional<gui::Pid> pid,
-                                  const std::string& reason) override;
+                                  const std::string& reason, int32_t eventId, nsecs_t eventTime,
+                                  std::chrono::milliseconds timeoutDuration) override;
     void notifyWindowResponsive(const sp<IBinder>& token, std::optional<gui::Pid> pid) override;
     // ANR-related callbacks -- end
     void notifyInputChannelBroken(const sp<IBinder>& token) override;
@@ -603,7 +605,9 @@ NativeInputManager::NativeInputManager(jobject serviceObj, const sp<Looper>& loo
 
     mServiceObj = env->NewGlobalRef(serviceObj);
 
-    InputManager* im = new InputManager(this, *this, *this, *this, env);
+    JavaVM* vm;
+    env->GetJavaVM(&vm);
+    InputManager* im = new InputManager(this, *this, *this, *this, vm);
     mInputManager = im;
     defaultServiceManager()->addService(String16("inputflinger"), im);
 }
@@ -683,10 +687,6 @@ void NativeInputManager::setDisplayViewports(JNIEnv* env, jobjectArray viewportO
 }
 
 void NativeInputManager::setDisplayTopology(JNIEnv* env, jobject topologyGraph) {
-    if (!InputFlags::connectedDisplaysCursorEnabled()) {
-        return;
-    }
-
     const base::Result<DisplayTopologyGraph> result =
             android_hardware_display_DisplayTopologyGraph_toNative(env, topologyGraph);
     if (!result.ok()) {
@@ -1214,7 +1214,8 @@ static jobject getInputApplicationHandleObjLocalRef(
 }
 
 void NativeInputManager::notifyNoFocusedWindowAnr(
-        const std::shared_ptr<InputApplicationHandle>& inputApplicationHandle) {
+        const std::shared_ptr<InputApplicationHandle>& inputApplicationHandle, int32_t eventId,
+        nsecs_t eventTime, std::chrono::milliseconds timeoutDuration) {
 #if DEBUG_INPUT_DISPATCHER_POLICY
     ALOGD("notifyNoFocusedWindowAnr");
 #endif
@@ -1227,13 +1228,15 @@ void NativeInputManager::notifyNoFocusedWindowAnr(
             getInputApplicationHandleObjLocalRef(env, inputApplicationHandle);
 
     env->CallVoidMethod(mServiceObj, gServiceClassInfo.notifyNoFocusedWindowAnr,
-                        inputApplicationHandleObj);
+                        inputApplicationHandleObj, eventId, eventTime, timeoutDuration.count());
     checkAndClearExceptionFromCallback(env, "notifyNoFocusedWindowAnr");
 }
 
 void NativeInputManager::notifyWindowUnresponsive(const sp<IBinder>& token,
                                                   std::optional<gui::Pid> pid,
-                                                  const std::string& reason) {
+                                                  const std::string& reason, int32_t eventId,
+                                                  nsecs_t eventTime,
+                                                  std::chrono::milliseconds timeoutDuration) {
 #if DEBUG_INPUT_DISPATCHER_POLICY
     ALOGD("notifyWindowUnresponsive");
 #endif
@@ -1246,7 +1249,8 @@ void NativeInputManager::notifyWindowUnresponsive(const sp<IBinder>& token,
     ScopedLocalRef<jstring> reasonObj(env, env->NewStringUTF(reason.c_str()));
 
     env->CallVoidMethod(mServiceObj, gServiceClassInfo.notifyWindowUnresponsive, tokenObj,
-                        pid.value_or(gui::Pid{0}).val(), pid.has_value(), reasonObj.get());
+                        pid.value_or(gui::Pid{0}).val(), pid.has_value(), reasonObj.get(), eventId,
+                        eventTime, timeoutDuration.count());
     checkAndClearExceptionFromCallback(env, "notifyWindowUnresponsive");
 }
 
@@ -1409,10 +1413,6 @@ void NativeInputManager::updateInactivityTimeoutLocked() REQUIRES(mLock) {
     forEachPointerControllerLocked([lightsOut = mLocked.systemUiLightsOut](PointerController& pc) {
         pc.setInactivityTimeout(lightsOut ? InactivityTimeout::SHORT : InactivityTimeout::NORMAL);
     });
-}
-
-void NativeInputManager::setPointerDisplayId(ui::LogicalDisplayId displayId) {
-    mInputManager->getChoreographer().setDefaultMouseDisplayId(displayId);
 }
 
 int32_t NativeInputManager::getMousePointerSpeed() {
@@ -3341,11 +3341,6 @@ static void nativeCancelCurrentTouch(JNIEnv* env, jobject nativeImplObj) {
     im->getInputManager()->getDispatcher().cancelCurrentTouch();
 }
 
-static void nativeSetPointerDisplayId(JNIEnv* env, jobject nativeImplObj, jint displayId) {
-    NativeInputManager* im = getNativeInputManager(env, nativeImplObj);
-    im->setPointerDisplayId(ui::LogicalDisplayId{displayId});
-}
-
 static jstring nativeGetBluetoothAddress(JNIEnv* env, jobject nativeImplObj, jint deviceId) {
     NativeInputManager* im = getNativeInputManager(env, nativeImplObj);
     const auto address = im->getBluetoothAddress(deviceId);
@@ -3585,7 +3580,6 @@ static const JNINativeMethod gInputManagerMethods[] = {
         {"disableSensor", "(II)V", (void*)nativeDisableSensor},
         {"flushSensor", "(II)Z", (void*)nativeFlushSensor},
         {"cancelCurrentTouch", "()V", (void*)nativeCancelCurrentTouch},
-        {"setPointerDisplayId", "(I)V", (void*)nativeSetPointerDisplayId},
         {"getBluetoothAddress", "(I)Ljava/lang/String;", (void*)nativeGetBluetoothAddress},
         {"setStylusButtonMotionEventsEnabled", "(Z)V",
          (void*)nativeSetStylusButtonMotionEventsEnabled},
@@ -3679,10 +3673,10 @@ int register_android_server_InputManager(JNIEnv* env) {
     GET_METHOD_ID(gServiceClassInfo.notifyVibratorState, clazz, "notifyVibratorState", "(IZ)V");
 
     GET_METHOD_ID(gServiceClassInfo.notifyNoFocusedWindowAnr, clazz, "notifyNoFocusedWindowAnr",
-                  "(Landroid/view/InputApplicationHandle;)V");
+                  "(Landroid/view/InputApplicationHandle;IJJ)V");
 
     GET_METHOD_ID(gServiceClassInfo.notifyWindowUnresponsive, clazz, "notifyWindowUnresponsive",
-                  "(Landroid/os/IBinder;IZLjava/lang/String;)V");
+                  "(Landroid/os/IBinder;IZLjava/lang/String;IJJ)V");
 
     GET_METHOD_ID(gServiceClassInfo.notifyWindowResponsive, clazz, "notifyWindowResponsive",
                   "(Landroid/os/IBinder;IZ)V");

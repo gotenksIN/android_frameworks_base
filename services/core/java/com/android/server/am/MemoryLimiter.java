@@ -16,6 +16,9 @@
 
 package com.android.server.am;
 
+import static android.os.Process.INVALID_PID;
+import static android.os.Process.INVALID_UID;
+import static android.os.Process.FIRST_APPLICATION_UID;
 import static android.text.TextUtils.formatSimple;
 
 import android.app.ActivityManager;
@@ -26,7 +29,9 @@ import android.os.Process;
 import android.os.Trace;
 import android.util.Slog;
 
+import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.os.BackgroundThread;
+import com.android.internal.util.MemInfoReader;
 import com.android.tools.r8.keepanno.annotations.UsedByNative;
 
 import java.util.Objects;
@@ -38,10 +43,14 @@ import java.util.Objects;
  * layer where the limits are applied.  The native layer notifies the java layer when limits are
  * exceeded.
  *
+ * An instance allocates native resources that are only released when the instance is closed.  This
+ * behavior supports testing.  In production use, the instance attached to ActivityManagerService
+ * lasts until the process exits, which releases all native resources back to the kernel.
+ *
  * This class is not thread-safe.  Production code should call APIs while holding the AMS lock.
  * Test code may be single-threaded or must include its own lock.
  */
-class MemoryLimiter {
+class MemoryLimiter implements AutoCloseable {
     // The standard logcat tag for this module.
     private static final String TAG = "MemoryLimiter";
 
@@ -61,145 +70,375 @@ class MemoryLimiter {
     static final int MEMORY_LIMIT_TYPE = 1;
     // LINT.ThenChange(/services/core/jni/com_android_server_am_MemoryLimiter.cpp:limitTypes)
 
-    private static boolean enableMemoryLimiter() {
-        return Flags.memoryLimiterEnable();
-    }
-
     /**
-     * Objects containing the app configuration parameters.  The only configuration parameter is
-     * memory.high, captured in a Long.
+     * A convenience function that maps limit types to strings.
      */
-
-    // Configure maximum memory.
-    private static final Long sMemoryMax = -1L;
-
-    // Return the memory limit that should be assigned to an app in the give state.
-    private static Long processStateToLimit(@ProcessState int processState) {
-        return switch (processState) {
-            // Never try to configure a process that does not exist.
-            case ActivityManager.PROCESS_STATE_NONEXISTENT -> null;
-
-            // This method is currently a stub, until actual limits are defined.
-            default -> sMemoryMax;
+    static String limitTypeToString(int type) {
+        return switch (type) {
+            case 0 -> "unknown";
+            case 1 -> "memory.high";
+            default -> "unexpected";
         };
     }
 
     /**
-     * The limiter queue uses existing Message fields to encode its data.  In all cases arg1 is
-     * the pid and arg2 is the uid.  The operation is encoded in 'what':
-     *  -1      means start the process
-     *  n >= 0  means apply profile n to the process
+     * A controller specializes the behavior of an individual MemoryLimiter.
      */
+    @UsedByNative
+    interface Controller {
+         /**
+         * Returns true if this controller is enabled and actively managing memory limits.  This
+         * can be overridden in test implementations to force the controller to be enabled or
+         * disabled, regardless of the feature flag.
+         */
+        boolean isEnabled();
 
-    // Start a process.
-    private static final int MESSAGE_START = 0;
+        // The pid or uid of the object has changed.  Push the update to the native layer.
+        void setPidUid(int pid, int uid);
 
-    // Configure a process.
-    private static final int MESSAGE_CONFIG = 1;
+        // The process limit has changed.  Push the update to the native layer.
+        void setLimit(int pid, int uid, Long limit);
 
-    // The message queue that distributes calls into the native layer.
-    private static Handler sQueue;
+        // Get the memory limit for the process state.
+        Long getStateLimit(@ProcessState int newState);
+
+        // The callback when an over-limit event occurs.
+        @UsedByNative
+        void onLimitExceeded(int pid, int uid, int limit);
+
+        // Block or unblock the limiter from monitoring/configuring the UID.
+        void ignoreUid(int uid, boolean ignore);
+
+        // Close and release any resources.
+        void close();
+    }
+
+    /**
+     * The controller for the disabled state is a bunch of no-ops.
+     */
+    static class ControllerDisabled implements Controller {
+        @Override
+        public boolean isEnabled() {
+            return false;
+        }
+
+        @Override
+        public void setPidUid(int pid, int uid) {
+        }
+
+        @Override
+        public void setLimit(int pid, int uid, Long limit) {
+        }
+
+        @Override
+        public Long getStateLimit(@ProcessState int newState) {
+            return null;
+        }
+
+        @Override
+        public void onLimitExceeded(int pid, int uid, int limit) {
+        }
+
+        @Override
+        public void ignoreUid(int uid, boolean ignore) {
+        }
+
+        @Override
+        public void close() {
+        }
+    }
+
+    /**
+     * The controller for production use when the flag is enabled.  This uses a message queue to
+     * handle process updates, which allows the updates to happen outside the AMS lock.  Since
+     * everything happens in the message handler, no locks are required.
+     */
+    @UsedByNative
+    static class ControllerEnabled implements Controller {
+
+        // The message queue that distributes calls into the native layer.
+        private final Handler mQueue;
+
+        // The opcode to start a process.
+        private static final int MESSAGE_START = 0;
+
+        // The opcode to configure a process.  The configuration data is in 'obj'.
+        private static final int MESSAGE_CONFIG = 1;
+
+        // The opcode to ignore a UID.  Whatever is in arg2 (the uid field) is ignored.  Pass a
+        // negative value to ignore nothing (since real UIDs are non-negative).
+        private static final int MESSAGE_IGNORE = 2;
+
+        // The opcode to close the controller.
+        private static final int MESSAGE_CLOSE = 3;
+
+        // Well-known memory limits.
+        private static final Long MAX_MEMORY = -1L;     // Maximum memory
+        private final Long mMemoryVisible;
+        private final Long mMemoryNotVisible;
+
+        // The ignore list.  The code supports exactly one ignored uid.  The invalid uid never
+        // matches a uid, so that value turns off ignoring.
+        private int mIgnoredUid = INVALID_UID;
+
+        /**
+         * In the constructor, create the native peer and the message queue that will handle all
+         * requests directed to the native layer.
+         */
+        ControllerEnabled() {
+            mQueue = new Handler(BackgroundThread.getHandler().getLooper()) {
+                    // Toggles to false once the Controller is closed.
+                    private boolean mOpen = true;
+
+                    // The native handler.
+                    private final long mNative = initLimiter(ControllerEnabled.this);
+
+                    @Override
+                    public void handleMessage(Message msg) {
+                        if (!mOpen) {
+                            // Getting a message after the controller has been closed is
+                            // unexpected but only happens during testing.  Silently ignore
+                            // it.
+                            return;
+                        }
+                        final int pid = msg.arg1;
+                        final int uid = msg.arg2;
+                        final int op = msg.what;
+                        switch (op) {
+                            case MESSAGE_START -> {
+                                if (uid != mIgnoredUid) {
+                                    onProcessStarted(mNative, pid, uid);
+                                }
+                            }
+
+                            case MESSAGE_CONFIG -> {
+                                if (msg.obj != null && uid != mIgnoredUid) {
+                                    long limit = (Long) msg.obj;
+                                    configureLimit(mNative, pid, uid, limit);
+                                }
+                            }
+
+                            case MESSAGE_IGNORE -> {
+                                // This message is only issued during testing.
+                                Slog.i(TAG, "ignoring " + uid + " was " + mIgnoredUid);
+                                mIgnoredUid = uid;
+                            }
+
+                            case MESSAGE_CLOSE -> {
+                                closeLimiter(mNative);
+                                mOpen = false;
+                            }
+
+                            default ->
+                                    Slog.e(TAG, "invalid message: op=" + op);
+                        }
+                    }
+                };
+
+            if (Flags.memoryLimiterDefaultAppLimits()) {
+                MemInfoReader memInfo = new MemInfoReader();
+                memInfo.readMemInfo();
+                long vmem = memInfo.getTotalSize();
+                // Visible apps get 50% of memory.  Others get 25% of memory.
+                mMemoryVisible = vmem / 2;
+                mMemoryNotVisible = vmem / 4;
+                final long meg = 1024 * 1024;
+                Slog.i(TAG, formatSimple("Limits set to visible=%dMB not-visible=%dMB",
+                                mMemoryVisible / meg, mMemoryNotVisible / meg));
+            } else {
+                mMemoryVisible = MAX_MEMORY;
+                mMemoryNotVisible = MAX_MEMORY;
+                Slog.i(TAG, "Limits set to visible=max not-visible=max");
+            }
+        }
+
+        @Override
+        public boolean isEnabled() {
+            return true;
+        }
+
+        /**
+         * Send a command.
+         */
+        private void sendCommand(int command, int pid, int uid, Object obj) {
+            mQueue.sendMessage(mQueue.obtainMessage(command, pid, uid, obj));
+        }
+
+        @Override
+        public void setPidUid(int pid, int uid) {
+            sendCommand(MESSAGE_START, pid, uid, null);
+        }
+
+        @Override
+        public void setLimit(int pid, int uid, Long limit) {
+            Trace.asyncTraceForTrackBegin(TRACE_TAG, TRACE_TRACK, "newLimit", pid);
+            sendCommand(MESSAGE_CONFIG, pid, uid, limit);
+        }
+
+        /**
+         * Objects containing the app configuration parameters.  The only configuration parameter is
+         * memory.high, captured in a Long.
+         */
+
+        @Override
+        public Long getStateLimit(@ProcessState int newState) {
+            // Never try to configure a process that does not exist or is cached.
+            if (newState == ActivityManager.PROCESS_STATE_UNKNOWN
+                    || newState == ActivityManager.PROCESS_STATE_NONEXISTENT) {
+                return null;
+            } else if (ActivityManager.isProcStateCached(newState)) {
+                return null;
+            } else if (ActivityManager.isProcStateJankPerceptible(newState)) {
+                return mMemoryVisible;
+            } else {
+                return mMemoryNotVisible;
+            }
+        }
+
+        @UsedByNative
+        @Override
+        public void onLimitExceeded(int pid, int uid, int limit) {
+            Slog.w(TAG, formatSimple("limits exceeded: pid=%d uid=%d limit=%s", pid, uid,
+                            limitTypeToString(limit)));
+        }
+
+        @Override
+        public void ignoreUid(int uid, boolean ignore) {
+            sendCommand(MESSAGE_IGNORE, INVALID_PID, ignore ? uid : INVALID_UID, null);
+        }
+
+        @Override
+        public void close() {
+            sendCommand(MESSAGE_CLOSE, INVALID_PID, INVALID_UID, null);
+        }
+    }
+
+    /**
+     * The controller for this processes created from this limiter.
+     */
+    private final Controller mController;
 
     /**
      * Initialize the native layer and any maps.  This eventually makes a native call and
      * therefore cannot be invoked before the native libraries are loaded.
      */
-    static void init() {
-        if (!enableMemoryLimiter()) return;
-
-        // Initialize the native layer.
-        initLimiter();
-
-        sQueue = new Handler(BackgroundThread.getHandler().getLooper()) {
-                @Override
-                public void handleMessage(Message msg) {
-                    final int pid = msg.arg1;
-                    final int uid = msg.arg2;
-                    final int op = msg.what;
-                    switch (op) {
-                        case MESSAGE_START:
-                            onProcessStarted(pid, uid);
-                            break;
-                        case MESSAGE_CONFIG:
-                            if (msg.obj != null) {
-                                configureLimit(pid, uid, (Long) msg.obj);
-                            }
-                            break;
-                        default:
-                            Slog.e(TAG, "invalid message: op=" + op);
-                            break;
-                    }
-                }
-            };
-    }
-
-    // The pid that this instance controls.
-    private int mPid = 0;
-    // The uid that this instance controls.
-    private int mUid = 0;
-    // The last limit assigned to the process.
-    private Long mLimit = null;
-
-    /**
-     * Send a command.
-     */
-    private void sendCommand(int command, Object obj) {
-        sQueue.sendMessage(sQueue.obtainMessage(command, mPid, mUid, obj));
+    @VisibleForTesting
+    MemoryLimiter(Controller controller) {
+        mController = controller;
     }
 
     /**
-     * Set the pid and uid of the instance.  The instance is created before the pid is known, so
-     * both are set at this time, and the native layer is notified that the process has started.
-     *
-     * This method should be called while holding the AMS lock.  The actual work happens on a
-     * handler thread.
+     * Construct the default memory limiter.
      */
-    void setPidUid(int pid, int uid) {
-        if (!enableMemoryLimiter()) return;
-
-        mPid = pid;
-        mUid = uid;
-
-        if (mPid == 0 || mUid == 0 || mUid < Process.FIRST_APPLICATION_UID) {
-            // A zero pid/zero uid is not valid for monitoring.  Do not try to configure the native
-            // layer.  Also, the feature does not monitor system processes.  The pid may change in
-            // the future, so reset the last-known profile.
-            mPid = 0;
-            mUid = 0;
-            mLimit = null;
-            return;
-        }
-        sendCommand(MESSAGE_START, null);
-    }
-
-    /**
-     * React to a new procstate.  If the new procstate requires a profile change, notify the
-     * native layer.  A trace is started if there is a limit change.  The trace ends in the native
-     * layer after the new limit has been applied.
-     *
-     * This method should be called while holding the AMS lock.  The actual work happens on a
-     * handler thread.
-     */
-    void onProcStateUpdated(@ProcessState int newState) {
-        if (!enableMemoryLimiter()) return;
-
-        // The process is not running, so we cannot assign limits.
-        if (mPid == 0) return;
-
-        final Long newLimit = processStateToLimit(newState);
-        if (newLimit != null && !Objects.equals(mLimit, newLimit)) {
-            Trace.asyncTraceForTrackBegin(TRACE_TAG, TRACE_TRACK, "newLimit", mPid);
-            sendCommand(MESSAGE_CONFIG, newLimit);
-            mLimit = newLimit;
+    private static Controller getDefaultController() {
+        if (!Flags.memoryLimiterEnable()) {
+            // The feature is disabled.
+            return new ControllerDisabled();
+        } else if (Process.myUid() != Process.SYSTEM_UID) {
+            // The feature is not running in a system process, which means this is a test.  The
+            // feature must be enabled explicitly by the test method using the constructor that
+            // takes a Controller.
+            return new ControllerDisabled();
+        } else {
+            // The feature is enabled and this is system_server.
+            return new ControllerEnabled();
         }
     }
 
     /**
-     * The callback from the native layer.
+     * Create the default controller, based on the feature flag and the enclosing process.
      */
-    @UsedByNative
-    private static void onLimitExceeded(int pid, int uid, int limit) {
-        Slog.w(TAG, formatSimple("limits exceeded: pid=%d uid=%d limit=%d", pid, uid, limit));
+    MemoryLimiter() {
+        this(getDefaultController());
+    }
+
+    // The object that tracks the state of an individual process.  It is not static.  Methods in
+    // this class are not thread-safe.  Normally, these are called inside the AMS lock.
+    class Limiter {
+
+        // The pid that this instance controls.
+        private int mPid = INVALID_PID;
+        // The uid that this instance controls.
+        private int mUid = INVALID_UID;
+        // The last limit assigned to the process.
+        private Long mLimit = null;
+
+        /**
+         * Set the pid and uid of the instance.  The instance is created before the pid is known,
+         * so both are set at this time, and the native layer is notified that the process has
+         * started.
+         *
+         * This method should be called while holding the AMS lock.  The actual work happens on a
+         * handler thread.
+         */
+        void setPidUid(int pid, int uid) {
+            if (!mController.isEnabled()) return;
+
+            mPid = pid;
+            mUid = uid;
+
+            if (mPid == INVALID_PID || mUid == INVALID_UID || mUid < FIRST_APPLICATION_UID) {
+                // A zero pid/zero uid is not valid for monitoring.  Do not forward any change to
+                // the controller.  The pid may change in the future, so reset the last-known
+                // limit.
+                mPid = INVALID_PID;
+                mUid = INVALID_UID;
+                mLimit = null;
+                return;
+            }
+            mController.setPidUid(pid, uid);
+        }
+
+        /**
+         * React to a new procstate.  If the new procstate requires a profile change, notify the
+         * controller.
+         *
+         * This method should be called while holding the AMS lock.  The actual work happens on a
+         * handler thread.
+         */
+        void onProcStateUpdated(@ProcessState int newState) {
+            if (!mController.isEnabled()) return;
+
+            // The process is not running, so we cannot assign limits.
+            if (mPid == INVALID_PID) return;
+
+            final Long newLimit = mController.getStateLimit(newState);
+            if (newLimit != null && !Objects.equals(mLimit, newLimit)) {
+                mLimit = newLimit;
+                mController.setLimit(mPid, mUid, mLimit);
+            }
+        }
+    }
+
+    /**
+     * Return a new Process object bound to this instance.
+     */
+    Limiter newLimiter() {
+        return new Limiter();
+    }
+
+    /**
+     * Close the instance.  This is idempotent.
+     */
+    @VisibleForTesting
+    public void close() {
+        mController.close();
+    }
+
+    /**
+     * Return the operational status of the controller.
+     */
+    boolean isEnabled() {
+        return mController.isEnabled();
+    }
+
+    /**
+     * Block or unblock a UID.  This is used in feature testing, when it is important that the
+     * limits are controlled by the test process and not by system_server.
+     */
+    @VisibleForTesting
+    void ignoreUid(int uid, boolean ignore) {
+        mController.ignoreUid(uid, ignore);
     }
 
     /**
@@ -207,21 +446,26 @@ class MemoryLimiter {
      */
 
     /**
-     * Initialize the native layer.  This starts the native monitoring thread.  The method returns
-     * the total ram available for processes; this value can be used to create dynamic limits.
+     * Initialize the native layer and return a pointer to the native handler.  The controller
+     * receives any over-limit events.
      */
-    private static native long initLimiter();
+    private static native long initLimiter(Controller controller);
+
+    /**
+     * Release the native handler.
+     */
+    private static native void closeLimiter(long servicePtr);
 
     /**
      * Inform the native layer that a process has started.  No profile is assigned to the process
      * but monitoring starts.  The function returns true on success.
      */
-    private static native boolean onProcessStarted(int pid, int uid);
+    private static native boolean onProcessStarted(long servicePtr, int pid, int uid);
 
     /**
      * Request that a process's memory.high be configured to limit.  Negative values for the limit
      * mean "maximum memory".  The function returns true on success.  If the process has not been
      * started, or the process has exited since the last start, the function returns false.
      */
-    private static native boolean configureLimit(int pid, int uid, long limit);
+    private static native boolean configureLimit(long servicePtr, int pid, int uid, long limit);
 }

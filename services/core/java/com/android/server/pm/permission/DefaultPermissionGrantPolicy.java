@@ -48,8 +48,8 @@ import android.os.Message;
 import android.os.Process;
 import android.os.UserHandle;
 import android.os.storage.StorageManager;
-import android.permission.flags.Flags;
 import android.permission.PermissionManager;
+import android.permission.flags.Flags;
 import android.print.PrintManager;
 import android.provider.CalendarContract;
 import android.provider.ContactsContract;
@@ -1399,6 +1399,17 @@ final class DefaultPermissionGrantPolicy {
                 final boolean changingGrantForSystemFixed = systemFixed
                         && (flags & PackageManager.FLAG_PERMISSION_SYSTEM_FIXED) != 0;
 
+                // Honor the fixed/user-set flags of the source permission when a permission split
+                // is for migrating the same functionality towards a different name. See also
+                // b/465842402
+                int sourceFlags = switch (permission) {
+                    case HealthPermissions.READ_HEART_RATE -> pm.getPermissionFlags(
+                            Manifest.permission.BODY_SENSORS, pkg, user);
+                    case HealthPermissions.READ_HEALTH_DATA_IN_BACKGROUND -> pm.getPermissionFlags(
+                            Manifest.permission.BODY_SENSORS_BACKGROUND, pkg, user);
+                    default -> 0;
+                };
+
                 // Certain flags imply that the permission's current state by the system or
                 // device/profile owner or the user. In these cases we do not want to clobber the
                 // current state.
@@ -1406,7 +1417,8 @@ final class DefaultPermissionGrantPolicy {
                 // Unless the caller wants to override user choices. The override is
                 // to make sure we can grant the needed permission to the default
                 // sms and phone apps after the user chooses this in the UI.
-                if (!isFixedOrUserSet(flags) || ignoreSystemPackage
+                if (!(isFixedOrUserSet(flags) || isFixedOrUserSet(sourceFlags))
+                        || ignoreSystemPackage
                         || changingGrantForSystemFixed) {
                     // Never clobber policy fixed permissions.
                     // We must allow the grant of a system-fixed permission because
@@ -1436,8 +1448,10 @@ final class DefaultPermissionGrantPolicy {
                         pm.grantPermission(permission, pkg, user);
                     }
 
-                    // clear the REVIEW_REQUIRED flag, if set
-                    int flagMask = newFlags | PackageManager.FLAG_PERMISSION_REVIEW_REQUIRED;
+                    // Create a mask to clear the REVIEW_REQUIRED and REVOKE_WHEN_REQUESTED flags.
+                    int flagMask = newFlags | PackageManager.FLAG_PERMISSION_REVIEW_REQUIRED |
+                            PackageManager.FLAG_PERMISSION_REVOKE_WHEN_REQUESTED;
+
                     pm.updatePermissionFlags(permission, pkg, flagMask, newFlags, user);
                 }
 

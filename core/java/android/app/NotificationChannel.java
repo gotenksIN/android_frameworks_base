@@ -118,17 +118,6 @@ public final class NotificationChannel implements Parcelable {
             List.of(NEWS_ID, SOCIAL_MEDIA_ID, PROMOTIONS_ID, RECS_ID));
 
     /**
-     * The formatter used by the system to create an id for notification
-     * channels when it automatically creates conversation channels on behalf of an app. The format
-     * string takes two arguments, in this order: the
-     * {@link #getId()} of the original notification channel, and the
-     * {@link ShortcutInfo#getId() id} of the conversation.
-     * @hide
-     */
-    // TODO: b/432250872 - Delete when inlining random_conversation_ids flag.
-    public static final String OLD_CONVERSATION_CHANNEL_ID_FORMAT = "%1$s : %2$s";
-
-    /**
      * TODO: STOPSHIP  remove
      * Conversation id to use for apps that aren't providing them yet.
      * @hide
@@ -1256,7 +1245,7 @@ public final class NotificationChannel implements Parcelable {
     }
 
     /**
-     * If {@param forRestore} is true, {@param Context} MUST be non-null.
+     * If {@code forRestore} is true, {@code Context} MUST be non-null.
      */
     private void populateFromXml(TypedXmlPullParser parser, boolean forRestore,
             boolean pkgInstalled, @Nullable Context context) {
@@ -1444,7 +1433,7 @@ public final class NotificationChannel implements Parcelable {
     }
 
     /**
-     * If {@param forBackup} is true, {@param Context} MUST be non-null.
+     * If {@code forBackup} is true, {@code Context} MUST be non-null.
      */
     private void writeXml(TypedXmlSerializer out, boolean forBackup, @Nullable Context context)
             throws IOException {

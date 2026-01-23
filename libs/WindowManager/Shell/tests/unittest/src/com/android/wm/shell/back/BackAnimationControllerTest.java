@@ -88,6 +88,7 @@ import androidx.test.filters.SmallTest;
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer;
 import com.android.wm.shell.ShellTestCase;
 import com.android.wm.shell.TestShellExecutor;
+import com.android.wm.shell.bubbles.BubbleController;
 import com.android.wm.shell.sysui.ShellCommandHandler;
 import com.android.wm.shell.sysui.ShellController;
 import com.android.wm.shell.sysui.ShellInit;
@@ -100,6 +101,8 @@ import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
+
+import java.util.Optional;
 
 /**
  * atest WMShellUnitTests:BackAnimationControllerTest
@@ -148,6 +151,8 @@ public class BackAnimationControllerTest extends ShellTestCase {
     private Handler mHandler;
     @Mock
     private Transitions.TransitionHandler mTakeoverHandler;
+    @Mock
+    private BubbleController mMockBubbleController;
 
     private BackAnimationController mController;
 
@@ -164,15 +169,17 @@ public class BackAnimationControllerTest extends ShellTestCase {
         mContext.addMockSystemService(InputManager.class, mInputManager);
         mContext.getApplicationInfo().privateFlags |= ApplicationInfo.PRIVATE_FLAG_PRIVILEGED;
         mShellInit = spy(new ShellInit(mShellExecutor));
-        mDefaultCrossActivityBackAnimation = new DefaultCrossActivityBackAnimation(mContext,
-                mAnimationBackground, mRootTaskDisplayAreaOrganizer, mHandler);
+        mDefaultCrossActivityBackAnimation = spy(new DefaultCrossActivityBackAnimation(mContext,
+                mAnimationBackground, mRootTaskDisplayAreaOrganizer, mHandler,
+                Optional.of(mMockBubbleController)));
         mCrossTaskBackAnimation = new CrossTaskBackAnimation(mContext, mAnimationBackground,
                 mHandler);
         mShellBackAnimationRegistry =
                 new ShellBackAnimationRegistry(mDefaultCrossActivityBackAnimation,
                         mCrossTaskBackAnimation, /* dialogCloseAnimation= */ null,
                         new CustomCrossActivityBackAnimation(mContext, mAnimationBackground,
-                                mRootTaskDisplayAreaOrganizer, mHandler),
+                                mRootTaskDisplayAreaOrganizer, mHandler,
+                                Optional.of(mMockBubbleController)),
                         /* defaultBackToHomeAnimation= */ null);
         mController =
                 new BackAnimationController(

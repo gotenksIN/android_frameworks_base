@@ -72,6 +72,7 @@ import android.os.Looper;
 import android.os.PowerManager;
 import android.os.UserHandle;
 import android.platform.test.annotations.DisableFlags;
+import android.platform.test.annotations.EnableFlags;
 import android.service.dreams.IDreamManager;
 import android.support.test.metricshelper.MetricsAsserts;
 import android.testing.TestableLooper;
@@ -102,6 +103,7 @@ import com.android.systemui.assist.AssistManager;
 import com.android.systemui.back.domain.interactor.BackActionInteractor;
 import com.android.systemui.bouncer.domain.interactor.AlternateBouncerInteractor;
 import com.android.systemui.broadcast.BroadcastDispatcher;
+import com.android.systemui.broadcast.BroadcastDispatcherCustomExecutor;
 import com.android.systemui.charging.WiredChargingRippleController;
 import com.android.systemui.classifier.FalsingCollectorFake;
 import com.android.systemui.classifier.FalsingManagerFake;
@@ -120,6 +122,7 @@ import com.android.systemui.keyguard.KeyguardViewMediator;
 import com.android.systemui.keyguard.ScreenLifecycle;
 import com.android.systemui.keyguard.WakefulnessLifecycle;
 import com.android.systemui.kosmos.KosmosJavaAdapter;
+import com.android.systemui.log.SessionTracker;
 import com.android.systemui.media.NotificationMediaManager;
 import com.android.systemui.navigationbar.NavigationBarController;
 import com.android.systemui.notetask.NoteTaskController;
@@ -488,7 +491,8 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
                     () -> mNotificationShadeWindowViewController,
                     () -> mNotificationPanelViewController,
                     () -> mAssistManager,
-                    () -> mNotificationGutsManager
+                    () -> mNotificationGutsManager,
+                    mKosmos::getShadeDisplaysInteractor
             ));
         }
         mShadeController.setNotificationPresenter(mNotificationPresenter);
@@ -617,7 +621,8 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
                 mEmergencyGestureIntentFactory,
                 mQuickAccessWalletController,
                 mWindowManager,
-                mWindowManagerProvider
+                mWindowManagerProvider,
+                mock(SessionTracker.class)
         );
         mScreenLifecycle.addObserver(mCentralSurfaces.mScreenObserver);
         mCentralSurfaces.initShadeVisibilityListener();
@@ -1016,12 +1021,24 @@ public class CentralSurfacesImplTest extends SysuiTestCase {
     }
 
     @Test
-    public void testRegisterBroadcastsonDispatcher() {
+    @DisableFlags(BroadcastDispatcherCustomExecutor.FLAG_NAME)
+    public void testRegisterBroadcastsOnDispatcher_flagOff() {
         mCentralSurfaces.registerBroadcastReceiver();
         verify(mBroadcastDispatcher).registerReceiver(
                 any(BroadcastReceiver.class),
                 any(IntentFilter.class),
                 eq(null),
+                any(UserHandle.class));
+    }
+
+    @Test
+    @EnableFlags(BroadcastDispatcherCustomExecutor.FLAG_NAME)
+    public void testRegisterBroadcastsOnDispatcher_flagOn() {
+        mCentralSurfaces.registerBroadcastReceiver();
+        verify(mBroadcastDispatcher).registerReceiver(
+                any(BroadcastReceiver.class),
+                any(IntentFilter.class),
+                eq(mMainExecutor),
                 any(UserHandle.class));
     }
 

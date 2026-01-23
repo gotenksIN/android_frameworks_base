@@ -24,6 +24,7 @@ import android.permission.PermissionManager
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.backgroundScope
 import com.android.systemui.kosmos.testDispatcher
+import com.android.systemui.plugins.activityStarter
 import com.android.systemui.shade.data.repository.privacyChipRepository
 import com.android.systemui.statusbar.data.repository.statusBarModeRepository
 import com.android.systemui.statusbar.notification.row.icon.appIconProvider
@@ -32,7 +33,6 @@ import com.android.systemui.statusbar.quickactions.av.AvControlsChipModule
 import com.android.systemui.statusbar.quickactions.av.shared.model.AvControlsChipModel
 import com.android.systemui.statusbar.quickactions.av.shared.model.SensorActivityModel
 import com.android.systemui.user.domain.interactor.selectedUserInteractor
-import javax.inject.Provider
 import kotlinx.coroutines.flow.MutableStateFlow
 import org.mockito.Mockito.mock
 
@@ -40,8 +40,11 @@ val Kosmos.avControlsChipInteractor: AvControlsChipInteractor by
     Kosmos.Fixture {
         AvControlsChipModule()
             .provideAvControlsChipInteractor(
-                avControlsChipSupported = Provider { avControlsChipInteractorImpl },
-                avControlsChipNotSupported = Provider { noOpAvControlsChipInteractor },
+                backgroundScope = backgroundScope,
+                avControlsChipSupportedFactory = {
+                    AvControlsChipInteractorImpl.Factory { _, _ -> avControlsChipInteractorImpl }
+                },
+                avControlsChipNotSupported = { noOpAvControlsChipInteractor },
             )
     }
 
@@ -52,20 +55,27 @@ val Kosmos.appOpsManagerMock: AppOpsManager by Kosmos.Fixture { mock(AppOpsManag
 
 val Kosmos.avControlsChipInteractorImpl: AvControlsChipInteractorImpl by
     Kosmos.Fixture {
-        AvControlsChipInteractorImpl(
-            backgroundScope = backgroundScope,
-            privacyChipRepository = privacyChipRepository,
-            bgDispatcher = testDispatcher,
-            statusBarModeRepositoryStore = statusBarModeRepository,
-            sensorPrivacyController = sensorPrivacyController,
-            permissionManager = PermissionManager(testableContext),
-            packageManager = packageManager,
-            selectedUserInteractor = selectedUserInteractor,
-            appIconProvider = appIconProvider,
-            appOpsManager = appOpsManagerMock,
-            activityManager = activityManagerInterface,
-        )
+        createAvControlsChipInteractorImplForDisplay(displayId = testableContext.displayId)
     }
+
+fun Kosmos.createAvControlsChipInteractorImplForDisplay(
+    displayId: Int
+): AvControlsChipInteractorImpl =
+    AvControlsChipInteractorImpl(
+        displayId = displayId,
+        backgroundScope = backgroundScope,
+        privacyChipRepository = privacyChipRepository,
+        bgDispatcher = testDispatcher,
+        statusBarModeRepositoryStore = statusBarModeRepository,
+        sensorPrivacyController = sensorPrivacyController,
+        permissionManager = PermissionManager(testableContext),
+        packageManager = packageManager,
+        selectedUserInteractor = selectedUserInteractor,
+        appIconProvider = appIconProvider,
+        appOpsManager = appOpsManagerMock,
+        activityManager = activityManagerInterface,
+        activityStarter = activityStarter,
+    )
 
 val Kosmos.noOpAvControlsChipInteractor: NoOpAvControlsChipInteractor by
     Kosmos.Fixture { NoOpAvControlsChipInteractor() }
@@ -93,4 +103,8 @@ class FakeAvControlsChipInteractor : AvControlsChipInteractor {
     }
 
     override fun closeApp(packageName: String) {}
+
+    override fun manageApp(packageName: String) {}
+
+    override fun openPrivacyDashboard() {}
 }

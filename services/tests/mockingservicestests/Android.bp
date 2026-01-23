@@ -53,6 +53,7 @@ android_test {
         "hamcrest-library",
         "kotlin-test",
         "mockingservicestests-utils-mockito",
+        "mockito-kotlin2",
         "mockito-target-extended-minus-junit4",
         "platform-compat-test-rules",
         "platform-parametric-runner-lib",
@@ -65,6 +66,7 @@ android_test {
         "service-sdksandbox.impl",
         "services.backup",
         "services.companion",
+        "services.contentrestriction",
         "services.core",
         "services.devicepolicy",
         "services.net",
@@ -428,4 +430,11 @@ test_module_config {
     base: "FrameworksMockingServicesTests",
     test_suites: ["device-tests"],
     include_filters: ["com.android.server.am.ApplicationStartInfoTest"],
+}
+
+test_module_config {
+    name: "FrameworksMockingServicesTests_contentrestriction",
+    base: "FrameworksMockingServicesTests",
+    test_suites: ["device-tests"],
+    include_filters: ["com.android.server.contentrestriction"],
 }

@@ -787,7 +787,7 @@ public abstract class WindowManagerInternal {
     /**
      * Called after virtual display Id is updated by
      * {@link com.android.server.vr.Vr2dDisplay} with a specific
-     * {@param vr2dDisplayId}.
+     * {@code vr2dDisplayId}.
      */
     public abstract void setVr2dDisplayId(int vr2dDisplayId);
 
@@ -814,7 +814,7 @@ public abstract class WindowManagerInternal {
      * arranged underneath non-{@code showWhenLocked} wallpaper tokens.
      *
      * @param windowToken wallpaper token previously added via {@link #addWindowToken}
-     * @param showWhenLocked whether {@param token} can continue to be shown on the lock screen.
+     * @param showWhenLocked whether {@code token} can continue to be shown on the lock screen.
      */
     public abstract void setWallpaperShowWhenLocked(IBinder windowToken, boolean showWhenLocked);
 
@@ -1081,6 +1081,21 @@ public abstract class WindowManagerInternal {
      *         {@code false} otherwise.
      */
     public abstract boolean shouldRestoreImeVisibility(IBinder imeTargetWindowToken);
+
+    /**
+     * Check whether the current ime input target window is stale in WM or not before updating it
+     * to the given {@code windowToken}.
+     *
+     * <p>The existing target is considered as stale only when the window that is different from the
+     * given {@code windowToken} is set but is being or already removed.
+     *
+     * <p>TODO(b/429304155): Come back  to this and properly address the underlying issue.
+     *
+     * @param windowToken The token of the window of the next ime input target
+     * @return {@code true} if the IME input target window in the given window's display is stale,
+     *         {@code false} otherwise.
+     */
+    public abstract boolean isImeInputTargetStaleForUpdate(@NonNull IBinder windowToken);
 
     /**
      * Internal methods for other parts of SystemServer to manage

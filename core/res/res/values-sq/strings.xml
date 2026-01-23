@@ -158,6 +158,10 @@
     <string name="wfc_mode_wifi_preferred_summary" msgid="1035175836270943089">"Telefono nëpërmjet Wi-Fi"</string>
     <string name="wfc_mode_cellular_preferred_summary" msgid="4958965609212575619">"Telefono nëpërmjet rrjetit celular"</string>
     <string name="wfc_mode_wifi_only_summary" msgid="104951993894678665">"Vetëm Wi-Fi"</string>
+    <string name="adaptive_low_frequency_less_than_one_minute" msgid="8869498183646028708">"~ %s"</string>
+    <string name="adaptive_low_frequency_neg_less_than_one_minute" msgid="2590062535985417056">"~ −%s"</string>
+    <string name="elapsed_time_low_frequency_short_format_h_mm" msgid="6728141238066668781">"%1$d:%2$02d:--"</string>
+    <string name="elapsed_time_low_frequency_short_format_mm" msgid="2405181895215514414">"%1$02d:--"</string>
     <!-- no translation found for crossSimFormat_spn (9125246077491634262) -->
     <skip />
     <string name="crossSimFormat_spn_cross_sim_calling" msgid="5620807020002879057">"Opsioni rezervë i telefonatave të <xliff:g id="SPN">%s</xliff:g>"</string>
@@ -283,7 +287,7 @@
     <string name="global_action_screenshot" msgid="2610053466156478564">"Pamja e ekranit"</string>
     <string name="global_action_standby" msgid="6786920589970257642">"Në gatishmëri"</string>
     <string name="bugreport_title" msgid="8549990811777373050">"Raporti i defekteve në kod"</string>
-    <string name="bugreport_message" msgid="5212529146119624326">"Ky funksion mundëson mbledhjen e informacioneve mbi gjendjen aktuale të pajisjes për ta dërguar si mesazh mail-i. Do të duhet pak kohë nga nisja e raportit të defekteve në kod. Faleminderit për durimin."</string>
+    <string name="bugreport_message" msgid="5212529146119624326">"Ky funksion mundëson mbledhjen e informacioneve mbi gjendjen aktuale të pajisjes për ta dërguar si mesazh email-i. Do të duhet pak kohë nga nisja e raportit të defekteve në kod. Faleminderit për durimin."</string>
     <string name="bugreport_option_interactive_title" msgid="7968287837902871289">"Raport interaktiv"</string>
     <string name="bugreport_option_interactive_summary" msgid="8493795476325339542">"Përdore këtë në shumicën e rrethanave. Të lejon të gjurmosh progresin e raportit dhe të fusësh më shumë detaje rreth problemit dhe të regjistrosh pamje të ekranit. Mund të fshijë disa seksione që përdoren më pak të cilat kërkojnë shumë kohë për t\'u raportuar."</string>
     <string name="bugreport_option_full_title" msgid="7681035745950045690">"Raporti i plotë"</string>
@@ -645,10 +649,8 @@
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"Lejon që aplikacioni të qaset në pajisjet në rrjetin lokal"</string>
     <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"përdor ndërfaqen e përsëritjes"</string>
     <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"Lejon që aplikacioni të ndërveprojë me aplikacionet e tjera nëpërmjet ndërfaqes së përsëritjes"</string>
-    <!-- no translation found for permlab_force_use_loopback_interface (1319727311706416481) -->
-    <skip />
-    <!-- no translation found for permdesc_force_use_loopback_interface (5829032514048681980) -->
-    <skip />
+    <string name="permlab_force_use_loopback_interface" msgid="1319727311706416481">"detyro përdorimin e ndërfaqes së përsëritjes"</string>
+    <string name="permdesc_force_use_loopback_interface" msgid="5829032514048681980">"Lejon apl. të ndërvep. me apl. e tjera përmes ndërfaqes së përsëritjes pa kërkuar që apl. tjetër të mbajë lejet e përsëritjes"</string>
     <string name="permlab_ranging" msgid="2854543350668593390">"të përcaktojë pozicionin e përafërt mes pajisjeve në afërsi"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"Lejo që aplikacioni të përcaktojë pozicionin e përafërt mes pajisjeve në afërsi"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"Informacionet për shërbimin e preferuar të pagesës me NFC"</string>
@@ -774,7 +776,7 @@
     <string name="face_acquired_too_low" msgid="4075391872960840081">"Ule telefonin më poshtë"</string>
     <string name="face_acquired_too_right" msgid="6245286514593540859">"Lëvize telefonin në të majtën tënde"</string>
     <string name="face_acquired_too_left" msgid="9201762240918405486">"Lëvize telefonin në të djathtën tënde"</string>
-    <string name="face_acquired_poor_gaze" msgid="4427153558773628020">"Shiko më drejt në pajisjen tënde."</string>
+    <string name="face_acquired_poor_gaze" msgid="6746437451436776485">"Shiko më drejtpërdrejt te kamera"</string>
     <string name="face_acquired_not_detected" msgid="1057966913397548150">"Fytyra s\'mund të shihet. Mbaje telefonin në nivelin e syve."</string>
     <string name="face_acquired_too_much_motion" msgid="8199691445085189528">"Ka shumë lëvizje. Mbaje telefonin të palëvizur."</string>
     <string name="face_acquired_recalibrate" msgid="8724013080976469746">"Regjistroje përsëri fytyrën tënde."</string>
@@ -1454,6 +1456,9 @@
     <string name="carrier_app_notification_text" msgid="6567057546341958637">"Trokit për ta konfiguruar"</string>
     <string name="time_zone_change_notification_title" msgid="5232503069219193218">"Brezi yt orar është ndryshuar"</string>
     <string name="time_zone_change_notification_body" msgid="6135793674904665585">"Tani je në <xliff:g id="TIME_ZONE_DISPLAY_NAME">%1$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET">%2$s</xliff:g>)"</string>
+    <string name="time_zone_offset_change_notification_title" msgid="8232305835199459588">"Ndryshimi i orës"</string>
+    <string name="time_zone_offset_change_notification_body_forward" msgid="1299493962341887576">"Orët u shtynë përpara me <xliff:g id="TIME_ZONE_OFFSET_DURATION">%1$s</xliff:g>. Tani je në sistemin: <xliff:g id="TIME_ZONE_DISPLAY_NAME">%2$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET_0">%3$s</xliff:g>)."</string>
+    <string name="time_zone_offset_change_notification_body_backward" msgid="6643532078142642118">"Orët u shtynë prapa me <xliff:g id="TIME_ZONE_OFFSET_DURATION">%1$s</xliff:g>. Tani je në <xliff:g id="TIME_ZONE_DISPLAY_NAME">%2$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET_0">%3$s</xliff:g>)."</string>
     <string name="time_picker_dialog_title" msgid="9053376764985220821">"Cakto kohën"</string>
     <string name="date_picker_dialog_title" msgid="5030520449243071926">"Vendos datën"</string>
     <string name="date_time_set" msgid="4603445265164486816">"Cakto"</string>
@@ -1794,7 +1799,7 @@
     <string name="kg_failed_attempts_now_wiping" product="default" msgid="5043730590446071189">"Ke tentuar <xliff:g id="NUMBER">%d</xliff:g> herë ta shkyçësh pa sukses telefonin tënd. Telefoni do të rivendoset tani si në gjendjen e fabrikës."</string>
     <string name="kg_failed_attempts_almost_at_login" product="tablet" msgid="7086799295109717623">"E ke vizatuar gabimisht motivin tënd të shkyçjes <xliff:g id="NUMBER_0">%1$d</xliff:g> herë. Pas <xliff:g id="NUMBER_1">%2$d</xliff:g> tentativave të tjera të pasuksesshme do të të kërkohet ta shkyçësh tabletin duke përdorur një llogari mail-i.\n\n Provo sërish për <xliff:g id="NUMBER_2">%3$d</xliff:g> sekonda."</string>
     <string name="kg_failed_attempts_almost_at_login" product="tv" msgid="4670840383567106114">"Ke vizatuar <xliff:g id="NUMBER_0">%1$d</xliff:g> herë pa sukses motivin tënd të shkyçjes. Pas <xliff:g id="NUMBER_1">%2$d</xliff:g> përpjekjesh të tjera të pasuksesshme, do të të kërkohet të shkyçësh pajisjen tënde Android TV duke përdorur një llogari email-i.\n\n Provo përsëri për <xliff:g id="NUMBER_2">%3$d</xliff:g> sekonda."</string>
-    <string name="kg_failed_attempts_almost_at_login" product="default" msgid="5270861875006378092">"Ke vizatuar <xliff:g id="NUMBER_0">%1$d</xliff:g> herë pa sukses motivin tënd. Pas <xliff:g id="NUMBER_1">%2$d</xliff:g> tentativave të tjera të pasuksesshme, do të të duhet ta shkyçësh telefonin duke përdorur një llogari mail-i.\n\n Provo sërish për <xliff:g id="NUMBER_2">%3$d</xliff:g> sekonda."</string>
+    <string name="kg_failed_attempts_almost_at_login" product="default" msgid="5270861875006378092">"Ke vizatuar <xliff:g id="NUMBER_0">%1$d</xliff:g> herë pa sukses motivin tënd. Pas <xliff:g id="NUMBER_1">%2$d</xliff:g> tentativave të tjera të pasuksesshme, do të të duhet ta shkyçësh telefonin duke përdorur një llogari email-i.\n\n Provo sërish për <xliff:g id="NUMBER_2">%3$d</xliff:g> sekonda."</string>
     <string name="kg_text_message_separator" product="default" msgid="4503708889934976866">" - "</string>
     <string name="kg_reordering_delete_drop_target_text" msgid="2034358143731750914">"Hiq"</string>
     <string name="safe_media_volume_warning" product="default" msgid="3751676824423049994">"Të ngrihet volumi mbi nivelin e rekomanduar?\n\nDëgjimi me volum të lartë për periudha të gjata mund të dëmtojë dëgjimin."</string>
@@ -1829,6 +1834,7 @@
     <string name="accessibility_shortcut_label_gesture" msgid="7987298674836890931">"gjesti"</string>
     <string name="accessibility_shortcut_label_quick_settings" msgid="6851280333772213611">"cilësimet e shpejta"</string>
     <string name="accessibility_shortcut_label_triple_tap" msgid="9058975959054454796">"trokitja tri herë"</string>
+    <string name="accessibility_shortcut_label_top_row_key" msgid="1488840908672437180">"tasti i qasshmërisë"</string>
     <string name="accessibility_uncheck_legacy_item_warning" msgid="8047830891064817447">"<xliff:g id="SERVICE_NAME">%s</xliff:g> është çaktivizuar"</string>
     <string name="edit_accessibility_shortcut_menu_button" msgid="8885752738733772935">"Redakto shkurtoret"</string>
     <string name="done_accessibility_shortcut_menu_button" msgid="3668407723770815708">"U krye"</string>
@@ -2105,6 +2111,7 @@
     <string name="app_suspended_default_message" msgid="6451215678552004172">"<xliff:g id="APP_NAME_0">%1$s</xliff:g> nuk ofrohet në këtë moment. Kjo menaxhohet nga <xliff:g id="APP_NAME_1">%2$s</xliff:g>."</string>
     <string name="app_suspended_more_details" msgid="211260942831587014">"Mëso më shumë"</string>
     <string name="app_suspended_unsuspend_message" msgid="1665438589450555459">"Anulo pauzën për aplikacionin"</string>
+    <string name="locked_app_biometric_prompt_description" msgid="6853122652400451464">"<xliff:g id="APP_NAME">%1$s</xliff:g> është kyçur"</string>
     <string name="work_mode_off_title" msgid="6367463960165135829">"Hiq nga pauza apl. e punës?"</string>
     <string name="work_mode_turn_on" msgid="5316648862401307800">"Hiq nga pauza"</string>
     <string name="work_mode_emergency_call_button" msgid="6818855962881612322">"Urgjenca"</string>
@@ -2183,29 +2190,21 @@
     <string name="autofill_picker_no_suggestions" msgid="1076022650427481509">"Asnjë sugjerim për plotësim automatik"</string>
     <string name="autofill_picker_some_suggestions" msgid="5560549696296202701">"{count,plural, =1{Një sugjerim për plotësim automatik}other{# sugjerime për plotësim automatik}}"</string>
     <string name="autofill_save_title" msgid="7719802414283739775">"Të ruhet te "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>"?"</string>
-    <!-- no translation found for autofill_save_title_expressive (2665408870424848558) -->
-    <skip />
+    <string name="autofill_save_title_expressive" msgid="2665408870424848558">"Ruaj informacionet në \""<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>"\""</string>
     <string name="autofill_save_title_with_type" msgid="3002460014579799605">"Të ruhet <xliff:g id="TYPE">%1$s</xliff:g> te "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>"?"</string>
-    <!-- no translation found for autofill_save_title_with_type_expressive (6063660551496235255) -->
-    <skip />
+    <string name="autofill_save_title_with_type_expressive" msgid="6063660551496235255">"Ruaj \"<xliff:g id="TYPE">%1$s</xliff:g>\" në \""<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>"\""</string>
     <string name="autofill_save_title_with_2types" msgid="3783270967447869241">"Të ruhet <xliff:g id="TYPE_0">%1$s</xliff:g> dhe <xliff:g id="TYPE_1">%2$s</xliff:g> te "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>"?"</string>
-    <!-- no translation found for autofill_save_title_with_2types_expressive (2996687022212666293) -->
-    <skip />
+    <string name="autofill_save_title_with_2types_expressive" msgid="2996687022212666293">"Ruaj \"<xliff:g id="TYPE_0">%1$s</xliff:g>\" dhe \"<xliff:g id="TYPE_1">%2$s</xliff:g>\" në \""<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>"\""</string>
     <string name="autofill_save_title_with_3types" msgid="6598228952100102578">"Të ruhet <xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g> dhe <xliff:g id="TYPE_2">%3$s</xliff:g> te "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>"?"</string>
-    <!-- no translation found for autofill_save_title_with_3types_expressive (3301676215501214049) -->
-    <skip />
+    <string name="autofill_save_title_with_3types_expressive" msgid="3301676215501214049">"Ruaj \"<xliff:g id="TYPE_0">%1$s</xliff:g>\", \"<xliff:g id="TYPE_1">%2$s</xliff:g>\" dhe \"<xliff:g id="TYPE_2">%3$s</xliff:g>\" në \""<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>"\""</string>
     <string name="autofill_update_title" msgid="3630695947047069136">"Të përditësohet në "<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>"?"</string>
-    <!-- no translation found for autofill_update_title_expressive (7660582214109012920) -->
-    <skip />
+    <string name="autofill_update_title_expressive" msgid="7660582214109012920">"Përditëso informacionet në \""<b>"<xliff:g id="LABEL">%1$s</xliff:g>"</b>"\""</string>
     <string name="autofill_update_title_with_type" msgid="5264152633488495704">"Të përditësohet <xliff:g id="TYPE">%1$s</xliff:g> në "<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>"?"</string>
-    <!-- no translation found for autofill_update_title_with_type_expressive (6162413585161767846) -->
-    <skip />
+    <string name="autofill_update_title_with_type_expressive" msgid="6162413585161767846">"Përditëso \"<xliff:g id="TYPE">%1$s</xliff:g>\" në \""<b>"<xliff:g id="LABEL">%2$s</xliff:g>"</b>"\""</string>
     <string name="autofill_update_title_with_2types" msgid="1797514386321086273">"Të përditësohet <xliff:g id="TYPE_0">%1$s</xliff:g> dhe <xliff:g id="TYPE_1">%2$s</xliff:g> në "<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>"?"</string>
-    <!-- no translation found for autofill_update_title_with_2types_expressive (1911825941498393471) -->
-    <skip />
+    <string name="autofill_update_title_with_2types_expressive" msgid="1911825941498393471">"Përditëso \"<xliff:g id="TYPE_0">%1$s</xliff:g>\" dhe \"<xliff:g id="TYPE_1">%2$s</xliff:g>\" në \""<b>"<xliff:g id="LABEL">%3$s</xliff:g>"</b>"\""</string>
     <string name="autofill_update_title_with_3types" msgid="8285767070604652626">"Të përditësohen këta artikuj në "<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>": <xliff:g id="TYPE_0">%1$s</xliff:g>, <xliff:g id="TYPE_1">%2$s</xliff:g> dhe <xliff:g id="TYPE_2">%3$s</xliff:g>?"</string>
-    <!-- no translation found for autofill_update_title_with_3types_expressive (6040725201378429027) -->
-    <skip />
+    <string name="autofill_update_title_with_3types_expressive" msgid="6040725201378429027">"Përditëso këta artikuj në \""<b>"<xliff:g id="LABEL">%4$s</xliff:g>"</b>"\": \"<xliff:g id="TYPE_0">%1$s</xliff:g>\", \"<xliff:g id="TYPE_1">%2$s</xliff:g>\" dhe \"<xliff:g id="TYPE_2">%3$s</xliff:g>\""</string>
     <string name="autofill_save_yes" msgid="8035743017382012850">"Ruaj"</string>
     <string name="autofill_save_no" msgid="9212826374207023544">"Jo, faleminderit"</string>
     <string name="autofill_save_notnow" msgid="2853932672029024195">"Jo tani"</string>
@@ -2552,6 +2551,8 @@
     <string name="accessibility_label_clone_profile" msgid="7579118375042398784">"Klon"</string>
     <string name="accessibility_label_communal_profile" msgid="1437173163111334791">"I përbashkët"</string>
     <string name="private_space_biometric_prompt_title" msgid="5777592909271728154">"Hapësira private"</string>
+    <string name="app_locked_new_notification" msgid="4409730436247596215">"Njoftim i ri"</string>
+    <string name="app_locked_notification_message" msgid="4576179600328065280">"Mesazh i ri"</string>
     <string name="redacted_notification_message" msgid="1520587845842228816">"Përmbajtjet delikate të njoftimeve janë fshehur"</string>
     <string name="redacted_notification_action_title" msgid="6942924973335920935"></string>
     <string name="screen_not_shared_sensitive_content" msgid="7058419185079565001">"Përmbajtja e aplikacionit është fshehur nga ndarja e ekranit për arsye sigurie"</string>

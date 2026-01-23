@@ -29,6 +29,7 @@ import com.android.systemui.flags.Flags
 import com.android.systemui.lifecycle.ExclusiveActivatable
 import com.android.systemui.lifecycle.Hydrator
 import com.android.systemui.notifications.ui.NotificationPlaceholderStateStorage
+import com.android.systemui.notifications.ui.YSpace
 import com.android.systemui.scene.domain.interactor.SceneInteractor
 import com.android.systemui.scene.shared.flag.SceneContainerFlag
 import com.android.systemui.scene.shared.model.Overlays
@@ -43,7 +44,6 @@ import com.android.systemui.statusbar.notification.stack.shared.model.Accessibil
 import com.android.systemui.statusbar.notification.stack.shared.model.ShadeScrimBounds
 import com.android.systemui.statusbar.notification.stack.shared.model.ShadeScrimRounding
 import com.android.systemui.statusbar.notification.stack.shared.model.ShadeScrollState
-import com.android.systemui.statusbar.notification.stack.ui.YSpace
 import com.android.systemui.util.kotlin.ActivatableFlowDumper
 import com.android.systemui.util.kotlin.ActivatableFlowDumperImpl
 import com.android.systemui.wallpapers.domain.interactor.WallpaperFocalAreaInteractor
@@ -130,14 +130,6 @@ constructor(
             traceName = "notificationsShadeContentKey",
             initialValue = getNotificationsShadeContentKey(shadeModeInteractor.shadeMode.value),
             source = shadeModeInteractor.shadeMode.map { getNotificationsShadeContentKey(it) },
-        )
-
-    /** The content key to use for the quick settings shade. */
-    val quickSettingsShadeContentKey: ContentKey by
-        hydrator.hydratedStateOf(
-            traceName = "quickSettingsShadeContentKey",
-            initialValue = getQuickSettingsShadeContentKey(shadeModeInteractor.shadeMode.value),
-            source = shadeModeInteractor.shadeMode.map { getQuickSettingsShadeContentKey(it) },
         )
 
     /** @see NotificationStackAppearanceInteractor.notificationStackHorizontalAlignment */
@@ -257,14 +249,6 @@ constructor(
 
     private fun getNotificationsShadeContentKey(shadeMode: ShadeMode): ContentKey {
         return if (shadeMode is ShadeMode.Dual) Overlays.NotificationsShade else Scenes.Shade
-    }
-
-    private fun getQuickSettingsShadeContentKey(shadeMode: ShadeMode): ContentKey {
-        return when (shadeMode) {
-            is ShadeMode.Single -> Scenes.QuickSettings
-            is ShadeMode.Split -> Scenes.Shade
-            is ShadeMode.Dual -> Overlays.QuickSettingsShade
-        }
     }
 
     @AssistedFactory

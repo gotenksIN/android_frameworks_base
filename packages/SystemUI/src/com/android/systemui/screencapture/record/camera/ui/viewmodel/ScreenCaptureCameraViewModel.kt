@@ -17,38 +17,38 @@
 package com.android.systemui.screencapture.record.camera.ui.viewmodel
 
 import android.util.Size
+import android.view.Display
 import android.view.Surface
 import androidx.compose.runtime.getValue
 import com.android.app.tracing.coroutines.flow.collectTraced
 import com.android.systemui.lifecycle.HydratedActivatable
-import com.android.systemui.screencapture.domain.interactor.ScreenCaptureOverlayStateInteractor
 import com.android.systemui.screencapture.record.camera.domain.interactor.ScreenRecordCameraInteractor
+import com.android.systemui.screencapture.record.camera.domain.interactor.ScreenRecordCameraSurfaceInteractor
+import com.android.systemui.screencapture.record.camera.shared.model.CameraState
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.consumeAsFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 class ScreenCaptureCameraViewModel
 @AssistedInject
 constructor(
-    private val cameraInteractor: ScreenRecordCameraInteractor,
-    overlayStateInteractor: ScreenCaptureOverlayStateInteractor,
+    private val screenRecordCameraSurfaceInteractor: ScreenRecordCameraSurfaceInteractor,
+    private val screenRecordCameraInteractor: ScreenRecordCameraInteractor,
 ) : HydratedActivatable() {
 
-    private val currentSurface = MutableStateFlow<CameraSurface?>(null)
     private val taps = Channel<Unit>()
 
     val shouldShowCamera: Boolean? by
-        overlayStateInteractor.isCameraInUse.hydratedStateOf(
-            "ScreenCaptureCameraViewModel#shouldShowCamera",
-            null,
-        )
+        screenRecordCameraInteractor.state
+            .map { it == CameraState.Started }
+            .hydratedStateOf("ScreenCaptureCameraViewModel#shouldShowCamera", null)
 
     val surfaceSize: Size? by
-        cameraInteractor.optimalCameraStreamSize.hydratedStateOf(
+        screenRecordCameraInteractor.optimalCameraStreamSize.hydratedStateOf(
             "ScreenCaptureCameraViewModel#surfaceSize",
             null,
         )
@@ -57,43 +57,34 @@ constructor(
         super.onActivated()
         coroutineScope {
             launch {
-                currentSurface.collectTraced("ScreenCaptureCameraViewModel#currentSurface") {
-                    cameraSurface ->
-                    if (cameraSurface == null) {
-                        cameraInteractor.stopStream()
-                    } else {
-                        cameraInteractor.startStream(
-                            surface = cameraSurface.surface,
-                            width = cameraSurface.width,
-                            height = cameraSurface.height,
-                        )
-                    }
-                }
-            }
-            launch {
                 taps.consumeAsFlow().collectTraced("ScreenCaptureCameraViewModel#taps") {
-                    cameraInteractor.onTap()
+                    screenRecordCameraInteractor.onTap()
                 }
             }
         }
     }
 
     fun onSurfaceReady(surface: Surface, width: Int, height: Int) {
-        currentSurface.value = CameraSurface(surface = surface, width = width, height = height)
+        screenRecordCameraSurfaceInteractor.startStream(surface, width, height)
     }
 
     fun onSurfaceDestroyed() {
-        currentSurface.value = null
+        screenRecordCameraSurfaceInteractor.stopStream()
     }
 
     fun onSurfaceClicked() {
         taps.trySend(Unit)
     }
 
+    fun onDisplayReady(display: Display) {
+        screenRecordCameraInteractor.onDisplayReady(
+            uniqueId = display.uniqueId,
+            rotation = display.rotation,
+        )
+    }
+
     @AssistedFactory
     interface Factory {
         fun create(): ScreenCaptureCameraViewModel
     }
-
-    private data class CameraSurface(val surface: Surface, val width: Int, val height: Int)
 }

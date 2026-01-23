@@ -42,6 +42,7 @@ java_library {
 
     proto: {
         type: "nano",
+        canonical_path_from_root: false,
     },
 
     libs: [
@@ -291,6 +292,9 @@ filegroup {
         "tests/src/**/systemui/qs/tiles/dialog/InternetDetailsContentManagerTest.kt",
         "tests/src/**/systemui/qs/external/TileLifecycleManagerTest.java",
         "tests/src/**/systemui/ScreenDecorationsTest.java",
+        "tests/src/**/systemui/usb/UsbConfirmActivityTest.kt",
+        "tests/src/**/systemui/usb/UsbDialogActivityTest.kt",
+        "tests/src/**/systemui/usb/UsbPermissionActivityTest.kt",
         "tests/src/**/systemui/user/domain/interactor/HeadlessSystemUserModeImplTest.kt",
         "tests/src/**/keyguard/CarrierTextManagerTest.java",
         "tests/src/**/keyguard/KeyguardUpdateMonitorTest.java",
@@ -559,13 +563,6 @@ android_library {
         "androidx.media3.media3-common",
         "androidx.media3.media3-session",
         "androidx.graphics_graphics-core",
-        "androidx.ink_ink-authoring",
-        "androidx.ink_ink-authoring-compose",
-        "androidx.ink_ink-brush",
-        "androidx.ink_ink-nativeloader",
-        "androidx.ink_ink-rendering",
-        "androidx.ink_ink-strokes",
-        "androidx.ink_ink-storage",
         "com.google.android.material_material",
         "device_state_flags_lib",
         "kotlinx_coroutines_android",
@@ -725,9 +722,11 @@ java_library {
     name: "SystemUI-tests-concurrency",
     srcs: [
         "src/com/android/systemui/util/concurrency/DelayableExecutor.java",
-        "pods/src/com/android/systemui/util/time/SystemClock.java",
         "tests/utils/src/com/android/systemui/util/concurrency/FakeExecutor.java",
         "tests/utils/src/com/android/systemui/util/time/FakeSystemClock.java",
+    ],
+    static_libs: [
+        "com.android.systemui.util.time-api",
     ],
     libs: [
         "androidx.annotation_annotation",
@@ -791,13 +790,6 @@ android_library {
         "androidx.media3.media3-common",
         "androidx.media3.media3-session",
         "androidx.graphics_graphics-core",
-        "androidx.ink_ink-authoring",
-        "androidx.ink_ink-authoring-compose",
-        "androidx.ink_ink-brush",
-        "androidx.ink_ink-nativeloader",
-        "androidx.ink_ink-rendering",
-        "androidx.ink_ink-strokes",
-        "androidx.ink_ink-storage",
         "device_state_flags_lib",
         "kotlinx-coroutines-android",
         "kotlinx-coroutines-core",
@@ -1066,6 +1058,7 @@ android_ravenwood_test {
     name: "SystemUiRavenTests",
     manifest: "tests/AndroidManifest-base.xml",
     build_resources: true,
+    data: ["ravenwood.prop"],
     srcs: [
         ":SystemUI-tests-utils",
         ":SystemUI-tests-multivalent-monolith",

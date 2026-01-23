@@ -70,7 +70,6 @@ import static android.content.pm.ActivityInfo.CONFIG_SCREEN_SIZE;
 import static android.content.pm.ActivityInfo.CONFIG_SMALLEST_SCREEN_SIZE;
 import static android.content.pm.ActivityInfo.CONFIG_UI_MODE;
 import static android.content.pm.ActivityInfo.CONFIG_WINDOW_CONFIGURATION;
-import static android.content.pm.ActivityInfo.FLAG_ALWAYS_FOCUSABLE;
 import static android.content.pm.ActivityInfo.FLAG_EXCLUDE_FROM_RECENTS;
 import static android.content.pm.ActivityInfo.FLAG_IMMERSIVE;
 import static android.content.pm.ActivityInfo.FLAG_INHERIT_SHOW_WHEN_LOCKED;
@@ -149,7 +148,6 @@ import static android.view.WindowManager.PROPERTY_ACTIVITY_EMBEDDING_SPLITS_ENAB
 import static android.view.WindowManager.PROPERTY_ALLOW_UNTRUSTED_ACTIVITY_EMBEDDING_STATE_SHARING;
 import static android.view.WindowManager.TRANSIT_RELAUNCH;
 import static android.view.WindowManager.hasWindowExtensionsEnabled;
-import static android.window.DesktopExperienceFlags.ENABLE_RESTART_MENU_FOR_CONNECTED_DISPLAYS;
 import static android.window.TransitionInfo.FLAGS_IS_OCCLUDED_NO_ANIMATION;
 import static android.window.TransitionInfo.FLAG_IS_OCCLUDED;
 import static android.window.TransitionInfo.FLAG_STARTING_WINDOW_TRANSFER_RECIPIENT;
@@ -217,7 +215,6 @@ import static com.android.server.wm.StartingData.AFTER_TRANSACTION_COPY_TO_CLIEN
 import static com.android.server.wm.StartingData.AFTER_TRANSACTION_IDLE;
 import static com.android.server.wm.StartingData.AFTER_TRANSACTION_REMOVE_DIRECTLY;
 import static com.android.server.wm.StartingData.AFTER_TRANSITION_FINISH;
-import static com.android.server.wm.SurfaceAnimator.ANIMATION_TYPE_APP_TRANSITION;
 import static com.android.server.wm.SurfaceAnimator.ANIMATION_TYPE_WINDOW_ANIMATION;
 import static com.android.server.wm.TaskFragment.TASK_FRAGMENT_VISIBILITY_VISIBLE;
 import static com.android.server.wm.TaskPersister.DEBUG;
@@ -652,6 +649,7 @@ public final class ActivityRecord extends WindowToken {
 // QTI_END: 2022-10-06: Core: Merge changes from topic "am-000f4089-22e1-4b8b-a1ba-7df6718ad762" into t-keystone-qcom-dev
     boolean mVoiceInteraction;
 
+    int mPostponedRelaunchConfigChangesFlags;
     int mPendingRelaunchCount;
     long mRelaunchStartTime;
 
@@ -1517,6 +1515,19 @@ public final class ActivityRecord extends WindowToken {
         return parent != null ? parent.asTaskFragment() : null;
     }
 
+    /**
+     * @return whether the other activity is in an adjacent TaskFragment of this activity's
+     * TaskFragment.
+     */
+    boolean isInAdjacentTaskFragment(@Nullable ActivityRecord other) {
+        if (other == null) {
+            return false;
+        }
+        final TaskFragment tf = getTaskFragment();
+        final TaskFragment otherTf = other.getTaskFragment();
+        return tf != null && otherTf != null && tf.isAdjacentTo(otherTf);
+    }
+
     /** Whether we should prepare a transition for this {@link ActivityRecord} parent change. */
     private boolean shouldStartChangeTransition(
             @Nullable TaskFragment newParent, @Nullable TaskFragment oldParent) {
@@ -1537,9 +1548,8 @@ public final class ActivityRecord extends WindowToken {
 
     @Override
     boolean canStartChangeTransition() {
-        final Task task = getTask();
         // Skip change transition when the Task is drag resizing.
-        return task != null && !task.isDragResizing() && super.canStartChangeTransition();
+        return !isDragResizing() && super.canStartChangeTransition();
     }
 
     @Override
@@ -1771,7 +1781,7 @@ public final class ActivityRecord extends WindowToken {
         }
 
         mAppCompatController.getLetterboxPolicy().onMovedToDisplay(mDisplayContent.getDisplayId());
-        mAppCompatController.getDisplayCompatModePolicy().onMovedToDisplay(prevDc, dc);
+        mAppCompatController.getDisplayCompatPolicy().onMovedToDisplay(prevDc, dc);
     }
 
     void layoutLetterboxIfNeeded(WindowState winHint) {
@@ -2876,8 +2886,8 @@ public final class ActivityRecord extends WindowToken {
     }
 
     /**
-     * Reparents this activity into {@param newTaskFrag} at the provided {@param position}. The
-     * caller should ensure that the {@param newTaskFrag} is not already the parent of this
+     * Reparents this activity into {@code newTaskFrag} at the provided {@code position}. The
+     * caller should ensure that the {@code newTaskFrag} is not already the parent of this
      * activity.
      */
     void reparent(TaskFragment newTaskFrag, int position, String reason) {
@@ -3159,7 +3169,7 @@ public final class ActivityRecord extends WindowToken {
 
     @Override
     boolean isFocusable() {
-        return super.isFocusable() && (canReceiveKeys() || isAlwaysFocusable());
+        return super.isFocusable() && canReceiveKeys();
     }
 
     boolean canReceiveKeys() {
@@ -3422,18 +3432,10 @@ public final class ActivityRecord extends WindowToken {
         return mAtmService.getAppOpsManager().checkOpNoThrow(
                 OP_PICTURE_IN_PICTURE, getUid(), packageName) == MODE_ALLOWED;
     }
-
-    private boolean isAlwaysFocusable() {
-        return (info.flags & FLAG_ALWAYS_FOCUSABLE) != 0;
-    }
-
     boolean windowsAreFocusable() {
         return windowsAreFocusable(false /* fromUserTouch */);
     }
 
-    // TODO: Does this really need to be different from isAlwaysFocusable()? For the activity side
-    // focusable means resumeable. I guess with that in mind maybe we should rename the other
-    // method to isResumeable() or something like that.
     boolean windowsAreFocusable(boolean fromUserTouch) {
         if (!fromUserTouch && mTargetSdk < Build.VERSION_CODES.Q) {
             final int pid = getPid();
@@ -3449,7 +3451,7 @@ public final class ActivityRecord extends WindowToken {
         // Check isAttached() because the method may be called when removing this activity from
         // display, and WindowContainer#compareTo will throw exception if it doesn't have a parent
         // when updating focused window from DisplayContent#findFocusedWindow.
-        return (canReceiveKeys() || isAlwaysFocusable()) && isAttached();
+        return canReceiveKeys() && isAttached();
     }
 
     /**
@@ -4303,6 +4305,7 @@ public final class ActivityRecord extends WindowToken {
     void finishOrAbortReplacingWindow() {
         mRelaunchStartTime = 0;
         mDisplayContent.getDisplayPolicy().removeRelaunchingApp(this);
+        resumePostponedRelaunch();
     }
 
     ActivityServiceConnectionsHolder getOrCreateServiceConnectionsHolder() {
@@ -4344,7 +4347,7 @@ public final class ActivityRecord extends WindowToken {
             // process dies, the SDKs are unloaded and can not handle the activity, so sandbox
             // activity records should be removed.
             remove = true;
-        } else if (mAppCompatController.getDisplayCompatModePolicy()
+        } else if (mAppCompatController.getDisplayCompatPolicy()
                 .shouldRecoverFromSelfKillOnDisplayMove()) {
             // Relaunch it as it's likely to be unintentionally killing itself on display move.
             remove = false;
@@ -5497,7 +5500,7 @@ public final class ActivityRecord extends WindowToken {
         boolean inFinishingTransition = false;
         if (mTransitionController.isShellTransitionsEnabled()) {
             if (mTransitionController.isCollecting()) {
-                if (Flags.promoteExistenceChangedStateToParent() && app == null) {
+                if (app == null) {
                     mTransitionController.collectExistenceChange(this);
                 } else {
                     mTransitionController.collect(this);
@@ -5744,20 +5747,11 @@ public final class ActivityRecord extends WindowToken {
         callServiceTrackeronActivityStatechange(state, false);
 
 // QTI_END: 2020-06-27: Frameworks: Passing every activity state change to Servicetracker HAL.
-        if (getTaskFragment() != null) {
-            getTaskFragment().onActivityStateChanged(this, state, reason);
+        final TaskFragment taskFragment = getTaskFragment();
+        if (taskFragment != null) {
+            taskFragment.onActivityStateChanged(this, state, reason);
         }
 
-        // The WindowManager interprets the app stopping signal as
-        // an indication that the Surface will eventually be destroyed.
-        // This however isn't necessarily true if we are going to sleep.
-        if (state == STOPPING && !isSleeping()) {
-            if (getParent() == null) {
-                Slog.w(TAG_WM, "Attempted to notify stopping on non-existing app token: "
-                        + token);
-                return;
-            }
-        }
         updateVisibleForServiceConnection();
         if (app != null) {
             mTaskSupervisor.onProcessActivityStateChanged(app, false /* forceBatch */);
@@ -6018,8 +6012,8 @@ public final class ActivityRecord extends WindowToken {
         mDisplayContent.mUnknownAppVisibilityController.notifyLaunched(this);
     }
 
-    /** @return {@code true} if this activity should be made visible. */
-    private boolean shouldBeVisible(boolean behindOccludedContainer, boolean ignoringKeyguard) {
+    /** Updates and returns whether this activity should be made visible. */
+    boolean updateAndCheckVisibility(boolean behindOccludedContainer, boolean ignoringKeyguard) {
         updateVisibilityIgnoringKeyguard(behindOccludedContainer);
 
         if (ignoringKeyguard) {
@@ -6029,6 +6023,10 @@ public final class ActivityRecord extends WindowToken {
         return shouldBeVisibleUnchecked();
     }
 
+    /**
+     * Returns the previous updated value of whether this activity should be made visible.
+     * Uses {@link #shouldBeVisible} to get the latest.
+     */
     boolean shouldBeVisibleUnchecked() {
         final Task rootTask = getRootTask();
         if (rootTask == null || !visibleIgnoringKeyguard) {
@@ -6095,14 +6093,7 @@ public final class ActivityRecord extends WindowToken {
     }
 
     boolean shouldBeVisible(boolean ignoringKeyguard) {
-        final Task task = getTask();
-        if (task == null) {
-            return false;
-        }
-
-        final boolean behindOccludedContainer = !task.shouldBeVisible(null /* starting */)
-                || task.getOccludingActivityAbove(this) != null;
-        return shouldBeVisible(behindOccludedContainer, ignoringKeyguard);
+        return mAtmService.mVisibilityHelper.shouldActivityBeVisible(this, ignoringKeyguard);
     }
 
     void makeVisibleIfNeeded(ActivityRecord starting, boolean reportToClient) {
@@ -6157,13 +6148,23 @@ public final class ActivityRecord extends WindowToken {
                                 && task.topRunningActivity(true /* focusableOnly */) == this) {
                             break;
                         }
-                        // Otherwise, starting to pause it since it is not visible.
-                        final TaskFragment taskFragment = getTaskFragment();
-                        if (taskFragment != null && taskFragment.startPausing(
-                                mTaskSupervisor.mUserLeaving, false /* uiSleeping */,
-                                null /* resuming */, "makeInvisible")) {
-                            break;
+
+                        // Checks if the activity can enter pip
+                        boolean inPip = false;
+                        final Transition finishingTransition =
+                                mTransitionController.mFinishingTransition;
+                        if (finishingTransition != null
+                                && finishingTransition.isInTransientHide(task)) {
+                            inPip = finishingTransition.checkEnterPipOnFinish(this);
                         }
+
+                        // If the activity is not entering pip and is still in RESUMED state,
+                        // starting to pause it since it is no longer visible.
+                        if (!inPip && mState == RESUMED) {
+                            getTaskFragment().startPausing(mTaskSupervisor.mUserLeaving,
+                                    false /* uiSleeping */, null /* resuming */, "makeInvisible");
+                        }
+                        break;
                     }
                     // fall through
                 case INITIALIZING:
@@ -7853,9 +7854,14 @@ public final class ActivityRecord extends WindowToken {
         if (com.android.wm.shell.Flags.enableCreateAnyBubble()) {
             final Task task = getTask();
             if (task != null) {
-                // Similar to floating windows, an app bubble should not apply legacy insets.
-                // TODO(b/407669465): Update mLaunchNextToBubble usage when migrated.
-                shouldApplyLegacyInsets &= !task.mLaunchNextToBubble;
+                if (com.android.window.flags.Flags.enableBubbleRootTask()) {
+                    final Task rootTask = task.getRootTask();
+                    if (rootTask != null) {
+                        shouldApplyLegacyInsets &= !rootTask.shouldIgnoreInsets();
+                    }
+                } else {
+                    shouldApplyLegacyInsets &= !task.mLaunchNextToBubble;
+                }
             }
         }
         mAppCompatController.getSandboxingPolicy().resolveTmpOverrides(newParentConfiguration,
@@ -8909,15 +8915,14 @@ public final class ActivityRecord extends WindowToken {
             skipRelaunchConfigMask |= CONFIG_UI_MODE;
         }
 
-        // TODO(b/274944389): remove workaround after long-term solution is implemented
         // Don't restart due to desk mode change if the app does not have desk resources.
-        if (mWmService.mSkipActivityRelaunchWhenDocking && onlyDeskInUiModeChanged(changesConfig)
+        if (shouldSkipActivityRelaunchWhenDocking() && onlyDeskInUiModeChanged(changesConfig)
                 && !hasDeskResources()) {
             skipRelaunchConfigMask |= CONFIG_UI_MODE;
         }
 
         // Some apps relaunch unexpectedly with display move and crash.
-        skipRelaunchConfigMask |= mAppCompatController.getDisplayCompatModePolicy()
+        skipRelaunchConfigMask |= mAppCompatController.getDisplayCompatPolicy()
                 .getDisplayCompatModeConfigMask();
 
         // For CONFIG_ASSETS_PATHS change, check the constraints for the resource overlays which
@@ -8994,6 +8999,16 @@ public final class ActivityRecord extends WindowToken {
         return mHasDeskResources;
     }
 
+    /**
+     * Returns true if we should skip the activity recreation when the device is docked or undocked
+     * and the application does not have desk mode resources.
+     */
+    boolean shouldSkipActivityRelaunchWhenDocking() {
+        return (Flags.enableLessActivityRecreationOnConfigChange()
+                && info.isChangeEnabled(ActivityInfo.SKIP_ACTIVITY_RECREATION_ON_CONFIG_CHANGE))
+                || mWmService.mSkipActivityRelaunchWhenDocking;
+    }
+
     private int getConfigurationChanges(Configuration lastReportedConfig) {
         // Determine what has changed.  May be nothing, if this is a config that has come back from
         // the app after going idle.  In that case we just want to leave the official config object
@@ -9014,9 +9029,51 @@ public final class ActivityRecord extends WindowToken {
                 | CONFIG_SCREEN_LAYOUT)) != 0;
     }
 
+    private boolean isDragResizing() {
+        return task != null && task.isDragResizing();
+    }
+
+    @Override
+    void resetDragResizingChangeReported() {
+        super.resetDragResizingChangeReported();
+        if (!Flags.improveFluidResizingPerformance()) {
+            return;
+        }
+        if (!isDragResizing()) {
+            // Stop waiting for the intermediate frames but resume the postponed relaunch now.
+            resumePostponedRelaunch();
+        }
+    }
+
+    /**
+     * Resumes a postponed relaunch if there is any. A relaunch can be postponed if it's triggered
+     * while the activity is already in the process of relaunching or before the main window has
+     * been drawn.
+     */
+    void resumePostponedRelaunch() {
+        if (!Flags.improveFluidResizingPerformance()) {
+            return;
+        }
+        if (mPostponedRelaunchConfigChangesFlags != 0) {
+            relaunchActivityLocked(true /* preserveWindow */, 0 /* configChangeFlags */);
+        }
+    }
+
     void relaunchActivityLocked(boolean preserveWindow, int configChangeFlags) {
         if (mAtmService.mSuppressResizeConfigChanges && preserveWindow) {
             return;
+        }
+        if (Flags.improveFluidResizingPerformance()) {
+            if (isDragResizing() && preserveWindow
+                        && (mPendingRelaunchCount > 0 || mRelaunchStartTime > 0)) {
+                mPostponedRelaunchConfigChangesFlags |= configChangeFlags;
+                // Don't relaunch during relaunching (mPendingRelaunchCount > 0) or before the main
+                // window is drawn (mRelaunchStartTime > 0). This helps increase the frame rate
+                // during drag-resizing.
+                return;
+            }
+            configChangeFlags |= mPostponedRelaunchConfigChangesFlags;
+            mPostponedRelaunchConfigChangesFlags = 0;
         }
 
         // Notify that the activity is already relaunching, therefore there's no need to refresh
@@ -9078,7 +9135,7 @@ public final class ActivityRecord extends WindowToken {
             // Note: don't need to call pauseIfSleepingLocked() here, because the caller will only
             // request resume if this activity is currently resumed, which implies we aren't
             // sleeping.
-            mAppCompatController.getDisplayCompatModePolicy()
+            mAppCompatController.getDisplayCompatPolicy()
                     .onActivityRelaunching(configChangeFlags);
         }
 
@@ -9112,7 +9169,7 @@ public final class ActivityRecord extends WindowToken {
         // Reset the existing override configuration so it can be updated according to the latest
         // configuration.
         mAppCompatController.getSizeCompatModePolicy().clearSizeCompatMode();
-        mAppCompatController.getDisplayCompatModePolicy().onProcessRestarted();
+        mAppCompatController.getDisplayCompatPolicy().onProcessRestarted();
 
         if (!attachedToProcess()) {
             return;
@@ -9187,9 +9244,7 @@ public final class ActivityRecord extends WindowToken {
         // be enabled. App switching may be allowed only for specific cases while/after Recents is
         // shown. As when a process is restarted, the user should be interacting with the app, so
         // it's safe to do this. See b/421048151 for more detail.
-        if (ENABLE_RESTART_MENU_FOR_CONNECTED_DISPLAYS.isTrue()) {
-            mAtmService.resumeAppSwitches();
-        }
+        mAtmService.resumeAppSwitches();
         return false;
     }
 
@@ -9537,8 +9592,7 @@ public final class ActivityRecord extends WindowToken {
         final long token = proto.start(fieldId);
         writeNameToProto(proto, NAME);
         super.dumpDebug(proto, WINDOW_TOKEN, logLevel);
-        proto.write(IS_ANIMATING, isAnimating(PARENTS | CHILDREN,
-                ANIMATION_TYPE_APP_TRANSITION | ANIMATION_TYPE_WINDOW_ANIMATION));
+        proto.write(IS_ANIMATING, isAnimating(PARENTS | CHILDREN, ANIMATION_TYPE_WINDOW_ANIMATION));
         proto.write(FILLS_PARENT, fillsParent());
         proto.write(APP_STOPPED, mAppStopped);
         proto.write(TRANSLUCENT, !occludesParent());
@@ -9582,7 +9636,7 @@ public final class ActivityRecord extends WindowToken {
     }
 
     @Override
-    void writeIdentifierToProto(ProtoOutputStream proto, long fieldId) {
+    public void writeIdentifierToProto(ProtoOutputStream proto, long fieldId) {
         final long token = proto.start(fieldId);
         proto.write(HASH_CODE, System.identityHashCode(this));
         proto.write(USER_ID, mUserId);

@@ -9,7 +9,6 @@ per-file PhantomProcessRecord.java = file:/ACTIVITY_MANAGER_OWNERS
 per-file SystemServer.java = file:/ACTIVITY_MANAGER_OWNERS
 per-file ServiceRecord.java = file:/ACTIVITY_MANAGER_OWNERS
 per-file AppProfiler.java = file:/ACTIVITY_MANAGER_OWNERS
-per-file ForegroundServiceTypeLoggerModule.java = file:/ACTIVITY_MANAGER_OWNERS
 per-file AppRestrictionController.java = file:/ACTIVITY_MANAGER_OWNERS
 per-file ConnectionRecord.java = file:/ACTIVITY_MANAGER_OWNERS
 per-file ActiveUids.java = file:/ACTIVITY_MANAGER_OWNERS
@@ -24,6 +23,7 @@ per-file UidObserverController* = file:/ACTIVITY_MANAGER_OWNERS
 per-file App*StartInfo* = file:/PERFORMANCE_OWNERS
 per-file appstartinfo.proto = file:/PERFORMANCE_OWNERS
 per-file MemoryLimiter* = file:/PERFORMANCE_OWNERS
+per-file ForegroundService* = file:/ACTIVITY_MANAGER_OWNERS
 
 # Permissions & Packages
 per-file AccessCheckDelegateHelper.java = file:/core/java/android/permission/OWNERS
@@ -68,7 +68,7 @@ per-file CarUserSwitchingDialog.java = file:platform/packages/services/Car:/OWNE
 per-file ActivityManager* = file:/ACTIVITY_SECURITY_OWNERS
 
 #App Lock
-per-file AppLockLocalService = file:/core/java/android/content/pm/APP_LOCK_OWNERS
+per-file AppLockLocalService.java = file:/core/java/android/content/pm/APP_LOCK_OWNERS
 
 # Native Application
 per-file *NativeApplication* = file:/libs/native_activity_thread/OWNERS

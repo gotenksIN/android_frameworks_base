@@ -429,9 +429,13 @@ public class DesktopModeTouchEventListener
                     taskInfo.displayId,
                     mFocusTransitionObserver.getGloballyFocusedTaskId(),
                     mFocusTransitionObserver.getGloballyFocusedDisplayId());
-            mDesktopModeUiEventLogger.log(taskInfo,
-                    DesktopUiEventEnum.DESKTOP_WINDOW_HEADER_TAP_TO_REFOCUS);
-            mDesktopTasksController.moveTaskToFront(taskInfo);
+            if (isPinned(taskInfo)) {
+                mPinnedLayerController.requestFocus(taskInfo);
+            } else {
+                mDesktopModeUiEventLogger.log(taskInfo,
+                        DesktopUiEventEnum.DESKTOP_WINDOW_HEADER_TAP_TO_REFOCUS);
+                mDesktopTasksController.moveTaskToFront(taskInfo);
+            }
         } else {
             debugLogD("moveTaskToFront already had global focus, skipping "
                             + " display=%d globallyFocusedTaskId=%d globallyFocusedDisplayId=%d",
@@ -677,12 +681,10 @@ public class DesktopModeTouchEventListener
                         viewName, MotionEvent.actionToString(e.getAction()), newTaskBounds,
                         validDragArea, mOnDragStartInitialBounds, touchingButton,
                         needDragIndicatorCleanup);
-                if (DesktopExperienceFlags.ENABLE_WINDOW_DROP_SMOOTH_TRANSITION.isTrue()) {
-                    if (needDragIndicatorCleanup) {
-                        SurfaceControl.Transaction t = mTransactionFactory.get();
-                        mMultiDisplayDragMoveIndicatorController.onDragEnd(taskInfo.taskId, t);
-                        t.apply();
-                    }
+                if (needDragIndicatorCleanup) {
+                    SurfaceControl.Transaction t = mTransactionFactory.get();
+                    mMultiDisplayDragMoveIndicatorController.onDragEnd(taskInfo.taskId, t);
+                    t.apply();
                 }
                 if (!wasDragging) {
                     debugLogD("handleFreeformMotionEvent(%s) action=%s "

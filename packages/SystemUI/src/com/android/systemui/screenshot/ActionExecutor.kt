@@ -26,14 +26,14 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.PersistableBundle
 import android.os.UserHandle
 import android.util.Log
 import android.util.Pair
 import android.view.Window
-import android.window.DesktopExperienceFlags
 import com.android.app.tracing.coroutines.launchTraced as launch
 import com.android.internal.app.ChooserActivity
-import com.android.systemui.Flags
+import com.android.systemui.clipboardoverlay.ClipboardListener.EXTRA_SUPPRESS_OVERLAY
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.user.data.repository.UserRepository
 import com.android.systemui.user.utils.UserScopedService
@@ -91,8 +91,11 @@ constructor(
     }
 
     // TODO(b/458072887): Fix the image data being pasteable as text when right-clicking.
+    // Copying the screenshot to clipboard avoids the Clipboard overlay UI.
     fun copyScreenshotToClipboard(uri: Uri) {
         val clipData = ClipData.newUri(context.contentResolver, "Screenshot", uri)
+        clipData.description.extras =
+            PersistableBundle().apply { putBoolean(EXTRA_SUPPRESS_OVERLAY, true) }
         clipboardManager.forUser(currentUserHandle).setPrimaryClip(clipData)
         viewProxy.requestDismissal(null)
     }
@@ -125,9 +128,7 @@ constructor(
                     ChooserActivity.FIRST_IMAGE_PREVIEW_TRANSITION_NAME,
                 ),
             )
-        if (SCREENSHOT_MULTIDISPLAY_FOCUS_CHANGE.isTrue) {
-            transition.first.launchDisplayId = window.context.displayId
-        }
+        transition.first.launchDisplayId = window.context.displayId
         return transition
     }
 
@@ -142,12 +143,5 @@ constructor(
 
     companion object {
         private const val TAG = "ActionExecutor"
-
-        val SCREENSHOT_MULTIDISPLAY_FOCUS_CHANGE =
-            DesktopExperienceFlags.DesktopExperienceFlag(
-                Flags::screenshotMultidisplayFocusChange,
-                /* shouldOverrideByDevOption= */ true,
-                Flags.FLAG_SCREENSHOT_MULTIDISPLAY_FOCUS_CHANGE,
-            )
     }
 }

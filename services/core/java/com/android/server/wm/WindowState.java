@@ -361,6 +361,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     boolean mLegacyPolicyVisibilityAfterAnim = true;
     // overlay window is hidden because the owning app is suspended
     private boolean mHiddenWhileSuspended;
+    private boolean mHiddenWhileLockedByAppLock;
     private boolean mAppOpVisibility = true;
 
     boolean mPermanentlyHidden; // the window should never be shown again
@@ -630,6 +631,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
 
     final WindowStateAnimator mWinAnimator;
 
+    /** Whether the client surface is attached to this WindowState. */
     boolean mHasSurface = false;
 
     // Whether this window is being moved via the resize API
@@ -871,13 +873,11 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
                     this, mAnimatingTypes, animatingTypes);
             mAnimatingTypes = animatingTypes;
 
-            if (android.view.inputmethod.Flags.reportAnimatingInsetsTypes()) {
-                ImeTracker.forLogging().onProgress(statsToken,
-                        ImeTracker.PHASE_SERVER_WINDOW_ANIMATING_TYPES_CHANGED);
-                final InsetsStateController insetsStateController =
-                        getDisplayContent().getInsetsStateController();
-                insetsStateController.onAnimatingTypesChanged(this, statsToken);
-            }
+            ImeTracker.forLogging().onProgress(statsToken,
+                    ImeTracker.PHASE_SERVER_WINDOW_ANIMATING_TYPES_CHANGED);
+            final InsetsStateController insetsStateController =
+                    getDisplayContent().getInsetsStateController();
+            insetsStateController.onAnimatingTypesChanged(this, statsToken);
         } else {
             ImeTracker.forLogging().onFailed(statsToken,
                     ImeTracker.PHASE_SERVER_WINDOW_ANIMATING_TYPES_CHANGED);
@@ -3008,6 +3008,10 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             // Being hidden due to owner package being suspended.
             return false;
         }
+        if (mHiddenWhileLockedByAppLock) {
+            // Being hidden due to owner package being locked by App Lock.
+            return false;
+        }
         if (mIsForceHiddenNonSystemOverlayWindow) {
             // This is an alert window that is currently force hidden.
             return false;
@@ -3129,6 +3133,25 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         mHiddenWhileSuspended = hide;
         if (hide) {
             hide(true /* doAnimation */, true /* requestAnim */);
+        } else {
+            show(true /* doAnimation */, true /* requestAnim */);
+        }
+    }
+
+    void setHiddenWhileLockedByAppLock(boolean hide) {
+        if (!android.security.Flags.appLockCore()) {
+            return;
+        }
+        if (mOwnerCanAddInternalSystemWindow
+                || (!isSystemAlertWindowType(mAttrs.type) && mAttrs.type != TYPE_TOAST)) {
+            return;
+        }
+        if (mHiddenWhileLockedByAppLock == hide) {
+            return;
+        }
+        mHiddenWhileLockedByAppLock = hide;
+        if (hide) {
+            hide(false /* doAnimation */, true /* requestAnim */);
         } else {
             show(true /* doAnimation */, true /* requestAnim */);
         }
@@ -3308,6 +3331,11 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         // relayout, and it won't redraw for resize.
         if (mStartingData instanceof SnapshotStartingData) {
             mLastConfigReportedToClient = true;
+            // Because snapshot starting window finishes draw immediately, put the reparent in sync
+            // transaction in case the transition starts before the pending transaction is applied.
+            if (mSyncState != SYNC_STATE_NONE) {
+                getSyncTransaction().reparent(surface, mSurfaceControl);
+            }
         }
     }
 
@@ -3355,8 +3383,15 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     // various indicators of whether the client has released the surface.
     // This is in general unsafe, and most callers should use {@link #destroySurface}
     void destroySurfaceUnchecked() {
-        mWinAnimator.destroySurfaceLocked(mTmpTransaction);
-        mTmpTransaction.apply();
+        if (WindowManager.useClientSurface()
+                && (mInRelayout || mWmService.mAnimator.isAnimationScheduled())) {
+            // Use pending transaction if it will be applied with next vsync. This prevents the
+            // same surface from being attached again due to pending reparent operations.
+            mWinAnimator.destroySurfaceLocked(getPendingTransaction());
+        } else {
+            mWinAnimator.destroySurfaceLocked(mTmpTransaction);
+            mTmpTransaction.apply();
+        }
 
         // Clear animating flags now, since the surface is now gone. (Note this is true even
         // if the surface is saved, to outside world the surface is still NO_SURFACE.)
@@ -4211,13 +4246,14 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         if (!isVisibleByPolicy() || !mLegacyPolicyVisibilityAfterAnim || !mAppOpVisibility
                 || isParentWindowHidden() || mPermanentlyHidden
                 || mIsForceHiddenNonSystemOverlayWindow
-                || mHiddenWhileSuspended) {
+                || mHiddenWhileSuspended || mHiddenWhileLockedByAppLock) {
             pw.println(prefix + "mPolicyVisibility=" + isVisibleByPolicy()
                     + " mLegacyPolicyVisibilityAfterAnim=" + mLegacyPolicyVisibilityAfterAnim
                     + " mAppOpVisibility=" + mAppOpVisibility
                     + " parentHidden=" + isParentWindowHidden()
                     + " mPermanentlyHidden=" + mPermanentlyHidden
                     + " mHiddenWhileSuspended=" + mHiddenWhileSuspended
+                    + " mHiddenWhileLockedByAppLock=" + mHiddenWhileLockedByAppLock
                     + " mIsForceHiddenNonSystemOverlayWindow="
                     + mIsForceHiddenNonSystemOverlayWindow);
         }
@@ -5905,6 +5941,8 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             Slog.i(TAG, "finishDrawing of orientation change: " + this + " " + duration + "ms");
             mOrientationChangeRedrawRequestTime = 0;
         } else if (mActivityRecord != null && mActivityRecord.mRelaunchStartTime != 0
+                && (!Flags.improveFluidResizingPerformance()
+                        || mActivityRecord.mPendingRelaunchCount == 0)
                 && mActivityRecord.findMainWindow(false /* includeStartingApp */) == this) {
             final long duration =
                     SystemClock.elapsedRealtime() - mActivityRecord.mRelaunchStartTime;
@@ -6139,6 +6177,12 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         mDrawHandlers.removeAll(consumedHandlers);
         mWmService.mH.removeMessages(WINDOW_STATE_BLAST_SYNC_TIMEOUT, this);
         if (applyHere) {
+            if (WindowManager.useClientSurface() && !mHasSurface && mSurfaceControl != null) {
+                // This is consuming draw handlers when destroying client surface (from
+                // destroySurfaceUnchecked). Hide the container surface immediately to prevent old
+                // content from showing if the window becomes visible in a short time.
+                t.hide(mSurfaceControl);
+            }
             t.apply();
         }
         return true;

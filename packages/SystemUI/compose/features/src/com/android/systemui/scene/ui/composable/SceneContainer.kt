@@ -54,18 +54,21 @@ import com.android.compose.animation.scene.UserActionResult
 import com.android.compose.animation.scene.content.state.TransitionState
 import com.android.compose.animation.scene.observableTransitionState
 import com.android.compose.animation.scene.rememberMutableSceneTransitionLayoutState
+import com.android.compose.animation.scene.transitions
 import com.android.compose.gesture.effect.rememberOffsetOverscrollEffectFactory
 import com.android.compose.snapshot.ObserveReads
 import com.android.systemui.keyguard.ui.composable.modifier.burnInAware
-import com.android.systemui.keyguard.ui.composable.rememberBurnIn
 import com.android.systemui.lifecycle.rememberActivated
 import com.android.systemui.lifecycle.rememberViewModel
 import com.android.systemui.ribbon.ui.composable.BottomRightCornerRibbon
+import com.android.systemui.scene.shared.model.Overlays
 import com.android.systemui.scene.shared.model.SceneDataSourceDelegator
 import com.android.systemui.scene.ui.view.SceneJankMonitor
 import com.android.systemui.scene.ui.viewmodel.SceneContainerViewModel
 import com.android.systemui.shade.ui.composable.OverlayShade
 import com.android.systemui.shade.ui.composable.isFullWidthShade
+import kotlinx.coroutines.CoroutineScope
+import platform.test.motion.compose.values.isRunningMotionTest
 
 /**
  * Renders a container of a collection of "scenes" that the user can switch between using certain
@@ -98,6 +101,9 @@ fun SceneContainer(
     transitionsBuilder: SceneContainerTransitionsBuilder,
     dataSourceDelegator: SceneDataSourceDelegator,
     sceneJankMonitorFactory: SceneJankMonitor.Factory,
+    onTransitionStart:
+        (transition: TransitionState.Transition, animationScope: CoroutineScope) -> Unit,
+    onSnap: (idle: TransitionState.Idle) -> Unit,
     modifier: Modifier = Modifier,
     swipeVelocityThreshold: Dp = SceneContainerDefaults.SwipeVelocityThreshold,
 ) {
@@ -138,6 +144,8 @@ fun SceneContainer(
             },
             transitions = sceneTransitions,
             onTransitionStart = { transition ->
+                onTransitionStart(transition, coroutineScope)
+
                 sceneJankMonitor.onTransitionStart(
                     view = view,
                     from = transition.fromContent,
@@ -153,6 +161,7 @@ fun SceneContainer(
                     cuj = transition.cuj,
                 )
             },
+            onSnap = onSnap,
             deferTransitionProgress = true,
         )
 
@@ -235,6 +244,7 @@ fun SceneContainer(
             swipeSourceDetector = viewModel.swipeSourceDetector,
             swipeDetector =
                 remember { PassthroughSwipeDetector(velocityThreshold = swipeVelocityThreshold) },
+            implicitTestTags = isRunningMotionTest,
             debugName = "SceneContainer",
         ) {
             sceneByKey.forEach { (sceneKey, scene) ->
@@ -265,6 +275,18 @@ fun SceneContainer(
                     // Activate the overlay.
                     LaunchedEffect(overlay) { overlay.activate() }
 
+                    if (overlayKey == Overlays.Bouncer) {
+                        // The bouncer overlay is special because it needs to be rendered above the
+                        // notifications which, themselves, are rendered above the scene container.
+                        //
+                        // There is a separate, external, bouncer scene container whose only job is
+                        // to render the bouncer overlay. We still want to have the overlay here in
+                        // this scene container because we still need it to manage transitions in
+                        // and out of that overlay - but we delegate the actual showing and
+                        // transition animations out to that dedicated bouncer scene container.
+                        return@overlay
+                    }
+
                     // Render the overlay.
                     with(overlay) { this@overlay.Content(Modifier) }
                 }
@@ -277,10 +299,7 @@ fun SceneContainer(
                 colorSaturation = { viewModel.ribbonColorSaturation },
                 modifier =
                     Modifier.align(Alignment.BottomEnd)
-                        .burnInAware(
-                            viewModel = viewModel.burnIn,
-                            params = rememberBurnIn(viewModel.clock).parameters,
-                        ),
+                        .burnInAware(movement = viewModel.burnInMovementState, isClock = false),
             )
         }
     }

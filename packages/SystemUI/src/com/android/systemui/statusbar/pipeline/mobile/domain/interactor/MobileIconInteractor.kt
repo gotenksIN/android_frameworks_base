@@ -25,7 +25,6 @@
 package com.android.systemui.statusbar.pipeline.mobile.domain.interactor
 import android.content.Context
 // QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
-import android.telephony.CarrierConfigManager
 import android.telephony.ims.stub.ImsRegistrationImplBase.REGISTRATION_TECH_CROSS_SIM
 import android.telephony.ims.stub.ImsRegistrationImplBase.REGISTRATION_TECH_IWLAN
 import android.telephony.TelephonyDisplayInfo
@@ -41,6 +40,7 @@ import com.android.settingslib.mobile.MobileMappings
 import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.log.table.TableLogBuffer
 import com.android.systemui.log.table.logDiffsForTable
+import com.android.systemui.statusbar.pipeline.mobile.NewSatelliteIcon
 import com.android.systemui.statusbar.pipeline.mobile.data.model.DataConnectionState.Connected
 // QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
 import com.android.systemui.statusbar.pipeline.mobile.data.model.MobileIconCustomizationMode
@@ -284,13 +284,19 @@ class MobileIconInteractorImpl(
     override val customizedCarrierName =
         combine(
             carrierName,
-            connectionRepository.nrIconType,
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+            connectionRepository.radioIconType,
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
             connectionRepository.dataNetworkType,
             connectionRepository.voiceNetworkType,
             connectionRepository.isInService,
-        ) { carrierName, nrIconType, dataNetworkType, voiceNetworkType, isInService ->
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+        ) { carrierName, radioIconType, dataNetworkType, voiceNetworkType, isInService ->
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
             carrierNameCustomization.getCustomizeCarrierNameModern(connectionRepository.subId,
-                carrierName, true, nrIconType, dataNetworkType, voiceNetworkType, isInService)
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+                carrierName, true, radioIconType, dataNetworkType, voiceNetworkType, isInService)
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
         }
         .stateIn(
             scope,
@@ -366,16 +372,22 @@ class MobileIconInteractorImpl(
     private val mobileIconCustomization: StateFlow<MobileIconCustomizationMode> =
         combine(
             signalStrengthCustomization,
-            connectionRepository.nrIconType,
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+            connectionRepository.radioIconType,
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
             connectionRepository.is6Rx,
             networkTypeIconCustomization,
             connectionRepository.originNetworkType,
-        ) { signalStrengthCustomization, nrIconType, is6Rx, networkTypeIconCustomization,
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+        ) { signalStrengthCustomization, radioIconType, is6Rx, networkTypeIconCustomization,
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
             originNetworkType ->
             MobileIconCustomizationMode(
                 dataNetworkType = signalStrengthCustomization.dataNetworkType,
                 voiceNetworkType = signalStrengthCustomization.voiceNetworkType,
-                fiveGServiceState = FiveGServiceState(nrIconType, is6Rx, context),
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+                fiveGServiceState = FiveGServiceState(radioIconType, is6Rx, context),
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
                 isRatCustomization = networkTypeIconCustomization.isRatCustomization,
                 alwaysShowNetworkTypeIcon =
                     networkTypeIconCustomization.alwaysShowNetworkTypeIcon,
@@ -554,7 +566,9 @@ class MobileIconInteractorImpl(
     private fun getMobileIconGroup(resolvedNetworkType: ResolvedNetworkType,
                                    customizationInfo: MobileIconCustomizationMode,
                                    mapping: Map<String, MobileIconGroup>): MobileIconGroup ?{
-        return if (customizationInfo.fiveGServiceState.isNrIconTypeValid) {
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+        return if (customizationInfo.fiveGServiceState.isRadioIconTypeValid) {
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
             customizationInfo.fiveGServiceState.iconGroup
         } else {
             when (resolvedNetworkType) {
@@ -589,8 +603,8 @@ class MobileIconInteractorImpl(
 // QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
     override val isEmergencyOnly: StateFlow<Boolean> = connectionRepository.isEmergencyOnly
     override val isAllowedDuringAirplaneMode = connectionRepository.isAllowedDuringAirplaneMode
-    /** Whether or not to show the error state of [SignalDrawable] */
-    private val showExclamationMark: StateFlow<Boolean> =
+    /** Whether or not to show the error state of [SignalDrawable] for cellular connections */
+    private val showExclamationMarkForCellular: StateFlow<Boolean> =
 // QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
         combine(
                 isDataEnabled,
@@ -605,6 +619,11 @@ class MobileIconInteractorImpl(
 // QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
             }
             .stateIn(scope, SharingStarted.WhileSubscribed(), true)
+
+    /** Whether or not to show the error state of [SignalDrawable] for satellite connection */
+    private val showExclamationMarkForSatellite: StateFlow<Boolean> =
+        isInService.map { !it }.stateIn(scope, SharingStarted.WhileSubscribed(), true)
+
     private val cellularShownLevel: StateFlow<Int> =
         combine(level, isInService, connectionRepository.inflateSignalStrength) {
                 level,
@@ -620,14 +639,28 @@ class MobileIconInteractorImpl(
     private val satelliteShownLevel: StateFlow<Int> =
         connectionRepository.satelliteLevel.stateIn(scope, SharingStarted.WhileSubscribed(), 0)
 
-    private val cellularIcon: Flow<SignalIconModel.Cellular> =
+    private val satelliteShownLevelV2: StateFlow<Int> =
+        combine(
+                connectionRepository.satelliteLevel,
+                isInService,
+                connectionRepository.inflateSignalStrength,
+            ) { level, inService, inflate ->
+                if (inService) {
+                    if (inflate) level + 1 else level
+                } else {
+                    0
+                }
+            }
+            .stateIn(scope, SharingStarted.WhileSubscribed(), 0)
+
+    private val cellularIcon: Flow<SignalIconModel.CellularTypeIconModel.Cellular> =
         combine(
             cellularShownLevel,
             numberOfLevels,
-            showExclamationMark,
+            showExclamationMarkForCellular,
             carrierNetworkChangeActive,
         ) { cellularShownLevel, numberOfLevels, showExclamationMark, carrierNetworkChange ->
-            SignalIconModel.Cellular(
+            SignalIconModel.CellularTypeIconModel.Cellular(
                 cellularShownLevel,
                 numberOfLevels,
                 showExclamationMark,
@@ -645,12 +678,24 @@ class MobileIconInteractorImpl(
         }
 // QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
 
-    private val customizedCellularIcon : Flow<SignalIconModel.Cellular> =
+    private val satelliteIconV2: Flow<SignalIconModel.CellularTypeIconModel.SatelliteV2> =
+        combine(satelliteShownLevelV2, numberOfLevels, showExclamationMarkForSatellite) {
+            shownLevel,
+            numberOfLevels,
+            showExclamationMark ->
+            SignalIconModel.CellularTypeIconModel.SatelliteV2(
+                shownLevel,
+                numberOfLevels,
+                showExclamationMark,
+            )
+        }
+
+    private val customizedCellularIcon : Flow<SignalIconModel.CellularTypeIconModel.Cellular> =
         combine(
             cellularIcon,
             customizedIcon,
         ) { cellularIcon, customizedIcon ->
-            if (customizedIcon != null && customizedIcon is SignalIconModel.Cellular) {
+            if (customizedIcon != null && customizedIcon is SignalIconModel.CellularTypeIconModel.Cellular) {
                 customizedIcon
             } else {
                 cellularIcon
@@ -660,16 +705,20 @@ class MobileIconInteractorImpl(
 // QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
     override val signalLevelIcon: StateFlow<SignalIconModel> = run {
         val initial =
-            SignalIconModel.Cellular(
+            SignalIconModel.CellularTypeIconModel.Cellular(
                 cellularShownLevel.value,
                 numberOfLevels.value,
-                showExclamationMark.value,
+                showExclamationMarkForCellular.value,
                 carrierNetworkChangeActive.value,
             )
         isNonTerrestrial
             .flatMapLatest { ntn ->
                 if (ntn) {
-                    satelliteIcon
+                    if (NewSatelliteIcon.isEnabled) {
+                        satelliteIconV2
+                    } else {
+                        satelliteIcon
+                    }
                 } else {
 // QTI_BEGIN: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
                     customizedCellularIcon

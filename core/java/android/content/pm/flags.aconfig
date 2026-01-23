@@ -307,6 +307,7 @@ flag {
     namespace: "package_manager_service"
     description: "Feature flag to add new ADB related APIs in the verification service"
     bug: "460818215"
+    is_exported: true
 }
 
 flag {
@@ -327,7 +328,7 @@ flag {
 
 flag {
     name: "verified_dexopt"
-    namespace: "desktop_security"
+    namespace: "hardware_backed_security"
     description: "Flag guarding the PackageState verifiedDexOpt API."
     is_exported: true
     bug: "439646165"
@@ -356,14 +357,6 @@ flag {
     namespace: "security"
     description: "Flag for the removal of shortcuts when app lock is enabled."
     bug: "447547850"
-}
-
-flag {
-    name: "enable_query_domain_verification"
-    is_exported: true
-    namespace: "package_manager_service"
-    description: "Enable apps to query domain verification status."
-    bug: "437043173"
 }
 
 flag {

@@ -204,6 +204,8 @@ public:
 
     void setForceDark(ForceDarkType type) { mForceDarkType = type; }
 
+    void setDrawingEnabled(bool enabled) { mDrawingEnabled = enabled; }
+
     ForceDarkType getForceDarkType() { return mForceDarkType; }
 
     SkISize getNextFrameSize() const;
@@ -249,6 +251,8 @@ public:
     static bool shouldDither();
 
     void visitAllRenderNodes(std::function<void(const RenderNode&)>) const;
+
+    void setRtAnimationsEnabled(bool enabled) { mEnableRTAnimations = enabled; }
 
 private:
     CanvasContext(RenderThread& thread, bool translucent, RenderNode* rootRenderNode,
@@ -337,6 +341,10 @@ private:
     LightInfo mLightInfo;
     LightGeometry mLightGeometry = {{0, 0, 0}, 0};
 
+    // Whether drawing is enabled for this CanvasContext, separate from whether drawing is enabled
+    // globally through Properties::isDrawingEnabled().
+    bool mDrawingEnabled = true;
+
     bool mHaveNewSurface = false;
     DamageAccumulator mDamageAccumulator;
     ColorArea mColorArea;
@@ -371,6 +379,8 @@ private:
 
     // If set to true, we expect that callbacks into onSurfaceStatsAvailable
     bool mExpectSurfaceStats = false;
+
+    bool mEnableRTAnimations = true;
 
     std::function<bool(int64_t, int64_t, int64_t)> mASurfaceTransactionCallback;
     std::function<void()> mPrepareSurfaceControlForWebviewCallback;

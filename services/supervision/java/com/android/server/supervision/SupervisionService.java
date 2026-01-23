@@ -191,7 +191,7 @@ public class SupervisionService extends ISupervisionManager.Stub {
         setSupervisionEnabledForUserInternal(userId, enabled, getSystemSupervisionPackage());
     }
 
-    // TODO(b/444411638): Remove this after enable_app_service_connection_callback rollout
+    // TODO(b/444411638): Remove this after enable_app_service_connection_callbacks rollout
     private List<AppServiceConnection> getSupervisionAppServiceConnections(@UserIdInt int userId) {
         AppBindingService abs = mInjector.getAppBindingService();
         return abs != null
@@ -267,14 +267,20 @@ public class SupervisionService extends ISupervisionManager.Stub {
         if (UserHandle.getUserId(Binder.getCallingUid()) != userId) {
             enforcePermission(INTERACT_ACROSS_USERS);
         }
-        if (!isSupervisionEnabledForUser(userId) || !hasSupervisionCredentials()) {
-            return null;
-        }
-        final Intent intent = new Intent(ACTION_CONFIRM_SUPERVISION_CREDENTIALS);
-        // explicitly set the package for security
-        intent.setPackage(SETTINGS_PACKAGE_NAME);
 
-        return intent;
+        return Binder.withCleanCallingIdentity(
+                () -> {
+                    if (!isSupervisionEnabledForUser(userId)
+                            || !hasAnySupervisionApprovalMethods(userId)) {
+                        return null;
+                    }
+
+                    final Intent intent = new Intent(ACTION_CONFIRM_SUPERVISION_CREDENTIALS);
+                    // explicitly set the package for security
+                    intent.setPackage(SETTINGS_PACKAGE_NAME);
+
+                    return intent;
+                });
     }
 
     /** Set the Supervision Recovery Info. */
@@ -337,6 +343,10 @@ public class SupervisionService extends ISupervisionManager.Stub {
         return true;
     }
 
+    private boolean hasAnySupervisionApprovalMethods(@UserIdInt int userId) {
+        return hasSupervisionCredentials() || hasAnySupervisionAppApprovalMethods(userId);
+    }
+
     @Override
     public boolean hasSupervisionCredentials() {
         enforceAnyPermission(QUERY_USERS, MANAGE_USERS);
@@ -353,6 +363,13 @@ public class SupervisionService extends ISupervisionManager.Stub {
             Binder.restoreCallingIdentity(token);
         }
         return true;
+    }
+
+    private boolean hasAnySupervisionAppApprovalMethods(@UserIdInt int userId) {
+        if (!Flags.enableSupervisionSettingsUiUpdates()) {
+            return false;
+        }
+        return !querySupervisionApprovalActivities(userId).isEmpty();
     }
 
     @Override
@@ -668,13 +685,12 @@ public class SupervisionService extends ISupervisionManager.Stub {
      * <p>This excludes the system and main user(s) as those users are created by default.
      */
     private boolean hasNonTestDefaultUsers() {
-        List<UserInfo> users = mInjector.getUserManagerInternal().getUsers(true);
-        for (var user : users) {
-            if (!user.isForTesting() && !user.isMain() && !isSystemUser(user)) {
-                return true;
-            }
-        }
-        return false;
+        UserManagerInternal userManager = mInjector.getUserManagerInternal();
+        // Headless system user mode has two default users: system and main/primary users.
+        int numOfDefaultUsers = userManager.isHeadlessSystemUserMode()
+                ? 2 : 1;
+        List<UserInfo> users = userManager.getUsers(true);
+        return users.stream().filter(user -> !user.isForTesting()).count() > numOfDefaultUsers;
     }
 
     private static boolean isSystemUser(UserInfo userInfo) {
@@ -718,6 +734,11 @@ public class SupervisionService extends ISupervisionManager.Stub {
         }
     }
 
+    /**
+     * Upgrades supervision settings from an older version. This is a one-way migration.
+     *
+     * @return {@code true} if the upgrade was successful.
+     */
     private boolean doUpgrade(int fromVersion, int toVersion) {
         // Perform upgrade without holding the lock
         if (!mInjector.areAllRequiredServicesAvailable()) {
@@ -728,14 +749,20 @@ public class SupervisionService extends ISupervisionManager.Stub {
         }
 
         final Context context = mInjector.context;
-        return new SupervisionSettingsUpgrader(
+        return new SupervisionPolicyMigrator(
                         context,
                         mInjector.getUserManagerInternal(),
-                        context.getSystemService(RoleManager.class),
+                        mInjector,
                         context.getSystemService(DevicePolicyManager.class))
                 .upgrade(fromVersion, toVersion);
     }
 
+    /**
+     * Performs data migration if necessary and completes boot-time initialization.
+     *
+     * <p>On boot, this checks the stored settings version and runs a data migration if it's out of
+     * date. It then registers listeners needed for supervision functionality.
+     */
     private void onBootCompleted() {
         final int fromVersion;
         final int toVersion = SupervisionSettings.VERSION;
@@ -745,6 +772,9 @@ public class SupervisionService extends ISupervisionManager.Stub {
         }
 
         if (fromVersion < toVersion) {
+            // The lock is released before calling doUpgrade and re-acquired after. This is a
+            // non-obvious but important pattern to avoid holding locks for long-running
+            // operations.
             final boolean success = doUpgrade(fromVersion, toVersion);
             if (success) {
                 synchronized (getLockObject()) {
@@ -828,7 +858,7 @@ public class SupervisionService extends ISupervisionManager.Stub {
     }
 
     private void executeOnSupervisionEnabled(Runnable runnable) {
-        if (Flags.enableAppServiceConnectionCallback()) {
+        if (Flags.enableAppServiceConnectionCallbacks()) {
             Binder.withCleanCallingIdentity(runnable::run);
         } else {
             executeOnServiceThread(runnable);
@@ -836,12 +866,12 @@ public class SupervisionService extends ISupervisionManager.Stub {
     }
 
     @NonNull
-    // TODO(b/444411638): Remove this after enable_app_service_connection_callback rollout
+    // TODO(b/444411638): Remove this after enable_app_service_connection_callbacks rollout
     private List<ISupervisionListener> getSupervisionAppServiceListeners(
             @UserIdInt int userId,
             @NonNull RemoteExceptionIgnoringConsumer<ISupervisionListener> action) {
         ArrayList<ISupervisionListener> listeners = new ArrayList<>();
-        if (!Flags.enableSupervisionAppService() || Flags.enableAppServiceConnectionCallback()) {
+        if (!Flags.enableSupervisionAppService() || Flags.enableAppServiceConnectionCallbacks()) {
             return listeners;
         }
 
@@ -872,7 +902,7 @@ public class SupervisionService extends ISupervisionManager.Stub {
     private void dispatchSupervisionEvent(
             @UserIdInt int userId,
             @NonNull RemoteExceptionIgnoringConsumer<ISupervisionListener> action) {
-        if (Flags.enableAppServiceConnectionCallback()) {
+        if (Flags.enableAppServiceConnectionCallbacks()) {
             dispatchSupervisionAppServiceEvent(userId, action);
         }
         // Add SupervisionAppServices listeners before the platform listeners.
@@ -1131,10 +1161,11 @@ public class SupervisionService extends ISupervisionManager.Stub {
         UserHandle userHandle = Binder.getCallingUserHandle();
         int callingUid = Binder.getCallingUid();
 
-        List<String> roleHolders =
-                new ArrayList<String>(
-                        mInjector.getRoleHoldersAsUser(ROLE_SYSTEM_SUPERVISION, userHandle));
-        roleHolders.addAll(mInjector.getRoleHoldersAsUser(ROLE_SUPERVISION, userHandle));
+        List<String> roleHolders = new ArrayList<String>();
+        synchronized (getLockObject()) {
+            roleHolders.addAll(
+                    getUserDataLocked(UserHandle.getUserId(callingUid)).supervisionRoleHolders);
+        }
 
         String[] packages = mInjector.getPackageManager().getPackagesForUid(callingUid);
         if (packages != null) {
@@ -1157,7 +1188,10 @@ public class SupervisionService extends ISupervisionManager.Stub {
      */
     private List<String> updateSupervisionRoleHolders(@UserIdInt int userId) {
         List<String> newRoleHolders =
-                mInjector.getRoleHoldersAsUser(ROLE_SUPERVISION, UserHandle.of(userId));
+                new ArrayList<String>(
+                        mInjector.getRoleHoldersAsUser(ROLE_SUPERVISION, UserHandle.of(userId)));
+        newRoleHolders.addAll(
+                mInjector.getRoleHoldersAsUser(ROLE_SYSTEM_SUPERVISION, UserHandle.of(userId)));
 
         synchronized (getLockObject()) {
             SupervisionUserData data = getUserDataLocked(userId);
@@ -1300,6 +1334,15 @@ public class SupervisionService extends ISupervisionManager.Stub {
             return Binder.getCallingUid();
         }
 
+        /**
+         * Checks if all services required for supervision are available.
+         *
+         * <p>The service needs to interact with user data, roles, and device policies to clear
+         * legacy settings.
+         *
+         * <p>This is used to avoid a crash loop in case of a crash during system server
+         * initialization.
+         */
         boolean areAllRequiredServicesAvailable() {
             if (getDpmInternal() == null
                     || getUserManagerInternal() == null
@@ -1503,7 +1546,7 @@ public class SupervisionService extends ISupervisionManager.Stub {
 
         @Override
         public void onRoleHoldersChanged(@NonNull String roleName, @NonNull UserHandle user) {
-            if (ROLE_SUPERVISION.equals(roleName)) {
+            if (ROLE_SUPERVISION.equals(roleName) || ROLE_SYSTEM_SUPERVISION.equals(roleName)) {
                 executeOnServiceThread(
                         () -> {
                             maybeApplyUserRestrictionsFor(user);

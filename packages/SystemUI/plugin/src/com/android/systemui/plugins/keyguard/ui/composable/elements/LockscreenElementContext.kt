@@ -20,12 +20,12 @@ import com.android.systemui.plugins.keyguard.VRectF
 
 /** Combined context for lockscreen elements. Contains relevant rendering parameters. */
 data class LockscreenElementContext(
-    /** Modifier to apply to elements that should handle burn-in when dozing */
-    val burnInModifier: Modifier = Modifier,
+    /** Modifier for elements that require burn-in mitigation */
+    val burnInAware: Modifier.(Boolean) -> Modifier = { this },
 
     /** Callback executed when an element is positioned by compose. */
     val onElementPositioned: (Key, VRectF) -> Unit = { _, _ -> },
 
     /** Modifier to apply to elements that should be hidden when only showing authUI when dozing */
-    val nonAuthUIModifier: Modifier = Modifier,
+    val nonAuthUI: Modifier.() -> Modifier = { this },
 )

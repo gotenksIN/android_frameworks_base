@@ -32,14 +32,16 @@ import com.android.systemui.classifier.Classifier
 import com.android.systemui.common.shared.model.ContentDescription
 import com.android.systemui.common.shared.model.Icon
 import com.android.systemui.lifecycle.ExclusiveActivatable
+import com.android.systemui.lifecycle.Hydrator
 import com.android.systemui.media.controls.shared.MediaLogger
+import com.android.systemui.media.controls.util.MediaUiEventLogger
 import com.android.systemui.media.remedia.domain.interactor.MediaInteractor
 import com.android.systemui.media.remedia.domain.model.MediaActionModel
+import com.android.systemui.media.remedia.domain.model.MediaSessionModel
 import com.android.systemui.media.remedia.shared.model.MediaColorScheme
 import com.android.systemui.media.remedia.shared.model.MediaSessionState
 import com.android.systemui.plugins.FalsingManager
 import com.android.systemui.res.R
-import com.android.systemui.statusbar.notification.collection.provider.VisualStabilityProvider
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -47,7 +49,6 @@ import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToLong
 import kotlin.time.Duration.Companion.milliseconds
-import kotlinx.coroutines.awaitCancellation
 
 /** Models UI state for a media element. */
 class MediaViewModel
@@ -56,10 +57,12 @@ constructor(
     private val interactor: MediaInteractor,
     private val falsingSystem: MediaFalsingSystem,
     val mediaLogger: MediaLogger,
-    val visualStabilityProvider: VisualStabilityProvider,
+    val mediaUiEventLogger: MediaUiEventLogger,
     @Assisted private val context: Context,
     @Assisted private val carouselVisibility: MediaCarouselVisibility,
 ) : ExclusiveActivatable() {
+
+    private val hydrator = Hydrator("MediaViewModel.hydrator")
 
     /** Whether the user is actively moving the thumb of the seek bar. */
     private var isScrubbing: Boolean by mutableStateOf(false)
@@ -82,11 +85,19 @@ constructor(
     private var latestVersion = emptyList<MediaCardViewModel>()
     private var isVisible: () -> Boolean = { true }
 
+    private val isOnLockscreen: Boolean by
+        hydrator.hydratedStateOf(
+            traceName = "isOnLockscreen",
+            initialValue = true,
+            source = interactor.isOnLockscreen,
+        )
+
     /** The current list of cards to show in the UI. */
     val cards: List<MediaCardViewModel> by derivedStateOf {
         interactor.sessions
             .mapIndexed { sessionIndex, session ->
-                val isCurrentSessionAndScrubbing = isScrubbing && sessionIndex == selectedCardIndex
+                val isCurrentSession = sessionIndex == selectedCardIndex
+                val isCurrentSessionAndScrubbing = isScrubbing && isCurrentSession
                 object : MediaCardViewModel {
                     override val key = session.key
                     override val icon = session.appIcon
@@ -101,11 +112,11 @@ constructor(
                     override val isExplicit = session.isExplicit
                     override val actionButtonLayout = session.actionButtonLayout
                     override val playPauseAction =
-                        session.playPauseAction.toPlayPauseActionViewModel(session.state)
+                        session.playPauseAction.toPlayPauseActionViewModel(session)
                     override val additionalActions: List<MediaSecondaryActionViewModel>
                         get() {
                             return session.additionalActions.map { action ->
-                                action.toSecondaryActionViewModel()
+                                action.toSecondaryActionViewModel(session)
                             }
                         }
 
@@ -124,6 +135,11 @@ constructor(
                                     dragDelta.isHorizontal() &&
                                         !falsingSystem.isFalseTouch(Classifier.MEDIA_SEEKBAR)
                                 ) {
+                                    mediaUiEventLogger.logSeek(
+                                        session.uid,
+                                        session.packageName,
+                                        session.key,
+                                    )
                                     interactor.seek(
                                         sessionKey = session.key,
                                         to = (seekProgress * session.durationMs).roundToLong(),
@@ -140,8 +156,8 @@ constructor(
                                         } else {
                                             seekProgress
                                         },
-                                    left = session.leftAction.toSecondaryActionViewModel(),
-                                    right = session.rightAction.toSecondaryActionViewModel(),
+                                    left = session.leftAction.toSecondaryActionViewModel(session),
+                                    right = session.rightAction.toSecondaryActionViewModel(session),
                                     isSquiggly =
                                         session.state != MediaSessionState.Paused &&
                                             !isCurrentSessionAndScrubbing,
@@ -159,8 +175,8 @@ constructor(
                                 )
                             } else {
                                 MediaNavigationViewModel.Hidden(
-                                    left = session.leftAction.toSecondaryActionViewModel(),
-                                    right = session.rightAction.toSecondaryActionViewModel(),
+                                    left = session.leftAction.toSecondaryActionViewModel(session),
+                                    right = session.rightAction.toSecondaryActionViewModel(session),
                                 )
                             }
                         }
@@ -168,7 +184,7 @@ constructor(
                     override val guts: MediaCardGutsViewModel
                         get() {
                             return MediaCardGutsViewModel(
-                                isVisible = isGutsVisible,
+                                isVisible = isGutsVisible && isCurrentSession,
                                 text =
                                     if (session.canBeHidden) {
                                         context.getString(
@@ -189,6 +205,11 @@ constructor(
                                                 falsingSystem.runIfNotFalseTap(
                                                     FalsingManager.LOW_PENALTY
                                                 ) {
+                                                    mediaUiEventLogger.logLongPressDismiss(
+                                                        session.uid,
+                                                        session.packageName,
+                                                        session.key,
+                                                    )
                                                     interactor.hide(
                                                         session.key,
                                                         MEDIA_PLAYER_ANIMATION_DELAY_MS,
@@ -237,6 +258,11 @@ constructor(
                                             falsingSystem.runIfNotFalseTap(
                                                 FalsingManager.LOW_PENALTY
                                             ) {
+                                                mediaUiEventLogger.logLongPressSettings(
+                                                    session.uid,
+                                                    session.packageName,
+                                                    session.key,
+                                                )
                                                 interactor.openMediaSettings()
                                             }
                                         },
@@ -279,6 +305,11 @@ constructor(
                                     falsingSystem.runIfNotFalseTap(
                                         FalsingManager.MODERATE_PENALTY
                                     ) {
+                                        mediaUiEventLogger.logOpenOutputSwitcher(
+                                            session.uid,
+                                            session.packageName,
+                                            session.key,
+                                        )
                                         session.outputDevice.onClick(expandable)
                                     }
                                 },
@@ -301,12 +332,33 @@ constructor(
 
                     override val onClick = { expandable: Expandable ->
                         falsingSystem.runIfNotFalseTap(FalsingManager.LOW_PENALTY) {
-                            session.onClick(expandable)
+                            if (isCurrentSession) {
+                                mediaUiEventLogger.logTapContentView(
+                                    session.uid,
+                                    session.packageName,
+                                    session.key,
+                                )
+                                session.onClick(expandable)
+                            } else {
+                                onCardSelected(sessionIndex)
+                            }
                         }
                     }
-                    override val onClickLabel =
-                        context.getString(R.string.controls_media_playing_item_description)
-                    override val onLongClick = { interactor.setIsGutsVisible(true) }
+                    override val contentDescription =
+                        context.getString(
+                            R.string.controls_media_playing_item_description,
+                            session.title,
+                            session.subtitle,
+                            session.appName,
+                        )
+                    override val onLongClick = {
+                        mediaUiEventLogger.logLongPressOpen(
+                            session.uid,
+                            session.packageName,
+                            session.key,
+                        )
+                        interactor.setIsGutsVisible(true)
+                    }
                 }
             }
             .let {
@@ -330,6 +382,7 @@ constructor(
                 ),
             onClick = {
                 falsingSystem.runIfNotFalseTap(FalsingManager.LOW_PENALTY) {
+                    mediaUiEventLogger.logCarouselSettings()
                     interactor.openMediaSettings()
                 }
             },
@@ -339,10 +392,12 @@ constructor(
     val isCarouselVisible: Boolean
         get() =
             when (carouselVisibility) {
-                MediaCarouselVisibility.WhenNotEmpty -> interactor.sessions.isNotEmpty()
+                MediaCarouselVisibility.WhenNotEmpty ->
+                    interactor.hasAnyMedia && (!isOnLockscreen || interactor.allowMediaOnLockscreen)
 
                 MediaCarouselVisibility.WhenAnyCardIsActive ->
-                    interactor.sessions.any { session -> session.isActive }
+                    interactor.hasActiveMedia &&
+                        (!isOnLockscreen || interactor.allowMediaOnLockscreen)
             }
 
     fun setVisibility(visible: () -> Boolean) {
@@ -356,6 +411,9 @@ constructor(
             "Invalid card index $cardIndex"
         }
         selectedCardIndex = cardIndex
+        if (selectedCardIndex != currentIndex) {
+            mediaUiEventLogger.logMediaCarouselPage(selectedCardIndex)
+        }
         interactor.storeCurrentCarouselIndex(selectedCardIndex)
     }
 
@@ -365,21 +423,27 @@ constructor(
     }
 
     override suspend fun onActivated(): Nothing {
-        awaitCancellation()
+        hydrator.activate()
     }
 
     private fun MediaActionModel.toPlayPauseActionViewModel(
-        mediaSessionState: MediaSessionState
+        session: MediaSessionModel
     ): MediaPlayPauseActionViewModel? {
         return when (this) {
             is MediaActionModel.Action ->
                 MediaPlayPauseActionViewModel(
-                    state = mediaSessionState,
+                    state = session.state,
                     icon = icon,
                     onClick =
                         onClick?.let {
                             {
                                 falsingSystem.runIfNotFalseTap(FalsingManager.MODERATE_PENALTY) {
+                                    mediaUiEventLogger.logTapAction(
+                                        id,
+                                        session.uid,
+                                        session.packageName,
+                                        session.key,
+                                    )
                                     it()
                                 }
                             }
@@ -390,7 +454,9 @@ constructor(
         }
     }
 
-    private fun MediaActionModel.toSecondaryActionViewModel(): MediaSecondaryActionViewModel {
+    private fun MediaActionModel.toSecondaryActionViewModel(
+        session: MediaSessionModel
+    ): MediaSecondaryActionViewModel {
         return when (this) {
             is MediaActionModel.Action ->
                 MediaSecondaryActionViewModel.Action(
@@ -399,6 +465,12 @@ constructor(
                         onClick?.let {
                             {
                                 falsingSystem.runIfNotFalseTap(FalsingManager.MODERATE_PENALTY) {
+                                    mediaUiEventLogger.logTapAction(
+                                        id,
+                                        session.uid,
+                                        session.packageName,
+                                        session.key,
+                                    )
                                     it()
                                 }
                             }

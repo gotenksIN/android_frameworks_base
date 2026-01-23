@@ -287,6 +287,42 @@ public class TaskTests extends WindowTestsBase {
         assertThat(mAtm.getRecentTasks().getRawTasks()).containsExactly(originalTask);
     }
 
+    @EnableFlags(Flags.FLAG_ENABLE_BUBBLE_ROOT_TASK)
+    @Test
+    public void testNotifyExitPipMode_onConfigurationChanged_flagEnabled() {
+        // Create a task and move it to pinned mode.
+        final ActivityRecord activity = new ActivityBuilder(mAtm).setCreateTask(true).build();
+        activity.setState(RESUMED, "test");
+        mAtm.mRootWindowContainer.moveActivityToPinnedRootTaskForTest(activity, "test");
+        final Task pinnedTask = activity.getTask();
+        spyOn(mRootWindowContainer);
+
+        // Exit pinned mode by setting windowing mode to fullscreen.
+        pinnedTask.setWindowingMode(WINDOWING_MODE_FULLSCREEN);
+
+        // Verify that the exit pip mode is notified. This is called from onConfigurationChanged
+        // when the flag is enabled.
+        verify(mRootWindowContainer).notifyActivityPipModeChanged(eq(pinnedTask), eq(null));
+    }
+
+    @DisableFlags(Flags.FLAG_ENABLE_BUBBLE_ROOT_TASK)
+    @Test
+    public void testNotifyExitPipMode_setWindowingMode_flagDisabled() {
+        // Create a task and move it to pinned mode.
+        final ActivityRecord activity = new ActivityBuilder(mAtm).setCreateTask(true).build();
+        activity.setState(RESUMED, "test");
+        mAtm.mRootWindowContainer.moveActivityToPinnedRootTaskForTest(activity, "test");
+        final Task pinnedTask = activity.getTask();
+        spyOn(mRootWindowContainer);
+
+        // Exit pinned mode by setting windowing mode to fullscreen.
+        pinnedTask.setWindowingMode(WINDOWING_MODE_FULLSCREEN);
+
+        // Verify that the exit pip mode is notified. This is called from setWindowingModeInner
+        // when the flag is disabled.
+        verify(mRootWindowContainer).notifyActivityPipModeChanged(eq(pinnedTask), eq(null));
+    }
+
     @Test
     public void testReparent_BetweenDisplays() {
         // Create first task on primary display.
@@ -1781,6 +1817,26 @@ public class TaskTests extends WindowTestsBase {
     }
 
     @Test
+    public void testSetPreserveLeafTaskIfRelaunch_organizedTask_setsFlag() {
+        final Task task = getTestTask();
+        task.mCreatedByOrganizer = true;
+        task.mTaskOrganizer = mock(ITaskOrganizer.class);
+
+        task.setPreserveLeafTaskIfRelaunch(true);
+        assertTrue(task.mPreserveLeafTaskIfRelaunch);
+
+        task.setPreserveLeafTaskIfRelaunch(false);
+        assertFalse(task.mPreserveLeafTaskIfRelaunch);
+    }
+
+    @Test
+    public void testSetPreserveLeafTaskIfRelaunch_nonOrganizedTask_doesNothing() {
+        final Task task = getTestTask();
+        task.setPreserveLeafTaskIfRelaunch(true);
+        assertFalse(task.mPreserveLeafTaskIfRelaunch);
+    }
+
+    @Test
     public void testSetReparentLeafTaskIfRelaunchFromHome_organizedTask_setsFlag() {
         final Task task = getTestTask();
         task.mCreatedByOrganizer = true;
@@ -2291,6 +2347,7 @@ public class TaskTests extends WindowTestsBase {
     }
 
     @Test
+    @DisableFlags(Flags.FLAG_DELEGATE_REQUEST_FULLSCREEN_HANDLING_TO_SHELL)
     public void testRestoreWindowingMode_reparentsToAttachedParent() {
         // Create a parent task that the child task will be restored to.
         final Task parentTask = new TaskBuilder(mSupervisor).setCreateActivity(true).build();
@@ -2314,6 +2371,7 @@ public class TaskTests extends WindowTestsBase {
     }
 
     @Test
+    @DisableFlags(Flags.FLAG_DELEGATE_REQUEST_FULLSCREEN_HANDLING_TO_SHELL)
     public void testRestoreWindowingMode_doesNotReparentToDetachedParent() {
         // Create a parent task that will be removed.
         final Task parentTask = new TaskBuilder(mSupervisor).setCreateActivity(true).build();
@@ -2523,6 +2581,44 @@ public class TaskTests extends WindowTestsBase {
         final byte[] bytes = serializeToBytes(task);
         final Task restored = restoreFromBytes(bytes);
         assertFalse(restored.mRealActivityAppLockEnabled);
+    }
+
+    @Test
+    @EnableFlags({android.security.Flags.FLAG_APP_LOCK_APIS,
+            android.security.Flags.FLAG_APP_LOCK_CORE})
+    public void testCreateTask_registersToAppLockController() {
+        final AppLockController appLockController = mWm.mAppLockController;
+        spyOn(appLockController);
+
+        final Task task = getTestTask();
+
+        verify(appLockController).registerTask(task);
+    }
+
+    @Test
+    public void testBuilder_notCreatedByOrganizer_ignoreInsetsAndAppCompatRoundedCornersDefault() {
+        final Task task = new Task.Builder(mAtm)
+                .setWindowingMode(WINDOWING_MODE_MULTI_WINDOW)
+                .setShouldIgnoreInsets(true)
+                .setDisableAppCompatRoundedCorners(true)
+                .build();
+        task.mCreatedByOrganizer = false;
+
+        assertFalse(task.shouldIgnoreInsets());
+        assertFalse(task.disableAppCompatRoundedCorners());
+    }
+
+    @Test
+    public void testBuilder_createdByOrganizer_setIgnoreInsetsAndAppCompatRoundedCorners() {
+        final Task task = new Task.Builder(mAtm)
+                .setWindowingMode(WINDOWING_MODE_MULTI_WINDOW)
+                .setShouldIgnoreInsets(true)
+                .setDisableAppCompatRoundedCorners(true)
+                .build();
+        task.mCreatedByOrganizer = true;
+
+        assertTrue(task.shouldIgnoreInsets());
+        assertTrue(task.disableAppCompatRoundedCorners());
     }
 
     private Task getTestTask() {

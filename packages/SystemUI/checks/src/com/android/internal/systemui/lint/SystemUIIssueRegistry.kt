@@ -30,18 +30,23 @@ class SystemUIIssueRegistry : IssueRegistry() {
         get() =
             listOf(
                 BindServiceOnMainThreadDetector.ISSUE,
+                // TODO(b/469073407): Add BinderCallOnMainThreadDetector.ISSUE here when ready.
                 BroadcastSentViaContextDetector.ISSUE,
                 CleanArchitectureDependencyViolationDetector.ISSUE,
                 CollectAsStateDetector.ISSUE,
                 DemotingTestWithoutBugDetector.ISSUE,
+                DisplayAwareDetector.ERROR_ISSUE,
+                DisplayAwareDetector.INFO_ISSUE,
                 DoNotDirectlyConstructKosmosDetector.ISSUE,
                 DumpableNotRegisteredDetector.ISSUE,
                 ExposeFlowFromUiLayerDetector.ISSUE,
                 FlowDetector.SHARED_FLOW_CREATION,
+                IncludeRunWithAnnotationDetector.ISSUE,
                 MainThreadCoroutineScopeDetector.ISSUE,
                 MissingApacheLicenseDetector.ISSUE,
                 NonInjectedMainThreadDetector.ISSUE,
                 NonInjectedServiceDetector.ISSUE,
+                NoKotlinTestInScenarioTestDetector.ISSUE,
                 NoMetricInParameterizedDetector.ISSUE_BEFORE,
                 NoMetricInParameterizedDetector.ISSUE_AFTER,
                 RegisterContentObserverSyncViaSettingsProxyDetector.SYNC_WARNING,

@@ -27,6 +27,7 @@ import com.android.internal.widget.remotecompose.core.operations.ClipRect;
 import com.android.internal.widget.remotecompose.core.operations.ColorAttribute;
 import com.android.internal.widget.remotecompose.core.operations.ColorConstant;
 import com.android.internal.widget.remotecompose.core.operations.ColorExpression;
+import com.android.internal.widget.remotecompose.core.operations.ColorTheme;
 import com.android.internal.widget.remotecompose.core.operations.ComponentValue;
 import com.android.internal.widget.remotecompose.core.operations.ConditionalOperations;
 import com.android.internal.widget.remotecompose.core.operations.DataDynamicListFloat;
@@ -96,6 +97,7 @@ import com.android.internal.widget.remotecompose.core.operations.TextLookupInt;
 import com.android.internal.widget.remotecompose.core.operations.TextMeasure;
 import com.android.internal.widget.remotecompose.core.operations.TextMerge;
 import com.android.internal.widget.remotecompose.core.operations.TextSubtext;
+import com.android.internal.widget.remotecompose.core.operations.TextTransform;
 import com.android.internal.widget.remotecompose.core.operations.Theme;
 import com.android.internal.widget.remotecompose.core.operations.TimeAttribute;
 import com.android.internal.widget.remotecompose.core.operations.TouchExpression;
@@ -1914,6 +1916,15 @@ public class RemoteComposeBuffer {
      *
      * @param id id of the value
      */
+    public void addComponentValue(int id, int type) {
+        ComponentValue.apply(mBuffer, type, mLastComponentId, id);
+    }
+
+    /**
+     * Add a component width value
+     *
+     * @param id id of the value
+     */
     public void addComponentWidthValue(int id) {
         ComponentValue.apply(mBuffer, ComponentValue.WIDTH, mLastComponentId, id);
     }
@@ -1925,6 +1936,60 @@ public class RemoteComposeBuffer {
      */
     public void addComponentHeightValue(int id) {
         ComponentValue.apply(mBuffer, ComponentValue.HEIGHT, mLastComponentId, id);
+    }
+
+    /**
+     * Add a component's content width value
+     *
+     * @param id id of the value
+     */
+    public void addComponentContentWidthValue(int id) {
+        ComponentValue.apply(mBuffer, ComponentValue.CONTENT_WIDTH, mLastComponentId, id);
+    }
+
+    /**
+     * Add a component's content height value
+     *
+     * @param id id of the value
+     */
+    public void addComponentContentHeightValue(int id) {
+        ComponentValue.apply(mBuffer, ComponentValue.CONTENT_HEIGHT, mLastComponentId, id);
+    }
+
+    /**
+     * Add a component's x value (in parent coordinates)
+     *
+     * @param id id of the value
+     */
+    public void addComponentXValue(int id) {
+        ComponentValue.apply(mBuffer, ComponentValue.POS_X, mLastComponentId, id);
+    }
+
+    /**
+     * Add a component's y value (in parent coordinates)
+     *
+     * @param id id of the value
+     */
+    public void addComponentYValue(int id) {
+        ComponentValue.apply(mBuffer, ComponentValue.POS_Y, mLastComponentId, id);
+    }
+
+    /**
+     * Add a component's x value (in root coordinates)
+     *
+     * @param id id of the value
+     */
+    public void addComponentRootXValue(int id) {
+        ComponentValue.apply(mBuffer, ComponentValue.POS_ROOT_X, mLastComponentId, id);
+    }
+
+    /**
+     * Add a component's y value (in root coordinates)
+     *
+     * @param id id of the value
+     */
+    public void addComponentRootYValue(int id) {
+        ComponentValue.apply(mBuffer, ComponentValue.POS_ROOT_Y, mLastComponentId, id);
     }
 
     /**
@@ -1993,6 +2058,8 @@ public class RemoteComposeBuffer {
             int color,
             int colorId,
             float fontSize,
+            float minFontSize,
+            float maxFontSize,
             int fontStyle,
             float fontWeight,
             int fontFamilyId,
@@ -2007,37 +2074,90 @@ public class RemoteComposeBuffer {
             int justificationMode,
             boolean underline,
             boolean strikethrough,
-            @NonNull int [] fontAxis,
-            @NonNull float [] fontAxisValues,
+            @Nullable int [] fontAxis,
+            @Nullable float [] fontAxisValues,
             boolean autosize,
             int flags) {
         mLastComponentId = getComponentId(componentId);
-        CoreText.apply(
-                mBuffer,
-                mLastComponentId,
-                animationId,
-                textId,
-                color,
-                colorId,
-                fontSize,
-                fontStyle,
-                fontWeight,
-                fontFamilyId,
-                textAlign,
-                overflow,
-                maxLines,
-                letterSpacing,
-                lineHeightAdd,
-                lineHeightMultiplier,
-                lineBreakStrategy,
-                hyphenationFrequency,
-                justificationMode,
-                underline,
-                strikethrough,
-                fontAxis,
-                fontAxisValues,
-                autosize,
-                flags);
+        if (mApiLevel < 7) {
+            if (letterSpacing != 0f
+                    || lineHeightAdd != 0f
+                    || lineHeightMultiplier != 1f
+                    || lineBreakStrategy != 0
+                    || hyphenationFrequency != 0
+                    || justificationMode != 0
+                    || underline
+                    || strikethrough
+                    || (fontAxis != null && fontAxis.length > 0)
+                    || (fontAxisValues != null && fontAxisValues.length > 0)
+                    || autosize
+            ) {
+                StringBuilder error = new StringBuilder();
+                error.append("The following text parameters are not supported on API level < 7:\n");
+                if (letterSpacing != 0f) {
+                    error.append("- letterSpacing\n");
+                }
+                if (lineHeightAdd != 0f || lineHeightMultiplier != 1f) {
+                    error.append("- lineHeight\n");
+                }
+                if (lineBreakStrategy != 0) {
+                    error.append("- lineBreakStrategy\n");
+                }
+                if (hyphenationFrequency != 0) {
+                    error.append("- hyphenationFrequency\n");
+                }
+                if (justificationMode != 0) {
+                    error.append("- justificationMode\n");
+                }
+                if (underline) {
+                    error.append("- underline\n");
+                }
+                if (strikethrough) {
+                    error.append("- strikethrough\n");
+                }
+                if ((fontAxis != null && fontAxis.length > 0)
+                        || (fontAxisValues != null && fontAxisValues.length > 0)) {
+                    error.append("- fontAxis\n");
+                }
+                if (autosize) {
+                    error.append("- autosize\n");
+                }
+                throw new RuntimeException(error.toString());
+            }
+            // Use TextLayout as a backstop
+            TextLayout.apply(mBuffer, mLastComponentId, animationId, textId,
+                    color, fontSize, fontStyle, fontWeight, fontFamilyId,
+                    textAlign, overflow, maxLines);
+        } else {
+            CoreText.apply(
+                    mBuffer,
+                    mLastComponentId,
+                    animationId,
+                    textId,
+                    color,
+                    colorId,
+                    fontSize,
+                    minFontSize,
+                    maxFontSize,
+                    fontStyle,
+                    fontWeight,
+                    fontFamilyId,
+                    textAlign,
+                    overflow,
+                    maxLines,
+                    letterSpacing,
+                    lineHeightAdd,
+                    lineHeightMultiplier,
+                    lineBreakStrategy,
+                    hyphenationFrequency,
+                    justificationMode,
+                    underline,
+                    strikethrough,
+                    fontAxis,
+                    fontAxisValues,
+                    autosize,
+                    flags);
+        }
     }
 
     /**
@@ -2335,6 +2455,19 @@ public class RemoteComposeBuffer {
      */
     public void textSubtext(int id, int txtId, float start, float len) {
         TextSubtext.apply(mBuffer, id, txtId, start, len);
+    }
+
+    /**
+     * Transform text uppercase lowercase etc
+     *
+     * @param id        the text subtext id
+     * @param txtId     the input text
+     * @param start     the start position 0 = first character
+     * @param len       the length of the subtext -1 = to the end
+     * @param operation the operation to perform
+     */
+    public void textTransform(int id, int txtId, float start, float len, int operation) {
+        TextTransform.apply(mBuffer, id, txtId, start, len, operation);
     }
 
     /**
@@ -2650,5 +2783,23 @@ public class RemoteComposeBuffer {
      */
     public void addValueFloatExpressionChangeActionOperation(int mValueId, int mValue) {
         ValueFloatExpressionChangeActionOperation.apply(mBuffer, mValueId, mValue);
+    }
+
+    /**
+     * Add a themed color operation
+     * @param id output id
+     * @param groupId group text id
+     * @param lightId light id color
+     * @param darkId dark id color
+     * @param lightFallback light fallback
+     * @param darkFallback dark fallback color
+     */
+    public void addThemedColor(int id,
+            int groupId,
+            short lightId,
+            short darkId,
+            int lightFallback,
+            int darkFallback) {
+        ColorTheme.apply(mBuffer, id, groupId, lightId, darkId, lightFallback, darkFallback);
     }
 }

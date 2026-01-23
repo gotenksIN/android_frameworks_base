@@ -836,6 +836,7 @@ rust_aconfig_library {
     aconfig_declarations: "android.security.flags-aconfig",
     apex_available: [
         "//apex_available:platform",
+        "com.android.compos",
         "com.android.virt",
     ],
 }
@@ -874,6 +875,12 @@ java_aconfig_library {
     aconfig_declarations: "android.content.pm.flags-aconfig",
     host_supported: true,
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
+cc_aconfig_library {
+    name: "android.content.pm.flags-aconfig-cc",
+    aconfig_declarations: "android.content.pm.flags-aconfig",
+    min_sdk_version: "30",
 }
 
 // Resources
@@ -1273,7 +1280,12 @@ aconfig_declarations {
     package: "android.app",
     container: "system",
     exportable: true,
-    srcs: ["core/java/android/app/*.aconfig"],
+    // Alarm flags are defined with AlarmManagerService in the jobscheduler APEX,
+    // but belong to the 'android.app' package.
+    srcs: [
+        "core/java/android/app/*.aconfig",
+        "apex/jobscheduler/framework/aconfig/alarm.aconfig",
+    ],
 }
 
 java_aconfig_library {
@@ -2001,6 +2013,7 @@ java_aconfig_library {
     name: "android.content.flags-aconfig-java",
     aconfig_declarations: "android.content.flags-aconfig",
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
+    mode: "exported",
     min_sdk_version: "30",
 }
 
@@ -2079,6 +2092,7 @@ aconfig_declarations {
     package: "android.bluetooth.platform.flags",
     container: "system",
     srcs: ["bluetooth/bluetooth.aconfig"],
+    exportable: true,
 }
 
 java_aconfig_library {
@@ -2089,6 +2103,29 @@ java_aconfig_library {
         "//apex_available:platform",
     ],
     defaults: ["framework-minus-apex-aconfig-java-defaults"],
+}
+
+java_aconfig_library {
+    name: "android.bluetooth.platform.flags-aconfig-java-export",
+    aconfig_declarations: "android.bluetooth.platform.flags-aconfig",
+    defaults: ["framework-minus-apex-aconfig-java-defaults"],
+    min_sdk_version: "33",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.bt",
+    ],
+    mode: "exported",
+}
+
+cc_aconfig_library {
+    name: "android.bluetooth.platform.flags-aconfig-cc",
+    aconfig_declarations: "android.bluetooth.platform.flags-aconfig",
+    min_sdk_version: "33",
+    apex_available: [
+        "//apex_available:platform",
+        "com.android.bt",
+    ],
+    host_supported: true,
 }
 
 // Wifi

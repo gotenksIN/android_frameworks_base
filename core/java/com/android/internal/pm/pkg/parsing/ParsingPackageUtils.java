@@ -101,6 +101,7 @@ import com.android.internal.pm.pkg.component.InstallConstraintsTagParser;
 import com.android.internal.pm.pkg.component.ParsedActivity;
 import com.android.internal.pm.pkg.component.ParsedActivityImpl;
 import com.android.internal.pm.pkg.component.ParsedActivityUtils;
+import com.android.internal.pm.pkg.component.ParsedAllowComponentAccessPolicyUtils;
 import com.android.internal.pm.pkg.component.ParsedApexSystemService;
 import com.android.internal.pm.pkg.component.ParsedApexSystemServiceUtils;
 import com.android.internal.pm.pkg.component.ParsedAttribution;
@@ -207,6 +208,7 @@ public class ParsingPackageUtils {
     public static final String TAG_USES_PERMISSION_SDK_M = "uses-permission-sdk-m";
     public static final String TAG_USES_SDK = "uses-sdk";
     public static final String TAG_USES_SPLIT = "uses-split";
+    public static final String TAG_ALLOW_COMPONENT_ACCESS = "allow-component-access";
 
     public static final String METADATA_MAX_ASPECT_RATIO = "android.max_aspect";
     public static final String METADATA_SUPPORTS_SIZE_CHANGES = "android.supports_size_changes";
@@ -1103,6 +1105,13 @@ public class ParsingPackageUtils {
                         mCallback.getInstallConstraintsAllowlist());
             case TAG_QUERIES:
                 return parseQueries(input, pkg, res, parser);
+            case TAG_ALLOW_COMPONENT_ACCESS:
+                if (android.app.privatecompute.flags.Flags.enableAllowComponentAccess()) {
+                    return ParsedAllowComponentAccessPolicyUtils.parseAllowComponentAccessPolicy(
+                            input, pkg, res, parser);
+                }
+                XmlUtils.skipCurrentTag(parser);
+                return input.success(pkg);
             default:
                 return ParsingUtils.unknownTag("<manifest>", pkg, parser, input);
         }

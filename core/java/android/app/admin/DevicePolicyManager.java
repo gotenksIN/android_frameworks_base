@@ -64,6 +64,7 @@ import static android.app.admin.flags.Flags.FLAG_POLICY_STREAMLINING;
 import static android.app.admin.flags.Flags.FLAG_REMOVE_MANAGED_PROFILE_ENABLED;
 import static android.app.admin.flags.Flags.FLAG_SECONDARY_LOCKSCREEN_API_ENABLED;
 import static android.app.admin.flags.Flags.FLAG_SPLIT_CREATE_MANAGED_PROFILE_ENABLED;
+import static android.app.admin.flags.Flags.FLAG_ENABLE_NULLABLE_ADMIN_COMPONENT;
 import static android.app.admin.flags.Flags.onboardingBugreportV2Enabled;
 import static android.app.admin.flags.Flags.onboardingConsentlessBugreports;
 import static android.content.Intent.LOCAL_FLAG_FROM_SYSTEM;
@@ -219,7 +220,7 @@ import java.util.function.Consumer;
  *
  * <p id="deviceadmin">A <b>Device Administrator</b> is an app which is able to enforce device
  * policies that it has declared in its device admin XML file. An app can prompt the user to give it
- * device administator privileges using the {@link #ACTION_ADD_DEVICE_ADMIN} action.
+ * device administrator privileges using the {@link #ACTION_ADD_DEVICE_ADMIN} action.
  *
  * <p>For more information about Device Administration, read the
  * <a href="{@docRoot}guide/topics/admin/device-admin.html">Device Administration</a>
@@ -4658,7 +4659,7 @@ public class DevicePolicyManager {
     }
 
     /**
-     * Acknoledges that the new managed user disclaimer was viewed by the (human) user
+     * Acknowledges that the new managed user disclaimer was viewed by the (human) user
      * so that {@link #ACTION_SHOW_NEW_USER_DISCLAIMER broadcast} is not sent again the next time
      * this user is switched to.
      *
@@ -6256,7 +6257,7 @@ public class DevicePolicyManager {
      * <p>
      * This method can be called on the {@link DevicePolicyManager} instance returned by
      * {@link #getParentProfileInstance(ComponentName)} in order to retrieve the number of failed
-     * password attemts for the parent user.
+     * password attempts for the parent user.
      * <p>
      * The calling device admin must have requested {@link DeviceAdminInfo#USES_POLICY_WATCH_LOGIN}
      * to be able to call this method; if it has not, a security exception will be thrown.
@@ -7676,7 +7677,7 @@ public class DevicePolicyManager {
      * of the installation, were made aware of the risks, viewed the certificate and still wanted to
      * keep the certificate on the device.
      *
-     * Calling with {@param approval} as {@code true} will cancel any ongoing warnings related to
+     * Calling with {@code approval} as {@code true} will cancel any ongoing warnings related to
      * this certificate.
      *
      * @hide
@@ -8536,7 +8537,7 @@ public class DevicePolicyManager {
      * {@link #uninstallCaCert}, {@link #uninstallAllUserCaCerts} and {@link #installKeyPair}.
      * <p>
      * Delegated certificate installer is a per-user state. The delegated access is persistent until
-     * it is later cleared by calling this method with a null value or uninstallling the certificate
+     * it is later cleared by calling this method with a null value or uninstalling the certificate
      * installer.
      * <p>
      * <b>Note:</b>Starting from {@link android.os.Build.VERSION_CODES#N}, if the caller
@@ -10263,15 +10264,17 @@ public class DevicePolicyManager {
      * <p>
      * May be called by the device owner or the profile owner of an organization-owned device.
      *
-     * @param admin The name of the admin component to check.
+     * @param admin The name of the admin component to check. Null if the caller is not a device
+     *              admin.
      * @param info Device owner information which will be displayed instead of the user owner info.
      * @throws SecurityException if {@code admin} is not a device owner.
      */
-    public void setDeviceOwnerLockScreenInfo(@NonNull ComponentName admin, CharSequence info) {
+    public void setDeviceOwnerLockScreenInfo(@SuppressLint("InvalidNullConversion")
+            @Nullable ComponentName admin, CharSequence info) {
         throwIfParentInstance("setDeviceOwnerLockScreenInfo");
         if (mService != null) {
             try {
-                mService.setDeviceOwnerLockScreenInfo(admin, info);
+                mService.setDeviceOwnerLockScreenInfo(admin, mContext.getPackageName(), info);
             } catch (RemoteException re) {
                 throw re.rethrowFromSystemServer();
             }
@@ -11052,7 +11055,7 @@ public class DevicePolicyManager {
      * {@link #KEYGUARD_DISABLE_TRUST_AGENTS}. If any admin declares
      * {@link #KEYGUARD_DISABLE_TRUST_AGENTS} but doesn't call
      * {@link #setTrustAgentConfiguration(ComponentName, ComponentName, PersistableBundle)}
-     * for this {@param agent} or calls it with a null configuration, null is returned.
+     * for this {@code agent} or calls it with a null configuration, null is returned.
      * @param agent Which component to get enabled features for.
      * @return configuration for the given trust agent.
      */
@@ -11669,7 +11672,7 @@ public class DevicePolicyManager {
      * {@code null} means all accessibility services are allowed.
      *
      * @param admin Which {@link DeviceAdminReceiver} this request is associated with.
-     * @return List of accessiblity service package names.
+     * @return List of accessibility service package names.
      * @throws SecurityException if {@code admin} is not a device or profile owner.
      */
     public @Nullable List<String> getPermittedAccessibilityServices(@NonNull ComponentName admin) {
@@ -11716,7 +11719,7 @@ public class DevicePolicyManager {
      * owners that apply to this user. It will also include any system accessibility services.
      *
      * @param userId which user to check for.
-     * @return List of accessiblity service package names.
+     * @return List of accessibility service package names.
      * @hide
      */
      @SystemApi
@@ -13035,7 +13038,13 @@ public class DevicePolicyManager {
      * @see #setDelegatedScopes
      * @see #DELEGATION_PACKAGE_ACCESS
      */
-    public void enableSystemApp(@NonNull ComponentName admin, String packageName) {
+    @FlaggedApi(FLAG_ENABLE_NULLABLE_ADMIN_COMPONENT)
+    public void enableSystemApp(@SuppressLint("InvalidNullConversion")
+            @Nullable ComponentName admin, String packageName) {
+        // The class can not be extended, thus changing the nullability of the admin parameter
+        // is not source breaking.
+        // TODO(b/466995800): Review Metalava's handling of non-extensible classes for
+        // nullability changes.
         throwIfParentInstance("enableSystemApp");
         if (mService != null) {
             try {
@@ -13060,7 +13069,13 @@ public class DevicePolicyManager {
      * @see #setDelegatedScopes
      * @see #DELEGATION_PACKAGE_ACCESS
      */
-    public int enableSystemApp(@NonNull ComponentName admin, Intent intent) {
+    @FlaggedApi(FLAG_ENABLE_NULLABLE_ADMIN_COMPONENT)
+    public int enableSystemApp(@SuppressLint("InvalidNullConversion")
+            @Nullable ComponentName admin, Intent intent) {
+        // The class can not be extended, thus changing the nullability of the admin parameter
+        // is not source breaking.
+        // TODO(b/466995800): Review Metalava's handling of non-extensible classes for
+        // nullability changes.
         throwIfParentInstance("enableSystemApp");
         if (mService != null) {
             try {
@@ -13538,7 +13553,6 @@ public class DevicePolicyManager {
 
     /**
      * Sets preferential network configurations.
-     * {@see PreferentialNetworkServiceConfig}
      *
      * An example of a supported preferential network service is the Enterprise
      * slice on 5G networks. For devices on 4G networks, the profile owner needs to additionally
@@ -13552,6 +13566,7 @@ public class DevicePolicyManager {
      *
      * @param preferentialNetworkServiceConfigs list of preferential network configurations.
      * @throws SecurityException if the caller is not the profile owner or device owner.
+     * @see PreferentialNetworkServiceConfig
      **/
     public void setPreferentialNetworkServiceConfigs(
             @NonNull List<PreferentialNetworkServiceConfig> preferentialNetworkServiceConfigs) {
@@ -13568,10 +13583,10 @@ public class DevicePolicyManager {
 
     /**
      * Get preferential network configuration
-     * {@see PreferentialNetworkServiceConfig}
      *
      * @return preferential network configuration.
      * @throws SecurityException if the caller is not the profile owner or device owner.
+     * @see PreferentialNetworkServiceConfig
      */
     public @NonNull List<PreferentialNetworkServiceConfig> getPreferentialNetworkServiceConfigs() {
         throwIfParentInstance("getPreferentialNetworkServiceConfigs");
@@ -14452,7 +14467,8 @@ public class DevicePolicyManager {
      * permissions affected, and the behavior change for managed profiles and fully-managed
      * devices.
      *
-     * @param admin Which profile or device owner this request is associated with.
+     * @param admin Which profile or device owner this request is associated with, or
+     *            {@code null} if the caller is a set permission policy delegate.
      * @param policy One of the policy constants {@link #PERMISSION_POLICY_PROMPT},
      *            {@link #PERMISSION_POLICY_AUTO_GRANT} and {@link #PERMISSION_POLICY_AUTO_DENY}.
      * @throws SecurityException if {@code admin} is not a device or profile owner.
@@ -14460,7 +14476,13 @@ public class DevicePolicyManager {
      * @see #setDelegatedScopes
      * @see #DELEGATION_PERMISSION_GRANT
      */
-    public void setPermissionPolicy(@NonNull ComponentName admin, int policy) {
+    @FlaggedApi(FLAG_ENABLE_NULLABLE_ADMIN_COMPONENT)
+    public void setPermissionPolicy(@SuppressLint("InvalidNullConversion")
+            @Nullable ComponentName admin, int policy) {
+        // The class can not be extended, thus changing the nullability of the admin parameter
+        // is not source breaking.
+        // TODO(b/466995800): Review Metalava's handling of non-extensible classes for
+        // nullability changes.
         throwIfParentInstance("setPermissionPolicy");
         try {
             mService.setPermissionPolicy(admin, mContext.getPackageName(), policy);
@@ -15251,11 +15273,11 @@ public class DevicePolicyManager {
 
     /**
      * Called by the system to check if a package is restricted from using metered data
-     * by {@param admin}.
+     * by {@code admin}.
      *
      * @param admin which {@link DeviceAdminReceiver} this request is associated with.
      * @param packageName the package whose restricted status is needed.
-     * @param userId the user to which {@param packageName} belongs.
+     * @param userId the user to which {@code packageName} belongs.
      * @return {@code true} if the package is restricted by admin, otherwise {@code false}
      * @throws SecurityException if the caller doesn't run with {@link Process#SYSTEM_UID}
      * @hide
@@ -15531,7 +15553,7 @@ public class DevicePolicyManager {
 
     /**
      * Set the {@link UserProvisioningState} for the supplied user. The supplied user has to be
-     * manged, otherwise it will throw an {@link IllegalStateException}.
+     * managed, otherwise it will throw an {@link IllegalStateException}.
      *
      * <p> For managed users/profiles/devices, only the following state changes are allowed:
      * <ul>
@@ -17490,7 +17512,7 @@ public class DevicePolicyManager {
      * @param admin Which {@link DeviceAdminReceiver} this request is associated with
      * @param timeoutMillis Maximum time the profile is allowed to be off in milliseconds or 0 if
      *        not limited. The minimum non-zero value corresponds to 72 hours. If an admin sets a
-     *        smaller non-zero vaulue, 72 hours will be set instead.
+     *        smaller non-zero value, 72 hours will be set instead.
      * @throws IllegalStateException if the profile owner doesn't have an activity that handles
      *        {@link #ACTION_CHECK_POLICY_COMPLIANCE}
      * @see #setPersonalAppsSuspended
@@ -18960,6 +18982,75 @@ public class DevicePolicyManager {
     }
 
     /**
+     * Returns the effective value of the given device-wide policy.
+     *
+     * <p> Can only applied on a {@link #RESOURCE_DEVICE_WIDE} policy.
+     *
+     * @param id Which policy to retrieve.
+     * @param <T> The type of the policy
+     * @return The effective value of the policy.
+     * @throws IllegalArgumentException if the policy is not a device-wide resource.
+     * @throws SecurityException If the caller does not have sufficient permissions to get the
+     *      specified policy. Check the documentation of individual identifiers for more details.
+     *      The QUERY_ADMIN_POLICY permission can in most cases be used to replace the per-policy
+     *      permission, but the cros-user permission is still checked.
+     */
+    @FlaggedApi(FLAG_POLICY_STREAMLINING)
+    @Nullable
+    public <T> T getResolvedDeviceWidePolicy(@NonNull PolicyIdentifier<T> id) {
+        throwIfParentInstance("getResolvedDeviceWidePolicy");
+        if (mService == null) {
+            return null;
+        }
+
+        try {
+            PolicyValueTransport value =
+                    mService.getResolvedDeviceWidePolicy(mContext.getPackageName(), id.getId());
+            return policyValueFromTransport(id, value);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Returns the effective value of the given per-user policy.
+     *
+     * <p> Can only applied on a {@link #RESOURCE_PER_USER} policy. Returns the effective policy
+     * value of the context user.
+     *
+     * @param id Which policy to retrieve.
+     * @param <T> The type of the policy
+     * @return The effective value of the policy.
+     * @throws IllegalArgumentException if the policy is not a per-user resource.
+     * throws SecurityException If the caller does not have sufficient permissions to get the
+     *      specified policy. Check the documentation of individual identifiers for more details.
+     *      The QUERY_ADMIN_POLICY permission can in most cases be used to replace the per-policy
+     *      permission, but the cros-user permission is still checked when querying a different
+     *      user.
+     */
+    @FlaggedApi(FLAG_POLICY_STREAMLINING)
+    @UserHandleAware
+    @Nullable
+    public <T> T getResolvedPerUserPolicy(@NonNull PolicyIdentifier<T> id) {
+        throwIfParentInstance("getResolvedPerUserPolicy");
+        if (mService == null) {
+            return null;
+        }
+
+        try {
+            PolicyValueTransport value = mService.getResolvedPerUserPolicy(
+                    mContext.getPackageName(),
+                    myUserId(),
+                    id.getId()
+            );
+
+            return policyValueFromTransport(id, value);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
      * Template free version of setPolicy to clear policies. The other type specific versions
      * defined below don't allow specifying null as a value.
      *
@@ -19017,6 +19108,22 @@ public class DevicePolicyManager {
             @PolicyScope int scope) {
         // TODO(b/434920631): Remove this method and use {@link #getPolicy} in tests directly.
         var result = getPolicy(new PolicyIdentifier<Integer>(key), scope);
+        return result == null ? -1 : result;
+    }
+
+    /**
+     * Template free version of getPolicy for integers.
+     * Returns '-1' if the policy is not set.
+     *
+     * @hide
+     */
+    @TestApi
+    @SuppressWarnings("UnflaggedApi") // @TestApi without associated feature.
+    public int getIntegerResolvedPerUserPolicy(
+            @NonNull String key) {
+        // TODO(b/434920631): Remove this method and use {@link #getResolvedPerUserPolicy} in tests
+        //  directly.
+        var result = getResolvedPerUserPolicy(new PolicyIdentifier<Integer>(key));
         return result == null ? -1 : result;
     }
 }

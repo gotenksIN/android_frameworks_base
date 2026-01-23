@@ -31,6 +31,7 @@ import android.annotation.RequiresPermission;
 import android.annotation.SuppressLint;
 import android.annotation.UserIdInt;
 import android.app.ActivityOptions;
+import android.app.IApplicationThread;
 import android.app.compat.CompatChanges;
 import android.app.role.RoleManager;
 import android.companion.AssociationInfo;
@@ -528,6 +529,7 @@ public class VirtualDeviceManagerService extends SystemService {
                 android.Manifest.permission.POST_NOTIFICATIONS})
         @Override // Binder call
         public void requestComputerControlSession(
+                @NonNull IApplicationThread appThread,
                 @NonNull AttributionSource attributionSource,
                 @NonNull ComputerControlSessionParams params,
                 @NonNull IComputerControlSessionCallback callback) {
@@ -536,12 +538,13 @@ public class VirtualDeviceManagerService extends SystemService {
                 throw new IllegalStateException(
                         "Cannot create ComputerControlSession - flag disabled");
             }
+            Objects.requireNonNull(appThread);
             Objects.requireNonNull(attributionSource);
             Objects.requireNonNull(params);
             Objects.requireNonNull(callback);
 
             mComputerControlSessionProcessor.processNewSessionRequest(
-                    attributionSource, params, callback);
+                    appThread, attributionSource, params, callback);
         }
 
         @EnforcePermission(android.Manifest.permission.CREATE_VIRTUAL_DEVICE)
@@ -679,17 +682,8 @@ public class VirtualDeviceManagerService extends SystemService {
         }
 
         @Override // Binder call
-        @Nullable
-        public Intent createAutomatedAppLaunchWarningIntent(
-                @NonNull String packageName, @UserIdInt int userId) {
-            // TODO(b/442624418): Replace this with a permission check.
-            if (!mActivityTaskManagerInternal.isCallerRecents(Binder.getCallingUid())) {
-                throw new SecurityException("Caller is not recents");
-            }
-            return mAutomatedPackagesRepository.createAutomatedAppLaunchWarningIntent(
-                    packageName, userId, /* callingPackageName= */ null,
-                    /* deviceOwnerForLaunchDisplayId= */ null,
-                    mComputerControlSessionProcessor::closeSessionByUserIntent);
+        public boolean validateAutomatedAppLaunchWarningIntent(@NonNull Intent intent) {
+            return mAutomatedPackagesRepository.validateAutomatedAppLaunchWarningIntent(intent);
         }
 
         @Override // Binder call

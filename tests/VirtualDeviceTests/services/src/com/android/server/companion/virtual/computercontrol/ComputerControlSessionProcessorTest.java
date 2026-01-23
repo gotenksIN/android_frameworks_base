@@ -25,6 +25,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.timeout;
@@ -33,6 +34,7 @@ import static org.mockito.Mockito.when;
 
 import android.app.Activity;
 import android.app.AppOpsManager;
+import android.app.IApplicationThread;
 import android.app.KeyguardManager;
 import android.app.admin.DevicePolicyManagerInternal;
 import android.companion.virtual.VirtualDeviceManager.VirtualDevice;
@@ -78,7 +80,6 @@ import java.util.List;
 public class ComputerControlSessionProcessorTest {
 
     private static final int CALLBACK_TIMEOUT_MS = 1_000;
-    private static final String PACKAGE_NAME_PERMISSION_CONTROLLER = "permission.controller";
     private static final String TARGET_PACKAGE = "com.android.foo";
     private static final String ANOTHER_TARGET_PACKAGE = "com.android.bar";
     private static final int CALLING_USER_ID = UserHandle.USER_SYSTEM;
@@ -93,6 +94,8 @@ public class ComputerControlSessionProcessorTest {
                     .setTargetPackageNames(List.of(TARGET_PACKAGE))
                     .build();
 
+    @Mock
+    private IApplicationThread mAppThread;
     @Mock
     private KeyguardManager mKeyguardManager;
     @Mock
@@ -152,6 +155,8 @@ public class ComputerControlSessionProcessorTest {
 
         Context context = spy(new ContextWrapper(
                 InstrumentationRegistry.getInstrumentation().getTargetContext()));
+        doReturn(context).when(context).createContextAsUser(any(UserHandle.class), anyInt());
+
         when(context.getSystemService(Context.KEYGUARD_SERVICE)).thenReturn(mKeyguardManager);
         when(context.getSystemService(Context.APP_OPS_SERVICE)).thenReturn(mAppOpsManager);
 
@@ -199,10 +204,10 @@ public class ComputerControlSessionProcessorTest {
 
     @Test
     public void keyguardLocked_sessionNotCreated() throws Exception {
-        when(mKeyguardManager.isDeviceLocked()).thenReturn(true);
+        when(mKeyguardManager.isDeviceLocked(anyInt())).thenReturn(true);
 
         mProcessor.processNewSessionRequest(
-                ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback);
+                mAppThread, ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback);
 
         verify(mComputerControlSessionCallback, timeout(CALLBACK_TIMEOUT_MS))
                 .onSessionCreationFailed(ComputerControlSession.ERROR_DEVICE_LOCKED);
@@ -213,7 +218,7 @@ public class ComputerControlSessionProcessorTest {
         when(mAppOpsManager.noteOpNoThrow(eq(AppOpsManager.OP_COMPUTER_CONTROL), any(), any()))
                 .thenReturn(AppOpsManager.MODE_IGNORED);
         mProcessor.processNewSessionRequest(
-                ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback);
+                mAppThread, ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback);
 
         verify(mComputerControlSessionCallback)
                 .onSessionCreationFailed(ComputerControlSession.ERROR_PERMISSION_DENIED);
@@ -226,7 +231,7 @@ public class ComputerControlSessionProcessorTest {
 
         assertThrows(SecurityException.class,
                 () -> mProcessor.processNewSessionRequest(
-                        ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback));
+                        mAppThread, ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback));
     }
 
     @Test
@@ -240,7 +245,7 @@ public class ComputerControlSessionProcessorTest {
                 .build();
         assertThrows(IllegalArgumentException.class, () -> {
             mProcessor.processNewSessionRequest(
-                    ATTRIBUTION_SOURCE, params, mComputerControlSessionCallback);
+                    mAppThread, ATTRIBUTION_SOURCE, params, mComputerControlSessionCallback);
         });
     }
 
@@ -254,7 +259,7 @@ public class ComputerControlSessionProcessorTest {
                 .setTargetPackageNames(List.of(TARGET_PACKAGE, ANOTHER_TARGET_PACKAGE))
                 .build();
         mProcessor.processNewSessionRequest(
-                ATTRIBUTION_SOURCE, params, mComputerControlSessionCallback);
+                mAppThread, ATTRIBUTION_SOURCE, params, mComputerControlSessionCallback);
 
         verify(mComputerControlSessionCallback, timeout(CALLBACK_TIMEOUT_MS).times(1))
                 .onSessionCreated(anyInt(), any());
@@ -265,7 +270,7 @@ public class ComputerControlSessionProcessorTest {
         try {
             for (int i = 0; i < MAXIMUM_CONCURRENT_SESSIONS; ++i) {
                 mProcessor.processNewSessionRequest(
-                        ATTRIBUTION_SOURCE, generateUniqueParams(i),
+                        mAppThread, ATTRIBUTION_SOURCE, generateUniqueParams(i),
                         mComputerControlSessionCallback);
             }
             verify(mComputerControlSessionCallback,
@@ -273,7 +278,8 @@ public class ComputerControlSessionProcessorTest {
                     .onSessionCreated(anyInt(), mSessionArgumentCaptor.capture());
 
             mProcessor.processNewSessionRequest(
-                    ATTRIBUTION_SOURCE, generateUniqueParams(-1), mComputerControlSessionCallback);
+                    mAppThread, ATTRIBUTION_SOURCE, generateUniqueParams(-1),
+                    mComputerControlSessionCallback);
             verify(mComputerControlSessionCallback, timeout(CALLBACK_TIMEOUT_MS))
                     .onSessionCreationFailed(ComputerControlSession.ERROR_SESSION_LIMIT_REACHED);
 
@@ -281,7 +287,8 @@ public class ComputerControlSessionProcessorTest {
             mSessionArgumentCaptor.getAllValues().getFirst().close();
 
             mProcessor.processNewSessionRequest(
-                    ATTRIBUTION_SOURCE, generateUniqueParams(-1), mComputerControlSessionCallback);
+                    mAppThread, ATTRIBUTION_SOURCE, generateUniqueParams(-1),
+                    mComputerControlSessionCallback);
             verify(mComputerControlSessionCallback,
                     timeout(CALLBACK_TIMEOUT_MS).times(MAXIMUM_CONCURRENT_SESSIONS + 1))
                     .onSessionCreated(anyInt(), mSessionArgumentCaptor.capture());
@@ -298,7 +305,7 @@ public class ComputerControlSessionProcessorTest {
                 .thenReturn(AppOpsManager.MODE_DEFAULT);
 
         mProcessor.processNewSessionRequest(
-                ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback);
+                mAppThread, ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback);
         verify(mPendingIntentFactory).create(any(), anyInt(), mIntentArgumentCaptor.capture());
         verify(mComputerControlSessionCallback).onSessionPending(any());
 
@@ -315,7 +322,7 @@ public class ComputerControlSessionProcessorTest {
                 .thenReturn(AppOpsManager.MODE_DEFAULT);
 
         mProcessor.processNewSessionRequest(
-                ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback);
+                mAppThread, ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback);
         verify(mPendingIntentFactory).create(any(), anyInt(), mIntentArgumentCaptor.capture());
         verify(mComputerControlSessionCallback).onSessionPending(any());
 
@@ -329,18 +336,18 @@ public class ComputerControlSessionProcessorTest {
     @Test
     public void validateParams_sessionNameMustBeUnique() throws Exception {
         mProcessor.processNewSessionRequest(
-                ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback);
+                mAppThread, ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback);
         verify(mComputerControlSessionCallback, timeout(CALLBACK_TIMEOUT_MS))
                 .onSessionCreated(anyInt(), any());
         assertThrows(IllegalArgumentException.class,
                 () -> mProcessor.processNewSessionRequest(
-                        ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback));
+                        mAppThread, ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback));
     }
 
     @Test
     public void validateParams_packageNamesAreValid() throws Exception {
         mProcessor.processNewSessionRequest(
-                ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback);
+                mAppThread, ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback);
 
         verify(mComputerControlSessionCallback, timeout(CALLBACK_TIMEOUT_MS))
                 .onSessionCreated(anyInt(), any());
@@ -353,14 +360,14 @@ public class ComputerControlSessionProcessorTest {
 
         assertThrows(SecurityException.class, () ->
                 mProcessor.processNewSessionRequest(
-                        ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback));
+                        mAppThread, ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback));
     }
 
     @Test
     public void isComputerControlDisplay_returnsTrueForDisplaysWithActiveSession()
             throws Exception {
         mProcessor.processNewSessionRequest(
-                ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback);
+                mAppThread, ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback);
         verify(mComputerControlSessionCallback,
                 timeout(CALLBACK_TIMEOUT_MS).times(1))
                 .onSessionCreated(anyInt(), mSessionArgumentCaptor.capture());
@@ -377,7 +384,7 @@ public class ComputerControlSessionProcessorTest {
         final int notificationId = 5;
         final String notificationTag = "hello";
         mProcessor.processNewSessionRequest(
-                ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback);
+                mAppThread, ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback);
         verify(mComputerControlSessionCallback,
                 timeout(CALLBACK_TIMEOUT_MS).times(1))
                 .onSessionCreated(anyInt(), mSessionArgumentCaptor.capture());
@@ -393,7 +400,7 @@ public class ComputerControlSessionProcessorTest {
     public void isComputerControlNotification_notificationInfoNotAttached_returnsFalse()
             throws Exception {
         mProcessor.processNewSessionRequest(
-                ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback);
+                mAppThread, ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback);
         verify(mComputerControlSessionCallback, timeout(CALLBACK_TIMEOUT_MS).times(1))
                 .onSessionCreated(anyInt(), any());
 
@@ -407,7 +414,7 @@ public class ComputerControlSessionProcessorTest {
 
         // Create a session.
         mProcessor.processNewSessionRequest(
-                ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback);
+                mAppThread, ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback);
         verify(mComputerControlSessionCallback, timeout(CALLBACK_TIMEOUT_MS))
                 .onSessionCreated(anyInt(), mSessionArgumentCaptor.capture());
 
@@ -427,7 +434,7 @@ public class ComputerControlSessionProcessorTest {
     public void closeSessionByUserIntent_sessionExists_closesSession() throws Exception {
         // Create a session.
         mProcessor.processNewSessionRequest(
-                ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback);
+                mAppThread, ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback);
         verify(mComputerControlSessionCallback, timeout(CALLBACK_TIMEOUT_MS))
                 .onSessionCreated(anyInt(), any());
 
@@ -447,7 +454,7 @@ public class ComputerControlSessionProcessorTest {
     public void closeSessionByUserIntent_sessionDoesNotExist_doesNothing() throws Exception {
         // Create a session.
         mProcessor.processNewSessionRequest(
-                ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback);
+                mAppThread, ATTRIBUTION_SOURCE, PARAMS, mComputerControlSessionCallback);
         verify(mComputerControlSessionCallback, timeout(CALLBACK_TIMEOUT_MS))
                 .onSessionCreated(anyInt(), any());
 

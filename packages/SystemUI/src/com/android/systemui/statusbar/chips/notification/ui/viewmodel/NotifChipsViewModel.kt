@@ -23,7 +23,6 @@ import android.content.Context
 import androidx.annotation.ColorRes
 import com.android.internal.jank.Cuj
 import com.android.internal.logging.InstanceId
-import com.android.systemui.Flags
 import com.android.systemui.animation.ActivityTransitionAnimator
 import com.android.systemui.animation.ComposableControllerFactory
 import com.android.systemui.common.shared.model.ContentDescription
@@ -54,7 +53,7 @@ import com.android.systemui.statusbar.core.StatusBarConnectedDisplays
 import com.android.systemui.statusbar.notification.domain.interactor.HeadsUpNotificationInteractor
 import com.android.systemui.statusbar.notification.domain.model.TopPinnedState
 import com.android.systemui.statusbar.notification.promoted.shared.model.PromotedNotificationContentModel
-import com.android.systemui.statusbar.notification.promoted.shared.model.PromotedNotificationContentModel.Metric
+import com.android.systemui.statusbar.notification.shared.Metric
 import com.android.systemui.statusbar.notification.shared.NotificationChipFromCompactContent
 import com.android.systemui.util.kotlin.pairwise
 import com.android.systemui.util.time.SystemClock
@@ -215,7 +214,6 @@ constructor(
             chronometerFormat =
                 chipChronometerFormat ?: OngoingActivityChipModel.Content.Timer.Format.CHRONOMETER,
             semanticStyle = chipSemanticStyle,
-            wasPromotedAutomatically = content.wasPromotedAutomatically,
             isAppVisible = isAppVisible,
             instanceId = instanceId,
         )
@@ -239,8 +237,7 @@ constructor(
         else OngoingActivityChipModel.Content.Timer.Format.CHRONOMETER
 
     // TODO: b/462677827 - Delete when inlining NOTIFICATION_CHIP_FROM_COMPACT_CONTENT
-    private fun PromotedNotificationContentModel.Metric.TimeDifference.toWhen():
-        PromotedNotificationContentModel.When? =
+    private fun Metric.TimeDifference.toWhen(): PromotedNotificationContentModel.When? =
         when (this) {
             is Metric.TimeDifference.Paused ->
                 // paused timers will need to be supported in the UI layer,
@@ -405,14 +402,6 @@ constructor(
                     OngoingActivityChipModel.Content.IconOnly
                 }
                 text != null -> OngoingActivityChipModel.Content.Text(text = text)
-                Flags.promoteNotificationsAutomatically() && wasPromotedAutomatically -> {
-                    // When we're promoting notifications automatically, the `when` time set on the
-                    // notification will likely just be set to the current time, which would cause
-                    // the chip to always show "now". We don't want early testers to get that
-                    // experience since it's not what will happen at launch, so just don't show any
-                    // time.
-                    OngoingActivityChipModel.Content.IconOnly
-                }
                 NotificationChipFromCompactContent.isEnabled && chronometer != null ->
                     OngoingActivityChipModel.Content.Timer(
                         value = chronometer,
@@ -525,8 +514,6 @@ constructor(
         /** The time to show in the chip, or null if the time shouldn't be shown. */
         // TODO: b/462677827 - Delete when inlining NOTIFICATION_CHIP_FROM_COMPACT_CONTENT
         val time: PromotedNotificationContentModel.When?,
-        /** See [PromotedNotificationContentModel.wasPromotedAutomatically]. */
-        val wasPromotedAutomatically: Boolean,
         val isAppVisible: Boolean,
         val instanceId: InstanceId?,
     )

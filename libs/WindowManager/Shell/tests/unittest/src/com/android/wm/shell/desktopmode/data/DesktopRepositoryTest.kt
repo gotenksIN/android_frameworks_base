@@ -26,8 +26,8 @@ import android.util.ArraySet
 import android.view.Display.DEFAULT_DISPLAY
 import android.view.Display.INVALID_DISPLAY
 import androidx.test.filters.SmallTest
+import com.android.testing.wm.util.MockToken
 import com.android.window.flags.Flags
-import com.android.wm.shell.MockToken
 import com.android.wm.shell.ShellTestCase
 import com.android.wm.shell.TestRunningTaskInfoBuilder
 import com.android.wm.shell.TestShellExecutor
@@ -2749,7 +2749,7 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
             taskBounds = TEST_TASK_BOUNDS,
         )
 
-        repo.preserveDesk(deskId = 1, uniqueDisplayId = UNIQUE_DISPLAY_ID)
+        repo.preserveDesk(deskId = 1, uniqueDisplayId = UNIQUE_DISPLAY_ID, preserveAsActive = true)
 
         val allDesks = repo.getAllDesks()
         // We only have the default desk left.
@@ -2760,6 +2760,56 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
             .addOrUpdateDesktop(any(), any(), any(), any(), any(), any(), any(), any())
         verify(persistentRepository, never())
             .addOrUpdateRepository(any(), any(), any(), any(), any())
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
+    fun preserveDesk_activeDesk_deskPreservedAsActive() = runTest {
+        val listener = TestDeskChangeListener()
+        val executor = TestShellExecutor()
+        repo.addDeskChangeListener(listener, executor)
+        repo.addDesk(
+            displayId = DEFAULT_DISPLAY,
+            deskId = 1,
+            uniqueDisplayId = UNIQUE_DISPLAY_ID,
+            transientDesk = true,
+        )
+        repo.addTaskToDesk(
+            displayId = DEFAULT_DISPLAY,
+            deskId = 1,
+            taskId = 1,
+            isVisible = true,
+            taskBounds = TEST_TASK_BOUNDS,
+        )
+
+        repo.preserveDesk(deskId = 1, uniqueDisplayId = UNIQUE_DISPLAY_ID, preserveAsActive = true)
+
+        assertThat(repo.removePreservedDisplay(UNIQUE_DISPLAY_ID)?.activeDeskId).isEqualTo(1)
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
+    fun preserveDesk_inactiveDesk_preservedActiveDeskIsNull() = runTest {
+        val listener = TestDeskChangeListener()
+        val executor = TestShellExecutor()
+        repo.addDeskChangeListener(listener, executor)
+        repo.addDesk(
+            displayId = DEFAULT_DISPLAY,
+            deskId = 1,
+            uniqueDisplayId = UNIQUE_DISPLAY_ID,
+            transientDesk = true,
+        )
+        repo.addTaskToDesk(
+            displayId = DEFAULT_DISPLAY,
+            deskId = 1,
+            taskId = 1,
+            isVisible = true,
+            taskBounds = TEST_TASK_BOUNDS,
+        )
+
+        repo.preserveDesk(deskId = 1, uniqueDisplayId = UNIQUE_DISPLAY_ID, preserveAsActive = false)
+
+        assertThat(repo.removePreservedDisplay(UNIQUE_DISPLAY_ID)?.activeDeskId).isNull()
     }
 
     @Test
@@ -2849,6 +2899,56 @@ class DesktopRepositoryTest(flags: FlagsParameterization) : ShellTestCase() {
                 preservedDisplays = any(),
                 rememberedBoundsRatioByPackageName = eq(ArrayMap()),
             )
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_REMEMBERED_BOUNDS)
+    fun clearAllRememberedBoundsRatio_flagEnabled_clearsAllBoundsAndPersists() = runTest {
+        // GIVEN that remembered bounds are stored for multiple packages
+        val packageName1 = "com.test.app1"
+        val bounds1 = RectF(0.1f, 0.2f, 0.8f, 0.9f)
+        repo.setRememberedBoundsRatio(packageName1, bounds1)
+        val packageName2 = "com.test.app2"
+        val bounds2 = RectF(0.2f, 0.3f, 0.7f, 0.8f)
+        repo.setRememberedBoundsRatio(packageName2, bounds2)
+        assertThat(repo.getRememberedBoundsRatio(packageName1)).isEqualTo(bounds1)
+        assertThat(repo.getRememberedBoundsRatio(packageName2)).isEqualTo(bounds2)
+
+        // WHEN clearAllRememberedBoundsRatio is called
+        repo.clearAllRememberedBoundsRatio()
+        bgScope.testScheduler.advanceUntilIdle()
+
+        // THEN all bounds are cleared
+        assertThat(repo.getRememberedBoundsRatio(packageName1)).isNull()
+        assertThat(repo.getRememberedBoundsRatio(packageName2)).isNull()
+        // AND the change is persisted
+        verify(persistentRepository)
+            .addOrUpdateRepository(
+                userId = eq(DEFAULT_USER_ID),
+                desks = any(),
+                activeDeskId = any(),
+                preservedDisplays = any(),
+                rememberedBoundsRatioByPackageName = eq(ArrayMap()),
+            )
+    }
+
+    @Test
+    @DisableFlags(Flags.FLAG_ENABLE_REMEMBERED_BOUNDS)
+    fun clearAllRememberedBoundsRatio_flagDisabled_isNoOp() = runTest {
+        // GIVEN the remembered bounds flag is disabled
+        // (and we attempt to set a value, which should be a no-op)
+        val packageName = "com.test.app"
+        val bounds = RectF(0.1f, 0.2f, 0.8f, 0.9f)
+        repo.setRememberedBoundsRatio(packageName, bounds)
+        assertThat(repo.getRememberedBoundsRatio(packageName)).isNull()
+
+        // WHEN clearAllRememberedBoundsRatio is called
+        repo.clearAllRememberedBoundsRatio()
+        bgScope.testScheduler.advanceUntilIdle()
+
+        // THEN nothing happens and persistence is not triggered
+        verify(persistentRepository, never())
+            .addOrUpdateRepository(any(), any(), any(), any(), any())
     }
 
     private class TestDeskChangeListener : DesktopRepository.DeskChangeListener {

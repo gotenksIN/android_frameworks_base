@@ -120,8 +120,9 @@ import com.android.systemui.statusbar.pipeline.shared.ui.view.SystemStatusIconsL
 import com.android.systemui.statusbar.pipeline.shared.ui.viewmodel.HomeStatusBarViewModel
 import com.android.systemui.statusbar.pipeline.shared.ui.viewmodel.HomeStatusBarViewModel.HomeStatusBarViewModelFactory
 import com.android.systemui.statusbar.policy.Clock
+import com.android.systemui.statusbar.quickactions.av.ui.viewmodel.AvControlsPopupViewModel
 import com.android.systemui.statusbar.quickactions.popups.StatusBarPopupChips
-import com.android.systemui.statusbar.quickactions.popups.ui.compose.StatusBarPopupChipsContainer
+import com.android.systemui.statusbar.quickactions.ui.compose.QuickActionChipsContainer
 import com.android.systemui.statusbar.systemstatusicons.SystemStatusIconsInCompose
 import com.android.systemui.statusbar.systemstatusicons.ui.compose.SystemStatusIcons
 import com.android.systemui.statusbar.systemstatusicons.ui.viewmodel.SystemStatusIconsViewModel
@@ -146,6 +147,7 @@ constructor(
     private val iconController: StatusBarIconController,
     @DisplayAware private val eventAnimationInteractor: SystemStatusEventAnimationInteractor,
     private val mediaHierarchyManager: MediaHierarchyManager,
+    private val avControlsPopupViewModelFactory: AvControlsPopupViewModel.Factory,
     @Named(MediaModule.POPUP) private val mediaHost: MediaHost,
     private val mediaViewModelFactory: MediaViewModel.Factory,
     @DisplayAware private val darkIconDispatcher: DarkIconDispatcher,
@@ -178,6 +180,7 @@ constructor(
                         statusBarRegionSamplingViewModelFactory =
                             statusBarRegionSamplingViewModelFactory,
                         onViewCreated = andThen,
+                        avControlsPopupViewModelFactory = avControlsPopupViewModelFactory,
                         modifier = Modifier.sysUiResTagContainer(),
                     )
                 }
@@ -216,6 +219,7 @@ fun StatusBarRoot(
     mediaHost: MediaHost,
     mediaViewModelFactory: MediaViewModel.Factory,
     statusBarRegionSamplingViewModelFactory: StatusBarRegionSamplingViewModel.Factory,
+    avControlsPopupViewModelFactory: AvControlsPopupViewModel.Factory,
     onViewCreated: (ViewGroup) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -259,6 +263,7 @@ fun StatusBarRoot(
             mediaHierarchyManager = mediaHierarchyManager,
             mediaViewModelFactory = mediaViewModelFactory,
             mediaHost = mediaHost,
+            avControlsPopupViewModelFactory = avControlsPopupViewModelFactory,
             iconViewStore = iconViewStore,
             modifier =
                 modifier.forwardDragAndSwipeToShadeRootView(shadeWindowRootView, touchSlop) {
@@ -333,7 +338,7 @@ fun StatusBarRoot(
                             )
 
                             setContent {
-                                StatusBarPopupChipsContainer(
+                                QuickActionChipsContainer(
                                     chips = statusBarViewModel.popupChips,
                                     mediaViewModelFactory = mediaViewModelFactory,
                                     mediaHost = mediaHost,
@@ -341,6 +346,8 @@ fun StatusBarRoot(
                                         mediaHierarchyManager.isMediaControlPopupShowing =
                                             popupShowing
                                     },
+                                    avControlsPopupViewModelFactory =
+                                        avControlsPopupViewModelFactory,
                                 )
                             }
                         }

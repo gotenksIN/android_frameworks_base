@@ -23,6 +23,8 @@ import android.content.Context
 import android.content.applicationContext
 import android.os.fakeExecutorHandler
 import com.android.systemui.SysuiTestCase
+import com.android.systemui.activity.data.repository.activityIntentRepository
+import com.android.systemui.activity.data.repository.fake
 import com.android.systemui.biometrics.data.repository.fingerprintPropertyRepository
 import com.android.systemui.bouncer.data.repository.bouncerRepository
 import com.android.systemui.bouncer.data.repository.fakeKeyguardBouncerRepository
@@ -80,6 +82,7 @@ import com.android.systemui.shade.data.repository.fakeShadeDisplaysRepository
 import com.android.systemui.shade.data.repository.shadeConfigRepository
 import com.android.systemui.shade.data.repository.shadeDialogContextInteractor
 import com.android.systemui.shade.data.repository.shadeRepository
+import com.android.systemui.shade.domain.interactor.shadeDisplaysInteractor
 import com.android.systemui.shade.domain.interactor.shadeInteractor
 import com.android.systemui.shade.domain.interactor.shadeLayoutParams
 import com.android.systemui.shade.domain.interactor.shadeModeInteractor
@@ -153,6 +156,7 @@ class KosmosJavaAdapter() {
     val testScope by lazy { kosmos.testScope }
     val fakeExecutor by lazy { kosmos.fakeExecutor }
     val fakeExecutorHandler by lazy { kosmos.fakeExecutorHandler }
+    val activityIntentRepository by lazy { kosmos.activityIntentRepository.fake }
     val configurationController by lazy { kosmos.configurationController }
     val configurationRepository by lazy { kosmos.fakeConfigurationRepository }
     val configurationInteractor by lazy { kosmos.configurationInteractor }
@@ -206,6 +210,7 @@ class KosmosJavaAdapter() {
     val brightnessMirrorShowingRepository by lazy { kosmos.brightnessMirrorShowingRepository }
     val qsLongPressEffect by lazy { kosmos.qsLongPressEffect }
     val shadeController by lazy { kosmos.shadeController }
+    val shadeDisplaysInteractor by lazy { kosmos.shadeDisplaysInteractor }
     val shadeRepository by lazy { kosmos.shadeRepository }
     val shadeConfigRepository by lazy { kosmos.shadeConfigRepository }
     val shadeInteractor by lazy { kosmos.shadeInteractor }

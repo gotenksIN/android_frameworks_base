@@ -20,6 +20,7 @@ import static com.android.launcher3.icons.IconNormalizer.ICON_VISIBLE_AREA_FACTO
 
 import android.content.Context;
 import android.content.res.Resources;
+import android.content.res.TypedArray;
 import android.graphics.Insets;
 import android.graphics.PointF;
 import android.graphics.Rect;
@@ -29,6 +30,7 @@ import android.view.WindowManager;
 import androidx.annotation.NonNull;
 import androidx.annotation.VisibleForTesting;
 
+import com.android.internal.policy.ScreenDecorationsUtils;
 import com.android.wm.shell.Flags;
 import com.android.wm.shell.R;
 import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
@@ -107,6 +109,7 @@ public class BubblePositioner implements BubbleDropTargetBoundsProvider {
     private int mBarExpViewDropTargetPaddingBottom;
     private int mBarDropTargetWidth;
     private int mBarDropTargetHeight;
+    private float mCornerRadius;
 
     private PointF mRestingStackPosition;
 
@@ -172,6 +175,21 @@ public class BubblePositioner implements BubbleDropTargetBoundsProvider {
         mBubbleOffscreenAmount = res.getDimensionPixelSize(R.dimen.bubble_stack_offscreen);
         mStackOffset = res.getDimensionPixelSize(R.dimen.bubble_stack_offset);
         mBubbleElevation = res.getDimensionPixelSize(R.dimen.bubble_elevation);
+
+        if (mShowingInBubbleBar) {
+            mCornerRadius = res.getDimensionPixelSize(
+                    R.dimen.bubble_bar_expanded_view_corner_radius);
+        } else {
+            if (ScreenDecorationsUtils.supportsRoundedCornersOnWindows(res)) {
+                final TypedArray ta = mContext.obtainStyledAttributes(new int[]{
+                        android.R.attr.dialogCornerRadius});
+                mCornerRadius = ta.getDimensionPixelSize(0, 0);
+                ta.recycle();
+            } else {
+                mCornerRadius = 0;
+            }
+        }
+
         mExpandedViewBubbleBarWidth = Math.min(
                 res.getDimensionPixelSize(R.dimen.bubble_bar_expanded_view_width),
                 mPositionRect.width() - 2 * mExpandedViewPadding
@@ -339,6 +357,11 @@ public class BubblePositioner implements BubbleDropTargetBoundsProvider {
     /** Size of the visible (non-overlapping) part of the pointer. */
     public int getPointerSize() {
         return mPointerHeight - mPointerOverlap;
+    }
+
+    /** Returns the corner radius of the expanded view. */
+    public float getCornerRadius() {
+        return mCornerRadius;
     }
 
     /** The maximum number of bubbles that can be displayed comfortably on screen. */
@@ -859,9 +882,8 @@ public class BubblePositioner implements BubbleDropTargetBoundsProvider {
                 screen.bottom);
     }
 
-
     /**
-     * Populates {@param out} with the rest bounds of an expanded bubble on screen.
+     * Populates {@code out} with the rest bounds of an expanded bubble on screen.
      * <p>
      * TODO: b/417226976
      *  Never used for the overflow or for floating mode on large screen -- bubble bar & phone

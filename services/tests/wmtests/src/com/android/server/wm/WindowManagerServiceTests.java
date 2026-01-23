@@ -112,6 +112,7 @@ import android.view.InputDevice;
 import android.view.InsetsSourceControl;
 import android.view.InsetsState;
 import android.view.SurfaceControl;
+import android.view.SurfaceControlViewHost;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowManager;
@@ -1884,7 +1885,6 @@ public class WindowManagerServiceTests extends WindowTestsBase {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_PERSISTING_DISPLAY_SIZE_FOR_CONNECTED_DISPLAYS)
     public void setForcedDisplayDensityRatio_forExternalDisplay_setsRatio() {
         final DisplayInfo displayInfo = new DisplayInfo(mDisplayInfo);
         displayInfo.displayId = DEFAULT_DISPLAY + 1;
@@ -1902,7 +1902,6 @@ public class WindowManagerServiceTests extends WindowTestsBase {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_PERSISTING_DISPLAY_SIZE_FOR_CONNECTED_DISPLAYS)
     public void setForcedDisplayDensityRatio_forInternalDisplay_setsRatio() {
         final DisplayInfo displayInfo = new DisplayInfo(mDisplayInfo);
         displayInfo.displayId = DEFAULT_DISPLAY + 1;
@@ -1920,7 +1919,6 @@ public class WindowManagerServiceTests extends WindowTestsBase {
 
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_PERSISTING_DISPLAY_SIZE_FOR_CONNECTED_DISPLAYS)
     public void setForcedDisplayDensity_forExternalDisplay_resetsRatio() {
         final DisplayInfo displayInfo = new DisplayInfo(mDisplayInfo);
         displayInfo.displayId = DEFAULT_DISPLAY + 1;
@@ -1939,7 +1937,6 @@ public class WindowManagerServiceTests extends WindowTestsBase {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_PERSISTING_DISPLAY_SIZE_FOR_CONNECTED_DISPLAYS)
     public void clearForcedDisplayDensityRatio_clearsRatioAndDensity() {
         final DisplayInfo displayInfo = new DisplayInfo(mDisplayInfo);
         displayInfo.displayId = DEFAULT_DISPLAY + 1;
@@ -2103,12 +2100,207 @@ public class WindowManagerServiceTests extends WindowTestsBase {
         doNothing().when(mWm.mRoot).forAllDisplayPolicies(DisplayPolicy::systemReady);
         spyOn(mWm.mSnapshotController);
         doNothing().when(mWm.mSnapshotController).systemReady();
-        spyOn(mWm.mAppCompatConfiguration);
-        doNothing().when(mWm.mAppCompatConfiguration).onSystemReady();
 
         mWm.systemReady();
 
         verify(appLockController).systemReady();
+    }
+
+    @Test
+    @EnableFlags({android.security.Flags.FLAG_APP_LOCK_APIS,
+            android.security.Flags.FLAG_APP_LOCK_CORE})
+    public void testIsPackageLockedByAppLock() {
+        final AppLockController appLockController = mWm.mAppLockController;
+        spyOn(appLockController);
+        doReturn(true).when(appLockController).isPackageLockedByAppLockLocked(TEST_PACKAGE_1,
+                TEST_USER_ID_1);
+        doReturn(true).when(appLockController).isPackageLockedByAppLockLocked(TEST_PACKAGE_2,
+                TEST_USER_ID_2);
+        doReturn(false).when(appLockController).isPackageLockedByAppLockLocked(TEST_PACKAGE_3,
+                TEST_USER_ID_1);
+
+        assertThat(mWm.isPackageLockedByAppLockLocked(TEST_PACKAGE_1, TEST_USER_ID_1)).isTrue();
+        assertThat(mWm.isPackageLockedByAppLockLocked(TEST_PACKAGE_2, TEST_USER_ID_2)).isTrue();
+        assertThat(mWm.isPackageLockedByAppLockLocked(TEST_PACKAGE_3, TEST_USER_ID_1)).isFalse();
+    }
+
+    @EnableFlags({android.security.Flags.FLAG_APP_LOCK_APIS,
+            android.security.Flags.FLAG_APP_LOCK_CORE})
+    @Test
+    public void testAddOverlayWindowBySystem_packageIsLockedByAppLock_showOnWindowReturnsTrue() {
+        internalTestAddOverlayWindowForAppLock(true /* isPackageLockedByAppLock */,
+                true /* isWindowCreatedBySystem */);
+    }
+
+    @EnableFlags({android.security.Flags.FLAG_APP_LOCK_APIS,
+            android.security.Flags.FLAG_APP_LOCK_CORE})
+    @Test
+    public void testAddOverlayWindowBySystem_packageIsNotLockedByAppLock_showOnWindowReturnsTrue() {
+        internalTestAddOverlayWindowForAppLock(false /* isPackageLockedByAppLock */,
+                true /* isWindowCreatedBySystem */);
+    }
+
+    @EnableFlags({android.security.Flags.FLAG_APP_LOCK_APIS,
+            android.security.Flags.FLAG_APP_LOCK_CORE})
+    @Test
+    public void testAddOverlayWindowByApp_packageIsLockedByAppLock_showOnWindowReturnsFalse() {
+        internalTestAddOverlayWindowForAppLock(true /* isPackageLockedByAppLock */,
+                false /* isWindowCreatedBySystem */);
+    }
+
+    @EnableFlags({android.security.Flags.FLAG_APP_LOCK_APIS,
+            android.security.Flags.FLAG_APP_LOCK_CORE})
+    @Test
+    public void testAddOverlayWindowByApp_packageIsNotLockedByAppLock_showOnWindowReturnsTrue() {
+        internalTestAddOverlayWindowForAppLock(false /* isPackageLockedByAppLock */,
+                false /* isWindowCreatedBySystem */);
+    }
+
+    private void internalTestAddOverlayWindowForAppLock(boolean isPackageLockedByAppLock,
+            boolean isWindowCreatedBySystem) {
+        spyOn(mWm.mContext);
+        doReturn(isWindowCreatedBySystem ? PackageManager.PERMISSION_GRANTED
+                : PackageManager.PERMISSION_DENIED).when(mWm.mContext).checkCallingOrSelfPermission(
+                eq(android.Manifest.permission.INTERNAL_SYSTEM_WINDOW));
+
+        final Session session = createTestSession(mAtm, 1234 /* pid */, 10123 /* uid */);
+        final IWindow client = new TestIWindow();
+        final WindowManager.LayoutParams params = new WindowManager.LayoutParams(
+                TYPE_APPLICATION_OVERLAY);
+        params.setTitle("overlayWindowLockedByAppLock: " + isPackageLockedByAppLock);
+        params.packageName = DEFAULT_COMPONENT_PACKAGE_NAME;
+        // Simulate package's locked by App Lock state.
+        final AppLockController appLockController = mWm.mAppLockController;
+        spyOn(appLockController);
+        doReturn(isPackageLockedByAppLock).when(appLockController).isPackageLockedByAppLockLocked(
+                DEFAULT_COMPONENT_PACKAGE_NAME, TEST_USER_ID_1);
+
+        final int addWindowRes = mWm.addWindow(session, client, params, View.VISIBLE,
+                DEFAULT_DISPLAY, TEST_USER_ID_1, WindowInsets.Type.defaultVisible(),
+                null /* outInputChannel */, new WindowRelayoutResult());
+
+        assertThat(addWindowRes).isAtLeast(WindowManagerGlobal.ADD_OKAY);
+        final WindowState win = mWm.mWindowMap.get(client.asBinder());
+        assertThat(win).isNotNull();
+        final boolean hideRes = win.hide(true /* doAnimation */, true /* requestAnim */);
+        final boolean showRes = win.show(true /* doAnimation */, true /* requestAnim */);
+        if (isWindowCreatedBySystem || !isPackageLockedByAppLock) {
+            assertThat(hideRes).isTrue();
+            assertThat(showRes).isTrue();
+        } else {
+            // Hiding and showing the window should not work if the package is locked by App Lock
+            // because the window is already hidden and can't be shown.
+            assertThat(hideRes).isFalse();
+            assertThat(showRes).isFalse();
+        }
+    }
+
+    @Test
+    public void testAddTrustedTaskOverlay_nullOverlay_throwsException() {
+        WindowManagerInternal wmInternal = LocalServices.getService(WindowManagerInternal.class);
+        final Task task = createTask(mDisplayContent);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> wmInternal.addTrustedTaskOverlay(task.mTaskId, null));
+    }
+
+    @Test
+    public void testAddTrustedTaskOverlay_invalidSurfaceControl_throwsException() {
+        WindowManagerInternal wmInternal = LocalServices.getService(WindowManagerInternal.class);
+        final Task task = createTask(mDisplayContent);
+        SurfaceControlViewHost.SurfacePackage overlay =
+                mock(SurfaceControlViewHost.SurfacePackage.class);
+        SurfaceControl sc = mock(SurfaceControl.class);
+        when(overlay.getSurfaceControl()).thenReturn(sc);
+        when(sc.isValid()).thenReturn(false);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> wmInternal.addTrustedTaskOverlay(task.mTaskId, overlay));
+    }
+
+    @Test
+    public void testAddTrustedTaskOverlay_invalidTaskId_throwsException() {
+        WindowManagerInternal wmInternal = LocalServices.getService(WindowManagerInternal.class);
+        SurfaceControlViewHost.SurfacePackage overlay =
+                mock(SurfaceControlViewHost.SurfacePackage.class);
+        SurfaceControl sc = mock(SurfaceControl.class);
+        when(overlay.getSurfaceControl()).thenReturn(sc);
+        when(sc.isValid()).thenReturn(true);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> wmInternal.addTrustedTaskOverlay(9999, overlay));
+    }
+
+    @Test
+    public void testAddTrustedTaskOverlay_leafTask() {
+        WindowManagerInternal wmInternal = LocalServices.getService(WindowManagerInternal.class);
+        final Task rootTask = createTask(mDisplayContent);
+        final Task childTask = createTaskInRootTask(rootTask, 0);
+        spyOn(childTask);
+
+        SurfaceControlViewHost.SurfacePackage overlay =
+                mock(SurfaceControlViewHost.SurfacePackage.class);
+        SurfaceControl sc = mock(SurfaceControl.class);
+        when(overlay.getSurfaceControl()).thenReturn(sc);
+        when(sc.isValid()).thenReturn(true);
+
+        wmInternal.addTrustedTaskOverlay(childTask.mTaskId, overlay);
+
+        verify(childTask).addTrustedOverlay(eq(overlay), any());
+    }
+
+    @Test
+    public void testRemoveTrustedTaskOverlay_nullOverlay_throwsException() {
+        WindowManagerInternal wmInternal = LocalServices.getService(WindowManagerInternal.class);
+        final Task task = createTask(mDisplayContent);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> wmInternal.removeTrustedTaskOverlay(task.mTaskId, null));
+    }
+
+    @Test
+    public void testRemoveTrustedTaskOverlay_invalidSurfaceControl_throwsException() {
+        WindowManagerInternal wmInternal = LocalServices.getService(WindowManagerInternal.class);
+        final Task task = createTask(mDisplayContent);
+        SurfaceControlViewHost.SurfacePackage overlay =
+                mock(SurfaceControlViewHost.SurfacePackage.class);
+        SurfaceControl sc = mock(SurfaceControl.class);
+        when(overlay.getSurfaceControl()).thenReturn(sc);
+        when(sc.isValid()).thenReturn(false);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> wmInternal.removeTrustedTaskOverlay(task.mTaskId, overlay));
+    }
+
+    @Test
+    public void testRemoveTrustedTaskOverlay_invalidTaskId_throwsException() {
+        WindowManagerInternal wmInternal = LocalServices.getService(WindowManagerInternal.class);
+        SurfaceControlViewHost.SurfacePackage overlay =
+                mock(SurfaceControlViewHost.SurfacePackage.class);
+        SurfaceControl sc = mock(SurfaceControl.class);
+        when(overlay.getSurfaceControl()).thenReturn(sc);
+        when(sc.isValid()).thenReturn(true);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> wmInternal.removeTrustedTaskOverlay(9999, overlay));
+    }
+
+    @Test
+    public void testRemoveTrustedTaskOverlay_leafTask() {
+        WindowManagerInternal wmInternal = LocalServices.getService(WindowManagerInternal.class);
+        final Task rootTask = createTask(mDisplayContent);
+        final Task childTask = createTaskInRootTask(rootTask, 0);
+        spyOn(childTask);
+
+        SurfaceControlViewHost.SurfacePackage overlay =
+                mock(SurfaceControlViewHost.SurfacePackage.class);
+        SurfaceControl sc = mock(SurfaceControl.class);
+        when(overlay.getSurfaceControl()).thenReturn(sc);
+        when(sc.isValid()).thenReturn(true);
+
+        wmInternal.removeTrustedTaskOverlay(childTask.mTaskId, overlay);
+
+        verify(childTask).removeTrustedOverlay(overlay);
     }
 
     /**

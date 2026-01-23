@@ -16,11 +16,10 @@
 
 package com.android.systemui.statusbar.notification.row;
 
-import static android.app.Flags.FLAG_NOTIFICATIONS_REDESIGN_TEMPLATES;
 import static android.app.Notification.FLAG_FSI_REQUESTED_BUT_DENIED;
 import static android.app.NotificationChannel.NEWS_ID;
 
-import static com.android.systemui.log.LogAssertKt.assertRunnableLogsWtf;
+import static com.android.systemui.Flags.FLAG_DEFAULT_HUN_EXPANSION;
 
 import static com.google.common.truth.Truth.assertThat;
 
@@ -67,19 +66,14 @@ import com.android.internal.R;
 import com.android.internal.widget.CachingIconView;
 import com.android.systemui.SysuiTestCase;
 import com.android.systemui.SysuiTestableContext;
-import com.android.systemui.flags.FakeFeatureFlagsClassic;
-import com.android.systemui.flags.Flags;
 import com.android.systemui.kosmos.KosmosJavaAdapter;
 import com.android.systemui.plugins.statusbar.NotificationMenuRowPlugin;
 import com.android.systemui.plugins.statusbar.StatusBarStateController;
 import com.android.systemui.statusbar.SysuiStatusBarStateController;
 import com.android.systemui.statusbar.notification.AboveShelfChangedListener;
 import com.android.systemui.statusbar.notification.SourceType;
-import com.android.systemui.statusbar.notification.collection.BundleEntryAdapter;
 import com.android.systemui.statusbar.notification.collection.BundleSpec;
 import com.android.systemui.statusbar.notification.collection.NotificationEntry;
-import com.android.systemui.statusbar.notification.collection.NotificationEntryBuilder;
-import com.android.systemui.statusbar.notification.collection.PipelineEntry;
 import com.android.systemui.statusbar.notification.headsup.PinnedStatus;
 import com.android.systemui.statusbar.notification.icon.IconPack;
 import com.android.systemui.statusbar.notification.row.ExpandableView.OnHeightChangedListener;
@@ -106,7 +100,6 @@ import java.util.function.Consumer;
 @RunWithLooper
 public class ExpandableNotificationRowTest extends SysuiTestCase {
 
-    private final FakeFeatureFlagsClassic mFeatureFlags = new FakeFeatureFlagsClassic();
     private KosmosJavaAdapter mKosmos;
     @Rule public MockitoRule mockito = MockitoJUnit.rule();
 
@@ -205,7 +198,6 @@ public class ExpandableNotificationRowTest extends SysuiTestCase {
     }
 
     @Test
-    @EnableFlags(FLAG_NOTIFICATIONS_REDESIGN_TEMPLATES)
     public void setSensitive_doesNothingIfCalledAgain() throws Exception {
         ExpandableNotificationRow row = mKosmos.createRow();
         measureAndLayout(row);
@@ -230,7 +222,6 @@ public class ExpandableNotificationRowTest extends SysuiTestCase {
     }
 
     @Test
-    @EnableFlags(FLAG_NOTIFICATIONS_REDESIGN_TEMPLATES)
     public void testSetSensitiveOnNotifRowUpdatesLayout() throws Exception {
         // GIVEN a sensitive notification row that's currently redacted
         ExpandableNotificationRow row = mKosmos.createRow();
@@ -249,30 +240,6 @@ public class ExpandableNotificationRowTest extends SysuiTestCase {
         // VERIFY that the layout is updated
         assertThat(row.getShowingLayout()).isSameInstanceAs(row.getPrivateLayout());
         verify(mockPrivateLayout).requestSelectLayout(eq(true));
-    }
-
-    @Test
-    @DisableFlags(FLAG_NOTIFICATIONS_REDESIGN_TEMPLATES)
-    public void testSetSensitiveOnNotifRowNotifiesOfHeightChange() throws Exception {
-        // GIVEN a sensitive notification row that's currently redacted
-        ExpandableNotificationRow row = mKosmos.createRow();
-        measureAndLayout(row);
-        row.setHideSensitiveForIntrinsicHeight(true);
-        row.setSensitive(true, true);
-        assertThat(row.getShowingLayout()).isSameInstanceAs(row.getPublicLayout());
-        assertThat(row.getIntrinsicHeight()).isGreaterThan(0);
-
-        // GIVEN that the row has a height change listener
-        OnHeightChangedListener listener = mock(OnHeightChangedListener.class);
-        row.setOnHeightChangedListener(listener);
-
-        // WHEN the row is set to no longer be sensitive
-        row.setSensitive(false, true);
-
-        // VERIFY that the height change listener is invoked
-        assertThat(row.getShowingLayout()).isSameInstanceAs(row.getPrivateLayout());
-        assertThat(row.getIntrinsicHeight()).isGreaterThan(0);
-        verify(listener).onHeightChanged(eq(row), eq(true), anyString());
     }
 
     @Test
@@ -1235,6 +1202,52 @@ public class ExpandableNotificationRowTest extends SysuiTestCase {
         assertThat(row.areChildrenExpanded()).isFalse();
         assertThat(row.getAttachedChildren().get(0).isExpanded()).isFalse();
     }
+
+    @Test
+    @EnableFlags(FLAG_DEFAULT_HUN_EXPANSION)
+    public void setPinned_expands_whenDefaultHunExpansionEnabled() {
+        mContext.getOrCreateTestableResources().addOverride(
+                com.android.systemui.res.R.bool.config_enableHUNExpansion, true);
+
+        ExpandableNotificationRow row = mKosmos.createRow();
+        row.setPinnedStatus(PinnedStatus.PinnedBySystem);
+
+        assertTrue("Row should be expanded when pinned and flag and config are enabled",
+                row.isPinnedAndExpanded());
+        assertTrue("Row should be user expanded when pinned and flag and config are enabled",
+                row.isUserExpanded());
+    }
+
+    @Test
+    @EnableFlags(FLAG_DEFAULT_HUN_EXPANSION)
+    public void setPinned_doesNotExpand_whenDefaultHunExpansionConfigIsFalse() {
+        mContext.getOrCreateTestableResources().addOverride(
+                com.android.systemui.res.R.bool.config_enableHUNExpansion, false);
+
+        ExpandableNotificationRow row = mKosmos.createRow();
+        row.setPinnedStatus(PinnedStatus.PinnedBySystem);
+
+        assertFalse("Row should not be expanded when pinned and config is false",
+                row.isPinnedAndExpanded());
+        assertFalse("Row should not be user expanded when config is false",
+                row.isUserExpanded());
+    }
+
+    @Test
+    @DisableFlags(FLAG_DEFAULT_HUN_EXPANSION)
+    public void setPinned_doesNotExpand_whenDefaultHunExpansionFlagIsFalse() {
+        mContext.getOrCreateTestableResources().addOverride(
+                com.android.systemui.res.R.bool.config_enableHUNExpansion, true);
+
+        ExpandableNotificationRow row = mKosmos.createRow();
+        row.setPinnedStatus(PinnedStatus.PinnedBySystem);
+
+        assertFalse("Row should not be expanded when pinned and flag is false",
+                row.isPinnedAndExpanded());
+        assertFalse("Row should not be user expanded when flag is false",
+                row.isUserExpanded());
+    }
+
 
     private void setDrawableIconsInImageView(CachingIconView icon, Drawable iconDrawable,
             Drawable rightIconDrawable) {

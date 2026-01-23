@@ -17,8 +17,8 @@
 package com.android.systemui.qs.tiles.impl.wifi.domain.interactor
 
 import android.os.UserHandle
-import android.platform.test.annotations.RequiresFlagsDisabled
-import android.platform.test.annotations.RequiresFlagsEnabled
+import android.platform.test.annotations.DisableFlags
+import android.platform.test.annotations.EnableFlags
 import android.platform.test.flag.junit.CheckFlagsRule
 import android.platform.test.flag.junit.DeviceFlagsValueProvider
 import android.platform.test.flag.junit.FlagsParameterization
@@ -185,7 +185,7 @@ class WifiTileDataInteractorTest(flags: FlagsParameterization) : SysuiTestCase()
         }
 
     @Test
-    @RequiresFlagsEnabled(QsSplitInternetTile.FLAG_NAME)
+    @EnableFlags(QsSplitInternetTile.FLAG_NAME)
     fun availability_flagEnabled_isTrue() =
         kosmos.runTest {
             assertThat(QsSplitInternetTile.isEnabled).isTrue()
@@ -194,7 +194,7 @@ class WifiTileDataInteractorTest(flags: FlagsParameterization) : SysuiTestCase()
         }
 
     @Test
-    @RequiresFlagsDisabled(QsSplitInternetTile.FLAG_NAME)
+    @DisableFlags(QsSplitInternetTile.FLAG_NAME)
     fun availability_flagDisabled_isFalse() =
         kosmos.runTest {
             assertThat(QsSplitInternetTile.isEnabled).isFalse()

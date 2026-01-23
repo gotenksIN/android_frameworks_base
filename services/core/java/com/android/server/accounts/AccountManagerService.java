@@ -74,7 +74,6 @@ import android.content.pm.ResolveInfo;
 import android.content.pm.Signature;
 import android.content.pm.SigningDetails.CertCapabilities;
 import android.content.pm.UserInfo;
-import android.database.Cursor;
 import android.database.sqlite.SQLiteCantOpenDatabaseException;
 import android.database.sqlite.SQLiteException;
 import android.database.sqlite.SQLiteFullException;
@@ -1125,7 +1124,18 @@ public class AccountManagerService
         intent.setPackage(packageName);
         intent.putExtra(AccountManager.KEY_ACCOUNT_NAME, account.name);
         intent.putExtra(AccountManager.KEY_ACCOUNT_TYPE, account.type);
-        mContext.sendBroadcastAsUser(intent, new UserHandle(userId));
+        final Bundle options;
+        if (Flags.coalesceAccountRemovedBroadcast()) {
+            options = BroadcastOptions.makeBasic()
+                    .setDeliveryGroupPolicy(BroadcastOptions.DELIVERY_GROUP_POLICY_MOST_RECENT)
+                    .setDeliveryGroupMatchingKey(AccountManager.ACTION_ACCOUNT_REMOVED,
+                            account.name + "/" + account.type)
+                    .toBundle();
+        } else {
+            options = null;
+        }
+        mContext.sendBroadcastAsUser(intent, new UserHandle(userId),
+                null /* receiverPermission */, options);
     }
 
     @Override
@@ -4641,14 +4651,18 @@ public class AccountManagerService
         for (int userId : userIds) {
             UserAccounts userAccounts = getUserAccounts(userId);
             if (userAccounts == null) continue;
-            Account[] accounts = getAccountsFromCache(
-                    userAccounts,
-                    null /* type */,
-                    Binder.getCallingUid(),
-                    "android"/* packageName */,
-                    false /* include managed not visible*/);
-            for (Account account : accounts) {
-                runningAccounts.add(new AccountAndUser(account, userId));
+            try {
+                Account[] accounts = getAccountsFromCache(
+                        userAccounts,
+                        null /* type */,
+                        Binder.getCallingUid(),
+                        "android"/* packageName */,
+                        false /* include managed not visible*/);
+                for (Account account : accounts) {
+                    runningAccounts.add(new AccountAndUser(account, userId));
+                }
+            } catch (SQLiteException e) {
+                Log.w(TAG, "Could not get accounts for user " + userId, e);
             }
         }
 

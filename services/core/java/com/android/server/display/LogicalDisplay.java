@@ -46,6 +46,7 @@ import android.view.SurfaceControl;
 import com.android.server.display.feature.flags.Flags;
 import com.android.server.display.layout.Layout;
 import com.android.server.display.mode.DisplayModeDirector;
+import com.android.server.display.utils.DebugTransactionDetails;
 import com.android.server.display.utils.DebugUtils;
 import com.android.server.wm.utils.InsetUtils;
 
@@ -230,18 +231,16 @@ final class LogicalDisplay {
 
     private final boolean mSyncedResolutionSwitchEnabled;
 
-    private final boolean mSizeOverrideEnabled;
-
     private boolean mCanHostTasks;
     private final CopyOnWriteSparseArray<CachedDisplayInfo> mDisplayInfoCache;
 
     LogicalDisplay(int displayId, int layerStack, DisplayDevice primaryDisplayDevice,
             CopyOnWriteSparseArray<CachedDisplayInfo> displayInfoCache) {
-        this(displayId, layerStack, primaryDisplayDevice, false, false, displayInfoCache);
+        this(displayId, layerStack, primaryDisplayDevice, false, displayInfoCache);
     }
 
     LogicalDisplay(int displayId, int layerStack, DisplayDevice primaryDisplayDevice,
-            boolean isSyncedResolutionSwitchEnabled, boolean sizeOverrideEnabled,
+            boolean isSyncedResolutionSwitchEnabled,
             CopyOnWriteSparseArray<CachedDisplayInfo> displayInfoCache) {
         mDisplayId = displayId;
         mLayerStack = layerStack;
@@ -254,7 +253,6 @@ final class LogicalDisplay {
         mPowerThrottlingDataId = DisplayDeviceConfig.DEFAULT_ID;
         mBaseDisplayInfo.thermalBrightnessThrottlingDataId = mThermalBrightnessThrottlingDataId;
         mSyncedResolutionSwitchEnabled = isSyncedResolutionSwitchEnabled;
-        mSizeOverrideEnabled = sizeOverrideEnabled;
         mDisplayInfoCache = displayInfoCache;
 
         // No need to initialize mCanHostTasks here; it's handled in
@@ -535,7 +533,7 @@ final class LogicalDisplay {
             float currentYDpi = deviceInfo.yDpi;
 
             Display.Mode sizeOverrideMode = getUserPreferredModeForSizeOverrideLocked(deviceInfo);
-            if (sizeOverrideMode != null && mSizeOverrideEnabled) {
+            if (sizeOverrideMode != null) {
                 currentWidth = sizeOverrideMode.getPhysicalWidth();
                 currentHeight = sizeOverrideMode.getPhysicalHeight();
                 currentXDpi = currentXDpi * (currentWidth / (float) deviceInfo.width);
@@ -886,31 +884,28 @@ final class LogicalDisplay {
 
         mDisplayPosition.set(mTempDisplayRect.left, mTempDisplayRect.top);
 
+        final DebugTransactionDetails debugTransactionDetails = DEBUG ?
+                new DebugTransactionDetails() : null;
+
         if (mSyncedResolutionSwitchEnabled || displayDeviceInfo.type == Display.TYPE_VIRTUAL) {
-            if (DEBUG) {
-                Slog.d(TAG, "Configuring Display Size. width=" + displayLogicalWidth
-                        + " height=" + displayLogicalHeight);
-            }
-            device.configureDisplaySizeLocked(t);
+            device.configureDisplaySizeLocked(t, debugTransactionDetails);
         }
+        device.setProjectionLocked(t, orientation, mTempLayerStackRect, mTempDisplayRect,
+                debugTransactionDetails);
+
         if (DEBUG) {
-            Slog.d(TAG, "Setting Projection. orientation=" + orientation
-                    + " mTempLayerStackRect=" + mTempLayerStackRect + " mTempDisplayRect="
-                    + mTempDisplayRect + ".");
-        }
-        device.setProjectionLocked(t, orientation, mTempLayerStackRect, mTempDisplayRect);
-        if (DEBUG) {
-            final int requestedLogicalWidth = displayLogicalWidth;
-            final int requestedLogicalHeight = displayLogicalHeight;
-            final int requestedOrientation = orientation;
-            final Rect requestedDisplayRect = new Rect(mTempDisplayRect);
-            final Rect requestedLayerStackRect = new Rect(mTempLayerStackRect);
+            final long transactionId = t.getId();
+            final String displayDescription = "[Display " + displayDeviceInfo.uniqueId + " " +
+                    Display.typeToString(displayInfo.type) + "]";
+
+            Slog.d(TAG, displayDescription + " configureDisplayLocked: "
+                    + "populated transaction " + debugTransactionDetails + ", "
+                    + "txId = " + transactionId);
+
             t.addTransactionCommittedListener(executor, () -> {
-                Slog.d(TAG, "Committed transaction for display configuration - width="
-                        + requestedLogicalWidth + " height=" + requestedLogicalHeight
-                        + " orientation=" + requestedOrientation + " mTempLayerStackRect="
-                        + requestedLayerStackRect + " mTempDisplayRect=" + requestedDisplayRect
-                        + ".");
+                Slog.d(TAG, displayDescription + " Committed transaction for "
+                        + "display configuration: " + debugTransactionDetails + ", "
+                        + "txId = " + transactionId);
             });
         }
         device.configureSurfaceLocked(t);
@@ -1128,6 +1123,8 @@ final class LogicalDisplay {
         }
 
         // The display doesn't allow dynamic content mode switch can always host tasks.
+        // TODO(b/466914512): Remove this once we have a better way to make sure activities can
+        // always be launched on the overlay displays used in WM CTS tests.
         if ((mPrimaryDisplayDevice.getDisplayDeviceInfoLocked().flags
                 & FLAG_ALLOWS_CONTENT_MODE_SWITCH) == 0) {
             return true;

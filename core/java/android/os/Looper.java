@@ -18,7 +18,13 @@ package android.os;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.app.compat.CompatChanges;
+import android.compat.annotation.ChangeId;
+import android.compat.annotation.EnabledSince;
+import android.compat.annotation.Overridable;
 import android.compat.annotation.UnsupportedAppUsage;
+import android.ravenwood.annotation.RavenwoodRedirect;
+import android.ravenwood.annotation.RavenwoodRedirectionClass;
 import android.util.Log;
 import android.util.Printer;
 import android.util.Slog;
@@ -57,6 +63,7 @@ import java.util.Objects;
   *  }</pre>
   */
 @android.ravenwood.annotation.RavenwoodKeepWholeClass
+@RavenwoodRedirectionClass("Looper_ravenwood")
 public final class Looper {
     /*
      * API Implementation Note:
@@ -108,6 +115,20 @@ public final class Looper {
      * True if a message delivery takes longer than {@link #mSlowDeliveryThresholdMs}.
      */
     private boolean mSlowDeliveryDetected;
+
+    /**
+     * Whether Looper clears Thread.interrupted() between tasks.
+     *
+     * When enabled, tasks don't propagate and pollute each other's interrupted state.
+     * When disabled, the backwards-compatible behavior is kept,
+     * preserving the legacy behavior and any associated app bugs.
+     *
+     * @hide
+     */
+    @ChangeId
+    @EnabledSince(targetSdkVersion = android.os.Build.VERSION_CODES.CINNAMON_BUN)
+    @Overridable // Can be overridden on user builds
+    public static final long LOOPER_CLEARS_THREAD_INTERRUPTED = 458413887L;
 
     /** Initialize the current thread as a looper.
       * This gives you a chance to create handlers that then reference
@@ -184,6 +205,13 @@ public final class Looper {
      */
     public static void setObserver(@Nullable Observer observer) {
         sObserver = observer;
+    }
+
+    // On Ravenwood, compat-IDs may not be initialized when it's called,
+    // so we have a separate check in Looper_ravenwood.
+    @RavenwoodRedirect(bug = 470164731)
+    private static boolean isLooperClearsThreadInterruptedEnabled() {
+        return CompatChanges.isChangeEnabled(LOOPER_CLEARS_THREAD_INTERRUPTED);
     }
 
     /**
@@ -267,6 +295,11 @@ public final class Looper {
         long origWorkSource = ThreadLocalWorkSource.setUid(msg.workSourceUid);
         try {
             msg.target.dispatchMessage(msg);
+            if (isLooperClearsThreadInterruptedEnabled()) {
+                // Clear the interrupted state of the thread after dispatching the message.
+                // This ensures that a new message dispatch starts with a clean interrupted state.
+                Thread.interrupted();
+            }
             if (observer != null) {
                 observer.messageDispatched(token, msg);
             }
@@ -370,7 +403,7 @@ public final class Looper {
         }
     }
 
-    @android.ravenwood.annotation.RavenwoodReplace
+    @android.ravenwood.annotation.RavenwoodRedirect
     private static int getThresholdOverride() {
         // Allow overriding the threshold for all processes' main looper with a system prop.
         // e.g. adb shell 'setprop log.looper.any.main.slow 1 && stop && start'
@@ -393,10 +426,6 @@ public final class Looper {
                 + Process.myUid() + "."
                 + Thread.currentThread().getName()
                 + ".slow", -1);
-    }
-
-    private static int getThresholdOverride$ravenwood() {
-        return -1;
     }
 
     private static int getThreadGroup() {

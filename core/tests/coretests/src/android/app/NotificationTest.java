@@ -147,7 +147,7 @@ public class NotificationTest {
     public void setUp() {
         mContext = InstrumentationRegistry.getContext();
         mRemoteViews = new RemoteViews(
-                mContext.getPackageName(), R.layout.notification_template_header);
+                mContext.getPackageName(), R.layout.notification_2025_template_header);
 
         mDefaultColors = new Notification.Colors();
         boolean nightMode = (mContext.getResources().getConfiguration().uiMode
@@ -196,38 +196,6 @@ public class NotificationTest {
     }
 
     @Test
-    public void testHasCompletedProgress_noProgress() {
-        Notification n = new Notification.Builder(mContext).build();
-
-        assertFalse(n.hasCompletedProgress());
-    }
-
-    @Test
-    public void testHasCompletedProgress_complete() {
-        Notification n = new Notification.Builder(mContext)
-                .setProgress(100, 100, true)
-                .build();
-        Notification n2 = new Notification.Builder(mContext)
-                .setProgress(10, 10, false)
-                .build();
-        assertTrue(n.hasCompletedProgress());
-        assertTrue(n2.hasCompletedProgress());
-    }
-
-    @Test
-    public void testHasCompletedProgress_notComplete() {
-        Notification n = new Notification.Builder(mContext)
-                .setProgress(100, 99, true)
-                .build();
-        Notification n2 = new Notification.Builder(mContext)
-                .setProgress(10, 4, false)
-                .build();
-        assertFalse(n.hasCompletedProgress());
-        assertFalse(n2.hasCompletedProgress());
-    }
-
-    @Test
-    @EnableFlags(Flags.FLAG_NOTIFICATION_UPDATE_SHEDDING_ALLOW_PROGRESS_COMPLETION)
     public void getProgressState_indeterminate_ongoing() {
         Notification n1 = new Notification.Builder(mContext)
                 .setProgress(0, 0, true)
@@ -246,14 +214,12 @@ public class NotificationTest {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_NOTIFICATION_UPDATE_SHEDDING_ALLOW_PROGRESS_COMPLETION)
     public void getProgressState_noProgress_none() {
         Notification n = new Notification.Builder(mContext).build();
         assertThat(n.getProgressState()).isEqualTo(Notification.PROGRESS_STATE_NONE);
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_NOTIFICATION_UPDATE_SHEDDING_ALLOW_PROGRESS_COMPLETION)
     public void getProgressState_atMax_complete() {
         Notification n = new Notification.Builder(mContext)
                 .setProgress(10, 10, false)
@@ -976,23 +942,31 @@ public class NotificationTest {
         Icon icon = Icon.createWithBitmap(
                 Bitmap.createBitmap(300, 300, Bitmap.Config.ARGB_8888));
         BridgedNotificationMetadata metadata = new BridgedNotificationMetadata(
-                BridgedNotificationMetadata.BRIDGED_METADATA_TYPE_PHONE,
-                "test_package", icon);
+                BridgedNotificationMetadata.BRIDGED_METADATA_TYPE_PHONE, "test_display_name",
+                "test_package", "test_channel_id", icon);
 
         Notification notification = new Notification.Builder(mContext, "whatever")
                 .setBridgedNotificationMetadata(metadata).build();
         assertEquals(metadata.getOriginDeviceType(),
                 notification.getBridgedNotificationMetadata().getOriginDeviceType());
+        assertEquals(metadata.getOriginDeviceName(),
+                notification.getBridgedNotificationMetadata().getOriginDeviceName());
         assertEquals(metadata.getPackageName(),
                 notification.getBridgedNotificationMetadata().getPackageName());
-        metadata.getIcon().sameAs(notification.getBridgedNotificationMetadata().getIcon());
+        assertEquals(metadata.getChannelId(),
+                notification.getBridgedNotificationMetadata().getChannelId());
+        metadata.getAppIcon().sameAs(notification.getBridgedNotificationMetadata().getAppIcon());
 
         Notification clone = writeAndReadParcelable(notification);
         assertEquals(metadata.getOriginDeviceType(),
                 clone.getBridgedNotificationMetadata().getOriginDeviceType());
+        assertEquals(metadata.getOriginDeviceName(),
+                clone.getBridgedNotificationMetadata().getOriginDeviceName());
         assertEquals(metadata.getPackageName(),
                 clone.getBridgedNotificationMetadata().getPackageName());
-        metadata.getIcon().sameAs(clone.getBridgedNotificationMetadata().getIcon());
+        assertEquals(metadata.getChannelId(),
+                clone.getBridgedNotificationMetadata().getChannelId());
+        metadata.getAppIcon().sameAs(clone.getBridgedNotificationMetadata().getAppIcon());
     }
 
     @Test

@@ -333,6 +333,9 @@ final class AppCompatConfiguration {
     // AppCompatOrientationPolicy#shouldIgnoreRequestedOrientation for details.
     private final boolean mIsPolicyForIgnoringRequestedOrientationEnabled;
 
+    // When true, display moves between internal displays are NOT exempt from the self-kil recovery.
+    private final boolean mIsSelfKillRecoveryBetweenInternalDisplaysEnabled;
+
     // Flags dynamically updated with {@link android.provider.DeviceConfig}.
     @NonNull private final SynchedDeviceConfig mDeviceConfig;
 
@@ -398,6 +401,8 @@ final class AppCompatConfiguration {
                 R.bool.config_isCameraCompatSimReqOrientationLandscapeTreatmentEnabled);
         mIsPolicyForIgnoringRequestedOrientationEnabled = mContext.getResources().getBoolean(
                 R.bool.config_letterboxIsPolicyForIgnoringRequestedOrientationEnabled);
+        mIsSelfKillRecoveryBetweenInternalDisplaysEnabled = mContext.getResources().getBoolean(
+                R.bool.config_enableSelfKillRecoveryBetweenInternalDisplays);
 
         mThinLetterboxWidthPxSupplier = new DimenPxIntSupplier(mContext,
                 R.dimen.config_letterboxThinLetterboxWidthDp);
@@ -437,10 +442,6 @@ final class AppCompatConfiguration {
                         mContext.getResources().getBoolean(
                                 R.bool.config_appCompatUserAppAspectRatioFullscreenIsEnabled))
                 .build();
-    }
-
-    void onSystemReady() {
-        mAppCompatConfigurationPersister.onSystemReady(mContext);
     }
 
     /**
@@ -1289,6 +1290,13 @@ final class AppCompatConfiguration {
      */
     boolean isPolicyForIgnoringRequestedOrientationEnabled() {
         return mIsPolicyForIgnoringRequestedOrientationEnabled;
+    }
+
+    /**
+     * When true, display moves between internal displays are NOT exempt from the self-kil recovery.
+     */
+    boolean isSelfKillRecoveryBetweenInternalDisplaysEnabled() {
+        return mIsSelfKillRecoveryBetweenInternalDisplaysEnabled;
     }
 
     /**

@@ -76,7 +76,13 @@ import android.hardware.display.DisplayManagerGlobal;
 import android.hardware.display.DisplayManagerInternal;
 import android.hardware.display.IVirtualDisplayCallback;
 import android.hardware.display.VirtualDisplayConfig;
-import android.hardware.input.IVirtualInputDevice;
+import android.hardware.input.IVirtualDpad;
+import android.hardware.input.IVirtualKeyboard;
+import android.hardware.input.IVirtualMouse;
+import android.hardware.input.IVirtualNavigationTouchpad;
+import android.hardware.input.IVirtualRotaryEncoder;
+import android.hardware.input.IVirtualStylus;
+import android.hardware.input.IVirtualTouchscreen;
 import android.hardware.input.VirtualDpadConfig;
 import android.hardware.input.VirtualKeyboardConfig;
 import android.hardware.input.VirtualMouseConfig;
@@ -106,7 +112,9 @@ import android.util.Slog;
 import android.util.SparseArray;
 import android.util.SparseIntArray;
 import android.view.Display;
+import android.view.IWindowManager;
 import android.view.WindowManager;
+import android.view.WindowManagerGlobal;
 import android.widget.Toast;
 import android.window.DisplayWindowPolicyController;
 
@@ -235,6 +243,8 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
     private final UiModeManagerInternal mUiModeManagerInternal;
     @NonNull
     private final PowerManager mPowerManager;
+    @NonNull
+    private final IWindowManager mWindowManager;
     @GuardedBy("mIntentInterceptors")
     private final Map<IBinder, IntentFilter> mIntentInterceptors = new ArrayMap<>();
 
@@ -482,6 +492,7 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
                 soundEffectListener,
                 params,
                 DisplayManagerGlobal.getInstance(),
+                WindowManagerGlobal.getWindowManagerService(),
                 isVirtualCameraEnabled()
                         ? new VirtualCameraController(
                                 params.getDevicePolicy(POLICY_TYPE_CAMERA), deviceId)
@@ -507,6 +518,7 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
             @Nullable IVirtualDeviceSoundEffectListener soundEffectListener,
             @NonNull VirtualDeviceParams params,
             @NonNull DisplayManagerGlobal displayManager,
+            @NonNull IWindowManager windowManager,
             @Nullable VirtualCameraController virtualCameraController,
             @Nullable ViewConfigurationController viewConfigurationController) {
         mVirtualDeviceLog = virtualDeviceLog;
@@ -528,6 +540,7 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
         mParams = params;
         mDevicePolicies = params.getDevicePolicies();
         mDisplayManager = displayManager;
+        mWindowManager = windowManager;
         mDisplayManagerInternal = LocalServices.getService(DisplayManagerInternal.class);
         mUiModeManagerInternal = LocalServices.getService(UiModeManagerInternal.class);
         mPowerManager = Objects.requireNonNull(context.getSystemService(PowerManager.class));
@@ -1085,7 +1098,7 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
     }
 
     @Override // Binder call
-    public IVirtualInputDevice createVirtualDpad(@NonNull VirtualDpadConfig config,
+    public IVirtualDpad createVirtualDpad(@NonNull VirtualDpadConfig config,
             @NonNull IBinder deviceToken) {
         checkCallerIsDeviceOwner();
         Objects.requireNonNull(config);
@@ -1096,13 +1109,13 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
     }
 
     @Override // Binder call
-    public IVirtualInputDevice createVirtualKeyboard(@NonNull VirtualKeyboardConfig config,
+    public IVirtualKeyboard createVirtualKeyboard(@NonNull VirtualKeyboardConfig config,
             @NonNull IBinder deviceToken) {
         checkCallerIsDeviceOwner();
         Objects.requireNonNull(config);
         Objects.requireNonNull(deviceToken);
         checkVirtualInputDeviceDisplayIdAssociation(config.getAssociatedDisplayId());
-        IVirtualInputDevice device = Binder.withCleanCallingIdentity(() ->
+        IVirtualKeyboard device = Binder.withCleanCallingIdentity(() ->
                 mInputController.createKeyboard(deviceToken, config));
         synchronized (mVirtualDeviceLock) {
             mLocaleList = LocaleList.forLanguageTags(config.getLanguageTag());
@@ -1111,7 +1124,7 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
     }
 
     @Override // Binder call
-    public IVirtualInputDevice createVirtualMouse(@NonNull VirtualMouseConfig config,
+    public IVirtualMouse createVirtualMouse(@NonNull VirtualMouseConfig config,
             @NonNull IBinder deviceToken) {
         checkCallerIsDeviceOwner();
         Objects.requireNonNull(config);
@@ -1122,7 +1135,7 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
     }
 
     @Override // Binder call
-    public IVirtualInputDevice createVirtualTouchscreen(@NonNull VirtualTouchscreenConfig config,
+    public IVirtualTouchscreen createVirtualTouchscreen(@NonNull VirtualTouchscreenConfig config,
             @NonNull IBinder deviceToken) {
         checkCallerIsDeviceOwner();
         Objects.requireNonNull(config);
@@ -1133,7 +1146,7 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
     }
 
     @Override // Binder call
-    public IVirtualInputDevice createVirtualNavigationTouchpad(
+    public IVirtualNavigationTouchpad createVirtualNavigationTouchpad(
             @NonNull VirtualNavigationTouchpadConfig config, @NonNull IBinder deviceToken) {
         checkCallerIsDeviceOwner();
         Objects.requireNonNull(config);
@@ -1144,7 +1157,7 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
     }
 
     @Override // Binder call
-    public IVirtualInputDevice createVirtualStylus(@NonNull VirtualStylusConfig config,
+    public IVirtualStylus createVirtualStylus(@NonNull VirtualStylusConfig config,
             @NonNull IBinder deviceToken) {
         checkCallerIsDeviceOwner();
         Objects.requireNonNull(config);
@@ -1155,7 +1168,7 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
     }
 
     @Override // Binder call
-    public IVirtualInputDevice createVirtualRotaryEncoder(
+    public IVirtualRotaryEncoder createVirtualRotaryEncoder(
             @NonNull VirtualRotaryEncoderConfig config, @NonNull IBinder deviceToken) {
         checkCallerIsDeviceOwner();
         Objects.requireNonNull(config);
@@ -1197,6 +1210,20 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
         } finally {
             Binder.restoreCallingIdentity(ident);
         }
+    }
+
+    @Override // Binder call
+    public void setDisplayInTouchMode(int displayId, boolean inTouchMode) {
+        checkCallerIsDeviceOwner();
+        synchronized (mVirtualDeviceLock) {
+            checkDisplayOwnedByVirtualDeviceLocked(displayId);
+            VirtualDisplayWrapper wrapper = mVirtualDisplays.get(displayId);
+            if (!wrapper.isTrusted() || wrapper.isMirror()) {
+                throw new SecurityException("Cannot set touch mode on untrusted or mirror display");
+            }
+        }
+        Binder.withCleanCallingIdentity(
+                () -> mWindowManager.setInTouchMode(inTouchMode, displayId));
     }
 
     @Override // Binder call

@@ -158,6 +158,10 @@
     <string name="wfc_mode_wifi_preferred_summary" msgid="1035175836270943089">"ವೈ-ಫೈ ಬಳಸಿ ಕರೆ ಮಾಡಿ"</string>
     <string name="wfc_mode_cellular_preferred_summary" msgid="4958965609212575619">"ಮೊಬೈಲ್‌ ನೆಟ್‌ವರ್ಕ್ ಬಳಸಿ ಕರೆ ಮಾಡಿ"</string>
     <string name="wfc_mode_wifi_only_summary" msgid="104951993894678665">"ವೈ-ಫೈ ಮಾತ್ರ"</string>
+    <string name="adaptive_low_frequency_less_than_one_minute" msgid="8869498183646028708">"~ %s"</string>
+    <string name="adaptive_low_frequency_neg_less_than_one_minute" msgid="2590062535985417056">"~ −%s"</string>
+    <string name="elapsed_time_low_frequency_short_format_h_mm" msgid="6728141238066668781">"%1$d:%2$02d:--"</string>
+    <string name="elapsed_time_low_frequency_short_format_mm" msgid="2405181895215514414">"%1$02d:--"</string>
     <!-- no translation found for crossSimFormat_spn (9125246077491634262) -->
     <skip />
     <string name="crossSimFormat_spn_cross_sim_calling" msgid="5620807020002879057">"<xliff:g id="SPN">%s</xliff:g> ಬ್ಯಾಕಪ್ ಕರೆ ಮಾಡುವಿಕೆ"</string>
@@ -645,10 +649,8 @@
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"ಸ್ಥಳೀಯ ನೆಟ್‌ವರ್ಕ್ ಸಾಧನಗಳನ್ನು ಆ್ಯಕ್ಸೆಸ್ ಮಾಡಲು ಆ್ಯಪ್‌ಗೆ ಅನುಮತಿಸುತ್ತದೆ"</string>
     <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"ಲೂಪ್‌ಬ್ಯಾಕ್ ಇಂಟರ್‌ಫೇಸ್ ಅನ್ನು ಬಳಸಿ"</string>
     <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"ಲೂಪ್‌ಬ್ಯಾಕ್ ಇಂಟರ್‌ಫೇಸ್ ಮೂಲಕ ಇತರ ಆ್ಯಪ್‌ಗಳ ಜೊತೆ ಸಂವಹನ ನಡೆಸಲು ಆ್ಯಪ್‌ಗೆ ಅನುಮತಿಸುತ್ತದೆ"</string>
-    <!-- no translation found for permlab_force_use_loopback_interface (1319727311706416481) -->
-    <skip />
-    <!-- no translation found for permdesc_force_use_loopback_interface (5829032514048681980) -->
-    <skip />
+    <string name="permlab_force_use_loopback_interface" msgid="1319727311706416481">"ಲೂಪ್‌ಬ್ಯಾಕ್ ಇಂಟರ್‌ಫೇಸ್ ಅನ್ನು ಬಳಸಲು ಒತ್ತಾಯಿಸಿ"</string>
+    <string name="permdesc_force_use_loopback_interface" msgid="5829032514048681980">"ಲೂಪ್‌ಬ್ಯಾಕ್ ಅನುಮತಿಗಳನ್ನು ಹೊಂದಿರಲು ಇತರ ಆ್ಯಪ್‌ನ ಅಗತ್ಯವಿಲ್ಲದೇ ಲೂಪ್‌ಬ್ಯಾಕ್ ಇಂಟರ್‌ಫೇಸ್ ಮೂಲಕ ಇತರ ಆ್ಯಪ್‌ಗಳೊಂದಿಗೆ ಸಂವಹನ ನಡೆಸಲು ಆ್ಯಪ್‌ಗೆ ಅನುಮತಿಸುತ್ತದೆ"</string>
     <string name="permlab_ranging" msgid="2854543350668593390">"ಸಮೀಪದ ಸಾಧನಗಳ ನಡುವಿನ ಸಂಬಂಧಿತ ಸ್ಥಾನವನ್ನು ನಿರ್ಧರಿಸಿ"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"ಸಮೀಪದಲ್ಲಿರುವ ಸಾಧನಗಳ ನಡುವಿನ ಸಂಬಂಧಿತ ಸ್ಥಾನವನ್ನು ನಿರ್ಧರಿಸಲು ಆ್ಯಪ್‌ಗೆ ಅನುಮತಿಸಿ"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"ಆದ್ಯತೆಯ NFC ಪಾವತಿ ಸೇವಾ ಮಾಹಿತಿ"</string>
@@ -774,7 +776,7 @@
     <string name="face_acquired_too_low" msgid="4075391872960840081">"ಫೋನ್ ಅನ್ನು ಕೆಳಗೆ ಸರಿಸಿ"</string>
     <string name="face_acquired_too_right" msgid="6245286514593540859">"ಫೋನ್ ಅನ್ನು ನಿಮ್ಮ ಎಡಕ್ಕೆ ಸರಿಸಿ"</string>
     <string name="face_acquired_too_left" msgid="9201762240918405486">"ಫೋನ್ ಅನ್ನು ನಿಮ್ಮ ಬಲಕ್ಕೆ ಸರಿಸಿ"</string>
-    <string name="face_acquired_poor_gaze" msgid="4427153558773628020">"ನಿಮ್ಮ ಸಾಧನದಲ್ಲಿ ಹೆಚ್ಚಿನದ್ದನ್ನು ನೇರವಾಗಿ ನೋಡಿ."</string>
+    <string name="face_acquired_poor_gaze" msgid="6746437451436776485">"ನಿಮ್ಮ ಕ್ಯಾಮರಾವನ್ನು ಹೆಚ್ಚು ನೇರವಾಗಿ ನೋಡಿ"</string>
     <string name="face_acquired_not_detected" msgid="1057966913397548150">"ನಿಮ್ಮ ಮುಖ ಕಾಣಿಸುತ್ತಿಲ್ಲ. ನಿಮ್ಮ ಫೋನ್ ಅನ್ನು ಕಣ್ಣಿನ ನೇರಕ್ಕೆ ಹಿಡಿದುಕೊಳ್ಳಿ."</string>
     <string name="face_acquired_too_much_motion" msgid="8199691445085189528">"ತುಂಬಾ ಅಲುಗಾಡುತ್ತಿದೆ ಫೋನ್ ಅನ್ನು ಸ್ಥಿರವಾಗಿ ಹಿಡಿಯಿರಿ."</string>
     <string name="face_acquired_recalibrate" msgid="8724013080976469746">"ನಿಮ್ಮ ಮುಖವನ್ನು ಮರುನೋಂದಣಿ ಮಾಡಿ."</string>
@@ -1454,6 +1456,9 @@
     <string name="carrier_app_notification_text" msgid="6567057546341958637">"ಇದನ್ನು ಸ್ಥಾಪಿಸಲು ಟ್ಯಾಪ್ ಮಾಡಿ"</string>
     <string name="time_zone_change_notification_title" msgid="5232503069219193218">"ನಿಮ್ಮ ಸಮಯವಲಯ ಬದಲಾಗಿದೆ."</string>
     <string name="time_zone_change_notification_body" msgid="6135793674904665585">"ನೀವು ಈಗ <xliff:g id="TIME_ZONE_DISPLAY_NAME">%1$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET">%2$s</xliff:g>) ನಲ್ಲಿದ್ದೀರಿ"</string>
+    <string name="time_zone_offset_change_notification_title" msgid="8232305835199459588">"ಗಡಿಯಾರದ ಬದಲಾವಣೆ"</string>
+    <string name="time_zone_offset_change_notification_body_forward" msgid="1299493962341887576">"ಗಡಿಯಾರಗಳನ್ನು <xliff:g id="TIME_ZONE_OFFSET_DURATION">%1$s</xliff:g> ಮುಂದಕ್ಕೆ ಸರಿಸಲಾಗಿದೆ. ನೀವು ಈಗ <xliff:g id="TIME_ZONE_DISPLAY_NAME">%2$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET_0">%3$s</xliff:g>) ನಲ್ಲಿದ್ದೀರಿ."</string>
+    <string name="time_zone_offset_change_notification_body_backward" msgid="6643532078142642118">"ಗಡಿಯಾರಗಳನ್ನು <xliff:g id="TIME_ZONE_OFFSET_DURATION">%1$s</xliff:g> ಹಿಂದಕ್ಕೆ ಸರಿಸಲಾಗಿದೆ. ನೀವು ಈಗ <xliff:g id="TIME_ZONE_DISPLAY_NAME">%2$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET_0">%3$s</xliff:g>) ನಲ್ಲಿದ್ದೀರಿ."</string>
     <string name="time_picker_dialog_title" msgid="9053376764985220821">"ಸಮಯವನ್ನು ಸೆಟ್ ಮಾಡಿ"</string>
     <string name="date_picker_dialog_title" msgid="5030520449243071926">"ದಿನಾಂಕವನ್ನು ಸೆಟ್ ಮಾಡಿ"</string>
     <string name="date_time_set" msgid="4603445265164486816">"ಹೊಂದಿಸು"</string>
@@ -1829,6 +1834,7 @@
     <string name="accessibility_shortcut_label_gesture" msgid="7987298674836890931">"ಗೆಸ್ಚರ್"</string>
     <string name="accessibility_shortcut_label_quick_settings" msgid="6851280333772213611">"ತ್ವರಿತ ಸೆಟ್ಟಿಂಗ್‍ಗಳು"</string>
     <string name="accessibility_shortcut_label_triple_tap" msgid="9058975959054454796">"ಟ್ರಿಪಲ್ ಟ್ಯಾಪ್ ಮಾಡಿ"</string>
+    <string name="accessibility_shortcut_label_top_row_key" msgid="1488840908672437180">"ಆ್ಯಕ್ಸೆಸಿಬಿಲಿಟಿ ಕೀ"</string>
     <string name="accessibility_uncheck_legacy_item_warning" msgid="8047830891064817447">"<xliff:g id="SERVICE_NAME">%s</xliff:g> ಅನ್ನು ಆಫ್ ಮಾಡಲಾಗಿದೆ"</string>
     <string name="edit_accessibility_shortcut_menu_button" msgid="8885752738733772935">"ಶಾರ್ಟ್‌ಕಟ್‌‍ಗಳನ್ನು ಎಡಿಟ್ ಮಾಡಿ"</string>
     <string name="done_accessibility_shortcut_menu_button" msgid="3668407723770815708">"ಪೂರ್ಣಗೊಂಡಿದೆ"</string>
@@ -2105,6 +2111,7 @@
     <string name="app_suspended_default_message" msgid="6451215678552004172">"<xliff:g id="APP_NAME_0">%1$s</xliff:g> ಆ್ಯಪ್‌ ಸದ್ಯಕ್ಕೆ ಲಭ್ಯವಿಲ್ಲ. ಇದನ್ನು <xliff:g id="APP_NAME_1">%2$s</xliff:g> ನಲ್ಲಿ ನಿರ್ವಹಿಸಲಾಗುತ್ತಿದೆ."</string>
     <string name="app_suspended_more_details" msgid="211260942831587014">"ಇನ್ನಷ್ಟು ತಿಳಿಯಿರಿ"</string>
     <string name="app_suspended_unsuspend_message" msgid="1665438589450555459">"ಆ್ಯಪ್ ವಿರಾಮ ನಿಲ್ಲಿಸಿ"</string>
+    <string name="locked_app_biometric_prompt_description" msgid="6853122652400451464">"<xliff:g id="APP_NAME">%1$s</xliff:g> ಅನ್ನು ಲಾಕ್ ಮಾಡಲಾಗಿದೆ"</string>
     <string name="work_mode_off_title" msgid="6367463960165135829">"ಕೆಲಸದ ಆ್ಯಪ್ ವಿರಾಮ ರದ್ದುಮಾಡಬೇಕೇ"</string>
     <string name="work_mode_turn_on" msgid="5316648862401307800">"ವಿರಾಮವನ್ನು ರದ್ದುಗೊಳಿಸಿ"</string>
     <string name="work_mode_emergency_call_button" msgid="6818855962881612322">"ತುರ್ತು"</string>
@@ -2544,6 +2551,8 @@
     <string name="accessibility_label_clone_profile" msgid="7579118375042398784">"ಕ್ಲೋನ್"</string>
     <string name="accessibility_label_communal_profile" msgid="1437173163111334791">"ಸಮುದಾಯ"</string>
     <string name="private_space_biometric_prompt_title" msgid="5777592909271728154">"ಪ್ರೈವೆಟ್ ಸ್ಪೇಸ್"</string>
+    <string name="app_locked_new_notification" msgid="4409730436247596215">"ಹೊಸ ನೋಟಿಫಿಕೇಶನ್"</string>
+    <string name="app_locked_notification_message" msgid="4576179600328065280">"ಹೊಸ ಸಂದೇಶ"</string>
     <string name="redacted_notification_message" msgid="1520587845842228816">"ಸೂಕ್ಷ್ಮ ನೋಟಿಫಿಕೇಶನ್ ಕಂಟೆಂಟ್ ಅನ್ನು ಮರೆಮಾಡಲಾಗಿದೆ"</string>
     <string name="redacted_notification_action_title" msgid="6942924973335920935"></string>
     <string name="screen_not_shared_sensitive_content" msgid="7058419185079565001">"ಭದ್ರತೆಗಾಗಿ ಸ್ಕ್ರೀನ್‌‌ ಹಂಚಿಕೊಳ್ಳುವಿಕೆಯಲ್ಲಿ ಆ್ಯಪ್ ಕಂಟೆಂಟ್‌ ಅನ್ನು ಮರೆಮಾಡಲಾಗಿದೆ"</string>

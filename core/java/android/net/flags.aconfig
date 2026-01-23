@@ -70,18 +70,18 @@ flag {
 }
 
 flag {
-    name: "collect_vpn_metrics"
-    namespace: "android_core_networking"
-    is_exported: false
-    description: "This flag controls VPN metrics collection."
-    bug: "306313287"
-}
-
-flag {
   name: "create_app_specific_network_permission"
   namespace: "android_core_networking"
   is_exported: false
   description: "Flag for adding CREATE_APP_SPECIFIC_NETWORK permission"
+  bug: "435313135"
+}
+
+flag {
+  name: "make_app_specific_network_permission_api"
+  namespace: "android_core_networking"
+  is_exported: false
+  description: "Flag for making CREATE_APP_SPECIFIC_NETWORK permission API"
   bug: "435313135"
 }
 
@@ -91,17 +91,6 @@ flag {
   is_exported: false
   description: "Flag for deleting VPN profile when the provisioning app is uninstalled"
   bug: "440083803"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
-  name: "reenable_inner_ipv6_on_vpn"
-  namespace: "android_core_networking"
-  is_exported: false
-  description: "Flag for adding inner IPv6 address back to VPN if MTU supports"
-  bug: "394337934"
   metadata {
     purpose: PURPOSE_BUGFIX
   }

@@ -375,6 +375,7 @@ public abstract class FileSystemProvider extends DocumentsProvider {
     public void deleteDocument(String docId) throws FileNotFoundException {
         final File file = getFileForDocId(docId);
         final File visibleFile = getFileForDocId(docId, true);
+        final boolean isTrashedDocument = isTrashFile(file);
 
         final boolean isDirectory = file.isDirectory();
         if (isDirectory) {
@@ -388,6 +389,11 @@ public abstract class FileSystemProvider extends DocumentsProvider {
 
         onDocIdChanged(docId);
         onDocIdDeleted(docId, /* shouldRevokeUriPermission */ true);
+        // Notify if deleting a trashed document.
+        if (isTrashedDocument) {
+            notifyTrashChange(docId);
+        }
+
         updateMediaStore(getContext(), visibleFile);
     }
 
@@ -652,7 +658,8 @@ public abstract class FileSystemProvider extends DocumentsProvider {
         return trashedDocId;
     }
 
-    protected final Cursor queryTrashDocuments(File parent, String[] projection)
+    protected final Cursor queryTrashDocuments(@NonNull File parent, @NonNull String volumeName,
+            @Nullable String[] projection)
             throws FileNotFoundException {
         String docId = getDocIdForFile(parent);
         String[] trashProjections = projection;
@@ -666,7 +673,14 @@ public abstract class FileSystemProvider extends DocumentsProvider {
         MatrixCursor result = new DirectoryCursor(trashProjections, docId, parent);
         includeTrashFiles(result, parent);
         // include MediaStore trashed files which are not in .trash-storage location
-        includeMediaStoreTrashFiles(result);
+        includeMediaStoreTrashFiles(result, volumeName);
+
+        // Set notification URI for trash
+        final Uri trashUri = buildTrashNotificationUri(docId);
+        if (trashUri != null) {
+            result.setNotificationUri(getContext().getContentResolver(), trashUri);
+        }
+
         return result;
     }
 
@@ -702,6 +716,8 @@ public abstract class FileSystemProvider extends DocumentsProvider {
         final String restoredDocId = getDocIdForFile(restoredFile);
         onDocIdChanged(documentId);
         onDocIdChanged(restoredDocId);
+        // Notify if restoring a trashed document.
+        notifyTrashChange(documentId);
 
         return restoredDocId;
     }
@@ -724,15 +740,22 @@ public abstract class FileSystemProvider extends DocumentsProvider {
         }
     }
 
-    private void includeMediaStoreTrashFiles(MatrixCursor result)
+    private void includeMediaStoreTrashFiles(@NonNull MatrixCursor result,
+            @NonNull String volumeName)
             throws FileNotFoundException {
         final Uri uri = MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL);
         final Bundle queryArgs = new Bundle();
         queryArgs.putInt(MediaStore.QUERY_ARG_MATCH_TRASHED, MediaStore.MATCH_ONLY);
-        queryArgs.putString(ContentResolver.QUERY_ARG_SQL_SELECTION,
-                MediaStore.MediaColumns.RELATIVE_PATH + " NOT LIKE ?");
-        queryArgs.putStringArray(ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS,
-                new String[]{DIRECTORY_TRASH_STORAGE + "/%"});
+
+        final String selection = MediaStore.MediaColumns.RELATIVE_PATH + " NOT LIKE ? AND "
+                + MediaStore.MediaColumns.VOLUME_NAME + " = ?";
+        final String[] selectionArgs = new String[]{
+                DIRECTORY_TRASH_STORAGE + "/%",
+                volumeName.toLowerCase(Locale.ROOT)
+        };
+
+        queryArgs.putString(ContentResolver.QUERY_ARG_SQL_SELECTION, selection);
+        queryArgs.putStringArray(ContentResolver.QUERY_ARG_SQL_SELECTION_ARGS, selectionArgs);
         String[] projection = new String[]{MediaStore.Files.FileColumns.DATA};
 
         try (Cursor cursor = getContext().getContentResolver().query(uri, projection,
@@ -894,6 +917,11 @@ public abstract class FileSystemProvider extends DocumentsProvider {
         return getFileForDocId(docId, false);
     }
 
+    @Nullable
+    protected Uri buildTrashNotificationUri(@NonNull String docId) {
+        return null;
+    }
+
     private String[] resolveProjection(String[] projection) {
         return projection == null ? mDefaultProjection : projection;
     }
@@ -1037,6 +1065,17 @@ public abstract class FileSystemProvider extends DocumentsProvider {
             return matcher.group(3);
         }
         return segment;
+    }
+
+    private void notifyTrashChange(String docId) {
+        if (!enableDocumentsTrashApi()) {
+            return;
+        }
+
+        Uri trashUri = buildTrashNotificationUri(docId);
+        if (trashUri != null) {
+            getContext().getContentResolver().notifyChange(trashUri, /* observer */ null);
+        }
     }
 
     private static class DirectoryObserver extends FileObserver {

@@ -256,7 +256,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             new SparseArray<>();
 
     /** The current user */
-    @UserIdInt int mCurrentUser;
+    int mCurrentUser;
     /** Root task id of the front root task when user switched, indexed by userId. */
     SparseIntArray mUserRootTaskInFront = new SparseIntArray(2);
     SparseArray<IntArray> mUserVisibleRootTasks = new SparseArray<>();
@@ -444,10 +444,6 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         }
     };
 
-    // TODO(b/412177078): remove @Nullable (and checks) once Flags.hsuAllowlistActivities() is gone
-    @Nullable
-    private final UserHelper mUserHelper;
-
     RootWindowContainer(WindowManagerService service) {
         super(service);
         mHandler = new MyHandler(service.mH.getLooper());
@@ -459,15 +455,6 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         mDeviceStateAutoRotateSettingController =
                 DisplayRotation.createDeviceStateAutoRotateDependencies(service.mContext,
                         mDeviceStateController, service);
-        mUserHelper = android.multiuser.Flags.hsuAllowlistActivities()
-                ? new UserHelper(service.mAtmService.getUserManagerInternal())
-                : null;
-    }
-
-    // TODO(b/412177078): remove @Nullable (and checks) once Flags.hsuAllowlistActivities() is gone
-    @Nullable
-    UserHelper getUserHelper() {
-        return mUserHelper;
     }
 
     /**
@@ -1375,8 +1362,8 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
 
             boolean allowHomeAlwaysPresent = isHomeAlwaysPresentAllowed(
                     homeActivityIntentPair.first, userId);
-            if (allowHomeAlwaysPresent
-                    && homeActivityIntentPair.first.applicationInfo.isPrivilegedApp()) {
+            if (homeActivityIntentPair.first.applicationInfo.isPrivilegedApp()
+                    && allowHomeAlwaysPresent) {
                 if (needsHomeLaunchOnDisplay(userId, taskDisplayArea)) {
                     // Launch home not on top as this path ensures the correct home activity is
                     // running in the background without disrupting the current foreground activity.
@@ -1384,12 +1371,10 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                             false /* allowInstrumenting */, false /* fromHomeKey */,
                             false /* onTop */);
                 }
-            } else {
-                if (taskDisplayArea.topRunningActivity() == null) {
-                    startHomeOnTaskDisplayArea(userId, reason, taskDisplayArea,
-                            false /* allowInstrumenting */, false /* fromHomeKey */,
-                            true /* onTop */);
-                }
+            } else if (taskDisplayArea.topRunningActivity() == null) {
+                startHomeOnTaskDisplayArea(userId, reason, taskDisplayArea,
+                        false /* allowInstrumenting */, false /* fromHomeKey */,
+                        true /* onTop */);
             }
         });
     }
@@ -1959,7 +1944,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         }
     }
 
-    boolean switchUser(@UserIdInt int userId, UserState uss) {
+    boolean switchUser(int userId, UserState uss) {
         final Task topFocusedRootTask = getTopDisplayFocusedRootTask();
         final int focusRootTaskId = topFocusedRootTask != null
                 ? topFocusedRootTask.getRootTaskId() : INVALID_TASK_ID;
@@ -2019,11 +2004,6 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             final int topRootTaskId = rootTaskIdsToRestore.get(rootTaskIdsToRestore.size() - 1);
             homeInFront = isHomeTask(topRootTaskId);
         }
-
-        if (mUserHelper != null) {
-            mUserHelper.setCurrentUserId(userId);
-        }
-
         return homeInFront;
     }
 
@@ -2278,15 +2258,6 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                 // automatically removed from the recents list.
                 rootTask.autoRemoveRecents = true;
 
-                // Reset the original task surface
-                // TODO (b/448208017): Investigate why this line isn't WAI in fullscreen case,
-                // and find a different workaround for freeform case when this is fixed.
-                if (!DesktopExperienceFlags
-                        .ENABLE_DESKTOP_WINDOWING_MULTI_ACTIVITY_PIP_KEEP_PARENT_OPEN
-                        .isTrue()) {
-                    task.resetSurfaceControlTransforms();
-                }
-
                 // The organized TaskFragment is becoming empty because this activity is reparented
                 // to a new PIP Task. In this case, we should notify the organizer about why the
                 // TaskFragment becomes empty.
@@ -2461,7 +2432,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
     /**
      * Notifies when an activity enters or leaves PIP mode.
      *
-     * @param task the task of {@param r}
+     * @param task the task of {@code r}
      * @param r indicates the activity currently in PIP, can be null to indicate no activity is
      *          currently in PIP mode.
      */
@@ -3143,8 +3114,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
     void invalidateTaskLayers() {
         if (!mTaskLayersChanged) {
             mTaskLayersChanged = true;
-            if (!com.android.window.flags.Flags.rankTaskLayerWithWindowLayout()
-                    || !mWindowManager.mWindowPlacerLocked.isLayoutDeferred()) {
+            if (!mWindowManager.mWindowPlacerLocked.isLayoutDeferred()) {
                 mService.mH.post(mRankTaskLayersRunnable);
             }
         }
@@ -3474,7 +3444,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
      * through all displays and root tasks in last-focused order.
      *
      * @param currentFocus  The root task that previously had focus.
-     * @param ignoreCurrent If we should ignore {@param currentFocus} when searching for next
+     * @param ignoreCurrent If we should ignore {@code currentFocus} when searching for next
      *                      candidate.
      * @return Next focusable {@link Task}, {@code null} if not found.
      */
@@ -3806,7 +3776,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
     }
 
     /**
-     * Find all tasks containing {@param userId} and intercept them with an activity
+     * Find all tasks containing {@code userId} and intercept them with an activity
      * to block out the contents and possibly start a credential-confirming intent.
      *
      * @param userId user handle for the locked managed profile.
@@ -4002,8 +3972,8 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
     }
 
     /**
-     * Dumps the activities matching the given {@param name} in the either the focused root task
-     * or all visible root tasks if {@param dumpVisibleRootTasksOnly} is true.
+     * Dumps the activities matching the given {@code name} in the either the focused root task
+     * or all visible root tasks if {@code dumpVisibleRootTasksOnly} is true.
      */
     ArrayList<ActivityRecord> getDumpActivities(String name, boolean dumpVisibleRootTasksOnly,
             boolean dumpFocusedRootTaskOnly, @UserIdInt int userId) {

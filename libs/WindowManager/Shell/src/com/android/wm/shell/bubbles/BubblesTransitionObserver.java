@@ -119,7 +119,7 @@ public class BubblesTransitionObserver implements Transitions.TransitionObserver
                 // If the opening task was launched by another bubble, skip collapsing the
                 // existing one since BubbleTransitions will start a new bubble for it.
                 if (BubbleAnythingFlagHelper.enableCreateAnyBubble()
-                        && mBubbleController.shouldBeAppBubble(taskInfo)) {
+                        && mBubbleController.getBubbleHelper().isAppBubbleTask(taskInfo)) {
                     ProtoLog.d(WM_SHELL_BUBBLES_NOISY,
                             "BubblesTransitionObserver.onTransitionReady(): "
                                     + "skipping app bubble for taskId=%d", taskInfo.taskId);
@@ -156,7 +156,7 @@ public class BubblesTransitionObserver implements Transitions.TransitionObserver
         }
 
         // If the opening tasks contains the bubble root task, skip collapsing.
-        if (mBubbleController.isAppBubbleRootTask(taskId)) {
+        if (mBubbleController.getBubbleHelper().isAppBubbleRootTask(taskId)) {
             ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "BubblesTransitionObserver.onTransitionReady(): "
                     + "task %d is the root task so skip collapsing", taskId);
             return true;
@@ -178,7 +178,8 @@ public class BubblesTransitionObserver implements Transitions.TransitionObserver
                     + "removing bubble for task launching into split taskId=%d", taskInfo.taskId);
             final TaskViewTaskController controller = bubble.getTaskView().getController();
             final ShellTaskOrganizer taskOrganizer = controller.getTaskOrganizer();
-            final WindowContainerTransaction wct = getExitBubbleTransaction(taskInfo.token,
+            final WindowContainerTransaction wct = getExitBubbleTransaction(
+                    mBubbleController.getBubbleHelper(), taskInfo.token,
                     bubble.getTaskView().getCaptionInsetsOwner(), false /* reparentToTda */);
 
             // Notify the task removal, but block all TaskViewTransitions during removal so we can

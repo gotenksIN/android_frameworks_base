@@ -15,9 +15,9 @@ import com.android.systemui.res.R
 import com.android.systemui.scene.shared.model.Overlays
 import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.scene.shared.model.TransitionKeys
+import com.android.systemui.scene.shared.model.TransitionKeys.ShadeExpandedToAlwaysOnDisplay
 import com.android.systemui.scene.shared.model.TransitionKeys.SlightlyFasterShadeTransition
 import com.android.systemui.scene.shared.model.TransitionKeys.SystemCommunalTransition
-import com.android.systemui.scene.shared.model.TransitionKeys.ToAlwaysOnDisplay
 import com.android.systemui.scene.shared.model.TransitionKeys.ToSplitShade
 import com.android.systemui.scene.ui.composable.transitions.bouncerToGoneTransition
 import com.android.systemui.scene.ui.composable.transitions.bouncerToLockscreenTransition
@@ -50,7 +50,7 @@ import com.android.systemui.scene.ui.composable.transitions.lockscreenToShadeSce
 import com.android.systemui.scene.ui.composable.transitions.lockscreenToSplitShadeTransition
 import com.android.systemui.scene.ui.composable.transitions.shadeToAlwaysOnDisplayTransition
 import com.android.systemui.scene.ui.composable.transitions.shadeToQuickSettingsTransition
-import com.android.systemui.scene.ui.composable.transitions.toBouncerTransition
+import com.android.systemui.scene.ui.composable.transitions.sharedBouncerTransitions
 import com.android.systemui.scene.ui.composable.transitions.toNotificationsShadeTransition
 import com.android.systemui.scene.ui.composable.transitions.toQuickSettingsShadeTransition
 import com.android.systemui.shade.ui.composable.Shade
@@ -158,7 +158,8 @@ class SceneContainerTransitions : SceneContainerTransitionsBuilder {
                 cujTag = TAG_EXPAND,
             ) {
                 lockscreenToShadeSceneTransition(
-                    transitionDistancePx = lockscreenToShadeTransitionDistancePx
+                    transitionDistancePx = lockscreenToShadeTransitionDistancePx,
+                    seekAnimation = true,
                 )
             }
             from(
@@ -208,6 +209,14 @@ class SceneContainerTransitions : SceneContainerTransitionsBuilder {
                 cujTag = TAG_COLLAPSE,
             ) {
                 reversed { goneToQuickSettingsTransition() }
+            }
+            from(
+                Scenes.QuickSettings,
+                to = Scenes.Lockscreen,
+                cuj = Cuj.CUJ_NOTIFICATION_SHADE_QS_EXPAND_COLLAPSE,
+                cujTag = TAG_COLLAPSE,
+            ) {
+                reversed { lockscreenToQuickSettingsSceneTransition() }
             }
             from(
                 Scenes.QuickSettings,
@@ -284,7 +293,7 @@ class SceneContainerTransitions : SceneContainerTransitionsBuilder {
             from(
                 Scenes.Shade,
                 to = Scenes.Lockscreen,
-                key = ToAlwaysOnDisplay,
+                key = ShadeExpandedToAlwaysOnDisplay,
                 cuj = Cuj.CUJ_NOTIFICATION_SHADE_EXPAND_COLLAPSE,
             ) {
                 shadeToAlwaysOnDisplayTransition()
@@ -310,15 +319,7 @@ class SceneContainerTransitions : SceneContainerTransitionsBuilder {
 
             // Overlay transitions
 
-            to(Overlays.Bouncer) { toBouncerTransition() }
-            from(Overlays.Bouncer) { fromBouncerTransition() }
-            from(
-                Overlays.Bouncer,
-                key = TransitionKey.PredictiveBack,
-                preview = { fromBouncerPreview() },
-            ) {
-                fromBouncerTransition()
-            }
+            sharedBouncerTransitions()
             from(Overlays.Bouncer, to = Scenes.Gone) { bouncerToGoneTransition() }
             from(Scenes.Dream, to = Overlays.Bouncer) { dreamToBouncerTransition() }
             from(

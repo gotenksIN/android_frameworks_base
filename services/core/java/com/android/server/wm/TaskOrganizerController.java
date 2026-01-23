@@ -53,6 +53,8 @@ import android.window.SplashScreenView;
 import android.window.StartingWindowInfo;
 import android.window.StartingWindowRemovalInfo;
 import android.window.TaskAppearedInfo;
+import android.window.TaskCreationParams;
+import android.window.TaskPropertiesRequest;
 import android.window.TaskSnapshot;
 import android.window.TransitionInfo;
 import android.window.TransitionRequestInfo;
@@ -182,7 +184,8 @@ class TaskOrganizerController extends ITaskOrganizerController.Stub {
             }
             try {
                 mTaskOrganizer.onBackPressedOnTaskRoot(task.getTaskInfo(),
-                        isFromMoveActivityTaskToBack, isOptInOnBackInvoked);
+                        isFromMoveActivityTaskToBack, isOptInOnBackInvoked,
+                        task.hasOpaqueSibling());
             } catch (Exception e) {
                 Slog.e(TAG, "Exception sending onBackPressedOnTaskRoot callback", e);
             }
@@ -903,23 +906,13 @@ class TaskOrganizerController extends ITaskOrganizerController.Stub {
 
     @Nullable
     @Override
-    public WindowContainerToken createRootTask(int displayId, int windowingMode,
-            @Nullable IBinder launchCookie, boolean removeWithTaskOrganizer,
-            boolean reparentOnDisplayRemoval, @Nullable String name, boolean isForceOpaque) {
-        enforceTaskPermission("createRootTask()");
+    public WindowContainerToken createTask(@NonNull TaskCreationParams params) {
+        enforceTaskPermission("createTask()");
         final long origId = Binder.clearCallingIdentity();
         try {
             synchronized (mGlobalLock) {
-                DisplayContent display = mService.mRootWindowContainer.getDisplayContent(displayId);
-                if (display == null) {
-                    ProtoLog.e(WM_DEBUG_WINDOW_ORGANIZER,
-                            "createRootTask unknown displayId=%d", displayId);
-                    return null;
-                }
-
-                final Task task = createRootTask(display, windowingMode, launchCookie,
-                        removeWithTaskOrganizer, reparentOnDisplayRemoval, name, isForceOpaque);
-                return task.mRemoteToken.toWindowContainerToken();
+                final Task task = createTaskInner(params);
+                return task != null ? task.mRemoteToken.toWindowContainerToken() : null;
             }
         } finally {
             Binder.restoreCallingIdentity(origId);
@@ -927,39 +920,44 @@ class TaskOrganizerController extends ITaskOrganizerController.Stub {
     }
 
     @VisibleForTesting
-    Task createRootTask(DisplayContent display, int windowingMode, @Nullable IBinder launchCookie) {
-        return createRootTask(display, windowingMode, launchCookie,
-                false /* removeWithTaskOrganizer */, false /* reparentOnDisplayRemoval */,
-                "test", false /* isForceOpaque */);
-    }
+    @Nullable
+    Task createTaskInner(@NonNull TaskCreationParams params) {
+        final DisplayContent display = mService.mRootWindowContainer.getDisplayContent(
+                params.getDisplayId());
+        if (display == null) {
+            ProtoLog.e(WM_DEBUG_WINDOW_ORGANIZER,
+                    "createTask unknown displayId=%d", params.getDisplayId());
+            return null;
+        }
+        ProtoLog.v(WM_DEBUG_WINDOW_ORGANIZER, "Create task displayId=%d winMode=%d",
+                display.mDisplayId, params.getWindowingMode());
+        final WindowContainer parent = display.getDefaultTaskDisplayArea();
+        final TaskPropertiesRequest properties = params.getTaskPropertiesRequest();
 
-    private Task createRootTask(DisplayContent display, int windowingMode,
-            @Nullable IBinder launchCookie, boolean removeWithTaskOrganizer,
-            boolean reparentOnDisplayRemoval, @Nullable String name, boolean isForceOpaque) {
-        ProtoLog.v(WM_DEBUG_WINDOW_ORGANIZER, "Create root task displayId=%d winMode=%d",
-                display.mDisplayId, windowingMode);
         // We want to defer the task appear signal until the task is fully created and attached to
         // to the hierarchy so that the complete starting configuration is in the task info we send
         // over to the organizer.
         final Task task = new Task.Builder(mService)
-                .setName(name)
-                .setWindowingMode(windowingMode)
+                .setName(params.getName())
+                .setWindowingMode(params.getWindowingMode())
                 .setIntent(new Intent())
                 .setCreatedByOrganizer(true)
                 .setDeferTaskAppear(true)
-                .setLaunchCookie(launchCookie)
-                .setParent(display.getDefaultTaskDisplayArea())
-                .setRemoveWithTaskOrganizer(removeWithTaskOrganizer)
-                .setReparentOnDisplayRemoval(reparentOnDisplayRemoval)
-                .setForceOpaque(isForceOpaque)
+                .setLaunchCookie(params.getLaunchCookie())
+                .setParent(parent)
+                .setRemoveWithTaskOrganizer(true)
+                .setReparentOnDisplayRemoval(properties.isReparentOnDisplayRemoval())
+                .setForceOpaque(properties.isForceOpaque())
+                .setShouldIgnoreInsets(properties.isIgnoreInsets())
+                .setDisableAppCompatRoundedCorners(properties.isDisableAppCompatRoundedCorners())
                 .build();
         task.setDeferTaskAppear(false /* deferTaskAppear */);
         return task;
     }
 
     @Override
-    public boolean deleteRootTask(WindowContainerToken token) {
-        enforceTaskPermission("deleteRootTask()");
+    public boolean deleteTask(@NonNull WindowContainerToken token) {
+        enforceTaskPermission("deleteTask()");
         final long origId = Binder.clearCallingIdentity();
         try {
             synchronized (mGlobalLock) {
@@ -972,9 +970,9 @@ class TaskOrganizerController extends ITaskOrganizerController.Stub {
                             "Attempt to delete task not created by organizer task=" + task);
                 }
 
-                ProtoLog.v(WM_DEBUG_WINDOW_ORGANIZER, "Delete root task display=%d winMode=%d",
+                ProtoLog.v(WM_DEBUG_WINDOW_ORGANIZER, "Delete task display=%d winMode=%d",
                         task.getDisplayId(), task.getWindowingMode());
-                task.remove(true /* withTransition */, "deleteRootTask");
+                task.remove(true /* withTransition */, "deleteTask");
                 return true;
             }
         } finally {
@@ -1023,6 +1021,33 @@ class TaskOrganizerController extends ITaskOrganizerController.Stub {
             if (state != null) {
                 try {
                     state.mOrganizer.mTaskOrganizer.onPackageUpdateRequested(updatingTasks);
+                } catch (RemoteException e) {
+                    Slog.e(TAG, "Exception sending onPackageUpdate callback", e);
+                }
+            }
+        }
+    }
+
+    void onPackageUpdateFinished(ArrayList<Task> tasks) {
+        final ArrayMap<TaskOrganizerState, ArrayList<ActivityManager.RunningTaskInfo>>
+                stateToTasks = new ArrayMap<>();
+        // Group the given tasks per state
+        for (int i = 0; i < tasks.size(); i++) {
+            final Task task = tasks.get(i);
+            final TaskOrganizerState state = mTaskOrganizerStates.get(
+                    task.mTaskOrganizer.asBinder());
+
+            if (state != null) {
+                stateToTasks.computeIfAbsent(state, k -> new ArrayList<>()).add(task.getTaskInfo());
+            }
+        }
+        for (int i = 0; i < stateToTasks.size(); i++) {
+            final TaskOrganizerState state = stateToTasks.keyAt(i);
+            final ArrayList<ActivityManager.RunningTaskInfo> updatingTasks = stateToTasks.valueAt(
+                    i);
+            if (state != null) {
+                try {
+                    state.mOrganizer.mTaskOrganizer.onPackageUpdateFinished(updatingTasks);
                 } catch (RemoteException e) {
                     Slog.e(TAG, "Exception sending onPackageUpdate callback", e);
                 }
@@ -1128,7 +1153,7 @@ class TaskOrganizerController extends ITaskOrganizerController.Stub {
                 }
                 // For now, only support returning children of tasks created by the organizer.
                 if (!task.mCreatedByOrganizer) {
-                    Slog.w(TAG, "Can only get children of root tasks created via createRootTask");
+                    Slog.w(TAG, "Can only get children of root tasks created via createTask");
                     return null;
                 }
                 ArrayList<RunningTaskInfo> out = new ArrayList<>();
@@ -1175,7 +1200,7 @@ class TaskOrganizerController extends ITaskOrganizerController.Stub {
     }
 
     /**
-     * Sets or unsets whether a back should be intercepted for a given {@param taskId}.
+     * Sets or unsets whether a back should be intercepted for a given {@code taskId}.
      */
     void setInterceptBackPressedOnTaskRoot(int taskId, boolean interceptBackPressed) {
         ProtoLog.v(WM_DEBUG_WINDOW_ORGANIZER, "Set intercept back pressed: taskId=%d intercept=%b",

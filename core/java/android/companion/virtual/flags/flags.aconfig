@@ -11,14 +11,6 @@ package: "android.companion.virtualdevice.flags"
 container: "system"
 
 flag {
-    namespace: "virtual_devices"
-    name: "virtual_display_insets"
-    description: "APIs for specifying virtual display insets (via cutout)"
-    bug: "350007135"
-    is_exported: true
-}
-
-flag {
      namespace: "virtual_devices"
      name: "activity_control_api"
      description: "Enable APIs for fine grained activity policy, fallback and callbacks"
@@ -204,6 +196,7 @@ flag {
     namespace: "virtual_devices"
     description: "Device and display awareness for UiModeManager"
     bug: "340667076"
+    is_exported: true
 }
 
 flag {
@@ -265,19 +258,17 @@ flag {
 }
 
 flag {
-    name: "computer_control_allowlists"
-    namespace: "virtual_devices"
-    description: "Use DeviceConfig to configure allowlists (agents, automatable apps) for ComputerControl."
-    bug: "432678187"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "virtual_camera_support_api"
     namespace: "virtual_devices"
     description: "API for checking if virtual camera is supported on the device"
     bug: "462710537"
+    is_exported: true
+}
+
+flag {
+    name: "device_aware_touch_mode"
+    namespace: "virtual_devices"
+    description: "API for setting the touch mode for a virtual display"
+    bug: "434903682"
     is_exported: true
 }

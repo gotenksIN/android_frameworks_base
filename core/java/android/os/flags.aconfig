@@ -13,6 +13,14 @@ flag {
 }
 
 flag {
+    name: "adpf_audio_performance"
+    is_exported: false
+    namespace: "media_audio"
+    description: "Guards the ADPF audio performance API"
+    bug: "466441536"
+}
+
+flag {
     name: "adpf_cap_max_batch_size"
     namespace: "game"
     description: "Caps the maximum batch size of work durations that can be sent in a report"
@@ -36,14 +44,6 @@ flag {
     namespace: "game"
     description: "Guards use of a boost when view measures during input events"
     bug: "256549451"
-}
-
-flag {
-    name: "adpf_obtainview_boost"
-    namespace: "game"
-    description: "Guards use of a boost in response to HWUI obtainView"
-    is_fixed_read_only: true
-    bug: "328238660"
 }
 
 flag {
@@ -259,10 +259,11 @@ flag {
 }
 
 flag {
-     name: "holdback_concurrent_message_queue_in_systemui"
-     namespace: "system_performance"
-     description: "Holdback for concurrent MessageQueue in SystemUI; if enabled, don't use concurrent MessageQueue in SystemUI."
-     bug: "463114494"
+    name: "initiate_bugreport_as_non_admin"
+    namespace: "feedback"
+    description: "Allow non-admin users with the INITIATE_BUGREPORT_AS_NON_ADMIN permission to generate a bug report."
+    bug: "450735514"
+    is_exported: true
 }
 
 flag {
@@ -491,13 +492,6 @@ flag {
      description: "Parcel marshal/unmarshall APIs that use ByteBuffer."
      is_fixed_read_only: true
      bug: "401362825"
-}
-
-flag {
-     namespace: "system_performance"
-     name: "perfetto_sdk_tracing"
-     description: "Tracing using Perfetto SDK."
-     bug: "303199244"
 }
 
 flag {

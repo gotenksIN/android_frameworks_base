@@ -442,6 +442,10 @@ void RenderProxy::setForceDark(ForceDarkType type) {
     mRenderThread.queue().post([this, type]() { mContext->setForceDark(type); });
 }
 
+void RenderProxy::setDrawingEnabled(bool enabled) {
+    mRenderThread.queue().post([this, enabled]() { mContext->setDrawingEnabled(enabled); });
+}
+
 void RenderProxy::copySurfaceInto(ANativeWindow* window, std::shared_ptr<CopyRequest>&& request) {
     auto& thread = RenderThread::getInstance();
     ANativeWindow_acquire(window);
@@ -523,6 +527,14 @@ void RenderProxy::setRtAnimationsEnabled(bool enabled) {
                 [enabled]() { Properties::enableRTAnimations = enabled; });
     } else {
         Properties::enableRTAnimations = enabled;
+    }
+}
+
+void RenderProxy::setRtAnimationsEnabledForContext(bool enabled) {
+    if (RenderThread::hasInstance()) {
+        RenderThread& thread = RenderThread::getInstance();
+        thread.queue().post(
+                [this, enabled]() { mContext->setRtAnimationsEnabled(enabled); });
     }
 }
 

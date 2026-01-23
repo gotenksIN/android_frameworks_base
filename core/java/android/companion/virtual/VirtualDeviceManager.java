@@ -258,7 +258,8 @@ public final class VirtualDeviceManager {
             IComputerControlSessionCallback callbackProxy =
                     new ComputerControlSession.CallbackProxy(mContext, executor, callback);
             mService.requestComputerControlSession(
-                    mContext.getAttributionSource(), params, callbackProxy);
+                    mContext.getIApplicationThread(), mContext.getAttributionSource(), params,
+                    callbackProxy);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -430,32 +431,6 @@ public final class VirtualDeviceManager {
                     it.remove();
                 }
             }
-        }
-    }
-
-    /**
-     * Returns the intent to warn the user about launching an application that is being automated.
-     *
-     * <p>If the given package is not being automated for this user, or if no intent interception
-     * is needed, returns {@code null}.</p>
-     *
-     * @param packageName the app being launched
-     * @param userId the user associated with that app
-     *
-     * @hide
-     */
-    @Nullable
-    public Intent createAutomatedAppLaunchWarningIntent(
-            @NonNull String packageName, @UserIdInt int userId) {
-        if (mService == null) {
-            Log.w(TAG, "Failed to create intent, no virtual device manager service");
-            return null;
-        }
-        try {
-            return mService.createAutomatedAppLaunchWarningIntent(
-                    Objects.requireNonNull(packageName), userId);
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
         }
     }
 
@@ -1300,6 +1275,27 @@ public final class VirtualDeviceManager {
          */
         public void setDisplayImePolicy(int displayId, @WindowManager.DisplayImePolicy int policy) {
             mVirtualDeviceInternal.setDisplayImePolicy(displayId, policy);
+        }
+
+        /**
+         * Sets whether the given display should be in <a
+         * href="https://developer.android.com/develop/ui/views/touch-and-input/input-events#TouchMode">
+         * touch mode</a>.
+         *
+         * @param displayId the ID of the display to change the touch mode for. It must be owned by
+         *   this virtual device.
+         * @param inTouchMode whether the display should be in touch mode.
+         * @throws SecurityException if the display is not owned by this device, is not
+         *   {@link DisplayManager#VIRTUAL_DISPLAY_FLAG_TRUSTED trusted}, or is a
+         *   {@link DisplayManager#VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR mirror} display.
+         * @see android.view.View#isInTouchMode
+         */
+        @FlaggedApi(Flags.FLAG_DEVICE_AWARE_TOUCH_MODE)
+        public void setDisplayInTouchMode(int displayId, boolean inTouchMode) {
+            if (!Flags.deviceAwareTouchMode()) {
+                throw new UnsupportedOperationException("Required flag is not enabled");
+            }
+            mVirtualDeviceInternal.setDisplayInTouchMode(displayId, inTouchMode);
         }
 
         /**

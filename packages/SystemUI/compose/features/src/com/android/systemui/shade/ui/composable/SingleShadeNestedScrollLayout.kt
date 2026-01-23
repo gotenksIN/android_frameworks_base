@@ -42,7 +42,6 @@ import androidx.compose.ui.unit.constrainHeight
 import androidx.compose.ui.unit.offset
 import com.android.compose.animation.scene.ContentScope
 import com.android.compose.gesture.effect.OffsetOverscrollEffect
-import com.android.compose.gesture.effect.rememberOffsetOverscrollEffect
 import com.android.compose.lifecycle.LaunchedEffectWithLifecycle
 import com.android.compose.modifiers.thenIf
 import com.android.compose.nestedscroll.PriorityNestedScrollConnection
@@ -65,8 +64,8 @@ import kotlinx.coroutines.launch
  * @param modifier The modifier to be applied to this layout.
  * @param shadeSession The session for this shade instance.
  * @param viewModel The view model for this placeholder.
- * @param scrollState The scroll state of the notification list.
- * @param scrimOverScrollEffect The overscroll effect for the scrim.
+ * @param contentScrollState The scroll state of the scrollable notification scrim content.
+ * @param contentOverScrollEffect Overscroll effect of the scrollable notification scrim content.
  * @param jankMonitor To monitor jank.
  * @param statusBarHeader The composable for the status bar header (clock, icons, etc). This header
  *   is always visible.
@@ -81,15 +80,13 @@ fun ContentScope.SingleShadeNestedScrollLayout(
     modifier: Modifier = Modifier,
     shadeSession: SaveableSession,
     viewModel: NotificationsPlaceholderViewModel,
-    scrollState: ScrollState,
+    contentScrollState: ScrollState,
+    scrollingContentOverscrollEffect: OffsetOverscrollEffect,
+    shortContentOverscrollEffect: OffsetOverscrollEffect,
     jankMonitor: InteractionJankMonitor,
     statusBarHeader: @Composable () -> Unit,
     mediaAndQqsHeader: @Composable () -> Unit,
-    scrollableScrim:
-        @Composable
-        (
-            onContentHeightChanged: (Int) -> Unit, scrimOverScrollEffect: OffsetOverscrollEffect,
-        ) -> Unit,
+    scrollableScrim: @Composable (onContentHeightChanged: (Int) -> Unit) -> Unit,
     cutoutInsetsProvider: () -> WindowInsets?,
 ) {
     val coroutineScope = shadeSession.sessionCoroutineScope(key = "SingleShadeNestedScrollLayout")
@@ -111,19 +108,6 @@ fun ContentScope.SingleShadeNestedScrollLayout(
     val contentHeight =
         shadeSession.rememberSession(key = "ScrimContentHeight") { mutableIntStateOf(0) }
 
-    /** Is the content taller than the scrim at rest (when QQS, Media can be fully visible). */
-    val isContentTallerThanScrimAtRest by
-        remember(minScrimHeight, contentHeight) {
-            derivedStateOf { minScrimHeight.intValue < contentHeight.intValue }
-        }
-
-    val scrimOverscrollEffect =
-        rememberOffsetOverscrollEffect(
-            maxDistance =
-                if (isContentTallerThanScrimAtRest) OffsetOverscrollEffect.DefaultMaxDistance
-                else OffsetOverscrollEffect.ShortMaxDistance
-        )
-
     // Some scenes or overlays that use this Composable may be using alwaysCompose=true which will
     // cause them to compose everything but not be visible. Because these side effects push UI state
     // upstream to observers which are shared between callers of this composable, invisible
@@ -131,10 +115,15 @@ fun ContentScope.SingleShadeNestedScrollLayout(
     // this is to remove these side effects when the content is not visible.
     if (isAlwaysComposedContentVisible()) {
         // whether the stack is moving due to a swipe or fling
-        val isScrollInProgress =
-            scrollState.isScrollInProgress ||
-                scrimOverscrollEffect.isInProgress ||
-                scrimOffset.isRunning
+        val isScrollInProgress by remember {
+            derivedStateOf {
+                contentScrollState.isScrollInProgress ||
+                    scrollingContentOverscrollEffect.isInProgress ||
+                    shortContentOverscrollEffect.isInProgress ||
+                    scrimOffset.isRunning
+            }
+        }
+
         LaunchedEffect(isScrollInProgress) {
             if (isScrollInProgress) {
                 jankMonitor.begin(composeViewRoot, CUJ_NOTIFICATION_SHADE_SCROLL_FLING)
@@ -144,29 +133,33 @@ fun ContentScope.SingleShadeNestedScrollLayout(
                 jankMonitor.end(CUJ_NOTIFICATION_SHADE_SCROLL_FLING)
             }
         }
-        val shadeScrollState by
-            shadeSession.rememberSession(key = "SingleShadeScrollState") {
-                derivedStateOf {
+
+        LaunchedEffect(contentScrollState, scrimOffset) {
+            snapshotFlow {
                     ShadeScrollState(
                         // we are not scrolled to the top unless the scroll position is zero,
                         // and the scrim is at its maximum offset
-                        isScrolledToTop = scrimOffset.value >= 0f && scrollState.value == 0,
-                        scrollPosition = scrollState.value,
-                        maxScrollPosition = scrollState.maxValue,
+                        isScrolledToTop = scrimOffset.value >= 0f && contentScrollState.value == 0,
+                        scrollPosition = contentScrollState.value,
+                        maxScrollPosition = contentScrollState.maxValue,
                     )
                 }
-            }
-        LaunchedEffect(shadeScrollState) { viewModel.setScrollState(shadeScrollState) }
+                .collect { shadeScrollState -> viewModel.setScrollState(shadeScrollState) }
+        }
     }
 
     val isContentOverscrolledOnTop by
-        remember(scrollState) {
+        remember(contentScrollState) {
             derivedStateOf {
                 // When the scrim cannot moved further up, scrolling takes over to move the content.
-                scrollState.value > 0
+                contentScrollState.value > 0
             }
         }
 
+    /** Is the content taller than the scrim at rest (when QQS, Media can be fully visible). */
+    fun isContentTallerThanScrimAtRest(): Boolean {
+        return minScrimHeight.intValue < contentHeight.intValue
+    }
     // If contentHeight drops below minimum visible scrim height while scrim is
     // expanded and IME is not showing, reset scrim offset.
     LaunchedEffectWithLifecycle(contentHeight, minScrimHeight, scrimOffset) {
@@ -205,6 +198,7 @@ fun ContentScope.SingleShadeNestedScrollLayout(
                             // When part of the gesture was used to scroll Notifications, don't
                             // allow Scene changes by swipes.
                             .disableSwipesWhenScrolling()
+                            // The glue between scrolling the content and offsetting the scrim.
                             .nestedScroll(
                                 remember(scrimOffset, flingBehavior) {
                                     scrimNestedScrollConnection(
@@ -218,13 +212,13 @@ fun ContentScope.SingleShadeNestedScrollLayout(
                                         collapsibleHeaderHeight = {
                                             overlappableHeaderHeight.intValue.toFloat()
                                         },
-                                        canOverscrollContent = { isContentTallerThanScrimAtRest },
+                                        canOverscrollContent = { isContentTallerThanScrimAtRest() },
                                         flingBehavior = flingBehavior,
                                     )
                                 }
                             )
                     ) {
-                        scrollableScrim({ contentHeight.intValue = it }, scrimOverscrollEffect)
+                        scrollableScrim { contentHeight.intValue = it }
                     }
                 },
             ),

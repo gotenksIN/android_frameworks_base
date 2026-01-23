@@ -104,15 +104,6 @@
     <item msgid="7073042887003102964">"map13"</item>
     <item msgid="8147982633566548515">"map14"</item>
   </string-array>
-  <string-array name="bluetooth_a2dp_codec_titles">
-    <item msgid="2494959071796102843">"စနစ်ရွေးချယ်မှုကို အသုံးပြုပါ (မူရင်း)"</item>
-    <item msgid="4055460186095649420">"SBC"</item>
-    <item msgid="720249083677397051">"AAC"</item>
-    <item msgid="1049450003868150455">"<xliff:g id="QUALCOMM">Qualcomm®</xliff:g> <xliff:g id="APTX">aptX™</xliff:g> အသံ"</item>
-    <item msgid="2908219194098827570">"<xliff:g id="QUALCOMM">Qualcomm®</xliff:g> <xliff:g id="APTX_HD">aptX™ HD</xliff:g> အသံ"</item>
-    <item msgid="3825367753087348007">"LDAC"</item>
-    <item msgid="8637806944387141612">"Opus"</item>
-  </string-array>
   <string-array name="bluetooth_a2dp_codec_summaries">
     <item msgid="8868109554557331312">"စနစ်ရွေးချယ်မှုကို အသုံးပြုပါ (မူရင်း)"</item>
     <item msgid="9024885861221697796">"SBC"</item>
@@ -296,7 +287,7 @@
   </string-array>
   <string-array name="shade_display_awareness_entries">
     <item msgid="816770658383209617">"စက်ဖန်သားပြင် သီးသန့် (မူရင်း)"</item>
-    <item msgid="9161645858025071955">"ပြင်ပဖန်သားပြင်"</item>
+    <item msgid="9161645858025071955">"ပြင်ပပြကွက်"</item>
     <item msgid="23651860565814477">"နောက်ဆုံး အခြေအနေပြဘား တို့ထိမှု"</item>
     <item msgid="7521112827893653392">"ပြသမှုအခြေပြု"</item>
   </string-array>

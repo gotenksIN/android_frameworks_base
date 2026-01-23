@@ -22,17 +22,22 @@ import android.os.Binder
 import android.platform.test.annotations.EnableFlags
 import android.view.SurfaceControl
 import android.view.WindowManager.TRANSIT_CLOSE
+import android.view.WindowManager.TRANSIT_FLAG_KEYGUARD_GOING_AWAY
 import android.view.WindowManager.TRANSIT_OPEN
+import android.view.WindowManager.TRANSIT_TO_BACK
+import android.view.WindowManager.TRANSIT_TO_FRONT
 import android.window.IRemoteTransition
 import android.window.RemoteTransition
 import android.window.TransitionInfo
 import android.window.TransitionRequestInfo
 import android.window.WindowContainerToken
+import android.window.WindowContainerTransaction
 import androidx.test.filters.SmallTest
 import com.android.dx.mockito.inline.extended.ExtendedMockito.spyOn
-import com.android.window.flags.Flags.FLAG_FIX_BUBBLE_TRAMPOLINE_ANIMATION
+import com.android.testing.wm.util.MockToken
+import com.android.window.flags.Flags.FLAG_ENABLE_BUBBLE_ROOT_TASK
 import com.android.wm.shell.Flags.FLAG_ENABLE_CREATE_ANY_BUBBLE
-import com.android.wm.shell.MockToken
+import com.android.wm.shell.Flags.FLAG_FIX_OPEN_APP_BUBBLE_FROM_LOCKSCREEN
 import com.android.wm.shell.ShellTestCase
 import com.android.wm.shell.TestShellExecutor
 import com.android.wm.shell.activityembedding.ActivityEmbeddingController
@@ -57,6 +62,7 @@ import java.util.Optional
 import org.junit.Before
 import org.junit.Test
 import org.mockito.kotlin.any
+import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.mock
@@ -206,6 +212,8 @@ class DefaultMixedHandlerTest : ShellTestCase() {
         val runningTask = createRunningTask(100)
         val request = createTransitionRequestInfo(runningTask)
 
+        bubbleHelper.stub { onGeneric { isAppBubbleTask(any()) } doReturn false }
+
         assertThat(mixedHandler.requestHasBubbleEnterFromAppBubbleOrExistingBubble(request))
             .isFalse()
     }
@@ -216,10 +224,7 @@ class DefaultMixedHandlerTest : ShellTestCase() {
         val runningTask = createRunningTask(100)
         val request = createTransitionRequestInfo(runningTask)
 
-        bubbleController.stub {
-            on { shouldBeAppBubble(runningTask) } doReturn true
-        }
-        doReturn(true).`when`(bubbleHelper).isAppBubbleTask(runningTask)
+        bubbleHelper.stub { onGeneric { isAppBubbleTask(any()) } doReturn true }
 
         assertThat(mixedHandler.requestHasBubbleEnterFromAppBubbleOrExistingBubble(request))
             .isTrue()
@@ -231,10 +236,7 @@ class DefaultMixedHandlerTest : ShellTestCase() {
         val runningTask = createRunningTask(100)
         val request = createTransitionRequestInfo(runningTask)
 
-        bubbleController.stub {
-            on { shouldBeAppBubble(runningTask) } doReturn true
-        }
-        doReturn(true).`when`(bubbleHelper).isAppBubbleTask(runningTask)
+        bubbleHelper.stub { onGeneric { isAppBubbleTask(any()) } doReturn true }
 
         assertThat(mixedHandler.requestHasBubbleEnterFromAppBubbleOrExistingBubble(request))
             .isTrue()
@@ -247,10 +249,7 @@ class DefaultMixedHandlerTest : ShellTestCase() {
         val remoteTransition = mock<IRemoteTransition>()
         val request = createTransitionRequestInfo(runningTask, RemoteTransition(remoteTransition))
 
-        bubbleController.stub {
-            on { shouldBeAppBubble(runningTask) } doReturn true
-        }
-        doReturn(true).`when`(bubbleHelper).isAppBubbleTask(runningTask)
+        bubbleHelper.stub { onGeneric { isAppBubbleTask(any()) } doReturn true }
 
         mixedHandler.handleRequest(Binder(), request)
 
@@ -262,15 +261,12 @@ class DefaultMixedHandlerTest : ShellTestCase() {
     fun test_startAnimation_NoBubbleEnterFromAppBubble() {
         val info = TransitionInfo(TRANSIT_OPEN, 0)
 
-        bubbleController.stub {
-            on { shouldBeAppBubble(any()) } doReturn true
-        }
-        doReturn(true).`when`(bubbleHelper).isAppBubbleTask(any())
+        bubbleHelper.stub { onGeneric { isAppBubbleTask(any()) } doReturn true }
 
         mixedHandler.startAnimation(Binder(), info, mock<SurfaceControl.Transaction>(),
             mock<SurfaceControl.Transaction>(), mock<Transitions.TransitionFinishCallback>())
 
-        verify(bubbleTransitions, never()).startBubbleToBubbleLaunchOrExistingBubbleConvert(
+        verify(bubbleTransitions, never()).startExpandAndSelectBubbleForExistingTransition(
             any(), any(), any())
     }
 
@@ -283,20 +279,17 @@ class DefaultMixedHandlerTest : ShellTestCase() {
         val info = TransitionInfo(TRANSIT_OPEN, 0)
         info.addChange(change)
 
-        bubbleController.stub {
-            on { shouldBeAppBubble(any()) } doReturn true
-        }
-        doReturn(true).`when`(bubbleHelper).isAppBubbleTask(any())
+        bubbleHelper.stub { onGeneric { isAppBubbleTask(any()) } doReturn true }
 
         mixedHandler.startAnimation(Binder(), info, mock<SurfaceControl.Transaction>(),
             mock<SurfaceControl.Transaction>(), mock<Transitions.TransitionFinishCallback>())
 
-        verify(bubbleTransitions).startBubbleToBubbleLaunchOrExistingBubbleConvert(
+        verify(bubbleTransitions).startExpandAndSelectBubbleForExistingTransition(
             any(), any(), any())
     }
 
     @Test
-    @EnableFlags(FLAG_ENABLE_CREATE_ANY_BUBBLE, FLAG_FIX_BUBBLE_TRAMPOLINE_ANIMATION)
+    @EnableFlags(FLAG_ENABLE_CREATE_ANY_BUBBLE)
     fun test_startAnimation_taskTrampolineBubbleLaunch() {
         val openingChange =
             TransitionInfo.Change(mock<WindowContainerToken>(), mock<SurfaceControl>())
@@ -310,15 +303,36 @@ class DefaultMixedHandlerTest : ShellTestCase() {
         info.addChange(openingChange)
         info.addChange(closingChange)
 
-        bubbleController.stub {
-            on { shouldBeAppBubble(any()) } doReturn true
-        }
-        doReturn(true).`when`(bubbleHelper).isAppBubbleTask(any())
+        bubbleHelper.stub { onGeneric { isAppBubbleTask(any()) } doReturn true }
 
         mixedHandler.startAnimation(Binder(), info, mock<SurfaceControl.Transaction>(),
             mock<SurfaceControl.Transaction>(), mock<Transitions.TransitionFinishCallback>())
 
         verify(bubbleTransitions).startTaskTrampolineBubbleLaunch(
+            any(), eq(openingChange.taskInfo!!), eq(closingChange.taskInfo!!), any())
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_CREATE_ANY_BUBBLE, FLAG_ENABLE_BUBBLE_ROOT_TASK)
+    fun test_startAnimation_bubbleSwitch() {
+        val openingChange =
+            TransitionInfo.Change(mock<WindowContainerToken>(), mock<SurfaceControl>())
+        openingChange.mode = TRANSIT_TO_FRONT
+        openingChange.taskInfo = createRunningTask()
+        val closingChange =
+            TransitionInfo.Change(mock<WindowContainerToken>(), mock<SurfaceControl>())
+        closingChange.mode = TRANSIT_TO_BACK
+        closingChange.taskInfo = createRunningTask()
+        val info = TransitionInfo(TRANSIT_TO_FRONT, 0)
+        info.addChange(openingChange)
+        info.addChange(closingChange)
+
+        bubbleHelper.stub { onGeneric { isAppBubbleTask(any()) } doReturn true }
+
+        mixedHandler.startAnimation(Binder(), info, mock<SurfaceControl.Transaction>(),
+            mock<SurfaceControl.Transaction>(), mock<Transitions.TransitionFinishCallback>())
+
+        verify(bubbleTransitions).startBubbleSwitch(
             any(), eq(openingChange.taskInfo!!), eq(closingChange.taskInfo!!), any())
     }
 
@@ -341,6 +355,62 @@ class DefaultMixedHandlerTest : ShellTestCase() {
 
         verify(mixedTransition).onTransitionConsumed(eq(transition), eq(true), any())
         assertThat(mixedHandler.mActiveTransitions.contains(mixedTransition)).isFalse()
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_CREATE_ANY_BUBBLE, FLAG_FIX_OPEN_APP_BUBBLE_FROM_LOCKSCREEN)
+    fun test_startAnimation_bubbleOpensFromKeyguard() {
+        val transition = Binder()
+        val info = TransitionInfo(TRANSIT_OPEN, TRANSIT_FLAG_KEYGUARD_GOING_AWAY)
+
+        // Set up bubble change
+        val change = TransitionInfo.Change(mock<WindowContainerToken>(), mock<SurfaceControl>())
+        change.mode = TRANSIT_OPEN
+        change.taskInfo = createRunningTask()
+        info.addChange(change)
+        bubbleHelper.stub {
+            onGeneric { isAppBubbleTask(any()) } doReturn true
+            onGeneric { getEnterBubbleTask(any()) } doReturn change
+        }
+        bubbleTransitions.stub {
+            on { canAnimateTransition(any(), any()) } doReturn true
+        }
+
+        val mixedTransition = DefaultMixedTransition(
+            TYPE_LAUNCH_OR_CONVERT_TO_BUBBLE, transition, transitions, mixedHandler,
+            pipTransitionController, splitScreenController.getTransitionHandler(),
+            keyguardTransitionHandler, unfoldTransitionHandler, activityEmbeddingController,
+            desktopTasksController, bubbleTransitions, bubbleHelper, pinnedLayerHandler
+        )
+        mixedHandler.mActiveTransitions.add(mixedTransition)
+
+        // Make sure keyguard handles it
+        keyguardTransitionHandler.stub {
+            on { startAnimation(eq(transition), any(), any(), any(), any()) } doReturn true
+        }
+
+        val startT = mock<SurfaceControl.Transaction>()
+        val finishT = mock<SurfaceControl.Transaction>()
+        val finishCallback = mock<Transitions.TransitionFinishCallback>()
+        mixedHandler.startAnimation(transition, info, startT, finishT, finishCallback)
+
+        // Verify Keyguard handler started
+        val callbackCaptor = argumentCaptor<Transitions.TransitionFinishCallback>()
+        verify(keyguardTransitionHandler).startAnimation(
+            eq(transition), any(), eq(startT), eq(finishT), callbackCaptor.capture()
+        )
+
+        // Verify bubble NOT started yet
+        verify(bubbleTransitions, never())
+            .startExpandAndSelectBubbleForExistingTransition(any(), any(), any())
+
+        // Check that bubble starts after keyguard finishes
+        val wct = mock<WindowContainerTransaction>()
+        callbackCaptor.firstValue.onTransitionFinished(wct)
+
+        verify(bubbleTransitions).startExpandAndSelectBubbleForExistingTransition(
+            eq(transition), eq(change.taskInfo!!), any()
+        )
     }
 
     private fun createTransitionRequestInfo(

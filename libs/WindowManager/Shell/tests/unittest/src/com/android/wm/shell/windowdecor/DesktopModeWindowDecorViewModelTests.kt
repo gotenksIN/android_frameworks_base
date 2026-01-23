@@ -62,6 +62,7 @@ import android.view.WindowInsets.Type.statusBars
 import android.window.WindowContainerTransaction
 import androidx.test.filters.SmallTest
 import com.android.dx.mockito.inline.extended.ExtendedMockito
+import com.android.testing.wm.util.StubTransaction
 import com.android.window.flags.Flags
 import com.android.wm.shell.R
 import com.android.wm.shell.common.DisplayController
@@ -78,7 +79,6 @@ import com.android.wm.shell.recents.RecentsTransitionStateListener
 import com.android.wm.shell.shared.bubbles.BubbleAnythingFlagHelper
 import com.android.wm.shell.shared.desktopmode.DesktopModeTransitionSource
 import com.android.wm.shell.splitscreen.SplitScreenController
-import com.android.wm.shell.util.StubTransaction
 import com.android.wm.shell.windowdecor.DesktopModeWindowDecorViewModel.DefaultWindowDecorationActions
 import com.google.common.truth.Truth.assertThat
 import junit.framework.Assert.assertFalse
@@ -1339,7 +1339,7 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
         assumeTrue(BubbleAnythingFlagHelper.enableRootTaskForBubble())
 
         val taskInfo = createTask(windowingMode = WINDOWING_MODE_MULTI_WINDOW)
-        mockBubbleController.stub { on { shouldBeAppBubble(taskInfo) } doReturn true }
+        bubbleHelper.stub { on { isAppBubbleTask(taskInfo) } doReturn true }
 
         val isWindowDecorCreated =
             desktopModeWindowDecorViewModel.onTaskOpening(
@@ -1361,7 +1361,7 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
                 // in BubbleTaskViewListener#onInitialized.
                 configuration.windowConfiguration.setAlwaysOnTop(true)
             }
-        mockBubbleController.stub { on { hasStableBubbleForTask(taskInfo.taskId) } doReturn true }
+        bubbleController.stub { on { hasStableBubbleForTask(taskInfo.taskId) } doReturn true }
 
         val isWindowDecorCreated =
             desktopModeWindowDecorViewModel.onTaskOpening(
@@ -1380,7 +1380,7 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
         assumeTrue(BubbleAnythingFlagHelper.enableCreateAnyBubble())
 
         val taskInfo = createTask(windowingMode = WINDOWING_MODE_MULTI_WINDOW)
-        mockBubbleController.stub { on { hasStableBubbleForTask(taskInfo.taskId) } doReturn true }
+        bubbleController.stub { on { hasStableBubbleForTask(taskInfo.taskId) } doReturn true }
 
         desktopModeWindowDecorViewModel.onTaskChanging(
             taskInfo,
@@ -1398,7 +1398,7 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
         assumeTrue(BubbleAnythingFlagHelper.enableCreateAnyBubble())
 
         val taskInfo = createTask(windowingMode = WINDOWING_MODE_MULTI_WINDOW)
-        mockBubbleController.stub { on { hasStableBubbleForTask(taskInfo.taskId) } doReturn true }
+        bubbleController.stub { on { hasStableBubbleForTask(taskInfo.taskId) } doReturn true }
         val mockDecoration = mock<WindowDecorationWrapper>()
         windowDecorByTaskIdSpy.put(taskInfo.taskId, mockDecoration)
 
@@ -1413,9 +1413,6 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
     }
 
     @Test
-    @EnableFlags(
-        Flags.FLAG_ENABLE_WINDOW_DROP_SMOOTH_TRANSITION,
-    )
     fun testOnFreeformWindowDragEnd_toDesktopModeDisplay_updateBounds() {
         val onTouchListenerCaptor = argumentCaptor<View.OnTouchListener>()
         val decor =
@@ -1542,9 +1539,6 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
     }
 
     @Test
-    @EnableFlags(
-        Flags.FLAG_ENABLE_WINDOW_DROP_SMOOTH_TRANSITION,
-    )
     fun testOnFreeformWindowDragMove_toNonDesktopModeDisplay_setsNoDropIcon() {
         val onTouchListenerCaptor = argumentCaptor<View.OnTouchListener>()
         val decor =

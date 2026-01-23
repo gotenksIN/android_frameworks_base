@@ -146,6 +146,7 @@ public:
     void addFrameMetricsObserver(sp<FrameMetricsObserver>&& observer);
     void removeFrameMetricsObserver(sp<FrameMetricsObserver>&& observer);
     void setForceDark(ForceDarkType type);
+    void setDrawingEnabled(bool enabled);
 
     static void copySurfaceInto(ANativeWindow* window, std::shared_ptr<CopyRequest>&& request);
     static void prepareToDraw(Bitmap& bitmap);
@@ -158,6 +159,8 @@ public:
     static int preload();
 
     static void setRtAnimationsEnabled(bool enabled);
+
+    void setRtAnimationsEnabledForContext(bool enabled);
 
 private:
     RenderThread& mRenderThread;

@@ -160,7 +160,6 @@ import android.view.Display;
 import android.webkit.URLUtil;
 import android.window.ActivityWindowInfo;
 import android.window.DesktopExperienceFlags;
-import android.window.DesktopModeFlags;
 
 import com.android.internal.R;
 import com.android.internal.annotations.GuardedBy;
@@ -186,7 +185,6 @@ import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
-import java.util.function.Predicate;
 
 // QTI_BEGIN: 2019-05-01: Performance: IOP: Fix and rebase PreferredApps.
 import java.util.Arrays;
@@ -313,8 +311,6 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
 
     /** Helper for {@link Task#fillTaskInfo}. */
     final TaskInfoHelper mTaskInfoHelper = new TaskInfoHelper();
-
-    final OpaqueContainerHelper mOpaqueContainerHelper = new OpaqueContainerHelper();
 
     private final ActivityTaskSupervisorHandler mHandler;
     final Looper mLooper;
@@ -533,7 +529,6 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
     }
 
     void onSystemReady() {
-        mPersisterQueue.onSystemReady(mService.mContext);
         mLaunchParamsPersister.onSystemReady();
     }
 
@@ -965,8 +960,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
                             && lockTaskController.getLockTaskModeState()
                     == LOCK_TASK_MODE_LOCKED)) {
 
-                if (DesktopExperienceFlags.ENABLE_DESKTOP_WINDOWING_ENTERPRISE_BUGFIX.isTrue()
-                        && task.mTransitionController.isShellTransitionsEnabled()) {
+                if (task.mTransitionController.isShellTransitionsEnabled()) {
                     final Transition transition = new Transition(TRANSIT_START_LOCK_TASK_MODE,
                             0 /* flags */,
                             task.mTransitionController, mWindowManager.mSyncEngine);
@@ -1509,7 +1503,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
         return mPermissionManager;
     }
 
-    private VirtualDeviceManagerInternal getVirtualDeviceManagerInternal() {
+    VirtualDeviceManagerInternal getVirtualDeviceManagerInternal() {
         if (mVirtualDeviceManagerInternal == null && mService.mHasCompanionDeviceSetupFeature) {
             mVirtualDeviceManagerInternal =
                     LocalServices.getService(VirtualDeviceManagerInternal.class);
@@ -1905,7 +1899,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
     }
 
     /**
-     * Removes the root task associated with the given {@param rootTask}. If the {@param rootTask}
+     * Removes the root task associated with the given {@code rootTask}. If the {@code rootTask}
      * is the pinned task, then its child tasks are not explicitly removed when the root task is
      * destroyed, but instead moved back onto the TaskDisplayArea.
      */
@@ -2260,6 +2254,8 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
     }
 
     boolean shutdownLocked(int timeout) {
+        mPersisterQueue.onSystemShutdown();
+
         mRootWindowContainer.prepareForShutdown();
         goingToSleepLocked();
         mRootWindowContainer.forAllDisplays(display -> display.setIsSleeping(true));
@@ -3319,117 +3315,6 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
         }
     }
 
-    /** The helper to calculate whether a container is opaque. */
-    static class OpaqueContainerHelper implements Predicate<ActivityRecord> {
-        private final boolean mEnableMultipleDesktopsBackend =
-                DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue();
-        private ActivityRecord mStarting;
-        private boolean mIgnoringInvisibleActivity;
-        private boolean mIgnoringKeyguard;
-
-        /** Whether the container is opaque. */
-        boolean isOpaque(@NonNull WindowContainer<?> container) {
-            return isOpaque(container, null /* starting */, true /* ignoringKeyguard */,
-                    false /* ignoringInvisibleActivity */);
-        }
-
-        /**
-         * Whether the container is opaque, but only including visible activities in its
-         * calculation.
-         */
-        boolean isOpaque(
-                @NonNull WindowContainer<?> container, @Nullable ActivityRecord starting,
-                boolean ignoringKeyguard,  boolean ignoringInvisibleActivity) {
-            mStarting = starting;
-            mIgnoringInvisibleActivity = ignoringInvisibleActivity;
-            mIgnoringKeyguard = ignoringKeyguard;
-
-            final boolean isOpaque;
-            if (!mEnableMultipleDesktopsBackend) {
-                isOpaque = container.getActivity(this,
-                        true /* traverseTopToBottom */, null /* boundary */) != null;
-            } else {
-                isOpaque = isOpaqueInner(container);
-            }
-            mStarting = null;
-            return isOpaque;
-        }
-
-        private boolean isOpaqueInner(@NonNull WindowContainer<?> container) {
-            final boolean isActivity = container.asActivityRecord() != null;
-            final boolean isLeafTaskFragment = container.asTaskFragment() != null
-                    && ((TaskFragment) container).isLeafTaskFragment();
-            final boolean isForceOpaque = container.asTask() != null
-                    && container.asTask().isForceOpaque();
-            if (isForceOpaque) {
-                return true;
-            }
-            if (isActivity || isLeafTaskFragment) {
-                // When it is an activity or leaf task fragment, then opacity is calculated based
-                // on itself or its activities.
-                return container.getActivity(this,
-                        true /* traverseTopToBottom */, null /* boundary */) != null;
-            }
-            // Otherwise, it's considered opaque if any of its opaque children fill this
-            // container, unless the children are adjacent fragments, in which case as long as they
-            // are all opaque then |container| is also considered opaque, even if the adjacent
-            // task fragment aren't filling.
-            TaskFragment.AdjacentVisibilityHelper adjacentVisibilityHelper = null;
-            for (int i = container.getChildCount() - 1; i >= 0; --i) {
-                final WindowContainer<?> child = container.getChildAt(i);
-                if (child.fillsParent() && isOpaque(child)) {
-                    return true;
-                }
-
-                if (com.android.window.flags.Flags.fixTfAdjacentVisibility()) {
-                    final TaskFragment tf = child.asTaskFragment();
-                    if (tf != null) {
-                        if (tf.hasAdjacentTaskFragment() && adjacentVisibilityHelper == null) {
-                            adjacentVisibilityHelper = tf.getAdjacentTaskFragments()
-                                    .getVisibilityHelper(this::isOpaque);
-                        }
-                        if (adjacentVisibilityHelper != null) {
-                            adjacentVisibilityHelper.process(tf);
-                            if (adjacentVisibilityHelper.isAllAdjacentTaskFragmentProcessed()) {
-                                if (adjacentVisibilityHelper.occludesParent()) {
-                                    // return early if the adjacent TFs are opaque.
-                                    return true;
-                                } else {
-                                    adjacentVisibilityHelper = null;
-                                }
-                            }
-                        }
-                    }
-                } else {
-                    if (child.asTaskFragment() != null
-                            && child.asTaskFragment().hasAdjacentTaskFragment()) {
-                        final boolean isAnyTranslucent = !isOpaque(child)
-                                || child.asTaskFragment().forOtherAdjacentTaskFragments(
-                                    tf -> !isOpaque(tf));
-                        if (!isAnyTranslucent) {
-                            // This task fragment and all its adjacent task fragments are opaque,
-                            // consider it opaque even if it doesn't fill its parent.
-                            return true;
-                        }
-                    }
-                }
-            }
-            return false;
-        }
-
-        @Override
-        public boolean test(ActivityRecord r) {
-            if (mIgnoringInvisibleActivity && r != mStarting
-                    && ((mIgnoringKeyguard && !r.visibleIgnoringKeyguard)
-                    || (!mIgnoringKeyguard && !r.isVisible()))) {
-                // Ignore invisible activities that are not the currently starting activity
-                // (about to be visible).
-                return false;
-            }
-            return r.occludesParent(!mIgnoringInvisibleActivity /* includingFinishing */);
-        }
-    }
-
     /**
      * Fills the info that needs to iterate all activities of task, such as the number of
      * non-finishing activities and collecting launch cookies.
@@ -3462,8 +3347,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
             if (r.finishing) {
                 return;
             }
-            if (DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_APP_TO_WEB.isTrue()
-                    && mInfo.capturedLink == null) {
+            if (mInfo.capturedLink == null) {
                 setCapturedLink(r);
             }
             mInfo.numActivities++;

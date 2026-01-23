@@ -416,6 +416,9 @@
     <!-- Motion Cues -->
     <uses-permission android:name="android.permission.BIND_MOTION_CUES_SERVICE"/>
 
+    <!-- To be able to start location button consent dialog activity in PermissionController. -->
+    <uses-permission android:name="android.permission.REQUEST_LOCATION_BUTTON_PERMISSIONS"/>
+
     <protected-broadcast android:name="com.android.settingslib.action.REGISTER_SLICE_RECEIVER" />
     <protected-broadcast android:name="com.android.settingslib.action.UNREGISTER_SLICE_RECEIVER" />
     <protected-broadcast android:name="com.android.settings.flashlight.action.FLASHLIGHT_CHANGED" />
@@ -1240,6 +1243,7 @@
             />
 
         <service android:name="com.android.systemui.personalcontext.SysuiVisualizerService"
+            android:enabled="false"
             android:exported="true"
             android:singleUser="true"
             android:permission="android.permission.BIND_INSIGHT_SURFACE_VISUALIZER_SERVICE">

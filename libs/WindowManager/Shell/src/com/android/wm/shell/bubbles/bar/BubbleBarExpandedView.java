@@ -18,7 +18,6 @@ package com.android.wm.shell.bubbles.bar;
 
 import static android.view.ViewGroup.LayoutParams.MATCH_PARENT;
 
-import static com.android.wm.shell.bubbles.util.BubbleUtils.isValidToBubble;
 import static com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_BUBBLES_NOISY;
 
 import static java.lang.Math.max;
@@ -42,7 +41,6 @@ import android.view.ViewOutlineProvider;
 import android.view.ViewRootImpl;
 import android.view.accessibility.AccessibilityNodeInfo;
 import android.widget.FrameLayout;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.VisibleForTesting;
@@ -57,8 +55,11 @@ import com.android.wm.shell.bubbles.BubbleTaskView;
 import com.android.wm.shell.bubbles.BubbleTaskViewListener;
 import com.android.wm.shell.bubbles.Bubbles;
 import com.android.wm.shell.bubbles.logging.BubbleLogger;
+import com.android.wm.shell.bubbles.util.BubblePolicyHelper;
+import com.android.wm.shell.bubbles.util.DefaultBubblePolicyHelper;
 import com.android.wm.shell.dagger.HasWMComponent;
 import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
+import com.android.wm.shell.shared.bubbles.ContextUtils;
 import com.android.wm.shell.taskview.TaskView;
 
 import java.io.PrintWriter;
@@ -177,6 +178,9 @@ public class BubbleBarExpandedView extends FrameLayout implements BubbleTaskView
     @VisibleForTesting
     @Inject
     public BubbleLogger bubbleLogger;
+
+    @VisibleForTesting
+    BubblePolicyHelper mBubblePolicyHelper = DefaultBubblePolicyHelper.INSTANCE;
 
     public BubbleBarExpandedView(Context context) {
         this(context, null);
@@ -393,8 +397,11 @@ public class BubbleBarExpandedView extends FrameLayout implements BubbleTaskView
 
     @Override
     public void onTaskInfoChanged(ActivityManager.RunningTaskInfo taskInfo) {
-        if (!isValidToBubble(taskInfo)) {
-            Toast.makeText(mContext, R.string.bubble_not_supported_text, Toast.LENGTH_SHORT).show();
+        if (mManager != null && taskInfo != null
+                && !mBubblePolicyHelper.isValidToBubble(taskInfo)) {
+            // Since the task is no longer valid to be bubbled after a state change (e.g. on fold),
+            // collapse the stack. When the user taps the bubble again, it will move out of bubble.
+            mManager.collapseStack();
         } else if (mCaptionView != null && taskInfo != null && taskInfo.taskDescription != null) {
             final int statusBarColor = taskInfo.taskDescription.getStatusBarColor();
             final int bgColor = taskInfo.taskDescription.getBackgroundColor();
@@ -407,7 +414,11 @@ public class BubbleBarExpandedView extends FrameLayout implements BubbleTaskView
             }
         }
         if (mBubble != null && taskInfo != null) {
-            mBubble.setIsTaskValidToBubble(isValidToBubble(taskInfo));
+            final boolean isTaskResizable = taskInfo.isResizeable;
+            final boolean isNonResizableTaskAndValidOnSmallScreen = !isTaskResizable
+                    && ContextUtils.getSupportsNonResizableMultiWindowOnSmallScreen(mContext);
+            mBubble.setIsTaskValidToBubbleOnSmallScreen(
+                    isTaskResizable || isNonResizableTaskAndValidOnSmallScreen);
         }
     }
 

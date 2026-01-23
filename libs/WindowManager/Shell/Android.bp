@@ -42,12 +42,14 @@ filegroup {
 }
 
 // Aidls which can be used directly downstream of this library
-filegroup {
-    name: "wm_shell-aidls",
-    srcs: [
-        "src/**/*.aidl",
-    ],
-    path: "src",
+java_library {
+    name: "WindowManager-Shell-aidls",
+    srcs: ["src/**/*.aidl"],
+    aidl: {
+        include_dirs: ["frameworks/native/libs/gui"],
+        local_include_dirs: ["shared/src/"],
+    },
+    static_libs: ["WindowManager-Shell-shared"],
 }
 
 // TODO(b/168581922) protologtool do not support kotlin(*.kt)
@@ -66,11 +68,15 @@ java_genrule {
         ":wm_shell-sources",
         ":wm_shell_protolog-groups",
     ],
-    tools: ["protologtool"],
+    tools: [
+        "protologtool",
+        "soong_javac_wrapper",
+    ],
     cmd: "$(location protologtool) transform-protolog-calls " +
         "--protolog-class com.android.internal.protolog.ProtoLog " +
         "--loggroups-class com.android.wm.shell.protolog.ShellProtoLogGroup " +
         "--loggroups-jar $(location :wm_shell_protolog-groups) " +
+        "--javac-wrapper-path $(location soong_javac_wrapper) " +
         "--viewer-config-file-path /system_ext/etc/wmshell.protolog.pb " +
         "--output-srcjar $(out) " +
         "$(locations :wm_shell-sources)",
@@ -83,11 +89,15 @@ java_genrule {
         ":wm_shell-sources",
         ":wm_shell_protolog-groups",
     ],
-    tools: ["protologtool"],
+    tools: [
+        "protologtool",
+        "soong_javac_wrapper",
+    ],
     cmd: "$(location protologtool) generate-viewer-config " +
         "--protolog-class com.android.internal.protolog.ProtoLog " +
         "--loggroups-class com.android.wm.shell.protolog.ShellProtoLogGroup " +
         "--loggroups-jar $(location :wm_shell_protolog-groups) " +
+        "--javac-wrapper-path $(location soong_javac_wrapper) " +
         "--viewer-config $(out) " +
         "$(locations :wm_shell-sources)",
     out: ["wmshell.protolog.pb"],
@@ -129,8 +139,6 @@ android_library {
     name: "WindowManager-Shell",
     srcs: [
         // TODO(b/168581922) protologtool do not support kotlin(*.kt)
-        ":wm_shell-aidls",
-        ":wm_shell-shared-aidls",
         ":wm_shell-sources-kt",
         ":wm_shell_protolog_src",
         "src/com/android/wm/shell/EventLogTags.logtags",
@@ -138,11 +146,6 @@ android_library {
     resource_dirs: [
         "res",
     ],
-    aidl: {
-        include_dirs: [
-            "frameworks/native/libs/gui",
-        ],
-    },
     static_libs: [
         "android.gui.boxshadow-java",
         "//frameworks/base/packages/SystemUI/aconfig:com_android_systemui_flags_lib",
@@ -155,11 +158,13 @@ android_library {
         "WindowManager-Shell-lite-proto",
         "WindowManager-Shell-proto",
         "WindowManager-Shell-shared",
+        "WindowManager-Shell-aidls",
         "am_flags_lib",
         "androidx-constraintlayout_constraintlayout",
         "androidx.appcompat_appcompat",
         "androidx.arch.core_core-runtime",
         "androidx.compose.material3_material3",
+        "com.google.android.material_material",
         "androidx.core_core-ktx",
         "androidx.datastore_datastore",
         "androidx.dynamicanimation_dynamicanimation",

@@ -109,7 +109,6 @@ filegroup {
         ":android.hardware.radio.data-V5-java-source",
         ":android.hardware.radio.network-V5-java-source",
         ":android.hardware.radio.voice-V5-java-source",
-        ":android.hardware.security.keymint-V4-java-source",
         ":android.hardware.security.secureclock-V1-java-source",
         ":android.hardware.thermal-V3-java-source",
         ":android.hardware.tv.tuner-V3-java-source",
@@ -118,7 +117,6 @@ filegroup {
         ":android.security.legacykeystore-java-source",
         ":android.security.maintenance-java-source",
         ":android.security.metrics-java-source",
-        ":android.system.keystore2-V5-java-source",
         ":android.hardware.cas-V1-java-source",
         ":credstore_aidl",
         ":dumpstate_aidl",
@@ -151,7 +149,17 @@ filegroup {
         ":statslog-framework-java-gen", // FrameworkStatsLog.java
         ":statslog-hwui-java-gen", // HwuiStatsLog.java
         ":audio_policy_configuration_V7_0",
-    ],
+    ] + select(release_flag("RELEASE_AIDL_USE_UNFROZEN"), {
+        // TODO(b/462036047): remove switch when HALs are re-frozen
+        true: [
+            ":android.hardware.security.keymint-V5-java-source",
+            ":android.system.keystore2-V6-java-source",
+        ],
+        default: [
+            ":android.hardware.security.keymint-V4-java-source",
+            ":android.system.keystore2-V5-java-source",
+        ],
+    }),
 }
 
 java_library {
@@ -490,7 +498,10 @@ java_defaults {
 java_defaults {
     name: "framework-non-updatable-lint-defaults",
     lint: {
-        extra_check_modules: ["AndroidFrameworkLintChecker"],
+        extra_check_modules: [
+            "AndroidFrameworkLintChecker",
+            "ProtoLogLintChecker",
+        ],
         disabled_checks: ["ApiMightLeakAppVisibility"],
         error_checks: [
             "ClearIdentityCallNotFollowedByTryFinally",
@@ -605,6 +616,23 @@ java_library {
         "framework-non-updatable-unbundled-impl-libs",
         "framework-updatable-stubs-module_libs_api",
     ],
+    sdk_version: "core_platform",
+    apex_available: ["//apex_available:platform"],
+}
+
+// "framework-minus-internal-res" is identical to "framework.jar", except that
+// com.android.internal.R is removed. This module is used only by the build
+// system for product apps which are allowlisted to use select hidden APIs.
+// Internal resources must not be used when the target app may be unbundled,
+// so this module explicitly removes such internal resources, while retaining
+// hidden APIs as-is.
+java_library {
+    name: "framework-minus-internal-res",
+    installable: false,
+    static_libs: [
+        "framework",
+    ],
+    jarjar_rules: "framework-minus-internal-res-jarjar-rules.txt",
     sdk_version: "core_platform",
     apex_available: ["//apex_available:platform"],
 }

@@ -64,16 +64,6 @@ flag {
 }
 
 flag {
-  name: "rank_task_layer_with_window_layout"
-  namespace: "windowing_frontend"
-  description: "Reduce lock contention of display thread"
-  bug: "445591466"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
   name: "no_alpha_rotation_enter_animation"
   namespace: "windowing_frontend"
   description: "Remove alpha effect of rotation enter animation"
@@ -126,16 +116,6 @@ flag {
   namespace: "windowing_frontend"
   description: "The orientation, aspect ratio, resizability of activity will follow system behavior by default"
   bug: "357141415"
-}
-
-flag {
-  name: "disable_opt_out_universal_resizable_by_default"
-  namespace: "windowing_frontend"
-  description: "Disable opt out universal resizability on large screen since target SDK 37"
-  bug: "447301631"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
 }
 
 flag {
@@ -473,16 +453,6 @@ flag {
 }
 
 flag {
-    name: "promote_existence_changed_state_to_parent"
-    namespace: "windowing_frontend"
-    description: "Always promote existenceChanged state to parent."
-    bug: "452214913"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "virtual_display_can_create_system_application_overlay"
     namespace: "windowing_frontend"
     description: "Virtual display owners can create system application overlays"
@@ -550,4 +520,11 @@ flag {
     metadata {
       purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+    name: "improve_fluid_resizing_performance"
+    namespace: "windowing_frontend"
+    description: "Improve the performance during fluid resizing."
+    bug: "429960813"
 }

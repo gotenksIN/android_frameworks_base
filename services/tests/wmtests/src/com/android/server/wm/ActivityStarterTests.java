@@ -20,6 +20,7 @@ import static android.app.Activity.RESULT_CANCELED;
 import static android.app.ActivityManager.PROCESS_STATE_BOUND_TOP;
 import static android.app.ActivityManager.START_ABORTED;
 import static android.app.ActivityManager.START_CANCELED;
+import static android.app.ActivityManager.START_CANNOT_GUARANTEE_TASK_MOVABILITY;
 import static android.app.ActivityManager.START_CLASS_NOT_FOUND;
 import static android.app.ActivityManager.START_DELIVERED_TO_TOP;
 import static android.app.ActivityManager.START_FORWARD_AND_REQUEST_CONFLICT;
@@ -31,9 +32,11 @@ import static android.app.ActivityManager.START_SUCCESS;
 import static android.app.ActivityManager.START_TASK_TO_FRONT;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_STANDARD;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN;
+import static android.app.WindowConfiguration.WINDOWING_MODE_MULTI_WINDOW;
 import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
 import static android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK;
 import static android.content.Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT;
+import static android.content.Intent.FLAG_ACTIVITY_MULTIPLE_TASK;
 import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
 import static android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT;
 import static android.content.Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED;
@@ -724,8 +727,10 @@ public final class ActivityStarterTests extends ActivityStarterTestBase {
         // Launch the activity to its adjacent parent
         final ActivityOptions options = ActivityOptions.makeBasic()
                 .setLaunchRootTask(adjacentParent.mRemoteToken.toWindowContainerToken());
-        prepareStarter(FLAG_ACTIVITY_NEW_TASK, false /* mockGetRootTask */)
-                .setIntent(activity.intent)
+        final Intent intent = activity.intent;
+        intent.setFlags(FLAG_ACTIVITY_NEW_TASK | FLAG_ACTIVITY_MULTIPLE_TASK);
+        prepareStarter(intent.getFlags(), false /* mockGetRootTask */)
+                .setIntent(intent)
                 .setActivityOptions(options.toBundle(),
                         Binder.getCallingPid(), Binder.getCallingUid())
                 .execute();
@@ -987,6 +992,38 @@ public final class ActivityStarterTests extends ActivityStarterTestBase {
         verify(secondaryTaskContainer, times(1)).createRootTask(anyInt(), anyInt(), anyBoolean());
     }
 
+    @Test
+    public void testLaunchTopFocusedActivityToDifferentRootTask() {
+        // Launch an activity to be the top focused one.
+        final ActivityRecord activity = new ActivityBuilder(mAtm).setCreateTask(true).build();
+        final Task initialTask = activity.getTask();
+        mAtm.setFocusedTask(initialTask.mTaskId);
+
+        // Create a new RootTask to be the target
+        final Task targetRootTask = new TaskBuilder(mSupervisor)
+                .setWindowingMode(WINDOWING_MODE_MULTI_WINDOW)
+                .setActivityType(ACTIVITY_TYPE_STANDARD)
+                .setCreatedByOrganizer(true)
+                .setOnTop(false)
+                .build();
+
+        // Prepare to launch the SAME activity intent, but targeting the new root task
+        final Intent intent = new Intent(activity.intent);
+        final ActivityOptions options = ActivityOptions.makeBasic()
+                .setLaunchRootTask(targetRootTask.mRemoteToken.toWindowContainerToken());
+
+        // Execute the start
+        prepareStarter(intent.getFlags(), false /* mockGetRootTask */)
+                .setIntent(intent)
+                .setActivityOptions(options.toBundle(),
+                        Binder.getCallingPid(), Binder.getCallingUid())
+                .execute();
+
+        // The activity's task should now be reparented under the targetRootTask
+        assertEquals(targetRootTask, initialTask.getParent());
+        assertEquals(activity, initialTask.getTopNonFinishingActivity());
+    }
+
     /**
      * This test ensures that activity launch on a secondary display that cannot host tasks is
      * disallowed, and a SecurityException should be thrown.
@@ -1145,6 +1182,63 @@ public final class ActivityStarterTests extends ActivityStarterTestBase {
         verify(recentTasks, times(1)).setFreezeTaskListReordering();
         verify(recentTasks, times(1)).resetFreezeTaskListReorderingOnTimeout();
     }
+
+    @Test
+    public void testMovableTaskRequired_abortsIfTaskNotAllowedToMove() {
+        final ActivityStarter starter = prepareStarter(FLAG_ACTIVITY_NEW_TASK);
+        final ActivityOptions options = ActivityOptions.makeBasic().setMovableTaskRequired(true);
+
+        final TaskDisplayArea tda = mRootWindowContainer.getDefaultTaskDisplayArea();
+        spyOn(tda);
+        doReturn(false).when(tda).getIsTaskMoveAllowed();
+
+        final int result = starter
+                .setActivityOptions(
+                        options.toBundle(),
+                        Binder.getCallingPid(),
+                        Binder.getCallingUid())
+                .execute();
+
+        assertEquals(START_CANNOT_GUARANTEE_TASK_MOVABILITY, result);
+    }
+
+    @Test
+    public void testMovableTaskRequired_succeedsIfTaskAllowedToMove() {
+        final ActivityStarter starter = prepareStarter(FLAG_ACTIVITY_NEW_TASK);
+        final ActivityOptions options = ActivityOptions.makeBasic().setMovableTaskRequired(true);
+
+        final TaskDisplayArea tda = mRootWindowContainer.getDefaultTaskDisplayArea();
+        spyOn(tda);
+        doReturn(true).when(tda).getIsTaskMoveAllowed();
+
+        final int result = starter
+                .setActivityOptions(
+                        options.toBundle(),
+                        Binder.getCallingPid(),
+                        Binder.getCallingUid())
+                .execute();
+
+        assertEquals(START_SUCCESS, result);
+    }
+
+    @Test
+    public void testMovableTaskRequired_abortsIfRecyclingTask() {
+        final ActivityStarter starter = prepareStarter(0);
+        final ActivityOptions options = ActivityOptions.makeBasic().setMovableTaskRequired(true);
+
+        final ActivityRecord existing = new ActivityBuilder(mAtm).setCreateTask(true).build();
+
+        final int result = starter
+                .setIntent(existing.intent)
+                .setActivityOptions(
+                        options.toBundle(),
+                        Binder.getCallingPid(),
+                        Binder.getCallingUid())
+                .execute();
+
+        assertEquals(START_CANNOT_GUARANTEE_TASK_MOVABILITY, result);
+    }
+
 
     @Test
     public void testNoActivityInfo() {
@@ -1857,11 +1951,14 @@ public final class ActivityStarterTests extends ActivityStarterTestBase {
 
     @Test
     @EnableFlags(FLAG_TRACK_LAUNCH_ORIGINATOR)
-    public void launchActivity_resultToHome_setsLaunchOriginatedFromHome() {
+    public void launchActivity_homeCallingUid_setsLaunchOriginatedFromHome() {
+        final int homeUid = 51121;
         final Task homeTask = mRootWindowContainer.getDefaultTaskDisplayArea().getRootHomeTask();
         final ActivityRecord homeActivity = new ActivityBuilder(mAtm).setTask(homeTask).build();
+        mAtm.mHomeProcess = mSystemServicesTestRule.addProcess(homeActivity.packageName,
+                homeActivity.processName, 114514 /* pid */, homeUid);
         final ActivityStarter starter = prepareStarter(FLAG_ACTIVITY_NEW_TASK)
-                .setResultTo(homeActivity.token);
+                .setRealCallingUid(homeUid);
 
         // Launch from home.
         starter.execute();

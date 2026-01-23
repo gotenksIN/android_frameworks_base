@@ -111,6 +111,7 @@ class BubbleBarLayerViewTest {
     @get:Rule val animatorTestRule: AnimatorTestRule = AnimatorTestRule(this)
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
+    private val bubbleHelper = mock<BubbleHelper>()
 
     private lateinit var bubbleBarLayerView: BubbleBarLayerView
     private lateinit var uiEventLoggerFake: UiEventLoggerFake
@@ -209,7 +210,8 @@ class BubbleBarLayerViewTest {
         bubbleBarLayerView =
             BubbleBarLayerView(context, bubbleController, bubbleData, bubbleLogger, mainExecutor)
 
-        expandedViewManager = FakeBubbleExpandedViewManager(bubbleBar = true, expanded = true)
+        expandedViewManager =
+            FakeBubbleExpandedViewManager(bubbleHelper, bubbleBar = true, expanded = true)
     }
 
     @After
@@ -284,7 +286,7 @@ class BubbleBarLayerViewTest {
             { false },
             sessionTracker,
             bubbleViewInfoTaskFactory,
-            mock<BubbleHelper>(),
+            bubbleHelper,
         )
     }
 
@@ -677,6 +679,29 @@ class BubbleBarLayerViewTest {
         waitForCollapseViewAnimation()
         assertThat(bubble.bubbleBarExpandedView).isNull()
         assertThat(bubble.getIconView()).isNull()
+    }
+
+    @Test
+    fun removeLastBubble_collapsesView() {
+        // Create a single bubble and expand it.
+        val bubble = createBubble("first")
+        getInstrumentation().runOnMainSync { bubbleBarLayerView.showExpandedView(bubble) }
+        waitForExpandedViewAnimation()
+        assertThat(bubbleBarLayerView.isExpanded).isTrue()
+
+        // Remove the bubble from the data source, this makes it the "last" bubble being removed.
+        testBubblesList.remove(bubble)
+
+        var endActionCalled = false
+        val endAction = Runnable { endActionCalled = true }
+
+        // When the last bubble is removed, the expanded view should collapse.
+        getInstrumentation().runOnMainSync { bubbleBarLayerView.removeBubble(bubble, endAction) }
+        waitForCollapseViewAnimation()
+
+        // Verify the view is collapsed and the end action is executed.
+        assertThat(bubbleBarLayerView.isExpanded).isFalse()
+        assertThat(endActionCalled).isTrue()
     }
 
     private fun createBubble(key: String): Bubble {

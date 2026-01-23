@@ -155,7 +155,7 @@
     <string name="screen_record_video_saved" msgid="1345283626390232282">"ভিডিঅ’ ছেভ কৰা হ’ল"</string>
     <string name="screen_record_video_deleted" msgid="30786214839944540">"ভিডিঅ’ মচা হ’ল"</string>
     <string name="screen_record_undo" msgid="7942716736019800870">"আনডু কৰক"</string>
-    <string name="screen_record_retake" msgid="3846643688365398450">"পুনৰ লওক"</string>
+    <string name="screen_record_take_another" msgid="8071412867905614800">"অন্য এটা লওক"</string>
     <string name="screen_record_edit" msgid="8733014191240769309">"সম্পাদনা কৰক"</string>
     <string name="screen_record_delete" msgid="1023421937978254537">"মচক"</string>
     <string name="screen_record_delete_dialog_title" msgid="5868561491974057044">"এই ৰেকৰ্ডিংটো মচিবনে?"</string>
@@ -186,6 +186,10 @@
     <string name="screen_capture_toolbar_fullscreen_button_screenshot_a11y" msgid="8699983355979869210">"গোটেই স্ক্ৰীনখনৰ স্ক্ৰীনশ্বট লওক"</string>
     <string name="screen_capture_toolbar_fullscreen_button_record_a11y" msgid="852148867883959158">"গোটেই স্ক্ৰীনখন ৰেকৰ্ড কৰক"</string>
     <string name="screen_capture_toolbar_settings_button_a11y" msgid="8014446956996739704">"স্ক্ৰীন কেপচাৰ কৰাৰ ছেটিং"</string>
+    <string name="screen_capture_post_recording_shelf_share_button_a11y" msgid="2907313384921655711">"স্ক্ৰীন ৰেকৰ্ডিং শ্বেয়াৰ কৰক"</string>
+    <string name="screen_capture_post_recording_shelf_folder_button_a11y" msgid="4217075254383938093">"ফাইল পৰিচালকত স্ক্ৰীন ৰেকৰ্ডিং খোলক"</string>
+    <string name="screen_capture_post_recording_shelf_delete_button_a11y" msgid="8519897681775354217">"স্ক্ৰীন ৰেকৰ্ডিং মচক"</string>
+    <string name="screen_capture_post_recording_shelf_thumbnail_a11y" msgid="8342622016203434332">"ভিডিঅ’ ভিউৱাৰত স্ক্ৰীন ৰেকৰ্ডিং খোলক"</string>
     <string name="screen_capture_show_clicks_and_keys" msgid="2151690554364148717">"ক্লিক আৰু কীসমূহ দেখুৱাওক"</string>
     <string name="screen_capture_device_audio" msgid="1537290197773737349">"ডিভাইচৰ অডিঅ’"</string>
     <string name="screen_capture_microphone_audio" msgid="1698835678818747741">"মাইক্ৰ’ফ’ন"</string>
@@ -376,6 +380,7 @@
     <string name="accessibility_clear_all" msgid="970525598287244592">"আটাইবোৰ জাননী মচক৷"</string>
     <string name="accessibility_notification_bell" msgid="7149451526721220526">"জাননী"</string>
     <string name="accessibility_status_bar_assistant_icon" msgid="1174898709836451013">"Assistant"</string>
+    <string name="accessibility_status_bar_input_method_indicator" msgid="4316411266975554038">"ইনপুটৰ পদ্ধতি"</string>
     <string name="notification_group_overflow_indicator" msgid="7605120293801012648">"+ <xliff:g id="NUMBER">%s</xliff:g>"</string>
     <string name="notification_group_overflow_description" msgid="7176322877233433278">"{count,plural, =1{ভিতৰত আৰু # টা জাননী আছে।}one{ভিতৰত আৰু # টা জাননী আছে।}other{ভিতৰত আৰু # টা জাননী আছে।}}"</string>
     <string name="accessibility_rotation_lock_on_landscape" msgid="936972553861524360">"স্ক্ৰীন লেণ্ডস্কে\'প দিশত লক কৰা হ’ল।"</string>
@@ -417,7 +422,6 @@
     <string name="quick_settings_rotation_unlocked_label" msgid="2359922767950346112">"স্বয়ং-ঘূৰ্ণন"</string>
     <string name="accessibility_quick_settings_rotation" msgid="4800050198392260738">"স্বয়ং-ঘূৰ্ণন স্ক্ৰীন"</string>
     <string name="quick_settings_location_label" msgid="2621868789013389163">"অৱস্থান"</string>
-    <string name="quick_settings_screensaver_label" msgid="1495003469366524120">"স্ক্ৰীন ছেভাৰ"</string>
     <string name="quick_settings_camera_label" msgid="5612076679385269339">"কেমেৰাৰ এক্সেছ"</string>
     <string name="quick_settings_mic_label" msgid="8392773746295266375">"মাইকৰ এক্সেছ"</string>
     <string name="quick_settings_camera_mic_available" msgid="1453719768420394314">"উপলব্ধ"</string>
@@ -643,8 +647,11 @@
     <string name="communal_widget_picker_title" msgid="1953369090475731663">"লক স্ক্ৰীনৰ ৱিজেট"</string>
     <string name="communal_widget_picker_description" msgid="6927728582371632782">"আপোনাৰ ডিভাইচটো লক কৰি ৰাখিলেও যিকোনো লোকে আপোনাৰ লক স্ক্ৰীনত ৱিজেট চাব পাৰে।"</string>
     <string name="accessibility_action_label_unselect_widget" msgid="1041811747619468698">"ৱিজেট বাছনিৰ পৰা আঁতৰাওক"</string>
+    <string name="accessibility_action_label_resize_widget" msgid="639756010934310745">"ৱিজেটৰ আকাৰ সলনি কৰক"</string>
     <string name="accessibility_action_label_shrink_widget" msgid="8259511040536438771">"উচ্চতা হ্ৰাস কৰক"</string>
     <string name="accessibility_action_label_expand_widget" msgid="9190524260912211759">"উচ্চতা বৃদ্ধি কৰক"</string>
+    <string name="accessibility_announcement_expand_widget" msgid="1123324821904704150">"উচ্চতা বিস্তাৰ কৰা হৈছে"</string>
+    <string name="accessibility_announcement_shrink_widget" msgid="2720176058287945622">"উচ্চতা হ্ৰাস কৰা হৈছে"</string>
     <string name="accessibility_action_label_umo_show_next" msgid="8033581654789193281">"পিছৰটো দেখুৱাওক"</string>
     <string name="accessibility_action_label_umo_show_previous" msgid="5935831384525173810">"পূৰ্বৰটো দেখুৱাওক"</string>
     <string name="communal_widgets_disclaimer_title" msgid="1150954395585308868">"লক স্ক্ৰীন ৱিজেট"</string>
@@ -730,7 +737,7 @@
     <string name="adaptive_notification_edu_hun_text" msgid="7743367744129536610">"আপুনি একেলগে বহুতো জাননী পালে আপোনাৰ ডিভাইচটোৰ ভলিউম আৰু সতৰ্কবাৰ্তা স্বয়ংক্ৰিয়ভাৱে ২ মিনিটলৈকে কমোৱা হয়।"</string>
     <string name="go_to_adaptive_notification_settings" msgid="2423690125178298479">"অফ কৰক"</string>
     <string name="unlock_to_see_notif_text" msgid="7439033907167561227">"পুৰণি জাননী চবলৈ আনলক কৰক"</string>
-    <string name="quick_settings_disclosure_parental_controls" msgid="5560100935261229784">"কিছুমান ছেটিং আপোনাৰ অভিভাৱকে পৰিচালনা কৰে"</string>
+    <string name="quick_settings_disclosure_parental_controls" msgid="9196246842317344981">"অভিভাৱকীয় নিয়ন্ত্ৰণ সক্ৰিয় হৈ আছে"</string>
     <string name="quick_settings_disclosure_parental_controls_legacy" msgid="4116797775361496057">"এই ডিভাইচটো আপোনাৰ অভিভাৱকে পৰিচালনা কৰে"</string>
     <string name="quick_settings_disclosure_pin_protection" msgid="9219481515114868267">"ডিভাইচৰ কিছুমান ছেটিং পিনৰ দ্বাৰা সুৰক্ষিত।"</string>
     <string name="quick_settings_disclosure_management_monitoring" msgid="8231336875820702180">"এই ডিভাইচটোৰ গৰাকী আপোনাৰ প্ৰতিষ্ঠান আৰু ই নেটৱৰ্কৰ ট্ৰেফিক নিৰীক্ষণ কৰিব পাৰে"</string>
@@ -820,7 +827,7 @@
     <string name="stream_bluetooth_sco" msgid="6234562365528664331">"ব্লুটুথ"</string>
     <string name="stream_dtmf" msgid="7322536356554673067">"ডুৱেল মাল্টি ট\'ন ফ্ৰিকুৱেন্সী"</string>
     <string name="stream_accessibility" msgid="3873610336741987152">"দিব্যাংগসকলৰ বাবে থকা সুবিধাসমূহ"</string>
-    <string name="stream_assistant" msgid="2163992770504149386">"Assistant"</string>
+    <string name="stream_assistant" msgid="2163992770504149386">"সহায়ক"</string>
     <string name="volume_ringer_status_normal" msgid="1339039682222461143">"ৰিং"</string>
     <string name="volume_ringer_status_vibrate" msgid="6970078708957857825">"কম্পন"</string>
     <string name="volume_ringer_status_silent" msgid="3691324657849880883">"মিউট"</string>
@@ -836,8 +843,7 @@
     <string name="volume_stream_content_description_vibrate_a11y" msgid="2742330052979397471">"%1$s। কম্পন অৱস্থাত ছেট কৰিবলৈ টিপক।"</string>
     <string name="volume_stream_content_description_mute_a11y" msgid="5743548478357238156">"%1$s। মিউট কৰিবলৈ টিপক।"</string>
     <string name="volume_panel_noise_control_title" msgid="7413949943872304474">"কোলাহল নিয়ন্ত্ৰণ"</string>
-    <!-- no translation found for volume_panel_mic_noise_cancellation_title (2324838199042895036) -->
-    <skip />
+    <string name="volume_panel_mic_noise_cancellation_title" msgid="2324838199042895036">"মাইকৰ অদৰকাৰী ধ্বনি নাশ"</string>
     <string name="volume_panel_spatial_audio_title" msgid="3367048857932040660">"স্থানিক অডিঅ’"</string>
     <string name="volume_panel_spatial_audio_off" msgid="4177490084606772989">"অফ কৰক"</string>
     <string name="volume_panel_spatial_audio_fixed" msgid="3136080137827746046">"নিৰ্ধাৰিত"</string>
@@ -891,6 +897,7 @@
     <string name="accessibility_status_bar_satellite_poor_connection" msgid="5231478574952724160">"উপগ্ৰহ, বেয়া সংযোগ"</string>
     <string name="accessibility_status_bar_satellite_good_connection" msgid="308079391708578704">"উপগ্ৰহ, ভাল সংযোগ"</string>
     <string name="accessibility_status_bar_satellite_available" msgid="6514855015496916829">"উপগ্ৰহ, সংযোগ উপলব্ধ"</string>
+    <string name="accessibility_status_bar_satellite_symbol" msgid="3840194796890095832">"উপগ্ৰহ"</string>
     <string name="satellite_connected_carrier_text" msgid="118524195198532589">"উপগ্ৰহ SOS"</string>
     <string name="satellite_emergency_only_carrier_text" msgid="9103913890116841786">"কেৱল জৰুৰীকালীন কল বা SOS"</string>
     <string name="satellite_network_title_text" msgid="1483004114819442028">"উপগ্ৰহৰ নেটৱৰ্ক"</string>
@@ -929,6 +936,8 @@
     <string name="inline_done_button" msgid="6043094985588909584">"কৰা হ’ল"</string>
     <string name="inline_ok_button" msgid="603075490581280343">"প্ৰয়োগ কৰক"</string>
     <string name="inline_turn_off_notifications" msgid="2653064779176881329">"অফ কৰক"</string>
+    <!-- no translation found for bridged_device_type_unknown (8435318668271946936) -->
+    <skip />
     <string name="bridged_device_type_phone" msgid="7971199513068521770">"ফ’ন"</string>
     <string name="bridged_device_type_tablet" msgid="7403330807933649592">"টেবলেট"</string>
     <string name="bridged_device_type_laptop" msgid="8027976360936787349">"লেপটপ"</string>
@@ -1176,6 +1185,7 @@
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_dialog_title" msgid="5331043821287212071">"<xliff:g id="ID_1">%1$s</xliff:g> কীব’ৰ্ডৰ শ্বৰ্টকাট অন কৰিবনে?"</string>
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_negative_button_text" msgid="6711239406914231612">"অন নকৰিব"</string>
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_positive_button_text" msgid="7748487028569821131">"শ্বৰ্টকাট অন কৰক"</string>
+    <string name="accessibility_key_gesture_color_inversion_dialog_content" msgid="8831745570619953566">"<xliff:g id="ID_1">^1</xliff:g> "<annotation id="action_key_icon">"চিহ্ন"</annotation>" + <xliff:g id="ID_2">^2</xliff:g> + <xliff:g id="ID_3">^3</xliff:g> হৈছে ৰং বিপৰীতকৰণ কৰিবলৈ ব্যৱহাৰ কৰিবৰ বাবে কীব’ৰ্ডৰ শ্বৰ্টকাট। ৰং বিপৰীতকৰণে পাতল স্ক্ৰীনসমূহ গাঢ় কৰি তোলে। এইটোৱে গাঢ় স্ক্ৰীনো পোহৰ কৰে।"</string>
     <string name="accessibility_key_gesture_magnification_dialog_title" msgid="5770691510738701250">"<xliff:g id="ID_1">%1$s</xliff:g> কীব’ৰ্ডৰ শ্বৰ্টকাট অন কৰা হৈছে"</string>
     <string name="accessibility_key_gesture_magnification_dialog_content" msgid="1647246652170256645">"<xliff:g id="ID_1">^1</xliff:g> "<annotation id="action_key_icon">"চিহ্ন"</annotation>" + <xliff:g id="ID_2">^2</xliff:g> + <xliff:g id="ID_3">^3</xliff:g> হৈছে <xliff:g id="ID_4">^4</xliff:g> ব্যৱহাৰ কৰাৰ বাবে কীব’ৰ্ডৰ শ্বৰ্টকাটটো, যি দিব্যাংগসকলৰ বাবে থকা এটা সুবিধা। এইটোৱে আপোনাক সমলৰ আকাৰ ডাঙৰ কৰিবলৈ স্ক্ৰীনখনত ক্ষিপ্ৰভাৱে জুম ইন কৰিবলৈ দিয়ে। বিবৰ্ধন অন হোৱাৰ পাছত, জুম মিলাবলৈ <xliff:g id="ID_5">^1</xliff:g>"<annotation id="action_key_icon">"চিহ্ন"</annotation>" + <xliff:g id="ID_6">^2</xliff:g> আৰু \"+\" বা \"-\" টিপক।"</string>
     <string name="accessibility_key_gesture_magnification_dialog_negative_button_text" msgid="8393469413785600834">"শ্বৰ্টকাট অফ কৰক"</string>
@@ -1187,9 +1197,16 @@
     <string name="accessibility_key_gesture_screen_reader_dialog_warning_view_control_screen_message" msgid="5810348116536082139">"ই স্ক্ৰীনৰ আটাইবোৰ সমল পঢ়িব পাৰে আৰু অন্য এপ্‌সমূহৰ ওপৰত সমল প্ৰদর্শন কৰিব পাৰে।"</string>
     <string name="accessibility_key_gesture_screen_reader_dialog_warning_perform_actions_heading" msgid="6032379987970298008">"কার্যসমূহ চাওক আৰু কৰক"</string>
     <string name="accessibility_key_gesture_screen_reader_dialog_warning_perform_actions_message" msgid="4565304881759944542">"ই আপুনি কোনো এপ্ বা হার্ডৱেৰ ছেন্সৰৰ সৈতে কৰা ভাব-বিনিময় আৰু আপোনাৰ হৈ অন্য কোনো লোকে এপৰ সৈতে কৰা ভাব-বিনিময় ট্ৰেক কৰিব পাৰে।"</string>
+    <string name="accessibility_key_gesture_select_to_speak_dialog_content" msgid="2241403419620826861">"<xliff:g id="ID_1">^1</xliff:g> "<annotation id="action_key_icon">"চিহ্ন"</annotation>" + <xliff:g id="ID_2">^2</xliff:g> + <xliff:g id="ID_3">^3</xliff:g> হৈছে <xliff:g id="ID_4">^4</xliff:g> ব্যৱহাৰ কৰিবলৈ কীব’ৰ্ডৰ শ্বৰ্টকাট। এইটোৱে আপোনাক ফণ্ট আৰু স্পে’চিং কাষ্টমাইজ কৰিবলৈ আৰু আপোনাৰ ডিভাইচত পাঠ ডাঙৰকৈ পঢ়া শুনিবলৈ দিয়ে।"</string>
     <string name="accessibility_key_gesture_voice_access_dialog_content" msgid="8539054865187379687">"<xliff:g id="ID_1">^1</xliff:g> "<annotation id="action_key_icon">"চিহ্ন"</annotation>" + <xliff:g id="ID_2">^2</xliff:g> + <xliff:g id="ID_3">^3</xliff:g> টিপিলে <xliff:g id="ID_4">^4</xliff:g> অন হয়, যি দিব্যাংগসকলৰ বাবে থকা এটা সুবিধা। এইটোৱে আপোনাক আপোনাৰ ডিভাইচ হেণ্ডছ্‌-ফ্ৰীকৈ নিয়ন্ত্ৰণ কৰিবলৈ দিয়ে।"</string>
+    <string name="accessibility_shortcutchooser_toprow_tutorial_dialog_title" msgid="4659318395231105188">"সাধ্য সুবিধাৰ কী"</string>
+    <string name="accessibility_shortcutchooser_toprow_tutorial_dialog_content" msgid="7058726404278534674">"সাধ্য-সুবিধা ব্যৱহাৰ কৰিবলৈ আৰম্ভ কৰিবলৈ আপুনি সাধ্য-সুবিধাৰ কীটোত টিপিব পাৰে।"</string>
+    <string name="accessibility_shortcutchooser_toprow_tutorial_dialog_positive_button_text" msgid="7095579813773247709">"সুবিধা যোগ দিয়ক"</string>
+    <string name="accessibility_shortcutchooser_editor_dialog_title" msgid="7881631878787325869">"<xliff:g id="ID_1">%1$s</xliff:g> ছেট আপ কৰক"</string>
+    <string name="accessibility_shortcutchooser_done_button" msgid="5288975589451082156">"হ’ল"</string>
+    <string name="accessibility_shortcutchooser_picker_dialog_title" msgid="6067291073174568750">"এটা সুবিধা বাছনি কৰক"</string>
+    <string name="accessibility_shortcutchooser_edit_button" msgid="1924449663239985111">"সম্পাদনা কৰক"</string>
     <string name="accessibility_quick_access_dialog_title" msgid="8792322423145117379">"সাধ্য সুবিধা"</string>
-    <string name="accessibility_quick_access_dialog_done_button_text" msgid="8013849920696848138">"হ’ল"</string>
     <string name="tuner_lock_screen" msgid="2267383813241144544">"লক স্ক্ৰীন"</string>
     <string name="shutdown_progress" msgid="5464239146561542178">"বন্ধ কৰি থকা হৈছে…"</string>
     <string name="thermal_shutdown_dialog_help_text" msgid="6413474593462902901">"যত্ন লোৱাৰ পদক্ষেপসমূহ চাওক"</string>
@@ -1509,6 +1526,7 @@
     <string name="qs_tile_request_dialog_title" msgid="5654666862347548966">"ক্ষিপ্ৰ ছেটিঙত টাইল যোগ দিয়ক"</string>
     <string name="qs_tile_request_dialog_small_format_content_description" msgid="5429197059724172135">"সৰু ফৰ্মেট"</string>
     <string name="qs_tile_request_dialog_large_format_content_description" msgid="67983044110405787">"ডাঙৰ ফৰ্মেট"</string>
+    <string name="qs_tile_satellite_label" msgid="2839625529776739941">"উপগ্ৰহ"</string>
     <string name="qs_user_switch_dialog_title" msgid="3045189293587781366">"ব্যৱহাৰকাৰী বাছনি কৰক"</string>
     <string name="fgs_manager_footer_label" msgid="8276763570622288231">"{count,plural, =1{# টা এপ্‌ সক্ৰিয় হৈ আছে}one{# টা এপ্‌ সক্ৰিয় হৈ আছে}other{# টা এপ্‌ সক্ৰিয় হৈ আছে}}"</string>
     <string name="fgs_dot_content_description" msgid="2865071539464777240">"নতুন তথ্য"</string>
@@ -1586,6 +1604,8 @@
     <string name="keyguard_unlock_to_customize_ls" msgid="2068542308086253819">"লক স্ক্ৰীন কাষ্টমাইজ কৰিবলৈ আনলক কৰক"</string>
     <string name="wifi_unavailable_dream_overlay_content_description" msgid="2024166212194640100">"ৱাই-ফাই উপলব্ধ নহয়"</string>
     <string name="location_active_dream_overlay_content_description" msgid="6208885541020673916">"অৱস্থান সক্ৰিয় হৈ আছে"</string>
+    <string name="camera_privacy_dream_overlay_content_description" msgid="4503818441101346249">"কেমেৰা সক্ৰিয় হৈ আছে"</string>
+    <string name="mic_privacy_dream_overlay_content_description" msgid="1164197684411086751">"মাইক্ৰ’ফ’ন সক্ৰিয় হৈ আছে"</string>
     <string name="camera_blocked_dream_overlay_content_description" msgid="4074759493559418130">"কেমেৰা অৱৰোধ কৰা আছে"</string>
     <string name="camera_and_microphone_blocked_dream_overlay_content_description" msgid="7891078093416249764">"কেমেৰা আৰু মাইক্ৰ’ফ’ন অৱৰোধ কৰা আছে"</string>
     <string name="microphone_blocked_dream_overlay_content_description" msgid="5466897982130007033">"মাইক্ৰ’ফ’ন অৱৰোধ কৰা আছে"</string>
@@ -1603,7 +1623,8 @@
     <string name="start_desktop_mode" msgid="5459815912537830841">"ডেস্কটপ"</string>
     <string name="start_mirroring" msgid="3611044878130481882">"মিৰ’ৰ"</string>
     <string name="connected_display_icon_desc" msgid="6373560639989971997">"ডিছপ্লে’ সংযোগ কৰা হৈছে"</string>
-    <string name="connected_display_extended_mode_text" msgid="2457269692913653696">"বাহ্যিক ডিছপ্লে’ৰ সৈতে সংযোগ কৰা হৈছে"</string>
+    <string name="connected_display_connection_text" msgid="6787771675124372815">"বাহ্যিক ডিছপ্লে’ৰ সৈতে সংযোগ কৰা হৈছে"</string>
+    <string name="connected_display_removal_text" msgid="8270253839172935318">"বাহ্যিক ডিছপ্লে’ৰ সংযোগ বিচ্ছিন্ন কৰা হৈছে"</string>
     <string name="privacy_dialog_title" msgid="5201413527644766025">"মাইক্ৰ’ফ’ন, কেমেৰা আৰু অৱস্থান"</string>
     <string name="privacy_dialog_summary" msgid="2458769652125995409">"শেহতীয়া এপৰ ব্যৱহাৰ"</string>
     <string name="privacy_dialog_more_button" msgid="7610604080293562345">"শেহতীয়া এক্সেছ চাওক"</string>
@@ -1756,6 +1777,7 @@
     <string name="pager_dots_previous_content_description" msgid="26963508904918908">"পূৰ্বৱৰ্তী"</string>
     <string name="pager_dots_next_content_description" msgid="613943992626163120">"পৰৱৰ্তী"</string>
     <string name="accessibility_pager_dots_navigate_to_next_page_action" msgid="7662720613169169465">"পৰৱৰ্তী পৃষ্ঠাখনলৈ যাওক"</string>
+    <string name="accessibility_close_overlay_action" msgid="3581095146209387670">"উভতি যাওক"</string>
     <string name="ambient_cue_autofill_action" msgid="9213025887835308128">"স্বয়ংপূৰ্তি"</string>
     <string name="ambient_cue_expand_action" msgid="6803711089932959312">"বিস্তাৰ কৰক"</string>
     <string name="location_button_text_share_precise_location" msgid="5341882050169860712">"সঠিক অৱস্থান শ্বেয়াৰ কৰক"</string>

@@ -2754,7 +2754,7 @@ public final class SystemServer implements Dumpable {
                 t.traceEnd();
             }
 
-            if (android.companion.Flags.enableUniversalClipboard()) {
+            if (android.companion.Flags.universalClipboard()) {
                 t.traceBegin("StartUniversalClipboardService");
                 mSystemServiceManager.startService(UniversalClipboardService.class);
                 t.traceEnd();
@@ -2780,13 +2780,11 @@ public final class SystemServer implements Dumpable {
                 t.traceEnd();
             }
 
-            if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_LIVE_TV) || isTv) {
+            if (isTv || mPackageManager.hasSystemFeature(PackageManager.FEATURE_LIVE_TV)) {
                 t.traceBegin("StartTvInteractiveAppManager");
                 mSystemServiceManager.startService(TvInteractiveAppManagerService.class);
                 t.traceEnd();
-            }
 
-            if (mPackageManager.hasSystemFeature(PackageManager.FEATURE_LIVE_TV) || isTv) {
                 t.traceBegin("StartTvInputManager");
                 mSystemServiceManager.startService(TvInputManagerService.class);
                 t.traceEnd();
@@ -3034,15 +3032,6 @@ public final class SystemServer implements Dumpable {
             }
 // QTI_END: 2024-11-24: Wearables: Adding try-catch block for wearOS specific service
             t.traceEnd();
-
-            boolean enableWristOrientationService =
-                    !android.server.Flags.migrateWristOrientation()
-                    && SystemProperties.getBoolean("config.enable_wristorientation", false);
-            if (enableWristOrientationService) {
-                t.traceBegin("StartWristOrientationService");
-                mSystemServiceManager.startService(WRIST_ORIENTATION_SERVICE_CLASS);
-                t.traceEnd();
-            }
 
             if (android.server.Flags.wearGestureApi()
                     && SystemProperties.getBoolean("config.enable_gesture_api", false)) {

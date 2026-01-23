@@ -158,6 +158,10 @@
     <string name="wfc_mode_wifi_preferred_summary" msgid="1035175836270943089">"ਵਾਈ-ਫਾਈ \'ਤੇ ਕਾਲ ਕਰੋ"</string>
     <string name="wfc_mode_cellular_preferred_summary" msgid="4958965609212575619">"ਮੋਬਾਈਲ ਨੈੱਟਵਰਕ ਤੋਂ ਕਾਲ ਕਰੋ"</string>
     <string name="wfc_mode_wifi_only_summary" msgid="104951993894678665">"ਸਿਰਫ਼ ਵਾਈ-ਫਾਈ"</string>
+    <string name="adaptive_low_frequency_less_than_one_minute" msgid="8869498183646028708">"~ %s"</string>
+    <string name="adaptive_low_frequency_neg_less_than_one_minute" msgid="2590062535985417056">"~ −%s"</string>
+    <string name="elapsed_time_low_frequency_short_format_h_mm" msgid="6728141238066668781">"%1$d:%2$02d:--"</string>
+    <string name="elapsed_time_low_frequency_short_format_mm" msgid="2405181895215514414">"%1$02d:--"</string>
     <!-- no translation found for crossSimFormat_spn (9125246077491634262) -->
     <skip />
     <string name="crossSimFormat_spn_cross_sim_calling" msgid="5620807020002879057">"<xliff:g id="SPN">%s</xliff:g> ਬੈਕਅੱਪ ਕਾਲਿੰਗ"</string>
@@ -641,14 +645,12 @@
     <string name="permdesc_uwb_ranging" msgid="2519723069604307055">"ਐਪ ਨੂੰ ਨਜ਼ਦੀਕੀ ਅਲਟ੍ਰਾ-ਵਾਈਡਬੈਂਡ ਡੀਵਾਈਸਾਂ ਦੇ ਵਿਚਾਲੇ ਸੰਬੰਧਿਤ ਸਥਿਤੀ ਨੂੰ ਨਿਰਧਾਰਿਤ ਕਰਨ ਦੀ ਇਜਾਜ਼ਤ ਦਿਓ"</string>
     <string name="permlab_nearby_wifi_devices" msgid="392774237063608500">"ਨਜ਼ਦੀਕੀ ਵਾਈ-ਫਾਈ ਡੀਵਾਈਸਾਂ ਨਾਲ ਅੰਤਰਕਿਰਿਆ ਕਰੋ"</string>
     <string name="permdesc_nearby_wifi_devices" msgid="3054307728646332906">"ਐਪ ਨੂੰ ਨਜ਼ਦੀਕੀ ਵਾਈ-ਫਾਈ ਡੀਵਾਈਸਾਂ \'ਤੇ ਵਿਗਿਆਪਨ ਦੇਣ, ਕਨੈਕਟ ਕਰਨ ਅਤੇ ਉਨ੍ਹਾਂ ਦੀ ਸੰਬੰਧਿਤ ਸਥਿਤੀ ਨੂੰ ਨਿਰਧਾਰਿਤ ਕਰਨ ਦੀ ਆਗਿਆ ਦਿੱਤੀ ਜਾਂਦੀ ਹੈ"</string>
-    <string name="permlab_access_local_network" msgid="3420360767259066877">"ਸਥਾਨਕ ਨੈੱਟਵਰਕ ਡੀਵਾਈਸਾਂ ਤੱਕ ਪਹੁੰਚ ਕਰਨ ਦੀ ਆਗਿਆ ਦਿਓ"</string>
+    <string name="permlab_access_local_network" msgid="3420360767259066877">"ਸਥਾਨਕ ਨੈੱਟਵਰਕ ਡੀਵਾਈਸਾਂ ਤੱਕ ਪਹੁੰਚ ਕਰੋ"</string>
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"ਐਪ ਨੂੰ ਸਥਾਨਕ ਨੈੱਟਵਰਕ ਡੀਵਾਈਸਾਂ ਤੱਕ ਪਹੁੰਚ ਕਰਨ ਦੀ ਆਗਿਆ ਮਿਲਦੀ ਹੈ"</string>
     <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"ਲੂਪਬੈਕ ਇੰਟਰਫ਼ੇਸ ਦੀ ਵਰਤੋਂ ਕਰੋ"</string>
     <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"ਇਸ ਨਾਲ ਐਪ ਨੂੰ ਲੂਪਬੈਕ ਇੰਟਰਫ਼ੇਸ \'ਤੇ ਹੋਰ ਐਪਾਂ ਨਾਲ ਅੰਤਰਕਿਰਿਆ ਕਰਨ ਦੀ ਆਗਿਆ ਮਿਲਦੀ ਹੈ"</string>
-    <!-- no translation found for permlab_force_use_loopback_interface (1319727311706416481) -->
-    <skip />
-    <!-- no translation found for permdesc_force_use_loopback_interface (5829032514048681980) -->
-    <skip />
+    <string name="permlab_force_use_loopback_interface" msgid="1319727311706416481">"ਲੂਪਬੈਕ ਇੰਟਰਫ਼ੇਸ ਨੂੰ ਜ਼ਬਰਦਸਤੀ ਵਰਤੋ"</string>
+    <string name="permdesc_force_use_loopback_interface" msgid="5829032514048681980">"ਇਸ ਨਾਲ ਐਪ ਨੂੰ ਲੂਪਬੈਕ ਇੰਟਰਫ਼ੇਸ \'ਤੇ ਹੋਰ ਐਪਾਂ ਨਾਲ ਅੰਤਰਕਿਰਿਆ ਦੀ ਆਗਿਆ ਮਿਲਦੀ ਹੈ, ਜਿਸ ਲਈ ਹੋਰ ਐਪ ਨੂੰ ਲੂਪਬੈਕ ਇਜਾਜ਼ਤਾਂ ਦੀ ਲੋੜ ਨਹੀਂ ਹੁੰਦੀ"</string>
     <string name="permlab_ranging" msgid="2854543350668593390">"ਨਜ਼ਦੀਕੀ ਡੀਵਾਈਸਾਂ ਵਿਚਾਲੇ ਸੰਬੰਧਿਤ ਸਥਿਤੀ ਨਿਰਧਾਰਿਤ ਕਰੋ"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"ਐਪ ਨੂੰ ਨਜ਼ਦੀਕੀ ਡੀਵਾਈਸਾਂ ਦੇ ਵਿਚਾਲੇ ਸੰਬੰਧਿਤ ਸਥਿਤੀ ਨੂੰ ਨਿਰਧਾਰਿਤ ਕਰਨ ਦੀ ਆਗਿਆ ਦਿਓ"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"ਤਰਜੀਹੀ NFC ਭੁਗਤਾਨਸ਼ੁਦਾ ਸੇਵਾ ਜਾਣਕਾਰੀ"</string>
@@ -774,7 +776,7 @@
     <string name="face_acquired_too_low" msgid="4075391872960840081">"ਫ਼ੋਨ ਨੂੰ ਥੋੜ੍ਹਾ ਹੇਠਾਂ ਲਿਜਾਓ"</string>
     <string name="face_acquired_too_right" msgid="6245286514593540859">"ਫ਼ੋਨ ਨੂੰ ਆਪਣੇ ਖੱਬੇ ਪਾਸੇ ਲਿਜਾਓ"</string>
     <string name="face_acquired_too_left" msgid="9201762240918405486">"ਫ਼ੋਨ ਨੂੰ ਆਪਣੇ ਸੱਜੇ ਪਾਸੇ ਲਿਜਾਓ"</string>
-    <string name="face_acquired_poor_gaze" msgid="4427153558773628020">"ਕਿਰਪਾ ਕਰਕੇ ਸਿੱਧਾ ਆਪਣੇ ਡੀਵਾਈਸ ਵੱਲ ਦੇਖੋ।"</string>
+    <string name="face_acquired_poor_gaze" msgid="6746437451436776485">"ਸਿੱਧਾ ਆਪਣੇ ਕੈਮਰੇ ਵੱਲ ਦੇਖੋ"</string>
     <string name="face_acquired_not_detected" msgid="1057966913397548150">"ਤੁਹਾਡਾ ਚਿਹਰਾ ਨਹੀਂ ਦਿਖ ਰਿਹਾ। ਆਪਣੇ ਫ਼ੋਨ ਨੂੰ ਅੱਖਾਂ ਦੀ ਸੇਧ ਵਿੱਚ ਰੱਖੋ।"</string>
     <string name="face_acquired_too_much_motion" msgid="8199691445085189528">"ਬਹੁਤ ਜ਼ਿਆਦਾ ਹਿਲਜੁਲ। ਫ਼ੋਨ ਨੂੰ ਸਥਿਰ ਰੱਖੋ।"</string>
     <string name="face_acquired_recalibrate" msgid="8724013080976469746">"ਕਿਰਪਾ ਕਰਕੇ ਆਪਣਾ ਚਿਹਰਾ ਦੁਬਾਰਾ ਦਰਜ ਕਰੋ।"</string>
@@ -1454,6 +1456,9 @@
     <string name="carrier_app_notification_text" msgid="6567057546341958637">"ਇਸ ਨੂੰ ਸੈੱਟ ਕਰਨ ਲਈ ਟੈਪ ਕਰੋ"</string>
     <string name="time_zone_change_notification_title" msgid="5232503069219193218">"ਤੁਹਾਡਾ ਸਮਾਂ ਖੇਤਰ ਬਦਲ ਗਿਆ ਹੈ"</string>
     <string name="time_zone_change_notification_body" msgid="6135793674904665585">"ਹੁਣ ਤੁਸੀਂ <xliff:g id="TIME_ZONE_DISPLAY_NAME">%1$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET">%2$s</xliff:g>) ਵਿੱਚ ਹੋ"</string>
+    <string name="time_zone_offset_change_notification_title" msgid="8232305835199459588">"ਘੜੀ ਬਦਲੋ"</string>
+    <string name="time_zone_offset_change_notification_body_forward" msgid="1299493962341887576">"ਘੜੀਆਂ ਨੂੰ <xliff:g id="TIME_ZONE_OFFSET_DURATION">%1$s</xliff:g> ਅੱਗੇ ਕੀਤਾ ਗਿਆ। ਹੁਣ ਤੁਸੀਂ <xliff:g id="TIME_ZONE_DISPLAY_NAME">%2$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET_0">%3$s</xliff:g>) ਵਿੱਚ ਹੋ।"</string>
+    <string name="time_zone_offset_change_notification_body_backward" msgid="6643532078142642118">"ਘੜੀਆਂ ਨੂੰ <xliff:g id="TIME_ZONE_OFFSET_DURATION">%1$s</xliff:g> ਪਿੱਛੇ ਕੀਤਾ ਗਿਆ। ਹੁਣ ਤੁਸੀਂ <xliff:g id="TIME_ZONE_DISPLAY_NAME">%2$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET_0">%3$s</xliff:g>) ਵਿੱਚ ਹੋ।"</string>
     <string name="time_picker_dialog_title" msgid="9053376764985220821">"ਸਮਾਂ ਸੈੱਟ ਕਰੋ"</string>
     <string name="date_picker_dialog_title" msgid="5030520449243071926">"ਤਾਰੀਖ ਸੈੱਟ ਕਰੋ"</string>
     <string name="date_time_set" msgid="4603445265164486816">"ਸੈੱਟ ਕਰੋ"</string>
@@ -1829,6 +1834,7 @@
     <string name="accessibility_shortcut_label_gesture" msgid="7987298674836890931">"ਇਸ਼ਾਰਾ"</string>
     <string name="accessibility_shortcut_label_quick_settings" msgid="6851280333772213611">"ਤਤਕਾਲ ਸੈਟਿੰਗਾਂ"</string>
     <string name="accessibility_shortcut_label_triple_tap" msgid="9058975959054454796">"ਟ੍ਰਿਪਲ ਟੈਪ ਕਰੋ"</string>
+    <string name="accessibility_shortcut_label_top_row_key" msgid="1488840908672437180">"ਪਹੁੰਚਯੋਗਤਾ ਕੁੰਜੀ"</string>
     <string name="accessibility_uncheck_legacy_item_warning" msgid="8047830891064817447">"<xliff:g id="SERVICE_NAME">%s</xliff:g> ਨੂੰ ਬੰਦ ਕਰ ਦਿੱਤਾ ਗਿਆ ਹੈ"</string>
     <string name="edit_accessibility_shortcut_menu_button" msgid="8885752738733772935">"ਸ਼ਾਰਟਕੱਟਾਂ ਦਾ ਸੰਪਾਦਨ ਕਰੋ"</string>
     <string name="done_accessibility_shortcut_menu_button" msgid="3668407723770815708">"ਹੋ ਗਿਆ"</string>
@@ -2105,6 +2111,7 @@
     <string name="app_suspended_default_message" msgid="6451215678552004172">"<xliff:g id="APP_NAME_0">%1$s</xliff:g> ਐਪ ਫਿਲਹਾਲ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਇਸਦਾ ਪ੍ਰਬੰਧਨ <xliff:g id="APP_NAME_1">%2$s</xliff:g> ਵੱਲੋਂ ਕੀਤਾ ਜਾਂਦਾ ਹੈ।"</string>
     <string name="app_suspended_more_details" msgid="211260942831587014">"ਹੋਰ ਜਾਣੋ"</string>
     <string name="app_suspended_unsuspend_message" msgid="1665438589450555459">"ਐਪ ਤੋਂ ਰੋਕ ਹਟਾਓ"</string>
+    <string name="locked_app_biometric_prompt_description" msgid="6853122652400451464">"<xliff:g id="APP_NAME">%1$s</xliff:g> ਲਾਕ ਹੈ"</string>
     <string name="work_mode_off_title" msgid="6367463960165135829">"ਕੰਮ ਸੰਬੰਧੀ ਐਪਾਂ ਤੋਂ ਰੋਕ ਹਟਾਈਏ?"</string>
     <string name="work_mode_turn_on" msgid="5316648862401307800">"ਰੋਕ ਹਟਾਓ"</string>
     <string name="work_mode_emergency_call_button" msgid="6818855962881612322">"ਐਮਰਜੈਂਸੀ"</string>
@@ -2544,6 +2551,8 @@
     <string name="accessibility_label_clone_profile" msgid="7579118375042398784">"ਕਲੋਨ"</string>
     <string name="accessibility_label_communal_profile" msgid="1437173163111334791">"ਭਾਈਚਾਰਕ"</string>
     <string name="private_space_biometric_prompt_title" msgid="5777592909271728154">"ਪ੍ਰਾਈਵੇਟ ਸਪੇਸ"</string>
+    <string name="app_locked_new_notification" msgid="4409730436247596215">"ਨਵੀਂ ਸੂਚਨਾ"</string>
+    <string name="app_locked_notification_message" msgid="4576179600328065280">"ਨਵਾਂ ਸੁਨੇਹਾ"</string>
     <string name="redacted_notification_message" msgid="1520587845842228816">"ਲੁਕੀ ਹੋਈ ਸੰਵੇਦਨਸ਼ੀਲ ਸੂਚਨਾ ਸਮੱਗਰੀ"</string>
     <string name="redacted_notification_action_title" msgid="6942924973335920935"></string>
     <string name="screen_not_shared_sensitive_content" msgid="7058419185079565001">"ਐਪ ਸਮੱਗਰੀ ਨੂੰ ਸੁਰੱਖਿਆ ਲਈ ਸਕ੍ਰੀਨ ਸਾਂਝਾਕਰਨ ਤੋਂ ਲੁਕਾਇਆ ਗਿਆ ਹੈ"</string>

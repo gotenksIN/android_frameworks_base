@@ -21,13 +21,12 @@ import static android.content.pm.ActivityInfo.CONFIG_COLOR_MODE;
 import static android.content.pm.ActivityInfo.CONFIG_DENSITY;
 import static android.content.pm.ActivityInfo.CONFIG_RESOURCES_UNUSED;
 import static android.content.pm.ActivityInfo.CONFIG_TOUCHSCREEN;
+import static android.content.pm.ActivityInfo.FLAG_EXCLUDE_FROM_RECENTS;
 import static android.content.pm.ActivityInfo.OVERRIDE_AUTO_RESTART_ON_DISPLAY_MOVE;
 
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doReturn;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.spyOn;
 import static com.android.window.flags.Flags.FLAG_ENABLE_AUTO_RECOVERY_FROM_SELF_KILL;
-import static com.android.window.flags.Flags.FLAG_ENABLE_DISPLAY_COMPAT_MODE;
-import static com.android.window.flags.Flags.FLAG_ENABLE_RESTART_MENU_FOR_CONNECTED_DISPLAYS;
 
 import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
@@ -35,11 +34,13 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import android.compat.testing.PlatformCompatChangeRule;
 import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.annotations.Presubmit;
+import android.view.Display;
 
 import androidx.annotation.NonNull;
 import androidx.test.filters.MediumTest;
@@ -85,7 +86,6 @@ public class AppCompatDisplayCompatTests extends WindowTestsBase {
         mDisplayContent.wakeIfNeeded();
     }
 
-    @EnableFlags({FLAG_ENABLE_DISPLAY_COMPAT_MODE, FLAG_ENABLE_RESTART_MENU_FOR_CONNECTED_DISPLAYS})
     @Test
     public void testDisplayCompatMode_gameDoesNotRestartWithDisplayMove() {
         runTestScenario((robot) -> {
@@ -122,7 +122,6 @@ public class AppCompatDisplayCompatTests extends WindowTestsBase {
         });
     }
 
-    @EnableFlags(FLAG_ENABLE_RESTART_MENU_FOR_CONNECTED_DISPLAYS)
     @Test
     public void testSizeCompatMode_sizeCompatModeAppHasRestartMenuWithDisplayMove() {
         runTestScenario((robot) -> {
@@ -239,6 +238,58 @@ public class AppCompatDisplayCompatTests extends WindowTestsBase {
         });
     }
 
+    @EnableFlags(FLAG_ENABLE_AUTO_RECOVERY_FROM_SELF_KILL)
+    @Test
+    public void testSelfKillRecoveryOnDisplayMove_nonStandardTypeActivity() {
+        runTestScenario((robot) -> {
+            robot.useSelfKillState(s -> s.mUseNonStandardTypeActivity = true);
+            robot.selfKillOnDisplayMove();
+        });
+    }
+
+    @EnableFlags(FLAG_ENABLE_AUTO_RECOVERY_FROM_SELF_KILL)
+    @Test
+    public void testSelfKillRecoveryOnDisplayMove_excludeFromRecents() {
+        runTestScenario((robot) -> {
+            robot.useSelfKillState(s -> s.mSetExcludeFromRecents = true);
+            robot.selfKillOnDisplayMove();
+        });
+    }
+
+    @EnableFlags(FLAG_ENABLE_AUTO_RECOVERY_FROM_SELF_KILL)
+    @Test
+    public void testSelfKillRecoveryOnDisplayMove_multipleActivities() {
+        runTestScenario((robot) -> {
+            robot.useSelfKillState(s -> {
+                s.mShouldRecoverFromSelfKill = true;
+                s.mLaunchMultipleActivities = true;
+            });
+            robot.selfKillOnDisplayMove();
+        });
+    }
+
+    @EnableFlags(FLAG_ENABLE_AUTO_RECOVERY_FROM_SELF_KILL)
+    @Test
+    public void testSelfKillRecoveryOnDisplayMove_betweenInternalDisplays_flagEnabled() {
+        runTestScenario((robot) -> {
+            robot.useSelfKillState(s -> {
+                s.mDisplayType = Display.TYPE_INTERNAL;
+                s.mShouldRecoverFromSelfKill = true;
+                s.mEnableRecoveryBetweenInternalDisplays = true;
+            });
+            robot.selfKillOnDisplayMove();
+        });
+    }
+
+    @EnableFlags(FLAG_ENABLE_AUTO_RECOVERY_FROM_SELF_KILL)
+    @Test
+    public void testSelfKillRecoveryOnDisplayMove_betweenInternalDisplays_flagDisabled() {
+        runTestScenario((robot) -> {
+            robot.useSelfKillState(s -> s.mDisplayType = Display.TYPE_INTERNAL);
+            robot.selfKillOnDisplayMove();
+        });
+    }
+
     void runTestScenario(@NonNull Consumer<DisplayCompatRobotTest> consumer) {
         final DisplayCompatRobotTest robot = new DisplayCompatRobotTest(this);
         consumer.accept(robot);
@@ -249,6 +300,11 @@ public class AppCompatDisplayCompatTests extends WindowTestsBase {
         boolean mMoveDisplays = true;
         boolean mRemoveDisplay = false;
         boolean mRelaunchActivity = true;
+        boolean mLaunchMultipleActivities = false;
+        boolean mEnableRecoveryBetweenInternalDisplays = false;
+        boolean mUseNonStandardTypeActivity = false;
+        boolean mSetExcludeFromRecents = false;
+        int mDisplayType = Display.TYPE_EXTERNAL;
         SelfKillType mSelfKillType = SelfKillType.FINISH_ACTIVITY;
     }
 
@@ -290,11 +346,29 @@ public class AppCompatDisplayCompatTests extends WindowTestsBase {
         }
 
         void selfKillOnDisplayMove() {
-            activity().createActivityWithComponentInSecondaryDisplay();
+            activity().createActivityWithComponentInSecondaryDisplay(mSelfKillState.mDisplayType);
+            if (mSelfKillState.mLaunchMultipleActivities) {
+                activity().createActivityWithComponent();
+            }
+            if (mSelfKillState.mUseNonStandardTypeActivity) {
+                spyOn(activity().top());
+                when(activity().top().isActivityTypeStandardOrUndefined()).thenReturn(false);
+            }
+            if (mSelfKillState.mSetExcludeFromRecents) {
+                activity().top().intent.addFlags(FLAG_EXCLUDE_FROM_RECENTS);
+            }
+
             activity().setTopActivityResumed();
             activity().setTopActivityConfigChanges(
                     mSelfKillState.mRelaunchActivity ? 0 : CONFIG_RESOURCES_UNUSED);
             activity().clearInvocationsForActivity();
+
+            if (mSelfKillState.mEnableRecoveryBetweenInternalDisplays) {
+                spyOn(activity().top().mWmService.mAppCompatConfiguration);
+                when(activity().top().mWmService.mAppCompatConfiguration
+                        .isSelfKillRecoveryBetweenInternalDisplaysEnabled())
+                        .thenReturn(true);
+            }
 
             if (mSelfKillState.mMoveDisplays) {
                 if (mSelfKillState.mRemoveDisplay) {
@@ -323,7 +397,7 @@ public class AppCompatDisplayCompatTests extends WindowTestsBase {
                 } else { // SelfKillType.FINISH_AND_REMOVE_TASK
                     activity().removeTopTask();
                 }
-                activity().top().mAppCompatController.getDisplayCompatModePolicy()
+                activity().top().mAppCompatController.getDisplayCompatPolicy()
                         .onActivityFinishing();
                 completeTransition();
                 checkSelfKillRecoveryExecuted(shouldRecoverFromSelfKill);

@@ -45,6 +45,7 @@ import android.view.View
 import android.view.WindowInsets
 import android.view.WindowManager
 import android.view.WindowManager.TRANSIT_CHANGE
+import android.view.WindowManager.TRANSIT_TO_FRONT
 import android.window.TransitionInfo
 import android.window.WindowContainerToken
 import androidx.core.content.getSystemService
@@ -55,8 +56,11 @@ import com.android.internal.logging.InstanceIdSequence
 import com.android.internal.logging.testing.UiEventLoggerFake
 import com.android.internal.protolog.ProtoLog
 import com.android.internal.statusbar.IStatusBarService
+import com.android.testing.wm.util.MockToken
+import com.android.window.flags.Flags.FLAG_ENABLE_BUBBLE_ROOT_TASK
 import com.android.wm.shell.Flags.FLAG_ENABLE_BUBBLE_BAR
 import com.android.wm.shell.Flags.FLAG_ENABLE_CREATE_ANY_BUBBLE
+import com.android.wm.shell.Flags.FLAG_FIX_BUBBLE_SWIPE_UP_GESTURE
 import com.android.wm.shell.R
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer
 import com.android.wm.shell.ShellTaskOrganizer
@@ -114,10 +118,12 @@ import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.isA
+import org.mockito.kotlin.isNull
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.stub
 import org.mockito.kotlin.verify
+import org.mockito.kotlin.whenever
 import platform.test.runner.parameterized.ParameterizedAndroidJunit4
 import platform.test.runner.parameterized.Parameters
 
@@ -160,6 +166,7 @@ class BubbleControllerTest(flags: FlagsParameterization) {
     private lateinit var bubbleTransitions: BubbleTransitions
     private lateinit var sessionTracker: BubbleSessionTracker
     private lateinit var bubbleViewInfoTaskFactory: FakeBubbleViewInfoTaskFactory
+    private lateinit var bubbleTaskViewFactory: FakeBubbleTaskViewFactory
 
     private var isStayAwakeOnFold = false
 
@@ -265,6 +272,7 @@ class BubbleControllerTest(flags: FlagsParameterization) {
         verify(displayInsetsController)
             .addInsetsChangedListener(anyInt(), insetsChangedListenerCaptor.capture())
         imeListener = insetsChangedListenerCaptor.lastValue
+        bubbleTaskViewFactory = FakeBubbleTaskViewFactory(context, mainExecutor)
     }
 
     @After
@@ -318,7 +326,36 @@ class BubbleControllerTest(flags: FlagsParameterization) {
     }
 
     @Test
-    fun onDeviceLocked_expanded_imeVisible_shouldHideImeBeforeCollapsing() {
+    @EnableFlags(FLAG_FIX_BUBBLE_SWIPE_UP_GESTURE)
+    fun onDeviceLocked_expanded_imeVisible_shouldCollapseImmediately() {
+        val bubble = createBubble("key")
+        getInstrumentation().runOnMainSync {
+            bubbleController.inflateAndAdd(
+                bubble,
+                /* suppressFlyout= */ true,
+                /* showInShade= */ true,
+            )
+        }
+        assertThat(bubbleData.hasBubbles()).isTrue()
+
+        // expand and show the IME. then lock the device
+        val imeVisibleInsetsState = createFakeInsetsState(imeVisible = true)
+        getInstrumentation().runOnMainSync {
+            bubbleController.expandStackAndSelectBubble(bubble)
+            assertThat(bubbleData.isExpanded).isTrue()
+            imeListener.insetsChanged(imeVisibleInsetsState)
+            assertThat(bubblePositioner.isImeVisible).isTrue()
+            bubbleController.onStatusBarStateChanged(/* isShade= */ false)
+        }
+
+        assertThat(bubbleData.isExpanded).isFalse()
+        // collapsing while the device is locked goes through display ime controller
+        verify(displayImeController).hideImeForBubblesWhenLocked(anyInt())
+    }
+
+    @Test
+    @DisableFlags(FLAG_FIX_BUBBLE_SWIPE_UP_GESTURE)
+    fun onDeviceLocked_expanded_imeVisible_withImeHiddenRunnable_shouldHideImeBeforeCollapsing() {
         val bubble = createBubble("key")
         getInstrumentation().runOnMainSync {
             bubbleController.inflateAndAdd(
@@ -353,7 +390,8 @@ class BubbleControllerTest(flags: FlagsParameterization) {
     }
 
     @Test
-    fun onDeviceLocked_whileHidingImeDuringCollapse() {
+    @DisableFlags(FLAG_FIX_BUBBLE_SWIPE_UP_GESTURE)
+    fun onDeviceLocked_whileHidingImeDuringCollapse_withImeHiddenRunnable() {
         val bubble = createBubble("key")
         val expandListener = FakeBubbleExpandListener()
         bubbleController.setExpandListener(expandListener)
@@ -585,6 +623,7 @@ class BubbleControllerTest(flags: FlagsParameterization) {
     fun convertExpandedBubbleToBar_startsConvertingToBar() {
         val bubble = createBubble("key")
         bubble.setShouldAutoExpand(true)
+        bubble.setIsTaskValidToBubbleOnSmallScreen(true)
         getInstrumentation().runOnMainSync {
             bubbleController.inflateAndAdd(
                 bubble,
@@ -612,6 +651,7 @@ class BubbleControllerTest(flags: FlagsParameterization) {
     fun convertExpandedBubbleToBar_updatesTaskViewParent() {
         val bubble = createBubble("key")
         bubble.setShouldAutoExpand(true)
+        bubble.setIsTaskValidToBubbleOnSmallScreen(true)
         getInstrumentation().runOnMainSync {
             bubbleController.inflateAndAdd(
                 bubble,
@@ -641,6 +681,7 @@ class BubbleControllerTest(flags: FlagsParameterization) {
     fun convertExpandedBubbleToBar_screenOff_doesNotCollapse() {
         val bubble = createBubble("key")
         bubble.setShouldAutoExpand(true)
+        bubble.setIsTaskValidToBubbleOnSmallScreen(true)
         getInstrumentation().runOnMainSync {
             bubbleController.inflateAndAdd(
                 bubble,
@@ -680,7 +721,7 @@ class BubbleControllerTest(flags: FlagsParameterization) {
 
         val bubble = createBubble("key")
         bubble.setShouldAutoExpand(true)
-        bubble.setIsTaskValidToBubble(true)
+        bubble.setIsTaskValidToBubbleOnSmallScreen(true)
         getInstrumentation().runOnMainSync {
             bubbleController.inflateAndAdd(
                 bubble,
@@ -726,7 +767,7 @@ class BubbleControllerTest(flags: FlagsParameterization) {
 
         val bubble = createBubble("key")
         bubble.setShouldAutoExpand(true)
-        bubble.setIsTaskValidToBubble(true)
+        bubble.setIsTaskValidToBubbleOnSmallScreen(true)
         getInstrumentation().runOnMainSync {
             bubbleController.inflateAndAdd(
                 bubble,
@@ -888,6 +929,43 @@ class BubbleControllerTest(flags: FlagsParameterization) {
         verify(windowManager).removeView(layerView)
     }
 
+    @EnableFlags(FLAG_ENABLE_BUBBLE_BAR)
+    @Test
+    fun removeBubbleInBubbleBar_withRemainingBubbles_doesNotHideLayerView() {
+        // GIVEN bubble bar mode is active with two bubbles
+        bubblePositioner.update(deviceConfigUnfolded)
+        bubblePositioner.isShowingInBubbleBar = true
+        getInstrumentation().runOnMainSync {
+            bubbleController.setLauncherHasBubbleBar(true)
+            bubbleController.registerBubbleStateListener(FakeBubblesStateListener())
+        }
+
+        val bubble1 = createBubble("key1")
+        val bubble2 = createBubble("key2")
+        getInstrumentation().runOnMainSync {
+            bubbleController.inflateAndAdd(bubble1, true, true)
+            bubbleController.inflateAndAdd(bubble2, true, true)
+        }
+        val layerView = bubbleController.layerView
+        assertThat(layerView).isNotNull()
+        verify(windowManager).addView(eq(layerView), any())
+
+        // WHEN one bubble is dismissed
+        getInstrumentation().runOnMainSync {
+            bubbleController.dismissBubble("key1", DISMISS_USER_GESTURE)
+        }
+        assertThat(bubbleData.hasBubbles()).isTrue()
+
+        // THEN the layer view is not hidden and not removed from the window manager, because
+        // another bubble is still present. This exercises the animation callback where the new
+        // logging was added.
+        mainExecutor.flushAll()
+        bgExecutor.flushAll()
+
+        assertThat(layerView!!.visibility).isEqualTo(View.VISIBLE)
+        verify(windowManager, never()).removeView(any())
+    }
+
     @Test
     fun testOnThemeChanged_skipInflationForOverflowBubbles() {
         val taskInfo1 =
@@ -996,6 +1074,49 @@ class BubbleControllerTest(flags: FlagsParameterization) {
         val log = uiEventLoggerFake.logs.first()
         assertThat(log.packageName).isEqualTo("package.name")
         assertThat(log.eventId).isEqualTo(BUBBLE_CREATED_FROM_ALL_APPS_ICON_MENU.id)
+    }
+
+    @EnableFlags(FLAG_ENABLE_CREATE_ANY_BUBBLE, FLAG_ENABLE_BUBBLE_ROOT_TASK)
+    @Test
+    fun applyBubbleExpandTransactionIfNeeded_appBubble() {
+        val taskInfo =
+            ActivityManager.RunningTaskInfo().apply {
+                taskId = 123
+                baseActivity = COMPONENT
+                token = MockToken.token()
+            }
+        val bubble = createAppBubble(taskInfo)
+        bubble.getOrCreateBubbleTaskView(bubbleTaskViewFactory)
+        val taskViewTaskController = bubble.taskView.controller
+
+        whenever(taskViewTaskController.taskInfo).thenReturn(taskInfo)
+        whenever(bubbleHelper.isAppBubbleTask(taskInfo)).thenReturn(true)
+        val rootTaskToken = MockToken.token()
+        whenever(bubbleHelper.getAppBubbleRootTaskToken()).thenReturn(rootTaskToken)
+
+        assertThat(bubbleController.applyBubbleExpandTransactionIfNeeded(bubble)).isTrue()
+
+        verify(transitions).startTransition(eq(TRANSIT_TO_FRONT), any(), isNull())
+    }
+
+    @EnableFlags(FLAG_ENABLE_CREATE_ANY_BUBBLE, FLAG_ENABLE_BUBBLE_ROOT_TASK)
+    @Test
+    fun applyBubbleExpandTransactionIfNeeded_nonAppBubble() {
+        val taskInfo =
+            ActivityManager.RunningTaskInfo().apply {
+                taskId = 123
+                baseActivity = COMPONENT
+            }
+        val bubble = FakeBubbleFactory.createChatBubble(context, "test")
+        bubble.getOrCreateBubbleTaskView(bubbleTaskViewFactory)
+        val taskViewTaskController = bubble.taskView.controller
+
+        whenever(taskViewTaskController.taskInfo).thenReturn(taskInfo)
+        whenever(bubbleHelper.isAppBubbleTask(taskInfo)).thenReturn(false)
+
+        assertThat(bubbleController.applyBubbleExpandTransactionIfNeeded(bubble)).isFalse()
+
+        verify(transitions, never()).startTransition(eq(TRANSIT_TO_FRONT), any(), isNull())
     }
 
     private fun createBubbleEntry(bubbleKey: String = "key", pkgName: String): BubbleEntry {

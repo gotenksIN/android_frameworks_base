@@ -514,8 +514,6 @@ public abstract class ContentCaptureSession implements AutoCloseable {
         if (CompatChanges.isChangeEnabled(NOTIFY_NODES_DISAPPEAR_NOW_SENDS_TREE_EVENTS)) {
             internalNotifyViewTreeEvent(mId, /* started= */ true);
         }
-        // TODO(b/123036895): use a internalNotifyViewsDisappeared that optimizes how the event is
-        // parcelized
         for (long id : virtualIds) {
             internalNotifyViewDisappeared(mId, new AutofillId(hostId, id, mId));
         }
@@ -645,6 +643,10 @@ public abstract class ContentCaptureSession implements AutoCloseable {
     /** @hide */
     public abstract void notifyContentCaptureEvents(
             @NonNull SparseArray<ArrayList<Object>> contentCaptureEvents);
+
+    /** @hide */
+    public abstract void notifyContentCaptureInteractionEvents(
+            @NonNull SparseArray<ArrayList<Object>> contentCaptureInteractionEvents);
 
     /**
      * Creates a {@link ViewStructure} for a "standard" view.

@@ -61,6 +61,7 @@ import com.android.server.display.color.ColorDisplayService;
 import com.android.server.display.feature.DisplayManagerFlags;
 import com.android.server.display.mode.DisplayModeDirector;
 import com.android.server.display.notifications.DisplayNotificationManager;
+import com.android.server.display.utils.DebugUtils;
 import com.android.server.lights.LightsManager;
 import com.android.server.lights.LogicalLight;
 
@@ -79,7 +80,10 @@ import java.util.Objects;
  */
 final class LocalDisplayAdapter extends DisplayAdapter {
     private static final String TAG = "LocalDisplayAdapter";
-    private static final boolean DEBUG = false;
+
+    // To enable these logs, run:
+    // 'adb shell setprop persist.log.tag.LocalDisplayAdapter DEBUG && adb reboot'
+    private static final boolean DEBUG = DebugUtils.isDebuggable(TAG);
 
     private static final String UNIQUE_ID_PREFIX = "local:";
 
@@ -323,8 +327,6 @@ final class LocalDisplayAdapter extends DisplayAdapter {
             int activeSfDisplayModeId = dynamicInfo.activeDisplayModeId;
             float renderFrameRate = dynamicInfo.renderFrameRate;
             boolean hasArrSupport = dynamicInfo.hasArrSupport;
-            boolean sizeOverrideEnabled =
-                    getFeatureFlags().isSizeOverrideForExternalDisplaysEnabled() && !isInternal;
 
             mSfDisplayModes = Arrays.copyOf(displayModes, displayModes.length);
             mActiveSfDisplayMode = getModeById(displayModes, activeSfDisplayModeId);
@@ -377,7 +379,7 @@ final class LocalDisplayAdapter extends DisplayAdapter {
                         alternativeRates[j] = alternativeRefreshRates.get(j);
                     }
                     Display.Mode displayMode = DisplayModeFactory.createMode(mode, alternativeRates,
-                            hasArrSupport, sizeOverrideEnabled);
+                            hasArrSupport, !isInternal);
                     record = new DisplayModeRecord(displayMode);
                     modesAdded = true;
                 }
@@ -557,8 +559,7 @@ final class LocalDisplayAdapter extends DisplayAdapter {
         private int getLogicalDensity() {
             DensityMapping densityMapping = getDisplayDeviceConfig().getDensityMapping();
             if (densityMapping == null) {
-                if (getFeatureFlags().isBaseDensityForExternalDisplaysEnabled()
-                        && !mStaticDisplayInfo.isInternal) {
+                if (!mStaticDisplayInfo.isInternal) {
                     // Return 0 for external displays as the base density will be calculated in
                     // the LogicalDisplay.
                     return 0;
@@ -1233,6 +1234,14 @@ final class LocalDisplayAdapter extends DisplayAdapter {
                 // TODO: Generate token for resolution switch and multi-display modeset.
                 IBinder applyToken = null;
 
+                if (DEBUG) {
+                    final var mode = findMode(displayModeSpecs.baseModeId);
+                    final var modeDescription = mode != null ? mode.getPhysicalWidth() + "x"
+                            + mode.getPhysicalHeight() : "unknown";
+                    Slog.d(TAG, "[Display " + mPhysicalDisplayId + "] Sending "
+                            + "DesiredDisplayModeSpecs to SF: baseMode = " + modeDescription + ", "
+                            + "sfModeId = " + baseSfModeId);
+                }
                 getHandler().sendMessage(PooledLambda.obtainMessage(
                         LocalDisplayDevice::setDesiredDisplayModeSpecsAsync, this,
                         new SurfaceControl.DesiredDisplayModeSpecs[] {

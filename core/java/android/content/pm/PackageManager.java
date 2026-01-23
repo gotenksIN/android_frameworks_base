@@ -5607,6 +5607,15 @@ public abstract class PackageManager {
     public static final int FLAG_PERMISSION_SELECTED_LOCATION_ACCURACY =  1 << 19;
 
     /**
+     * Permission flag: This location permission is granted by system provided location button.
+     *
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(android.permission.flags.Flags.FLAG_LOCATION_BUTTON_ENABLED)
+    public static final int FLAG_PERMISSION_GRANTED_BY_LOCATION_BUTTON =  1 << 20;
+
+    /**
      * Permission flags: Reserved for use by the permission controller. The platform and any
      * packages besides the permission controller should not assume any definition about these
      * flags.
@@ -5659,7 +5668,9 @@ public abstract class PackageManager {
             | FLAG_PERMISSION_GRANTED_BY_ROLE
             | FLAG_PERMISSION_REVOKED_COMPAT
             | FLAG_PERMISSION_ONE_TIME
-            | FLAG_PERMISSION_AUTO_REVOKED;
+            | FLAG_PERMISSION_AUTO_REVOKED
+            | FLAG_PERMISSION_SELECTED_LOCATION_ACCURACY
+            | FLAG_PERMISSION_GRANTED_BY_LOCATION_BUTTON;
 
     /**
      * Injected activity in app that forwards user to setting activity of that app.
@@ -7004,7 +7015,9 @@ public abstract class PackageManager {
             FLAG_PERMISSION_GRANTED_BY_ROLE,
             FLAG_PERMISSION_REVOKED_COMPAT,
             FLAG_PERMISSION_ONE_TIME,
-            FLAG_PERMISSION_AUTO_REVOKED
+            FLAG_PERMISSION_AUTO_REVOKED,
+            FLAG_PERMISSION_SELECTED_LOCATION_ACCURACY,
+            FLAG_PERMISSION_GRANTED_BY_LOCATION_BUTTON
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface PermissionFlags {}
@@ -7598,7 +7611,7 @@ public abstract class PackageManager {
             int flags, @UserIdInt int userId);
 
     /**
-     * See {@link #getInstalledApplicationsAsUser(int, int}.
+     * See {@link #getInstalledApplicationsAsUser(int, int)}
      * @hide
      */
     @NonNull
@@ -10711,7 +10724,6 @@ public abstract class PackageManager {
      * @throws NameNotFoundException if the package could not be found.
      * @see ApplicationInfo#FLAG_STOPPED
      */
-    @FlaggedApi(android.content.pm.Flags.FLAG_STAY_STOPPED)
     public boolean isPackageStopped(@NonNull String packageName) throws NameNotFoundException {
         throw new UnsupportedOperationException("isPackageStopped not implemented");
     }
@@ -11091,6 +11103,8 @@ public abstract class PackageManager {
             case FLAG_PERMISSION_REVOKED_COMPAT: return "REVOKED_COMPAT";
             case FLAG_PERMISSION_ONE_TIME: return "ONE_TIME";
             case FLAG_PERMISSION_AUTO_REVOKED: return "AUTO_REVOKED";
+            case FLAG_PERMISSION_SELECTED_LOCATION_ACCURACY: return "SELECTED_LOCATION_ACCURACY";
+            case FLAG_PERMISSION_GRANTED_BY_LOCATION_BUTTON: return "GRANTED_BY_LOCATION_BUTTON";
             default: return Integer.toString(flag);
         }
     }

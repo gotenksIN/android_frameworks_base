@@ -16,7 +16,6 @@
 
 package com.android.server;
 
-import static android.app.Flags.enableCurrentModeTypeBinderCache;
 import static android.app.Flags.enableNightModeBinderCache;
 import static android.app.Flags.fixContrastAndForceInvertStateForMultiUser;
 import static android.app.UiModeManager.ContrastUtils.CONTRAST_DEFAULT_VALUE;
@@ -232,9 +231,7 @@ final class UiModeManagerService extends SystemService {
         public void set(int mode) {
             if (mCurrentModeTypeValue != mode) {
                 mCurrentModeTypeValue = mode;
-                if (enableCurrentModeTypeBinderCache()) {
-                    UiModeManager.invalidateCurrentModeTypeCache();
-                }
+                UiModeManager.invalidateCurrentModeTypeCache();
             }
         }
     };
@@ -272,7 +269,8 @@ final class UiModeManagerService extends SystemService {
     private final IUiModeManager.Stub mService;
 
     @GuardedBy("mLock")
-    private final SparseArray<RemoteCallbackList<IUiModeManagerCallback>> mUiModeManagerCallbacks =
+    @VisibleForTesting
+    final SparseArray<RemoteCallbackList<IUiModeManagerCallback>> mUiModeManagerCallbacks =
             new SparseArray<>();
 
     @GuardedBy("mLock")
@@ -453,9 +451,10 @@ final class UiModeManagerService extends SystemService {
         }
     };
 
-    private final ContentObserver mForceInvertOverrideObserver = new ContentObserver(mHandler) {
+    @VisibleForTesting
+    final ContentObserver mForceInvertOverrideObserver = new ContentObserver(mHandler) {
         @Override
-        public void onChange(boolean selfChange, Uri uri) {
+        public void onChange(boolean selfChange) {
             updateForceInvertOverrideStates();
         }
     };
@@ -495,13 +494,16 @@ final class UiModeManagerService extends SystemService {
 
         synchronized (mLock) {
             for (var i = 0; i < mUiModeManagerCallbacks.size(); i++) {
+                // We don't use the return value of `updateForceInvertOverrideStateLocked` here
+                // since the Settings values are already updated by the states in the setter.
+                // Therefore, calling `updateForceInvertOverrideStateLocked` here will always return
+                // false if the Settings value is changed by `setForceInvertOverrideStateLocked`.
                 var userId = mUiModeManagerCallbacks.keyAt(i);
-                if (updateForceInvertOverrideStateLocked(userId)) {
-                    mUiModeManagerCallbacks.valueAt(i).broadcast(ignoreRemoteException(
-                            callback -> callback
-                                    .notifyForceInvertOverrideStateChanged()
-                    ));
-                }
+                updateForceInvertOverrideStateLocked(userId);
+                mUiModeManagerCallbacks.valueAt(i).broadcast(ignoreRemoteException(
+                        callback -> callback
+                                .notifyForceInvertOverrideStateChanged()
+                ));
             }
         }
     }
@@ -1728,6 +1730,7 @@ final class UiModeManagerService extends SystemService {
             int userId, String packageName,
             @ForceInvertPackageOverrideState int newState) {
         var states = mForceInvertOverrideStates.get(userId);
+
         if (states == null && mSystemReady) {
             updateForceInvertOverrideStateLocked(userId);
             states = mForceInvertOverrideStates.get(userId);
@@ -2408,19 +2411,14 @@ final class UiModeManagerService extends SystemService {
             // change.
             Intent homeIntent = buildHomeIntent(category);
             if (shouldStartDockApp(getContext(), homeIntent)) {
-                try {
-                    int result = ActivityTaskManager.getService().startActivityWithConfig(
-                            null, getContext().getBasePackageName(),
-                            getContext().getAttributionTag(), homeIntent, null, null, null, 0, 0,
-                            mConfiguration, null, UserHandle.USER_CURRENT);
-                    if (ActivityManager.isStartResultSuccessful(result)) {
-                        dockAppStarted = true;
-                    } else if (result != ActivityManager.START_INTENT_NOT_RESOLVED) {
-                        Slog.e(TAG, "Could not start dock app: " + homeIntent
-                                + ", startActivityWithConfig result " + result);
-                    }
-                } catch (RemoteException ex) {
-                    Slog.e(TAG, "Could not start dock app: " + homeIntent, ex);
+                final int result = mActivityTaskManager.startActivityWithConfig(
+                        getContext().getBasePackageName(), getContext().getAttributionTag(),
+                        homeIntent, mConfiguration, UserHandle.USER_CURRENT);
+                if (ActivityManager.isStartResultSuccessful(result)) {
+                    dockAppStarted = true;
+                } else if (result != ActivityManager.START_INTENT_NOT_RESOLVED) {
+                    Slog.e(TAG, "Could not start dock app: " + homeIntent
+                            + ", startActivityWithConfig result " + result);
                 }
             }
         }
@@ -2790,10 +2788,8 @@ final class UiModeManagerService extends SystemService {
                     Slog.d(TAG, "Setting UI mode override on display " + displayId + ": " + uiMode);
                     mDisplayUiModeOverrides.put(displayId, uiMode);
                 }
-                if (enableCurrentModeTypeBinderCache()) {
-                    UiModeManager.invalidateCurrentModeTypeCache();
-                    UiModeManager.invalidateNightModeCache();
-                }
+                UiModeManager.invalidateCurrentModeTypeCache();
+                UiModeManager.invalidateNightModeCache();
             }
             mWindowManager.onDisplayUiModeChanged(displayId);
         }

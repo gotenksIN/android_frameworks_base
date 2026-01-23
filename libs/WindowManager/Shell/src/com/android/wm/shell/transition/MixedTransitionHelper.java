@@ -208,8 +208,8 @@ public class MixedTransitionHelper {
      * @param pipChange TransitionInfo.Change indicating the task that is being pipped
      * @param splitMainStageRootId MainStage's rootTaskInfo's id
      * @param splitSideStageRootId SideStage's rootTaskInfo's id
-     * @param lastPipSplitStage The last stage that {@param pipChange} was in
-     * @return The change from {@param info} that is replacing the {@param pipChange}, {@code null}
+     * @param lastPipSplitStage The last stage that {@code pipChange} was in
+     * @return The change from {@code info} that is replacing the {@code pipChange}, {@code null}
      *         otherwise
      */
     @Nullable
@@ -315,5 +315,20 @@ public class MixedTransitionHelper {
             }
         }
         return SplitScreen.STAGE_TYPE_UNDEFINED;
+    }
+
+    /**
+     * Find the first change in this transition that is for the home task.
+     *
+     * @return change or {@code null} if the home task is not in the list of changes
+     */
+    static @Nullable TransitionInfo.Change getHomeChange(@NonNull TransitionInfo info) {
+        for (TransitionInfo.Change change : info.getChanges()) {
+            if (change.getTaskInfo() != null
+                    && change.getTaskInfo().getActivityType() == ACTIVITY_TYPE_HOME) {
+                return change;
+            }
+        }
+        return null;
     }
 }

@@ -182,6 +182,7 @@ constructor(
                             presentationStyle = MediaPresentationStyle.Default,
                             behavior = viewModel.mediaUiBehavior,
                             onDismissed = viewModel::onMediaSwipeToDismiss,
+                            location = Media.Location.SHADE,
                         )
                     }
                 }
@@ -197,7 +198,6 @@ constructor(
                     isTransparencyEnabled = viewModel.isTransparencyEnabled,
                     stackTopPadding = notificationStackPadding,
                     stackBottomPadding = notificationStackPadding,
-                    shouldFillMaxSize = false,
                     shouldDrawScrimBackground = false,
                     modifier =
                         Modifier.fillMaxWidth().focusProperties {

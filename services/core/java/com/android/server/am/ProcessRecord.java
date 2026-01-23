@@ -401,7 +401,7 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
     /**
      * The MemoryLimiter associated with this process.  The limiter may be null.
      */
-    private final MemoryLimiter mMemoryLimiter;
+    private final MemoryLimiter.Limiter mMemoryLimiter;
 
     /**
      * The preceding instance of the process, which would exist when the previous process is killed
@@ -627,7 +627,7 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
         mErrorState = new ProcessErrorStateRecord(this);
         mWindowProcessController = new WindowProcessController(
                 mService.mActivityTaskManager, info, processName, uid, userId, this, this);
-        mMemoryLimiter = new MemoryLimiter();
+        mMemoryLimiter = mService.newMemoryLimiter();
 
         mOptRecord = new ProcessCachedOptimizerRecord(this);
         final long now = SystemClock.uptimeMillis();
@@ -1700,8 +1700,8 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
     }
 
     /**
-     * Allows background activity starts using token {@param entity}. Optionally, you can provide
-     * {@param originatingToken} if you have one such originating token, this is useful for tracing
+     * Allows background activity starts using token {@code entity}. Optionally, you can provide
+     * {@code originatingToken} if you have one such originating token, this is useful for tracing
      * back the grant in the case of the notification token.
      */
     void addOrUpdateBackgroundStartPrivileges(@NonNull Binder entity,

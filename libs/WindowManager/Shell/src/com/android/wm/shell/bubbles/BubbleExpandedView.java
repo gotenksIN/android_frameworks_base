@@ -23,7 +23,6 @@ import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 import static com.android.wm.shell.bubbles.BubbleDebugConfig.TAG_BUBBLES;
 import static com.android.wm.shell.bubbles.BubbleDebugConfig.TAG_WITH_CLASS_NAME;
 import static com.android.wm.shell.bubbles.BubblePositioner.MAX_HEIGHT;
-import static com.android.wm.shell.bubbles.util.BubbleUtils.isValidToBubble;
 import static com.android.wm.shell.shared.TypefaceUtils.setTypeface;
 
 import android.annotation.NonNull;
@@ -64,9 +63,12 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.policy.ScreenDecorationsUtils;
 import com.android.wm.shell.Flags;
 import com.android.wm.shell.R;
+import com.android.wm.shell.bubbles.util.BubblePolicyHelper;
+import com.android.wm.shell.bubbles.util.DefaultBubblePolicyHelper;
 import com.android.wm.shell.common.AlphaOptimizedButton;
 import com.android.wm.shell.shared.TriangleShape;
 import com.android.wm.shell.shared.TypefaceUtils;
+import com.android.wm.shell.shared.bubbles.ContextUtils;
 import com.android.wm.shell.shared.bubbles.logging.BubbleLog;
 import com.android.wm.shell.taskview.TaskView;
 
@@ -192,6 +194,8 @@ public class BubbleExpandedView extends LinearLayout {
     private final FrameLayout mExpandedViewContainer = new FrameLayout(getContext());
 
     private BubbleTaskViewListener mTaskViewListener;
+
+    private BubblePolicyHelper mBubblePolicyHelper = DefaultBubblePolicyHelper.INSTANCE;
 
     public BubbleExpandedView(Context context) {
         this(context, null);
@@ -349,7 +353,13 @@ public class BubbleExpandedView extends LinearLayout {
                         @Override
                         public void onTaskInfoChanged(RunningTaskInfo taskInfo) {
                             if (mBubble != null && taskInfo != null) {
-                                mBubble.setIsTaskValidToBubble(isValidToBubble(taskInfo));
+                                final boolean isTaskResizable = taskInfo.isResizeable;
+                                final boolean isNonResizableTaskAndValidOnSmallScreen =
+                                        !isTaskResizable && ContextUtils
+                                                .getSupportsNonResizableMultiWindowOnSmallScreen(
+                                                        mContext);
+                                mBubble.setIsTaskValidToBubbleOnSmallScreen(
+                                        isTaskResizable || isNonResizableTaskAndValidOnSmallScreen);
                             }
                         }
                     });

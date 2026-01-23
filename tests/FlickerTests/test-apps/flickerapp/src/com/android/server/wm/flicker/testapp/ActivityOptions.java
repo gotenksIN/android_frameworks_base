@@ -334,4 +334,20 @@ public class ActivityOptions {
         public static final ComponentName COMPONENT = new ComponentName(FLICKER_APP_PACKAGE,
                 FLICKER_APP_PACKAGE + ".ImmersiveActivity");
     }
+
+    public static class StaticShortcutsActivity {
+        public static final String LABEL = "Static Shortcuts";
+        public static final ComponentName COMPONENT = new ComponentName(FLICKER_APP_PACKAGE,
+                FLICKER_APP_PACKAGE + ".StaticShortcutsActivity");
+
+        public static class Shortcuts {
+            public static final String LAUNCH_SSA = "Open SSA";
+        }
+    }
+
+    public static class RequestFullscreenModeActivity {
+        public static final String LABEL = "RequestFullscreenModeActivity";
+        public static final ComponentName COMPONENT = new ComponentName(FLICKER_APP_PACKAGE,
+                FLICKER_APP_PACKAGE + ".RequestFullscreenModeActivity");
+    }
 }

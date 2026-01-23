@@ -16,11 +16,15 @@
 
 package com.android.settingslib.safetycenter
 
+import android.app.PendingIntent
+import android.content.Context
+import android.content.Intent
 import android.os.UserHandle
 import android.safetycenter.SafetyCenterEntry
 import android.safetycenter.SafetyCenterIssue
 import android.safetycenter.SafetyCenterStaticEntry
 import android.safetycenter.SafetyCenterStatus
+import androidx.test.core.app.ApplicationProvider
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -29,6 +33,7 @@ import org.robolectric.RobolectricTestRunner
 @RunWith(RobolectricTestRunner::class)
 class SafetyCenterUiDataTest {
 
+    private val context: Context = ApplicationProvider.getApplicationContext()
     private val user0 = UserHandle.of(0)
     private val user10 = UserHandle.of(10)
 
@@ -64,8 +69,15 @@ class SafetyCenterUiDataTest {
         user: UserHandle,
         sourceId: String,
         title: String = "Entry $id",
+        summary: CharSequence? = null,
+        severityLevel: Int = SafetyCenterEntry.ENTRY_SEVERITY_LEVEL_UNSPECIFIED,
+        pendingIntent: PendingIntent? = null,
     ): SafetyCenterEntry {
-        return SafetyCenterEntry.Builder(id, title, user, sourceId).build()
+        return SafetyCenterEntry.Builder(id, title, user, sourceId)
+            .setSummary(summary)
+            .setSeverityLevel(severityLevel)
+            .setPendingIntent(pendingIntent)
+            .build()
     }
 
     // Helper to create a minimal SafetyCenterStaticEntry
@@ -73,8 +85,13 @@ class SafetyCenterUiDataTest {
         user: UserHandle,
         sourceId: String,
         title: String = "Static entry",
+        summary: CharSequence? = null,
+        pendingIntent: PendingIntent? = null,
     ): SafetyCenterStaticEntry {
-        return SafetyCenterStaticEntry.Builder(title, user, sourceId).build()
+        return SafetyCenterStaticEntry.Builder(title, user, sourceId)
+            .setSummary(summary)
+            .setPendingIntent(pendingIntent)
+            .build()
     }
 
     private val entry1 = createEntry("entry1", user0, "sourceA")
@@ -114,15 +131,32 @@ class SafetyCenterUiDataTest {
             SafetyCenterIssue.ISSUE_SEVERITY_LEVEL_RECOMMENDATION,
         )
     private val issue5 =
-        createIssue("issue5", user10, setOf("s1"), SafetyCenterIssue.ISSUE_SEVERITY_LEVEL_OK)
+        createIssue(
+            "issue5",
+            user10,
+            setOf("s1"),
+            SafetyCenterIssue.ISSUE_SEVERITY_LEVEL_OK,
+            )
     private val dismissedIssue1 =
-        createIssue("issue6", user0, setOf("s4"), SafetyCenterIssue.ISSUE_SEVERITY_LEVEL_OK)
+        createIssue(
+            "issue6",
+            user0,
+            setOf("s4"),
+            SafetyCenterIssue.ISSUE_SEVERITY_LEVEL_OK,
+            )
     private val dismissedIssue2 =
         createIssue(
             "issue7",
             user0,
             setOf("s3"),
             SafetyCenterIssue.ISSUE_SEVERITY_LEVEL_RECOMMENDATION,
+        )
+    private val dismissedIssue3 =
+        createIssue(
+            "issue8",
+            user10,
+            setOf("s1"),
+            SafetyCenterIssue.ISSUE_SEVERITY_LEVEL_CRITICAL_WARNING,
         )
 
     private val testSafetyCenterUiData =
@@ -145,7 +179,11 @@ class SafetyCenterUiDataTest {
                     "s3" to listOf(issue4),
                 ),
             dismissedIssuesBySourceId =
-                mapOf("s4" to listOf(dismissedIssue1), "s3" to listOf(dismissedIssue2)),
+                mapOf(
+                    "s4" to listOf(dismissedIssue1),
+                    "s3" to listOf(dismissedIssue2),
+                    "s1" to listOf(dismissedIssue3),
+                ),
         )
 
     @Test
@@ -243,6 +281,38 @@ class SafetyCenterUiDataTest {
     }
 
     @Test
+    fun getDismissedIssues_noOrder_sortedBySeverity() {
+        val issues = testSafetyCenterUiData.getDismissedIssues()
+        assertThat(issues)
+            .containsExactly(dismissedIssue3, dismissedIssue2, dismissedIssue1)
+            .inOrder()
+    }
+
+    @Test
+    fun getDismissedIssues_withOrder_sortedBySeverityAndSourceOrder() {
+        val sourceOrder = listOf("s3", "s4", "s1")
+        val issues = testSafetyCenterUiData.getDismissedIssues(sourceOrder)
+        // Expected order: CRITICAL (s1), RECOMMENDATION (s3), OK (s4)
+        assertThat(issues)
+            .containsExactly(dismissedIssue3, dismissedIssue2, dismissedIssue1)
+            .inOrder()
+    }
+
+    @Test
+    fun getDismissedIssues_emptyData_returnsEmptyList() {
+        val emptyUiData =
+            SafetyCenterUiData(
+                status = defaultStatus,
+                entriesByUserIdAndSourceId = emptyMap(),
+                staticEntriesByUserIdAndSourceId = emptyMap(),
+                activeIssuesBySourceId = emptyMap(),
+                dismissedIssuesBySourceId = emptyMap(),
+            )
+        val result = emptyUiData.getDismissedIssues()
+        assertThat(result).isEmpty()
+    }
+
+    @Test
     fun getActiveIssuesForSources_filtersAndSorts() {
         val sourceOrder = listOf("s3", "s1")
         val issues = testSafetyCenterUiData.getActiveIssuesForSources(sourceOrder)
@@ -257,13 +327,13 @@ class SafetyCenterUiDataTest {
 
     @Test
     fun getDismissedIssuesForSources_filtersOutGreenIssues() {
-        val issues = testSafetyCenterUiData.getDismissedIssuesForSources(listOf("s3", "s4"))
-        assertThat(issues).containsExactly(dismissedIssue2)
+        val issues = testSafetyCenterUiData.getDismissedIssuesForSources(listOf("s1", "s3", "s4"))
+        assertThat(issues).containsExactly(dismissedIssue3, dismissedIssue2).inOrder()
     }
 
     @Test
     fun getDismissedIssuesForSources_notFound_returnsEmpty() {
-        val issues = testSafetyCenterUiData.getDismissedIssuesForSources(listOf("s1"))
+        val issues = testSafetyCenterUiData.getDismissedIssuesForSources(listOf("s2"))
         assertThat(issues).isEmpty()
     }
 
@@ -284,5 +354,69 @@ class SafetyCenterUiDataTest {
 
         val expectedUiData = testSafetyCenterUiData.copy(resolvedIssues = resolved)
         assertThat(updatedUiData).isEqualTo(expectedUiData)
+    }
+
+    /** Verifies that all fields from a [SafetyCenterEntry] are correctly mapped. */
+    @Test
+    fun fromSafetyCenterEntry_mapsAllFieldsCorrectly() {
+        // Setup: Create a detailed SafetyCenterEntry
+        val intent = Intent("FAKE_ACTION")
+        val pendingIntent =
+            PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_IMMUTABLE)
+        val entry =
+            createEntry(
+                id = "entry_id",
+                user = user0,
+                sourceId = "source_id",
+                title = "Title",
+                summary = "Summary",
+                severityLevel = SafetyCenterEntry.ENTRY_SEVERITY_LEVEL_RECOMMENDATION,
+                pendingIntent = pendingIntent,
+            )
+
+        // Action: Convert to SafetyCenterUiEntry
+        val uiEntry = SafetyCenterUiEntry.fromSafetyCenterEntry(entry)
+
+        // Assertions: Verify all fields are mapped correctly
+        assertThat(uiEntry.title).isEqualTo("Title")
+        assertThat(uiEntry.summary).isEqualTo("Summary")
+        assertThat(uiEntry.severityLevel)
+            .isEqualTo(SafetyCenterEntry.ENTRY_SEVERITY_LEVEL_RECOMMENDATION)
+        assertThat(uiEntry.safetySourceId).isEqualTo("source_id")
+        assertThat(uiEntry.user).isEqualTo(user0)
+        assertThat(uiEntry.pendingIntent).isSameInstanceAs(pendingIntent)
+    }
+
+    /**
+     * Verifies that all fields from a [SafetyCenterStaticEntry] are correctly mapped, with
+     * severity level set to UNSPECIFIED.
+     */
+    @Test
+    fun fromSafetyCenterStaticEntry_mapsAllFieldsCorrectly() {
+        // Setup: Create a detailed SafetyCenterStaticEntry
+        val intent = Intent("FAKE_ACTION")
+        val pendingIntent =
+            PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_IMMUTABLE)
+        val staticEntry =
+            createStaticEntry(
+                user = user0,
+                sourceId = "source_id",
+                title = "Title",
+                summary = "Summary",
+                pendingIntent = pendingIntent,
+            )
+
+        // Action: Convert to SafetyCenterUiEntry
+        val uiEntry = SafetyCenterUiEntry.fromSafetyCenterStaticEntry(staticEntry)
+
+        // Assertions: Verify all fields are mapped correctly
+        assertThat(uiEntry.title).isEqualTo("Title")
+        assertThat(uiEntry.summary).isEqualTo("Summary")
+        // Static entries should always have an UNSPECIFIED severity level
+        assertThat(uiEntry.severityLevel)
+            .isEqualTo(SafetyCenterEntry.ENTRY_SEVERITY_LEVEL_UNSPECIFIED)
+        assertThat(uiEntry.safetySourceId).isEqualTo("source_id")
+        assertThat(uiEntry.user).isEqualTo(user0)
+        assertThat(uiEntry.pendingIntent).isSameInstanceAs(pendingIntent)
     }
 }

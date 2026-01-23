@@ -31,6 +31,7 @@ import static android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_CACHE
 import static android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_VISIBLE;
 import static android.hardware.display.DisplayManager.BRIGHTNESS_UNIT_NITS;
 import static android.hardware.display.DisplayManager.BRIGHTNESS_UNIT_PERCENTAGE;
+import static android.hardware.display.DisplayManager.DEFAULT_HDR_PREFERENCE;
 import static android.hardware.display.DisplayManager.VIRTUAL_DISPLAY_FLAG_ALWAYS_UNLOCKED;
 import static android.hardware.display.DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR;
 import static android.hardware.display.DisplayManager.VIRTUAL_DISPLAY_FLAG_CAN_SHOW_WITH_INSECURE_KEYGUARD;
@@ -93,6 +94,7 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.content.pm.ParceledListSlice;
+import android.content.pm.UserInfo;
 import android.content.res.Resources;
 import android.content.res.TypedArray;
 import android.database.ContentObserver;
@@ -209,6 +211,7 @@ import com.android.server.display.plugin.PluginManager;
 import com.android.server.display.utils.DebugUtils;
 import com.android.server.display.utils.SensorUtils;
 import com.android.server.input.InputManagerInternal;
+import com.android.server.pm.UserManagerInternal;
 import com.android.server.utils.FoldSettingProvider;
 import com.android.server.wm.ActivityTaskManagerInternal;
 import com.android.server.wm.DesktopModeHelper;
@@ -219,7 +222,9 @@ import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -318,6 +323,7 @@ public final class DisplayManagerService extends SystemService {
     private InputManagerInternal mInputManagerInternal;
     private ActivityManagerInternal mActivityManagerInternal;
     private ActivityTaskManagerInternal mActivityTaskManagerInternal;
+    private UserManagerInternal mUserManagerInternal;
     private final UidImportanceListener mUidImportanceListener = new UidImportanceListener();
 
     private final DisplayFrameworkStatsLogger mStatsLogger = new DisplayFrameworkStatsLogger();
@@ -749,7 +755,8 @@ public final class DisplayManagerService extends SystemService {
         mDisplayNotificationManager = new DisplayNotificationManager(mContext,
                 mExternalDisplayStatsService);
         mExternalDisplayPolicy = new ExternalDisplayPolicy(new ExternalDisplayPolicyInjector());
-        mPluginManager = new PluginManager(mContext, mFlags);
+        mPluginManager =
+                new PluginManager(context, new PluginProviderDependencyInjector() , mFlags);
         mSecondaryDisplayPolicy =
                 new SecondaryDisplayPolicy(mContext, () -> mInjector.canEnterDesktopMode(mContext));
     }
@@ -948,6 +955,16 @@ public final class DisplayManagerService extends SystemService {
                         mInjector.isDesktopModeSupportedOnInternalDisplay(mContext)
                                 || getIncludeDefaultDisplayInTopologySetting();
             }
+            mUserManagerInternal = LocalServices.getService(UserManagerInternal.class);
+            if (mUserManagerInternal != null) {
+                mUserManagerInternal.addUserLifecycleListener(
+                        new UserManagerInternal.UserLifecycleListener() {
+                            @Override
+                            public void onUserRemoved(UserInfo user) {
+                                mPersistentDataStore.removeUserData(user.serialNumber);
+                            }
+                        });
+            }
         }
 
         mDisplayModeDirector.setDesiredDisplayModeSpecsListener(
@@ -967,10 +984,8 @@ public final class DisplayManagerService extends SystemService {
 
         mContext.registerReceiver(mIdleModeReceiver, filter);
 
-        if (mFlags.isResolutionBackupRestoreEnabled()) {
-            final IntentFilter restoreFilter = new IntentFilter(Intent.ACTION_SETTING_RESTORED);
-            mContext.registerReceiver(mResolutionRestoreReceiver, restoreFilter);
-        }
+        final IntentFilter restoreFilter = new IntentFilter(Intent.ACTION_SETTING_RESTORED);
+        mContext.registerReceiver(mResolutionRestoreReceiver, restoreFilter);
 
         mSmallAreaDetectionController = SmallAreaDetectionController.create(mContext);
 
@@ -1595,9 +1610,9 @@ public final class DisplayManagerService extends SystemService {
         if (mDisplayInfoCache.size() <= 1) {
             return ARRAY_DEFAULT_DISPLAY_ONLY;
         }
-        return mDisplayInfoCache.filteredKeys((Integer key, CachedDisplayInfo value) ->
-                (includeDisabled || value.isEnabled())
-                        && doesCallingUidHaveAccessToDisplay(callingUid, value.info()));
+        return mDisplayInfoCache.filteredKeys(
+                (Integer key, CachedDisplayInfo value) -> (includeDisabled || value.isEnabled())
+                        && mInjector.doesCallingUidHaveAccessToDisplay(callingUid, value.info()));
     }
 
     private DisplayInfo getDisplayInfoInternal(int displayId, int callingUid) {
@@ -1609,7 +1624,7 @@ public final class DisplayManagerService extends SystemService {
                     return null;
                 }
                 Slog.w(TAG, "Default display not found in cache");
-            } else if (!doesCallingUidHaveAccessToDisplay(callingUid, info.info())) {
+            } else if (!mInjector.doesCallingUidHaveAccessToDisplay(callingUid, info.info())) {
                 Slog.w(TAG, "Calling uid " + callingUid + " does not have access to display "
                         + displayId);
                 return null;
@@ -1629,7 +1644,7 @@ public final class DisplayManagerService extends SystemService {
                 final DisplayInfo info =
                         getDisplayInfoForFrameRateOverride(display.getFrameRateOverrides(),
                                 display.getDisplayInfoLocked(), callingUid);
-                if (doesCallingUidHaveAccessToDisplay(callingUid, info)) {
+                if (mInjector.doesCallingUidHaveAccessToDisplay(callingUid, info)) {
                     if (DEBUG) {
                         Slog.d(TAG, "getDisplayInfoInternal: for display"
                                 + " for uid " + callingUid + " displayId " + displayId);
@@ -3035,7 +3050,7 @@ public final class DisplayManagerService extends SystemService {
         // a new resolution for the default display (normally stored in PDS), we will also save it
         // to a setting that is backed up.
         // TODO(b/330943343) - Consider a full fidelity DisplayBackupHelper for this instead.
-        if (mFlags.isResolutionBackupRestoreEnabled() && displayId == Display.DEFAULT_DISPLAY) {
+        if (displayId == Display.DEFAULT_DISPLAY) {
             // Checks to see which of the two resolutions is selected
             // TODO(b/330906790) Uses the same logic as Settings, but should be made to support
             //     more than two resolutions using explicit mode enums long-term.
@@ -3480,10 +3495,6 @@ public final class DisplayManagerService extends SystemService {
     private boolean isUidPresentOnDisplayInternal(int uid, int displayId) {
         final IntArray displayUIDs = mDisplayAccessUIDs.get(displayId);
         return displayUIDs != null && displayUIDs.indexOf(uid) != -1;
-    }
-
-    private boolean doesCallingUidHaveAccessToDisplay(int uid, DisplayInfo info) {
-        return info.hasAccess(uid) || isUidPresentOnDisplayInternal(uid, info.displayId);
     }
 
     @Nullable
@@ -4295,6 +4306,10 @@ public final class DisplayManagerService extends SystemService {
         PersistentDataStore getPersistentDataStore() {
             return new PersistentDataStore();
         }
+
+        boolean doesCallingUidHaveAccessToDisplay(int uid, DisplayInfo info) {
+            return info.hasAccess(uid);
+        }
     }
 
     @VisibleForTesting
@@ -4466,6 +4481,35 @@ public final class DisplayManagerService extends SystemService {
                     mPersistentDataStore.getConnectionPreference(displayDevice);
             return mSecondaryDisplayPolicy.getPolicyAwareConnectionPreference(
                     persistedConnectionPreference);
+        }
+    }
+
+    private void setUserPreferredHdrModeInternal(int displayId, int preference) {
+        synchronized (mSyncRoot) {
+            DisplayDevice displayDevice = getDeviceForDisplayLocked(displayId);
+            if (displayDevice == null) {
+                Slog.w(
+                        TAG,
+                        "Attempted to set user HDR preference for a display that does not exist: "
+                                + displayId);
+                return;
+            }
+            if (mPersistentDataStore.setUserPreferredHdrMode(displayDevice, preference)) {
+                mPersistentDataStore.saveIfNeeded();
+                // TODO(b/460304742): Implement HDR mode voting in DisplayModeDirector. displayId
+                //   param will be used in the voting summary
+            }
+        }
+    }
+
+    private int getUserPreferredHdrModeInternal(int displayId) {
+        synchronized (mSyncRoot) {
+            DisplayDevice displayDevice = getDeviceForDisplayLocked(displayId);
+            if (displayDevice == null) {
+                return DEFAULT_HDR_PREFERENCE;
+            }
+
+            return mPersistentDataStore.getUserPreferredHdrMode(displayDevice);
         }
     }
 
@@ -4898,6 +4942,20 @@ public final class DisplayManagerService extends SystemService {
                                     + mInternalEventFlagsMask + ",uid" + mUid);
                 }
                 // The client is not interested in these events, so do nothing.
+                return 0;
+            }
+
+            // Access check, except for removed and disconnected events where the process is not
+            // present on the display any more.
+            if ((Flags.displayListenerSnapshot() || Flags.displayIdsCache())
+                    && (eventMask & DisplayManagerGlobal.EVENT_DISPLAY_REMOVED) == 0
+                    && (eventMask & DisplayManagerGlobal.EVENT_DISPLAY_DISCONNECTED) == 0
+                    && getDisplayInfoInternal(displayId, mUid) == null) {
+                if (DEBUG || extraLogging(mPackageName)) {
+                    Slog.i(TAG, "Not sending displayEvent: " + eventsToString(oldEventMask)
+                            + " due to no access to display with ID=" + displayId + " uid=" + mUid
+                            + " pid=" + mPid + " packageName=" + mPackageName);
+                }
                 return 0;
             }
 
@@ -5510,8 +5568,10 @@ public final class DisplayManagerService extends SystemService {
             // Any app can get information about available wifi displays.
             // Except for configure wifi display permission, which is required to get the wifi
             // display address.
-            final boolean hasConfigureWifiDisplayPermission = checkCallingPermission(
-                    android.Manifest.permission.CONFIGURE_WIFI_DISPLAY, "getWifiDisplayStatus()");
+            final int callingUid = Binder.getCallingUid();
+            final boolean hasConfigureWifiDisplayPermission = (callingUid == Process.SYSTEM_UID)
+                    || checkCallingPermission(android.Manifest.permission.CONFIGURE_WIFI_DISPLAY,
+                            "getWifiDisplayStatus()");
             final long token = Binder.clearCallingIdentity();
             try {
                 return getWifiDisplayStatusInternal(hasConfigureWifiDisplayPermission);
@@ -5998,6 +6058,31 @@ public final class DisplayManagerService extends SystemService {
             final long token = Binder.clearCallingIdentity();
             try {
                 return getConnectionPreferenceInternal(uniqueId);
+            } finally {
+                Binder.restoreCallingIdentity(token);
+            }
+        }
+
+        @EnforcePermission(MANAGE_DISPLAYS)
+        @Override // Binder call
+        public void setUserPreferredHdrMode(int displayId, int preference) {
+            setUserPreferredHdrMode_enforcePermission();
+            // Use clearCallingIdentity to perform the work with system privileges
+            final long token = Binder.clearCallingIdentity();
+            try {
+                setUserPreferredHdrModeInternal(displayId, preference);
+            } finally {
+                Binder.restoreCallingIdentity(token);
+            }
+        }
+
+        @EnforcePermission(MANAGE_DISPLAYS)
+        @Override // Binder call
+        public int getUserPreferredHdrMode(int displayId) {
+            getUserPreferredHdrMode_enforcePermission();
+            final long token = Binder.clearCallingIdentity();
+            try {
+                return getUserPreferredHdrModeInternal(displayId);
             } finally {
                 Binder.restoreCallingIdentity(token);
             }
@@ -7036,4 +7121,22 @@ public final class DisplayManagerService extends SystemService {
     private record DisplayInfoChangedFields(int changedGroups,
                                             DisplayInfo.DisplayInfoChangeSource source) {}
 
+    /**
+     * Provides needed dependencies for {@link PluginManager} to pass to Plugin Providers
+     */
+    public class PluginProviderDependencyInjector
+            implements PluginManager.PluginProviderDependencies{
+        @Override
+        public Map<String, DisplayDeviceConfig> getDisplayDeviceConfigs() {
+            Map<String, DisplayDeviceConfig> configMap = new HashMap<>();
+            synchronized (mSyncRoot) {
+                mDisplayDeviceRepo.forEachLocked(device -> {
+                    configMap.put(
+                            device.getUniqueId(), device.getDisplayDeviceConfig());
+                });
+            }
+            return configMap;
+        }
+
+    }
 }

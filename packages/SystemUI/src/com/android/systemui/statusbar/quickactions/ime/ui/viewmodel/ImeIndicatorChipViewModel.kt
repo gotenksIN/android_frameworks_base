@@ -16,13 +16,22 @@
 
 package com.android.systemui.statusbar.quickactions.ime.ui.viewmodel
 
+import android.content.Context
 import androidx.compose.runtime.getValue
+import com.android.systemui.common.shared.model.ContentDescription
+import com.android.systemui.common.shared.model.Icon
+import com.android.systemui.common.shared.model.asIcon
+import com.android.systemui.dagger.qualifiers.Application
+import com.android.systemui.display.dagger.SystemUIDisplaySubcomponent.DisplayId
 import com.android.systemui.lifecycle.HydratedActivatable
+import com.android.systemui.res.R
 import com.android.systemui.statusbar.quickactions.ime.domain.interactor.ImeIndicatorChipInteractor
 import com.android.systemui.statusbar.quickactions.ime.shared.model.ImeIndicatorChipModel
 import com.android.systemui.statusbar.quickactions.popups.ui.viewmodel.StatusBarPopupChipViewModel
+import com.android.systemui.statusbar.quickactions.ui.viewmodel.ChipIcon
 import com.android.systemui.statusbar.quickactions.ui.viewmodel.QuickActionChipId
 import com.android.systemui.statusbar.quickactions.ui.viewmodel.QuickActionChipUiState
+import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.flow.map
@@ -30,8 +39,11 @@ import kotlinx.coroutines.flow.map
 /** View model for the IME indicator chip in the status bar. */
 class ImeIndicatorChipViewModel
 @AssistedInject
-constructor(private val imeIndicatorChipInteractor: ImeIndicatorChipInteractor) :
-    StatusBarPopupChipViewModel, HydratedActivatable() {
+constructor(
+    @param:Application private val context: Context,
+    @Assisted private val displayId: Int,
+    private val imeIndicatorChipInteractor: ImeIndicatorChipInteractor,
+) : StatusBarPopupChipViewModel, HydratedActivatable() {
 
     override val chip: QuickActionChipUiState by
         imeIndicatorChipInteractor.chipModel
@@ -46,20 +58,49 @@ constructor(private val imeIndicatorChipInteractor: ImeIndicatorChipInteractor) 
             return QuickActionChipUiState.Hidden(QuickActionChipId.ImeIndicator)
         }
 
-        // TODO(b/458557858): Use IME icon or subtype short label if available, update the fallback
-        // to a keyboard icon, and remove the placeholder "IME" string.
-        val chipText = model.selectedSubtype?.subtypeId?.toString() ?: "IME"
+        // TODO(b/458557858): Determine what to set as the accessible name when there is a selected
+        // subtype.
+        val subtypeIcon =
+            model.selectedSubtype?.icon?.let { subtypeIcon ->
+                android.graphics.drawable.Icon.createWithResource(
+                        subtypeIcon.packageName,
+                        subtypeIcon.resId,
+                    )
+                    .loadDrawable(context)
+                    ?.asIcon(resId = subtypeIcon.resId, resPackage = subtypeIcon.packageName)
+            }
+        val subtypeShortLabel = model.selectedSubtype?.shortLabel
+
+        val (icons: List<ChipIcon>, chipText: String?) =
+            when {
+                subtypeIcon != null -> {
+                    listOf(ChipIcon(subtypeIcon)) to null
+                }
+                !subtypeShortLabel.isNullOrBlank() -> {
+                    emptyList<ChipIcon>() to subtypeShortLabel
+                }
+                else -> {
+                    val defaultIcon =
+                        Icon.Resource(
+                            R.drawable.ic_keyboard,
+                            ContentDescription.Resource(
+                                R.string.accessibility_status_bar_input_method_indicator
+                            ),
+                        )
+                    listOf(ChipIcon(defaultIcon)) to null
+                }
+            }
 
         return QuickActionChipUiState.PopupChip(
             chipId = QuickActionChipId.ImeIndicator,
-            icons = emptyList(),
+            icons = icons,
             chipText = chipText,
-            showPopup = { imeIndicatorChipInteractor.showInputMethodPicker() },
+            showPopup = { imeIndicatorChipInteractor.showInputMethodPicker(displayId) },
         )
     }
 
     @AssistedFactory
     interface Factory {
-        fun create(): ImeIndicatorChipViewModel
+        fun create(@DisplayId displayId: Int): ImeIndicatorChipViewModel
     }
 }

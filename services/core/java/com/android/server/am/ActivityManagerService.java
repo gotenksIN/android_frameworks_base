@@ -505,6 +505,7 @@ import com.android.server.am.psc.OomAdjuster;
 import com.android.server.am.psc.OomAdjusterDebugLogger;
 import com.android.server.am.psc.ProcessListInternal.ProcessChangeItem;
 import com.android.server.am.psc.ProcessRecordInternal;
+import com.android.server.am.psc.ProcessStateController;
 import com.android.server.am.psc.UidRecordInternal;
 import com.android.server.appop.AppOpsService;
 import com.android.server.compat.PlatformCompat;
@@ -771,6 +772,8 @@ public class ActivityManagerService extends IActivityManager.Stub
 
     public final IntentFirewall mIntentFirewall;
 
+    private final MemoryLimiter mMemoryLimiter = new MemoryLimiter();
+
     /**
      * The global lock for AMS, it's de-facto the ActivityManagerService object as of now.
      */
@@ -901,20 +904,59 @@ public class ActivityManagerService extends IActivityManager.Stub
             THREAD_PRIORITY_FOREGROUND, LockGuard.INDEX_ACTIVITY);
 
     static void boostPriorityForLockedSection() {
-        PerfettoTrace.begin(BIG_LOCKS_V3, "ams_lock_acquire").emit();
         sThreadPriorityBooster.boost();
     }
 
     static void resetPriorityAfterLockedSection() {
         sThreadPriorityBooster.reset();
-        PerfettoTrace.end(BIG_LOCKS_V3).emit();
     }
 
     private static ThreadPriorityBooster sProcThreadPriorityBooster = new ThreadPriorityBooster(
             THREAD_PRIORITY_FOREGROUND, LockGuard.INDEX_PROC);
 
+    /**
+     * Emits a trace event indicating the start of an attempt to acquire the main AMS lock.
+     */
+    public static void traceBeforeAmsLock() {
+        PerfettoTrace.instant(BIG_LOCKS_V3, "ams_lock_acquire").emit();
+    }
+
+    /**
+     * Emits a trace event indicating that the main AMS lock has been acquired and is now held.
+     */
+    public static void traceAfterAmsLock() {
+        PerfettoTrace.begin(BIG_LOCKS_V3, "ams_lock_held").emit();
+    }
+
+    /**
+     * Emits a trace event indicating the end of the critical section protected by the AMS lock.
+     */
+    public static void traceAfterAmsUnlock() {
+        PerfettoTrace.end(BIG_LOCKS_V3).emit();
+    }
+
+    /**
+     * Emits a trace event indicating the start of an attempt to acquire the process lock.
+     */
+    public static void traceBeforeProcLock() {
+        PerfettoTrace.instant(BIG_LOCKS_V3, "proc_lock_acquire").emit();
+    }
+
+    /**
+     * Emits a trace event indicating that the process lock has been acquired and is now held.
+     */
+    public static void traceAfterProcLock() {
+        PerfettoTrace.begin(BIG_LOCKS_V3, "proc_lock_held").emit();
+    }
+
+    /**
+     * Emits a trace event indicating the end of the critical section protected by the process lock.
+     */
+    public static void traceAfterProcUnlock() {
+        PerfettoTrace.end(BIG_LOCKS_V3).emit();
+    }
+
     static void boostPriorityForProcLockedSection() {
-        PerfettoTrace.begin(BIG_LOCKS_V3, "proc_lock_acquire").emit();
         if (ENABLE_PROC_LOCK) {
             sProcThreadPriorityBooster.boost();
         } else {
@@ -928,7 +970,6 @@ public class ActivityManagerService extends IActivityManager.Stub
         } else {
             sThreadPriorityBooster.reset();
         }
-        PerfettoTrace.end(BIG_LOCKS_V3).emit();
     }
 
     /**
@@ -1212,9 +1253,7 @@ public class ActivityManagerService extends IActivityManager.Stub
 
             final String packageName = name.getPackageName();
             synchronized (ActivityManagerService.this) {
-                String processRecordName = Flags.appStartInfoProcessNameFix()
-                        ? processName : packageName;
-                ProcessRecord record = getProcessRecordLocked(processRecordName, uid);
+                ProcessRecord record = getProcessRecordLocked(processName, uid);
                 mProcessList.getAppStartInfoTracker().onActivityLaunched(id, name, temperature,
                         record);
             }
@@ -2343,6 +2382,9 @@ public class ActivityManagerService extends IActivityManager.Stub
             if (phase == PHASE_SYSTEM_SERVICES_READY) {
                 mService.mBatteryStatsService.systemServicesReady();
                 mService.mServices.systemServicesReady();
+                if (mService.mAppLockLocalService != null) {
+                    mService.mAppLockLocalService.systemServicesReady();
+                }
             } else if (phase == PHASE_ACTIVITY_MANAGER_READY) {
                 mService.mBroadcastController.startBroadcastObservers();
             } else if (phase == PHASE_THIRD_PARTY_APPS_CAN_START) {
@@ -2547,7 +2589,6 @@ public class ActivityManagerService extends IActivityManager.Stub
                 .setHandlerThread(handlerThread)
                 .build();
         mOomAdjuster = mProcessStateController.getOomAdjuster();
-        MemoryLimiter.init();
 
         mIntentFirewall = injector.getIntentFirewall();
         mProcessStats = new ProcessStatsService(this, mContext.getCacheDir());
@@ -2626,7 +2667,6 @@ public class ActivityManagerService extends IActivityManager.Stub
                 .setProcessLruUpdater(mProcessList)
                 .build();
         mOomAdjuster = mProcessStateController.getOomAdjuster();
-        MemoryLimiter.init();
 
         mBroadcastQueue = mInjector.getBroadcastQueue(this);
         mBroadcastController = new BroadcastController(mContext, this, mBroadcastQueue);
@@ -2730,6 +2770,20 @@ public class ActivityManagerService extends IActivityManager.Stub
 
     public void setInstaller(Installer installer) {
         mInstaller = installer;
+    }
+
+    /**
+     * Return a new limiter from the controller.
+     */
+    MemoryLimiter.Limiter newMemoryLimiter() {
+        return mMemoryLimiter.newLimiter();
+    }
+
+    /**
+     * Return the controller.  This is used by the shell to support test and debug.
+     */
+    MemoryLimiter getMemoryLimiter() {
+        return mMemoryLimiter;
     }
 
     private void start() {
@@ -3322,10 +3376,13 @@ public class ActivityManagerService extends IActivityManager.Stub
             // checks and restrictions
             return;
         }
+
         final int userId = UserHandle.getUserId(callingUid);
-        final int packageUid = getPackageManagerInternal().getPackageUid(packageName,
-                /*flags=*/ 0, userId);
-        if (packageUid != callingUid) {
+        final PackageManagerInternal pmi = getPackageManagerInternal();
+        boolean isSameApp = enablePccFrameworkSupport()
+                ? pmi.isSameApp(packageName, /*flags*/ 0, callingUid, userId)
+                : pmi.getPackageUid(packageName, /*flags*/ 0, userId) == callingUid;
+        if (!isSameApp) {
             final SecurityException e =
                     new SecurityException(packageName + " does not belong to uid " + callingUid);
             if (throwException) {
@@ -4744,18 +4801,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                         packageName, null, userId);
         }
 
-        boolean clearPendingIntentsForStoppedApp = false;
-        try {
-            clearPendingIntentsForStoppedApp = (packageStateStopped
-                    && android.content.pm.Flags.stayStopped());
-        } catch (IllegalStateException e) {
-            // It's unlikely for a package to be force-stopped early in the boot cycle. So, if we
-            // check for 'packageStateStopped' which should evaluate to 'false', then this should
-            // ensure we are not accessing the flag early in the boot cycle. As an additional
-            // safety measure, catch the exception and ignore to avoid causing a device restart.
-            clearPendingIntentsForStoppedApp = false;
-        }
-        if (packageName == null || uninstalling || clearPendingIntentsForStoppedApp) {
+        if (packageName == null || uninstalling || packageStateStopped) {
             final int cancelReason;
             if (packageName == null) {
                 cancelReason = PendingIntentRecord.CANCEL_REASON_USER_STOPPED;
@@ -5494,7 +5540,6 @@ public class ActivityManagerService extends IActivityManager.Stub
         if (isRestrictedBackupMode) return;
 
         if (!sendBroadcast) {
-            if (!android.content.pm.Flags.stayStopped()) return;
             // Nothing to do if it wasn't previously stopped
             if (!wasForceStopped) {
                 return;
@@ -8788,19 +8833,15 @@ public class ActivityManagerService extends IActivityManager.Stub
         final long origId = Binder.clearCallingIdentity();
         try {
             synchronized (this) {
-                boolean changed = false;
-                ProcessRecord pr;
+                final ProcessRecord pr;
                 synchronized (mPidsSelfLocked) {
                     pr = mPidsSelfLocked.get(pid);
                     if (pr == null) {
                         Slog.w(TAG, "setHasTopUi called on unknown pid: " + pid);
                         return;
                     }
-                    changed = mProcessStateController.setHasTopUi(pr, hasTopUi);
                 }
-                if (changed) {
-                    mProcessStateController.runUpdate(pr, OOM_ADJ_REASON_UI_VISIBILITY);
-                }
+                mProcessStateController.setHasTopUi(pr, hasTopUi);
             }
         } finally {
             Binder.restoreCallingIdentity(origId);
@@ -15874,6 +15915,9 @@ public class ActivityManagerService extends IActivityManager.Stub
                 mLocalPowerManager.updateUidProcState(uid, procState);
             }
         }
+        if (mAppLockLocalService != null) {
+            mAppLockLocalService.handleUidChangeLocked(uidRec, uid, enqueuedChange, procState);
+        }
     }
 
     @GuardedBy(anyOf = {"this", "mProcLock"})
@@ -17530,16 +17574,14 @@ public class ActivityManagerService extends IActivityManager.Stub
                         return;
                     }
                 }
-                if (mProcessStateController.setHasOverlayUi(pr, hasOverlayUi)) {
-                    mProcessStateController.runUpdate(pr, OOM_ADJ_REASON_UI_VISIBILITY);
-                }
+                mProcessStateController.setHasOverlayUi(pr, hasOverlayUi);
             }
         }
 
         /**
          * Called after the network policy rules are updated by
-         * {@link com.android.server.net.NetworkPolicyManagerService} for a specific {@param uid}
-         * and {@param procStateSeq}.
+         * {@link com.android.server.net.NetworkPolicyManagerService} for a specific {@code uid}
+         * and {@code procStateSeq}.
          */
         @Override
         public void notifyNetworkPolicyRulesUpdated(int uid, long procStateSeq) {

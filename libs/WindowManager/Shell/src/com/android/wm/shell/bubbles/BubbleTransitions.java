@@ -82,6 +82,7 @@ import com.android.wm.shell.transition.Transitions.TransitionHandler;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 
@@ -139,20 +140,6 @@ public class BubbleTransitions {
     @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
     public void setBubbleController(BubbleController controller) {
         mBubbleController = controller;
-    }
-
-    /**
-     * Returns whether the given Task should be an App Bubble.
-     */
-    public boolean shouldBeAppBubble(@NonNull ActivityManager.RunningTaskInfo taskInfo) {
-        return mBubbleController.shouldBeAppBubble(taskInfo);
-    }
-
-    /**
-     * Returns whether the given Task is the App Bubble Root Task.
-     */
-    public boolean isAppBubbleRootTask(@NonNull ActivityManager.RunningTaskInfo taskInfo) {
-        return mBubbleController.isAppBubbleRootTask(taskInfo.taskId);
     }
 
     /**
@@ -257,10 +244,11 @@ public class BubbleTransitions {
     }
 
     /**
-     * Initiates axed bubble-to-bubble launch/existing bubble convert for the given transition.
+     * Expands and selects the given task in a bubble when there is already a running transition
+     * for it.
      */
-    public void startBubbleToBubbleLaunchOrExistingBubbleConvert(@NonNull IBinder transition,
-            @NonNull ActivityManager.RunningTaskInfo launchingTask,
+    public void startExpandAndSelectBubbleForExistingTransition(
+            @NonNull IBinder transition, @NonNull ActivityManager.RunningTaskInfo launchingTask,
             @NonNull Consumer<TransitionHandler> onInflatedCallback) {
         final TransitionHandler handler =
                 mBubbleController.expandStackAndSelectBubbleForExistingTransition(
@@ -282,16 +270,27 @@ public class BubbleTransitions {
     }
 
     /**
+     * Initiates a Task  Bubble launch for the given transition.
+     */
+    public void startBubbleSwitch(@NonNull IBinder transition,
+            @NonNull ActivityManager.RunningTaskInfo openingTask,
+            @NonNull ActivityManager.RunningTaskInfo closingTask,
+            @NonNull Consumer<TransitionHandler> onInflatedCallback) {
+        final TransitionHandler handler = mBubbleController.bubbleSwitchTransition(openingTask,
+                closingTask, transition, onInflatedCallback);
+        mEnterTransitions.put(transition, handler);
+    }
+
+    /**
      * Starts a new launch or convert transition to show the given bubble.
      */
     public TransitionHandler startLaunchNewTaskBubbleForExistingTransition(Bubble bubble,
             BubbleExpandedViewManager expandedViewManager, BubbleTaskViewFactory factory,
-            BubblePositioner positioner, BubbleStackView stackView,
-            BubbleBarLayerView layerView, BubbleIconFactory iconFactory,
+            BubbleStackView stackView, BubbleBarLayerView layerView, BubbleIconFactory iconFactory,
             boolean inflateSync, IBinder transition,
             Consumer<TransitionHandler> onInflatedCallback) {
         return new LaunchNewTaskBubbleForExistingTransition(bubble, mContext, expandedViewManager,
-                factory, positioner, stackView, layerView, iconFactory, inflateSync, transition,
+                factory, stackView, layerView, iconFactory, inflateSync, transition,
                 onInflatedCallback);
     }
 
@@ -300,12 +299,25 @@ public class BubbleTransitions {
      */
     public TransitionHandler startJumpcutBubbleSwitchTransition(Bubble openingBubble,
             Bubble closingBubble, BubbleExpandedViewManager expandedViewManager,
-            BubbleTaskViewFactory factory, BubblePositioner positioner, BubbleStackView stackView,
+            BubbleTaskViewFactory factory, BubbleStackView stackView,
             BubbleBarLayerView layerView, BubbleIconFactory iconFactory, boolean inflateSync,
             IBinder transition, Consumer<TransitionHandler> onInflatedCallback) {
         return new JumpcutBubbleSwitchTransition(openingBubble, closingBubble, mContext,
-                expandedViewManager, factory, positioner, stackView, layerView, iconFactory,
-                inflateSync, transition, onInflatedCallback);
+                expandedViewManager, factory, stackView, layerView, iconFactory, inflateSync,
+                transition, onInflatedCallback);
+    }
+
+    /**
+     * Starts a bubble switch transition to update Task in the expanding Bubble.
+     */
+    public TransitionHandler startBubbleSwitchTransition(Bubble openingBubble,
+            Bubble closingBubble, BubbleExpandedViewManager expandedViewManager,
+            BubbleTaskViewFactory factory, BubbleStackView stackView, BubbleBarLayerView layerView,
+            BubbleIconFactory iconFactory, boolean inflateSync, IBinder transition,
+            Consumer<TransitionHandler> onInflatedCallback) {
+        return new BubbleSwitchTransition(openingBubble, closingBubble, mContext,
+                expandedViewManager, factory, stackView, layerView, iconFactory, inflateSync,
+                transition, onInflatedCallback);
     }
 
     /**
@@ -339,6 +351,12 @@ public class BubbleTransitions {
         return new FloatingToBarConversion(bubble, positioner);
     }
 
+    /** Starts a transition that converts an expanded bubble bar bubble to floating. */
+    public BubbleTransition startBarToFloatingConversion(Bubble bubble,
+            BubblePositioner positioner) {
+        return new BarToFloatingConversion(bubble, positioner);
+    }
+
     /** Starts a transition that converts a dragged bubble icon to a full screen task. */
     public BubbleTransition startDraggedBubbleIconToFullscreen(Bubble bubble, Point dropLocation) {
         return new DraggedBubbleIconToFullscreen(bubble, dropLocation);
@@ -365,7 +383,7 @@ public class BubbleTransitions {
                 continue;
             }
             // Check whether it is still an app bubble.
-            return !shouldBeAppBubble(taskInfo);
+            return !mBubbleHelper.isAppBubbleTask(taskInfo);
         }
         return false;
     }
@@ -438,9 +456,16 @@ public class BubbleTransitions {
         default boolean isConvertingBubbleToBar() {
             return (this instanceof FloatingToBarConversion);
         }
+        default boolean isConvertingBubbleToFloating() {
+            return (this instanceof BarToFloatingConversion);
+        }
         /** Whether this transition is for switching from one bubble to another using jumpcut. */
         default boolean isJumpcutBubbleSwitching() {
             return (this instanceof JumpcutBubbleSwitchTransition);
+        }
+        /** Whether this transition is for switching from one bubble to another. */
+        default boolean isBubbleSwitching() {
+            return (this instanceof BubbleSwitchTransition);
         }
     }
 
@@ -536,7 +561,6 @@ public class BubbleTransitions {
      */
     @VisibleForTesting
     class LaunchNewTaskBubbleForExistingTransition implements TransitionHandler, BubbleTransition {
-        final BubblePositioner mPositioner;
         final BubbleExpandedViewTransitionAnimator mExpandedViewAnimator;
         private final TransitionProgress mTransitionProgress;
         Bubble mBubble;
@@ -558,9 +582,8 @@ public class BubbleTransitions {
 
         LaunchNewTaskBubbleForExistingTransition(Bubble bubble, Context context,
                 BubbleExpandedViewManager expandedViewManager, BubbleTaskViewFactory factory,
-                BubblePositioner positioner, BubbleStackView stackView,
-                BubbleBarLayerView layerView, BubbleIconFactory iconFactory,
-                boolean inflateSync, IBinder transition,
+                BubbleStackView stackView, BubbleBarLayerView layerView,
+                BubbleIconFactory iconFactory, boolean inflateSync, IBinder transition,
                 Consumer<TransitionHandler> onInflatedCallback) {
             if (layerView != null) {
                 mExpandedViewAnimator = layerView;
@@ -572,7 +595,6 @@ public class BubbleTransitions {
             mBubble = bubble;
             mTransition = transition;
             mTransitionProgress = new TransitionProgress();
-            mPositioner = positioner;
             mBubble.setInflateSynchronously(inflateSync);
             mBubble.setCurrentTransition(this);
             mBubble.inflate(
@@ -611,9 +633,10 @@ public class BubbleTransitions {
             // inflation (the task view will be in the right bounds)
             mTaskViewTransitions.removePendingTransitions(tv.getController());
             mTaskViewTransitions.enqueueRunningExternal(tv.getController(), mTransition);
-            // TODO(b/456051408): this should not be needed after we support switch in root task
             if (BubbleAnythingFlagHelper.enableRootTaskForBubble()
                     && mBubble.getTaskView().isSurfaceCreated()) {
+                // In case the Bubble surface has already been created, trigger the surfaceCreated
+                // immediately
                 surfaceCreated();
             }
         }
@@ -641,6 +664,9 @@ public class BubbleTransitions {
         @Override
         public void onTransitionConsumed(@NonNull IBinder transition, boolean aborted,
                 @NonNull SurfaceControl.Transaction finishTransaction) {
+            BubbleLog.d(
+                    "LaunchNewTaskBubbleForExistingTransition.onTransitionConsumed() aborted=%b",
+                    aborted);
             if (!aborted) return;
             cleanup();
         }
@@ -681,7 +707,7 @@ public class BubbleTransitions {
                     mPlayConvertTaskAnimation = false;
                     found = true;
                 } else if (BubbleAnythingFlagHelper.enableRootTaskForBubble() && taskInfo != null
-                        && mBubbleController.shouldBeAppBubble(taskInfo)) {
+                        && mBubbleHelper.isAppBubbleTask(taskInfo)) {
                     // Starting a new bubble from an existing expanded bubble may immediately hide
                     // the currently expanded bubble in the same transition. Ensure the surfaces
                     // stays in the TaskView vs. under the transition root.
@@ -851,9 +877,8 @@ public class BubbleTransitions {
 
         JumpcutBubbleSwitchTransition(Bubble openingBubble, Bubble closingBubble, Context context,
                 BubbleExpandedViewManager expandedViewManager, BubbleTaskViewFactory factory,
-                BubblePositioner positioner, BubbleStackView stackView,
-                BubbleBarLayerView layerView, BubbleIconFactory iconFactory,
-                boolean inflateSync, IBinder transition,
+                BubbleStackView stackView, BubbleBarLayerView layerView,
+                BubbleIconFactory iconFactory, boolean inflateSync, IBinder transition,
                 Consumer<TransitionHandler> onInflatedCallback) {
             if (layerView != null) {
                 mExpandedViewAnimator = layerView;
@@ -1087,6 +1112,244 @@ public class BubbleTransitions {
     }
 
     /**
+     * Starts a Bubble switch animation to update Task in the expanding Bubble transition.
+     * TODO(b/408328557): To be consolidated with LaunchOrConvertToBubble and ConvertToBubble
+     */
+    @VisibleForTesting
+    class BubbleSwitchTransition implements TransitionHandler, BubbleTransition {
+        private final BubbleExpandedViewTransitionAnimator mExpandedViewAnimator;
+        private final TransitionProgress mTransitionProgress;
+        private final Bubble mOpeningBubble;
+        private final Bubble mClosingBubble;
+
+        private IBinder mTransition;
+        private Transitions.TransitionFinishCallback mFinishCb;
+        private WindowContainerTransaction mFinishWct;
+        // The task info is resolved once we find the task from the transition info using the
+        // pending launch cookie otherwise
+        @Nullable
+        private TaskInfo mOpeningTaskInfo;
+
+        private SurfaceControl.Transaction mFinishT;
+        private SurfaceControl mTaskLeash;
+
+        BubbleSwitchTransition(Bubble openingBubble, Bubble closingBubble, Context context,
+                BubbleExpandedViewManager expandedViewManager, BubbleTaskViewFactory factory,
+                BubbleStackView stackView, BubbleBarLayerView layerView,
+                BubbleIconFactory iconFactory, boolean inflateSync, IBinder transition,
+                Consumer<TransitionHandler> onInflatedCallback) {
+            if (layerView != null) {
+                mExpandedViewAnimator = layerView;
+            } else {
+                mExpandedViewAnimator = stackView;
+            }
+            BubbleLog.d("BubbleSwitchTransition() closing=%s, opening=%s",
+                    closingBubble.getKey(), openingBubble.getKey());
+            mOpeningBubble = openingBubble;
+            mClosingBubble = closingBubble;
+            mTransition = transition;
+            mTransitionProgress = new TransitionProgress();
+            mOpeningBubble.setInflateSynchronously(inflateSync);
+            mOpeningBubble.setCurrentTransition(this);
+            mClosingBubble.setCurrentTransition(this);
+            mOpeningBubble.inflate(
+                    b -> {
+                        onInflated(b);
+                        onInflatedCallback.accept(BubbleSwitchTransition.this);
+                    },
+                    context,
+                    expandedViewManager,
+                    factory,
+                    stackView,
+                    layerView,
+                    iconFactory,
+                    false /* skipInflation */,
+                    mBubbleViewInfoTaskFactory);
+        }
+
+        @VisibleForTesting
+        void onInflated(Bubble b) {
+            BubbleLog.d("BubbleSwitchTransition.onInflated()");
+            if (b != mOpeningBubble) {
+                throw new IllegalArgumentException("inflate callback doesn't match bubble");
+            }
+            final TaskView tv = b.getTaskView();
+            tv.setSurfaceLifecycle(SurfaceView.SURFACE_LIFECYCLE_FOLLOWS_ATTACHMENT);
+            final TaskViewRepository.TaskViewState state = mRepository.byTaskView(
+                    tv.getController());
+            if (state != null) {
+                state.mVisible = true;
+            }
+            mTransitionProgress.setInflated();
+            // Remove any intermediate queued transitions that were started as a result of the
+            // inflation (the task view will be in the right bounds)
+            mTaskViewTransitions.removePendingTransitions(tv.getController());
+            mTaskViewTransitions.enqueueExternal(tv.getController(), () -> mTransition);
+            if (mOpeningBubble.getTaskView().isSurfaceCreated()) {
+                // In case the Bubble surface has already been created, trigger the surfaceCreated
+                // immediately
+                surfaceCreated();
+            }
+        }
+
+        @Override
+        public void skip() {
+            BubbleLog.d("BubbleSwitchTransition.skip()");
+            cleanup();
+        }
+
+        @Override
+        public WindowContainerTransaction handleRequest(@NonNull IBinder transition,
+                @Nullable TransitionRequestInfo request) {
+            return null;
+        }
+
+        @Override
+        public void mergeAnimation(@NonNull IBinder transition, @NonNull TransitionInfo info,
+                @NonNull SurfaceControl.Transaction startT,
+                @NonNull SurfaceControl.Transaction finishT,
+                @NonNull IBinder mergeTarget,
+                @NonNull Transitions.TransitionFinishCallback finishCallback) {
+        }
+
+        @Override
+        public void onTransitionConsumed(@NonNull IBinder transition, boolean aborted,
+                @NonNull SurfaceControl.Transaction finishTransaction) {
+            if (!aborted) return;
+            cleanup();
+        }
+
+        /**
+         * @return true As DefaultMixedTransition assumes that this transition will be handled by
+         * this handler in all cases.
+         */
+        @Override
+        public boolean startAnimation(@NonNull IBinder transition,
+                @NonNull TransitionInfo info,
+                @NonNull SurfaceControl.Transaction startTransaction,
+                @NonNull SurfaceControl.Transaction finishTransaction,
+                @NonNull Transitions.TransitionFinishCallback finishCallback) {
+            BubbleLog.d("BubbleSwitchTransition.startAnimation()");
+
+            final TransitionInfo.Change enterBubbleTask = mBubbleHelper.getEnterBubbleTask(info);
+            final TransitionInfo.Change closingBubbleTask = mBubbleHelper.getClosingBubbleTask(
+                    info);
+            mOpeningTaskInfo = enterBubbleTask.getTaskInfo();
+            mFinishWct = new WindowContainerTransaction();
+            mFinishT = finishTransaction;
+            mFinishCb = finishCallback;
+            mTaskLeash = enterBubbleTask.getLeash();
+
+            mBubbleData.setSelectedBubbleAndExpandStack(mOpeningBubble);
+
+            // Keep showing the closing Bubble Task within the closing Bubble TaskView until the
+            // opening Bubble TaskView is ready.
+            final SurfaceControl closingBubbleTaskLeash = closingBubbleTask.getLeash();
+            final SurfaceControl closingBubbleTaskView = mClosingBubble.getTaskView()
+                    .getSurfaceControl();
+            startTransaction.setAlpha(closingBubbleTaskLeash, 1f)
+                    .setPosition(closingBubbleTaskLeash, 0, 0)
+                    .reparent(closingBubbleTaskLeash, closingBubbleTaskView)
+                    .show(closingBubbleTaskLeash)
+                    .setAlpha(mTaskLeash, 0f);
+
+            startTransaction.apply();
+
+            mTransitionProgress.setTransitionReady();
+            if (mExpandedViewAnimator.canExpandView(mOpeningBubble)) {
+                final BubbleViewProvider priorBubble =
+                        mExpandedViewAnimator.prepareConvertedView(mOpeningBubble);
+                if (priorBubble != mClosingBubble
+                        // TODO b/419347947 BubbleStackView will return null for non-overflow bubble
+                        && priorBubble != null) {
+                    throw new IllegalStateException("Previous expanded Bubble was taskId="
+                            + priorBubble.getTaskId() + " but expect taskId="
+                            + mClosingBubble.getTaskId());
+                }
+            } else if (mExpandedViewAnimator.isExpanded()) {
+                mTransitionProgress.setReadyToExpand();
+            }
+            startAnimationIfReady();
+
+            return true;
+        }
+
+        @Override
+        public void continueExpand() {
+            mTransitionProgress.setReadyToExpand();
+        }
+
+        @Override
+        public void surfaceCreated() {
+            mTransitionProgress.setSurfaceReady();
+            mMainExecutor.execute(() -> {
+                BubbleLog.d("BubbleSwitchTransition.surfaceCreated()");
+                final TaskViewTaskController tvc = mOpeningBubble.getTaskView().getController();
+                final TaskViewRepository.TaskViewState state = mRepository.byTaskView(tvc);
+                if (state == null) return;
+                state.mVisible = true;
+                startAnimationIfReady();
+            });
+        }
+
+        private void startAnimationIfReady() {
+            if (!mTransitionProgress.isReadyToAnimate()) {
+                // Not yet ready.
+                return;
+            }
+            animateSwitch();
+        }
+
+        private void animateSwitch() {
+            BubbleLog.d("BubbleSwitchTransition.animateSwitch()");
+            mTaskViewTransitions.onExternalDone(mTransition);
+            mTransition = null;
+            final TaskViewTaskController tv = mOpeningBubble.getTaskView().getController();
+
+            // Prepare the transaction to apply when the TaskView surface is ready.
+            final SurfaceControl.Transaction startT = new SurfaceControl.Transaction();
+            final SurfaceControl openingTaskViewLeash = mOpeningBubble.getTaskView()
+                    .getSurfaceControl();
+            // Set task position to 0,0 as it will be placed inside the TaskView
+            startT.setPosition(mTaskLeash, 0, 0)
+                    .setAlpha(mTaskLeash, 1f)
+                    .reparent(mTaskLeash, openingTaskViewLeash)
+                    .show(mTaskLeash);
+            mTaskViewTransitions.prepareOpenAnimation(tv, false /* newTask */, startT, mFinishT,
+                    (ActivityManager.RunningTaskInfo) mOpeningTaskInfo, mTaskLeash, mFinishWct);
+            startT.apply();
+
+            // Add the task view task listener manually since we aren't going through
+            // TaskViewTransitions (which normally sets up the listener via a pending launch cookie)
+            // Note: In this path, because a new task is being started, the transition may receive
+            // the transition for the task before the organizer does
+            mTaskOrganizer.addListenerForTaskId(tv, mOpeningTaskInfo.taskId);
+
+            if (mFinishWct.isEmpty()) {
+                mFinishWct = null;
+            }
+
+            mExpandedViewAnimator.animateExpand(mClosingBubble, this::cleanup);
+        }
+
+        private void cleanup() {
+            mOpeningBubble.setCurrentTransition(null);
+            mClosingBubble.setCurrentTransition(null);
+            if (mFinishCb != null) {
+                // Trigger finishCb after reset current transition as it will immediately kick off
+                // the next transition, which may set transition to the previous Bubble.
+                ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "BubbleSwitchTransition.cleanup()");
+                mFinishCb.onTransitionFinished(mFinishWct);
+                mFinishCb = null;
+            }
+            if (mTransition != null) {
+                mTaskViewTransitions.onExternalDone(mTransition);
+                mTransition = null;
+            }
+        }
+    }
+
+    /**
      * Starts a new transition into a bubble, which will either play a launch animation (if the task
      * was not previously visible) or a convert animation (if the task is currently visible).
      */
@@ -1179,7 +1442,7 @@ public class BubbleTransitions {
                 opts.setLaunchCookie(mLaunchCookie);
                 opts.setReparentLeafTaskToTda(true);
                 final WindowContainerToken rootTaskToken =
-                        mBubbleController.getAppBubbleRootTaskToken();
+                        mBubbleHelper.getAppBubbleRootTaskToken();
                 if (rootTaskToken != null) {
                     opts.setLaunchRootTask(rootTaskToken);
                 } else {
@@ -1249,7 +1512,11 @@ public class BubbleTransitions {
             final WindowContainerTransaction wct = new WindowContainerTransaction();
             final Rect bounds = new Rect();
             mPositioner.getTaskViewRestBounds(bounds);
-            wct.setBounds(mBubbleController.getAppBubbleRootTaskToken(), bounds);
+            final WindowContainerToken bubbleRootTask =
+                    Objects.requireNonNull(mBubbleHelper.getAppBubbleRootTaskToken());
+            wct.setBounds(bubbleRootTask, bounds);
+            wct.setAlwaysOnTop(bubbleRootTask, true);
+
             BubbleLog.d("LaunchOrConvertToBubble.handleRequest(), set root bounds " + bounds);
             return wct;
         }
@@ -1332,7 +1599,8 @@ public class BubbleTransitions {
                     mSnapshot = chg.getSnapshot();
                     mPlayConvertTaskAnimation = !isOpeningMode(chg.getMode()) && mSnapshot != null;
                     found = true;
-                    if (BubbleAnythingFlagHelper.enableRootTaskForBubble()) {
+                    if (BubbleAnythingFlagHelper.enableRootTaskForBubble()
+                            && chg.getMode() != TRANSIT_CHANGE) {
                         // Prepare to animate in. This is normally pre-set in
                         // Transitions#setupStartState, but after root Task for Bubble, the opening
                         // leaf Task can be considered as dependent.
@@ -1568,13 +1836,13 @@ public class BubbleTransitions {
             final boolean reparentToTda =
                     mTaskInfo.getWindowingMode() == WINDOWING_MODE_MULTI_WINDOW
                             && mTaskInfo.getParentTaskId() != INVALID_TASK_ID;
-            final WindowContainerToken rootToken = mBubbleController.getAppBubbleRootTaskToken();
             final WindowContainerTransaction wct = getEnterBubbleTransaction(
-                    mTaskInfo.token, rootToken, launchBounds,
+                    mBubbleHelper, mTaskInfo.token, launchBounds,
                     true /* isAppBubble */, reparentToTda);
             mHomeIntentProvider.addLaunchHomePendingIntent(wct, mTaskInfo.displayId,
                     mTaskInfo.userId);
 
+            final WindowContainerToken rootToken = mBubbleHelper.getAppBubbleRootTaskToken();
             wct.setBounds(rootToken != null ? rootToken : mTaskInfo.token, launchBounds);
 
             final TaskView tv = b.getTaskView();
@@ -1802,7 +2070,7 @@ public class BubbleTransitions {
             final WindowContainerToken token = mTaskInfo.getToken();
             final Binder captionInsetsOwner = mBubble.getTaskView().getCaptionInsetsOwner();
             final WindowContainerTransaction wct =
-                    getExitBubbleTransaction(token, captionInsetsOwner);
+                    getExitBubbleTransaction(mBubbleHelper, token, captionInsetsOwner);
             mTaskViewTransitions.enqueueExternal(
                     mBubble.getTaskView().getController(),
                     () -> {
@@ -1985,7 +2253,7 @@ public class BubbleTransitions {
             final WindowContainerToken token = bubble.getTaskView().getTaskInfo().getToken();
             final Binder captionInsetsOwner = bubble.getTaskView().getCaptionInsetsOwner();
             final WindowContainerTransaction wct =
-                    getExitBubbleTransaction(token, captionInsetsOwner);
+                    getExitBubbleTransaction(mBubbleHelper, token, captionInsetsOwner);
             wct.reorder(token, /* onTop= */ true);
             mTaskViewTransitions.enqueueExternal(bubble.getTaskView().getController(), () -> {
                 mTransition = mTransitions.startTransition(TRANSIT_TO_FRONT, wct, this);
@@ -2136,7 +2404,7 @@ public class BubbleTransitions {
         private final TransactionProvider mTransactionProvider;
         IBinder mTransition;
         private final Rect mBounds = new Rect();
-        private SurfaceControl mTaskLeash;
+        private final SurfaceControl mTaskLeash;
         private SurfaceControl.Transaction mFinishTransaction;
         private boolean mIsStarted = false;
         private boolean mHasBounds = false;
@@ -2153,6 +2421,9 @@ public class BubbleTransitions {
             mBubble.setCurrentTransition(this);
             mTransactionProvider = transactionProvider;
             mPositioner = positioner;
+            // with bubble root task, only the root task may be listed in the changes, so get the
+            // bubble task leash directly from the task view.
+            mTaskLeash = mBubble.getTaskView().getController().getTaskLeash();
             BubbleLog.d("FloatingToBarConversion() key=%s", bubble.getKey());
         }
 
@@ -2189,48 +2460,13 @@ public class BubbleTransitions {
             }
             BubbleLog.d("FloatingToBarConversion.startAnimation()");
 
-            // startTransaction must be applied by the handler.
+            startTransaction.setAlpha(mTaskLeash, 0);
             startTransaction.apply();
-
-            final TaskViewTaskController taskViewTaskController =
-                    mBubble.getTaskView().getController();
-            if (taskViewTaskController == null) {
-                cleanup();
-                finishCallback.onTransitionFinished(null);
-                return true;
-            }
-
-            TransitionInfo.Change change = findTransitionChange(info);
-            if (change == null) {
-                Slog.w(TAG, "Expected a TaskView transition to front but didn't find "
-                        + "one, cleaning up the task view");
-                taskViewTaskController.setTaskNotFound();
-                cleanup();
-                finishCallback.onTransitionFinished(null);
-                return true;
-            }
-
-            mTaskLeash = change.getLeash();
             mFinishTransaction = finishTransaction;
             updateBubbleTask();
             cleanup();
             finishCallback.onTransitionFinished(null);
             return true;
-        }
-
-        private TransitionInfo.Change findTransitionChange(TransitionInfo info) {
-            WindowContainerToken token = mBubble.getTaskView().getTaskInfo().getToken();
-            for (int i = 0; i < info.getChanges().size(); ++i) {
-                final TransitionInfo.Change change = info.getChanges().get(i);
-                if (change.getTaskInfo() == null) {
-                    continue;
-                }
-                if (!token.equals(change.getTaskInfo().token)) {
-                    continue;
-                }
-                return change;
-            }
-            return null;
         }
 
         @Override
@@ -2278,7 +2514,6 @@ public class BubbleTransitions {
 
         @Override
         public void mergeWithUnfold(SurfaceControl taskLeash, SurfaceControl.Transaction finishT) {
-            mTaskLeash = taskLeash;
             mFinishTransaction = finishT;
             updateBubbleTask();
             cleanup();
@@ -2309,6 +2544,7 @@ public class BubbleTransitions {
             startT.setCornerRadius(mTaskLeash,
                     mBubble.getBubbleBarExpandedView().getRestingCornerRadius());
             startT.setWindowCrop(mTaskLeash, mBounds.width(), mBounds.height());
+            startT.setAlpha(mTaskLeash, 1);
             startT.apply();
             mFinishTransaction.reparent(mTaskLeash, taskViewSurface);
             mFinishTransaction.setPosition(mTaskLeash, 0, 0);
@@ -2323,6 +2559,152 @@ public class BubbleTransitions {
             if (mTransition != null) {
                 mTaskViewTransitions.onExternalDone(mTransition);
                 mTransition = null;
+            }
+        }
+    }
+
+    /** A transition to convert an expanded bar bubble to a floating bubble. */
+    class BarToFloatingConversion implements TransitionHandler, BubbleTransition {
+        private final BubblePositioner mPositioner;
+        private final Bubble mBubble;
+        IBinder mTransition;
+        private final Rect mBounds = new Rect();
+        private SurfaceControl mTaskLeash;
+        private boolean mIsStarted = false;
+        private boolean mCanExpand = false;
+        private boolean mSurfaceCreated = false;
+        private IBinder mDummyTransition;
+
+        @VisibleForTesting
+        BarToFloatingConversion(Bubble bubble, BubblePositioner positioner) {
+            mBubble = bubble;
+            mBubble.setCurrentTransition(this);
+            mPositioner = positioner;
+            BubbleLog.d("BarToFloatingConversion key=%s", bubble.getKey());
+
+            // enqueue a dummy transition to ignore task view bounds changes until the new views are
+            // inflated and the task view is ready to be positioned.
+            mDummyTransition = new Binder();
+            mTaskViewTransitions.enqueueExternal(bubble.getTaskView().getController(),
+                    () -> mDummyTransition);
+        }
+
+        @Override
+        public void surfaceCreated() {
+            mSurfaceCreated = true;
+            if (canStart()) {
+                startTransition();
+            }
+        }
+
+        @Override
+        public void continueExpand() {
+            mCanExpand = true;
+            if (canStart()) {
+                startTransition();
+            }
+        }
+
+        private boolean canStart() {
+            return mCanExpand && mSurfaceCreated && !mIsStarted && hasTaskInfo();
+        }
+
+        private boolean hasTaskInfo() {
+            return mBubble.getTaskView().getTaskInfo() != null;
+        }
+
+        private void startTransition() {
+            mIsStarted = true;
+            final TaskView tv = mBubble.getTaskView();
+            mPositioner.getTaskViewRestBounds(mBounds);
+            WindowContainerTransaction wct = new WindowContainerTransaction();
+            mTaskViewTransitions.updateTaskViewTaskBounds(wct, tv.getTaskInfo(), mBounds);
+            mTransition = mTransitions.startTransition(TRANSIT_CHANGE, wct, this);
+        }
+
+        @Override
+        public WindowContainerTransaction handleRequest(@NonNull IBinder transition,
+                @Nullable TransitionRequestInfo request) {
+            return null;
+        }
+
+        @Override
+        public void mergeAnimation(@NonNull IBinder transition, @NonNull TransitionInfo info,
+                @NonNull SurfaceControl.Transaction startT,
+                @NonNull SurfaceControl.Transaction finishT,
+                @NonNull IBinder mergeTarget,
+                @NonNull Transitions.TransitionFinishCallback finishCallback) {
+        }
+
+        @Override
+        public void onTransitionConsumed(@NonNull IBinder transition, boolean aborted,
+                @Nullable SurfaceControl.Transaction finishTransaction) {
+            cleanup();
+        }
+
+        @Override
+        public boolean startAnimation(@NonNull IBinder transition,
+                @NonNull TransitionInfo info,
+                @NonNull SurfaceControl.Transaction startTransaction,
+                @NonNull SurfaceControl.Transaction finishTransaction,
+                @NonNull Transitions.TransitionFinishCallback finishCallback) {
+            if (mTransition != transition) {
+                cleanup();
+                return false;
+            }
+            BubbleLog.d("BarToFloatingConversion.startAnimation for bubble %s", mBubble.getKey());
+
+            final TaskViewTaskController taskViewTaskController =
+                    mBubble.getTaskView().getController();
+
+            // with bubble root task, only the root task may be listed in the changes, so get the
+            // bubble task leash directly from the task view.
+            mTaskLeash = taskViewTaskController.getTaskLeash();
+            updateBubbleTask(startTransaction, finishTransaction);
+            cleanup();
+            finishCallback.onTransitionFinished(null);
+            return true;
+        }
+
+        private void updateBubbleTask(SurfaceControl.Transaction startT,
+                SurfaceControl.Transaction finishT) {
+            final TaskView tv = mBubble.getTaskView();
+            final TaskViewTaskController tvc = tv.getController();
+            final SurfaceControl taskViewSurface = mBubble.getTaskView().getSurfaceControl();
+            final TaskViewRepository.TaskViewState state = mRepository.byTaskView(tvc);
+            if (state == null) return;
+            final BubbleExpandedView expandedView = mBubble.getExpandedView();
+            if (expandedView == null) {
+                BubbleLog.e("BarToFloatingConversion.updateBubbleTask %s"
+                        + "expandedView is null", mBubble.getKey());
+                return;
+            }
+            state.mVisible = true;
+            state.mBounds.set(mBounds);
+
+            startT.reparent(mTaskLeash, taskViewSurface);
+            startT.setPosition(mTaskLeash, 0, 0);
+            startT.setCornerRadius(mTaskLeash, expandedView.getCornerRadius());
+            startT.setWindowCrop(mTaskLeash, mBounds.width(), mBounds.height());
+            startT.setAlpha(mTaskLeash, 1);
+            startT.show(mTaskLeash);
+            startT.apply();
+
+            finishT.reparent(mTaskLeash, taskViewSurface);
+            finishT.setPosition(mTaskLeash, 0, 0);
+            finishT.setWindowCrop(mTaskLeash, mBounds.width(), mBounds.height());
+
+            mTaskViewTransitions.removePendingTransitions(tv.getController());
+            mTaskViewTransitions.onExternalDone(mDummyTransition);
+            mDummyTransition = null;
+        }
+
+        private void cleanup() {
+            ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "BarToFloatingConversion.cleanup");
+            mBubble.setCurrentTransition(null);
+            if (mDummyTransition != null) {
+                mTaskViewTransitions.onExternalDone(mDummyTransition);
+                mDummyTransition = null;
             }
         }
     }

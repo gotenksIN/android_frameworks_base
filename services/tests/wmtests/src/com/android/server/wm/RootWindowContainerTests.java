@@ -24,9 +24,6 @@ import static android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN;
 import static android.app.WindowConfiguration.WINDOWING_MODE_MULTI_WINDOW;
 import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
-import static android.content.pm.ActivityInfo.FLAG_ALWAYS_FOCUSABLE;
-import static android.multiuser.Flags.FLAG_HSU_ALLOWLIST_ACTIVITIES;
-import static android.multiuser.Flags.hsuAllowlistActivities;
 import static android.view.Display.DEFAULT_DISPLAY;
 import static android.window.DisplayAreaOrganizer.FEATURE_VENDOR_FIRST;
 
@@ -45,7 +42,6 @@ import static com.android.server.wm.RootWindowContainer.MATCH_ATTACHED_TASK_OR_R
 import static com.android.server.wm.WindowContainer.POSITION_BOTTOM;
 
 import static com.google.common.truth.Truth.assertThat;
-import static com.google.common.truth.Truth.assertWithMessage;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -71,7 +67,6 @@ import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.testng.internal.junit.ArrayAsserts.assertArrayEquals;
 
-import android.annotation.UserIdInt;
 import android.app.ActivityOptions;
 import android.app.WindowConfiguration;
 import android.content.ComponentName;
@@ -85,9 +80,9 @@ import android.graphics.Rect;
 import android.os.PowerManager;
 import android.os.RemoteException;
 import android.os.UserHandle;
+import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.annotations.Presubmit;
-import android.util.Log;
 import android.util.Pair;
 import android.view.DisplayInfo;
 
@@ -117,8 +112,6 @@ import java.util.function.Consumer;
 @RunWith(WindowTestRunner.class)
 public class RootWindowContainerTests extends WindowTestsBase {
 
-    private static final String TAG = RootWindowContainerTests.class.getSimpleName();
-
     @Before
     public void setUp() throws Exception {
         doNothing().when(mAtm).sleepIfNeededLocked();
@@ -126,7 +119,8 @@ public class RootWindowContainerTests extends WindowTestsBase {
     }
 
     @Test
-    public void testUpdateDefaultTaskDisplayAreaWindowingModeOnSettingsRetrieved() {
+    @DisableFlags(Flags.FLAG_DISABLE_DISPLAY_FORCE_FREEFORM_ON_PC)
+    public void testUpdateDefaultTaskDisplayAreaWindowingModeOnSettingsRetrieved_freeform() {
         assertEquals(WindowConfiguration.WINDOWING_MODE_FULLSCREEN,
                 mWm.getDefaultDisplayContentLocked().getDefaultTaskDisplayArea()
                         .getWindowingMode());
@@ -137,6 +131,23 @@ public class RootWindowContainerTests extends WindowTestsBase {
         mWm.mRoot.onSettingsRetrieved();
 
         assertEquals(WindowConfiguration.WINDOWING_MODE_FREEFORM,
+                mWm.getDefaultDisplayContentLocked().getDefaultTaskDisplayArea()
+                        .getWindowingMode());
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_DISABLE_DISPLAY_FORCE_FREEFORM_ON_PC)
+    public void testUpdateDefaultTaskDisplayAreaWindowingModeOnSettingsRetrieved_fullscreen() {
+        assertEquals(WindowConfiguration.WINDOWING_MODE_FULLSCREEN,
+                mWm.getDefaultDisplayContentLocked().getDefaultTaskDisplayArea()
+                        .getWindowingMode());
+
+        mWm.mIsPc = true;
+        mWm.mAtmService.mSupportsFreeformWindowManagement = true;
+
+        mWm.mRoot.onSettingsRetrieved();
+
+        assertEquals(WINDOWING_MODE_FULLSCREEN,
                 mWm.getDefaultDisplayContentLocked().getDefaultTaskDisplayArea()
                         .getWindowingMode());
     }
@@ -824,13 +835,6 @@ public class RootWindowContainerTests extends WindowTestsBase {
         // We should not be focusable when in pinned mode
         assertFalse(pinnedTask.isTopActivityFocusable());
         assertFalse(pinnedActivity.isFocusable());
-
-        // Add flag forcing focusability.
-        pinnedActivity.info.flags |= FLAG_ALWAYS_FOCUSABLE;
-
-        // Task with FLAG_ALWAYS_FOCUSABLE should be focusable.
-        assertTrue(pinnedTask.isTopActivityFocusable());
-        assertTrue(pinnedActivity.isFocusable());
     }
 
     /**
@@ -1396,7 +1400,6 @@ public class RootWindowContainerTests extends WindowTestsBase {
 
         assertNotNull(taskDisplayArea.getRootHomeTask());
         assertEquals(taskDisplayArea.getTopRootTask(), taskDisplayArea.getRootHomeTask());
-        assertCurrentUserOnUserHelper(otherUser);
     }
 
     @Test
@@ -1434,7 +1437,6 @@ public class RootWindowContainerTests extends WindowTestsBase {
                 new int[]{rootTask2.mTaskId, rootTask3.mTaskId},
                 mRootWindowContainer.mUserVisibleRootTasks.get(currentUser).toArray()
         );
-        assertCurrentUserOnUserHelper(otherUser);
     }
 
     @Test
@@ -1487,10 +1489,9 @@ public class RootWindowContainerTests extends WindowTestsBase {
     @Test
     public void testGetTopVisibleActivities_fullscreen() {
         // Make every Task opaque.
-        final ActivityTaskSupervisor.OpaqueContainerHelper opaqueContainerHelper =
-                mAtm.mTaskSupervisor.mOpaqueContainerHelper;
-        spyOn(opaqueContainerHelper);
-        doReturn(true).when(opaqueContainerHelper).isOpaque(
+        final WindowContainerVisibilityHelper visibilityHelper = mAtm.mVisibilityHelper;
+        spyOn(visibilityHelper);
+        doReturn(true).when(visibilityHelper).isOpaque(
                 any(), any(), anyBoolean(), anyBoolean());
 
         final DisplayContent display = mRootWindowContainer.getDefaultDisplay();
@@ -1509,10 +1510,9 @@ public class RootWindowContainerTests extends WindowTestsBase {
     @Test
     public void testGetTopVisibleActivities_splitScreen() {
         // Make every Task opaque.
-        final ActivityTaskSupervisor.OpaqueContainerHelper opaqueContainerHelper =
-                mAtm.mTaskSupervisor.mOpaqueContainerHelper;
-        spyOn(opaqueContainerHelper);
-        doReturn(true).when(opaqueContainerHelper).isOpaque(
+        final WindowContainerVisibilityHelper visibilityHelper = mAtm.mVisibilityHelper;
+        spyOn(visibilityHelper);
+        doReturn(true).when(visibilityHelper).isOpaque(
                 any(), any(), anyBoolean(), anyBoolean());
 
         final DisplayContent display = mRootWindowContainer.getDefaultDisplay();
@@ -1579,10 +1579,9 @@ public class RootWindowContainerTests extends WindowTestsBase {
     @Test
     public void testGetTopVisibleActivities_focusedAndNonFocusedRootTasks() {
         // Make every Task opaque.
-        final ActivityTaskSupervisor.OpaqueContainerHelper opaqueContainerHelper =
-                mAtm.mTaskSupervisor.mOpaqueContainerHelper;
-        spyOn(opaqueContainerHelper);
-        doReturn(true).when(opaqueContainerHelper).isOpaque(
+        final WindowContainerVisibilityHelper visibilityHelper = mAtm.mVisibilityHelper;
+        spyOn(visibilityHelper);
+        doReturn(true).when(visibilityHelper).isOpaque(
                 any(), any(), anyBoolean(), anyBoolean());
 
         final DisplayContent display = mRootWindowContainer.getDefaultDisplay();
@@ -1827,6 +1826,43 @@ public class RootWindowContainerTests extends WindowTestsBase {
         verify(mAtm, times(2)).onTaskMoveAllowedChanged();
     }
 
+    @Test
+    public void testUpdateFocusedWindowLocked_skipsRemovingOrRemovedDisplay() {
+        // Create a second display and spy on it and the default display.
+        final TestDisplayContent secondDisplay =
+                addNewDisplayContentAt(DisplayContent.POSITION_TOP);
+        spyOn(mDisplayContent);
+        spyOn(secondDisplay);
+
+        // Case 1: Test that a "removing" display is skipped.
+        doReturn(true).when(secondDisplay).isRemoving();
+
+        // Update focused window.
+        mRootWindowContainer.updateFocusedWindowLocked(
+                WindowManagerService.UPDATE_FOCUS_NORMAL, true /* updateInputWindows */);
+
+        // Verify that updateFocusedWindowLocked is called on the default display.
+        verify(mDisplayContent).updateFocusedWindowLocked(anyInt(), anyBoolean(), anyInt());
+        // Verify that updateFocusedWindowLocked is NOT called on the removing display.
+        verify(secondDisplay, never()).updateFocusedWindowLocked(anyInt(), anyBoolean(), anyInt());
+
+        // Reset mocks for the next case.
+        reset(mDisplayContent, secondDisplay);
+
+        // Case 2: Test that a "removed" display is skipped.
+        doReturn(false).when(secondDisplay).isRemoving(); // ensure previous mock is gone
+        doReturn(true).when(secondDisplay).isRemoved();
+
+        // Update focused window again.
+        mRootWindowContainer.updateFocusedWindowLocked(
+                WindowManagerService.UPDATE_FOCUS_NORMAL, true /* updateInputWindows */);
+
+        // Verify that updateFocusedWindowLocked is called on the default display.
+        verify(mDisplayContent).updateFocusedWindowLocked(anyInt(), anyBoolean(), anyInt());
+        // Verify that updateFocusedWindowLocked is NOT called on the removed display.
+        verify(secondDisplay, never()).updateFocusedWindowLocked(anyInt(), anyBoolean(), anyInt());
+    }
+
     /**
      * Mock {@link RootWindowContainer#resolveHomeActivity} for returning consistent activity
      * info for test cases.
@@ -1872,17 +1908,5 @@ public class RootWindowContainerTests extends WindowTestsBase {
         aInfo.applicationInfo.packageName =
                 primaryHome ? "fakeHomePackage" : "fakeSecondaryHomePackage";
         return  aInfo;
-    }
-
-    private void assertCurrentUserOnUserHelper(@UserIdInt int userId) {
-        if (!hsuAllowlistActivities()) {
-            Log.d(TAG, "assertCurrentUserOnUserHelper(): ignoring as flag "
-                    + FLAG_HSU_ALLOWLIST_ACTIVITIES + " is disabled");
-            return;
-        }
-        UserHelper userHelper = mRootWindowContainer.getUserHelper();
-        assertWithMessage("current user on UserHelper (%s)", userHelper)
-                .that(userHelper.getCurrentUserId())
-                .isEqualTo(userId);
     }
 }

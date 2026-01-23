@@ -18,7 +18,6 @@ package android.view.inputmethod;
 
 import static android.os.Trace.TRACE_TAG_WINDOW_MANAGER;
 import static android.view.ViewProtoLogGroups.INPUT_METHOD_MANAGER_DEBUG;
-import static android.view.inputmethod.Flags.FLAG_GUARD_INPUT_METHOD_LIST_APIS;
 import static android.view.inputmethod.Flags.FLAG_HOME_SCREEN_HANDWRITING_DELEGATOR;
 import static android.view.ViewProtoLogGroups.INPUT_METHOD_MANAGER_WITH_LOGCAT;
 import static android.view.inputmethod.Flags.initiationWithoutInputConnection;
@@ -117,6 +116,7 @@ import com.android.internal.annotations.GuardedBy;
 import com.android.internal.inputmethod.DirectBootAwareness;
 import com.android.internal.inputmethod.IBooleanListener;
 import com.android.internal.inputmethod.IConnectionlessHandwritingCallback;
+import com.android.internal.inputmethod.IImeSwitcherMenu;
 import com.android.internal.inputmethod.IInputMethodClient;
 import com.android.internal.inputmethod.IInputMethodSession;
 import com.android.internal.inputmethod.IRemoteAccessibilityInputConnection;
@@ -1778,14 +1778,9 @@ public final class InputMethodManager {
      *
      * <p>On multi user environment, this API returns a result for the calling process user.</p>
      *
-     * <p>Starting with targetSdkVersion 37, requires {@code android.permission.QUERY_INPUT_METHOD}
-     * to use this API.</p>
-     *
      * @return {@link List} of {@link InputMethodInfo}.
      */
     @NonNull
-    @FlaggedApi(FLAG_GUARD_INPUT_METHOD_LIST_APIS)
-    @RequiresPermission(value = Manifest.permission.QUERY_INPUT_METHOD, conditional = true)
     public List<InputMethodInfo> getInputMethodList() {
         // We intentionally do not use UserHandle.getCallingUserId() here because for system
         // services InputMethodManagerInternal.getInputMethodListAsUser() should be used
@@ -1942,14 +1937,9 @@ public final class InputMethodManager {
      *
      * <p>On multi user environment, this API returns a result for the calling process user.</p>
      *
-     * <p>Starting with targetSdkVersion 37, requires {@code android.permission.QUERY_INPUT_METHOD}
-     * to use this API.</p>
-     *
      * @return {@link List} of {@link InputMethodInfo}.
      */
     @NonNull
-    @FlaggedApi(FLAG_GUARD_INPUT_METHOD_LIST_APIS)
-    @RequiresPermission(value = Manifest.permission.QUERY_INPUT_METHOD, conditional = true)
     public List<InputMethodInfo> getEnabledInputMethodList() {
         // We intentionally do not use UserHandle.getCallingUserId() here because for system
         // services InputMethodManagerInternal.getEnabledInputMethodListAsUser() should be used
@@ -1981,9 +1971,6 @@ public final class InputMethodManager {
      *
      * <p>On multi user environment, this API returns a result for the calling process user.</p>
      *
-     * <p>Starting with targetSdkVersion 37, requires {@code android.permission.QUERY_INPUT_METHOD}
-     * to use this API.</p>
-     *
      * @param imi The {@link InputMethodInfo} whose subtypes list will be returned. If {@code null},
      * returns enabled subtypes for the currently selected {@link InputMethodInfo}.
      * @param allowsImplicitlyEnabledSubtypes A boolean flag to allow to return the implicitly
@@ -1991,8 +1978,6 @@ public final class InputMethodManager {
      * will implicitly enable subtypes according to the current system language.
      */
     @NonNull
-    @FlaggedApi(FLAG_GUARD_INPUT_METHOD_LIST_APIS)
-    @RequiresPermission(value = Manifest.permission.QUERY_INPUT_METHOD, conditional = true)
     public List<InputMethodSubtype> getEnabledInputMethodSubtypeList(@Nullable InputMethodInfo imi,
             boolean allowsImplicitlyEnabledSubtypes) {
         return IInputMethodManagerGlobalInvoker.getEnabledInputMethodSubtypeList(
@@ -2540,7 +2525,7 @@ public final class InputMethodManager {
      * {@link #RESULT_UNCHANGED_HIDDEN}, {@link #RESULT_SHOWN}, or
      * {@link #RESULT_HIDDEN}.
      * @return {@code true} if a request was sent to system_server, {@code false} otherwise. Note:
-     * this does not return result of the request. For result use {@param resultReceiver} instead.
+     * this does not return result of the request. For result use {@code resultReceiver} instead.
      *
      * @deprecated The {@link ResultReceiver} is not a reliable way of determining whether the
      * Input Method is actually shown or hidden. If result is needed, use
@@ -2737,7 +2722,7 @@ public final class InputMethodManager {
      * {@link #RESULT_HIDDEN}.
      * @return {@code true} if a request was sent to system_server, {@code false} otherwise. Note:
      * This does not return the result of that request (i.e. whether the IME was actually hidden).
-     * For result use {@param resultReceiver} instead.
+     * For result use {@code resultReceiver} instead.
      *
      * @deprecated The {@link ResultReceiver} is not a reliable way of determining whether the
      * Input Method is actually shown or hidden. If result is needed, use
@@ -3733,7 +3718,7 @@ public final class InputMethodManager {
                         && ProtoLog.isEnabled(INPUT_METHOD_MANAGER_DEBUG, LogLevel.VERBOSE)) {
                 ProtoLog.v(INPUT_METHOD_MANAGER_DEBUG,
                         "START INPUT: view=%s ic=%s editorInfo=%s startInputFlags=%s "
-                                + "imeRequestedVisible=%s",
+                                + "imeRequestedVisible=%b",
                         InputMethodDebug.dumpViewInfo(view), ic, editorInfo,
                         InputMethodDebug.startInputFlagsToString(startInputFlags),
                         imeRequestedVisible);
@@ -3879,6 +3864,23 @@ public final class InputMethodManager {
         synchronized (mH) {
             IInputMethodManagerGlobalInvoker.setAllowedImesByPolicyForTest(
                     mClient, allowedPackages);
+        }
+    }
+
+    /**
+     * A test-only method to set a list of allowed apps to bypass IME startup prevention.
+     *
+     * @param allowedPackages {@link List} of allowed apps for which the IME should start up. Set
+     *                        {@code null} to reset after the test run.
+     * @hide
+     */
+    @TestApi
+    @FlaggedApi(Flags.FLAG_PREVENT_IME_STARTUP_BYPASSED_APPS)
+    @RequiresPermission(Manifest.permission.TEST_INPUT_METHOD)
+    public void setPreventImeStartupBypassedAppsForTest(@Nullable List<String> allowedPackages) {
+        synchronized (mH) {
+            IInputMethodManagerGlobalInvoker.setPreventImeStartupBypassedAppsForTest(
+                    allowedPackages);
         }
     }
 
@@ -4133,7 +4135,7 @@ public final class InputMethodManager {
                     ProtoLog.d(INPUT_METHOD_MANAGER_DEBUG, "updateSelection");
 
                     ProtoLog.v(INPUT_METHOD_MANAGER_DEBUG,
-                            "SELECTION CHANGE: " + mCurBindState.mImeSession);
+                            "SELECTION CHANGE: %s", mCurBindState.mImeSession);
                 } else if (DEBUG) {
                     Log.d(TAG, "updateSelection");
                     Log.v(TAG, "SELECTION CHANGE: " + mCurBindState.mImeSession);
@@ -4656,8 +4658,9 @@ public final class InputMethodManager {
             if (timeout) {
                 if (android.tracing.Flags.imetrackerProtolog()) {
                     ProtoLog.w(INPUT_METHOD_MANAGER_WITH_LOGCAT,
-                            "Timeout waiting for IME to handle input event after %d ms: %s",
-                            INPUT_METHOD_NOT_RESPONDING_TIMEOUT, p.mInputMethodId);
+                            "Timeout waiting for IME to handle input event after "
+                                    + INPUT_METHOD_NOT_RESPONDING_TIMEOUT + " ms: %s",
+                            p.mInputMethodId);
                 } else {
                     Log.w(TAG, "Timeout waiting for IME to handle input event after "
                             + INPUT_METHOD_NOT_RESPONDING_TIMEOUT + " ms: " + p.mInputMethodId);
@@ -4767,7 +4770,8 @@ public final class InputMethodManager {
     @TestApi
     @RequiresPermission(Manifest.permission.TEST_INPUT_METHOD)
     public boolean isInputMethodPickerShown() {
-        return IInputMethodManagerGlobalInvoker.isInputMethodPickerShownForTest();
+        return IInputMethodManagerGlobalInvoker
+                .isInputMethodPickerShownForTest(UserHandle.myUserId());
     }
 
     /**
@@ -4795,6 +4799,23 @@ public final class InputMethodManager {
     @RequiresPermission(Manifest.permission.TEST_INPUT_METHOD)
     public boolean shouldShowImeSwitcherButtonForTest() {
         return IInputMethodManagerGlobalInvoker.shouldShowImeSwitcherButtonForTest();
+    }
+
+    /**
+     * Registers an interface for sending calls to the IME Switcher Menu controller. This is called
+     * after the IME Switcher Menu is fully initialized.
+     *
+     * @param imeSwitcherMenu the interface to send calls to the IME Switcher Menu controller.
+     *
+     * @hide
+     */
+    @RequiresPermission(allOf = {
+            Manifest.permission.WRITE_SECURE_SETTINGS,
+            Manifest.permission.INTERACT_ACROSS_USERS_FULL,
+            Manifest.permission.STATUS_BAR_SERVICE,
+    })
+    public void registerImeSwitcherMenu(@NonNull IImeSwitcherMenu imeSwitcherMenu) {
+        IInputMethodManagerGlobalInvoker.registerImeSwitcherMenu(imeSwitcherMenu);
     }
 
     /**

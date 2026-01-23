@@ -40,6 +40,7 @@ import com.android.systemui.authentication.shared.model.AuthenticationMethodMode
 import com.android.systemui.authentication.shared.model.AuthenticationMethodModel.Pattern
 import com.android.systemui.authentication.shared.model.AuthenticationMethodModel.Pin
 import com.android.systemui.authentication.shared.model.AuthenticationPatternCoordinate
+import com.android.systemui.authentication.shared.model.AuthenticationResult
 import com.android.systemui.biometrics.FaceHelpMessageDebouncer
 import com.android.systemui.biometrics.data.repository.fakeFacePropertyRepository
 import com.android.systemui.biometrics.data.repository.fakeFingerprintPropertyRepository
@@ -937,7 +938,7 @@ class BouncerMessageViewModelTest : SysuiTestCase() {
                     assertThat(bouncerMessage?.text).isEqualTo(text)
 
                     kosmos.fakeAuthenticationRepository.reportAuthenticationAttempt(
-                        isSuccessful = true
+                        AuthenticationResult.SUCCEEDED
                     )
 
                     job.cancelAndJoin()

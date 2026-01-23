@@ -557,7 +557,6 @@ public class SizeCompatTests extends WindowTestsBase {
         assertDownScaled();
     }
 
-    @EnableFlags(Flags.FLAG_ENABLE_SIZE_COMPAT_MODE_IMPROVEMENTS_FOR_CONNECTED_DISPLAYS)
     @Test
     public void testFixedMiscConfigurationWhenMovingToDisplay() {
         setUpDisplaySizeWithApp(1000, 2500);
@@ -4617,7 +4616,6 @@ public class SizeCompatTests extends WindowTestsBase {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_IGNORE_ASPECT_RATIO_RESTRICTIONS_FOR_RESIZEABLE_FREEFORM_ACTIVITIES)
     public void testUserAspectRatioOverridesNotAppliedToResizeableFreeformActivity() {
         final TaskBuilder taskBuilder =
                 new TaskBuilder(mSupervisor).setWindowingMode(WINDOWING_MODE_FREEFORM);
@@ -4640,7 +4638,6 @@ public class SizeCompatTests extends WindowTestsBase {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_IGNORE_ASPECT_RATIO_RESTRICTIONS_FOR_RESIZEABLE_FREEFORM_ACTIVITIES)
     public void testUserAspectRatioOverridesAppliedToNonResizeableFreeformActivity() {
         final TaskBuilder taskBuilder =
                 new TaskBuilder(mSupervisor).setWindowingMode(WINDOWING_MODE_FREEFORM);
@@ -4665,7 +4662,6 @@ public class SizeCompatTests extends WindowTestsBase {
     @Test
     @EnableCompatChanges({ActivityInfo.OVERRIDE_MIN_ASPECT_RATIO,
             ActivityInfo.OVERRIDE_MIN_ASPECT_RATIO_LARGE})
-    @EnableFlags(Flags.FLAG_IGNORE_ASPECT_RATIO_RESTRICTIONS_FOR_RESIZEABLE_FREEFORM_ACTIVITIES)
     public void testSystemAspectRatioOverridesNotAppliedToResizeableFreeformActivity() {
         final TaskBuilder taskBuilder =
                 new TaskBuilder(mSupervisor).setWindowingMode(WINDOWING_MODE_FREEFORM);
@@ -4678,7 +4674,6 @@ public class SizeCompatTests extends WindowTestsBase {
     @Test
     @EnableCompatChanges({ActivityInfo.OVERRIDE_MIN_ASPECT_RATIO,
             ActivityInfo.OVERRIDE_MIN_ASPECT_RATIO_LARGE})
-    @EnableFlags(Flags.FLAG_IGNORE_ASPECT_RATIO_RESTRICTIONS_FOR_RESIZEABLE_FREEFORM_ACTIVITIES)
     public void testSystemAspectRatioOverridesAppliedToNonResizeableFreeformActivity() {
         final TaskBuilder taskBuilder =
                 new TaskBuilder(mSupervisor).setWindowingMode(WINDOWING_MODE_FREEFORM);
@@ -5303,8 +5298,7 @@ public class SizeCompatTests extends WindowTestsBase {
     }
 
     @Test
-    @EnableFlags({Flags.FLAG_IGNORE_ASPECT_RATIO_RESTRICTIONS_FOR_RESIZEABLE_FREEFORM_ACTIVITIES,
-            Flags.FLAG_ENABLE_CAMERA_COMPAT_FOR_DESKTOP_WINDOWING})
+    @EnableFlags(Flags.FLAG_ENABLE_CAMERA_COMPAT_FOR_DESKTOP_WINDOWING)
     public void testCameraCompatAspectRatioAppliedForFixedOrientationCameraActivities() {
         // Needed to create camera compat policy in DisplayContent.
         allowDesktopMode();
@@ -5330,8 +5324,7 @@ public class SizeCompatTests extends WindowTestsBase {
     }
 
     @Test
-    @EnableFlags({Flags.FLAG_IGNORE_ASPECT_RATIO_RESTRICTIONS_FOR_RESIZEABLE_FREEFORM_ACTIVITIES,
-            Flags.FLAG_ENABLE_CAMERA_COMPAT_FOR_DESKTOP_WINDOWING})
+    @EnableFlags(Flags.FLAG_ENABLE_CAMERA_COMPAT_FOR_DESKTOP_WINDOWING)
     public void testCameraCompatAspectRatioForFixedOrientationCameraActivitiesPortraitWindow() {
         // Needed to create camera compat policy in DisplayContent.
         allowDesktopMode();
@@ -5357,8 +5350,7 @@ public class SizeCompatTests extends WindowTestsBase {
     }
 
     @Test
-    @EnableFlags({Flags.FLAG_IGNORE_ASPECT_RATIO_RESTRICTIONS_FOR_RESIZEABLE_FREEFORM_ACTIVITIES,
-            Flags.FLAG_ENABLE_CAMERA_COMPAT_FOR_DESKTOP_WINDOWING})
+    @EnableFlags(Flags.FLAG_ENABLE_CAMERA_COMPAT_FOR_DESKTOP_WINDOWING)
     public void testCameraCompatAspectRatioAppliedInsteadOfDefaultAspectRatio() {
         // Needed to create camera compat policy in DisplayContent.
         allowDesktopMode();
@@ -5388,8 +5380,7 @@ public class SizeCompatTests extends WindowTestsBase {
     }
 
     @Test
-    @EnableFlags({Flags.FLAG_IGNORE_ASPECT_RATIO_RESTRICTIONS_FOR_RESIZEABLE_FREEFORM_ACTIVITIES,
-            Flags.FLAG_ENABLE_CAMERA_COMPAT_FOR_DESKTOP_WINDOWING})
+    @EnableFlags(Flags.FLAG_ENABLE_CAMERA_COMPAT_FOR_DESKTOP_WINDOWING)
     public void testCameraCompatAspectRatio_defaultAspectRatioAppliedWhenGreater() {
         // Needed to create camera compat policy in DisplayContent.
         allowDesktopMode();
@@ -5527,7 +5518,6 @@ public class SizeCompatTests extends WindowTestsBase {
     @Test
     @EnableCompatChanges({ActivityInfo.UNIVERSAL_RESIZABLE_BY_DEFAULT,
             AppCompatResizeOverrides.DISABLE_OPT_OUT_UNIVERSAL_RESIZABLE_BY_DEFAULT})
-    @EnableFlags(Flags.FLAG_DISABLE_OPT_OUT_UNIVERSAL_RESIZABLE_BY_DEFAULT)
     public void testDisableOptOutUniversalResizeableByDefault() {
         makeDisplayLargeScreen(mDisplayContent);
         declareOptOutUniversalResizeable();

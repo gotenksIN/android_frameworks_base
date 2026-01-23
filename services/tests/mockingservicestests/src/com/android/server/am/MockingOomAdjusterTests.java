@@ -50,7 +50,6 @@ import static android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
 import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
 
 import static com.android.server.am.MockingOomAdjusterTests.ProcessStateAssert.assertThatProcess;
-import static com.android.server.am.ProcessStateController.FOLLOW_UP_UPDATE_MSG;
 import static com.android.server.am.psc.Constants.BACKUP_APP_ADJ;
 import static com.android.server.am.psc.Constants.CACHED_APP_IMPORTANCE_LEVELS;
 import static com.android.server.am.psc.Constants.CACHED_APP_MAX_ADJ;
@@ -86,6 +85,7 @@ import static com.android.server.am.psc.OomAdjuster.CPU_TIME_REASON_TRANSMITTED_
 import static com.android.server.am.psc.OomAdjuster.IMPLICIT_CPU_TIME_REASON_OTHER;
 import static com.android.server.am.psc.OomAdjuster.IMPLICIT_CPU_TIME_REASON_TRANSMITTED;
 import static com.android.server.am.psc.OomAdjuster.IMPLICIT_CPU_TIME_REASON_TRANSMITTED_LEGACY;
+import static com.android.server.am.psc.ProcessStateController.FOLLOW_UP_UPDATE_MSG;
 import static com.android.server.wm.WindowProcessController.ACTIVITY_STATE_FLAG_IS_PAUSING_OR_PAUSED;
 import static com.android.server.wm.WindowProcessController.ACTIVITY_STATE_FLAG_IS_STOPPING;
 import static com.android.server.wm.WindowProcessController.ACTIVITY_STATE_FLAG_IS_STOPPING_FINISHING;
@@ -110,6 +110,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import android.app.ActivityManager;
 import android.app.AppOpsManager;
@@ -139,10 +140,11 @@ import android.util.SparseBooleanArray;
 import android.util.SparseIntArray;
 
 import com.android.server.LocalServices;
-import com.android.server.am.ProcessStateController.ProcessLruUpdater;
 import com.android.server.am.psc.ActiveUidsInternal;
 import com.android.server.am.psc.OomAdjuster;
 import com.android.server.am.psc.ProcessRecordInternal;
+import com.android.server.am.psc.ProcessStateController;
+import com.android.server.am.psc.ProcessStateController.ProcessLruUpdater;
 import com.android.server.am.psc.ServiceRecordInternal;
 import com.android.server.am.psc.UidRecordInternal;
 import com.android.server.tests.assertutils.FlagAssert;
@@ -152,6 +154,7 @@ import com.android.server.wm.WindowProcessController;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Rule;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
@@ -217,12 +220,20 @@ public class MockingOomAdjusterTests {
     private OomAdjusterInjector mInjector = new OomAdjusterInjector();
     private ActivityManagerService.OomAdjusterCallback mCallback;
     private final Handler mUpdateHandler = mock(Handler.class);
+    // A limiter that does nothing, because it is created with no arguments, outside
+    // system_server.
+    private final MemoryLimiter mMemoryLimiter = new MemoryLimiter();
 
     private HandlerThread mActivityStateHandlerThread;
     private Handler mActivityStateHandler;
 
     @Rule
     public final SetFlagsRule mSetFlagsRule = new SetFlagsRule();
+
+    @BeforeClass
+    public static void setUpClass() {
+        System.loadLibrary("mockingservicestestjni");
+    }
 
     @SuppressWarnings("GuardedBy")
     @Before
@@ -334,6 +345,8 @@ public class MockingOomAdjusterTests {
         mService.mActivityTaskManager.initialize(null, null, mProcessStateController,
                 mActivityStateHandlerThread.getLooper());
         mService.mAtmInternal = spy(mService.mActivityTaskManager.getAtmInternal());
+        // Ensure clients can get a valid memory limiter.  The limiter will do nothing.
+        when(mService.newMemoryLimiter()).thenReturn(mMemoryLimiter.newLimiter());
     }
 
     @SuppressWarnings("GuardedBy")
@@ -3149,21 +3162,18 @@ public class MockingOomAdjusterTests {
                 MOCKAPP_PACKAGENAME + "/.TestService");
         final ServiceRecord s1 = bindService(app1, client1, null, null, 0, mock(IBinder.class));
         setFieldValue(ServiceRecord.class, s1, "name", cn1);
-        setFieldValue(ServiceRecord.class, s1, "serviceInfo", new ServiceInfo());
         mProcessStateController.setStartRequested(s1, true);
 
         final ComponentName cn2 = ComponentName.unflattenFromString(
                 MOCKAPP2_PACKAGENAME + "/.TestService");
         final ServiceRecord s2 = bindService(app2, client2, null, null, 0, mock(IBinder.class));
         setFieldValue(ServiceRecord.class, s2, "name", cn2);
-        setFieldValue(ServiceRecord.class, s2, "serviceInfo", new ServiceInfo());
         mProcessStateController.setStartRequested(s2, true);
 
         final ComponentName cn3 = ComponentName.unflattenFromString(
                 MOCKAPP5_PACKAGENAME + "/.TestService");
         final ServiceRecord s3 = bindService(app3, client1, null, null, 0, mock(IBinder.class));
         setFieldValue(ServiceRecord.class, s3, "name", cn3);
-        setFieldValue(ServiceRecord.class, s3, "serviceInfo", new ServiceInfo());
         mProcessStateController.setStartRequested(s3, true);
 
         final ComponentName cn4 = ComponentName.unflattenFromString(
@@ -4589,6 +4599,37 @@ public class MockingOomAdjusterTests {
         assertThatProcess(app).notHasImplicitCpuTimeCapability();
     }
 
+    @SuppressWarnings("GuardedBy")
+    @Test
+    public void testUpdateOomAdj_DoOne_ZramWrittenBack() {
+        final int TEST_OOM_ADJ_FOR_ZRAM_WRITEBACK = 249;
+        mService.mOomAdjuster.configureAdjForZramWriteback(TEST_OOM_ADJ_FOR_ZRAM_WRITEBACK);
+        ProcessRecord app = makeDefaultProcessRecord(MOCKAPP_PID, MOCKAPP_UID, MOCKAPP_PROCESSNAME,
+                MOCKAPP_PACKAGENAME, false);
+        app.setCurAdj(CACHED_APP_MIN_ADJ);
+        app.setCurRawAdj(CACHED_APP_MIN_ADJ);
+        app.setSetAdj(CACHED_APP_MIN_ADJ);
+
+        mProcessStateController.setIsZramWrittenBack(app, true);
+
+        assertEquals(TEST_OOM_ADJ_FOR_ZRAM_WRITEBACK, mInjector.mLastSetOomAdj.get(app.getPid()));
+        assertEquals(TEST_OOM_ADJ_FOR_ZRAM_WRITEBACK, app.getSetAdj());
+
+        assertTrue(mInjector.mLastSetForLmkdOnly.get(app.getPid()));
+        verify(mCallback)
+                .onOomAdjustChanged(eq(CACHED_APP_MIN_ADJ), eq(TEST_OOM_ADJ_FOR_ZRAM_WRITEBACK),
+                        eq(app));
+
+        mProcessStateController.setIsZramWrittenBack(app, false);
+
+        assertEquals(CACHED_APP_MIN_ADJ, mInjector.mLastSetOomAdj.get(app.getPid()));
+        assertEquals(CACHED_APP_MIN_ADJ, app.getSetAdj());
+        assertFalse(mInjector.mLastSetForLmkdOnly.get(app.getPid()));
+        verify(mCallback)
+                .onOomAdjustChanged(eq(TEST_OOM_ADJ_FOR_ZRAM_WRITEBACK), eq(CACHED_APP_MIN_ADJ),
+                        eq(app));
+    }
+
     private ProcessRecord makeDefaultProcessRecord(int pid, int uid, String processName,
             String packageName, boolean hasShownUi) {
         final ProcessRecord proc = new ProcessRecordBuilder(pid, uid, processName,
@@ -4643,6 +4684,9 @@ public class MockingOomAdjusterTests {
         setFieldValue(ServiceRecord.class, record, "packageName", app.info.packageName);
         app.mServices.startService(record);
         record.appInfo = app.info;
+        ServiceInfo serviceInfo = new ServiceInfo();
+        serviceInfo.applicationInfo = app.info;
+        setFieldValue(ServiceRecord.class, record, "serviceInfo", serviceInfo);
         setFieldValue(ServiceRecord.class, record, "bindings", new ArrayMap<>());
         setFieldValue(ServiceRecord.class, record, "pendingStarts", new ArrayList<>());
         setFieldValue(ServiceRecordInternal.class, record, "isSdkSandbox", app.isSdkSandbox);
@@ -5083,6 +5127,7 @@ public class MockingOomAdjusterTests {
         // Jump ahead in time by this offset amount.
         long mTimeOffsetMillis = 0;
         private SparseIntArray mLastSetOomAdj = new SparseIntArray();
+        private SparseBooleanArray mLastSetForLmkdOnly = new SparseBooleanArray();
 
         // A sequence number that increases every time setOomAdj is called
         int mLastAppliedAt = 0;
@@ -5094,6 +5139,7 @@ public class MockingOomAdjusterTests {
             mLastSetOomAdj.clear();
             mLastAppliedAt = 0;
             mSetOomAdjAppliedAt.clear();
+            mLastSetForLmkdOnly.clear();
         }
 
         void jumpUptimeAheadTo(long uptimeMillis) {
@@ -5123,10 +5169,11 @@ public class MockingOomAdjusterTests {
         }
 
         @Override
-        public void setOomAdj(int pid, int uid, int adj) {
+        public void setOomAdj(int pid, int uid, int adj, boolean forLmkdOnly) {
             if (pid <= 0) return;
             mLastSetOomAdj.put(pid, adj);
             mSetOomAdjAppliedAt.put(pid, mLastAppliedAt++);
+            mLastSetForLmkdOnly.put(pid, forLmkdOnly);
         }
 
         @Override

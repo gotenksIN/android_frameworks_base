@@ -19,6 +19,7 @@ package android.app;
 import static android.app.Instrumentation.DEBUG_FINISH_ACTIVITY;
 import static android.app.WindowConfiguration.activityTypeToString;
 import static android.app.WindowConfiguration.windowingModeToString;
+import static android.app.privatecompute.flags.Flags.enablePccFrameworkSupport;
 import static android.content.Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS;
 import static android.content.pm.ActivityInfo.RESIZE_MODE_RESIZEABLE;
 
@@ -571,6 +572,14 @@ public class ActivityManager {
             FIRST_START_FATAL_ERROR_CODE + 12;
 
     /**
+     * Result for IActivityManager.startActivity: the system cannot guarantee that the new task
+     * will be movable right after launch.
+     * @hide
+     */
+    public static final int START_CANNOT_GUARANTEE_TASK_MOVABILITY =
+            FIRST_START_FATAL_ERROR_CODE + 13;
+
+    /**
      * Result for IActivityManager.startActivity: the activity was started
      * successfully as normal.
      * @hide
@@ -1070,14 +1079,17 @@ public class ActivityManager {
             | PROCESS_CAPABILITY_IMPLICIT_CPU_TIME;
 
     /**
-     * All implicit capabilities. This capability set is currently only used for processes under
-     * active instrumentation. The intent is to allow CTS tests to always have these capabilities
-     * so that every test doesn't need to launch FGS.
+     * Default capabilities for processes under active instrumentation. The intent is to allow CTS
+     * tests to always have these capabilities so that every test doesn't need to launch a
+     * foreground service or other special lifecycle only to get these capabilities.
+     *
      * @hide
      */
-    @TestApi
-    public static final int PROCESS_CAPABILITY_ALL_IMPLICIT = PROCESS_CAPABILITY_FOREGROUND_CAMERA
-            | PROCESS_CAPABILITY_FOREGROUND_MICROPHONE;
+    public static final int PROCESS_CAPABILITY_INSTRUMENTATION_DEFAULTS =
+            // TODO: b/467684465 - CTS tests should gain capabilities explicitly where necessary
+            PROCESS_CAPABILITY_FOREGROUND_CAMERA
+            | PROCESS_CAPABILITY_FOREGROUND_MICROPHONE
+            | PROCESS_CAPABILITY_FOREGROUND_AUDIO_CONTROL;
 
     /**
      * Print capability bits in human-readable form.
@@ -5539,11 +5551,41 @@ public class ActivityManager {
         if (UserHandle.isIsolated(uid)) {
             return PackageManager.PERMISSION_DENIED;
         }
+
         // If there is a uid that owns whatever is being accessed, it has
         // blanket access to it regardless of the permissions it requires.
         if (owningUid >= 0 && UserHandle.isSameApp(uid, owningUid)) {
             return PackageManager.PERMISSION_GRANTED;
         }
+
+        if (owningUid >= 0 && enablePccFrameworkSupport()) {
+            boolean isCallerPcc = Process.isPrivateComputeCoreUid(uid);
+            boolean isOwnerPcc = Process.isPrivateComputeCoreUid(owningUid);
+
+            // If a PCC process and a non-PCC process from the same app are trying to communicate,
+            // convert the PCC UID back to an app UID to check if they are the same app.
+            // This allows accessing non-exported PCC components.
+            if (isCallerPcc != isOwnerPcc) {
+                int callerAppUid = uid;
+                int ownerAppUid = owningUid;
+                try {
+                    if (isCallerPcc) {
+                        callerAppUid = AppGlobals.getPackageManager()
+                                .getAppUidForPrivateComputeCoreUid(uid);
+                    } else {
+                        ownerAppUid = AppGlobals.getPackageManager()
+                                .getAppUidForPrivateComputeCoreUid(owningUid);
+                    }
+                } catch (RemoteException e) {
+                    throw e.rethrowFromSystemServer();
+                }
+
+                if (UserHandle.isSameApp(callerAppUid, ownerAppUid)) {
+                    return PackageManager.PERMISSION_GRANTED;
+                }
+            }
+        }
+
         // If the target is not exported, then nobody else can get to it.
         if (!exported) {
             /*

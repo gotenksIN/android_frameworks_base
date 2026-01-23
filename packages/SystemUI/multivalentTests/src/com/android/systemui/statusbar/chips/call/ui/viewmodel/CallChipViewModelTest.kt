@@ -293,20 +293,8 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
         }
 
     @Test
-    @DisableFlags(StatusBarChipsReturnAnimations.FLAG_NAME, StatusBarCallChipUseIsHidden.FLAG_NAME)
-    fun chipLegacy_inCallWithVisibleApp_zeroStartTime_isHiddenAsInactive() =
-        kosmos.runTest {
-            val latest by collectLastValue(underTest.chip)
-
-            addOngoingCallState(startTimeMs = 0, isAppVisible = true)
-
-            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Inactive::class.java)
-        }
-
-    @Test
     @DisableFlags(StatusBarChipsReturnAnimations.FLAG_NAME)
-    @EnableFlags(StatusBarCallChipUseIsHidden.FLAG_NAME)
-    fun chipLegacy_useIsHidden_inCallWithVisibleApp_zeroStartTime_isHiddenAsIconOnly() =
+    fun chipLegacy_inCallWithVisibleApp_zeroStartTime_isHiddenAsIconOnly() =
         kosmos.runTest {
             val latest by collectLastValue(underTest.chip)
 
@@ -335,17 +323,6 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
         }
 
     @Test
-    @DisableFlags(StatusBarChipsReturnAnimations.FLAG_NAME, StatusBarCallChipUseIsHidden.FLAG_NAME)
-    fun chipLegacy_inCallWithVisibleApp_negativeStartTime_isHiddenAsInactive() =
-        kosmos.runTest {
-            val latest by collectLastValue(underTest.chip)
-
-            addOngoingCallState(startTimeMs = -2, isAppVisible = true)
-
-            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Inactive::class.java)
-        }
-
-    @Test
     @EnableFlags(StatusBarChipsReturnAnimations.FLAG_NAME)
     fun chipWithReturnAnimation_inCallWithVisibleApp_negativeStartTime_isHiddenAsIconOnly() =
         kosmos.runTest {
@@ -360,9 +337,8 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
         }
 
     @Test
-    @EnableFlags(StatusBarCallChipUseIsHidden.FLAG_NAME)
     @DisableFlags(StatusBarChipsReturnAnimations.FLAG_NAME)
-    fun chipLegacy_useIsHidden_animationsDisabled_negativeStartTime_isHiddenAsIconOnly() =
+    fun chipLegacy_inCallWithVisibleApp_negativeStartTime_isHiddenAsIconOnly() =
         kosmos.runTest {
             val latest by collectLastValue(underTest.chip)
 
@@ -374,17 +350,6 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
             assertThat(activeChip.isHidden).isTrue()
             assertThat(activeChip.content)
                 .isInstanceOf(OngoingActivityChipModel.Content.IconOnly::class.java)
-        }
-
-    @Test
-    @DisableFlags(StatusBarChipsReturnAnimations.FLAG_NAME, StatusBarCallChipUseIsHidden.FLAG_NAME)
-    fun chipLegacy_inCallWithVisibleApp_positiveStartTime_isHiddenAsInactive() =
-        kosmos.runTest {
-            val latest by collectLastValue(underTest.chip)
-
-            addOngoingCallState(startTimeMs = 345, isAppVisible = true)
-
-            assertThat(latest).isInstanceOf(OngoingActivityChipModel.Inactive::class.java)
         }
 
     @Test
@@ -402,9 +367,8 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
         }
 
     @Test
-    @EnableFlags(StatusBarCallChipUseIsHidden.FLAG_NAME)
     @DisableFlags(StatusBarChipsReturnAnimations.FLAG_NAME)
-    fun chipLegacy_useIsHidden_animationsDisabled_positiveStartTime_isHiddenAsTimer() =
+    fun chipLegacy_inCallWithVisibleApp_positiveStartTime_isHiddenAsTimer() =
         kosmos.runTest {
             val latest by collectLastValue(underTest.chip)
 
@@ -1118,8 +1082,7 @@ class CallChipViewModelTest(flags: FlagsParameterization) : SysuiTestCase() {
             get() = buildList {
                 addAll(
                     FlagsParameterization.allCombinationsOf(
-                        StatusBarCallChipUseIsHidden.FLAG_NAME,
-                        StatusBarChipsReturnAnimations.FLAG_NAME,
+                        StatusBarChipsReturnAnimations.FLAG_NAME
                     )
                 )
             }

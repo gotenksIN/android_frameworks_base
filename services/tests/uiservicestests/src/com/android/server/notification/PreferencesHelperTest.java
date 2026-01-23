@@ -18,7 +18,6 @@ package com.android.server.notification;
 import static android.app.AppOpsManager.MODE_ALLOWED;
 import static android.app.AppOpsManager.MODE_DEFAULT;
 import static android.app.AppOpsManager.OP_SYSTEM_ALERT_WINDOW;
-import static android.app.Flags.FLAG_NOTIFICATION_CLASSIFICATION_UI;
 import static android.app.Notification.VISIBILITY_PRIVATE;
 import static android.app.Notification.VISIBILITY_SECRET;
 import static android.app.NotificationChannel.ALLOW_BUBBLE_ON;
@@ -109,7 +108,6 @@ import android.content.IContentProvider;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
-import android.content.pm.ParceledListSlice;
 import android.content.pm.Signature;
 import android.content.pm.UserInfo;
 import android.content.res.Resources;
@@ -126,7 +124,6 @@ import android.os.RemoteException;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.permission.PermissionManager;
-import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.flag.junit.FlagsParameterization;
 import android.platform.test.flag.junit.SetFlagsRule;
@@ -250,8 +247,7 @@ public class PreferencesHelperTest extends UiServiceTestCase {
 
     @Parameters(name = "{0}")
     public static List<FlagsParameterization> getParams() {
-        return FlagsParameterization.allCombinationsOf(
-                android.app.Flags.FLAG_NM_BINDER_PERF_CACHE_CHANNELS);
+        return FlagsParameterization.allCombinationsOf();
     }
 
     public PreferencesHelperTest(FlagsParameterization flags) {
@@ -6163,7 +6159,6 @@ public class PreferencesHelperTest extends UiServiceTestCase {
     }
 
     @Test
-    @EnableFlags({FLAG_NOTIFICATION_CLASSIFICATION_UI})
     public void testPullPackagePreferencesStats_createsExpectedStatsEvents()
             throws InvalidProtocolBufferException {
         // make sure there's at least one channel for each package we want to test
@@ -6638,7 +6633,6 @@ public class PreferencesHelperTest extends UiServiceTestCase {
     }
 
     @Test
-    @EnableFlags(android.app.Flags.FLAG_NM_BINDER_PERF_CACHE_CHANNELS)
     public void testInvalidateChannelCache_invalidateOnCreationAndChange() {
         mHelper.resetCacheInvalidation();
         NotificationChannel channel = new NotificationChannel("id", "name", IMPORTANCE_DEFAULT);
@@ -6675,7 +6669,6 @@ public class PreferencesHelperTest extends UiServiceTestCase {
     }
 
     @Test
-    @EnableFlags(android.app.Flags.FLAG_NM_BINDER_PERF_CACHE_CHANNELS)
     public void testInvalidateChannelCache_invalidateOnDelete() {
         NotificationChannel channel = new NotificationChannel("id", "name", IMPORTANCE_DEFAULT);
         mHelper.createNotificationChannel(PKG_N_MR1, UID_N_MR1, channel, true, false, UID_N_MR1,
@@ -6696,7 +6689,6 @@ public class PreferencesHelperTest extends UiServiceTestCase {
     }
 
     @Test
-    @EnableFlags(android.app.Flags.FLAG_NM_BINDER_PERF_CACHE_CHANNELS)
     public void testInvalidateChannelCache_noInvalidationWhenNoChange() {
         NotificationChannel channel = new NotificationChannel("id", "name", IMPORTANCE_DEFAULT);
         mHelper.createNotificationChannel(PKG_N_MR1, UID_N_MR1, channel, true, false, UID_N_MR1,
@@ -6721,7 +6713,6 @@ public class PreferencesHelperTest extends UiServiceTestCase {
     }
 
     @Test
-    @EnableFlags(android.app.Flags.FLAG_NM_BINDER_PERF_CACHE_CHANNELS)
     public void testInvalidateCache_multipleUsersAndPackages() {
         // Setup: create channels for:
         // pkg O, user
@@ -6769,7 +6760,6 @@ public class PreferencesHelperTest extends UiServiceTestCase {
     }
 
     @Test
-    @EnableFlags(android.app.Flags.FLAG_NM_BINDER_PERF_CACHE_CHANNELS)
     public void testInvalidateCache_userRemoved() throws Exception {
         NotificationChannel c1 = new NotificationChannel("id1", "name1", IMPORTANCE_DEFAULT);
         int uid1 = UserHandle.getUid(1, 1);
@@ -6784,7 +6774,6 @@ public class PreferencesHelperTest extends UiServiceTestCase {
     }
 
     @Test
-    @EnableFlags(android.app.Flags.FLAG_NM_BINDER_PERF_CACHE_CHANNELS)
     public void testInvalidateCache_packagesChanged() {
         NotificationChannel channel1 =
                 new NotificationChannel("id1", "name1", NotificationManager.IMPORTANCE_HIGH);
@@ -6809,37 +6798,6 @@ public class PreferencesHelperTest extends UiServiceTestCase {
     }
 
     @Test
-    @DisableFlags(android.app.Flags.FLAG_NM_BINDER_PERF_CACHE_CHANNELS)
-    public void testInvalidateCache_flagOff_neverTouchesCaches() {
-        // Do a bunch of channel-changing operations.
-        NotificationChannel channel =
-                new NotificationChannel("id", "name1", NotificationManager.IMPORTANCE_HIGH);
-        mHelper.createNotificationChannel(PKG_N_MR1, UID_N_MR1, channel, true, false,
-                UID_N_MR1, false);
-
-        // and also a group
-        NotificationChannelGroup ncg = new NotificationChannelGroup("1", "group1");
-        mHelper.createNotificationChannelGroup(PKG_O, UID_O, ncg, true, UID_O, false);
-
-        NotificationChannel copy = channel.copy();
-        copy.setName("name2");
-        mHelper.updateNotificationChannel(PKG_N_MR1, UID_N_MR1, copy, true, UID_N_MR1, false);
-        mHelper.deleteNotificationChannel(PKG_N_MR1, UID_N_MR1, "id", UID_N_MR1, false);
-
-        assertThat(mHelper.hasChannelCacheBeenInvalidated()).isFalse();
-        assertThat(mHelper.hasGroupCacheBeenInvalidated()).isFalse();
-    }
-
-    @Test
-    @DisableFlags(android.app.Flags.FLAG_NM_BINDER_PERF_CACHE_CHANNELS)
-    public void testGetNotificationChannels_neverCreatesWhenFlagOff() {
-        ParceledListSlice<NotificationChannel> channels = mHelper.getNotificationChannels(PKG_N_MR1,
-                UID_N_MR1, false, false);
-        assertThat(channels.getList().size()).isEqualTo(0);
-    }
-
-    @Test
-    @EnableFlags(android.app.Flags.FLAG_NM_BINDER_PERF_CACHE_CHANNELS)
     public void testInvalidateGroupCache_onlyChannelsChanged() {
         // Channels change, but groups don't change; we should invalidate the channel cache, but
         // not the group cache.
@@ -6864,7 +6822,6 @@ public class PreferencesHelperTest extends UiServiceTestCase {
     }
 
     @Test
-    @EnableFlags(android.app.Flags.FLAG_NM_BINDER_PERF_CACHE_CHANNELS)
     public void testInvalidateGroupCache_onlyGroupsChanged() {
         // Group info changes, but the channels associated with the group do not
         NotificationChannelGroup ncg = new NotificationChannelGroup("1", "group1");
@@ -6887,7 +6844,6 @@ public class PreferencesHelperTest extends UiServiceTestCase {
     }
 
     @Test
-    @EnableFlags(android.app.Flags.FLAG_NM_BINDER_PERF_CACHE_CHANNELS)
     public void testInvalidateGroupCache_groupUnchanged() {
         NotificationChannelGroup ncg = new NotificationChannelGroup("1", "group1");
         NotificationChannelGroup ncg2 = new NotificationChannelGroup("2", "group2");
@@ -6903,7 +6859,6 @@ public class PreferencesHelperTest extends UiServiceTestCase {
     }
 
     @Test
-    @EnableFlags(android.app.Flags.FLAG_NM_BINDER_PERF_CACHE_CHANNELS)
     public void testInvalidateGroupCache_deletedGroups() {
         NotificationChannelGroup ncg = new NotificationChannelGroup("1", "group1");
         NotificationChannelGroup ncg2 = new NotificationChannelGroup("2", "group2");

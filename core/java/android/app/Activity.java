@@ -915,6 +915,7 @@ public class Activity extends ContextThemeWrapper
     private boolean mDestroyed;
     private boolean mDoReportFullyDrawn = true;
     private boolean mRestoredFromBundle;
+    private boolean mIsHandoffEnabled;
 
     /** {@code true} if the activity lifecycle is in a state which supports picture-in-picture.
      * This only affects the client-side exception, the actual state check still happens in AMS. */
@@ -3087,7 +3088,7 @@ public class Activity extends ContextThemeWrapper
      *
      * @param isInMultiWindowMode True if the activity is in multi-window mode.
      * @param newConfig The new configuration of the activity with the state
-     *                  {@param isInMultiWindowMode}.
+     *                  {@code isInMultiWindowMode}.
      */
     public void onMultiWindowModeChanged(boolean isInMultiWindowMode, Configuration newConfig) {
         // Left deliberately empty. There should be no side effects if a direct
@@ -3135,7 +3136,7 @@ public class Activity extends ContextThemeWrapper
      *
      * @param isInPictureInPictureMode True if the activity is in picture-in-picture mode.
      * @param newConfig The new configuration of the activity with the state
-     *                  {@param isInPictureInPictureMode}.
+     *                  {@code isInPictureInPictureMode}.
      */
     public void onPictureInPictureModeChanged(boolean isInPictureInPictureMode,
             Configuration newConfig) {
@@ -3207,14 +3208,14 @@ public class Activity extends ContextThemeWrapper
 
     /**
      * Puts the activity in picture-in-picture mode if possible in the current system state. The
-     * set parameters in {@param params} will be combined with the parameters from prior calls to
+     * set parameters in {@code params} will be combined with the parameters from prior calls to
      * {@link #setPictureInPictureParams(PictureInPictureParams)}.
      *
      * The system may disallow entering picture-in-picture in various cases, including when the
      * activity is not visible, if the screen is locked or if the user has an activity pinned.
      *
      * <p>By default, system calculates the dimension of picture-in-picture window based on the
-     * given {@param params}.
+     * given {@code params}.
      * See <a href="{@docRoot}guide/topics/ui/picture-in-picture">Picture-in-picture Support</a>
      * on how to override this behavior.</p>
      *
@@ -7737,7 +7738,7 @@ public class Activity extends ContextThemeWrapper
      */
     @FlaggedApi(android.companion.Flags.FLAG_TASK_CONTINUITY)
     public final boolean isHandoffEnabled() {
-        return ActivityClient.getInstance().isHandoffEnabled(mToken);
+        return mIsHandoffEnabled;
     }
 
     /**
@@ -7759,6 +7760,7 @@ public class Activity extends ContextThemeWrapper
         @Nullable HandoffActivityParams handoffActivityParams) {
         ActivityClient.getInstance().setHandoffEnabled(
                 mToken, handoffEnabled, handoffActivityParams);
+        mIsHandoffEnabled = handoffEnabled;
     }
 
     /**

@@ -79,13 +79,6 @@ flag {
 }
 
 flag {
-    name: "allow_dream_when_postured"
-    namespace: "systemui"
-    description: "Allow dreaming when device is stationary and upright"
-    bug: "383208131"
-}
-
-flag {
     name: "dreams_v2"
     namespace: "systemui"
     description: "Enables various improvements to the dream experience "
@@ -123,16 +116,6 @@ flag {
     namespace: "systemui"
     description: "Allows dreaming even when a charge limit is active"
     bug: "397717022"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "dream_overlay_started_fix"
-    namespace: "systemui"
-    description: "Guards fix for the lifetime of when the dream is considered started"
-    bug: "432039567"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

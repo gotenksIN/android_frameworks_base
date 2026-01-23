@@ -36,6 +36,7 @@ import com.android.systemui.statusbar.pipeline.mobile.domain.model.SignalIconMod
 // QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
 import com.android.systemui.statusbar.pipeline.mobile.ui.view.ModernStatusBarMobileView
 import com.android.systemui.statusbar.pipeline.shared.ConnectivityConstants
+import com.android.systemui.util.kotlin.mapDirect
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
 import kotlin.coroutines.CoroutineContext
@@ -49,7 +50,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 /**
  * View model for describing the system's current mobile cellular connections. The result is a list
@@ -75,7 +75,9 @@ constructor(
 // QTI_BEGIN: 2024-08-01: Android_UI: SystemUI: Fix DDS signal strength is null issue.
     val subscriptionIdsFlow: StateFlow<List<Int>> =
         interactor.filteredSubscriptions
-            .mapLatest { subscriptions ->
+// QTI_END: 2024-08-01: Android_UI: SystemUI: Fix DDS signal strength is null issue.
+            .mapDirect { subscriptions ->
+// QTI_BEGIN: 2024-08-01: Android_UI: SystemUI: Fix DDS signal strength is null issue.
                 subscriptions.map { subscriptionModel -> subscriptionModel.subscriptionId }
             }
             .stateIn(scope, SharingStarted.WhileSubscribed(), listOf())

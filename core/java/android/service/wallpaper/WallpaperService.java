@@ -384,6 +384,7 @@ public abstract class WallpaperService extends Service {
         // The hiearchy is the following:
         //   mSurfaceControl <- mTransformSurfaceControl <- mBbqSurfaceControl
         SurfaceControl mTransformSurfaceControl;
+        @GuardedBy("mSurfaceReleaseLock")
         BLASTBufferQueue mBlastBufferQueue;
         IBinder mBbqApplyToken = new Binder();
         private SurfaceControl mScreenshotSurfaceControl;
@@ -1634,7 +1635,7 @@ public abstract class WallpaperService extends Service {
                     frameRateCompat).apply();
             // TODO: b/406967924 - remove after creating public APIs
             sendTransformSurfaceControl();
-            return mBbqSurfaceControl;
+            return mTransformSurfaceControl;
         }
 
         private void sendTransformSurfaceControl() {
@@ -2498,26 +2499,28 @@ public abstract class WallpaperService extends Service {
                 };
 
         private Surface getOrCreateBLASTSurface(int width, int height, int format) {
-            if (mBbqSurfaceControl == null || !mBbqSurfaceControl.isValid()) {
-                Log.w(TAG, "Skipping BlastBufferQueue update/create"
-                    + " - invalid surface control");
-                return null;
-            }
+            synchronized (mSurfaceReleaseLock) {
+                if (mBbqSurfaceControl == null || !mBbqSurfaceControl.isValid()) {
+                    Log.w(TAG, "Skipping BlastBufferQueue update/create"
+                            + " - invalid surface control");
+                    return null;
+                }
 
-            Surface ret = null;
-            if (mBlastBufferQueue == null) {
-                mBlastBufferQueue = new BLASTBufferQueue("Wallpaper",
-                        true /* updateDestinationFrame */);
-                mBlastBufferQueue.setApplyToken(mBbqApplyToken);
-                mBlastBufferQueue.update(mBbqSurfaceControl, width, height, format);
-                // We only return the Surface the first time, as otherwise
-                // it hasn't changed and there is no need to update.
-                ret = mBlastBufferQueue.createSurface();
-            } else {
-                mBlastBufferQueue.update(mBbqSurfaceControl, width, height, format);
-            }
+                Surface ret = null;
+                if (mBlastBufferQueue == null) {
+                    mBlastBufferQueue = new BLASTBufferQueue("Wallpaper",
+                            true /* updateDestinationFrame */);
+                    mBlastBufferQueue.setApplyToken(mBbqApplyToken);
+                    mBlastBufferQueue.update(mBbqSurfaceControl, width, height, format);
+                    // We only return the Surface the first time, as otherwise
+                    // it hasn't changed and there is no need to update.
+                    ret = mBlastBufferQueue.createSurface();
+                } else {
+                    mBlastBufferQueue.update(mBbqSurfaceControl, width, height, format);
+                }
 
-            return ret;
+                return ret;
+            }
         }
 
         /**

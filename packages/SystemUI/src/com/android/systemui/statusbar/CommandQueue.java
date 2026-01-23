@@ -283,10 +283,11 @@ public class CommandQueue extends IStatusBar.Stub implements
         /**
          * Sets the new IME window status.
          *
-         * @param displayId The id of the display to which the IME is bound.
-         * @param vis The IME window visibility.
-         * @param backDisposition The IME back disposition mode.
-         * @param showImeSwitcherButton Whether the IME Switcher button should be shown.
+         * @param displayId             The ID of the display where the IME should be shown.
+         * @param vis                   The IME window visibility.
+         * @param backDisposition       The IME back disposition mode.
+         * @param showImeSwitcherButton Whether the IME Switcher button should be shown when the IME
+         *                              is shown.
          */
         default void setImeWindowStatus(int displayId, @ImeWindowVisibility int vis,
                 @BackDispositionMode int backDisposition, boolean showImeSwitcherButton) { }
@@ -569,6 +570,11 @@ public class CommandQueue extends IStatusBar.Stub implements
         default void moveFocusedTaskToFullscreen(int displayId) {}
 
         /**
+         * @see IStatusBar#moveFocusedTaskToStageSplit
+         */
+        default void moveFocusedTaskToStageSplit(int displayId, boolean leftOrTop) {}
+
+        /**
          * @see IStatusBar#setSplitscreenFocus
          */
         default void setSplitscreenFocus(boolean leftOrTop) {}
@@ -576,8 +582,8 @@ public class CommandQueue extends IStatusBar.Stub implements
         /**
          * @see IStatusBar#showMediaOutputSwitcher
          */
-        default void showMediaOutputSwitcher(String packageName, UserHandle userHandle,
-                @Nullable MediaSession.Token sessionToken) {}
+        default void showMediaOutputSwitcher(@NonNull String packageName,
+                @NonNull UserHandle userHandle, @Nullable MediaSession.Token sessionToken) {}
 
         /**
          * @see IStatusBar#confirmImmersivePrompt
@@ -596,10 +602,10 @@ public class CommandQueue extends IStatusBar.Stub implements
         default void moveFocusedTaskToDesktop(int displayId) {}
 
         /**
-         * @see IStatusBar#startMotionCuesSession(ComponentName, MotionCuesSettings)
+         * @see IStatusBar#startMotionCuesSession(ComponentName, int, MotionCuesSettings)
          */
         default void startMotionCuesSession(
-                ComponentName componentName, MotionCuesSettings motionCuesSettings) {}
+                ComponentName componentName, int userId, MotionCuesSettings motionCuesSettings) {}
 
         /**
          * @see IStatusBar#endMotionCuesSession()
@@ -1461,13 +1467,24 @@ public class CommandQueue extends IStatusBar.Stub implements
     }
 
     @Override
+    public void moveFocusedTaskToStageSplit(int displayId, boolean leftOrTop) {
+        synchronized (mLock) {
+            SomeArgs args = SomeArgs.obtain();
+            args.argi1 = displayId;
+            args.argi2 = leftOrTop ? 1 : 0;
+            mHandler.obtainMessage(MSG_MOVE_FOCUSED_TASK_TO_STAGE_SPLIT,
+                    args).sendToTarget();
+        }
+    }
+
+    @Override
     public void setSplitscreenFocus(boolean leftOrTop) {
         synchronized (mLock) {
             mHandler.obtainMessage(MSG_SET_SPLITSCREEN_FOCUS, leftOrTop).sendToTarget();
         }
     }
     @Override
-    public void showMediaOutputSwitcher(String packageName, UserHandle userHandle,
+    public void showMediaOutputSwitcher(@NonNull String packageName, @NonNull UserHandle userHandle,
             @Nullable MediaSession.Token sessionToken) {
         int callingUid = Binder.getCallingUid();
         if (callingUid != 0 && callingUid != Process.SYSTEM_UID) {
@@ -1561,11 +1578,12 @@ public class CommandQueue extends IStatusBar.Stub implements
 
     @Override
     public void startMotionCuesSession(
-            ComponentName componentName, MotionCuesSettings motionCuesSettings)
+            ComponentName componentName, int userId, MotionCuesSettings motionCuesSettings)
             throws RemoteException {
         SomeArgs args = SomeArgs.obtain();
         args.arg1 = componentName;
-        args.arg2 = motionCuesSettings;
+        args.arg2 = userId;
+        args.arg3 = motionCuesSettings;
         mHandler.obtainMessage(MSG_START_MOTION_CUES, args).sendToTarget();
     }
 
@@ -2075,6 +2093,15 @@ public class CommandQueue extends IStatusBar.Stub implements
                     }
                     break;
                 }
+                case MSG_MOVE_FOCUSED_TASK_TO_STAGE_SPLIT: {
+                    args = (SomeArgs) msg.obj;
+                    int displayId = args.argi1;
+                    boolean leftOrTop = args.argi2 != 0;
+                    for (Callbacks callback : mCallbacks) {
+                        callback.moveFocusedTaskToStageSplit(displayId, leftOrTop);
+                    }
+                    break;
+                }
                 case MSG_SET_SPLITSCREEN_FOCUS:
                     for (Callbacks callback : mCallbacks) {
                         callback.setSplitscreenFocus((Boolean) msg.obj);
@@ -2116,10 +2143,11 @@ public class CommandQueue extends IStatusBar.Stub implements
                 case MSG_START_MOTION_CUES:
                     args = (SomeArgs) msg.obj;
                     ComponentName motionCuesComponentName = (ComponentName) args.arg1;
-                    MotionCuesSettings motionCuesSettings = (MotionCuesSettings) args.arg2;
+                    int userId = (int) args.arg2;
+                    MotionCuesSettings motionCuesSettings = (MotionCuesSettings) args.arg3;
                     for (Callbacks callback : mCallbacks) {
                         callback.startMotionCuesSession(
-                                motionCuesComponentName, motionCuesSettings);
+                                motionCuesComponentName, userId, motionCuesSettings);
                     }
                     break;
                 case MSG_END_MOTION_CUES:

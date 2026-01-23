@@ -425,10 +425,10 @@ public class Installer extends SystemService {
 
     public void moveCompleteApp(String fromUuid, String toUuid, String packageName,
             int appId, String seInfo, int targetSdkVersion,
-            String fromCodePath) throws InstallerException {
+            String fromCodePath, int pccId) throws InstallerException {
         if (!checkBeforeRemote()) return;
         try {
-            mInstalld.moveCompleteApp(fromUuid, toUuid, packageName, appId, seInfo,
+            mInstalld.moveCompleteApp(fromUuid, toUuid, packageName, appId, pccId, seInfo,
                     targetSdkVersion, fromCodePath);
         } catch (Exception e) {
             throw InstallerException.from(e);
@@ -706,6 +706,7 @@ public class Installer extends SystemService {
      *
      * @param pkg name of the package to restore user data for.
      * @param appId id of the package to restore user data for.
+     * @param pccId pccId of the package to restore user data for
      * @param userId id of the user whose data to restore.
      * @param snapshotId id of the snapshot to restore.
      * @param storageFlags flags controlling which data (CE or DE) to restore.
@@ -715,12 +716,13 @@ public class Installer extends SystemService {
      *
      * @throws InstallerException if failed to restore user data.
      */
-    public boolean restoreAppDataSnapshot(String pkg, @AppIdInt  int appId, String seInfo,
+    public boolean restoreAppDataSnapshot(String pkg, @AppIdInt  int appId, int pccId,
+            String seInfo,
             @UserIdInt int userId, int snapshotId, int storageFlags) throws InstallerException {
         if (!checkBeforeRemote()) return false;
 
         try {
-            mInstalld.restoreAppDataSnapshot(null, pkg, appId, seInfo, userId, snapshotId,
+            mInstalld.restoreAppDataSnapshot(null, pkg, appId, pccId, seInfo, userId, snapshotId,
                     storageFlags);
             return true;
         } catch (Exception e) {

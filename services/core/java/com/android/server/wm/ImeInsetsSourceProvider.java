@@ -19,7 +19,6 @@ package com.android.server.wm;
 import static android.view.InsetsSource.ID_IME;
 
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_IME;
-import static com.android.server.wm.ImeInsetsSourceProviderProto.INSETS_SOURCE_PROVIDER;
 import static com.android.server.wm.WindowManagerService.H.UPDATE_MULTI_WINDOW_STACKS;
 
 import android.annotation.NonNull;
@@ -28,12 +27,10 @@ import android.graphics.Rect;
 import android.os.IBinder;
 import android.os.UserHandle;
 import android.util.Slog;
-import android.util.proto.ProtoOutputStream;
 import android.view.InsetsSource;
 import android.view.InsetsSourceConsumer;
 import android.view.InsetsSourceControl;
 import android.view.WindowInsets;
-import android.view.inputmethod.Flags;
 import android.view.inputmethod.ImeTracker;
 
 import com.android.internal.inputmethod.SoftInputShowHideReason;
@@ -325,9 +322,9 @@ final class ImeInsetsSourceProvider extends InsetsSourceProvider {
     /**
      * Freeze IME insets source state when required.
      *
-     * <p>When setting {@param frozen} as {@code true}, the IME insets provider will freeze the
+     * <p>When setting {@code frozen} as {@code true}, the IME insets provider will freeze the
      * current IME insets state and pending the IME insets state update until setting
-     * {@param frozen} as {@code false}.</p>
+     * {@code frozen} as {@code false}.</p>
      */
     void setFrozen(boolean frozen) {
         if (mFrozen == frozen) {
@@ -497,8 +494,8 @@ final class ImeInsetsSourceProvider extends InsetsSourceProvider {
             @Nullable ImeTracker.Token statsToken) {
         final var imeListener = mDisplayContent.mWmService.mOnImeRequestedChangedListener;
         if (imeListener != null) {
-            final boolean imeAnimating = Flags.reportAnimatingInsetsTypes()
-                    && (controlTarget.getAnimatingTypes() & WindowInsets.Type.ime()) != 0;
+            final boolean imeAnimating =
+                    (controlTarget.getAnimatingTypes() & WindowInsets.Type.ime()) != 0;
             final boolean imeVisible =
                     controlTarget.isRequestedVisible(WindowInsets.Type.ime()) || imeAnimating;
             // TODO (b/459507475): get actual user ID (owner of display)
@@ -536,19 +533,17 @@ final class ImeInsetsSourceProvider extends InsetsSourceProvider {
     @Override
     void onAnimatingTypesChanged(@NonNull InsetsControlTarget caller,
             @Nullable ImeTracker.Token statsToken) {
-        if (Flags.reportAnimatingInsetsTypes()) {
-            final InsetsControlTarget controlTarget = getControlTarget();
-            // If the IME is not being requested anymore and the animation is finished, we need to
-            // invoke the listener, to let IMS eventually know
-            if (caller == controlTarget && !caller.isRequestedVisible(WindowInsets.Type.ime())
-                    && (caller.getAnimatingTypes() & WindowInsets.Type.ime()) == 0) {
-                ImeTracker.forLogging().onProgress(statsToken,
-                        ImeTracker.PHASE_SERVER_NOTIFY_HIDE_ANIMATION_FINISHED);
-                invokeOnImeRequestedChangedListener(caller, statsToken);
-            } else {
-                ImeTracker.forLogging().onCancelled(statsToken,
-                        ImeTracker.PHASE_SERVER_NOTIFY_HIDE_ANIMATION_FINISHED);
-            }
+        final InsetsControlTarget controlTarget = getControlTarget();
+        // If the IME is not being requested anymore and the animation is finished, we need to
+        // invoke the listener, to let IMS eventually know
+        if (caller == controlTarget && !caller.isRequestedVisible(WindowInsets.Type.ime())
+                && (caller.getAnimatingTypes() & WindowInsets.Type.ime()) == 0) {
+            ImeTracker.forLogging().onProgress(statsToken,
+                    ImeTracker.PHASE_SERVER_NOTIFY_HIDE_ANIMATION_FINISHED);
+            invokeOnImeRequestedChangedListener(caller, statsToken);
+        } else {
+            ImeTracker.forLogging().onCancelled(statsToken,
+                    ImeTracker.PHASE_SERVER_NOTIFY_HIDE_ANIMATION_FINISHED);
         }
     }
 
@@ -675,14 +670,6 @@ final class ImeInsetsSourceProvider extends InsetsSourceProvider {
         pw.print(" mLastDrawn=");
         pw.print(mLastDrawn);
         pw.println();
-    }
-
-    @Override
-    void dumpDebug(@NonNull ProtoOutputStream proto, long fieldId,
-            @WindowTracingLogLevel int logLevel) {
-        final long token = proto.start(fieldId);
-        super.dumpDebug(proto, INSETS_SOURCE_PROVIDER, logLevel);
-        proto.end(token);
     }
 
     /**

@@ -270,6 +270,10 @@ public class BubbleBarLayerView extends FrameLayout
         super.onDetachedFromWindow();
         getViewTreeObserver().removeOnComputeInternalInsetsListener(this);
 
+        if (com.android.wm.shell.Flags.fixBubbleSwipeUpDismissBubbleBar()) {
+            stopMonitoringSwipeUpGesture();
+        }
+
         if (mExpandedView != null) {
             mEducationViewController.hideEducation(/* animated = */ false);
             removeView(mExpandedView);
@@ -310,7 +314,7 @@ public class BubbleBarLayerView extends FrameLayout
     }
 
     /**
-     * @return whether it's possible to expand {@param b} right now. This is {@code false} if
+     * @return whether it's possible to expand {@code b} right now. This is {@code false} if
      * the bubble has no view or if the bubble is already showing.
      */
     @Override
@@ -406,6 +410,11 @@ public class BubbleBarLayerView extends FrameLayout
 
             DragListener dragListener = inDismiss -> {
                 if (inDismiss && mExpandedBubble != null) {
+                    if (com.android.wm.shell.Flags.bugDontRemoveTaskBubble()) {
+                        if (mExpandedBubble instanceof Bubble) {
+                            ((Bubble) mExpandedBubble).setTaskShouldBeRemoved(true);
+                        }
+                    }
                     mBubbleController.dismissBubble(mExpandedBubble.getKey(), DISMISS_USER_GESTURE);
                     logBubbleEvent(BubbleLogger.Event.BUBBLE_BAR_BUBBLE_DISMISSED_DRAG_EXP_VIEW);
                 }

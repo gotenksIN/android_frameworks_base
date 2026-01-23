@@ -16,7 +16,6 @@
 
 package com.android.systemui.statusbar.notification.row;
 
-import static android.app.Flags.notificationClassificationUi;
 import static android.app.Notification.EXTRA_BUILDER_APPLICATION_INFO;
 import static android.app.NotificationManager.BUBBLE_PREFERENCE_ALL;
 import static android.app.NotificationManager.BUBBLE_PREFERENCE_NONE;
@@ -76,7 +75,6 @@ import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.people.widget.PeopleSpaceWidgetManager;
 import com.android.systemui.res.R;
 import com.android.systemui.shade.ShadeController;
-import com.android.systemui.statusbar.notification.NmSummarizationUiFlag;
 import com.android.systemui.statusbar.notification.NotificationChannelHelper;
 import com.android.systemui.statusbar.notification.collection.EntryAdapter;
 import com.android.systemui.statusbar.notification.collection.NotificationEntry;

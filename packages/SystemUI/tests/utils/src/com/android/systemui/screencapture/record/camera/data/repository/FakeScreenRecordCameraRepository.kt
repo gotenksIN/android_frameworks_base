@@ -18,9 +18,11 @@ package com.android.systemui.screencapture.record.camera.data.repository
 
 import android.util.Size
 import android.view.Surface
+import com.android.systemui.screencapture.record.camera.shared.model.CameraState
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.consumeAsFlow
 import kotlinx.coroutines.flow.emptyFlow
@@ -30,8 +32,8 @@ class FakeScreenRecordCameraRepository : ScreenRecordCameraRepository {
     override val errors: Flow<Int>
         get() = emptyFlow()
 
-    private val _state = MutableStateFlow(STATE_STOPPED)
-    override val state: Flow<Int>
+    private val _state = MutableStateFlow(CameraState.Unavailable)
+    override val state: StateFlow<CameraState>
         get() = _state.asStateFlow()
 
     private val _isConnected = MutableStateFlow(false)
@@ -56,11 +58,13 @@ class FakeScreenRecordCameraRepository : ScreenRecordCameraRepository {
     }
 
     override suspend fun startStream(surface: Surface, size: Size) {
-        _state.value = STATE_STARTED
+        _state.value = CameraState.Starting
+        _state.value = CameraState.Started
     }
 
     override suspend fun stopStream() {
-        _state.value = STATE_STOPPED
+        _state.value = CameraState.Stopping
+        _state.value = CameraState.Stopped
     }
 
     override suspend fun isCameraSupported(): Boolean = isCameraSupported
@@ -69,7 +73,10 @@ class FakeScreenRecordCameraRepository : ScreenRecordCameraRepository {
 
     override suspend fun isBackgroundColorSupported(): Boolean = isBackgroundColorSupported
 
-    override suspend fun getOptimalCameraStreamSize(): Size? = optimalCameraStreamSize
+    override suspend fun prepareStream(
+        displayUniqueId: String?,
+        @Surface.Rotation displayRotation: Int,
+    ): Size? = optimalCameraStreamSize
 
     override suspend fun setBackgroundColor(color: Int) {
         backgroundColor = color
@@ -77,10 +84,5 @@ class FakeScreenRecordCameraRepository : ScreenRecordCameraRepository {
 
     override suspend fun onTap() {
         _taps.trySend(Unit)
-    }
-
-    companion object {
-        const val STATE_STARTED = 1
-        const val STATE_STOPPED = STATE_STARTED + 1
     }
 }

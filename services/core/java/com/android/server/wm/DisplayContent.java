@@ -37,6 +37,7 @@ import static android.internal.perfetto.protos.Windowmanagerservice.DisplayConte
 import static android.internal.perfetto.protos.Windowmanagerservice.DisplayContentProto.CURRENT_FOCUS_IDENTIFIER;
 import static android.internal.perfetto.protos.Windowmanagerservice.DisplayContentProto.DISPLAY_FRAMES;
 import static android.internal.perfetto.protos.Windowmanagerservice.DisplayContentProto.DISPLAY_INFO;
+import static android.internal.perfetto.protos.Windowmanagerservice.DisplayContentProto.DISPLAY_POLICY;
 import static android.internal.perfetto.protos.Windowmanagerservice.DisplayContentProto.DISPLAY_READY;
 import static android.internal.perfetto.protos.Windowmanagerservice.DisplayContentProto.DISPLAY_ROTATION;
 import static android.internal.perfetto.protos.Windowmanagerservice.DisplayContentProto.DPI;
@@ -48,6 +49,7 @@ import static android.internal.perfetto.protos.Windowmanagerservice.DisplayConte
 import static android.internal.perfetto.protos.Windowmanagerservice.DisplayContentProto.INPUT_METHOD_CONTROL_TARGET_IDENTIFIER;
 import static android.internal.perfetto.protos.Windowmanagerservice.DisplayContentProto.INPUT_METHOD_INPUT_TARGET_IDENTIFIER;
 import static android.internal.perfetto.protos.Windowmanagerservice.DisplayContentProto.INPUT_METHOD_LAYERING_TARGET_IDENTIFIER;
+import static android.internal.perfetto.protos.Windowmanagerservice.DisplayContentProto.INSETS_STATE_CONTROLLER;
 import static android.internal.perfetto.protos.Windowmanagerservice.DisplayContentProto.IS_SLEEPING;
 import static android.internal.perfetto.protos.Windowmanagerservice.DisplayContentProto.KEEP_CLEAR_AREAS;
 import static android.internal.perfetto.protos.Windowmanagerservice.DisplayContentProto.MIN_SIZE_OF_RESIZEABLE_TASK_DP;
@@ -935,20 +937,41 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         // Descend through all of the app tokens and find the first that either matches
         // win.mActivityRecord (return win) or mFocusedApp (return null).
         if (activity != null && w.mAttrs.type != TYPE_APPLICATION_STARTING) {
-            if (focusedApp.compareTo(activity) > 0) {
+            final boolean reachedEnd;
+            if (Flags.fixTfAdjacentFocus()
+                    && focusedApp.getTask() != null && activity.getTask() != null) {
+                // If the current window is below the Task of the focused app, it will never get
+                // the focus. Activities in the same task but below the focused app are still
+                // considered because of adjacent TaskFragments: if the focused app doesn't have
+                // any focusable window, the focus may go to the activity in the adjacent
+                // TaskFragment below.
+                reachedEnd = focusedApp.getTask().compareTo(activity.getTask()) > 0;
+            } else {
+                reachedEnd = focusedApp.compareTo(activity) > 0;
+            }
+            if (reachedEnd) {
                 // App root task below focused app root task. No focus for you!!!
                 ProtoLog.v(WM_DEBUG_FOCUS_LIGHT,
                         "findFocusedWindow: Reached focused app=%s", focusedApp);
-                mTmpWindow = null;
                 return true;
             }
 
-            // If the candidate activity is currently being embedded in the focused task, the
-            // activity cannot be focused unless it is on the same TaskFragment as the focusedApp's.
+            // If the candidate activity is currently being embedded in the focused task, it
+            // becomes focused if it is in the same TaskFragment as the focusedApp. Otherwise, we
+            // tentatively set the window to mTmpWindow and continue the search. If there is a
+            // focusable window in the focusedApp TaskFragment, then that window becomes focused; if
+            // we reach the end without finding another window, then this window becomes focused.
             TaskFragment parent = activity.getTaskFragment();
             if (parent != null && parent.isEmbedded()) {
                 if (activity.getTask() == focusedApp.getTask()
                         && activity.getTaskFragment() != focusedApp.getTaskFragment()) {
+                    if (Flags.fixTfAdjacentFocus()
+                            && focusedApp.isInAdjacentTaskFragment(activity)
+                            && mTmpWindow == null) {
+                        mTmpWindow = w;
+                        ProtoLog.v(WM_DEBUG_FOCUS_LIGHT, "findFocusedWindow: Found window (%s)"
+                                + " in adjacent TaskFragment and continue searching", w);
+                    }
                     return false;
                 }
             }
@@ -1970,6 +1993,19 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         return (int) TypedValue.complexToFloat(value.data);
     }
 
+    @Nullable
+    private ActivityRecord getTopActivityFollowingBehindOrientation() {
+        final ActivityRecord top = topRunningActivity();
+        if (top != null) {
+            final int orientation = top.getRequestedOrientation();
+            if ((orientation == SCREEN_ORIENTATION_UNSPECIFIED && !top.providesOrientation())
+                    || (orientation == ActivityInfo.SCREEN_ORIENTATION_BEHIND)) {
+                return top;
+            }
+        }
+        return null;
+    }
+
     private boolean updateOrientation(boolean forceUpdate) {
         final WindowContainer prevOrientationSource = mLastOrientationSource;
         final int orientation = getOrientation();
@@ -1990,8 +2026,14 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
             }
             // The orientation source may not be the top if it uses SCREEN_ORIENTATION_BEHIND,
             // or it is a translucent SCREEN_ORIENTATION_UNSPECIFIED activity.
-            final ActivityRecord topCandidate = !r.isOnTop() ? topRunningActivity() : r;
-            if (topCandidate != null && handleTopActivityLaunchingInDifferentOrientation(
+            ActivityRecord topCandidate = r;
+            if (r != mFocusedApp && !r.isOnTop()) {
+                final ActivityRecord topFollowBehind = getTopActivityFollowingBehindOrientation();
+                if (topFollowBehind != null) {
+                    topCandidate = topFollowBehind;
+                }
+            }
+            if (handleTopActivityLaunchingInDifferentOrientation(
                     topCandidate, r, true /* checkOpening */)) {
                 // Display orientation should be deferred until the top fixed rotation is finished.
                 return false;
@@ -2140,7 +2182,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
      * inadvertently in a wrong orientation.
      *
      * @param r The launching activity which may change display orientation.
-     * @param orientationSrc It may be different from {@param r} if the launching activity uses
+     * @param orientationSrc It may be different from {@code r} if the launching activity uses
      *                       "behind" orientation.
      * @param checkOpening Whether to check if the activity is animating by transition. Set to
      *                     {@code true} if the caller is not sure whether the activity is launching.
@@ -3346,8 +3388,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         }
 
         // Update the base density if there is a forced density ratio.
-        if (DesktopExperienceFlags.ENABLE_PERSISTING_DISPLAY_SIZE_FOR_CONNECTED_DISPLAYS.isTrue()
-                && mForcedDisplayDensityRatio != 0.0f) {
+        if (mForcedDisplayDensityRatio != 0.0f) {
             mBaseDisplayDensity = getBaseDensityFromRatio();
         }
 
@@ -3412,14 +3453,12 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
 
     void setForcedDensityRatio(float ratio, int userId) {
         // Save the new density ratio to settings and update forced density with the ratio.
-        if (DesktopExperienceFlags.ENABLE_PERSISTING_DISPLAY_SIZE_FOR_CONNECTED_DISPLAYS.isTrue()) {
-            mForcedDisplayDensityRatio = ratio;
-            mWmService.mDisplayWindowSettings.setForcedDensityRatio(getDisplayInfo(),
-                    mForcedDisplayDensityRatio);
+        mForcedDisplayDensityRatio = ratio;
+        mWmService.mDisplayWindowSettings.setForcedDensityRatio(getDisplayInfo(),
+                mForcedDisplayDensityRatio);
 
-            // Set forced density from ratio.
-            setForcedDensity(getBaseDensityFromRatio(), userId);
-        }
+        // Set forced density from ratio.
+        setForcedDensity(getBaseDensityFromRatio(), userId);
     }
 
     void clearForcedDensityRatio() {
@@ -3894,7 +3933,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
             mCurrentFocus.writeIdentifierToProto(proto, CURRENT_FOCUS_IDENTIFIER);
         }
         if (mInsetsStateController != null) {
-            mInsetsStateController.dumpDebug(proto, logLevel);
+            mInsetsStateController.dumpDebug(proto, INSETS_STATE_CONTROLLER);
         }
         proto.write(IME_POLICY, getImePolicy());
         for (Rect r : mRestrictedKeepClearAreas) {
@@ -3906,6 +3945,8 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         if (com.android.window.flags.Flags.deviceEngagementMode()) {
             proto.write(ENGAGEMENT_MODE, mEngagementMode);
         }
+        mDisplayPolicy.dumpDebug(proto, DISPLAY_POLICY);
+        mInsetsPolicy.dumpDebug(proto, DisplayContentProto.INSETS_POLICY);
         proto.end(token);
     }
 
@@ -5885,14 +5926,9 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         }
         if (!DesktopExperienceFlags.ENABLE_DISPLAY_CONTENT_MODE_MANAGEMENT.isTrue()
                 && isPublicSecondaryDisplayWithDesktopModeForceEnabled()) {
-            if (com.android.window.flags.Flags.rearDisplayDisableForceDesktopSystemDecorations()) {
-                // System decorations should not be forced on a rear display due to security
-                // policies.
-                return (mDisplay.getFlags() & Display.FLAG_REAR) == 0;
-            }
-            // If the display is forced to desktop mode, treat it the same as it is configured to
-            // show system decorations.
-            return true;
+            // System decorations should not be forced on a rear display due to security
+            // policies.
+            return (mDisplay.getFlags() & Display.FLAG_REAR) == 0;
         }
         return false;
     }
@@ -5934,7 +5970,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
     }
 
     /**
-     * Returns whether the {@param windowingMode} is supported on this display.
+     * Returns whether the {@code windowingMode} is supported on this display.
      * @param windowingMode The windowing mode to check for.
      * @return Whether this windowing mode is supported.
      */
@@ -6266,9 +6302,9 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
     }
 
     /**
-     * Fills {@param outRestricted} with all keep-clear areas from visible, relevant windows
+     * Fills {@code outRestricted} with all keep-clear areas from visible, relevant windows
      * on this display, which set restricted keep-clear areas.
-     * Fills {@param outUnrestricted} with keep-clear areas from visible, relevant windows on this
+     * Fills {@code outUnrestricted} with keep-clear areas from visible, relevant windows on this
      * display, which set unrestricted keep-clear areas.
      *
      * For context on restricted vs unrestricted keep-clear areas, see
@@ -7402,10 +7438,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
             if (mAnimatingTypes != animatingTypes) {
                 getInsetsPolicy().onAnimatingTypesChanged(this, mAnimatingTypes, animatingTypes);
                 mAnimatingTypes = animatingTypes;
-
-                if (android.view.inputmethod.Flags.reportAnimatingInsetsTypes()) {
-                    getInsetsStateController().onAnimatingTypesChanged(this, statsToken);
-                }
+                getInsetsStateController().onAnimatingTypesChanged(this, statsToken);
             }
         }
 
@@ -7418,6 +7451,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                     + "}";
         }
 
+        @Override
         public void writeIdentifierToProto(ProtoOutputStream proto, long fieldId) {
             final long token = proto.start(fieldId);
             proto.write(HASH_CODE, System.identityHashCode(this));

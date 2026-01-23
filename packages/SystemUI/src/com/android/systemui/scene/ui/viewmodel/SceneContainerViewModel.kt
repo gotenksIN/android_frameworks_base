@@ -32,6 +32,7 @@ import com.android.compose.animation.scene.SceneKey
 import com.android.compose.animation.scene.SwipeSourceDetector
 import com.android.compose.animation.scene.UserAction
 import com.android.compose.animation.scene.UserActionResult
+import com.android.compose.animation.scene.content.state.TransitionState
 import com.android.systemui.classifier.Classifier
 import com.android.systemui.classifier.domain.interactor.FalsingInteractor
 import com.android.systemui.desktop.domain.interactor.DesktopInteractor
@@ -39,8 +40,7 @@ import com.android.systemui.deviceentry.domain.interactor.DeviceUnlockedInteract
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardTransitionInteractor
 import com.android.systemui.keyguard.shared.model.KeyguardState
-import com.android.systemui.keyguard.ui.viewmodel.AodBurnInViewModel
-import com.android.systemui.keyguard.ui.viewmodel.KeyguardClockViewModel
+import com.android.systemui.keyguard.ui.viewmodel.BurnInMovementState
 import com.android.systemui.keyguard.ui.viewmodel.LightRevealScrimViewModel
 import com.android.systemui.lifecycle.ExclusiveActivatable
 import com.android.systemui.lifecycle.Hydrator
@@ -92,8 +92,7 @@ constructor(
     val wallpaperViewModel: WallpaperViewModel,
     keyguardInteractor: KeyguardInteractor,
     keyguardTransitionInteractor: KeyguardTransitionInteractor,
-    val burnIn: AodBurnInViewModel,
-    val clock: KeyguardClockViewModel,
+    val burnInMovementFactory: BurnInMovementState.Factory,
     val dualShadeEducationalTooltipsViewModelFactory: DualShadeEducationalTooltipsViewModel.Factory,
     val animateQsTilesViewModelFactory: AnimateQsTilesViewModel.Factory,
     sceneTransitionBlurViewModelFactory: SceneTransitionBlurViewModel.Factory,
@@ -104,6 +103,9 @@ constructor(
     /** The scene that should be rendered. */
     val currentScene: StateFlow<SceneKey> = sceneInteractor.currentScene
 
+    val currentSceneAsState: SceneKey
+        get() = sceneInteractor.currentSceneAsState
+
     private val hydrator = Hydrator("SceneContainerViewModel.hydrator")
     val blurViewModel: SceneTransitionBlurViewModel = sceneTransitionBlurViewModelFactory.create()
 
@@ -111,6 +113,8 @@ constructor(
     val isVisible: Boolean by hydrator.hydratedStateOf("isVisible", sceneInteractor.isVisible)
 
     val hapticsViewModel: SceneContainerHapticsViewModel = hapticsViewModelFactory.create()
+
+    val burnInMovementState: BurnInMovementState = burnInMovementFactory.create()
 
     val isAodOrDozing: Boolean by
         hydrator.hydratedStateOf(
@@ -201,6 +205,7 @@ constructor(
                 launch("NotificationContainerInteractor") {
                     notificationContainerInteractor.activate()
                 }
+                launch("BurnInMovementState") { burnInMovementState.activate() }
             }
             awaitCancellation()
         } finally {
@@ -459,6 +464,10 @@ constructor(
     /** Immediately changes the initial scene if necessary. */
     suspend fun onInitialComposition() {
         onBootTransitionInteractor.maybeChangeInitialScene()
+    }
+
+    fun startTransitionImmediately(transition: TransitionState.Transition) {
+        sceneInteractor.startTransitionImmediately(transition)
     }
 
     private fun isFalsingAllowingContentChange(from: ContentKey?, to: ContentKey): Boolean {

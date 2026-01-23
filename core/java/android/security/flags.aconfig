@@ -57,13 +57,6 @@ flag {
 }
 
 flag {
-    name: "software_ratelimiter"
-    namespace: "security"
-    description: "Enable support for SoftwareRateLimiter in LockSettingsService"
-    bug: "395976735"
-}
-
-flag {
     name: "stop_recognizing_legacy_password_hashes"
     namespace: "security"
     description: "Make LockSettingsService stop recognizing legacy password hashes"
@@ -199,16 +192,6 @@ flag {
     namespace: "security"
     description: "Show larger time units than seconds on lockscreen"
     bug: "443823194"
-}
-
-flag {
-    name: "manage_lockout_end_time_in_service"
-    namespace: "security"
-    description: "Manage lockout end time in LockSettingsService rather than LockPatternUtils"
-    bug: "322014085"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {

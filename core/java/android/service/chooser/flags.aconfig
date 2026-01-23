@@ -61,12 +61,9 @@ flag {
 }
 
 flag {
-  name: "resolver_esc_exit"
-  is_exported: false
+  name: "tap_to_share"
+  is_exported: true
   namespace: "intentresolver"
-  description: "Whether to ESC exits Resolver."
-  bug: "405433601"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
+  description: "Enables Tap to Share feature."
+  bug: "461778971"
 }

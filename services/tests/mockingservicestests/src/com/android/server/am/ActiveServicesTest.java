@@ -21,10 +21,13 @@ import static com.android.internal.app.procstats.ProcessStats.ADJ_MEM_FACTOR_CRI
 import static com.android.internal.app.procstats.ProcessStats.ADJ_MEM_FACTOR_LOW;
 import static com.android.internal.app.procstats.ProcessStats.ADJ_MEM_FACTOR_MODERATE;
 import static com.android.internal.app.procstats.ProcessStats.ADJ_MEM_FACTOR_NORMAL;
+import static com.android.internal.util.FrameworkStatsLog.FOREGROUND_SERVICE_STATE_CHANGED__FGS_NOTIFICATION_PERMISSION_STATE__FGS_NOTIFICATION_PERMISSION_DECLARED_AND_GRANTED;
+import static com.android.internal.util.FrameworkStatsLog.FOREGROUND_SERVICE_STATE_CHANGED__FGS_NOTIFICATION_PERMISSION_STATE__FGS_NOTIFICATION_PERMISSION_DECLARED_BUT_DENIED;
+import static com.android.internal.util.FrameworkStatsLog.FOREGROUND_SERVICE_STATE_CHANGED__FGS_NOTIFICATION_PERMISSION_STATE__FGS_NOTIFICATION_PERMISSION_NOT_DECLARED;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertTrue;
+import static com.google.common.truth.Truth.assertThat;
+import static com.google.common.truth.Truth.assertWithMessage;
+
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -34,33 +37,44 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
+import android.Manifest;
 import android.app.IApplicationThread;
 import android.app.compat.CompatChanges;
+import android.app.privatecompute.flags.Flags;
 import android.app.usage.UsageStatsManagerInternal;
 import android.content.ComponentName;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.ApplicationInfo;
+import android.content.pm.PackageInfo;
+import android.content.pm.PackageManager;
 import android.content.pm.PackageManagerInternal;
 import android.content.pm.ServiceInfo;
+import android.os.Process;
+import android.os.SystemClock;
+import android.platform.test.annotations.RequiresFlagsEnabled;
+import android.platform.test.flag.junit.CheckFlagsRule;
+import android.platform.test.flag.junit.DeviceFlagsValueProvider;
 import android.service.ondeviceintelligence.OnDeviceSandboxedInferenceService;
 import android.service.voice.HotwordDetectionService;
 import android.service.voice.VisualQueryDetectionService;
 import android.service.wearable.WearableSensingService;
-import android.os.Process;
-import android.os.SystemClock;
 import android.util.ArraySet;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 
 import com.android.server.am.psc.ProcessRecordInternal;
+import com.android.server.am.psc.ProcessStateController;
 import com.android.server.am.psc.ServiceRecordInternal;
 import com.android.server.wm.ActivityTaskManagerService;
 
 import org.junit.After;
 import org.junit.Before;
+import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
@@ -74,6 +88,9 @@ import java.util.ArrayList;
 @SmallTest
 @RunWith(AndroidJUnit4.class)
 public final class ActiveServicesTest {
+    @Rule
+    public final CheckFlagsRule mCheckFlagsRule = DeviceFlagsValueProvider.createCheckFlagsRule();
+
     private static final String PACKAGE_NAME_1 = "com.foo";
     private static final String PACKAGE_NAME_2 = "com.bar";
     private static final String SERVICE_NAME = "barService";
@@ -93,9 +110,15 @@ public final class ActiveServicesTest {
         DEFAULT_SERVICE_MIN_RESTART_TIME_BETWEEN * 3
     };
 
+    private static final int TEST_UID = 10123;
+    private static final int TEST_USERID = 0;
+    private static final int TEST_PID = 1234;
+
     private MockitoSession mMockingSession;
     private ActivityManagerService mService;
     private ActiveServices mActiveServices;
+    private PackageManagerInternal mPackageManagerInternal;
+    private Context mContext;
 
     @Before
     public void setUp() {
@@ -105,6 +128,9 @@ public final class ActiveServicesTest {
                         .strictness(Strictness.LENIENT)
                         .mockStatic(CompatChanges.class)
                         .startMocking();
+        // Most tests require a non-null ActivityManagerService.  Create one now.  If the test
+        // requires a specialized mock, the test can replace this value.
+        mService = mock(ActivityManagerService.class);
     }
 
     @After
@@ -298,7 +324,7 @@ public final class ActiveServicesTest {
         String processName =
                 ActiveServices.getProcessNameForService(
                         regularService, null, null, null, false, false, false);
-        assertEquals(PROCESS_NAME_1, processName);
+        assertThat(processName).isEqualTo(PROCESS_NAME_1);
     }
 
     @Test
@@ -310,7 +336,7 @@ public final class ActiveServicesTest {
         String processName =
                 ActiveServices.getProcessNameForService(
                         isolatedService, component, null, null, false, false, false);
-        assertEquals(PROCESS_NAME_1 + ":" + SERVICE_NAME, processName);
+        assertThat(processName).isEqualTo(PROCESS_NAME_1 + ":" + SERVICE_NAME);
     }
 
     @Test
@@ -323,7 +349,7 @@ public final class ActiveServicesTest {
         String processName =
                 ActiveServices.getProcessNameForService(
                         isolatedService, componentName, null, null, false, false, false);
-        assertEquals(TRUSTED_ISOLATED_PROCESS_NAME_1 + ":" + SERVICE_NAME, processName);
+        assertThat(processName).isEqualTo(TRUSTED_ISOLATED_PROCESS_NAME_1 + ":" + SERVICE_NAME);
     }
 
     @Test
@@ -342,7 +368,7 @@ public final class ActiveServicesTest {
                         false,
                         false,
                         true);
-        assertEquals(PROCESS_NAME_1 + ":" + SERVICE_NAME, packageSharedIsolatedProcessName);
+        assertThat(packageSharedIsolatedProcessName).isEqualTo(PROCESS_NAME_1 + ":" + SERVICE_NAME);
     }
 
     @Test
@@ -362,7 +388,7 @@ public final class ActiveServicesTest {
                         false,
                         false,
                         true);
-        assertEquals(TRUSTED_ISOLATED_PROCESS_NAME_1, packageSharedIsolatedProcessName);
+        assertThat(packageSharedIsolatedProcessName).isEqualTo(TRUSTED_ISOLATED_PROCESS_NAME_1);
     }
 
     @Test
@@ -387,7 +413,7 @@ public final class ActiveServicesTest {
                         false,
                         false,
                         true);
-        assertEquals(TRUSTED_ISOLATED_PROCESS_NAME_1, packageSharedIsolatedProcessName);
+        assertThat(packageSharedIsolatedProcessName).isEqualTo(TRUSTED_ISOLATED_PROCESS_NAME_1);
     }
 
     @Test
@@ -412,7 +438,7 @@ public final class ActiveServicesTest {
                         false,
                         false,
                         true);
-        assertEquals(TRUSTED_ISOLATED_PROCESS_NAME_1, packageSharedIsolatedProcessName);
+        assertThat(packageSharedIsolatedProcessName).isEqualTo(TRUSTED_ISOLATED_PROCESS_NAME_1);
     }
 
     @Test
@@ -439,7 +465,7 @@ public final class ActiveServicesTest {
                         false,
                         false,
                         true);
-        assertEquals(ISOLATED_PROCESS_NAME_2, packageSharedIsolatedProcessName);
+        assertThat(packageSharedIsolatedProcessName).isEqualTo(ISOLATED_PROCESS_NAME_2);
     }
 
     @Test
@@ -456,7 +482,7 @@ public final class ActiveServicesTest {
                         false,
                         true,
                         false);
-        assertEquals(SHARED_ISOLATED_PROCESS_NAME, sharedIsolatedProcessName1);
+        assertThat(sharedIsolatedProcessName1).isEqualTo(SHARED_ISOLATED_PROCESS_NAME);
     }
 
     @Test
@@ -487,7 +513,7 @@ public final class ActiveServicesTest {
                         false,
                         true,
                         false);
-        assertEquals(sharedIsolatedProcessName1, sharedIsolatedProcessName2);
+        assertThat(sharedIsolatedProcessName2).isEqualTo(sharedIsolatedProcessName1);
     }
 
     @Test
@@ -517,10 +543,11 @@ public final class ActiveServicesTest {
                         false,
                         true,
                         false);
-        assertNotEquals(sharedIsolatedProcessName1, sharedIsolatedProcessName2);
+        assertThat(sharedIsolatedProcessName2).isNotEqualTo(sharedIsolatedProcessName1);
     }
 
     @Test
+    @RequiresFlagsEnabled(Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
     public void bringUpServiceLocked_pcc() throws Exception {
         prepareTestRescheduleServiceRestarts();
         mService.mPackageManagerInt = mock(PackageManagerInternal.class);
@@ -584,13 +611,13 @@ public final class ActiveServicesTest {
                         eq(Process.ZYGOTE_POLICY_FLAG_EMPTY),
                         eq(false),
                         eq(false));
-        assertTrue(hostingRecord.getValue().isPcc());
+        assertThat(hostingRecord.getValue().isPcc()).isTrue();
     }
 
     @Test
+    @RequiresFlagsEnabled(Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
     public void attachApplicationLocked_pcc() throws Exception {
         prepareTestRescheduleServiceRestarts();
-        mService = mock(ActivityManagerService.class);
         mService.mProcessStateController = mock(ProcessStateController.class);
         mService.mAppProfiler = mock(AppProfiler.class);
         mService.mActivityTaskManager = mock(ActivityTaskManagerService.class);
@@ -626,11 +653,10 @@ public final class ActiveServicesTest {
 
         mActiveServices.attachApplicationLocked(proc, r.processName);
 
-        assertTrue(mActiveServices.mPendingServices.isEmpty());
+        assertThat(mActiveServices.mPendingServices).isEmpty();
     }
 
     private void prepareTestRescheduleServiceRestarts() {
-        mService = mock(ActivityManagerService.class);
         mService.mConstants = mock(ActivityManagerConstants.class);
         mService.mConstants.mEnableExtraServiceRestartDelayOnMemPressure = true;
         mService.mConstants.mExtraServiceRestartDelayOnMemPressure =
@@ -675,15 +701,28 @@ public final class ActiveServicesTest {
                 .isServiceRestartBackoffEnabledLocked(any(String.class));
     }
 
+    /**
+     * Sets the value of a field in an object using reflection. This is useful for setting private
+     * or final fields in tests.
+     *
+     * @param clazz The class of the object.
+     * @param obj The object whose field to set.
+     * @param fieldName The name of the field to set.
+     * @param val The new value for the field.
+     * @param <T> The type of the field value.
+     * @throws RuntimeException if the field does not exist or cannot be accessed.
+     */
     private static <T> void setFieldValue(Class<?> clazz, Object obj, String fieldName, T val) {
         try {
             Field field = clazz.getDeclaredField(fieldName);
             field.setAccessible(true);
+            // Remove the 'final' modifier to allow re-assignment.
             Field mfield = Field.class.getDeclaredField("accessFlags");
             mfield.setAccessible(true);
             mfield.setInt(field, mfield.getInt(field) & ~(Modifier.FINAL | Modifier.PRIVATE));
             field.set(obj, val);
         } catch (NoSuchFieldException | IllegalAccessException e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -720,12 +759,10 @@ public final class ActiveServicesTest {
     private void verifyDelays(long now, long[] delays) {
         for (int i = 0; i < delays.length; i++) {
             final ServiceRecord r = mActiveServices.mRestartingServices.get(i);
-            assertEquals(
-                    "Expected restart delay=" + delays[i], Math.max(0, delays[i]), r.restartDelay);
-            assertEquals(
-                    "Expected next restart time=" + (now + delays[i]),
-                    now + delays[i],
-                    r.nextRestartTime);
+            assertWithMessage("Expected restart delay=" + delays[i]).that(r.restartDelay).isEqualTo(
+                    Math.max(0, delays[i]));
+            assertWithMessage("Expected next restart time=" + now + delays[i]).that(
+                    r.nextRestartTime).isEqualTo(now + delays[i]);
         }
     }
 
@@ -758,6 +795,7 @@ public final class ActiveServicesTest {
         r.appInfo.pccUid = 30001;
         r.appInfo.packageName = "com.android.pcc";
         final ServiceInfo si = new ServiceInfo();
+        si.applicationInfo = r.appInfo;
         si.flags = ServiceInfo.FLAG_RUN_IN_PCC_SANDBOX;
         setFieldValue(ServiceRecord.class, r, "serviceInfo", si);
         setFieldValue(ServiceRecord.class, r, "processName", "test");
@@ -777,7 +815,7 @@ public final class ActiveServicesTest {
         setFieldValue(ServiceRecord.class, r, "packageName", "com.foo");
         Intent intent = new Intent(HotwordDetectionService.SERVICE_INTERFACE);
         String seInfo = activeServices.generateAdditionalSeInfoFromService(intent, r);
-        assertEquals(":isolatedComputeApp", seInfo);
+        assertThat(seInfo).isEqualTo(":isolatedComputeApp");
     }
 
     @Test
@@ -790,7 +828,7 @@ public final class ActiveServicesTest {
         setFieldValue(ServiceRecord.class, r, "packageName", "com.foo");
         Intent intent = new Intent(VisualQueryDetectionService.SERVICE_INTERFACE);
         String seInfo = activeServices.generateAdditionalSeInfoFromService(intent, r);
-        assertEquals(":isolatedComputeApp", seInfo);
+        assertThat(seInfo).isEqualTo(":isolatedComputeApp");
     }
 
     @Test
@@ -803,7 +841,7 @@ public final class ActiveServicesTest {
         setFieldValue(ServiceRecord.class, r, "packageName", "com.foo");
         Intent intent = new Intent(OnDeviceSandboxedInferenceService.SERVICE_INTERFACE);
         String seInfo = activeServices.generateAdditionalSeInfoFromService(intent, r);
-        assertEquals(":isolatedComputeApp", seInfo);
+        assertThat(seInfo).isEqualTo(":isolatedComputeApp");
     }
 
     @Test
@@ -817,7 +855,7 @@ public final class ActiveServicesTest {
         Intent intent = new Intent(WearableSensingService.SERVICE_INTERFACE);
         when(mService.hasRestrictedAssociations(r.packageName)).thenReturn(false);
         String seInfo = activeServices.generateAdditionalSeInfoFromService(intent, r);
-        assertEquals(":isolatedComputeApp", seInfo);
+        assertThat(seInfo).isEqualTo(":isolatedComputeApp");
     }
 
     @Test
@@ -832,7 +870,7 @@ public final class ActiveServicesTest {
         Intent intent = new Intent(WearableSensingService.SERVICE_INTERFACE);
         when(mService.hasRestrictedAssociations(r.packageName)).thenReturn(true);
         String seInfo = activeServices.generateAdditionalSeInfoFromService(intent, r);
-        assertEquals("", seInfo);
+        assertThat(seInfo).isEmpty();
     }
 
     @Test
@@ -841,7 +879,7 @@ public final class ActiveServicesTest {
         ServiceRecord r = createPccServiceRecord();
         Intent intent = new Intent(HotwordDetectionService.SERVICE_INTERFACE);
         String seInfo = activeServices.generateAdditionalSeInfoFromService(intent, r);
-        assertEquals("", seInfo);
+        assertThat(seInfo).isEmpty();
     }
 
     @Test
@@ -854,7 +892,7 @@ public final class ActiveServicesTest {
         setFieldValue(ServiceRecord.class, r, "packageName", "com.foo");
         Intent intent = new Intent("com.foo.bar.MY_SERVICE");
         String seInfo = activeServices.generateAdditionalSeInfoFromService(intent, r);
-        assertEquals("", seInfo);
+        assertThat(seInfo).isEmpty();
     }
 
     @Test
@@ -867,7 +905,7 @@ public final class ActiveServicesTest {
         setFieldValue(ServiceRecord.class, r, "packageName", "com.foo");
         Intent intent = new Intent();
         String seInfo = activeServices.generateAdditionalSeInfoFromService(intent, r);
-        assertEquals("", seInfo);
+        assertThat(seInfo).isEmpty();
     }
 
     @Test
@@ -879,6 +917,170 @@ public final class ActiveServicesTest {
         setFieldValue(ServiceRecord.class, r, "serviceInfo", si);
         setFieldValue(ServiceRecord.class, r, "packageName", "com.foo");
         String seInfo = activeServices.generateAdditionalSeInfoFromService(null, r);
-        assertEquals("", seInfo);
+        assertThat(seInfo).isEmpty();
+    }
+
+    @Test
+    public void testGetNotificationPermissionState_notificationPermissionNotDeclared() {
+        mActiveServices = new ActiveServices(mService);
+        mPackageManagerInternal = mock(PackageManagerInternal.class);
+
+        ServiceRecord r = createServiceRecord();
+        when(mService.getPackageManagerInternal()).thenReturn(mPackageManagerInternal);
+
+        PackageInfo packageInfo = setupPackageInfo(false);
+        when(mPackageManagerInternal.getPackageInfo(eq(PACKAGE_NAME_1), anyLong(), eq(TEST_UID),
+                eq(TEST_USERID)))
+                .thenReturn(packageInfo);
+
+        int result = mActiveServices.getNotificationPermissionState(r);
+        assertThat(result)
+                .isEqualTo(
+                        FOREGROUND_SERVICE_STATE_CHANGED__FGS_NOTIFICATION_PERMISSION_STATE__FGS_NOTIFICATION_PERMISSION_NOT_DECLARED);
+        assertThat(mActiveServices.mNotificationPermCache.get(TEST_UID)).isFalse();
+    }
+
+    @Test
+    public void testGetNotificationPermissionState_notificationPermissionDeclaredAndGranted() {
+        mActiveServices = new ActiveServices(mService);
+        mPackageManagerInternal = mock(PackageManagerInternal.class);
+        mContext = mock(Context.class);
+
+        ServiceRecord r = createServiceRecord();
+        when(mService.getPackageManagerInternal()).thenReturn(mPackageManagerInternal);
+
+        PackageInfo packageInfo = setupPackageInfo(true);
+        when(mPackageManagerInternal.getPackageInfo(eq(PACKAGE_NAME_1), anyLong(), eq(TEST_UID),
+                eq(TEST_USERID)))
+                .thenReturn(packageInfo);
+
+        setFieldValue(ActivityManagerService.class, mService, "mContext", mContext);
+        when(mContext.checkPermission(eq(Manifest.permission.POST_NOTIFICATIONS), eq(TEST_PID),
+                eq(TEST_UID)))
+                .thenReturn(PackageManager.PERMISSION_GRANTED);
+
+        int result = mActiveServices.getNotificationPermissionState(r);
+
+        assertThat(result)
+                .isEqualTo(
+                        FOREGROUND_SERVICE_STATE_CHANGED__FGS_NOTIFICATION_PERMISSION_STATE__FGS_NOTIFICATION_PERMISSION_DECLARED_AND_GRANTED);
+        assertThat(mActiveServices.mNotificationPermCache.get(TEST_UID)).isTrue();
+    }
+
+    @Test
+    public void testGetNotificationPermissionState_notificationPermissionDeclaredAndDenied() {
+        mActiveServices = new ActiveServices(mService);
+        mPackageManagerInternal = mock(PackageManagerInternal.class);
+        mContext = mock(Context.class);
+
+        ServiceRecord r = createServiceRecord();
+        when(mService.getPackageManagerInternal()).thenReturn(mPackageManagerInternal);
+
+        PackageInfo packageInfo = setupPackageInfo(true);
+        when(mPackageManagerInternal.getPackageInfo(eq(PACKAGE_NAME_1), anyLong(), eq(TEST_UID),
+                eq(TEST_USERID)))
+                .thenReturn(packageInfo);
+
+        setFieldValue(ActivityManagerService.class, mService, "mContext", mContext);
+        when(mContext.checkPermission(eq(Manifest.permission.POST_NOTIFICATIONS), eq(TEST_PID),
+                eq(TEST_UID)))
+                .thenReturn(PackageManager.PERMISSION_DENIED);
+
+        int result = mActiveServices.getNotificationPermissionState(r);
+
+        assertThat(result)
+                .isEqualTo(
+                        FOREGROUND_SERVICE_STATE_CHANGED__FGS_NOTIFICATION_PERMISSION_STATE__FGS_NOTIFICATION_PERMISSION_DECLARED_BUT_DENIED);
+        assertThat(mActiveServices.mNotificationPermCache.get(TEST_UID)).isTrue();
+    }
+
+    @Test
+    public void testGetNotificationPermissionState_notificationPermissionCacheHit() {
+        mActiveServices = new ActiveServices(mService);
+        mPackageManagerInternal = mock(PackageManagerInternal.class);
+
+        ServiceRecord r = createServiceRecord();
+        when(mService.getPackageManagerInternal()).thenReturn(mPackageManagerInternal);
+
+        PackageInfo packageInfo = setupPackageInfo(false);
+        when(mPackageManagerInternal.getPackageInfo(eq(PACKAGE_NAME_1), anyLong(), eq(TEST_UID),
+                eq(TEST_USERID)))
+                .thenReturn(packageInfo);
+
+
+        // Populates cache on first call
+        mActiveServices.getNotificationPermissionState(r);
+        verify(mPackageManagerInternal, times(1)).getPackageInfo(eq(PACKAGE_NAME_1), anyLong(),
+                eq(TEST_UID), eq(TEST_USERID));
+
+        // Gets the permission state from cache on second call
+        int result = mActiveServices.getNotificationPermissionState(r);
+        assertThat(result)
+                .isEqualTo(
+                        FOREGROUND_SERVICE_STATE_CHANGED__FGS_NOTIFICATION_PERMISSION_STATE__FGS_NOTIFICATION_PERMISSION_NOT_DECLARED);
+        verify(mPackageManagerInternal, times(1)).getPackageInfo(eq(PACKAGE_NAME_1), anyLong(),
+                eq(TEST_UID), eq(TEST_USERID));
+    }
+
+
+    @Test
+    public void testGetNotificationPermissionState_cacheInvalidationOnPackageUpdate() {
+        mActiveServices = new ActiveServices(mService);
+        mPackageManagerInternal = mock(PackageManagerInternal.class);
+        mContext = mock(Context.class);
+
+        ServiceRecord r = createServiceRecord();
+        when(mService.getPackageManagerInternal()).thenReturn(mPackageManagerInternal);
+
+        PackageInfo packageInfo = setupPackageInfo(false);
+        when(mPackageManagerInternal.getPackageInfo(eq(PACKAGE_NAME_1), anyLong(), eq(TEST_UID),
+                eq(TEST_USERID)))
+                .thenReturn(packageInfo);
+
+        // Populates cache with false
+        mActiveServices.getNotificationPermissionState(r);
+        assertThat(mActiveServices.mNotificationPermCache.get(TEST_UID)).isFalse();
+
+        // Triggering package update
+        mActiveServices.mPackageMonitor.onPackageUpdateFinished(PACKAGE_NAME_1, TEST_UID);
+
+        packageInfo = setupPackageInfo(true);
+        when(mPackageManagerInternal.getPackageInfo(eq(PACKAGE_NAME_1), anyLong(), eq(TEST_UID),
+                eq(TEST_USERID)))
+                .thenReturn(packageInfo);
+
+
+        setFieldValue(ActivityManagerService.class, mService, "mContext", mContext);
+        when(mContext.checkPermission(eq(Manifest.permission.POST_NOTIFICATIONS), eq(TEST_PID),
+                eq(TEST_UID)))
+                .thenReturn(PackageManager.PERMISSION_GRANTED);
+
+        int result = mActiveServices.getNotificationPermissionState(r);
+        assertThat(result)
+                .isEqualTo(
+                        FOREGROUND_SERVICE_STATE_CHANGED__FGS_NOTIFICATION_PERMISSION_STATE__FGS_NOTIFICATION_PERMISSION_DECLARED_AND_GRANTED);
+    }
+
+    private ServiceRecord createServiceRecord() {
+        ServiceRecord r = mock(ServiceRecord.class);
+        setFieldValue(ServiceRecord.class, r, "packageName", PACKAGE_NAME_1);
+        r.appInfo = new ApplicationInfo();
+        r.appInfo.uid = TEST_UID;
+        setFieldValue(ServiceRecord.class, r, "userId", TEST_USERID);
+        ProcessRecord processRecord = mock(ProcessRecord.class);
+        when(processRecord.getPid()).thenReturn(TEST_PID);
+        when(r.getHostProcess()).thenReturn(processRecord);
+        return r;
+    }
+
+    private PackageInfo setupPackageInfo(boolean declarePermission) {
+        PackageInfo packageInfo = new PackageInfo();
+        packageInfo.packageName = PACKAGE_NAME_1;
+        if (declarePermission) {
+            packageInfo.requestedPermissions = new String[]{Manifest.permission.POST_NOTIFICATIONS};
+        } else {
+            packageInfo.requestedPermissions = new String[]{};
+        }
+        return packageInfo;
     }
 }

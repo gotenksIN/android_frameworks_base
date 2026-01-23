@@ -16,6 +16,7 @@
 
 package com.android.wm.shell.bubbles.bar
 
+import android.app.ActivityManager.RunningTaskInfo
 import android.content.ComponentName
 import android.content.Context
 import android.graphics.Insets
@@ -33,13 +34,14 @@ import com.android.internal.protolog.ProtoLog
 import com.android.wm.shell.R
 import com.android.wm.shell.bubbles.Bubble
 import com.android.wm.shell.bubbles.BubbleExpandedViewManager
+import com.android.wm.shell.bubbles.BubbleHelper
 import com.android.wm.shell.bubbles.BubblePositioner
 import com.android.wm.shell.bubbles.BubbleTaskView
-import com.android.wm.shell.bubbles.FakeBubbleExpandedViewManager
 import com.android.wm.shell.bubbles.FakeBubbleFactory
 import com.android.wm.shell.bubbles.FakeBubbleTaskViewFactory
 import com.android.wm.shell.bubbles.UiEventSubject.Companion.assertThat
 import com.android.wm.shell.bubbles.logging.BubbleLogger
+import com.android.wm.shell.bubbles.util.BubblePolicyHelper
 import com.android.wm.shell.common.TestShellExecutor
 import com.android.wm.shell.shared.bubbles.DeviceConfig
 import com.google.common.truth.Truth.assertThat
@@ -48,6 +50,11 @@ import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.kotlin.doReturn
+import org.mockito.kotlin.mock
+import org.mockito.kotlin.never
+import org.mockito.kotlin.stub
+import org.mockito.kotlin.verify
 
 /** Tests for [BubbleBarExpandedViewTest] */
 @SmallTest
@@ -60,11 +67,18 @@ class BubbleBarExpandedViewTest {
 
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val windowManager = context.getSystemService(WindowManager::class.java)
+    private val bubbleHelper = mock<BubbleHelper>()
+    private val bubblePolicyHelper = mock<BubblePolicyHelper>()
+    private val expandedViewManager =
+        mock<BubbleExpandedViewManager> {
+            on { isShowingAsBubbleBar() } doReturn true
+            on { isStackExpanded() } doReturn true
+            on { getBubbleHelper() } doReturn bubbleHelper
+        }
 
     private lateinit var mainExecutor: TestShellExecutor
     private lateinit var bgExecutor: TestShellExecutor
 
-    private lateinit var expandedViewManager: BubbleExpandedViewManager
     private lateinit var positioner: BubblePositioner
     private lateinit var bubbleTaskView: BubbleTaskView
     private lateinit var bubble: Bubble
@@ -93,7 +107,6 @@ class BubbleBarExpandedViewTest {
             )
         positioner.update(deviceConfig)
 
-        expandedViewManager = FakeBubbleExpandedViewManager(bubbleBar = true, expanded = true)
         bubbleTaskViewFactory = FakeBubbleTaskViewFactory(context, mainExecutor)
 
         bubble = FakeBubbleFactory.createChatBubble(context)
@@ -104,6 +117,7 @@ class BubbleBarExpandedViewTest {
                 .inflate(R.layout.bubble_bar_expanded_view, null, false /* attachToRoot */)
                 as BubbleBarExpandedView
         bubbleExpandedView.bubbleLogger = BubbleLogger(uiEventLoggerFake)
+        bubbleExpandedView.mBubblePolicyHelper = bubblePolicyHelper
         bubbleExpandedView.initialize(
             expandedViewManager,
             positioner,
@@ -318,6 +332,28 @@ class BubbleBarExpandedViewTest {
         val captionView = overflowExpandedView.findViewById<View>(R.id.bubble_bar_caption_view)
         assertThat(captionView.visibility).isEqualTo(View.GONE)
         assertThat(overflowExpandedView.handleView.visibility).isEqualTo(View.GONE)
+    }
+
+    @Test
+    fun onTaskInfoChanged_invalidTask_collapseStack() {
+        val taskInfo = RunningTaskInfo()
+        taskInfo.supportsMultiWindow = false
+        bubblePolicyHelper.stub { on { isValidToBubble(taskInfo) } doReturn false }
+
+        bubbleExpandedView.onTaskInfoChanged(taskInfo)
+
+        verify(expandedViewManager).collapseStack()
+    }
+
+    @Test
+    fun onTaskInfoChanged_validTask_doesNotCollapseStack() {
+        val taskInfo = RunningTaskInfo()
+        taskInfo.supportsMultiWindow = true
+        bubblePolicyHelper.stub { on { isValidToBubble(taskInfo) } doReturn true }
+
+        bubbleExpandedView.onTaskInfoChanged(taskInfo)
+
+        verify(expandedViewManager, never()).collapseStack()
     }
 
     private fun BubbleBarExpandedView.menuView(): BubbleBarMenuView {

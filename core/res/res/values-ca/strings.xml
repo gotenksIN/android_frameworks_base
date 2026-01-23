@@ -159,6 +159,10 @@
     <string name="wfc_mode_wifi_preferred_summary" msgid="1035175836270943089">"Trucades per Wi‑Fi"</string>
     <string name="wfc_mode_cellular_preferred_summary" msgid="4958965609212575619">"Truca a través de la xarxa mòbil"</string>
     <string name="wfc_mode_wifi_only_summary" msgid="104951993894678665">"Només Wi-Fi"</string>
+    <string name="adaptive_low_frequency_less_than_one_minute" msgid="8869498183646028708">"~ %s"</string>
+    <string name="adaptive_low_frequency_neg_less_than_one_minute" msgid="2590062535985417056">"~ −%s"</string>
+    <string name="elapsed_time_low_frequency_short_format_h_mm" msgid="6728141238066668781">"%1$d:%2$02d:--"</string>
+    <string name="elapsed_time_low_frequency_short_format_mm" msgid="2405181895215514414">"%1$02d:--"</string>
     <!-- no translation found for crossSimFormat_spn (9125246077491634262) -->
     <skip />
     <string name="crossSimFormat_spn_cross_sim_calling" msgid="5620807020002879057">"Trucades alternatives (<xliff:g id="SPN">%s</xliff:g>)"</string>
@@ -411,7 +415,7 @@
     <string name="permdesc_answerPhoneCalls" msgid="894386681983116838">"Permet que l\'aplicació contesti a una trucada telefònica entrant."</string>
     <string name="permlab_receiveSms" msgid="505961632050451881">"recepció de missatges de text (SMS)"</string>
     <string name="permdesc_receiveSms" msgid="1797345626687832285">"Permet que l\'aplicació rebi i processi missatges SMS. Això vol dir que l\'aplicació pot controlar o suprimir missatges que s\'han enviat al teu dispositiu sense mostrar-te\'ls."</string>
-    <string name="permlab_receiveMms" msgid="4000650116674380275">"recepció de missatges de text (MMS)"</string>
+    <string name="permlab_receiveMms" msgid="4000650116674380275">"rebre missatges de text (MMS)"</string>
     <string name="permdesc_receiveMms" msgid="958102423732219710">"Permet que l\'aplicació rebi i processi missatges MMS. Això vol dir que l\'aplicació pot controlar o suprimir missatges que s\'han enviat al teu dispositiu sense mostrar-te\'ls."</string>
     <string name="permlab_bindCellBroadcastService" msgid="586746677002040651">"Reenviar els missatges de difusió mòbil"</string>
     <string name="permdesc_bindCellBroadcastService" msgid="6540910200973641606">"Permet que l\'aplicació es vinculi al mòdul de difusió mòbil per poder reenviar els missatges de difusió mòbil a mesura que es reben. Les alertes de difusió mòbil s\'entreguen en algunes ubicacions per alertar de situacions d\'emergència. És possible que les aplicacions malicioses interfereixin en el rendiment o en el funcionament del dispositiu quan es rebi una difusió mòbil d\'emergència."</string>
@@ -646,10 +650,8 @@
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"Permet que l\'aplicació accedeixi als dispositius de la xarxa local"</string>
     <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"utilitza la interfície de bucle invertit"</string>
     <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"Permet que l\'aplicació interaccioni amb altres aplicacions a través de la interfície de bucle invertit"</string>
-    <!-- no translation found for permlab_force_use_loopback_interface (1319727311706416481) -->
-    <skip />
-    <!-- no translation found for permdesc_force_use_loopback_interface (5829032514048681980) -->
-    <skip />
+    <string name="permlab_force_use_loopback_interface" msgid="1319727311706416481">"forçar l\'ús de la interfície de bucle invertit"</string>
+    <string name="permdesc_force_use_loopback_interface" msgid="5829032514048681980">"Permet que l\'aplicació interaccioni amb altres aplicacions a través de la interfície de bucle invertit sense requerir que l\'altra aplicació tingui permisos de bucle invertit"</string>
     <string name="permlab_ranging" msgid="2854543350668593390">"determin. posició relativa entre dispositius propers"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"Permet que l\'aplicació determini la posició relativa entre els dispositius propers"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"Informació preferent sobre el servei de pagament per NFC"</string>
@@ -775,7 +777,7 @@
     <string name="face_acquired_too_low" msgid="4075391872960840081">"Abaixa el telèfon"</string>
     <string name="face_acquired_too_right" msgid="6245286514593540859">"Mou el telèfon cap a l\'esquerra"</string>
     <string name="face_acquired_too_left" msgid="9201762240918405486">"Mou el telèfon cap a la dreta"</string>
-    <string name="face_acquired_poor_gaze" msgid="4427153558773628020">"Mira més directament cap al dispositiu."</string>
+    <string name="face_acquired_poor_gaze" msgid="6746437451436776485">"Mira més directament a la càmera"</string>
     <string name="face_acquired_not_detected" msgid="1057966913397548150">"No se\'t veu la cara. Mantén el telèfon a l\'altura dels ulls."</string>
     <string name="face_acquired_too_much_motion" msgid="8199691445085189528">"Massa moviment. Subjecta bé el telèfon."</string>
     <string name="face_acquired_recalibrate" msgid="8724013080976469746">"Torna a registrar la teva cara."</string>
@@ -1455,6 +1457,9 @@
     <string name="carrier_app_notification_text" msgid="6567057546341958637">"Toca per configurar-la"</string>
     <string name="time_zone_change_notification_title" msgid="5232503069219193218">"La zona horària ha canviat"</string>
     <string name="time_zone_change_notification_body" msgid="6135793674904665585">"Ara ets a <xliff:g id="TIME_ZONE_DISPLAY_NAME">%1$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET">%2$s</xliff:g>)"</string>
+    <string name="time_zone_offset_change_notification_title" msgid="8232305835199459588">"Canvi d\'hora"</string>
+    <string name="time_zone_offset_change_notification_body_forward" msgid="1299493962341887576">"Els rellotges s\'han avançat <xliff:g id="TIME_ZONE_OFFSET_DURATION">%1$s</xliff:g>. Ara la teva zona horària és <xliff:g id="TIME_ZONE_DISPLAY_NAME">%2$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET_0">%3$s</xliff:g>)."</string>
+    <string name="time_zone_offset_change_notification_body_backward" msgid="6643532078142642118">"Els rellotges s\'han endarrerit <xliff:g id="TIME_ZONE_OFFSET_DURATION">%1$s</xliff:g>. Ara la teva zona horària és <xliff:g id="TIME_ZONE_DISPLAY_NAME">%2$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET_0">%3$s</xliff:g>)."</string>
     <string name="time_picker_dialog_title" msgid="9053376764985220821">"Defineix l\'hora"</string>
     <string name="date_picker_dialog_title" msgid="5030520449243071926">"Establiment de data"</string>
     <string name="date_time_set" msgid="4603445265164486816">"Defineix"</string>
@@ -1830,6 +1835,7 @@
     <string name="accessibility_shortcut_label_gesture" msgid="7987298674836890931">"gest"</string>
     <string name="accessibility_shortcut_label_quick_settings" msgid="6851280333772213611">"configuració ràpida"</string>
     <string name="accessibility_shortcut_label_triple_tap" msgid="9058975959054454796">"triple toc"</string>
+    <string name="accessibility_shortcut_label_top_row_key" msgid="1488840908672437180">"clau d\'accessibilitat"</string>
     <string name="accessibility_uncheck_legacy_item_warning" msgid="8047830891064817447">"<xliff:g id="SERVICE_NAME">%s</xliff:g> s\'ha desactivat"</string>
     <string name="edit_accessibility_shortcut_menu_button" msgid="8885752738733772935">"Edita les dreceres"</string>
     <string name="done_accessibility_shortcut_menu_button" msgid="3668407723770815708">"Fet"</string>
@@ -2106,6 +2112,7 @@
     <string name="app_suspended_default_message" msgid="6451215678552004172">"<xliff:g id="APP_NAME_0">%1$s</xliff:g> no està disponible en aquests moments. Aquesta opció es gestiona a <xliff:g id="APP_NAME_1">%2$s</xliff:g>."</string>
     <string name="app_suspended_more_details" msgid="211260942831587014">"Més informació"</string>
     <string name="app_suspended_unsuspend_message" msgid="1665438589450555459">"Reactiva l\'aplicació"</string>
+    <string name="locked_app_biometric_prompt_description" msgid="6853122652400451464">"<xliff:g id="APP_NAME">%1$s</xliff:g> s\'ha bloquejat"</string>
     <string name="work_mode_off_title" msgid="6367463960165135829">"Reactivar les apps de treball?"</string>
     <string name="work_mode_turn_on" msgid="5316648862401307800">"Reactiva"</string>
     <string name="work_mode_emergency_call_button" msgid="6818855962881612322">"Emergència"</string>
@@ -2545,6 +2552,8 @@
     <string name="accessibility_label_clone_profile" msgid="7579118375042398784">"Clon"</string>
     <string name="accessibility_label_communal_profile" msgid="1437173163111334791">"Comunitari"</string>
     <string name="private_space_biometric_prompt_title" msgid="5777592909271728154">"Espai privat"</string>
+    <string name="app_locked_new_notification" msgid="4409730436247596215">"Notificació nova"</string>
+    <string name="app_locked_notification_message" msgid="4576179600328065280">"Missatge nou"</string>
     <string name="redacted_notification_message" msgid="1520587845842228816">"S\'ha amagat contingut sensible de les notificacions"</string>
     <string name="redacted_notification_action_title" msgid="6942924973335920935"></string>
     <string name="screen_not_shared_sensitive_content" msgid="7058419185079565001">"Contingut de l\'aplicació amagat de la compartició de pantalla per seguretat"</string>

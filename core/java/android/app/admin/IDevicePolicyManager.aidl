@@ -207,7 +207,7 @@ interface IDevicePolicyManager {
 
     boolean checkDeviceIdentifierAccess(in String packageName, int pid, int uid);
 
-    void setDeviceOwnerLockScreenInfo(in ComponentName who, CharSequence deviceOwnerInfo);
+    void setDeviceOwnerLockScreenInfo(in ComponentName who, String callerPackageName, CharSequence deviceOwnerInfo);
     CharSequence getDeviceOwnerLockScreenInfo();
 
     String[] setPackagesSuspended(in ComponentName admin, in String callerPackage, in String[] packageNames, boolean suspended);
@@ -666,4 +666,6 @@ interface IDevicePolicyManager {
 
     void setPolicy(in String callerPackageName, in String policy, in int scope, in PolicyValueTransport value);
     PolicyValueTransport getPolicy(in String callerPackageName, in String policy, in int scope);
+    PolicyValueTransport getResolvedDeviceWidePolicy(in String callerPackageName, in String policy);
+    PolicyValueTransport getResolvedPerUserPolicy(in String callerPackageName, in int userId, in String policy);
 }

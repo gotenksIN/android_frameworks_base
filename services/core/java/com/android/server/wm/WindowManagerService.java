@@ -158,7 +158,6 @@ import static com.android.server.wm.WindowManagerDebugConfig.TAG_WM;
 import static com.android.server.wm.WindowManagerInternal.OnWindowRemovedListener;
 import static com.android.server.wm.WindowManagerInternal.WindowFocusChangeListener;
 import static com.android.window.flags.Flags.multiCrop;
-import static com.android.window.flags.Flags.setScPropertiesInClient;
 
 import android.Manifest;
 import android.Manifest.permission;
@@ -1202,12 +1201,31 @@ public class WindowManagerService extends IWindowManager.Stub
     private final SurfaceControl.Transaction mTransaction;
 
     static void boostPriorityForLockedSection() {
-        PerfettoTrace.begin(BIG_LOCKS_V3, "wms_lock_acquire").emit();
         sThreadPriorityBooster.boost();
     }
 
     static void resetPriorityAfterLockedSection() {
         sThreadPriorityBooster.reset();
+    }
+
+    /**
+     * Emits a trace event indicating the start of an attempt to acquire the main WMS lock.
+     */
+    public static void traceBeforeWmsLock() {
+        PerfettoTrace.instant(BIG_LOCKS_V3, "wms_lock_acquire").emit();
+    }
+
+    /**
+     * Emits a trace event indicating that the main WMS lock has been acquired and is now held.
+     */
+    public static void traceAfterWmsLock() {
+        PerfettoTrace.begin(BIG_LOCKS_V3, "wms_lock_held").emit();
+    }
+
+    /**
+     * Emits a trace event indicating the end of the critical section protected by the WMS lock.
+     */
+    public static void traceAfterWmsUnlock() {
         PerfettoTrace.end(BIG_LOCKS_V3).emit();
     }
 
@@ -1357,6 +1375,10 @@ public class WindowManagerService extends IWindowManager.Stub
                 com.android.internal.R.bool.config_perDisplayFocusEnabled);
         mAssistantOnTopOfDream = context.getResources().getBoolean(
                 com.android.internal.R.bool.config_assistantOnTopOfDream);
+
+        // TODO(b/427186215): Remove mSkipActivityRelaunchWhenDocking and
+        // config_skipActivityRelaunchWhenDocking when the aconfig flag
+        // enable_less_activity_recreation_on_config_change is eligible for cleanup.
         mSkipActivityRelaunchWhenDocking = context.getResources()
                 .getBoolean(R.bool.config_skipActivityRelaunchWhenDocking);
 
@@ -1958,6 +1980,12 @@ public class WindowManagerService extends IWindowManager.Stub
             final boolean suspended = mPmInternal.isPackageSuspended(win.getOwningPackage(),
                     UserHandle.getUserId(win.getOwningUid()));
             win.setHiddenWhileSuspended(suspended);
+
+            if (android.security.Flags.appLockCore() && win.getOwningPackage() != null) {
+                final boolean lockedByAppLock = isPackageLockedByAppLockLocked(
+                        win.getOwningPackage(), UserHandle.getUserId(win.getOwningUid()));
+                win.setHiddenWhileLockedByAppLock(lockedByAppLock);
+            }
 
             final boolean hideSystemAlertWindows = shouldHideNonSystemOverlayWindow(win);
             win.setForceHideNonSystemOverlayWindowIfNeeded(hideSystemAlertWindows);
@@ -2608,13 +2636,6 @@ public class WindowManagerService extends IWindowManager.Stub
                 if ((privateFlagChanges & SYSTEM_FLAG_HIDE_NON_SYSTEM_OVERLAY_WINDOWS) != 0) {
                     updateNonSystemOverlayWindowsVisibilityIfNeeded(
                             win, win.mWinAnimator.getShown());
-                }
-                if (!setScPropertiesInClient()) {
-                    if ((attrChanges & (WindowManager.LayoutParams.PRIVATE_FLAGS_CHANGED)) != 0) {
-                        winAnimator.setColorSpaceAgnosticLocked((win.mAttrs.privateFlags
-                                & WindowManager.LayoutParams.PRIVATE_FLAG_COLOR_SPACE_AGNOSTIC)
-                                != 0);
-                    }
                 }
                 // See if the DisplayWindowPolicyController wants to keep the activity on the window
                 if (displayContent.mDwpcHelper.hasController()
@@ -3422,6 +3443,28 @@ public class WindowManagerService extends IWindowManager.Stub
         }
     }
 
+    /**
+     * Returns {@code true} if the given package is currently in a locked state by App Lock.
+     *
+     * <p>A package is considered locked if App Lock is enabled for it and the conditions for being
+     * unlocked are not met. After a successful user authentication, an unlocked state is granted
+     * while the application is in the foreground, or within a short grace period after the app is
+     * no longer in the foreground.
+     *
+     * <p>This method checks the internal state of packages that are locked by App Lock, which is
+     * stored in {@link AppLockController}.
+     *
+     * @param packageName the package name to check for the App Lock locked state
+     * @param userId      the user for whom to check the locked state
+     * @return {@code true} if the package is locked for the given user
+     */
+    @GuardedBy("mGlobalLock")
+    boolean isPackageLockedByAppLockLocked(@NonNull String packageName, int userId) {
+        Objects.requireNonNull(packageName);
+        return mAppLockController != null && mAppLockController.isPackageLockedByAppLockLocked(
+                packageName, userId);
+    }
+
     /** Returns {@code true} if this binder is a registered window token. */
     @Override
     public boolean isWindowToken(IBinder binder) {
@@ -4157,10 +4200,8 @@ public class WindowManagerService extends IWindowManager.Stub
                 displayContent.setForcedDensity(targetDensity, UserHandle.USER_CURRENT);
 
                 mRoot.forAllDisplays(display -> {
-                    if (Flags.moveUserDisplaySettingsToDeStorage()) {
-                        mDisplayWindowSettings.applySettingsToDisplayLocked(display);
-                        display.reconfigureDisplayLocked();
-                    }
+                    mDisplayWindowSettings.applySettingsToDisplayLocked(display);
+                    display.reconfigureDisplayLocked();
 
                     // Because DisplayWindowSettingsProvider.mOverrideSettings has been reset for
                     // the new user, we need to update DisplayWindowSettings.mShouldShowSystemDecors
@@ -4679,20 +4720,6 @@ public class WindowManagerService extends IWindowManager.Stub
         }
 
         return screenshotBuffer;
-    }
-
-    /**
-     * Requests a screenshot to be taken for Assist purposes.
-     *
-     * This method initiates the process of capturing the current screen content and delivering it
-     * to the provided {@link IAssistDataReceiver}.
-     *
-     * @param receiver The {@link IAssistDataReceiver} that will receive the screenshot bitmap. Must
-     * not be null.
-     */
-    @Override
-    public void requestAssistScreenshot(final IAssistDataReceiver receiver) {
-        requestAssistScreenshotInternal(receiver, DEFAULT_DISPLAY);
     }
 
     /**
@@ -5220,23 +5247,21 @@ public class WindowManagerService extends IWindowManager.Stub
     public void updateDisplayWindowAnimatingTypes(int displayId, @InsetsType int animatingTypes,
             @Nullable ImeTracker.Token statsToken) {
         updateDisplayWindowAnimatingTypes_enforcePermission();
-        if (android.view.inputmethod.Flags.reportAnimatingInsetsTypes()) {
-            final long origId = Binder.clearCallingIdentity();
-            try {
-                synchronized (mGlobalLock) {
-                    final DisplayContent dc = mRoot.getDisplayContent(displayId);
-                    if (dc == null || dc.mRemoteInsetsControlTarget == null) {
-                        ImeTracker.forLogging().onFailed(statsToken,
-                                ImeTracker.PHASE_SERVER_UPDATE_DISPLAY_WINDOW_ANIMATING_TYPES);
-                        return;
-                    }
-                    ImeTracker.forLogging().onProgress(statsToken,
+        final long origId = Binder.clearCallingIdentity();
+        try {
+            synchronized (mGlobalLock) {
+                final DisplayContent dc = mRoot.getDisplayContent(displayId);
+                if (dc == null || dc.mRemoteInsetsControlTarget == null) {
+                    ImeTracker.forLogging().onFailed(statsToken,
                             ImeTracker.PHASE_SERVER_UPDATE_DISPLAY_WINDOW_ANIMATING_TYPES);
-                    dc.mRemoteInsetsControlTarget.setAnimatingTypes(animatingTypes, statsToken);
+                    return;
                 }
-            } finally {
-                Binder.restoreCallingIdentity(origId);
+                ImeTracker.forLogging().onProgress(statsToken,
+                        ImeTracker.PHASE_SERVER_UPDATE_DISPLAY_WINDOW_ANIMATING_TYPES);
+                dc.mRemoteInsetsControlTarget.setAnimatingTypes(animatingTypes, statsToken);
             }
+        } finally {
+            Binder.restoreCallingIdentity(origId);
         }
     }
 
@@ -6043,7 +6068,6 @@ public class WindowManagerService extends IWindowManager.Stub
         if (mAppLockController != null) {
             mAppLockController.systemReady();
         }
-        mAppCompatConfiguration.onSystemReady();
     }
 
 
@@ -9026,6 +9050,25 @@ public class WindowManagerService extends IWindowManager.Stub
         @Override
         public boolean shouldRestoreImeVisibility(IBinder imeTargetWindowToken) {
             return WindowManagerService.this.shouldRestoreImeVisibility(imeTargetWindowToken);
+        }
+
+        @Override
+        public boolean isImeInputTargetStaleForUpdate(@NonNull IBinder windowToken) {
+            synchronized (mGlobalLock) {
+                final InputTarget inputTarget = getInputTargetFromWindowTokenLocked(windowToken);
+                // The current IME target is not stale if the new window is already the target,
+                // or if there's no existing target to compare against.
+                if (inputTarget == null
+                        || inputTarget.getDisplayContent() == null
+                        || inputTarget.getDisplayContent().getImeInputTarget() == null
+                        || inputTarget.getDisplayContent().getImeInputTarget() == inputTarget) {
+                    return false;
+                }
+                final WindowState imeTargetWindow =
+                        inputTarget.getDisplayContent().getImeInputTarget().getWindowState();
+                return imeTargetWindow != null
+                        && (imeTargetWindow.mRemoved || imeTargetWindow.mDestroying);
+            }
        }
 
         @Override
@@ -9208,7 +9251,7 @@ public class WindowManagerService extends IWindowManager.Stub
                                 mTaskSnapshotController.removeAndDeleteSnapshot(
                                         task.mTaskId, task.mUserId);
                                 // Refresh TaskThumbnailCache
-                                task.onSnapshotInvalidated();
+                                task.onSnapshotReleased();
                             }
                         }, /* traverseTopToBottom= */ true);
                     }

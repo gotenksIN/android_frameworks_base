@@ -41,12 +41,6 @@ flag {
     description: "Controls whether the connected mice's primary buttons, left and right, can be swapped."
     bug: "352598211"
 }
-flag {
-    name: "touchpad_system_gesture_disable"
-    namespace: "input"
-    description: "Adds an accessibility setting to disable system navigation gestures (3- and 4-finger swipes) on touchpads"
-    bug: "353947750"
-}
 
 flag {
     name: "enable_customizable_input_gestures"
@@ -103,13 +97,6 @@ flag {
     namespace: "input"
     description: "Adds key gestures for voice access"
     bug: "383734125"
-}
-
-flag {
-    name: "can_window_override_power_gesture_api"
-    namespace: "wallet_integration"
-    description: "Adds new API in WindowManager class to check if the window can override the power key double tap behavior."
-    bug: "378736024"
 }
 
 flag {
@@ -175,13 +162,6 @@ flag {
     is_exported: true
     description: "Adds support for creating a virtual keyboard API"
     bug: "416054433"
-}
-
-flag {
-    name: "mouse_to_touch_per_app_compat"
-    namespace: "lse_desktop_experience"
-    description: "Enables per-app overrides compatibility for mouse to touch"
-    bug: "413207127"
 }
 
 flag {
@@ -263,5 +243,20 @@ flag {
     namespace: "input"
     description: "Enables ScaleGestureDetector to use motion events classification"
     bug: "331164772"
+}
+
+flag {
+    name: "enable_note_taking_keyboard_shortcut"
+    namespace: "note"
+    description: "Enables the keyboard shorcut for accessing the note-taking app"
+    bug: "443222861"
+}
+
+flag {
+    name: "enable_new_26q2_keycodes"
+    namespace: "input"
+    description: "Enables new 26Q2 keycodes"
+    bug: "458094955"
+    is_exported: true
 }
 

@@ -61,6 +61,7 @@ import static org.mockito.Mockito.when;
 import android.annotation.SuppressLint;
 import android.app.ActivityOptions;
 import android.app.AppOpsManager;
+import android.app.IApplicationThread;
 import android.companion.virtual.ActivityPolicyExemption;
 import android.companion.virtual.VirtualDeviceManager;
 import android.companion.virtual.VirtualDeviceManager.VirtualDevice;
@@ -119,9 +120,9 @@ import com.android.server.appinteraction.AppInteractionService;
 import com.android.server.input.InputManagerInternal;
 import com.android.server.inputmethod.InputMethodManagerInternal;
 import com.android.server.pm.UserManagerInternal;
-import com.android.server.testutils.StubTransaction;
 import com.android.server.wm.ActivityTaskManagerInternal;
 import com.android.server.wm.WindowManagerInternal;
+import com.android.testing.wm.util.StubTransaction;
 
 import junitparams.JUnitParamsRunner;
 import junitparams.Parameters;
@@ -157,6 +158,7 @@ public class ComputerControlSessionImplTest {
             List.of(TARGET_PACKAGE_1, TARGET_PACKAGE_2);
     private static final String UNDECLARED_TARGET_PACKAGE = "com.android.baz";
     private static final String TARGET_CLASS = "com.android.foo.FooActivity";
+    private static final String ATTRIBUTION_TAG = "tag";
     private static final long GLOBAL_TIMEOUT_MILLIS = 10000L;
     private static final String AGENT_PACKAGE = "com.package";
     private static final ComponentName TEST_COMPONENT = new ComponentName(TARGET_PACKAGE_1,
@@ -230,6 +232,8 @@ public class ComputerControlSessionImplTest {
     private ComputerControlAllowlistController mAllowlistController;
     @Mock
     private AppInteractionService mAppInteractionService;
+    @Mock
+    private IApplicationThread mAppThread;
 
     @Captor
     private ArgumentCaptor<Intent> mIntentArgumentCaptor;
@@ -316,8 +320,7 @@ public class ComputerControlSessionImplTest {
                 mVirtualAudioDevice);
         when(mVirtualAudioDevice.startAudioCapture(any())).thenReturn(mAudioCapture);
         when(mVirtualAudioDevice.startAudioInjection(any())).thenReturn(mAudioInjection);
-        when(mAllowlistController.isPackageAutomatable(anyString(), anyString(), any()))
-                .thenReturn(true);
+        when(mAllowlistController.isPackageAutomatable(anyString(), any())).thenReturn(true);
     }
 
     @After
@@ -634,8 +637,7 @@ public class ComputerControlSessionImplTest {
         createComputerControlSession(mDefaultParams);
         when(mOwnerPackageManager.queryIntentActivities(any(), any()))
                 .thenReturn(List.of(new ResolveInfo()));
-        when(mAllowlistController.isPackageAutomatable(anyString(), anyString(), any()))
-                .thenReturn(false);
+        when(mAllowlistController.isPackageAutomatable(anyString(), any())).thenReturn(false);
 
         assertThrows(IllegalArgumentException.class,
                 () -> mSession.launchApplication(TARGET_PACKAGE_1, TARGET_CLASS));
@@ -939,7 +941,6 @@ public class ComputerControlSessionImplTest {
                         eq(TEST_COMPONENT.getPackageName()),
                         isNull(),
                         anyLong(),
-                        eq(0L),
                         eq(USER_ID));
     }
 
@@ -956,7 +957,7 @@ public class ComputerControlSessionImplTest {
                 .onActivityLaunchRequested(VIRTUAL_DISPLAY_ID, BLOCKED_COMPONENT, USER_ID);
 
         verify(mAppInteractionService, never())
-                .noteAppInteraction(any(), any(), any(), anyLong(), anyLong(), anyInt());
+                .noteAppInteraction(any(), any(), any(), anyLong(), anyInt());
     }
 
     @Test
@@ -1241,8 +1242,9 @@ public class ComputerControlSessionImplTest {
         displayManagerGlobal.disableLocalDisplayInfoCaches();
         mSession = new ComputerControlSessionImpl(
                 mContext, displayManagerGlobal, mAllowlistController, mViewConfiguration,
-                globalSessionTimeoutDurationMs, () -> mTransaction, mAppToken, params,
-                new AttributionSource(UserHandle.getUid(USER_ID, 0), AGENT_PACKAGE, "tag"),
+                globalSessionTimeoutDurationMs, () -> mTransaction, mAppToken, params, mAppThread,
+                new AttributionSource(UserHandle.getUid(USER_ID, 0), AGENT_PACKAGE,
+                        ATTRIBUTION_TAG),
                 mVirtualDeviceFactory, mOnClosedListener, Runnable::run);
     }
 
@@ -1252,8 +1254,10 @@ public class ComputerControlSessionImplTest {
         verify(mOwnerPackageManager).queryIntentActivities(mIntentArgumentCaptor.capture(), any());
         assertLaunchIntent(mIntentArgumentCaptor.getValue(), packageName);
         // Verifying start.
-        verify(mContext).startActivityAsUser(
-                mIntentArgumentCaptor.capture(), mBundleArgumentCaptor.capture(), any());
+        verify(mActivityTaskManagerInternal).startActivityAsUser(
+                eq(mAppThread), eq(AGENT_PACKAGE), eq(ATTRIBUTION_TAG),
+                mIntentArgumentCaptor.capture(), isNull(), eq(Intent.FLAG_ACTIVITY_NEW_TASK),
+                mBundleArgumentCaptor.capture(), eq(USER_ID));
         assertLaunchIntent(mIntentArgumentCaptor.getValue(), packageName);
         assertThat(
                 ActivityOptions.fromBundle(mBundleArgumentCaptor.getValue()).getLaunchDisplayId())
@@ -1264,20 +1268,6 @@ public class ComputerControlSessionImplTest {
         assertThat(intent.getAction()).isEqualTo(Intent.ACTION_MAIN);
         assertThat(intent.getCategories()).containsExactly(Intent.CATEGORY_LAUNCHER);
         assertThat(intent.getComponent()).isEqualTo(new ComponentName(packageName, TARGET_CLASS));
-    }
-
-    private static final class MatchesActivityPolicyExemption implements
-            ArgumentMatcher<ActivityPolicyExemption> {
-        private final String mPackageName;
-
-        MatchesActivityPolicyExemption(String packageName) {
-            mPackageName = packageName;
-        }
-
-        @Override
-        public boolean matches(ActivityPolicyExemption argument) {
-            return mPackageName.equals(argument.getPackageName());
-        }
     }
 
     private static final class MatchesTouchEvent implements ArgumentMatcher<VirtualTouchEvent> {

@@ -40,10 +40,9 @@ import com.android.internal.annotations.VisibleForTesting
 import com.android.internal.dynamicanimation.animation.SpringAnimation
 import com.android.internal.dynamicanimation.animation.SpringForce
 import com.android.systemui.Flags
+import com.android.systemui.animation.ActivityTransitionAnimator.Companion.INTERPOLATORS
 import java.util.concurrent.Executor
 import kotlin.math.abs
-import kotlin.math.max
-import kotlin.math.min
 import kotlin.math.roundToInt
 
 private const val TAG = "TransitionAnimator"
@@ -55,23 +54,48 @@ class TransitionAnimator(
     private val interpolators: Interpolators,
 
     /** [springTimings] and [springInterpolators] must either both be null or both not null. */
-    private val springTimings: SpringTimings? = null,
-    private val springInterpolators: Interpolators? = null,
-    private val springParams: SpringParams = DEFAULT_SPRING_PARAMS,
+    private val springTimings: SpringTimings? = SPRING_TIMINGS,
+    private val springInterpolators: Interpolators? = SPRING_INTERPOLATORS,
 ) {
     companion object {
         internal const val DEBUG = false
         private val SRC_MODE = PorterDuffXfermode(PorterDuff.Mode.SRC)
 
+        private const val SPRING_MAX_SPEED = 6500f
+        private const val SPRING_SPEED_FALLOFF_COEFFICIENT = 1800f
+        private const val SPRING_SPEED_FALLOFF_THRESHOLD = 4000f
+
         /** Default parameters for the multi-spring animator. */
         private val DEFAULT_SPRING_PARAMS =
             SpringParams(
-                centerXStiffness = 450f,
-                centerXDampingRatio = 0.965f,
-                centerYStiffness = 400f,
-                centerYDampingRatio = 0.95f,
-                scaleStiffness = 500f,
-                scaleDampingRatio = 0.99f,
+                centerXStiffness = 340f,
+                centerXDampingRatio = 1.1f,
+                centerYStiffness = 340f,
+                centerYDampingRatio = 0.9f,
+                scaleStiffness = 340f,
+                scaleDampingRatio = 1f,
+            )
+
+        /** The interpolators when animating a View into an app using a spring animator. */
+        val SPRING_INTERPOLATORS =
+            INTERPOLATORS.copy(
+                contentBeforeFadeOutInterpolator =
+                    com.android.app.animation.Interpolators.DECELERATE_1_5,
+                contentAfterFadeInInterpolator =
+                    com.android.app.animation.Interpolators.SLOW_OUT_LINEAR_IN,
+            )
+
+        /**
+         * The timings when animating a View into an app using a spring animator. These timings
+         * represent fractions of the progress between the spring's initial value and its final
+         * value.
+         */
+        val SPRING_TIMINGS =
+            SpringTimings(
+                contentBeforeFadeOutDelay = 0f,
+                contentBeforeFadeOutDuration = 0.8f,
+                contentAfterFadeInDelay = 0.85f,
+                contentAfterFadeInDuration = 0.135f,
             )
 
         /**
@@ -114,6 +138,8 @@ class TransitionAnimator(
                 1.0f,
             )
         }
+
+        fun dynamicTargetResolutionEnabled() = Flags.animationLibraryDynamicTargetResolution()
 
         internal fun WindowAnimationState.toTransitionState() =
             State().also {
@@ -523,6 +549,8 @@ class TransitionAnimator(
         drawHole: Boolean = false,
         startVelocity: PointF? = null,
         startFrameTime: Long = -1,
+        springParams: SpringParams = DEFAULT_SPRING_PARAMS,
+        useDynamicPivot: Boolean = false,
     ): Animation {
         // We add an extra layer with the same color as the dialog/app splash screen background
         // color, which is usually the same color of the app background. We first fade in this layer
@@ -543,6 +571,8 @@ class TransitionAnimator(
                 drawHole,
                 startVelocity,
                 startFrameTime,
+                springParams,
+                useDynamicPivot,
             )
             .apply { start() }
     }
@@ -557,6 +587,8 @@ class TransitionAnimator(
         drawHole: Boolean = false,
         startVelocity: PointF? = null,
         startFrameTime: Long = -1,
+        springParams: SpringParams = DEFAULT_SPRING_PARAMS,
+        useDynamicPivot: Boolean = false,
     ): Animation {
         val transitionContainer = controller.transitionContainer
         val transitionContainerOverlay = transitionContainer.overlay
@@ -588,6 +620,8 @@ class TransitionAnimator(
                 shouldFadeWindowBackgroundLayer,
                 drawHole,
                 moveBackgroundLayerWhenAppVisibilityChanges,
+                springParams,
+                useDynamicPivot,
             )
         } else {
             createInterpolatedAnimation(
@@ -780,6 +814,8 @@ class TransitionAnimator(
         shouldFadeWindowBackgroundLayer: () -> Boolean = { true },
         drawHole: Boolean = false,
         moveBackgroundLayerWhenAppVisibilityChanges: Boolean = false,
+        springParams: SpringParams,
+        useDynamicPivot: Boolean = false,
     ): Animation {
         var endState = startState
         var pivot = AnimationPivot.CENTER
@@ -787,6 +823,11 @@ class TransitionAnimator(
         /** Recalculates the end state and the animation pivot. */
         fun updateEndStateAndPivot() {
             endState = calculateEndState()
+
+            if (!useDynamicPivot) {
+                pivot = AnimationPivot.CENTER
+                return
+            }
 
             val useTopPivot = endState.top > startState.top && endState.bottom > startState.bottom
             val useBottomPivot =
@@ -1018,6 +1059,25 @@ class TransitionAnimator(
             )
         }
 
+        /**
+         * Applies this dampening function to the given [speed]:
+         * - between 0 and 4000, no dampening
+         * - otherwise, apply f(x) = maxSpeed * (x / (x + k))
+         *
+         * If [speed] is negative, the same rules apply to the absolute value and the sign is
+         * maintained.
+         */
+        fun dampenSpeed(speed: Float): Float {
+            val absolute = abs(speed)
+            val sign = speed / absolute
+            if (absolute <= SPRING_SPEED_FALLOFF_THRESHOLD) return speed
+            return SPRING_MAX_SPEED *
+                (absolute / (absolute + SPRING_SPEED_FALLOFF_COEFFICIENT)) *
+                sign
+        }
+
+        val scaledVelocity = PointF(dampenSpeed(startVelocity.x), dampenSpeed(startVelocity.y))
+
         springX =
             SpringAnimation(
                     springState,
@@ -1031,9 +1091,7 @@ class TransitionAnimator(
                         }
 
                     setStartValue(startX)
-                    setStartVelocity(startVelocity.x)
-                    setMinValue(min(startX, targetX))
-                    setMaxValue(max(startX, targetX))
+                    setStartVelocity(scaledVelocity.x)
 
                     addEndListener { _, _, _, _ ->
                         springState.isXDone = true
@@ -1053,9 +1111,7 @@ class TransitionAnimator(
                         }
 
                     setStartValue(startY)
-                    setStartVelocity(startVelocity.y)
-                    setMinValue(min(startY, targetY))
-                    setMaxValue(max(startY, targetY))
+                    setStartVelocity(scaledVelocity.y)
 
                     addEndListener { _, _, _, _ ->
                         springState.isYDone = true
@@ -1075,7 +1131,6 @@ class TransitionAnimator(
                         }
 
                     setStartValue(0f)
-                    setMaxValue(1f)
                     setMinimumVisibleChange(abs(1f / startState.height))
 
                     addEndListener { _, _, _, _ ->

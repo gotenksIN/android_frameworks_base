@@ -883,6 +883,10 @@ public final class SystemServiceRegistry {
                                     android.hardware.serial.ISerialManager.Stub.asInterface(b));
                         }
                     });
+            // The serial service moved to a new package. If someone asks for the old
+            // interface by class then we want to redirect over to the new interface instead
+            // (which extends it).
+            SYSTEM_SERVICE_NAMES.put(android.hardware.SerialManager.class, Context.SERIAL_SERVICE);
         } else {
             registerService(Context.SERIAL_SERVICE, android.hardware.SerialManager.class,
                     new CachedServiceFetcher<android.hardware.SerialManager>() {
@@ -1563,7 +1567,7 @@ public final class SystemServiceRegistry {
                     });
         }
 
-        if (android.companion.Flags.enableUniversalClipboard()) {
+        if (android.companion.Flags.universalClipboard()) {
             registerService(Context.UNIVERSAL_CLIPBOARD_SERVICE, UniversalClipboardManager.class,
                     new CachedServiceFetcher<UniversalClipboardManager>() {
                         @Override
@@ -2097,7 +2101,7 @@ public final class SystemServiceRegistry {
                 TelecomDependencies.registerServiceWrapper();
             }
 
-            if (com.android.webapp.flags.Flags.enableWebAppService()) {
+            if (com.android.webapp.flags.Flags.enableWebAppServiceV2()) {
                 WebAppFrameworkInitializer.registerServiceWrappers();
             }
 

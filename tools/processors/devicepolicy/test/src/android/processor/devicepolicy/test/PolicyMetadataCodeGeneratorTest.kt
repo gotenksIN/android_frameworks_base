@@ -21,35 +21,35 @@ import android.processor.devicepolicy.protos.FullyQualifiedFieldName
 import android.processor.devicepolicy.protos.PolicyMetadata
 import android.processor.devicepolicy.protos.PolicyMetadataList
 import android.processor.devicepolicy.protos.TypeSpecificPolicyMetadata
-import com.squareup.javapoet.JavaFile
-import org.junit.Test
-import java.io.CharArrayWriter
 import com.google.common.truth.Truth.assertThat
+import com.squareup.javapoet.JavaFile
+import java.io.CharArrayWriter
+import org.junit.Test
 
-/**
- * Remove whitespace and empty lines to make string comparisons on code simpler for tests.
- */
+/** Remove whitespace and empty lines to make string comparisons on code simpler for tests. */
 private fun trimLines(string: String) =
     string.lines().map { it.trim() }.filter { !it.isEmpty() }.joinToString("\n")
 
 class PolicyMetadataCodeGeneratorTest {
     private fun fillInFile(
         code: String,
-        includes: String = """
+        includes: String =
+            """
             import java.util.ArrayList;
             import java.util.List;
             import java.util.Set;
         """,
-        staticImports: List<String> = listOf()
-    ) = trimLines(
-        """
+        staticImports: List<String> = listOf(),
+    ) =
+        trimLines(
+            """
         package android.app.admin.metadata;
 
         ${
             staticImports.sorted().joinToString(
                 separator = ";\nimport static ",
                 prefix = "import static ",
-                postfix = ";"
+                postfix = ";",
             )
         }
         $includes
@@ -68,7 +68,7 @@ class PolicyMetadataCodeGeneratorTest {
             }
         }
         """
-    )
+        )
 
     private fun javaFileToString(file: JavaFile): String {
         val writer = CharArrayWriter()
@@ -103,29 +103,28 @@ class PolicyMetadataCodeGeneratorTest {
 
     @Test
     fun test_booleanPolicy_outputMatches() {
-        val policyList = PolicyMetadataList.newBuilder()
-            .addPolicyMetadata(
-                boolTestPolicy(
-                    "test.package.PolicyContainer.MY_TEST_BOOL_POLICY"
-                )
-                    .addAllAllowedScopes(
-                        listOf(
-                            PolicyMetadata.PolicyScope.POLICY_SCOPE_USER,
-                            PolicyMetadata.PolicyScope.POLICY_SCOPE_PARENT_USER
+        val policyList =
+            PolicyMetadataList.newBuilder()
+                .addPolicyMetadata(
+                    boolTestPolicy("test.package.PolicyContainer.MY_TEST_BOOL_POLICY")
+                        .addAllAllowedScopes(
+                            listOf(
+                                PolicyMetadata.PolicyScope.POLICY_SCOPE_USER,
+                                PolicyMetadata.PolicyScope.POLICY_SCOPE_PARENT_USER,
+                            )
                         )
-                    )
-                    .setAffectedResource(
-                        PolicyMetadata.ResourceType.RESOURCE_DEVICE_WIDE
-                    )
-            )
-            .build()
+                        .setAffectedResource(PolicyMetadata.ResourceType.RESOURCE_DEVICE_WIDE)
+                )
+                .build()
 
         val javaFile = PolicyMetadataCodeGenerator.generate(policyList)
 
-        assertThat(javaFileToString(javaFile)).isEqualTo(
-            fillInFile(
-                staticImports = listOf("test.package.PolicyContainer.MY_TEST_BOOL_POLICY"),
-                code = """
+        assertThat(javaFileToString(javaFile))
+            .isEqualTo(
+                fillInFile(
+                    staticImports = listOf("test.package.PolicyContainer.MY_TEST_BOOL_POLICY"),
+                    code =
+                        """
                 policies.add(new BooleanPolicyMetadata(
                     /* id= */ MY_TEST_BOOL_POLICY,
                     /* allowedScopes= */ Set.of(
@@ -137,53 +136,49 @@ class PolicyMetadataCodeGeneratorTest {
                     /* requiredCrossUserPermission= */ null,
                     /* allowedDpcTypes= */ Set.of()
                 ));
-                """
+                """,
+                )
             )
-        )
     }
 
     @Test
     fun test_doubleBooleanPolicy_outputMatches() {
-        val policyList = PolicyMetadataList.newBuilder()
-            .addPolicyMetadata(
-                boolTestPolicy(
-                    "test.package.PolicyContainer.MY_TEST_BOOL_POLICY"
-                )
-                    .addAllAllowedScopes(
-                        listOf(
-                            PolicyMetadata.PolicyScope.POLICY_SCOPE_USER,
-                            PolicyMetadata.PolicyScope.POLICY_SCOPE_PARENT_USER
+        val policyList =
+            PolicyMetadataList.newBuilder()
+                .addPolicyMetadata(
+                    boolTestPolicy("test.package.PolicyContainer.MY_TEST_BOOL_POLICY")
+                        .addAllAllowedScopes(
+                            listOf(
+                                PolicyMetadata.PolicyScope.POLICY_SCOPE_USER,
+                                PolicyMetadata.PolicyScope.POLICY_SCOPE_PARENT_USER,
+                            )
                         )
-                    )
-                    .setAffectedResource(
-                        PolicyMetadata.ResourceType.RESOURCE_DEVICE_WIDE
-                    )
-            )
-            .addPolicyMetadata(
-                boolTestPolicy(
-                    "test.package.PolicyContainer.MY_SECOND_TEST_BOOL_POLICY"
+                        .setAffectedResource(PolicyMetadata.ResourceType.RESOURCE_DEVICE_WIDE)
                 )
-                    .addAllAllowedScopes(
-                        listOf(
-                            PolicyMetadata.PolicyScope.POLICY_SCOPE_DEVICE,
-                            PolicyMetadata.PolicyScope.POLICY_SCOPE_PARENT_USER
+                .addPolicyMetadata(
+                    boolTestPolicy("test.package.PolicyContainer.MY_SECOND_TEST_BOOL_POLICY")
+                        .addAllAllowedScopes(
+                            listOf(
+                                PolicyMetadata.PolicyScope.POLICY_SCOPE_DEVICE,
+                                PolicyMetadata.PolicyScope.POLICY_SCOPE_PARENT_USER,
+                            )
                         )
-                    )
-                    .setAffectedResource(
-                        PolicyMetadata.ResourceType.RESOURCE_PER_USER
-                    )
-            )
-            .build()
+                        .setAffectedResource(PolicyMetadata.ResourceType.RESOURCE_PER_USER)
+                )
+                .build()
 
         val javaFile = PolicyMetadataCodeGenerator.generate(policyList)
 
-        assertThat(javaFileToString(javaFile)).isEqualTo(
-            fillInFile(
-                staticImports = listOf(
-                    "test.package.PolicyContainer.MY_TEST_BOOL_POLICY",
-                    "test.package.PolicyContainer.MY_SECOND_TEST_BOOL_POLICY"
-                ),
-                code = """
+        assertThat(javaFileToString(javaFile))
+            .isEqualTo(
+                fillInFile(
+                    staticImports =
+                        listOf(
+                            "test.package.PolicyContainer.MY_TEST_BOOL_POLICY",
+                            "test.package.PolicyContainer.MY_SECOND_TEST_BOOL_POLICY",
+                        ),
+                    code =
+                        """
                 policies.add(new BooleanPolicyMetadata(
                     /* id= */ MY_TEST_BOOL_POLICY,
                     /* allowedScopes= */ Set.of(
@@ -206,9 +201,9 @@ class PolicyMetadataCodeGeneratorTest {
                     /* requiredCrossUserPermission= */ null,
                     /* allowedDpcTypes= */ Set.of()
                 ));
-                """
+                """,
+                )
             )
-        )
     }
 
     private fun integerTestPolicy(name: String): PolicyMetadata.Builder =
@@ -223,28 +218,23 @@ class PolicyMetadataCodeGeneratorTest {
 
     @Test
     fun test_integerPolicy_outputMatches() {
-        val policyList = PolicyMetadataList.newBuilder()
-            .addPolicyMetadata(
-                integerTestPolicy(
-                    "test.package.PolicyContainer.MY_TEST_INTEGER_POLICY"
+        val policyList =
+            PolicyMetadataList.newBuilder()
+                .addPolicyMetadata(
+                    integerTestPolicy("test.package.PolicyContainer.MY_TEST_INTEGER_POLICY")
+                        .addAllAllowedScopes(listOf(PolicyMetadata.PolicyScope.POLICY_SCOPE_DEVICE))
+                        .setAffectedResource(PolicyMetadata.ResourceType.RESOURCE_DEVICE_WIDE)
                 )
-                    .addAllAllowedScopes(
-                        listOf(
-                            PolicyMetadata.PolicyScope.POLICY_SCOPE_DEVICE
-                        )
-                    )
-                    .setAffectedResource(
-                        PolicyMetadata.ResourceType.RESOURCE_DEVICE_WIDE
-                    )
-            )
-            .build()
+                .build()
 
         val javaFile = PolicyMetadataCodeGenerator.generate(policyList)
 
-        assertThat(javaFileToString(javaFile)).isEqualTo(
-            fillInFile(
-                staticImports = listOf("test.package.PolicyContainer.MY_TEST_INTEGER_POLICY"),
-                code = """
+        assertThat(javaFileToString(javaFile))
+            .isEqualTo(
+                fillInFile(
+                    staticImports = listOf("test.package.PolicyContainer.MY_TEST_INTEGER_POLICY"),
+                    code =
+                        """
                 policies.add(new IntegerPolicyMetadata(
                     /* id= */ MY_TEST_INTEGER_POLICY,
                     /* allowedScopes= */ Set.of(
@@ -255,9 +245,9 @@ class PolicyMetadataCodeGeneratorTest {
                     /* requiredCrossUserPermission= */ null,
                     /* allowedDpcTypes= */ Set.of()
                 ));
-                """
+                """,
+                )
             )
-        )
     }
 
     private fun enumTestPolicy(name: String, allowedValues: Set<Int>): PolicyMetadata.Builder =
@@ -280,26 +270,26 @@ class PolicyMetadataCodeGeneratorTest {
 
     @Test
     fun test_enumPolicy_outputMatches() {
-        val policyList = PolicyMetadataList.newBuilder()
-            .addPolicyMetadata(
-                enumTestPolicy("test.package.PolicyContainer.MY_TEST_ENUM_POLICY", setOf(1, 5, 7))
-                    .addAllAllowedScopes(
-                        listOf(
-                            PolicyMetadata.PolicyScope.POLICY_SCOPE_DEVICE
+        val policyList =
+            PolicyMetadataList.newBuilder()
+                .addPolicyMetadata(
+                    enumTestPolicy(
+                            "test.package.PolicyContainer.MY_TEST_ENUM_POLICY",
+                            setOf(1, 5, 7),
                         )
-                    )
-                    .setAffectedResource(
-                        PolicyMetadata.ResourceType.RESOURCE_DEVICE_WIDE
-                    )
-            )
-            .build()
+                        .addAllAllowedScopes(listOf(PolicyMetadata.PolicyScope.POLICY_SCOPE_DEVICE))
+                        .setAffectedResource(PolicyMetadata.ResourceType.RESOURCE_DEVICE_WIDE)
+                )
+                .build()
 
         val javaFile = PolicyMetadataCodeGenerator.generate(policyList)
 
-        assertThat(javaFileToString(javaFile)).isEqualTo(
-            fillInFile(
-                staticImports = listOf("test.package.PolicyContainer.MY_TEST_ENUM_POLICY"),
-                code = """
+        assertThat(javaFileToString(javaFile))
+            .isEqualTo(
+                fillInFile(
+                    staticImports = listOf("test.package.PolicyContainer.MY_TEST_ENUM_POLICY"),
+                    code =
+                        """
                 policies.add(new EnumPolicyMetadata(
                     /* id= */ MY_TEST_ENUM_POLICY,
                     /* allowedScopes= */ Set.of(
@@ -315,9 +305,9 @@ class PolicyMetadataCodeGeneratorTest {
                         7
                     )
                 ));
-                """
+                """,
+                )
             )
-        )
     }
 
     private fun stringTestPolicy(name: String): PolicyMetadata.Builder =
@@ -325,35 +315,28 @@ class PolicyMetadataCodeGeneratorTest {
             .setIdentifier(simpleNameToFieldName(name))
             .setTypeSpecificMetadata(
                 TypeSpecificPolicyMetadata.newBuilder()
-                    .setStringMetadata(
-                        TypeSpecificPolicyMetadata.StringPolicyMetadata.newBuilder()
-                    )
+                    .setStringMetadata(TypeSpecificPolicyMetadata.StringPolicyMetadata.newBuilder())
             )
 
     @Test
     fun test_stringPolicy_outputMatches() {
-        val policyList = PolicyMetadataList.newBuilder()
-            .addPolicyMetadata(
-                stringTestPolicy(
-                    "test.package.PolicyContainer.MY_TEST_STRING_POLICY"
+        val policyList =
+            PolicyMetadataList.newBuilder()
+                .addPolicyMetadata(
+                    stringTestPolicy("test.package.PolicyContainer.MY_TEST_STRING_POLICY")
+                        .addAllAllowedScopes(listOf(PolicyMetadata.PolicyScope.POLICY_SCOPE_DEVICE))
+                        .setAffectedResource(PolicyMetadata.ResourceType.RESOURCE_DEVICE_WIDE)
                 )
-                    .addAllAllowedScopes(
-                        listOf(
-                            PolicyMetadata.PolicyScope.POLICY_SCOPE_DEVICE
-                        )
-                    )
-                    .setAffectedResource(
-                        PolicyMetadata.ResourceType.RESOURCE_DEVICE_WIDE
-                    )
-            )
-            .build()
+                .build()
 
         val javaFile = PolicyMetadataCodeGenerator.generate(policyList)
 
-        assertThat(javaFileToString(javaFile)).isEqualTo(
-            fillInFile(
-                staticImports = listOf("test.package.PolicyContainer.MY_TEST_STRING_POLICY"),
-                code = """
+        assertThat(javaFileToString(javaFile))
+            .isEqualTo(
+                fillInFile(
+                    staticImports = listOf("test.package.PolicyContainer.MY_TEST_STRING_POLICY"),
+                    code =
+                        """
                 policies.add(new StringPolicyMetadata(
                     /* id= */ MY_TEST_STRING_POLICY,
                     /* allowedScopes= */ Set.of(
@@ -365,9 +348,9 @@ class PolicyMetadataCodeGeneratorTest {
                     /* allowedDpcTypes= */ Set.of(),
                     /* emptyStringAllowed= */ false
                 ));
-                """
+                """,
+                )
             )
-        )
     }
 
     private fun listOfStringTestPolicy(name: String): PolicyMetadata.Builder =
@@ -375,42 +358,44 @@ class PolicyMetadataCodeGeneratorTest {
             .setIdentifier(simpleNameToFieldName(name))
             .setTypeSpecificMetadata(
                 TypeSpecificPolicyMetadata.newBuilder()
-                    .setListOfStringMetadata(
-                        TypeSpecificPolicyMetadata.ListOfStringPolicyMetadata.newBuilder()
+                    .setListMetadata(
+                        TypeSpecificPolicyMetadata.ListPolicyMetadata.newBuilder()
+                            .setStringMetadata(
+                                TypeSpecificPolicyMetadata.StringPolicyMetadata.newBuilder()
+                            )
                     )
             )
 
     @Test
     fun test_listOfStringPolicy_outputMatches() {
-        val policyList = PolicyMetadataList.newBuilder()
-            .addPolicyMetadata(
-                listOfStringTestPolicy(
-                    "test.package.PolicyContainer.MY_TEST_STRING_LIST_POLICY"
-                )
-                    .addAllAllowedScopes(
-                        listOf(
-                            PolicyMetadata.PolicyScope.POLICY_SCOPE_DEVICE
+        val policyList =
+            PolicyMetadataList.newBuilder()
+                .addPolicyMetadata(
+                    listOfStringTestPolicy(
+                            "test.package.PolicyContainer.MY_TEST_STRING_LIST_POLICY"
                         )
-                    )
-                    .setAffectedResource(
-                        PolicyMetadata.ResourceType.RESOURCE_DEVICE_WIDE
-                    )
-            )
-            .build()
+                        .addAllAllowedScopes(listOf(PolicyMetadata.PolicyScope.POLICY_SCOPE_DEVICE))
+                        .setAffectedResource(PolicyMetadata.ResourceType.RESOURCE_DEVICE_WIDE)
+                )
+                .build()
 
         val javaFile = PolicyMetadataCodeGenerator.generate(policyList)
 
-        assertThat(javaFileToString(javaFile)).isEqualTo(
-            fillInFile(
-                includes = """
+        assertThat(javaFileToString(javaFile))
+            .isEqualTo(
+                fillInFile(
+                    includes =
+                        """
                 import android.app.admin.PolicyIdentifier;
                 import java.lang.String;
                 import java.util.ArrayList;
                 import java.util.List;
                 import java.util.Set;
                 """,
-                staticImports = listOf("test.package.PolicyContainer.MY_TEST_STRING_LIST_POLICY"),
-                code = """
+                    staticImports =
+                        listOf("test.package.PolicyContainer.MY_TEST_STRING_LIST_POLICY"),
+                    code =
+                        """
                 policies.add(new ListPolicyMetadata<String>(
                     /* id= */ MY_TEST_STRING_LIST_POLICY,
                     /* elementMetadata= */ new StringPolicyMetadata(
@@ -426,38 +411,179 @@ class PolicyMetadataCodeGeneratorTest {
                     ),
                     /* emptyListAllowed= */ false
                 ));
-                """
+                """,
+                )
             )
-        )
+    }
+
+    private fun listOfIntegerTestPolicy(
+        name: String,
+        emptyListAllowed: Boolean,
+    ): PolicyMetadata.Builder =
+        PolicyMetadata.newBuilder()
+            .setIdentifier(simpleNameToFieldName(name))
+            .setTypeSpecificMetadata(
+                TypeSpecificPolicyMetadata.newBuilder()
+                    .setListMetadata(
+                        TypeSpecificPolicyMetadata.ListPolicyMetadata.newBuilder()
+                            .setIntegerMetadata(
+                                TypeSpecificPolicyMetadata.IntegerPolicyMetadata.newBuilder()
+                            )
+                            .setEmptyListAllowed(emptyListAllowed)
+                    )
+            )
+
+    @Test
+    fun test_listOfIntegerPolicy_outputMatches() {
+        val policyList =
+            PolicyMetadataList.newBuilder()
+                .addPolicyMetadata(
+                    listOfIntegerTestPolicy(
+                            "test.package.PolicyContainer.MY_TEST_INTEGER_LIST_POLICY",
+                            emptyListAllowed = true,
+                        )
+                        .addAllAllowedScopes(listOf(PolicyMetadata.PolicyScope.POLICY_SCOPE_DEVICE))
+                        .setAffectedResource(PolicyMetadata.ResourceType.RESOURCE_DEVICE_WIDE)
+                )
+                .build()
+
+        val javaFile = PolicyMetadataCodeGenerator.generate(policyList)
+
+        assertThat(javaFileToString(javaFile))
+            .isEqualTo(
+                fillInFile(
+                    includes =
+                        """
+                import android.app.admin.PolicyIdentifier;
+                import java.lang.Integer;
+                import java.util.ArrayList;
+                import java.util.List;
+                import java.util.Set;
+                """,
+                    staticImports =
+                        listOf("test.package.PolicyContainer.MY_TEST_INTEGER_LIST_POLICY"),
+                    code =
+                        """
+                policies.add(new ListPolicyMetadata<Integer>(
+                    /* id= */ MY_TEST_INTEGER_LIST_POLICY,
+                    /* elementMetadata= */ new IntegerPolicyMetadata(
+                        /* id= */ new PolicyIdentifier<Integer>(MY_TEST_INTEGER_LIST_POLICY.getId() + "#elements"),
+                        /* allowedScopes= */ Set.of(
+                            2
+                        ),
+                        /* affectedResource= */ 1,
+                        /* requiredPermission= */ null,
+                        /* requiredCrossUserPermission= */ null,
+                        /* allowedDpcTypes= */ Set.of()
+                    ),
+                    /* emptyListAllowed= */ true
+                ));
+                """,
+                )
+            )
+    }
+
+    private fun listOfEnumTestPolicy(name: String, enumValues: Set<Int>): PolicyMetadata.Builder =
+        PolicyMetadata.newBuilder()
+            .setIdentifier(simpleNameToFieldName(name))
+            .setTypeSpecificMetadata(
+                TypeSpecificPolicyMetadata.newBuilder()
+                    .setListMetadata(
+                        TypeSpecificPolicyMetadata.ListPolicyMetadata.newBuilder()
+                            .setEnumMetadata(
+                                TypeSpecificPolicyMetadata.EnumPolicyMetadata.newBuilder()
+                                    .addAllValues(
+                                        enumValues.map {
+                                            TypeSpecificPolicyMetadata.EnumPolicyMetadata.EnumValue
+                                                .newBuilder()
+                                                .setIntValue(it)
+                                                .build()
+                                        }
+                                    )
+                            )
+                    )
+            )
+
+    @Test
+    fun test_listOfEnumPolicy_outputMatches() {
+        val policyList =
+            PolicyMetadataList.newBuilder()
+                .addPolicyMetadata(
+                    listOfEnumTestPolicy(
+                            "test.package.PolicyContainer.MY_TEST_ENUM_LIST_POLICY",
+                            enumValues = setOf(1, 9, 17),
+                        )
+                        .addAllAllowedScopes(listOf(PolicyMetadata.PolicyScope.POLICY_SCOPE_DEVICE))
+                        .setAffectedResource(PolicyMetadata.ResourceType.RESOURCE_DEVICE_WIDE)
+                )
+                .build()
+
+        val javaFile = PolicyMetadataCodeGenerator.generate(policyList)
+
+        assertThat(javaFileToString(javaFile))
+            .isEqualTo(
+                fillInFile(
+                    includes =
+                        """
+                import android.app.admin.PolicyIdentifier;
+                import java.lang.Integer;
+                import java.util.ArrayList;
+                import java.util.List;
+                import java.util.Set;
+                """,
+                    staticImports = listOf("test.package.PolicyContainer.MY_TEST_ENUM_LIST_POLICY"),
+                    code =
+                        """
+                policies.add(new ListPolicyMetadata<Integer>(
+                    /* id= */ MY_TEST_ENUM_LIST_POLICY,
+                    /* elementMetadata= */ new EnumPolicyMetadata(
+                        /* id= */ new PolicyIdentifier<Integer>(MY_TEST_ENUM_LIST_POLICY.getId() + "#elements"),
+                        /* allowedScopes= */ Set.of(
+                            2
+                        ),
+                        /* affectedResource= */ 1,
+                        /* requiredPermission= */ null,
+                        /* requiredCrossUserPermission= */ null,
+                        /* allowedDpcTypes= */ Set.of(),
+                        /* allowedValues= */ Set.of(
+                          1,
+                          9,
+                          17
+                        )
+                    ),
+                    /* emptyListAllowed= */ false
+                ));
+                """,
+                )
+            )
     }
 
     @Test
     fun test_permissions_outputMatches() {
-        val policyList = PolicyMetadataList.newBuilder()
-            .addPolicyMetadata(
-                boolTestPolicy(
-                    "test.package.PolicyContainer.MY_TEST_BOOL_POLICY"
-                )
-                    .addAllAllowedScopes(
-                        listOf(
-                            PolicyMetadata.PolicyScope.POLICY_SCOPE_USER,
-                            PolicyMetadata.PolicyScope.POLICY_SCOPE_PARENT_USER
+        val policyList =
+            PolicyMetadataList.newBuilder()
+                .addPolicyMetadata(
+                    boolTestPolicy("test.package.PolicyContainer.MY_TEST_BOOL_POLICY")
+                        .addAllAllowedScopes(
+                            listOf(
+                                PolicyMetadata.PolicyScope.POLICY_SCOPE_USER,
+                                PolicyMetadata.PolicyScope.POLICY_SCOPE_PARENT_USER,
+                            )
                         )
-                    )
-                    .setAffectedResource(
-                        PolicyMetadata.ResourceType.RESOURCE_DEVICE_WIDE
-                    )
-                    .setRequiredPermission("test_permission")
-                    .setRequiredCrossUserPermission("test_cross_permission")
-            )
-            .build()
+                        .setAffectedResource(PolicyMetadata.ResourceType.RESOURCE_DEVICE_WIDE)
+                        .setRequiredPermission("test_permission")
+                        .setRequiredCrossUserPermission("test_cross_permission")
+                )
+                .build()
 
         val javaFile = PolicyMetadataCodeGenerator.generate(policyList)
 
-        assertThat(javaFileToString(javaFile)).isEqualTo(
-            fillInFile(
-                staticImports = listOf("test.package.PolicyContainer.MY_TEST_BOOL_POLICY"),
-                code = """
+        assertThat(javaFileToString(javaFile))
+            .isEqualTo(
+                fillInFile(
+                    staticImports = listOf("test.package.PolicyContainer.MY_TEST_BOOL_POLICY"),
+                    code =
+                        """
                 policies.add(new BooleanPolicyMetadata(
                     /* id= */ MY_TEST_BOOL_POLICY,
                     /* allowedScopes= */ Set.of(
@@ -469,35 +595,37 @@ class PolicyMetadataCodeGeneratorTest {
                     /* requiredCrossUserPermission= */ "test_cross_permission",
                     /* allowedDpcTypes= */ Set.of()
                 ));
-                """
+                """,
+                )
             )
-        )
     }
 
     @Test
     fun test_allowedDpcTypes_outputMatches() {
-        val policyList = PolicyMetadataList.newBuilder()
-            .addPolicyMetadata(
-                enumTestPolicy("test.package.MY_TEST_POLICY", setOf())
-                    .addAllAllowedScopes(listOf(
-                        PolicyMetadata.PolicyScope.POLICY_SCOPE_USER,
-                    ))
-                    .setAffectedResource(
-                        PolicyMetadata.ResourceType.RESOURCE_DEVICE_WIDE
-                    )
-                    .addAllAllowedDpcTypes(listOf(
-                        PolicyMetadata.DpcType.DPC_TYPE_DEFAULT_DEVICE_OWNER,
-                        PolicyMetadata.DpcType.DPC_TYPE_PROFILE_OWNER
-                    ))
-            )
-            .build()
+        val policyList =
+            PolicyMetadataList.newBuilder()
+                .addPolicyMetadata(
+                    enumTestPolicy("test.package.MY_TEST_POLICY", setOf())
+                        .addAllAllowedScopes(listOf(PolicyMetadata.PolicyScope.POLICY_SCOPE_USER))
+                        .setAffectedResource(PolicyMetadata.ResourceType.RESOURCE_DEVICE_WIDE)
+                        .addAllAllowedDpcTypes(
+                            listOf(
+                                PolicyMetadata.DpcType.DPC_TYPE_DEVICE_OWNER,
+                                PolicyMetadata.DpcType
+                                    .DPC_TYPE_MANAGED_PROFILE_OWNER_OF_PERSONAL_OWNED_DEVICE,
+                            )
+                        )
+                )
+                .build()
 
         val javaFile = PolicyMetadataCodeGenerator.generate(policyList)
 
-        assertThat(javaFileToString(javaFile)).isEqualTo(
-            fillInFile(
-              staticImports = listOf("test.package.MY_TEST_POLICY"),
-               code = """
+        assertThat(javaFileToString(javaFile))
+            .isEqualTo(
+                fillInFile(
+                    staticImports = listOf("test.package.MY_TEST_POLICY"),
+                    code =
+                        """
                 policies.add(new EnumPolicyMetadata(
                     /* id= */ MY_TEST_POLICY,
                     /* allowedScopes= */ Set.of(
@@ -507,45 +635,49 @@ class PolicyMetadataCodeGeneratorTest {
                     /* requiredPermission= */ null,
                     /* requiredCrossUserPermission= */ null,
                     /* allowedDpcTypes= */ Set.of(
-                        1, // DEFAULT_DEVICE_OWNER
-                        5  // PROFILE_OWNER
+                        1, // DEVICE_OWNER
+                        5  // MANAGED_PROFILE_OWNER_OF_PERSONAL_OWNED_DEVICE
                     ),
                     /* allowedValues= */ Set.of()
                 ));
-                """
+                """,
+                )
             )
-        )
     }
 
     @Test
     fun test_allAllowedDpcTypes_outputMatches() {
-        val policyList = PolicyMetadataList.newBuilder()
-            .addPolicyMetadata(
-                enumTestPolicy("test.package.MY_TEST_POLICY", setOf())
-                    .addAllAllowedScopes(listOf(
-                        PolicyMetadata.PolicyScope.POLICY_SCOPE_USER,
-                    ))
-                    .setAffectedResource(
-                        PolicyMetadata.ResourceType.RESOURCE_DEVICE_WIDE
-                    )
-                    .addAllAllowedDpcTypes(listOf(
-                        PolicyMetadata.DpcType.DPC_TYPE_DEFAULT_DEVICE_OWNER,
-                        PolicyMetadata.DpcType.DPC_TYPE_FINANCED_DEVICE_OWNER,
-                        PolicyMetadata.DpcType.DPC_TYPE_PROFILE_OWNER_OF_ORGANIZATION_OWNED_DEVICE,
-                        PolicyMetadata.DpcType.DPC_TYPE_PROFILE_OWNER_ON_USER0,
-                        PolicyMetadata.DpcType.DPC_TYPE_PROFILE_OWNER,
-                        PolicyMetadata.DpcType.DPC_TYPE_PROFILE_OWNER_ON_USER,
-                        PolicyMetadata.DpcType.DPC_TYPE_AFFILIATED_PROFILE_OWNER_ON_USER,
-                    ))
-            )
-            .build()
+        val policyList =
+            PolicyMetadataList.newBuilder()
+                .addPolicyMetadata(
+                    enumTestPolicy("test.package.MY_TEST_POLICY", setOf())
+                        .addAllAllowedScopes(listOf(PolicyMetadata.PolicyScope.POLICY_SCOPE_USER))
+                        .setAffectedResource(PolicyMetadata.ResourceType.RESOURCE_DEVICE_WIDE)
+                        .addAllAllowedDpcTypes(
+                            listOf(
+                                PolicyMetadata.DpcType.DPC_TYPE_DEVICE_OWNER,
+                                PolicyMetadata.DpcType.DPC_TYPE_FINANCED_DEVICE_OWNER,
+                                PolicyMetadata.DpcType
+                                    .DPC_TYPE_MANAGED_PROFILE_OWNER_OF_ORGANIZATION_OWNED_DEVICE,
+                                PolicyMetadata.DpcType.DPC_TYPE_PROFILE_OWNER_ON_USER0,
+                                PolicyMetadata.DpcType
+                                    .DPC_TYPE_MANAGED_PROFILE_OWNER_OF_PERSONAL_OWNED_DEVICE,
+                                PolicyMetadata.DpcType
+                                    .DPC_TYPE_UNAFFILIATED_FULL_USER_PROFILE_OWNER,
+                                PolicyMetadata.DpcType.DPC_TYPE_AFFILIATED_FULL_USER_PROFILE_OWNER,
+                            )
+                        )
+                )
+                .build()
 
         val javaFile = PolicyMetadataCodeGenerator.generate(policyList)
 
-        assertThat(javaFileToString(javaFile)).isEqualTo(
-            fillInFile(
-              staticImports = listOf("test.package.MY_TEST_POLICY"),
-               code = """
+        assertThat(javaFileToString(javaFile))
+            .isEqualTo(
+                fillInFile(
+                    staticImports = listOf("test.package.MY_TEST_POLICY"),
+                    code =
+                        """
                 policies.add(new EnumPolicyMetadata(
                     /* id= */ MY_TEST_POLICY,
                     /* allowedScopes= */ Set.of(
@@ -555,18 +687,18 @@ class PolicyMetadataCodeGeneratorTest {
                     /* requiredPermission= */ null,
                     /* requiredCrossUserPermission= */ null,
                     /* allowedDpcTypes= */ Set.of(
-                        1, // DEFAULT_DEVICE_OWNER
+                        1, // DEVICE_OWNER
                         2, // FINANCED_DEVICE_OWNER
-                        3, // PROFILE_OWNER_OF_ORGANIZATION_OWNED_DEVICE
+                        3, // MANAGED_PROFILE_OWNER_OF_ORGANIZATION_OWNED_DEVICE
                         4, // PROFILE_OWNER_ON_USER0
-                        5, // PROFILE_OWNER
-                        6, // PROFILE_OWNER_ON_USER
-                        7  // AFFILIATED_PROFILE_OWNER_ON_USER
+                        5, // MANAGED_PROFILE_OWNER_OF_PERSONAL_OWNED_DEVICE
+                        6, // UNAFFILIATED_FULL_USER_PROFILE_OWNER
+                        7  // AFFILIATED_FULL_USER_PROFILE_OWNER
                     ),
                     /* allowedValues= */ Set.of()
                 ));
-                """
+                """,
+                )
             )
-        )
     }
 }

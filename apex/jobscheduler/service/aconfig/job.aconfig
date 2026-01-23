@@ -23,23 +23,6 @@ flag {
 }
 
 flag {
-    name: "relax_prefetch_connectivity_constraint_only_on_charger"
-    namespace: "backstage_power"
-    description: "Only relax a prefetch job's connectivity constraint when the device is charging and battery is not low"
-    bug: "299329948"
-}
-
-flag {
-   name: "thermal_restrictions_to_fgs_jobs"
-   namespace: "backstage_power"
-   description: "Apply thermal restrictions to FGS jobs."
-   bug: "315157163"
-   metadata {
-       purpose: PURPOSE_BUGFIX
-   }
-}
-
-flag {
    name: "adjust_quota_default_constants"
    namespace: "backstage_power"
    description: "Adjust quota default parameters"
@@ -58,26 +41,6 @@ flag {
     namespace: "backstage_power"
     description: "Limit the schedule calls towards the persisted proxy jobs"
     bug: "377912323"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "enhance_system_job_limit_exception"
-    namespace: "backstage_power"
-    description: "Enhance the IllegalStateException with debug information about top jobs when the system UID exceeds the job scheduling limit."
-    bug: "438864409"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "include_trace_tag_in_job_name"
-    namespace: "backstage_power"
-    description: "Add the trace tag to the job name"
-    bug: "354795473"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

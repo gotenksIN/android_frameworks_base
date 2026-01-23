@@ -41,7 +41,7 @@ import com.android.settingslib.graph.proto.PreferenceProto
 import com.android.settingslib.graph.proto.PreferenceProto.ActionTarget
 import com.android.settingslib.graph.proto.PreferenceScreenProto
 import com.android.settingslib.graph.proto.TextProto
-import com.android.settingslib.catalyst.flags.Flags as CatalystFlags
+import com.android.settingslib.metadata.CatalystFlagProviderFactory
 import com.android.settingslib.metadata.EXTRA_BINDING_SCREEN_ARGS
 import com.android.settingslib.metadata.IntRangeValuePreference
 import com.android.settingslib.metadata.ValidatedKeyParameters
@@ -61,6 +61,7 @@ import com.android.settingslib.metadata.PreferenceTitleProvider
 import com.android.settingslib.metadata.ReadWritePermit
 import com.android.settingslib.metadata.SensitivityLevel.Companion.HIGH_SENSITIVITY
 import com.android.settingslib.metadata.SensitivityLevel.Companion.UNKNOWN_SENSITIVITY
+import com.android.settingslib.metadata.preferencesapi.PreferencesApiScreen
 import com.android.settingslib.metadata.getPreferenceIcon
 import com.android.settingslib.metadata.isPreferenceIndexable
 import com.android.settingslib.preference.PreferenceScreenCreator
@@ -99,7 +100,7 @@ private constructor(
         for (screen in request.screens) {
             val screenKey = screen.screenKey
             val factory = factories[screenKey] ?: continue
-            val hasParameters = if (CatalystFlags.catalystUseKeyParameters()) {
+            val hasParameters = if (CatalystFlagProviderFactory.catalystUseKeyParameters()) {
                 screen.keyParameters != null
             } else {
                 screen.args != null
@@ -222,7 +223,7 @@ private constructor(
 
         val args = preferenceScreen.peekExtras()?.getBundle(EXTRA_BINDING_SCREEN_ARGS)
 
-        if (CatalystFlags.catalystUseKeyParameters()) {
+        if (CatalystFlagProviderFactory.catalystUseKeyParameters()) {
             val parametersSchema = PreferenceScreenRegistry.getScreenParametersSchema(key)
             val keyParameters = args?.let { parametersSchema?.prepare(it) }
 
@@ -251,11 +252,11 @@ private constructor(
             val screen = screens.getOrPut(screenKey) { PreferenceScreenProto.newBuilder() }
             screen.root = preferenceGroupProto { preference = preferenceProto { key = screenKey } }
             screen.parameterized = true
-            if (CatalystFlags.catalystUseKeyParameters()) {
-                screen.parametersSchema = factory.parametersSchema.toJsonString()
+            if (CatalystFlagProviderFactory.catalystUseKeyParameters()) {
+                screen.parametersSchema = factory.parametersSchema.toJsonString(context)
             }
             if (includeParameters) {
-                if (CatalystFlags.catalystUseKeyParameters()) {
+                if (CatalystFlagProviderFactory.catalystUseKeyParameters()) {
                     factory.keyParameters(context).collect {
                         screen.addKeyParameters(it.toProto())
                     }
@@ -266,7 +267,7 @@ private constructor(
         }
         if (includeHierarchy) {
             var flagEnabled: Boolean? = null
-            if (CatalystFlags.catalystUseKeyParameters()) {
+            if (CatalystFlagProviderFactory.catalystUseKeyParameters()) {
                 factory.keyParameters(context).collect {
                     if (flagEnabled == false) return@collect
                     val screenMetadata = factory.createWithKeyParameters(context, it)
@@ -289,7 +290,7 @@ private constructor(
     private suspend fun addPreferenceScreen(metadata: PreferenceScreenMetadata): Boolean {
         if (!checkScreenFlag(metadata)) return false
 
-        return if (CatalystFlags.catalystUseKeyParameters()) {
+        return if (CatalystFlagProviderFactory.catalystUseKeyParameters()) {
             addPreferenceScreenWithKeyParameters(metadata.key, metadata.keyParameters) {
                 completeHierarchy = metadata.hasCompleteHierarchy()
                 root = if (includeHierarchy) {
@@ -311,10 +312,16 @@ private constructor(
     }
 
     private fun checkScreenFlag(metadata: PreferenceScreenMetadata): Boolean {
-        if (
-            !forceIncludeAllScreens &&
-                (metadata as? PreferenceScreenCreator)?.isFlagEnabled(context) == false
-        ) {
+        val isFlagDisabled = when (metadata) {
+            is PreferenceScreenCreator, is PreferencesApiScreen-> {
+                !metadata.isFlagEnabled(context)
+            }
+            else -> {
+                false
+            }
+        }
+
+        if (!forceIncludeAllScreens && isFlagDisabled) {
             Log.w(TAG, "Ignore ${metadata.key} as the flag is disabled")
             return false
         }
@@ -358,7 +365,7 @@ private constructor(
             PreferenceScreenProto.newBuilder().also {
                 it.parameterized = true
                 PreferenceScreenRegistry.getScreenParametersSchema(key)?.let { schema ->
-                    it.parametersSchema = schema.toJsonString()
+                    it.parametersSchema = schema.toJsonString(context)
                 }
             }
 
@@ -497,7 +504,7 @@ private constructor(
                     fragment.createPreferenceScreen(preferenceScreenFactory, coroutineScope)
                 val screenKey = screen?.key
                 if (!screenKey.isNullOrEmpty()) {
-                    if (CatalystFlags.catalystUseKeyParameters()) {
+                    if (CatalystFlagProviderFactory.catalystUseKeyParameters()) {
                         addPreferenceScreenWithKeyParameters(screenKey, null) { root = screen.toProto() }
                     } else {
                         @Suppress("CheckReturnValue")
@@ -570,7 +577,7 @@ fun PreferenceMetadata.toProto(
         if (metadata is PreferenceScreenMetadata) {
             actionTarget = actionTargetProto {
                 key = metadata.key
-                if (CatalystFlags.catalystUseKeyParameters()) {
+                if (CatalystFlagProviderFactory.catalystUseKeyParameters()) {
                     metadata.keyParameters?.let { keyParameters = it.toProto() }
                 } else {
                     metadata.arguments?.let { args = it.toProto() }
@@ -647,14 +654,27 @@ fun <T> PersistentPreference<T>.evalWritePermit(
     context: Context,
     callingPid: Int,
     callingUid: Int,
-): Int? =
-    when {
-        sensitivityLevel == UNKNOWN_SENSITIVITY || sensitivityLevel == HIGH_SENSITIVITY ->
-            ReadWritePermit.DISALLOW
+): Int? {
+    // Build.IS_DEBUGGABLE is a hidden API and cannot be used here because this module
+    // is built against "system_current". We check Build.TYPE instead to identify
+    // debuggable builds (userdebug/eng).
+    val isDebuggable = Build.TYPE == "eng" || Build.TYPE == "userdebug"
+
+    return when {
+        // High sensitivity is strictly disallowed.
+        sensitivityLevel == HIGH_SENSITIVITY -> ReadWritePermit.DISALLOW
+
+        // Unknown sensitivity is disallowed, unless we are on a debuggable build.
+        sensitivityLevel == UNKNOWN_SENSITIVITY && !isDebuggable -> ReadWritePermit.DISALLOW
+
+        // If the app lacks the required permissions, require them.
         getWritePermissions(context)?.check(context, callingPid, callingUid) == false ->
             ReadWritePermit.REQUIRE_APP_PERMISSION
+
+        // Otherwise, delegate to the specific permit logic.
         else -> getWritePermit(context, callingPid, callingUid)
     }
+}
 
 private fun PreferenceMetadata.getTitleTextProto(context: Context, isRoot: Boolean): TextProto? {
     if (isRoot && this is PreferenceScreenMetadata) {

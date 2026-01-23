@@ -503,20 +503,22 @@ public class AudioTrack extends PlayerBase
     public static final int PERFORMANCE_MODE_POWER_SAVING = 2;
 
     /**
-     * Accuracy mode for {@link #flushFromFrame(long, int)} to indicate the framework will flush the
+     * Accuracy mode for {@link #flushWrittenFramesFromPosition(long, int)}
+     * to indicate the framework will flush the
      * data as close as possible, but not below, to the requested position.
      *
-     * @see #flushFromFrame(long, int)
+     * @see #flushWrittenFramesFromPosition(long, int)
      */
     @FlaggedApi(FLAG_PARTIAL_FLUSH_FOR_PCM_OFFLOAD)
     public static final int FLUSH_FROM_ACCURACY_BEST_EFFORT = 0;
 
     /**
-     * Accuracy mode for {@link #flushFromFrame(long, int)} to indicate the AudioTrack must be
+     * Accuracy mode for {@link #flushWrittenFramesFromPosition(long, int)}
+     * to indicate the AudioTrack must be
      * flushed from the requested position. If it is not possible to flush from the requested
      * position, the AudioTrack must not be flushed.
      *
-     * @see #flushFromFrame(long, int)
+     * @see #flushWrittenFramesFromPosition(long, int)
      */
     @FlaggedApi(FLAG_PARTIAL_FLUSH_FOR_PCM_OFFLOAD)
     public static final int FLUSH_FROM_ACCURACY_EXACT = 1;
@@ -1395,8 +1397,9 @@ public class AudioTrack extends PlayerBase
         * of the audio data used for the {@link AudioTrack} is different from
         * the original codec.
         *
-        * The values for codec media types should be provided using corresponding constants
-        * from the {@link MediaFormat} class.
+        * The values for codec media types should be provided using corresponding constants from the
+        * {@link MediaFormat} class. For example, {@link MediaFormat#MIMETYPE_AUDIO_EAC3_JOC} may be
+        * used for audio content originating from Dolby Atmos media.
         *
         * @param codecMediaType a non-null string indicating codec type using media string
         * @return the same Builder instance
@@ -1615,9 +1618,9 @@ public class AudioTrack extends PlayerBase
      * stream.
      * After the end of stream, previously set padding and delay values are ignored.
      * Can only be called only if the AudioTrack is opened in offload mode
-     * {@see Builder#setOffloadedPlayback(boolean)}.
-     * Can only be called only if the AudioTrack is in state {@link #PLAYSTATE_PLAYING}
-     * {@see #getPlayState()}.
+     * see {@link Builder#setOffloadedPlayback(boolean)}.
+     * Can only be called only if the AudioTrack is in state {@link #PLAYSTATE_PLAYING};
+     * see {@link #getPlayState()}.
      * Use this method in the same thread as any write() operation.
      */
     public void setOffloadEndOfStream() {
@@ -2337,6 +2340,35 @@ public class AudioTrack extends PlayerBase
         }
     }
 
+    /**
+     * Returns the number of audio frames written to a {@link #MODE_STREAM} {@link AudioTrack}.
+     * <p> The counter starts from zero and is incremented for every successful
+     * {@link #write} call to a {@code MODE_STREAM} {@code AudioTrack},
+     * and is set to the return value of a successful
+     * {@link #flushWrittenFramesFromPosition(long, int)} call.
+     * This counter is not reset when the track is flushed by {@link #flush()},
+     * stopped by {@link #stop()}, or paused by {@link #pause()}.
+     *
+     * The frames returned by this method represents the current frame position
+     * for {@link #flushWrittenFramesFromPosition(long, int)}.
+     * It does not represent the actual frames rendered.
+     *
+     * @return the number of frames written.
+     * @throws IllegalStateException if the track is not initialized or called on
+     *         a {@code MODE_STATIC} {@code AudioTrack}.
+     * @see #flushWrittenFramesFromPosition(long, int)
+     */
+    @FlaggedApi(FLAG_PARTIAL_FLUSH_FOR_PCM_OFFLOAD)
+    public long getWrittenFramesCount() {
+        if (mState == STATE_UNINITIALIZED) {
+            throw new IllegalStateException(
+                    "getWrittenFramesCount() called on uninitialized AudioTrack.");
+        } else if (mDataLoadMode == MODE_STATIC) {
+            throw new IllegalStateException(
+                    "getWrittenFramesCount() called on static AudioTrack.");
+        }
+        return native_get_written_frames_count();
+    }
 
     /**
      * Returns the effective size of the <code>AudioTrack</code> buffer
@@ -3233,7 +3265,8 @@ public class AudioTrack extends PlayerBase
     /**
      * Flush all data from the given position.
      * <p> If this operation returns successfully, {@link #write} after a call to this method will
-     * be written from frame position returned by this method.
+     * be written from frame position returned by this method. The method
+     * {@link #getWrittenFramesCount()} may be used to find the current frame position.
      *
      * <p> This method is only allowed in offload mode ((i.e. tracks created with
      * {@link Builder#setOffloadedPlayback(boolean)} set to {@code true})). Applications can call
@@ -3241,7 +3274,7 @@ public class AudioTrack extends PlayerBase
      *
      * <p> When clients request to flush from a certain position, the audio system will return the
      * actual flushed position based on the requested position, the requested flush accuracy, and
-     * how much it was able to discard. All data behind actual flushed position will be discarded.
+     * how much it was able to discard. All data from the actual flushed position will be discarded.
      * When the stream is flushed, the stream end (if set by {@link #setOffloadEndOfStream()}) will
      * be reset.
      *
@@ -3251,8 +3284,8 @@ public class AudioTrack extends PlayerBase
      *
      * @param accuracy the accuracy requirement when flushing. Use
      *     {@link #FLUSH_FROM_ACCURACY_BEST_EFFORT} to indicate flush as close as possible to the
-     *     requested position. Use {@link #FLUSH_FROM_ACCURACY_EXACT} to indicate mush flush from
-     *     requested position.
+     *     requested position. Use {@link #FLUSH_FROM_ACCURACY_EXACT} to indicate must flush from
+     *     the requested position.
      * @param positionInFrames the start point in frames to flush. The value must be between 0 and
      *     total written frames.
      * @return the actual flushed position or {@link #ERROR_BAD_VALUE} if the requested accuracy is
@@ -3264,10 +3297,11 @@ public class AudioTrack extends PlayerBase
      */
     @CheckResult
     @FlaggedApi(FLAG_PARTIAL_FLUSH_FOR_PCM_OFFLOAD)
-    public long flushFromFrame(long positionInFrames, @FlushFromAccuracy int accuracy) {
+    public long flushWrittenFramesFromPosition(
+            long positionInFrames, @FlushFromAccuracy int accuracy) {
         if (!mOffloaded) {
             throw new IllegalStateException(
-                    "flushFromFrame is only supported for offload track");
+                    "flushWrittenFramesFromPosition is only supported for offload track");
         }
         if (mState != STATE_INITIALIZED) {
             throw new IllegalStateException("The track is not initialized");
@@ -3848,8 +3882,7 @@ public class AudioTrack extends PlayerBase
      * Attaches an auxiliary effect to the audio track. A typical auxiliary
      * effect is a reverberation effect which can be applied on any sound source
      * that directs a certain amount of its energy to this effect. This amount
-     * is defined by setAuxEffectSendLevel().
-     * {@see #setAuxEffectSendLevel(float)}.
+     * is defined by {@link #setAuxEffectSendLevel(float)}.
      * <p>After creating an auxiliary effect (e.g.
      * {@link android.media.audiofx.EnvironmentalReverb}), retrieve its ID with
      * {@link android.media.audiofx.AudioEffect#getId()} and use it when calling
@@ -4678,6 +4711,8 @@ public class AudioTrack extends PlayerBase
 
     private native final int native_set_pos_update_period(int updatePeriod);
     private native final int native_get_pos_update_period();
+
+    private native long native_get_written_frames_count();
 
     private native final int native_set_position(int position);
     private native final int native_get_position();

@@ -355,14 +355,12 @@ constructor(
         taskSurface: SurfaceControl?,
     ) =
         traceSection("DefaultWindowDecoration#relayout") {
-            if (DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_APP_TO_WEB.isTrue) {
-                taskInfo.capturedLink?.let {
-                    appToWebRepository.setCapturedLink(
-                        taskInfo.taskId,
-                        it,
-                        taskInfo.capturedLinkTimestamp,
-                    )
-                }
+            taskInfo.capturedLink?.let {
+                appToWebRepository.setCapturedLink(
+                    taskInfo.taskId,
+                    it,
+                    taskInfo.capturedLinkTimestamp,
+                )
             }
 
             if (DesktopExperienceFlags.ENABLE_BUG_FIXES_FOR_SECONDARY_DISPLAY.isTrue) {
@@ -401,10 +399,7 @@ constructor(
             // After this line, [WindowDecoration2.taskInfo] is up-to-date and should be
             // used instead of the taskInfo passed to the relayout method.
             if (!wct.isEmpty) {
-                if (
-                    DesktopExperienceFlags.ENABLE_DESKTOP_WINDOWING_PIP.isTrue &&
-                        relayoutParams.shouldSetAppBounds
-                ) {
+                if (relayoutParams.shouldSetAppBounds) {
                     // When expanding from PiP to freeform, we need to start a Transition for
                     // applying
                     // the inset changes so that PiP receives the insets for the final bounds. This
@@ -715,10 +710,7 @@ constructor(
         } else if (DesktopModeFlags.ENABLE_FULLY_IMMERSIVE_IN_DESKTOP.isTrue && inFullImmersive) {
             showCaption = isStatusBarVisible && !isKeyguardVisibleAndOccluded
 
-            if (
-                DesktopExperienceFlags.ENABLE_DESKTOP_WINDOWING_ENTERPRISE_BUGFIX.isTrue() &&
-                    !taskInfo.isFreeform
-            ) {
+            if (!taskInfo.isFreeform) {
                 showCaption = showCaption && !isTaskLocked
             }
         } else {
@@ -733,10 +725,7 @@ constructor(
             showCaption =
                 taskInfo.isFreeform || (isStatusBarVisible && !isKeyguardVisibleAndOccluded)
 
-            if (
-                DesktopExperienceFlags.ENABLE_DESKTOP_WINDOWING_ENTERPRISE_BUGFIX.isTrue() &&
-                    !taskInfo.isFreeform
-            ) {
+            if (!taskInfo.isFreeform) {
                 showCaption = showCaption && !isTaskLocked
             }
         }

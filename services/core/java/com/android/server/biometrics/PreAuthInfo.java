@@ -39,7 +39,6 @@ import android.util.Pair;
 import android.util.Slog;
 import android.view.Display;
 
-import com.android.internal.R;
 import com.android.server.biometrics.sensors.LockoutTracker;
 
 import java.lang.annotation.Retention;
@@ -133,11 +132,6 @@ class PreAuthInfo {
         final boolean isMandatoryBiometricsAuthentication =
                 updateAuthenticatorsIfIdentityCheckIsActive(promptInfo, effectiveUserId,
                         trustManager, settingObserver);
-
-        if (!Flags.bpFallbackOptions() && isMandatoryBiometricsAuthentication
-                && promptInfo.getNegativeButtonText() == null) {
-            promptInfo.setNegativeButtonText(context.getString(R.string.cancel));
-        }
 
         final boolean biometricRequested = Utils.isBiometricRequested(promptInfo);
         final int requestedStrength = Utils.getPublicBiometricStrength(promptInfo);
@@ -287,9 +281,6 @@ class PreAuthInfo {
                     sensor.impl.getLockoutModeForUser(userId);
             if (lockoutMode == LockoutTracker.LOCKOUT_TIMED) {
                 return BIOMETRIC_LOCKOUT_TIMED;
-            } else if (lockoutMode == LockoutTracker.LOCKOUT_PERMANENT
-                    && !Flags.bpFallbackOptions()) {
-                return BIOMETRIC_LOCKOUT_PERMANENT;
             }
         } catch (RemoteException e) {
             return BIOMETRIC_HARDWARE_NOT_DETECTED;
@@ -435,8 +426,15 @@ class PreAuthInfo {
                 // Pick the first sensor error if it exists
                 if (!ineligibleSensors.isEmpty()) {
                     final Pair<BiometricSensor, Integer> pair = calculateErrorByPriority();
-                    modality |= pair.first.modality;
-                    status = pair.second;
+                    if (com.android.server.biometrics.Flags.returnCredentialNotEnrolled()
+                            && (pair.second == BIOMETRIC_INSUFFICIENT_STRENGTH
+                            || pair.second == BIOMETRIC_INSUFFICIENT_STRENGTH_AFTER_DOWNGRADE)) {
+                        modality |= TYPE_CREDENTIAL;
+                        status = CREDENTIAL_NOT_ENROLLED;
+                    } else {
+                        modality |= pair.first.modality;
+                        status = pair.second;
+                    }
                 } else {
                     modality |= TYPE_CREDENTIAL;
                     status = CREDENTIAL_NOT_ENROLLED;

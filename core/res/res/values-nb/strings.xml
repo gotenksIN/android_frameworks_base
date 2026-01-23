@@ -158,6 +158,10 @@
     <string name="wfc_mode_wifi_preferred_summary" msgid="1035175836270943089">"Ring via Wifi"</string>
     <string name="wfc_mode_cellular_preferred_summary" msgid="4958965609212575619">"Ring over mobilnettverk"</string>
     <string name="wfc_mode_wifi_only_summary" msgid="104951993894678665">"Bare wifi"</string>
+    <string name="adaptive_low_frequency_less_than_one_minute" msgid="8869498183646028708">"~ %s"</string>
+    <string name="adaptive_low_frequency_neg_less_than_one_minute" msgid="2590062535985417056">"~ −%s"</string>
+    <string name="elapsed_time_low_frequency_short_format_h_mm" msgid="6728141238066668781">"%1$d:%2$02d:--"</string>
+    <string name="elapsed_time_low_frequency_short_format_mm" msgid="2405181895215514414">"%1$02d:--"</string>
     <!-- no translation found for crossSimFormat_spn (9125246077491634262) -->
     <skip />
     <string name="crossSimFormat_spn_cross_sim_calling" msgid="5620807020002879057">"<xliff:g id="SPN">%s</xliff:g>-reserve for anrop"</string>
@@ -645,10 +649,8 @@
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"Gir appen tilgang til enheter på det lokale nettverket"</string>
     <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"bruke loopback-grensesnittet"</string>
     <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"Lar appen bruke andre apper via loopback-grensesnittet"</string>
-    <!-- no translation found for permlab_force_use_loopback_interface (1319727311706416481) -->
-    <skip />
-    <!-- no translation found for permdesc_force_use_loopback_interface (5829032514048681980) -->
-    <skip />
+    <string name="permlab_force_use_loopback_interface" msgid="1319727311706416481">"tving bruk av loopback-grensesnitt"</string>
+    <string name="permdesc_force_use_loopback_interface" msgid="5829032514048681980">"Lar appen bruke andre apper via loopback-grensesnittet uten at den andre appen trenger loopback-tillatelser"</string>
     <string name="permlab_ranging" msgid="2854543350668593390">"Relativ posisjon mellom enheter i nærheten"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"Tillat at appen avgjør den relative posisjonen mellom enheter i nærheten"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"Informasjon om prioritert NFC-betalingstjeneste"</string>
@@ -774,7 +776,7 @@
     <string name="face_acquired_too_low" msgid="4075391872960840081">"Flytt telefonen lavere"</string>
     <string name="face_acquired_too_right" msgid="6245286514593540859">"Flytt telefonen til venstre"</string>
     <string name="face_acquired_too_left" msgid="9201762240918405486">"Flytt telefonen til høyre"</string>
-    <string name="face_acquired_poor_gaze" msgid="4427153558773628020">"Se mer direkte på enheten din."</string>
+    <string name="face_acquired_poor_gaze" msgid="6746437451436776485">"Se mer direkte på kameraet"</string>
     <string name="face_acquired_not_detected" msgid="1057966913397548150">"Kan ikke se ansiktet ditt. Hold telefonen i øyehøyde."</string>
     <string name="face_acquired_too_much_motion" msgid="8199691445085189528">"For mye bevegelse. Hold telefonen stødig."</string>
     <string name="face_acquired_recalibrate" msgid="8724013080976469746">"Registrer ansiktet ditt på nytt."</string>
@@ -1454,6 +1456,9 @@
     <string name="carrier_app_notification_text" msgid="6567057546341958637">"Konfigurer"</string>
     <string name="time_zone_change_notification_title" msgid="5232503069219193218">"Tidssonen er endret"</string>
     <string name="time_zone_change_notification_body" msgid="6135793674904665585">"Nå er du i <xliff:g id="TIME_ZONE_DISPLAY_NAME">%1$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET">%2$s</xliff:g>)"</string>
+    <string name="time_zone_offset_change_notification_title" msgid="8232305835199459588">"Klokkeendring"</string>
+    <string name="time_zone_offset_change_notification_body_forward" msgid="1299493962341887576">"Klokkene er stilt <xliff:g id="TIME_ZONE_OFFSET_DURATION">%1$s</xliff:g> frem. Nå er du i <xliff:g id="TIME_ZONE_DISPLAY_NAME">%2$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET_0">%3$s</xliff:g>)."</string>
+    <string name="time_zone_offset_change_notification_body_backward" msgid="6643532078142642118">"Klokkene er stilt <xliff:g id="TIME_ZONE_OFFSET_DURATION">%1$s</xliff:g> tilbake. Nå er du i <xliff:g id="TIME_ZONE_DISPLAY_NAME">%2$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET_0">%3$s</xliff:g>)."</string>
     <string name="time_picker_dialog_title" msgid="9053376764985220821">"Angi tidspunkt"</string>
     <string name="date_picker_dialog_title" msgid="5030520449243071926">"Angi dato"</string>
     <string name="date_time_set" msgid="4603445265164486816">"Lagre"</string>
@@ -1829,16 +1834,17 @@
     <string name="accessibility_shortcut_label_gesture" msgid="7987298674836890931">"bevegelse"</string>
     <string name="accessibility_shortcut_label_quick_settings" msgid="6851280333772213611">"hurtiginnstillinger"</string>
     <string name="accessibility_shortcut_label_triple_tap" msgid="9058975959054454796">"trippeltrykk"</string>
+    <string name="accessibility_shortcut_label_top_row_key" msgid="1488840908672437180">"tilgjengelighetstast"</string>
     <string name="accessibility_uncheck_legacy_item_warning" msgid="8047830891064817447">"<xliff:g id="SERVICE_NAME">%s</xliff:g> er slått av"</string>
     <string name="edit_accessibility_shortcut_menu_button" msgid="8885752738733772935">"Endre snarveier"</string>
     <string name="done_accessibility_shortcut_menu_button" msgid="3668407723770815708">"Ferdig"</string>
     <string name="disable_accessibility_shortcut" msgid="5806091378745232383">"Slå av snarveien"</string>
     <string name="leave_accessibility_shortcut_on" msgid="6543362062336990814">"Bruk snarveien"</string>
     <string name="color_inversion_feature_name" msgid="2672824491933264951">"Fargeinvertering"</string>
-    <string name="color_correction_feature_name" msgid="7975133554160979214">"Fargekorrigering"</string>
-    <string name="one_handed_mode_feature_name" msgid="2334330034828094891">"Enhåndsmodus"</string>
+    <string name="color_correction_feature_name" msgid="7975133554160979214">"Farge­korrigering"</string>
+    <string name="one_handed_mode_feature_name" msgid="2334330034828094891">"Enhånds­modus"</string>
     <string name="reduce_bright_colors_feature_name" msgid="3222994553174604132">"Ekstra dimmet"</string>
-    <string name="hearing_aids_feature_name" msgid="1125892105105852542">"Høreapparater"</string>
+    <string name="hearing_aids_feature_name" msgid="1125892105105852542">"Høre­apparater"</string>
     <string name="autoclick_feature_name" msgid="4056260617171267864">"Autoklikk (holdetid)"</string>
     <string name="mouse_keys_feature_name" msgid="3362643216513384542">"Musetaster"</string>
     <string name="hearing_device_status_disconnected" msgid="497547752953543832">"Frakoblet"</string>
@@ -2105,6 +2111,7 @@
     <string name="app_suspended_default_message" msgid="6451215678552004172">"<xliff:g id="APP_NAME_0">%1$s</xliff:g> er ikke tilgjengelig akkurat nå. Dette administreres av <xliff:g id="APP_NAME_1">%2$s</xliff:g>."</string>
     <string name="app_suspended_more_details" msgid="211260942831587014">"Finn ut mer"</string>
     <string name="app_suspended_unsuspend_message" msgid="1665438589450555459">"Opphev pause for appen"</string>
+    <string name="locked_app_biometric_prompt_description" msgid="6853122652400451464">"<xliff:g id="APP_NAME">%1$s</xliff:g> er låst"</string>
     <string name="work_mode_off_title" msgid="6367463960165135829">"Vil du slå på jobbapper igjen?"</string>
     <string name="work_mode_turn_on" msgid="5316648862401307800">"Slå på"</string>
     <string name="work_mode_emergency_call_button" msgid="6818855962881612322">"Nød"</string>
@@ -2544,6 +2551,8 @@
     <string name="accessibility_label_clone_profile" msgid="7579118375042398784">"Klon"</string>
     <string name="accessibility_label_communal_profile" msgid="1437173163111334791">"Felles"</string>
     <string name="private_space_biometric_prompt_title" msgid="5777592909271728154">"Privat område"</string>
+    <string name="app_locked_new_notification" msgid="4409730436247596215">"Nytt varsel"</string>
+    <string name="app_locked_notification_message" msgid="4576179600328065280">"Ny melding"</string>
     <string name="redacted_notification_message" msgid="1520587845842228816">"Sensitivt varselinnhold er skjult"</string>
     <string name="redacted_notification_action_title" msgid="6942924973335920935"></string>
     <string name="screen_not_shared_sensitive_content" msgid="7058419185079565001">"Av sikkerhetsgrunner er appinnholdet skjult for skjermdelingen"</string>

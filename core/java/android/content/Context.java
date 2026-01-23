@@ -7079,6 +7079,18 @@ public abstract class Context {
     public static final String ON_DEVICE_INTELLIGENCE_SERVICE = "on_device_intelligence";
 
     /**
+     * Use with {@link #getSystemService(String)} to retrieve a {@link
+     * android.app.contentsafety.ContentSafetyManager}.
+     *
+     * @see #getSystemService(String)
+     * @see android.app.contentsafety.ContentSafetyManager
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(android.app.contentsafety.flags.Flags.FLAG_ENABLE_CONTENTSAFETY)
+    public static final String CONTENT_SAFETY_SERVICE = "content_safety";
+
+    /**
      * Use with {@link #getSystemService(String)} to retrieve a
      * {@link android.health.connect.HealthConnectManager}.
      *
@@ -7111,7 +7123,7 @@ public abstract class Context {
      *
      * @see #getSystemService(String)
      */
-    @FlaggedApi(com.android.webapp.flags.Flags.FLAG_ENABLE_WEB_APP_SERVICE)
+    @FlaggedApi(com.android.webapp.flags.Flags.FLAG_ENABLE_WEB_APP_SERVICE_V2)
     public static final String WEB_APP_SERVICE = "web_app";
 
     /**

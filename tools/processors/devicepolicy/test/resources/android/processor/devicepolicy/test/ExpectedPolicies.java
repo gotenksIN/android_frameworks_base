@@ -22,6 +22,8 @@ import static android.app.admin.PolicyIdentifier.SIMPLE_INTEGER_POLICY;
 import static android.app.admin.PolicyIdentifier.SIMPLE_STRING_LIST_POLICY;
 import static android.app.admin.PolicyIdentifier.SIMPLE_STRING_POLICY;
 import static android.app.admin.PolicyIdentifier.TEST_AFFILIATED_PROFILE_OWNER_ON_USER_ALLOWED;
+import static android.app.admin.PolicyIdentifier.TEST_AFFILIATED_PROFILE_OWNER_ON_USER_SAME_AS_UNAFFILIATED;
+import static android.app.admin.PolicyIdentifier.TEST_AFFILIATED_PROFILE_OWNER_ON_USER_SAME_AS_UNAFFILIATED_DISALLOWED;
 import static android.app.admin.PolicyIdentifier.TEST_DEFAULT_DEVICE_OWNER_ALLOWED;
 import static android.app.admin.PolicyIdentifier.TEST_FINANCED_DEVICE_OWNER_ALLOWED;
 import static android.app.admin.PolicyIdentifier.TEST_MULTIPLE_DPC_TYPES_ALLOWED;
@@ -91,7 +93,7 @@ public class Policies {
             /* requiredPermission= */ null,
             /* requiredCrossUserPermission= */ null,
             /* allowedDpcTypes= */ Set.of(
-                1  // DEFAULT_DEVICE_OWNER
+                1  // DEVICE_OWNER
             )
         ));
         policies.add(new IntegerPolicyMetadata(
@@ -115,7 +117,7 @@ public class Policies {
             /* requiredPermission= */ null,
             /* requiredCrossUserPermission= */ null,
             /* allowedDpcTypes= */ Set.of(
-                3  // PROFILE_OWNER_OF_ORGANIZATION_OWNED_DEVICE
+                3  // MANAGED_PROFILE_OWNER_OF_ORGANIZATION_OWNED_DEVICE
             )
         ));
         policies.add(new IntegerPolicyMetadata(
@@ -139,7 +141,7 @@ public class Policies {
             /* requiredPermission= */ null,
             /* requiredCrossUserPermission= */ null,
             /* allowedDpcTypes= */ Set.of(
-                5  // PROFILE_OWNER
+                5  // MANAGED_PROFILE_OWNER_OF_PERSONAL_OWNED_DEVICE
             )
         ));
         policies.add(new IntegerPolicyMetadata(
@@ -151,7 +153,8 @@ public class Policies {
             /* requiredPermission= */ null,
             /* requiredCrossUserPermission= */ null,
             /* allowedDpcTypes= */ Set.of(
-                6  // PROFILE_OWNER_ON_USER
+                6, // UNAFFILIATED_FULL_USER_PROFILE_OWNER
+                7  // AFFILIATED_FULL_USER_PROFILE_OWNER
             )
         ));
         policies.add(new IntegerPolicyMetadata(
@@ -163,8 +166,31 @@ public class Policies {
             /* requiredPermission= */ null,
             /* requiredCrossUserPermission= */ null,
             /* allowedDpcTypes= */ Set.of(
-                7  // AFFILIATED_PROFILE_OWNER_ON_USER
+                7  // AFFILIATED_FULL_USER_PROFILE_OWNER
             )
+        ));
+        policies.add(new IntegerPolicyMetadata(
+            /* id= */ TEST_AFFILIATED_PROFILE_OWNER_ON_USER_SAME_AS_UNAFFILIATED,
+            /* allowedScopes= */ Set.of(
+                1
+            ),
+            /* affectedResource= */ 1,
+            /* requiredPermission= */ null,
+            /* requiredCrossUserPermission= */ null,
+            /* allowedDpcTypes= */ Set.of(
+                6, // UNAFFILIATED_FULL_USER_PROFILE_OWNER
+                7  // AFFILIATED_FULL_USER_PROFILE_OWNER
+            )
+        ));
+        policies.add(new IntegerPolicyMetadata(
+            /* id= */ TEST_AFFILIATED_PROFILE_OWNER_ON_USER_SAME_AS_UNAFFILIATED_DISALLOWED,
+            /* allowedScopes= */ Set.of(
+                1
+            ),
+            /* affectedResource= */ 1,
+            /* requiredPermission= */ null,
+            /* requiredCrossUserPermission= */ null,
+            /* allowedDpcTypes= */ Set.of()
         ));
         policies.add(new IntegerPolicyMetadata(
             /* id= */ TEST_MULTIPLE_DPC_TYPES_ALLOWED,
@@ -175,10 +201,10 @@ public class Policies {
             /* requiredPermission= */ null,
             /* requiredCrossUserPermission= */ null,
             /* allowedDpcTypes= */ Set.of(
-                1, // DEFAULT_DEVICE_OWNER
-                3, // PROFILE_OWNER_OF_ORGANIZATION_OWNED_DEVICE
-                5, // PROFILE_OWNER
-                7  // AFFILIATED_PROFILE_OWNER_ON_USER
+                1, // DEVICE_OWNER
+                3, // MANAGED_PROFILE_OWNER_OF_ORGANIZATION_OWNED_DEVICE
+                5, // MANAGED_PROFILE_OWNER_OF_PERSONAL_OWNED_DEVICE
+                7  // AFFILIATED_FULL_USER_PROFILE_OWNER
             )
         ));
         policies.add(new StringPolicyMetadata(

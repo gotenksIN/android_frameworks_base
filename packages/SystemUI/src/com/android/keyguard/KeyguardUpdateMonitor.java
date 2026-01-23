@@ -47,7 +47,6 @@ import static com.android.internal.widget.LockPatternUtils.StrongAuthTracker.STR
 import static com.android.internal.widget.LockPatternUtils.StrongAuthTracker.STRONG_AUTH_REQUIRED_AFTER_USER_LOCKDOWN;
 import static com.android.internal.widget.LockPatternUtils.StrongAuthTracker.STRONG_BIOMETRIC_AUTH_REQUIRED_FOR_SECURE_LOCK_DEVICE;
 import static com.android.systemui.Flags.glanceableHubV2;
-import static com.android.systemui.Flags.simNextSubId;
 import static com.android.systemui.Flags.simPinBouncerReset;
 import static com.android.systemui.statusbar.policy.DevicePostureController.DEVICE_POSTURE_OPENED;
 
@@ -125,7 +124,6 @@ import com.android.settingslib.Utils;
 import com.android.settingslib.WirelessUtils;
 import com.android.settingslib.fuelgauge.BatteryStatus;
 import com.android.systemui.CoreStartable;
-import com.android.systemui.Flags;
 import com.android.systemui.ambient.statusbar.shared.flag.OngoingActivityChipsOnDream;
 import com.android.systemui.biometrics.AuthController;
 import com.android.systemui.biometrics.FingerprintInteractiveToAuthProvider;
@@ -500,8 +498,6 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
         }
     }
 
-    @Deprecated
-    private final SparseBooleanArray mUserIsUnlocked = new SparseBooleanArray();
     private final SparseBooleanArray mUserHasTrust = new SparseBooleanArray();
     private final SparseBooleanArray mUserTrustIsManaged = new SparseBooleanArray();
     private final SparseBooleanArray mUserTrustIsUsuallyManaged = new SparseBooleanArray();
@@ -2193,7 +2189,6 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
     private void handleUserUnlocked(int userId) {
         Assert.isMainThread();
         mLogger.logUserUnlocked(userId);
-        mUserIsUnlocked.put(userId, true);
         mNeedsSlowUnlockTransition = resolveNeedsSlowUnlockTransition();
         for (int i = 0; i < mCallbacks.size(); i++) {
             KeyguardUpdateMonitorCallback cb = mCallbacks.get(i).get();
@@ -2207,14 +2202,12 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
         Assert.isMainThread();
         boolean isUnlocked = mUserManager.isUserUnlocked(userId);
         mLogger.logUserStopped(userId, isUnlocked);
-        mUserIsUnlocked.put(userId, isUnlocked);
     }
 
     @VisibleForTesting
     void handleUserRemoved(int userId) {
         Assert.isMainThread();
         mLogger.logUserRemoved(userId);
-        mUserIsUnlocked.delete(userId);
         mUserTrustIsUsuallyManaged.delete(userId);
     }
 
@@ -2608,9 +2601,6 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
 
         mTaskStackChangeListeners.registerTaskStackListener(mTaskStackListener);
         int user = mSelectedUserInteractor.getSelectedUserId();
-        boolean isUserUnlocked = mUserManager.isUserUnlocked(user);
-        mLogger.logUserUnlockedInitialState(user, isUserUnlocked);
-        mUserIsUnlocked.put(user, isUserUnlocked);
         updateSecondaryLockscreenRequirement(user);
         List<UserInfo> allUsers = mUserManager.getUsers();
         for (UserInfo userInfo : allUsers) {
@@ -2846,11 +2836,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
      * @see Intent#ACTION_USER_UNLOCKED
      */
     public boolean isUserUnlocked(int userId) {
-        if (Flags.userEncryptedSource()) {
-            return mUserManager.isUserUnlocked(userId);
-        } else {
-            return mUserIsUnlocked.get(userId);
-        }
+        return mUserManager.isUserUnlocked(userId);
     }
 
     /**
@@ -4252,35 +4238,20 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
      * @return subid or {@link SubscriptionManager#INVALID_SUBSCRIPTION_ID} if none found
      */
     public int getNextSubIdForState(int state) {
-        if (simNextSubId()) {
-            int resultSubId = SubscriptionManager.INVALID_SUBSCRIPTION_ID;
-            int bestSlotId = Integer.MAX_VALUE; // Favor lowest slot first
+        int resultSubId = SubscriptionManager.INVALID_SUBSCRIPTION_ID;
+        int bestSlotId = Integer.MAX_VALUE; // Favor lowest slot first
 
-            synchronized (mSimDataLockObject) {
-                for (var simDataBySlotId : mSimDatasBySlotId.entrySet()) {
-                    final int subId = simDataBySlotId.getValue().subId;
-                    final int slotId = simDataBySlotId.getKey();
-                    if (state == getSimStateForSlotId(slotId) && bestSlotId > slotId) {
-                        resultSubId = subId;
-                        bestSlotId = slotId;
-                    }
+        synchronized (mSimDataLockObject) {
+            for (var simDataBySlotId : mSimDatasBySlotId.entrySet()) {
+                final int subId = simDataBySlotId.getValue().subId;
+                final int slotId = simDataBySlotId.getKey();
+                if (state == getSimStateForSlotId(slotId) && bestSlotId > slotId) {
+                    resultSubId = subId;
+                    bestSlotId = slotId;
                 }
             }
-            return resultSubId;
         }
-        List<SubscriptionInfo> list = getSubscriptionInfo(false /* forceReload */);
-        int resultId = SubscriptionManager.INVALID_SUBSCRIPTION_ID;
-        int bestSlotId = Integer.MAX_VALUE; // Favor lowest slot first
-        for (int i = 0; i < list.size(); i++) {
-            final SubscriptionInfo info = list.get(i);
-            final int id = info.getSubscriptionId();
-            final int slotId = info.getSimSlotIndex();
-            if (state == getSimStateForSlotId(slotId) && bestSlotId > slotId) {
-                resultId = id;
-                bestSlotId = slotId;
-            }
-        }
-        return resultId;
+        return resultSubId;
     }
 
 // QTI_BEGIN: 2020-04-23: Android_UI: SystemUI: there is unexpected SIM PIN input dialog.
@@ -4498,7 +4469,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
         pw.println("    strongAuthFlags=" + Integer.toHexString(strongAuthFlags));
         pw.println("ActiveUnlockRunning="
                 + mTrustManager.isActiveUnlockRunning(mSelectedUserInteractor.getSelectedUserId()));
-        pw.println("userUnlockedCache[userid=" + userId + "]=" + mUserIsUnlocked.get(userId));
+        pw.println("userUnlockedCache[userid=" + userId + "]=" + isUserUnlocked(userId));
         pw.println("actualUserUnlocked[userid=" + userId + "]="
                 + mUserManager.isUserUnlocked(userId));
         new DumpsysTableLogger(

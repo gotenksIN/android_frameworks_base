@@ -205,6 +205,7 @@ applications that come with the platform
 
     <privapp-permissions package="com.android.contactspicker">
         <permission name="android.permission.MANAGE_CONTACTS_PICKER_SESSION" />
+        <permission name="android.permission.INTERACT_ACROSS_USERS" />
     </privapp-permissions>
 
     <privapp-permissions package="com.android.providers.calendar">
@@ -607,6 +608,8 @@ applications that come with the platform
         <permission name="android.permission.CAPTURE_TUNER_AUDIO_INPUT" />
         <permission name="android.permission.CAPTURE_VOICE_COMMUNICATION_OUTPUT" />
         <permission name="android.permission.MODIFY_CELL_BROADCASTS" />
+        <!-- Permission required for CTS test - ContentSafetyManagerTest -->
+        <permission name="android.permission.CHECK_CONTENT_SAFETY" />
         <!-- Permission required for CTS test - CtsBroadcastRadioTestCases -->
         <permission name="android.permission.ACCESS_BROADCAST_RADIO"/>
         <!-- Permission required for CTS test - CtsAmbientContextServiceTestCases -->
@@ -659,6 +662,7 @@ applications that come with the platform
         <permission name="android.permission.EXECUTE_APP_FUNCTIONS" />
         <!-- Permission required for CTS test - CtsNfcTestCases -->
         <permission name="android.permission.NFC_SET_CONTROLLER_ALWAYS_ON" />
+        <permission name="android.permission.PERFORM_GESTURE_EXCHANGE" />
         <!-- Permission required for CTS test - CtsAppTestCases -->
         <permission name="android.permission.KILL_UID" />
         <!-- Permission required for CTS test - AdvancedProtectionManagerTest -->
@@ -697,6 +701,10 @@ applications that come with the platform
         <permission name="android.permission.SHOW_POWER_MENU_PRIVILEGED" />
         <!-- Permission required for Health Connect CTS tests -->
         <permission name="android.permission.PROVIDE_HEALTH_CONNECT_DEVICE_DATA" />
+        <!-- Permission required for CTS test - CtsSerialTestCases -->
+        <permission name="android.permission.MANAGE_SERIAL_PORTS"/>
+        <!-- Permission required for CTS test - CtsMotionCuesTestCases -->
+        <permission name="android.permission.DRAW_MOTION_CUES" />
     </privapp-permissions>
 
     <privapp-permissions package="com.android.soundpicker">

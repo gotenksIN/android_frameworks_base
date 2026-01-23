@@ -41,7 +41,6 @@ import android.app.WindowConfiguration;
 import android.content.LocusId;
 import android.content.pm.ActivityInfo;
 import android.graphics.Rect;
-import android.os.Binder;
 import android.os.Debug;
 import android.os.IBinder;
 import android.util.ArrayMap;
@@ -52,6 +51,7 @@ import android.window.ITaskOrganizerController;
 import android.window.StartingWindowInfo;
 import android.window.StartingWindowRemovalInfo;
 import android.window.TaskAppearedInfo;
+import android.window.TaskCreationParams;
 import android.window.TaskOrganizer;
 import android.window.TransitionInfo;
 import android.window.TransitionRequestInfo;
@@ -125,9 +125,11 @@ public class ShellTaskOrganizer extends TaskOrganizer {
          *                                     Activity#moveTaskToBack(), {@code false} if this is
          *                                     from back button press.
          * @param isOptInOnBackInvoked {@code true} if the app opts in enableOnBackInvokedCallback.
+         * @param hasOpaqueSibling Whether the task has an opaque sibling
          */
         default void onBackPressedOnTaskRoot(RunningTaskInfo taskInfo,
-                boolean isFromMoveActivityTaskToBack, boolean isOptInOnBackInvoked) {}
+                boolean isFromMoveActivityTaskToBack, boolean isOptInOnBackInvoked,
+                boolean hasOpaqueSibling) {}
         /** Whether this task listener supports compat UI. */
         default boolean supportCompatUI() {
             // All TaskListeners should support compat UI except PIP and StageCoordinator.
@@ -231,6 +233,11 @@ public class ShellTaskOrganizer extends TaskOrganizer {
          * Notifies when a package update is requested for a list of tasks.
          */
         void onPackageUpdateRequested(List<RunningTaskInfo> updatingTasks);
+
+        /**
+         * Notifies when a package update is finished for a list of tasks.
+         */
+        void onPackageUpdateFinished(List<RunningTaskInfo> updatedTasks);
     }
     /**
      * Keys map from either a task id or {@link TaskListenerType}.
@@ -435,75 +442,19 @@ public class ShellTaskOrganizer extends TaskOrganizer {
     }
 
     /**
-     * Creates a persistent root task in WM for a particular windowing-mode.
-     * @param displayId The display to create the root task on.
-     * @param windowingMode Windowing mode to put the root task in.
+     * Creates a persistent task with the given {@link TaskCreationParams}.
+     * @param params The creation params
      * @param listener The listener to get the created task callback.
-     *
-     * @deprecated Use {@link #createRootTask(CreateRootTaskRequest, TaskListener)}
-     */
-    public void createRootTask(int displayId, int windowingMode, TaskListener listener) {
-        createRootTask(new CreateRootTaskRequest()
-                        .setDisplayId(displayId)
-                        .setWindowingMode(windowingMode),
-                listener);
-    }
-
-    /**
-     * Creates a persistent root task in WM for a particular windowing-mode.
-     * @param displayId The display to create the root task on.
-     * @param windowingMode Windowing mode to put the root task in.
-     * @param listener The listener to get the created task callback.
-     * @param removeWithTaskOrganizer True if this task should be removed when organizer destroyed.
-     *
-     * @deprecated Use {@link #createRootTask(CreateRootTaskRequest, TaskListener)}
-     */
-    public void createRootTask(int displayId, int windowingMode, TaskListener listener,
-            boolean removeWithTaskOrganizer) {
-        createRootTask(new CreateRootTaskRequest()
-                        .setDisplayId(displayId)
-                        .setWindowingMode(windowingMode)
-                        .setRemoveWithTaskOrganizer(removeWithTaskOrganizer),
-                listener);
-    }
-
-    /**
-     * Creates a persistent root task in WM for a particular windowing-mode.
-     * @param displayId The display to create the root task on.
-     * @param windowingMode Windowing mode to put the root task in.
-     * @param listener The listener to get the created task callback.
-     * @param removeWithTaskOrganizer True if this task should be removed when organizer destroyed.
-     * @param reparentOnDisplayRemoval True if this task should be reparented on display removal.
-     *
-     * @deprecated Use {@link #createRootTask(CreateRootTaskRequest, TaskListener)}
-     */
-    public void createRootTask(int displayId, int windowingMode, TaskListener listener,
-            boolean removeWithTaskOrganizer, boolean reparentOnDisplayRemoval) {
-        createRootTask(new CreateRootTaskRequest()
-                        .setDisplayId(displayId)
-                        .setWindowingMode(windowingMode)
-                        .setRemoveWithTaskOrganizer(removeWithTaskOrganizer)
-                        .setReparentOnDisplayRemoval(reparentOnDisplayRemoval),
-                listener);
-    }
-
-    /**
-     * Creates a persistent root task in WM for a particular windowing-mode.
-     * @param request The data for this request
-     * @param listener The listener to get the created task callback.
-     * @return the WindowContainerToken of the newly created root task.
-     *
-     * @hide
+     * @return the WindowContainerToken of the newly created Task. This can be {@code null} if the
+     * Task creation fails in the system server (e.g., due to invalid displayId).
      */
     @Nullable
-    public WindowContainerToken createRootTask(@NonNull CreateRootTaskRequest request,
+    public WindowContainerToken createTask(@NonNull TaskCreationParams params,
             TaskListener listener) {
-        ProtoLog.v(WM_SHELL_TASK_ORG, "createRootTask() displayId=%d winMode=%d listener=%s" ,
-                request.displayId, request.windowingMode, listener.toString());
-        final IBinder cookie = new Binder();
-        request.setLaunchCookie(cookie);
-        setPendingLaunchCookieListener(cookie, listener);
-        return super.createRootTask(request);
+        ProtoLog.v(WM_SHELL_TASK_ORG, "createTask() displayId=%d winMode=%d listener=%s" ,
+                params.getDisplayId(), params.getWindowingMode(), listener.toString());
+        setPendingLaunchCookieListener(params.getLaunchCookie(), listener);
+        return super.createTask(params);
     }
 
     /**
@@ -765,8 +716,7 @@ public class ShellTaskOrganizer extends TaskOrganizer {
         if (!isOverviewOverlayEnabled(displayId)) {
             return null;
         }
-        if (!mOverviewOverlayLeashes.contains(displayId)
-                && Flags.enableOverviewOnConnectedDisplays()) {
+        if (!mOverviewOverlayLeashes.contains(displayId)) {
             SurfaceControl.Builder builder = new SurfaceControl.Builder()
                     .setName("overview_overlay_container")
                     .setContainerLayer()
@@ -951,15 +901,17 @@ public class ShellTaskOrganizer extends TaskOrganizer {
 
     @Override
     public void onBackPressedOnTaskRoot(RunningTaskInfo taskInfo,
-            boolean isFromMoveActivityTaskToBack, boolean isOptInOnBackInvoked) {
+            boolean isFromMoveActivityTaskToBack, boolean isOptInOnBackInvoked,
+            boolean hasOpaqueSibling) {
         synchronized (mLock) {
             ProtoLog.v(WM_SHELL_TASK_ORG, "Task root back pressed taskId=%d "
-                    + "isFromMoveActivityTaskToBack=%b isOptInOnBackInvoked=%b",
-                    taskInfo.taskId, isFromMoveActivityTaskToBack, isOptInOnBackInvoked);
+                    + "isFromMoveActivityTaskToBack=%b isOptInOnBackInvoked=%b hasOpaqueSibling=%b",
+                    taskInfo.taskId, isFromMoveActivityTaskToBack, isOptInOnBackInvoked,
+                    hasOpaqueSibling);
             final TaskListener listener = getTaskListener(taskInfo);
             if (listener != null) {
                 listener.onBackPressedOnTaskRoot(taskInfo, isFromMoveActivityTaskToBack,
-                        isOptInOnBackInvoked);
+                        isOptInOnBackInvoked, hasOpaqueSibling);
             }
         }
     }
@@ -1328,7 +1280,7 @@ public class ShellTaskOrganizer extends TaskOrganizer {
     private boolean isOverviewOverlayEnabled(int displayId) {
         return (Flags.enableLauncherOverviewInWindow()
                 || Flags.enableFallbackOverviewInWindow()
-                || (Flags.enableOverviewOnConnectedDisplays() && displayId != DEFAULT_DISPLAY));
+                || displayId != DEFAULT_DISPLAY);
     }
 
     @Override
@@ -1356,6 +1308,15 @@ public class ShellTaskOrganizer extends TaskOrganizer {
         synchronized (mLock) {
             for (PackageUpdateListener listener : mPackageUpdateListeners) {
                 listener.onPackageUpdateRequested(updatingTasks);
+            }
+        }
+    }
+
+    @Override
+    public void onPackageUpdateFinished(@NonNull List<RunningTaskInfo> updatedTasks) {
+        synchronized (mLock) {
+            for (PackageUpdateListener listener : mPackageUpdateListeners) {
+                listener.onPackageUpdateFinished(updatedTasks);
             }
         }
     }

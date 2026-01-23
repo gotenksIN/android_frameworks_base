@@ -9,20 +9,10 @@ flag {
 }
 
 flag {
-  name: "internal_cleanup_for_all_profiles"
+  name: "return_credential_not_enrolled"
   namespace: "biometrics_framework"
-  description: "Feature flag for scheduling internal cleanup for all profiles"
-  bug: "441557507"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
-  name: "hidl_service_died_fix"
-  namespace: "biometrics_framework"
-  description: "This bugfix flag is for setting user id and session to null when HIDL HAL service dies"
-  bug: "446125611"
+  description: "This bugfix flag is to prioritize credential not enrolled error"
+  bug: "466940874"
   metadata {
     purpose: PURPOSE_BUGFIX
   }

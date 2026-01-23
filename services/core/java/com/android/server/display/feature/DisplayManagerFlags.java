@@ -58,10 +58,6 @@ public class DisplayManagerFlags {
             com.android.graphics.surfaceflinger.flags.Flags::syncedResolutionSwitch
     );
 
-    private final FlagState mResolutionBackupRestore = new FlagState(
-            Flags.FLAG_RESOLUTION_BACKUP_RESTORE,
-            Flags::resolutionBackupRestore);
-
     private final FlagState mFastHdrTransitions = new FlagState(
             Flags.FLAG_FAST_HDR_TRANSITIONS,
             Flags::fastHdrTransitions);
@@ -128,11 +124,6 @@ public class DisplayManagerFlags {
             Flags::subscribeGranularDisplayEvents
     );
 
-    private final FlagState mBaseDensityForExternalDisplays = new FlagState(
-            Flags.FLAG_BASE_DENSITY_FOR_EXTERNAL_DISPLAYS,
-            DesktopExperienceFlags.BASE_DENSITY_FOR_EXTERNAL_DISPLAYS::isTrue
-    );
-
     private final FlagState mFramerateOverrideTriggersRrCallbacks = new FlagState(
             Flags.FLAG_FRAMERATE_OVERRIDE_TRIGGERS_RR_CALLBACKS,
             Flags::framerateOverrideTriggersRrCallbacks
@@ -197,11 +188,6 @@ public class DisplayManagerFlags {
             DesktopExperienceFlags.ENABLE_DISPLAY_MIRROR_IN_LOCK_TASK_MODE::isTrue
     );
 
-    private final FlagState mIsSizeOverrideForExternalDisplaysEnabled = new FlagState(
-        Flags.FLAG_ENABLE_SIZE_OVERRIDE_FOR_EXTERNAL_DISPLAYS,
-        Flags::enableSizeOverrideForExternalDisplays
-    );
-
     /** Returns whether power throttling clamper is enabled on not. */
     public boolean isPowerThrottlingClamperEnabled() {
         return mPowerThrottlingClamperFlagState.isEnabled();
@@ -214,10 +200,6 @@ public class DisplayManagerFlags {
 
     public boolean isSyncedResolutionSwitchEnabled() {
         return mSyncedResolutionSwitch.isEnabled();
-    }
-
-    public boolean isResolutionBackupRestoreEnabled() {
-        return mResolutionBackupRestore.isEnabled();
     }
 
     public boolean isFastHdrTransitionsEnabled() {
@@ -308,13 +290,6 @@ public class DisplayManagerFlags {
     }
 
     /**
-     * @return {@code true} if the flag for base density for external displays is enabled
-     */
-    public boolean isBaseDensityForExternalDisplaysEnabled() {
-        return mBaseDensityForExternalDisplays.isEnabled();
-    }
-
-    /**
      * @return {@code true} if the flag triggering refresh rate callbacks when framerate is
      * overridden is enabled
      */
@@ -384,10 +359,6 @@ public class DisplayManagerFlags {
         return mIsDisplayMirrorInLockTaskModeEnabled.isEnabled();
     }
 
-    public boolean isSizeOverrideForExternalDisplaysEnabled() {
-        return mIsSizeOverrideForExternalDisplaysEnabled.isEnabled();
-    }
-
     /**
      * dumps all flagstates
      * @param pw printWriter
@@ -402,7 +373,6 @@ public class DisplayManagerFlags {
         pw.println(" " + mFastHdrTransitions);
         pw.println(" " + mSensorBasedBrightnessThrottling);
         pw.println(" " + mDozeBrightnessStrategy);
-        pw.println(" " + mResolutionBackupRestore);
         pw.println(" " + mUseFusionProxSensor);
         pw.println(" " + mNormalBrightnessForDozeParameter);
         pw.println(" " + mEnableBatteryStatsForAllDisplays);
@@ -413,7 +383,6 @@ public class DisplayManagerFlags {
         pw.println(" " + mDisplayListenerPerformanceImprovementsFlagState);
         pw.println(" " + mSubscribeGranularDisplayEvents);
         pw.println(" " + mEnableDisplayContentModeManagementFlagState);
-        pw.println(" " + mBaseDensityForExternalDisplays);
         pw.println(" " + mFramerateOverrideTriggersRrCallbacks);
         pw.println(" " + mRefreshRateEventForForegroundApps);
         pw.println(" " + mCommittedStateSeparateEvent);
@@ -427,7 +396,6 @@ public class DisplayManagerFlags {
         pw.println(" " + mIsLoggingForDisplayEventsEnabled);
         pw.println(" " + mIsMinmodeCapBrightnessEnabled);
         pw.println(" " + mIsDisplayMirrorInLockTaskModeEnabled);
-        pw.println(" " + mIsSizeOverrideForExternalDisplaysEnabled);
     }
 
     private static class FlagState {

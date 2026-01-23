@@ -1141,7 +1141,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             if (mPermissionsManuallyAccepted) {
                 return USER_ACTION_NOT_NEEDED;
             }
-            // For pre-pappvoal case, the mPackageName would be null.
+            // For pre-approval case, the mPackageName would be null.
             if (mPackageName != null) {
                 packageName = mPackageName;
             } else if (mPreapprovalRequested.get() && mPreapprovalDetails != null) {
@@ -3113,8 +3113,7 @@ public class PackageInstallerSession extends IPackageInstallerSession.Stub {
             // The system doesn't have a verifier specified.
             return false;
         }
-        // TODO(b/460818215): Remove this once adb check is handled by the verifier module.
-        if (isAdbInstall()) {
+        if (!Flags.verificationServiceAdb() && isAdbInstall()) {
             // adb installs are exempted from verification unless explicitly requested
             if (!params.forceVerification) {
                 synchronized (mMetrics) {

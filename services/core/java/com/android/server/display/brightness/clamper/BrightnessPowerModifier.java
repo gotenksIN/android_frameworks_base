@@ -139,6 +139,11 @@ class BrightnessPowerModifier implements BrightnessStateModifier,
         });
     }
 
+    @VisibleForTesting
+    ThermalLevelListener getThermalLevelListener() {
+        return mThermalLevelListener;
+    }
+
     //region BrightnessStateModifier
     @Override
     public void apply(DisplayManagerInternal.DisplayPowerRequest request,
@@ -284,7 +289,9 @@ class BrightnessPowerModifier implements BrightnessStateModifier,
                     }
                 }
             } else { // Current power consumed is under the quota.
-                targetBrightnessCap = PowerManager.BRIGHTNESS_MAX;
+                float brightnessCap =
+                    (powerQuota / mCurrentAvgPowerConsumed) * mCurrentBrightness;
+                targetBrightnessCap = Math.min(brightnessCap, PowerManager.BRIGHTNESS_MAX);
             }
         }
 
@@ -376,7 +383,7 @@ class BrightnessPowerModifier implements BrightnessStateModifier,
         mPmicMonitor.stop();
     }
 
-    private final class ThermalLevelListener extends IThermalEventListener.Stub {
+    final class ThermalLevelListener extends IThermalEventListener.Stub {
         private final Handler mHandler;
         private IThermalService mThermalService;
         private boolean mStarted;
@@ -418,6 +425,8 @@ class BrightnessPowerModifier implements BrightnessStateModifier,
                 if (!mPmicMonitor.isStopped()) {
                     mHandler.post(() -> deactivatePmicMonitor(status));
                 }
+                // reset power and remove the brightness cap.
+                recalculatePowerQuotaChange(0, status);
             }
         }
 

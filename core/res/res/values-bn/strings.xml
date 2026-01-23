@@ -158,6 +158,10 @@
     <string name="wfc_mode_wifi_preferred_summary" msgid="1035175836270943089">"ওয়াই-ফাইয়ের মাধ্যমে কল করুন"</string>
     <string name="wfc_mode_cellular_preferred_summary" msgid="4958965609212575619">"মোবাইল নেটওয়ার্কের মাধ্যমে কল করুন"</string>
     <string name="wfc_mode_wifi_only_summary" msgid="104951993894678665">"শুধুমাত্র ওয়াই-ফাই"</string>
+    <string name="adaptive_low_frequency_less_than_one_minute" msgid="8869498183646028708">"~ %s"</string>
+    <string name="adaptive_low_frequency_neg_less_than_one_minute" msgid="2590062535985417056">"~ −%s"</string>
+    <string name="elapsed_time_low_frequency_short_format_h_mm" msgid="6728141238066668781">"%1$d:%2$02d:--"</string>
+    <string name="elapsed_time_low_frequency_short_format_mm" msgid="2405181895215514414">"%1$02d:--"</string>
     <!-- no translation found for crossSimFormat_spn (9125246077491634262) -->
     <skip />
     <string name="crossSimFormat_spn_cross_sim_calling" msgid="5620807020002879057">"<xliff:g id="SPN">%s</xliff:g> ব্যাক-আপ কলিং"</string>
@@ -645,10 +649,8 @@
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"অ্যাপকে লোকাল নেটওয়ার্ক ডিভাইস অ্যাক্সেস করার অনুমতি দেয়"</string>
     <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"লুপব্যাক ইন্টারফেস ব্যবহার করুন"</string>
     <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"লুপব্যাক ইন্টারফেসের মাধ্যমে অন্যান্য অ্যাপের সাথে ইন্টার‍্যাক্ট করার জন্য অ্যাপকে অনুমতি দেয়"</string>
-    <!-- no translation found for permlab_force_use_loopback_interface (1319727311706416481) -->
-    <skip />
-    <!-- no translation found for permdesc_force_use_loopback_interface (5829032514048681980) -->
-    <skip />
+    <string name="permlab_force_use_loopback_interface" msgid="1319727311706416481">"লুপব্যাক ইন্টারফেসই ব্যবহার করুন"</string>
+    <string name="permdesc_force_use_loopback_interface" msgid="5829032514048681980">"লুপব্যাক ইন্টারফেসের মাধ্যমে অন্যান্য অ্যাপের সাথে ইন্টার‍্যাক্ট করার জন্য অ্যাপকে অনুমতি দেয়, এর জন্য অন্যান্য অ্যাপের লুপব্যাক সংক্রান্ত অনুমতির প্রয়োজন নেই"</string>
     <string name="permlab_ranging" msgid="2854543350668593390">"আশেপাশের ডিভাইসের আপেক্ষিক অবস্থান নির্ণয় করুন"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"অ্যাপকে আশেপাশের ডিভাইসের আপেক্ষিক অবস্থান নির্ণয় করার অনুমতি দিন"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"পছন্দের NFC পেমেন্ট পরিষেবার তথ্য"</string>
@@ -774,7 +776,7 @@
     <string name="face_acquired_too_low" msgid="4075391872960840081">"ফোন নিচে নামান"</string>
     <string name="face_acquired_too_right" msgid="6245286514593540859">"ফোন আপনার বাঁদিকে সরান"</string>
     <string name="face_acquired_too_left" msgid="9201762240918405486">"ফোন আপনার ডানদিকে সরান"</string>
-    <string name="face_acquired_poor_gaze" msgid="4427153558773628020">"সরাসরি ডিভাইসের দিকে তাকান।"</string>
+    <string name="face_acquired_poor_gaze" msgid="6746437451436776485">"আপনার ক্যামেরার দিকে আরও সরাসরি তাকান"</string>
     <string name="face_acquired_not_detected" msgid="1057966913397548150">"আপনার মুখ দেখা যাচ্ছে না। ফোন আপনার চোখের সোজাসুজি ধরুন।"</string>
     <string name="face_acquired_too_much_motion" msgid="8199691445085189528">"খুব বেশি নড়ছে। ফোনটি যাতে না কাঁপে সেইভাবে ধরুন।"</string>
     <string name="face_acquired_recalibrate" msgid="8724013080976469746">"আপনার মুখের ছবি আবার নথিভুক্ত করুন।"</string>
@@ -1454,6 +1456,9 @@
     <string name="carrier_app_notification_text" msgid="6567057546341958637">"এটিকে সেট-আপ করতে আলতো চাপুন"</string>
     <string name="time_zone_change_notification_title" msgid="5232503069219193218">"আপনার টাইম জোন পরিবর্তন হয়ে গেছে"</string>
     <string name="time_zone_change_notification_body" msgid="6135793674904665585">"আপনি এখন <xliff:g id="TIME_ZONE_DISPLAY_NAME">%1$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET">%2$s</xliff:g>)-এ আছেন"</string>
+    <string name="time_zone_offset_change_notification_title" msgid="8232305835199459588">"ঘড়িতে সময় পরিবর্তন"</string>
+    <string name="time_zone_offset_change_notification_body_forward" msgid="1299493962341887576">"ঘড়িতে সময় <xliff:g id="TIME_ZONE_OFFSET_DURATION">%1$s</xliff:g> এগিয়ে গেছে। আপনি এখন <xliff:g id="TIME_ZONE_DISPLAY_NAME">%2$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET_0">%3$s</xliff:g>)-এ আছেন।"</string>
+    <string name="time_zone_offset_change_notification_body_backward" msgid="6643532078142642118">"ঘড়িতে সময় <xliff:g id="TIME_ZONE_OFFSET_DURATION">%1$s</xliff:g> পিছিয়ে গেছে। আপনি এখন <xliff:g id="TIME_ZONE_DISPLAY_NAME">%2$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET_0">%3$s</xliff:g>)-এ আছেন।"</string>
     <string name="time_picker_dialog_title" msgid="9053376764985220821">"সময় সেট করুন"</string>
     <string name="date_picker_dialog_title" msgid="5030520449243071926">"তারিখ সেট করুন"</string>
     <string name="date_time_set" msgid="4603445265164486816">"সেট করুন"</string>
@@ -1829,6 +1834,7 @@
     <string name="accessibility_shortcut_label_gesture" msgid="7987298674836890931">"জেসচার"</string>
     <string name="accessibility_shortcut_label_quick_settings" msgid="6851280333772213611">"দ্রুত সেটিংস"</string>
     <string name="accessibility_shortcut_label_triple_tap" msgid="9058975959054454796">"ট্রিপল ট্যাপ"</string>
+    <string name="accessibility_shortcut_label_top_row_key" msgid="1488840908672437180">"অ্যাক্সেসিবিলিটি কী"</string>
     <string name="accessibility_uncheck_legacy_item_warning" msgid="8047830891064817447">"<xliff:g id="SERVICE_NAME">%s</xliff:g> বন্ধ করে দেওয়া হয়েছে"</string>
     <string name="edit_accessibility_shortcut_menu_button" msgid="8885752738733772935">"শর্টকাট এডিট করুন"</string>
     <string name="done_accessibility_shortcut_menu_button" msgid="3668407723770815708">"হয়ে গেছে"</string>
@@ -2105,6 +2111,7 @@
     <string name="app_suspended_default_message" msgid="6451215678552004172">"<xliff:g id="APP_NAME_0">%1$s</xliff:g> এখন উপলভ্য নয়। এই অ্যাপটিকে <xliff:g id="APP_NAME_1">%2$s</xliff:g> অ্যাপ ম্যানেজ করে।"</string>
     <string name="app_suspended_more_details" msgid="211260942831587014">"আরও জানুন"</string>
     <string name="app_suspended_unsuspend_message" msgid="1665438589450555459">"অ্যাপ আবার চালু করুন"</string>
+    <string name="locked_app_biometric_prompt_description" msgid="6853122652400451464">"<xliff:g id="APP_NAME">%1$s</xliff:g> লক করা হয়েছে"</string>
     <string name="work_mode_off_title" msgid="6367463960165135829">"অফিসের অ্যাপ আনপজ করতে চান?"</string>
     <string name="work_mode_turn_on" msgid="5316648862401307800">"আনপজ করুন"</string>
     <string name="work_mode_emergency_call_button" msgid="6818855962881612322">"জরুরি"</string>
@@ -2544,6 +2551,8 @@
     <string name="accessibility_label_clone_profile" msgid="7579118375042398784">"ক্লোন"</string>
     <string name="accessibility_label_communal_profile" msgid="1437173163111334791">"কমিউনাল"</string>
     <string name="private_space_biometric_prompt_title" msgid="5777592909271728154">"প্রাইভেট স্পেস"</string>
+    <string name="app_locked_new_notification" msgid="4409730436247596215">"নতুন বিজ্ঞপ্তি"</string>
+    <string name="app_locked_notification_message" msgid="4576179600328065280">"নতুন মেসেজ"</string>
     <string name="redacted_notification_message" msgid="1520587845842228816">"সংবেদনশীল বিজ্ঞপ্তির কন্টেন্ট লুকানো আছে"</string>
     <string name="redacted_notification_action_title" msgid="6942924973335920935"></string>
     <string name="screen_not_shared_sensitive_content" msgid="7058419185079565001">"নিরাপত্তার জন্য স্ক্রিন শেয়ার করা থেকে লুকানো অ্যাপের কন্টেন্ট"</string>

@@ -895,8 +895,16 @@ public class HeadsUpManagerImpl
             int minX = tmpArray[0];
             int maxX = tmpArray[0] + topRow.getWidth();
             int height = topRow.getIntrinsicHeight();
-            final boolean stretchToTop = tmpArray[1] <= mHeadsUpInset;
-            mTouchableRegion.set(minX, stretchToTop ? 0 : tmpArray[1], maxX, tmpArray[1] + height);
+            if (SceneContainerFlag.isEnabled()) {
+                // Don't stretch touchable region of HUN to screen top, because in flexi, the
+                // touchable region is the key to avoid the Notification to consume touches that's
+                // supposed to be dispatched to the StatusBar.
+                mTouchableRegion.set(minX, tmpArray[1], maxX, tmpArray[1] + height);
+            } else {
+                final boolean stretchToTop = tmpArray[1] <= mHeadsUpInset;
+                mTouchableRegion.set(
+                        minX, stretchToTop ? 0 : tmpArray[1], maxX, tmpArray[1] + height);
+            }
             return mTouchableRegion;
         }
     }
@@ -1038,6 +1046,19 @@ public class HeadsUpManagerImpl
         if (headsUpEntry == null) return;
         if (entry.isRowPinned() || !gutsShown) {
             headsUpEntry.setGutsShownPinned(gutsShown);
+        }
+    }
+
+    /**
+     * Pauses or resumes the auto-dismiss timer for a heads-up notification.
+     * @param entryKey the key of the notification entry
+     * @param paused true to pause the timer, false to resume
+     */
+    @Override
+    public void setHeadsUpDismissTimerPaused(@NonNull String entryKey, boolean paused) {
+        HeadsUpEntry headsUpEntry = getHeadsUpEntry(entryKey);
+        if (headsUpEntry != null) {
+            headsUpEntry.setPaused(paused);
         }
     }
 
@@ -1275,6 +1296,9 @@ public class HeadsUpManagerImpl
         @VisibleForTesting
         boolean mWasUnpinned;
 
+        private boolean mPaused;
+        private long mPauseTime;
+
         @Nullable public NotificationEntry mEntry;
         public long mPostTime;
         public long mEarliestRemovalTime;
@@ -1425,6 +1449,10 @@ public class HeadsUpManagerImpl
             };
             mAvalancheController.update(this, runnable, "updateEntry reason:"
                     + reason + " updatePostTime:" + updatePostTime);
+
+            if (mPaused) {
+                return;
+            }
 
             if (!ignoreSticky && isSticky()) {
                 cancelAutoRemovalCallbacks("updateEntry (sticky)");
@@ -1649,6 +1677,29 @@ public class HeadsUpManagerImpl
                 cancelAutoRemovalCallbacks("setExpanded(true)");
             } else {
                 updateEntry(false /* updatePostTime */, "setExpanded(false)");
+            }
+        }
+
+        /**
+         * Pauses or resumes the auto-dismiss timer for this heads-up entry.
+         *
+         * <p>When paused, the notification will not be automatically dismissed. When resumed, the
+         * auto-dismiss timer continues from where it left off.
+         *
+         * @param paused {@code true} to pause the auto-dismiss timer, {@code false} to resume.
+         */
+        public void setPaused(boolean paused) {
+            if (mPaused == paused) {
+                return;
+            }
+            mPaused = paused;
+            if (paused) {
+                cancelAutoRemovalCallbacks("paused");
+                mPauseTime = mSystemClock.elapsedRealtime();
+            } else {
+                final long pausedDuration = mSystemClock.elapsedRealtime() - mPauseTime;
+                mPostTime += pausedDuration;
+                updateEntry(/* updatePostTime= */ false, "resumed");
             }
         }
 

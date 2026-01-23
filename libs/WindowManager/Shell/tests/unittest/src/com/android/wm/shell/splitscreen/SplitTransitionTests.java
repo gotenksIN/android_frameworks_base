@@ -26,7 +26,6 @@ import static android.view.WindowManager.TRANSIT_TO_BACK;
 import static android.view.WindowManager.TRANSIT_TO_FRONT;
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_CHILDREN_TASKS_REPARENT;
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_REORDER;
-import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_REPARENT;
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_SET_ANIMATION_DELEGATE;
 
 import static com.android.wm.shell.common.split.SplitScreenUtils.getNewParentTokenForStage;
@@ -38,13 +37,12 @@ import static com.android.wm.shell.splitscreen.SplitScreen.STAGE_TYPE_SIDE;
 import static com.android.wm.shell.splitscreen.SplitScreenController.EXIT_REASON_APP_DOES_NOT_SUPPORT_MULTIWINDOW;
 import static com.android.wm.shell.splitscreen.SplitScreenController.EXIT_REASON_DRAG_DIVIDER;
 import static com.android.wm.shell.splitscreen.SplitTestUtils.createMockSurface;
-import static com.android.wm.shell.transition.Transitions.TRANSIT_SPLIT_DISMISS;
 import static com.android.wm.shell.transition.Transitions.TRANSIT_SPLIT_SCREEN_PAIR_OPEN;
 
 import static org.hamcrest.CoreMatchers.allOf;
-import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.CoreMatchers.hasItem;
 import static org.hamcrest.CoreMatchers.hasItems;
+import static org.hamcrest.CoreMatchers.not;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
@@ -85,8 +83,10 @@ import androidx.test.filters.SmallTest;
 import androidx.test.runner.AndroidJUnit4;
 
 import com.android.launcher3.icons.IconProvider;
+import com.android.testing.wm.util.ChangeBuilder;
+import com.android.testing.wm.util.MockToken;
+import com.android.testing.wm.util.TransitionInfoBuilder;
 import com.android.wm.shell.Flags;
-import com.android.wm.shell.MockToken;
 import com.android.wm.shell.RootDisplayAreaOrganizer;
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer;
 import com.android.wm.shell.ShellTaskOrganizer;
@@ -108,7 +108,6 @@ import com.android.wm.shell.shared.desktopmode.FakeDesktopState;
 import com.android.wm.shell.shared.split.SplitScreenConstants;
 import com.android.wm.shell.transition.DefaultMixedHandler;
 import com.android.wm.shell.transition.TestRemoteTransition;
-import com.android.wm.shell.transition.TransitionInfoBuilder;
 import com.android.wm.shell.transition.Transitions;
 import com.android.wm.shell.windowdecor.WindowDecorViewModel;
 
@@ -119,7 +118,6 @@ import org.hamcrest.TypeSafeMatcher;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.mockito.stubbing.Answer;
@@ -605,8 +603,10 @@ public class SplitTransitionTests extends ShellTestCase {
         // include the launcher becoming visible underneath.
         TransitionInfo info = new TransitionInfoBuilder(TRANSIT_OPEN, 0)
                 .addChange(TRANSIT_TO_FRONT, TransitionInfo.FLAG_SHOW_WALLPAPER, mHomeTask)
-                .addChange(TRANSIT_TO_FRONT, TransitionInfo.FLAG_IS_WALLPAPER, null)
-                .addChange(TRANSIT_CHANGE, movedMainChild, mSecondaryDisplayAreaInfo.displayId)
+                .addChange(TRANSIT_TO_FRONT, TransitionInfo.FLAG_IS_WALLPAPER)
+                .addChange(new ChangeBuilder(movedMainChild, TRANSIT_CHANGE)
+                        .moveToDisplay(DEFAULT_DISPLAY, mSecondaryDisplayAreaInfo.displayId)
+                        .build())
                 .build();
 
         // Simulate the transition. Split does not need to play it, but does need to know about it.

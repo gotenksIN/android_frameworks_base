@@ -19,6 +19,7 @@ package com.android.server.wm;
 import static android.app.Activity.RESULT_CANCELED;
 import static android.app.ActivityManager.START_ABORTED;
 import static android.app.ActivityManager.START_CANCELED;
+import static android.app.ActivityManager.START_CANNOT_GUARANTEE_TASK_MOVABILITY;
 import static android.app.ActivityManager.START_CLASS_NOT_FOUND;
 import static android.app.ActivityManager.START_DELIVERED_TO_TOP;
 import static android.app.ActivityManager.START_FLAG_ONLY_IF_NEEDED;
@@ -364,8 +365,12 @@ class ActivityStarter {
                 if (mService.mRootWindowContainer == null) {
                     throw new IllegalStateException("Too early to start activity.");
                 }
+                UserHelper userHelper = android.multiuser.Flags.hsuAllowlistActivities()
+                        ? new UserHelper(mService.getUserManagerInternal())
+                        : null;
+
                 starter = new ActivityStarter(mController, mService, mSupervisor, mInterceptor,
-                        mService.mRootWindowContainer.getUserHelper());
+                        userHelper);
             }
 
             return starter;
@@ -822,7 +827,7 @@ class ActivityStarter {
             }
 
             final LaunchingState launchingState;
-            final ActivityRecord originator;
+            final int originalCallerUid;
             synchronized (mService.mGlobalLock) {
                 final ActivityRecord caller = ActivityRecord.forTokenLocked(mRequest.resultTo);
                 final int callingUid = mRequest.realCallingUid == Request.DEFAULT_REAL_CALLING_UID
@@ -830,12 +835,13 @@ class ActivityStarter {
                 launchingState = mSupervisor.getActivityMetricsLogger().notifyActivityLaunching(
                         mRequest.intent, caller, callingUid);
                 callerActivityName = caller != null ? caller.info.name : null;
-                originator = trackLaunchOriginator() && caller != null
-                        ? launchingState.tracksOriginator(caller) : null;
+                originalCallerUid = trackLaunchOriginator() ? launchingState.tracksOriginator(
+                        callingUid) : Request.DEFAULT_REAL_CALLING_UID;
             }
 
-            if (trackLaunchOriginator() && originator != null) {
-                mRequest.mLaunchOriginatedFromHome = originator.isActivityTypeHome();
+            if (trackLaunchOriginator() && mService.mHomeProcess != null) {
+                mRequest.mLaunchOriginatedFromHome =
+                        (originalCallerUid == mService.mHomeProcess.mUid);
             }
 
             if (mRequest.intent != null) {
@@ -2050,6 +2056,17 @@ class ActivityStarter {
             mPriorAboveTask = TaskDisplayArea.getRootTaskAbove(targetTask.getRootTask());
         }
 
+        if (mOptions != null && mOptions.isMovableTaskRequired()) {
+            if (!newTask) {
+                return START_CANNOT_GUARANTEE_TASK_MOVABILITY;
+            }
+
+            if (mPreferredTaskDisplayArea == null
+                    || !mPreferredTaskDisplayArea.getIsTaskMoveAllowed()) {
+                return START_CANNOT_GUARANTEE_TASK_MOVABILITY;
+            }
+        }
+
         final ActivityRecord targetTaskTop = newTask
                 ? null : targetTask.getTopNonFinishingActivity();
         if (targetTaskTop != null) {
@@ -3148,7 +3165,8 @@ class ActivityStarter {
             final Task topTask = curTop != null ? curTop.getTask() : null;
             differentTopTask = topTask != intentTask
                     || (focusRootTask != null && topTask != focusRootTask.getTopMostTask())
-                    || (focusRootTask != null && focusRootTask != origRootTask);
+                    || (focusRootTask != null && focusRootTask != origRootTask)
+                    || mTargetRootTask != origRootTask;
         } else {
             // The existing task should always be different from those in other displays.
             differentTopTask = true;
@@ -3190,6 +3208,7 @@ class ActivityStarter {
             } else {
                 // TODO(b/199997762): Consider leaving all reparent operation of organized tasks
                 //  to task organizer.
+                intentTask.mTransitionController.collectExistenceChange(intentTask);
                 intentTask.reparent(mTargetRootTask, ON_TOP, REPARENT_MOVE_ROOT_TASK_TO_FRONT,
                         ANIMATE, DEFER_RESUME, "reparentToTargetRootTask");
                 mMovedToFront = true;

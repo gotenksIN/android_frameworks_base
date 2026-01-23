@@ -513,25 +513,6 @@ public class TelephonyManager {
                 }
             };
 
-    /** Enum indicating multisim variants
-     *  DSDS - Dual SIM Dual Standby
-     *  DSDA - Dual SIM Dual Active
-     *  TSTS - Triple SIM Triple Standby
-     **/
-    /** @hide */
-    @UnsupportedAppUsage(implicitMember =
-            "values()[Landroid/telephony/TelephonyManager$MultiSimVariants;")
-    public enum MultiSimVariants {
-        @UnsupportedAppUsage
-        DSDS,
-        @UnsupportedAppUsage
-        DSDA,
-        @UnsupportedAppUsage
-        TSTS,
-        @UnsupportedAppUsage
-        UNKNOWN
-    };
-
     /** @hide */
     @UnsupportedAppUsage
     public TelephonyManager(Context context) {
@@ -652,30 +633,6 @@ public class TelephonyManager {
     }
 
     /**
-     * Returns the multi SIM variant.
-     *
-     * <ul>
-     *   <li>Returns DSDS for Dual SIM Dual Standby.</li>
-     *   <li>Returns DSDA for Dual SIM Dual Active.</li>
-     *   <li>Returns TSTS for Triple SIM Triple Standby.</li>
-     *   <li>Returns UNKNOWN for others.</li>
-     * </ul>
-     */
-    /** @hide */
-    @UnsupportedAppUsage
-    public MultiSimVariants getMultiSimConfiguration() {
-        String mSimConfig =
-                TelephonyProperties.multi_sim_config().orElse("");
-        if (mSimConfig.equals("dsds")) {
-            return MultiSimVariants.DSDS;
-        } else if (mSimConfig.equals("dsda")) {
-            return MultiSimVariants.DSDA;
-        } else if (mSimConfig.equals("tsts")) {
-            return MultiSimVariants.TSTS;
-        } else {
-            return MultiSimVariants.UNKNOWN;
-        }
-    }
 
 // QTI_BEGIN: 2021-07-13: Telephony: IMS: Define new property for multi sim voice capability
     /**
@@ -732,6 +689,10 @@ public class TelephonyManager {
         return getActiveModemCount();
     }
 
+    private static final String MULTI_SIM_VARIANT_DSDS = "dsds";
+    private static final String MULTI_SIM_VARIANT_DSDA = "dsda";
+    private static final String MULTI_SIM_VARIANT_TSTS = "tsts";
+
     /**
      * Returns the number of logical modems currently configured to be activated.
      *
@@ -743,24 +704,13 @@ public class TelephonyManager {
      * </ul>
      */
     public int getActiveModemCount() {
-        int modemCount = 1;
-        switch (getMultiSimConfiguration()) {
-            case UNKNOWN:
-                modemCount = 1;
-                // check for voice and data support, 0 if not supported
-                if (!isDeviceVoiceCapable() && !isSmsCapable() && !isDataCapable()) {
-                    modemCount = 0;
-                }
-                break;
-            case DSDS:
-            case DSDA:
-                modemCount = 2;
-                break;
-            case TSTS:
-                modemCount = 3;
-                break;
-        }
-        return modemCount;
+        if (!isDeviceVoiceCapable() && !isDeviceSmsCapable() && !isDataCapable()) return 0;
+
+        return switch(TelephonyProperties.multi_sim_config().orElse("").toLowerCase(Locale.ROOT)) {
+            case MULTI_SIM_VARIANT_DSDS, MULTI_SIM_VARIANT_DSDA -> 2;
+            case MULTI_SIM_VARIANT_TSTS -> 3;
+            default -> 1;
+        };
     }
 
     /**
@@ -782,15 +732,12 @@ public class TelephonyManager {
      */
     @SystemApi
     public int getMaxNumberOfSimultaneouslyActiveSims() {
-        switch (getMultiSimConfiguration()) {
-            case UNKNOWN:
-            case DSDS:
-            case TSTS:
-                return 1;
-            case DSDA:
-                return 2;
-        }
-        return 1;
+        return switch(TelephonyProperties.multi_sim_config().orElse("").toLowerCase(Locale.ROOT)) {
+            case MULTI_SIM_VARIANT_DSDS -> 1;
+            case MULTI_SIM_VARIANT_DSDA -> 2;
+            case MULTI_SIM_VARIANT_TSTS -> 1;
+            default -> 1;
+        };
     }
 
     /** @hide */
@@ -6316,7 +6263,7 @@ public class TelephonyManager {
     }
 
     /**
-     * Returns the IMS home network domain name that was loaded from the ISIM {@see #APPTYPE_ISIM}.
+     * Returns the IMS home network domain name that was loaded from the ISIM {@link #APPTYPE_ISIM}.
      * @return the IMS domain name. Returns {@code null} if ISIM hasn't been loaded or IMS domain
      * hasn't been loaded or isn't present on the ISIM.
      *
@@ -7045,7 +6992,7 @@ public class TelephonyManager {
          *
          * @param cellInfo a list of {@link CellInfo} or an empty list.
          *
-         * {@see android.telephony.TelephonyManager#getAllCellInfo getAllCellInfo()}
+         * @see android.telephony.TelephonyManager#getAllCellInfo getAllCellInfo()
          */
         public abstract void onCellInfo(@NonNull List<CellInfo> cellInfo);
 
@@ -8315,9 +8262,9 @@ public class TelephonyManager {
      * If this object has been created with {@link #createForSubscriptionId}, then the provided
      * subId is returned. Otherwise, the preferred subId which is based on caller's context is
      * returned.
-     * {@see SubscriptionManager#getDefaultDataSubscriptionId()}
-     * {@see SubscriptionManager#getDefaultVoiceSubscriptionId()}
-     * {@see SubscriptionManager#getDefaultSmsSubscriptionId()}
+     * @see SubscriptionManager#getDefaultDataSubscriptionId()
+     * @see SubscriptionManager#getDefaultVoiceSubscriptionId()
+     * @see SubscriptionManager#getDefaultSmsSubscriptionId()
      */
     @UnsupportedAppUsage
     private int getSubId(int preferredSubId) {
@@ -8344,9 +8291,9 @@ public class TelephonyManager {
      * If this object has been created with {@link #createForSubscriptionId}, then the phoneId
      * associated with the provided subId is returned. Otherwise, return the phoneId associated
      * with the preferred subId based on caller's context.
-     * {@see SubscriptionManager#getDefaultDataSubscriptionId()}
-     * {@see SubscriptionManager#getDefaultVoiceSubscriptionId()}
-     * {@see SubscriptionManager#getDefaultSmsSubscriptionId()}
+     * @see SubscriptionManager#getDefaultDataSubscriptionId()
+     * @see SubscriptionManager#getDefaultVoiceSubscriptionId()
+     * @see SubscriptionManager#getDefaultSmsSubscriptionId()
      */
     @UnsupportedAppUsage
     private int getPhoneId(int preferredSubId) {
@@ -16539,7 +16486,8 @@ public class TelephonyManager {
      * forwarding otherwise.
      *
      * If you wish to be notified about the results of this operation, provide an {@link Executor}
-     * and {@link Consumer<Integer>} to be notified asynchronously when the operation completes.
+     * and {@link Consumer} of {@link Integer} to be notified asynchronously when the operation
+     * completes.
      *
      * @param callForwardingInfo Info about whether calls should be forwarded and where they
      *                           should be forwarded to.
@@ -16727,7 +16675,8 @@ public class TelephonyManager {
      * Sets the call waiting status of this device with the network.
      *
      * If you wish to be notified about the results of this operation, provide an {@link Executor}
-     * and {@link Consumer<Integer>} to be notified asynchronously when the operation completes.
+     * and {@link Consumer} of {@link Integer} to be notified asynchronously when the operation
+     * completes.
      *
      * @see #getCallWaitingStatus for a description of the call waiting functionality.
      *

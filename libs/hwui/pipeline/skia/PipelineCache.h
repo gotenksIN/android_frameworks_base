@@ -74,7 +74,7 @@ public:
     PipelineCacheStore(PipelineCacheStore&&) = delete;
     PipelineCacheStore& operator=(PipelineCacheStore&&) = delete;
 
-    void store(std::string path, std::vector<uint8_t> data);
+    void store(std::string path, sk_sp<SkData> key, sk_sp<SkData> data);
 
     size_t getLastSizeBytes() const;
 
@@ -88,13 +88,14 @@ private:
 
     struct StoreRequest {
         std::string path;
-        std::vector<uint8_t> data;
+        sk_sp<SkData> key;
+        sk_sp<SkData> data;
     };
     std::optional<StoreRequest> mStoreRequest;
 
     std::atomic_size_t mLastSizeBytes;
 
-    std::atomic_bool mExit;
+    bool mExit;
     std::thread mThread;
 };
 
@@ -112,7 +113,6 @@ private:
     std::string mStorePath;
     PipelineCacheStore mPipelineCacheStore;
 
-    bool mHasCache;
     sk_sp<SkData> mKey;
     sk_sp<SkData> mData;
 };

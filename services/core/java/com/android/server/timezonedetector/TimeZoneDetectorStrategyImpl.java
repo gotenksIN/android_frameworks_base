@@ -41,7 +41,6 @@ import android.app.timezonedetector.ManualTimeZoneSuggestion;
 import android.app.timezonedetector.TelephonyTimeZoneSuggestion;
 import android.content.Context;
 import android.os.Handler;
-import android.os.SystemClock;
 import android.os.TimestampedValue;
 import android.os.UserHandle;
 import android.util.IndentingPrintWriter;
@@ -852,22 +851,20 @@ public final class TimeZoneDetectorStrategyImpl
         }
         mEnvironment.setDeviceTimeZoneAndConfidence(newZoneId, newConfidence, logInfo);
 
-        if (com.android.server.flags.Flags.datetimeNotifications()) {
-            // Record the fact that the time zone was changed so that it can be tracked, i.e.
-            // whether the device / user sticks with it.
-            TimeZoneChangeListener.TimeZoneChangeEvent changeEvent =
-                    new TimeZoneChangeListener.TimeZoneChangeEvent(
-                            SystemClock.elapsedRealtime(),
-                            System.currentTimeMillis(),
-                            origin,
-                            userId,
-                            currentZoneId,
-                            newZoneId,
-                            currentConfidence,
-                            newConfidence,
-                            cause);
-            mChangeTracker.process(changeEvent);
-        }
+        // Record the fact that the time zone was changed so that it can be tracked, i.e.
+        // whether the device / user sticks with it.
+        TimeZoneChangeListener.TimeZoneChangeEvent changeEvent =
+                new TimeZoneChangeListener.TimeZoneChangeEvent(
+                        mEnvironment.elapsedRealtimeMillis(),
+                        mEnvironment.currentTimeMillis(),
+                        origin,
+                        userId,
+                        currentZoneId,
+                        newZoneId,
+                        currentConfidence,
+                        newConfidence,
+                        cause);
+        mChangeTracker.process(changeEvent);
     }
 
     @GuardedBy("this")
@@ -957,16 +954,23 @@ public final class TimeZoneDetectorStrategyImpl
         ipw.println("mEnvironment.getDeviceTimeZoneConfidence()="
                 + mEnvironment.getDeviceTimeZoneConfidence());
 
-        ipw.println("Misc state:");
-        ipw.increaseIndent(); // level 2
-        ipw.println("mTelephonyTimeZoneFallbackEnabled="
-                + formatDebugString(mTelephonyTimeZoneFallbackEnabled));
-        ipw.decreaseIndent(); // level 2
+        if (!android.timezone.flags.Flags.enableFusedTimeZoneDetector()) {
+            ipw.println("Misc state:");
+            ipw.increaseIndent(); // level 2
+            ipw.println(
+                    "mTelephonyTimeZoneFallbackEnabled="
+                            + formatDebugString(mTelephonyTimeZoneFallbackEnabled));
+            ipw.decreaseIndent(); // level 2
+        }
 
         ipw.println("Time zone debug log:");
         ipw.increaseIndent(); // level 2
         mEnvironment.dumpDebugLog(ipw);
         ipw.decreaseIndent(); // level 2
+
+        if (android.timezone.flags.Flags.enableFusedTimeZoneDetector()) {
+            mFusedTimeZoneDetector.dump(ipw, args);
+        }
 
         ipw.println("Manual suggestion history:");
         ipw.increaseIndent(); // level 2
@@ -983,16 +987,10 @@ public final class TimeZoneDetectorStrategyImpl
         mTelephonySuggestionsBySlotIndex.dump(ipw);
         ipw.decreaseIndent(); // level 2
 
-        if (com.android.server.flags.Flags.datetimeNotifications()) {
-            ipw.println("Time zone change tracker:");
-            ipw.increaseIndent(); // level 2
-            mChangeTracker.dump(ipw);
-            ipw.decreaseIndent(); // level 2
-        }
-
-        if (android.timezone.flags.Flags.enableFusedTimeZoneDetector()) {
-            mFusedTimeZoneDetector.dump(ipw, args);
-        }
+        ipw.println("Time zone change tracker:");
+        ipw.increaseIndent(); // level 2
+        mChangeTracker.dump(ipw);
+        ipw.decreaseIndent(); // level 2
 
         if (ExperimentHelper.isTimeZoneOffsetChangeNotificationEnabled()) {
             ipw.println("Time zone offset change notifier:");

@@ -226,7 +226,6 @@ class NotifUiAdjustmentProviderTest : SysuiTestCase() {
     }
 
     @Test
-    @EnableFlags(android.app.Flags.FLAG_NM_SUMMARIZATION_UI)
     fun changeIsSummarization_needReInflation_newlySummarized() {
         // Given: an Entry with no summarization
         val oldAdjustment = adjustmentProvider.calculateAdjustment(entry)
@@ -244,7 +243,6 @@ class NotifUiAdjustmentProviderTest : SysuiTestCase() {
     }
 
     @Test
-    @EnableFlags(android.app.Flags.FLAG_NM_SUMMARIZATION_UI)
     fun changeIsSummarization_needReInflation_summarizationChanged() {
         // Given: an Entry with no summarization
         val rb = RankingBuilder(entry.ranking)
@@ -264,7 +262,6 @@ class NotifUiAdjustmentProviderTest : SysuiTestCase() {
     }
 
     @Test
-    @EnableFlags(android.app.Flags.FLAG_NOTIFICATION_CLASSIFICATION_UI)
     fun changeIsBundled_needReInflation_becomesBundled() {
         // Given: an Entry that is not bundled
         val oldAdjustment = adjustmentProvider.calculateAdjustment(entry)
@@ -281,7 +278,6 @@ class NotifUiAdjustmentProviderTest : SysuiTestCase() {
     }
 
     @Test
-    @EnableFlags(android.app.Flags.FLAG_NOTIFICATION_CLASSIFICATION_UI)
     fun changeIsBundled_needReInflation_becomesUnbundled() {
         // Given: an Entry that is bundled
         val rb = RankingBuilder(entry.ranking)

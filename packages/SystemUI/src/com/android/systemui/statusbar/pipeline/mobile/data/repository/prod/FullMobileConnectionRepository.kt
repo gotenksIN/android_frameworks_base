@@ -37,6 +37,7 @@ import com.android.systemui.log.table.logDiffsForTable
 import com.android.systemui.statusbar.pipeline.mobile.data.model.NetworkNameModel
 import com.android.systemui.statusbar.pipeline.mobile.data.model.SubscriptionModel
 import com.android.systemui.statusbar.pipeline.mobile.data.repository.MobileConnectionRepository
+import com.android.systemui.util.kotlin.mapDirect
 import java.io.PrintWriter
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
@@ -45,7 +46,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.stateIn
 
 /**
@@ -120,7 +120,7 @@ class FullMobileConnectionRepository(
             }
 
         this.isCarrierMerged
-            .mapLatest { isCarrierMerged ->
+            .mapDirect { isCarrierMerged ->
                 if (isCarrierMerged) {
                     carrierMergedRepo
                 } else {
@@ -406,18 +406,24 @@ class FullMobileConnectionRepository(
 
 // QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
 // QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
-    override val nrIconType =
-        activeRepo.flatMapLatest { it.nrIconType }
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+    override val radioIconType =
+        activeRepo.flatMapLatest { it.radioIconType }
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
             .logDiffsForTable(
                 tableLogBuffer,
                 columnPrefix = "",
-                columnName = "nrIconType",
-                initialValue = activeRepo.value.nrIconType.value,
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+                columnName = "radioIconType",
+                initialValue = activeRepo.value.radioIconType.value,
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
             )
             .stateIn(
                 scope,
                 SharingStarted.WhileSubscribed(),
-                activeRepo.value.nrIconType.value
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+                activeRepo.value.radioIconType.value
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
             )
 
 // QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon

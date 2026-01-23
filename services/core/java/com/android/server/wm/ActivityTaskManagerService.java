@@ -80,7 +80,6 @@ import static android.view.WindowManager.TRANSIT_PIP;
 import static android.view.WindowManager.TRANSIT_START_LOCK_TASK_MODE;
 import static android.view.WindowManager.TRANSIT_TO_FRONT;
 import static android.view.WindowManagerPolicyConstants.KEYGUARD_GOING_AWAY_FLAG_TO_LAUNCHER_CLEAR_SNAPSHOT;
-import static android.window.DesktopExperienceFlags.ENABLE_DESKTOP_WINDOWING_PIP;
 import static android.window.TransitionInfo.FLAG_IN_TASK_WITH_EMBEDDED_ACTIVITY;
 
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_CONFIGURATION;
@@ -268,7 +267,6 @@ import android.view.RemoteAnimationDefinition;
 import android.view.WindowManager;
 import android.window.BackAnimationAdapter;
 import android.window.BackNavigationInfo;
-import android.window.DesktopExperienceFlags;
 import android.window.ITaskSnapshotManager;
 import android.window.IWindowOrganizerController;
 import android.window.SplashScreenView.SplashScreenViewParcelable;
@@ -305,8 +303,8 @@ import com.android.server.am.AssistDataRequester;
 import com.android.server.am.BaseErrorDialog;
 import com.android.server.am.PendingIntentController;
 import com.android.server.am.PendingIntentRecord;
-import com.android.server.am.ProcessStateController;
 import com.android.server.am.UserState;
+import com.android.server.am.psc.ProcessStateController;
 import com.android.server.firewall.IntentFirewall;
 import com.android.server.grammaticalinflection.GrammaticalInflectionManagerInternal;
 import com.android.server.pm.UserManagerInternal;
@@ -439,6 +437,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     final Object mGlobalLockWithoutBoost = mGlobalLock;
     public ActivityTaskSupervisor mTaskSupervisor;
     ActivityClientController mActivityClientController;
+    WindowContainerVisibilityHelper mVisibilityHelper;
     RootWindowContainer mRootWindowContainer;
     WindowManagerService mWindowManager;
     private UserManagerService mUserManager;
@@ -941,6 +940,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             mAppWarnings.onSystemReady();
             mGrammaticalManagerInternal = LocalServices.getService(
                     GrammaticalInflectionManagerInternal.class);
+            mPackageUpdateManager.onSystemReady();
         }
     }
 
@@ -1065,6 +1065,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         mActivityStateUpdater = processStateController.createActivityStateAsyncUpdater(looper);
         mTaskSupervisor = createTaskSupervisor();
         mActivityClientController = new ActivityClientController(this);
+        mVisibilityHelper = new WindowContainerVisibilityHelperImpl(this);
 
         mTaskChangeNotificationController =
                 new TaskChangeNotificationController(mTaskSupervisor, mH);
@@ -1267,7 +1268,9 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             synchronized (mService.getGlobalLock()) {
                 persisterQueue = mService.mTaskSupervisor.mPersisterQueue;
             }
-            persisterQueue.flush();
+            // Flush the queue as a best effort and avoid blocking. The writing thread may not have
+            // started, and this is the safest choice. See b/470097874.
+            persisterQueue.flushNoWait();
         }
 
         @Override
@@ -1672,32 +1675,6 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 .setWaitResult(res)
                 .execute();
         return res;
-    }
-
-    @Override
-    public final int startActivityWithConfig(IApplicationThread caller, String callingPackage,
-            String callingFeatureId, Intent intent, String resolvedType, IBinder resultTo,
-            String resultWho, int requestCode, int startFlags, Configuration config,
-            Bundle bOptions, int userId) {
-        assertPackageMatchesCallingUid(callingPackage);
-        enforceNotIsolatedCaller("startActivityWithConfig");
-        final int callingPid = Binder.getCallingPid();
-        final int callingUid = Binder.getCallingUid();
-        userId = handleIncomingUser(callingPid, callingUid, userId, "startActivityWithConfig");
-        // TODO: Switch to user app stacks here.
-        return getActivityStartController().obtainStarter(intent, "startActivityWithConfig")
-                .setCaller(caller)
-                .setCallingPackage(callingPackage)
-                .setCallingFeatureId(callingFeatureId)
-                .setResolvedType(resolvedType)
-                .setResultTo(resultTo)
-                .setResultWho(resultWho)
-                .setRequestCode(requestCode)
-                .setStartFlags(startFlags)
-                .setGlobalConfiguration(config)
-                .setActivityOptions(bOptions, callingPid, callingUid)
-                .setUserId(userId)
-                .execute();
     }
 
     @Override
@@ -2905,8 +2882,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                 if (task == null) {
                     return;
                 }
-                if (DesktopExperienceFlags.ENABLE_DESKTOP_WINDOWING_ENTERPRISE_BUGFIX.isTrue()
-                        && getTransitionController().isShellTransitionsEnabled()) {
+                if (getTransitionController().isShellTransitionsEnabled()) {
                     if (!canEnterLockTaskMode(task)) {
                         Slog.w(TAG, "startLockTaskMode: Can't lock due to auth");
                         return;
@@ -4211,10 +4187,8 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         }
     }
 
-    @Override
-    public boolean isAssistDataAllowed() {
+    boolean isAssistDataAllowed() {
         int userId;
-        boolean hasRestrictedWindow;
         synchronized (mGlobalLock) {
             final Task focusedRootTask = getTopDisplayFocusedRootTask();
             if (focusedRootTask == null || focusedRootTask.isActivityTypeAssistant()) {
@@ -5046,8 +5020,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         synchronized (mGlobalLock) {
             TaskDisplayArea tda = mRootWindowContainer.getDefaultTaskDisplayArea();
             // If the PiP is on a non-default display
-            if (com.android.window.flags.Flags.enablePipUiStateChangeCallbackForConnectedDisplays()
-                    && displayId != DEFAULT_DISPLAY) {
+            if (displayId != DEFAULT_DISPLAY) {
                 DisplayContent dc = mRootWindowContainer.getDisplayContent(displayId);
                 if (dc != null) {
                     tda = dc.getDefaultTaskDisplayArea();
@@ -5232,9 +5205,9 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
      * The caller should not hold lock when calling this method because it will wait for the
      * activities to complete the dump.
      *
-     * @param dumpVisibleRootTasksOnly dump activity with {@param name} only if in a visible root
+     * @param dumpVisibleRootTasksOnly dump activity with {@code name} only if in a visible root
      *                                 task
-     * @param dumpFocusedRootTaskOnly  dump activity with {@param name} only if in the focused
+     * @param dumpFocusedRootTaskOnly  dump activity with {@code name} only if in the focused
      *                                 root task
      */
     protected boolean dumpActivity(FileDescriptor fd, PrintWriter pw, String name, String[] args,
@@ -5725,8 +5698,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         // Notify to continue.
         mLifecycleManager.onLayoutContinued();
 
-        if (com.android.window.flags.Flags.rankTaskLayerWithWindowLayout()
-                && mRootWindowContainer.mTaskLayersChanged
+        if (mRootWindowContainer.mTaskLayersChanged
                 // The later ActivityRecord#setState RESUMED will invoke WindowProcessController's
                 // updateProcessInfo -> prepareOomAdjustment -> rankTaskLayers.
                 && !mTaskSupervisor.hasPendingTopResumedSwitch()
@@ -6993,7 +6965,8 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
         }
 
         @Override
-        public int startActivitiesAsPackage(String packageName, @Nullable String featureId,
+        public int startActivitiesAsPackage(@Nullable IBinder callingActivityToken,
+                String packageName, @Nullable String featureId,
                 int userId, Intent[] intents, Bundle bOptions) {
             Objects.requireNonNull(intents, "intents");
             final String[] resolvedTypes = new String[intents.length];
@@ -7022,7 +6995,7 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             final int callingUid = Binder.getCallingUid();
             return getActivityStartController().startActivitiesInPackage(
                     packageUid, packageName, featureId,
-                    intents, resolvedTypes, null /* resultTo */,
+                    intents, resolvedTypes, callingActivityToken /* resultTo */,
                     SafeActivityOptions.fromBundle(bOptions, callingPid, callingUid), userId,
                     false /* validateIncomingUser */, null /* originatingPendingIntent */,
                     false);
@@ -7090,10 +7063,27 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
                     .execute();
         }
 
+        @Override
+        public int startActivityWithConfig(@NonNull String callingPackage,
+                @NonNull String callingFeatureId, @NonNull Intent intent,
+                @NonNull Configuration config, @CannotBeSpecialUser @UserIdInt int userId) {
+            assertPackageMatchesCallingUid(callingPackage);
+            enforceNotIsolatedCaller("startActivityWithConfig");
+            final int callingPid = Binder.getCallingPid();
+            final int callingUid = Binder.getCallingUid();
+            userId = handleIncomingUser(callingPid, callingUid, userId, "startActivityWithConfig");
+            return getActivityStartController().obtainStarter(intent, "startActivityWithConfig")
+                    .setCallingPackage(callingPackage)
+                    .setCallingFeatureId(callingFeatureId)
+                    .setGlobalConfiguration(config)
+                    .setUserId(userId)
+                    .execute();
+        }
+
         /**
          * Called after virtual display Id is updated by
          * {@link com.android.server.vr.Vr2dDisplay} with a specific
-         * {@param vrVr2dDisplayId}.
+         * {@code vrVr2dDisplayId}.
          */
         @Override
         public void setVr2dDisplayId(int vr2dDisplayId) {
@@ -7301,7 +7291,6 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
             mWindowManager.mSnapshotController.mTaskSnapshotController.prepareShutdown();
             synchronized (mGlobalLock) {
                 updateEventDispatchingLocked(booted);
-                notifyTaskPersisterLocked(null, true);
                 return mTaskSupervisor.shutdownLocked(timeout);
             }
         }
@@ -8584,17 +8573,14 @@ public class ActivityTaskManagerService extends IActivityTaskManager.Stub {
     /**
      * @return {@code true} if PiP2 implementation should be used.
      *
-     * Note: if PiP on Desktop Windowing is enabled, override the PiP2 gantry flag to be ON.
-     * Note: For form factors other than phone, such as TV, separate flag needs to be ON.
+     * Note: PiP2 is now enabled by default on all non-TV devices.
      */
     static boolean isPip2ExperimentEnabled() {
         if (sIsPip2ExperimentEnabled == null) {
             final FeatureInfo tvFeature = SystemConfig.getInstance().getAvailableFeatures().get(
                     FEATURE_LEANBACK);
             final boolean isTv = tvFeature != null && tvFeature.version >= 0;
-            final boolean shouldOverridePip2Flag = ENABLE_DESKTOP_WINDOWING_PIP.isTrue();
-            sIsPip2ExperimentEnabled = (Flags.enablePip2() || shouldOverridePip2Flag)
-                    && (!isTv || Flags.enablePip2OnTv());
+            sIsPip2ExperimentEnabled = Flags.enablePip2() && (!isTv || Flags.enablePip2OnTv());
         }
         return sIsPip2ExperimentEnabled;
     }

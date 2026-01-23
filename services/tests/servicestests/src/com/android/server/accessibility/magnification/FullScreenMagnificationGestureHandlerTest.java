@@ -286,10 +286,8 @@ public class FullScreenMagnificationGestureHandlerTest {
         mClock = new OffsettableClock.Stopped();
 
         boolean detectSingleFingerTripleTap = true;
-        boolean detectTwoFingerTripleTap = true;
         boolean detectShortcutTrigger = true;
-        mMgh = newInstance(detectSingleFingerTripleTap, detectTwoFingerTripleTap,
-                detectShortcutTrigger);
+        mMgh = newInstance(detectSingleFingerTripleTap, detectShortcutTrigger);
     }
 
     @After
@@ -306,7 +304,7 @@ public class FullScreenMagnificationGestureHandlerTest {
 
     @NonNull
     private FullScreenMagnificationGestureHandler newInstance(boolean detectSingleFingerTripleTap,
-            boolean detectTwoFingerTripleTap, boolean detectShortcutTrigger) {
+            boolean detectShortcutTrigger) {
         enableOneFingerPanning(
                     isWatch() || Flags.enableMagnificationOneFingerPanningGesture());
         FullScreenMagnificationGestureHandler h =
@@ -316,7 +314,6 @@ public class FullScreenMagnificationGestureHandlerTest {
                         mMockTraceManager,
                         mMockCallback,
                         detectSingleFingerTripleTap,
-                        detectTwoFingerTripleTap,
                         detectShortcutTrigger,
                         mWindowMagnificationPromptController,
                         DISPLAY_0,
@@ -491,22 +488,49 @@ public class FullScreenMagnificationGestureHandlerTest {
     }
 
     @Test
-    @RequiresFlagsDisabled(Flags.FLAG_ENABLE_MAGNIFICATION_MULTIPLE_FINGER_MULTIPLE_TAP_GESTURE)
-    public void testDisablingTripleTap_removesInputLag() {
-        mMgh = newInstance(/* detectSingleFingerTripleTap= */ false,
-                /* detectTwoFingerTripleTap= */ true, /* detectShortcutTrigger= */ true);
-        goFromStateIdleTo(STATE_IDLE);
-        allowEventDelegation();
-        tap();
-        // no fast forward
-        verify(mMgh.getNext(), times(2)).onMotionEvent(any(), any(), anyInt());
+    @RequiresFlagsDisabled(Flags.FLAG_ENABLE_MAGNIFICATION_REBASED_DELAYED_MOTION_EVENT)
+    public void testSendDelayedMotionEvents_flagOff_onlyDownTimeAdjusted() {
+        final EventCaptor eventCaptor = new EventCaptor();
+        mMgh.setNext(eventCaptor);
+
+        // Use two taps to verify that rebased logic applies individually, preserving the interval.
+        tap(DEFAULT_X, DEFAULT_Y);
+        fastForward(50);
+        tap(DEFAULT_X, DEFAULT_Y);
+        // Wait for timeout to trigger delegation.
+        fastForward1sec();
+
+        MotionEvent firstDownEvent = eventCaptor.mEvents.get(0);
+        MotionEvent secondDownEvent = eventCaptor.mEvents.get(2);
+        assertThat(firstDownEvent.getDownTime()).isNotEqualTo(secondDownEvent.getDownTime());
+        assertThat(firstDownEvent.getEventTime()).isNotEqualTo(firstDownEvent.getDownTime());
+        assertThat(secondDownEvent.getEventTime()).isNotEqualTo(secondDownEvent.getDownTime());
     }
 
     @Test
-    @RequiresFlagsEnabled(Flags.FLAG_ENABLE_MAGNIFICATION_MULTIPLE_FINGER_MULTIPLE_TAP_GESTURE)
-    public void testDisablingSingleFingerTripleTapAndTwoFingerTripleTap_removesInputLag() {
+    @RequiresFlagsEnabled(Flags.FLAG_ENABLE_MAGNIFICATION_REBASED_DELAYED_MOTION_EVENT)
+    public void testActionDownMotionEvent_flagOn_downTimeAndEventTimeAdjusted() {
+        final EventCaptor eventCaptor = new EventCaptor();
+        mMgh.setNext(eventCaptor);
+
+        // Use two taps to verify that rebased logic applies individually, preserving the interval.
+        tap(DEFAULT_X, DEFAULT_Y);
+        fastForward(50);
+        tap(DEFAULT_X, DEFAULT_Y);
+        // Wait for timeout to trigger delegation.
+        fastForward1sec();
+
+        MotionEvent firstDownEvent = eventCaptor.mEvents.get(0);
+        MotionEvent secondDownEvent = eventCaptor.mEvents.get(2);
+        assertThat(firstDownEvent.getDownTime()).isNotEqualTo(secondDownEvent.getDownTime());
+        assertThat(firstDownEvent.getEventTime()).isEqualTo(firstDownEvent.getDownTime());
+        assertThat(secondDownEvent.getEventTime()).isEqualTo(secondDownEvent.getDownTime());
+    }
+
+    @Test
+    public void testDisablingTripleTap_removesInputLag() {
         mMgh = newInstance(/* detectSingleFingerTripleTap= */ false,
-                /* detectTwoFingerTripleTap= */ false, /* detectShortcutTrigger= */ true);
+                /* detectShortcutTrigger= */ true);
         goFromStateIdleTo(STATE_IDLE);
         allowEventDelegation();
         tap();
@@ -665,93 +689,6 @@ public class FullScreenMagnificationGestureHandlerTest {
     }
 
     @Test
-    @RequiresFlagsEnabled(Flags.FLAG_ENABLE_MAGNIFICATION_MULTIPLE_FINGER_MULTIPLE_TAP_GESTURE)
-    public void testTwoFingerDoubleTap_StateIsIdle_shouldInActivated() {
-        goFromStateIdleTo(STATE_IDLE);
-
-        twoFingerTap();
-        twoFingerTap();
-
-        assertIn(STATE_ACTIVATED);
-        verify(mMockMagnificationLogger, never()).logMagnificationTripleTap(anyBoolean());
-        verify(mMockMagnificationLogger).logMagnificationTwoFingerTripleTap(true);
-    }
-
-    @Test
-    @RequiresFlagsEnabled(Flags.FLAG_ENABLE_MAGNIFICATION_MULTIPLE_FINGER_MULTIPLE_TAP_GESTURE)
-    public void testTwoFingerDoubleTap_StateIsActivated_shouldInIdle() {
-        goFromStateIdleTo(STATE_ACTIVATED);
-        reset(mMockMagnificationLogger);
-
-        twoFingerTap();
-        twoFingerTap();
-
-        assertIn(STATE_IDLE);
-        verify(mMockMagnificationLogger, never()).logMagnificationTripleTap(anyBoolean());
-        verify(mMockMagnificationLogger).logMagnificationTwoFingerTripleTap(false);
-    }
-
-    @Test
-    @RequiresFlagsEnabled(Flags.FLAG_ENABLE_MAGNIFICATION_MULTIPLE_FINGER_MULTIPLE_TAP_GESTURE)
-    public void testTwoFingerDoubleTapAndHold_StateIsIdle_shouldZoomsImmediately() {
-        goFromStateIdleTo(STATE_IDLE);
-
-        twoFingerTap();
-        twoFingerTapAndHold();
-
-        assertIn(STATE_NON_ACTIVATED_ZOOMED_TMP);
-        verify(mMockMagnificationLogger, never()).logMagnificationTripleTap(anyBoolean());
-        verify(mMockMagnificationLogger).logMagnificationTwoFingerTripleTap(true);
-    }
-
-    @Test
-    @RequiresFlagsEnabled(Flags.FLAG_ENABLE_MAGNIFICATION_MULTIPLE_FINGER_MULTIPLE_TAP_GESTURE)
-    public void testTwoFingerDoubleSwipeAndHold_StateIsIdle_shouldZoomsImmediately() {
-        goFromStateIdleTo(STATE_IDLE);
-
-        twoFingerTap();
-        twoFingerSwipeAndHold();
-
-        assertIn(STATE_NON_ACTIVATED_ZOOMED_TMP);
-        verify(mMockMagnificationLogger, never()).logMagnificationTripleTap(anyBoolean());
-        verify(mMockMagnificationLogger).logMagnificationTwoFingerTripleTap(true);
-    }
-
-    @Test
-    @RequiresFlagsEnabled(Flags.FLAG_ENABLE_MAGNIFICATION_MULTIPLE_FINGER_MULTIPLE_TAP_GESTURE)
-    public void testTwoFingerTap_StateIsActivated_shouldInDetecting() {
-        assumeTrue(isWatch());
-        enableOneFingerPanning(false);
-        goFromStateIdleTo(STATE_ACTIVATED);
-        allowEventDelegation();
-
-        send(downEvent());
-        send(pointerEvent(ACTION_POINTER_DOWN, DEFAULT_X * 2, DEFAULT_Y));
-        send(upEvent());
-        fastForward(mMgh.mDetectingState.mMultiTapMaxDelay);
-
-        verify(mMgh.getNext(), times(3)).onMotionEvent(any(), any(), anyInt());
-        assertTrue(mMgh.mCurrentState == mMgh.mDetectingState);
-    }
-
-    @Test
-    @RequiresFlagsEnabled(Flags.FLAG_ENABLE_MAGNIFICATION_MULTIPLE_FINGER_MULTIPLE_TAP_GESTURE)
-    public void testTwoFingerTap_StateIsIdle_shouldInDetecting() {
-        assumeTrue(isWatch());
-        enableOneFingerPanning(false);
-        goFromStateIdleTo(STATE_IDLE);
-        allowEventDelegation();
-
-        send(downEvent());
-        send(pointerEvent(ACTION_POINTER_DOWN, DEFAULT_X * 2, DEFAULT_Y));
-        send(upEvent());
-        fastForward(mMgh.mDetectingState.mMultiTapMaxDelay);
-
-        verify(mMgh.getNext(), times(3)).onMotionEvent(any(), any(), anyInt());
-        assertTrue(mMgh.mCurrentState == mMgh.mDetectingState);
-    }
-
-    @Test
     public void testMultiTap_outOfDistanceSlop_shouldInIdle() {
         // All delay motion events should be sent, if multi-tap with out of distance slop.
         // STATE_IDLE will check if tapCount() < 2.
@@ -858,45 +795,6 @@ public class FullScreenMagnificationGestureHandlerTest {
     }
 
     @Test
-    @RequiresFlagsEnabled(Flags.FLAG_ENABLE_MAGNIFICATION_MULTIPLE_FINGER_MULTIPLE_TAP_GESTURE)
-    public void testSecondFingerSwipe_twoPointerDownAndActivatedState_shouldInPanningState() {
-        goFromStateIdleTo(STATE_ACTIVATED);
-        PointF pointer1 = DEFAULT_POINT;
-        PointF pointer2 = new PointF(DEFAULT_X * 1.5f, DEFAULT_Y);
-
-        send(downEvent());
-        send(pointerEvent(ACTION_POINTER_DOWN, new PointF[] {pointer1, pointer2}, 1));
-        //The minimum movement to transit to panningState.
-        final float sWipeMinDistance = ViewConfiguration.get(mContext).getScaledTouchSlop();
-        pointer2.offset(sWipeMinDistance + 1, 0);
-        send(pointerEvent(ACTION_MOVE, new PointF[] {pointer1, pointer2}, 0));
-        fastForward(ViewConfiguration.getTapTimeout());
-        assertIn(STATE_PANNING);
-
-        returnToNormalFrom(STATE_PANNING);
-    }
-
-    @Test
-    @RequiresFlagsEnabled(Flags.FLAG_ENABLE_MAGNIFICATION_MULTIPLE_FINGER_MULTIPLE_TAP_GESTURE)
-    public void testTowFingerSwipe_twoPointerDownAndShortcutTriggeredState_shouldInPanningState() {
-        goFromStateIdleTo(STATE_SHORTCUT_TRIGGERED);
-        PointF pointer1 = DEFAULT_POINT;
-        PointF pointer2 = new PointF(DEFAULT_X * 1.5f, DEFAULT_Y);
-
-        send(downEvent());
-        send(pointerEvent(ACTION_POINTER_DOWN, new PointF[] {pointer1, pointer2}, 1));
-        //The minimum movement to transit to panningState.
-        final float sWipeMinDistance = ViewConfiguration.get(mContext).getScaledTouchSlop();
-        pointer2.offset(sWipeMinDistance + 1, 0);
-        send(pointerEvent(ACTION_MOVE, new PointF[] {pointer1, pointer2}, 0));
-        fastForward(ViewConfiguration.getTapTimeout());
-        assertIn(STATE_PANNING);
-
-        returnToNormalFrom(STATE_PANNING);
-    }
-
-    @Test
-    @RequiresFlagsDisabled(Flags.FLAG_ENABLE_MAGNIFICATION_MULTIPLE_FINGER_MULTIPLE_TAP_GESTURE)
     public void testSecondFingerSwipe_twoPointerDownAndActivatedState_panningState() {
         goFromStateIdleTo(STATE_ACTIVATED);
         PointF pointer1 = DEFAULT_POINT;
@@ -914,7 +812,6 @@ public class FullScreenMagnificationGestureHandlerTest {
     }
 
     @Test
-    @RequiresFlagsDisabled(Flags.FLAG_ENABLE_MAGNIFICATION_MULTIPLE_FINGER_MULTIPLE_TAP_GESTURE)
     public void testSecondFingerSwipe_twoPointerDownAndShortcutTriggeredState_panningState() {
         goFromStateIdleTo(STATE_SHORTCUT_TRIGGERED);
         PointF pointer1 = DEFAULT_POINT;
@@ -1507,7 +1404,6 @@ public class FullScreenMagnificationGestureHandlerTest {
     }
 
     @Test
-    @RequiresFlagsEnabled(Flags.FLAG_ENABLE_MAGNIFICATION_FOLLOWS_MOUSE_WITH_POINTER_MOTION_FILTER)
     public void testMouseMoveEventsDoNotMoveMagnifierViewport() {
         runMoveEventsDoNotMoveMagnifierViewport(InputDevice.SOURCE_MOUSE);
     }
@@ -1561,7 +1457,6 @@ public class FullScreenMagnificationGestureHandlerTest {
     }
 
     @Test
-    @RequiresFlagsEnabled(Flags.FLAG_ENABLE_MAGNIFICATION_FOLLOWS_MOUSE_WITH_POINTER_MOTION_FILTER)
     public void testMouseHoverMoveEventsDoNotMoveMagnifierViewport() {
         // Note that this means mouse hover shouldn't be handled here.
         // FullScreenMagnificationPointerMotionEventFilter handles mouse input events.
@@ -1569,22 +1464,9 @@ public class FullScreenMagnificationGestureHandlerTest {
     }
 
     @Test
-    @RequiresFlagsEnabled(Flags.FLAG_ENABLE_MAGNIFICATION_FOLLOWS_MOUSE_WITH_POINTER_MOTION_FILTER)
     public void testStylusHoverMoveEventsDoNotMoveMagnifierViewport() {
         // TODO(b/398984690): We will revisit the behavior.
         runHoverMoveEventsDoNotMoveMagnifierViewport(InputDevice.SOURCE_STYLUS);
-    }
-
-    @Test
-    @RequiresFlagsDisabled(Flags.FLAG_ENABLE_MAGNIFICATION_FOLLOWS_MOUSE_WITH_POINTER_MOTION_FILTER)
-    public void testMouseHoverMoveEventsMoveMagnifierViewport() {
-        runHoverMovesViewportTest(InputDevice.SOURCE_MOUSE);
-    }
-
-    @Test
-    @RequiresFlagsDisabled(Flags.FLAG_ENABLE_MAGNIFICATION_FOLLOWS_MOUSE_WITH_POINTER_MOTION_FILTER)
-    public void testStylusHoverMoveEventsMoveMagnifierViewport() {
-        runHoverMovesViewportTest(InputDevice.SOURCE_STYLUS);
     }
 
     @Test
@@ -1605,49 +1487,6 @@ public class FullScreenMagnificationGestureHandlerTest {
     @Test
     public void testStylusUpEventsDoNotMoveMagnifierViewport() {
         runUpDoesNotMoveViewportTest(InputDevice.SOURCE_STYLUS);
-    }
-
-    @Test
-    @RequiresFlagsDisabled(Flags.FLAG_ENABLE_MAGNIFICATION_FOLLOWS_MOUSE_WITH_POINTER_MOTION_FILTER)
-    public void testMouseMoveEventsMoveMagnifierViewport() {
-        final EventCaptor eventCaptor = new EventCaptor();
-        mMgh.setNext(eventCaptor);
-
-        float centerX =
-                (INITIAL_MAGNIFICATION_BOUNDS.left + INITIAL_MAGNIFICATION_BOUNDS.width()) / 2.0f;
-        float centerY =
-                (INITIAL_MAGNIFICATION_BOUNDS.top + INITIAL_MAGNIFICATION_BOUNDS.height()) / 2.0f;
-        float scale = 6.2f; // value is unimportant but unique among tests to increase coverage.
-        mFullScreenMagnificationController.setScaleAndCenter(
-                DISPLAY_0, scale, centerX, centerY, true, /* animate= */ false, 1);
-        MotionEvent event = mouseEvent(centerX, centerY, ACTION_HOVER_MOVE);
-        send(event, InputDevice.SOURCE_MOUSE);
-        fastForward(20);
-        event = mouseEvent(centerX, centerY, ACTION_DOWN);
-        send(event, InputDevice.SOURCE_MOUSE);
-        fastForward(20);
-
-        // Mouse drag event does impact magnifier viewport.
-        event = mouseEvent(centerX + 30, centerY + 60, ACTION_MOVE);
-        send(event, InputDevice.SOURCE_MOUSE);
-        fastForward(20);
-
-        assertThat(mFullScreenMagnificationController.getCenterX(DISPLAY_0))
-                .isEqualTo(centerX + 30);
-        assertThat(mFullScreenMagnificationController.getCenterY(DISPLAY_0))
-                .isEqualTo(centerY + 60);
-
-        // The mouse events were not consumed by magnifier.
-        assertThat(eventCaptor.mEvents.size()).isEqualTo(3);
-        assertThat(eventCaptor.mEvents.get(0).getSource()).isEqualTo(InputDevice.SOURCE_MOUSE);
-        assertThat(eventCaptor.mEvents.get(1).getSource()).isEqualTo(InputDevice.SOURCE_MOUSE);
-        assertThat(eventCaptor.mEvents.get(2).getSource()).isEqualTo(InputDevice.SOURCE_MOUSE);
-
-        final List<Integer> expectedActions = new ArrayList();
-        expectedActions.add(Integer.valueOf(ACTION_HOVER_MOVE));
-        expectedActions.add(Integer.valueOf(ACTION_DOWN));
-        expectedActions.add(Integer.valueOf(ACTION_MOVE));
-        assertActionsInOrder(eventCaptor.mEvents, expectedActions);
     }
 
     private void runHoverMovesViewportTest(int source) {
@@ -2211,30 +2050,6 @@ public class FullScreenMagnificationGestureHandlerTest {
         send(downEvent());
         fastForward(2000);
         send(upEvent());
-    }
-
-    private void twoFingerTap() {
-        send(downEvent());
-        send(pointerEvent(ACTION_POINTER_DOWN, DEFAULT_X * 2, DEFAULT_Y));
-        send(pointerEvent(ACTION_POINTER_UP, DEFAULT_X * 2, DEFAULT_Y));
-        send(upEvent());
-    }
-
-    private void twoFingerTapAndHold() {
-        send(downEvent());
-        send(pointerEvent(ACTION_POINTER_DOWN, DEFAULT_X * 2, DEFAULT_Y));
-        fastForward(2000);
-    }
-
-    private void twoFingerSwipeAndHold() {
-        PointF pointer1 = DEFAULT_POINT;
-        PointF pointer2 = new PointF(DEFAULT_X * 1.5f, DEFAULT_Y);
-
-        send(downEvent());
-        send(pointerEvent(ACTION_POINTER_DOWN, new PointF[] {pointer1, pointer2}, 1));
-        final float sWipeMinDistance = ViewConfiguration.get(mContext).getScaledTouchSlop();
-        pointer1.offset(sWipeMinDistance + 1, 0);
-        send(pointerEvent(ACTION_MOVE, new PointF[] {pointer1, pointer2}, 0));
     }
 
     private void triggerShortcut() {

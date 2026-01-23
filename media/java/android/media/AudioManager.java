@@ -25,7 +25,6 @@ import static android.media.audio.Flags.FLAG_DEPRECATE_STREAM_BT_SCO;
 import static android.media.audio.Flags.FLAG_BT_AUDIO_DISCONNECT_API;
 import static android.media.audio.Flags.FLAG_FOCUS_EXCLUSIVE_WITH_RECORDING;
 import static android.media.audio.Flags.FLAG_FOCUS_FREEZE_TEST_API;
-import static android.media.audio.Flags.FLAG_GUARD_STREAM_VOLUME_APIS;
 import static android.media.audio.Flags.FLAG_REGISTER_VOLUME_CALLBACK_API_HARDENING;
 import static android.media.audio.Flags.FLAG_AMSCO_AVAILABLE_API;
 import static android.media.audio.Flags.FLAG_STREAM_ASSISTANT_PUBLIC;
@@ -1350,15 +1349,10 @@ public class AudioManager {
     /**
      * Returns the maximum volume index for a particular stream.
      *
-     * <p>Starting with targetSdkVersion 37, requires {@link Manifest.permission#QUERY_AUDIO_VOLUME}
-     * to use this API.</p>
-     *
      * @param streamType The stream type whose maximum volume index is returned.
      * @return The maximum valid volume index for the stream.
      * @see #getStreamVolume(int)
      */
-    @FlaggedApi(FLAG_GUARD_STREAM_VOLUME_APIS)
-    @RequiresPermission(value = Manifest.permission.QUERY_AUDIO_VOLUME, conditional = true)
     public int getStreamMaxVolume(int streamType) {
         return mVolMaxCache.query(new VolumeCacheQuery(streamType, QUERY_VOL_MAX));
     }
@@ -1394,16 +1388,11 @@ public class AudioManager {
     /**
      * Returns the current volume index for a particular stream.
      *
-     * <p>Starting with targetSdkVersion 37, requires {@link Manifest.permission#QUERY_AUDIO_VOLUME}
-     * to use this API.</p>
-     *
      * @param streamType The stream type whose volume index is returned.
      * @return The current volume index for the stream.
      * @see #getStreamMaxVolume(int)
      * @see #setStreamVolume(int, int, int)
      */
-    @FlaggedApi(FLAG_GUARD_STREAM_VOLUME_APIS)
-    @RequiresPermission(value = Manifest.permission.QUERY_AUDIO_VOLUME, conditional = true)
     public int getStreamVolume(int streamType) {
         return mVolCache.query(new VolumeCacheQuery(streamType, QUERY_VOL));
     }
@@ -6588,6 +6577,13 @@ public class AudioManager {
     public static final int DEVICE_OUT_MULTICHANNEL_GROUP =
             AudioSystem.DEVICE_OUT_MULTICHANNEL_GROUP;
     /** @hide
+     * A device corresponding to the transmit path in an android implementation
+     * operating in a Bluetooth audio peripheral mode (LE Audio, A2DP or HFP profiles).
+     */
+    public static final int DEVICE_OUT_BLE_CENTRAL =
+            AudioSystem.DEVICE_OUT_BLE_CENTRAL;
+
+    /** @hide
      * This is not used as a returned value from {@link #getDevicesForStream}, but could be
      *  used in the future in a set method to select whatever default device is chosen by the
      *  platform-specific implementation.
@@ -6690,6 +6686,20 @@ public class AudioManager {
      * The audio input device code for a BLE audio hearing aid.
      */
     public static final int DEVICE_IN_BLE_HEARING_AID = AudioSystem.DEVICE_IN_BLE_HEARING_AID;
+
+    /** @hide
+     * A device corresponding to the receive path in an android implementation
+     * operating in a Bluetooth audio peripheral mode (LE Audio, A2DP or HFP profiles).
+     */
+    public static final int DEVICE_IN_BLE_CENTRAL =
+            AudioSystem.DEVICE_IN_BLE_CENTRAL;
+
+    /** @hide
+     * A device corresponding to the receive path in an android implementation
+     * operating in a Bluetooth LE audio peripheral mode in a broadcast group.
+     */
+    public static final int DEVICE_IN_BLE_CENTRAL_BROADCAST =
+            AudioSystem.DEVICE_IN_BLE_CENTRAL_BROADCAST;
 
     /**
      * Return true if the device code corresponds to an output device.
@@ -9136,7 +9146,7 @@ public class AudioManager {
      * @hide
      * Indicates whether the platform supports capturing content from the hotword recognition
      * pipeline. To capture content of this type, create an AudioRecord with
-     * {@link AudioRecord.Builder.setRequestHotwordStream(boolean, boolean)}.
+     * {@link AudioRecord.Builder#setRequestHotwordStream(boolean, boolean)}.
      * @param lookbackAudio Query if the hotword stream additionally supports providing buffered
      * audio prior to stream open.
      * @return True if the platform supports capturing hotword content, and if lookbackAudio
@@ -9164,7 +9174,7 @@ public class AudioManager {
      * application to start streaming data using these {@link AudioAttributes} on the selected
      * device by Audio Policy Engine.
      * @return a (possibly zero-length) array of
-     *         {@see android.media.audiopolicy.AudioProductStrategy} objects.
+     *         {@link android.media.audiopolicy.AudioProductStrategy} objects.
      */
     @SystemApi
     @NonNull
@@ -9188,7 +9198,7 @@ public class AudioManager {
      * When implementing {Car|Oem}AudioManager, use this method  to retrieve the collection of
      * audio volume groups.
      * @return a (possibly zero-length) List of
-     *         {@see android.media.audiopolicy.AudioVolumeGroup} objects.
+     *         {@link android.media.audiopolicy.AudioVolumeGroup} objects.
      */
     @SystemApi
     @NonNull
@@ -9353,8 +9363,10 @@ public class AudioManager {
      * Set whether or not there is an active RTT call.
      * This method should be called by Telecom service.
      * @hide
-     * TODO: make this a @SystemApi
      */
+    @SystemApi
+    @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE)
+    @FlaggedApi(android.telecom.flags.Flags.FLAG_TELECOM_MAINLINE_API)
     public static void setRttEnabled(boolean rttEnabled) {
         try {
             getService().setRttEnabled(rttEnabled);

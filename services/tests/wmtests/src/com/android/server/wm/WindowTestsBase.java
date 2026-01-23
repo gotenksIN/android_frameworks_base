@@ -69,6 +69,7 @@ import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.ActivityOptions;
+import android.app.WindowConfiguration;
 import android.content.ComponentName;
 import android.content.ContentResolver;
 import android.content.Context;
@@ -114,6 +115,7 @@ import android.window.ITaskFragmentOrganizer;
 import android.window.ITransitionPlayer;
 import android.window.StartingWindowInfo;
 import android.window.StartingWindowRemovalInfo;
+import android.window.TaskCreationParams;
 import android.window.TaskFragmentOrganizer;
 import android.window.TransitionInfo;
 import android.window.TransitionRequestInfo;
@@ -150,6 +152,16 @@ public class WindowTestsBase extends SystemServiceTestsBase {
 
     static final int DEFAULT_TASK_FRAGMENT_ORGANIZER_UID = 10000;
     static final String DEFAULT_TASK_FRAGMENT_ORGANIZER_PROCESS_NAME = "Test:TaskFragmentOrganizer";
+
+    static final String TEST_PACKAGE_1 = "com.test.pkg1";
+    static final String TEST_PACKAGE_2 = "com.test.pkg2";
+    static final String TEST_PACKAGE_3 = "com.test.pkg3";
+    static final String TEST_ACTIVITY = ".TestActivity";
+    static final int TEST_USER_ID_1 = 0;
+    static final int TEST_USER_ID_2 = 1;
+    static final ComponentName TEST_COMPONENT_1 = new ComponentName(TEST_PACKAGE_1, TEST_ACTIVITY);
+    static final ComponentName TEST_COMPONENT_2 = new ComponentName(TEST_PACKAGE_2, TEST_ACTIVITY);
+    static final ComponentName TEST_COMPONENT_3 = new ComponentName(TEST_PACKAGE_3, TEST_ACTIVITY);
 
     // Default base activity name
     private static final String DEFAULT_COMPONENT_CLASS_NAME = ".BarActivity";
@@ -682,7 +694,8 @@ public class WindowTestsBase extends SystemServiceTestsBase {
             int windowingMode, int activityType, boolean onTop, boolean twoLevelTask) {
         return createTask(taskDisplayArea, windowingMode, activityType,
                 onTop, true /* createActivity */, twoLevelTask,
-                false /* forceOpaque */);
+                false /* forceOpaque */, false /* shouldIgnoreInsets */,
+                false /* disableAppCompatRoundedCorners */);
     }
 
     /** Creates a {@link Task} and adds to the given {@link DisplayContent}. */
@@ -698,20 +711,24 @@ public class WindowTestsBase extends SystemServiceTestsBase {
     Task createTask(TaskDisplayArea taskDisplayArea, int windowingMode, int activityType) {
         return createTask(taskDisplayArea, windowingMode, activityType,
                 true /* onTop */, false /* createActivity */, false /* twoLevelTask */,
-                false /* forceOpaque */);
+                false /* forceOpaque */, false /* shouldIgnoreInsets */,
+                false /* disableAppCompatRoundedCorners */);
     }
 
     /** Creates a {@link Task} and adds to the given {@link TaskDisplayArea}. */
     Task createTask(TaskDisplayArea taskDisplayArea, int windowingMode, int activityType,
             boolean onTop, boolean createActivity, boolean twoLevelTask,
-            boolean forcepaque) {
+            boolean forceOpaque, boolean shouldIgnoreInsets,
+            boolean disableAppCompatRoundedCorners) {
         final TaskBuilder builder = new TaskBuilder(mSupervisor)
                 .setTaskDisplayArea(taskDisplayArea)
                 .setWindowingMode(windowingMode)
                 .setActivityType(activityType)
                 .setOnTop(onTop)
                 .setCreateActivity(createActivity)
-                .setForceOpaque(forcepaque);
+                .setForceOpaque(forceOpaque)
+                .setShouldIgnoreInsets(shouldIgnoreInsets)
+                .setDisableAppCompatRoundedCorners(disableAppCompatRoundedCorners);
         if (twoLevelTask) {
             return builder
                     .setCreateParentTask(true)
@@ -728,6 +745,20 @@ public class WindowTestsBase extends SystemServiceTestsBase {
                 .setUserId(userId)
                 .setParentTask(rootTask)
                 .build();
+        return task;
+    }
+
+    /** Creates a {@link Task} with an activity and adds to the given root {@link Task}. */
+    Task createLeafTaskWithActivity(Task rootTask,
+            @WindowConfiguration.WindowingMode int windowingMode, boolean opaque, boolean filling) {
+        final ActivityRecord activity = new ActivityBuilder(mAtm)
+                .setCreateTask(true)
+                .setParentTask(rootTask)
+                .build();
+        activity.setOccludesParent(opaque);
+        final Task task = activity.getTask();
+        task.setWindowingMode(windowingMode);
+        task.setBounds(filling ? new Rect() : new Rect(100, 100, 200, 200));
         return task;
     }
 
@@ -1562,6 +1593,8 @@ public class WindowTestsBase extends SystemServiceTestsBase {
         private boolean mCreateActivity = false;
         private boolean mCreatedByOrganizer = false;
         private boolean mIsForceOpaque = false;
+        private boolean mShouldIgnoreInsets = false;
+        private boolean mDisableAppCompatRoundedCorners = false;
 
         TaskBuilder(ActivityTaskSupervisor supervisor) {
             mSupervisor = supervisor;
@@ -1663,6 +1696,16 @@ public class WindowTestsBase extends SystemServiceTestsBase {
             return this;
         }
 
+        TaskBuilder setShouldIgnoreInsets(boolean shouldIgnoreInsets) {
+            mShouldIgnoreInsets = shouldIgnoreInsets;
+            return this;
+        }
+
+        TaskBuilder setDisableAppCompatRoundedCorners(boolean disableAppCompatRoundedCorners) {
+            mDisableAppCompatRoundedCorners = disableAppCompatRoundedCorners;
+            return this;
+        }
+
         Task build() {
             SystemServicesTestRule.checkHoldsLock(mSupervisor.mService.mGlobalLock);
 
@@ -1699,7 +1742,9 @@ public class WindowTestsBase extends SystemServiceTestsBase {
                     .setOnTop(mOnTop)
                     .setVoiceSession(mVoiceSession)
                     .setCreatedByOrganizer(mCreatedByOrganizer)
-                    .setForceOpaque(mIsForceOpaque);
+                    .setForceOpaque(mIsForceOpaque)
+                    .setShouldIgnoreInsets(mShouldIgnoreInsets)
+                    .setDisableAppCompatRoundedCorners(mDisableAppCompatRoundedCorners);
             final Task task;
             if (mParentTask == null) {
                 task = builder.setActivityType(mActivityType)
@@ -1762,6 +1807,7 @@ public class WindowTestsBase extends SystemServiceTestsBase {
         private DisplayContent mTargetDisplay;
         private int mWindowingMode = WINDOWING_MODE_FULLSCREEN;
         private WindowToken mWindowToken;
+        private String mOwningPackage = "test";
 
         WindowStateBuilder(String name, int type, WindowManagerService windowManagerService,
                 DisplayContent dc, IWindow iWindow, Supplier<WindowToken, Session> sessionSupplier,
@@ -1816,12 +1862,17 @@ public class WindowTestsBase extends SystemServiceTestsBase {
             return this;
         }
 
+        WindowStateBuilder setOwningPackage(String owningPackage) {
+            mOwningPackage = owningPackage;
+            return this;
+        }
+
         WindowState build() {
             SystemServicesTestRule.checkHoldsLock(mWm.mGlobalLock);
 
             final WindowManager.LayoutParams attrs = new WindowManager.LayoutParams(mType);
             attrs.setTitle(mName);
-            attrs.packageName = "test";
+            attrs.packageName = mOwningPackage;
 
             assertFalse(
                     "targetDisplay shouldn't be specified together with windowToken, since"
@@ -1914,10 +1965,16 @@ public class WindowTestsBase extends SystemServiceTestsBase {
             mDefaultTDA = display.getDefaultTaskDisplayArea();
             mDisplayId = display.mDisplayId;
             mService.mTaskOrganizerController.registerTaskOrganizer(this);
-            mPrimary = mService.mTaskOrganizerController.createRootTask(
-                    display, WINDOWING_MODE_MULTI_WINDOW, null);
-            mSecondary = mService.mTaskOrganizerController.createRootTask(
-                    display, WINDOWING_MODE_MULTI_WINDOW, null);
+            mPrimary = mService.mTaskOrganizerController.createTaskInner(
+                    new TaskCreationParams.Builder()
+                            .setDisplayId(mDisplayId)
+                            .setWindowingMode(WINDOWING_MODE_MULTI_WINDOW)
+                            .build());
+            mSecondary = mService.mTaskOrganizerController.createTaskInner(
+                    new TaskCreationParams.Builder()
+                            .setDisplayId(mDisplayId)
+                            .setWindowingMode(WINDOWING_MODE_MULTI_WINDOW)
+                            .build());
 
             mPrimary.setAdjacentTaskFragments(new TaskFragment.AdjacentSet(mPrimary, mSecondary));
             display.getDefaultTaskDisplayArea().setLaunchAdjacentFlagRootTask(mSecondary);
@@ -1990,8 +2047,11 @@ public class WindowTestsBase extends SystemServiceTestsBase {
         }
 
         public Task createTask(Rect bounds) {
-            Task task = mService.mTaskOrganizerController.createRootTask(
-                    mDisplay, WINDOWING_MODE_FREEFORM, null);
+            Task task = mService.mTaskOrganizerController.createTaskInner(
+                    new TaskCreationParams.Builder()
+                            .setDisplayId(mDisplay.getDisplayId())
+                            .setWindowingMode(WINDOWING_MODE_FREEFORM)
+                            .build());
             task.setBounds(bounds);
             mTasks.add(task);
             spyOn(task);

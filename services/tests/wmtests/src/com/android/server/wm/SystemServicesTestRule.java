@@ -46,6 +46,7 @@ import static org.mockito.Mockito.withSettings;
 import android.annotation.Nullable;
 import android.app.ActivityManagerInternal;
 import android.app.ActivityThread;
+import android.app.AppLockInternal;
 import android.app.AppOpsManager;
 import android.app.IApplicationThread;
 import android.app.usage.UsageStatsManagerInternal;
@@ -89,8 +90,8 @@ import com.android.server.UiModeManagerInternal;
 import com.android.server.UiThread;
 import com.android.server.Watchdog;
 import com.android.server.am.ActivityManagerService;
-import com.android.server.am.ProcessStateController;
 import com.android.server.am.psc.AsyncBatchSession;
+import com.android.server.am.psc.ProcessStateController;
 import com.android.server.display.DisplayControl;
 import com.android.server.display.color.ColorDisplayService;
 import com.android.server.firewall.IntentFirewall;
@@ -100,8 +101,8 @@ import com.android.server.pm.UserManagerInternal;
 import com.android.server.pm.UserManagerService;
 import com.android.server.policy.PermissionPolicyInternal;
 import com.android.server.statusbar.StatusBarManagerInternal;
-import com.android.server.testutils.StubTransaction;
 import com.android.server.uri.UriGrantsManagerInternal;
+import com.android.testing.wm.util.StubTransaction;
 
 import org.junit.rules.TestRule;
 import org.junit.runner.Description;
@@ -326,6 +327,9 @@ public class SystemServicesTestRule implements TestRule {
         ComponentName systemServiceComponent = new ComponentName("android.test.system.service", "");
         doReturn(systemServiceComponent).when(packageManagerInternal).getSystemUiServiceComponent();
 
+        // AppLockInternal
+        LocalServices.addService(AppLockInternal.class, mock(AppLockInternal.class));
+
         // PowerManagerInternal
         final PowerManagerInternal pmi = mock(PowerManagerInternal.class);
         final PowerSaveState state = new PowerSaveState.Builder().build();
@@ -514,6 +518,7 @@ public class SystemServicesTestRule implements TestRule {
         LocalServices.removeServiceForTest(UiModeManagerInternal.class);
         LocalServices.removeServiceForTest(UserManagerInternal.class);
         LocalServices.removeServiceForTest(GrammaticalInflectionManagerInternal.class);
+        LocalServices.removeServiceForTest(AppLockInternal.class);
     }
 
     Description getDescription() {

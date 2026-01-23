@@ -34,11 +34,9 @@ import static android.view.WindowManager.TRANSIT_TO_FRONT;
 import static android.window.TransitionInfo.FLAG_IS_DISPLAY;
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_REORDER;
 
-import static com.android.window.flags.Flags.exitSplitOnDisplayMoveBugfix;
 import static com.android.window.flags.Flags.enableNonDefaultDisplaySplitBugfix;
 import static com.android.wm.shell.Flags.enableFlexibleSplit;
 import static com.android.wm.shell.Flags.enableFlexibleTwoAppSplit;
-
 import static com.android.wm.shell.common.split.SplitLayout.PARALLAX_ALIGN_CENTER;
 import static com.android.wm.shell.common.split.SplitLayout.PARALLAX_FLEX_HYBRID;
 import static com.android.wm.shell.common.split.SplitLayout.RESTING_DIM_LAYER;
@@ -130,7 +128,8 @@ import android.widget.Toast;
 import android.window.DesktopExperienceFlags;
 import android.window.DisplayAreaInfo;
 import android.window.RemoteTransition;
-import android.window.TaskOrganizer;
+import android.window.TaskCreationParams;
+import android.window.TaskPropertiesRequest;
 import android.window.TransitionInfo;
 import android.window.TransitionRequestInfo;
 import android.window.WindowContainerToken;
@@ -141,6 +140,7 @@ import com.android.internal.logging.InstanceId;
 import com.android.internal.policy.FoldLockSettingsObserver;
 import com.android.internal.protolog.ProtoLog;
 import com.android.launcher3.icons.IconProvider;
+import com.android.window.flags.Flags;
 import com.android.wm.shell.R;
 import com.android.wm.shell.RootDisplayAreaOrganizer;
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer;
@@ -268,6 +268,7 @@ public class StageCoordinator extends StageCoordinatorAbstract {
     @VisibleForTesting
     RunningTaskInfo mSplitRootTaskInfo;
 
+    private WindowContainerToken mRootTaskToken;
     private SurfaceControl mRootTaskLeash;
 
     // Tracks whether we should update the recent tasks.  Only allow this to happen in between enter
@@ -323,23 +324,17 @@ public class StageCoordinator extends StageCoordinatorAbstract {
     @Override
     public void addMoveSplitPairToDisplayChanges(int oldDisplayId, int destinationDisplayId,
             @NonNull WindowContainerTransaction wct, boolean onTop) {
-        if (!DesktopExperienceFlags.ENABLE_NON_DEFAULT_DISPLAY_SPLIT_BUGFIX.isTrue()
-                || !DesktopExperienceFlags.ENABLE_MOVE_TO_NEXT_DISPLAY_SHORTCUT.isTrue()) {
+        if (!DesktopExperienceFlags.ENABLE_NON_DEFAULT_DISPLAY_SPLIT_BUGFIX.isTrue()) {
             return;
         }
 
-        DisplayAreaInfo newDisplayAreaInfo =
-                mRootTDAOrganizer.getDisplayAreaInfo(destinationDisplayId);
-        if (newDisplayAreaInfo == null) {
+        if (mSplitRootTaskInfo.displayId != oldDisplayId) {
+            ProtoLog.d(WM_SHELL_SPLIT_SCREEN, "No SplitScreen RootTask found on"
+                    + " displayID %d", oldDisplayId);
             return;
         }
 
-        WindowContainerToken stageCoordinatorRootTaskToken = mSplitRootTaskInfo.token;
-        if (stageCoordinatorRootTaskToken == null || mSplitRootTaskInfo.displayId != oldDisplayId) {
-            ProtoLog.d(WM_SHELL_SPLIT_SCREEN, "No SplitScreen RootTask found");
-            return;
-        }
-        wct.reparent(stageCoordinatorRootTaskToken, newDisplayAreaInfo.token, onTop);
+        prepareMovingSplitScreenRoot(wct, destinationDisplayId, onTop);
     }
 
     @Override
@@ -465,14 +460,15 @@ public class StageCoordinator extends StageCoordinatorAbstract {
         mMSDLPlayer = msdlPlayer;
         mBubbleController = bubbleController;
 
-        final var request = new TaskOrganizer.CreateRootTaskRequest()
+        final TaskPropertiesRequest taskProperties = new TaskPropertiesRequest()
+                .setForceOpaque(com.android.window.flags.Flags.enableForceOpaque());
+        final TaskCreationParams params = new TaskCreationParams.Builder()
                 .setName("SplitRoot")
                 .setDisplayId(displayId)
-                .setWindowingMode(WINDOWING_MODE_FULLSCREEN);
-        if (com.android.window.flags.Flags.enableForceOpaque()) {
-            request.setForceOpaque(true);
-        }
-        taskOrganizer.createRootTask(request, this);
+                .setWindowingMode(WINDOWING_MODE_FULLSCREEN)
+                .setTaskPropertiesRequest(taskProperties)
+                .build();
+        mRootTaskToken = taskOrganizer.createTask(params, this);
 
         ProtoLog.d(WM_SHELL_SPLIT_SCREEN, "Creating main/side root task");
         if (enableFlexibleSplit()) {
@@ -937,6 +933,65 @@ public class StageCoordinator extends StageCoordinatorAbstract {
                 "startTasks: task1=%d task2=%d position=%d snapPosition=%d",
                 taskId1, taskId2, splitPosition, snapPosition);
         final WindowContainerTransaction wct = new WindowContainerTransaction();
+        if (taskId2 == INVALID_TASK_ID) {
+            // Handle the start request as a single task start instead if the second task is
+            // invalid.
+            if (DesktopExperienceFlags.ENABLE_NON_DEFAULT_DISPLAY_SPLIT_BUGFIX.isTrue()) {
+                // When entering split screen from the overview app menu, check the task's display.
+                // If the task is on a different display than the split screen root, move the root
+                // to the task's display.
+                RunningTaskInfo taskInfo1 = mTaskOrganizer.getRunningTaskInfo(taskId1);
+                if (taskInfo1 != null) {
+                    updateSplitLayoutConfig(mRootTDAOrganizer, taskInfo1.displayId, mSplitLayout);
+                    prepareMovingSplitScreenRoot(wct, taskInfo1.displayId, true /* onTop */);
+                }
+            }
+            startSingleTask(taskId1, options1, wct, remoteTransition);
+            return;
+        }
+        prepareStartTasks(wct, taskId1, options1, taskId2, options2, splitPosition);
+        startWithTask(wct, taskId2, options2, snapPosition, remoteTransition, instanceId,
+                splitPosition);
+    }
+
+    /**
+     * Augments a transition request with the changes to start 2 tasks. Useful when handling a
+     * core-started transition that supplies a transition {@link IBinder} and
+     * {@link WindowContainerTransaction wct} to which changes should be applied, for example,
+     * the fullscreen->split restore request handled by
+     * {@link com.android.wm.shell.common.ClientFullscreenRequestController}.
+     *
+     * See {@link #startTasks} for a version where WMShell directly starts a new transition that
+     * starts two tasks.
+     *
+     *
+     * @param transition the transition being augmented
+     * @param wct        transaction to augment the request
+     * @param taskId1 starts in the mSideStage
+     * @param taskId2 starts in the mainStage #startWithTask()
+     */
+    void startTasksWithExistingTransition(@NonNull IBinder transition,
+            @NonNull WindowContainerTransaction wct, int taskId1, @Nullable Bundle options1,
+            int taskId2, @Nullable Bundle options2, @SplitPosition int splitPosition,
+            @PersistentSnapPosition int snapPosition) {
+        ProtoLog.d(WM_SHELL_SPLIT_SCREEN,
+                "augmentStartTasks: task1=%d task2=%d position=%d snapPosition=%d transition=%s",
+                taskId1, taskId2, splitPosition, snapPosition, transition);
+        prepareStartTasks(wct, taskId1, options1, taskId2, options2, splitPosition);
+        startWithTaskWithExistingTransition(transition, wct, taskId2, options2, snapPosition,
+                splitPosition);
+    }
+
+    /**
+     * Prepares the provided {@link WindowContainerTransaction} with the changes necessary to
+     * start two tasks directly into split.
+     */
+    private void prepareStartTasks(@NonNull WindowContainerTransaction wct, int taskId1,
+            @Nullable Bundle options1, int taskId2, @Nullable Bundle options2,
+            @SplitPosition int splitPosition) {
+        if (taskId1 == INVALID_TASK_ID || taskId2 == INVALID_TASK_ID) {
+            throw new IllegalArgumentException("task ids must be valid");
+        }
 
         // When entering split screen from the overview app menu, check the task's display.
         // If the task is on a different display than the split screen root, move the root
@@ -947,11 +1002,6 @@ public class StageCoordinator extends StageCoordinatorAbstract {
                 updateSplitLayoutConfig(mRootTDAOrganizer, taskInfo1.displayId, mSplitLayout);
                 prepareMovingSplitScreenRoot(wct, taskInfo1.displayId, true /* onTop */);
             }
-        }
-
-        if (taskId2 == INVALID_TASK_ID) {
-            startSingleTask(taskId1, options1, wct, remoteTransition);
-            return;
         }
 
         if (enableFlexibleTwoAppSplit()
@@ -973,9 +1023,6 @@ public class StageCoordinator extends StageCoordinatorAbstract {
         Bundle[] outOptions = new Bundle[]{options1, options2};
         prepareTasksForSplitScreen(new int[]{taskId1, taskId2}, wct, outOptions);
         wct.startTask(taskId1, outOptions[0]);
-
-        startWithTask(wct, taskId2, outOptions[1], snapPosition, remoteTransition, instanceId,
-                splitPosition);
     }
 
     /** Start an intent and a task to a split pair in one transition. */
@@ -1189,8 +1236,42 @@ public class StageCoordinator extends StageCoordinatorAbstract {
      */
     private void startWithTask(WindowContainerTransaction wct, int mainTaskId,
             @Nullable Bundle mainOptions, @PersistentSnapPosition int snapPosition,
-            @Nullable RemoteTransition remoteTransition, InstanceId instanceId,
+            @Nullable RemoteTransition remoteTransition, @Nullable InstanceId instanceId,
             @SplitPosition int splitPosition) {
+        prepareStartWithTask(wct, mainTaskId, mainOptions, snapPosition, instanceId, splitPosition);
+        mSplitTransitions.startEnterTransition(TRANSIT_TO_FRONT, wct, remoteTransition, this,
+                TRANSIT_SPLIT_SCREEN_PAIR_OPEN, false, snapPosition);
+        setEnterInstanceId(instanceId);
+    }
+
+    /**
+     * Augments a transition request with the changes to start split-screen with the second task to
+     * a split pair in one transition. Useful when handling a core-started transition that supplies
+     * a transition {@link IBinder} and {@link WindowContainerTransaction wct} to which changes
+     * should be applied.
+     *
+     * @param transition the transition being augmented
+     * @param wct        transaction to start the first task
+     */
+    private void startWithTaskWithExistingTransition(@NonNull IBinder transition,
+            @NonNull WindowContainerTransaction wct, int mainTaskId, @Nullable Bundle mainOptions,
+            @PersistentSnapPosition int snapPosition, @SplitPosition int splitPosition) {
+        prepareStartWithTask(wct, mainTaskId, mainOptions, snapPosition, /* instanceId = */ null,
+                splitPosition);
+        mSplitTransitions.setEnterTransition(transition, /* remoteTransition = */ null,
+                TRANSIT_SPLIT_SCREEN_PAIR_OPEN, false, snapPosition);
+    }
+
+    /**
+     * Prepares a WCT to start with the second task to a split pair in one transition.
+     *
+     * @param wct        transaction to start the first task
+     * @param instanceId if {@code null}, will not log. Otherwise it will be used in
+     *                   {@link SplitscreenEventLogger#logEnter(float, int, int, int, int, boolean)}
+     */
+    private void prepareStartWithTask(@NonNull WindowContainerTransaction wct, int mainTaskId,
+            @Nullable Bundle mainOptions, @PersistentSnapPosition int snapPosition,
+            @Nullable InstanceId instanceId, @SplitPosition int splitPosition) {
         if (!isSplitActive()) {
             // Build a request WCT that will launch both apps such that task 0 is on the main stage
             // while task 1 is on the side stage.
@@ -1226,9 +1307,6 @@ public class StageCoordinator extends StageCoordinatorAbstract {
         if (mPausingTasks.contains(mainTaskId)) {
             mPausingTasks.clear();
         }
-        mSplitTransitions.startEnterTransition(TRANSIT_TO_FRONT, wct, remoteTransition, this,
-                TRANSIT_SPLIT_SCREEN_PAIR_OPEN, false, snapPosition);
-        setEnterInstanceId(instanceId);
     }
 
     void startIntents(PendingIntent pendingIntent1, Intent fillInIntent1,
@@ -2098,7 +2176,10 @@ public class StageCoordinator extends StageCoordinatorAbstract {
         setDividerVisibility(true, finishT);
         // Ensure divider surface are re-parented back into the hierarchy at the end of the
         // transition. See Transition#buildFinishTransaction for more detail.
-        finishT.reparent(mSplitLayout.getDividerLeash(), mRootTaskLeash);
+        SurfaceControl dividerLeash = mSplitLayout.getDividerLeash();
+        if (dividerLeash != null && dividerLeash.isValid()) {
+            finishT.reparent(dividerLeash, mRootTaskLeash);
+        }
         if (enableFlexibleSplit()) {
             mStageOrderOperator.getActiveStages().forEach(stage -> {
                 finishT.reparent(stage.mDimLayer, stage.mRootLeash);
@@ -2155,6 +2236,11 @@ public class StageCoordinator extends StageCoordinatorAbstract {
         return SPLIT_POSITION_UNDEFINED;
     }
 
+    @Override
+    int calculateCurrentSnapPosition() {
+        return mSplitLayout.calculateCurrentSnapPosition();
+    }
+
     private void addActivityOptions(Bundle opts, @Nullable StageTaskListener launchTarget) {
         ActivityOptions options = ActivityOptions.fromBundle(opts);
         if (launchTarget != null) {
@@ -2199,6 +2285,13 @@ public class StageCoordinator extends StageCoordinatorAbstract {
 
     void updateActivityOptions(Bundle opts, @SplitPosition int position) {
         addActivityOptions(opts, position == mSideStagePosition ? mSideStage : mMainStage);
+    }
+
+    @Override
+    void setFullscreenRequestAllowMode(int mode) {
+        final WindowContainerTransaction wct = new WindowContainerTransaction();
+        wct.setFullscreenRequestAllowMode(mRootTaskToken, mode);
+        mTaskOrganizer.applyTransaction(wct);
     }
 
     void registerSplitScreenListener(SplitScreen.SplitScreenListener listener) {
@@ -2973,7 +3066,7 @@ public class StageCoordinator extends StageCoordinatorAbstract {
     }
 
     /**
-     * Returns the {@link StageType} where {@param token} is being used
+     * Returns the {@link StageType} where {@code token} is being used
      * {@link SplitScreen#STAGE_TYPE_UNDEFINED} otherwise
      */
     @StageType
@@ -3194,8 +3287,18 @@ public class StageCoordinator extends StageCoordinatorAbstract {
         final boolean isLaunchingDesktopTask =
                 isOpening && mDesktopState.canEnterDesktopMode()
                         && triggerTask.getWindowingMode() == WINDOWING_MODE_FREEFORM;
+        final boolean isClientRequestedFullscreenRequest =
+                Flags.delegateRequestFullscreenHandlingToShell()
+                && request != null && request.getFullscreenRequestChange() != null;
         final StageTaskListener stage = getStageOfTask(triggerTask);
 
+        if (isClientRequestedFullscreenRequest) {
+            // Let the request be handled by the ClientFullscreenRequestController.
+            ProtoLog.d(WM_SHELL_SPLIT_SCREEN,
+                    "handleRequest: transition=%d has fullscreen request, skipping",
+                    request.getDebugId());
+            return null;
+        }
         if (inDesktopMode || isLaunchingDesktopTask) {
             // Don't handle request when desktop mode is showing (since they don't coexist), or
             // when launching a desktop task (defer to DesktopTasksController)
@@ -3249,7 +3352,8 @@ public class StageCoordinator extends StageCoordinatorAbstract {
                                 TRANSIT_SPLIT_SCREEN_OPEN_TO_SIDE, true /*resizeAnim*/,
                                 SNAP_TO_2_50_50);
                     }
-                } else if (inFullscreen && isSplitScreenVisible()) {
+                } else if (inFullscreen && isSplitScreenVisible()
+                        && !Flags.delegateRequestFullscreenHandlingToShell()) {
                     // If the trigger task is in fullscreen and in split, exit split and place
                     // task on top
                     final int stageType = getStageOfTask(triggerTask.taskId);
@@ -3316,12 +3420,14 @@ public class StageCoordinator extends StageCoordinatorAbstract {
                         SNAP_TO_2_50_50);
                 return out;
             }
-            ProtoLog.d(WM_SHELL_SPLIT_SCREEN, "handleRequest: transition=%d "
-                    + "restoring to split", request.getDebugId());
-            out = new WindowContainerTransaction();
-            mSplitTransitions.setEnterTransition(transition, request.getRemoteTransition(),
-                    TRANSIT_SPLIT_SCREEN_OPEN_TO_SIDE, false /* resizeAnim */,
-                    SNAP_TO_2_50_50);
+            if (!Flags.delegateRequestFullscreenHandlingToShell()) {
+                ProtoLog.d(WM_SHELL_SPLIT_SCREEN, "handleRequest: transition=%d "
+                        + "restoring to split", request.getDebugId());
+                out = new WindowContainerTransaction();
+                mSplitTransitions.setEnterTransition(transition, request.getRemoteTransition(),
+                        TRANSIT_SPLIT_SCREEN_OPEN_TO_SIDE, false /* resizeAnim */,
+                        SNAP_TO_2_50_50);
+            }
         }
         return out;
     }

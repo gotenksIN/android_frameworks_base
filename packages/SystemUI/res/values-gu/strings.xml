@@ -155,7 +155,7 @@
     <string name="screen_record_video_saved" msgid="1345283626390232282">"વીડિયો સાચવ્યો"</string>
     <string name="screen_record_video_deleted" msgid="30786214839944540">"વીડિયો ડિલીટ કર્યો"</string>
     <string name="screen_record_undo" msgid="7942716736019800870">"છેલ્લો ફેરફાર રદ કરો"</string>
-    <string name="screen_record_retake" msgid="3846643688365398450">"ફરીથી લો"</string>
+    <string name="screen_record_take_another" msgid="8071412867905614800">"અન્ય રેકોર્ડિંગ લો"</string>
     <string name="screen_record_edit" msgid="8733014191240769309">"ફેરફાર કરો"</string>
     <string name="screen_record_delete" msgid="1023421937978254537">"ડિલીટ કરો"</string>
     <string name="screen_record_delete_dialog_title" msgid="5868561491974057044">"આ રેકોર્ડિંગ ડિલીટ કરીએ?"</string>
@@ -186,6 +186,10 @@
     <string name="screen_capture_toolbar_fullscreen_button_screenshot_a11y" msgid="8699983355979869210">"સંપૂર્ણ સ્ક્રીનનો સ્ક્રીનશૉટ લો"</string>
     <string name="screen_capture_toolbar_fullscreen_button_record_a11y" msgid="852148867883959158">"પૂર્ણ સ્ક્રીન રેકોર્ડ કરો"</string>
     <string name="screen_capture_toolbar_settings_button_a11y" msgid="8014446956996739704">"સ્ક્રીન કૅપ્ચરના સેટિંગ"</string>
+    <string name="screen_capture_post_recording_shelf_share_button_a11y" msgid="2907313384921655711">"સ્ક્રીન રેકોર્ડિંગ શેર કરો"</string>
+    <string name="screen_capture_post_recording_shelf_folder_button_a11y" msgid="4217075254383938093">"ફાઇલ મેનેજરમાં સ્ક્રીન રેકોર્ડિંગ ખોલો"</string>
+    <string name="screen_capture_post_recording_shelf_delete_button_a11y" msgid="8519897681775354217">"સ્ક્રીન રેકોર્ડિંગ ડિલીટ કરો"</string>
+    <string name="screen_capture_post_recording_shelf_thumbnail_a11y" msgid="8342622016203434332">"વીડિયો વ્યૂઅરમાં સ્ક્રીન રેકોર્ડિંગ ખોલો"</string>
     <string name="screen_capture_show_clicks_and_keys" msgid="2151690554364148717">"ક્લિક અને કી બતાવો"</string>
     <string name="screen_capture_device_audio" msgid="1537290197773737349">"ડિવાઇસનો ઑડિયો"</string>
     <string name="screen_capture_microphone_audio" msgid="1698835678818747741">"માઇક્રોફોન"</string>
@@ -376,6 +380,7 @@
     <string name="accessibility_clear_all" msgid="970525598287244592">"બધા સૂચનો સાફ કરો."</string>
     <string name="accessibility_notification_bell" msgid="7149451526721220526">"નોટિફિકેશન"</string>
     <string name="accessibility_status_bar_assistant_icon" msgid="1174898709836451013">"આસિસ્ટંટ"</string>
+    <string name="accessibility_status_bar_input_method_indicator" msgid="4316411266975554038">"ઇનપુટ પદ્ધતિ"</string>
     <string name="notification_group_overflow_indicator" msgid="7605120293801012648">"+ <xliff:g id="NUMBER">%s</xliff:g>"</string>
     <string name="notification_group_overflow_description" msgid="7176322877233433278">"{count,plural, =1{વધુ # નોટિફિકેશન અંદર છે.}one{વધુ # નોટિફિકેશન અંદર છે.}other{વધુ # નોટિફિકેશન અંદર છે.}}"</string>
     <string name="accessibility_rotation_lock_on_landscape" msgid="936972553861524360">"સ્ક્રીન લેન્ડસ્કેપ ઓરિએન્ટેશનમાં લૉક કરેલ છે."</string>
@@ -417,7 +422,6 @@
     <string name="quick_settings_rotation_unlocked_label" msgid="2359922767950346112">"ઑટો રોટેટ"</string>
     <string name="accessibility_quick_settings_rotation" msgid="4800050198392260738">"ઑટો રોટેટ સ્ક્રીન"</string>
     <string name="quick_settings_location_label" msgid="2621868789013389163">"લોકેશન"</string>
-    <string name="quick_settings_screensaver_label" msgid="1495003469366524120">"સ્ક્રીન સેવર"</string>
     <string name="quick_settings_camera_label" msgid="5612076679385269339">"કૅમેરાનો ઍક્સેસ"</string>
     <string name="quick_settings_mic_label" msgid="8392773746295266375">"માઇકનો ઍક્સેસ"</string>
     <string name="quick_settings_camera_mic_available" msgid="1453719768420394314">"ઉપલબ્ધ છે"</string>
@@ -643,8 +647,11 @@
     <string name="communal_widget_picker_title" msgid="1953369090475731663">"લૉક સ્ક્રીન વિજેટ"</string>
     <string name="communal_widget_picker_description" msgid="6927728582371632782">"તમારું ડિવાઇસ લૉક કરેલું હોય તો પણ કોઈપણ તમારી લૉક સ્ક્રીન પર વિજેટ જોઈ શકે છે."</string>
     <string name="accessibility_action_label_unselect_widget" msgid="1041811747619468698">"વિજેટ નાપસંદ કરો"</string>
+    <string name="accessibility_action_label_resize_widget" msgid="639756010934310745">"વિજેટનું કદ બદલો"</string>
     <string name="accessibility_action_label_shrink_widget" msgid="8259511040536438771">"ઊંચાઈ ઘટાડો"</string>
     <string name="accessibility_action_label_expand_widget" msgid="9190524260912211759">"ઊંચાઈ વધારો"</string>
+    <string name="accessibility_announcement_expand_widget" msgid="1123324821904704150">"ઊંચાઈ મોટી કરી"</string>
+    <string name="accessibility_announcement_shrink_widget" msgid="2720176058287945622">"ઊંચાઈ ઘટાડવામાં આવી"</string>
     <string name="accessibility_action_label_umo_show_next" msgid="8033581654789193281">"આગલું બતાવો"</string>
     <string name="accessibility_action_label_umo_show_previous" msgid="5935831384525173810">"પાછલું બતાવો"</string>
     <string name="communal_widgets_disclaimer_title" msgid="1150954395585308868">"લૉક સ્ક્રીન વિજેટ"</string>
@@ -730,7 +737,7 @@
     <string name="adaptive_notification_edu_hun_text" msgid="7743367744129536610">"જ્યારે તમને એકસાથે ઘણા બધા નોટિફિકેશન મળે ત્યારે તમારા ડિવાઇસનું વૉલ્યૂમ અને અલર્ટ ઑટોમૅટિક રીતે 2 મિનિટ જેટલા સમય માટે ઘટાડવામાં આવે છે."</string>
     <string name="go_to_adaptive_notification_settings" msgid="2423690125178298479">"બંધ કરો"</string>
     <string name="unlock_to_see_notif_text" msgid="7439033907167561227">"જૂના નોટિફિકેશન જોવા માટે અનલૉક કરો"</string>
-    <string name="quick_settings_disclosure_parental_controls" msgid="5560100935261229784">"કેટલાક સેટિંગ તમારા માતાપિતા દ્વારા મેનેજ કરવામાં આવે છે"</string>
+    <string name="quick_settings_disclosure_parental_controls" msgid="9196246842317344981">"માતાપિતાના યોગ્ય નિયંત્રણો સક્રિય છે"</string>
     <string name="quick_settings_disclosure_parental_controls_legacy" msgid="4116797775361496057">"આ ડિવાઇસ તમારા માતાપિતા દ્વારા મેનેજ કરવામાં આવે છે"</string>
     <string name="quick_settings_disclosure_pin_protection" msgid="9219481515114868267">"ડિવાઇસના કેટલાક સેટિંગ પિન વડે સુરક્ષિત હોય છે."</string>
     <string name="quick_settings_disclosure_management_monitoring" msgid="8231336875820702180">"તમારી સંસ્થા આ ડિવાઇસની માલિકી ધરાવે છે અને નેટવર્ક ટ્રાફિકનું નિરીક્ષણ કરી શકે છે"</string>
@@ -890,6 +897,7 @@
     <string name="accessibility_status_bar_satellite_poor_connection" msgid="5231478574952724160">"સૅટલાઇટ, નબળું કનેક્શન"</string>
     <string name="accessibility_status_bar_satellite_good_connection" msgid="308079391708578704">"સૅટલાઇટ, સારું કનેક્શન"</string>
     <string name="accessibility_status_bar_satellite_available" msgid="6514855015496916829">"સૅટલાઇટ, કનેક્શન ઉપલબ્ધ છે"</string>
+    <string name="accessibility_status_bar_satellite_symbol" msgid="3840194796890095832">"સૅટલાઇટ"</string>
     <string name="satellite_connected_carrier_text" msgid="118524195198532589">"ઇમર્જન્સી સૅટલાઇટ સહાય"</string>
     <string name="satellite_emergency_only_carrier_text" msgid="9103913890116841786">"માત્ર ઇમર્જન્સી કૉલ કે ઇમર્જન્સી સૅટલાઇટ સહાય"</string>
     <string name="satellite_network_title_text" msgid="1483004114819442028">"સૅટલાઇટ નેટવર્ક"</string>
@@ -928,6 +936,8 @@
     <string name="inline_done_button" msgid="6043094985588909584">"થઈ ગયું"</string>
     <string name="inline_ok_button" msgid="603075490581280343">"લાગુ કરો"</string>
     <string name="inline_turn_off_notifications" msgid="2653064779176881329">"બંધ કરો"</string>
+    <!-- no translation found for bridged_device_type_unknown (8435318668271946936) -->
+    <skip />
     <string name="bridged_device_type_phone" msgid="7971199513068521770">"ફોન"</string>
     <string name="bridged_device_type_tablet" msgid="7403330807933649592">"ટૅબ્લેટ"</string>
     <string name="bridged_device_type_laptop" msgid="8027976360936787349">"લૅપટૉપ"</string>
@@ -1175,7 +1185,8 @@
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_dialog_title" msgid="5331043821287212071">"<xliff:g id="ID_1">%1$s</xliff:g> કીબોર્ડ શૉર્ટકટ ચાલુ કરીએ?"</string>
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_negative_button_text" msgid="6711239406914231612">"ચાલુ કરશો નહીં"</string>
     <string name="accessibility_key_gesture_shortcut_not_yet_enabled_positive_button_text" msgid="7748487028569821131">"શૉર્ટકટ ચાલુ કરો"</string>
-    <string name="accessibility_key_gesture_magnification_dialog_title" msgid="5770691510738701250">"<xliff:g id="ID_1">%1$s</xliff:g> કીબોર્ડ શૉર્ટકટ ચાલુ કર્યો"</string>
+    <string name="accessibility_key_gesture_color_inversion_dialog_content" msgid="8831745570619953566">"<xliff:g id="ID_1">^1</xliff:g> "<annotation id="action_key_icon">"આઇકન"</annotation>" + <xliff:g id="ID_2">^2</xliff:g> + <xliff:g id="ID_3">^3</xliff:g> એ વિપરીત રંગમાં બદલવાની સુવિધાનો ઉપયોગ કરવા માટે કીબોર્ડ શૉર્ટકટ છે. વિપરીત રંગમાં બદલવાની સુવિધાથી લાઇટ સ્ક્રીન ડાર્ક બની જાય છે. તે ડાર્ક સ્ક્રીનને લાઇટ પણ બનાવે છે."</string>
+    <string name="accessibility_key_gesture_magnification_dialog_title" msgid="5770691510738701250">"<xliff:g id="ID_1">%1$s</xliff:g> કીબોર્ડનો શૉર્ટકટ ચાલુ કર્યો"</string>
     <string name="accessibility_key_gesture_magnification_dialog_content" msgid="1647246652170256645">"<xliff:g id="ID_1">^1</xliff:g> "<annotation id="action_key_icon">"આઇકન"</annotation>" + <xliff:g id="ID_2">^2</xliff:g> + <xliff:g id="ID_3">^3</xliff:g> એ <xliff:g id="ID_4">^4</xliff:g>નો ઉપયોગ કરવા માટે કીબોર્ડ શૉર્ટકટ છે, જે એક ઍક્સેસિબિલિટી સુવિધા છે. આ તમને કન્ટેન્ટને વધારે મોટું કરવા માટે સ્ક્રીન પર ઝડપથી મોટું કરવાની સુવિધા આપે છે. એકવાર મોટું કરવાની સુવિધા ચાલુ કરવામાં આવે, પછી નાનું-મોટું કરવાનું ગોઠવવા માટે <xliff:g id="ID_5">^1</xliff:g> "<annotation id="action_key_icon">"આઇકન"</annotation>" + <xliff:g id="ID_6">^2</xliff:g> અને \"+\" અથવા \"-\" દબાવો."</string>
     <string name="accessibility_key_gesture_magnification_dialog_negative_button_text" msgid="8393469413785600834">"શૉર્ટકટ બંધ કરો"</string>
     <string name="accessibility_key_gesture_magnification_dialog_positive_button_text" msgid="895076240681888057">"ચાલુ રાખો"</string>
@@ -1186,9 +1197,16 @@
     <string name="accessibility_key_gesture_screen_reader_dialog_warning_view_control_screen_message" msgid="5810348116536082139">"તે સ્ક્રીન પરનું બધું કન્ટેન્ટ વાંચી શકે છે અને કન્ટેન્ટને અન્ય ઍપની ઉપર ડિસ્પ્લે કરી શકે છે."</string>
     <string name="accessibility_key_gesture_screen_reader_dialog_warning_perform_actions_heading" msgid="6032379987970298008">"ઍક્શન જુઓ અને તેને પર્ફોર્મ કરો"</string>
     <string name="accessibility_key_gesture_screen_reader_dialog_warning_perform_actions_message" msgid="4565304881759944542">"તે કોઈ ઍપ અથવા હાર્ડવેર સેન્સર સાથેની તમારી ક્રિયાપ્રતિક્રિયાઓને ટ્રૅક કરી શકે છે અને તમારા વતી ઍપ સાથે ક્રિયાપ્રતિક્રિયા કરી શકે છે."</string>
+    <string name="accessibility_key_gesture_select_to_speak_dialog_content" msgid="2241403419620826861">"<xliff:g id="ID_1">^1</xliff:g> "<annotation id="action_key_icon">"આઇકન"</annotation>" + <xliff:g id="ID_2">^2</xliff:g> + <xliff:g id="ID_3">^3</xliff:g> એ <xliff:g id="ID_4">^4</xliff:g>નો ઉપયોગ કરવા માટે કીબોર્ડ શૉર્ટકટ છે. આનાથી તમે ફૉન્ટ અને સ્પેસિંગ કસ્ટમાઇઝ કરી શકો છો અને સીધા તમારા ડિવાઇસ પર ટેક્સ્ટ મોટેથી વંચાતી સાંભળી શકો છો."</string>
     <string name="accessibility_key_gesture_voice_access_dialog_content" msgid="8539054865187379687">"<xliff:g id="ID_1">^1</xliff:g> "<annotation id="action_key_icon">"આઇકન"</annotation>" + <xliff:g id="ID_2">^2</xliff:g> + <xliff:g id="ID_3">^3</xliff:g> દબાવવાથી <xliff:g id="ID_4">^4</xliff:g> ચાલુ થાય છે, જે એક ઍક્સેસિબિલિટી સુવિધા છે. આ તમને હાથના ઉપયોગ વિના તમારા ડિવાઇસને નિયંત્રિત કરવાની સુવિધા આપે છે."</string>
+    <string name="accessibility_shortcutchooser_toprow_tutorial_dialog_title" msgid="4659318395231105188">"ઍક્સેસિબિલિટી કી"</string>
+    <string name="accessibility_shortcutchooser_toprow_tutorial_dialog_content" msgid="7058726404278534674">"ઍક્સેસિબિલિટી સુવિધાઓનો ઉપયોગ કરવાનું શરૂ કરવા માટે, તમે ઍક્સેસિબિલિટી કી દબાવી શકો છો."</string>
+    <string name="accessibility_shortcutchooser_toprow_tutorial_dialog_positive_button_text" msgid="7095579813773247709">"સુવિધાઓ ઉમેરો"</string>
+    <string name="accessibility_shortcutchooser_editor_dialog_title" msgid="7881631878787325869">"<xliff:g id="ID_1">%1$s</xliff:g>નું સેટઅપ કરો"</string>
+    <string name="accessibility_shortcutchooser_done_button" msgid="5288975589451082156">"થઈ ગયું"</string>
+    <string name="accessibility_shortcutchooser_picker_dialog_title" msgid="6067291073174568750">"સુવિધા પસંદ કરો"</string>
+    <string name="accessibility_shortcutchooser_edit_button" msgid="1924449663239985111">"ફેરફાર કરો"</string>
     <string name="accessibility_quick_access_dialog_title" msgid="8792322423145117379">"ઍક્સેસિબિલિટી"</string>
-    <string name="accessibility_quick_access_dialog_done_button_text" msgid="8013849920696848138">"થઈ ગયું"</string>
     <string name="tuner_lock_screen" msgid="2267383813241144544">"લૉક સ્ક્રીન"</string>
     <string name="shutdown_progress" msgid="5464239146561542178">"શટ ડાઉન કરી રહ્યાં છીએ…"</string>
     <string name="thermal_shutdown_dialog_help_text" msgid="6413474593462902901">"સારસંભાળના પગલાં જુઓ"</string>
@@ -1508,6 +1526,7 @@
     <string name="qs_tile_request_dialog_title" msgid="5654666862347548966">"\'ઝડપી સેટિંગ\'માં ટાઇલ ઉમેરો"</string>
     <string name="qs_tile_request_dialog_small_format_content_description" msgid="5429197059724172135">"નાનું ફૉર્મેટ"</string>
     <string name="qs_tile_request_dialog_large_format_content_description" msgid="67983044110405787">"મોટું ફૉર્મેટ"</string>
+    <string name="qs_tile_satellite_label" msgid="2839625529776739941">"સૅટલાઇટ"</string>
     <string name="qs_user_switch_dialog_title" msgid="3045189293587781366">"વપરાશકર્તા પસંદ કરો"</string>
     <string name="fgs_manager_footer_label" msgid="8276763570622288231">"{count,plural, =1{# ઍપ ઍક્ટિવ છે}one{# ઍપ ઍક્ટિવ છે}other{# ઍપ ઍક્ટિવ છે}}"</string>
     <string name="fgs_dot_content_description" msgid="2865071539464777240">"નવી માહિતી"</string>
@@ -1585,6 +1604,8 @@
     <string name="keyguard_unlock_to_customize_ls" msgid="2068542308086253819">"લૉક સ્ક્રીનને કસ્ટમાઇઝ કરવા માટે અનલૉક કરો"</string>
     <string name="wifi_unavailable_dream_overlay_content_description" msgid="2024166212194640100">"વાઇ-ફાઇ ઉપલબ્ધ નથી"</string>
     <string name="location_active_dream_overlay_content_description" msgid="6208885541020673916">"લોકેશન સક્રિય"</string>
+    <string name="camera_privacy_dream_overlay_content_description" msgid="4503818441101346249">"કૅમેરો સક્રિય છે"</string>
+    <string name="mic_privacy_dream_overlay_content_description" msgid="1164197684411086751">"માઇક્રોફોન સક્રિય છે"</string>
     <string name="camera_blocked_dream_overlay_content_description" msgid="4074759493559418130">"કૅમેરા બ્લૉક કરેલો છે"</string>
     <string name="camera_and_microphone_blocked_dream_overlay_content_description" msgid="7891078093416249764">"કૅમેરા અને માઇક્રોફોન બ્લૉક કરેલા છે"</string>
     <string name="microphone_blocked_dream_overlay_content_description" msgid="5466897982130007033">"માઇક્રોફોન બ્લૉક કરેલો છે"</string>
@@ -1602,7 +1623,8 @@
     <string name="start_desktop_mode" msgid="5459815912537830841">"ડેસ્કટૉપ"</string>
     <string name="start_mirroring" msgid="3611044878130481882">"મિરર કરો"</string>
     <string name="connected_display_icon_desc" msgid="6373560639989971997">"Display કનેક્ટેડ છે"</string>
-    <string name="connected_display_extended_mode_text" msgid="2457269692913653696">"બાહ્ય ડિસ્પ્લે સાથે કનેક્ટ કરવામાં આવ્યું"</string>
+    <string name="connected_display_connection_text" msgid="6787771675124372815">"બાહ્ય ડિસ્પ્લે સાથે કનેક્ટ કરવામાં આવ્યું"</string>
+    <string name="connected_display_removal_text" msgid="8270253839172935318">"બાહ્ય ડિસ્પ્લે ડિસ્કનેક્ટ કરવામાં આવ્યું"</string>
     <string name="privacy_dialog_title" msgid="5201413527644766025">"માઇક્રોફોન, કૅમેરા અને લોકેશન"</string>
     <string name="privacy_dialog_summary" msgid="2458769652125995409">"તાજેતરનો ઍપનો વપરાશ"</string>
     <string name="privacy_dialog_more_button" msgid="7610604080293562345">"તાજેતરનો ઍક્સેસ જુઓ"</string>
@@ -1755,6 +1777,7 @@
     <string name="pager_dots_previous_content_description" msgid="26963508904918908">"પાછળ"</string>
     <string name="pager_dots_next_content_description" msgid="613943992626163120">"આગળ"</string>
     <string name="accessibility_pager_dots_navigate_to_next_page_action" msgid="7662720613169169465">"નૅવિગેટ કરીને આગલા પેજ પર જાઓ"</string>
+    <string name="accessibility_close_overlay_action" msgid="3581095146209387670">"પાછા જાઓ"</string>
     <string name="ambient_cue_autofill_action" msgid="9213025887835308128">"ઑટોમૅટિક રીતે ભરવાની સુવિધા"</string>
     <string name="ambient_cue_expand_action" msgid="6803711089932959312">"મોટું કરો"</string>
     <string name="location_button_text_share_precise_location" msgid="5341882050169860712">"સચોટ લોકેશન શેર કરો"</string>

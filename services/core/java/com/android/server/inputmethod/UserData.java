@@ -94,6 +94,12 @@ final class UserData {
     boolean mInFullscreenMode;
 
     /**
+     * {@code true} when the IME Switcher Menu is visible.
+     */
+    @GuardedBy("ImfLock.class")
+    boolean mImeSwitcherMenuVisible;
+
+    /**
      * The {@link IRemoteInputConnection} last provided by the current client.
      */
     @GuardedBy("ImfLock.class")
@@ -145,6 +151,9 @@ final class UserData {
     @Nullable
     InputMethodManagerService.SessionState mEnabledSession;
 
+    /**
+     * Currently enabled accessibility sessions, indexed by the accessibility service id.
+     */
     @GuardedBy("ImfLock.class")
     @NonNull
     SparseArray<InputMethodManagerService.AccessibilitySessionState> mEnabledAccessibilitySessions =

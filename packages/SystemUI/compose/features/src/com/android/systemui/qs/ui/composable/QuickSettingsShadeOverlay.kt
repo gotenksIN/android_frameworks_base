@@ -61,6 +61,7 @@ import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.android.compose.PlatformSliderDefaults
@@ -370,6 +371,7 @@ private fun ContentScope.QuickSettingsLayout(
                 behavior = QuickSettingsContainerViewModel.mediaUiBehavior,
                 onDismissed = qsContainerViewModel::onMediaSwipeToDismiss,
                 modifier = Modifier,
+                location = Media.Location.QS,
             )
 
             if (qsContainerViewModel.showMedia) {
@@ -427,9 +429,10 @@ private fun ContentScope.QuickSettingsLayout(
                         )
                         Spacer(Modifier.width(8.dp))
                         IconButton(
-                            modifier = Modifier.size(
-                                QuickSettingsShade.Dimensions.VolumeSliderDimensions.trackHeight
-                            ),
+                            modifier =
+                                Modifier.size(
+                                    QuickSettingsShade.Dimensions.VolumeSliderDimensions.trackHeight
+                                ),
                             colors =
                                 IconButtonDefaults.iconButtonColors(
                                     containerColor = MaterialTheme.colorScheme.primary,
@@ -498,6 +501,7 @@ object QuickSettingsShade {
             @ReadOnlyComposable
             get() =
                 BrightnessSliderDimensions(
+                    DpSize(sliderIconSize, sliderIconSize),
                     brightnessThumbHeight,
                     brightnessThumbWidth,
                     brightnessTrackHeight,
@@ -519,6 +523,7 @@ object QuickSettingsShade {
             @ReadOnlyComposable
             get() =
                 VolumeSliderDimensions(
+                    sliderIconSize,
                     volumeThumbHeight,
                     volumeThumbWidth,
                     volumeTrackHeight,
@@ -562,6 +567,11 @@ object QuickSettingsShade {
             @Composable
             @ReadOnlyComposable
             get() = dimensionResource(id = R.dimen.overlay_qs_layout_brightness_vertical_padding)
+
+        private val sliderIconSize: Dp
+            @Composable
+            @ReadOnlyComposable
+            get() = dimensionResource(id = R.dimen.overlay_qs_layout_brightness_icon_size)
 
         private val volumeVerticalPadding: Dp
             @Composable

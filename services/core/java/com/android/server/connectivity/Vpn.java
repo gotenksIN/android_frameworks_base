@@ -26,8 +26,6 @@ import static android.net.RouteInfo.RTN_UNREACHABLE;
 import static android.net.VpnManager.NOTIFICATION_CHANNEL_VPN;
 import static android.net.ipsec.ike.IkeSessionParams.ESP_ENCAP_TYPE_AUTO;
 import static android.net.ipsec.ike.IkeSessionParams.ESP_IP_VERSION_AUTO;
-import static android.net.platform.flags.Flags.collectVpnMetrics;
-import static android.net.platform.flags.Flags.reenableInnerIpv6OnVpn;
 import static android.net.vcn.util.PersistableBundleUtils.STRING_DESERIALIZER;
 import static android.os.PowerWhitelistManager.REASON_VPN;
 import static android.os.UserHandle.PER_USER_RANGE;
@@ -390,16 +388,9 @@ public class Vpn {
     private final VpnProfileStore mVpnProfileStore;
     /**
      * Instance responsible for collecting VPN connectivity metrics.
-     * This field will be null if the {@link collectVpnMetrics} flag is set to false.
      */
-    @Nullable
+    @NonNull
     private final VpnConnectivityMetrics mVpnConnectivityMetrics;
-
-    /**
-     * Instance responsible for handling Inner IPv6 address when MTU changes. This field will get
-     * assigned via {@link reenableInnerIpv6OnVpn} in VPN constructor
-     */
-    private boolean mReenableInnerIpv6OnVpn = false;
 
     @VisibleForTesting
     VpnProfileStore getVpnProfileStore() {
@@ -620,9 +611,7 @@ public class Vpn {
         }
 
         /**
-         * @see VpnConnectivityMetrics.
-         *
-         * <p>This method is only called when {@link collectVpnMetrics} is true.
+         * @see VpnConnectivityMetrics
          */
         public VpnConnectivityMetrics makeVpnConnectivityMetrics(int userId,
                 ConnectivityManager cm) {
@@ -684,9 +673,7 @@ public class Vpn {
         mPackage = VpnConfig.LEGACY_VPN;
         mOwnerUID = getAppUid(mContext, mPackage, mUserId);
         mIsPackageTargetingAtLeastQ = doesPackageTargetAtLeastQ(mPackage);
-        mVpnConnectivityMetrics = collectVpnMetrics()
-                ? mDeps.makeVpnConnectivityMetrics(userId, mConnectivityManager) : null;
-        mReenableInnerIpv6OnVpn = reenableInnerIpv6OnVpn();
+        mVpnConnectivityMetrics = mDeps.makeVpnConnectivityMetrics(userId, mConnectivityManager);
         try {
             netService.registerObserver(mObserver);
         } catch (RemoteException e) {
@@ -1923,7 +1910,7 @@ public class Vpn {
      * Creates a {@link Set} of non-intersecting {@code Range<Integer>} objects including all UIDs
      * associated with one user, and any restricted profiles attached to that user.
      *
-     * <p>If one of {@param allowedApplications} or {@param disallowedApplications} is provided,
+     * <p>If one of {@code allowedApplications} or {@code disallowedApplications} is provided,
      * the UID ranges will match the app list specified there. Otherwise, all UIDs
      * in each user and profile will be included.
      *
@@ -1963,12 +1950,12 @@ public class Vpn {
      * Updates a {@link Set} of non-intersecting {@code Range<Integer>} objects to include all UIDs
      * associated with one user.
      *
-     * <p>If one of {@param allowedApplications} or {@param disallowedApplications} is provided,
+     * <p>If one of {@code allowedApplications} or {@code disallowedApplications} is provided,
      * the UID ranges will match the app allowlist or denylist specified there. Otherwise, all UIDs
      * in the user will be included.
      *
      * @param ranges {@link Set} of {@code Range<Integer>}s to which to add.
-     * @param userId The userId to add to {@param ranges}.
+     * @param userId The userId to add to {@code ranges}.
      * @param allowedApplications (optional) allowlist of applications to include.
      * @param disallowedApplications (optional) denylist of applications to exclude.
      */
@@ -2119,7 +2106,7 @@ public class Vpn {
      * The exception for the VPN UID isn't technically necessary -- setup should use protected
      * sockets -- but in practice it saves apps that don't protect their sockets from breaking.
      *
-     * Calling multiple times with {@param enforce} = {@code true} will recreate the set of UIDs to
+     * Calling multiple times with {@code enforce} = {@code true} will recreate the set of UIDs to
      * block every time, and if anything has changed update using {@link #setAllowOnlyVpnForUids}.
      *
      * @param enforce {@code true} to require that all traffic under the jurisdiction of this
@@ -2181,7 +2168,7 @@ public class Vpn {
      * {@code protect()} called on them.
      *
      * @param enforce {@code true} to add to the denylist, {@code false} to remove.
-     * @param ranges {@link Collection} of {@link UidRangeParcel}s to add (if {@param enforce} is
+     * @param ranges {@link Collection} of {@link UidRangeParcel}s to add (if {@code enforce} is
      *               {@code true}) or to remove.
      * @return {@code true} if all of the UIDs were added/removed. {@code false} otherwise,
      *         including added ranges that already existed or removed ones that didn't.
@@ -3289,7 +3276,7 @@ public class Vpn {
                                     removed.getAddress(), removed.getPrefixLength());
                         }
                     } else {
-                        if (mReenableInnerIpv6OnVpn && needReenableIPv6Locked(newMtu, oldMtu)) {
+                        if (needReenableIPv6Locked(newMtu, oldMtu)) {
                             // To reenable IPv6, we will first only update the MTU via
                             // doSendLinkProperties. After the MTU update is completed,
                             // onVpnNetworkLinkPropertiesChanged will be fired and we will then
@@ -3328,11 +3315,6 @@ public class Vpn {
 
         @Override
         public void onVpnNetworkLinkPropertiesChanged(@NonNull LinkProperties lp) {
-            // Ignore if config set to false
-            if (!mReenableInnerIpv6OnVpn) {
-                return;
-            }
-
             // If the service isn't running, this is a stale runner, or the new properties
             // don't match the current interface, then we can't proceed.
             if (!mIsRunning) {
@@ -4614,17 +4596,24 @@ public class Vpn {
     /**
      * Set the application exclusion list for the specified VPN profile.
      *
-     * @param packageName the package name of the app provisioning this profile
-     * @param excludedApps the list of excluded packages
+     * <p>This list persists in keystore and will be applied to future VPN connections. If the
+     * package name matches the currently active VPN, the exclusion list will also be applied to
+     * the running connection immediately.
      *
-     * @return whether setting the list is successful or not
+     * @param packageName The package name of the app needs to set exclusion list.
+     * @param excludedApps The list of package names needs to be excluded.
+     *
+     * @return {@code true} if the exclusion list was successfully stored; {@code false} otherwise.
      */
     public synchronized boolean setAppExclusionList(@NonNull String packageName,
             @NonNull List<String> excludedApps) {
         enforceNotRestrictedUser();
         if (!storeAppExclusionList(packageName, excludedApps)) return false;
 
-        updateAppExclusionList(excludedApps);
+        // Only update the running VPN if the package name matches
+        if (TextUtils.equals(mPackage, packageName)) {
+            updateAppExclusionList(excludedApps);
+        }
 
         return true;
     }
@@ -4636,6 +4625,15 @@ public class Vpn {
         updateAppExclusionList(getAppExclusionList(mPackage));
     }
 
+    /**
+     * Triggers an update of the VPN network's excluded UIDs if a VPN is running.
+     *
+     * <p> It is the caller's responsibility to ensure that the provided {@code excludedApps} list
+     * corresponds to the currently active VPN package ({@code mPackage}) before calling this
+     * method.
+     *
+     * @param excludedApps the list of excluded packages
+     */
     private synchronized void updateAppExclusionList(@NonNull List<String> excludedApps) {
         // Re-build and update NetworkCapabilities via NetworkAgent.
         if (mNetworkAgent != null) {
@@ -4652,6 +4650,35 @@ public class Vpn {
                 doSendNetworkCapabilities(mNetworkAgent, mNetworkCapabilities);
             }
         }
+    }
+
+    /**
+     * Clears the application exclusion list associated with the specified package.
+     *
+     * <p>This method fully removes the record from keystore that matches the key. If a VPN for
+     * the specified package is currently active, its exclusion list will also be updated to be
+     * empty.
+     *
+     * @param packageName The package name of the app needs to clear exclusion list.
+     * @return {@code true} if the exclusion list was successfully removed from the keystore;
+     *         {@code false} if no such list was found (e.g., the package is not a VPN app or has
+     *         no configured exclusions) or if the removal failed.
+     */
+    public synchronized boolean clearAppExclusionList(@NonNull String packageName) {
+        requireNonNull(packageName, "No package name provided");
+        enforceNotRestrictedUser();
+        final long oldId = Binder.clearCallingIdentity();
+        try {
+            if (!getVpnProfileStore().remove(getVpnAppExcludedForPackage(packageName))) {
+                return false;
+            }
+        } finally {
+            Binder.restoreCallingIdentity(oldId);
+        }
+        if (TextUtils.equals(mPackage, packageName)) {
+            updateAppExclusionList(new ArrayList<>());
+        }
+        return true;
     }
 
     /**

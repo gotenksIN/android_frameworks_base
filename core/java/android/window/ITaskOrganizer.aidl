@@ -91,9 +91,11 @@ oneway interface ITaskOrganizer {
      *        {@link Activity#moveTaskToBack}, false if it's triggered by a back press.
      * @param isOptInOnBackInvoked True if the root activity of the task has opted in to
      *        {@link android.window.OnBackInvokedCallback}.
+     * @param hasOpaqueSibling Whether the task has an opaque sibling
      */
     void onBackPressedOnTaskRoot(in ActivityManager.RunningTaskInfo taskInfo,
-            boolean isFromMoveActivityTaskToBack, boolean isOptInOnBackInvoked);
+            boolean isFromMoveActivityTaskToBack, boolean isOptInOnBackInvoked,
+            boolean hasOpaqueSibling);
 
     /**
      * Called when the IME has drawn on the organized task.
@@ -132,4 +134,12 @@ oneway interface ITaskOrganizer {
      *                          {@link WindowContainerTransaction#setHandlePackageUpdateForTask}.
      */
     void onPackageUpdateRequested(in List<ActivityManager.RunningTaskInfo> updatingTaskInfos);
+
+    /**
+    * Called when a group of tasks belonging to a package has finished updating. Tasks here
+    * match the tasks previously sent through {@link ITaskOrganizer#onPackageUpdateRequested}.
+    *
+    * @param updatedTaskInfos Information about the tasks that are updated.
+    */
+    void onPackageUpdateFinished(in List<ActivityManager.RunningTaskInfo> updatedTaskInfos);
 }

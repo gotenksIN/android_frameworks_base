@@ -28,6 +28,7 @@ import com.android.internal.widget.LockPatternUtils.StrongAuthTracker.STRONG_BIO
 import com.android.keyguard.KeyguardSecurityModel
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.authentication.shared.model.AuthenticationMethodModel
+import com.android.systemui.authentication.shared.model.AuthenticationResult
 import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.coroutines.collectValues
 import com.android.systemui.flags.EnableSceneContainer
@@ -37,7 +38,7 @@ import com.android.systemui.log.table.logcatTableLogBuffer
 import com.android.systemui.statusbar.pipeline.mobile.data.repository.fake
 import com.android.systemui.statusbar.pipeline.mobile.data.repository.mobileConnectionsRepository
 import com.android.systemui.testKosmos
-import com.android.systemui.user.data.repository.FakeUserRepository
+import com.android.systemui.user.data.repository.fakeUserRepository
 import com.android.systemui.util.mockito.whenever
 import com.android.systemui.util.time.FakeSystemClock
 import com.google.common.truth.Truth.assertThat
@@ -69,7 +70,7 @@ class AuthenticationRepositoryTest : SysuiTestCase() {
     private val kosmos = testKosmos()
     private val testScope = kosmos.testScope
     private val clock = FakeSystemClock()
-    private val userRepository = FakeUserRepository()
+    private val userRepository = kosmos.fakeUserRepository
     private val mobileConnectionsRepository = kosmos.mobileConnectionsRepository
 
     private lateinit var underTest: AuthenticationRepository
@@ -204,10 +205,10 @@ class AuthenticationRepositoryTest : SysuiTestCase() {
 
             clock.setElapsedRealtime(clock.elapsedRealtime() + 60.seconds.inWholeMilliseconds)
 
-            underTest.reportAuthenticationAttempt(isSuccessful = false)
+            underTest.reportAuthenticationAttempt(AuthenticationResult.FAILED)
             assertThat(hasLockoutOccurred).isTrue()
 
-            underTest.reportAuthenticationAttempt(isSuccessful = true)
+            underTest.reportAuthenticationAttempt(AuthenticationResult.SUCCEEDED)
             assertThat(hasLockoutOccurred).isFalse()
         }
 
@@ -219,7 +220,7 @@ class AuthenticationRepositoryTest : SysuiTestCase() {
             whenever(lockPatternUtils.getStrongAuthForUser(anyInt()))
                 .thenReturn(STRONG_BIOMETRIC_AUTH_REQUIRED_FOR_SECURE_LOCK_DEVICE)
 
-            underTest.reportAuthenticationAttempt(true)
+            underTest.reportAuthenticationAttempt(AuthenticationResult.SUCCEEDED)
             verify(lockPatternUtils, never()).userPresent(anyInt())
             verify(lockPatternUtils, never()).reportSuccessfulPasswordAttempt(anyInt())
         }

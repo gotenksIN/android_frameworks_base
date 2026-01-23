@@ -183,20 +183,26 @@ class MobileInputLogger @Inject constructor(@MobileInputLog private val buffer: 
     }
 
 // QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
-    fun logOnNrIconTypeChanged(nrIconType: Int, is6Rx : Boolean, subId: Int) {
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+    fun logOnRadioIconTypeChanged(radioIconType: Int, is6Rx : Boolean, subId: Int) {
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
 // QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
         buffer.log(
             TAG,
             LogLevel.INFO,
             {
                 int1 = subId
-                str1 = nrIconType.toString()
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+                str1 = radioIconType.toString()
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
 // QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
                 bool1 = is6Rx
 // QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
             },
 // QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
-            { "onNrIconTypeChanged: subId=$int1 nrIconType=$str1 is6Rx=$bool1" },
+// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+            { "onRadioIconTypeChanged: subId=$int1 radioIconType=$str1 is6Rx=$bool1" },
+// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
 // QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
         )
     }

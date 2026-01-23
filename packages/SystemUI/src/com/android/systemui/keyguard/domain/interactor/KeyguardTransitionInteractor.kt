@@ -44,6 +44,7 @@ import com.android.systemui.scene.domain.interactor.SceneInteractor
 import com.android.systemui.scene.shared.flag.SceneContainerFlag
 import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.util.kotlin.WithPrev
+import com.android.systemui.util.kotlin.mapDirect
 import com.android.systemui.util.kotlin.pairwise
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
@@ -63,7 +64,6 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.onStart
 
 /** Encapsulates business-logic related to the keyguard transitions. */
@@ -271,6 +271,9 @@ constructor(
                 fromContent.isLockscreenOrNull() && toContent.isLockscreenOrNull()
             val isTransitioningBetweenDesiredScenes =
                 sceneInteractor.transitionState.value.isTransitioning(fromContent, toContent)
+            val isSnapToTransitionBetweenDesiredScenes =
+                sceneTransitionPair.value.previousValue.isIdle(fromContent) &&
+                    sceneInteractor.transitionState.value.isIdle(toContent)
 
             // When in STL A -> B settles in A we can't do the same in KTF as KTF requires us to
             // start B -> A to get back to A. [LockscreenSceneTransitionInteractor] will emit these
@@ -292,6 +295,7 @@ constructor(
                     sceneTransitionPair.value.previousValue.isTransitioning(fromContent, toContent)
 
             return@filterTraced isTransitioningBetweenLockscreenStates ||
+                isSnapToTransitionBetweenDesiredScenes ||
                 isTransitioningBetweenDesiredScenes ||
                 terminalStepBelongsToPreviousTransition ||
                 belongsToInstantReversedTransition
@@ -530,7 +534,7 @@ constructor(
     @Deprecated("Use scene container aware alternatives in this class")
     val currentKeyguardState: StateFlow<KeyguardState> =
         repository.transitions
-            .mapLatest {
+            .mapDirect {
                 if (it.transitionState == TransitionState.FINISHED) {
                     it.to
                 } else {

@@ -1375,7 +1375,7 @@ public abstract class Connection extends Conferenceable {
         }
 
         /**
-         * Writes the string {@param input} into the text stream to the UI for this RTT call. Since
+         * Writes the string {@code input} into the text stream to the UI for this RTT call. Since
          * RTT transmits text in real-time, this method should be called as often as text snippets
          * are received from the remote user, even if it is only one character.
          * <p>
@@ -3978,7 +3978,7 @@ public abstract class Connection extends Conferenceable {
      * The returned {@code Connection} can be assumed to {@link #destroy()} itself when appropriate,
      * so users of this method need not maintain a reference to its return value to destroy it.
      *
-     * @param disconnectCause The disconnect cause, ({@see android.telecomm.DisconnectCause}).
+     * @param disconnectCause The disconnect cause, (see {@link android.telecomm.DisconnectCause}).
      * @return A {@code Connection} which indicates failure.
      */
     public static Connection createFailedConnection(DisconnectCause disconnectCause) {

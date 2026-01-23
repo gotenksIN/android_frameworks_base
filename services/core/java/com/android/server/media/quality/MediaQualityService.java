@@ -794,6 +794,8 @@ public class MediaQualityService extends SystemService {
                     pp.pictureParameters = pictureParameters;
 
                     mMediaQuality.sendDefaultPictureParameters(pp);
+                    mMediaQuality.sendDefaultPictureProfile(
+                            mHalNotifier.convertToHalPictureProfile(longId, params));
                     parcel.recycle();
                     return true;
                 }
@@ -1397,6 +1399,8 @@ public class MediaQualityService extends SystemService {
                     sp.soundParameters = soundParameters;
 
                     mMediaQuality.sendDefaultSoundParameters(sp);
+                    mMediaQuality.sendDefaultSoundProfile(
+                            mHalNotifier.convertToHalSoundProfile(longId, params));
                     return true;
                 }
             } catch (RemoteException e) {
@@ -1668,7 +1672,9 @@ public class MediaQualityService extends SystemService {
                     if (pcHal != null) {
                         String name = MediaQualityUtils.getParameterName(pcHal.name);
                         boolean isSupported = pcHal.isSupported;
-                        boolean isMutable = isSupported && pcHal.commonParamCapability.isMutable;
+                        // commonParamCapability is optional. If not present, assume mutable.
+                        boolean isMutable = isSupported && (pcHal.commonParamCapability == null
+                                || pcHal.commonParamCapability.isMutable);
                         int type = pcHal.defaultValue == null ? 0 : pcHal.defaultValue.getTag() + 1;
                         Bundle bundle = MediaQualityUtils.convertToCaps(type, pcHal.range);
                         putParamCapDefaultValueIntoBundle(bundle, pcHal.defaultValue);
@@ -1684,7 +1690,9 @@ public class MediaQualityService extends SystemService {
                     if (vpcHal != null) {
                         String name = MediaQualityUtils.getVendorParameterName(vpcHal);
                         boolean isSupported = vpcHal.isSupported;
-                        boolean isMutable = isSupported && vpcHal.commonParamCapability.isMutable;
+                        // commonParamCapability is optional. If not present, assume mutable.
+                        boolean isMutable = isSupported && (vpcHal.commonParamCapability == null
+                                || vpcHal.commonParamCapability.isMutable);
                         // The default value for VendorParamCapability in HAL is IntValue = 0,
                         // LongValue = 1, DoubleValue = 2, StringValue = 3. The default value for
                         // ParameterCapability in the framework is None = 0, IntValue = 1,
@@ -2245,15 +2253,27 @@ public class MediaQualityService extends SystemService {
                 List<ParameterCapability> paramCaps, int uid, int pid) {
             UserState userState = getOrCreateUserState(UserHandle.USER_SYSTEM);
             int n = userState.mPictureProfileCallbacks.beginBroadcast();
+
             for (int i = 0; i < n; ++i) {
+                IPictureProfileCallback callback =
+                        userState.mPictureProfileCallbacks.getBroadcastItem(i);
                 try {
-                    IPictureProfileCallback callback = userState.mPictureProfileCallbacks
-                            .getBroadcastItem(i);
-                    Pair<Integer, Integer> pidUid = userState.mPictureProfileCallbackPidUidMap
-                            .get(callback);
+                    Pair<Integer, Integer> pidUid =
+                            userState.mPictureProfileCallbackPidUidMap.get(callback);
+
+                    // Handle race condition: callback might have been removed from map during
+                    // broadcast
+                    // TODO(b/469055031): Use a lock to prevent this race condition.
+                    if (pidUid == null) {
+                        Slog.w(TAG, "Callback found in broadcast but missing from PidUidMap; "
+                                + "skipping.");
+                        continue;
+                    }
+
                     if ((pidUid.first == pid && pidUid.second == uid)
                             || (hasGlobalPictureQualityServicePermission(
                                     pidUid.second, pidUid.first))) {
+
                         if (profile != null
                                 && profile.getProfileType() == PictureProfile.TYPE_SYSTEM) {
                             switch (mode) {
@@ -2268,23 +2288,22 @@ public class MediaQualityService extends SystemService {
                             switch (mode) {
                                 case ProfileModes.ERROR -> callback.onError(profileId, errorCode);
                                 case ProfileModes.PARAMETER_CAPABILITY_CHANGED ->
-                                    callback.onParameterCapabilitiesChanged(profileId, paramCaps);
+                                        callback.onParameterCapabilitiesChanged(
+                                                profileId, paramCaps);
                             }
                         }
                     }
                 } catch (RemoteException e) {
-                    if (mode == ProfileModes.ADD) {
-                        Slog.e(TAG, "Failed to report added picture profile to callback", e);
-                    } else if (mode == ProfileModes.UPDATE) {
-                        Slog.e(TAG, "Failed to report updated picture profile to callback", e);
-                    } else if (mode == ProfileModes.REMOVE) {
-                        Slog.e(TAG, "Failed to report removed picture profile to callback", e);
-                    } else if (mode == ProfileModes.ERROR) {
-                        Slog.e(TAG, "Failed to report picture profile error to callback", e);
-                    } else {
-                        Slog.e(TAG, "Failed to report picture profile parameter capability"
-                                + " change to callback", e);
-                    }
+                    String message = switch (mode) {
+                        case ProfileModes.ADD -> "added picture profile";
+                        case ProfileModes.UPDATE -> "updated picture profile";
+                        case ProfileModes.REMOVE -> "removed picture profile";
+                        case ProfileModes.ERROR -> "picture profile error";
+                        case ProfileModes.PARAMETER_CAPABILITY_CHANGED ->
+                                "parameter capability change";
+                        default -> "unknown picture profile event";
+                    };
+                    Slog.e(TAG, "Failed to report " + message + " to callback", e);
                 }
             }
             userState.mPictureProfileCallbacks.finishBroadcast();
@@ -2317,7 +2336,9 @@ public class MediaQualityService extends SystemService {
             for (ParamCapability cap: caps) {
                 String name = MediaQualityUtils.getParameterName(cap.name);
                 boolean isSupported = cap.isSupported;
-                boolean isMutable = isSupported && cap.commonParamCapability.isMutable;
+                // commonParamCapability is optional. If not present, assume mutable.
+                boolean isMutable = isSupported && (cap.commonParamCapability == null
+                        || cap.commonParamCapability.isMutable);
                 int type = cap.defaultValue == null ? 0 : cap.defaultValue.getTag() + 1;
                 Bundle bundle = MediaQualityUtils.convertToCaps(type, cap.range);
                 putParamCapDefaultValueIntoBundle(bundle, cap.defaultValue);
@@ -2336,15 +2357,21 @@ public class MediaQualityService extends SystemService {
             int n = userState.mSoundProfileCallbacks.beginBroadcast();
 
             for (int i = 0; i < n; ++i) {
+                ISoundProfileCallback callback =
+                        userState.mSoundProfileCallbacks.getBroadcastItem(i);
                 try {
-                    ISoundProfileCallback callback = userState.mSoundProfileCallbacks
-                            .getBroadcastItem(i);
-                    Pair<Integer, Integer> pidUid = userState.mSoundProfileCallbackPidUidMap
-                            .get(callback);
+                    Pair<Integer, Integer> pidUid =
+                            userState.mSoundProfileCallbackPidUidMap.get(callback);
+                    if (pidUid == null) {
+                        Slog.w(TAG, "Callback found in broadcast but missing from PidUidMap;"
+                                + "skipping.");
+                        continue;
+                    }
 
                     if ((pidUid.first == pid && pidUid.second == uid)
                             || (hasGlobalSoundQualityServicePermission(
-                            pidUid.second, pidUid.first))) {
+                                    pidUid.second, pidUid.first))) {
+
                         if (profile != null
                                 && profile.getProfileType() == SoundProfile.TYPE_SYSTEM) {
                             switch (mode) {
@@ -2359,23 +2386,22 @@ public class MediaQualityService extends SystemService {
                             switch (mode) {
                                 case ProfileModes.ERROR -> callback.onError(profileId, errorCode);
                                 case ProfileModes.PARAMETER_CAPABILITY_CHANGED ->
-                                    callback.onParameterCapabilitiesChanged(profileId, paramCaps);
+                                        callback.onParameterCapabilitiesChanged(
+                                                profileId, paramCaps);
                             }
                         }
                     }
                 } catch (RemoteException e) {
-                    if (mode == ProfileModes.ADD) {
-                        Slog.e(TAG, "Failed to report added sound profile to callback", e);
-                    } else if (mode == ProfileModes.UPDATE) {
-                        Slog.e(TAG, "Failed to report updated sound profile to callback", e);
-                    } else if (mode == ProfileModes.REMOVE) {
-                        Slog.e(TAG, "Failed to report removed sound profile to callback", e);
-                    } else if (mode == ProfileModes.ERROR) {
-                        Slog.e(TAG, "Failed to report sound profile error to callback", e);
-                    } else if (mode == ProfileModes.PARAMETER_CAPABILITY_CHANGED) {
-                        Slog.e(TAG, "Failed to report sound profile parameter capability change "
-                                + "to callback", e);
-                    }
+                    String message = switch (mode) {
+                        case ProfileModes.ADD -> "added sound profile";
+                        case ProfileModes.UPDATE -> "updated sound profile";
+                        case ProfileModes.REMOVE -> "removed sound profile";
+                        case ProfileModes.ERROR -> "sound profile error";
+                        case ProfileModes.PARAMETER_CAPABILITY_CHANGED ->
+                                "sound profile parameter capability change";
+                        default -> "unknown sound profile event";
+                    };
+                    Slog.e(TAG, "Failed to report " + message + " to callback", e);
                 }
             }
             userState.mSoundProfileCallbacks.finishBroadcast();
@@ -2543,7 +2569,9 @@ public class MediaQualityService extends SystemService {
                 for (ParamCapability cap: caps) {
                     String name = MediaQualityUtils.getParameterName(cap.name);
                     boolean isSupported = cap.isSupported;
-                    boolean isMutable = isSupported && cap.commonParamCapability.isMutable;
+                    // commonParamCapability is optional. If not present, assume mutable.
+                    boolean isMutable = isSupported && (cap.commonParamCapability == null
+                            || cap.commonParamCapability.isMutable);
                     //Reason for +1: please see getParameterCapabilityList()
                     int type = cap.defaultValue == null ? 0 : cap.defaultValue.getTag() + 1;
                     Bundle bundle = MediaQualityUtils.convertToCaps(type, cap.range);
@@ -2566,7 +2594,9 @@ public class MediaQualityService extends SystemService {
                 for (VendorParamCapability vpcHal: caps) {
                     String name = MediaQualityUtils.getVendorParameterName(vpcHal);
                     boolean isSupported = vpcHal.isSupported;
-                    boolean isMutable = isSupported && vpcHal.commonParamCapability.isMutable;
+                    // commonParamCapability is optional. If not present, assume mutable.
+                    boolean isMutable = isSupported && (vpcHal.commonParamCapability == null
+                            || vpcHal.commonParamCapability.isMutable);
                     //Reason for +1: please see getParameterCapabilityList()
                     int type = vpcHal.defaultValue
                             == null ? 0 : vpcHal.defaultValue.getTag() + 1;

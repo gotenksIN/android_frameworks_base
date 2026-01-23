@@ -138,7 +138,7 @@ constructor(
         }
     }
 
-    fun startToLockscreenOrGlanceableHubTransition(openHub: Boolean) {
+    fun startTransitionFromDream(openHub: Boolean) {
         scope.launch {
             if (
                 transitionInteractor.startedKeyguardTransitionStep.value.to ==
@@ -155,10 +155,17 @@ constructor(
                                 else null,
                         )
                     } else {
-                        startTransitionTo(
-                            KeyguardState.LOCKSCREEN,
-                            ownerReason = "Dream has ended and device is awake",
-                        )
+                        if (isDismissible()) {
+                            startTransitionTo(
+                                KeyguardState.GONE,
+                                ownerReason = "Dream has ended and device is dismissible",
+                            )
+                        } else {
+                            startTransitionTo(
+                                KeyguardState.LOCKSCREEN,
+                                ownerReason = "Dream has ended and device is awake",
+                            )
+                        }
                     }
                 }
             }
@@ -175,7 +182,11 @@ constructor(
     private fun listenForDreamingToOccludedOrGoneOrLockscreen() {
         if (SceneContainerFlag.isEnabled) return
         scope.launch {
-            combine(keyguardInteractor.isKeyguardOccluded, keyguardInteractor.isAbleToDream, ::Pair)
+            combine(
+                    keyguardInteractor.isKeyguardOccluded,
+                    keyguardInteractor.isDreamingNotDozing,
+                    ::Pair,
+                )
                 // Debounce signals since there is a race condition between the occluded and
                 // dreaming signals when starting or stopping dreaming. We therefore add a small
                 // delay to give enough time for occluded to flip to false when the dream
@@ -183,11 +194,7 @@ constructor(
                 .debounce(100.milliseconds)
                 .filterRelevantKeyguardStateAnd { (isOccluded, isDreaming) -> !isDreaming }
                 .collect { (isOccluded, isDreaming) ->
-                    val isDismissible =
-                        keyguardInteractor.isKeyguardDismissible.value &&
-                            !keyguardInteractor.isKeyguardShowing.value
-
-                    if (isDismissible) {
+                    if (isDismissible()) {
                         startTransitionTo(
                             KeyguardState.GONE,
                             ownerReason = "No longer dreaming; dismissable",
@@ -242,6 +249,11 @@ constructor(
                     else -> DEFAULT_DURATION
                 }.inWholeMilliseconds
         }
+    }
+
+    private fun isDismissible(): Boolean {
+        return keyguardInteractor.isKeyguardDismissible.value &&
+            !keyguardInteractor.isKeyguardShowing.value
     }
 
     companion object {

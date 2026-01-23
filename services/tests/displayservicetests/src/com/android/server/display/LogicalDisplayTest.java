@@ -170,7 +170,7 @@ public class LogicalDisplayTest {
     public void testNoLetterbox_noAnisotropyCorrectionIfAnisotropicModesEnabled() {
         mDisplayDeviceInfo.type = Display.TYPE_EXTERNAL;
         mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice,
-                /*isSyncedResolutionSwitchEnabled=*/ true, false, mDisplayInfoCacheMocked);
+                /*isSyncedResolutionSwitchEnabled=*/ true, mDisplayInfoCacheMocked);
 
         // In case of Anisotropy of pixels, then the content should be rescaled so it would adjust
         // to using the whole screen. This is because display will rescale it back to fill the
@@ -288,11 +288,11 @@ public class LogicalDisplayTest {
     @Test
     public void testSetDisplaySizeIsCalledDuringConfigureDisplayLocked() {
         mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice,
-                /*isSyncedResolutionSwitchEnabled=*/ true, false, mDisplayInfoCacheMocked);
+                /*isSyncedResolutionSwitchEnabled=*/ true, mDisplayInfoCacheMocked);
         mLogicalDisplay.updateLocked(mDeviceRepo);
         SurfaceControl.Transaction t = mock(SurfaceControl.Transaction.class);
         mLogicalDisplay.configureDisplayLocked(t, mDisplayDevice, false, mExecutor);
-        verify(mDisplayDevice).configureDisplaySizeLocked(eq(t));
+        verify(mDisplayDevice).configureDisplaySizeLocked(eq(t), any());
     }
 
     @Test
@@ -667,7 +667,7 @@ public class LogicalDisplayTest {
     @Test
     public void testUserPreferredModeWithSizeOverride_updatesResolution() {
         mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice, false,
-                true, mDisplayInfoCacheMocked);
+            mDisplayInfoCacheMocked);
         Display.Mode mode = new Display.Mode(OTHER_MODE_ID, -1, Display.Mode.FLAG_SIZE_OVERRIDE,
                 1000, 1000, 60f, 60f, new float[]{}, new int[]{});
         mDisplayDeviceInfo.supportedModes = new Display.Mode[] {mode};
@@ -688,7 +688,7 @@ public class LogicalDisplayTest {
     @Test
     public void testUserPreferredModeWithoutSizeOverride_doesNotUpdateResolution() {
         mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice, false,
-                true, mDisplayInfoCacheMocked);
+                mDisplayInfoCacheMocked);
         Display.Mode mode = new Display.Mode(OTHER_MODE_ID, -1, 0,
                 1000, 1000, 60f, 60f, new float[]{}, new int[]{});
         mDisplayDeviceInfo.supportedModes = new Display.Mode[] {mode};
@@ -707,10 +707,67 @@ public class LogicalDisplayTest {
     }
 
     @Test
+    public void testUserPreferredModeWithSizeOverride_withRotation_updatesProjection() {
+        // Enable size override for this test
+        mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice, false,
+                mDisplayInfoCacheMocked);
+
+        // Setup a physical display that is portrait (1000x2000)
+        mDisplayDeviceInfo.type = Display.TYPE_EXTERNAL;
+        mDisplayDeviceInfo.width = 1000;
+        mDisplayDeviceInfo.height = 2000;
+        mDisplayDeviceInfo.xDpi = 100;
+        mDisplayDeviceInfo.yDpi = 100;
+
+        // Setup a user-preferred mode that is landscape (2000x1000) with size override
+        Display.Mode overrideMode = new Display.Mode(OTHER_MODE_ID, -1,
+                Display.Mode.FLAG_SIZE_OVERRIDE, 2000, 1000, 60f, 60f, new float[]{}, new int[]{});
+        mDisplayDeviceInfo.supportedModes = new Display.Mode[] {overrideMode};
+        mDisplayDeviceInfo.userPreferredModeId = OTHER_MODE_ID;
+
+        // Update the logical display. This will adopt the override mode's resolution.
+        mLogicalDisplay.updateLocked(mDeviceRepo);
+        DisplayInfo baseInfo = mLogicalDisplay.getDisplayInfoLocked();
+        assertThat(baseInfo.logicalWidth).isEqualTo(2000);
+        assertThat(baseInfo.logicalHeight).isEqualTo(1000);
+
+        // Now, simulate a rotation from WindowManager. The logical display is now landscape,
+        // and we're rotating it by 90 degrees to be displayed on the portrait physical display.
+        DisplayInfo overrideInfo = new DisplayInfo(baseInfo);
+        overrideInfo.rotation = Surface.ROTATION_90;
+        mLogicalDisplay.setDisplayInfoOverrideFromWindowManagerLocked(overrideInfo);
+
+        // Configure the display projection
+        SurfaceControl.Transaction t = mock(SurfaceControl.Transaction.class);
+        mLogicalDisplay.configureDisplayLocked(t, mDisplayDevice, false, mExecutor);
+
+        // With the fix, the user mode dimensions are swapped for rotation, leading to
+        // correct scaling and a letterboxed projection.
+        // Without the fix, the dimensions are not swapped, leading to incorrect scaling
+        // and a projection that fills the screen (position 0,0).
+        //
+        // Calculation with fix:
+        // Physical display (rotated for projection): 2000x1000
+        // Logical display (from override mode): 2000x1000
+        // User override mode (rotated for scaling): 1000x2000
+        //
+        // Recalculated logical size for projection:
+        // displayLogicalWidth = 2000 * 2000 / 1000 = 4000
+        // displayLogicalHeight = 1000 * 1000 / 2000 = 500
+        //
+        // Fit 4000x500 content into 2000x1000 physical space (letterboxed):
+        // displayRectWidth = 2000
+        // displayRectHeight = 500 * 2000 / 4000 = 250
+        // displayRectTop = (1000 - 250) / 2 = 375
+        // displayRectLeft = 0
+        assertEquals(new Point(0, 375), mLogicalDisplay.getDisplayPosition());
+    }
+
+    @Test
     @EnableFlags(Flags.FLAG_ANISOTROPY_CORRECTED_MODE_BY_DEFAULT)
     public void testAnisotropyCorrectedMode_selected() {
         mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice, false,
-                true, mDisplayInfoCacheMocked);
+                mDisplayInfoCacheMocked);
         Display.Mode anisotropicMode = new Display.Mode(MODE_ID, -1, 0,
                 1000, 1000, 60f, 60f, new float[]{}, new int[]{});
         Display.Mode anisotropyCorrectedMode = new Display.Mode(OTHER_MODE_ID, MODE_ID,
@@ -742,7 +799,7 @@ public class LogicalDisplayTest {
     @EnableFlags(Flags.FLAG_ANISOTROPY_CORRECTED_MODE_BY_DEFAULT)
     public void testAnisotropyCorrectedMode_notSelectedNoMatchingMode() {
         mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice, false,
-                true, mDisplayInfoCacheMocked);
+                mDisplayInfoCacheMocked);
         Display.Mode anisotropicMode = new Display.Mode(MODE_ID, -1, 0,
                 1000, 1000, 60f, 60f, new float[]{}, new int[]{});
         Display.Mode anisotropyCorrectedMode = new Display.Mode(OTHER_MODE_ID, 1000,
@@ -774,7 +831,7 @@ public class LogicalDisplayTest {
     @EnableFlags(Flags.FLAG_ANISOTROPY_CORRECTED_MODE_BY_DEFAULT)
     public void testAnisotropyCorrectedMode_notSelectedIntenalDisplay() {
         mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice, false,
-                true, mDisplayInfoCacheMocked);
+                mDisplayInfoCacheMocked);
         Display.Mode anisotropicMode = new Display.Mode(MODE_ID, -1, 0,
                 1000, 1000, 60f, 60f, new float[]{}, new int[]{});
         Display.Mode anisotropyCorrectedMode = new Display.Mode(OTHER_MODE_ID, MODE_ID,
@@ -806,7 +863,7 @@ public class LogicalDisplayTest {
     @EnableFlags(Flags.FLAG_ANISOTROPY_CORRECTED_MODE_BY_DEFAULT)
     public void testAnisotropyCorrectedMode_notSelectedUserPreferredModeSetAndSelected() {
         mLogicalDisplay = new LogicalDisplay(DISPLAY_ID, LAYER_STACK, mDisplayDevice, false,
-                true, mDisplayInfoCacheMocked);
+                mDisplayInfoCacheMocked);
         Display.Mode anisotropicMode = new Display.Mode(MODE_ID, -1, 0,
                 1000, 1000, 60f, 60f, new float[]{}, new int[]{});
         Display.Mode anisotropyCorrectedMode = new Display.Mode(OTHER_MODE_ID, MODE_ID,

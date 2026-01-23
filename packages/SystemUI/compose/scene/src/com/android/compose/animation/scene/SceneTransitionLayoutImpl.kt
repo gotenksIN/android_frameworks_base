@@ -46,6 +46,9 @@ import androidx.compose.ui.node.LayoutAwareModifierNode
 import androidx.compose.ui.node.LayoutModifierNode
 import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntSize
@@ -59,6 +62,12 @@ import com.android.compose.animation.scene.content.Content
 import com.android.compose.animation.scene.content.Overlay
 import com.android.compose.animation.scene.content.Scene
 import com.android.compose.animation.scene.content.state.TransitionState
+import com.android.compose.animation.scene.debug.StateLogger
+import com.android.compose.animation.scene.debug.StlDebugConfig
+import com.android.compose.animation.scene.debug.debugContent
+import com.android.compose.animation.scene.debug.debugStl
+import com.android.compose.animation.scene.debug.logElementsOnTransitionChange
+import com.android.compose.animation.scene.debug.withoutReadObservation
 import com.android.compose.animation.scene.mechanics.UserActionGestureScope
 import com.android.compose.modifiers.thenIf
 import com.android.compose.ui.util.lerp
@@ -281,6 +290,13 @@ internal class SceneTransitionLayoutImpl(
         return ancestors.fastAny { it.inContent == content }
     }
 
+    internal fun isLocalContent(key: ContentKey): Boolean {
+        return when (key) {
+            is SceneKey -> scenes.contains(key)
+            is OverlayKey -> overlays.contains(key)
+        }
+    }
+
     internal fun contentForUserActions(): Content {
         return findOverlayWithHighestZIndex() ?: scene(state.transitionState.currentScene)
     }
@@ -479,6 +495,12 @@ internal class SceneTransitionLayoutImpl(
 
     @Composable
     internal fun Content(modifier: Modifier) {
+        val stateLogger =
+            if (StlDebugConfig.logElements()) {
+                remember { StateLogger() }
+            } else {
+                null
+            }
         Box(
             modifier
                 .nestedScroll(nestedScrollConnection, nestedScrollDispatcher)
@@ -491,6 +513,19 @@ internal class SceneTransitionLayoutImpl(
                     LayoutElement(layoutImpl = this, transitionState = this.state.transitionState)
                 )
                 .thenIf(implicitTestTags) { Modifier.testTag(SceneTransitionLayoutRootContentTag) }
+                .thenIf(StlDebugConfig.isDebuggingStl()) {
+                    Modifier.debugStl(
+                        state = state.withoutReadObservation(),
+                        debugName = debugName,
+                        nestingLevel = ancestors.size,
+                    )
+                }
+                .thenIf(StlDebugConfig.logElements() && stateLogger != null) {
+                    Modifier.logElementsOnTransitionChange(
+                        this.withoutReadObservation(),
+                        stateLogger!!,
+                    )
+                }
         ) {
             LookaheadScope {
                 if (_lookaheadScope == null) {
@@ -519,7 +554,12 @@ internal class SceneTransitionLayoutImpl(
             key(scene.key) {
                 scene.Content(
                     isInvisible = isInvisible,
-                    modifier = Modifier.then(ContentElement(scene.zIndex, isInvisible)),
+                    modifier =
+                        Modifier.then(ContentElement(scene.zIndex, isInvisible)).thenIf(
+                            StlDebugConfig.isDebuggingContent()
+                        ) {
+                            Modifier.debugContent(scene.key)
+                        },
                 )
             }
         }
@@ -572,6 +612,14 @@ internal class SceneTransitionLayoutImpl(
             return
         }
 
+        val hasModalOverlay = overlaysOrderedByZIndex.fastAny { it.overlay.isModal }
+        val closeOverlayActionLabel =
+            if (hasModalOverlay) stringResource(R.string.accessibility_close_overlay_action) else ""
+        val closeOverlayBoundingBoxDescription =
+            if (hasModalOverlay)
+                stringResource(R.string.accessibility_close_overlay_box_description)
+            else ""
+
         overlaysOrderedByZIndex.fastForEach { (overlay, isInvisible) ->
             val key = overlay.key
             key(key) {
@@ -582,19 +630,36 @@ internal class SceneTransitionLayoutImpl(
                     if (overlay.isModal) {
                         // Add a fullscreen clickable to prevent swipes from reaching the scenes and
                         // other overlays behind this overlay. Clicking will close the overlay.
+                        //
+                        // The clikable is given a label that announces that interacting with it
+                        // will "go back". Alternatively, we could remove it from accessibility by
+                        // using clickableWithoutFocus, but that is blocked on b/463616873 to
+                        // prevent TalkBack from announcing elements from behind the overlay then.
                         Box(
-                            Modifier.fillMaxSize().clickable(
-                                interactionSource = remember { MutableInteractionSource() },
-                                indication = null,
-                            ) {
-                                if (state.canHideOverlay(key)) {
-                                    state.hideOverlay(key, animationScope = animationScope)
+                            Modifier.fillMaxSize()
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null,
+                                    onClickLabel = closeOverlayActionLabel,
+                                ) {
+                                    if (state.canHideOverlay(key)) {
+                                        state.hideOverlay(key, animationScope = animationScope)
+                                    }
                                 }
-                            }
+                                .semantics {
+                                    contentDescription = closeOverlayBoundingBoxDescription
+                                }
                         )
                     }
 
-                    overlay.Content(Modifier.align(overlay.alignment), isInvisible = isInvisible)
+                    overlay.Content(
+                        Modifier.align(overlay.alignment).thenIf(
+                            StlDebugConfig.isDebuggingContent()
+                        ) {
+                            Modifier.debugContent(key)
+                        },
+                        isInvisible = isInvisible,
+                    )
                 }
             }
         }

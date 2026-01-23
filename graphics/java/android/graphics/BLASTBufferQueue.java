@@ -225,7 +225,7 @@ public final class BLASTBufferQueue {
     }
 
     /**
-     * @return True if the associated SurfaceControl has the same handle as {@param sc}.
+     * @return True if the associated SurfaceControl has the same handle as {@code sc}.
      */
     public boolean isSameSurfaceControl(SurfaceControl sc) {
         return nativeIsSameSurfaceControl(mNativeObject, sc.mNativeObject);

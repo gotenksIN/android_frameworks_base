@@ -159,7 +159,9 @@ class BridgedNotificationInfoTest : SysuiTestCase() {
         val bridgedMetadata =
             BridgedNotificationMetadata(
                 BridgedNotificationMetadata.BRIDGED_METADATA_TYPE_PHONE,
+                "test_display_name",
                 "test_package",
+                "test_channel_id",
                 icon,
             )
         val notification =
@@ -215,7 +217,9 @@ class BridgedNotificationInfoTest : SysuiTestCase() {
     fun testSummaryText() {
         bindNotification()
         assertThat((underTest.findViewById(R.id.bridged_summary) as TextView).text)
-            .isEqualTo("Synced notification priority and settings can be adjusted on your phone")
+            .isEqualTo(
+                "Synced notification priority and settings can be adjusted on your test_display_name"
+            )
     }
 
     private fun bindNotification(

@@ -158,6 +158,10 @@
     <string name="wfc_mode_wifi_preferred_summary" msgid="1035175836270943089">"Panggilan telepon melalui Wi-Fi"</string>
     <string name="wfc_mode_cellular_preferred_summary" msgid="4958965609212575619">"Panggilan telepon melalui jaringan seluler"</string>
     <string name="wfc_mode_wifi_only_summary" msgid="104951993894678665">"Khusus Wi-Fi"</string>
+    <string name="adaptive_low_frequency_less_than_one_minute" msgid="8869498183646028708">"~ %s"</string>
+    <string name="adaptive_low_frequency_neg_less_than_one_minute" msgid="2590062535985417056">"~ −%s"</string>
+    <string name="elapsed_time_low_frequency_short_format_h_mm" msgid="6728141238066668781">"%1$d:%2$02d:--"</string>
+    <string name="elapsed_time_low_frequency_short_format_mm" msgid="2405181895215514414">"%1$02d:--"</string>
     <!-- no translation found for crossSimFormat_spn (9125246077491634262) -->
     <skip />
     <string name="crossSimFormat_spn_cross_sim_calling" msgid="5620807020002879057">"Panggilan Cadangan <xliff:g id="SPN">%s</xliff:g>"</string>
@@ -410,7 +414,7 @@
     <string name="permdesc_answerPhoneCalls" msgid="894386681983116838">"Mengizinkan aplikasi menjawab panggilan telepon masuk."</string>
     <string name="permlab_receiveSms" msgid="505961632050451881">"terima pesan teks (SMS)"</string>
     <string name="permdesc_receiveSms" msgid="1797345626687832285">"Memungkinkan aplikasi menerima dan memproses pesan SMS. Ini artinya aplikasi dapat memantau atau menghapus pesan yang dikirim ke perangkat Anda tanpa menunjukkannya kepada Anda."</string>
-    <string name="permlab_receiveMms" msgid="4000650116674380275">"terima pesan teks (MMS)"</string>
+    <string name="permlab_receiveMms" msgid="4000650116674380275">"menerima pesan teks (MMS)"</string>
     <string name="permdesc_receiveMms" msgid="958102423732219710">"Memungkinkan aplikasi menerima dan memproses pesan MMS. Ini artinya aplikasi dapat memantau atau menghapus pesan yang dikirim ke perangkat Anda tanpa menunjukkannya kepada Anda."</string>
     <string name="permlab_bindCellBroadcastService" msgid="586746677002040651">"Teruskan pesan cell broadcast"</string>
     <string name="permdesc_bindCellBroadcastService" msgid="6540910200973641606">"Mengizinkan aplikasi mem-binding ke modul cell broadcast untuk meneruskan pesan cell broadcast saat pesan tersebut diterima. Notifikasi cell broadcast dikirim di beberapa lokasi untuk memperingatkan Anda tentang situasi darurat. Aplikasi berbahaya dapat mengganggu performa atau operasi perangkat saat cell broadcast darurat diterima."</string>
@@ -631,11 +635,11 @@
     <string name="permdesc_bluetooth" product="tablet" msgid="3053222571491402635">"Memungkinkan aplikasi melihat konfigurasi Bluetooth di tablet, dan membuat serta menerima sambungan dengan perangkat yang disandingkan."</string>
     <string name="permdesc_bluetooth" product="tv" msgid="8851534496561034998">"Mengizinkan aplikasi melihat konfigurasi Bluetooth di perangkat Android TV, serta melakukan dan menerima sambungan dengan perangkat yang terhubung."</string>
     <string name="permdesc_bluetooth" product="default" msgid="2779606714091276746">"Memungkinkan aplikasi melihat konfigurasi Bluetooth di ponsel, dan membuat serta menerima sambungan dengan perangkat yang disandingkan."</string>
-    <string name="permlab_bluetooth_scan" msgid="5402587142833124594">"temukan &amp; sambungkan perangkat Bluetooth di sekitar"</string>
+    <string name="permlab_bluetooth_scan" msgid="5402587142833124594">"menemukan &amp; menyambungkan perangkat Bluetooth di sekitar"</string>
     <string name="permdesc_bluetooth_scan" product="default" msgid="6540723536925289276">"Mengizinkan aplikasi menemukan dan menyambungkan perangkat Bluetooth di sekitar"</string>
-    <string name="permlab_bluetooth_connect" msgid="6657463246355003528">"hubungkan ke perangkat Bluetooth yang disambungkan"</string>
+    <string name="permlab_bluetooth_connect" msgid="6657463246355003528">"terhubung ke perangkat Bluetooth yang disambungkan"</string>
     <string name="permdesc_bluetooth_connect" product="default" msgid="4546016548795544617">"Mengizinkan aplikasi terhubung ke perangkat Bluetooth yang disambungkan"</string>
-    <string name="permlab_bluetooth_advertise" msgid="2781147747928853177">"tampilkan iklan ke perangkat Bluetooth di sekitar"</string>
+    <string name="permlab_bluetooth_advertise" msgid="2781147747928853177">"menampilkan iklan ke perangkat Bluetooth di sekitar"</string>
     <string name="permdesc_bluetooth_advertise" product="default" msgid="6085174451034210183">"Mengizinkan aplikasi untuk menampilkan iklan ke perangkat Bluetooth di sekitar"</string>
     <string name="permlab_uwb_ranging" msgid="8141915781475770665">"menentukan posisi relatif antar-perangkat Ultra-Wideband di sekitar"</string>
     <string name="permdesc_uwb_ranging" msgid="2519723069604307055">"Mengizinkan aplikasi menentukan posisi relatif antar-perangkat Ultra-Wideband di sekitar"</string>
@@ -645,10 +649,8 @@
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"Mengizinkan aplikasi mengakses perangkat jaringan lokal"</string>
     <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"gunakan antarmuka loopback"</string>
     <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"Memungkinkan aplikasi berinteraksi dengan aplikasi lain melalui antarmuka loopback"</string>
-    <!-- no translation found for permlab_force_use_loopback_interface (1319727311706416481) -->
-    <skip />
-    <!-- no translation found for permdesc_force_use_loopback_interface (5829032514048681980) -->
-    <skip />
+    <string name="permlab_force_use_loopback_interface" msgid="1319727311706416481">"paksa penggunaan antarmuka loopback"</string>
+    <string name="permdesc_force_use_loopback_interface" msgid="5829032514048681980">"Memungkinkan aplikasi berinteraksi dengan aplikasi lain melalui antarmuka loopback tanpa mewajibkan aplikasi lain memiliki izin loopback"</string>
     <string name="permlab_ranging" msgid="2854543350668593390">"menentukan posisi relatif antar-perangkat di sekitar"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"Izinkan aplikasi menentukan posisi relatif antar-perangkat di sekitar"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"Informasi Layanan Pembayaran NFC Pilihan"</string>
@@ -774,7 +776,7 @@
     <string name="face_acquired_too_low" msgid="4075391872960840081">"Geser ponsel ke bawah"</string>
     <string name="face_acquired_too_right" msgid="6245286514593540859">"Geser ponsel ke kiri"</string>
     <string name="face_acquired_too_left" msgid="9201762240918405486">"Geser ponsel ke kanan"</string>
-    <string name="face_acquired_poor_gaze" msgid="4427153558773628020">"Lihat langsung ke perangkat."</string>
+    <string name="face_acquired_poor_gaze" msgid="6746437451436776485">"Lihat lebih lurus ke arah kamera"</string>
     <string name="face_acquired_not_detected" msgid="1057966913397548150">"Wajah tidak terlihat. Pegang ponsel sejajar mata."</string>
     <string name="face_acquired_too_much_motion" msgid="8199691445085189528">"Terlalu banyak gerakan. Stabilkan ponsel."</string>
     <string name="face_acquired_recalibrate" msgid="8724013080976469746">"Daftarkan ulang wajah Anda."</string>
@@ -1454,6 +1456,9 @@
     <string name="carrier_app_notification_text" msgid="6567057546341958637">"Ketuk untuk menyiapkan"</string>
     <string name="time_zone_change_notification_title" msgid="5232503069219193218">"Zona waktu Anda diubah"</string>
     <string name="time_zone_change_notification_body" msgid="6135793674904665585">"Anda sekarang berada di <xliff:g id="TIME_ZONE_DISPLAY_NAME">%1$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET">%2$s</xliff:g>)"</string>
+    <string name="time_zone_offset_change_notification_title" msgid="8232305835199459588">"Perubahan jam"</string>
+    <string name="time_zone_offset_change_notification_body_forward" msgid="1299493962341887576">"Waktu dimajukan <xliff:g id="TIME_ZONE_OFFSET_DURATION">%1$s</xliff:g>. Anda sekarang berada di <xliff:g id="TIME_ZONE_DISPLAY_NAME">%2$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET_0">%3$s</xliff:g>)."</string>
+    <string name="time_zone_offset_change_notification_body_backward" msgid="6643532078142642118">"Jam dimundurkan <xliff:g id="TIME_ZONE_OFFSET_DURATION">%1$s</xliff:g>. Anda sekarang berada di <xliff:g id="TIME_ZONE_DISPLAY_NAME">%2$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET_0">%3$s</xliff:g>)."</string>
     <string name="time_picker_dialog_title" msgid="9053376764985220821">"Setel waktu"</string>
     <string name="date_picker_dialog_title" msgid="5030520449243071926">"Setel tanggal"</string>
     <string name="date_time_set" msgid="4603445265164486816">"Setel"</string>
@@ -1829,6 +1834,7 @@
     <string name="accessibility_shortcut_label_gesture" msgid="7987298674836890931">"gestur"</string>
     <string name="accessibility_shortcut_label_quick_settings" msgid="6851280333772213611">"setelan cepat"</string>
     <string name="accessibility_shortcut_label_triple_tap" msgid="9058975959054454796">"ketuk tiga kali"</string>
+    <string name="accessibility_shortcut_label_top_row_key" msgid="1488840908672437180">"tombol aksesibilitas"</string>
     <string name="accessibility_uncheck_legacy_item_warning" msgid="8047830891064817447">"<xliff:g id="SERVICE_NAME">%s</xliff:g> telah dinonaktifkan"</string>
     <string name="edit_accessibility_shortcut_menu_button" msgid="8885752738733772935">"Edit pintasan"</string>
     <string name="done_accessibility_shortcut_menu_button" msgid="3668407723770815708">"Selesai"</string>
@@ -2105,6 +2111,7 @@
     <string name="app_suspended_default_message" msgid="6451215678552004172">"<xliff:g id="APP_NAME_0">%1$s</xliff:g> saat ini tidak tersedia. Aplikasi ini dikelola oleh <xliff:g id="APP_NAME_1">%2$s</xliff:g>."</string>
     <string name="app_suspended_more_details" msgid="211260942831587014">"Pelajari lebih lanjut"</string>
     <string name="app_suspended_unsuspend_message" msgid="1665438589450555459">"Batalkan jeda aplikasi"</string>
+    <string name="locked_app_biometric_prompt_description" msgid="6853122652400451464">"<xliff:g id="APP_NAME">%1$s</xliff:g> dikunci"</string>
     <string name="work_mode_off_title" msgid="6367463960165135829">"Batalkan jeda aplikasi kerja?"</string>
     <string name="work_mode_turn_on" msgid="5316648862401307800">"Batalkan jeda"</string>
     <string name="work_mode_emergency_call_button" msgid="6818855962881612322">"Darurat"</string>
@@ -2544,6 +2551,8 @@
     <string name="accessibility_label_clone_profile" msgid="7579118375042398784">"Clone"</string>
     <string name="accessibility_label_communal_profile" msgid="1437173163111334791">"Umum"</string>
     <string name="private_space_biometric_prompt_title" msgid="5777592909271728154">"Ruang privasi"</string>
+    <string name="app_locked_new_notification" msgid="4409730436247596215">"Notifikasi baru"</string>
+    <string name="app_locked_notification_message" msgid="4576179600328065280">"Pesan baru"</string>
     <string name="redacted_notification_message" msgid="1520587845842228816">"Konten notifikasi sensitif disembunyikan"</string>
     <string name="redacted_notification_action_title" msgid="6942924973335920935"></string>
     <string name="screen_not_shared_sensitive_content" msgid="7058419185079565001">"Konten aplikasi disembunyikan dari berbagi layar karena alasan keamanan"</string>

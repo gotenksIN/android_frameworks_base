@@ -158,6 +158,10 @@
     <string name="wfc_mode_wifi_preferred_summary" msgid="1035175836270943089">"Bellen via wifi"</string>
     <string name="wfc_mode_cellular_preferred_summary" msgid="4958965609212575619">"Bellen via mobiel netwerk"</string>
     <string name="wfc_mode_wifi_only_summary" msgid="104951993894678665">"Alleen wifi"</string>
+    <string name="adaptive_low_frequency_less_than_one_minute" msgid="8869498183646028708">"~ %s"</string>
+    <string name="adaptive_low_frequency_neg_less_than_one_minute" msgid="2590062535985417056">"~ −%s"</string>
+    <string name="elapsed_time_low_frequency_short_format_h_mm" msgid="6728141238066668781">"%1$d:%2$02d:--"</string>
+    <string name="elapsed_time_low_frequency_short_format_mm" msgid="2405181895215514414">"%1$02d:--"</string>
     <!-- no translation found for crossSimFormat_spn (9125246077491634262) -->
     <skip />
     <string name="crossSimFormat_spn_cross_sim_calling" msgid="5620807020002879057">"Reserveoptie voor bellen van <xliff:g id="SPN">%s</xliff:g>"</string>
@@ -645,10 +649,8 @@
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"Hiermee krijgt de app toegang tot apparaten in het lokale netwerk"</string>
     <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"loopback-interface gebruiken"</string>
     <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"Hiermee kan de app interactie hebben met andere apps via de loopback-interface"</string>
-    <!-- no translation found for permlab_force_use_loopback_interface (1319727311706416481) -->
-    <skip />
-    <!-- no translation found for permdesc_force_use_loopback_interface (5829032514048681980) -->
-    <skip />
+    <string name="permlab_force_use_loopback_interface" msgid="1319727311706416481">"gebruik van loopback-interface afdwingen"</string>
+    <string name="permdesc_force_use_loopback_interface" msgid="5829032514048681980">"Hiermee kan de app interactie met andere apps hebben via de loopback-interface zonder dat de andere app loopback-rechten nodig heeft"</string>
     <string name="permlab_ranging" msgid="2854543350668593390">"relatieve positie tussen apparaten in de buurt bepalen"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"Sta toe dat de app de relatieve positie tussen apparaten in de buurt bepaalt"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"Informatie over voorkeursservice voor NFC-betaling"</string>
@@ -774,7 +776,7 @@
     <string name="face_acquired_too_low" msgid="4075391872960840081">"Houd de telefoon lager"</string>
     <string name="face_acquired_too_right" msgid="6245286514593540859">"Beweeg de telefoon naar links"</string>
     <string name="face_acquired_too_left" msgid="9201762240918405486">"Beweeg de telefoon naar rechts"</string>
-    <string name="face_acquired_poor_gaze" msgid="4427153558773628020">"Kijk rechter naar je apparaat."</string>
+    <string name="face_acquired_poor_gaze" msgid="6746437451436776485">"Kijk goed recht naar je camera"</string>
     <string name="face_acquired_not_detected" msgid="1057966913397548150">"Je gezicht is niet te zien. Houd je telefoon op ooghoogte."</string>
     <string name="face_acquired_too_much_motion" msgid="8199691445085189528">"Te veel beweging. Houd je telefoon stil."</string>
     <string name="face_acquired_recalibrate" msgid="8724013080976469746">"Registreer je gezicht opnieuw."</string>
@@ -1093,7 +1095,7 @@
     <string name="lockscreen_too_many_failed_password_attempts_dialog_message" msgid="3118353451602377380">"Je hebt je wachtwoord <xliff:g id="NUMBER_0">%1$d</xliff:g> keer onjuist getypt. \n\nProbeer het  opnieuw over <xliff:g id="NUMBER_1">%2$d</xliff:g> seconden."</string>
     <string name="lockscreen_too_many_failed_pin_attempts_dialog_message" msgid="2874278239714821984">"Je hebt je pincode <xliff:g id="NUMBER_0">%1$d</xliff:g> keer onjuist getypt. \n\nProbeer het opnieuw over <xliff:g id="NUMBER_1">%2$d</xliff:g> seconden."</string>
     <string name="lockscreen_failed_attempts_almost_glogin" product="tablet" msgid="3069635524964070596">"Je hebt je ontgrendelingspatroon <xliff:g id="NUMBER_0">%1$d</xliff:g> keer onjuist getekend. Na nog eens <xliff:g id="NUMBER_1">%2$d</xliff:g> mislukte pogingen wordt u gevraagd je tablet te ontgrendelen met je aanmeldingsgegevens voor Google.\n\n Probeer het over <xliff:g id="NUMBER_2">%3$d</xliff:g> seconden opnieuw."</string>
-    <string name="lockscreen_failed_attempts_almost_glogin" product="tv" msgid="6399092175942158529">"Je hebt je ontgrendelingspatroon <xliff:g id="NUMBER_0">%1$d</xliff:g> keer onjuist getekend. Na nog eens <xliff:g id="NUMBER_1">%2$d</xliff:g> mislukte pogingen word je gevraagd om je Android TV-apparaat te ontgrendelen met je Google-inloggegevens.\n\n Probeer het over <xliff:g id="NUMBER_2">%3$d</xliff:g> seconden opnieuw."</string>
+    <string name="lockscreen_failed_attempts_almost_glogin" product="tv" msgid="6399092175942158529">"Je hebt je ontgrendelingspatroon <xliff:g id="NUMBER_0">%1$d</xliff:g> keer onjuist getekend. Na nog eens <xliff:g id="NUMBER_1">%2$d</xliff:g> mislukte pogingen wordt je gevraagd om je Android TV-apparaat te ontgrendelen met je Google-inloggegevens.\n\n Probeer het over <xliff:g id="NUMBER_2">%3$d</xliff:g> seconden opnieuw."</string>
     <string name="lockscreen_failed_attempts_almost_glogin" product="default" msgid="5691623136957148335">"Je hebt je ontgrendelingspatroon <xliff:g id="NUMBER_0">%1$d</xliff:g> keer onjuist getekend. Na nog eens <xliff:g id="NUMBER_1">%2$d</xliff:g> mislukte pogingen wordt u gevraagd je telefoon te ontgrendelen met je aanmeldingsgegevens voor Google.\n\n Probeer het over <xliff:g id="NUMBER_2">%3$d</xliff:g> seconden opnieuw."</string>
     <string name="lockscreen_failed_attempts_almost_at_wipe" product="tablet" msgid="7914445759242151426">"Je hebt <xliff:g id="NUMBER_0">%1$d</xliff:g> keer geprobeerd de tablet op een onjuiste manier te ontgrendelen. Na nog eens <xliff:g id="NUMBER_1">%2$d</xliff:g> mislukte pogingen worden de fabrieksinstellingen hersteld op de tablet en gaan alle gebruikersgegevens verloren."</string>
     <string name="lockscreen_failed_attempts_almost_at_wipe" product="tv" msgid="4275591249631864248">"Je hebt <xliff:g id="NUMBER_0">%1$d</xliff:g> mislukte pogingen ondernomen om je Android TV-apparaat te ontgrendelen. Na nog eens <xliff:g id="NUMBER_1">%2$d</xliff:g> mislukte pogingen wordt je Android TV-apparaat teruggezet op de fabrieksinstellingen en gaan alle gebruikersgegevens verloren."</string>
@@ -1454,6 +1456,9 @@
     <string name="carrier_app_notification_text" msgid="6567057546341958637">"Tik om dit in te stellen"</string>
     <string name="time_zone_change_notification_title" msgid="5232503069219193218">"Je tijdzone is gewijzigd"</string>
     <string name="time_zone_change_notification_body" msgid="6135793674904665585">"Je tijdzone is <xliff:g id="TIME_ZONE_DISPLAY_NAME">%1$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET">%2$s</xliff:g>)"</string>
+    <string name="time_zone_offset_change_notification_title" msgid="8232305835199459588">"Klokwijziging"</string>
+    <string name="time_zone_offset_change_notification_body_forward" msgid="1299493962341887576">"De klok is <xliff:g id="TIME_ZONE_OFFSET_DURATION">%1$s</xliff:g> vooruitgezet. Je bent nu in <xliff:g id="TIME_ZONE_DISPLAY_NAME">%2$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET_0">%3$s</xliff:g>)."</string>
+    <string name="time_zone_offset_change_notification_body_backward" msgid="6643532078142642118">"De klokken zijn <xliff:g id="TIME_ZONE_OFFSET_DURATION">%1$s</xliff:g> teruggezet. Je bent nu in <xliff:g id="TIME_ZONE_DISPLAY_NAME">%2$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET_0">%3$s</xliff:g>)."</string>
     <string name="time_picker_dialog_title" msgid="9053376764985220821">"Tijd instellen"</string>
     <string name="date_picker_dialog_title" msgid="5030520449243071926">"Datum instellen"</string>
     <string name="date_time_set" msgid="4603445265164486816">"Instellen"</string>
@@ -1793,7 +1798,7 @@
     <string name="kg_failed_attempts_now_wiping" product="tv" msgid="5045460916106267585">"Je hebt <xliff:g id="NUMBER">%d</xliff:g> mislukte pogingen ondernomen om je Android TV-apparaat te ontgrendelen. Je Android TV-apparaat wordt nu teruggezet op de fabrieksinstellingen."</string>
     <string name="kg_failed_attempts_now_wiping" product="default" msgid="5043730590446071189">"Je hebt <xliff:g id="NUMBER">%d</xliff:g> keer geprobeerd de telefoon op een onjuiste manier te ontgrendelen. De fabrieksinstellingen worden nu hersteld op de telefoon."</string>
     <string name="kg_failed_attempts_almost_at_login" product="tablet" msgid="7086799295109717623">"Je hebt je ontgrendelingspatroon <xliff:g id="NUMBER_0">%1$d</xliff:g> keer onjuist getekend. Na nog eens <xliff:g id="NUMBER_1">%2$d</xliff:g> mislukte pogingen wordt u gevraagd je tablet te ontgrendelen via een e-mailaccount.\n\n Probeer het over <xliff:g id="NUMBER_2">%3$d</xliff:g> seconden opnieuw."</string>
-    <string name="kg_failed_attempts_almost_at_login" product="tv" msgid="4670840383567106114">"Je hebt je ontgrendelingspatroon <xliff:g id="NUMBER_0">%1$d</xliff:g> keer onjuist getekend. Na nog eens <xliff:g id="NUMBER_1">%2$d</xliff:g> mislukte pogingen word je gevraagd je Android TV-apparaat te ontgrendelen via een e-mailaccount.\n\n Probeer het over <xliff:g id="NUMBER_2">%3$d</xliff:g> seconden opnieuw."</string>
+    <string name="kg_failed_attempts_almost_at_login" product="tv" msgid="4670840383567106114">"Je hebt je ontgrendelingspatroon <xliff:g id="NUMBER_0">%1$d</xliff:g> keer onjuist getekend. Na nog eens <xliff:g id="NUMBER_1">%2$d</xliff:g> mislukte pogingen wordt je gevraagd je Android TV-apparaat te ontgrendelen via een e-mailaccount.\n\n Probeer het over <xliff:g id="NUMBER_2">%3$d</xliff:g> seconden opnieuw."</string>
     <string name="kg_failed_attempts_almost_at_login" product="default" msgid="5270861875006378092">"Je hebt je ontgrendelingspatroon <xliff:g id="NUMBER_0">%1$d</xliff:g> keer onjuist getekend. Na nog eens <xliff:g id="NUMBER_1">%2$d</xliff:g> mislukte pogingen wordt u gevraagd je telefoon te ontgrendelen via een e-mailaccount.\n\n Probeer het over <xliff:g id="NUMBER_2">%3$d</xliff:g> seconden opnieuw."</string>
     <string name="kg_text_message_separator" product="default" msgid="4503708889934976866">" — "</string>
     <string name="kg_reordering_delete_drop_target_text" msgid="2034358143731750914">"Verwijderen"</string>
@@ -1829,6 +1834,7 @@
     <string name="accessibility_shortcut_label_gesture" msgid="7987298674836890931">"gebaar"</string>
     <string name="accessibility_shortcut_label_quick_settings" msgid="6851280333772213611">"snelle instellingen"</string>
     <string name="accessibility_shortcut_label_triple_tap" msgid="9058975959054454796">"3 keer tikken"</string>
+    <string name="accessibility_shortcut_label_top_row_key" msgid="1488840908672437180">"toegankelijkheidstoets"</string>
     <string name="accessibility_uncheck_legacy_item_warning" msgid="8047830891064817447">"<xliff:g id="SERVICE_NAME">%s</xliff:g> is uitgezet"</string>
     <string name="edit_accessibility_shortcut_menu_button" msgid="8885752738733772935">"Snelkoppelingen bewerken"</string>
     <string name="done_accessibility_shortcut_menu_button" msgid="3668407723770815708">"Klaar"</string>
@@ -2105,6 +2111,7 @@
     <string name="app_suspended_default_message" msgid="6451215678552004172">"<xliff:g id="APP_NAME_0">%1$s</xliff:g> is nu niet beschikbaar. Dit wordt beheerd door <xliff:g id="APP_NAME_1">%2$s</xliff:g>."</string>
     <string name="app_suspended_more_details" msgid="211260942831587014">"Meer info"</string>
     <string name="app_suspended_unsuspend_message" msgid="1665438589450555459">"App niet meer onderbreken"</string>
+    <string name="locked_app_biometric_prompt_description" msgid="6853122652400451464">"<xliff:g id="APP_NAME">%1$s</xliff:g> is vergrendeld"</string>
     <string name="work_mode_off_title" msgid="6367463960165135829">"Werk-apps hervatten?"</string>
     <string name="work_mode_turn_on" msgid="5316648862401307800">"Hervatten"</string>
     <string name="work_mode_emergency_call_button" msgid="6818855962881612322">"Noodgeval"</string>
@@ -2544,6 +2551,8 @@
     <string name="accessibility_label_clone_profile" msgid="7579118375042398784">"Kloon"</string>
     <string name="accessibility_label_communal_profile" msgid="1437173163111334791">"Gemeenschappelijk"</string>
     <string name="private_space_biometric_prompt_title" msgid="5777592909271728154">"Privégedeelte"</string>
+    <string name="app_locked_new_notification" msgid="4409730436247596215">"Nieuwe melding"</string>
+    <string name="app_locked_notification_message" msgid="4576179600328065280">"Nieuw bericht"</string>
     <string name="redacted_notification_message" msgid="1520587845842228816">"Content van gevoelige meldingen verborgen"</string>
     <string name="redacted_notification_action_title" msgid="6942924973335920935"></string>
     <string name="screen_not_shared_sensitive_content" msgid="7058419185079565001">"Vanwege beveiligingsrisico\'s is app-content verborgen voor scherm delen"</string>

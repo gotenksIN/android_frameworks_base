@@ -3,23 +3,6 @@ container: "system"
 
 # NOTE: Keep alphabetized to help limit merge conflicts from multiple simultaneous editors.
 flag {
-    name: "accessibility_debug_log_base_on_prop"
-    namespace: "accessibility"
-    description: "Enable/Disable debug log by setting property. Support per file LOG_TAG or all files by using TAG AccessibilityLogUtil"
-    bug: "438268325"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "cleanup_a11y_overlays"
-    namespace: "accessibility"
-    description: "Removes all attached accessibility overlays when a service is removed."
-    bug: "271490102"
-}
-
-flag {
     name: "enable_autoclick_for_connected_displays"
     namespace: "accessibility"
     description: "Fix autoclick to work with connected displays."
@@ -79,38 +62,10 @@ flag {
 }
 
 flag {
-    name: "enable_low_vision_generic_feedback"
-    namespace: "accessibility"
-    description: "Use generic feedback for low vision."
-    bug: "398736573"
-}
-
-flag {
-    name: "enable_low_vision_hats"
-    namespace: "accessibility"
-    description: "Use HaTS for low vision feedback."
-    bug: "397794341"
-}
-
-flag {
-    name: "enable_magnification_follows_mouse_with_pointer_motion_filter"
-    namespace: "accessibility"
-    description: "Whether to enable mouse following using pointer motion filter"
-    bug: "361817142"
-}
-
-flag {
     name: "enable_magnification_joystick"
     namespace: "accessibility"
     description: "Whether to enable joystick controls for magnification"
     bug: "297211257"
-}
-
-flag {
-    name: "enable_magnification_multiple_finger_multiple_tap_gesture"
-    namespace: "accessibility"
-    description: "Whether to enable multi-finger-multi-tap gesture for magnification"
-    bug: "257274411"
 }
 
 flag {
@@ -121,10 +76,10 @@ flag {
 }
 
 flag {
-    name: "enable_magnification_ui_for_fullscreen_only_capability"
+    name: "enable_magnification_rebased_delayed_motion_event"
     namespace: "accessibility"
-    description: "Whether to enable magnification UI for fullscreen only capability"
-    bug: "363166354"
+    description: "Whether to dispatch rebased MotionEvents for Magnification delayed events to fix timestamp synchronization issues"
+    bug: "279211403"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -165,16 +120,6 @@ flag {
 }
 
 flag {
-    name: "magnification_connection_approves_system_user"
-    namespace: "accessibility"
-    description: "Adds special case to automatically approve the system user when requesting connection"
-    bug: "402109095"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "manager_lifecycle_user_change"
     namespace: "accessibility"
     description: "Use A11yManagerService's Lifecycle to change users, instead of listening for user changed events."
@@ -184,6 +129,24 @@ flag {
     }
 }
 
+flag {
+    name: "pass_through_unprocessed_motion_events"
+    namespace: "accessibility"
+    description: "Fixes screen freeze by passing through motion events that AccessibilityInputFilter declines to process (e.g. during mid-gesture feature enables)."
+    bug: "397138372"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+flag {
+    name: "send_a11y_action_cancel_on_reset"
+    namespace: "accessibility"
+    description: "Sends ACTION_CANCEL to InputDispatcher when AccessibilityInputFilter resets with active pointers to prevent state desynchronization."
+    bug: "433890873"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
 
 flag {
     name: "send_a11y_events_based_on_state"
@@ -193,18 +156,18 @@ flag {
 }
 
 flag {
-    name: "shell_command_enforce_permission"
-    namespace: "accessibility"
-    description: "Adds a permission check to 'cmd accessibility' shell command"
-    bug: "227200331"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "type_speech_state_change_allowed"
     namespace: "accessibility"
     description: "Allow global dispatch for TYPE_SPEECH_STATE_CHANGE"
     bug: "444032233"
+}
+
+flag {
+    name: "use_state_for_action_up_injection"
+    namespace: "accessibility"
+    description: "Uses the current injected pointer state from mState as the source of truth for the pointer bitmask when sending ACTION_UP, preventing injection failures."
+    bug: "445338326"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }

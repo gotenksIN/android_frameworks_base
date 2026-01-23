@@ -2189,7 +2189,7 @@ public class NotificationStackScrollLayoutController implements Dumpable {
             boolean swipeWantsIt = false;
             if (mLongPressedView == null && !mView.isBeingDragged()
                     && !mView.isExpandingNotification()
-                    && !mView.getExpandedNotificationInThisMotion()
+                    && !mView.getExpandedInThisMotion()
                     && !lockscreenExpandWantsIt
                     && !mView.getOnlyScrollingInThisMotion()
                     && !mView.getDisallowDismissInThisMotion()
@@ -2243,8 +2243,8 @@ public class NotificationStackScrollLayoutController implements Dumpable {
                 boolean wasExpandingBefore = expandingNotification;
                 expandWantsIt = expandHelper.onTouchEvent(ev);
                 expandingNotification = mView.isExpandingNotification();
-                if (mView.getExpandedNotificationInThisMotion() && !expandingNotification
-                        && wasExpandingBefore && !mView.getDisallowScrollingInThisMotion()) {
+                if (mView.getExpandedInThisMotion() && !expandingNotification && wasExpandingBefore
+                        && !mView.getDisallowScrollingInThisMotion()) {
                     // Finish expansion here, as this gesture will be marked to be sent to
                     // scene container
                     if (SceneContainerFlag.isEnabled() && !isCancelOrUp) {
@@ -2269,7 +2269,7 @@ public class NotificationStackScrollLayoutController implements Dumpable {
             if (mLongPressedView == null && !mView.isBeingDragged()
                     && !expandingNotification
                     && !lockscreenExpandWantsIt
-                    && !mView.getExpandedNotificationInThisMotion()
+                    && !mView.getExpandedInThisMotion()
                     && !onlyScrollingInThisMotion
                     && !mView.getDisallowDismissInThisMotion()) {
                 horizontalSwipeWantsIt = mSwipeHelper.onTouchEvent(ev);
@@ -2281,10 +2281,10 @@ public class NotificationStackScrollLayoutController implements Dumpable {
             }
             boolean hunWantsIt = false;
             if (shouldHeadsUpHandleTouch()) {
+                // hunWantsIt means that the hun would like to keep listening to the rest of gesture
+                // this is different to: the HUN claims the gesture and marks NSSL as being dragged
+                // right away.
                 hunWantsIt = mHeadsUpTouchHelper.onTouchEvent(ev);
-                if (hunWantsIt) {
-                    mView.startDraggingOnHun();
-                }
             }
 
             // Check if we need to clear any snooze leavebehinds

@@ -40,7 +40,6 @@ import static com.android.internal.accessibility.common.ShortcutConstants.UserSh
 import static com.android.internal.accessibility.common.ShortcutConstants.UserShortcutType.SOFTWARE;
 import static com.android.internal.accessibility.common.ShortcutConstants.UserShortcutType.TOP_ROW_KEY;
 import static com.android.internal.accessibility.common.ShortcutConstants.UserShortcutType.TRIPLETAP;
-import static com.android.internal.accessibility.common.ShortcutConstants.UserShortcutType.TWOFINGER_DOUBLETAP;
 import static com.android.server.accessibility.AccessibilityUserState.doesShortcutTargetsStringContain;
 
 import static com.google.common.truth.Truth.assertThat;
@@ -201,7 +200,6 @@ public class AccessibilityUserStateTest {
         mUserState.setTargetAssignedToAccessibilityButton(componentNameString);
         mUserState.setTouchExplorationEnabledLocked(true);
         mUserState.setMagnificationSingleFingerTripleTapEnabledLocked(true);
-        mUserState.setMagnificationTwoFingerTripleTapEnabledLocked(true);
         mUserState.setAutoclickEnabledLocked(true);
         mUserState.setUserNonInteractiveUiTimeoutLocked(30);
         mUserState.setUserInteractiveUiTimeoutLocked(30);
@@ -229,7 +227,6 @@ public class AccessibilityUserStateTest {
         assertNull(mUserState.getTargetAssignedToAccessibilityButton());
         assertFalse(mUserState.isTouchExplorationEnabledLocked());
         assertFalse(mUserState.isMagnificationSingleFingerTripleTapEnabledLocked());
-        assertFalse(mUserState.isMagnificationTwoFingerTripleTapEnabledLocked());
         assertFalse(mUserState.isAutoclickEnabledLocked());
         assertEquals(0, mUserState.getUserNonInteractiveUiTimeoutLocked());
         assertEquals(0, mUserState.getUserInteractiveUiTimeoutLocked());
@@ -454,6 +451,25 @@ public class AccessibilityUserStateTest {
         assertFalse(isShortcutTargetPermitted);
     }
 
+    @Test
+    @EnableFlags(android.security.Flags.FLAG_EXTEND_AAPM_TO_A11Y_SERVICES)
+    public void isShortcutTargetPermittedLocked_nullDpm_returnsFalse() {
+        // Setup: Add an installed service to the user state.
+        List<AccessibilityServiceInfo> installedServices = new ArrayList<>(
+                mUserState.getInstalledServices());
+        installedServices.add(mMockServiceInfo);
+        mUserState.buildInstalledServicesMapLocked(installedServices);
+        // Setup: DevicePolicyManager is not available.
+        when(mMockContext.getSystemService(Context.DEVICE_POLICY_SERVICE)).thenReturn(null);
+
+        // Action: Check if the service is permitted as a shortcut target.
+        boolean isShortcutTargetPermitted = mUserState.isShortcutTargetPermittedLocked(
+                COMPONENT_NAME.flattenToString(), USER_ID);
+
+        // Assertion: Should be false, as a null DPM is treated as an empty permitted list.
+        assertFalse(isShortcutTargetPermitted);
+    }
+
 
     @Test
     public void isShortcutTargetInstalledLocked_invalidTarget_returnFalse() {
@@ -636,7 +652,7 @@ public class AccessibilityUserStateTest {
     @Test
     public void getShortcutTargetsLocked_returnsCorrectTargets() {
         for (int shortcutType : ShortcutConstants.USER_SHORTCUT_TYPES) {
-            if (((TRIPLETAP | TWOFINGER_DOUBLETAP) & shortcutType) == shortcutType) {
+            if ((TRIPLETAP & shortcutType) == shortcutType) {
                 continue;
             }
             Set<String> expectedSet = Set.of(ShortcutUtils.convertToKey(shortcutType));
@@ -684,8 +700,6 @@ public class AccessibilityUserStateTest {
             @UserShortcutType int shortcutType, boolean enabled) {
         if (shortcutType == TRIPLETAP) {
             mUserState.setMagnificationSingleFingerTripleTapEnabledLocked(enabled);
-        } else if (shortcutType == TWOFINGER_DOUBLETAP) {
-            mUserState.setMagnificationTwoFingerTripleTapEnabledLocked(enabled);
         } else {
             mUserState.updateShortcutTargetsLocked(
                     enabled ? Set.of(MAGNIFICATION_CONTROLLER_NAME) : Set.of(), shortcutType);

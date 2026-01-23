@@ -44,6 +44,7 @@ import android.window.WindowContainerToken
 import android.window.WindowContainerTransaction
 import androidx.test.filters.SmallTest
 import com.android.internal.jank.InteractionJankMonitor
+import com.android.testing.wm.util.StubTransaction
 import com.android.window.flags.Flags
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer
 import com.android.wm.shell.ShellTestCase
@@ -59,13 +60,13 @@ import com.android.wm.shell.desktopmode.compatui.SystemModalsTransitionHandler
 import com.android.wm.shell.desktopmode.data.DesktopRepository
 import com.android.wm.shell.desktopmode.desktopwallpaperactivity.DesktopWallpaperActivityTokenProvider
 import com.android.wm.shell.desktopmode.multidesks.DeskSwitchTransitionHandler
+import com.android.wm.shell.desktopmode.multidesks.DesksController
 import com.android.wm.shell.desktopmode.multidesks.DesksOrganizer
 import com.android.wm.shell.desktopmode.multidesks.DesksTransitionObserver
 import com.android.wm.shell.freeform.FreeformTaskTransitionHandler
 import com.android.wm.shell.sysui.ShellInit
 import com.android.wm.shell.transition.Transitions
 import com.android.wm.shell.transition.Transitions.TransitionFinishCallback
-import com.android.wm.shell.util.StubTransaction
 import com.google.common.truth.Truth.assertThat
 import java.util.Optional
 import org.junit.Assert.assertFalse
@@ -74,7 +75,6 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.Mock
 import org.mockito.Mockito
 import org.mockito.Mockito.verify
@@ -136,6 +136,7 @@ class DesktopMixedTransitionHandlerTest : ShellTestCase() {
                 context = context,
                 desktopUserRepositories = userRepositories,
                 desksOrganizer = mock(),
+                desksController = mock(),
                 desktopWallpaperActivityTokenProvider = mock(),
                 displayController = mock(),
                 clientFullscreenRequestController = Optional.empty(),
@@ -650,7 +651,6 @@ class DesktopMixedTransitionHandlerTest : ShellTestCase() {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_FORCE_CLOSE_TOP_TRANSPARENT_FULLSCREEN_TASK)
     fun startAndAnimateLaunchTransition_withClosingTopTransTask_callsModalsTransitionHandler() {
         val launchingTask = createTask(WINDOWING_MODE_FREEFORM)
         val closingTopTransparentTask = createTask(WINDOWING_MODE_FULLSCREEN)
@@ -923,6 +923,7 @@ class DesktopMixedTransitionHandlerTest : ShellTestCase() {
         context: Context,
         desktopUserRepositories: DesktopUserRepositories,
         desksOrganizer: DesksOrganizer,
+        desksController: DesksController,
         desktopWallpaperActivityTokenProvider: DesktopWallpaperActivityTokenProvider,
         displayController: DisplayController,
         clientFullscreenRequestController: Optional<ClientFullscreenRequestController>,
@@ -932,6 +933,7 @@ class DesktopMixedTransitionHandlerTest : ShellTestCase() {
             context,
             desktopUserRepositories,
             desksOrganizer,
+            desksController,
             desktopWallpaperActivityTokenProvider,
             displayController,
             clientFullscreenRequestController,

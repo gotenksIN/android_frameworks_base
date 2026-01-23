@@ -3,16 +3,6 @@ container: "system"
 
 # go/keep-sorted start block=yes newline_separated=yes by_regex=name:\s*"([^"]+)"
 flag {
-    name: "activity_starter_display_aware"
-    namespace: "systemui"
-    description: "Fix non display aware calls in ActivityStarter"
-    bug: "432402434"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "ambient_cue_plugin"
     namespace: "ailabs"
     description: "Enable plugin for ambient cue project"
@@ -27,6 +17,16 @@ flag {
   metadata {
     purpose: PURPOSE_BUGFIX
   }
+}
+
+flag {
+    name: "animation_library_atomic_listeners"
+    namespace: "systemui"
+    description: "Better atomicity enforcement for Animation Library listeners."
+    bug: "468224528"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -55,6 +55,16 @@ flag {
   namespace: "systemui"
   description: "Enables Backlinks improvement feature in App Clips"
   bug: "300307759"
+}
+
+flag {
+    name: "av_controls_chip_per_display"
+    namespace: "systemui"
+    description: "Makes Av Controls Chip related code per display."
+    bug: "433653329"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -107,6 +117,16 @@ flag {
 }
 
 flag {
+    name: "broadcast_dispatcher_custom_executor"
+    namespace: "systemui"
+    description: "Default BroadcastDispatcher to use a custom executor instead of main executor"
+    bug: "466355597"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "captions_toggle_in_volume_dialog_v1"
     namespace: "systemui"
     description: "Bring the captions toggle back to the volume rocker."
@@ -141,13 +161,6 @@ flag {
     metadata {
         purpose: PURPOSE_BUGFIX
     }
-}
-
-flag {
-    name: "clock_fidget_animation"
-    namespace: "systemui"
-    description: "Enables the clock fidget animation"
-    bug: "364664389"
 }
 
 flag {
@@ -317,6 +330,16 @@ flag {
 }
 
 flag {
+  name: "display_aware_shade_controller_impl"
+  namespace: "systemui"
+  description: "Make ShadeControllerImpl display aware"
+  bug: "444658034"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
     name: "do_not_use_immediate_coroutine_dispatcher"
     namespace: "systemui"
     description: "Uses the Main coroutine dispatcher (not immediate) when enabled"
@@ -451,6 +474,13 @@ flag {
    namespace: "systemui"
    description: "Enables the growth framework for desktop."
    bug: "416287338"
+}
+
+flag {
+    name: "enable_dialog_spring_animation"
+    namespace: "systemui"
+    description: "Adding Spring Animation to dialog"
+    bug: "446828194"
 }
 
 flag {
@@ -605,16 +635,6 @@ flag {
     namespace: "systemui"
     description: "Extends the on-screen display duration for HUNs when a mouse is detected."
     bug: "456554989"
-}
-
-flag {
-   name: "face_scanning_animation_npe_fix"
-   namespace: "systemui"
-   description: "Fix for the face scanning animation NPE"
-   bug: "392032258"
-   metadata {
-       purpose: PURPOSE_BUGFIX
-   }
 }
 
 flag {
@@ -1285,20 +1305,20 @@ flag {
 }
 
 flag {
+    name: "optimize_flow_map_operators"
+    namespace: "systemui"
+    description: "Use map instead of mapLatest for non-suspend flow transformations"
+    bug: "466952109"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
    name: "override_suppress_overlay_condition"
    namespace: "systemui"
    description: "Allow override the conditions to suppress the clipboard overlay"
    bug: "358473717"
-}
-
-flag {
-   name: "per_display_ongoing_call_status_bar_visibility"
-   namespace: "systemui"
-   description: "Adds per display implementation for the logic of whether the status bar should be visible for ongoing calls."
-   bug: "433704306"
-   metadata {
-     purpose: PURPOSE_BUGFIX
-   }
 }
 
 flag {
@@ -1323,15 +1343,6 @@ flag {
 }
 
 flag {
-    name: "promote_notifications_automatically"
-    namespace: "systemui"
-    description: "Flag to automatically turn certain notifications into promoted notifications so "
-        " we can test promoted notifications with teamfooders. This flag should *never* be released "
-        "to trunkfood or nextfood."
-    bug: "367705002"
-}
-
-flag {
    name: "pss_task_switcher"
    namespace: "systemui"
    description: "Enable the task switcher feature for partial screen sharing"
@@ -1339,10 +1350,20 @@ flag {
 }
 
 flag {
-    name: "qs_edit_mode_v2"
+    name: "qr_code_scanner_intent_action"
     namespace: "systemui"
-    description: "Updates the removal process of tiles and improves tiles selection."
-    bug: "438943936"
+    description: "Adds an intent action to the intent used to launch the QR code scanner from the quick settings tile."
+    bug: "461701811"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "qs_delete_uninstalled_tile_service"
+    namespace: "systemui"
+    description: "When a TileService package is uninstalled, remove the tile completely and all associated data."
+    bug: "362234193"
     metadata {
       purpose: PURPOSE_BUGFIX
     }
@@ -1400,6 +1421,13 @@ flag {
 }
 
 flag {
+    name: "qs_split_internet_tile_rw"
+    namespace: "systemui"
+    description: "Splits the Internet tile into Wifi (with internet info) + Mobile Data. Read/write"
+    bug: "201143076"
+}
+
+flag {
     name: "qs_tile_detailed_view"
     namespace: "systemui"
     description: "Enables the tile detailed view UI."
@@ -1415,9 +1443,9 @@ flag {
 
 flag {
     name: "qs_wifi_config"
-    namespace: "desktop_connectivity"
+    namespace: "systemui"
     description: "Enables the multi-user WiFi configuration UI in Interent detailed tiles. This flag depends on qs_tile_detailed_view flag"
-    bug: "406548883"
+    bug: "402214828"
 }
 
 flag {
@@ -1435,16 +1463,6 @@ flag {
    metadata {
      purpose: PURPOSE_BUGFIX
    }
-}
-
-flag {
-  name: "remove_dream_overlay_hide_on_touch"
-  namespace: "systemui"
-  description: "Removes logic to hide the dream overlay on user interaction, as it conflicts with various transitions"
-  bug: "329091030"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
 }
 
 flag {
@@ -1523,6 +1541,16 @@ flag {
 }
 
 flag {
+    name: "screenshot_disable_long_screenshot_for_system_shade"
+    namespace: "systemui"
+    description: "Disable long screenshot when the system shade is expanded."
+    bug: "457677963"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "screenshot_dismissal_spring"
     namespace: "systemui"
     description: "Use a spring animator for screenshot dismissal, fade out after const distance"
@@ -1554,16 +1582,6 @@ flag {
   metadata {
     purpose: PURPOSE_BUGFIX
   }
-}
-
-flag {
-    name: "shade_app_launch_animation_skip_in_desktop"
-    namespace: "systemui"
-    description: "Fixes the animation for notification shade entry points in Desktop Mode"
-    bug: "383061244"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -1625,16 +1643,6 @@ flag {
 }
 
 flag {
-   name: "sim_next_sub_id"
-   namespace: "systemui"
-   description: "Update for determining the next SIM subscription ID for a given state"
-   bug: "410750970"
-   metadata {
-        purpose: PURPOSE_BUGFIX
-   }
-}
-
-flag {
    name: "sim_pin_bouncer_reset"
    namespace: "systemui"
    description: "The SIM PIN bouncer does not close after unlocking"
@@ -1659,16 +1667,6 @@ flag {
    namespace: "systemui"
    description: "Relocate Smartspace to bottom of the Lock Screen"
    bug: "316212788"
-}
-
-flag {
-    name: "smartspace_swipe_event_logging_fix"
-    namespace: "systemui"
-    description: "Log card swipe events in smartspace"
-    bug: "374150422"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-   }
 }
 
 flag {
@@ -1706,13 +1704,6 @@ flag {
 }
 
 flag {
-    name: "split_show_passwords_to_touch_and_physical"
-    namespace: "systemui"
-    description: "Splits the 'Show passwords' setting into two new settings: one for touch inputs and one for physical inputs."
-    bug: "417951523"
-}
-
-flag {
     name: "stabilize_heads_up_group_v2"
     namespace: "systemui"
     description: "Stabilize heads up groups in VisualStabilityCoordinator"
@@ -1745,16 +1736,6 @@ flag {
     namespace: "systemui"
     description: "Feature flag for the assistant icon in desktop status bar"
     bug: "440281094"
-}
-
-flag {
-    name: "status_bar_call_chip_use_is_hidden"
-    namespace: "systemui"
-    description: "Enables isHidden field for all call chips"
-    bug: "427747840"
-    metadata {
-       purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -1922,16 +1903,6 @@ flag {
 }
 
 flag {
-    name: "sysui_intrinsic_lock_dispatcher"
-    namespace: "systemui"
-    description: "Custom dispatcher for background tasks, which uses intrinsic locks instead of ReentrantLock"
-    bug: "419472502"
-    metadata {
-         purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "sysui_teamfood"
     namespace: "systemui"
     description: "Enables all the sysui classic flags that are marked as being in teamfood"
@@ -1967,11 +1938,10 @@ flag {
 }
 
 flag {
-    name: "use_aad_prox_sensor_if_present"
-    namespace: "systemui"
-    description: "Use AAD proximity sensor if flag is enabled and sensor is present"
-    bug: "402534470"
-    is_fixed_read_only: true
+  name: "use_android_ui_dispatcher"
+  namespace: "systemui"
+  description: "Use compose's AndroidUiDispatcher as default"
+  bug: "460414443"
 }
 
 flag {
@@ -1979,16 +1949,6 @@ flag {
     namespace: "permissions"
     description: "Use the views moved into system ui from the framework for the system selection toolbar."
     bug: "450977221"
-}
-
-flag {
-   name: "user_encrypted_source"
-   namespace: "systemui"
-   description: "Get rid of the local cache and rely on UserManager.isUserUnlocked directly to determine whether user CE storage is encrypted."
-   bug: "333656491"
-   metadata {
-        purpose: PURPOSE_BUGFIX
-   }
 }
 
 flag {

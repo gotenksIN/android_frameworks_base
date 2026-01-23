@@ -19,14 +19,18 @@ package com.android.systemui.statusbar.quickactions.av.domain.interactor
 import android.Manifest
 import android.app.AppOpsManager
 import android.app.IActivityManager
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.drawable.Drawable
 import android.hardware.SensorPrivacyManager
 import android.os.UserHandle
 import android.permission.PermissionManager
+import com.android.systemui.Flags
 import com.android.systemui.dagger.qualifiers.Background
+import com.android.systemui.plugins.ActivityStarter
 import com.android.systemui.privacy.PrivacyType
 import com.android.systemui.shade.data.repository.PrivacyChipRepository
+import com.android.systemui.statusbar.data.repository.StatusBarModePerDisplayRepository
 import com.android.systemui.statusbar.data.repository.StatusBarModeRepositoryStore
 import com.android.systemui.statusbar.notification.row.icon.AppIconProvider
 import com.android.systemui.statusbar.policy.IndividualSensorPrivacyController
@@ -35,6 +39,9 @@ import com.android.systemui.statusbar.quickactions.av.shared.model.Sensor
 import com.android.systemui.statusbar.quickactions.av.shared.model.SensorAccess
 import com.android.systemui.statusbar.quickactions.av.shared.model.SensorActivityModel
 import com.android.systemui.user.domain.interactor.SelectedUserInteractor
+import dagger.assisted.Assisted
+import dagger.assisted.AssistedFactory
+import dagger.assisted.AssistedInject
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
@@ -46,6 +53,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
@@ -76,7 +84,14 @@ interface AvControlsChipInteractor {
 
     abstract fun setMicrophoneBlocked(value: Boolean)
 
+    /** Closes the app identified by the package name. */
     abstract fun closeApp(packageName: String)
+
+    /** Opens permission settings for the app identified by the package name. */
+    abstract fun manageApp(packageName: String)
+
+    /** Opens the privacy dashboard settings page. */
+    abstract fun openPrivacyDashboard()
 }
 
 /**
@@ -94,12 +109,17 @@ class NoOpAvControlsChipInteractor @Inject constructor() : AvControlsChipInterac
     override fun setMicrophoneBlocked(value: Boolean) {}
 
     override fun closeApp(packageName: String) {}
+
+    override fun manageApp(packageName: String) {}
+
+    override fun openPrivacyDashboard() {}
 }
 
 class AvControlsChipInteractorImpl
-@Inject
+@AssistedInject
 constructor(
-    @Background private val backgroundScope: CoroutineScope,
+    @Assisted private val backgroundScope: CoroutineScope,
+    @Assisted private val displayId: Int,
     @Background private val bgDispatcher: CoroutineDispatcher,
     privacyChipRepository: PrivacyChipRepository,
     statusBarModeRepositoryStore: StatusBarModeRepositoryStore,
@@ -110,7 +130,13 @@ constructor(
     private val appIconProvider: AppIconProvider,
     private val appOpsManager: AppOpsManager,
     private val activityManager: IActivityManager,
+    private val activityStarter: ActivityStarter,
 ) : AvControlsChipInteractor {
+
+    @AssistedFactory
+    fun interface Factory {
+        fun create(backgroundScope: CoroutineScope, displayId: Int): AvControlsChipInteractorImpl
+    }
 
     private data class BlockedSensorInfo(
         val cameraBlocked: Boolean = false,
@@ -288,8 +314,18 @@ constructor(
                     AvControlsChipModel(sensorActivityModel = SensorActivityModel.Inactive),
             )
 
+    private val statusBarModePerDisplayRepository: StatusBarModePerDisplayRepository? =
+        if (Flags.avControlsChipPerDisplay()) {
+            statusBarModeRepositoryStore.forDisplay(displayId)
+        } else {
+            statusBarModeRepositoryStore.defaultDisplay
+        }
+
+    private val isStatusBarModeFullScreen: Flow<Boolean> =
+        statusBarModePerDisplayRepository?.isInFullscreenMode ?: flowOf(false)
+
     override val isShowingAvChip: StateFlow<Boolean> =
-        combine(model, statusBarModeRepositoryStore.defaultDisplay.isInFullscreenMode) {
+        combine(model, isStatusBarModeFullScreen) {
                 chipModel: AvControlsChipModel,
                 isInFullscreenMode: Boolean ->
                 when (chipModel.sensorActivityModel) {
@@ -323,6 +359,21 @@ constructor(
     override fun closeApp(packageName: String) {
         backgroundScope.launch {
             activityManager.stopAppForUser(packageName, selectedUserInteractor.getSelectedUserId())
+        }
+    }
+
+    override fun manageApp(packageName: String) {
+        val userId = selectedUserInteractor.getSelectedUserId()
+        val navigationIntent = Intent(android.provider.Settings.ACTION_APP_PERMISSIONS_SETTINGS)
+        navigationIntent.putExtra(Intent.EXTRA_PACKAGE_NAME, packageName)
+        navigationIntent.putExtra(Intent.EXTRA_USER, UserHandle.of(userId))
+        backgroundScope.launch { activityStarter.startActivity(navigationIntent, true) }
+    }
+
+    override fun openPrivacyDashboard() {
+        backgroundScope.launch {
+            val navigationIntent = Intent(Intent.ACTION_REVIEW_PERMISSION_USAGE)
+            activityStarter.startActivity(navigationIntent, true)
         }
     }
 }

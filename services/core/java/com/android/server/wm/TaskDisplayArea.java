@@ -1058,6 +1058,15 @@ final class TaskDisplayArea extends DisplayArea<WindowContainer> {
                 });
                 return adjacentRootTask[0] != null ? adjacentRootTask[0] : launchRootTask;
             }
+            if (sourceTask != null && mLaunchRootTasks.get(i).contains(
+                    sourceTask.getWindowingMode(), sourceTask.getActivityType())) {
+                // Use the candidate's root task if it needs to preserve leaf tasks during a
+                // relaunch (e.g., Bubble relaunch from desktop).
+                final Task candidateRootTask = getPreservedRootTaskIfEnabled(candidateTask);
+                if (candidateRootTask != null) {
+                    return candidateRootTask;
+                }
+            }
         }
 
         // If a task is launching from a created-by-organizer task, it should be launched into the
@@ -1085,6 +1094,12 @@ final class TaskDisplayArea extends DisplayArea<WindowContainer> {
                 if (adjacentRootTask[0] != null) {
                     return adjacentRootTask[0];
                 }
+                // Use the candidate's root task instead of the source's if it needs to preserve
+                // leaf tasks during a relaunch (e.g., Bubble relaunch from split-screen).
+                final Task candidateRootTask = getPreservedRootTaskIfEnabled(candidateTask);
+                if (candidateRootTask != null) {
+                    return candidateRootTask;
+                }
                 return sourceTask.getCreatedByOrganizerTask();
             }
             if (com.android.window.flags.Flags.enableBubbleRootTask()) {
@@ -1095,6 +1110,24 @@ final class TaskDisplayArea extends DisplayArea<WindowContainer> {
             }
         }
 
+        return null;
+    }
+
+    /**
+     * Returns the root task of the given {@code task} if leaf preservation is enabled.
+     *
+     * <p>This method checks the root task of the given {@code task}. If that root
+     * exists and has {@code mPreserveLeafTaskIfRelaunch} set to true, it is returned.
+     * This allows the caller to prioritize the existing root structure over the source's,
+     * preventing leaf tasks from being unexpectedly reparented during a relaunch.
+     */
+    @Nullable
+    private static Task getPreservedRootTaskIfEnabled(@Nullable Task task) {
+        final Task rootTask = task != null ? task.getCreatedByOrganizerTask() : null;
+        if (com.android.window.flags.Flags.enablePreserveLeafTaskIfRelaunch()
+                && rootTask != null && rootTask.mPreserveLeafTaskIfRelaunch) {
+            return rootTask;
+        }
         return null;
     }
 
@@ -1246,7 +1279,7 @@ final class TaskDisplayArea extends DisplayArea<WindowContainer> {
     }
 
     /**
-     * Returns whether the {@param windowingMode} is supported.
+     * Returns whether the {@code windowingMode} is supported.
      * @param windowingMode The windowing mode to check for.
      * @return Whether this windowing mode is supported.
      */
@@ -1257,7 +1290,7 @@ final class TaskDisplayArea extends DisplayArea<WindowContainer> {
     }
 
     /**
-     * Returns true if the {@param windowingMode} is supported based on other parameters passed in.
+     * Returns true if the {@code windowingMode} is supported based on other parameters passed in.
      *
      * @param windowingMode       The windowing mode we are checking support for.
      * @param supportsMultiWindow If we should consider support for multi-window mode in general.
@@ -1592,8 +1625,8 @@ final class TaskDisplayArea extends DisplayArea<WindowContainer> {
     }
 
     /**
-     * Moves the {@param rootTask} behind the given {@param behindRootTask} if possible. If
-     * {@param behindRootTask} is not currently in the display, then then the root task is moved
+     * Moves the {@code rootTask} behind the given {@code behindRootTask} if possible. If
+     * {@code behindRootTask} is not currently in the display, then then the root task is moved
      * to the back.
      */
     void moveRootTaskBehindRootTask(Task rootTask, Task behindRootTask) {
@@ -1623,8 +1656,8 @@ final class TaskDisplayArea extends DisplayArea<WindowContainer> {
     }
 
     /**
-     * @return the root task currently above the {@param rootTask}. Can be null if the
-     * {@param rootTask} is already top-most.
+     * @return the root task currently above the {@code rootTask}. Can be null if the
+     * {@code rootTask} is already top-most.
      */
     static Task getRootTaskAbove(Task rootTask) {
         final WindowContainer wc = rootTask.getParent();

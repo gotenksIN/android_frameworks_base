@@ -53,6 +53,7 @@ import com.android.systemui.common.shared.model.Icon as IconModel
 import com.android.systemui.common.shared.model.Icon
 import com.android.systemui.common.ui.compose.Icon
 import com.android.systemui.compose.modifiers.sysUiResTagContainer
+import com.android.systemui.compose.modifiers.sysuiResTag
 import com.android.systemui.lifecycle.rememberViewModel
 import com.android.systemui.media.controls.ui.controller.MediaHierarchyManager
 import com.android.systemui.media.controls.ui.view.MediaHost
@@ -71,8 +72,9 @@ import com.android.systemui.statusbar.phone.ui.TintedIconManager
 import com.android.systemui.statusbar.pipeline.battery.ui.composable.UnifiedBattery
 import com.android.systemui.statusbar.pipeline.battery.ui.viewmodel.BatteryViewModel
 import com.android.systemui.statusbar.pipeline.shared.ui.viewmodel.HomeStatusBarViewModel
+import com.android.systemui.statusbar.quickactions.av.ui.viewmodel.AvControlsPopupViewModel
 import com.android.systemui.statusbar.quickactions.popups.StatusBarPopupChips
-import com.android.systemui.statusbar.quickactions.popups.ui.compose.StatusBarPopupChipsContainer
+import com.android.systemui.statusbar.quickactions.ui.compose.QuickActionChipsContainer
 import com.android.systemui.statusbar.systemstatusicons.SystemStatusIconsInCompose
 import com.android.systemui.statusbar.systemstatusicons.ui.compose.SystemStatusIcons
 import com.android.systemui.statusbar.systemstatusicons.ui.compose.SystemStatusIconsLegacy
@@ -98,6 +100,7 @@ fun DesktopStatusBar(
     iconManagerFactory: TintedIconManager.Factory,
     mediaHierarchyManager: MediaHierarchyManager,
     mediaViewModelFactory: MediaViewModel.Factory,
+    avControlsPopupViewModelFactory: AvControlsPopupViewModel.Factory,
     mediaHost: MediaHost,
     iconViewStore: NotificationIconContainerViewBinder.IconViewStore?,
     modifier: Modifier = Modifier,
@@ -161,13 +164,14 @@ fun DesktopStatusBar(
             }
 
             if (StatusBarPopupChips.isEnabled) {
-                StatusBarPopupChipsContainer(
+                QuickActionChipsContainer(
                     chips = viewModel.popupChips,
                     mediaViewModelFactory = mediaViewModelFactory,
                     mediaHost = mediaHost,
                     onMediaControlPopupVisibilityChanged = { popupShowing ->
                         mediaHierarchyManager.isMediaControlPopupShowing = popupShowing
                     },
+                    avControlsPopupViewModelFactory = avControlsPopupViewModelFactory,
                 )
             }
 
@@ -207,9 +211,10 @@ private fun NotificationsChip(viewModel: HomeStatusBarViewModel, modifier: Modif
 
         ShadeHighlightChip(
             modifier =
-                modifier.height(DesktopStatusBar.Dimensions.ChipHeight).semantics {
-                    this.contentDescription = contentDescription
-                },
+                modifier
+                    .height(DesktopStatusBar.Dimensions.ChipHeight)
+                    .semantics { this.contentDescription = contentDescription }
+                    .sysuiResTag("notificationIcons"),
             onClick = { viewModel.onNotificationIconChipClicked() },
             backgroundColor = chipHighlightModel.backgroundColor,
             hoverBackgroundColor = hoverColor,
@@ -266,7 +271,8 @@ private fun QuickSettingsChip(
             }
 
         ShadeHighlightChip(
-            modifier = modifier.height(DesktopStatusBar.Dimensions.ChipHeight),
+            modifier =
+                modifier.height(DesktopStatusBar.Dimensions.ChipHeight).sysuiResTag("statusIcons"),
             onClick = { viewModel.onQuickSettingsChipClicked() },
             backgroundColor = chipHighlightModel.backgroundColor,
             hoverBackgroundColor = hoverColor,

@@ -910,6 +910,7 @@
 
     <!-- Added in 26Q4 -->
     <protected-broadcast android:name="android.app.action.DYNAMIC_BUNDLE_MODIFIED" />
+    <protected-broadcast android:name="android.app.action.BRIDGED_NOTIFICATION_PREFERENCES" />
 
     <!-- ====================================================================== -->
     <!--                          RUNTIME PERMISSIONS                           -->
@@ -2448,9 +2449,10 @@
                 android:featureFlag="android.bluetooth.platform.flags.grant_permission_via_module_protection_level"
                 android:protectionLevel="signature|role|module" />
 
-    <!-- @hide Allows applications to register a NetworkAgent for its own use.
+    <!-- @SystemApi @hide Allows applications to register a NetworkAgent for its own use.
          <p>Such networks are not available to other applications on the device unless they have
          the CONNECTIVITY_USE_RESTRICTED_NETWORKS permission.
+         @FlaggedApi(android.net.platform.flags.Flags.FLAG_MAKE_APP_SPECIFIC_NETWORK_PERMISSION_API)
     -->
     <permission android:name="android.permission.CREATE_APP_SPECIFIC_NETWORK"
                 android:protectionLevel="signature|privileged"
@@ -2644,7 +2646,7 @@
          <p>A local network refers to an IP network that utilizes a broadcast-capable
          network interface, such as Wi-Fi or Ethernet, but excludes cellular (WWAN) or VPN
          connections.
-         @see https://developer.android.com/privacy-and-security/local-network-definition
+         @see <a href="https://developer.android.com/privacy-and-security/local-network-definition">Local Network Definition</a>
          @FlaggedApi(android.permission.flags.Flags.FLAG_ACCESS_LOCAL_NETWORK_PERMISSION_ENABLED)
          <p>Protection level: dangerous -->
     <permission android:name="android.permission.ACCESS_LOCAL_NETWORK"
@@ -2776,6 +2778,14 @@
     <permission android:name="android.permission.PERFORM_GESTURE_EXCHANGE"
          android:protectionLevel="signature|privileged"
          android:featureFlag="com.android.nfc.module.flags.tap_to_x"/>
+
+    <!-- @SystemApi Allows system application to provide a service for Tap-to-Share.
+         <p>Protection level: signature
+         @FlaggedApi(android.service.chooser.Flags.FLAG_TAP_TO_SHARE)
+         @hide -->
+    <permission android:name="android.permission.BIND_TO_TAP_TO_SHARE_SERVICE"
+         android:protectionLevel="signature"
+         android:featureFlag="android.service.chooser.tap_to_share"/>
 
     <!-- @SystemApi Allows an internal user to use privileged SecureElement APIs.
          Applications holding this permission can access OMAPI reset system API
@@ -3054,6 +3064,19 @@
         android:name="android.permission.READ_ASSIST_STRUCTURE_SCREEN_CONTENT"
         android:protectionLevel="normal"
         android:featureFlag="android.permission.flags.restrict_assist_structure_screen_content_enabled" />
+
+    <!-- Allows an application to manage voice interaction read screen context requests (e.g.
+        request denial count)
+
+        <p>Protection level: signature|installer
+        @FlaggedApi(android.permission.flags.Flags.FLAG_ASSIST_SETTINGS_PRIVACY_IMPROVEMENTS_ENABLED)
+        @SystemApi
+        @hide
+    -->
+    <permission
+        android:name="android.permission.MANAGE_READ_SCREEN_CONTEXT_REQUEST"
+        android:protectionLevel="signature|installer"
+        android:featureFlag="android.permission.flags.assist_settings_privacy_improvements_enabled" />
 
     <!-- ======================================== -->
     <!-- Permissions for factory reset protection -->
@@ -4628,7 +4651,7 @@
          for the embedded app to consent.
          <p>For now, this permission is only granted to the Assistant application selected by
          the user.
-         {@see https://developer.android.com/guide/topics/large-screens/activity-embedding#trust_model}
+         @see <a href="https://developer.android.com/guide/topics/large-screens/activity-embedding#trust_model">Activity Embedding: Trust Model</a>
          @SystemApi
          @FlaggedApi("com.android.window.flags.untrusted_embedding_any_app_permission")
          @hide
@@ -4817,8 +4840,8 @@
                 android:protectionLevel="normal" />
 
     <!-- Allows a companion app to start a foreground service from the background.
-         {@see android.Manifest.permission#REQUEST_COMPANION_RUN_IN_BACKGROUND}
          <p>Protection level: normal
+         @see android.Manifest.permission#REQUEST_COMPANION_RUN_IN_BACKGROUND
          -->
     <permission android:name="android.permission.REQUEST_COMPANION_START_FOREGROUND_SERVICES_FROM_BACKGROUND"
                 android:label="@string/permlab_startForegroundServicesFromBackground"
@@ -5672,9 +5695,9 @@
          "XR_ACTIVITY_START_MODE_FULL_SPACE_UNMANAGED") do not require
          this permission to get head tracking data.
 
-         {@see https://developer.android.com/develop/xr/get-started#property_activity_xr_start_mode_property}
-
          <p>Protection level: dangerous
+
+         @see <a href="https://developer.android.com/develop/xr/openxr/get-started#property_xr_activity_start_mode-property">PROPERTY_XR_ACTIVITY_START_MODE property</a>
 
          @FlaggedApi(android.xr.Flags.FLAG_XR_MANIFEST_ENTRIES) -->
     <permission android:name="android.permission.HEAD_TRACKING"
@@ -6107,6 +6130,17 @@
     <permission android:name="android.permission.BIND_COMPANION_DEVICE_SERVICE"
                 android:protectionLevel="signature" />
 
+    <!-- Must be required by {@link android.security.trusttoken.TrustTokenService}
+         to ensure that only the system can bind to it.
+         <p>Protection level: signature
+         @FlaggedApi(android.security.Flags.FLAG_TALISMAN_SERVICE_API)
+         @SystemApi
+         @hide -->
+    <permission
+        android:name="android.permission.BIND_TRUST_TOKEN_SERVICE"
+        android:protectionLevel="signature"
+        android:featureFlag="android.security.talisman_service_api" />
+
     <!-- @SystemApi Must be required by the RuntimePermissionPresenterService to ensure
          that only the system can bind to it.
          @hide -->
@@ -6343,9 +6377,11 @@
          permission KEYPHRASE_ENROLLMENT_APPLICATION. For the caller to enroll sound models with
          this permission, it must hold the permission and be the active VoiceInteractionService in
          the system.
-         {@see Settings.Secure.VOICE_INTERACTION_SERVICE}
-         @hide @SystemApi Intended for OEM and system apps.
+
          <p>Protection level: signature|privileged
+
+         @see Settings.Secure.VOICE_INTERACTION_SERVICE
+         @hide @SystemApi Intended for OEM and system apps.
     -->
     <permission android:name="android.permission.MANAGE_VOICE_KEYPHRASES"
         android:protectionLevel="signature|privileged" />
@@ -7198,12 +7234,12 @@
 
     <!--@SystemApi Allows control of audio behavior related to Assistant experiences, including
         routing, mode change and volume control of the Assistant audio stream.
-        <p>Protection level: signature|privileged|role
+        <p>Protection level: signature|role
         @FlaggedApi(android.media.audio.Flags.FLAG_MANAGE_ASSISTANT_AUDIO_PERMISSION)
         @hide -->
     <permission android:name="android.permission.MANAGE_ASSISTANT_AUDIO"
                 android:featureFlag="android.media.audio.manage_assistant_audio_permission"
-                android:protectionLevel="signature|privileged|role" />
+                android:protectionLevel="signature|role" />
 
     <!-- @SystemApi Allows an application to access the uplink and downlink audio of an ongoing
         call.
@@ -7774,12 +7810,12 @@
 
     <!-- @SystemApi @hide Allows an application to query domain verification.
          <p>Not for use by third-party applications.
-         @FlaggedApi(android.content.pm.Flags.FLAG_ENABLE_QUERY_DOMAIN_VERIFICATION)
+         @FlaggedApi(android.view.flags.Flags.FLAG_REDACT_WEB_OTP_SMS_API)
     -->
     <permission
         android:name="android.permission.QUERY_DOMAIN_VERIFICATION"
         android:protectionLevel="signature|module"
-        android:featureFlag="android.content.pm.enable_query_domain_verification" />
+        android:featureFlag="android.view.flags.redact_web_otp_sms_api" />
 
     <!-- @SystemApi Allows applications to access serial ports via the SerialManager.
          @hide -->
@@ -7851,8 +7887,7 @@
 
     <!-- @hide @SystemApi Allows an application running a foreground service to hide the
     notification icon from the status bar.
-    <p>Not for use by third-party applications.
-    @FlaggedApi(android.app.Flags.FLAG_HIDE_STATUS_BAR_NOTIFICATION)-->
+    <p>Not for use by third-party applications.-->
     <permission android:name="android.permission.HIDE_STATUS_BAR_NOTIFICATION"
         android:protectionLevel="signature|privileged"
         android:featureFlag="android.app.hide_status_bar_notification"/>
@@ -9063,6 +9098,19 @@
     <permission android:name="android.permission.LAUNCH_DEVICE_MANAGER_SETUP"
         android:protectionLevel="signature|role" />
 
+    <!-- @hide @SystemApi
+         @FlaggedApi(android.os.Flags.FLAG_INITIATE_BUGREPORT_AS_NON_ADMIN)
+         Allows a privileged app to initiate a bug report even when the active user is not an
+         admin user (e.g., a Guest or Secondary User). This is intended for use by designated
+         feedback applications on devices with specific multi-user configurations like HSUM.
+         <p>Protection level: signature|privileged
+         <p>Not for use by third-party applications.
+    -->
+    <permission
+        android:name="android.permission.INITIATE_BUGREPORT_AS_NON_ADMIN"
+        android:protectionLevel="signature|privileged"
+        android:featureFlag="android.os.initiate_bugreport_as_non_admin" />
+
     <!-- @SystemApi Allows an application to update certain device management related system
          resources.
          @hide -->
@@ -9193,7 +9241,7 @@
         navigating out of the application.
 
         <p> Protection level: normal
-        {@see android.view.WindowManager.LayoutParams#setKeyboardCaptureEnabled}
+        @see android.view.WindowManager.LayoutParams#setKeyboardCaptureEnabled
     -->
     <permission android:name="android.permission.CAPTURE_KEYBOARD"
         android:protectionLevel="normal"
@@ -9390,12 +9438,24 @@
     <!-- Allows an app use location button, which grants temporary location permission when a user
          clicks the button.
          <p>Protection level: normal
-         @FlaggedApi(android.widget.flags.Flags.FLAG_LOCATION_BUTTON_ENABLED)
+         @FlaggedApi(android.permission.flags.Flags.FLAG_LOCATION_BUTTON_ENABLED)
     -->
     <permission
         android:name="android.permission.USE_LOCATION_BUTTON"
         android:protectionLevel="normal"
-        android:featureFlag="android.widget.flags.location_button_enabled" />
+        android:featureFlag="android.permission.flags.location_button_enabled" />
+
+    <!-- @hide @SystemApi
+        Allows an application to start the location button consent activity in
+        PermissionController. This permission should only be held by the system component rendering
+        the location button.
+        <p>Protection level: signature
+        @FlaggedApi(android.permission.flags.Flags.FLAG_LOCATION_BUTTON_ENABLED)
+    -->
+    <permission
+        android:name="android.permission.REQUEST_LOCATION_BUTTON_PERMISSIONS"
+        android:protectionLevel="signature"
+        android:featureFlag="android.permission.flags.location_button_enabled" />
 
     <!-- @SystemApi Allows an app to query apps in clone profile. The permission is
          bidirectional in nature, i.e. cloned apps would be able to query apps in root user.
@@ -9784,8 +9844,9 @@
         android:featureFlag="android.companion.task_continuity" />
 
     <!-- @SystemApi Allows an app to manage AiSeal Virtual Machine.
-         {@see android.aiseal.AiSealManager}
          <p>Protection level: signature|privileged
+
+         @see android.aiseal.AiSealManager
          @FlaggedApi(android.aiseal.Flags.FLAG_AISEAL_HOST_APIS)
          @SystemApi
          @hide
@@ -9831,7 +9892,7 @@
         android:featureFlag="android.media.tv.flags.enable_tv_watchdog_emmc_protection" />
 
     <!-- Permission required to set or update the anomaly detector configuration via
-         {@see android.os.AnomalyDetectorManager}.
+         {@link android.os.AnomalyDetectorManager}.
          Only one app per device is permitted to hold this permission and set or update the config.
          <p>Protection level: signature|privileged
          @FlaggedApi(android.os.profiling.anomaly.flags.Flags.FLAG_ANOMALY_DETECTOR_CORE)
@@ -9842,18 +9903,6 @@
         android:protectionLevel="signature|privileged"
         android:featureFlag="android.os.profiling.anomaly.flags.anomaly_detector_core" />
 
-    <!-- @FlaggedApi(android.media.audio.Flags.FLAG_GUARD_STREAM_VOLUME_APIS)
-    Purpose guarded permission to query volume-related APIs.
-    {@see android.media.AudioManager}
-    <p>Protection level: normal
-    -->
-    <permission android:name="android.permission.QUERY_AUDIO_VOLUME"
-            android:protectionLevel="normal"
-            android:featureFlag="android.media.audio.guard_stream_volume_apis"
-            android:requiresPurposeTargetSdkVersion="37">
-            <valid-purpose android:name="notForIdentification" />
-    </permission>
-
     <!-- Permission required to bind content restriction service
          <p>Protection level: signature
          @FlaggedApi(android.permission.flags.Flags.FLAG_CONTENT_RESTRICTION_ROLE_ENABLED)
@@ -9861,18 +9910,6 @@
     <permission android:name="android.permission.BIND_CONTENT_RESTRICTION_SERVICE"
         android:protectionLevel="signature"
         android:featureFlag="android.permission.flags.content_restriction_role_enabled" />
-
-    <!-- @FlaggedApi(android.view.inputmethod.Flags.FLAG_GUARD_INPUT_METHOD_LIST_APIS)
-        Purpose guarded permission to query input method list APIs.
-        {@link android.view.inputmethod.InputMethodManager}
-        <p>Protection level: normal
-    -->
-    <permission android:name="android.permission.QUERY_INPUT_METHOD"
-            android:protectionLevel="normal"
-            android:featureFlag="android.view.inputmethod.guard_input_method_list_apis"
-            android:requiresPurposeTargetSdkVersion="37">
-            <valid-purpose android:name="notForIdentification" />
-    </permission>
 
     <!-- Must be required by a
          {@link android.service.personalcontext.renderer.InsightRendererService}, to ensure that
@@ -10020,7 +10057,7 @@
                   android:excludeFromRecents="true"
                   android:documentLaunchMode="never"
                   android:relinquishTaskIdentity="true"
-                  android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|keyboard|keyboardHidden"
+                  android:configChanges="screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden"
                   android:process=":ui"
                   android:visibleToInstantApps="true">
             <intent-filter>
@@ -10189,6 +10226,12 @@
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
+
+        <activity android:name="com.android.internal.app.LockedAppActivity"
+                  android:exported="false"
+                  android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|keyboard|keyboardHidden|uiMode"
+                  android:enableOnBackInvokedCallback="true"
+                  android:featureFlag="android.security.app_lock_core" />
 
         <activity android:name="com.android.internal.app.UnlaunchableAppActivity"
                 android:theme="@style/Theme.Dialog.Confirmation"

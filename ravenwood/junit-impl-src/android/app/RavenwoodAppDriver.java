@@ -15,9 +15,8 @@
  */
 package android.app;
 
-import static org.junit.Assert.fail;
-
 import android.annotation.NonNull;
+import android.app.ActivityThread.AppBindData;
 import android.content.ContentProvider;
 import android.content.Context;
 import android.content.IContentProvider;
@@ -176,6 +175,10 @@ public final class RavenwoodAppDriver {
         mActivityThread.mInitialApplication = application;
         mTargetContext = appContext;
 
+        var data = new AppBindData();
+        data.appInfo = application.getApplicationInfo();
+        mActivityThread.mBoundApplication = data;
+
         mInstrumentation.onCreate(Bundle.EMPTY);
         mInstrumentation.callApplicationOnCreate(application);
 
@@ -230,9 +233,13 @@ public final class RavenwoodAppDriver {
      * Throws if a change ID is unknown.
      */
     public static void validateChangeId(long changeId) {
+        if (sAllKnownCompatIds.length == 0) {
+            throw new IllegalStateException("@ChangeId's not initialized yet!");
+        }
         var known = isChangeIdKnown(changeId);
         if (!known) {
-            fail("@ChangeId " + changeId + " is not known to Ravenwood. Reach out to g/ravenwood to"
+            throw new IllegalStateException("@ChangeId " + changeId
+                    + " is not known to Ravenwood. Reach out to g/ravenwood to"
                     + " get it available on Ravenwood");
         }
     }

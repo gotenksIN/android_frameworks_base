@@ -158,6 +158,10 @@
     <string name="wfc_mode_wifi_preferred_summary" msgid="1035175836270943089">"Wi-Fi арқылы қоңырау шалу"</string>
     <string name="wfc_mode_cellular_preferred_summary" msgid="4958965609212575619">"Мобильдік желі арқылы қоңырау шалу"</string>
     <string name="wfc_mode_wifi_only_summary" msgid="104951993894678665">"Тек Wi-Fi"</string>
+    <string name="adaptive_low_frequency_less_than_one_minute" msgid="8869498183646028708">"~ %s"</string>
+    <string name="adaptive_low_frequency_neg_less_than_one_minute" msgid="2590062535985417056">"~ −%s"</string>
+    <string name="elapsed_time_low_frequency_short_format_h_mm" msgid="6728141238066668781">"%1$d:%2$02d:--"</string>
+    <string name="elapsed_time_low_frequency_short_format_mm" msgid="2405181895215514414">"%1$02d:--"</string>
     <!-- no translation found for crossSimFormat_spn (9125246077491634262) -->
     <skip />
     <string name="crossSimFormat_spn_cross_sim_calling" msgid="5620807020002879057">"<xliff:g id="SPN">%s</xliff:g> Қосалқы қоңырау шалу"</string>
@@ -635,20 +639,18 @@
     <string name="permdesc_bluetooth_scan" product="default" msgid="6540723536925289276">"Қолданбаға маңайдағы Bluetooth құрылғыларын анықтап, жұптауға рұқсат береді."</string>
     <string name="permlab_bluetooth_connect" msgid="6657463246355003528">"жұпталған Bluetooth құрылғыларына қосылу"</string>
     <string name="permdesc_bluetooth_connect" product="default" msgid="4546016548795544617">"Қолданбаға жұпталған Bluetooth құрылғыларына қосылуға рұқсат береді."</string>
-    <string name="permlab_bluetooth_advertise" msgid="2781147747928853177">"Жарнаманы маңайдағы Bluetooth құрылғыларына беру"</string>
+    <string name="permlab_bluetooth_advertise" msgid="2781147747928853177">"маңайдағы Bluetooth құрылғыларына жарнама жіберу"</string>
     <string name="permdesc_bluetooth_advertise" product="default" msgid="6085174451034210183">"Қолданба жарнаманы маңайдағы Bluetooth құрылғыларына бере алады."</string>
     <string name="permlab_uwb_ranging" msgid="8141915781475770665">"маңайдағы кең жолақты құрылғылардың бір-біріне қатысты орнын анықтау"</string>
     <string name="permdesc_uwb_ranging" msgid="2519723069604307055">"Қолданбаға маңайдағы кең жолақты құрылғылардың бір-біріне қатысты орнын анықтауға мүмкіндік береді."</string>
     <string name="permlab_nearby_wifi_devices" msgid="392774237063608500">"маңайдағы Wi-Fi құрылғыларымен байланысу"</string>
     <string name="permdesc_nearby_wifi_devices" msgid="3054307728646332906">"Қолданба маңайдағы Wi‑Fi құрылғыларына жарнама беріп, оларға қосылып, шамамен орналасқан жерін анықтай алады."</string>
-    <string name="permlab_access_local_network" msgid="3420360767259066877">"жергілікті желілік құрылғыларға кіру"</string>
-    <string name="permdesc_access_local_network" msgid="6364679803386822638">"Қолданбаға жергілікті желілік құрылғыларға кіруге мүмкіндік береді"</string>
+    <string name="permlab_access_local_network" msgid="3420360767259066877">"жергілікті желідегі құрылғыларға кіру"</string>
+    <string name="permdesc_access_local_network" msgid="6364679803386822638">"Қолданбаға жергілікті желідегі құрылғыларға кіруге мүмкіндік береді."</string>
     <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"кері байланыс интерфейсін пайдалану"</string>
     <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"Қолданбаға кері байланыс интерфейсі арқылы басқа қолданбалармен әрекеттесуге рұқсат береді."</string>
-    <!-- no translation found for permlab_force_use_loopback_interface (1319727311706416481) -->
-    <skip />
-    <!-- no translation found for permdesc_force_use_loopback_interface (5829032514048681980) -->
-    <skip />
+    <string name="permlab_force_use_loopback_interface" msgid="1319727311706416481">"кері байланыс интерфейсін мәжбүрлеп пайдалану"</string>
+    <string name="permdesc_force_use_loopback_interface" msgid="5829032514048681980">"Қолданба кері байланыс интерфейсінде басқасымен әрекеттеседі. Басқа қолданбада кері байланыс рұқсаты болуы қажет емес."</string>
     <string name="permlab_ranging" msgid="2854543350668593390">"маңайдағы құрылғылардың салыстырмалы орнын анықтау"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"Қолданбаның маңайдағы құрылғылардың салыстырмалы орнын анықтауына рұқсат береді."</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"Таңдаулы NFC төлеу қызметі туралы ақпарат"</string>
@@ -774,7 +776,7 @@
     <string name="face_acquired_too_low" msgid="4075391872960840081">"Телефонды төменірек ұстаңыз"</string>
     <string name="face_acquired_too_right" msgid="6245286514593540859">"Телефонды солға қарай жылжытыңыз"</string>
     <string name="face_acquired_too_left" msgid="9201762240918405486">"Телефонды оңға қарай жылжытыңыз"</string>
-    <string name="face_acquired_poor_gaze" msgid="4427153558773628020">"Құрылғының камерасына тура қараңыз."</string>
+    <string name="face_acquired_poor_gaze" msgid="6746437451436776485">"Камераға барынша тура қараңыз."</string>
     <string name="face_acquired_not_detected" msgid="1057966913397548150">"Бетіңіз көрінбей тұр. Телефонды көз деңгейінде ұстаңыз."</string>
     <string name="face_acquired_too_much_motion" msgid="8199691445085189528">"Қозғалыс тым көп. Телефонды қозғалтпаңыз."</string>
     <string name="face_acquired_recalibrate" msgid="8724013080976469746">"Қайта тіркеліңіз."</string>
@@ -1454,6 +1456,9 @@
     <string name="carrier_app_notification_text" msgid="6567057546341958637">"Оны орнату үшін түртіңіз"</string>
     <string name="time_zone_change_notification_title" msgid="5232503069219193218">"Уақыт белдеуі өзгертілді"</string>
     <string name="time_zone_change_notification_body" msgid="6135793674904665585">"Қазір <xliff:g id="TIME_ZONE_DISPLAY_NAME">%1$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET">%2$s</xliff:g>) белдеуіндесіз."</string>
+    <string name="time_zone_offset_change_notification_title" msgid="8232305835199459588">"Уақыттың өзгеруі"</string>
+    <string name="time_zone_offset_change_notification_body_forward" msgid="1299493962341887576">"Уақыт <xliff:g id="TIME_ZONE_OFFSET_DURATION">%1$s</xliff:g> алға қойылды. Қазір <xliff:g id="TIME_ZONE_DISPLAY_NAME">%2$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET_0">%3$s</xliff:g>) белдеуіндесіз."</string>
+    <string name="time_zone_offset_change_notification_body_backward" msgid="6643532078142642118">"Уақыт <xliff:g id="TIME_ZONE_OFFSET_DURATION">%1$s</xliff:g> артқа қойылды. Қазір <xliff:g id="TIME_ZONE_DISPLAY_NAME">%2$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET_0">%3$s</xliff:g>) белдеуіндесіз."</string>
     <string name="time_picker_dialog_title" msgid="9053376764985220821">"Уақытты реттеу"</string>
     <string name="date_picker_dialog_title" msgid="5030520449243071926">"Мезгілін реттеу"</string>
     <string name="date_time_set" msgid="4603445265164486816">"Орнату"</string>
@@ -1829,6 +1834,7 @@
     <string name="accessibility_shortcut_label_gesture" msgid="7987298674836890931">"қимыл"</string>
     <string name="accessibility_shortcut_label_quick_settings" msgid="6851280333772213611">"жылдам параметрлер"</string>
     <string name="accessibility_shortcut_label_triple_tap" msgid="9058975959054454796">"үш рет түрту"</string>
+    <string name="accessibility_shortcut_label_top_row_key" msgid="1488840908672437180">"арнайы мүмкіндіктер пернесі"</string>
     <string name="accessibility_uncheck_legacy_item_warning" msgid="8047830891064817447">"<xliff:g id="SERVICE_NAME">%s</xliff:g> қызметі өшірулі."</string>
     <string name="edit_accessibility_shortcut_menu_button" msgid="8885752738733772935">"Жылдам пәрмендерді өзгерту"</string>
     <string name="done_accessibility_shortcut_menu_button" msgid="3668407723770815708">"Дайын"</string>
@@ -2105,6 +2111,7 @@
     <string name="app_suspended_default_message" msgid="6451215678552004172">"<xliff:g id="APP_NAME_0">%1$s</xliff:g> дәл қазір қолжетімді емес. Ол <xliff:g id="APP_NAME_1">%2$s</xliff:g> арқылы басқарылады."</string>
     <string name="app_suspended_more_details" msgid="211260942831587014">"Толық ақпарат"</string>
     <string name="app_suspended_unsuspend_message" msgid="1665438589450555459">"Қолданбаны қайта қосу"</string>
+    <string name="locked_app_biometric_prompt_description" msgid="6853122652400451464">"<xliff:g id="APP_NAME">%1$s</xliff:g> құлыпталды."</string>
     <string name="work_mode_off_title" msgid="6367463960165135829">"Жұмыс қолданбаларын қайта қосасыз ба?"</string>
     <string name="work_mode_turn_on" msgid="5316648862401307800">"Қайта қосу"</string>
     <string name="work_mode_emergency_call_button" msgid="6818855962881612322">"Құтқару қызметіне қоңырау шалу"</string>
@@ -2544,6 +2551,8 @@
     <string name="accessibility_label_clone_profile" msgid="7579118375042398784">"Клон"</string>
     <string name="accessibility_label_communal_profile" msgid="1437173163111334791">"Жалпы"</string>
     <string name="private_space_biometric_prompt_title" msgid="5777592909271728154">"Құпия кеңістік"</string>
+    <string name="app_locked_new_notification" msgid="4409730436247596215">"Жаңа хабарландыру"</string>
+    <string name="app_locked_notification_message" msgid="4576179600328065280">"Жаңа хабар"</string>
     <string name="redacted_notification_message" msgid="1520587845842228816">"Хабарландырудың құпия контенті жасырылған."</string>
     <string name="redacted_notification_action_title" msgid="6942924973335920935"></string>
     <string name="screen_not_shared_sensitive_content" msgid="7058419185079565001">"Қауіпсіздік мақсатында қолданба контенті экранды бөлісу кезінде жасырылды."</string>

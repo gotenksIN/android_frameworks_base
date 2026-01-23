@@ -17,6 +17,7 @@
 package com.android.wm.shell.taskview;
 
 import static android.app.WindowConfiguration.WINDOWING_MODE_MULTI_WINDOW;
+import static android.app.WindowConfiguration.WINDOWING_MODE_UNDEFINED;
 import static android.view.WindowManager.TRANSIT_CHANGE;
 import static android.view.WindowManager.TRANSIT_CLOSE;
 import static android.view.WindowManager.TRANSIT_NONE;
@@ -26,6 +27,7 @@ import static android.view.WindowManager.TRANSIT_TO_FRONT;
 
 import static com.android.window.flags.Flags.enableHandlersDebuggingMode;
 import static com.android.wm.shell.bubbles.util.BubbleUtils.getExitBubbleTransaction;
+import static com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_BUBBLES;
 import static com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_BUBBLES_NOISY;
 import static com.android.wm.shell.transition.TransitionDispatchState.CAPTURED_CHANGE_IN_WRONG_TRANSITION;
 import static com.android.wm.shell.transition.TransitionDispatchState.CAPTURED_UNRELATED_CHANGE;
@@ -45,6 +47,7 @@ import android.os.Binder;
 import android.os.IBinder;
 import android.util.Slog;
 import android.view.SurfaceControl;
+import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.window.TransitionInfo;
 import android.window.TransitionRequestInfo;
@@ -276,7 +279,7 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
         return null;
     }
 
-    /** Looks through the pending transitions for one matching {@param claimed} */
+    /** Looks through the pending transitions for one matching {@code claimed} */
     @VisibleForTesting
     public PendingTransition findPending(IBinder claimed) {
         for (int i = 0; i < mPending.size(); ++i) {
@@ -435,8 +438,28 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
         if (taskToken == null) return;
         ProtoLog.d(WM_SHELL_BUBBLES_NOISY, "Transitions.moveTaskViewToFullscreen(): taskView=%d",
                 taskView.hashCode());
-        final WindowContainerTransaction wct =
-                getExitBubbleTransaction(taskToken, taskView.getCaptionInsetsOwner());
+        final WindowContainerTransaction wct;
+        if (mBubbleHelper.isPresent()) {
+            wct = getExitBubbleTransaction(mBubbleHelper.get(), taskToken,
+                    taskView.getCaptionInsetsOwner());
+        } else {
+            // Not a Bubble TaskView, reset all overrides.
+            wct = new WindowContainerTransaction();
+            wct.setWindowingMode(taskToken, WINDOWING_MODE_UNDEFINED);
+            wct.setInterceptBackPressedOnTaskRoot(taskToken, false);
+            wct.setTaskForceExcludedFromRecents(taskToken, false);
+            wct.setDisablePip(taskToken, false);
+            wct.setDisableLaunchAdjacent(taskToken, false);
+            wct.setAlwaysOnTop(taskToken, false);
+            wct.setBounds(taskToken, new Rect());
+            if (taskView.getCaptionInsetsOwner() != null) {
+                wct.removeInsetsSource(
+                        taskToken,
+                        taskView.getCaptionInsetsOwner(),
+                        0 /* index */,
+                        WindowInsets.Type.captionBar());
+            }
+        }
         mShellExecutor.execute(() -> {
             mPending.add(new PendingTransition(TRANSIT_CHANGE, wct, taskView, null /* cookie */));
             startNextTransition();
@@ -1108,6 +1131,10 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
             updateBounds(taskView, boundsOnScreen, startTransaction, finishTransaction, taskInfo,
                     leash, wct);
         } else {
+            // Note: This shouldn't happen, but when this happens on Bubble with root Task approach,
+            // it will move the leaf Task to TDA, which leaves the Bubble in a broken state.
+            ProtoLog.e(WM_SHELL_BUBBLES,
+                    "Transitions.prepareOpenAnimation(): open TaskView's surface was not created");
             // The surface has already been destroyed before the task has appeared,
             // so go ahead and hide the task entirely
             wct.setHidden(taskInfo.token, true /* hidden */);

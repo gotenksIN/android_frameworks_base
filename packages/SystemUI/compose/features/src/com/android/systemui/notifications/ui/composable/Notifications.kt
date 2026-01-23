@@ -31,6 +31,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.imeAnimationTarget
 import androidx.compose.foundation.layout.padding
@@ -38,7 +39,7 @@ import androidx.compose.foundation.layout.windowInsetsBottomHeight
 import androidx.compose.foundation.overscroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.withoutEventHandling
+import androidx.compose.foundation.withoutVisualEffect
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -72,6 +73,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
@@ -96,6 +98,7 @@ import com.android.compose.nestedscroll.ScrollController
 import com.android.internal.jank.Cuj.CUJ_NOTIFICATION_SHADE_SCROLL_FLING
 import com.android.internal.jank.InteractionJankMonitor
 import com.android.systemui.common.ui.compose.windowinsets.LocalScreenCornerRadius
+import com.android.systemui.notifications.ui.YSpace
 import com.android.systemui.res.R
 import com.android.systemui.scene.session.ui.composable.SaveableSession
 import com.android.systemui.scene.session.ui.composable.sessionCoroutineScope
@@ -105,7 +108,6 @@ import com.android.systemui.statusbar.notification.stack.shared.model.Accessibil
 import com.android.systemui.statusbar.notification.stack.shared.model.ShadeScrimBounds
 import com.android.systemui.statusbar.notification.stack.shared.model.ShadeScrimRounding
 import com.android.systemui.statusbar.notification.stack.shared.model.ShadeScrollState
-import com.android.systemui.statusbar.notification.stack.ui.YSpace
 import com.android.systemui.statusbar.notification.stack.ui.view.NotificationScrollView
 import com.android.systemui.statusbar.notification.stack.ui.viewmodel.NotificationTransitionThresholds.EXPANSION_FOR_MAX_CORNER_RADIUS
 import com.android.systemui.statusbar.notification.stack.ui.viewmodel.NotificationTransitionThresholds.EXPANSION_FOR_MAX_SCRIM_ALPHA
@@ -201,21 +203,29 @@ fun ContentScope.ScrollingNotificationPanel(
     stackTopPadding: Dp,
     stackBottomPadding: Dp,
     modifier: Modifier = Modifier,
-    shouldFillMaxSize: Boolean = true,
+    shouldFillMaxHeight: Boolean = false,
     shouldIncludeHeadsUpSpace: Boolean = true,
     shouldDrawScrimBackground: Boolean = true,
     isActivated: Boolean = true,
-    scrollState: ScrollState =
+    contentScrollState: ScrollState =
         shadeSession.rememberSaveableSession(saver = ScrollState.Saver, key = "ScrollState") {
             ScrollState(initial = 0)
         },
-    overscrollEffect: OffsetOverscrollEffect = rememberOffsetOverscrollEffect(),
     onEmptySpaceClick: (() -> Unit)? = null,
 ) {
+    val scrollingContentOverscrollEffect = rememberOffsetOverscrollEffect()
+    val shortContentOverscrollEffect = rememberOffsetOverscrollEffect()
+
     if (isActivated && isAlwaysComposedContentVisible()) {
         val composeViewRoot = LocalView.current
         // whether the stack is moving due to a swipe or fling
-        val isScrollInProgress = scrollState.isScrollInProgress || overscrollEffect.isInProgress
+        val isScrollInProgress by remember {
+            derivedStateOf {
+                contentScrollState.isScrollInProgress ||
+                    scrollingContentOverscrollEffect.isInProgress ||
+                    shortContentOverscrollEffect.isInProgress
+            }
+        }
 
         LaunchedEffect(isScrollInProgress) {
             if (isScrollInProgress) {
@@ -227,18 +237,17 @@ fun ContentScope.ScrollingNotificationPanel(
             }
         }
 
-        val shadeScrollState by
-            shadeSession.rememberSession(key = "ScrollingNotificationPanelScrollState") {
-                derivedStateOf {
+        LaunchedEffect(contentScrollState) {
+            snapshotFlow {
                     ShadeScrollState(
                         // we are not scrolled to the top unless the scroll position is zero,
-                        isScrolledToTop = scrollState.value == 0,
-                        scrollPosition = scrollState.value,
-                        maxScrollPosition = scrollState.maxValue,
+                        isScrolledToTop = contentScrollState.value == 0,
+                        scrollPosition = contentScrollState.value,
+                        maxScrollPosition = contentScrollState.maxValue,
                     )
                 }
-            }
-        LaunchedEffect(shadeScrollState) { viewModel.setScrollState(shadeScrollState) }
+                .collect { viewModel.setScrollState(it) }
+        }
     }
 
     NestedScrollingNotificationPanel(
@@ -251,12 +260,14 @@ fun ContentScope.ScrollingNotificationPanel(
         isTransparencyEnabled = isTransparencyEnabled,
         stackTopPadding = stackTopPadding,
         stackBottomPadding = stackBottomPadding,
-        shouldFillMaxSize = shouldFillMaxSize,
+        shouldContentFillMaxSize = shouldFillMaxHeight,
+        shouldScrimBackgroundFillMaxHeight = false,
         shouldDrawScrimBackground = shouldDrawScrimBackground,
         shouldIncludeHeadsUpSpace = shouldIncludeHeadsUpSpace,
         isActivated = isActivated,
-        scrollState = scrollState,
-        overscrollEffect = overscrollEffect,
+        contentScrollState = contentScrollState,
+        scrollingContentOverscrollEffect = scrollingContentOverscrollEffect,
+        shortContentOverscrollEffect = shortContentOverscrollEffect,
         onEmptySpaceClick = onEmptySpaceClick,
         onStackHeightChanged = { /* no-op without nested scroll */ },
     )
@@ -273,10 +284,12 @@ fun ContentScope.NestedScrollingNotificationPanel(
     isTransparencyEnabled: Boolean,
     stackTopPadding: Dp,
     stackBottomPadding: Dp,
-    scrollState: ScrollState,
-    overscrollEffect: OffsetOverscrollEffect,
+    contentScrollState: ScrollState,
+    scrollingContentOverscrollEffect: OffsetOverscrollEffect,
+    shortContentOverscrollEffect: OffsetOverscrollEffect,
     modifier: Modifier = Modifier,
-    shouldFillMaxSize: Boolean = true,
+    shouldContentFillMaxSize: Boolean,
+    shouldScrimBackgroundFillMaxHeight: Boolean,
     shouldIncludeHeadsUpSpace: Boolean = true,
     shouldDrawScrimBackground: Boolean = true,
     isActivated: Boolean = true,
@@ -329,7 +342,7 @@ fun ContentScope.NestedScrollingNotificationPanel(
                         scrollStackWithNestedScroll(
                             delta = Offset(x = 0f, y = remoteInputRowBottom - imeTopValue),
                             nestedScrollDispatcher = nestedScrollDispatcher,
-                            scrollState = scrollState,
+                            scrollState = contentScrollState,
                         )
                     }
                 }
@@ -348,15 +361,15 @@ fun ContentScope.NestedScrollingNotificationPanel(
                     }
                 val viewPortHeight = stackBoundsOnScreen.value.height
                 val scrollStep = max(0f, viewPortHeight - stackScrollView.stackBottomInset)
-                val scrollPosition = scrollState.value.toFloat()
-                val scrollRange = scrollState.maxValue.toFloat()
+                val scrollPosition = contentScrollState.value.toFloat()
+                val scrollRange = contentScrollState.maxValue.toFloat()
                 val targetScroll =
                     (scrollPosition + direction * scrollStep).coerceIn(0f, scrollRange)
                 coroutineScope.launch {
                     scrollStackWithNestedScroll(
                         delta = Offset(x = 0f, y = targetScroll - scrollPosition),
                         nestedScrollDispatcher = nestedScrollDispatcher,
-                        scrollState = scrollState,
+                        scrollState = contentScrollState,
                     )
                 }
             }
@@ -430,18 +443,20 @@ fun ContentScope.NestedScrollingNotificationPanel(
             )
         }
 
-    val scrimOverscrollEffect: OffsetOverscrollEffect = rememberOffsetOverscrollEffect()
-
     val interactionSource = remember { MutableInteractionSource() }
 
-    val screenHeightDp = LocalConfiguration.current.screenHeightDp.dp
+    // Prevent background gaps during overscroll.
+    val backgroundHeightDp =
+        LocalWindowInfo.current.containerDpSize.height + OffsetOverscrollEffect.DefaultMaxDistance
 
     Layout(
         modifier =
             modifier
                 .element(Notifications.Elements.NotificationScrim)
-                .overscroll(verticalOverscrollEffect)
-                .overscroll(scrimOverscrollEffect.withoutEventHandling())
+                // Apply overscroll visuals (visuals only, no event handling):
+                .overscroll(verticalOverscrollEffect) // SceneContainer transitions
+                .overscroll(scrollingContentOverscrollEffect) // Content scrolling
+                .overscroll(shortContentOverscrollEffect) // Short/Empty content swipes
                 .onGloballyPositioned { coordinates ->
                     val boundsInWindow = coordinates.boundsInWindow()
                     debugLog(viewModel) {
@@ -509,11 +524,20 @@ fun ContentScope.NestedScrollingNotificationPanel(
                     )
                 },
                 {
+                    /** Whether the content is tall enough to use [verticalScroll]. */
+                    val isScrollable by remember {
+                        derivedStateOf { contentScrollState.maxValue > 0 }
+                    }
+
                     // NotificationPanel content
                     Box {
                         Column(
                             modifier =
-                                Modifier.padding(top = stackTopPadding, bottom = stackBottomPadding)
+                                Modifier.then(
+                                        if (shouldContentFillMaxSize) Modifier.fillMaxSize()
+                                        else Modifier.fillMaxWidth()
+                                    )
+                                    .padding(top = stackTopPadding, bottom = stackBottomPadding)
                                     .onPlaced {
                                         val rawBounds = it.rawBoundsInWindow()
                                         debugLog(viewModel) {
@@ -534,16 +558,23 @@ fun ContentScope.NestedScrollingNotificationPanel(
                                         connection = object : NestedScrollConnection {},
                                         dispatcher = nestedScrollDispatcher,
                                     )
-                                    // Adding these 3 modifiers is needed to enable overscroll
-                                    // when the list fits within its bounds: b/295810376
-                                    .overscroll(overscrollEffect)
-                                    .verticalScroll(scrollState)
+                                    // Scroll vertically when content exceeds available height.
+                                    .verticalScroll(
+                                        contentScrollState,
+                                        // Disable visuals; The effect applies to the scrim.
+                                        overscrollEffect =
+                                            scrollingContentOverscrollEffect.withoutVisualEffect(),
+                                    )
+                                    // Workaround: Separate scrollable to enable overscroll on short
+                                    // content that fits in the vertical bounds (b/295810376).
                                     .scrollable(
                                         rememberScrollableState { 0f },
-                                        Orientation.Vertical,
-                                        overscrollEffect = overscrollEffect,
+                                        orientation = Orientation.Vertical,
+                                        // This node doesn't apply visuals; No wrapper needed.
+                                        overscrollEffect = shortContentOverscrollEffect,
+                                        // Active only when the content is non-scrollable.
+                                        enabled = !isScrollable,
                                     )
-                                    .fillMaxWidth()
                                     // Added extra bottom padding for keeping footerView inside
                                     // parent Viewbounds during overscroll, refer to
                                     // b/437347340#comment3
@@ -600,23 +631,15 @@ fun ContentScope.NestedScrollingNotificationPanel(
             val backgroundMeasurable = measurables[0][0]
             val contentMeasurable = measurables[1][0]
 
-            if (shouldFillMaxSize) {
-                // Fill the entire available space with the content. We force the background to
-                // match the screen height to ensure it covers the full display area.
-
-                val content =
-                    contentMeasurable.measure(
-                        Constraints.fixed(
-                            width = constraints.maxWidth,
-                            height = constraints.maxHeight,
-                        )
-                    )
-
+            if (shouldScrimBackgroundFillMaxHeight) {
+                // Let the content match its constraints, but force the background to match the
+                // screen height to ensure it covers the full display area.
+                val content = contentMeasurable.measure(constraints)
                 val background =
                     backgroundMeasurable.measure(
                         Constraints.fixed(
                             width = constraints.maxWidth,
-                            height = screenHeightDp.roundToPx(),
+                            height = backgroundHeightDp.roundToPx(),
                         )
                     )
 

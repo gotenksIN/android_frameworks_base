@@ -440,6 +440,16 @@
     <!-- WFC, summary for Ims Preferred -->
     <string name="wfc_mode_ims_preferred_summary">Ims Preferred</string>
 
+    <!-- Displayed on a chronometer in low power mode to show approximately one minute for duration less than one minute [CHAR LIMIT=5] -->
+    <string name="adaptive_low_frequency_less_than_one_minute">~ %s</string>
+    <!-- Displayed on a chronometer in low power mode to show approximately negative one minute for duration less than one minute [CHAR LIMIT=5] -->
+    <string name="adaptive_low_frequency_neg_less_than_one_minute">~ −%s</string>
+
+    <!-- Format string for elapsed time in hours, minutes, and low frequency placeholder. [CHAR LIMIT=NONE] -->
+    <string name="elapsed_time_low_frequency_short_format_h_mm">%1$d:%2$02d:--</string>
+    <!-- Format string for elapsed time in minutes and low frequency placeholder. [CHAR LIMIT=NONE] -->
+    <string name="elapsed_time_low_frequency_short_format_mm">%1$02d:--</string>
+
     <!-- Template for showing mobile network operator name while Cross SIM calling is active -->
     <string-array name="crossSimSpnFormats" translatable="false">
         <item>@string/crossSimFormat_spn</item>
@@ -1895,7 +1905,7 @@
 
     <!-- Title of an application permission, listed so the user can choose whether they want to allow the application to do this. [CHAR LIMIT=50]-->
     <string name="permlab_force_use_loopback_interface">force use loopback interface</string>
-    <!-- Description of an application permission, listed so the user can choose whether they want to allow the application to do this. [CHAR LIMIT=120]-->
+    <!-- Description of an application permission, listed so the user can choose whether they want to allow the application to do this. [CHAR LIMIT=175]-->
     <string name="permdesc_force_use_loopback_interface">Allows the app to interact with other apps over loopback interface without requiring the other app to hold loopback permissions</string>
 
     <!-- Title of an application permission, listed so the user can choose whether they want to allow the application to do this. [CHAR LIMIT=50]-->
@@ -5077,8 +5087,8 @@
     <!-- Label for triple tap shortcut. [CHAR LIMIT=100] -->
     <string name="accessibility_shortcut_label_triple_tap">triple tap</string>
 
-    <!-- DO NOT TRANSLATE -->
-    <string name="accessibility_shortcut_label_top_row_key">top row key</string>
+    <!-- Label for top row accessibility key. [CHAR LIMIT=100] -->
+    <string name="accessibility_shortcut_label_top_row_key">accessibility key</string>
 
     <!-- Text for showing the warning to user when uncheck the legacy app item in the accessibility
     shortcut menu, user can aware the service to be disabled. [CHAR LIMIT=100] -->
@@ -5837,6 +5847,10 @@
     <!-- Message shown in a toast notifying the user about the successful disablement of App Lock on the provided application [CHAR LIMIT=NONE] -->
     <string name="disable_app_lock_success_toast_message" translatable="false">
         App Lock is removed from <xliff:g id="app_name" example="Gmail">%1$s</xliff:g>
+    </string>
+    <!-- Message shown on the system-provided BiometricPrompt, informing the user the app they're trying to open is locked by App Lock. [CHAR LIMIT=NONE] -->
+    <string name="locked_app_biometric_prompt_description">
+        <xliff:g id="app_name" example="Gmail">%1$s</xliff:g> is locked
     </string>
 
     <!-- Title of a dialog. This text is confirming that the user wants to turn on access to their work apps, which the user had previously paused. "Work" is an adjective. [CHAR LIMIT=30] -->
@@ -6895,6 +6909,11 @@
 
     <!-- Label for private space biometric prompt logo description [CHAR LIMIT=30] -->
     <string name="private_space_biometric_prompt_title">Private space</string>
+
+    <!-- Notification message used when the app that posted a notification is locked by App Lock [CHAR_LIMIT=NOTIF_BODY] -->
+    <string name="app_locked_new_notification">New notification</string>
+    <!-- Notification message used when the app that posted a notification is locked by App Lock [CHAR_LIMIT=NOTIF_BODY] -->
+    <string name="app_locked_notification_message">New message</string>
 
     <!-- Notification message used when a notification's normal message contains sensitive information [CHAR_LIMIT=NOTIF_BODY] -->
     <string name="redacted_notification_message">Sensitive notification content hidden</string>

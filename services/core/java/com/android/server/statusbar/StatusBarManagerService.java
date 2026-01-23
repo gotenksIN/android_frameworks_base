@@ -34,7 +34,6 @@ import static android.os.UserHandle.USER_SYSTEM;
 import static android.os.UserHandle.getCallingUserId;
 import static android.os.UserManager.isVisibleBackgroundUsersEnabled;
 import static android.view.Display.DEFAULT_DISPLAY;
-import static android.view.ViewRootImpl.CLIENT_TRANSIENT;
 import static android.view.WindowManagerPolicyConstants.NAV_BAR_MODE_2BUTTON_OVERLAY;
 import static android.view.WindowManagerPolicyConstants.NAV_BAR_MODE_3BUTTON_OVERLAY;
 import static android.view.WindowManagerPolicyConstants.NAV_BAR_MODE_GESTURAL_OVERLAY;
@@ -664,7 +663,7 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
                 }
                 return;
             }
-            if (!CLIENT_TRANSIENT) {
+            if (!com.android.window.flags.Flags.enableTransientGestureInSystemUi()) {
                 // Only call from here when the client transient is not enabled.
                 runWithStatusBarIfPresent(
                         bar -> bar.immersiveModeChanged(
@@ -812,6 +811,16 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
         @Override
         public void moveFocusedTaskToFullscreen(int displayId) {
             runWithStatusBarIfPresent(bar -> bar.moveFocusedTaskToFullscreen(displayId));
+        }
+
+        @Override
+        public void moveFocusedTaskToStageSplit(int displayId, boolean leftOrTop) {
+            IStatusBar bar = mBar;
+            if (bar != null) {
+                try {
+                    bar.moveFocusedTaskToStageSplit(displayId, leftOrTop);
+                } catch (RemoteException ex) { }
+            }
         }
 
         @Override
@@ -1362,10 +1371,13 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
         private String mPackageName = "none";
         private int mDisabled1 = 0;
         private int mDisabled2 = 0;
+        /** The IME window visibility. */
         @ImeWindowVisibility
         private int mImeWindowVis = 0;
+        /** The IME back disposition mode. */
         @BackDispositionMode
         private int mImeBackDisposition = BACK_DISPOSITION_DEFAULT;
+        /** Whether the IME Switcher button should be shown when the IME is shown. */
         private boolean mShowImeSwitcherButton = false;
         private LetterboxDetails[] mLetterboxDetails = new LetterboxDetails[0];
 
@@ -2570,10 +2582,13 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
      */
     @Override
     public void startMotionCuesSession(
-            @NonNull ComponentName componentName, @NonNull MotionCuesSettings motionCuesSettings) {
+            @NonNull ComponentName componentName,@NonNull MotionCuesSettings motionCuesSettings) {
         enforceMotionCuesDrawingControl();
+        final int callingUid = Binder.getCallingUid();
+        final int userId = UserHandle.getUserId(callingUid);
+        checkCallingUidPackage(componentName.getPackageName(), callingUid, userId);
         runWithStatusBarIfPresent(
-                bar -> bar.startMotionCuesSession(componentName, motionCuesSettings),
+                bar -> bar.startMotionCuesSession(componentName, userId, motionCuesSettings),
                 "startMotionCuesSession");
     }
 

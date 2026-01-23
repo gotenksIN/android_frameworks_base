@@ -39,8 +39,8 @@ import android.window.WindowContainerToken
 import android.window.WindowContainerTransaction
 import android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_REMOVE_TASK
 import android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_REORDER
+import com.android.testing.wm.util.MockToken
 import com.android.window.flags.Flags
-import com.android.wm.shell.MockToken
 import com.android.wm.shell.ShellTaskOrganizer
 import com.android.wm.shell.ShellTestCase
 import com.android.wm.shell.common.DisplayController
@@ -136,7 +136,6 @@ class DesktopTasksTransitionObserverTest : ShellTestCase() {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_INCLUDE_TOP_TRANSPARENT_FULLSCREEN_TASK_IN_DESKTOP_HEURISTIC)
     fun topTransparentTaskClosed_clearTaskDataFromRepository() {
         val mockTransition = Mockito.mock(IBinder::class.java)
         val topTransparentTask = createTaskInfo(1)
@@ -157,7 +156,6 @@ class DesktopTasksTransitionObserverTest : ShellTestCase() {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_INCLUDE_TOP_TRANSPARENT_FULLSCREEN_TASK_IN_DESKTOP_HEURISTIC)
     fun topTransparentTaskSentToBack_clearTaskDataFromRepository() {
         val mockTransition = Mockito.mock(IBinder::class.java)
         val topTransparentTask = createTaskInfo(1)
@@ -178,7 +176,6 @@ class DesktopTasksTransitionObserverTest : ShellTestCase() {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_INCLUDE_TOP_TRANSPARENT_FULLSCREEN_TASK_IN_DESKTOP_HEURISTIC)
     fun nonTopTransparentTaskOpened_clearTopTransparentTaskIdFromRepository() {
         val mockTransition = Mockito.mock(IBinder::class.java)
         val topTransparentTask = createTaskInfo(1)
@@ -200,7 +197,6 @@ class DesktopTasksTransitionObserverTest : ShellTestCase() {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_INCLUDE_TOP_TRANSPARENT_FULLSCREEN_TASK_IN_DESKTOP_HEURISTIC)
     fun nonTopTransparentTaskSentToFront_clearTopTransparentTaskIdFromRepository() {
         val mockTransition = Mockito.mock(IBinder::class.java)
         val topTransparentTask = createTaskInfo(1)

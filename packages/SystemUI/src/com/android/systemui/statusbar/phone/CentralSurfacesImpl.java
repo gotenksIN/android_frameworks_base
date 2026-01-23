@@ -17,6 +17,7 @@
 package com.android.systemui.statusbar.phone;
 
 import static android.app.StatusBarManager.DISABLE_HOME;
+import static android.app.StatusBarManager.SESSION_KEYGUARD;
 import static android.app.StatusBarManager.WINDOW_STATE_HIDDEN;
 import static android.app.StatusBarManager.WINDOW_STATE_SHOWING;
 import static android.app.StatusBarManager.WindowVisibleState;
@@ -73,6 +74,7 @@ import android.view.Display;
 import android.view.IRemoteAnimationRunner;
 import android.view.IWindowManager;
 import android.view.MotionEvent;
+import android.view.SurfaceControl;
 import android.view.ThreadedRenderer;
 import android.view.View;
 import android.view.WindowInsets;
@@ -114,6 +116,7 @@ import com.android.systemui.assist.AssistManager;
 import com.android.systemui.back.domain.interactor.BackActionInteractor;
 import com.android.systemui.bouncer.domain.interactor.AlternateBouncerInteractor;
 import com.android.systemui.broadcast.BroadcastDispatcher;
+import com.android.systemui.broadcast.BroadcastDispatcherCustomExecutor;
 import com.android.systemui.camera.CameraIntents;
 import com.android.systemui.charging.WiredChargingRippleController;
 import com.android.systemui.charging.WirelessChargingAnimation;
@@ -136,6 +139,7 @@ import com.android.systemui.keyguard.KeyguardUnlockAnimationController;
 import com.android.systemui.keyguard.KeyguardViewMediator;
 import com.android.systemui.keyguard.ScreenLifecycle;
 import com.android.systemui.keyguard.WakefulnessLifecycle;
+import com.android.systemui.log.SessionTracker;
 import com.android.systemui.media.NotificationMediaManager;
 import com.android.systemui.navigationbar.NavigationBarController;
 import com.android.systemui.navigationbar.views.NavigationBarView;
@@ -694,7 +698,8 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
             EmergencyGestureIntentFactory emergencyGestureIntentFactory,
             QuickAccessWalletController walletController,
             WindowManager windowManager,
-            WindowManagerProvider windowManagerProvider
+            WindowManagerProvider windowManagerProvider,
+            SessionTracker sessionTracker
     ) {
         mContext = context;
         mNotificationsController = notificationsController;
@@ -830,6 +835,7 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
 
         mWindowManager = windowManager;
         mWindowManagerProvider = windowManagerProvider;
+        mSessionTracker = sessionTracker;
     }
 
     private void initBubbles(Bubbles bubbles) {
@@ -1397,7 +1403,14 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         IntentFilter filter = new IntentFilter();
         filter.addAction(Intent.ACTION_CLOSE_SYSTEM_DIALOGS);
         filter.addAction(Intent.ACTION_SCREEN_OFF);
-        mBroadcastDispatcher.registerReceiver(mBroadcastReceiver, filter, null, UserHandle.ALL);
+        Executor executor;
+        if (BroadcastDispatcherCustomExecutor.isEnabled()) {
+            executor = mMainExecutor;
+        } else {
+            executor = null;
+        }
+        mBroadcastDispatcher.registerReceiver(
+                mBroadcastReceiver, filter, executor, UserHandle.ALL);
     }
 
     protected QS createDefaultQSFragment() {
@@ -1921,7 +1934,8 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
             mMetricsLogger.write(mStatusBarStateLog
                     .setCategory(isBouncerShowing ? MetricsEvent.BOUNCER : MetricsEvent.LOCKSCREEN)
                     .setType(isShowing ? MetricsEvent.TYPE_OPEN : MetricsEvent.TYPE_CLOSE)
-                    .setSubtype(isSecure ? 1 : 0));
+                    .setSubtype(isSecure ? 1 : 0)
+            );
             EventLogTags.writeSysuiStatusBarState(mState,
                     isShowing ? 1 : 0,
                     isOccluded ? 1 : 0,
@@ -1934,7 +1948,12 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
             uiEventValueBuilder.append(isBouncerShowing ? "BOUNCER" : "LOCKSCREEN");
             uiEventValueBuilder.append(isShowing ? "_OPEN" : "_CLOSE");
             uiEventValueBuilder.append(isSecure ? "_SECURE" : "_INSECURE");
-            sUiEventLogger.log(StatusBarUiEvent.valueOf(uiEventValueBuilder.toString()));
+            sUiEventLogger.logWithInstanceId(
+                    StatusBarUiEvent.valueOf(uiEventValueBuilder.toString()),
+                    0,
+                    null,
+                    mSessionTracker.getSessionId(SESSION_KEYGUARD)
+            );
         }
     }
 
@@ -2760,6 +2779,7 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     protected IWindowManager mWindowManagerService;
     private final IDreamManager mDreamManager;
     private final WindowManagerProvider mWindowManagerProvider;
+    private final SessionTracker mSessionTracker;
 
     protected Display mDisplay;
     private int mDisplayId;
@@ -3043,7 +3063,8 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
                 }
 
                 @Override
-                public void onTransitionAnimationEnd() {
+                public void onTransitionAnimationEnd(
+                        @Nullable SurfaceControl.Transaction transaction) {
                     if (Flags.notificationShadeBlur()) {
                         mNotificationShadeDepthControllerLazy.get()
                                 .onTransitionAnimationEnd();

@@ -21,12 +21,10 @@ import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
 import static android.view.WindowManager.TRANSIT_CHANGE;
 import static android.view.WindowManager.TRANSIT_OPEN;
 
-import static com.android.window.flags.Flags.FLAG_ENABLE_CROSS_DISPLAYS_PIP_TASK_LAUNCH;
 import static com.android.wm.shell.transition.Transitions.TRANSIT_EXIT_PIP;
 import static com.android.wm.shell.transition.Transitions.TRANSIT_EXIT_PIP_TO_SPLIT;
 
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
@@ -44,7 +42,6 @@ import android.content.Intent;
 import android.content.res.Resources;
 import android.graphics.Rect;
 import android.os.IBinder;
-import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.flag.junit.FlagsParameterization;
 import android.platform.test.flag.junit.SetFlagsRule;
@@ -61,6 +58,8 @@ import android.window.WindowContainerTransaction;
 import androidx.test.filters.SmallTest;
 import androidx.test.platform.app.InstrumentationRegistry;
 
+import com.android.testing.wm.util.StubTransaction;
+import com.android.testing.wm.util.TransitionInfoBuilder;
 import com.android.wm.shell.Flags;
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer;
 import com.android.wm.shell.common.DisplayController;
@@ -75,8 +74,6 @@ import com.android.wm.shell.pip2.phone.PipInteractionHandler;
 import com.android.wm.shell.pip2.phone.PipScheduler;
 import com.android.wm.shell.pip2.phone.PipTransitionState;
 import com.android.wm.shell.splitscreen.SplitScreenController;
-import com.android.wm.shell.transition.TransitionInfoBuilder;
-import com.android.wm.shell.util.StubTransaction;
 
 import org.junit.Before;
 import org.junit.Rule;
@@ -92,6 +89,7 @@ import platform.test.runner.parameterized.Parameters;
 
 import java.util.List;
 import java.util.Optional;
+
 
 /**
  * Unit test against {@link PipExpandHandler}
@@ -183,15 +181,6 @@ public class PipExpandHandlerTest {
     }
 
     @Test
-    @DisableFlags(FLAG_ENABLE_CROSS_DISPLAYS_PIP_TASK_LAUNCH)
-    public void handleRequest_crossDisplaysPipLaunchFlagDisabled_returnsNull() {
-        WindowContainerTransaction wct = mPipExpandHandler.handleRequest(
-                mMockTransitionToken, mMockRequestInfo);
-        assertNull(wct);
-    }
-
-    @Test
-    @EnableFlags(FLAG_ENABLE_CROSS_DISPLAYS_PIP_TASK_LAUNCH)
     public void handleRequest_opensPipOnAnotherDisplay_returnsWct() {
         final ActivityManager.RunningTaskInfo pipTaskInfo = createPipTaskInfo(
                 TASk_ID, WINDOWING_MODE_PINNED, new PictureInPictureParams.Builder().build());
@@ -210,7 +199,6 @@ public class PipExpandHandlerTest {
     }
 
     @Test
-    @EnableFlags(FLAG_ENABLE_CROSS_DISPLAYS_PIP_TASK_LAUNCH)
     public void startAnimation_exitViaExpandOnDifferentDisplay_startExpandAnimation() {
         final ActivityManager.RunningTaskInfo pipTaskInfo = createPipTaskInfo(
                 TASk_ID, WINDOWING_MODE_PINNED, new PictureInPictureParams.Builder().build());
@@ -287,8 +275,9 @@ public class PipExpandHandlerTest {
     private TransitionInfo getExpandFromPipTransitionInfo(@WindowManager.TransitionType int type,
             @Nullable ActivityManager.RunningTaskInfo pipTaskInfo,
             @Nullable WindowContainerToken lastParent, boolean toSplit) {
-        final TransitionInfo info = new TransitionInfoBuilder(type)
-                .addChange(TRANSIT_CHANGE, pipTaskInfo).build();
+        final TransitionInfo info = pipTaskInfo == null
+                ? new TransitionInfoBuilder(type).addChange(TRANSIT_CHANGE).build()
+                : new TransitionInfoBuilder(type).addChange(TRANSIT_CHANGE, pipTaskInfo).build();
         final TransitionInfo.Change pipChange = info.getChanges().getFirst();
         pipChange.setRotation(DISPLAY_ROTATION,
                 WindowConfiguration.ROTATION_UNDEFINED);

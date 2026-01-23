@@ -22,8 +22,8 @@ import static android.view.KeyEvent.KEYCODE_UNKNOWN;
 import static android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS;
 
 import static com.android.hardware.input.Flags.enableCustomizableInputGestures;
-import static com.android.hardware.input.Flags.keyboardBacklightShortcuts;
 import static com.android.hardware.input.Flags.keyEventActivityDetection;
+import static com.android.hardware.input.Flags.keyboardBacklightShortcuts;
 import static com.android.hardware.input.Flags.touchpadVisualizer;
 import static com.android.server.policy.WindowManagerPolicy.ACTION_PASS_TO_USER;
 
@@ -43,6 +43,7 @@ import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.graphics.PixelFormat;
 import android.graphics.PointF;
+import android.gui.StalledTransactionInfo;
 import android.hardware.SensorPrivacyManager;
 import android.hardware.SensorPrivacyManager.Sensors;
 import android.hardware.SensorPrivacyManagerInternal;
@@ -62,9 +63,14 @@ import android.hardware.input.IKeyGestureHandler;
 import android.hardware.input.IKeyboardBacklightListener;
 import android.hardware.input.IStickyModifierStateListener;
 import android.hardware.input.ITabletModeChangedListener;
+import android.hardware.input.IVirtualDpad;
 import android.hardware.input.IVirtualGamepad;
-import android.hardware.input.IVirtualInputDevice;
 import android.hardware.input.IVirtualKeyboard;
+import android.hardware.input.IVirtualMouse;
+import android.hardware.input.IVirtualNavigationTouchpad;
+import android.hardware.input.IVirtualRotaryEncoder;
+import android.hardware.input.IVirtualStylus;
+import android.hardware.input.IVirtualTouchscreen;
 import android.hardware.input.InputDeviceIdentifier;
 import android.hardware.input.InputGestureData;
 import android.hardware.input.InputManager;
@@ -144,6 +150,7 @@ import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.inputmethod.InputMethodSubtypeHandle;
 import com.android.internal.os.SomeArgs;
+import com.android.internal.os.TimeoutRecord;
 import com.android.internal.policy.IShortcutService;
 import com.android.internal.protolog.ProtoLog;
 import com.android.internal.protolog.ProtoLogGroup;
@@ -160,6 +167,7 @@ import com.android.server.input.data.InputDataStore;
 import com.android.server.input.debug.FocusEventDebugView;
 import com.android.server.input.debug.TouchpadDebugViewController;
 import com.android.server.policy.WindowManagerPolicy;
+import com.android.server.utils.AnrTimer;
 
 import libcore.io.IoUtils;
 
@@ -728,10 +736,6 @@ public class InputManagerService extends IInputManager.Stub
             vArray[i] = viewports.get(i);
         }
         mNative.setDisplayViewports(vArray);
-
-        // Attempt to update the default pointer display when the viewports change.
-        // Take care to not make calls to window manager while holding internal locks.
-        mNative.setPointerDisplayId(mWindowManagerCallbacks.getPointerDisplayId());
     }
 
     private void setDisplayTopologyInternal(DisplayTopologyGraph topology) {
@@ -2004,23 +2008,6 @@ public class InputManagerService extends IInputManager.Stub
                 config.getLanguageTag(), config.getLayoutType());
     }
 
-    /**
-     * Creates a virtual keyboard that is to be used by internal local services, such as VDM.
-     * Returns a {@link IVirtualInputDevice} that is not safe for client processes (can send
-     * non-keyboard events) to own but is safe for internal services dependent on the
-     * template.
-     */
-    @NonNull
-    IVirtualInputDevice createVirtualInputKeyboardDeviceInternal(@NonNull IBinder token,
-            @NonNull VirtualKeyboardConfig config) {
-        return mVirtualInputDeviceController.createVirtualInputKeyboardDevice(
-                config.getInputDeviceName(),
-                config.getVendorId(), config.getProductId(), token,
-                InputManagerService.this.getTargetDisplayIdForInput(
-                        config.getAssociatedDisplayId()),
-                config.getLanguageTag(), config.getLayoutType());
-    }
-
     @NonNull
     IVirtualGamepad createVirtualGamepadInternal(@NonNull IBinder token,
             @NonNull VirtualGamepadConfig config) {
@@ -2630,16 +2617,41 @@ public class InputManagerService extends IInputManager.Stub
 
     // Native callback.
     @SuppressWarnings("unused")
-    private void notifyNoFocusedWindowAnr(InputApplicationHandle inputApplicationHandle) {
-        mWindowManagerCallbacks.notifyNoFocusedWindowAnr(inputApplicationHandle);
+    private void notifyNoFocusedWindowAnr(
+            InputApplicationHandle inputApplicationHandle,
+            int eventId,
+            long eventTimeNs,
+            long timeoutDurationMs) {
+        TimeoutRecord timeoutRecord =
+                TimeoutRecord.forInputDispatchNoFocusedWindow(
+                        timeoutMessage(
+                                OptionalInt.empty(), "Application does not have a focused window"));
+
+        if (android.app.Flags.includeAnrInfo()) {
+            setAnrInfoInTimeoutRecord(timeoutRecord, eventId, eventTimeNs, timeoutDurationMs);
+        }
+        mWindowManagerCallbacks.notifyNoFocusedWindowAnr(inputApplicationHandle, timeoutRecord);
     }
 
     // Native callback
     @SuppressWarnings("unused")
-    private void notifyWindowUnresponsive(IBinder token, int pid, boolean isPidValid,
-            String reason) {
-        mWindowManagerCallbacks.notifyWindowUnresponsive(token,
-                isPidValid ? OptionalInt.of(pid) : OptionalInt.empty(), reason);
+    private void notifyWindowUnresponsive(
+            IBinder token,
+            int pid,
+            boolean isPidValid,
+            String reason,
+            int eventId,
+            long eventTimeNs,
+            long timeoutDurationMs) {
+        OptionalInt optionalPid = isPidValid ? OptionalInt.of(pid) : OptionalInt.empty();
+        TimeoutRecord timeoutRecord =
+                TimeoutRecord.forInputDispatchWindowUnresponsive(
+                        timeoutMessage(optionalPid, reason));
+
+        if (android.app.Flags.includeAnrInfo()) {
+            setAnrInfoInTimeoutRecord(timeoutRecord, eventId, eventTimeNs, timeoutDurationMs);
+        }
+        mWindowManagerCallbacks.notifyWindowUnresponsive(token, optionalPid, timeoutRecord);
     }
 
     // Native callback
@@ -3545,17 +3557,20 @@ public class InputManagerService extends IInputManager.Stub
          * Notify the window manager about the focused application that does not have any focused
          * window and is unable to respond to focused input events.
          */
-        void notifyNoFocusedWindowAnr(InputApplicationHandle applicationHandle);
+        void notifyNoFocusedWindowAnr(
+                InputApplicationHandle applicationHandle, @NonNull TimeoutRecord timeoutRecord);
 
         /**
          * Notify the window manager about a window that is unresponsive.
          *
          * @param token the token that can be used to look up the window
          * @param pid the pid of the window owner, if known
-         * @param reason the reason why this connection is unresponsive
+         * @param timeoutRecord a record containing details about the ANR event.
          */
-        void notifyWindowUnresponsive(@NonNull IBinder token, @NonNull OptionalInt pid,
-                @NonNull String reason);
+        void notifyWindowUnresponsive(
+                @NonNull IBinder token,
+                @NonNull OptionalInt pid,
+                @NonNull TimeoutRecord timeoutRecord);
 
         /**
          * Notify the window manager about a window that has become responsive.
@@ -4132,14 +4147,14 @@ public class InputManagerService extends IInputManager.Stub
 
         @NonNull
         @Override
-        public IVirtualInputDevice createVirtualKeyboard(@NonNull IBinder token,
+        public IVirtualKeyboard createVirtualKeyboard(@NonNull IBinder token,
                 @NonNull VirtualKeyboardConfig config) {
-            return InputManagerService.this.createVirtualInputKeyboardDeviceInternal(token, config);
+            return InputManagerService.this.createVirtualKeyboardInternal(token, config);
         }
 
         @NonNull
         @Override
-        public IVirtualInputDevice createVirtualMouse(@NonNull IBinder token,
+        public IVirtualMouse createVirtualMouse(@NonNull IBinder token,
                 @NonNull VirtualMouseConfig config) {
             return mVirtualInputDeviceController.createMouse(config.getInputDeviceName(),
                     config.getVendorId(), config.getProductId(), token,
@@ -4148,7 +4163,7 @@ public class InputManagerService extends IInputManager.Stub
 
         @NonNull
         @Override
-        public IVirtualInputDevice createVirtualTouchscreen(@NonNull IBinder token,
+        public IVirtualTouchscreen createVirtualTouchscreen(@NonNull IBinder token,
                 @NonNull VirtualTouchscreenConfig config) {
             return mVirtualInputDeviceController.createTouchscreen(config.getInputDeviceName(),
                     config.getVendorId(), config.getProductId(), token,
@@ -4157,7 +4172,7 @@ public class InputManagerService extends IInputManager.Stub
 
         @NonNull
         @Override
-        public IVirtualInputDevice createVirtualNavigationTouchpad(@NonNull IBinder token,
+        public IVirtualNavigationTouchpad createVirtualNavigationTouchpad(@NonNull IBinder token,
                 @NonNull VirtualNavigationTouchpadConfig config) {
             return mVirtualInputDeviceController.createNavigationTouchpad(
                     config.getInputDeviceName(), config.getVendorId(),
@@ -4169,7 +4184,7 @@ public class InputManagerService extends IInputManager.Stub
 
         @NonNull
         @Override
-        public IVirtualInputDevice createVirtualDpad(@NonNull IBinder token,
+        public IVirtualDpad createVirtualDpad(@NonNull IBinder token,
                 @NonNull VirtualDpadConfig config) {
             return mVirtualInputDeviceController.createDpad(config.getInputDeviceName(),
                     config.getVendorId(), config.getProductId(), token,
@@ -4179,7 +4194,7 @@ public class InputManagerService extends IInputManager.Stub
 
         @NonNull
         @Override
-        public IVirtualInputDevice createVirtualStylus(@NonNull IBinder token,
+        public IVirtualStylus createVirtualStylus(@NonNull IBinder token,
                 @NonNull VirtualStylusConfig config) {
             return mVirtualInputDeviceController.createStylus(config.getInputDeviceName(),
                     config.getVendorId(), config.getProductId(), token,
@@ -4188,7 +4203,7 @@ public class InputManagerService extends IInputManager.Stub
 
         @NonNull
         @Override
-        public IVirtualInputDevice createVirtualRotaryEncoder(
+        public IVirtualRotaryEncoder createVirtualRotaryEncoder(
                 @NonNull IBinder token,
                 @NonNull VirtualRotaryEncoderConfig config) {
             return mVirtualInputDeviceController.createRotaryEncoder(config.getInputDeviceName(),
@@ -4467,6 +4482,40 @@ public class InputManagerService extends IInputManager.Stub
                  MotionEvent.AXIS_RY -> true;
             default -> false;
         };
+    }
+
+    private String timeoutMessage(OptionalInt pid, String reason) {
+        String message =
+                (reason == null)
+                        ? "Input dispatching timed out."
+                        : TextUtils.formatSimple("Input dispatching timed out (%s).", reason);
+        if (pid.isEmpty()) {
+            return message;
+        }
+        StalledTransactionInfo stalledTransactionInfo =
+                SurfaceControl.getStalledTransactionInfo(pid.getAsInt());
+        if (stalledTransactionInfo == null) {
+            return message;
+        }
+        return String.format(
+                "%s Buffer processing for the associated surface is stuck due to an "
+                        + "unsignaled fence (window=%s, bufferId=0x%016X, frameNumber=%s). This "
+                        + "potentially indicates a GPU hang.",
+                message,
+                stalledTransactionInfo.layerName,
+                stalledTransactionInfo.bufferId,
+                stalledTransactionInfo.frameNumber);
+    }
+
+    /**
+     * Creates a {@link AnrTimer.ExpiredTimer} object which store information about the ANR
+     * information and attach it to the timeout record to propagate ANR details.
+     */
+    private void setAnrInfoInTimeoutRecord(
+            TimeoutRecord timeoutRecord, int anrId, long eventTimeNs, long timeoutDurationMs) {
+        AnrTimer.ExpiredTimer expiredTimer =
+                new AnrTimer.ExpiredTimer(anrId, eventTimeNs / 1000_000, timeoutDurationMs);
+        timeoutRecord.setExpiredTimer(expiredTimer);
     }
 
     interface KeyboardBacklightControllerInterface {

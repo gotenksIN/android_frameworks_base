@@ -167,7 +167,7 @@ public class Bubble implements BubbleViewProvider {
     @Nullable
     private Icon mIcon;
     private boolean mIsBubble;
-    private boolean mIsTaskValidToBubble;
+    private boolean mIsTaskValidToBubbleOnSmallScreen = true;
     private boolean mIsTextChanged;
     private boolean mIsDismissable;
     private boolean mShouldSuppressNotificationDot;
@@ -712,14 +712,25 @@ public class Bubble implements BubbleViewProvider {
         mCurrentTransition = transit;
     }
 
-    /** Whether this bubble is currently converting to bubble bar. */
+    /** Whether this bubble is currently converting from floating to bubble bar. */
     public boolean isConvertingToBar() {
         return getCurrentTransition() != null && getCurrentTransition().isConvertingBubbleToBar();
+    }
+
+    /** Whether this bubble is currently converting from bar to floating. */
+    public boolean isConvertingToFloating() {
+        return getCurrentTransition() != null
+                && getCurrentTransition().isConvertingBubbleToFloating();
     }
 
     /** Whether this bubble is currently switching to expanded from another bubble using jumpcut. */
     public boolean isJumpcutBubbleSwitching() {
         return getCurrentTransition() != null && getCurrentTransition().isJumpcutBubbleSwitching();
+    }
+
+    /** Whether this transition is for switching from one bubble to another. */
+    public boolean isBubbleSwitching() {
+        return getCurrentTransition() != null && getCurrentTransition().isBubbleSwitching();
     }
 
     /**
@@ -1066,10 +1077,10 @@ public class Bubble implements BubbleViewProvider {
     }
 
     /**
-     * Sets whether the task is valid to bubble.
+     * Sets whether the task is valid to bubble on small screens.
      */
-    public void setIsTaskValidToBubble(boolean isTaskValidToBubble) {
-        mIsTaskValidToBubble = isTaskValidToBubble;
+    public void setIsTaskValidToBubbleOnSmallScreen(boolean isTaskValidToBubbleOnSmallScreen) {
+        mIsTaskValidToBubbleOnSmallScreen = isTaskValidToBubbleOnSmallScreen;
     }
 
     /**
@@ -1284,6 +1295,15 @@ public class Bubble implements BubbleViewProvider {
         }
     }
 
+    /**
+     * Marks whether the bubble task should be removed during the cleanup process
+     */
+    public void setTaskShouldBeRemoved(boolean taskShouldBeRemoved) {
+        if (mBubbleTaskView != null) {
+            mBubbleTaskView.setTaskShouldBeRemoved(taskShouldBeRemoved);
+        }
+    }
+
     public void setIsBubble(final boolean isBubble) {
         mIsBubble = isBubble;
     }
@@ -1308,8 +1328,8 @@ public class Bubble implements BubbleViewProvider {
         return mFlags;
     }
 
-    public boolean isTaskValidToBubble() {
-        return mIsTaskValidToBubble;
+    public boolean isTaskValidToBubbleOnSmallScreen() {
+        return mIsTaskValidToBubbleOnSmallScreen;
     }
 
     @Override
@@ -1333,6 +1353,7 @@ public class Bubble implements BubbleViewProvider {
         pw.println("  bubbleMetadataFlagListener null?: " + (mBubbleMetadataFlagListener == null));
         pw.println("  mCurrentTransition null?: " + (mCurrentTransition == null));
         pw.println("  isConvertingToBar: " + isConvertingToBar());
+        pw.println("  isConvertingToFloating: " + isConvertingToFloating());
         pw.println("  isCleanupDeferred: " + mIsCleanupDeferred);
         if (mExpandedView != null) {
             mExpandedView.dump(pw, "  ");

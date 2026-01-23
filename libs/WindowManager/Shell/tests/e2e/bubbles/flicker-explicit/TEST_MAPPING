@@ -81,7 +81,11 @@
       "keywords": ["device"]
     },
     {
-      "name": "WMShellExplicitFlickerTestsBubbles-ExpandBubbleViaBubbleStackTest",
+      "name": "WMShellExplicitFlickerTestsBubbles-ExpandBubbleViaRelaunchFromSplitTest",
+      "keywords": ["device"]
+    },
+    {
+      "name": "WMShellExplicitFlickerTestsBubbles-RelaunchBubbleIntoSplitScreenTest",
       "keywords": ["device"]
     },
     {
@@ -135,7 +139,19 @@
       "keywords": ["device"]
     },
     {
-      "name": "WMShellExplicitFlickerTestsBubbles-RelaunchBubbleIntoSplitScreenTest",
+      "name": "WMShellExplicitFlickerTestsBubbles-RelaunchBubbleToFullscreenViaAppIconTest",
+      "keywords": ["device"]
+    },
+    {
+      "name": "WMShellExplicitFlickerTestsBubbles-RelaunchBubbleToFullscreenViaShortcutTest",
+      "keywords": ["device"]
+    },
+    {
+      "name": "WMShellExplicitFlickerTestsBubbles-RelaunchBubbleToFullscreenViaTaskbarAppIconTest",
+      "keywords": ["device"]
+    },
+    {
+      "name": "WMShellExplicitFlickerTestsBubbles-RelaunchBubbleToFullscreenViaTaskbarShortcutTest",
       "keywords": ["device"]
     }
   ]

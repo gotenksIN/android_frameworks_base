@@ -158,6 +158,10 @@
     <string name="wfc_mode_wifi_preferred_summary" msgid="1035175836270943089">"વાઇ-ફાઇ પરથી કૉલ કરો"</string>
     <string name="wfc_mode_cellular_preferred_summary" msgid="4958965609212575619">"મોબાઇલ નેટવર્ક પરથી કૉલ કરો"</string>
     <string name="wfc_mode_wifi_only_summary" msgid="104951993894678665">"ફક્ત વાઇ-ફાઇ"</string>
+    <string name="adaptive_low_frequency_less_than_one_minute" msgid="8869498183646028708">"~ %s"</string>
+    <string name="adaptive_low_frequency_neg_less_than_one_minute" msgid="2590062535985417056">"~ −%s"</string>
+    <string name="elapsed_time_low_frequency_short_format_h_mm" msgid="6728141238066668781">"%1$d:%2$02d:--"</string>
+    <string name="elapsed_time_low_frequency_short_format_mm" msgid="2405181895215514414">"%1$02d:--"</string>
     <!-- no translation found for crossSimFormat_spn (9125246077491634262) -->
     <skip />
     <string name="crossSimFormat_spn_cross_sim_calling" msgid="5620807020002879057">"<xliff:g id="SPN">%s</xliff:g> બૅકઅપ કૉલિંગ"</string>
@@ -631,13 +635,13 @@
     <string name="permdesc_bluetooth" product="tablet" msgid="3053222571491402635">"એપ્લિકેશનને ટેબ્લેટ પર બ્લૂટૂથ ની ગોઠવણી જોવાની અને જોડી કરેલ ઉપકરણો સાથે કનેક્શન્સ કરવાની અને સ્વીકારવાની મંજૂરી આપે છે."</string>
     <string name="permdesc_bluetooth" product="tv" msgid="8851534496561034998">"ઍપને તમારા Android TV ડિવાઇસ પર બ્લૂટૂથની ગોઠવણી જોવાની અને જોડાણ કરેલા ડિવાઇસની સાથે કનેક્શન કરવાની અને સ્વીકારવાની મંજૂરી આપે છે."</string>
     <string name="permdesc_bluetooth" product="default" msgid="2779606714091276746">"એપ્લિકેશનને ફોન પર બ્લૂટૂથ ની ગોઠવણી જોવાની અને જોડી કરેલ ઉપકરણો સાથે કનેક્શન્સ કરવાની અને સ્વીકારવાની મંજૂરી આપે છે."</string>
-    <string name="permlab_bluetooth_scan" msgid="5402587142833124594">"આસપાસના બ્લૂટૂથ ડિવાઇસ શોધો અને તેની સાથે જોડી કરો"</string>
+    <string name="permlab_bluetooth_scan" msgid="5402587142833124594">"નજીકના બ્લૂટૂથ ડિવાઇસ શોધો અને તેની સાથે જોડાણ કરો"</string>
     <string name="permdesc_bluetooth_scan" product="default" msgid="6540723536925289276">"ઍપને આસપાસના બ્લૂટૂથ ડિવાઇસ શોધવાની અને તેની સાથે જોડી કરવાની મંજૂરી આપે છે"</string>
-    <string name="permlab_bluetooth_connect" msgid="6657463246355003528">"જોડી કરેલા બ્લૂટૂથ ડિવાઇસ સાથે કનેક્ટ કરો"</string>
+    <string name="permlab_bluetooth_connect" msgid="6657463246355003528">"જોડાણ કરેલા બ્લૂટૂથ ડિવાઇસ સાથે કનેક્ટ કરો"</string>
     <string name="permdesc_bluetooth_connect" product="default" msgid="4546016548795544617">"ઍપને જોડી કરેલા બ્લૂટૂથ ડિવાઇસ સાથે કનેક્ટ કરવાની મંજૂરી આપે છે"</string>
     <string name="permlab_bluetooth_advertise" msgid="2781147747928853177">"નજીકના બ્લૂટૂથ ડિવાઇસ પર જાહેરાત કરો"</string>
     <string name="permdesc_bluetooth_advertise" product="default" msgid="6085174451034210183">"નજીકના બ્લૂટૂથ ડિવાઇસ પર ઍપને જાહેરાત કરવાની મંજૂરી આપે છે"</string>
-    <string name="permlab_uwb_ranging" msgid="8141915781475770665">"અલ્ટ્રા-વાઇડબૅન્ડ ડિવાઇસની વચ્ચેનું અંતર નક્કી કરો"</string>
+    <string name="permlab_uwb_ranging" msgid="8141915781475770665">"નજીકના અલ્ટ્રા-વાઇડબૅન્ડ ડિવાઇસની વચ્ચેનું અંતર નક્કી કરો"</string>
     <string name="permdesc_uwb_ranging" msgid="2519723069604307055">"ઍપને નજીકના અલ્ટ્રા-વાઇડબૅન્ડ ડિવાઇસની વચ્ચેનું સંબંધિત અંતર નક્કી કરવાની મંજૂરી આપો"</string>
     <string name="permlab_nearby_wifi_devices" msgid="392774237063608500">"નજીકના વાઇ-ફાઇ ડિવાઇસ સાથે ક્રિયાપ્રતિક્રિયા કરો"</string>
     <string name="permdesc_nearby_wifi_devices" msgid="3054307728646332906">"ઍપને નજીકના વાઇ-ફાઇ ડિવાઇસની માહિતી બતાવવાની, તેની સાથે કનેક્ટ કરવાની અને તેની સંબંધિત સ્થિતિ નક્કી કરવાની મંજૂરી આપો"</string>
@@ -645,10 +649,8 @@
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"ઍપને સ્થાનિક નેટવર્કના ડિવાઇસ ઍક્સેસ કરવાની મંજૂરી આપે છે"</string>
     <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"લૂપબૅક ઇન્ટરફેસનો ઉપયોગ કરો"</string>
     <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"ઍપને લૂપબૅક ઇન્ટરફેસ પર અન્ય ઍપ સાથે ક્રિયાપ્રતિક્રિયા કરવાની મંજૂરી આપે છે"</string>
-    <!-- no translation found for permlab_force_use_loopback_interface (1319727311706416481) -->
-    <skip />
-    <!-- no translation found for permdesc_force_use_loopback_interface (5829032514048681980) -->
-    <skip />
+    <string name="permlab_force_use_loopback_interface" msgid="1319727311706416481">"લૂપબૅક ઇન્ટરફેસનો ફરજિયાત ઉપયોગ"</string>
+    <string name="permdesc_force_use_loopback_interface" msgid="5829032514048681980">"અન્ય ઍપને લૂપબૅક પરવાનગીઓ ધરાવવાની જરૂરિયાત વિના, ઍપને લૂપબૅક ઇન્ટરફેસ પર અન્ય ઍપ સાથે ક્રિયાપ્રતિક્રિયા કરવા દે છે"</string>
     <string name="permlab_ranging" msgid="2854543350668593390">"ડિવાઇસની વચ્ચેનું સાપેક્ષ અંતર નક્કી કરો"</string>
     <string name="permdesc_ranging" msgid="6703905535621521710">"ઍપને નજીકના ડિવાઇસની વચ્ચેનું સાપેક્ષ અંતર નક્કી કરવાની મંજૂરી આપો"</string>
     <string name="permlab_preferredPaymentInfo" msgid="5274423844767445054">"પસંદગીની NFC ચુકવણીની સેવા વિશે માહિતી"</string>
@@ -774,7 +776,7 @@
     <string name="face_acquired_too_low" msgid="4075391872960840081">"ફોનને થોડો નીચે લઈ જાઓ"</string>
     <string name="face_acquired_too_right" msgid="6245286514593540859">"ફોનને તમારી ડાબી બાજુએ લઈ જાઓ"</string>
     <string name="face_acquired_too_left" msgid="9201762240918405486">"ફોનને તમારી જમણી બાજુએ લઈ જાઓ"</string>
-    <string name="face_acquired_poor_gaze" msgid="4427153558773628020">"કૃપા કરીને તમારા ડિવાઇસ તરફ સીધું જુઓ."</string>
+    <string name="face_acquired_poor_gaze" msgid="6746437451436776485">"વધારે પ્રમાણમાં સીધું તમારા કૅમેરા તરફ જુઓ"</string>
     <string name="face_acquired_not_detected" msgid="1057966913397548150">"તમારો ચહેરો દેખાતો નથી. તમારા ફોનને આંખના લેવલ પર પકડી રાખો."</string>
     <string name="face_acquired_too_much_motion" msgid="8199691445085189528">"ડિવાઇસ અસ્થિર છે. ફોનને સ્થિર રાખો."</string>
     <string name="face_acquired_recalibrate" msgid="8724013080976469746">"કૃપા કરીને તમારા ચહેરાની ફરી નોંધણી કરાવો."</string>
@@ -1454,6 +1456,9 @@
     <string name="carrier_app_notification_text" msgid="6567057546341958637">"તેને સેટ કરવા માટે ટૅપ કરો"</string>
     <string name="time_zone_change_notification_title" msgid="5232503069219193218">"તમારો ટાઇમ ઝોન બદલાયો છે"</string>
     <string name="time_zone_change_notification_body" msgid="6135793674904665585">"તમે <xliff:g id="TIME_ZONE_DISPLAY_NAME">%1$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET">%2$s</xliff:g>)માં છો"</string>
+    <string name="time_zone_offset_change_notification_title" msgid="8232305835199459588">"ઘડિયાળના સમયમાં ફેરફાર"</string>
+    <string name="time_zone_offset_change_notification_body_forward" msgid="1299493962341887576">"ઘડિયાળોનો સમય <xliff:g id="TIME_ZONE_OFFSET_DURATION">%1$s</xliff:g> આગળ ખસેડવામાં આવ્યો. હવે તમે <xliff:g id="TIME_ZONE_DISPLAY_NAME">%2$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET_0">%3$s</xliff:g>)માં છો."</string>
+    <string name="time_zone_offset_change_notification_body_backward" msgid="6643532078142642118">"ઘડિયાળોનો સમય <xliff:g id="TIME_ZONE_OFFSET_DURATION">%1$s</xliff:g> પાછળ ખસેડવામાં આવ્યો. હવે તમે <xliff:g id="TIME_ZONE_DISPLAY_NAME">%2$s</xliff:g> (<xliff:g id="TIME_ZONE_OFFSET_0">%3$s</xliff:g>)માં છો."</string>
     <string name="time_picker_dialog_title" msgid="9053376764985220821">"સમય સેટ કરો"</string>
     <string name="date_picker_dialog_title" msgid="5030520449243071926">"તારીખ સેટ કરો"</string>
     <string name="date_time_set" msgid="4603445265164486816">"સેટ કરો"</string>
@@ -1829,6 +1834,7 @@
     <string name="accessibility_shortcut_label_gesture" msgid="7987298674836890931">"સંકેત"</string>
     <string name="accessibility_shortcut_label_quick_settings" msgid="6851280333772213611">"ઝડપી સેટિંગ"</string>
     <string name="accessibility_shortcut_label_triple_tap" msgid="9058975959054454796">"ત્રણ વાર ટૅપ કરો"</string>
+    <string name="accessibility_shortcut_label_top_row_key" msgid="1488840908672437180">"ઍક્સેસિબિલિટી કી"</string>
     <string name="accessibility_uncheck_legacy_item_warning" msgid="8047830891064817447">"<xliff:g id="SERVICE_NAME">%s</xliff:g> બંધ કરવામાં આવ્યું છે"</string>
     <string name="edit_accessibility_shortcut_menu_button" msgid="8885752738733772935">"શૉર્ટકટમાં ફેરફાર કરો"</string>
     <string name="done_accessibility_shortcut_menu_button" msgid="3668407723770815708">"થઈ ગયું"</string>
@@ -2105,6 +2111,7 @@
     <string name="app_suspended_default_message" msgid="6451215678552004172">"<xliff:g id="APP_NAME_0">%1$s</xliff:g> હમણાં ઉપલબ્ધ નથી. આને <xliff:g id="APP_NAME_1">%2$s</xliff:g> દ્વારા મેનેજ કરવામાં આવે છે."</string>
     <string name="app_suspended_more_details" msgid="211260942831587014">"વધુ જાણો"</string>
     <string name="app_suspended_unsuspend_message" msgid="1665438589450555459">"ઍપ ફરી શરૂ કરો"</string>
+    <string name="locked_app_biometric_prompt_description" msgid="6853122652400451464">"<xliff:g id="APP_NAME">%1$s</xliff:g> લૉક કરેલી છે"</string>
     <string name="work_mode_off_title" msgid="6367463960165135829">"ઑફિસની થોભાવેલી ઍપ ચાલુ કરીએ?"</string>
     <string name="work_mode_turn_on" msgid="5316648862401307800">"ફરી ચાલુ કરો"</string>
     <string name="work_mode_emergency_call_button" msgid="6818855962881612322">"ઇમર્જન્સી"</string>
@@ -2544,6 +2551,8 @@
     <string name="accessibility_label_clone_profile" msgid="7579118375042398784">"ક્લોન"</string>
     <string name="accessibility_label_communal_profile" msgid="1437173163111334791">"કૉમ્યુનલ"</string>
     <string name="private_space_biometric_prompt_title" msgid="5777592909271728154">"ખાનગી સ્પેસ"</string>
+    <string name="app_locked_new_notification" msgid="4409730436247596215">"નવું નોટિફિકેશન"</string>
+    <string name="app_locked_notification_message" msgid="4576179600328065280">"નવો મેસેજ"</string>
     <string name="redacted_notification_message" msgid="1520587845842228816">"સંવેદનશીલ માહિતીવાળા નોટિફિકેશનનું કન્ટેન્ટ છુપાવ્યું"</string>
     <string name="redacted_notification_action_title" msgid="6942924973335920935"></string>
     <string name="screen_not_shared_sensitive_content" msgid="7058419185079565001">"સુરક્ષા માટે સ્ક્રીન શેર કરતી વખતે ઍપનું કન્ટેન્ટ છુપાવેલું છે"</string>

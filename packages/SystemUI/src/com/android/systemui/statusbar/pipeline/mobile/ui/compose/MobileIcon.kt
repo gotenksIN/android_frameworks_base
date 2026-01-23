@@ -68,7 +68,7 @@ fun MobileIcon(viewModel: MobileIconViewModelCommon, modifier: Modifier = Modifi
     if (!isVisible) return
 
     val icon by viewModel.icon.collectAsStateWithLifecycle(initialValue = SignalIconModel.DEFAULT)
-    if (icon !is SignalIconModel.Cellular) return
+    if (icon !is SignalIconModel.CellularTypeIconModel.Cellular) return
 
     val contentDescription by
         viewModel.contentDescription.collectAsStateWithLifecycle(initialValue = null)
@@ -84,7 +84,10 @@ fun MobileIcon(viewModel: MobileIconViewModelCommon, modifier: Modifier = Modifi
     val context = LocalContext.current
     val contentColor = LocalContentColor.current
     val spacing = with(LocalDensity.current) { MobileIconDimensions.IconSpacingSp.toDp() }
-
+    val volteId by
+        viewModel.volteId.collectAsStateWithLifecycle(initialValue = 0)
+    val showSignalStrengthIcon by
+        viewModel.showSignalStrengthIcon.collectAsStateWithLifecycle(initialValue = true)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier =
@@ -94,6 +97,19 @@ fun MobileIcon(viewModel: MobileIconViewModelCommon, modifier: Modifier = Modifi
                 }
             },
     ) {
+        if (volteId != 0) {
+            val volteHeight = with(LocalDensity.current) {
+                MobileIconDimensions.VolteIconHeightSp.toDp() }
+            Image(
+                painter = painterResource(volteId),
+                contentDescription = null,
+                modifier = Modifier.height(volteHeight),
+                colorFilter = ColorFilter.tint(contentColor, BlendMode.SrcIn),
+                contentScale = ContentScale.FillHeight,
+            )
+            Spacer(Modifier.size(spacing))
+        }
+
         if (activityContainerVisible) {
             Column {
                 ActivityIndicators(
@@ -119,9 +135,14 @@ fun MobileIcon(viewModel: MobileIconViewModelCommon, modifier: Modifier = Modifi
 
         Spacer(Modifier.size(spacing))
 
-        MobileSignalIcon(viewModel = icon as SignalIconModel.Cellular, color = contentColor)
+        if (showSignalStrengthIcon) {
+        MobileSignalIcon(
+            viewModel = icon as SignalIconModel.CellularTypeIconModel.Cellular,
+            color = contentColor,
+        )
 
-        Spacer(Modifier.size(spacing))
+            Spacer(Modifier.size(spacing))
+        }
 
         if (roaming) {
             val height =
@@ -181,7 +202,7 @@ fun ActivityIndicators(
 /** Composable for rendering the mobile signal strength */
 @Composable
 private fun MobileSignalIcon(
-    viewModel: SignalIconModel.Cellular,
+    viewModel: SignalIconModel.CellularTypeIconModel.Cellular,
     color: Color,
     modifier: Modifier = Modifier,
 ) {
@@ -322,4 +343,5 @@ private object MobileIconDimensions {
     val RoamingIconHeightSp = 10.sp
     val RoamingIconPaddingTopSp = 1.sp
     val ActivityIndicatorSizeSp = 12.sp
+    val VolteIconHeightSp = 8.sp
 }

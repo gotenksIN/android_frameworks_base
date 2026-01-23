@@ -187,7 +187,7 @@ public abstract class NotificationListenerService extends Service {
      * the value is unavailable for any reason.  For example, before the notification listener
      * is connected.
      *
-     * {@see #onListenerConnected()}
+     * @see #onListenerConnected()
      */
     public static final int INTERRUPTION_FILTER_UNKNOWN
             = NotificationManager.INTERRUPTION_FILTER_UNKNOWN;
@@ -782,7 +782,7 @@ public abstract class NotificationListenerService extends Service {
      * <p>The service should wait for the {@link #onListenerConnected()} event
      * before performing this operation.
      *
-     * {@see #cancelNotification(String, String, int)}
+     * @see #cancelNotification(String, String, int)
      */
     public final void cancelAllNotifications() {
         cancelNotifications(null /*all*/);
@@ -799,7 +799,7 @@ public abstract class NotificationListenerService extends Service {
      *
      * @param keys Notifications to dismiss, or {@code null} to dismiss all.
      *
-     * {@see #cancelNotification(String, String, int)}
+     * @see #cancelNotification(String, String, int)
      */
     public final void cancelNotifications(String[] keys) {
         if (!isBound()) return;
@@ -1527,26 +1527,7 @@ public abstract class NotificationListenerService extends Service {
     /** @hide */
     protected class NotificationListenerWrapper extends INotificationListener.Stub {
         @Override
-        public void onNotificationPosted(IStatusBarNotificationHolder sbnHolder,
-                NotificationRankingUpdate update, long dispatchToken) {
-            StatusBarNotification sbn;
-            try {
-                sbn = sbnHolder.get();
-            } catch (RemoteException e) {
-                Log.w(TAG, "onNotificationPosted: Error receiving StatusBarNotification", e);
-                notifyDispatchCompletion(dispatchToken);
-                return;
-            }
-            if (sbn == null) {
-                Log.w(TAG, "onNotificationPosted: Error receiving StatusBarNotification");
-                notifyDispatchCompletion(dispatchToken);
-                return;
-            }
-            onNotificationPostedFull(sbn, update, dispatchToken);
-        }
-
-        @Override
-        public void onNotificationPostedFull(StatusBarNotification sbn,
+        public void onNotificationPosted(StatusBarNotification sbn,
                 NotificationRankingUpdate update, long dispatchToken) {
             try {
                 // convert icon metadata to legacy format for older clients
@@ -1582,22 +1563,7 @@ public abstract class NotificationListenerService extends Service {
         }
 
         @Override
-        public void onNotificationRemoved(IStatusBarNotificationHolder sbnHolder,
-                NotificationRankingUpdate update, NotificationStats stats, int reason,
-                long dispatchToken) {
-            StatusBarNotification sbn;
-            try {
-                sbn = sbnHolder.get();
-            } catch (RemoteException e) {
-                Log.w(TAG, "onNotificationRemoved: Error receiving StatusBarNotification", e);
-                notifyDispatchCompletion(dispatchToken);
-                return;
-            }
-            onNotificationRemovedFull(sbn, update, stats, reason, dispatchToken);
-        }
-
-        @Override
-        public void onNotificationRemovedFull(StatusBarNotification sbn,
+        public void onNotificationRemoved(StatusBarNotification sbn,
                 NotificationRankingUpdate update, NotificationStats stats, int reason,
                 long dispatchToken) {
             if (sbn == null) {
@@ -1676,14 +1642,6 @@ public abstract class NotificationListenerService extends Service {
 
         @Override
         public void onNotificationEnqueuedWithChannel(
-                IStatusBarNotificationHolder notificationHolder, NotificationChannel channel,
-                NotificationRankingUpdate update)
-                throws RemoteException {
-            // no-op in the listener
-        }
-
-        @Override
-        public void onNotificationEnqueuedWithChannelFull(
                 StatusBarNotification sbn, NotificationChannel channel,
                 NotificationRankingUpdate update)
                 throws RemoteException {
@@ -1714,13 +1672,6 @@ public abstract class NotificationListenerService extends Service {
 
         @Override
         public void onNotificationSnoozedUntilContext(
-                IStatusBarNotificationHolder notificationHolder, String snoozeCriterionId)
-                throws RemoteException {
-            // no-op in the listener
-        }
-
-        @Override
-        public void onNotificationSnoozedUntilContextFull(
                 StatusBarNotification sbn, String snoozeCriterionId)
                 throws RemoteException {
             // no-op in the listener
@@ -2223,7 +2174,6 @@ public abstract class NotificationListenerService extends Service {
          * notification and related notifications (for example, if this is provided for a group
          * summary notification it may be summarizing all the child notifications).
          */
-        @FlaggedApi(android.app.Flags.FLAG_NM_SUMMARIZATION)
         public @Nullable String getSummarization() {
             return mSummarization;
         }

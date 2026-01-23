@@ -39,7 +39,6 @@ import static com.android.keyguard.KeyguardUpdateMonitor.BIOMETRIC_STATE_CANCELL
 import static com.android.keyguard.KeyguardUpdateMonitor.BIOMETRIC_STATE_STOPPED;
 import static com.android.keyguard.KeyguardUpdateMonitor.HAL_POWER_PRESS_TIMEOUT;
 import static com.android.systemui.Flags.FLAG_GLANCEABLE_HUB_V2;
-import static com.android.systemui.Flags.FLAG_SIM_NEXT_SUB_ID;
 import static com.android.systemui.statusbar.policy.DevicePostureController.DEVICE_POSTURE_OPENED;
 import static com.android.systemui.statusbar.policy.DevicePostureController.DEVICE_POSTURE_UNKNOWN;
 
@@ -135,7 +134,6 @@ import com.android.keyguard.KeyguardUpdateMonitor.BiometricAuthenticated;
 import com.android.keyguard.logging.KeyguardUpdateMonitorLogger;
 import com.android.keyguard.logging.SimLogger;
 import com.android.settingslib.fuelgauge.BatteryStatus;
-import com.android.systemui.Flags;
 import com.android.systemui.SysuiTestCase;
 import com.android.systemui.ambient.statusbar.shared.flag.OngoingActivityChipsOnDream;
 import com.android.systemui.biometrics.AuthController;
@@ -204,7 +202,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 @SmallTest
 @RunWith(ParameterizedAndroidJunit4.class)
 @TestableLooper.RunWithLooper
-@EnableFlags(Flags.FLAG_USER_ENCRYPTED_SOURCE)
 public class KeyguardUpdateMonitorTest extends SysuiTestCase {
     private static final String PKG_ALLOWING_FP_LISTEN_ON_OCCLUDING_ACTIVITY =
             "test_app_fp_listen_on_occluding_activity";
@@ -2477,7 +2474,6 @@ public class KeyguardUpdateMonitorTest extends SysuiTestCase {
     }
 
     @Test
-    @EnableFlags(FLAG_SIM_NEXT_SUB_ID)
     public void getNextSubIdForState_noSimData() {
         var subId = mKeyguardUpdateMonitor.getNextSubIdForState(
                 TelephonyManager.SIM_STATE_PIN_REQUIRED);
@@ -2485,7 +2481,6 @@ public class KeyguardUpdateMonitorTest extends SysuiTestCase {
     }
 
     @Test
-    @EnableFlags(FLAG_SIM_NEXT_SUB_ID)
     public void getNextSubIdForState_noSimDataThatMatchesState() {
         int subId = 1;
         int slotId = 0;
@@ -2498,7 +2493,6 @@ public class KeyguardUpdateMonitorTest extends SysuiTestCase {
     }
 
     @Test
-    @EnableFlags(FLAG_SIM_NEXT_SUB_ID)
     public void getNextSubIdForState_oneSimDataThatMatchesState() {
         int subId = 1;
         int slotId = 0;
@@ -2511,7 +2505,6 @@ public class KeyguardUpdateMonitorTest extends SysuiTestCase {
     }
 
     @Test
-    @EnableFlags(FLAG_SIM_NEXT_SUB_ID)
     public void getNextSubIdForState_twoSimDataThatMatchesState_returnsLowestSlotId() {
         int subId1 = 10;
         int slotId1 = 0;

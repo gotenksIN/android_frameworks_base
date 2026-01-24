@@ -200,6 +200,8 @@ class CarrierMergedConnectionRepositoryKairos(
         telephonyManager.setDataEnabledForReason(TelephonyManager.DATA_ENABLED_REASON_USER, enabled)
     }
 
+    override val volteId: State<Int> = stateOf(0)
+    override val showSignalStrengthIcon: State<Boolean> = stateOf(true)
     companion object {
         // Carrier merged is never roaming
         private const val ROAMING = false

@@ -2397,7 +2397,7 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
     @Override
     public void surfaceDestroyed() {
         setWindowStopped(true);
-        mRemoteAccessibilityController.disassosciateHierarchy();
+        mRemoteAccessibilityController.disassociateHierarchy();
     }
 
     /**
@@ -2609,7 +2609,7 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
     private void initEmbeddedHierarchyForAccessibility(SurfaceControlViewHost.SurfacePackage p) {
         if (!mShouldEmbedAccessibilityHierarchy) {
             if (mRemoteAccessibilityController.connected()) {
-                mRemoteAccessibilityController.disassosciateHierarchy();
+                mRemoteAccessibilityController.disassociateHierarchy();
             }
             return;
         }
@@ -2617,8 +2617,9 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
         if (mRemoteAccessibilityController.alreadyAssociated(connection)) {
             return;
         }
-        mRemoteAccessibilityController.assosciateHierarchy(connection,
-            getViewRootImpl().mLeashToken, getAccessibilityViewId());
+        mRemoteAccessibilityController.associateHierarchy(connection,
+                getViewRootImpl().mLeashToken, getAccessibilityViewId(),
+                getAccessibilityWindowId());
 
         updateEmbeddedAccessibilityMatrix(true);
     }

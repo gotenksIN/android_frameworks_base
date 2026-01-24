@@ -764,7 +764,6 @@ package android.app.appfunctions {
 
   @FlaggedApi("android.app.appfunctions.flags.enable_app_function_manager") public final class AppFunctionManager {
     method @FlaggedApi("android.permission.flags.app_function_access_api_enabled") @NonNull @RequiresPermission(android.Manifest.permission.MANAGE_APP_FUNCTION_ACCESS) public java.util.List<android.content.pm.SignedPackage> getAgentAllowlist();
-    method @FlaggedApi("android.permission.flags.app_function_access_api_enabled") @NonNull public java.util.Set<java.lang.String> getDeviceSettingPackages();
     field @FlaggedApi("android.permission.flags.app_function_access_api_enabled") public static final int ACCESS_FLAG_MASK_ALL = 63; // 0x3f
     field @FlaggedApi("android.permission.flags.app_function_access_api_enabled") public static final int ACCESS_FLAG_MASK_OTHER = 48; // 0x30
     field @FlaggedApi("android.permission.flags.app_function_access_api_enabled") public static final int ACCESS_FLAG_MASK_USER = 12; // 0xc
@@ -3252,6 +3251,8 @@ package android.provider {
     field public static final int STYLUS_HANDWRITING_DEFAULT_VALUE = 1; // 0x1
     field public static final String STYLUS_HANDWRITING_ENABLED = "stylus_handwriting_enabled";
     field @RequiresPermission(android.Manifest.permission.WRITE_SECURE_SETTINGS) public static final String SYNC_PARENT_SOUNDS = "sync_parent_sounds";
+    field @FlaggedApi("android.service.chooser.tap_to_share") public static final String TAP_EVENT_SERVICE_COMPONENT = "tap_event_service_component";
+    field @FlaggedApi("android.service.chooser.tap_to_share") public static final String TAP_SHARE_FULFILLMENT_ACTIVITY_COMPONENT = "tap_share_fulfillment_activity_component";
     field public static final String VOICE_INTERACTION_SERVICE = "voice_interaction_service";
   }
 
@@ -3740,7 +3741,7 @@ package android.telephony {
     ctor @Deprecated public PreciseDataConnectionState(int, int, int, @NonNull String, @Nullable android.net.LinkProperties, int);
   }
 
-  @FlaggedApi("com.android.internal.telephony.flags.security_algorithms_update_indications") public final class SecurityAlgorithmUpdate implements android.os.Parcelable {
+  public final class SecurityAlgorithmUpdate implements android.os.Parcelable {
     ctor public SecurityAlgorithmUpdate(int, int, int, boolean);
   }
 

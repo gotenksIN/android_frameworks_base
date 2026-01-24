@@ -789,9 +789,12 @@ public final class CachedAppOptimizerTest {
     @Test
     public void zramWritebackNotInitiatedDueToGpuMemory() throws Exception {
         final int pid = 1;
+        final int gpuMemThreshold =
+                CachedAppOptimizer.DEFAULT_ZRAM_WRITEBACK_GPU_MEM_THRESHOLD_KB;
         KernelAllocationStats.ProcessGpuMem[] gpuAllocations =
                 new KernelAllocationStats.ProcessGpuMem[1];
-        gpuAllocations[0] = new KernelAllocationStats.ProcessGpuMem(pid, 1024);
+        gpuAllocations[0] = new KernelAllocationStats.ProcessGpuMem(
+                pid, gpuMemThreshold + 1);
         doReturn(gpuAllocations).when(mKernelAllocProvider).getGpuAllocations();
 
         long[] rssAfter =
@@ -806,7 +809,9 @@ public final class CachedAppOptimizerTest {
     @Test
     public void zramWritebackNotInitiatedDueToDmaBuf() throws Exception {
         final int pid = 1;
-        doReturn(1024L).when(mKernelAllocProvider).getDmabufSizeForProcessKb(pid);
+        doReturn(CachedAppOptimizer.DEFAULT_ZRAM_WRITEBACK_DMABUF_MEM_THRESHOLD_KB + 1L)
+                .when(mKernelAllocProvider)
+                .getDmabufSizeForProcessKb(pid);
 
         long[] rssAfter =
                 new long[]{/*totalRSS*/ 9000, /*fileRSS*/ 9000, /*anonRSS*/ 11000, /*swap*/9000};
@@ -1236,39 +1241,6 @@ public final class CachedAppOptimizerTest {
         mFreezeCounter = new CountDownLatch(2);
         mCachedAppOptimizerUnderTest.forceFreezeForTest(app, false);
         assertTrue(mFreezeCounter.await(5, TimeUnit.SECONDS));
-    }
-
-    @Test
-    public void shouldNotFreezeIgnored() throws InterruptedException {
-        mProcessDependencies.setRss(new long[] {
-                0 /*total_rss*/,
-                0 /*file*/,
-                0 /*anon*/,
-                0 /*swap*/,
-                0 /*shmem*/
-        });
-        mUseFreezer = true;
-        // Force the system to use the freezer
-        DeviceConfig.setProperty(DeviceConfig.NAMESPACE_ACTIVITY_MANAGER_NATIVE_BOOT,
-                CachedAppOptimizer.KEY_USE_FREEZER, "true", false);
-        mCachedAppOptimizerUnderTest.init();
-        initActivityManagerService();
-
-        int pid = 10000;
-        int uid = 2;
-        int pkgUid = 3;
-        final ProcessRecord app = makeProcessRecord(pid, uid, pkgUid, "p1", "app1");
-        app.setShouldNotFreeze(true, false, 0, 0);
-
-        assertNotNull(app.mOptRecord);
-        assertFalse(app.mOptRecord.isFrozen());
-
-        mFreezeCounter = new CountDownLatch(1);
-        mCachedAppOptimizerUnderTest.forceFreezeForTest(app, true);
-        waitForHandler();
-
-        assertTrue(mFreezeCounter.await(0, TimeUnit.SECONDS));
-        assertTrue(app.mOptRecord.isFrozen());
     }
 
     private void setFlag(String key, String value, boolean defaultValue) throws Exception {

@@ -28,8 +28,6 @@ import static com.android.server.appfunctions.AppFunctionExecutors.THREAD_POOL_E
 import static com.android.server.appfunctions.CallerValidator.CAN_EXECUTE_APP_FUNCTIONS_ALLOWED_HAS_PERMISSION;
 import static com.android.server.appfunctions.CallerValidator.CAN_EXECUTE_APP_FUNCTIONS_DENIED;
 
-import android.Manifest;
-import android.annotation.EnforcePermission;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.PermissionManuallyEnforced;
@@ -79,11 +77,7 @@ import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManagerInternal;
-import android.content.pm.SignedPackage;
-import android.content.pm.SignedPackageParcel;
 import android.content.pm.SigningInfo;
-import android.database.ContentObserver;
-import android.net.Uri;
 import android.os.Binder;
 import android.os.CancellationSignal;
 import android.os.IBinder;
@@ -96,9 +90,6 @@ import android.os.ResultReceiver;
 import android.os.ShellCallback;
 import android.os.UserHandle;
 import android.os.UserManager;
-import android.permission.flags.Flags;
-import android.provider.DeviceConfig;
-import android.provider.Settings;
 import android.text.TextUtils;
 import android.util.ArraySet;
 import android.util.Slog;
@@ -109,15 +100,12 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.content.PackageMonitor;
 import com.android.internal.infra.AndroidFuture;
 import com.android.internal.util.DumpUtils;
-import com.android.server.FgThread;
-import com.android.server.SystemService;
 import com.android.server.SystemService.TargetUser;
 import com.android.server.appinteraction.AppInteractionService;
 import com.android.server.uri.UriGrantsManagerInternal;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -130,13 +118,6 @@ import java.util.concurrent.Executor;
 /** Implementation of the AppFunctionManagerService. */
 public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
     private static final String TAG = AppFunctionManagerServiceImpl.class.getSimpleName();
-    private static final String ALLOWLISTED_APP_FUNCTIONS_AGENTS =
-            "allowlisted_app_functions_agents";
-    private static final String NAMESPACE_MACHINE_LEARNING = "machine_learning";
-    private static final String SHELL_PKG = "com.android.shell";
-
-    private static final Uri ADDITIONAL_AGENTS_URI =
-            Settings.Secure.getUriFor(Settings.Secure.APP_FUNCTION_ADDITIONAL_AGENT_ALLOWLIST);
 
     private final RemoteServiceCaller<IAppFunctionService> mRemoteServiceCaller;
     private final CallerValidator mCallerValidator;
@@ -157,46 +138,10 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
 
     private final IBinder mPermissionOwner;
 
-    private final DeviceSettingHelper mDeviceSettingHelper;
-
     private final MultiUserDynamicAppFunctionRegistry mDynamicAppFunctionRegistry;
-
-    private final Object mAgentAllowlistLock = new Object();
 
     private final AppFunctionMetadataReader mAppFunctionMetadataReader;
     private final AppFunctionMetadataObserver mAppFunctionMetadataObserver;
-
-    // Any agents hardcoded by the system
-    private static final List<SignedPackage> sSystemAllowlist =
-            List.of(new SignedPackage(SHELL_PKG, null));
-
-    // The main agent allowlist, set by the updatable DeviceConfig System
-    @GuardedBy("mAgentAllowlistLock")
-    private List<SignedPackage> mUpdatableAgentAllowlist = Collections.emptyList();
-
-    // A secondary agent allowlist, set by ADB command using a secure setting
-    @GuardedBy("mAgentAllowlistLock")
-    private List<SignedPackage> mSecureSettingAgentAllowlist = Collections.emptyList();
-
-    // The merged allowlist.
-    @GuardedBy("mAgentAllowlistLock")
-    private ArraySet<SignedPackage> mAgentAllowlist = new ArraySet<>(sSystemAllowlist);
-
-    private final ContentObserver mAdbAgentObserver =
-            new ContentObserver(FgThread.getHandler()) {
-                @Override
-                public void onChange(boolean selfChange, Uri uri) {
-                    if (!ADDITIONAL_AGENTS_URI.equals(uri)) {
-                        return;
-                    }
-                    updateAgentAllowlist(
-                            /* readFromDeviceConfig= */ false, /* readFromSecureSetting= */ true);
-                }
-            };
-
-    private final Executor mBackgroundExecutor;
-
-    private final AppFunctionAgentAllowlistStorage mAgentAllowlistStorage;
 
     @Nullable private final AppInteractionService mAppInteractionService;
 
@@ -209,10 +154,8 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
             @NonNull IUriGrantsManager uriGrantsManager,
             @NonNull UriGrantsManagerInternal uriGrantsManagerInternal,
             @NonNull AppFunctionsLoggerWrapper loggerWrapper,
-            @NonNull AppFunctionAgentAllowlistStorage agentAllowlistStorage,
             @NonNull MultiUserDynamicAppFunctionRegistry dynamicAppFunctionRegistry,
             @Nullable AppInteractionService appInteractionService,
-            @NonNull Executor backgroundExecutor,
             @NonNull AppFunctionMetadataReader appFunctionMetadataReader) {
         this(
                 context,
@@ -229,10 +172,7 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
                 appFunctionAccessServiceInterface,
                 uriGrantsManager,
                 uriGrantsManagerInternal,
-                new DeviceSettingHelperImpl(context),
-                agentAllowlistStorage,
                 dynamicAppFunctionRegistry,
-                backgroundExecutor,
                 appFunctionMetadataReader,
                 new AppFunctionMetadataObserver(context, appFunctionMetadataReader),
                 appInteractionService,
@@ -250,10 +190,7 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
             AppFunctionAccessServiceInterface appFunctionAccessServiceInterface,
             IUriGrantsManager uriGrantsManager,
             UriGrantsManagerInternal uriGrantsManagerInternal,
-            DeviceSettingHelper deviceSettingHelper,
-            AppFunctionAgentAllowlistStorage agentAllowlistStorage,
             MultiUserDynamicAppFunctionRegistry dynamicAppFunctionRegistry,
-            Executor backgroundExecutor,
             AppFunctionMetadataReader appFunctionMetadataReader,
             AppFunctionMetadataObserver appFunctionMetadataObserver,
             @Nullable AppInteractionService appInteractionService,
@@ -271,10 +208,7 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
         mPermissionOwner =
                 Objects.requireNonNull(
                         mUriGrantsManagerInternal.newUriPermissionOwner("appfunctions"));
-        mDeviceSettingHelper = Objects.requireNonNull(deviceSettingHelper);
-        mAgentAllowlistStorage = Objects.requireNonNull(agentAllowlistStorage);
         mDynamicAppFunctionRegistry = Objects.requireNonNull(dynamicAppFunctionRegistry);
-        mBackgroundExecutor = Objects.requireNonNull(backgroundExecutor);
         mAppFunctionMetadataReader = Objects.requireNonNull(appFunctionMetadataReader);
         mAppFunctionMetadataObserver = Objects.requireNonNull(appFunctionMetadataObserver);
         mAppInteractionService = appInteractionService;
@@ -370,38 +304,6 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
             @NonNull ResultReceiver resultReceiver) {
         new AppFunctionManagerServiceShellCommand(mContext, this)
                 .exec(this, in, out, err, args, callback, resultReceiver);
-    }
-
-    private final DeviceConfig.OnPropertiesChangedListener mDeviceConfigListener =
-            properties -> {
-                if (Flags.appFunctionAccessServiceEnabled()) {
-                    if (properties.getKeyset().contains(ALLOWLISTED_APP_FUNCTIONS_AGENTS)) {
-                        updateAgentAllowlist(
-                                /* readFromDeviceConfig= */ true,
-                                /* readFromSecureSetting= */ false);
-                    }
-                }
-            };
-
-    /**
-     * Called during different phases of the system boot process.
-     *
-     * @param phase The current boot phase, as defined in {@link SystemService}. This method
-     *     specifically acts on {@link SystemService#PHASE_SYSTEM_SERVICES_READY}.
-     */
-    public void onBootPhase(int phase) {
-        if (!Flags.appFunctionAccessServiceEnabled()) return;
-        if (phase == SystemService.PHASE_SYSTEM_SERVICES_READY) {
-            mBackgroundExecutor.execute(
-                    () ->
-                            updateAgentAllowlist(
-                                    /* readFromDeviceConfig */ true,
-                                    /* readFromSecureSetting= */ true));
-            DeviceConfig.addOnPropertiesChangedListener(
-                    NAMESPACE_MACHINE_LEARNING, mBackgroundExecutor, mDeviceConfigListener);
-            mContext.getContentResolver()
-                    .registerContentObserver(ADDITIONAL_AGENTS_URI, false, mAdbAgentObserver);
-        }
     }
 
     @Override
@@ -926,10 +828,8 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
         if (!accessCheckFlagsEnabled()) {
             return 0;
         }
-        final String targetPermissionOwner =
-                mDeviceSettingHelper.getPermissionOwnerPackage(targetPackageName);
         return mAppFunctionAccessService.getAccessFlags(
-                agentPackageName, agentUserId, targetPermissionOwner, targetUserId);
+                agentPackageName, agentUserId, targetPackageName, targetUserId);
     }
 
     @Override
@@ -944,15 +844,8 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
         if (!accessCheckFlagsEnabled()) {
             return false;
         }
-        final String targetPermissionOwner =
-                mDeviceSettingHelper.getPermissionOwnerPackage(targetPackageName);
         return mAppFunctionAccessService.updateAccessFlags(
-                agentPackageName,
-                agentUserId,
-                targetPermissionOwner,
-                targetUserId,
-                flagMask,
-                flags);
+                agentPackageName, agentUserId, targetPackageName, targetUserId, flagMask, flags);
     }
 
     @Override
@@ -994,9 +887,7 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
         if (!accessCheckFlagsEnabled()) {
             return;
         }
-        final String targetPermissionOwner =
-                mDeviceSettingHelper.getPermissionOwnerPackage(targetPackageName);
-        mAppFunctionAccessService.revokeSelfAccess(targetPermissionOwner);
+        mAppFunctionAccessService.revokeSelfAccess(targetPackageName);
     }
 
     @Override
@@ -1006,10 +897,8 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
         if (!accessCheckFlagsEnabled()) {
             return ACCESS_REQUEST_STATE_UNREQUESTABLE;
         }
-        final String targetPermissionOwner =
-                mDeviceSettingHelper.getPermissionOwnerPackage(targetPackageName);
         return mAppFunctionAccessService.getAccessRequestState(
-                agentPackageName, agentUserId, targetPermissionOwner, targetUserId);
+                agentPackageName, agentUserId, targetPackageName, targetUserId);
     }
 
     @Override
@@ -1031,47 +920,10 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
         final int validTargetSize = validTargets.size();
         for (int i = 0; i < validTargetSize; i++) {
             final String target = validTargets.get(i);
-            final String permissionOwner = mDeviceSettingHelper.getPermissionOwnerPackage(target);
-            validPermissionOwnerTargets.add(permissionOwner);
+            validPermissionOwnerTargets.add(target);
         }
 
         return List.copyOf(validPermissionOwnerTargets);
-    }
-
-    @Override
-    @EnforcePermission(Manifest.permission.MANAGE_APP_FUNCTION_ACCESS)
-    public List<SignedPackage> getAgentAllowlist() {
-        getAgentAllowlist_enforcePermission();
-        if (!accessCheckFlagsEnabled()) {
-            return List.of();
-        }
-        synchronized (mAgentAllowlistLock) {
-            int agentAllowlistSize = mAgentAllowlist.size();
-            List<SignedPackage> agentAllowlist = new ArrayList<>(agentAllowlistSize);
-            for (int i = 0; i < agentAllowlistSize; i++) {
-                agentAllowlist.add(mAgentAllowlist.valueAt(i));
-            }
-            return agentAllowlist;
-        }
-    }
-
-    @Override
-    @EnforcePermission(Manifest.permission.MANAGE_APP_FUNCTION_ACCESS)
-    public List<SignedPackageParcel> getAgentAllowlistLegacy() {
-        getAgentAllowlistLegacy_enforcePermission();
-        List<SignedPackage> packages = getAgentAllowlist();
-        List<SignedPackageParcel> agentAllowlist = new ArrayList<>(packages.size());
-        for (int i = 0; i < packages.size(); i++) {
-            agentAllowlist.add(packages.get(i).toSignedPackageParcel());
-        }
-        return agentAllowlist;
-    }
-
-    @Override
-    @EnforcePermission(Manifest.permission.MANAGE_APP_FUNCTION_ACCESS)
-    public void clearAccessHistory(int userId) {
-        clearAccessHistory_enforcePermission();
-        // TODO(b/459347717): Remove this alone with public test API
     }
 
     @Override
@@ -1086,120 +938,12 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
         mAppFunctionAccessService.removeOnAccessChangedListener(listener, userId);
     }
 
-    private void enforceClearAccessHistoryUserPermission(int userId) {
-        final int callingUid = Binder.getCallingUid();
-        final int callingPid = Binder.getCallingPid();
-        mCallerValidator.verifyUserInteraction(userId, callingUid, callingPid);
-    }
-
-    private void updateAgentAllowlist(boolean readFromDeviceConfig, boolean readFromSecureSetting) {
-        synchronized (mAgentAllowlistLock) {
-            List<SignedPackage> newDeviceConfigAgents;
-            boolean changed = false;
-            if (readFromDeviceConfig) {
-                newDeviceConfigAgents = readDeviceConfigAgentAllowlist();
-                if (newDeviceConfigAgents == null) {
-                    // If we fail to parse a valid list
-                    newDeviceConfigAgents = mUpdatableAgentAllowlist;
-                }
-            } else {
-                newDeviceConfigAgents = mUpdatableAgentAllowlist;
-            }
-            changed = changed || !newDeviceConfigAgents.equals(mUpdatableAgentAllowlist);
-            List<SignedPackage> newAdbAgents;
-            if (readFromSecureSetting) {
-                newAdbAgents = readAdbAgentAllowlist();
-            } else {
-                newAdbAgents = mSecureSettingAgentAllowlist;
-            }
-            changed = changed || !newAdbAgents.equals(mSecureSettingAgentAllowlist);
-
-            if (!changed) {
-                return;
-            }
-
-            ArraySet<SignedPackage> newAgents = new ArraySet<>();
-            newAgents.addAll(newDeviceConfigAgents);
-            newAgents.addAll(newAdbAgents);
-            newAgents.addAll(sSystemAllowlist);
-
-            mUpdatableAgentAllowlist = newDeviceConfigAgents;
-            mSecureSettingAgentAllowlist = newAdbAgents;
-            mAgentAllowlist = newAgents;
-            mAppFunctionAccessService.setAgentAllowlist(mAgentAllowlist);
-        }
-    }
-
-    @Nullable
-    @WorkerThread
-    private List<SignedPackage> readDeviceConfigAgentAllowlist() {
-        final String allowlistString =
-                DeviceConfig.getString(
-                        NAMESPACE_MACHINE_LEARNING, ALLOWLISTED_APP_FUNCTIONS_AGENTS, "");
-        if (!TextUtils.isEmpty(allowlistString)) {
-            try {
-                List<SignedPackage> parsedAllowlist =
-                        SignedPackageParser.parseList(allowlistString);
-                mAgentAllowlistStorage.writeCurrentAllowlist(allowlistString);
-                return parsedAllowlist;
-            } catch (Exception e) {
-                Slog.e(TAG, "Cannot parse agent allowlist from config: " + allowlistString, e);
-            }
-        }
-        List<SignedPackage> stored = mAgentAllowlistStorage.readPreviousValidAllowlist();
-        if (stored != null) {
-            Slog.i(TAG, "Using previously stored valid allowlist.");
-            return stored;
-        }
-        Slog.i(TAG, "No valid stored allowlist, falling back to static list.");
-        return readPreloadedAgentAllowlist();
-    }
-
-    @NonNull
-    private List<SignedPackage> readPreloadedAgentAllowlist() {
-        final String[] preloadedAllowlistArray =
-                mContext.getResources()
-                        .getStringArray(
-                                com.android.internal.R.array
-                                        .config_defaultAppFunctionAgentAllowlist);
-        if (preloadedAllowlistArray.length == 0) {
-            return Collections.emptyList();
-        }
-        final String preloadedAllowlistString = String.join(";", preloadedAllowlistArray);
-        try {
-            return SignedPackageParser.parseList(preloadedAllowlistString);
-        } catch (Exception e) {
-            Slog.e(TAG, "Cannot parse preloaded allowlist: " + preloadedAllowlistString, e);
-            return Collections.emptyList();
-        }
-    }
-
-    @NonNull
-    private List<SignedPackage> readAdbAgentAllowlist() {
-        String agents =
-                Settings.Secure.getStringForUser(
-                        mContext.getContentResolver(),
-                        Settings.Secure.APP_FUNCTION_ADDITIONAL_AGENT_ALLOWLIST,
-                        Process.myUserHandle().getIdentifier());
-        if (agents == null) {
-            return Collections.emptyList();
-        }
-        try {
-            return SignedPackageParser.parseList(agents);
-        } catch (Exception e) {
-            Slog.e(TAG, "Cannot parse agent list string: " + agents, e);
-            return Collections.emptyList();
-        }
-    }
-
     @Override
     @NonNull
     public Intent createRequestAccessIntent(@NonNull String targetPackageName) {
         Objects.requireNonNull(targetPackageName);
-        final String permissionOwner =
-                mDeviceSettingHelper.getPermissionOwnerPackage(targetPackageName);
         Intent intent = new Intent(ACTION_REQUEST_APP_FUNCTION_ACCESS);
-        intent.putExtra(Intent.EXTRA_PACKAGE_NAME, permissionOwner);
+        intent.putExtra(Intent.EXTRA_PACKAGE_NAME, targetPackageName);
         intent.setPackage(mContext.getPackageManager().getPermissionControllerPackageName());
         return intent;
     }

@@ -1392,7 +1392,7 @@ public abstract class CameraMetadata<TKey> {
      * @hide
      */
     @FlaggedApi(Flags.FLAG_NEW_DYNAMIC_RANGE_PROFILES)
-    public static final int REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD_AGTM = 0x2000;
+    public static final int REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_STANDARD_SMPTE_2094_50 = 0x2000;
 
     /**
      * <p>10-bit pixel samples encoded using the Hybrid log-gamma transfer function with
@@ -1401,7 +1401,7 @@ public abstract class CameraMetadata<TKey> {
      * @hide
      */
     @FlaggedApi(Flags.FLAG_NEW_DYNAMIC_RANGE_PROFILES)
-    public static final int REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_HLG10_AGTM = 0x4000;
+    public static final int REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_HLG10_SMPTE_2094_50 = 0x4000;
 
     /**
      * <p>10-bit pixel samples encoded using the SMPTE ST 2084 transfer function.
@@ -1411,7 +1411,7 @@ public abstract class CameraMetadata<TKey> {
      * @hide
      */
     @FlaggedApi(Flags.FLAG_NEW_DYNAMIC_RANGE_PROFILES)
-    public static final int REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_HDR10_AGTM = 0x8000;
+    public static final int REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_HDR10_SMPTE_2094_50 = 0x8000;
 
     /**
      * <p>10-bit pixel samples encoded using the SMPTE ST 2084 transfer function.
@@ -1422,7 +1422,7 @@ public abstract class CameraMetadata<TKey> {
      * @hide
      */
     @FlaggedApi(Flags.FLAG_NEW_DYNAMIC_RANGE_PROFILES)
-    public static final int REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_HDR10_PLUS_AGTM = 0x10000;
+    public static final int REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_HDR10_PLUS_SMPTE_2094_50 = 0x10000;
 
     /**
      * <p>This is a camera mode for Dolby Vision capture optimized for a more scene
@@ -1433,7 +1433,7 @@ public abstract class CameraMetadata<TKey> {
      * @hide
      */
     @FlaggedApi(Flags.FLAG_NEW_DYNAMIC_RANGE_PROFILES)
-    public static final int REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_10B_HDR_REF_AGTM = 0x20000;
+    public static final int REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_10B_HDR_REF_SMPTE_2094_50 = 0x20000;
 
     /**
      * <p>This is the power optimized mode for 10-bit Dolby Vision HDR Reference Mode
@@ -1442,7 +1442,7 @@ public abstract class CameraMetadata<TKey> {
      * @hide
      */
     @FlaggedApi(Flags.FLAG_NEW_DYNAMIC_RANGE_PROFILES)
-    public static final int REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_10B_HDR_REF_PO_AGTM = 0x40000;
+    public static final int REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_10B_HDR_REF_PO_SMPTE_2094_50 = 0x40000;
 
     /**
      * <p>This is the camera mode for the default Dolby Vision capture mode for the
@@ -1454,7 +1454,7 @@ public abstract class CameraMetadata<TKey> {
      * @hide
      */
     @FlaggedApi(Flags.FLAG_NEW_DYNAMIC_RANGE_PROFILES)
-    public static final int REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_10B_HDR_OEM_AGTM = 0x80000;
+    public static final int REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_10B_HDR_OEM_SMPTE_2094_50 = 0x80000;
 
     /**
      * <p>This is the power optimized mode for 10-bit Dolby Vision HDR device specific
@@ -1463,7 +1463,7 @@ public abstract class CameraMetadata<TKey> {
      * @hide
      */
     @FlaggedApi(Flags.FLAG_NEW_DYNAMIC_RANGE_PROFILES)
-    public static final int REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_10B_HDR_OEM_PO_AGTM = 0x100000;
+    public static final int REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_10B_HDR_OEM_PO_SMPTE_2094_50 = 0x100000;
 
     /**
      * <p>This is the 8-bit version of the Dolby Vision reference capture mode optimized
@@ -1472,7 +1472,7 @@ public abstract class CameraMetadata<TKey> {
      * @hide
      */
     @FlaggedApi(Flags.FLAG_NEW_DYNAMIC_RANGE_PROFILES)
-    public static final int REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_8B_HDR_REF_AGTM = 0x200000;
+    public static final int REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_8B_HDR_REF_SMPTE_2094_50 = 0x200000;
 
     /**
      * <p>This is the power optimized mode for 8-bit Dolby Vision HDR Reference Mode and
@@ -1481,7 +1481,7 @@ public abstract class CameraMetadata<TKey> {
      * @hide
      */
     @FlaggedApi(Flags.FLAG_NEW_DYNAMIC_RANGE_PROFILES)
-    public static final int REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_8B_HDR_REF_PO_AGTM = 0x400000;
+    public static final int REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_8B_HDR_REF_PO_SMPTE_2094_50 = 0x400000;
 
     /**
      * <p>This is the 8-bit version of device specific tuned and optimized Dolby Vision
@@ -1490,7 +1490,7 @@ public abstract class CameraMetadata<TKey> {
      * @hide
      */
     @FlaggedApi(Flags.FLAG_NEW_DYNAMIC_RANGE_PROFILES)
-    public static final int REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_8B_HDR_OEM_AGTM = 0x800000;
+    public static final int REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_8B_HDR_OEM_SMPTE_2094_50 = 0x800000;
 
     /**
      * <p>This is the power optimized mode for 8-bit Dolby Vision HDR device specific
@@ -1499,7 +1499,7 @@ public abstract class CameraMetadata<TKey> {
      * @hide
      */
     @FlaggedApi(Flags.FLAG_NEW_DYNAMIC_RANGE_PROFILES)
-    public static final int REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_8B_HDR_OEM_PO_AGTM = 0x1000000;
+    public static final int REQUEST_AVAILABLE_DYNAMIC_RANGE_PROFILES_MAP_DOLBY_VISION_8B_HDR_OEM_PO_SMPTE_2094_50 = 0x1000000;
 
     /**
      *

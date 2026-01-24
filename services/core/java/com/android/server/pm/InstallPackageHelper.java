@@ -23,6 +23,7 @@ package com.android.server.pm;
 import static android.app.privatecompute.flags.Flags.enablePccFrameworkSupport;
 import static android.content.pm.Flags.allowUpdatedVersionBetterThanApkInApex;
 import static android.content.pm.Flags.disallowSdkLibsToBeApps;
+import static android.content.pm.Flags.trustSystemApkSignatures;
 import static android.content.pm.PackageManager.APP_METADATA_SOURCE_APK;
 import static android.content.pm.PackageManager.APP_METADATA_SOURCE_INSTALLER;
 import static android.content.pm.PackageManager.APP_METADATA_SOURCE_UNKNOWN;
@@ -1146,11 +1147,11 @@ final class InstallPackageHelper {
     void doPostDexopt(List<ReconciledPackage> reconciledPackages,
             List<InstallRequest> requests, Map<String, Boolean> createdAppId,
             MoveInfo moveInfo, long acquireTime) {
-        boolean isDexoptSuccess = true;
+        boolean isDexoptCompleted = true;
         for (InstallRequest request : requests) {
             request.onWaitDexoptFinished();
             if (request.getReturnCode() != PackageManager.INSTALL_SUCCEEDED) {
-                isDexoptSuccess = false;
+                isDexoptCompleted = false;
             }
         }
 
@@ -1162,7 +1163,7 @@ final class InstallPackageHelper {
                 releaseWakeLock(acquireTime, requests.size());
             };
 
-            if (!isDexoptSuccess) {
+            if (!isDexoptCompleted) {
                 postCommitActions.accept(false);
                 return;
             }
@@ -1171,7 +1172,7 @@ final class InstallPackageHelper {
         } else {
             boolean success = false;
             try {
-                if (isDexoptSuccess && commitInstallPackages(reconciledPackages)) {
+                if (isDexoptCompleted && commitInstallPackages(reconciledPackages)) {
                     success = true;
                 }
             } finally {
@@ -4878,7 +4879,9 @@ final class InstallPackageHelper {
                     final ParseTypeImpl input = ParseTypeImpl.forDefaultParsing();
                     final ParseResult<SigningDetails> result =
                             ParsingPackageUtils.getSigningDetails(input, parsedPackage,
-                                    false /*skipVerify*/);
+                                    // It is safe to skip the full verification here because the APK
+                                    // is in an immutable partition secured by dm-verity.
+                                    Flags.trustSystemApkSignatures() /*skipVerify*/);
                     if (result.isError()) {
                         throw new PrepareFailure("Failed collect during scanPackageForInitLI",
                                 result.getException());

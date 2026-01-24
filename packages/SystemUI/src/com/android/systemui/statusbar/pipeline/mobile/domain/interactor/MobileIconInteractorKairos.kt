@@ -128,6 +128,8 @@ interface MobileIconInteractorKairos {
 
     /** True when in carrier network change mode */
     val carrierNetworkChangeActive: State<Boolean>
+    val volteId: State<Int>
+    val showSignalStrengthIcon: State<Boolean>
 }
 
 /** Interactor for a single mobile connection. This connection _should_ have one subscription ID */
@@ -160,6 +162,11 @@ class MobileIconInteractorKairosImpl(
     override val carrierNetworkChangeActive: State<Boolean>
         get() = connectionRepository.carrierNetworkChangeActive
 
+    override val volteId: State<Int>
+        get() = connectionRepository.volteId
+
+    override val showSignalStrengthIcon: State<Boolean>
+        get() = connectionRepository.showSignalStrengthIcon
     override val networkName: State<NetworkNameModel> =
         combine(connectionRepository.operatorAlphaShort, connectionRepository.networkName) {
             operatorAlphaShort,

@@ -523,6 +523,9 @@ constructor(
             )
     }
 
+    override val volteId: State<Int> = stateOf(0)
+    override val showSignalStrengthIcon: State<Boolean> = stateOf(true)
+
     @AssistedFactory
     fun interface Factory {
         fun create(

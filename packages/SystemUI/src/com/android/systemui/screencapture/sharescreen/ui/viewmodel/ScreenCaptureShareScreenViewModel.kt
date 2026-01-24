@@ -17,6 +17,9 @@
 package com.android.systemui.screencapture.sharescreen.ui.viewmodel
 
 import android.content.pm.PackageManager
+import android.media.projection.MediaProjectionConfig.PROJECTION_SOURCE_APP
+import android.media.projection.MediaProjectionConfig.PROJECTION_SOURCE_APP_CONTENT
+import android.media.projection.MediaProjectionConfig.PROJECTION_SOURCE_DISPLAY
 import android.os.UserHandle
 import android.util.Log
 import androidx.compose.runtime.getValue
@@ -31,9 +34,7 @@ import com.android.systemui.screencapture.common.ui.viewmodel.AudioSwitchViewMod
 import com.android.systemui.screencapture.common.ui.viewmodel.DisplaysViewModel
 import com.android.systemui.screencapture.common.ui.viewmodel.DrawableLoaderViewModel
 import com.android.systemui.screencapture.common.ui.viewmodel.RecentTasksViewModel
-import com.android.systemui.screencapture.common.ui.viewmodel.TargetsViewModel
 import com.android.systemui.screencapture.sharescreen.domain.interactor.ShareScreenUiInteractor
-import com.android.systemui.statusbar.quickactions.sharescreen.domain.interactor.ShareScreenPrivacyIndicatorInteractor
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
@@ -45,7 +46,6 @@ constructor(
     private val packageManager: PackageManager,
     private val drawableLoaderViewModel: DrawableLoaderViewModel,
     private val shareScreenUiInteractor: ShareScreenUiInteractor,
-    private val shareScreenPrivacyIndicatorInteractor: ShareScreenPrivacyIndicatorInteractor,
     private val mediaProjectionMetricsLogger: MediaProjectionMetricsLogger,
     @Assisted("thumbnailWidthPx") private val thumbnailWidthPx: Int,
     @Assisted("thumbnailHeightPx") private val thumbnailHeightPx: Int,
@@ -58,7 +58,39 @@ constructor(
     private val appContentsViewModel =
         appContentsViewModelFactory.create(thumbnailWidthPx, thumbnailHeightPx)
 
-    var currentTargetsModel by mutableStateOf<TargetsViewModel>(appContentsViewModel)
+    val isAppContentSharingEnabled: Boolean
+        get() =
+            shareScreenUiInteractor.config?.isSourceEnabled(PROJECTION_SOURCE_APP_CONTENT) ?: false
+
+    val isAppSharingEnabled: Boolean
+        get() = shareScreenUiInteractor.config?.isSourceEnabled(PROJECTION_SOURCE_APP) ?: false
+
+    val isEntireScreenSharingEnabled: Boolean
+        get() = shareScreenUiInteractor.config?.isSourceEnabled(PROJECTION_SOURCE_DISPLAY) ?: false
+
+    val isAudioRequested: Boolean
+        get() = shareScreenUiInteractor.config?.isAudioRequested ?: false
+
+    private val initialSource = shareScreenUiInteractor.config?.initiallySelectedSource ?: -1
+
+    var currentTargetsModel by
+        mutableStateOf(
+            when {
+                // Prioritize initialSource if it's enabled.
+                initialSource == PROJECTION_SOURCE_APP_CONTENT && isAppContentSharingEnabled ->
+                    appContentsViewModel
+                initialSource == PROJECTION_SOURCE_APP && isAppSharingEnabled ->
+                    recentTasksViewModel
+                initialSource == PROJECTION_SOURCE_DISPLAY && isEntireScreenSharingEnabled ->
+                    displaysViewModel
+                // Fallback to the first available enabled source in order: AppContent, App, Display
+                isAppContentSharingEnabled -> appContentsViewModel
+                isAppSharingEnabled -> recentTasksViewModel
+                isEntireScreenSharingEnabled -> displaysViewModel
+                // Ultimate fallback if nothing is set.
+                else -> appContentsViewModel
+            }
+        )
         private set
 
     var isUiVisible by mutableStateOf(true)
@@ -137,7 +169,6 @@ constructor(
             }
             else -> throw IllegalStateException("Unsupported TargetsViewModel type: $currentModel")
         }
-        shareScreenPrivacyIndicatorInteractor.showChip()
     }
 
     fun onCloseClicked() {

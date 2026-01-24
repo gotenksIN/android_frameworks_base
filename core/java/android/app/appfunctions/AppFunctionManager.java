@@ -23,10 +23,9 @@ import static android.app.appfunctions.AppFunctionException.ERROR_SYSTEM_ERROR;
 import static android.app.appfunctions.AppFunctionManagerHelper.buildCancellationSignal;
 import static android.app.appfunctions.AppFunctionManagerHelper.executionExceptionToErrorCode;
 import static android.app.appfunctions.flags.Flags.FLAG_ENABLE_APP_FUNCTION_MANAGER;
-import static android.app.appfunctions.flags.Flags.FLAG_ENABLE_DYNAMIC_APP_FUNCTIONS;
 import static android.app.appfunctions.flags.Flags.FLAG_ENABLE_APP_FUNCTION_PERMISSION_V2;
+import static android.app.appfunctions.flags.Flags.FLAG_ENABLE_DYNAMIC_APP_FUNCTIONS;
 import static android.permission.flags.Flags.FLAG_APP_FUNCTION_ACCESS_UI_ENABLED;
-import static android.permission.flags.Flags.allowlistServiceEnabled;
 
 import android.Manifest;
 import android.annotation.CallbackExecutor;
@@ -44,7 +43,6 @@ import android.app.appsearch.AppSearchManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.SignedPackage;
-import android.content.pm.SignedPackageParcel;
 import android.os.Binder;
 import android.os.CancellationSignal;
 import android.os.ICancellationSignal;
@@ -54,10 +52,8 @@ import android.os.RemoteException;
 import android.os.SystemClock;
 import android.permission.flags.Flags;
 import android.util.ArrayMap;
-import android.util.ArraySet;
 import android.util.Log;
 
-import com.android.internal.R;
 import com.android.internal.annotations.GuardedBy;
 
 import java.lang.annotation.Retention;
@@ -65,7 +61,6 @@ import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import java.util.Set;
 import java.util.concurrent.Executor;
 
 /**
@@ -400,14 +395,21 @@ public final class AppFunctionManager {
      *     <p>If the calling app does not own the app function or does not have {@code
      *     android.permission.EXECUTE_APP_FUNCTIONS}, the execution result will contain {@code
      *     AppFunctionException.ERROR_DENIED}.
-     *     <p>If the caller only has {@code android.permission.EXECUTE_APP_FUNCTIONS}, the execution
-     *     result will contain {@code AppFunctionException.ERROR_DENIED}
+     *     <p>If the caller only has {@link Manifest.permission#EXECUTE_APP_FUNCTIONS} or {@link
+     *     Manifest.permission#EXECUTE_APP_FUNCTIONS_SYSTEM}, the execution result will contain
+     *     {@code AppFunctionException.ERROR_DENIED}
      *     <p>If the function requested for execution is disabled, then the execution result will
      *     contain {@code AppFunctionException.ERROR_DISABLED}
      *     <p>If the cancellation signal is issued, the operation is cancelled and no response is
      *     returned to the caller.
      */
-    @RequiresPermission(value = Manifest.permission.EXECUTE_APP_FUNCTIONS, conditional = true)
+    @FlaggedApi(FLAG_ENABLE_APP_FUNCTION_PERMISSION_V2)
+    @RequiresPermission(
+            anyOf = {
+                Manifest.permission.EXECUTE_APP_FUNCTIONS,
+                Manifest.permission.EXECUTE_APP_FUNCTIONS_SYSTEM
+            },
+            conditional = true)
     @UserHandleAware
     public void executeAppFunction(
             @NonNull ExecuteAppFunctionRequest request,
@@ -473,8 +475,9 @@ public final class AppFunctionManager {
      * <p>The calling app can search for:
      * <li>Functions in its own package (no permission required).
      * <li>When holding the {@link Manifest.permission#EXECUTE_APP_FUNCTIONS} or {@link
-     *     Manifest.permission#READ_APP_FUNCTION_METADATA} permission - functions in other packages
-     *     that it is allowed to query via {@link
+     *     Manifest.permission#DISCOVER_APP_FUNCTIONS} or {@link
+     *     Manifest.permission#EXECUTE_APP_FUNCTIONS_SYSTEM} permission - functions in other
+     *     packages that it is allowed to query via {@link
      *     android.content.pm.PackageManager#canPackageQuery}.
      *
      * @param searchSpec The spec of app functions to search for.
@@ -485,7 +488,8 @@ public final class AppFunctionManager {
     @RequiresPermission(
             anyOf = {
                 Manifest.permission.EXECUTE_APP_FUNCTIONS,
-                Manifest.permission.READ_APP_FUNCTION_METADATA
+                Manifest.permission.DISCOVER_APP_FUNCTIONS,
+                Manifest.permission.EXECUTE_APP_FUNCTIONS_SYSTEM,
             },
             conditional = true)
     @UserHandleAware
@@ -536,7 +540,8 @@ public final class AppFunctionManager {
      * <p>This method can only check app functions owned by the caller, or those where the caller
      * has visibility to the owner package and holds the {@link
      * Manifest.permission#EXECUTE_APP_FUNCTIONS} or {@link
-     * Manifest.permission#READ_APP_FUNCTION_METADATA} permission.
+     * Manifest.permission#DISCOVER_APP_FUNCTIONS} or {@link
+     * Manifest.permission#EXECUTE_APP_FUNCTIONS_SYSTEM} permission.
      *
      * <p>If the operation fails, the callback's {@link OutcomeReceiver#onError} is called with
      * errors:
@@ -557,7 +562,8 @@ public final class AppFunctionManager {
     @RequiresPermission(
             anyOf = {
                 Manifest.permission.EXECUTE_APP_FUNCTIONS,
-                Manifest.permission.READ_APP_FUNCTION_METADATA
+                Manifest.permission.DISCOVER_APP_FUNCTIONS,
+                Manifest.permission.EXECUTE_APP_FUNCTIONS_SYSTEM,
             },
             conditional = true)
     public void isAppFunctionEnabled(
@@ -961,24 +967,6 @@ public final class AppFunctionManager {
     }
 
     /**
-     * Gets the configured list of package names that should be grouped as Device Settings.
-     *
-     * <p>The list here is a configuration, the returned packages are not necessarily installed. The
-     * package names here must refer to system apps.
-     *
-     * @hide
-     */
-    @TestApi
-    @FlaggedApi(Flags.FLAG_APP_FUNCTION_ACCESS_API_ENABLED)
-    @NonNull
-    public Set<String> getDeviceSettingPackages() {
-        final String[] deviceSettingPackages =
-                mContext.getResources()
-                        .getStringArray(R.array.config_appFunctionDeviceSettingsPackages);
-        return new ArraySet<>(deviceSettingPackages);
-    }
-
-    /**
      * Gets the current agent allowlist
      *
      * @hide
@@ -987,22 +975,7 @@ public final class AppFunctionManager {
     @RequiresPermission(MANAGE_APP_FUNCTION_ACCESS)
     @FlaggedApi(Flags.FLAG_APP_FUNCTION_ACCESS_API_ENABLED)
     public @NonNull List<SignedPackage> getAgentAllowlist() {
-        try {
-            if (allowlistServiceEnabled()) {
-                List<SignedPackage> packages = mService.getAgentAllowlist();
-                return packages;
-            } else {
-                List<SignedPackageParcel> packageParcels = mService.getAgentAllowlistLegacy();
-                int packageParcelsSize = packageParcels.size();
-                List<SignedPackage> packages = new ArrayList<>(packageParcelsSize);
-                for (int i = 0; i < packageParcelsSize; i++) {
-                    packages.add(new SignedPackage(packageParcels.get(i)));
-                }
-                return packages;
-            }
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
+        return new ArrayList<>();
     }
 
     /**

@@ -63,6 +63,8 @@ class FakeMobileConnectionRepositoryKairos(
     override val isAllowedDuringAirplaneMode = MutableState(false)
     override val hasPrioritizedNetworkCapabilities = MutableState(false)
     override val isInEcmMode: State<Boolean> = MutableState(false)
+    override val volteId = MutableState(0)
+    override val showSignalStrengthIcon = MutableState(true)
 
     /**
      * Set [primaryLevel] and [cdmaLevel]. Convenient when you don't care about the connection type

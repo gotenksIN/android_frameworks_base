@@ -431,12 +431,9 @@ public abstract class OomAdjuster {
          * @param oomAdjReason The reason for the OOM adjustment leading to this call.
          * @param immediate True if the freeze/unfreeze action should be applied immediately.
          * @param oldOomAdj The previous OOM adjustment score of the process.
-         * @param shouldNotFreezeChanged True if the process's {@code shouldNotFreeze} property
-         *        has changed during the current OOM adjustment cycle.
          */
         void onProcessFreezabilityChanged(ProcessRecordInternal app, boolean freezePolicy,
-                @OomAdjReason int oomAdjReason, boolean immediate, int oldOomAdj,
-                boolean shouldNotFreezeChanged);
+                @OomAdjReason int oomAdjReason, boolean immediate, int oldOomAdj);
 
         /** Notifies the client component when a process's process state is updated. */
         void onProcStateUpdated(ProcessRecordInternal app, long now, long nowElapsed,
@@ -2692,9 +2689,8 @@ public abstract class OomAdjuster {
     public void updateAppFreezeStateLSP(ProcessRecordInternal app, @OomAdjReason int oomAdjReason,
             boolean immediate, int oldOomAdj) {
         final boolean freezePolicy = getFreezePolicy(app);
-        final boolean shouldNotFreezeChanged = app.shouldNotFreezeAdjSeq() == mAdjSeq;
         mCallback.onProcessFreezabilityChanged(app, freezePolicy, oomAdjReason, immediate,
-                oldOomAdj, shouldNotFreezeChanged);
+                oldOomAdj);
     }
 
     /**
@@ -2786,12 +2782,6 @@ public abstract class OomAdjuster {
                 & ALL_CPU_TIME_CAPABILITIES) != 0) {
             // The connection might grant CPU capability to the service.
             needDryRun = true;
-        } else if (cr.hasFlag(Context.BIND_WAIVE_PRIORITY | Context.BIND_ALLOW_OOM_MANAGEMENT)) {
-            // These bind flags can grant the shouldNotFreeze state to the service.
-            needDryRun = true;
-        } else if (client.shouldNotFreeze() && !app.shouldNotFreeze()) {
-            // The shouldNotFreeze state can be propagated and needs to be checked.
-            needDryRun = true;
         }
 
         if (needDryRun) {
@@ -2823,11 +2813,6 @@ public abstract class OomAdjuster {
                 && (app.getSetCapability() & client.getSetCapability())
                             != PROCESS_CAPABILITY_NONE) {
             return true;
-        } else if (cr.hasFlag(Context.BIND_WAIVE_PRIORITY | Context.BIND_ALLOW_OOM_MANAGEMENT)) {
-            return true;
-        } else if (app.shouldNotFreeze() && client.shouldNotFreeze()) {
-            // Process has shouldNotFreeze and it could have gotten it from the client.
-            return true;
         } else if ((client.getSetCapability() & app.getSetCapability()
                     & ALL_CPU_TIME_CAPABILITIES) != 0) {
             return true;
@@ -2850,8 +2835,6 @@ public abstract class OomAdjuster {
         if (app.getSetAdj() > client.getSetAdj()) {
             needDryRun = true;
         } else if (app.getSetProcState() > client.getSetProcState()) {
-            needDryRun = true;
-        } else if (client.shouldNotFreeze() && !app.shouldNotFreeze()) {
             needDryRun = true;
         } else if ((client.getSetCapability() & ~app.getSetCapability()
                     & ALL_CPU_TIME_CAPABILITIES) != 0) {
@@ -2879,9 +2862,6 @@ public abstract class OomAdjuster {
         if (app.getSetAdj() >= client.getSetAdj()) {
             return true;
         } else if (app.getSetProcState() >= client.getSetProcState()) {
-            return true;
-        } else if (app.shouldNotFreeze() && client.shouldNotFreeze()) {
-            // Process has shouldNotFreeze and it could have gotten it from the client.
             return true;
         } else if ((client.getSetCapability() & app.getSetCapability()
                 & ALL_CPU_TIME_CAPABILITIES) != 0) {

@@ -181,6 +181,8 @@ class MobileIconsInteractorKairosAdapterTest : MobileIconsInteractorTestBase() {
         override val isAllowedDuringAirplaneMode: State<Boolean>,
         override val hasPrioritizedNetworkCapabilities: State<Boolean>,
         override val isInEcmMode: State<Boolean>,
+        override val volteId: State<Int>,
+        override val showSignalStrengthIcon: State<Boolean>,
     ) : MobileConnectionRepositoryKairos {
         override fun setDataEnabled(enabled: Boolean) {
             unwrapped.setDataEnabled(enabled)
@@ -221,6 +223,8 @@ class MobileIconsInteractorKairosAdapterTest : MobileIconsInteractorTestBase() {
                     isAllowedDuringAirplaneMode = isAllowedDuringAirplaneMode.toState(),
                     hasPrioritizedNetworkCapabilities = hasPrioritizedNetworkCapabilities.toState(),
                     isInEcmMode = stateOf(false),
+                    volteId = stateOf(0),
+                    showSignalStrengthIcon = stateOf(true),
                 )
             }
     }

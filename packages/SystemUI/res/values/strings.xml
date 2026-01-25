@@ -809,6 +809,8 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_share_a11y_announcement">Choose what to share. Select tab, app, or entire screen. Then press share.</string>
+    <!-- Accessibility announcement for when the screen share UI is dismissed without sharing [CHAR LIMIT=NONE] -->
+    <string name="screen_share_cancel_announcement">Screen sharing initiation ended. Screen not shared with anyone.</string>
     <!-- Content description for the app window screenshot button in the toolbar, when the capture mode is set to "screenshot". [CHAR LIMIT=NONE] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -7425,6 +7427,8 @@
     <string name="av_camera_blur_full">Full</string>
     <!-- Title for portrait relight button [CHAR LIMIT=NONE] -->
     <string name="av_camera_improve_lighting">Improve lighting</string>
+    <!-- Title for portrait retouch button [CHAR LIMIT=NONE] -->
+    <string name="av_camera_face_retouch">Portrait touch-up</string>
     <!-- Title for camera framing button [CHAR LIMIT=NONE] -->
     <string name="av_camera_framing">Camera Framing</string>
     <!-- Title for studio mic button [CHAR LIMIT=NONE] -->

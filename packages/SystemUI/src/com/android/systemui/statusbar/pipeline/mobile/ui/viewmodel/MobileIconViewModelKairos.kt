@@ -17,7 +17,6 @@
 package com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel
 
 import com.android.settingslib.R as settingsLibR
-import com.android.systemui.Flags.statusBarStaticInoutIndicators
 import com.android.systemui.KairosBuilder
 import com.android.systemui.activated
 import com.android.systemui.common.shared.model.ContentDescription
@@ -40,6 +39,7 @@ import com.android.systemui.statusbar.pipeline.mobile.domain.model.SignalIconMod
 import com.android.systemui.statusbar.pipeline.mobile.ui.model.MobileContentDescription
 import com.android.systemui.statusbar.pipeline.shared.ConnectivityConstants
 import com.android.systemui.statusbar.pipeline.shared.data.model.DataActivityModel
+import com.android.systemui.statusbar.systemstatusicons.SystemStatusIconsInCompose
 
 /** Common interface for all of the location-based mobile icon view models. */
 interface MobileIconViewModelKairosCommon {
@@ -57,6 +57,8 @@ interface MobileIconViewModelKairosCommon {
     val activityInVisible: KairosState<Boolean>
     val activityOutVisible: KairosState<Boolean>
     val activityContainerVisible: KairosState<Boolean>
+    val volteId: KairosState<Int>
+    val showSignalStrengthIcon: KairosState<Boolean>
 }
 
 /**
@@ -130,6 +132,9 @@ class MobileIconViewModelKairos(
 
     override val activityContainerVisible: KairosState<Boolean> =
         vmProvider.flatMap { it.activityContainerVisible }
+    override val volteId: KairosState<Int> = vmProvider.flatMap { it.volteId }
+    override val showSignalStrengthIcon: KairosState<Boolean> =
+        vmProvider.flatMap { it.showSignalStrengthIcon }
 }
 
 /** Representation of this network when it is non-terrestrial (e.g., satellite) */
@@ -162,6 +167,8 @@ private class CarrierBasedSatelliteViewModelKairosImpl(
     override val activityInVisible: KairosState<Boolean> = stateOf(false)
     override val activityOutVisible: KairosState<Boolean> = stateOf(false)
     override val activityContainerVisible: KairosState<Boolean> = stateOf(false)
+    override val volteId: KairosState<Int> = stateOf(0)
+    override val showSignalStrengthIcon: KairosState<Boolean> = stateOf(true)
 }
 
 /** Terrestrial (cellular) icon. */
@@ -326,9 +333,11 @@ private class CellularIconViewModelKairos(
         activity.map { it?.hasActivityOut ?: false }
 
     override val activityContainerVisible: KairosState<Boolean> =
-        if (statusBarStaticInoutIndicators()) {
+        if (SystemStatusIconsInCompose.isEnabled) {
             stateOf(constants.shouldShowActivityConfig)
         } else {
             activity.map { it != null && (it.hasActivityIn || it.hasActivityOut) }
         }
+    override val volteId: KairosState<Int> = iconInteractor.volteId
+    override val showSignalStrengthIcon: KairosState<Boolean> = iconInteractor.showSignalStrengthIcon
 }

@@ -136,7 +136,6 @@ import android.view.WindowManagerGlobal;
 import android.view.accessibility.AccessibilityManager;
 import android.window.ClientWindowFrames;
 import android.window.DesktopExperienceFlags;
-import android.window.DesktopModeFlags;
 
 import com.android.internal.R;
 import com.android.internal.annotations.VisibleForTesting;
@@ -3073,8 +3072,7 @@ public class DisplayPolicy {
                 && !topFreeformTask.getBounds().equals(mDisplayContent.getBounds());
         // Always show status/nav bar for non-fullscreen multi window (excluding PiP).
         final boolean showSystemBarsByLegacyPolicy = adjacentTasksVisible
-                || (DesktopModeFlags.ENABLE_FULLY_IMMERSIVE_IN_DESKTOP.isTrue()
-                ? inNonFullscreenFreeformMode : freeformRootTaskVisible);
+                || inNonFullscreenFreeformMode;
 
         getInsetsPolicy().updateSystemBars(
                 win,

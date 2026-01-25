@@ -411,6 +411,8 @@ constructor(
 
     override val isInEcmMode: State<Boolean> = activeRepo.flatMap { it.isInEcmMode }
 
+    override val volteId: State<Int> = activeRepo.flatMap { it.volteId }
+    override val showSignalStrengthIcon: State<Boolean> = activeRepo.flatMap { it.showSignalStrengthIcon }
     fun dump(pw: PrintWriter) {
         val cache = dumpCache ?: return
         val ipw = IndentingPrintWriter(pw, "  ")

@@ -2361,7 +2361,7 @@ public final class ActivityRecord extends WindowToken {
         }
 
         final TaskSnapshot snapshot = mWmService.mTaskSnapshotController.getSnapshot(task.mTaskId,
-                Flags.respectRequestedTaskSnapshotResolution()
+                Flags.onlyCacheLowResTaskSnapshot()
                         ? TaskSnapshotManager.RESOLUTION_ANY
                         : TaskSnapshotManager.RESOLUTION_HIGH);
         final int type = getStartingWindowType(newTask, taskSwitch, processRunning,

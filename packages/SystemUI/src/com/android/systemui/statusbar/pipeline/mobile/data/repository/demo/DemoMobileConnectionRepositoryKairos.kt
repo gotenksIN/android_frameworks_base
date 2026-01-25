@@ -424,6 +424,9 @@ class DemoMobileConnectionRepositoryKairos(
 
     override val isInEcmMode: State<Boolean> = stateOf(false)
 
+    override val volteId: State<Int> = stateOf(0)
+    override val showSignalStrengthIcon: State<Boolean> = stateOf(true)
+
     private fun TransactionScope.resolvedNetworkTypeForIconGroup(
         iconGroup: SignalIcon.MobileIconGroup?
     ) = DefaultNetworkType(mobileMappingsReverseLookup.sample()[iconGroup] ?: "dis")

@@ -171,6 +171,8 @@ interface MobileConnectionRepositoryKairos {
      * @see [TelephonyManager.getEmergencyCallbackMode]
      */
     val isInEcmMode: State<Boolean>
+    val volteId: State<Int>
+    val showSignalStrengthIcon: State<Boolean>
 
     companion object {
         /** The default number of levels to use for [numberOfLevels]. */

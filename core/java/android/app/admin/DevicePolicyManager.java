@@ -3126,6 +3126,19 @@ public class DevicePolicyManager {
     public static final int STATUS_NON_DEFAULT_DEVICE_POLICY_MANAGEMENT_ROLE_HOLDER_EXISTS = 23;
 
     /**
+     * Result code for {@link #checkProvisioningPreCondition}.
+     *
+     * <p>Returned for {@link #ACTION_PROVISION_MULTI_USER_DEVICE} and
+     * {@link #ACTION_PROVISION_MULTI_USER_MANAGED_USER} when the device doesn't support multi user
+     * management.
+     *
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_MULTI_USER_MANAGEMENT_DEVICE_PROVISIONING)
+    public static final int STATUS_MULTI_USER_MANAGEMENT_NOT_SUPPORTED = 23;
+
+    /**
      * Result codes for {@link #checkProvisioningPrecondition} indicating all the provisioning pre
      * conditions.
      *
@@ -6970,7 +6983,7 @@ public class DevicePolicyManager {
     public static final int WIPE_RESET_PROTECTION_DATA = 0x0002;
 
     /**
-     * Flag for {@link #wipeData(int)}: also erase the device's eUICC data.
+     * Flag for {@link #wipeDevice(int)}: also erase the device's eUICC data.
      */
     public static final int WIPE_EUICC = 0x0004;
 
@@ -6983,8 +6996,8 @@ public class DevicePolicyManager {
      * See {@link #wipeData(int, CharSequence)}
      *
      * @param flags Bit mask of additional options: currently supported flags are
-     *              {@link #WIPE_EXTERNAL_STORAGE}, {@link #WIPE_RESET_PROTECTION_DATA},
-     *              {@link #WIPE_EUICC} and {@link #WIPE_SILENTLY}.
+     *              {@link #WIPE_EXTERNAL_STORAGE}, {@link #WIPE_RESET_PROTECTION_DATA}
+     *              and {@link #WIPE_SILENTLY}.
      * @throws SecurityException if the calling application does not own an active
      *                           administrator
      *                           that uses {@link DeviceAdminInfo#USES_POLICY_WIPE_DATA} and is
@@ -7024,8 +7037,7 @@ public class DevicePolicyManager {
      * should use {@link #wipeDevice} instead.
      *
      * @param flags Bit mask of additional options: currently supported flags are
-     *            {@link #WIPE_EXTERNAL_STORAGE}, {@link #WIPE_RESET_PROTECTION_DATA} and
-     *            {@link #WIPE_EUICC}.
+     *            {@link #WIPE_EXTERNAL_STORAGE} and {@link #WIPE_RESET_PROTECTION_DATA}.
      * @param reason a string that contains the reason for wiping data, which can be
      *            presented to the user.
      * @throws SecurityException if the calling application does not own an active administrator

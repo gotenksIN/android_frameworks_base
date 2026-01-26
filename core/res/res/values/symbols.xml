@@ -860,6 +860,7 @@
   <java-symbol type="string" name="package_deleted_device_owner" />
   <java-symbol type="string" name="lockscreen_access_pattern_cell_added" />
   <java-symbol type="string" name="lockscreen_access_pattern_cell_added_verbose" />
+  <java-symbol type="string" name="lockscreen_access_pattern_cell_verbose" />
   <java-symbol type="string" name="lockscreen_access_pattern_cleared" />
   <java-symbol type="string" name="lockscreen_access_pattern_detected" />
   <java-symbol type="string" name="lockscreen_access_pattern_start" />
@@ -4311,6 +4312,11 @@
   <java-symbol type="string" name="foreground_service_apps_in_background" />
   <java-symbol type="string" name="foreground_service_tap_for_details" />
   <java-symbol type="string" name="foreground_service_multiple_separator" />
+
+  <java-symbol type="string" name="config_defaultContentSafetyService" />
+  <java-symbol type="string" name="config_defaultContentSafetyIsolatedService" />
+  <java-symbol type="string" name="config_defaultContentSafetyPccService" />
+  <java-symbol type="string" name="config_defaultContentSafetySettingsService" />
 
   <java-symbol type="bool" name="config_enableCredentialFactoryResetProtection" />
   <java-symbol type="bool" name="config_disableWeaverOnUnsecuredUsers" />

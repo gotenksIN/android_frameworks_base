@@ -144,6 +144,7 @@ public class CachedAppOptimizer {
     @VisibleForTesting static final String KEY_COMPACT_THROTTLE_4 = "compact_throttle_4";
     @VisibleForTesting static final String KEY_COMPACT_THROTTLE_5 = "compact_throttle_5";
     @VisibleForTesting static final String KEY_COMPACT_THROTTLE_6 = "compact_throttle_6";
+    @VisibleForTesting static final String KEY_ZRAM_WRITEBACK_ENABLED = "zram_writeback_enabled";
     @VisibleForTesting static final String KEY_ZRAM_WRITEBACK_WAIT_SECONDS =
             "zram_writeback_wait_seconds";
     @VisibleForTesting static final String KEY_ZRAM_WRITEBACK_OOM_ADJ =
@@ -323,6 +324,7 @@ public class CachedAppOptimizer {
 // QTI_END: 2024-07-04: Performance: CachedAppOptimizer: Initialize compactProfile and compactTime
     @VisibleForTesting static final long DEFAULT_COMPACT_THROTTLE_5 = 10 * 60 * 1000;
     @VisibleForTesting static final long DEFAULT_COMPACT_THROTTLE_6 = 10 * 60 * 1000;
+    @VisibleForTesting static final boolean DEFAULT_ZRAM_WRITEBACK_ENABLED = false;
     @VisibleForTesting static final long DEFAULT_ZRAM_WRITEBACK_WAIT_SECONDS = 10 * 60;
     @VisibleForTesting static final long DEFAULT_ZRAM_WRITEBACK_THRESHOLD_KB = 150 * 1024L;
     @VisibleForTesting static final int DEFAULT_ZRAM_WRITEBACK_GPU_MEM_THRESHOLD_KB = 60;
@@ -496,6 +498,8 @@ public class CachedAppOptimizer {
                                 updateMinOomAdjThrottle();
                             } else if (KEY_COMPACT_THROTTLE_MAX_OOM_ADJ.equals(name)) {
                                 updateMaxOomAdjThrottle();
+                            } else if (KEY_ZRAM_WRITEBACK_ENABLED.equals(name)) {
+                                updateZramWritebackEnabled();
                             } else if (KEY_ZRAM_WRITEBACK_WAIT_SECONDS.equals(name)) {
                                 updateZramWritebackWait();
                             } else if (KEY_ZRAM_WRITEBACK_OOM_ADJ.equals(name)) {
@@ -577,6 +581,8 @@ public class CachedAppOptimizer {
     @GuardedBy("mPhenotypeFlagLock")
     @VisibleForTesting volatile long mCompactThrottleMaxOomAdj =
             DEFAULT_COMPACT_THROTTLE_MAX_OOM_ADJ;
+    @GuardedBy("mPhenotypeFlagLock")
+    @VisibleForTesting volatile boolean mZramWritebackEnabled = DEFAULT_ZRAM_WRITEBACK_ENABLED;
     @GuardedBy("mPhenotypeFlagLock")
     @VisibleForTesting volatile long mZramWritebackWaitSeconds =
             DEFAULT_ZRAM_WRITEBACK_WAIT_SECONDS;
@@ -740,6 +746,7 @@ public class CachedAppOptimizer {
             updateUseFreezer();
             updateMinOomAdjThrottle();
             updateMaxOomAdjThrottle();
+            updateZramWritebackEnabled();
             updateZramWritebackWait();
             updateZramWritebackOomAdj();
             updateZramWritebackThresholdKb();
@@ -888,6 +895,7 @@ public class CachedAppOptimizer {
             pw.println("  " + KEY_COMPACT_THROTTLE_4 + "=" + mCompactThrottleFullFull);
             pw.println("  " + KEY_COMPACT_THROTTLE_MIN_OOM_ADJ + "=" + mCompactThrottleMinOomAdj);
             pw.println("  " + KEY_COMPACT_THROTTLE_MAX_OOM_ADJ + "=" + mCompactThrottleMaxOomAdj);
+            pw.println("  " + KEY_ZRAM_WRITEBACK_ENABLED + "=" + mZramWritebackEnabled);
             pw.println("  " + KEY_ZRAM_WRITEBACK_WAIT_SECONDS + "=" + mZramWritebackWaitSeconds);
             pw.println("  " + KEY_ZRAM_WRITEBACK_OOM_ADJ + "=" + mZramWritebackOomAdj);
             pw.println("  " + KEY_ZRAM_WRITEBACK_THRESHOLD_KB + "=" + mZramWritebackThresholdKb);
@@ -1358,6 +1366,12 @@ public class CachedAppOptimizer {
         if (mCompactThrottleMaxOomAdj > CACHED_APP_MAX_ADJ) {
             mCompactThrottleMaxOomAdj = DEFAULT_COMPACT_THROTTLE_MAX_OOM_ADJ;
         }
+    }
+
+    @GuardedBy("mPhenotypeFlagLock")
+    private void updateZramWritebackEnabled() {
+        mZramWritebackEnabled = DeviceConfig.getBoolean(DeviceConfig.NAMESPACE_ACTIVITY_MANAGER,
+                KEY_ZRAM_WRITEBACK_ENABLED, DEFAULT_ZRAM_WRITEBACK_ENABLED);
     }
 
     @GuardedBy("mPhenotypeFlagLock")
@@ -1948,12 +1962,15 @@ public class CachedAppOptimizer {
 
     private void maybeWritebackZram(ProcessRecord app, int pid, String processName,
             String packageName, int uid, long zramUsedDeltaKb, boolean hasActivities) {
+        final boolean zramWritebackEnabled = Flags.enableZramWriteback() && mZramWritebackEnabled;
         if (DEBUG_WRITEBACK) {
             Slog.i(
                 TAG_AM,
                 "maybeWritebackZram "
-                        + " enableZramWriteback: "
+                        + " enableZramWriteback(flag): "
                         + Flags.enableZramWriteback()
+                        + " enableZramWriteback(deviceConfig): "
+                        + mZramWritebackEnabled
                         + " processName: "
                         + processName
                         + " pid: "
@@ -1964,7 +1981,7 @@ public class CachedAppOptimizer {
                         + hasActivities
                         );
         }
-        if (!Flags.logZramWritebackEvents() && !Flags.enableZramWriteback()) {
+        if (!Flags.logZramWritebackEvents() && !zramWritebackEnabled) {
             return;
         }
         int eventTypeToLog =
@@ -2079,7 +2096,7 @@ public class CachedAppOptimizer {
                     final FileDescriptor fd = Process.openPidFd(pid, 0);
                     try (final ParcelFileDescriptor pfd =
                             ParcelFileDescriptor.adoptFd(fd.getInt$())) {
-                        if (!Flags.enableZramWriteback()) {
+                        if (!zramWritebackEnabled) {
                             eventTypeToLog =
                                     FrameworkStatsLog
                                             .ZRAM_WRITEBACK_EVENT__EVENT_TYPE__DISABLED_BY_FLAG;

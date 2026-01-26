@@ -177,7 +177,6 @@ import static com.android.server.am.Flags.FLAG_FGS_DELEGATE_SYSTEM_API;
 import static com.android.server.am.Flags.FLAG_GET_PACKAGE_NAMES_FOR_PID_API;
 import static com.android.server.am.LogcatFetcher.LOGCAT_TIMEOUT_SEC;
 import static com.android.server.am.LogcatFetcher.RESERVED_BYTES_PER_LOGCAT_LINE;
-import static com.android.server.am.MemoryStatUtil.hasMemcg;
 import static com.android.server.am.ProcessList.ProcStartHandler;
 import static com.android.server.am.ProcessList.TAG_PROCESS_OBSERVERS;
 import static com.android.server.am.psc.Constants.BACKUP_APP_ADJ;
@@ -4059,12 +4058,6 @@ public class ActivityManagerService extends IActivityManager.Stub
         } else if (DEBUG_PROCESSES) {
             Slog.d(TAG_PROCESSES, "Received spurious death notification for thread "
                     + thread.asBinder());
-        }
-
-        // On the device which doesn't have Cgroup, log LmkStateChanged which is used as a signal
-        // for pulling memory stats of other running processes when this process died.
-        if (!hasMemcg()) {
-            FrameworkStatsLog.write(FrameworkStatsLog.APP_DIED, SystemClock.elapsedRealtime());
         }
     }
     @Override
@@ -14870,13 +14863,15 @@ public class ActivityManagerService extends IActivityManager.Stub
                             ? new ComponentName(app.packageName, app.backupAgentName)
                             : new ComponentName("android", "FullBackupAgent");
 
-            ProcessRecord proc = getProcessRecordLocked(app.processName, app.uid);
+            ProcessRecord proc = getProcessRecordLocked(app.processName, getBackupAgentUid(app));
             boolean isProcessStarted = proc != null;
             if (!isProcessStarted) {
-                proc = startProcessLocked(app.processName, app,
-                  false, 0,
-                  new HostingRecord(HostingRecord.HOSTING_TYPE_BACKUP, hostingName),
-                  ZYGOTE_POLICY_FLAG_SYSTEM_PROCESS, false, false);
+                HostingRecord hostingRecord = enablePccFrameworkSupport()
+                        ? new HostingRecord(HostingRecord.HOSTING_TYPE_BACKUP, hostingName,
+                        /*isTopApp*/ false, app.shouldBackupAgentRunInPccProcess())
+                        : new HostingRecord(HostingRecord.HOSTING_TYPE_BACKUP, hostingName);
+                proc = startProcessLocked(app.processName, app, false, 0, hostingRecord,
+                        ZYGOTE_POLICY_FLAG_SYSTEM_PROCESS, false, false);
             }
             if (proc == null) {
                 Slog.e(TAG, "Unable to start backup agent process " + r);
@@ -14899,8 +14894,8 @@ public class ActivityManagerService extends IActivityManager.Stub
             //  replaced here, but an OomAdjsuter update is not triggered on the previous app
             //  (whose state will change from being removed from mBackupTargets).
             final BackupRecord backupTarget = mBackupTargets.get(targetUserId);
-            oldBackupUid = backupTarget != null ? backupTarget.appInfo.uid : -1;
-            newBackupUid = proc.isInFullBackup() ? r.appInfo.uid : -1;
+            oldBackupUid = backupTarget != null ? getBackupAgentUid(backupTarget.appInfo) : -1;
+            newBackupUid = proc.isInFullBackup() ? getBackupAgentUid(r.appInfo) : -1;
             mBackupTargets.put(targetUserId, r);
             mProcessStateController.setBackupTarget(proc, targetUserId);
 
@@ -14965,6 +14960,10 @@ public class ActivityManagerService extends IActivityManager.Stub
 
         JobSchedulerInternal js = LocalServices.getService(JobSchedulerInternal.class);
         js.clearAllBackingUpUids();
+    }
+
+    private static int getBackupAgentUid(ApplicationInfo appInfo) {
+        return enablePccFrameworkSupport() ? appInfo.getBackupAgentUid() : appInfo.uid;
     }
 
     // A backup agent has just come up
@@ -15049,7 +15048,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                 proc.setInFullBackup(false);
                 proc.mProfile.clearHostingComponentType(HOSTING_COMPONENT_TYPE_BACKUP);
 
-                oldBackupUid = backupTarget != null ? backupTarget.appInfo.uid : -1;
+                oldBackupUid = backupTarget != null ? getBackupAgentUid(backupTarget.appInfo) : -1;
 
                 // If the app crashed during backup, 'thread' will be null here
                 final IApplicationThread thread = proc.getThread();

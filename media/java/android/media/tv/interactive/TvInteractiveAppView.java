@@ -552,6 +552,22 @@ public class TvInteractiveAppView extends ViewGroup {
     }
 
     /**
+     * Starts an interactive application using the unique identifier to this session.
+     *
+     * @param handle the handle id of the interactive application.
+     *
+     * @hide
+     */
+    public void startInteractiveApp(int handle) {
+        if (DEBUG) {
+            Log.d(TAG, "startInteractiveApp");
+        }
+        if (mSession != null) {
+            mSession.startInteractiveApp(handle);
+        }
+    }
+
+    /**
      * Sends current video bounds to related TV interactive app.
      *
      * @param bounds the rectangle area for rendering the current video.
@@ -1152,6 +1168,39 @@ public class TvInteractiveAppView extends ViewGroup {
     }
 
     /**
+     * Request a list of Web Service Clients.
+     * @hide
+     */
+    public void requestWebServiceClients() {
+        if (mSession != null) {
+            mSession.requestWebServiceClients();
+        }
+    }
+
+    /**
+     * Updates the state of a specific Web Service Client.
+     * @param handle The handle of the Web Service Client.
+     * @param state The new state of the Web Service Client.
+     * @hide
+     */
+    public void updateWebServiceClientState(int handle, int state) {
+        if (mSession != null) {
+            mSession.updateWebServiceClientState(handle, state);
+        }
+    }
+
+    /**
+     * Removes a Web Service Client.
+     * @param handle The handle of the Web Service Client to be removed.
+     * @hide
+     */
+    public void removeWebServiceClient(int handle) {
+        if (mSession != null) {
+            mSession.removeWebServiceClient(handle);
+        }
+    }
+
+    /**
      * Callback used to receive various status updates on the {@link TvInteractiveAppView}.
      */
     public abstract static class TvInteractiveAppCallback {
@@ -1198,6 +1247,17 @@ public class TvInteractiveAppView extends ViewGroup {
                 @NonNull String iAppServiceId,
                 @TvInteractiveAppManager.InteractiveAppState int state,
                 @TvInteractiveAppManager.ErrorCode int err) {
+        }
+
+        /**
+         * This is called when any interactive app's metadata has changed.
+         *
+         * @param iAppServiceId The ID of the TV interactive app service bound to this view.
+         * @param appInfo the interactive app info.
+         * @hide
+         */
+        public void onInteractiveAppInfoChanged(@NonNull String iAppServiceId,
+                TvInteractiveAppInfo appInfo) {
         }
 
         /**
@@ -1497,6 +1557,17 @@ public class TvInteractiveAppView extends ViewGroup {
                 @NonNull String iAppServiceId,
                 @TvRecordingInfo.TvRecordingListType int type) {
         }
+
+        /**
+         * Invoked when the interactive app service sends a new client list.
+         *
+         * @param iAppServiceId The ID of the TV interactive app service bound to this view.
+         * @param list The list of Web Service Clients.
+         * @hide
+         */
+        public void onSendWebServiceClientList(@NonNull String iAppServiceId,
+                @NonNull List<WebServiceClientInfo> list) {
+        }
     }
 
     /**
@@ -1662,6 +1733,33 @@ public class TvInteractiveAppView extends ViewGroup {
                         synchronized (mCallbackLock) {
                             if (mCallback != null) {
                                 mCallback.onStateChanged(mIAppServiceId, state, err);
+                            }
+                        }
+                    });
+                }
+            }
+        }
+
+        /**
+         * This is called when the state of any interactive app metadata changed.
+         *
+         * @param appInfo the interactive app info.
+         */
+        @Override
+        public void onInteractiveAppInfoChanged(Session session, TvInteractiveAppInfo appInfo) {
+            if (DEBUG) {
+                Log.d(TAG, "onInteractiveAppStateChanged");
+            }
+            if (this != mSessionCallback) {
+                Log.w(TAG, "onInteractiveAppStateChanged - session not created");
+                return;
+            }
+            synchronized (mCallbackLock) {
+                if (mCallbackExecutor != null) {
+                    mCallbackExecutor.execute(() -> {
+                        synchronized (mCallbackLock) {
+                            if (mCallback != null) {
+                                mCallback.onInteractiveAppInfoChanged(mIAppServiceId, appInfo);
                             }
                         }
                     });
@@ -2050,6 +2148,21 @@ public class TvInteractiveAppView extends ViewGroup {
             }
             if (mCallback != null && Flags.tiafVApis()) {
                 mCallback.onRequestCertificate(mIAppServiceId, host, port);
+            }
+        }
+
+        @Override
+        public void onSendWebServiceClientList(Session session,
+                @NonNull List<WebServiceClientInfo> list) {
+            if (DEBUG) {
+                Log.d(TAG, "onSendWebServiceClientList");
+            }
+            if (this != mSessionCallback) {
+                Log.w(TAG, "onSendWebServiceClientList - session not created");
+                return;
+            }
+            if (mCallback != null) {
+                mCallback.onSendWebServiceClientList(mIAppServiceId, list);
             }
         }
     }

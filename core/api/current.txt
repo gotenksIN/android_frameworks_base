@@ -572,6 +572,7 @@ package android {
     field public static final int backgroundTint = 16843883; // 0x101046b
     field public static final int backgroundTintMode = 16843884; // 0x101046c
     field public static final int backupAgent = 16843391; // 0x101027f
+    field @FlaggedApi("android.app.privatecompute.flags.enable_pcc_framework_support") public static final int backupAgentProcess;
     field public static final int backupInForeground = 16844058; // 0x101051a
     field public static final int banner = 16843762; // 0x10103f2
     field public static final int baseline = 16843548; // 0x101031c
@@ -9730,6 +9731,11 @@ package android.app.contentrestriction {
     field public static final String ACTION_CONTENT_RESTRICTION_APP_SERVICE = "android.app.action.CONTENT_RESTRICTION_SERVICE";
   }
 
+  @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") public class ContentRestrictionManager {
+    method @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") public void isContentAllowed(@NonNull android.app.contentrestriction.Content, @NonNull java.util.function.Consumer<java.lang.Boolean>);
+    method @FlaggedApi("android.app.contentrestriction.flags.content_restriction_api") public boolean isContentRestrictionEnabled();
+  }
+
 }
 
 package android.app.jank {
@@ -9903,6 +9909,8 @@ package android.app.job {
     field public static final int STOP_REASON_CONSTRAINT_DEVICE_IDLE = 8; // 0x8
     field public static final int STOP_REASON_CONSTRAINT_STORAGE_NOT_LOW = 9; // 0x9
     field public static final int STOP_REASON_DEVICE_STATE = 4; // 0x4
+    field @FlaggedApi("android.app.job.enhanced_pending_and_stop_reasons_api") public static final int STOP_REASON_DEVICE_STATE_BATTERY_SAVER = 18; // 0x12
+    field @FlaggedApi("android.app.job.enhanced_pending_and_stop_reasons_api") public static final int STOP_REASON_DEVICE_STATE_THERMAL = 17; // 0x11
     field public static final int STOP_REASON_ESTIMATED_APP_LAUNCH_TIME_CHANGED = 15; // 0xf
     field public static final int STOP_REASON_PREEMPT = 2; // 0x2
     field public static final int STOP_REASON_QUOTA = 10; // 0xa
@@ -9943,6 +9951,8 @@ package android.app.job {
     field public static final int PENDING_JOB_REASON_CONSTRAINT_PREFETCH = 10; // 0xa
     field public static final int PENDING_JOB_REASON_CONSTRAINT_STORAGE_NOT_LOW = 11; // 0xb
     field public static final int PENDING_JOB_REASON_DEVICE_STATE = 12; // 0xc
+    field @FlaggedApi("android.app.job.enhanced_pending_and_stop_reasons_api") public static final int PENDING_JOB_REASON_DEVICE_STATE_BATTERY_SAVER = 18; // 0x12
+    field @FlaggedApi("android.app.job.enhanced_pending_and_stop_reasons_api") public static final int PENDING_JOB_REASON_DEVICE_STATE_THERMAL = 17; // 0x11
     field public static final int PENDING_JOB_REASON_EXECUTING = -1; // 0xffffffff
     field public static final int PENDING_JOB_REASON_INVALID_JOB_ID = -2; // 0xfffffffe
     field public static final int PENDING_JOB_REASON_JOB_SCHEDULER_OPTIMIZATION = 13; // 0xd
@@ -10134,11 +10144,12 @@ package android.app.permissionui {
     method public void setStrokeWidth(int);
     method public void setTextColor(@ColorInt int);
     method public void setTextType(int);
-    field public static final int TEXT_TYPE_NEAR_PRECISE_LOCATION = 1; // 0x1
+    field public static final int TEXT_TYPE_NEAR_MY_PRECISE_LOCATION = 4; // 0x4
+    field public static final int TEXT_TYPE_NEAR_YOUR_PRECISE_LOCATION = 5; // 0x5
     field public static final int TEXT_TYPE_NONE = 0; // 0x0
-    field public static final int TEXT_TYPE_PRECISE_LOCATION = 2; // 0x2
+    field public static final int TEXT_TYPE_PRECISE_LOCATION = 1; // 0x1
     field public static final int TEXT_TYPE_SHARE_PRECISE_LOCATION = 3; // 0x3
-    field public static final int TEXT_TYPE_USE_PRECISE_LOCATION = 4; // 0x4
+    field public static final int TEXT_TYPE_USE_PRECISE_LOCATION = 2; // 0x2
   }
 
 }
@@ -10751,6 +10762,7 @@ package android.companion {
     method @FlaggedApi("android.companion.association_extra_permission") @NonNull public java.util.Set<java.lang.String> getExtraPermissions();
     method public int getId();
     method public int getSystemDataSyncFlags();
+    method @FlaggedApi("android.companion.support_ai_agent") public boolean isRemoteAiAgentSupported();
     method public boolean isSelfManaged();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.companion.AssociationInfo> CREATOR;
@@ -10763,6 +10775,7 @@ package android.companion {
     method @Nullable public CharSequence getDisplayName();
     method @FlaggedApi("android.companion.association_extra_permission") @NonNull public java.util.Set<java.lang.String> getExtraPermissions();
     method public boolean isForceConfirmation();
+    method @FlaggedApi("android.companion.support_ai_agent") public boolean isRemoteAiAgentSupported();
     method public boolean isSelfManaged();
     method public boolean isSingleDevice();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
@@ -10788,6 +10801,7 @@ package android.companion {
     method @NonNull public android.companion.AssociationRequest.Builder setDisplayName(@NonNull CharSequence);
     method @FlaggedApi("android.companion.association_extra_permission") @NonNull public android.companion.AssociationRequest.Builder setExtraPermissions(@NonNull java.util.Set<java.lang.String>);
     method @NonNull @RequiresPermission(android.Manifest.permission.REQUEST_COMPANION_SELF_MANAGED) public android.companion.AssociationRequest.Builder setForceConfirmation(boolean);
+    method @FlaggedApi("android.companion.support_ai_agent") @NonNull public android.companion.AssociationRequest.Builder setRemoteAiAgentSupported(boolean);
     method @NonNull @RequiresPermission(android.Manifest.permission.REQUEST_COMPANION_SELF_MANAGED) public android.companion.AssociationRequest.Builder setSelfManaged(boolean);
     method @NonNull public android.companion.AssociationRequest.Builder setSingleDevice(boolean);
   }
@@ -21482,6 +21496,7 @@ package android.hardware.camera2.params {
     method public int getMaxSharedSurfaceCount();
     method public int getMirrorMode();
     method @FlaggedApi("com.android.internal.camera.flags.mirror_mode_shared_surfaces") public int getMirrorMode(@NonNull android.view.Surface);
+    method @FlaggedApi("com.android.internal.camera.flags.output_configuration_get_physical_camera_id") @Nullable public String getPhysicalCameraId();
     method public long getStreamUseCase();
     method @Nullable public android.view.Surface getSurface();
     method public int getSurfaceGroupId();
@@ -28418,6 +28433,7 @@ package android.media.quality {
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String LEVEL_RANGE_AUTO = "AUTO";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String LEVEL_RANGE_FULL = "FULL";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String LEVEL_RANGE_LIMITED = "LIMITED";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final int PANEL_TECHNOLOGY_OLED = 0; // 0x0
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PICTURE_QUALITY_EVENT_TYPE_BBD_RESULT = "BBD_RESULT";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PICTURE_QUALITY_EVENT_TYPE_CAPTUREPOINT_INFO_CHANGE = "CAPTUREPOINT_INFO_CHANGE";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PICTURE_QUALITY_EVENT_TYPE_DOLBY_APO_CHANGE = "DOLBY_APO_CHANGE";
@@ -28536,18 +28552,23 @@ package android.media.quality {
   }
 
   public static final class MediaQualityContract.SoundQuality {
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PARAMETER_AD_HEADPHONE_ENABLE = "ad_headphone_enable";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PARAMETER_AD_SPEAKER_ENABLE = "ad_speaker_enable";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PARAMETER_AD_VOLUME = "ad_volume";
     field public static final String PARAMETER_AUTO_VOLUME_CONTROL = "auto_volume_control";
     field public static final String PARAMETER_BALANCE = "balance";
     field public static final String PARAMETER_BASS = "bass";
     field public static final String PARAMETER_DIALOGUE_ENHANCER = "dialogue_enhancer";
     field public static final String PARAMETER_DIGITAL_OUTPUT_DELAY_MILLIS = "digital_output_delay_millis";
     field public static final String PARAMETER_DIGITAL_OUTPUT_MODE = "digital_output_mode";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PARAMETER_DOLBY_AUDIO_PROCESSING = "dolby_audio_processing";
     field public static final String PARAMETER_DOLBY_AUDIO_PROCESSING_DOLBY_ATMOS = "dolby_audio_processing_dolby_atmos";
     field public static final String PARAMETER_DOLBY_AUDIO_PROCESSING_SOUND_MODE = "dolby_audio_processing_sound_mode";
     field public static final String PARAMETER_DOLBY_AUDIO_PROCESSING_SURROUND_VIRTUALIZER = "dolby_audio_processing_surround_virtualizer";
     field public static final String PARAMETER_DOLBY_AUDIO_PROCESSING_VOLUME_LEVELER = "dolby_audio_processing_volume_leveler";
     field public static final String PARAMETER_DOWN_MIX_MODE = "down_mix_mode";
     field public static final String PARAMETER_DTS_DRC = "dts_drc";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PARAMETER_DTS_VIRTUAL_X = "dts_virtual_x";
     field public static final String PARAMETER_DTS_VIRTUAL_X_DEFINITION = "dts_virtual_x_definition";
     field public static final String PARAMETER_DTS_VIRTUAL_X_DIALOG_CLARITY = "dts_virtual_x_dialog_clarity";
     field public static final String PARAMETER_DTS_VIRTUAL_X_HEIGHT = "dts_virtual_x_height";
@@ -28556,6 +28577,8 @@ package android.media.quality {
     field public static final String PARAMETER_DTS_VIRTUAL_X_TRU_SURROUND_X = "dts_virtual_x_tru_surround_x";
     field public static final String PARAMETER_DTS_VIRTUAL_X_TRU_VOLUME_HD = "dts_virtual_x_tru_volume_hd";
     field public static final String PARAMETER_EARC = "earc";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PARAMETER_PAN_FADE_ENABLE = "pan_fade_enable";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PARAMETER_SOUND_STYLE = "sound_style";
     field public static final String PARAMETER_SPEAKERS = "speakers";
     field public static final String PARAMETER_SPEAKERS_DELAY_MILLIS = "speakers_delay_millis";
     field public static final String PARAMETER_SURROUND_SOUND = "surround_sound";
@@ -28590,6 +28613,7 @@ package android.media.quality {
     method public void unregisterSoundProfileCallback(@NonNull android.media.quality.MediaQualityManager.SoundProfileCallback);
     method public void updatePictureProfile(@NonNull String, @NonNull android.media.quality.PictureProfile);
     method public void updateSoundProfile(@NonNull String, @NonNull android.media.quality.SoundProfile);
+    method @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public boolean usesDisplayTechnology(int);
   }
 
   public static interface MediaQualityManager.AmbientBacklightCallback {
@@ -41761,6 +41785,7 @@ package android.security {
     ctor public KeyChain();
     method public static void choosePrivateKeyAlias(@NonNull android.app.Activity, @NonNull android.security.KeyChainAliasCallback, @Nullable String[], @Nullable java.security.Principal[], @Nullable String, int, @Nullable String);
     method public static void choosePrivateKeyAlias(@NonNull android.app.Activity, @NonNull android.security.KeyChainAliasCallback, @Nullable String[], @Nullable java.security.Principal[], @Nullable android.net.Uri, @Nullable String);
+    method @FlaggedApi("android.app.admin.flags.keychain_suppress_certificate_selection") public static void choosePrivateKeyAlias(@NonNull android.app.Activity, @Nullable java.util.List<java.lang.String>, @Nullable java.util.List<java.security.Principal>, @Nullable android.net.Uri, @Nullable String, boolean, @NonNull java.util.concurrent.Executor, @NonNull android.security.KeyChainAliasCallback);
     method @NonNull public static android.content.Intent createInstallIntent();
     method @NonNull public static android.content.Intent createManageCredentialsIntent(@NonNull android.security.AppUriAuthenticationPolicy);
     method @Nullable @WorkerThread public static java.security.cert.X509Certificate[] getCertificateChain(@NonNull android.content.Context, @NonNull String) throws java.lang.InterruptedException, android.security.KeyChainException;
@@ -41780,10 +41805,13 @@ package android.security {
     field public static final String EXTRA_NAME = "name";
     field public static final String EXTRA_PKCS12 = "PKCS12";
     field public static final String KEY_ALIAS_SELECTION_DENIED = "android:alias-selection-denied";
+    field @FlaggedApi("android.app.admin.flags.keychain_suppress_certificate_selection") public static final int SELECTION_ERROR_CERTIFICATE_SELECTION_SUPPRESSED = 2; // 0x2
+    field @FlaggedApi("android.app.admin.flags.keychain_suppress_certificate_selection") public static final int SELECTION_ERROR_OTHER = 1; // 0x1
   }
 
   public interface KeyChainAliasCallback {
     method public void alias(@Nullable String);
+    method @FlaggedApi("android.app.admin.flags.keychain_suppress_certificate_selection") public default void onError(int);
   }
 
   public class KeyChainException extends java.lang.Exception {
@@ -43867,6 +43895,9 @@ package android.service.persistentdata {
 
 package android.service.personalcontext {
 
+  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public interface ComponentIdProvider {
+  }
+
   @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class RenderToken implements java.lang.Comparable<android.service.personalcontext.RenderToken> android.os.Parcelable {
     method public int compareTo(@NonNull android.service.personalcontext.RenderToken);
     method public int describeContents();
@@ -43895,6 +43926,7 @@ package android.service.personalcontext.hint {
   @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public class AutofillInlineRequestHint extends android.service.personalcontext.hint.ContextHint {
     method @NonNull public android.content.ComponentName getActivityComponent();
     method @NonNull public android.view.autofill.AutofillValue getAutofillValue();
+    method @Nullable public android.service.autofill.FillEventHistory getFillEventHistory();
     method @NonNull public android.view.autofill.AutofillId getFocusedId();
     method @NonNull public android.view.inputmethod.InlineSuggestionsRequest getInlineSuggestionsRequest();
     method @NonNull public java.time.Instant getRequestTimestamp();
@@ -43908,6 +43940,7 @@ package android.service.personalcontext.hint {
     method @NonNull public android.service.personalcontext.hint.AutofillInlineRequestHint build();
     method @NonNull public android.service.personalcontext.hint.AutofillInlineRequestHint.Builder setActivityComponent(@NonNull android.content.ComponentName);
     method @NonNull public android.service.personalcontext.hint.AutofillInlineRequestHint.Builder setAutofillValue(@NonNull android.view.autofill.AutofillValue);
+    method @NonNull public android.service.personalcontext.hint.AutofillInlineRequestHint.Builder setFillEventHistory(@Nullable android.service.autofill.FillEventHistory);
     method @NonNull public android.service.personalcontext.hint.AutofillInlineRequestHint.Builder setFocusedId(@NonNull android.view.autofill.AutofillId);
     method @NonNull public android.service.personalcontext.hint.AutofillInlineRequestHint.Builder setInlineSuggestionsRequest(@NonNull android.view.inputmethod.InlineSuggestionsRequest);
     method @NonNull public android.service.personalcontext.hint.AutofillInlineRequestHint.Builder setRequestTimestamp(@NonNull java.time.Instant);
@@ -43925,6 +43958,7 @@ package android.service.personalcontext.hint {
     method @NonNull public android.service.personalcontext.hint.BundleHint.Builder addToken(@NonNull android.service.personalcontext.Token);
     method @NonNull public android.service.personalcontext.hint.BundleHint build();
     method @NonNull public android.service.personalcontext.hint.BundleHint.Builder setDataBundle(@NonNull android.os.Bundle);
+    method @NonNull public android.service.personalcontext.hint.BundleHint.Builder setHintTypeName(@Nullable String);
   }
 
   @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class CallHint extends android.service.personalcontext.hint.ContextHint {
@@ -43994,6 +44028,7 @@ package android.service.personalcontext.hint {
 
   @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public abstract class ContextHint {
     method @NonNull public final java.util.UUID getHintId();
+    method @NonNull public String getHintTypeName();
     method @NonNull public final java.util.Set<android.service.personalcontext.Token> getTokens();
   }
 
@@ -44194,12 +44229,15 @@ package android.service.personalcontext.insight {
     method @NonNull public android.service.personalcontext.insight.BundleInsight.Builder addToken(@NonNull android.service.personalcontext.Token);
     method @NonNull public android.service.personalcontext.insight.BundleInsight build();
     method @NonNull public android.service.personalcontext.insight.BundleInsight.Builder setDataBundle(@NonNull android.os.Bundle);
+    method @NonNull public android.service.personalcontext.insight.BundleInsight.Builder setInsightTypeName(@Nullable String);
   }
 
   @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public abstract class ContextInsight {
     method @NonNull public final java.util.UUID getInsightId();
+    method @NonNull public String getInsightTypeName();
     method @NonNull public java.util.Set<android.service.personalcontext.hint.ContextHintWithSignature> getOriginHints();
     method @NonNull public java.util.Set<android.service.personalcontext.Token> getTokens();
+    method public void reportEvent(@NonNull android.content.Context, int, @NonNull android.service.personalcontext.RenderToken, @Nullable android.os.Bundle);
   }
 
   @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class DisplayInsight extends android.service.personalcontext.insight.ContextInsight {
@@ -44238,8 +44276,8 @@ package android.service.personalcontext.insight {
   }
 
   @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final class InsightCollection.Builder {
-    ctor public InsightCollection.Builder(@NonNull java.util.Collection<android.service.personalcontext.insight.ContextInsight>);
     ctor public InsightCollection.Builder();
+    ctor public InsightCollection.Builder(@NonNull java.util.Collection<android.service.personalcontext.insight.ContextInsight>);
     method @NonNull public android.service.personalcontext.insight.InsightCollection.Builder addInsight(@NonNull android.service.personalcontext.insight.ContextInsight);
     method @NonNull public android.service.personalcontext.insight.InsightCollection build();
   }

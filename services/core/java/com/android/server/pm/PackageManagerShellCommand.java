@@ -2247,37 +2247,52 @@ class PackageManagerShellCommand extends ShellCommand {
             return runRemoveSplits(packageName, splitNames);
         }
 
+        // Note: if userId is USER_ALL, we rely on the DELETE_ALL_USERS flag to affect all users but
+        // must pass in some Admin user so that it can have the authority to downgrade sys apps.
+        int translatedUserId =
+                translateUserId(userId, getAdminUserId(), "runUninstall");
+        final PackageManagerInternal internal =
+                LocalServices.getService(PackageManagerInternal.class);
+
+        if (!internal.isApexPackage(packageName) && userId != UserHandle.USER_ALL) {
+            final PackageInfo info = mInterface.getPackageInfo(packageName,
+                    PackageManager.MATCH_STATIC_SHARED_AND_SDK_LIBRARIES, translatedUserId);
+            if (info == null) {
+                pw.println("Failure [not installed for " + translatedUserId + "]");
+                return 1;
+            }
+            final boolean isSystem =
+                    (info.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) != 0;
+            if (isSystem) {
+                if (LocalServices.getService(UserManagerInternal.class)
+                        .getUsers(UserManagerInternal.USER_FILTER_WITH_ALL_COMPLETE_USERS)
+                        .size() > 1) {
+                    // If we are being asked to delete a system app for just one user, set flag so
+                    // it disables rather than reverting to system version of the app.
+                    flags |= PackageManager.DELETE_SYSTEM_APP;
+                } else {
+                    // We are being asked to uninstall a system app for just one user, and it is the
+                    // only user on the device. Instead of deleting the system app for the user, it
+                    // should follow the same flow as when the user id is USER_ALL (i.e. revert to
+                    // system version of the app). This is because the system app might be required
+                    // to be enabled on the device for at least one user.
+                    userId = UserHandle.USER_ALL;
+                    translatedUserId =
+                            translateUserId(userId, getAdminUserId(), "runUninstall");
+                }
+            }
+        }
+
         if (userId == UserHandle.USER_ALL) {
             flags |= PackageManager.DELETE_ALL_USERS;
         }
-        // Note: if userId is USER_ALL, we rely on the DELETE_ALL_USERS flag to affect all users but
-        // must pass in some Admin user so that it can have the authority to downgrade sys apps.
-        final int translatedUserId =
-                translateUserId(userId, getAdminUserId(), "runUninstall");
+
         final LocalIntentReceiver receiver = new LocalIntentReceiver();
-        final PackageManagerInternal internal =
-                LocalServices.getService(PackageManagerInternal.class);
 
         if (internal.isApexPackage(packageName)) {
             internal.uninstallApex(
                     packageName, versionCode, translatedUserId, receiver.getIntentSender(), flags);
         } else {
-            if ((flags & PackageManager.DELETE_ALL_USERS) == 0) {
-                final PackageInfo info = mInterface.getPackageInfo(packageName,
-                        PackageManager.MATCH_STATIC_SHARED_AND_SDK_LIBRARIES, translatedUserId);
-                if (info == null) {
-                    pw.println("Failure [not installed for " + translatedUserId + "]");
-                    return 1;
-                }
-                final boolean isSystem =
-                        (info.applicationInfo.flags & ApplicationInfo.FLAG_SYSTEM) != 0;
-                // If we are being asked to delete a system app for just one
-                // user set flag so it disables rather than reverting to system
-                // version of the app.
-                if (isSystem) {
-                    flags |= PackageManager.DELETE_SYSTEM_APP;
-                }
-            }
             mInterface.getPackageInstaller().uninstall(new VersionedPackage(packageName,
                             versionCode), null /*callerPackageName*/, flags,
                     receiver.getIntentSender(), translatedUserId);
@@ -2858,7 +2873,9 @@ class PackageManagerShellCommand extends ShellCommand {
     private boolean isVendorApp(String pkg) {
         try {
             final PackageInfo info = mInterface.getPackageInfo(
-                     pkg, PackageManager.MATCH_ANY_USER, UserHandle.USER_SYSTEM);
+                     pkg, PackageManager.MATCH_KNOWN_PACKAGES
+                     | PackageManager.MATCH_HIDDEN_UNTIL_INSTALLED_COMPONENTS,
+                     UserHandle.USER_SYSTEM);
             return info != null && info.applicationInfo.isVendor();
         } catch (RemoteException e) {
             return false;
@@ -2868,7 +2885,9 @@ class PackageManagerShellCommand extends ShellCommand {
     private boolean isProductApp(String pkg) {
         try {
             final PackageInfo info = mInterface.getPackageInfo(
-                    pkg, PackageManager.MATCH_ANY_USER, UserHandle.USER_SYSTEM);
+                    pkg, PackageManager.MATCH_KNOWN_PACKAGES
+                    | PackageManager.MATCH_HIDDEN_UNTIL_INSTALLED_COMPONENTS,
+                    UserHandle.USER_SYSTEM);
             return info != null && info.applicationInfo.isProduct();
         } catch (RemoteException e) {
             return false;
@@ -2878,7 +2897,9 @@ class PackageManagerShellCommand extends ShellCommand {
     private boolean isSystemExtApp(String pkg) {
         try {
             final PackageInfo info = mInterface.getPackageInfo(
-                    pkg, PackageManager.MATCH_ANY_USER, UserHandle.USER_SYSTEM);
+                    pkg, PackageManager.MATCH_KNOWN_PACKAGES
+                    | PackageManager.MATCH_HIDDEN_UNTIL_INSTALLED_COMPONENTS,
+                    UserHandle.USER_SYSTEM);
             return info != null && info.applicationInfo.isSystemExt();
         } catch (RemoteException e) {
             return false;

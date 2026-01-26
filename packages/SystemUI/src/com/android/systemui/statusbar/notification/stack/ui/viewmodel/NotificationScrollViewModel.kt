@@ -28,6 +28,7 @@ import com.android.compose.animation.scene.ObservableTransitionState.Transition.
 import com.android.compose.animation.scene.OverlayKey
 import com.android.compose.animation.scene.SceneKey
 import com.android.systemui.bouncer.domain.interactor.BouncerInteractor
+import com.android.systemui.brightness.domain.interactor.BrightnessMirrorShowingInteractor
 import com.android.systemui.dump.DumpManager
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
 import com.android.systemui.lifecycle.ExclusiveActivatable
@@ -37,7 +38,6 @@ import com.android.systemui.scene.domain.interactor.SceneInteractor
 import com.android.systemui.scene.shared.flag.SceneContainerFlag
 import com.android.systemui.scene.shared.model.Overlays
 import com.android.systemui.scene.shared.model.Scenes
-import com.android.systemui.settings.brightness.domain.interactor.BrightnessMirrorShowingInteractor
 import com.android.systemui.shade.domain.interactor.ShadeInteractor
 import com.android.systemui.shade.domain.interactor.ShadeModeInteractor
 import com.android.systemui.shade.shared.model.ShadeMode
@@ -111,18 +111,13 @@ constructor(
     private fun expandFractionDuringSceneChange(sceneChange: ChangeScene): Flow<Float> =
         with(sceneChange) {
             when {
-                // Follow expandFraction when collapsing the Shade over Lockscreen, but keep the
-                // shade "fully expanded" during other Lockscreen transitions to avoid flickering.
-                isTransitioning(from = Scenes.Shade, to = Scenes.Lockscreen) ->
+                // Transitions following variable Shade expansion
+                isTransitioningBetween(Scenes.Gone, Scenes.Shade) ||
+                    isTransitioningBetween(Scenes.Occluded, Scenes.Shade) ||
+                    isTransitioning(from = Scenes.Shade, to = Scenes.Lockscreen) ->
                     shadeInteractor.shadeExpansion
-                isTransitioningFromOrTo(Scenes.Lockscreen) -> flowOf(1f)
 
-                // When the stack in visible on both scenes, keep it expanded throughout.
-                fromScene.showsNotifications() && toScene.showsNotifications() -> flowOf(1f)
-
-                // Follow the expansion fraction for all other Shade transitions.
-                isTransitioningFromOrTo(Scenes.Shade) -> shadeInteractor.shadeExpansion
-
+                // Transitions following delayed variable QS expansion
                 isTransitioningBetween(Scenes.Gone, Scenes.QuickSettings) ->
                     shadeInteractor.qsExpansion
                         .map { qsExpansion ->
@@ -134,6 +129,16 @@ constructor(
                         }
                         .distinctUntilChanged()
 
+                // Special case: Keep collapsed when entering Lockscreen from Gone to avoid showing
+                // the stack early.
+                isTransitioning(from = Scenes.Gone, to = Scenes.Lockscreen) -> flowOf(0f)
+
+                // Stay fully expanded if Lockscreen is involved or both scenes show notifications
+                // (Covers: Lockscreen <-> Occluded|Communal|Dream, Shade <-> QuickSettings, etc.)
+                isTransitioningFromOrTo(Scenes.Lockscreen) ||
+                    (fromScene.showsNotifications() && toScene.showsNotifications()) -> flowOf(1f)
+
+                // Default to collapsed
                 // TODO(b/356596436): If notification shade overlay is open, we'll reach this point
                 //  and the expansion fraction in that case should be `shadeExpansion`.
                 else -> flowOf(0f)

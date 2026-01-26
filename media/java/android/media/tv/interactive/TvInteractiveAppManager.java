@@ -104,9 +104,23 @@ public final class TvInteractiveAppManager {
     @IntDef(flag = false, prefix = "INTERACTIVE_APP_STATE_", value = {
             INTERACTIVE_APP_STATE_STOPPED,
             INTERACTIVE_APP_STATE_RUNNING,
-            INTERACTIVE_APP_STATE_ERROR})
+            INTERACTIVE_APP_STATE_ERROR,
+            INTERACTIVE_APP_STATE_UNKNOWN,
+            INTERACTIVE_APP_STATE_SIGNALED,
+            INTERACTIVE_APP_STATE_LOADING,
+            INTERACTIVE_APP_STATE_READY,
+            INTERACTIVE_APP_STATE_STARTING,
+            INTERACTIVE_APP_STATE_STARTED,
+            INTERACTIVE_APP_STATE_STOPPING,
+            INTERACTIVE_APP_STATE_UNLOADED
+    })
     public @interface InteractiveAppState {}
 
+    /**
+     * Unknown state of interactive application.
+     * @hide
+     */
+    public static final int INTERACTIVE_APP_STATE_UNKNOWN = 0;
     /**
      * Stopped (or not started) state of interactive application.
      */
@@ -119,7 +133,49 @@ public final class TvInteractiveAppManager {
      * Error state of interactive application.
      */
     public static final int INTERACTIVE_APP_STATE_ERROR = 3;
-
+    // -- Extended interactive app states that covers a more detailed lifecycle.
+    /**
+     * Signaled state of interactive application before it is loaded.
+     * Sub-state of {@code INTERACTIVE_APP_STATE_STOPPED}
+     * @hide
+     */
+    public static final int INTERACTIVE_APP_STATE_SIGNALED = 4;
+    /**
+     * Loading state of interactive application before it is ready.
+     * Sub-state of {@code INTERACTIVE_APP_STATE_STOPPED}
+     * @hide
+     */
+    public static final int INTERACTIVE_APP_STATE_LOADING = 5;
+    /**
+     * Ready state of interactive application, indicate app is ready to start.
+     * Sub-state of {@code INTERACTIVE_APP_STATE_STOPPED}
+     * @hide
+     */
+    public static final int INTERACTIVE_APP_STATE_READY = 6;
+    /**
+     * Starting state of interactive application.
+     * Sub-state of {@code INTERACTIVE_APP_STATE_RUNNING}
+     * @hide
+     */
+    public static final int INTERACTIVE_APP_STATE_STARTING = 7;
+    /**
+     * Started state of interactive application.
+     * Sub-state of {@code INTERACTIVE_APP_STATE_RUNNING}
+     * @hide
+     */
+    public static final int INTERACTIVE_APP_STATE_STARTED = 8;
+    /**
+     * Stopping state of interactive application, app has not been fully stopped yet.
+     * Sub-state of {@code INTERACTIVE_APP_STATE_RUNNING}
+     * @hide
+     */
+    public static final int INTERACTIVE_APP_STATE_STOPPING = 9;
+    /**
+     * Unloaded state of interactive application.
+     * Sub-state of {@code INTERACTIVE_APP_STATE_STOPPED}
+     * @hide
+     */
+    public static final int INTERACTIVE_APP_STATE_UNLOADED = 10;
 
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
@@ -694,6 +750,18 @@ public final class TvInteractiveAppManager {
             }
 
             @Override
+            public void onInteractiveAppInfoChanged(TvInteractiveAppInfo appInfo, int seq) {
+                synchronized (mSessionCallbackRecordMap) {
+                    SessionCallbackRecord record = mSessionCallbackRecordMap.get(seq);
+                    if (record == null) {
+                        Log.e(TAG, "Callback not found for seq " + seq);
+                        return;
+                    }
+                    record.postInteractiveAppStateChanged(appInfo);
+                }
+            }
+
+            @Override
             public void onBiInteractiveAppCreated(Uri biIAppUri, String biIAppId, int seq) {
                 synchronized (mSessionCallbackRecordMap) {
                     SessionCallbackRecord record = mSessionCallbackRecordMap.get(seq);
@@ -726,6 +794,16 @@ public final class TvInteractiveAppManager {
                         return;
                     }
                     record.postAdBufferReady(buffer);
+                }
+            }
+
+            @Override
+            public void onSendWebServiceClientList(List<WebServiceClientInfo> clients, int seq) {
+                synchronized (mSessionCallbackRecordMap) {
+                    SessionCallbackRecord record = mSessionCallbackRecordMap.get(seq);
+                    if (record != null) {
+                        record.postWebServiceClientList(clients);
+                    }
                 }
             }
         };
@@ -1145,6 +1223,18 @@ public final class TvInteractiveAppManager {
             }
             try {
                 mService.resetInteractiveApp(mToken, mUserId);
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
+
+        void startInteractiveApp(int handle) {
+            if (mToken == null) {
+                Log.w(TAG, "The session has been already released");
+                return;
+            }
+            try {
+                mService.startInteractiveAppWithHandle(mToken, mUserId, handle);
             } catch (RemoteException e) {
                 throw e.rethrowFromSystemServer();
             }
@@ -1968,6 +2058,42 @@ public final class TvInteractiveAppManager {
         }
 
         /**
+         * Requests TIAS to send the list of the web service clients to the client app.
+         */
+        public void requestWebServiceClients() {
+            try {
+                mService.requestWebServiceClients(mToken, mUserId);
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
+
+        /**
+         * Updates the state of the web service client.
+         * @param handle identification of the web service client.
+         * @param state new state of the web service client.
+         */
+        public void updateWebServiceClientState(int handle, int state) {
+            try {
+                mService.updateWebServiceClientState(mToken, handle, state, mUserId);
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
+
+        /**
+         * Removes the web service client.
+         * @param handle the identification of the web service client to be removed.
+         */
+        public void removeWebServiceClient(int handle) {
+            try {
+                mService.removeWebServiceClient(mToken, handle, mUserId);
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
+
+        /**
          * Callback that is invoked when an input event that was dispatched to this session has been
          * finished.
          *
@@ -2338,6 +2464,15 @@ public final class TvInteractiveAppManager {
             });
         }
 
+        void postInteractiveAppStateChanged(TvInteractiveAppInfo appInfo) {
+            mHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    mSessionCallback.onInteractiveAppInfoChanged(mSession, appInfo);
+                }
+            });
+        }
+
         void postBiInteractiveAppCreated(Uri biIAppUri, String biIAppId) {
             mHandler.post(new Runnable() {
                 @Override
@@ -2363,6 +2498,15 @@ public final class TvInteractiveAppManager {
                     if (mSession.getInputSession() != null) {
                         mSession.getInputSession().notifyAdBufferReady(buffer);
                     }
+                }
+            });
+        }
+
+        void postWebServiceClientList(final List<WebServiceClientInfo> clients) {
+            mHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    mSessionCallback.onSendWebServiceClientList(mSession, clients);
                 }
             });
         }
@@ -2674,6 +2818,16 @@ public final class TvInteractiveAppManager {
         }
 
         /**
+         * This is called when
+         * {@link TvInteractiveAppService.Session#notifyInteractiveAppInfo} is called.
+         *
+         * @param session A {@link TvInteractiveAppManager.Session} associated with this callback.
+         * @param appInfo the current interactive app info.
+         */
+        public void onInteractiveAppInfoChanged(Session session, TvInteractiveAppInfo appInfo) {
+        }
+
+        /**
          * This is called when {@link TvInteractiveAppService.Session#notifyBiInteractiveAppCreated}
          * is called.
          *
@@ -2695,6 +2849,14 @@ public final class TvInteractiveAppManager {
          */
         public void onTeletextAppStateChanged(
                 Session session, @TvInteractiveAppManager.TeletextAppState int state) {
+        }
+
+        /**
+         * Called when the web service client list is sent.
+         * @param clients web service client list.
+         * @hide
+         */
+        public void onSendWebServiceClientList(Session session, List<WebServiceClientInfo> clients){
         }
     }
 }

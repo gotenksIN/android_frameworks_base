@@ -139,6 +139,36 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
     public String backupAgentName;
 
     /**
+     * Specifies the process that the backup agent will run in.
+     * @hide
+     */
+    public @BackupAgentProcess int backupAgentProcess = BACKUP_AGENT_PROCESS_MAIN;
+
+    /**
+     * Specifies that the backup agent should run in the default main process of the application
+     * that runs under the regular uid of the application.
+     * @hide
+     */
+    public static final int BACKUP_AGENT_PROCESS_MAIN = 0;
+
+    /**
+     * Specifies that the backup agent should run in a private compute core process of
+     * the application.
+     * @hide
+     */
+    public static final int BACKUP_AGENT_PROCESS_PCC = 1;
+
+    /** @hide */
+    @IntDef(
+            prefix = {"BACKUP_AGENT_PROCESS_"},
+            value = {
+                    BACKUP_AGENT_PROCESS_MAIN,
+                    BACKUP_AGENT_PROCESS_PCC,
+            })
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface BackupAgentProcess {}
+
+    /**
      * An optional attribute that indicates the app supports automatic backup of app data.
      * <p>0 is the default and means the app's entire data folder + managed external storage will
      * be backed up;
@@ -2178,6 +2208,7 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         descriptionRes = orig.descriptionRes;
         uiOptions = orig.uiOptions;
         backupAgentName = orig.backupAgentName;
+        backupAgentProcess = orig.backupAgentProcess;
         fullBackupContent = orig.fullBackupContent;
         dataExtractionRulesRes = orig.dataExtractionRulesRes;
         crossProfile = orig.crossProfile;
@@ -2281,6 +2312,7 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         dest.writeInt(installLocation);
         dest.writeString8(manageSpaceActivityName);
         dest.writeString8(backupAgentName);
+        dest.writeInt(backupAgentProcess);
         dest.writeInt(descriptionRes);
         dest.writeInt(uiOptions);
         dest.writeInt(fullBackupContent);
@@ -2395,6 +2427,7 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         installLocation = source.readInt();
         manageSpaceActivityName = source.readString8();
         backupAgentName = source.readString8();
+        backupAgentProcess = source.readInt();
         descriptionRes = source.readInt();
         uiOptions = source.readInt();
         fullBackupContent = source.readInt();
@@ -3178,4 +3211,21 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
 // QTI_BEGIN: 2018-02-20: Performance: Activity Trigger frameworks support
     /** {@hide} */ public int canOverrideRes() { return overrideRes; }
 // QTI_END: 2018-02-20: Performance: Activity Trigger frameworks support
+
+    /**
+     * Returns whether the backup agent should run in pcc process.
+     * @hide
+     */
+    public boolean shouldBackupAgentRunInPccProcess() {
+        return android.app.privatecompute.flags.Flags.enablePccFrameworkSupport()
+                && backupAgentProcess == BACKUP_AGENT_PROCESS_PCC;
+    }
+
+    /**
+     * Returns the uid that the backup agent should run under.
+     * @hide
+     */
+    public int getBackupAgentUid() {
+        return shouldBackupAgentRunInPccProcess() ? pccUid : uid;
+    }
 }

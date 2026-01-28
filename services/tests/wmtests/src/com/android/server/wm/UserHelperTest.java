@@ -219,6 +219,32 @@ public final class UserHelperTest {
     }
 
     @Test
+    public void testCheckRequest_whenAllowlistModeChangedFromDisabledToEnabled() {
+        mockHsuActivityAllowlistMode(ALLOWLIST_MODE_ENABLED);
+        expect.withMessage("checkRequest() after mode set to enabled")
+                .that(mUserHelper.checkRequest(mRequest))
+                .isEqualTo(START_NOT_ALLOWED_FOR_USER);
+
+        mockHsuActivityAllowlistMode(ALLOWLIST_MODE_DISABLED);
+        expect.withMessage("checkRequest() after mode set to disabled")
+                .that(mUserHelper.checkRequest(mRequest))
+                .isEqualTo(START_SUCCESS);
+    }
+
+    @Test
+    public void testCheckRequest_whenAllowlistModeChangedFromEnabledToDisabled() {
+        mockHsuActivityAllowlistMode(ALLOWLIST_MODE_DISABLED);
+        expect.withMessage("checkRequest() after mode set to disabled")
+                .that(mUserHelper.checkRequest(mRequest))
+                .isEqualTo(START_SUCCESS);
+
+        mockHsuActivityAllowlistMode(ALLOWLIST_MODE_ENABLED);
+        expect.withMessage("checkRequest() after mode set to enabled")
+                .that(mUserHelper.checkRequest(mRequest))
+                .isEqualTo(START_NOT_ALLOWED_FOR_USER);
+    }
+
+    @Test
     public void testCheckRequest_allowlisted_success() {
         mockDefaultActivityAllowlisted();
 
@@ -282,6 +308,30 @@ public final class UserHelperTest {
     }
 
     @Test
+    @android.platform.test.annotations.RequiresFlagsEnabled(
+            android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    public void testGetUserId_usesGetUid() {
+        int pccUid = android.os.Process.FIRST_PCC_UID + 5;
+        // Use user 10 to ensure different user ID from PCC (user 0)
+        int appUid = UserHandle.getUid(10, android.os.Process.FIRST_APPLICATION_UID + 123);
+        int pccUserId = UserHandle.getUserId(pccUid);
+        int appUserId = UserHandle.getUserId(appUid);
+
+        ActivityInfo aInfo = new ActivityInfo();
+        aInfo.applicationInfo = new ApplicationInfo();
+        aInfo.applicationInfo.uid = appUid;
+        aInfo.applicationInfo.pccUid = pccUid;
+        // Mark as PCC component so getUid() returns pccUid
+        aInfo.flags |= ActivityInfo.FLAG_RUN_IN_PCC_SANDBOX;
+
+        // Verify getUserId uses getUid() (PCC UID) instead of applicationInfo.uid
+        expect.withMessage("getUserId() should return user ID from PCC UID")
+                .that(UserHelper.getUserId(aInfo)).isEqualTo(pccUserId);
+        expect.withMessage("getUserId() should NOT return user ID from App UID")
+                .that(UserHelper.getUserId(aInfo)).isNotEqualTo(appUserId);
+    }
+
+    @Test
     public void testDump_hsum() throws Exception {
         String dump = dump(mUserHelper, "...");
 
@@ -290,7 +340,7 @@ public final class UserHelperTest {
                       ...UserHelper:
                       ...  TAG=ActivityTaskManager
                       ...  mIsHeadlessSystemUserMode=true
-                      ...  mActivityLaunchIntegrationStatus=1 (ENABLED)
+                      ...  activityLaunchIntegrationStatus=1 (ENABLED)
                       ...  mHsuActivitiesAllowlist=Schindler's
                       """);
     }
@@ -307,7 +357,7 @@ public final class UserHelperTest {
                       ...UserHelper:
                       ...  TAG=ActivityTaskManager
                       ...  mIsHeadlessSystemUserMode=false
-                      ...  mActivityLaunchIntegrationStatus=-1 (DISABLED_NOT_HSUM)
+                      ...  activityLaunchIntegrationStatus=-1 (DISABLED_NOT_HSUM)
                       ...  mHsuActivitiesAllowlist=null
                       """);
     }
@@ -324,7 +374,7 @@ public final class UserHelperTest {
                       ...UserHelper:
                       ...  TAG=ActivityTaskManager
                       ...  mIsHeadlessSystemUserMode=true
-                      ...  mActivityLaunchIntegrationStatus=-2 (DISABLED_NO_ALLOWLIST)
+                      ...  activityLaunchIntegrationStatus=-2 (DISABLED_NO_ALLOWLIST)
                       ...  mHsuActivitiesAllowlist=null
                       """);
     }
@@ -341,7 +391,7 @@ public final class UserHelperTest {
                       ...UserHelper:
                       ...  TAG=ActivityTaskManager
                       ...  mIsHeadlessSystemUserMode=true
-                      ...  mActivityLaunchIntegrationStatus=-3 (DISABLED_EXPLICITLY)
+                      ...  activityLaunchIntegrationStatus=-3 (DISABLED_EXPLICITLY)
                       ...  mHsuActivitiesAllowlist=Schindler's
                       """);
     }
@@ -358,7 +408,7 @@ public final class UserHelperTest {
                       ...UserHelper:
                       ...  TAG=ActivityTaskManager
                       ...  mIsHeadlessSystemUserMode=true
-                      ...  mActivityLaunchIntegrationStatus=-4 (DISABLED_LOG_ONLY)
+                      ...  activityLaunchIntegrationStatus=-4 (DISABLED_LOG_ONLY)
                       ...  mHsuActivitiesAllowlist=Schindler's
                       """);
     }
@@ -375,7 +425,7 @@ public final class UserHelperTest {
                       ...UserHelper:
                       ...  TAG=ActivityTaskManager
                       ...  mIsHeadlessSystemUserMode=true
-                      ...  mActivityLaunchIntegrationStatus=-5 (DISABLED_INVALID_MODE)
+                      ...  activityLaunchIntegrationStatus=-5 (DISABLED_INVALID_MODE)
                       ...  mHsuActivitiesAllowlist=Schindler's
                       """);
     }

@@ -1,5 +1,5 @@
 /*
- * Copyright 2025 The Android Open Source Project
+ * Copyright (C) 2026 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,7 +14,21 @@
  * limitations under the License.
  */
 
-package android.service.personalcontext.hint;
+package android.processor.devicepolicy;
 
-/** @hide */
-parcelable ContextHintWithSignature;
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+/**
+ * Metadata for a long policy.
+ */
+@Retention(RetentionPolicy.SOURCE)
+@Target({ElementType.FIELD})
+public @interface LongPolicyDefinition {
+    /**
+     * Base data for all policies.
+     */
+    PolicyDefinition base();
+}

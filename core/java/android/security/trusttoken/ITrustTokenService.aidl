@@ -16,6 +16,7 @@
 
 package android.security.trusttoken;
 
+import android.os.ICancellationSignal;
 import android.security.trusttoken.ITrustTokenCallback;
 import android.security.trusttoken.TrustTokenRequest;
 

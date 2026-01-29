@@ -110,28 +110,7 @@ constructor(
         subscriptionIdsFlow
             .map { ids -> ids.map { commonViewModelForSub(it) } }
             .stateIn(scope, SharingStarted.WhileSubscribed(), emptyList())
-    private val firstMobileSubViewModel: StateFlow<MobileIconViewModelCommon?> =
-        mobileSubViewModels
-            .map {
-                if (it.isEmpty()) {
-                    null
-                } else {
-                    // Mobile icons get reversed by [StatusBarIconController], so the last element
-                    // in this list will show up visually first.
-                    it.last()
-                }
-            }
-            .stateIn(scope, SharingStarted.WhileSubscribed(), null)
-    /**
-     * A flow that emits `true` if the mobile sub that's displayed first visually is showing its
-     * network type icon and `false` otherwise.
-     */
-    val firstMobileSubShowingNetworkTypeIcon: StateFlow<Boolean> =
-        firstMobileSubViewModel
-            .flatMapLatest { firstMobileSubViewModel ->
-                firstMobileSubViewModel?.networkTypeIcon?.map { it != null } ?: flowOf(false)
-            }
-            .stateIn(scope, SharingStarted.WhileSubscribed(), false)
+
     /** Whether all of [mobileSubViewModels] are visible or not. */
     private val iconsAreAllVisible =
         mobileSubViewModels

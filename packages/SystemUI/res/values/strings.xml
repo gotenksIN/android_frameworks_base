@@ -599,6 +599,10 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screenrecord_stop_label">Stop</string>
+    <!-- Content description for a button that stops screen recording [CHAR LIMIT=NONE] -->
+    <string name="screenrecord_stop_description">Stop recording</string>
+    <!-- Content description for a button that starts screen recording [CHAR LIMIT=NONE] -->
+    <string name="screenrecord_start_description">Start recording</string>
     <!-- Label for notification action to share screen recording [CHAR LIMIT=35] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->

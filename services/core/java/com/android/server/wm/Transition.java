@@ -71,6 +71,7 @@ import static android.window.TransitionInfo.FLAG_TRANSLUCENT;
 import static android.window.TransitionInfo.FLAG_WILL_IME_SHOWN;
 import static android.window.WindowContainerTransaction.HierarchyOp.HIERARCHY_OP_TYPE_PENDING_INTENT;
 
+import static com.android.graphics.surfaceflinger.flags.Flags.setClientDrawnCornerRadii;
 import static com.android.server.policy.WindowManagerPolicy.FINISH_LAYOUT_REDO_WALLPAPER;
 import static com.android.server.wm.ActivityClientController.reportMultiwindowFullscreenRequestFallbackResult;
 import static com.android.server.wm.ActivityRecord.State.RESUMED;
@@ -2065,6 +2066,8 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
         // Resolve the animating targets from the participants.
         mTargets = calculateTargets(mParticipants, mChanges);
 
+        // Disable client-drawn rounded corners when transition starts
+
         // Check whether the participants were animated from back navigation.
         mController.mAtm.mBackNavigationController.onTransactionReady(this, mTargets,
                 transaction, mFinishTransaction);
@@ -2086,6 +2089,14 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
 
         for (int i = 0; i < mTargets.size(); ++i) {
             final WindowContainer<?> wc = mTargets.get(i).mContainer;
+            if (setClientDrawnCornerRadii()) {
+                Task task = wc.asTask();
+                if (task != null) {
+                    SurfaceControl sc = task.getSurfaceControl();
+                    transaction.toggleClientDrawnRoundedCornersOpt(sc, /* enable= */false);
+                    mController.onRoundedCornerOptDisabled(task);
+                }
+            }
             final WallpaperWindowToken wp = wc.asWallpaperToken();
             if (wp != null) {
                 // If on a rotation leash, the wallpaper token surface needs to be shown explicitly
@@ -3617,6 +3628,7 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
             @NonNull WindowContainer<?> topWc) {
         final int displayId = getDisplayId(topWc);
         WindowContainer<?> ancestor = topWc.getParent();
+        WindowContainer<?> reparentedClosingTarget = null;
         // Go up ancestor parent chain until all targets are descendants. Ancestor should never be
         // null because all targets are attached.
         for (int i = targets.size() - 1; i >= 0; i--) {
@@ -3646,8 +3658,16 @@ class Transition implements BLASTSyncEngine.TransactionReadyListener {
                 final int transitionMode = change.getTransitMode(wc);
                 if (transitionMode == TRANSIT_CLOSE || transitionMode == TRANSIT_TO_BACK) {
                     ancestor = change.mStartParent;
+                    reparentedClosingTarget = wc;
                     continue;
                 }
+            }
+            // Do not escalate if other container is a descendant of the initial break container.
+            // (e.g. TaskFragment belongs to a Task.)
+            if (com.android.window.flags.Flags.refineAncestorSearchAndBounds()
+                    && reparentedClosingTarget != null
+                    && wc.isDescendantOf(reparentedClosingTarget)) {
+                continue;
             }
             while (!wc.isDescendantOf(ancestor)) {
                 ancestor = ancestor.getParent();

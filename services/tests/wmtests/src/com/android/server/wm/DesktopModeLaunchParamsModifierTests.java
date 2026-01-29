@@ -101,6 +101,8 @@ import org.junit.Test;
 import org.junit.rules.TestRule;
 import org.junit.runner.RunWith;
 
+import java.util.Arrays;
+
 /**
  * Tests for desktop mode task bounds.
  *
@@ -659,6 +661,7 @@ public class DesktopModeLaunchParamsModifierTests extends
 
     @Test
     @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE)
+    @DisableFlags(Flags.FLAG_ENABLE_TRAMPOLINE_TASK_AFFINITY_BUGFIX)
     public void testDontInheritTaskBoundsFromExistingInstanceIfDifferentPackage() {
         setupDesktopModeLaunchParamsModifier();
 
@@ -686,6 +689,42 @@ public class DesktopModeLaunchParamsModifierTests extends
         new CalculateRequestBuilder().setTask(launchingTask)
                 .setActivity(launchingTask.getRootActivity()).calculate();
         // New instance should not inherit task bounds of old instance as packages differ.
+        assertNotEquals(existingFreeformTask.getBounds(), mResult.mBounds);
+    }
+
+    @Test
+    @EnableFlags({Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE,
+            Flags.FLAG_ENABLE_TRAMPOLINE_TASK_AFFINITY_BUGFIX})
+    public void testDontInheritTaskBoundsFromExistingInstanceIfDifferentBasePackage() {
+        setupDesktopModeLaunchParamsModifier();
+
+        final String packageName1 = "com.package.one";
+        final String packageName2 = "com.package.two";
+        // Setup existing task.
+        final DisplayContent dc = spy(createNewDisplay());
+        final Task existingFreeformTask = new TaskBuilder(mSupervisor).setCreateActivity(true)
+                .setWindowingMode(WINDOWING_MODE_FREEFORM).setPackage(packageName1).build();
+        existingFreeformTask.topRunningActivity().launchMode = LAUNCH_SINGLE_INSTANCE;
+        existingFreeformTask.setBounds(
+                /* left */ 0,
+                /* top */ 0,
+                /* right */ 500,
+                /* bottom */ 500);
+        doReturn(existingFreeformTask.getRootActivity()).when(dc)
+                .getTopMostVisibleFreeformActivity();
+        // Set up new instance of a task with an activity from the existing tasks package..
+        final Task launchingTask = spy(new TaskBuilder(mSupervisor).setPackage(packageName1)
+                .setCreateActivity(true).build());
+        // Now mock task to belong to a different base package.
+        doReturn(packageName2).when(launchingTask).getBasePackageName();
+        launchingTask.topRunningActivity().launchMode = LAUNCH_SINGLE_INSTANCE;
+        launchingTask.onDisplayChanged(dc);
+
+
+        new CalculateRequestBuilder().setTask(launchingTask)
+                .setActivity(launchingTask.getRootActivity()).calculate();
+        // New instance should not inherit task bounds of existing instance as task base packages
+        // differ despite sharing the same top activity package..
         assertNotEquals(existingFreeformTask.getBounds(), mResult.mBounds);
     }
 
@@ -2370,6 +2409,10 @@ public class DesktopModeLaunchParamsModifierTests extends
             throws PackageManager.NameNotFoundException {
         final PackageInfo packageInfo = mock(PackageInfo.class);
         packageInfo.requestedPermissions = permissions;
+        packageInfo.requestedPermissionsFlags = new int[permissions.length];
+        Arrays.fill(
+                packageInfo.requestedPermissionsFlags,
+                PackageInfo.REQUESTED_PERMISSION_GRANTED);
         doReturn(packageInfo).when(mPackageManager).getPackageInfoAsUser(
                 anyString(),
                 eq(PackageManager.GET_PERMISSIONS),

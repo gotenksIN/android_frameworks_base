@@ -104,13 +104,13 @@ import org.mockito.kotlin.times
     com.android.hardware.input.Flags.FLAG_ENABLE_TALKBACK_KEY_GESTURES,
     com.android.hardware.input.Flags.FLAG_ENABLE_VOICE_ACCESS_KEY_GESTURES,
     com.android.window.flags.Flags.FLAG_KEYBOARD_SHORTCUTS_TO_SWITCH_DESKS,
-    com.android.hardware.input.Flags.FLAG_ENABLE_NEW_25Q2_KEYCODES,
     com.android.hardware.input.Flags.FLAG_ENABLE_NEW_26Q2_KEYCODES,
     com.android.hardware.input.Flags.FLAG_ENABLE_QUICK_SETTINGS_PANEL_SHORTCUT,
     com.android.hardware.input.Flags.FLAG_ENABLE_PARTIAL_SCREENSHOT_KEYBOARD_SHORTCUT,
     com.android.hardware.input.Flags.FLAG_KEYBOARD_BACKLIGHT_SHORTCUTS,
     com.android.hardware.input.Flags.FLAG_ENABLE_CONTEXTUAL_SEARCH_DESKTOP_ENTRYPOINTS,
     com.android.hardware.input.Flags.FLAG_ENABLE_NOTE_TAKING_KEYBOARD_SHORTCUT,
+    com.android.hardware.input.Flags.FLAG_ENABLE_CONTEXTUAL_INPUT_TRIGGER,
 )
 class KeyGestureControllerTests {
 

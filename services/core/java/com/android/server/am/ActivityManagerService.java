@@ -8458,7 +8458,9 @@ public class ActivityManagerService extends IActivityManager.Stub
                 if (proc.mState.getCurrentSchedulingGroup() == ProcessList.SCHED_GROUP_TOP_APP) {
                     if (DEBUG_OOM_ADJ) Slog.d("UI_FIFO", "Promoting " + tid + "out of band");
                     if (proc.useFifoUiScheduling()
-                            || AppBackgroundManager.getInstance().useUIRTSettings()) {
+                            || ((AppBackgroundManager.getInstance().useUIRTSettings())
+                                && (!proc.info.isSystemApp() && !proc.info.isUpdatedSystemApp()
+                                && proc.processName.equals(proc.info.packageName)))) {
                         setThreadScheduler(proc.getRenderThreadTid(),
                                 SCHED_FIFO | SCHED_RESET_ON_FORK, 1);
                     } else {

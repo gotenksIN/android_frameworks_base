@@ -6822,12 +6822,8 @@ public final class ActivityRecord extends WindowToken {
 
     /** Called when the windows associated app window container are visible. */
     void onWindowsVisible() {
-// QTI_BEGIN: 2025-12-22: Perf: Set FPS according to scenarios
-// QTI_BEGIN: 2025-10-14: Performance: Perf: Enable UI perf mode automatically according to pid
         if (mPerf != null && mPerf.shouldUseUiPerf(mWmService.mContext, packageName)
                           && mPerf.getLegacyUiPerfHint(mWmService.mContext, packageName) == -1) {
-// QTI_END: 2025-10-14: Performance: Perf: Enable UI perf mode automatically according to pid
-// QTI_END: 2025-12-22: Perf: Set FPS according to scenarios
 
 // QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
             int hint = mPerf.getUiPerfHint(mWmService.mContext, info.name);
@@ -6835,14 +6831,16 @@ public final class ActivityRecord extends WindowToken {
                 int timeout_ms = 5 * 60 * 1000;
                 mPerfScenarioBoostHandler = mPerf.perfHintAcqRel(mPerfScenarioBoostHandler,
                          hint, "android", timeout_ms);
-// QTI_BEGIN: 2025-12-22: Perf: Set FPS according to scenarios
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
                 mPerf.pickDisplayRefreshRate(mWmService.mContext, info.name);
             } else {
                 mPerf.displayRefreshRateRestore(mWmService.mContext);
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
             }
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
         } else if (mPerf != null && mPerf.getLegacyUiPerfHint(mWmService.mContext, packageName) == -1) {
             mPerf.displayRefreshRateRestore(mWmService.mContext);
-// QTI_END: 2025-12-22: Perf: Set FPS according to scenarios
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
         }
 
 // QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization

@@ -36,7 +36,9 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.RemoteException;
 import android.os.StrictMode;
+// QTI_BEGIN: 2026-01-22: Performance: touch: support tunable scroll touch slop.
 import android.os.SystemProperties;
+// QTI_END: 2026-01-22: Performance: touch: support tunable scroll touch slop.
 import android.provider.Settings;
 import android.util.DisplayMetrics;
 import android.util.LongSparseArray;
@@ -200,11 +202,13 @@ public class ViewConfiguration {
      */
     private static final int DOUBLE_TAP_TOUCH_SLOP = TOUCH_SLOP;
 
+// QTI_BEGIN: 2026-01-22: Performance: touch: support tunable scroll touch slop.
     /**
      * Add new system property to set touch slop.
      */
     private static final String KEY_TOUCH_SLOP = "ro.view.configuration.touch.slop";
 
+// QTI_END: 2026-01-22: Performance: touch: support tunable scroll touch slop.
     /**
      * Distance a touch can wander before we think the user is attempting a paged scroll
      * (in dips)
@@ -554,7 +558,9 @@ public class ViewConfiguration {
         }
 
         mFadingMarqueeEnabled = res.getBoolean(R.bool.config_ui_enableFadingMarquee);
+// QTI_BEGIN: 2026-01-22: Performance: touch: support tunable scroll touch slop.
         mTouchSlop = resolveTouchSlop(res);
+// QTI_END: 2026-01-22: Performance: touch: support tunable scroll touch slop.
         mHandwritingSlop = res.getDimensionPixelSize(
                 R.dimen.config_viewConfigurationHandwritingSlop);
         mHoverSlop = res.getDimensionPixelSize(R.dimen.config_viewConfigurationHoverSlop);
@@ -624,6 +630,7 @@ public class ViewConfiguration {
         mDeviceId = context.getDeviceId();
     }
 
+// QTI_BEGIN: 2026-01-22: Performance: touch: support tunable scroll touch slop.
     /**
      * Returns touch slop px.
      * @hide
@@ -645,6 +652,7 @@ public class ViewConfiguration {
         }
     }
 
+// QTI_END: 2026-01-22: Performance: touch: support tunable scroll touch slop.
     /**
      * Returns a configuration for the specified visual {@link Context}. The configuration depends
      * on various parameters of the {@link Context}, like the dimension of the display or the

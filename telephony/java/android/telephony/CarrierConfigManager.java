@@ -11733,6 +11733,18 @@ public class CarrierConfigManager {
     @FlaggedApi(Flags.FLAG_ENABLE_IS_PRIVATE_NETWORK_API)
     public static final String KEY_IS_PRIVATE_NETWORK_BOOL = "is_private_network_bool";
 
+    /**
+     * Controls whether the turbo DSDA icon is shown on the UI.
+     *
+     * <p>If {@code true}, the turbo DSDA icon is shown next to the signal strength on the status
+     * bar
+     *
+     * <p>The default value is false.
+     *
+     * @hide
+     */
+    public static final String KEY_SHOW_TURBO_DSDA_ICON = "show_turbo_dsda_icon";
+
     /** The default value for every variable. */
     private static final PersistableBundle sDefaults;
 
@@ -12716,6 +12728,7 @@ public class CarrierConfigManager {
         sDefaults.putBoolean(KEY_SUPPORT_PHONE_NUMBER_SOURCE_TS43_BOOL, false);
         sDefaults.putBoolean(KEY_APN_MATCHED_REQUIRED, true);
         sDefaults.putBoolean(KEY_IS_PRIVATE_NETWORK_BOOL, false);
+        sDefaults.putBoolean(KEY_SHOW_TURBO_DSDA_ICON, false);
     }
 
     /**

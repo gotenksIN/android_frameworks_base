@@ -95,9 +95,9 @@ public class AppBackgroundManager {
     private static final int PID_NOT_FOUND = -1;
     private static final int BINDER_FREEZE_FAILED = -2;
     private static final int SKIP_FREEZE = -3;
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
     private static final int FOREGROUND_SERVICE_ACTIVE = -4;
 
-// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
     private Object mPhenotypeFlagLock = new Object();
     private Object mFreezeFlagLock = new Object();
     private Object mCpuHighLoadLock = new Object();
@@ -633,7 +633,9 @@ public class AppBackgroundManager {
                     for (int i=0; i<pList.size(); i++) {
                         ProcessRecord pr = pList.get(i);
                         if (pr == null || pr.getPid() <= 0) {
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
                             mPackageFreezerManager.removePendingProcess(pr);
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
                             continue;
                         }
 
@@ -645,10 +647,13 @@ public class AppBackgroundManager {
                                             + pr.processName + " from pending list.");
                                 }
                                 pr.setDebugging(true);
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
                                 mPackageFreezerManager.removePendingProcess(pr);
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
                                 mPackageFreezerManager.appendAppPids(pr.info.packageName, pr);
                                 break;
                             case BINDER_FREEZE_FAILED:
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
                             case FOREGROUND_SERVICE_ACTIVE:
                                 if (mPackageFreezerManager.isFreezeRetryLimitReached(pr)) {
                                     Slog.w(TAG, "Give up freezing " + pr.processName +
@@ -662,6 +667,7 @@ public class AppBackgroundManager {
                                             ", retrying later (attempt " +
                                             mPackageFreezerManager.getFreezeRetryCount(pr) + ")");
                                     }
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
                                 }
                                 break;
                             default:
@@ -669,7 +675,9 @@ public class AppBackgroundManager {
                                     Slog.d(TAG, "Freeze failed for process: "
                                             + pr.processName + ", removing from pending list");
                                 }
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
                                 mPackageFreezerManager.removePendingProcess(pr);
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
                                 break;
                         }
                     }
@@ -678,9 +686,11 @@ public class AppBackgroundManager {
                     final SparseArray<ProcessRecord> pids =
                             mPackageFreezerManager.findRelatedPids(packageName);
 
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
                     if (pids == null || pids.size() == 0) {
                         break;
                     }
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
                     if (mUseDebug) {
                         String trace = "Start freeze \"" + packageName + "\" application. ";
                         Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, trace);
@@ -703,8 +713,11 @@ public class AppBackgroundManager {
                                 pr.setDebugging(true);
                                 break;
                             case BINDER_FREEZE_FAILED:
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
                                 Slog.w(TAG, "Binder freeze failed, add to pending list: "
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
                                         + pr.processName);
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
                                 mPackageFreezerManager.appendPendingList(pr,
                                             "Binder Transaction Pending");
                                 toRemove.add(pid);
@@ -714,6 +727,7 @@ public class AppBackgroundManager {
                                         + pr.processName);
                                 mPackageFreezerManager.appendPendingList(pr,
                                             "Foreground Service Active");
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
                                 toRemove.add(pid);
                                 break;
                             default:
@@ -1196,8 +1210,8 @@ public class AppBackgroundManager {
                                         processName, state.getCurAdj()));
                         Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
                     }
-                    return FOREGROUND_SERVICE_ACTIVE;
 // QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
+                    return FOREGROUND_SERVICE_ACTIVE;
                 }
             }
         }
@@ -1462,6 +1476,7 @@ public class AppBackgroundManager {
     }
 
     public class PackageLevelFreezer {
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
         private class PendingInfo {
             String mReason;
             int mRetryCount;
@@ -1472,16 +1487,22 @@ public class AppBackgroundManager {
             }
         }
 
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
         private final Map<String, SparseArray<ProcessRecord>> mAppPids = new HashMap<>();
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
         private final Map<ProcessRecord, PendingInfo> mPendingFreezeMap = new ArrayMap<>();
         private final Object mPendingFreezeLock = new Object();
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
         private final Object mAppPidsLock = new Object();
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
         public static final int MAX_FREEZE_RETRIES = 2;
 
         public void appendPendingList(ProcessRecord app, String reason) {
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
             if (app == null) {
                 return;
             }
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
 
             synchronized (mPendingFreezeLock) {
                 PendingInfo info = mPendingFreezeMap.get(app);
@@ -1494,15 +1515,19 @@ public class AppBackgroundManager {
                     }
                     info.mReason = reason;
                 }
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
             }
         }
 
         public List<ProcessRecord> getPendingList() {
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
             synchronized (mPendingFreezeLock) {
                 return new ArrayList<>(mPendingFreezeMap.keySet());
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
             }
         }
 
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
         public String getPendingFreezeReason(ProcessRecord app) {
             synchronized (mPendingFreezeLock) {
                 PendingInfo info = mPendingFreezeMap.get(app);
@@ -1527,24 +1552,31 @@ public class AppBackgroundManager {
         }
 
         public void removePendingProcessesByPackage(String packageName) {
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
             if (packageName == null) {
                 return;
             }
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
 
             synchronized (mPendingFreezeLock) {
                 Iterator<Map.Entry<ProcessRecord, PendingInfo>> iterator =
                         mPendingFreezeMap.entrySet().iterator();
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
                 while (iterator.hasNext()) {
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
                     Map.Entry<ProcessRecord, PendingInfo> entry = iterator.next();
                     ProcessRecord app = entry.getKey();
 
                     if (app != null && app.info != null
                             && packageName.equals(app.info.packageName)) {
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
                         if (mUseDebug) {
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
                             PendingInfo info = entry.getValue();
                             Slog.d(TAG, "Removing process " + app.processName
                                     + " (reason: " + info.mReason
                                     + ", retries: " + info.mRetryCount + ")");
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
                         }
                         iterator.remove();
                     }
@@ -1552,6 +1584,7 @@ public class AppBackgroundManager {
             }
         }
 
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
         public boolean isFreezeRetryLimitReached(ProcessRecord app) {
             synchronized (mPendingFreezeLock) {
                 PendingInfo info = mPendingFreezeMap.get(app);
@@ -1563,12 +1596,15 @@ public class AppBackgroundManager {
         }
 
         public boolean removePendingProcess(ProcessRecord app) {
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
             if (app == null) {
                 return false;
             }
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
 
             synchronized (mPendingFreezeLock) {
                 return mPendingFreezeMap.remove(app) != null;
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
             }
         }
 
@@ -1649,7 +1685,9 @@ public class AppBackgroundManager {
                 return;
             }
 
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
             removePendingProcessesByPackage(packageName);
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
             if (!containsApp(packageName)) {
                 if (mUseDebug) {
                     Slog.d(TAG, "Skipping unfreeze request for " + packageName
@@ -1682,7 +1720,6 @@ public class AppBackgroundManager {
                 unfreezePackageLevel(packageName);
             }
         }
-// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
         public void dump(PrintWriter pw, String prefix) {
             pw.print(prefix);
             pw.println("PACKAGE LEVEL FREEZER:");
@@ -1738,6 +1775,7 @@ public class AppBackgroundManager {
             }
             pw.println();
         }
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
     }
 
     private void freezePackageLevel(String packageName) {
@@ -1809,6 +1847,7 @@ public class AppBackgroundManager {
                 }
             }
         }
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
 
         public void dump(PrintWriter pw, String prefix) {
             pw.print(prefix);
@@ -1838,6 +1877,7 @@ public class AppBackgroundManager {
             }
             pw.println();
         }
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
     }
 
     public void setPackageAutoStartAllowed(String packageName) {

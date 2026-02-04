@@ -4175,6 +4175,15 @@ public class CarrierConfigManager {
             "nr_timers_reset_on_plmn_change_bool";
 
     /**
+     * Whether device resets all of NR timers when device transits from ENDC to NR SA.
+     * The default value is false;
+     *
+     * @hide
+     */
+    public static final String KEY_NR_TIMERS_RESET_ON_ENDC_TO_SA_TRANSIT_BOOL =
+            "nr_timers_reset_on_endc_to_sa_transit_bool";
+
+    /**
      * A list of additional NR advanced band would map to
      * {@link TelephonyDisplayInfo#OVERRIDE_NETWORK_TYPE_NR_ADVANCED} when the device is on that
      * band.
@@ -4933,6 +4942,33 @@ public class CarrierConfigManager {
      */
     public static final String KEY_DATA_STALL_RECOVERY_TIMERS_LONG_ARRAY =
             "data_stall_recovery_timers_long_array";
+
+    /**
+     * A long type timer array specifying the max milliseconds to add as a random offset to
+     * each corresponding timer in {@link #KEY_DATA_STALL_RECOVERY_TIMERS_LONG_ARRAY}.
+     *
+     * <p>The array has a fixed size of 4. Each index corresponds to a specific data stall
+     * recovery action stage defined by {@link #KEY_DATA_STALL_RECOVERY_TIMERS_LONG_ARRAY}:
+     *
+     * <ul>
+     *     <li>Index 0: Max random offset for timer between RECOVERY_ACTION GET_DATA_CALL_LIST
+     *     and CLEANUP.</li>
+     *     <li>Index 1: Max random offset for timer between RECOVERY_ACTION CLEANUP and
+     *     RE-REGISTER.</li>
+     *     <li>Index 2: Max random offset for timer between RECOVERY_ACTION RE-REGISTER and
+     *     RADIO_RESTART.</li>
+     *     <li>Index 3: Max random offset for timer between RECOVERY_ACTION RADIO_RESTART
+     *     and RESET_MODEM.</li>
+     * </ul>
+     *
+     * <p>The size of this array MUST match {@link #KEY_DATA_STALL_RECOVERY_TIMERS_LONG_ARRAY}.
+     * If a value is 0, no randomization is added for that step.
+     * @see #KEY_DATA_STALL_RECOVERY_TIMERS_LONG_ARRAY
+     *
+     * @hide
+     */
+    public static final String KEY_DATA_STALL_RECOVERY_TIMERS_RANDOMIZATION_MILLIS_LONG_ARRAY =
+            "data_stall_recovery_timers_randomization_millis_long_array";
 
     /**
      * The data stall recovery action boolean array, we use this array to determine if the
@@ -6233,6 +6269,21 @@ public class CarrierConfigManager {
         public static final String KEY_NR_SA_DISABLE_POLICY_INT =
                 KEY_PREFIX + "sa_disable_policy_int";
 
+        /**
+         * Specifies the policy for disabling NR SA mode for emergency.
+         * Default value is {@link #SA_DISABLE_POLICY_NONE}.
+         * The value set as below:
+         * <ul>
+         * <li>0: {@link #SA_DISABLE_POLICY_NONE }</li>
+         * <li>1: {@link #SA_DISABLE_POLICY_WFC_ESTABLISHED }</li>
+         * <li>2: {@link #SA_DISABLE_POLICY_WFC_ESTABLISHED_WHEN_VONR_DISABLED  }</li>
+         * <li>3: {@link #SA_DISABLE_POLICY_VOWIFI_REGISTERED  }</li>
+         * </ul>
+         * @hide
+         */
+        public static final String KEY_NR_SA_DISABLE_POLICY_FOR_EMERGENCY_INT =
+                KEY_PREFIX + "sa_disable_policy_for_emergency_int";
+
         /** @hide */
         @IntDef({
                 NR_SA_DISABLE_POLICY_NONE,
@@ -6358,6 +6409,7 @@ public class CarrierConfigManager {
             defaults.putInt(KEY_REGISTRATION_RETRY_MAX_TIMER_MILLIS_INT, 1800000);
             defaults.putInt(KEY_REGISTRATION_SUBSCRIBE_EXPIRY_TIMER_SEC_INT, 600000);
             defaults.putInt(KEY_NR_SA_DISABLE_POLICY_INT, NR_SA_DISABLE_POLICY_NONE);
+            defaults.putInt(KEY_NR_SA_DISABLE_POLICY_FOR_EMERGENCY_INT, NR_SA_DISABLE_POLICY_NONE);
 
             defaults.putIntArray(
                     KEY_IPSEC_AUTHENTICATION_ALGORITHMS_INT_ARRAY,
@@ -10085,7 +10137,9 @@ public class CarrierConfigManager {
      * A PLMN supporting DTC technology must be distinct from terrestrial networks;
      * therefore, it will be classified as an NTN.
      * </ul>
+     * @hide
      */
+    @SystemApi
     @FlaggedApi(Flags.FLAG_SATELLITE_26Q2_APIS)
     public static final String KEY_SATELLITE_TECHNOLOGY_INT_ARRAY =
             "satellite_technology_type_int_array";
@@ -12304,6 +12358,7 @@ public class CarrierConfigManager {
         sDefaults.putBoolean(KEY_NR_TIMERS_RESET_IF_NON_ENDC_AND_RRC_IDLE_BOOL, false);
         sDefaults.putBoolean(KEY_NR_TIMERS_RESET_ON_VOICE_QOS_BOOL, false);
         sDefaults.putBoolean(KEY_NR_TIMERS_RESET_ON_PLMN_CHANGE_BOOL, false);
+        sDefaults.putBoolean(KEY_NR_TIMERS_RESET_ON_ENDC_TO_SA_TRANSIT_BOOL, false);
         /* Default value is 1 hour. */
         sDefaults.putLong(KEY_5G_WATCHDOG_TIME_MS_LONG, 3600000);
         sDefaults.putIntArray(KEY_ADDITIONAL_NR_ADVANCED_BANDS_INT_ARRAY, new int[0]);
@@ -12697,6 +12752,9 @@ public class CarrierConfigManager {
         // Default data stall recovery configurations.
         sDefaults.putLongArray(KEY_DATA_STALL_RECOVERY_TIMERS_LONG_ARRAY,
                 new long[] {180000, 180000, 180000, 180000});
+        // Default data stall recovery randomization.
+        sDefaults.putLongArray(KEY_DATA_STALL_RECOVERY_TIMERS_RANDOMIZATION_MILLIS_LONG_ARRAY,
+                new long[] {0, 0, 0, 0});
         sDefaults.putBooleanArray(KEY_DATA_STALL_RECOVERY_SHOULD_SKIP_BOOL_ARRAY,
                 new boolean[] {false, false, true, false, false});
         sDefaults.putStringArray(KEY_CARRIER_SERVICE_NAME_STRING_ARRAY, new String[0]);

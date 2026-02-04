@@ -31,8 +31,6 @@ import android.annotation.SystemApi;
 import android.annotation.TestApi;
 import android.app.Service;
 import android.app.contentsafety.ContentSafetyManager;
-import android.app.contentsafety.ContentSafetyManager.FeatureType;
-import android.app.contentsafety.SupportedTypesResult;
 import android.content.Intent;
 import android.os.CancellationSignal;
 import android.os.Handler;
@@ -50,11 +48,9 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * Abstract class for performing content safety checks. Basically implements the function
- * {@link ContentSafetyService#onGetSupportedInputTypes} which maps to the API function
- * {@link ContentSafetyManager#getSupportedInputTypes}. Also, this class should implement
- * {@link ContentSafetyService#onGetFeature} that should be called internally by the system service
- * before calling the remote API {@link ContentSafetySandboxedService#onCheckContent}.
+ * Abstract class for performing content safety checks. Basically implements
+ * {@link ContentSafetyService#requestOnGetFeature} that should be called internally by the system service
+ * before calling the remote API {@link ContentSafetySandboxedService#onCheckContentRequest}.
  *
  * <p>The system's default ContentSafetyService implementation is configured in {@code
  * config_defaultContentSafetyService}. If this config has no value, an error is returned.
@@ -109,7 +105,7 @@ public abstract class ContentSafetyService extends Service {
 
                 @Override
                 @RequiresPermission(android.Manifest.permission.CHECK_CONTENT_SAFETY)
-                public void getFeature(
+                public void requestGetFeature(
                         int featureType,
                         AndroidFuture cancellationSignalFuture,
                         IGetFeatureCallback callback) {
@@ -123,17 +119,11 @@ public abstract class ContentSafetyService extends Service {
 
                     mHandler.executeOrSendMessage(
                             obtainMessage(
-                                    ContentSafetyService::onGetFeature,
+                                    ContentSafetyService::onGetFeatureRequest,
                                     ContentSafetyService.this,
                                     featureType,
                                     CancellationSignal.fromTransport(transport),
                                     wrapGetFeatureCallback(callback)));
-                }
-
-                @Override
-                @RequiresPermission(android.Manifest.permission.CHECK_CONTENT_SAFETY)
-                public @NonNull SupportedTypesResult getSupportedInputTypes(int featureType) {
-                    return onGetSupportedInputTypes(featureType);
                 }
 
                 @Override
@@ -225,7 +215,7 @@ public abstract class ContentSafetyService extends Service {
      *     identifiers for the files (e.g., model names) and values are the file descriptors.
      *     On error, a {@link ContentSafetyException} is provided.
      */
-    public abstract void onGetFeature(
+    public abstract void onGetFeatureRequest(
             int featureType,
             @Nullable CancellationSignal cancellationSignal,
             @NonNull OutcomeReceiver<Map<String, ParcelFileDescriptor>,
@@ -235,7 +225,7 @@ public abstract class ContentSafetyService extends Service {
      * Invoked when a new instance of the remote sandboxed service is created. This method should
      * be used as a signal to perform any initialization operations.
      * This method should be invoked before calling the API
-     * {@link ContentSafetyManager#checkContent}.
+     * {@link ContentSafetyManager#requestCheckContent}.
      */
     public abstract void onNotifySandboxedServiceConnected();
 
@@ -246,16 +236,11 @@ public abstract class ContentSafetyService extends Service {
      * Invoked when a new instance of the remote settings service is created. This method should
      * be used as a signal of perform initialization operations.
      * This method should be invoked before calling the API
-     * {@link ContentSafetyManager#isFeatureEnabled}.
+     * {@link ContentSafetyManager#requestIsFeatureEnabled}.
      */
     public abstract void onNotifySettingsServiceConnected();
 
     /** Invoked when an instance of the remote settings service is disconnected. */
     public abstract void onNotifySettingsServiceDisconnected();
 
-    /** Provide a list of the supported file types that can be used as input to the
-     * {@link ContentSafetyManager#checkContent} API
-     */
-    public abstract @NonNull SupportedTypesResult onGetSupportedInputTypes(
-            @FeatureType int featureType);
 }

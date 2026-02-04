@@ -16,16 +16,20 @@
 
 package android.service.personalcontext;
 
+import static java.util.Objects.requireNonNull;
+
 import android.annotation.FlaggedApi;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.RequiresNoPermission;
+import android.annotation.SdkConstant;
 import android.annotation.SystemApi;
 import android.annotation.SystemService;
 import android.annotation.UserHandleAware;
 import android.content.Context;
 import android.os.ParcelUuid;
 import android.os.RemoteException;
+import android.provider.Settings;
 import android.service.personalcontext.embedded.InsightSurfaceClientInfo;
 import android.service.personalcontext.hint.ContextHint;
 import android.service.personalcontext.hint.ContextHintWithSignature;
@@ -33,24 +37,31 @@ import android.service.personalcontext.hint.ContextHintWrapper;
 import android.service.personalcontext.insight.ContextInsight;
 import android.service.personalcontext.insight.ContextInsightWrapper;
 import android.service.personalcontext.insight.interaction.InsightEvent;
+import android.service.personalcontext.insight.interaction.ReturnHintReport;
 import android.util.Log;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
 /**
  * Client facing access to the PersonalContext service.
- *
- * @hide
  */
 @FlaggedApi(Flags.FLAG_ENABLE_PERSONAL_CONTEXT_SERVICE)
-@SystemApi
 @SystemService(Context.PERSONAL_CONTEXT_SERVICE)
 public final class PersonalContextManager {
     /** The name of the Personal Context service. */
     public static final String PERSONAL_CONTEXT_SERVICE = "personal_context";
 
     private static final String TAG = "PersonalContextManager";
+
+    /**
+     * Intent that is broadcast when the state of {@link #isEnabled()} changes.
+     * This broadcast is only sent to registered receivers.
+     */
+    @SdkConstant(SdkConstant.SdkConstantType.BROADCAST_INTENT_ACTION)
+    public static final String ACTION_PERSONAL_CONTEXT_ENABLED_CHANGED =
+            "android.service.personalcontext.action.PERSONAL_CONTEXT_ENABLED_CHANGED";
 
     private final Context mContext;
     private final IPersonalContextManager mService;
@@ -63,6 +74,37 @@ public final class PersonalContextManager {
         if (Log.isLoggable(TAG, Log.DEBUG)) {
             Log.d(TAG, "Set up service: " + mService);
         }
+    }
+
+    /**
+     * Returns whether the Personal Context service is enabled.
+     * @hide
+     */
+    @SystemApi
+    @UserHandleAware(
+            requiresPermissionIfNotCaller = android.Manifest.permission.INTERACT_ACROSS_USERS)
+    public boolean isEnabled() {
+        // TODO(b/477958468): Correctly handle enabling/disabling the service and then make the
+        // default "disabled".
+        return Settings.Secure.getIntForUser(
+                mContext.getContentResolver(),
+                Settings.Secure.PERSONAL_CONTEXT_ENABLED,
+                1, mContext.getUserId()) == 1;
+    }
+
+    /**
+     * Set whether the Personal Context service is enabled.
+     * @param enable whether to enable or disable the service
+     * @hide
+     */
+    @SystemApi
+    @UserHandleAware(
+            requiresPermissionIfNotCaller = android.Manifest.permission.INTERACT_ACROSS_USERS)
+    public void setEnabled(boolean enable) {
+        Settings.Secure.putIntForUser(
+                mContext.getContentResolver(),
+                Settings.Secure.PERSONAL_CONTEXT_ENABLED,
+                enable ? 1 : 0, mContext.getUserId());
     }
 
     /**
@@ -110,6 +152,31 @@ public final class PersonalContextManager {
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
+    }
+
+    /**
+     * Triggers a Personal Context service flow with raw data in the form of hints.
+     *
+     * @throws IllegalArgumentException if the hints collection is null or empty
+     *
+     * @param returnHintReport Routing information from an insight that these hints are related to
+     * @param hints raw data to be injected into the context flow
+     */
+    @UserHandleAware(
+            requiresPermissionIfNotCaller = android.Manifest.permission.INTERACT_ACROSS_USERS)
+    public void publishTriggeringHint(
+            @NonNull ReturnHintReport returnHintReport, @NonNull List<ContextHint> hints) {
+        requireNonNull(returnHintReport, "returnHintReport must not be null");
+
+        if (hints == null || hints.isEmpty()) {
+            throw new IllegalArgumentException("hints collection must not be null or empty");
+        }
+
+        final List<ContextHint> allHints = new ArrayList<>();
+        allHints.add(returnHintReport.getInsightReferenceHint());
+        allHints.addAll(hints);
+
+        publishTriggeringHint(allHints, returnHintReport.getRenderTokens(), null);
     }
 
     /**

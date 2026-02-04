@@ -34,7 +34,6 @@ import android.app.contentsafety.FeatureException;
 import android.app.contentsafety.ICheckContentCallback;
 import android.app.contentsafety.IContentSafetyManager;
 import android.app.contentsafety.IIsFeatureEnabledCallback;
-import android.app.contentsafety.SupportedTypesResult;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -81,7 +80,6 @@ import java.lang.annotation.Target;
 import java.util.ArrayList;
 import java.util.Objects;
 import java.util.Set;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -240,51 +238,6 @@ public class ContentSafetyManagerService extends SystemService {
                 mContentSafetySettingsComponentName);
     }
 
-    private SupportedTypesResult getSupportedInputTypesInternal(int featureType) {
-        if (!android.app.contentsafety.flags.Flags.enableContentsafety()) {
-            return new SupportedTypesResult(false, null);
-        }
-        // Initialize the remote services and set up the lifecycleCallbacks.
-        ensureRemoteContentSafetyServicesInitialized();
-
-        if (!mIsServiceEnabled) {
-            Slog.w(TAG, "Service not available");
-            return new SupportedTypesResult(false, null);
-        }
-
-        AndroidFuture future = new AndroidFuture();
-        mRemoteContentSafetyService.run(service -> {
-            try {
-                if (!future.isDone()) {
-                    SupportedTypesResult supportedTypesResult =
-                            service.getSupportedInputTypes(featureType);
-                    future.complete(supportedTypesResult);
-                }
-            } catch (Exception e) {
-                Slog.w(TAG, "Exception while calling getSupportedInputTypes ", e);
-                if (!future.isDone()) {
-                    future.completeExceptionally(e);
-                }
-            }
-        });
-
-        // block the current thread to wait for the result or timeout.
-        try {
-            return (SupportedTypesResult) future.get(getIdleTimeoutMsContentService(),
-                    TimeUnit.MILLISECONDS);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            Slog.w(TAG, "Interrupted while waiting for supported types", e);
-            return new SupportedTypesResult(false, null);
-        } catch (ExecutionException e) {
-            Slog.e(TAG, "Remote service call failed", e.getCause());
-            return new SupportedTypesResult(false, null);
-        } catch (TimeoutException e) {
-            Slog.e(TAG, "Timeout waiting for remote service to return supported types", e);
-            return new SupportedTypesResult(false, null);
-        }
-    }
-
     private void checkContentInternal(
             int featureType,
             Bundle input,
@@ -339,7 +292,7 @@ public class ContentSafetyManagerService extends SystemService {
                             mRemoteSandboxedService.postAsync(
                                     service -> {
                                         AndroidFuture future = new AndroidFuture();
-                                        service.checkContent(
+                                        service.requestCheckContent(
                                                 featureType,
                                                 input,
                                                 wrapCancellationFuture(
@@ -370,7 +323,7 @@ public class ContentSafetyManagerService extends SystemService {
                         mRemoteContentSafetyService.postAsync(
                                 csService -> {
                                     AndroidFuture future = new AndroidFuture();
-                                    csService.getFeature(
+                                    csService.requestGetFeature(
                                             featureType,
                                             wrapCancellationFuture(
                                                     cancellationSignalFuture),
@@ -423,7 +376,7 @@ public class ContentSafetyManagerService extends SystemService {
                 mRemoteContentSafetySettingsService.run(
                         service -> {
                             AndroidFuture future = new AndroidFuture();
-                            service.isFeatureEnabled(
+                            service.requestIsFeatureEnabled(
                                     featureType,
                                     userId,
                                     wrapCancellationFuture(cancellationSignalFuture),
@@ -484,14 +437,7 @@ public class ContentSafetyManagerService extends SystemService {
 
             @Override
             @PermissionManuallyEnforced
-            public SupportedTypesResult getSupportedInputTypes(int featureType) {
-                mContext.enforceCallingPermission(Manifest.permission.CHECK_CONTENT_SAFETY, TAG);
-                return getSupportedInputTypesInternal(featureType);
-            }
-
-            @Override
-            @PermissionManuallyEnforced
-            public void checkContent(
+            public void requestCheckContent(
                     int featureType,
                     Bundle input,
                     @Nullable AndroidFuture cancellationSignalFuture,
@@ -503,7 +449,7 @@ public class ContentSafetyManagerService extends SystemService {
 
             @Override
             @PermissionManuallyEnforced
-            public void isFeatureEnabled(
+            public void requestIsFeatureEnabled(
                     int featureType,
                     @Nullable AndroidFuture cancellationSignalFuture,
                     @NonNull IIsFeatureEnabledCallback callback)
@@ -598,7 +544,7 @@ public class ContentSafetyManagerService extends SystemService {
                                                             + " map. %s",
                                                     ex));
                                 }
-                                service.loadFeature(
+                                service.requestLoadFeature(
                                         result,
                                         wrapCancellationFuture(
                                                 cancellationSignalFuture),
@@ -684,7 +630,7 @@ public class ContentSafetyManagerService extends SystemService {
             AndroidFuture checkContentResultFuture =
                     mRemoteSandboxedService.postAsync(
                             service -> {
-                                service.checkContent(
+                                service.requestCheckContent(
                                         featureType,
                                         input,
                                         wrapCancellationFuture(

@@ -103,6 +103,7 @@ import androidx.compose.material3.IconButtonColors
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -124,6 +125,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -186,6 +188,7 @@ import com.android.compose.windowsizeclass.LocalWindowSizeClass
 import com.android.internal.R.dimen.system_app_widget_background_radius
 import com.android.systemui.Flags
 import com.android.systemui.Flags.communalEditModeAccessibilityResize
+import com.android.systemui.Flags.communalHubCancelAddWidget
 import com.android.systemui.Flags.communalResponsiveGrid
 import com.android.systemui.Flags.communalTimerFlickerFix
 import com.android.systemui.Flags.communalWidgetResizing
@@ -234,6 +237,7 @@ fun CommunalHub(
     val communalContent by
         viewModel.communalContent.collectAsStateWithLifecycle(initialValue = emptyList())
     var removeButtonCoordinates: LayoutCoordinates? by remember { mutableStateOf(null) }
+    var cancelButtonCoordinates: LayoutCoordinates? by remember { mutableStateOf(null) }
     var toolbarSize: IntSize? by remember { mutableStateOf(null) }
     var gridCoordinates: LayoutCoordinates? by remember { mutableStateOf(null) }
     var contentOffset: Offset by remember { mutableStateOf(Offset.Zero) }
@@ -245,6 +249,7 @@ fun CommunalHub(
 
     val contentListState = rememberContentListState(widgetConfigurator, communalContent, viewModel)
     val reorderingWidgets by viewModel.reorderingWidgets.collectAsStateWithLifecycle()
+    val addingWidgetDragAction by viewModel.addingWidgetDragAction.collectAsStateWithLifecycle()
     val selectedKey = viewModel.selectedKey.collectAsStateWithLifecycle()
     val removeButtonEnabled by remember {
         derivedStateOf { selectedKey.value != null || reorderingWidgets }
@@ -467,6 +472,30 @@ fun CommunalHub(
                             interactionHandler = interactionHandler,
                             widgetSection = widgetSection,
                             contentScope = contentScope,
+                            updateDragPositionForCancel = { widgetShadowOffset ->
+                                if (communalHubCancelAddWidget()) {
+                                    val cancelButtonInWindow =
+                                        cancelButtonCoordinates?.boundsInWindow()
+                                    if (addingWidgetDragAction && cancelButtonInWindow != null) {
+                                        // The newly added widget is only a widget shadow
+                                        // we know the center point of this widget shadow
+                                        // (widgetShadowoffset)
+                                        // we are creating a bigger zone for the cancel area
+                                        val fullWidthCancelBounds =
+                                            Rect(
+                                                left = 0f,
+                                                top = 0f,
+                                                right = screenWidth.toFloat(),
+                                                bottom = cancelButtonInWindow.bottom,
+                                            )
+                                        fullWidthCancelBounds.contains(widgetShadowOffset)
+                                    } else {
+                                        false
+                                    }
+                                } else {
+                                    false
+                                }
+                            },
                         )
                     }
                 }
@@ -504,6 +533,8 @@ fun CommunalHub(
                         }
                     },
                     removeEnabled = removeButtonEnabled,
+                    cancelAddEnabled = addingWidgetDragAction,
+                    setCancelButtonCoordinates = { cancelButtonCoordinates = it },
                 )
             }
         }
@@ -918,6 +949,7 @@ private fun BoxScope.CommunalHubLazyGrid(
     interactionHandler: RemoteViews.InteractionHandler?,
     widgetSection: CommunalAppWidgetSection,
     contentScope: ContentScope?,
+    updateDragPositionForCancel: (widgetShadowOffset: Offset) -> Boolean,
 ) {
     var gridModifier =
         Modifier.align(Alignment.TopStart).onGloballyPositioned { setGridCoordinates(it) }
@@ -929,6 +961,7 @@ private fun BoxScope.CommunalHubLazyGrid(
         else if (communalResponsiveGrid() && isMediumWindow()) hubDimensions.ItemSpacingMedium
         else Dimensions.ItemSpacing
     val windowSize = WindowSizeUtils.getWindowSizeCategory(LocalContext.current)
+    var draggingPlaceHolderAlpha: Float by remember { mutableStateOf(1f) }
     if (viewModel.isEditMode && viewModel is CommunalEditModeViewModel) {
         list = contentListState.list
         // for drag & drop operations within the communal hub grid
@@ -955,6 +988,9 @@ private fun BoxScope.CommunalHubLazyGrid(
                 gridItemSize = gridItemSize,
                 contentListState = contentListState,
                 contentOffset = contentOffset,
+                viewModel = viewModel,
+                updateDragPositionForCancel = updateDragPositionForCancel,
+                setDraggingPlaceHolderAlpha = { draggingPlaceHolderAlpha = it },
             )
 
         // A full size box in background that listens to widget drops from the picker.
@@ -963,8 +999,10 @@ private fun BoxScope.CommunalHubLazyGrid(
         Box(Modifier.fillMaxSize().dragAndDropTarget(dragAndDropTargetState)) {}
     } else if (communalResponsiveGrid()) {
         gridModifier = gridModifier.fillMaxSize()
+        draggingPlaceHolderAlpha = 1f
     } else {
         gridModifier = gridModifier.height(hubDimensions.GridHeight)
+        draggingPlaceHolderAlpha = 1f
     }
 
     HorizontalGridWrapper(
@@ -1110,7 +1148,9 @@ private fun BoxScope.CommunalHubLazyGrid(
                             widgetSection = widgetSection,
                             resizeableItemFrameViewModel = resizeableItemFrameViewModel,
                             isVisible = isVisible,
-                        )
+                        ) {
+                            draggingPlaceHolderAlpha
+                        }
                     }
                 }
             } else {
@@ -1135,7 +1175,9 @@ private fun BoxScope.CommunalHubLazyGrid(
                     resizeableItemFrameViewModel = resizeableItemFrameViewModel,
                     contentScope = contentScope,
                     isVisible = isVisible,
-                )
+                ) {
+                    draggingPlaceHolderAlpha
+                }
             }
         }
     }
@@ -1238,10 +1280,16 @@ private fun Toolbar(
     setRemoveButtonCoordinates: (coordinates: LayoutCoordinates?) -> Unit,
     onOpenWidgetPicker: () -> Unit,
     onEditDone: () -> Unit,
+    cancelAddEnabled: Boolean,
+    setCancelButtonCoordinates: (coordinates: LayoutCoordinates?) -> Unit,
 ) {
     if (!removeEnabled) {
         // Clear any existing coordinates when remove is not enabled.
         setRemoveButtonCoordinates(null)
+    }
+    if (!cancelAddEnabled) {
+        // Clear any existing coordinates when cancel is not enabled.
+        setCancelButtonCoordinates(null)
     }
     val removeButtonAlpha: Float by
         animateFloatAsState(
@@ -1251,8 +1299,10 @@ private fun Toolbar(
     val toolbarPadding = toolbarPadding()
     Box(modifier = Modifier.fillMaxWidth().padding(toolbarPadding)) {
         val addWidgetText = stringResource(R.string.hub_mode_add_widget_button_text)
+        val isCancelAddActiveAndVisible = communalHubCancelAddWidget() && cancelAddEnabled
+        val isRemoveActiveAndVisible = Flags.hubEditModeTouchAdjustments() && removeEnabled
 
-        if (!(Flags.hubEditModeTouchAdjustments() && removeEnabled)) {
+        if (!(isRemoveActiveAndVisible || isCancelAddActiveAndVisible)) {
             ToolbarButton(
                 isPrimary = !removeEnabled,
                 modifier = Modifier.align(Alignment.CenterStart),
@@ -1309,13 +1359,51 @@ private fun Toolbar(
             }
         }
 
-        ToolbarButton(
-            isPrimary = !removeEnabled,
-            modifier = Modifier.align(Alignment.CenterEnd),
-            onClick = onEditDone,
-        ) {
-            Icon(Icons.Default.Check, contentDescription = null)
-            ToolbarButtonText(stringResource(R.string.hub_mode_editing_exit_button_text))
+        if (communalHubCancelAddWidget()) {
+            AnimatedVisibility(
+                modifier = Modifier.align(Alignment.Center),
+                visible = cancelAddEnabled,
+                enter = fadeIn(),
+                exit = fadeOut(),
+            ) {
+                Surface(
+                    modifier =
+                        Modifier.toolbarHeight().onGloballyPositioned {
+                            // It's possible for this callback to fire after cancel has been
+                            // disabled. Check enabled state before setting.
+                            if (cancelAddEnabled) {
+                                setCancelButtonCoordinates(it)
+                            }
+                        },
+                    shape = ButtonDefaults.shape,
+                    color = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary,
+                ) {
+                    Row(
+                        modifier = Modifier.padding(Dimensions.ButtonPadding),
+                        horizontalArrangement =
+                            Arrangement.spacedBy(
+                                ButtonDefaults.IconSpacing,
+                                Alignment.CenterHorizontally,
+                            ),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = null)
+                        ToolbarButtonText(stringResource(R.string.cancel))
+                    }
+                }
+            }
+        }
+
+        if (!isCancelAddActiveAndVisible) {
+            ToolbarButton(
+                isPrimary = !removeEnabled,
+                modifier = Modifier.align(Alignment.CenterEnd),
+                onClick = onEditDone,
+            ) {
+                Icon(Icons.Default.Check, contentDescription = null)
+                ToolbarButtonText(stringResource(R.string.hub_mode_editing_exit_button_text))
+            }
         }
     }
 }
@@ -1410,6 +1498,7 @@ private fun CommunalContent(
     resizeableItemFrameViewModel: ResizeableItemFrameViewModel?,
     contentScope: ContentScope? = null,
     isVisible: Boolean,
+    draggingPlaceHolderAlpha: () -> Float,
 ) {
     when (model) {
         is CommunalContentModel.WidgetContent.Widget ->
@@ -1426,7 +1515,13 @@ private fun CommunalContent(
                 resizeableItemFrameViewModel,
                 isVisible,
             )
-        is CommunalContentModel.WidgetPlaceholder -> HighlightedItem(modifier)
+        is CommunalContentModel.WidgetPlaceholder -> {
+            if (communalHubCancelAddWidget()) {
+                AnimatedWidgetPlaceholder(modifier, alphaState = draggingPlaceHolderAlpha)
+            } else {
+                HighlightedItem(modifier)
+            }
+        }
         is CommunalContentModel.WidgetContent.DisabledWidget ->
             DisabledWidgetPlaceholder(model, viewModel, modifier)
         is CommunalContentModel.WidgetContent.PendingWidget ->
@@ -1462,6 +1557,12 @@ fun HighlightedItem(modifier: Modifier = Modifier, alpha: Float = 1.0f) {
                 )
             }
     )
+}
+
+@Composable
+private fun AnimatedWidgetPlaceholder(modifier: Modifier, alphaState: () -> Float) {
+    val alpha by animateFloatAsState(targetValue = alphaState(), label = "PlaceholderAlpha")
+    HighlightedItem(modifier, alpha = alpha)
 }
 
 /** Presents a CTA tile at the end of the grid, to customize the hub. */

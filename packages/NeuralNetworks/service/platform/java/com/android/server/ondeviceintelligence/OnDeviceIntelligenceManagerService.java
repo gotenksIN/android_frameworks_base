@@ -33,6 +33,7 @@ import android.annotation.Nullable;
 import android.annotation.RequiresPermission;
 import android.app.ActivityManager;
 import android.app.AppGlobals;
+import android.app.ondeviceintelligence.Content;
 import android.app.ondeviceintelligence.DownloadCallback;
 import android.app.ondeviceintelligence.Feature;
 import android.app.ondeviceintelligence.FeatureDetails;
@@ -47,6 +48,14 @@ import android.app.ondeviceintelligence.IStreamingResponseCallback;
 import android.app.ondeviceintelligence.ITokenInfoCallback;
 import android.app.ondeviceintelligence.ILifecycleListener;
 import android.app.ondeviceintelligence.InferenceInfo;
+import android.app.ondeviceintelligence.embedding.IEmbeddingCallback;
+import android.app.ondeviceintelligence.embedding.IEmbeddingModelCallback;
+import android.app.ondeviceintelligence.embedding.IEmbeddingModelListCallback;
+import android.app.ondeviceintelligence.imagedescription.IImageDescriptionCallback;
+import android.app.ondeviceintelligence.imagedescription.IImageDescriptionModelCallback;
+import android.app.ondeviceintelligence.imagedescription.IImageDescriptionModelListCallback;
+import android.app.ondeviceintelligence.embedding.EmbeddingRequest;
+import android.app.ondeviceintelligence.imagedescription.ImageDescriptionRequest;
 import android.app.ondeviceintelligence.OnDeviceIntelligenceManager;
 import android.app.ondeviceintelligence.OnDeviceIntelligenceException;
 import android.content.ComponentName;
@@ -141,6 +150,13 @@ public class OnDeviceIntelligenceManagerService extends SystemService {
     /** Default value in absence of {@link DeviceConfig} override. */
     private static final boolean DEFAULT_SERVICE_ENABLED = true;
     private static final String NAMESPACE_ON_DEVICE_INTELLIGENCE = "ondeviceintelligence";
+
+    private static final int STATUS_UNAVAILABLE =
+            OnDeviceIntelligenceException.ON_DEVICE_INTELLIGENCE_SERVICE_UNAVAILABLE;
+    private static final int STATUS_CONNECTION_FAILED =
+            OnDeviceIntelligenceException.PROCESSING_UPDATE_STATUS_CONNECTION_FAILED;
+    private static final int STATUS_TIMEOUT =
+            OnDeviceIntelligenceException.PROCESSING_ERROR_CANCELLED;
 
     private static final String SYSTEM_PACKAGE = "android";
     private static final long MAX_AGE_MS = TimeUnit.HOURS.toMillis(3);
@@ -644,6 +660,52 @@ public class OnDeviceIntelligenceManagerService extends SystemService {
             }
 
             @Override
+            public void requestTokenInfoWithContent(Feature feature,
+                    Content content,
+                    AndroidFuture cancellationSignalFuture,
+                    ITokenInfoCallback tokenInfoCallback) throws RemoteException {
+                int callerUid = Binder.getCallingUid();
+                Slog.i(TAG, "OnDeviceIntelligenceManagerInternal requestTokenInfoWithContent");
+                AndroidFuture<?> result = null;
+                try {
+                    Objects.requireNonNull(feature);
+                    Objects.requireNonNull(tokenInfoCallback);
+                    var executor = new InferenceServiceExecutor.Builder()
+                            .onFailure(
+                                    type -> {
+                                        switch (type) {
+                                            case SERVICE_UNAVAILABLE -> tokenInfoCallback.onFailure(
+                                                STATUS_UNAVAILABLE,
+                                                "OnDeviceIntelligenceManagerService is unavailable",
+                                                PersistableBundle.EMPTY);
+                                            case REMOTE_FAILURE -> tokenInfoCallback.onFailure(
+                                                    STATUS_CONNECTION_FAILED,
+                                                    "Remote call failed",
+                                                    PersistableBundle.EMPTY);
+                                            case TIMEOUT -> tokenInfoCallback.onFailure(
+                                                OnDeviceIntelligenceException
+                                                        .PROCESSING_ERROR_CANCELLED,
+                                                "Remote call timed out",
+                                                PersistableBundle.EMPTY);
+                                        }
+                                    })
+                            .build();
+                    result = executor.execute(service -> {
+                                AndroidFuture<Void> future = new AndroidFuture<>();
+                                service.requestTokenInfoWithContent(callerUid, feature,
+                                        content,
+                                        wrapCancellationFuture(cancellationSignalFuture),
+                                        wrapWithValidation(tokenInfoCallback, future,
+                                                mInferenceInfoStore));
+                                return future.orTimeout(getIdleTimeoutMs(),
+                                        TimeUnit.MILLISECONDS);
+                            });
+                    trackInferenceJob(callerUid, result);
+                } finally {
+                }
+            }
+
+            @Override
             public void processRequest(Feature feature,
                     Bundle request,
                     int requestType,
@@ -845,6 +907,269 @@ public class OnDeviceIntelligenceManagerService extends SystemService {
                     return;
                 }
                 mLifecycleListeners.unregister(listener);
+            }
+
+            @Override
+            public void listEmbeddingModels(IEmbeddingModelListCallback callback)
+                    throws RemoteException {
+                mContext.enforceCallingPermission(
+                        Manifest.permission.USE_ON_DEVICE_INTELLIGENCE, TAG);
+                int callerUid = Binder.getCallingUid();
+                Slog.i(TAG, "OnDeviceIntelligenceManagerInternal listEmbeddingModels");
+                Objects.requireNonNull(callback);
+                var executor =
+                        new IntelligenceServiceExecutor.Builder()
+                                .onFailure(
+                                        type -> {
+                                            switch (type) {
+                                                case SERVICE_UNAVAILABLE ->
+                                                        callback.onFailure(
+                                                                STATUS_UNAVAILABLE,
+                                                                "OnDeviceIntelligenceManagerService"
+                                                                    + " is unavailable",
+                                                                PersistableBundle.EMPTY);
+                                                case REMOTE_FAILURE ->
+                                                        callback.onFailure(
+                                                                STATUS_CONNECTION_FAILED,
+                                                                "Remote call failed",
+                                                                PersistableBundle.EMPTY);
+                                                case TIMEOUT ->
+                                                        callback.onFailure(
+                                                                STATUS_TIMEOUT,
+                                                                "Remote call timed out",
+                                                                PersistableBundle.EMPTY);
+                                            }
+                                        })
+                                .build();
+                var unused = executor.execute(
+                        service -> {
+                            // TODO: b/479090677 - Handle timeouts and resource closing.
+                            service.listEmbeddingModels(callerUid, callback);
+                            return AndroidFuture.completedFuture(null);
+                        });
+            }
+
+            @Override
+            public void fetchEmbeddingModel(String modelSignature, IEmbeddingModelCallback callback)
+                    throws RemoteException {
+                mContext.enforceCallingPermission(
+                        Manifest.permission.USE_ON_DEVICE_INTELLIGENCE, TAG);
+                int callerUid = Binder.getCallingUid();
+                Slog.i(TAG, "OnDeviceIntelligenceManagerInternal fetchEmbeddingModel");
+                Objects.requireNonNull(modelSignature);
+                Objects.requireNonNull(callback);
+                var executor =
+                        new IntelligenceServiceExecutor.Builder()
+                                .onFailure(
+                                        type -> {
+                                            switch (type) {
+                                                case SERVICE_UNAVAILABLE ->
+                                                        callback.onFailure(
+                                                                STATUS_UNAVAILABLE,
+                                                                "OnDeviceIntelligenceManagerService"
+                                                                    + " is unavailable",
+                                                                PersistableBundle.EMPTY);
+                                                case REMOTE_FAILURE ->
+                                                        callback.onFailure(
+                                                                STATUS_CONNECTION_FAILED,
+                                                                "Remote call failed",
+                                                                PersistableBundle.EMPTY);
+                                                case TIMEOUT ->
+                                                        callback.onFailure(
+                                                                STATUS_TIMEOUT,
+                                                                "Remote call timed out",
+                                                                PersistableBundle.EMPTY);
+                                            }
+                                        })
+                                .build();
+                var unused = executor.execute(
+                        service -> {
+                            // TODO: b/479090677 - Handle timeouts and resource closing.
+                            service.fetchEmbeddingModel(callerUid, modelSignature, callback);
+                            return AndroidFuture.completedFuture(null);
+                        });
+            }
+
+            @Override
+            public void fetchImageDescriptionModel(String modelSignature,
+                    IImageDescriptionModelCallback callback)
+                    throws RemoteException {
+                int callerUid = Binder.getCallingUid();
+                Slog.i(TAG, "OnDeviceIntelligenceManagerInternal fetchImageDescriptionModel");
+                Objects.requireNonNull(modelSignature);
+                Objects.requireNonNull(callback);
+                var executor =
+                        new IntelligenceServiceExecutor.Builder()
+                                .onFailure(
+                                        type -> {
+                                            switch (type) {
+                                                case SERVICE_UNAVAILABLE ->
+                                                        callback.onFailure(
+                                                                STATUS_UNAVAILABLE,
+                                                                "OnDeviceIntelligenceManagerService"
+                                                                    + " is unavailable",
+                                                                PersistableBundle.EMPTY);
+                                                case REMOTE_FAILURE ->
+                                                        callback.onFailure(
+                                                                STATUS_CONNECTION_FAILED,
+                                                                "Remote call failed",
+                                                                PersistableBundle.EMPTY);
+                                                case TIMEOUT ->
+                                                        callback.onFailure(
+                                                                STATUS_TIMEOUT,
+                                                                "Remote call timed out",
+                                                                PersistableBundle.EMPTY);
+                                            }
+                                        })
+                                .build();
+                executor.execute(
+                        service -> {
+                            // TODO: b/479090677 - Handle timeouts and resource closing.
+                            service.fetchImageDescriptionModel(callerUid, modelSignature, callback);
+                            return AndroidFuture.completedFuture(null);
+                        });
+            }
+
+            @Override
+            public void listImageDescriptionModels(IImageDescriptionModelListCallback callback)
+                    throws RemoteException {
+                mContext.enforceCallingPermission(
+                        Manifest.permission.USE_ON_DEVICE_INTELLIGENCE, TAG);
+                int callerUid = Binder.getCallingUid();
+                Slog.i(TAG, "OnDeviceIntelligenceManagerInternal listImageDescriptionModels");
+                Objects.requireNonNull(callback);
+                var executor =
+                        new IntelligenceServiceExecutor.Builder()
+                                .onFailure(
+                                        type -> {
+                                            switch (type) {
+                                                case SERVICE_UNAVAILABLE ->
+                                                        callback.onFailure(
+                                                                STATUS_UNAVAILABLE,
+                                                                "OnDeviceIntelligenceManagerService"
+                                                                    + " is unavailable",
+                                                                PersistableBundle.EMPTY);
+                                                case REMOTE_FAILURE ->
+                                                        callback.onFailure(
+                                                                STATUS_CONNECTION_FAILED,
+                                                                "Remote call failed",
+                                                                PersistableBundle.EMPTY);
+                                                case TIMEOUT ->
+                                                        callback.onFailure(
+                                                                STATUS_TIMEOUT,
+                                                                "Remote call timed out",
+                                                                PersistableBundle.EMPTY);
+                                            }
+                                        })
+                                .build();
+                var unused = executor.execute(
+                        service -> {
+                            // TODO: b/479090677 - Handle timeouts and resource closing.
+                            service.listImageDescriptionModels(callerUid, callback);
+                            return AndroidFuture.completedFuture(null);
+                        });
+            }
+
+            @Override
+            public void generateEmbeddings(
+                    Feature feature,
+                    EmbeddingRequest request,
+                    AndroidFuture cancellationSignalFuture,
+                    IEmbeddingCallback callback)
+                    throws RemoteException {
+                mContext.enforceCallingPermission(
+                        Manifest.permission.USE_ON_DEVICE_INTELLIGENCE, TAG);
+                int callerUid = Binder.getCallingUid();
+                Slog.i(TAG, "OnDeviceIntelligenceManagerInternal generateEmbeddings");
+                Objects.requireNonNull(feature);
+                Objects.requireNonNull(request);
+                Objects.requireNonNull(callback);
+                var executor =
+                        new InferenceServiceExecutor.Builder()
+                                .onFailure(
+                                        type -> {
+                                            switch (type) {
+                                                case SERVICE_UNAVAILABLE ->
+                                                        callback.onFailure(
+                                                                STATUS_UNAVAILABLE,
+                                                                "OnDeviceIntelligenceManagerService"
+                                                                    + " is unavailable",
+                                                                PersistableBundle.EMPTY);
+                                                case REMOTE_FAILURE ->
+                                                        callback.onFailure(
+                                                                STATUS_CONNECTION_FAILED,
+                                                                "Remote call failed",
+                                                                PersistableBundle.EMPTY);
+                                                case TIMEOUT ->
+                                                        callback.onFailure(
+                                                                STATUS_TIMEOUT,
+                                                                "Remote call timed out",
+                                                                PersistableBundle.EMPTY);
+                                            }
+                                        })
+                                .build();
+                var unused = executor.execute(
+                        service -> {
+                            // TODO: b/479090677 - Handle timeouts and resource closing.
+                            service.generateEmbeddings(
+                                    callerUid,
+                                    feature,
+                                    request,
+                                    wrapCancellationFuture(cancellationSignalFuture),
+                                    callback);
+                            return AndroidFuture.completedFuture(null);
+                        });
+            }
+
+            @Override
+            public void generateImageDescription(
+                    Feature feature,
+                    ImageDescriptionRequest request,
+                    AndroidFuture cancellationSignalFuture,
+                    IImageDescriptionCallback callback)
+                    throws RemoteException {
+                mContext.enforceCallingPermission(
+                        Manifest.permission.USE_ON_DEVICE_INTELLIGENCE, TAG);
+                int callerUid = Binder.getCallingUid();
+                Slog.i(TAG, "OnDeviceIntelligenceManagerInternal generateImageDescription");
+                Objects.requireNonNull(feature);
+                Objects.requireNonNull(request);
+                Objects.requireNonNull(callback);
+                var executor =
+                        new InferenceServiceExecutor.Builder()
+                                .onFailure(
+                                        type -> {
+                                            switch (type) {
+                                                case SERVICE_UNAVAILABLE ->
+                                                        callback.onFailure(
+                                                                STATUS_UNAVAILABLE,
+                                                                "OnDeviceIntelligenceManagerService"
+                                                                    + " is unavailable",
+                                                                PersistableBundle.EMPTY);
+                                                case REMOTE_FAILURE ->
+                                                        callback.onFailure(
+                                                                STATUS_CONNECTION_FAILED,
+                                                                "Remote call failed",
+                                                                PersistableBundle.EMPTY);
+                                                case TIMEOUT ->
+                                                        callback.onFailure(
+                                                                STATUS_TIMEOUT,
+                                                                "Remote call timed out",
+                                                                PersistableBundle.EMPTY);
+                                            }
+                                        })
+                                .build();
+                var unused = executor.execute(
+                        service -> {
+                            // TODO: b/479090677 - Handle timeouts and resource closing.
+                            service.generateImageDescription(
+                                    callerUid,
+                                    feature,
+                                    request,
+                                    wrapCancellationFuture(cancellationSignalFuture),
+                                    callback);
+                            return AndroidFuture.completedFuture(null);
+                        });
             }
         };
     }
@@ -1154,6 +1479,10 @@ public class OnDeviceIntelligenceManagerService extends SystemService {
             }
             ComponentName serviceComponent = ComponentName.unflattenFromString(
                     serviceName);
+            if (serviceComponent == null) {
+                throw new IllegalStateException(
+                        "Remote service is not configured to complete the request.");
+            }
             ServiceInfo serviceInfo =
                     mContext.getPackageManager().getServiceInfo(
                             serviceComponent,
@@ -1516,6 +1845,9 @@ public class OnDeviceIntelligenceManagerService extends SystemService {
                     Slog.d(TAG, "Adding shared high priority binding for UID " + uid);
                     String serviceName = getSandboxedInferenceServiceName();
                     ComponentName componentName = ComponentName.unflattenFromString(serviceName);
+                    if (componentName == null) {
+                        return;
+                    }
                     mHighPriorityConnection = new RemoteOnDeviceSandboxedInferenceService(mContext,
                             componentName, UserHandle.SYSTEM.getIdentifier(),
                             Context.BIND_SCHEDULE_LIKE_TOP_APP);

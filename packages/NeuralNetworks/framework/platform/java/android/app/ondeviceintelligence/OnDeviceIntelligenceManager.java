@@ -17,6 +17,7 @@
 package android.app.ondeviceintelligence;
 
 import static android.app.ondeviceintelligence.flags.Flags.FLAG_ON_DEVICE_INTELLIGENCE_25Q4;
+import static android.app.ondeviceintelligence.flags.Flags.FLAG_ON_DEVICE_INTELLIGENCE_26Q2;
 
 import android.Manifest;
 import android.annotation.CallbackExecutor;
@@ -48,6 +49,21 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
+
+import android.app.ondeviceintelligence.embedding.EmbeddingModel;
+import android.app.ondeviceintelligence.embedding.EmbeddingRequest;
+import android.app.ondeviceintelligence.embedding.EmbeddingResponse;
+import android.app.ondeviceintelligence.embedding.IEmbeddingCallback;
+import android.app.ondeviceintelligence.embedding.IEmbeddingModelCallback;
+import android.app.ondeviceintelligence.embedding.IEmbeddingModelListCallback;
+import android.app.ondeviceintelligence.imagedescription.ImageDescriptionModel;
+import android.app.ondeviceintelligence.imagedescription.ImageDescriptionRequest;
+import android.app.ondeviceintelligence.imagedescription.ImageDescriptionCallback;
+import android.app.ondeviceintelligence.imagedescription.ImageDescriptionResponse;
+import android.app.ondeviceintelligence.imagedescription.IImageDescriptionCallback;
+import android.app.ondeviceintelligence.imagedescription.IImageDescriptionModelCallback;
+import android.app.ondeviceintelligence.imagedescription.IImageDescriptionModelListCallback;
+import android.app.ondeviceintelligence.utils.BinderUtils;
 
 import com.android.internal.infra.AndroidFuture;
 
@@ -404,6 +420,53 @@ public final class OnDeviceIntelligenceManager {
         }
     }
 
+    /**
+     * The methods computes the token related information for a given request payload using the
+     * provided {@link Feature}.
+     *
+     * @param feature            feature associated with the request.
+     * @param content            content payload to tokenize.
+     * @param cancellationSignal signal to invoke cancellation on the operation in the remote
+     *                           implementation.
+     * @param callbackExecutor   executor to run the callback on.
+     * @param outcomeReceiver    callback to populate the token info or exception in case of
+     *                           failure.
+     *
+     * @hide
+     */
+    @RequiresPermission(Manifest.permission.USE_ON_DEVICE_INTELLIGENCE)
+    @FlaggedApi(FLAG_ON_DEVICE_INTELLIGENCE_26Q2)
+    public void requestTokenInfo(@NonNull Feature feature, @NonNull Content content,
+            @Nullable CancellationSignal cancellationSignal,
+            @NonNull @CallbackExecutor Executor callbackExecutor,
+            @NonNull OutcomeReceiver<TokenInfo,
+                    OnDeviceIntelligenceException> outcomeReceiver) {
+        try {
+            ITokenInfoCallback callback = new ITokenInfoCallback.Stub() {
+                @Override
+                public void onSuccess(TokenInfo tokenInfo) {
+                    Binder.withCleanCallingIdentity(() -> callbackExecutor.execute(
+                            () -> outcomeReceiver.onResult(tokenInfo)));
+                }
+
+                @Override
+                public void onFailure(int errorCode, String errorMessage,
+                        PersistableBundle errorParams) {
+                    Binder.withCleanCallingIdentity(() -> callbackExecutor.execute(
+                            () -> outcomeReceiver.onError(
+                                    new OnDeviceIntelligenceException(
+                                            errorCode, errorMessage, errorParams))));
+                }
+            };
+
+            mService.requestTokenInfoWithContent(feature, content,
+                    configureRemoteCancellationFuture(cancellationSignal, callbackExecutor),
+                    callback);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
 
     /**
      * Asynchronously Process a request based on the associated params, to populate a
@@ -644,6 +707,331 @@ public final class OnDeviceIntelligenceManager {
         }
     }
 
+    /**
+     * Asynchronously lists the available {@link EmbeddingModel embedding models}.
+     *
+     * <p>The caller can use this method to discover available models and their signatures.
+     * The model signature can then be cached and used to fetch the model directly via
+     * {@link #getEmbeddingModel(String, Executor, OutcomeReceiver)} in future calls.
+     *
+     * @param callbackExecutor Executor to run the callback on.
+     * @param callback         Callback to receive the list of {@link EmbeddingModel embedding
+     *                         models} or an error.
+     */
+    @RequiresPermission(Manifest.permission.USE_ON_DEVICE_INTELLIGENCE)
+    @FlaggedApi(FLAG_ON_DEVICE_INTELLIGENCE_26Q2)
+    public void listEmbeddingModels(
+            @NonNull @CallbackExecutor Executor callbackExecutor,
+            @NonNull
+                    OutcomeReceiver<List<EmbeddingModel>, OnDeviceIntelligenceException> callback) {
+        try {
+            IEmbeddingModelListCallback internalCallback =
+                    new IEmbeddingModelListCallback.Stub() {
+                        @Override
+                        public void onSuccess(List<EmbeddingModel> result) {
+                            BinderUtils.withCleanCallingIdentity(
+                                    () ->
+                                            callbackExecutor.execute(
+                                                    () ->
+                                                            onGetEmbeddingModelsSuccess(
+                                                                    result, callback)));
+                        }
+
+                        @Override
+                        public void onFailure(
+                                int errorCode, String errorMessage, PersistableBundle errorParams) {
+                            BinderUtils.withCleanCallingIdentity(
+                                    () ->
+                                            callbackExecutor.execute(
+                                                    () ->
+                                                            onGetEmbeddingModelsFailure(
+                                                                    errorCode,
+                                                                    errorMessage,
+                                                                    errorParams,
+                                                                    callback)));
+                        }
+                    };
+            mService.listEmbeddingModels(internalCallback);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        } catch (IllegalStateException e) {
+            callback.onError(
+                    new OnDeviceIntelligenceException(
+                            OnDeviceIntelligenceException.PROCESSING_ERROR_SERVICE_NOT_CONFIGURED,
+                            "Service is not configured.",
+                            null));
+        }
+    }
+
+    /**
+     * Asynchronously fetches a specific {@link EmbeddingModel} by its signature.
+     *
+     * <p>This allows direct access to a model if its signature is already known (e.g., cached from
+     * a previous {@link #getEmbeddingModels(Executor, OutcomeReceiver)} call).
+     *
+     * @param modelSignature   The unique signature of the embedding model.
+     * @param callbackExecutor Executor to run the callback on.
+     * @param callback         Callback to receive the {@link EmbeddingModel} or an error.
+     */
+    @RequiresPermission(Manifest.permission.USE_ON_DEVICE_INTELLIGENCE)
+    @FlaggedApi(FLAG_ON_DEVICE_INTELLIGENCE_26Q2)
+    public void fetchEmbeddingModel(
+            @NonNull String modelSignature,
+            @NonNull @CallbackExecutor Executor callbackExecutor,
+            @NonNull OutcomeReceiver<EmbeddingModel, OnDeviceIntelligenceException> callback) {
+        try {
+            IEmbeddingModelCallback internalCallback =
+                    new IEmbeddingModelCallback.Stub() {
+                        @Override
+                        public void onSuccess(EmbeddingModel result) {
+                            BinderUtils.withCleanCallingIdentity(
+                                    () ->
+                                            callbackExecutor.execute(
+                                                    () -> {
+                                                        result.setOnDeviceIntelligenceManager(
+                                                            OnDeviceIntelligenceManager.this);
+                                                        callback.onResult(result);
+                                                    }));
+                        }
+
+                        @Override
+                        public void onFailure(
+                                int errorCode, String errorMessage, PersistableBundle errorParams) {
+                            BinderUtils.withCleanCallingIdentity(
+                                    () ->
+                                            callbackExecutor.execute(
+                                                    () ->
+                                                        callback.onError(
+                                                            new OnDeviceIntelligenceException(
+                                                                            errorCode,
+                                                                            errorMessage,
+                                                                            errorParams))));
+                        }
+                    };
+            mService.fetchEmbeddingModel(modelSignature, internalCallback);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }  catch (IllegalStateException e) {
+            callback.onError(
+                    new OnDeviceIntelligenceException(
+                            OnDeviceIntelligenceException.PROCESSING_ERROR_SERVICE_NOT_CONFIGURED,
+                            "Service is not configured.",
+                            null));
+        }
+    }
+
+    /**
+     * Asynchronously gets a list of available {@link ImageDescriptionModel}s.
+     *
+     * <p>The caller can use this method to discover available models and their signatures.
+     * The model signature can then be cached and used to fetch the model directly via
+     * {@link #fetchImageDescriptionModel(String, Executor, OutcomeReceiver)} in future calls.
+     *
+     * @param callbackExecutor Executor to run the callback on.
+     * @param callback         Callback to receive the list of {@link ImageDescriptionModel}s or
+     *                         an error.
+     */
+    @RequiresPermission(Manifest.permission.USE_ON_DEVICE_INTELLIGENCE)
+    @FlaggedApi(FLAG_ON_DEVICE_INTELLIGENCE_26Q2)
+    public void listImageDescriptionModels(
+            @NonNull @CallbackExecutor Executor callbackExecutor,
+            @NonNull
+                    OutcomeReceiver<List<ImageDescriptionModel>, OnDeviceIntelligenceException>
+                            callback) {
+        try {
+            IImageDescriptionModelListCallback internalCallback =
+                    new IImageDescriptionModelListCallback.Stub() {
+                        @Override
+                        public void onSuccess(List<ImageDescriptionModel> result) {
+                            BinderUtils.withCleanCallingIdentity(
+                                    () ->
+                                            callbackExecutor.execute(
+                                                    () ->
+                                                            onGetImageDescriptionModelsSuccess(
+                                                                    result, callback)));
+                        }
+
+                        @Override
+                        public void onFailure(
+                                int errorCode, String errorMessage, PersistableBundle errorParams) {
+                            BinderUtils.withCleanCallingIdentity(
+                                    () ->
+                                            callbackExecutor.execute(
+                                                    () ->
+                                                            onGetImageDescriptionModelsFailure(
+                                                                    errorCode,
+                                                                    errorMessage,
+                                                                    errorParams,
+                                                                    callback)));
+                        }
+                    };
+            mService.listImageDescriptionModels(internalCallback);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        } catch (IllegalStateException e) {
+            callback.onError(
+                    new OnDeviceIntelligenceException(
+                            OnDeviceIntelligenceException.PROCESSING_ERROR_SERVICE_NOT_CONFIGURED,
+                            "Service is not configured.",
+                            null));
+        }
+    }
+
+    /**
+     * Asynchronously gets a specific {@link ImageDescriptionModel} by its signature.
+     *
+     * <p>This allows direct access to a model if its signature is already known (e.g., cached from
+     * a previous {@link #getImageDescriptionModels(Executor, OutcomeReceiver)} call).
+     *
+     * @param modelSignature   The unique signature of the image description model.
+     * @param callbackExecutor Executor to run the callback on.
+     * @param callback         Callback to receive the {@link ImageDescriptionModel} or an error.
+     */
+    @RequiresPermission(Manifest.permission.USE_ON_DEVICE_INTELLIGENCE)
+    @FlaggedApi(FLAG_ON_DEVICE_INTELLIGENCE_26Q2)
+    public void fetchImageDescriptionModel(
+            @NonNull String modelSignature,
+            @NonNull @CallbackExecutor Executor callbackExecutor,
+            @NonNull
+                    OutcomeReceiver<ImageDescriptionModel, OnDeviceIntelligenceException>
+                            callback) {
+        try {
+            IImageDescriptionModelCallback internalCallback =
+                    new IImageDescriptionModelCallback.Stub() {
+                        @Override
+                        public void onSuccess(ImageDescriptionModel result) {
+                            BinderUtils.withCleanCallingIdentity(
+                                    () ->
+                                            callbackExecutor.execute(
+                                                    () -> {
+                                                        result.setOnDeviceIntelligenceManager(
+                                                            OnDeviceIntelligenceManager.this);
+                                                        callback.onResult(result);
+                                                    }));
+                        }
+
+                        @Override
+                        public void onFailure(
+                                int errorCode, String errorMessage, PersistableBundle errorParams) {
+                            BinderUtils.withCleanCallingIdentity(
+                                    () ->
+                                            callbackExecutor.execute(
+                                                    () ->
+                                                        callback.onError(
+                                                            new OnDeviceIntelligenceException(
+                                                                            errorCode,
+                                                                            errorMessage,
+                                                                            errorParams))));
+                        }
+                    };
+            mService.fetchImageDescriptionModel(modelSignature, internalCallback);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        } catch (IllegalStateException e) {
+            callback.onError(
+                    new OnDeviceIntelligenceException(
+                            OnDeviceIntelligenceException.PROCESSING_ERROR_SERVICE_NOT_CONFIGURED,
+                            "Service is not configured.",
+                            null));
+        }
+    }
+
+    /** @hide */
+    @RequiresPermission(Manifest.permission.USE_ON_DEVICE_INTELLIGENCE)
+    @FlaggedApi(FLAG_ON_DEVICE_INTELLIGENCE_26Q2)
+    public void generateEmbeddings(
+            @NonNull Feature feature,
+            @NonNull EmbeddingRequest request,
+            @Nullable CancellationSignal cancellationSignal,
+            @NonNull @CallbackExecutor Executor callbackExecutor,
+            @NonNull OutcomeReceiver<EmbeddingResponse, OnDeviceIntelligenceException> callback) {
+        try {
+            IEmbeddingCallback internalCallback =
+                    new IEmbeddingCallback.Stub() {
+                        @Override
+                        public void onSuccess(EmbeddingResponse result) {
+                            BinderUtils.withCleanCallingIdentity(
+                                    () ->
+                                            callbackExecutor.execute(
+                                                    () -> callback.onResult(result)));
+                        }
+
+                        @Override
+                        public void onFailure(
+                                int errorCode, String errorMessage, PersistableBundle errorParams) {
+                            BinderUtils.withCleanCallingIdentity(
+                                    () ->
+                                            callbackExecutor.execute(
+                                                    () ->
+                                                        callback.onError(
+                                                            new OnDeviceIntelligenceException(
+                                                                            errorCode,
+                                                                            errorMessage,
+                                                                            errorParams))));
+                        }
+                    };
+            mService.generateEmbeddings(
+                    feature,
+                    request,
+                    configureRemoteCancellationFuture(cancellationSignal, callbackExecutor),
+                    internalCallback);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /** @hide */
+    @RequiresPermission(Manifest.permission.USE_ON_DEVICE_INTELLIGENCE)
+    @FlaggedApi(FLAG_ON_DEVICE_INTELLIGENCE_26Q2)
+    public void generateImageDescription(
+            @NonNull Feature feature,
+            @NonNull ImageDescriptionRequest request,
+            @Nullable CancellationSignal cancellationSignal,
+            @NonNull @CallbackExecutor Executor callbackExecutor,
+            @NonNull ImageDescriptionCallback callback) {
+        try {
+            IImageDescriptionCallback internalCallback =
+                    new IImageDescriptionCallback.Stub() {
+                        @Override
+                        public void onSuccess(ImageDescriptionResponse result) {
+                            BinderUtils.withCleanCallingIdentity(
+                                    () ->
+                                            callbackExecutor.execute(
+                                                    () -> callback.onResult(result)));
+                        }
+
+                        @Override
+                        public void onFailure(
+                                int errorCode, String errorMessage, PersistableBundle errorParams) {
+                            BinderUtils.withCleanCallingIdentity(
+                                    () ->
+                                            callbackExecutor.execute(
+                                                    () ->
+                                                        callback.onError(
+                                                                new OnDeviceIntelligenceException(
+                                                                            errorCode,
+                                                                            errorMessage,
+                                                                            errorParams))));
+                        }
+
+                        @Override
+                        public void onNewText(String text) {
+                            BinderUtils.withCleanCallingIdentity(
+                                    () ->
+                                            callbackExecutor.execute(
+                                                    () -> callback.onNewText(text)));
+                        }
+                    };
+            mService.generateImageDescription(
+                    feature,
+                    request,
+                    configureRemoteCancellationFuture(cancellationSignal, callbackExecutor),
+                    internalCallback);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
     /** Request inference with provided Bundle and Params. */
     public static final int REQUEST_TYPE_INFERENCE = 0;
 
@@ -727,6 +1115,42 @@ public final class OnDeviceIntelligenceManager {
      */
     @Target({ElementType.PARAMETER, ElementType.FIELD})
     public @interface ResponseParams {
+    }
+
+    private void onGetEmbeddingModelsSuccess(
+            List<EmbeddingModel> result,
+            OutcomeReceiver<List<EmbeddingModel>, OnDeviceIntelligenceException> callback) {
+        for (EmbeddingModel model : result) {
+            model.setOnDeviceIntelligenceManager(this);
+        }
+        callback.onResult(result);
+    }
+
+    private void onGetEmbeddingModelsFailure(
+            int errorCode,
+            String errorMessage,
+            PersistableBundle errorParams,
+            OutcomeReceiver<List<EmbeddingModel>, OnDeviceIntelligenceException> callback) {
+        callback.onError(
+                new OnDeviceIntelligenceException(errorCode, errorMessage, errorParams));
+    }
+
+    private void onGetImageDescriptionModelsSuccess(
+            List<ImageDescriptionModel> result,
+            OutcomeReceiver<List<ImageDescriptionModel>, OnDeviceIntelligenceException> callback) {
+        for (ImageDescriptionModel model : result) {
+            model.setOnDeviceIntelligenceManager(this);
+        }
+        callback.onResult(result);
+    }
+
+    private void onGetImageDescriptionModelsFailure(
+            int errorCode,
+            String errorMessage,
+            PersistableBundle errorParams,
+            OutcomeReceiver<List<ImageDescriptionModel>, OnDeviceIntelligenceException> callback) {
+        callback.onError(
+                new OnDeviceIntelligenceException(errorCode, errorMessage, errorParams));
     }
 
     @Nullable

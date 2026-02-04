@@ -48,6 +48,7 @@ import android.media.quality.ActiveProcessingPicture;
 import android.media.quality.AmbientBacklightEvent;
 import android.media.quality.AmbientBacklightMetadata;
 import android.media.quality.AmbientBacklightSettings;
+import android.media.quality.EqualizerSettings;
 import android.media.quality.IActiveProcessingPictureListener;
 import android.media.quality.IAmbientBacklightCallback;
 import android.media.quality.IMediaQualityManager;
@@ -922,6 +923,23 @@ public class MediaQualityService extends SystemService {
 
         @GuardedBy("mPictureProfileLock")
         @Override
+        public List<PictureProfileHandle> getPictureProfileHandleList(String[] ids, int userId) {
+            List<PictureProfileHandle> toReturn = new ArrayList<>();
+            synchronized (mPictureProfileLock) {
+                for (String id : ids) {
+                    Long key = mPictureProfileTempIdMap.getKey(id);
+                    if (key != null) {
+                        toReturn.add(new PictureProfileHandle(key));
+                    } else {
+                        toReturn.add(null);
+                    }
+                }
+            }
+            return toReturn;
+        }
+
+        @GuardedBy("mPictureProfileLock")
+        @Override
         public long getPictureProfileHandleValue(String id, int userId) {
             if (DEBUG) {
                 Slog.d(TAG, "getPictureProfileHandleValue with id = " + id);
@@ -1062,6 +1080,61 @@ public class MediaQualityService extends SystemService {
             }
         }
 
+        public PictureProfileHandle getCurrentPictureProfileHandleForTvInput(
+                String inputId, int userId) {
+            if (DEBUG) {
+                Slog.d(TAG, "getCurrentPictureProfileHandleForTvInput for id " + inputId);
+            }
+            // TODO: cache profiles
+            String[] columns = {BaseParameters.PARAMETER_ID};
+            String selection = BaseParameters.PARAMETER_TYPE + " = ? AND ("
+                    + BaseParameters.PARAMETER_NAME + " = ? OR "
+                    + BaseParameters.PARAMETER_NAME + " = ? OR "
+                    + BaseParameters.PARAMETER_NAME + " LIKE ?) AND "
+                    + BaseParameters.PARAMETER_INPUT_ID + " = ?";
+            String[] selectionArguments = {
+                    Integer.toString(PictureProfile.TYPE_SYSTEM),
+                    PictureProfile.NAME_DEFAULT,
+                    PictureProfile.NAME_DEFAULT + "/" + PictureProfile.STATUS_SDR,
+                    // b/427656481 Workaround to recognize temp input default.
+                    "%" + PictureProfile.NAME_DEFAULT + "/" + PictureProfile.STATUS_SDR,
+                    inputId
+            };
+            synchronized (mPictureProfileLock) {
+                try (Cursor cursor = mMqDatabaseUtils.getCursorAfterQuerying(
+                        mMediaQualityDbHelper.PICTURE_QUALITY_TABLE_NAME,
+                        columns, selection, selectionArguments)) {
+                    int count = cursor.getCount();
+                    if (count == 0) {
+                        Slog.e(TAG, "getPictureProfileHandleForTvInput: the count is 0");
+                        return PictureProfileHandle.NONE;
+                    }
+                    PictureProfileHandle handle = PictureProfileHandle.NONE;
+                    cursor.moveToFirst();
+                    PictureProfile p = MediaQualityUtils.convertCursorToPictureProfileWithTempId(
+                            cursor, mPictureProfileTempIdMap);
+                    if (p == null || p.getHandle() == null) {
+                        Slog.e(TAG, "getPictureProfileHandleForTvInput: retrieved profile or"
+                                + "handle is null");
+                        return PictureProfileHandle.NONE;
+                    }
+                    handle = p.getHandle();
+                    PictureProfile current = mOriginalHandleToCurrentPictureProfile
+                            .get(handle.getId());
+                    if (current != null && current.getHandle() != null) {
+                        if (DEBUG) {
+                            Slog.d(TAG, "handle returned is " + current.getHandle().getId());
+                        }
+                        return current.getHandle();
+                    }
+                    if (DEBUG) {
+                        Slog.d(TAG, "handle returned is " + handle);
+                    }
+                    return handle;
+                }
+            }
+        }
+
         public PictureProfile getCurrentPictureProfileForTvInput(String inputId, int userId) {
             if (DEBUG) {
                 Slog.d(TAG, "getCurrentPictureProfileForTvInput");
@@ -1135,6 +1208,28 @@ public class MediaQualityService extends SystemService {
             }
             return toReturn;
         }
+
+        @GuardedBy("mSoundProfileLock")
+        @Override
+        public List<SoundProfileHandle> getSoundProfileHandleList(
+                @NonNull String[] ids, int userId) {
+            if (DEBUG) {
+                Slog.d(TAG, "getSoundProfileHandle");
+            }
+            List<SoundProfileHandle> toReturn = new ArrayList<>();
+            synchronized (mSoundProfileLock) {
+                for (String id : ids) {
+                    Long key = mSoundProfileTempIdMap.getKey(id);
+                    if (key != null) {
+                        toReturn.add(MediaQualityUtils.SOUND_PROFILE_HANDLE_NONE);
+                    } else {
+                        toReturn.add(null);
+                    }
+                }
+            }
+            return toReturn;
+        }
+
 
         @GuardedBy("mSoundProfileLock")
         @Override
@@ -1957,6 +2052,90 @@ public class MediaQualityService extends SystemService {
                 }
                 return false;
             }
+        }
+
+        @Override
+        public android.media.quality.EqualizerCapabilities getEqualizerCapabilities(int userId) {
+            if (DEBUG) {
+                Slog.d(TAG, "getEqualizerCapabilities");
+            }
+            int callingUid = Binder.getCallingUid();
+            int callingPid = Binder.getCallingPid();
+            if (!hasGlobalSoundQualityServicePermission(callingUid, callingPid)) {
+                Slog.e(TAG, "getEqualizerCapabilities: "
+                        + "no permission to get equalizer capabilities");
+                return null;
+            }
+
+            if (mMediaQuality != null) {
+                try {
+                    android.hardware.tv.mediaquality.EqualizerCapabilities halCaps =
+                            mMediaQuality.getEqualizerCapabilities();
+                    return MediaQualityUtils.convertToFrameworkEqualizerCapabilities(halCaps);
+                } catch (RemoteException e) {
+                    Slog.e(TAG, "Failed to get equalizer capabilities from HAL", e);
+                }
+            }
+            return null;
+        }
+
+        @Override
+        public android.media.quality.EqualizerSettings getEqualizerSettings(int userId) {
+            if (DEBUG) {
+                Slog.d(TAG, "getEqualizerSettings");
+            }
+            int callingUid = Binder.getCallingUid();
+            int callingPid = Binder.getCallingPid();
+            if (!hasGlobalSoundQualityServicePermission(callingUid, callingPid)) {
+                Slog.e(TAG, "getEqualizerSettings: no permission to get equalizer settings");
+                return null;
+            }
+
+            if (mMediaQuality != null) {
+                try {
+                    android.hardware.tv.mediaquality.EqualizerDetail halDetail =
+                            mMediaQuality.getEqualizerSettings();
+                    return MediaQualityUtils.convertToFrameworkEqualizerSettings(halDetail);
+                } catch (RemoteException e) {
+                    Slog.e(TAG, "Failed to get equalizer settings from HAL", e);
+                }
+            }
+            return null;
+        }
+
+        @Override
+        public void setEqualizerSettings(EqualizerSettings settings, int userId) {
+            if (DEBUG) {
+                Slog.d(TAG, "setEqualizerSettings");
+            }
+            int callingUid = Binder.getCallingUid();
+            int callingPid = Binder.getCallingPid();
+
+            mHandler.post(() -> {
+                if (!hasGlobalSoundQualityServicePermission(callingUid, callingPid)) {
+                    Slog.e(TAG, "setEqualizerSettings: no permission to set equalizer settings");
+                    return;
+                }
+
+                if (settings == null) {
+                    Slog.e(TAG, "setEqualizerSettings: provided detail is null");
+                    return;
+                }
+
+                synchronized (mSoundProfileLock) {
+                    if (mMediaQuality != null) {
+                        try {
+                            android.hardware.tv.mediaquality.EqualizerDetail halDetail =
+                                    MediaQualityUtils.convertToHalEqualizerDetail(settings);
+                            if (halDetail != null) {
+                                mMediaQuality.setEqualizerSettings(halDetail);
+                            }
+                        } catch (RemoteException e) {
+                            Slog.e(TAG, "Failed to set equalizer settings to HAL", e);
+                        }
+                    }
+                }
+            });
         }
 
         @GuardedBy("mAmbientBacklightLock")

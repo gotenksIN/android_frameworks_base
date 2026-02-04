@@ -95,13 +95,21 @@ import java.util.concurrent.Executor;
  *
  * <h3>Discovering App Functions</h3>
  *
- * <p>When there is a package change or the device starts up, the metadata of available functions is
- * indexed on-device by {@link AppSearchManager}. AppSearch stores the indexed information as an
- * {@code AppFunctionStaticMetadata} document. This document contains the {@code functionIdentifier}
- * and the schema information that the app function implements. This allows other apps and the app
- * itself to discover these functions using the AppSearch search APIs. Visibility to this metadata
- * document is based on the packages that have visibility to the app providing the app functions.
- * AppFunction SDK provides a convenient way to achieve this and is the preferred method.
+ * <p>Apps can discover available functions by querying {@link AppFunctionMetadata} using the {@link
+ * #searchAppFunctions} API.
+ *
+ * <p>{@link AppFunctionMetadata} contains info about the app function, including {@link
+ * AppFunctionName} and {@link AppFunctionSchemaMetadata}, which are required to identify and
+ * execute a function.
+ *
+ * <p>To maintain an up-to-date snapshot of {@link AppFunctionMetadata}, apps can monitor metadata
+ * updates using the {@link #observeAppFunctions} API alongside {@link #searchAppFunctions}. Updates
+ * to function metadata may happen due to a package change, or due to a runtime change; such as an
+ * invocation of {@link #setAppFunctionEnabled}.
+ *
+ * <p>Visibility to the metadata document is based on the packages that have visibility to the app
+ * providing the app functions. AppFunction SDK provides a convenient way to achieve this and is the
+ * preferred method.
  *
  * <h3>Executing App Functions</h3>
  *
@@ -368,7 +376,7 @@ public final class AppFunctionManager {
     @Retention(RetentionPolicy.SOURCE)
     public @interface EnabledState {}
 
-    private AppFunctionRegistry mRegistry = new AppFunctionRegistry();
+    private final AppFunctionRegistry mRegistry = new AppFunctionRegistry();
 
     /**
      * Creates an instance.
@@ -467,8 +475,8 @@ public final class AppFunctionManager {
     }
 
     /**
-     * Performs a one-time search for AppFunctionMetadata with the given searchSpec and notifies the
-     * given callback of the result.
+     * Performs a one-time search for {@link AppFunctionMetadata} with the given {@link
+     * AppFunctionSearchSpec} and notifies the given callback of the result.
      *
      * <p>Note that the state is not guaranteed to be the latest, as metadata can change between
      * request and execute times.
@@ -536,6 +544,100 @@ public final class AppFunctionManager {
     }
 
     /**
+     * Registers an observer to monitor changes to {@link AppFunctionMetadata} that match the
+     * provided {@link AppFunctionSearchSpec}.
+     *
+     * <p>When a change occurs, the registered {@link AppFunctionObserver} will be notified with
+     * information about the changed app functions.
+     *
+     * <p>The callback is only triggered by changes after its registration. Existing app functions
+     * are not reported.
+     *
+     * <p>The caller should retain a reference to the returned {@link AppFunctionObservation}, and
+     * call {@link AppFunctionObservation#cancel()} when observation is no longer required.
+     *
+     * <p>Typically, this method is used alongside {@link #searchAppFunctions} to maintain a
+     * complete, up-to-date snapshot of {@link AppFunctionMetadata}.
+     *
+     * <p>An example usage flow is:
+     *
+     * <ol>
+     *   <li>Call this method, {@link #observeAppFunctions}, to start monitoring changes for the app
+     *       functions of interest, using the {@link AppFunctionObserver}.
+     *   <li>Call {@link #searchAppFunctions} to get an initial snapshot of {@link
+     *       AppFunctionMetadata}.
+     *   <li>When the observer is triggered, use the change information within it to construct a new
+     *       {@link AppFunctionSearchSpec} targeting the specific changed functions or packages.
+     *   <li>Call {@link #searchAppFunctions} again with the new spec to retrieve the full, updated
+     *       {@link AppFunctionMetadata} for the changed items and update your snapshot.
+     * </ol>
+     *
+     * <strong>Note:</strong> If app functions are reported to have changed but are not returned
+     * from {@link #searchAppFunctions}, it means that they have been removed.
+     *
+     * @param searchSpec the spec of AppFunctions to observe for.
+     * @param executor the executor to run the {@link AppFunctionObserver} callbacks.
+     * @param appFunctionObserver the observer to receive updates to registered app functions.
+     * @return An {@link AppFunctionObservation} used to cancel this observation.
+     * @throws IllegalStateException if {@code appFunctionObserver} is already registered.
+     */
+    @FlaggedApi(FLAG_ENABLE_DYNAMIC_APP_FUNCTIONS)
+    @RequiresPermission(
+            anyOf = {
+                Manifest.permission.EXECUTE_APP_FUNCTIONS,
+                Manifest.permission.DISCOVER_APP_FUNCTIONS,
+                Manifest.permission.EXECUTE_APP_FUNCTIONS_SYSTEM,
+            },
+            conditional = true)
+    @UserHandleAware
+    @NonNull
+    public AppFunctionObservation observeAppFunctions(
+            @NonNull AppFunctionSearchSpec searchSpec,
+            @NonNull @CallbackExecutor Executor executor,
+            @NonNull AppFunctionObserver appFunctionObserver) {
+        Objects.requireNonNull(searchSpec);
+        Objects.requireNonNull(executor);
+        Objects.requireNonNull(appFunctionObserver);
+
+        AppFunctionAidlSearchSpec aidlSearchSpec =
+                new AppFunctionAidlSearchSpec(
+                        mContext.getPackageName(), searchSpec, mContext.getUserId());
+
+        IObserveAppFunctionChangesCallback internalCallback =
+                new IObserveAppFunctionChangesCallback.Stub() {
+                    @Override
+                    public void onAppFunctionsChanged(List<AppFunctionName> changedFunctionNames) {
+                        executor.execute(
+                                () ->
+                                        appFunctionObserver.onAppFunctionsChanged(
+                                                changedFunctionNames));
+                    }
+
+                    @Override
+                    public void onPackagesChanged(List<String> packageNames) {
+                        executor.execute(() -> appFunctionObserver.onPackagesChanged(packageNames));
+                    }
+                };
+
+        final AppFunctionObservation observation =
+                () -> {
+                    try {
+                        mService.unregisterAppFunctionObserver(
+                                mContext.getPackageName(), mContext.getUser(), internalCallback);
+                    } catch (RemoteException e) {
+                        throw e.rethrowFromSystemServer();
+                    }
+                };
+
+        try {
+            mService.observeAppFunctions(aidlSearchSpec, internalCallback);
+            return observation;
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
      * Returns a boolean through a callback, indicating whether the app function is enabled.
      *
      * <p>This method can only check app functions owned by the caller, or those where the caller
@@ -583,8 +685,8 @@ public final class AppFunctionManager {
      * lightweight, in-process handling of function calls and requires the app to be running to
      * execute.
      *
-     * <p>To register multiple functions at once in a single, batched call, consider using
-     * {@link #registerAppFunctions(List)} as a more efficient alternative.
+     * <p>To register multiple functions at once in a single, batched call, consider using {@link
+     * #registerAppFunctions(List)} as a more efficient alternative.
      *
      * <h3>Function Execution</h3>
      *
@@ -643,22 +745,22 @@ public final class AppFunctionManager {
     /**
      * Registers several {@link AppFunction} implementations at once, sharing a single lifecycle.
      *
-     * <p>This is a more efficient alternative to calling
-     * {@link #registerAppFunction(String, Executor, AppFunction)} multiple times.
+     * <p>This is a more efficient alternative to calling {@link #registerAppFunction(String,
+     * Executor, AppFunction)} multiple times.
      *
      * <h3>Behavior and Lifecycle</h3>
      *
      * <p>Each function registered through this method follows the same execution and lifecycle
      * rules as those registered individually. For detailed information on function execution,
-     * lifecycle management, and error handling, see the documentation for
-     * {@link #registerAppFunction(String, Executor, AppFunction)}.
+     * lifecycle management, and error handling, see the documentation for {@link
+     * #registerAppFunction(String, Executor, AppFunction)}.
      *
      * <h3>Batch Operation and Atomicity</h3>
      *
      * <p>The registration is atomic: either all functions in the provided list are registered
      * successfully, or none are. If any function in the list fails validation (e.g., its ID is
-     * already registered or not declared in the manifest), this method will throw an exception,
-     * and no functions from the batch will be registered.
+     * already registered or not declared in the manifest), this method will throw an exception, and
+     * no functions from the batch will be registered.
      *
      * <p>A single {@link AppFunctionRegistration} object is returned, which can be used to
      * unregister the entire batch of functions with one call.
@@ -1129,8 +1231,7 @@ public final class AppFunctionManager {
         private final Object mLock = new Object();
 
         @GuardedBy("mLock")
-        private final ArrayMap<String, RegistrationRecord> mRegistrations =
-                new ArrayMap<>();
+        private final ArrayMap<String, RegistrationRecord> mRegistrations = new ArrayMap<>();
 
         private final IAppFunctionExecutor.Stub mExecutor =
                 new IAppFunctionExecutor.Stub() {
@@ -1199,8 +1300,7 @@ public final class AppFunctionManager {
         void unregister(@NonNull ArrayMap<String, RegistrationRecord> batchRegistrations) {
             synchronized (mLock) {
                 List<String> functionIdsToUnregister = new ArrayList<>(batchRegistrations.size());
-                for (Map.Entry<String, RegistrationRecord> entry :
-                        batchRegistrations.entrySet()) {
+                for (Map.Entry<String, RegistrationRecord> entry : batchRegistrations.entrySet()) {
                     String functionId = entry.getKey();
                     if (mRegistrations.get(functionId) != entry.getValue()) {
                         continue;
@@ -1241,23 +1341,21 @@ public final class AppFunctionManager {
                                         new OutcomeReceiver<>() {
                                             @Override
                                             public void onResult(
-                                                    ExecuteAppFunctionResponse result
-                                            ) {
+                                                    ExecuteAppFunctionResponse result) {
                                                 safeCallback.onResult(result);
                                             }
 
                                             @Override
                                             public void onError(
-                                                    @NonNull AppFunctionException exception
-                                            ) {
+                                                    @NonNull AppFunctionException exception) {
                                                 safeCallback.onError(exception);
                                             }
                                         });
                             } catch (Exception ex) {
                                 safeCallback.onError(
                                         new AppFunctionException(
-                                                executionExceptionToErrorCode(ex), ex.getMessage())
-                                );
+                                                executionExceptionToErrorCode(ex),
+                                                ex.getMessage()));
                             }
                         });
             }

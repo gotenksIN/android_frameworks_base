@@ -41,8 +41,10 @@ package android {
     field public static final String BIND_COMPANION_DEVICE_SERVICE = "android.permission.BIND_COMPANION_DEVICE_SERVICE";
     field public static final String BIND_CONDITION_PROVIDER_SERVICE = "android.permission.BIND_CONDITION_PROVIDER_SERVICE";
     field @FlaggedApi("android.permission.flags.content_restriction_role_enabled") public static final String BIND_CONTENT_RESTRICTION_SERVICE = "android.permission.BIND_CONTENT_RESTRICTION_SERVICE";
+    field @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final String BIND_CONTEXT_COMPONENT_SERVICE = "android.permission.BIND_CONTEXT_COMPONENT_SERVICE";
     field public static final String BIND_CONTROLS = "android.permission.BIND_CONTROLS";
     field public static final String BIND_CREDENTIAL_PROVIDER_SERVICE = "android.permission.BIND_CREDENTIAL_PROVIDER_SERVICE";
+    field @FlaggedApi("android.app.privatecompute.flags.enable_pcc_framework_support") public static final String BIND_DATA_MIGRATION_FOR_PRIVATECOMPUTE = "android.permission.BIND_DATA_MIGRATION_FOR_PRIVATECOMPUTE";
     field public static final String BIND_DEVICE_ADMIN = "android.permission.BIND_DEVICE_ADMIN";
     field public static final String BIND_DREAM_SERVICE = "android.permission.BIND_DREAM_SERVICE";
     field public static final String BIND_INCALL_SERVICE = "android.permission.BIND_INCALL_SERVICE";
@@ -5260,6 +5262,10 @@ package android.app {
     method @NonNull public android.app.AppInteractionAttribution.Builder setInteractionUri(@Nullable android.net.Uri);
   }
 
+  @FlaggedApi("android.app.appfunctions.flags.enable_app_interaction_api") public final class AppInteractionContract implements android.provider.BaseColumns {
+    method @NonNull public static java.util.List<java.lang.String> getDeviceAssistancePackageNames(@NonNull android.content.Context);
+  }
+
   public class AppOpsManager {
     method @FlaggedApi("android.permission.flags.check_op_overload_api_enabled") public int checkOp(@NonNull String, int, @NonNull String);
     method @FlaggedApi("android.permission.flags.check_op_overload_api_enabled") public int checkOp(@NonNull String, int, @NonNull String, @Nullable String);
@@ -9291,6 +9297,7 @@ package android.app.appfunctions {
     method @FlaggedApi("android.permission.flags.app_function_access_api_enabled") public int getAccessRequestState(@NonNull String);
     method @FlaggedApi("android.app.appfunctions.flags.enable_app_function_permission_v2") @RequiresPermission(anyOf={android.Manifest.permission.EXECUTE_APP_FUNCTIONS, "android.permission.DISCOVER_APP_FUNCTIONS", "android.permission.EXECUTE_APP_FUNCTIONS_SYSTEM"}, conditional=true) public void isAppFunctionEnabled(@NonNull String, @NonNull String, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Boolean,java.lang.Exception>);
     method public void isAppFunctionEnabled(@NonNull String, @NonNull java.util.concurrent.Executor, @NonNull android.os.OutcomeReceiver<java.lang.Boolean,java.lang.Exception>);
+    method @FlaggedApi("android.app.appfunctions.flags.enable_dynamic_app_functions") @NonNull @RequiresPermission(anyOf={android.Manifest.permission.EXECUTE_APP_FUNCTIONS, "android.permission.DISCOVER_APP_FUNCTIONS", "android.permission.EXECUTE_APP_FUNCTIONS_SYSTEM"}, conditional=true) public android.app.appfunctions.AppFunctionObservation observeAppFunctions(@NonNull android.app.appfunctions.AppFunctionSearchSpec, @NonNull java.util.concurrent.Executor, @NonNull android.app.appfunctions.AppFunctionObserver);
     method @FlaggedApi("android.app.appfunctions.flags.enable_dynamic_app_functions") @NonNull public android.app.appfunctions.AppFunctionRegistration registerAppFunction(@NonNull String, @NonNull java.util.concurrent.Executor, @NonNull android.app.appfunctions.AppFunction);
     method @FlaggedApi("android.app.appfunctions.flags.enable_dynamic_app_functions") @NonNull public android.app.appfunctions.AppFunctionRegistration registerAppFunctions(@NonNull java.util.List<android.app.appfunctions.RegisterAppFunctionRequest>);
     method @FlaggedApi("android.permission.flags.app_function_access_api_enabled") public void revokeSelfAccess(@NonNull String);
@@ -9330,6 +9337,15 @@ package android.app.appfunctions {
     method @NonNull public String getPackageName();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.app.appfunctions.AppFunctionName> CREATOR;
+  }
+
+  @FlaggedApi("android.app.appfunctions.flags.enable_dynamic_app_functions") public interface AppFunctionObservation {
+    method public void cancel();
+  }
+
+  @FlaggedApi("android.app.appfunctions.flags.enable_dynamic_app_functions") public interface AppFunctionObserver {
+    method public void onAppFunctionsChanged(@NonNull java.util.List<android.app.appfunctions.AppFunctionName>);
+    method public void onPackagesChanged(@NonNull java.util.List<java.lang.String>);
   }
 
   @FlaggedApi("android.app.appfunctions.flags.enable_dynamic_app_functions") public final class AppFunctionPackageMetadata implements android.os.Parcelable {
@@ -10164,6 +10180,36 @@ package android.app.permissionui {
 
 package android.app.privatecompute {
 
+  @FlaggedApi("android.app.privatecompute.flags.enable_pcc_framework_support") public abstract class DataMigrationToPccService extends android.app.Service {
+    ctor public DataMigrationToPccService();
+    method @Nullable public final android.os.IBinder onBind(@Nullable android.content.Intent);
+    method public abstract void onMigrationRequested(@NonNull android.app.privatecompute.MigrationRequestResultSender);
+    field public static final long MIGRATION_TIMEOUT_MS = 60000L; // 0xea60L
+    field public static final String SERVICE_INTERFACE = "android.app.privatecompute.DataMigrationToPccService";
+  }
+
+  @FlaggedApi("android.app.privatecompute.flags.enable_pcc_framework_support") public final class MigrationRequestResult implements android.os.Parcelable {
+    ctor public MigrationRequestResult(int, @Nullable android.os.PersistableBundle);
+    method public int describeContents();
+    method @NonNull public android.os.PersistableBundle getExtras();
+    method public int getStatus();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.app.privatecompute.MigrationRequestResult> CREATOR;
+    field public static final int MIGRATION_REQUEST_ACCEPTED = 1; // 0x1
+    field public static final int MIGRATION_REQUEST_REJECTED = 2; // 0x2
+  }
+
+  @FlaggedApi("android.app.privatecompute.flags.enable_pcc_framework_support") public interface MigrationRequestResultReceiver {
+    method public void onError(int, @Nullable String);
+    method public void onResult(@NonNull android.app.privatecompute.MigrationRequestResult);
+    field public static final int ERROR_INVOCATION_FAILED = 1; // 0x1
+    field public static final int ERROR_TIMEOUT = 2; // 0x2
+  }
+
+  @FlaggedApi("android.app.privatecompute.flags.enable_pcc_framework_support") public final class MigrationRequestResultSender {
+    method public void sendResult(@NonNull android.app.privatecompute.MigrationRequestResult);
+  }
+
   @FlaggedApi("android.app.privatecompute.flags.enable_pcc_framework_support") public class PccClient {
     method @NonNull public static android.app.privatecompute.PccClient createInstance(@NonNull android.content.Context, @NonNull android.os.IBinder);
     method public void sendData(@NonNull android.os.Bundle);
@@ -10171,6 +10217,7 @@ package android.app.privatecompute {
 
   @FlaggedApi("android.app.privatecompute.flags.enable_pcc_framework_support") public final class PccSandboxManager {
     method public boolean isPrivateComputeServicesUid(int);
+    method @FlaggedApi("android.app.privatecompute.flags.enable_pcc_framework_support") public void startNonPccProcessForDataMigration(@NonNull java.util.concurrent.Executor, @NonNull android.app.privatecompute.MigrationRequestResultReceiver);
     method public void writeToAuditLog(@NonNull android.os.PersistableBundle);
   }
 
@@ -22682,6 +22729,7 @@ package android.media {
 
   public final class AudioFormat implements android.os.Parcelable {
     method public int describeContents();
+    method @FlaggedApi("android.media.audio.ambisonics_support_api") public int getChannelAcnMask();
     method public int getChannelCount();
     method public int getChannelIndexMask();
     method public int getChannelMask();
@@ -22689,6 +22737,37 @@ package android.media {
     method @IntRange(from=1) public int getFrameSizeInBytes();
     method public int getSampleRate();
     method public void writeToParcel(android.os.Parcel, int);
+    field @FlaggedApi("android.media.audio.ambisonics_support_api") public static final int CHANNEL_ACN_HORIZONTAL = 512; // 0x200
+    field @FlaggedApi("android.media.audio.ambisonics_support_api") public static final int CHANNEL_ACN_ORDER_0 = 1; // 0x1
+    field @FlaggedApi("android.media.audio.ambisonics_support_api") public static final int CHANNEL_ACN_ORDER_0_HRZ = 513; // 0x201
+    field @FlaggedApi("android.media.audio.ambisonics_support_api") public static final int CHANNEL_ACN_ORDER_1 = 4; // 0x4
+    field @FlaggedApi("android.media.audio.ambisonics_support_api") public static final int CHANNEL_ACN_ORDER_10 = 121; // 0x79
+    field @FlaggedApi("android.media.audio.ambisonics_support_api") public static final int CHANNEL_ACN_ORDER_10_HRZ = 533; // 0x215
+    field @FlaggedApi("android.media.audio.ambisonics_support_api") public static final int CHANNEL_ACN_ORDER_11 = 144; // 0x90
+    field @FlaggedApi("android.media.audio.ambisonics_support_api") public static final int CHANNEL_ACN_ORDER_11_HRZ = 535; // 0x217
+    field @FlaggedApi("android.media.audio.ambisonics_support_api") public static final int CHANNEL_ACN_ORDER_12 = 169; // 0xa9
+    field @FlaggedApi("android.media.audio.ambisonics_support_api") public static final int CHANNEL_ACN_ORDER_12_HRZ = 537; // 0x219
+    field @FlaggedApi("android.media.audio.ambisonics_support_api") public static final int CHANNEL_ACN_ORDER_13 = 196; // 0xc4
+    field @FlaggedApi("android.media.audio.ambisonics_support_api") public static final int CHANNEL_ACN_ORDER_13_HRZ = 539; // 0x21b
+    field @FlaggedApi("android.media.audio.ambisonics_support_api") public static final int CHANNEL_ACN_ORDER_14 = 225; // 0xe1
+    field @FlaggedApi("android.media.audio.ambisonics_support_api") public static final int CHANNEL_ACN_ORDER_14_HRZ = 541; // 0x21d
+    field @FlaggedApi("android.media.audio.ambisonics_support_api") public static final int CHANNEL_ACN_ORDER_1_HRZ = 515; // 0x203
+    field @FlaggedApi("android.media.audio.ambisonics_support_api") public static final int CHANNEL_ACN_ORDER_2 = 9; // 0x9
+    field @FlaggedApi("android.media.audio.ambisonics_support_api") public static final int CHANNEL_ACN_ORDER_2_HRZ = 517; // 0x205
+    field @FlaggedApi("android.media.audio.ambisonics_support_api") public static final int CHANNEL_ACN_ORDER_3 = 16; // 0x10
+    field @FlaggedApi("android.media.audio.ambisonics_support_api") public static final int CHANNEL_ACN_ORDER_3_HRZ = 519; // 0x207
+    field @FlaggedApi("android.media.audio.ambisonics_support_api") public static final int CHANNEL_ACN_ORDER_4 = 25; // 0x19
+    field @FlaggedApi("android.media.audio.ambisonics_support_api") public static final int CHANNEL_ACN_ORDER_4_HRZ = 521; // 0x209
+    field @FlaggedApi("android.media.audio.ambisonics_support_api") public static final int CHANNEL_ACN_ORDER_5 = 36; // 0x24
+    field @FlaggedApi("android.media.audio.ambisonics_support_api") public static final int CHANNEL_ACN_ORDER_5_HRZ = 523; // 0x20b
+    field @FlaggedApi("android.media.audio.ambisonics_support_api") public static final int CHANNEL_ACN_ORDER_6 = 49; // 0x31
+    field @FlaggedApi("android.media.audio.ambisonics_support_api") public static final int CHANNEL_ACN_ORDER_6_HRZ = 525; // 0x20d
+    field @FlaggedApi("android.media.audio.ambisonics_support_api") public static final int CHANNEL_ACN_ORDER_7 = 64; // 0x40
+    field @FlaggedApi("android.media.audio.ambisonics_support_api") public static final int CHANNEL_ACN_ORDER_7_HRZ = 527; // 0x20f
+    field @FlaggedApi("android.media.audio.ambisonics_support_api") public static final int CHANNEL_ACN_ORDER_8 = 81; // 0x51
+    field @FlaggedApi("android.media.audio.ambisonics_support_api") public static final int CHANNEL_ACN_ORDER_8_HRZ = 529; // 0x211
+    field @FlaggedApi("android.media.audio.ambisonics_support_api") public static final int CHANNEL_ACN_ORDER_9 = 100; // 0x64
+    field @FlaggedApi("android.media.audio.ambisonics_support_api") public static final int CHANNEL_ACN_ORDER_9_HRZ = 531; // 0x213
     field @Deprecated public static final int CHANNEL_CONFIGURATION_DEFAULT = 1; // 0x1
     field @Deprecated public static final int CHANNEL_CONFIGURATION_INVALID = 0; // 0x0
     field @Deprecated public static final int CHANNEL_CONFIGURATION_MONO = 2; // 0x2
@@ -22807,6 +22886,7 @@ package android.media {
     ctor public AudioFormat.Builder();
     ctor public AudioFormat.Builder(android.media.AudioFormat);
     method public android.media.AudioFormat build();
+    method @FlaggedApi("android.media.audio.ambisonics_support_api") @NonNull public android.media.AudioFormat.Builder setChannelAcnMask(int);
     method @NonNull public android.media.AudioFormat.Builder setChannelIndexMask(int);
     method @NonNull public android.media.AudioFormat.Builder setChannelMask(int);
     method public android.media.AudioFormat.Builder setEncoding(int) throws java.lang.IllegalArgumentException;
@@ -25251,7 +25331,7 @@ package android.media {
     field public static final String KEY_HAPTIC_CHANNEL_COUNT = "haptic-channel-count";
     field public static final String KEY_HARDWARE_AV_SYNC_ID = "hw-av-sync-id";
     field public static final String KEY_HDR10_PLUS_INFO = "hdr10-plus-info";
-    field @FlaggedApi("android.media.codec.agtm_metadata") public static final String KEY_HDR_ECLIPSA_VIDEO_INFO = "hdr-eclipsa-video-info";
+    field @FlaggedApi("android.media.codec.agtm_metadata") public static final String KEY_HDR_ST2094_50_INFO = "hdr-st2094-50-info";
     field public static final String KEY_HDR_STATIC_INFO = "hdr-static-info";
     field public static final String KEY_HEIGHT = "height";
     field @FlaggedApi("android.media.codec.flip_support") public static final String KEY_HORIZONTAL_FLIP = "horizontal-flip";
@@ -28394,6 +28474,41 @@ package android.media.quality {
     field public static final int SOURCE_VIDEO = 2; // 0x2
   }
 
+  @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public final class EqualizerBand implements android.os.Parcelable {
+    ctor public EqualizerBand(@IntRange(from=1) int, int, @FloatRange(from=0.0, fromInclusive=false) float);
+    method public int describeContents();
+    method @IntRange(from=1) public int getFrequencyHz();
+    method public int getGainDb();
+    method @FloatRange(from=0.0, fromInclusive=false) public float getQFactor();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.media.quality.EqualizerBand> CREATOR;
+  }
+
+  @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public final class EqualizerCapabilities implements android.os.Parcelable {
+    ctor public EqualizerCapabilities(int, int, @NonNull java.util.List<java.lang.Integer>, boolean);
+    method public int describeContents();
+    method public int getMaxLevelDb();
+    method public int getMinLevelDb();
+    method @NonNull public java.util.List<java.lang.Integer> getSupportedFrequenciesHz();
+    method public boolean hasAdjustableQ();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.media.quality.EqualizerCapabilities> CREATOR;
+  }
+
+  @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public final class EqualizerSettings implements android.os.Parcelable {
+    method public int describeContents();
+    method @NonNull public java.util.List<android.media.quality.EqualizerBand> getBands();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.media.quality.EqualizerSettings> CREATOR;
+  }
+
+  public static final class EqualizerSettings.Builder {
+    ctor public EqualizerSettings.Builder();
+    method @NonNull public android.media.quality.EqualizerSettings.Builder addBand(@NonNull android.media.quality.EqualizerBand);
+    method @NonNull public android.media.quality.EqualizerSettings build();
+    method @NonNull public android.media.quality.EqualizerSettings.Builder setBands(@NonNull java.util.List<android.media.quality.EqualizerBand>);
+  }
+
   @FlaggedApi("android.media.tv.flags.media_quality_fw") public class MediaQualityContract {
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String COLOR_SPACE_ADOBE_RGB = "ADOBE_RGB";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String COLOR_SPACE_AUTO = "AUTO";
@@ -28441,6 +28556,7 @@ package android.media.quality {
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String LEVEL_RANGE_AUTO = "AUTO";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String LEVEL_RANGE_FULL = "FULL";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String LEVEL_RANGE_LIMITED = "LIMITED";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String LEVEL_USER = "level_user";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final int PANEL_TECHNOLOGY_OLED = 0; // 0x0
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PICTURE_QUALITY_EVENT_TYPE_BBD_RESULT = "BBD_RESULT";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PICTURE_QUALITY_EVENT_TYPE_CAPTUREPOINT_INFO_CHANGE = "CAPTUREPOINT_INFO_CHANGE";
@@ -28474,9 +28590,15 @@ package android.media.quality {
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String STREAM_STATUS_IMAX_SDR = "IMAXSDR";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String STREAM_STATUS_SDR = "SDR";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String STREAM_STATUS_TCH = "TCH";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String THREE_D_MODE_FRAME_PACKING = "frame_packing";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String THREE_D_MODE_OFF = "off";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String THREE_D_MODE_SIDE_BY_SIDE = "side_by_side";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String THREE_D_MODE_TOP_AND_BOTTOM = "top_and_bottom";
   }
 
   public static final class MediaQualityContract.PictureQuality {
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PARAMETER_3D_MODE = "3d_mode";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PARAMETER_3D_TO_2D = "3d_to_2d";
     field public static final String PARAMETER_AUTO_PICTURE_QUALITY_ENABLED = "auto_picture_quality_enabled";
     field public static final String PARAMETER_AUTO_SUPER_RESOLUTION_ENABLED = "auto_super_resolution_enabled";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PARAMETER_BLACK_STRETCH = "black_stretch";
@@ -28540,8 +28662,12 @@ package android.media.quality {
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PARAMETER_LEVEL_RANGE = "level_range";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PARAMETER_LOW_BLUE_LIGHT = "low_blue_light";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PARAMETER_LOW_LATENCY = "low_latency";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PARAMETER_MEMC_DEBLUR = "memc_deblur";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PARAMETER_MEMC_DEJUDDER = "memc_dejudder";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PARAMETER_MEMC_EFFECT = "memc_effect";
     field public static final String PARAMETER_MPEG_NOISE_REDUCTION = "mpeg_noise_reduction";
     field public static final String PARAMETER_NOISE_REDUCTION = "noise_reduction";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PARAMETER_ORIGINAL_FRAMERATE = "original_framerate";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PARAMETER_OSD_BLUE_GAIN = "osd_blue_gain";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PARAMETER_OSD_BLUE_OFFSET = "osd_blue_offset";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PARAMETER_OSD_CONTRAST = "osd_contrast";
@@ -28565,7 +28691,11 @@ package android.media.quality {
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PARAMETER_AD_VOLUME = "ad_volume";
     field public static final String PARAMETER_AUTO_VOLUME_CONTROL = "auto_volume_control";
     field public static final String PARAMETER_BALANCE = "balance";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PARAMETER_BALANCE_BLUETOOTH = "balance_bluetooth";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PARAMETER_BALANCE_HEADPHONES = "balance_headphones";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PARAMETER_BALANCE_SPEAKER = "balance_speaker";
     field public static final String PARAMETER_BASS = "bass";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PARAMETER_BT_LATENCY_US = "bt_latency_us";
     field public static final String PARAMETER_DIALOGUE_ENHANCER = "dialogue_enhancer";
     field public static final String PARAMETER_DIGITAL_OUTPUT_DELAY_MILLIS = "digital_output_delay_millis";
     field public static final String PARAMETER_DIGITAL_OUTPUT_MODE = "digital_output_mode";
@@ -28585,6 +28715,8 @@ package android.media.quality {
     field public static final String PARAMETER_DTS_VIRTUAL_X_TRU_SURROUND_X = "dts_virtual_x_tru_surround_x";
     field public static final String PARAMETER_DTS_VIRTUAL_X_TRU_VOLUME_HD = "dts_virtual_x_tru_volume_hd";
     field public static final String PARAMETER_EARC = "earc";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PARAMETER_EQUALIZER_SETTINGS = "equalizer_settings";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PARAMETER_HI_RES_AUDIO = "hi_res_audio";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PARAMETER_PAN_FADE_ENABLE = "pan_fade_enable";
     field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String PARAMETER_SOUND_STYLE = "sound_style";
     field public static final String PARAMETER_SPEAKERS = "speakers";
@@ -28599,6 +28731,8 @@ package android.media.quality {
     method public void createSoundProfile(@NonNull android.media.quality.SoundProfile);
     method @NonNull public java.util.List<android.media.quality.PictureProfile> getAvailablePictureProfiles(@Nullable android.media.quality.MediaQualityManager.ProfileQueryParams);
     method @NonNull public java.util.List<android.media.quality.SoundProfile> getAvailableSoundProfiles(@Nullable android.media.quality.MediaQualityManager.ProfileQueryParams);
+    method @FlaggedApi("android.media.tv.flags.media_quality_fw_c") @Nullable public android.media.quality.EqualizerCapabilities getEqualizerCapabilities();
+    method @FlaggedApi("android.media.tv.flags.media_quality_fw_c") @Nullable public android.media.quality.EqualizerSettings getEqualizerSettings();
     method @NonNull public java.util.List<android.media.quality.ParameterCapability> getParameterCapabilities(@NonNull java.util.List<java.lang.String>);
     method @Nullable public android.media.quality.PictureProfile getPictureProfile(int, @NonNull String, @Nullable android.media.quality.MediaQualityManager.ProfileQueryParams);
     method @Nullable public android.media.quality.SoundProfile getSoundProfile(int, @NonNull String, @Nullable android.media.quality.MediaQualityManager.ProfileQueryParams);
@@ -28615,6 +28749,7 @@ package android.media.quality {
     method public void setAmbientBacklightEnabled(boolean);
     method public void setAmbientBacklightSettings(@NonNull android.media.quality.AmbientBacklightSettings);
     method @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public void setColorMuteEnabled(boolean);
+    method @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public void setEqualizerSettings(@Nullable android.media.quality.EqualizerSettings);
     method @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public void setMutedColor(@ColorInt int);
     method public void unregisterAmbientBacklightCallback(@NonNull android.media.quality.MediaQualityManager.AmbientBacklightCallback);
     method public void unregisterPictureProfileCallback(@NonNull android.media.quality.MediaQualityManager.PictureProfileCallback);
@@ -28687,6 +28822,7 @@ package android.media.quality {
     method @NonNull public android.os.PersistableBundle getParameters();
     method @Nullable public String getProfileId();
     method public int getProfileType();
+    method @FlaggedApi("android.media.tv.flags.media_quality_fw_c") @NonNull public java.util.Map<java.lang.String,android.os.PersistableBundle> getStreamStatusVariants();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.media.quality.PictureProfile> CREATOR;
     field public static final int ERROR_DUPLICATE = 2; // 0x2
@@ -28694,6 +28830,14 @@ package android.media.quality {
     field public static final int ERROR_NOT_ALLOWLISTED = 4; // 0x4
     field public static final int ERROR_NO_PERMISSION = 1; // 0x1
     field public static final int ERROR_UNKNOWN = 0; // 0x0
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String NAME_DEFAULT = "default";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String NAME_ENERGY_SAVING = "energy_saving";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String NAME_GAME = "game";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String NAME_MOVIE = "movie";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String NAME_SPORTS = "sports";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String NAME_STANDARD = "standard";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String NAME_USER = "user";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String NAME_VIVID = "vivid";
     field public static final int TYPE_APPLICATION = 2; // 0x2
     field public static final int TYPE_SYSTEM = 1; // 0x1
   }
@@ -28701,6 +28845,7 @@ package android.media.quality {
   public static final class PictureProfile.Builder {
     ctor public PictureProfile.Builder(@NonNull String);
     ctor public PictureProfile.Builder(@NonNull android.media.quality.PictureProfile);
+    method @FlaggedApi("android.media.tv.flags.media_quality_fw_c") @NonNull public android.media.quality.PictureProfile.Builder addStreamStatusVariant(@NonNull String, @NonNull android.os.PersistableBundle);
     method @NonNull public android.media.quality.PictureProfile build();
     method @NonNull public android.media.quality.PictureProfile.Builder setParameters(@NonNull android.os.PersistableBundle);
   }
@@ -28720,6 +28865,14 @@ package android.media.quality {
     field public static final int ERROR_NOT_ALLOWLISTED = 4; // 0x4
     field public static final int ERROR_NO_PERMISSION = 1; // 0x1
     field public static final int ERROR_UNKNOWN = 0; // 0x0
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String NAME_DEFAULT = "default";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String NAME_MOVIE = "movie";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String NAME_MUSIC = "music";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String NAME_NEWS = "news";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String NAME_SPORTS = "sports";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String NAME_STANDARD = "standard";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String NAME_USER = "user";
+    field @FlaggedApi("android.media.tv.flags.media_quality_fw_c") public static final String NAME_VIVID = "vivid";
     field public static final int TYPE_APPLICATION = 2; // 0x2
     field public static final int TYPE_SYSTEM = 1; // 0x1
   }
@@ -41795,7 +41948,7 @@ package android.security {
     ctor public KeyChain();
     method public static void choosePrivateKeyAlias(@NonNull android.app.Activity, @NonNull android.security.KeyChainAliasCallback, @Nullable String[], @Nullable java.security.Principal[], @Nullable String, int, @Nullable String);
     method public static void choosePrivateKeyAlias(@NonNull android.app.Activity, @NonNull android.security.KeyChainAliasCallback, @Nullable String[], @Nullable java.security.Principal[], @Nullable android.net.Uri, @Nullable String);
-    method @FlaggedApi("android.app.admin.flags.keychain_suppress_certificate_selection") public static void choosePrivateKeyAlias(@NonNull android.app.Activity, @Nullable java.util.List<java.lang.String>, @Nullable java.util.List<java.security.Principal>, @Nullable android.net.Uri, @Nullable String, boolean, @NonNull java.util.concurrent.Executor, @NonNull android.security.KeyChainAliasCallback);
+    method @FlaggedApi("android.app.admin.flags.keychain_suppress_certificate_selections") public static void choosePrivateKeyAlias(@NonNull android.app.Activity, @Nullable java.util.List<java.lang.String>, @Nullable java.util.List<java.security.Principal>, @Nullable android.net.Uri, @Nullable String, boolean, @NonNull java.util.concurrent.Executor, @NonNull android.security.KeyChainAliasCallback);
     method @NonNull public static android.content.Intent createInstallIntent();
     method @NonNull public static android.content.Intent createManageCredentialsIntent(@NonNull android.security.AppUriAuthenticationPolicy);
     method @Nullable @WorkerThread public static java.security.cert.X509Certificate[] getCertificateChain(@NonNull android.content.Context, @NonNull String) throws java.lang.InterruptedException, android.security.KeyChainException;
@@ -41815,13 +41968,13 @@ package android.security {
     field public static final String EXTRA_NAME = "name";
     field public static final String EXTRA_PKCS12 = "PKCS12";
     field public static final String KEY_ALIAS_SELECTION_DENIED = "android:alias-selection-denied";
-    field @FlaggedApi("android.app.admin.flags.keychain_suppress_certificate_selection") public static final int SELECTION_ERROR_CERTIFICATE_SELECTION_SUPPRESSED = 2; // 0x2
-    field @FlaggedApi("android.app.admin.flags.keychain_suppress_certificate_selection") public static final int SELECTION_ERROR_OTHER = 1; // 0x1
+    field @FlaggedApi("android.app.admin.flags.keychain_suppress_certificate_selections") public static final int SELECTION_ERROR_CERTIFICATE_SELECTION_SUPPRESSED = 2; // 0x2
+    field @FlaggedApi("android.app.admin.flags.keychain_suppress_certificate_selections") public static final int SELECTION_ERROR_OTHER = 1; // 0x1
   }
 
   public interface KeyChainAliasCallback {
     method public void alias(@Nullable String);
-    method @FlaggedApi("android.app.admin.flags.keychain_suppress_certificate_selection") public default void onError(int);
+    method @FlaggedApi("android.app.admin.flags.keychain_suppress_certificate_selections") public default void onError(int);
   }
 
   public class KeyChainException extends java.lang.Exception {
@@ -43908,19 +44061,20 @@ package android.service.personalcontext {
   @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public interface ComponentIdProvider {
   }
 
+  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class PersonalContextManager {
+    method public void publishTriggeringHint(@NonNull android.service.personalcontext.insight.interaction.ReturnHintReport, @NonNull java.util.List<android.service.personalcontext.hint.ContextHint>);
+    field public static final String ACTION_PERSONAL_CONTEXT_ENABLED_CHANGED = "android.service.personalcontext.action.PERSONAL_CONTEXT_ENABLED_CHANGED";
+    field public static final String PERSONAL_CONTEXT_SERVICE = "personal_context";
+  }
+
   @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class RenderToken implements java.lang.Comparable<android.service.personalcontext.RenderToken> android.os.Parcelable {
+    ctor public RenderToken(@NonNull java.util.UUID);
     method public int compareTo(@NonNull android.service.personalcontext.RenderToken);
     method public int describeContents();
     method @NonNull public java.util.UUID getRendererComponentId();
     method @NonNull public java.util.UUID getTokenId();
     method public void writeToParcel(@NonNull android.os.Parcel, int);
     field @NonNull public static final android.os.Parcelable.Creator<android.service.personalcontext.RenderToken> CREATOR;
-  }
-
-  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public static final class RenderToken.RenderTokenBuilder {
-    ctor public RenderToken.RenderTokenBuilder();
-    method @NonNull public android.service.personalcontext.RenderToken build();
-    method @NonNull public android.service.personalcontext.RenderToken.RenderTokenBuilder setRendererComponentId(@NonNull java.util.UUID);
   }
 
   @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class Token implements android.os.Parcelable {
@@ -43959,7 +44113,6 @@ package android.service.personalcontext.hint {
   }
 
   @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class BundleHint extends android.service.personalcontext.hint.ContextHint {
-    ctor @Deprecated public BundleHint();
     method @NonNull public android.os.Bundle getDataBundle();
   }
 
@@ -44129,6 +44282,10 @@ package android.service.personalcontext.hint {
     method @NonNull public android.service.personalcontext.hint.HintInvalidationHint build();
   }
 
+  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class InsightReferenceHint extends android.service.personalcontext.hint.ContextHint {
+    method @NonNull public java.util.UUID getInsightId();
+  }
+
   @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public abstract class NotificationEvent {
   }
 
@@ -44226,7 +44383,7 @@ package android.service.personalcontext.hint {
 package android.service.personalcontext.insight {
 
   @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class ActionableInsight extends android.service.personalcontext.insight.ContextInsight {
-    method @Deprecated @Nullable public android.content.Intent createActionIntent();
+    method @NonNull public android.service.personalcontext.insight.interaction.ReturnHintReport createReturnHintReport();
     method @NonNull public android.service.personalcontext.insight.InsightActionDetails getActionDetails();
     method @NonNull public android.service.personalcontext.insight.InsightDisplayDetails getDisplayDetails();
   }
@@ -44324,6 +44481,16 @@ package android.service.personalcontext.insight {
     method @NonNull public android.service.personalcontext.insight.InsightDisplayDetails build();
     method @NonNull public android.service.personalcontext.insight.InsightDisplayDetails.Builder setContentDescription(@Nullable CharSequence);
     method @NonNull public android.service.personalcontext.insight.InsightDisplayDetails.Builder setSubtitle(@Nullable CharSequence);
+  }
+
+}
+
+package android.service.personalcontext.insight.interaction {
+
+  @FlaggedApi("android.service.personalcontext.enable_personal_context_service") public final class ReturnHintReport implements android.os.Parcelable {
+    method public int describeContents();
+    method public void writeToParcel(@NonNull android.os.Parcel, int);
+    field @NonNull public static final android.os.Parcelable.Creator<android.service.personalcontext.insight.interaction.ReturnHintReport> CREATOR;
   }
 
 }
@@ -45924,7 +46091,6 @@ package android.telephony {
     field @FlaggedApi("com.android.internal.telephony.flags.satellite_26q2_apis") public static final String KEY_SATELLITE_SUPPORTED_DISASTER_PLMN_STRING_ARRAY = "satellite_supported_disaster_plmn_string_array";
     field @FlaggedApi("com.android.internal.telephony.flags.satellite_26q2_apis") public static final String KEY_SATELLITE_SUPPORTED_EMERGENCY_PLMN_STRING_ARRAY = "satellite_supported_emergency_plmn_string_array";
     field @FlaggedApi("com.android.internal.telephony.flags.satellite_system_apis") public static final String KEY_SATELLITE_SUPPORTED_MSG_APPS_STRING_ARRAY = "satellite_supported_msg_apps_string_array";
-    field @FlaggedApi("com.android.internal.telephony.flags.satellite_26q2_apis") public static final String KEY_SATELLITE_TECHNOLOGY_INT_ARRAY = "satellite_technology_type_int_array";
     field public static final String KEY_SHOW_4G_FOR_3G_DATA_ICON_BOOL = "show_4g_for_3g_data_icon_bool";
     field public static final String KEY_SHOW_4G_FOR_LTE_DATA_ICON_BOOL = "show_4g_for_lte_data_icon_bool";
     field @Deprecated public static final String KEY_SHOW_APN_SETTING_CDMA_BOOL = "show_apn_setting_cdma_bool";
@@ -54857,6 +55023,7 @@ package android.view {
     method protected void dispatchRestoreInstanceState(android.util.SparseArray<android.os.Parcelable>);
     method protected void dispatchSaveInstanceState(android.util.SparseArray<android.os.Parcelable>);
     method public void dispatchScrollCaptureSearch(@NonNull android.graphics.Rect, @NonNull android.graphics.Point, @NonNull java.util.function.Consumer<android.view.ScrollCaptureTarget>);
+    method @FlaggedApi("android.view.flags.scroll_to_top") public boolean dispatchScrollToTop(int);
     method protected void dispatchSetActivated(boolean);
     method protected void dispatchSetPressed(boolean);
     method protected void dispatchSetSelected(boolean);
@@ -55842,7 +56009,7 @@ package android.view {
     method @FlaggedApi("android.companion.virtualdevice.flags.viewconfiguration_apis") public float getScrollFrictionAmount();
     method public static int getTapTimeout();
     method @FlaggedApi("android.companion.virtualdevice.flags.viewconfiguration_apis") public int getTapTimeoutMillis();
-    method @FlaggedApi("android.view.accessibility.text_cursor_blink_interval") public int getTextCursorBlinkIntervalMillis();
+    method public int getTextCursorBlinkIntervalMillis();
     method @Deprecated public static int getTouchSlop();
     method @Deprecated public static int getWindowTouchSlop();
     method public static long getZoomControlsTimeout();

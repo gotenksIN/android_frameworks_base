@@ -5466,6 +5466,14 @@
         android:protectionLevel="signature" />
     <uses-permission android:name="android.permission.BIND_JOB_SERVICE"/>
 
+    <!-- Allows the system to bind to an application's data migration service for Private Compute.
+         <p>Protection level: signature
+         @FlaggedApi(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    -->
+    <permission android:name="android.permission.BIND_DATA_MIGRATION_FOR_PRIVATECOMPUTE"
+      android:protectionLevel="signature" />
+    <uses-permission android:name="android.permission.BIND_DATA_MIGRATION_FOR_PRIVATECOMPUTE"/>
+
     <!-- Allows an application to initiate configuration updates
          <p>An application requesting this permission is responsible for
          verifying the source and integrity of any update before passing
@@ -7762,6 +7770,14 @@
          @hide -->
     <permission android:name="android.permission.CONFIRM_FULL_BACKUP"
         android:protectionLevel="signature" />
+
+    <!-- @SystemApi Allows an application to request a delayed restore of their app data
+         <p>Not for use by third-party applications.
+         @FlaggedApi(com.android.server.backup.Flags.FLAG_ENABLE_DELAYED_RESTORE_API)
+         @hide -->
+    <permission android:name="android.permission.SCHEDULE_DELAYED_RESTORE"
+        android:protectionLevel="signature|privileged"
+        android:featureFlag="com.android.server.backup.enable_delayed_restore_api" />
 
     <!-- Must be required by a {@link android.widget.RemoteViewsService},
          to ensure that only the system can bind to it.
@@ -10237,6 +10253,18 @@
     <permission android:name="android.permission.BIND_CONTENT_RESTRICTION_SERVICE"
         android:protectionLevel="signature"
         android:featureFlag="android.permission.flags.content_restriction_role_enabled" />
+
+    <!-- Must be required by any
+         {@link android.service.personalcontext.refiner.HintRefinerService},
+         {@link android.service.personalcontext.undedrstander.ContextUnderstanderService}, or
+         {@link android.service.personalcontext.renderer.InsightRendererService} to ensure that
+         only the system can bind to it.
+         <p>Protection level: signature
+         @FlaggedApi(android.service.personalcontext.Flags.FLAG_ENABLE_PERSONAL_CONTEXT_SERVICE)
+    -->
+    <permission android:name="android.permission.BIND_CONTEXT_COMPONENT_SERVICE"
+        android:protectionLevel="signature"
+        android:featureFlag="android.service.personalcontext.enable_personal_context_service" />
 
     <!-- Must be required by a
          {@link android.service.personalcontext.renderer.InsightRendererService}, to ensure that

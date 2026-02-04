@@ -17,6 +17,7 @@
 package com.android.wm.shell.desktopmode
 
 import android.Manifest.permission.SYSTEM_ALERT_WINDOW
+import android.app.ActivityManager
 import android.app.ActivityManager.RecentTaskInfo
 import android.app.ActivityManager.RunningTaskInfo
 import android.app.ActivityOptions
@@ -332,6 +333,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     @Mock private lateinit var fullscreenDisconnectHandler: FullscreenDisconnectHandler
     @Mock private lateinit var pinnedLayerController: PinnedLayerController
     @Mock private lateinit var desktopTasksTransitionObserver: DesktopTasksTransitionObserver
+    @Mock private lateinit var desktopAnimationConfiguration: DesktopAnimationConfiguration
 
     private lateinit var controller: DesktopTasksController
     private lateinit var shellInit: ShellInit
@@ -357,9 +359,9 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     // Mock running tasks are registered here so we can get the list from mock shell task organizer
     private val runningTasks = mutableListOf<RunningTaskInfo>()
 
-    private val DEFAULT_USER_ID = 0
+    private val DEFAULT_USER_ID = ActivityManager.getCurrentUser()
     private val DEFAULT_USER_WORK_PROFILE_ID = 100
-    private val SECONDARY_USER_ID = 11
+    private val SECONDARY_USER_ID = DEFAULT_USER_ID + 1
 
     private val SECONDARY_DISPLAY_ID = 1
     private val DISPLAY_DIMENSION_SHORT = 1600
@@ -403,6 +405,9 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
                     UserInfo(DEFAULT_USER_WORK_PROFILE_ID, "default_work", FLAG_PROFILE),
                 )
             )
+        whenever(desktopAnimationConfiguration.toDesktopAnimationDurationMs)
+            .thenReturn(TO_DESKTOP_ANIM_DURATION)
+
         userRepositories =
             DesktopUserRepositories(
                 shellInit,
@@ -544,6 +549,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     private fun createController() =
         DesktopTasksController(
             context,
+            desktopAnimationConfiguration,
             shellInit,
             shellCommandHandler,
             shellController,
@@ -12707,6 +12713,7 @@ private fun createRecentTaskInfo(taskId: Int, displayId: Int = DEFAULT_DISPLAY):
         this.displayId = displayId
         token = WindowContainerToken(mock(IWindowContainerToken::class.java))
         positionInParent = Point()
+        userId = ActivityManager.getCurrentUser()
     }
 
 private fun RootTaskDisplayAreaOrganizer.setTouchFirst(displayId: Int) {

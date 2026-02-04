@@ -17,7 +17,6 @@
 package android.service.contentsafety;
 
 import android.os.Bundle;
-import android.app.contentsafety.SupportedTypesResult;
 import com.android.internal.infra.AndroidFuture;
 import android.service.contentsafety.IGetFeatureCallback;
 
@@ -30,7 +29,7 @@ import android.service.contentsafety.IGetFeatureCallback;
  interface IContentSafetyService {
 
   @JavaPassthrough(annotation="@android.annotation.RequiresPermission(android.Manifest.permission.CHECK_CONTENT_SAFETY)")
-  oneway void getFeature(in int featureType, in AndroidFuture cancellationSignal, in IGetFeatureCallback callback) = 1;
+  oneway void requestGetFeature(in int featureType, in AndroidFuture cancellationSignal, in IGetFeatureCallback callback) = 1;
 
   oneway void notifySandboxedServiceConnected() = 2;
   oneway void notifySandboxedServiceDisconnected() = 3;
@@ -38,8 +37,6 @@ import android.service.contentsafety.IGetFeatureCallback;
   oneway void notifySettingsServiceConnected() = 5;
   oneway void notifySettingsServiceDisconnected() = 6;
 
-  @JavaPassthrough(annotation="@android.annotation.RequiresPermission(android.Manifest.permission.CHECK_CONTENT_SAFETY)")
-  SupportedTypesResult getSupportedInputTypes(in int featureType) = 7;
 
  }
 

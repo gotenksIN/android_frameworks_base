@@ -103,16 +103,9 @@ public class CarrierTextManagerTest extends SysuiTestCase {
     private static final String TEST_CARRIER = "TEST_CARRIER";
     private static final String TEST_CARRIER_2 = "TEST_CARRIER_2";
     private static final int TEST_CARRIER_ID = 1;
-    private static final SubscriptionInfo TEST_SUBSCRIPTION = new SubscriptionInfo(0, "", 0,
-            TEST_CARRIER, TEST_CARRIER, NAME_SOURCE_CARRIER_ID, 0xFFFFFF, "",
-            DATA_ROAMING_DISABLE, null, null, null, null, false, null, "", false, null,
-            TEST_CARRIER_ID, 0);
-    private static final SubscriptionInfo TEST_SUBSCRIPTION_NULL = new SubscriptionInfo(0, "", 0,
-            TEST_CARRIER, null, NAME_SOURCE_CARRIER_ID, 0xFFFFFF, "", DATA_ROAMING_DISABLE,
-            null, null, null, null, false, null, "");
-    private static final SubscriptionInfo TEST_SUBSCRIPTION_ROAMING = new SubscriptionInfo(0, "", 0,
-            TEST_CARRIER, TEST_CARRIER, NAME_SOURCE_CARRIER_ID, 0xFFFFFF, "",
-            DATA_ROAMING_ENABLE, null, null, null, null, false, null, "");
+    private SubscriptionInfo mTestSubscription;
+    private SubscriptionInfo mTestSubscriptionNull;
+    private SubscriptionInfo mTestSubscriptionRoaming;
     private FakeWifiRepository mWifiRepository = new FakeWifiRepository();
     private final FakeDeviceBasedSatelliteViewModel mSatelliteViewModel =
             new FakeDeviceBasedSatelliteViewModel();
@@ -157,6 +150,42 @@ public class CarrierTextManagerTest extends SysuiTestCase {
     @Before
     public void setUp() {
         MockitoAnnotations.initMocks(this);
+
+        mTestSubscription = new SubscriptionInfo.Builder()
+                .setId(0)
+                .setIccId("")
+                .setSimSlotIndex(0)
+                .setDisplayName(TEST_CARRIER)
+                .setCarrierName(TEST_CARRIER)
+                .setDisplayNameSource(NAME_SOURCE_CARRIER_ID)
+                .setIconTint(0xFFFFFF)
+                .setNumber("")
+                .setDataRoaming(DATA_ROAMING_DISABLE)
+                .setCarrierId(TEST_CARRIER_ID)
+                .setProfileClass(0)
+                .build();
+        mTestSubscriptionNull = new SubscriptionInfo.Builder()
+                .setId(0)
+                .setIccId("")
+                .setSimSlotIndex(0)
+                .setDisplayName(TEST_CARRIER)
+                .setCarrierName(null)
+                .setDisplayNameSource(NAME_SOURCE_CARRIER_ID)
+                .setIconTint(0xFFFFFF)
+                .setNumber("")
+                .setDataRoaming(DATA_ROAMING_DISABLE)
+                .build();
+        mTestSubscriptionRoaming = new SubscriptionInfo.Builder()
+                .setId(0)
+                .setIccId("")
+                .setSimSlotIndex(0)
+                .setDisplayName(TEST_CARRIER)
+                .setCarrierName(TEST_CARRIER)
+                .setDisplayNameSource(NAME_SOURCE_CARRIER_ID)
+                .setIconTint(0xFFFFFF)
+                .setNumber("")
+                .setDataRoaming(DATA_ROAMING_ENABLE)
+                .build();
 
         mContext.addMockSystemService(PackageManager.class, mPackageManager);
         when(mPackageManager.hasSystemFeature(PackageManager.FEATURE_TELEPHONY)).thenReturn(true);
@@ -218,7 +247,7 @@ public class CarrierTextManagerTest extends SysuiTestCase {
         Settings.Global.putInt(mContext.getContentResolver(), Settings.Global.AIRPLANE_MODE_ON, 1);
         reset(mCarrierTextCallback);
         List<SubscriptionInfo> list = new ArrayList<>();
-        list.add(TEST_SUBSCRIPTION);
+        list.add(mTestSubscription);
         when(mKeyguardUpdateMonitor.getFilteredSubscriptionInfo()).thenReturn(list);
         when(mKeyguardUpdateMonitor.getSimStateForSlotId(0)).thenReturn(
                 TelephonyManager.SIM_STATE_READY);
@@ -239,7 +268,7 @@ public class CarrierTextManagerTest extends SysuiTestCase {
     public void testCardIOError_flagEnabled() {
         reset(mCarrierTextCallback);
         List<SubscriptionInfo> list = new ArrayList<>();
-        list.add(TEST_SUBSCRIPTION);
+        list.add(mTestSubscription);
         when(mKeyguardUpdateMonitor.getFilteredSubscriptionInfo()).thenReturn(list);
         when(mKeyguardUpdateMonitor.getSimStateForSlotId(0)).thenReturn(
                 TelephonyManager.SIM_STATE_READY);
@@ -336,7 +365,7 @@ public class CarrierTextManagerTest extends SysuiTestCase {
     public void testCreateInfo_OneValidSubscription_flagEnabled() {
         reset(mCarrierTextCallback);
         List<SubscriptionInfo> list = new ArrayList<>();
-        list.add(TEST_SUBSCRIPTION);
+        list.add(mTestSubscription);
         when(mKeyguardUpdateMonitor.getSimStateForSlotId(anyInt())).thenReturn(
                 TelephonyManager.SIM_STATE_READY);
         when(mKeyguardUpdateMonitor.getFilteredSubscriptionInfo()).thenReturn(list);
@@ -361,7 +390,7 @@ public class CarrierTextManagerTest extends SysuiTestCase {
     public void testCreateInfo_OneValidSubscriptionWithRoaming_flagEnabled() {
         reset(mCarrierTextCallback);
         List<SubscriptionInfo> list = new ArrayList<>();
-        list.add(TEST_SUBSCRIPTION_ROAMING);
+        list.add(mTestSubscriptionRoaming);
         when(mKeyguardUpdateMonitor.getSimStateForSlotId(anyInt())).thenReturn(
                 TelephonyManager.SIM_STATE_READY);
         when(mKeyguardUpdateMonitor.getFilteredSubscriptionInfo()).thenReturn(list);
@@ -386,7 +415,7 @@ public class CarrierTextManagerTest extends SysuiTestCase {
     public void testCarrierText_noTextOnReadySimWhenNull_flagEnabled() {
         reset(mCarrierTextCallback);
         List<SubscriptionInfo> list = new ArrayList<>();
-        list.add(TEST_SUBSCRIPTION_NULL);
+        list.add(mTestSubscriptionNull);
         when(mKeyguardUpdateMonitor.getSimStateForSlotId(anyInt())).thenReturn(
                 TelephonyManager.SIM_STATE_READY);
         when(mKeyguardUpdateMonitor.getFilteredSubscriptionInfo()).thenReturn(list);
@@ -403,7 +432,7 @@ public class CarrierTextManagerTest extends SysuiTestCase {
 
         assertTrue("Carrier text should be empty, instead it's " + captor.getValue().carrierText,
                 TextUtils.isEmpty(captor.getValue().carrierText));
-        assertFalse("No SIM should be available", captor.getValue().anySimReady);
+        assertTrue("SIM should be available", captor.getValue().anySimReady);
     }
 
     @Test
@@ -411,7 +440,7 @@ public class CarrierTextManagerTest extends SysuiTestCase {
         Settings.Global.putInt(mContext.getContentResolver(), Settings.Global.AIRPLANE_MODE_ON, 1);
         reset(mCarrierTextCallback);
         List<SubscriptionInfo> list = new ArrayList<>();
-        list.add(TEST_SUBSCRIPTION_NULL);
+        list.add(mTestSubscriptionNull);
         when(mKeyguardUpdateMonitor.getSimStateForSlotId(anyInt())).thenReturn(
                 TelephonyManager.SIM_STATE_READY);
         when(mKeyguardUpdateMonitor.getFilteredSubscriptionInfo()).thenReturn(list);
@@ -431,7 +460,7 @@ public class CarrierTextManagerTest extends SysuiTestCase {
         mKeyguardUpdateMonitor.mServiceStates = new HashMap<>();
         ServiceState ss = mock(ServiceState.class);
         when(ss.getDataRegistrationState()).thenReturn(ServiceState.STATE_IN_SERVICE);
-        mKeyguardUpdateMonitor.mServiceStates.put(TEST_SUBSCRIPTION_NULL.getSubscriptionId(), ss);
+        mKeyguardUpdateMonitor.mServiceStates.put(mTestSubscriptionNull.getSubscriptionId(), ss);
 
         ArgumentCaptor<CarrierTextManager.CarrierTextCallbackInfo> captor =
                 ArgumentCaptor.forClass(
@@ -441,7 +470,7 @@ public class CarrierTextManagerTest extends SysuiTestCase {
         FakeExecutor.exhaustExecutors(mMainExecutor, mBgExecutor);
         verify(mCarrierTextCallback).updateCarrierInfo(captor.capture());
 
-        assertFalse("No SIM should be available", captor.getValue().anySimReady);
+        assertTrue("SIM should be available", captor.getValue().anySimReady);
         // There's no airplane mode if at least one SIM is State.READY and there's wifi
         assertFalse("Device should not be in airplane mode", captor.getValue().airplaneMode);
         assertNotEquals(AIRPLANE_MODE_TEXT, captor.getValue().carrierText);
@@ -451,7 +480,7 @@ public class CarrierTextManagerTest extends SysuiTestCase {
     public void carrierText_satelliteTextNull_isSatelliteFalse_textNotUsed_flagEnabled() {
         reset(mCarrierTextCallback);
         List<SubscriptionInfo> list = new ArrayList<>();
-        list.add(TEST_SUBSCRIPTION);
+        list.add(mTestSubscription);
         when(mKeyguardUpdateMonitor.getSimStateForSlotId(anyInt())).thenReturn(
                 TelephonyManager.SIM_STATE_READY);
         when(mKeyguardUpdateMonitor.getFilteredSubscriptionInfo()).thenReturn(list);
@@ -476,7 +505,7 @@ public class CarrierTextManagerTest extends SysuiTestCase {
     public void carrierText_hasSatelliteText_isSatelliteTrue_textUsed_flagEnabled() {
         reset(mCarrierTextCallback);
         List<SubscriptionInfo> list = new ArrayList<>();
-        list.add(TEST_SUBSCRIPTION);
+        list.add(mTestSubscription);
         when(mKeyguardUpdateMonitor.getSimStateForSlotId(anyInt())).thenReturn(
                 TelephonyManager.SIM_STATE_READY);
         when(mKeyguardUpdateMonitor.getFilteredSubscriptionInfo()).thenReturn(list);
@@ -501,7 +530,7 @@ public class CarrierTextManagerTest extends SysuiTestCase {
     public void carrierText_satelliteTextUpdates_autoTriggersCallback_flagEnabled() {
         reset(mCarrierTextCallback);
         List<SubscriptionInfo> list = new ArrayList<>();
-        list.add(TEST_SUBSCRIPTION);
+        list.add(mTestSubscription);
         when(mKeyguardUpdateMonitor.getSimStateForSlotId(anyInt())).thenReturn(
                 TelephonyManager.SIM_STATE_READY);
         when(mKeyguardUpdateMonitor.getFilteredSubscriptionInfo()).thenReturn(list);
@@ -538,7 +567,7 @@ public class CarrierTextManagerTest extends SysuiTestCase {
     public void carrierText_updatedWhileNotListening_getsNewValueWhenListening_flagEnabled() {
         reset(mCarrierTextCallback);
         List<SubscriptionInfo> list = new ArrayList<>();
-        list.add(TEST_SUBSCRIPTION);
+        list.add(mTestSubscription);
         when(mKeyguardUpdateMonitor.getSimStateForSlotId(anyInt())).thenReturn(
                 TelephonyManager.SIM_STATE_READY);
         when(mKeyguardUpdateMonitor.getFilteredSubscriptionInfo()).thenReturn(list);
@@ -601,7 +630,7 @@ public class CarrierTextManagerTest extends SysuiTestCase {
     public void testCarrierText_oneValidSubscription_flagEnabled() {
         reset(mCarrierTextCallback);
         List<SubscriptionInfo> list = new ArrayList<>();
-        list.add(TEST_SUBSCRIPTION);
+        list.add(mTestSubscription);
         when(mKeyguardUpdateMonitor.getSimStateForSlotId(anyInt())).thenReturn(
                 TelephonyManager.SIM_STATE_READY);
         when(mKeyguardUpdateMonitor.getFilteredSubscriptionInfo()).thenReturn(list);
@@ -623,8 +652,8 @@ public class CarrierTextManagerTest extends SysuiTestCase {
     public void testCarrierText_twoValidSubscriptions_flagEnabled() {
         reset(mCarrierTextCallback);
         List<SubscriptionInfo> list = new ArrayList<>();
-        list.add(TEST_SUBSCRIPTION);
-        list.add(TEST_SUBSCRIPTION);
+        list.add(mTestSubscription);
+        list.add(mTestSubscription);
         when(mKeyguardUpdateMonitor.getSimStateForSlotId(anyInt())).thenReturn(
                 TelephonyManager.SIM_STATE_READY);
         when(mKeyguardUpdateMonitor.getFilteredSubscriptionInfo()).thenReturn(list);
@@ -647,8 +676,8 @@ public class CarrierTextManagerTest extends SysuiTestCase {
     public void testCarrierText_oneDisabledSub_flagEnabled() {
         reset(mCarrierTextCallback);
         List<SubscriptionInfo> list = new ArrayList<>();
-        list.add(TEST_SUBSCRIPTION);
-        list.add(TEST_SUBSCRIPTION);
+        list.add(mTestSubscription);
+        list.add(mTestSubscription);
         when(mKeyguardUpdateMonitor.getSimStateForSlotId(anyInt()))
                 .thenReturn(TelephonyManager.SIM_STATE_READY)
                 .thenReturn(TelephonyManager.SIM_STATE_NOT_READY);
@@ -672,8 +701,8 @@ public class CarrierTextManagerTest extends SysuiTestCase {
     public void testCarrierText_firstDisabledSub_flagEnabled() {
         reset(mCarrierTextCallback);
         List<SubscriptionInfo> list = new ArrayList<>();
-        list.add(TEST_SUBSCRIPTION);
-        list.add(TEST_SUBSCRIPTION);
+        list.add(mTestSubscription);
+        list.add(mTestSubscription);
         when(mKeyguardUpdateMonitor.getSimStateForSlotId(anyInt()))
                 .thenReturn(TelephonyManager.SIM_STATE_NOT_READY)
                 .thenReturn(TelephonyManager.SIM_STATE_READY);
@@ -697,9 +726,9 @@ public class CarrierTextManagerTest extends SysuiTestCase {
     public void testCarrierText_threeSubsMiddleDisabled_flagEnabled() {
         reset(mCarrierTextCallback);
         List<SubscriptionInfo> list = new ArrayList<>();
-        list.add(TEST_SUBSCRIPTION);
-        list.add(TEST_SUBSCRIPTION);
-        list.add(TEST_SUBSCRIPTION);
+        list.add(mTestSubscription);
+        list.add(mTestSubscription);
+        list.add(mTestSubscription);
         when(mKeyguardUpdateMonitor.getSimStateForSlotId(anyInt()))
                 .thenReturn(TelephonyManager.SIM_STATE_READY)
                 .thenReturn(TelephonyManager.SIM_STATE_NOT_READY)

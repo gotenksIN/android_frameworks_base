@@ -25,6 +25,7 @@ import android.content.Intent
 import android.graphics.Rect
 import android.graphics.RectF
 import android.os.IBinder
+import android.platform.test.annotations.DisableFlags
 import android.platform.test.annotations.EnableFlags
 import android.view.Display.DEFAULT_DISPLAY
 import android.view.WindowManager
@@ -305,7 +306,8 @@ class DesktopTasksTransitionObserverTest : ShellTestCase() {
     }
 
     @Test
-    fun closingTask_startsTransitionToRemoveFully() {
+    @EnableFlags(Flags.FLAG_SKIP_KILL_PROCESS_FOR_DESKTOP_TASK_CORE_CLOSE_TRANSITION)
+    fun closingTask_skipKillProcessFlagEnabled_startsTransitionToRemoveFully() {
         val mockTransition = Mockito.mock(IBinder::class.java)
         val freeformTask = createTaskInfo(1)
         val freeformTask2 = createTaskInfo(2)
@@ -322,8 +324,53 @@ class DesktopTasksTransitionObserverTest : ShellTestCase() {
 
         val wct = getLatestWct(type = TRANSIT_CLOSE)
         assertThat(wct.hierarchyOps).hasSize(2)
-        wct.assertRemoveAt(index = 0, freeformTask.token)
-        wct.assertRemoveAt(index = 1, freeformTask2.token)
+        // The skip-kill-process flag is enabled; the processes should not be killed
+        wct.assertRemoveAt(
+            index = 0,
+            freeformTask.token,
+            /* removeFromRecents= */ true,
+            /* killProcess= */ false,
+        )
+        wct.assertRemoveAt(
+            index = 1,
+            freeformTask2.token,
+            /* removeFromRecents= */ true,
+            /* killProcess= */ false,
+        )
+    }
+
+    @Test
+    @DisableFlags(Flags.FLAG_SKIP_KILL_PROCESS_FOR_DESKTOP_TASK_CORE_CLOSE_TRANSITION)
+    fun closingTask_skipKillProcessFlagDisabled_startsTransitionToRemoveFully() {
+        val mockTransition = Mockito.mock(IBinder::class.java)
+        val freeformTask = createTaskInfo(1)
+        val freeformTask2 = createTaskInfo(2)
+        whenever(taskRepository.isAnyDeskActive(any())).thenReturn(true)
+        whenever(mixedHandler.hasTransition(mockTransition)).thenReturn(false)
+
+        transitionObserver.onTransitionReady(
+            transition = mockTransition,
+            info = createCloseTransition(listOf(freeformTask, freeformTask2)),
+            startTransaction = mock(),
+            finishTransaction = mock(),
+        )
+        transitionObserver.onTransitionFinished(transition = mockTransition, aborted = false)
+
+        val wct = getLatestWct(type = TRANSIT_CLOSE)
+        assertThat(wct.hierarchyOps).hasSize(2)
+        // The skip-kill-process flag is disabled; the processes should be killed
+        wct.assertRemoveAt(
+            index = 0,
+            freeformTask.token,
+            /* removeFromRecents= */ true,
+            /* killProcess= */ true,
+        )
+        wct.assertRemoveAt(
+            index = 1,
+            freeformTask2.token,
+            /* removeFromRecents= */ true,
+            /* killProcess= */ true,
+        )
     }
 
     @Test
@@ -398,6 +445,75 @@ class DesktopTasksTransitionObserverTest : ShellTestCase() {
         val task =
             createTaskInfo(1, WINDOWING_MODE_FREEFORM).apply {
                 baseActivity = ComponentName(packageName, "component.name")
+                configuration.windowConfiguration.bounds.set(endBounds)
+            }
+        val displayLayout = mock<DisplayLayout>()
+        whenever(displayLayout.getStableBoundsForDesktopMode(any())).thenAnswer {
+            (it.arguments[0] as Rect).set(stableBounds)
+        }
+        whenever(displayController.getDisplayLayout(task.displayId)).thenReturn(displayLayout)
+
+        transitionObserver.onTransitionReady(
+            transition = mockTransition,
+            info = createChangeTransition(task, startBounds, endBounds),
+            startTransaction = mock(),
+            finishTransaction = mock(),
+        )
+
+        verify(taskRepository, never()).setRememberedBoundsRatio(any(), any())
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_REMEMBERED_BOUNDS)
+    fun onTransitionReady_changeTransition_updatesLastPackageState_usesRealActivity() {
+        val mockTransition = Mockito.mock(IBinder::class.java)
+        val startBounds = Rect(0, 0, 100, 100)
+        val endBounds = Rect(10, 20, 120, 130)
+        val stableBounds = Rect(0, 0, 200, 200)
+        val realPackageName = "real.package"
+        val basePackageName = "base.package"
+        val task =
+            createTaskInfo(1, WINDOWING_MODE_FREEFORM).apply {
+                realActivity = ComponentName(realPackageName, "component.name")
+                baseActivity = ComponentName(basePackageName, "component.name")
+                configuration.windowConfiguration.bounds.set(endBounds)
+            }
+        val displayLayout = mock<DisplayLayout>()
+        whenever(displayLayout.getStableBoundsForDesktopMode(any())).thenAnswer {
+            (it.arguments[0] as Rect).set(stableBounds)
+        }
+        whenever(displayController.getDisplayLayout(task.displayId)).thenReturn(displayLayout)
+
+        transitionObserver.addPendingUserBoundsChangeTransition(mockTransition)
+        transitionObserver.onTransitionReady(
+            transition = mockTransition,
+            info = createChangeTransition(task, startBounds, endBounds),
+            startTransaction = mock(),
+            finishTransaction = mock(),
+        )
+
+        val expectedBoundsRatio =
+            RectF(
+                (endBounds.left - stableBounds.left).toFloat() / stableBounds.width(),
+                (endBounds.top - stableBounds.top).toFloat() / stableBounds.height(),
+                (endBounds.right - stableBounds.left).toFloat() / stableBounds.width(),
+                (endBounds.bottom - stableBounds.top).toFloat() / stableBounds.height(),
+            )
+
+        verify(taskRepository).setRememberedBoundsRatio(realPackageName, expectedBoundsRatio)
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_REMEMBERED_BOUNDS)
+    fun onTransitionReady_changeTransition_noPackageName_doesNotUpdateRememberedBounds() {
+        val mockTransition = Mockito.mock(IBinder::class.java)
+        val startBounds = Rect(0, 0, 100, 100)
+        val endBounds = Rect(10, 20, 120, 130)
+        val stableBounds = Rect(0, 0, 200, 200)
+        val task =
+            createTaskInfo(1, WINDOWING_MODE_FREEFORM).apply {
+                baseActivity = null
+                realActivity = null
                 configuration.windowConfiguration.bounds.set(endBounds)
             }
         val displayLayout = mock<DisplayLayout>()
@@ -616,11 +732,18 @@ class DesktopTasksTransitionObserverTest : ShellTestCase() {
         return arg.value
     }
 
-    private fun WindowContainerTransaction.assertRemoveAt(index: Int, token: WindowContainerToken) {
+    private fun WindowContainerTransaction.assertRemoveAt(
+        index: Int,
+        token: WindowContainerToken,
+        removeFromRecents: Boolean?,
+        killProcess: Boolean?,
+    ) {
         assertIndexInBounds(index)
         val op = hierarchyOps[index]
         assertThat(op.type).isEqualTo(HIERARCHY_OP_TYPE_REMOVE_TASK)
         assertThat(op.container).isEqualTo(token.asBinder())
+        removeFromRecents?.let { assertThat(op.removeFromRecents).isEqualTo(it) }
+        killProcess?.let { assertThat(op.killProcess).isEqualTo(it) }
     }
 
     private fun WindowContainerTransaction.assertReorderAt(

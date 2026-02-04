@@ -436,7 +436,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
     }
 
     private final Consumer<WindowState> mCloseSystemDialogsConsumer = w -> {
-        if (w.mHasSurface) {
+        if (w.isVisible()) {
             try {
                 w.mClient.closeSystemDialogs(mCloseSystemDialogsReason);
             } catch (RemoteException e) {

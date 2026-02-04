@@ -55,6 +55,7 @@ import android.app.appfunctions.IAppFunctionSearchResults;
 import android.app.appfunctions.IAppFunctionService;
 import android.app.appfunctions.ICancellationCallback;
 import android.app.appfunctions.IExecuteAppFunctionCallback;
+import android.app.appfunctions.IGetAppFunctionStatesCallback;
 import android.app.appfunctions.IIsAppFunctionEnabledCallback;
 import android.app.appfunctions.IObserveAppFunctionChangesCallback;
 import android.app.appfunctions.IOnAppFunctionAccessChangeListener;
@@ -112,6 +113,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.WeakHashMap;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
@@ -518,6 +520,84 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
     }
 
     @Override
+    public void getAppFunctionStates(
+            @NonNull List<AppFunctionName> appFunctionNames,
+            @NonNull String callingPackageName,
+            int targetUserId,
+            @NonNull IGetAppFunctionStatesCallback callback)
+            throws RemoteException {
+        Objects.requireNonNull(appFunctionNames);
+        Objects.requireNonNull(callback);
+
+        final int callingUid = Binder.getCallingUid();
+        final int callingPid = Binder.getCallingPid();
+
+        try {
+            // The calling package name will be used to determine the visible packages.
+            mCallerValidator.validateCallingPackage(callingPackageName);
+            mCallerValidator.verifyUserInteraction(
+                    /* targetUserId= */ targetUserId,
+                    /* callingUid= */ callingUid,
+                    /* callingPid= */ callingPid,
+                    /* callingPackageName= */ callingPackageName);
+        } catch (SecurityException e) {
+            try {
+                callback.onError(new ParcelableException(e));
+            } catch (RemoteException ex) {
+                Slog.e(TAG, "Failed to execute callback#onError.", e);
+            }
+            return;
+        }
+
+        UserHandle targetUser = UserHandle.of(targetUserId);
+        AppSearchManager perUserAppSearchManager = getAppSearchManagerAsUser(targetUser);
+        if (perUserAppSearchManager == null) {
+            throw new IllegalStateException(
+                    "AppSearchManager not found for user:" + targetUser.getIdentifier());
+        }
+
+        THREAD_POOL_EXECUTOR.execute(
+                () -> {
+                    List<AppFunctionName> visibleAppFunctionNames =
+                            mVisibilityHelper.filterVisibleAppFunctions(
+                                    appFunctionNames, callingPackageName, callingUid, callingPid);
+
+                    FutureGlobalSearchSession futureGlobalSearchSession =
+                            new FutureGlobalSearchSession(
+                                    perUserAppSearchManager, THREAD_POOL_EXECUTOR);
+
+                    final long token = Binder.clearCallingIdentity();
+                    try {
+                        var unused =
+                                mAppFunctionMetadataReader
+                                        .getAppFunctionStates(
+                                                futureGlobalSearchSession,
+                                                visibleAppFunctionNames,
+                                                targetUserId)
+                                        .whenCompleteAsync(
+                                                (states, exception) -> {
+                                                    try {
+                                                        if (exception != null) {
+                                                            callback.onError(
+                                                                    new ParcelableException(
+                                                                            exception));
+                                                        } else {
+                                                            callback.onSuccess(states);
+                                                        }
+                                                    } catch (RemoteException re) {
+                                                        Slog.w(TAG, "Fail to call onError");
+                                                    } finally {
+                                                        futureGlobalSearchSession.close();
+                                                    }
+                                                },
+                                                THREAD_POOL_EXECUTOR);
+                    } finally {
+                        Binder.restoreCallingIdentity(token);
+                    }
+                });
+    }
+
+    @Override
     public void searchAppFunctions(
             @NonNull AppFunctionAidlSearchSpec aidlSearchSpec,
             @NonNull ISearchAppFunctionsCallback searchAppFunctionsCallback)
@@ -594,8 +674,7 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
                                 mAppFunctionMetadataReader.searchAppFunctions(
                                         futureGlobalSearchSession,
                                         filteredSearchSpec,
-                                        THREAD_POOL_EXECUTOR,
-                                        aidlSearchSpec.getTargetUserId());
+                                        THREAD_POOL_EXECUTOR);
                         try {
                             searchAppFunctionsCallback.onSuccess(results);
                         } catch (RemoteException e) {
@@ -870,10 +949,11 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
     @Override
     public void registerAppFunctions(
             String packageName, List<String> functionIdentifiers, IAppFunctionExecutor executor) {
+        UserHandle callingUserHandle = Binder.getCallingUserHandle();
         mCallerValidator.validateCallingPackage(packageName);
         for (String functionIdentifier : functionIdentifiers) {
             if (!mAppFunctionMetadataReader.isDynamicFunction(
-                    packageName, functionIdentifier, Binder.getCallingUserHandle())) {
+                    packageName, functionIdentifier, callingUserHandle)) {
                 throw new IllegalArgumentException(
                         "Unable to register AppFunction "
                                 + functionIdentifier
@@ -883,21 +963,19 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
             }
         }
         mDynamicAppFunctionRegistry.registerAppFunctions(
-                packageName, functionIdentifiers, executor, Binder.getCallingUserHandle());
+                packageName, functionIdentifiers, executor, callingUserHandle);
 
-        for (String functionIdentifier : functionIdentifiers) {
-            onDynamicFunctionRegistrationChanged(packageName, functionIdentifier,
-                    Binder.getCallingUserHandle());
-        }
+        onDynamicFunctionRegistrationChanged(callingUserHandle, packageName, functionIdentifiers);
     }
 
     @Override
     public void unregisterAppFunctions(
             String packageName, List<String> functionIdentifiers, IAppFunctionExecutor session) {
+        UserHandle callingUserHandle = Binder.getCallingUserHandle();
         mCallerValidator.validateCallingPackage(packageName);
         for (String functionIdentifier : functionIdentifiers) {
             if (!mAppFunctionMetadataReader.isDynamicFunction(
-                    packageName, functionIdentifier, Binder.getCallingUserHandle())) {
+                    packageName, functionIdentifier, callingUserHandle)) {
                 throw new IllegalArgumentException(
                         "Unable to unregister AppFunction "
                                 + functionIdentifier
@@ -907,23 +985,24 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
             }
         }
         mDynamicAppFunctionRegistry.unregisterAppFunctions(
-                packageName, functionIdentifiers, session, Binder.getCallingUserHandle());
+                packageName, functionIdentifiers, session, callingUserHandle);
 
-        for (String functionIdentifier : functionIdentifiers) {
-            onDynamicFunctionRegistrationChanged(packageName, functionIdentifier,
-                    Binder.getCallingUserHandle());
-        }
+        onDynamicFunctionRegistrationChanged(callingUserHandle, packageName, functionIdentifiers);
     }
 
     private void onDynamicFunctionRegistrationChanged(
-            String packageName, String functionIdentifier, UserHandle callingUserHandle) {
+            UserHandle callingUserHandle, String packageName, List<String> functionIdentifiers) {
+        Set<AppFunctionName> functionNames = new ArraySet<>();
+        for (String functionId : functionIdentifiers) {
+            functionNames.add(new AppFunctionName(packageName, functionId));
+        }
         // TODO(b/438413081): Verify that the function is runtime enabled before notifying after
         //   registration/unregistration to avoid redundant calls when the effective state hasn't
         //   changed.
         THREAD_POOL_EXECUTOR.execute(
                 () ->
-                        mAppFunctionMetadataObserver.onEnabledStateChanged(
-                                callingUserHandle, packageName, functionIdentifier));
+                        mAppFunctionMetadataObserver.onEnabledStatesChanged(
+                                callingUserHandle, functionNames));
     }
 
     @Override
@@ -1181,8 +1260,9 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
 
             try {
                 if (isExistingMetadataEffectivelyEnabled != isNewMetadataEffectivelyEnabled) {
-                    mAppFunctionMetadataObserver.onEnabledStateChanged(
-                            userHandle, callingPackage, functionIdentifier);
+                    mAppFunctionMetadataObserver.onEnabledStatesChanged(
+                            userHandle,
+                            Set.of(new AppFunctionName(callingPackage, functionIdentifier)));
                 }
             } catch (Exception e) {
                 Slog.w(TAG, "Failed to report enabled state change.", e);

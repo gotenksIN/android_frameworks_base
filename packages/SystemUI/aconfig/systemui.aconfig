@@ -160,6 +160,16 @@ flag {
 }
 
 flag {
+    name: "communal_accessibility_resize"
+    namespace: "systemui"
+    description: "Allows users to resize communal hub widgets by single-point actions."
+    bug: "431683508"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
   name: "communal_bouncer_do_not_modify_plugin_open"
   namespace: "systemui"
   description: "do not modify notification shade when handling bouncer expansion."
@@ -167,13 +177,6 @@ flag {
   metadata {
     purpose: PURPOSE_BUGFIX
   }
-}
-
-flag {
-    name: "communal_edit_mode_accessibility_resize"
-    namespace: "systemui"
-    description: "Allows users to resize communal hub widgets by single-point actions."
-    bug: "431683508"
 }
 
 flag {
@@ -1223,16 +1226,6 @@ flag {
 }
 
 flag {
-  name: "notification_smart_replies_edit_before_sending"
-  namespace: "systemui"
-  description: "This flag enables the tap-to-send behavior on smart replies."
-  bug: "450898813"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
    name: "notification_transparent_header_fix"
    namespace: "systemui"
    description: "fix the transparent group header issue for async header inflation."
@@ -1335,6 +1328,16 @@ flag {
     namespace: "systemui"
     description: "When a TileService package is uninstalled, remove the tile completely and all associated data."
     bug: "362234193"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "qs_edit_mode_hover_fixes"
+    namespace: "systemui"
+    description: "Various fixes for the hover states of the quick settings edit mode"
+    bug: "435626373"
     metadata {
       purpose: PURPOSE_BUGFIX
     }
@@ -1895,13 +1898,6 @@ flag {
   namespace: "systemui"
   description: "Use compose's AndroidUiDispatcher as default"
   bug: "460414443"
-}
-
-flag {
-    name: "use_systemui_views_for_system_toolbar"
-    namespace: "permissions"
-    description: "Use the views moved into system ui from the framework for the system selection toolbar."
-    bug: "450977221"
 }
 
 flag {

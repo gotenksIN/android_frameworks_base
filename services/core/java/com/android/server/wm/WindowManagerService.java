@@ -2743,17 +2743,6 @@ public class WindowManagerService extends IWindowManager.Stub
                             "Relayout invis " + win + ": mAnimatingExit=" + win.mAnimatingExit);
                 }
                 result |= RELAYOUT_RES_SURFACE_CHANGED;
-                // When FLAG_SHOW_WALLPAPER flag is removed from a window, we usually set a flag
-                // in DC#pendingLayoutChanges and update the wallpaper target later.
-                // However it's possible that FLAG_SHOW_WALLPAPER flag is removed from a window
-                // when the window is about to exit, so we update the wallpaper target
-                // immediately here. Otherwise this window will be stuck in exiting and its
-                // surface remains on the screen.
-                // TODO(b/189856716): Allow destroying surface even if it belongs to the
-                //  keyguard target.
-                if (wallpaperMayMove) {
-                    displayContent.mWallpaperController.adjustWallpaperWindows();
-                }
                 tryStartExitingAnimation(win, winAnimator);
             }
 
@@ -7108,8 +7097,7 @@ public class WindowManagerService extends IWindowManager.Stub
     }
 
     @Override
-    public void createInputConsumer(IBinder token, String name, int displayId,
-            InputChannel inputChannel) {
+    public InputChannel createInputConsumer(IBinder token, String name, int displayId) {
         if (!mAtmService.isCallerRecents(Binder.getCallingUid())
                 && mContext.checkCallingOrSelfPermission(INPUT_CONSUMER) != PERMISSION_GRANTED) {
             throw new SecurityException("createInputConsumer requires INPUT_CONSUMER permission");
@@ -7118,10 +7106,11 @@ public class WindowManagerService extends IWindowManager.Stub
         synchronized (mGlobalLock) {
             DisplayContent display = mRoot.getDisplayContent(displayId);
             if (display != null) {
-                display.getInputMonitor().createInputConsumer(token, name, inputChannel,
+                return display.getInputMonitor().createInputConsumer(token, name,
                         Binder.getCallingPid(), Binder.getCallingUserHandle());
             }
         }
+        return null;
     }
 
     @Override
@@ -8865,14 +8854,16 @@ public class WindowManagerService extends IWindowManager.Stub
 
         @Override
         public void enableClientRenderingLimitationsOnDisplay(int displayId, boolean enable) {
-            final DisplayContent dc = mRoot.getDisplayContent(displayId);
-            if (dc == null) {
-                Slog.e(TAG, "Failed to change client rendering limitations"
-                        + " for display: " + displayId
-                        + " - DisplayContent not found.");
-                return;
+            synchronized (mGlobalLock) {
+                final DisplayContent dc = mRoot.getDisplayContent(displayId);
+                if (dc == null) {
+                    Slog.e(TAG, "Failed to change client rendering limitations"
+                            + " for display: " + displayId
+                            + " - DisplayContent not found.");
+                    return;
+                }
+                dc.enableClientRenderingLimitations(enable);
             }
-            dc.enableClientRenderingLimitations(enable);
         }
 
         @Override

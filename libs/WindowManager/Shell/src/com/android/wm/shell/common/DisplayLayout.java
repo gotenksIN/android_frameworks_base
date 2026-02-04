@@ -21,6 +21,9 @@ import static android.content.res.Configuration.ORIENTATION_PORTRAIT;
 import static android.os.Process.SYSTEM_UID;
 import static android.provider.Settings.Global.DEVELOPMENT_FORCE_DESKTOP_MODE_ON_EXTERNAL_DISPLAYS;
 import static android.view.Display.FLAG_SHOULD_SHOW_SYSTEM_DECORATIONS;
+import static android.view.Surface.ROTATION_180;
+
+import static java.lang.Math.max;
 
 import android.annotation.IntDef;
 import android.annotation.NonNull;
@@ -77,6 +80,7 @@ public class DisplayLayout {
     private int mWidth;
     private int mHeight;
     private RectF mGlobalBoundsDp;
+    @Nullable
     private DisplayCutout mCutout;
     private int mRotation;
     private int mDensityDpi;
@@ -105,6 +109,25 @@ public class DisplayLayout {
                 && mRotation == other.mRotation
                 && mDensityDpi == other.mDensityDpi
                 && Objects.equals(mCutout, other.mCutout);
+    }
+
+    /**
+     * @return {@code true} if the given {@link DisplayLayout} is identical geometry wise but
+     * differs in its rotation.
+     */
+    public boolean isSameRotatedGeometry(@NonNull DisplayLayout other) {
+        if (mRotation == other.mRotation || mDensityDpi != other.mDensityDpi) return false;
+        DisplayCutout cutoutRotated = mCutout.getRotated(
+                mWidth, mHeight, mRotation, other.mRotation);
+        if (mRotation == ROTATION_180) {
+            return mWidth == other.mWidth
+                    && mHeight == other.mHeight
+                    && Objects.equals(cutoutRotated, other.mCutout);
+        } else {
+            return mWidth == other.mHeight
+                    && mHeight == other.mWidth
+                    && Objects.equals(cutoutRotated, other.mCutout);
+        }
     }
 
     @Override
@@ -238,7 +261,8 @@ public class DisplayLayout {
 
     @VisibleForTesting
     void recalcInsets(Resources res) {
-        computeNonDecorInsets(mInsetsState, mNonDecorInsets, mHasNavigationBar);
+        Rect cutoutInsets = mCutout == null ? null : mCutout.getSafeInsets();
+        computeNonDecorInsets(mInsetsState, mNonDecorInsets, mHasNavigationBar, cutoutInsets);
         mStableInsets.set(mNonDecorInsets);
         if (mHasStatusBar) {
             convertNonDecorInsetsToStableInsets(res, mStableInsets, mCutout, mHasStatusBar);
@@ -376,7 +400,7 @@ public class DisplayLayout {
         if (displayHardwareIsLandscape) {
             return mReverseDefaultRotation ? Surface.ROTATION_270 : Surface.ROTATION_90;
         }
-        return Surface.ROTATION_180;
+        return ROTATION_180;
     }
 
     /** Gets the orientation of this layout */
@@ -416,7 +440,7 @@ public class DisplayLayout {
             return;
         }
         int statusBarHeight = SystemBarUtils.getStatusBarHeight(res, cutout);
-        inOutInsets.top = Math.max(inOutInsets.top, statusBarHeight);
+        inOutInsets.top = max(inOutInsets.top, statusBarHeight);
     }
 
     /**
@@ -427,9 +451,11 @@ public class DisplayLayout {
      * @param hasNavigationBar indicates whether a navigation bar exists on the display
      */
     static void computeNonDecorInsets(InsetsState insetsState,
-            Rect outInsets, boolean hasNavigationBar) {
-        final int types = (hasNavigationBar ? WindowInsets.Type.navigationBars() : 0)
-                | WindowInsets.Type.displayCutout();
+            Rect outInsets, boolean hasNavigationBar, @Nullable Rect cutout) {
+        // don't look at the source cutout inset because it may not have been updated yet if we just
+        // rotated. instead we have to rely on the manually rotated cutout and merge that into the
+        // final insets
+        final int types = (hasNavigationBar ? WindowInsets.Type.navigationBars() : 0);
         final Rect displayFrame = insetsState.getDisplayFrame();
         final Insets insets = insetsState.calculateInsets(
                 displayFrame,
@@ -437,6 +463,16 @@ public class DisplayLayout {
                 types,
                 true /* ignoreVisibility */);
         outInsets.set(insets.toRect());
+        if (cutout != null) {
+            mergeInsets(outInsets, cutout);
+        }
+    }
+
+    private static void mergeInsets(Rect inOut, Rect other) {
+        inOut.left = Math.max(inOut.left, other.left);
+        inOut.top = Math.max(inOut.top, other.top);
+        inOut.right = Math.max(inOut.right, other.right);
+        inOut.bottom = Math.max(inOut.bottom, other.bottom);
     }
 
     static boolean hasNavigationBar(DisplayInfo info, Context context, int displayId) {

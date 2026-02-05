@@ -2218,8 +2218,8 @@ public final class ProcessList extends ProcessListInternal
         app.setPendingStart(true);
         app.setRemoved(false);
         synchronized (mProcLock) {
-            app.setKilledByAm(false);
-            app.setKilled(false);
+            mService.mProcessStateController.setKilledByAm(app, false);
+            mService.mProcessStateController.setKilled(app, false);
         }
         if (app.getStartSeq() != 0) {
             Slog.wtf(TAG, "startProcessLocked processName:" + app.processName

@@ -30,7 +30,6 @@ import android.util.ArrayMap;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.annotation.VisibleForTesting;
 
 import java.util.List;
 import java.util.Objects;
@@ -39,13 +38,11 @@ import java.util.concurrent.Executor;
 /**
  * Extensions for Computer Control features.
  *
- * Internally relies on multiple system features that may be unavailable. Getting an instance via
+ * <p>Internally relies on multiple system features that may be unavailable. Getting an instance via
  * {@link #getInstance(Context)} will enable the creation of new {@link ComputerControlSession}s
- * that enable inputs and outputs for computer control features.
+ * that enable inputs and outputs for computer control features.</p>
  */
 public class ComputerControlExtensions {
-    @VisibleForTesting static final int EXTENSIONS_VERSION = 4;
-
     private final ArrayMap<AutomatedPackageListener,
             android.companion.virtual.computercontrol.AutomatedPackageListener> mListeners =
             new ArrayMap<>();
@@ -56,7 +53,7 @@ public class ComputerControlExtensions {
      * Retrieve the current version of the extensions.
      */
     public static int getVersion() {
-        return EXTENSIONS_VERSION;
+        return VirtualDeviceManager.COMPUTER_CONTROL_VERSION;
     }
 
     /**
@@ -95,8 +92,10 @@ public class ComputerControlExtensions {
         ComputerControlSessionParams sessionParams =
                 new ComputerControlSessionParams.Builder()
                         .setName(params.getName())
+                        .setTargetExtensionVersion(params.getTargetExtensionVersion())
                         .setTargetPackageNames(params.getTargetPackageNames())
                         .setPreviewIntent(params.getPreviewIntent())
+                        .setAppInteractionAttribution(params.getAppInteractionAttribution())
                         .build();
 
         var sessionCallback =
@@ -188,11 +187,17 @@ public class ComputerControlExtensions {
             return false;
         }
 
-        var vdm = context.getSystemService(VirtualDeviceManager.class);
-        if (vdm == null) {
+        return context.getSystemService(VirtualDeviceManager.class) != null;
+    }
+
+    /**
+     * @return {@code true} if computer control functionality is available on the device and the
+     * caller is allowed to access session creation functionality with the given {@link Context}.
+     */
+    public static boolean isSessionCreationAvailable(@NonNull Context context) {
+        if (!isAvailable(context)) {
             return false;
         }
-
-        return vdm.isComputerControlAvailable();
+        return context.getSystemService(VirtualDeviceManager.class).isComputerControlAvailable();
     }
 }

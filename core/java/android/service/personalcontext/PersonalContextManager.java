@@ -26,11 +26,15 @@ import android.annotation.SdkConstant;
 import android.annotation.SystemApi;
 import android.annotation.SystemService;
 import android.annotation.UserHandleAware;
+import android.app.assist.AssistStructure;
 import android.content.Context;
+import android.graphics.Rect;
+import android.os.Bundle;
 import android.os.ParcelUuid;
 import android.os.RemoteException;
 import android.provider.Settings;
 import android.service.personalcontext.embedded.InsightSurfaceClientInfo;
+import android.service.personalcontext.hint.AutofillInlineRequestHint;
 import android.service.personalcontext.hint.ContextHint;
 import android.service.personalcontext.hint.ContextHintWithSignature;
 import android.service.personalcontext.hint.ContextHintWrapper;
@@ -310,6 +314,49 @@ public final class PersonalContextManager {
     public void reportEvent(@NonNull InsightEvent event) {
         try {
             mService.reportEvent(event, mContext.getUserId());
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Returns the {@link AssistStructure.ViewNode} for the node focused by autofill in the given
+     * {@link AutofillInlineRequestHint}.
+     *
+     * @hide
+     */
+    @SystemApi
+    @NonNull
+    public AssistStructure.ViewNode getFocusedViewNode(@NonNull AutofillInlineRequestHint hint) {
+        return hint.getAugmentedAutofillProxy().getFocusedViewNode(hint.getFocusedId());
+    }
+
+    /**
+     * Returns the coordinates of the input field view that autofill suggestions are being generated
+     * for in the given {@link AutofillInlineRequestHint}.
+     *
+     * @hide
+     */
+    @SystemApi
+    @NonNull
+    public Rect getViewCoordinates(@NonNull AutofillInlineRequestHint hint) {
+        return hint.getAugmentedAutofillProxy().getViewCoordinates(hint.getFocusedId());
+    }
+
+    /**
+     * Reports that the user wants to provide feedback. A UI may be shown to the user to complete
+     * filling out feedback (using initial user preferences from {@code feedbackPreview}, and the
+     * resulting completed feedback is sent to the understander that generated the {@code insight}.
+     *
+     * @param insight the insight that feedback is being provided for
+     * @param feedbackPreview initial user feedback values provided by the renderer
+     */
+    @RequiresNoPermission
+    public void reportUserFeedback(
+            @NonNull ContextInsight insight, @Nullable Bundle feedbackPreview) {
+        try {
+            mService.reportFeedback(
+                    new ContextInsightWrapper(insight), feedbackPreview, mContext.getUserId());
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }

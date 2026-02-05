@@ -400,6 +400,7 @@
   <java-symbol type="bool" name="config_omnipresentCommunalUser"/>
   <java-symbol type="bool" name="config_enableNewAutoSelectNetworkUI"/>
   <java-symbol type="bool" name="config_disableUsbPermissionDialogs"/>
+  <java-symbol type="bool" name="config_allowContentRestrictionDevicePolicyBypassing"/>
   <java-symbol type="dimen" name="config_highResTaskSnapshotScale" />
   <java-symbol type="dimen" name="config_lowResTaskSnapshotScale" />
   <java-symbol type="dimen" name="config_resActivitySnapshotScale" />
@@ -4311,6 +4312,7 @@
   <java-symbol type="string" name="config_retailDemoPackageSignature" />
 
   <java-symbol type="bool" name="config_systemCaptionsServiceCallsEnabled" />
+  <java-symbol type="bool" name="config_easyReaderCaptionsSupported" />
 
   <java-symbol type="string" name="notification_channel_foreground_service" />
   <java-symbol type="string" name="foreground_service_app_in_background" />
@@ -6441,6 +6443,7 @@
 
   <!-- Device CMF Theming Settings -->
   <java-symbol type="array" name="theming_defaults" />
+  <java-symbol type="array" name="theming_legacy_overlays" />
 
   <java-symbol type="string" name="config_help_url_action_disabled_by_advanced_protection" />
 

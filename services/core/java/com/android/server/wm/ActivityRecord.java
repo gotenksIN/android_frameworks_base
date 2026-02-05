@@ -4684,7 +4684,7 @@ public final class ActivityRecord extends WindowToken {
                 if (fromActivity.allDrawn) {
                     allDrawn = true;
                 }
-                if (fromActivity.firstWindowDrawn) {
+                if (!Flags.noTransferFirstWindowDrawn() && fromActivity.firstWindowDrawn) {
                     firstWindowDrawn = true;
                 }
                 if (fromActivity.isVisible()) {

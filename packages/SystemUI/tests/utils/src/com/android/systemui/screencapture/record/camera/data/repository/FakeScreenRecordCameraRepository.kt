@@ -19,6 +19,7 @@ package com.android.systemui.screencapture.record.camera.data.repository
 import android.graphics.Region
 import android.util.Size
 import android.view.Surface
+import com.android.systemui.screencapture.record.camera.data.model.StreamConfiguration
 import com.android.systemui.screencapture.record.camera.shared.model.CameraState
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -36,10 +37,10 @@ class FakeScreenRecordCameraRepository : ScreenRecordCameraRepository {
     override val state: StateFlow<CameraState> = _state.asStateFlow()
 
     private val _isConnected = MutableStateFlow(false)
-    override val isConnected: Flow<Boolean> = _isConnected.asStateFlow()
+    override val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
 
-    private val _cameraBounds = MutableStateFlow<Region?>(null)
-    override val cameraSubjectBounds: StateFlow<Region?> = _cameraBounds.asStateFlow()
+    private val _cameraSubjectBounds = MutableStateFlow<Region?>(null)
+    override val cameraSubjectBounds: StateFlow<Region?> = _cameraSubjectBounds.asStateFlow()
 
     private val _taps: Channel<Unit> = Channel()
     val taps: Flow<Unit> = _taps.consumeAsFlow()
@@ -77,7 +78,7 @@ class FakeScreenRecordCameraRepository : ScreenRecordCameraRepository {
     override suspend fun prepareStream(
         displayUniqueId: String?,
         @Surface.Rotation displayRotation: Int,
-    ): Size? = optimalCameraStreamSize
+    ): StreamConfiguration? = optimalCameraStreamSize?.let { StreamConfiguration(it, it) }
 
     override suspend fun setBackgroundColor(color: Int) {
         backgroundColor = color
@@ -87,7 +88,7 @@ class FakeScreenRecordCameraRepository : ScreenRecordCameraRepository {
         _taps.trySend(Unit)
     }
 
-    fun setCameraRegion(bounds: Region) {
-        _cameraBounds.value = bounds
+    fun setCameraSubjectBounds(bounds: Region) {
+        _cameraSubjectBounds.value = bounds
     }
 }

@@ -42,6 +42,7 @@ import android.util.TimeUtils;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.os.SomeArgs;
+import com.android.server.am.psc.Constants.SchedGroup;
 
 import dalvik.annotation.optimization.NeverCompile;
 
@@ -610,7 +611,7 @@ class BroadcastProcessQueue {
         return (app != null) && (app.getOnewayThread() != null) && !app.isKilled();
     }
 
-    public int getPreferredSchedulingGroupLocked() {
+    public @SchedGroup int getPreferredSchedulingGroupLocked() {
         if (!isActive()) {
             return SCHED_GROUP_UNDEFINED;
         } else if (mCountForeground > mCountForegroundDeferred) {
@@ -849,6 +850,10 @@ class BroadcastProcessQueue {
     public void traceActiveBegin() {
         Trace.asyncTraceForTrackBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER,
                 runningTraceTrackName, mActive.toShortString() + " scheduled", hashCode());
+        if (mActive.options != null && mActive.options.getDebugReason() != null) {
+            Trace.instantForTrack(Trace.TRACE_TAG_ACTIVITY_MANAGER,
+                    runningTraceTrackName, "reason: " + mActive.options.getDebugReason());
+        }
     }
 
     public void traceActiveEnd() {

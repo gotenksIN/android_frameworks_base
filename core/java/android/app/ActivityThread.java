@@ -18,6 +18,7 @@ package android.app;
 
 import static android.app.ActivityManager.PROCESS_STATE_UNKNOWN;
 import static android.app.ConfigurationController.createNewConfigAndUpdateIfNotNull;
+import static android.app.Flags.customBackupagentInstantiation;
 import static android.app.Flags.skipBgMemTrimOnFgApp;
 import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
 import static android.app.WindowConfiguration.WINDOWING_MODE_UNDEFINED;
@@ -50,6 +51,7 @@ import android.app.RemoteServiceException.BadForegroundServiceNotificationExcept
 import android.app.RemoteServiceException.BadUserInitiatedJobNotificationException;
 import android.app.RemoteServiceException.CannotPostForegroundServiceNotificationException;
 import android.app.RemoteServiceException.CrashedByAdbException;
+import android.app.RemoteServiceException.ExcessiveEnqueuedBroadcastsException;
 import android.app.RemoteServiceException.ForegroundServiceDidNotStartInTimeException;
 import android.app.RemoteServiceException.ForegroundServiceDidNotStopInTimeException;
 import android.app.RemoteServiceException.MissingRequestPasswordComplexityPermissionException;
@@ -2560,9 +2562,12 @@ public final class ActivityThread extends ClientTransactionHandler
             case CrashedByAdbException.TYPE_ID:
                 throw new CrashedByAdbException(message);
 
+            case ExcessiveEnqueuedBroadcastsException.TYPE_ID:
+                throw new ExcessiveEnqueuedBroadcastsException(message);
+
             default:
                 throw new RemoteServiceException(message
-                        + " (with unwknown typeId:" + typeId + ")");
+                        + " (with unknown typeId:" + typeId + ")");
         }
     }
 
@@ -4723,11 +4728,14 @@ public final class ActivityThread extends ClientTransactionHandler
             final int tid = HardwareRenderer.preload();
             // Adjust the RenderThread priority as soon as it's created.
             if (tid > 0) {
-                try {
-                    ActivityManager.getService().setRenderThread(tid);
-                } catch (Throwable t) {
-                    Log.w(TAG, "Failed to set scheduler for RenderThread", t);
-                }
+                AsyncTask.THREAD_POOL_EXECUTOR.execute(() -> {
+                    HardwareRenderer.waitForRenderThreadPriorityInitialized();
+                    try {
+                        ActivityManager.getService().setRenderThread(tid);
+                    } catch (Throwable t) {
+                        Log.w(TAG, "Failed to set scheduler for RenderThread", t);
+                    }
+                });
             }
         }
 
@@ -5464,7 +5472,11 @@ public final class ActivityThread extends ClientTransactionHandler
                     if (DEBUG_BACKUP) Slog.v(TAG, "Initializing agent class " + classname);
 
                     java.lang.ClassLoader cl = packageInfo.getClassLoader();
-                    agent = (BackupAgent) cl.loadClass(classname).newInstance();
+                    if (customBackupagentInstantiation()) {
+                        agent = packageInfo.getAppFactory().instantiateBackupAgent(cl, classname);
+                    } else {
+                        agent = (BackupAgent) cl.loadClass(classname).newInstance();
+                    }
 
                     // set up the agent's context
                     ContextImpl context = ContextImpl.createAppContext(this, packageInfo);
@@ -9453,16 +9465,13 @@ public final class ActivityThread extends ClientTransactionHandler
     }
 
     private Bundle getCoreSettingsForDeviceLocked(int deviceId) {
-        if (android.companion.virtualdevice.flags.Flags.deviceAwareSettingsOverride()) {
-            Bundle bundle = mCoreSettings.getBundle(String.valueOf(deviceId));
-            if (deviceId != Context.DEVICE_ID_DEFAULT && bundle == null) {
-                // There hasn't been any overridden settings for the virtual device, so just return
-                // the settings for the default device.
-                bundle = mCoreSettings.getBundle(String.valueOf(Context.DEVICE_ID_DEFAULT));
-            }
-            return bundle;
+        Bundle bundle = mCoreSettings.getBundle(String.valueOf(deviceId));
+        if (deviceId != Context.DEVICE_ID_DEFAULT && bundle == null) {
+            // There hasn't been any overridden settings for the virtual device, so just return
+            // the settings for the default device.
+            bundle = mCoreSettings.getBundle(String.valueOf(Context.DEVICE_ID_DEFAULT));
         }
-        return mCoreSettings;
+        return bundle;
     }
 
     @RavenwoodThrow(comment = "See ActivityThread_ravenwood for initialization on Ravenwood")

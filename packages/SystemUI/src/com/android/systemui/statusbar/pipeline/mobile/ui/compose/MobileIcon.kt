@@ -68,6 +68,7 @@ fun MobileIcon(state: MobileIconState, modifier: Modifier = Modifier) {
     val contentDescription = state.contentDescription
     val context = LocalContext.current
     val volteId = state.volteId
+    val showSignalStrengthIcon = state.showSignalStrengthIcon
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier =
@@ -77,7 +78,6 @@ fun MobileIcon(state: MobileIconState, modifier: Modifier = Modifier) {
                 }
             },
     ) {
-    val showSignalStrengthIcon = state.showSignalStrengthIcon
         when (iconModel) {
             is SignalIconModel.CellularTypeIconModel ->
                 MobileIcon(state = state, iconModel = iconModel)

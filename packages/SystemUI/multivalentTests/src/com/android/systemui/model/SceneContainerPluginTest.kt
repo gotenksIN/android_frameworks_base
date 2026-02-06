@@ -16,16 +16,14 @@
 
 package com.android.systemui.model
 
-import android.platform.test.annotations.DisableFlags
-import android.platform.test.annotations.EnableFlags
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
-import com.android.systemui.Flags
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.flags.EnableSceneContainer
 import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.scene.shared.model.fakeSceneDataSource
 import com.android.systemui.shade.data.repository.fakeShadeDisplaysRepository
+import com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_AWAKE
 import com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_NOTIFICATION_PANEL_VISIBLE
 import com.android.systemui.testKosmos
 import com.google.common.truth.Truth.assertThat
@@ -44,7 +42,6 @@ class SceneContainerPluginTest : SysuiTestCase() {
     private val underTest: SceneContainerPlugin = kosmos.sceneContainerPluginImpl
 
     @Test
-    @EnableFlags(Flags.FLAG_SHADE_WINDOW_GOES_AROUND)
     fun flagValueOverride_differentDisplayId_alwaysFalse() {
         sceneDataSource.changeScene(Scenes.Shade)
 
@@ -60,7 +57,15 @@ class SceneContainerPluginTest : SysuiTestCase() {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_SHADE_WINDOW_GOES_AROUND)
+    fun flagValueOverride_doesntOverrideAwake() {
+        sceneDataSource.changeScene(Scenes.Shade)
+
+        shadeDisplayRepository.setPendingDisplayId(1)
+
+        assertThat(underTest.flagValueOverride(flag = SYSUI_STATE_AWAKE, displayId = 1)).isNull()
+    }
+
+    @Test
     fun flagValueOverride_sameDisplayId_returnsTrue() {
         sceneDataSource.changeScene(Scenes.Shade)
 
@@ -70,22 +75,6 @@ class SceneContainerPluginTest : SysuiTestCase() {
                 underTest.flagValueOverride(
                     flag = SYSUI_STATE_NOTIFICATION_PANEL_VISIBLE,
                     displayId = 1,
-                )
-            )
-            .isTrue()
-    }
-
-    @Test
-    @DisableFlags(Flags.FLAG_SHADE_WINDOW_GOES_AROUND)
-    fun flagValueOverride_differentDisplayId_shadeGoesAroundFlagOff_returnsTrue() {
-        sceneDataSource.changeScene(Scenes.Shade)
-
-        shadeDisplayRepository.setPendingDisplayId(1)
-
-        assertThat(
-                underTest.flagValueOverride(
-                    flag = SYSUI_STATE_NOTIFICATION_PANEL_VISIBLE,
-                    displayId = 2,
                 )
             )
             .isTrue()

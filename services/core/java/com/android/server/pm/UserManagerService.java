@@ -1195,8 +1195,7 @@ public class UserManagerService extends IUserManager.Stub {
             sInstance = this;
         }
         mSystemPackageInstaller = new UserSystemPackageInstaller(this, mUserTypes);
-        mPerUserTypeActivitiesAllowlist =
-                buildActivitiesAllowlist(context.getResources(), mUserTypes);
+        mPerUserTypeActivitiesAllowlist = buildActivitiesAllowlist(context, mUserTypes);
         // Most common sizes would be 1-3 (HSU, full user, profile), so setting to 4 as it's the
         // closed multiple of 2.
         mPerUserActivitiesAllowlist = Flags.hsuAllowlistActivities()
@@ -1565,8 +1564,7 @@ public class UserManagerService extends IUserManager.Stub {
      */
     private @UserIdInt int getHsumBootUserBasedOnProvisioning()
             throws UserManager.CheckedUserOperationException {
-        final boolean provisioned = Settings.Global.getInt(mContext.getContentResolver(),
-                                            Settings.Global.DEVICE_PROVISIONED, 0) != 0;
+        final boolean provisioned = isDeviceProvisioned(mContext);
         if (provisioned) {
             return UserHandle.USER_SYSTEM;
         } else {
@@ -1581,6 +1579,12 @@ public class UserManagerService extends IUserManager.Stub {
             throw new UserManager.CheckedUserOperationException(
                 "No switchable full user found", USER_OPERATION_ERROR_UNKNOWN);
         }
+    }
+
+    /** Checks whether the {@code DEVICE_PROVISIONED} global setting was set. */
+    private static boolean isDeviceProvisioned(Context context) {
+        return Settings.Global
+                .getInt(context.getContentResolver(), Settings.Global.DEVICE_PROVISIONED, 0) != 0;
     }
 
     /**
@@ -4948,13 +4952,14 @@ public class UserManagerService extends IUserManager.Stub {
 
     /** This method is called in the constructor once (hence it's static) */
     private static @Nullable ArrayMap<String, UserActivitiesAllowlist> buildActivitiesAllowlist(
-            Resources resources, ArrayMap<String, UserTypeDetails> userTypes) {
+            Context context, ArrayMap<String, UserTypeDetails> userTypes) {
         if (!android.multiuser.Flags.hsuAllowlistActivities()) {
             return null;
         }
 
         // Most likely only enabled for the Headless System User (at most), hence initial size is 1
         final ArrayMap<String, UserActivitiesAllowlist> userActivitiesAllowlist = new ArrayMap<>(1);
+        final Resources resources = context.getResources();
 
         for (int i = 0; i < userTypes.size(); i++) {
             final UserTypeDetails utd = userTypes.valueAt(i);
@@ -4975,9 +4980,15 @@ public class UserManagerService extends IUserManager.Stub {
 
             }
 
-            int allowlistMode = resources.getInteger(R.integer.config_hsuActivitiesAllowlistMode);
-            userActivitiesAllowlist.put(userType,
-                    new UserActivitiesAllowlist(allowlistMode, allowlistedActivities));
+            final int allowlistMode =
+                    resources.getInteger(R.integer.config_hsuActivitiesAllowlistMode);
+            final UserActivitiesAllowlist allowlist =
+                    new UserActivitiesAllowlist(allowlistMode, allowlistedActivities);
+            // TODO(b/477998894): call overrideDisallowedStatus(
+            //   STATUS_ALLOWED_ALLOWLISTING_DISABLED_WHILE_DEVICE_IS_PROVISIONING) if the device is
+            // not provisioned (will be done in a separate CL as it'd also require changing
+            // HsuDeviceProvisioner to reset it later).
+            userActivitiesAllowlist.put(userType, allowlist);
         }
         return userActivitiesAllowlist;
     }
@@ -5534,6 +5545,11 @@ public class UserManagerService extends IUserManager.Stub {
         } else {
             // File exists and flag is on, make sure file has correct permissions
             // TODO: annabauza - Remove with flag cleanup. Temporary for current testing population.
+            FileUtils.setPermissions(
+                    mPerfUserListFile.toString(),
+                    FileUtils.S_IRUSR | FileUtils.S_IWUSR | FileUtils.S_IRGRP
+                            | FileUtils.S_IWGRP | FileUtils.S_IROTH,
+                    -1, -1);
             SELinux.restorecon(mPerfUserListFile);
         }
     }
@@ -6279,7 +6295,6 @@ public class UserManagerService extends IUserManager.Stub {
         // If new user is of type CLONE, check if creation of clone profile is allowed
         // If new user is of type MANAGED, check if creation of managed profile is allowed
         // If new user is of type PRIVATE, check if creation of private profile is allowed
-        // If new user is of type GUEST, check if creation of guest profile is allowed
         String restriction = UserManager.DISALLOW_ADD_USER;
         if (UserManager.isUserTypeCloneProfile(userType)) {
             restriction = UserManager.DISALLOW_ADD_CLONE_PROFILE;
@@ -6287,12 +6302,17 @@ public class UserManagerService extends IUserManager.Stub {
             restriction = UserManager.DISALLOW_ADD_MANAGED_PROFILE;
         } else if (UserManager.isUserTypePrivateProfile(userType)) {
             restriction = UserManager.DISALLOW_ADD_PRIVATE_PROFILE;
-        } else if (UserManager.isUserTypeGuest(userType)) {
-            restriction = UserManager.DISALLOW_ADD_GUEST;
         }
 
         enforceUserRestriction(restriction, UserHandle.getCallingUserId(),
                 "Cannot add user");
+
+        if (android.os.Flags.disallowAddGuest() && UserManager.isUserTypeGuest(userType)) {
+            // In addition to the DISALLOW_ADD_USER already done, also check for Guest specifically
+            enforceUserRestriction(UserManager.DISALLOW_ADD_GUEST, UserHandle.getCallingUserId(),
+                    "Cannot add user");
+        }
+
         if (Flags.unicornModeRefactoringForHsumReadOnly()) {
             if ((flags & UserInfo.FLAG_ADMIN) != 0) {
                 enforceUserRestriction(UserManager.DISALLOW_GRANT_ADMIN,

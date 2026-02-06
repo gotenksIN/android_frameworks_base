@@ -34,6 +34,7 @@ import androidx.test.filters.SmallTest
 import com.android.compose.animation.scene.TestContentScope
 import com.android.compose.theme.PlatformTheme
 import com.android.systemui.compose.modifiers.resIdToTestTag
+import com.android.systemui.shade.domain.interactor.enableSplitShade
 import com.android.systemui.Flags
 import com.android.systemui.Flags.FLAG_DUAL_SHADE
 import com.android.systemui.SysuiTestCase
@@ -42,6 +43,7 @@ import com.android.systemui.integration.SystemUiIntegrationTest
 import com.android.systemui.jank.interactionJankMonitor
 import com.android.systemui.kosmos.runCurrent
 import com.android.systemui.kosmos.runTest
+import com.android.systemui.media.swipeDownToOpenShade
 import com.android.systemui.media.remedia.data.repository.fakeMediaData
 import com.android.systemui.media.remedia.data.repository.setFakeCurrentMedia
 import com.android.systemui.media.remedia.data.repository.setHasMedia
@@ -122,22 +124,9 @@ class SwipeDownToMediaTest : SysuiTestCase() {
             runCurrent()
             composeTestRule.waitForIdle()
 
-            // Get the root node bounds to calculate swipe coordinates.
-            val rootBounds = composeTestRule.onRoot().getUnclippedBoundsInRoot()
-            val x = (rootBounds.left + rootBounds.right) / 2
-            val startY = rootBounds.top
-            val endY = (rootBounds.top + rootBounds.bottom) / 2
-
             // Perform a realistic swipe from the top-center edge of the screen.
-            composeTestRule.onRoot().performTouchInput {
-                swipe(
-                    start = Offset(x.toPx(), startY.toPx()),
-                    end = Offset(x.toPx(), endY.toPx()),
-                    durationMillis = 200,
-                )
-            }
+            composeTestRule.swipeDownToOpenShade()
             runCurrent()
-            composeTestRule.waitForIdle()
 
             // Verify that the QQS panel exists.
             composeTestRule.onNodeWithTag(QQS_PANEL_TAG, useUnmergedTree = true).assertExists()
@@ -147,8 +136,42 @@ class SwipeDownToMediaTest : SysuiTestCase() {
                 .assertExists()
         }
 
+    @DisableFlags(Flags.FLAG_STATUS_BAR_MOBILE_ICON_KAIROS)
+    @Test
+    fun swipeDown_showsQqsAndMedia_splitShade() =
+        kosmos.runTest {
+            usingMediaInComposeFragment = true
+            enableSplitShade()
+            setHasMedia(true)
+
+            // Start with the shade closed to properly test the swipe gesture.
+            composeTestRule.setContent {
+                PlatformTheme {
+                    WithStatusIconContext(tintedIconManagerFactory) {
+                        with(scene) {
+                            TestContentScope(currentScene = Scenes.Gone) { Content(Modifier) }
+                        }
+                    }
+                }
+            }
+            runCurrent()
+            composeTestRule.waitForIdle()
+
+            // Perform a realistic swipe from the top-center edge of the screen.
+            composeTestRule.swipeDownToOpenShade()
+            runCurrent()
+
+            // Verify that the split shade qs exists.
+            composeTestRule.onNodeWithTag(SPLIT_SHADE_QS_TAG).assertExists()
+            // Verify that the media controls (UMO) are visible in the shade.
+            composeTestRule
+                .onNodeWithContentDescription(EXPECTED_UMO_CONTENT_DESC, substring = true)
+                .assertExists()
+        }
+
     private companion object {
         private val QQS_PANEL_TAG = resIdToTestTag("quick_qs_panel")
+        private const val SPLIT_SHADE_QS_TAG = "element:SplitShadeQuickSettings"
         private const val EXPECTED_UMO_CONTENT_DESC = "Fake_Music_Player"
     }
 }

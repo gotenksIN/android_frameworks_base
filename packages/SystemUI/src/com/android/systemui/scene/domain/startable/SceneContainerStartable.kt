@@ -18,7 +18,6 @@ package com.android.systemui.scene.domain.startable
 
 import android.app.StatusBarManager
 import android.os.PowerManager
-import android.view.Display
 import android.view.SurfaceControl
 import com.android.compose.animation.scene.ObservableTransitionState
 import com.android.compose.animation.scene.OverlayKey
@@ -89,7 +88,6 @@ import com.android.systemui.scene.shared.model.isKeyguardScene
 import com.android.systemui.shade.domain.interactor.ShadeDisplaysInteractor
 import com.android.systemui.shade.domain.interactor.ShadeInteractor
 import com.android.systemui.shade.domain.interactor.ShadeModeInteractor
-import com.android.systemui.shade.shared.flag.ShadeWindowGoesAround
 import com.android.systemui.statusbar.NotificationShadeWindowController
 import com.android.systemui.statusbar.SysuiStatusBarStateController
 import com.android.systemui.statusbar.VibratorHelper
@@ -184,12 +182,7 @@ constructor(
 
     private val authInteractionProperties = AuthInteractionProperties()
 
-    private val shadePendingDisplayId: Flow<Int> =
-        if (ShadeWindowGoesAround.isEnabled) {
-            shadeDisplaysInteractor.get().pendingDisplayId
-        } else {
-            flowOf(Display.DEFAULT_DISPLAY)
-        }
+    private val shadePendingDisplayId: Flow<Int> = shadeDisplaysInteractor.get().pendingDisplayId
 
     override fun start() {
         if (SceneContainerFlag.isEnabled) {
@@ -730,7 +723,6 @@ constructor(
                     alternateBouncerInteractor.hide()
                     dismissCallbackRegistry.notifyDismissCancelled()
                     val isAodAvailable = keyguardInteractor.isAodAvailable.value
-                    val isShadeAnyExpanded = shadeInteractor.isShadeAnyExpanded.value
 
                     switchToScene(
                         targetSceneKey = Scenes.Lockscreen,
@@ -738,7 +730,6 @@ constructor(
                         transitionKey = ToAlwaysOnDisplay.takeIf { isAodAvailable },
                         keyguardState = getKeyguardStateForWakefulness(isAwake = false),
                         freezeAndAnimateToCurrentState = !isAodAvailable,
-                        instantlySnapScenes = isShadeAnyExpanded && isAodAvailable,
                     )
                 } else {
                     if (wakeDirectlyToGoneInteractor.canWakeDirectlyToGone.value) {
@@ -769,6 +760,27 @@ constructor(
                     }
                 }
             }
+        }
+
+        applicationScope.launch {
+            // Mainly used for tests that are frequently changing keyguard enabled state. There is a
+            // race condition on wake up, where checks for suppression happen on background threads
+            // that lead to calls to wakeDirectlyToGoneInteractor.canWakeDirectlyToGone.value
+            // retrieving the value too early. See [KeyguardEnabledInteractor#isKeyguardSuppressed]
+            combine(
+                    wakeDirectlyToGoneInteractor.shouldSuppressKeyguard,
+                    wakeDirectlyToGoneInteractor.canWakeDirectlyToGone,
+                    ::Pair,
+                )
+                .collect { (shouldSuppressKeyguard, canWakeDirectlyToGone) ->
+                    if (shouldSuppressKeyguard && canWakeDirectlyToGone) {
+                        switchToScene(
+                            targetSceneKey = Scenes.Gone,
+                            loggingReason = "keyguard suppressed and can wake to gone",
+                            instantlySnapScenes = !keyguardInteractor.isAodAvailable.value,
+                        )
+                    }
+                }
         }
     }
 
@@ -1097,6 +1109,11 @@ constructor(
                                 keyguardState = getKeyguardStateForWakefulness(isAwake),
                             )
                         }
+                    }
+                    if (!occluded) {
+                        sceneBackInteractor.removeOccludedSceneOnBackStack(
+                            reason = "removing occluded from backstack, if present"
+                        )
                     }
                 }
         }

@@ -29,6 +29,8 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.PermissionManuallyEnforced;
 import android.annotation.WorkerThread;
+import android.app.appfunctions.AppFunctionActivityId;
+import android.app.appfunctions.AppFunctionActivityState;
 import android.app.appfunctions.AppFunctionManagerHelper;
 import android.app.appfunctions.AppFunctionMetadata;
 import android.app.appfunctions.AppFunctionName;
@@ -51,6 +53,7 @@ import android.os.RemoteException;
 import android.os.UserHandle;
 import android.text.TextUtils;
 import android.util.ArrayMap;
+import android.util.ArraySet;
 import android.util.Pair;
 import android.util.Slog;
 
@@ -63,6 +66,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executor;
@@ -128,6 +132,23 @@ final class AppFunctionMetadataReader {
     public boolean isDynamicFunction(
             String packageName, String functionIdentifier, UserHandle user) {
         return mCache.isDynamicFunction(packageName, functionIdentifier, user);
+    }
+
+    /**
+     * Returns whether the function is activity scoped dynamic app function.
+     * Activity scoped dynamic app functions must be registered within the activity context and
+     * support multiregistration (so the same app function can be registered by multiple
+     * activities).
+     *
+     * See {@link android.app.appfunctions.AppFunctionActivityId}.
+     *
+     * @param packageName The package name of the application containing the function.
+     * @param functionIdentifier The unique identifier for the function within the package.
+     * @return {boolean} Whether app function is activity scoped dynamic.
+     */
+    public boolean isActivityScopedDynamicFunction(
+            String packageName, String functionIdentifier, UserHandle user) {
+        return mCache.isActivityScopedDynamicFunction(packageName, functionIdentifier, user);
     }
 
     /**
@@ -233,7 +254,7 @@ final class AppFunctionMetadataReader {
     @NonNull
     AndroidFuture<List<AppFunctionState>> getAppFunctionStates(
             @NonNull FutureGlobalSearchSession futureGlobalSearchSession,
-            @NonNull List<AppFunctionName> appFunctionNames,
+            @NonNull Set<AppFunctionName> appFunctionNames,
             int userId) {
         Objects.requireNonNull(futureGlobalSearchSession);
         Objects.requireNonNull(appFunctionNames);
@@ -274,6 +295,15 @@ final class AppFunctionMetadataReader {
                                                 searchResults.close();
                                             });
                         });
+    }
+
+    @WorkerThread
+    @NonNull
+    AndroidFuture<List<AppFunctionActivityState>> getAppFunctionActivityStates(
+            @NonNull List<AppFunctionActivityId> activityIds, int userId) {
+        return AndroidFuture.completedFuture(
+                mMultiUserDynamicAppFunctionRegistry.getAppFunctionActivityStates(
+                        activityIds, UserHandle.of(userId)));
     }
 
     @NonNull
@@ -322,11 +352,22 @@ final class AppFunctionMetadataReader {
 
             return new AppFunctionState(
                     appFunctionName,
-                    calculateEffectiveEnabledState(staticDocument, runtimeDocument, userId));
+                    calculateEffectiveEnabledState(staticDocument, runtimeDocument, userId),
+                    getActivityIdInfo(appFunctionName, UserHandle.of(userId)));
         } catch (RuntimeException e) {
             Slog.e(TAG, "Failed to convert SearchResult to AppFunctionState.", e);
             return null;
         }
+    }
+
+    @Nullable
+    private ArraySet<AppFunctionActivityId> getActivityIdInfo(
+            @NonNull AppFunctionName functionName, @NonNull UserHandle user) {
+        if (!mCache.isActivityScopedDynamicFunction(
+                functionName.getPackageName(), functionName.getFunctionId(), user)) {
+            return null;
+        }
+        return mMultiUserDynamicAppFunctionRegistry.getRegisteredActivityIds(functionName, user);
     }
 
     /**

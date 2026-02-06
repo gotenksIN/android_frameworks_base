@@ -30,6 +30,11 @@ fun PreferenceScreenMetadata.getPreferenceScreenTitle(context: Context): CharSeq
         else -> getScreenTitle(context) ?: (this as? PreferenceTitleProvider)?.getTitle(context)
     }
 
+
+/** Returns the preference purpose */
+fun PreferenceMetadata.getPreferencePurpose(context: Context) : CharSequence? =
+    context.getString(purpose)
+
 /** Returns the preference title. */
 fun PreferenceMetadata.getPreferenceTitle(context: Context): CharSequence? =
     when {
@@ -62,6 +67,14 @@ fun PreferenceMetadata.getPreferenceIcon(context: Context): Int =
  */
 fun PreferenceMetadata.isPreferenceIndexable(context: Context): Boolean =
     if (this is PreferenceIndexableProvider) isIndexable(context) else indexable
+
+/**
+ * Returns whether the preference is only relevant for the UI.
+ *
+ * @return true if preference is only relevant for the UI, false otherwise
+ */
+fun PreferenceMetadata.isUiOnlyPreference(context: Context): Boolean =
+    tags(context).contains(UI_ONLY_PREFERENCE)
 
 /**
  * Performs preference hierarchy operation with a new [CoroutineScope].

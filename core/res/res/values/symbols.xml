@@ -421,6 +421,7 @@
   <java-symbol type="string" name="config_usbAccessoryUriActivity" />
   <java-symbol type="string" name="config_usbConfirmActivity" />
   <java-symbol type="string" name="config_usbResolverActivity" />
+  <java-symbol type="string" name="config_usbAuthorizationActivity" />
   <java-symbol type="string" name="config_sensorUseStartedActivity" />
   <java-symbol type="string" name="config_sensorUseStartedActivity_hwToggle" />
   <java-symbol type="string" name="config_sensorStateChangedActivity" />
@@ -2445,6 +2446,14 @@
   <java-symbol type="string" name="usb_contaminant_detected_message" />
   <java-symbol type="string" name="usb_contaminant_not_detected_title" />
   <java-symbol type="string" name="usb_contaminant_not_detected_message" />
+  <java-symbol type="string" name="usb_authorization_notify_on_screenlock_title" />
+  <java-symbol type="string" name="usb_authorization_notify_on_screenlock_message" />
+  <java-symbol type="string" name="usb_authorization_notify_on_screenlock_message_multiple" />
+  <java-symbol type="string" name="usb_authorization_notify_finish_logging_in_title" />
+  <java-symbol type="string" name="usb_authorization_notify_finish_logging_in_message" />
+  <java-symbol type="string" name="usb_authorization_notify_finish_logging_in_title_multiple" />
+  <java-symbol type="string" name="usb_authorization_notify_finish_logging_in_message_multiple" />
+  <java-symbol type="string" name="notification_channel_usb_authorization" />
   <java-symbol type="string" name="config_UsbDeviceConnectionHandling_component" />
   <java-symbol type="string" name="vpn_text" />
   <java-symbol type="string" name="vpn_text_long" />
@@ -3702,6 +3711,7 @@
 
   <java-symbol type="drawable" name="app_lock_scrollbar_handle" />
 
+  <java-symbol type="id" name="app_lock_activity_layout" />
   <java-symbol type="id" name="app_lock_dialog_add_screen_lock_button" />
   <java-symbol type="id" name="app_lock_dialog_cancel_button" />
   <java-symbol type="id" name="app_lock_dialog_message" />
@@ -3710,7 +3720,9 @@
   <java-symbol type="id" name="app_lock_edu_dialog_btn_cancel" />
   <java-symbol type="id" name="app_lock_edu_dialog_btn_lock_app" />
   <java-symbol type="id" name="app_lock_edu_dialog_desc" />
+  <java-symbol type="id" name="app_lock_edu_dialog_info_ai_text" />
   <java-symbol type="id" name="app_lock_edu_dialog_title" />
+  <java-symbol type="id" name="app_lock_edu_layout" />
   <java-symbol type="id" name="app_lock_permission_review_app_list_recycler_view" />
   <java-symbol type="id" name="app_lock_permission_review_btn_cancel" />
   <java-symbol type="id" name="app_lock_permission_review_btn_continue" />
@@ -3733,6 +3745,7 @@
   <java-symbol type="string" name="app_lock_edu_dialog_description_template" />
   <java-symbol type="string" name="app_lock_edu_dialog_description_template_no_biometrics" />
   <java-symbol type="string" name="app_lock_edu_dialog_enable_app_lock_title" />
+  <java-symbol type="string" name="app_lock_edu_dialog_info_ai_disclaimer" />
   <java-symbol type="string" name="app_lock_edu_dialog_lockscreen_password_name" />
   <java-symbol type="string" name="app_lock_edu_dialog_lockscreen_pattern_name" />
   <java-symbol type="string" name="app_lock_edu_dialog_lockscreen_pin_name" />
@@ -6251,6 +6264,7 @@
   <java-symbol type="string" name="satellite_messaging_unsupported_default_sms_app_notification_summary" />
   <java-symbol type="string" name="satellite_messaging_location_disabled_notification_title" />
   <java-symbol type="string" name="satellite_messaging_location_disabled_notification_summary" />
+  <java-symbol type="string" name="satellite_indicator" />
 
   <!-- DisplayManager configs. -->
   <java-symbol type="bool" name="config_evenDimmerEnabled" />
@@ -6560,6 +6574,9 @@
   <!-- Whether contextual mode (e.g. Do Not Disturb Mode) sync is supported by this device. -->
   <java-symbol type="bool" name="config_supportContextualModeSync"/>
 
+  <!-- Whether the native_serial service is supported by this device. -->
+  <java-symbol type="bool" name="config_supportNativeSerialService" />
+
   <!-- Whether Airplane Mode sync is supported by this device. -->
   <java-symbol type="bool" name="config_supportAirplaneModeSync"/>
 
@@ -6569,4 +6586,7 @@
   <java-symbol type="integer" name="config_tvWatchdogUserPackageSettingsResetDays" />
   <java-symbol type="integer" name="config_tvWatchdogRecurringOverusePeriodInDays" />
   <java-symbol type="integer" name="config_tvWatchdogRecurringOveruseTimes" />
+
+  <!-- Wallpaper Local Color Extraction configuration -->
+  <java-symbol type="bool" name="config_enableWallpaperLocalColorExtraction"/>
 </resources>

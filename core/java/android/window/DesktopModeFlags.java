@@ -45,8 +45,6 @@ public enum DesktopModeFlags {
     // go/keep-sorted start
     ENABLE_CAMERA_COMPAT_SIMULATE_REQUESTED_ORIENTATION(
             Flags::enableCameraCompatForDesktopWindowing, true),
-    ENABLE_CAPTION_COMPAT_INSET_FORCE_CONSUMPTION(Flags::enableCaptionCompatInsetForceConsumption,
-            true),
     ENABLE_CAPTION_COMPAT_INSET_FORCE_CONSUMPTION_ALWAYS(
             Flags::enableCaptionCompatInsetForceConsumptionAlways, true),
     ENABLE_DESKTOP_APP_HANDLE_ANIMATION(Flags::enableDesktopAppHandleAnimation, true),
@@ -60,13 +58,10 @@ public enum DesktopModeFlags {
             Flags::enableDesktopWindowingExitTransitionsBugfix, true),
     ENABLE_DESKTOP_WINDOWING_MODE(Flags::enableDesktopWindowingMode, true),
     ENABLE_DESKTOP_WINDOWING_PERSISTENCE(Flags::enableDesktopWindowingPersistence, true),
-    ENABLE_DESKTOP_WINDOWING_SCVH_CACHE(Flags::enableDesktopWindowingScvhCacheBugFix, true),
     ENABLE_DESKTOP_WINDOWING_SIZE_CONSTRAINTS(Flags::enableDesktopWindowingSizeConstraints, true),
     ENABLE_DESKTOP_WINDOWING_WALLPAPER_ACTIVITY(Flags::enableDesktopWindowingWallpaperActivity,
             true),
     ENABLE_HANDLE_INPUT_FIX(Flags::enableHandleInputFix, true),
-    ENABLE_HOLD_TO_DRAG_APP_HANDLE(Flags::enableHoldToDragAppHandle, true),
-    ENABLE_INPUT_LAYER_TRANSITION_FIX(Flags::enableInputLayerTransitionFix, true),
     ENABLE_REQUEST_FULLSCREEN_BUGFIX(Flags::enableRequestFullscreenBugfix, true),
     ENABLE_RESIZING_METRICS(Flags::enableResizingMetrics, true),
     ENABLE_TASKBAR_OVERFLOW(Flags::enableTaskbarOverflow, false),

@@ -18,12 +18,15 @@ package android.app.appfunctions;
 import static android.app.appfunctions.flags.Flags.FLAG_ENABLE_DYNAMIC_APP_FUNCTIONS;
 
 import android.annotation.FlaggedApi;
+import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.appsearch.GenericDocument;
 import android.os.Parcel;
 import android.os.Parcelable;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import java.util.Objects;
 
 /**
@@ -117,6 +120,70 @@ public final class AppFunctionMetadata implements AbstractAppFunctionMetadata, P
     public static final String PROPERTY_ENABLED_BY_DEFAULT = "enabledByDefault";
 
     /**
+     * Property name for the scope of this function.
+     *
+     * <p>This name identifies the app function's scope property in the XML file that declares app
+     * functions.
+     *
+     * @see #getScope()
+     */
+    public static final String PROPERTY_SCOPE = "scope";
+
+    /**
+     * The value for {@link #PROPERTY_SCOPE} in the XML representing a global scope.
+     *
+     * @see #getScope()
+     * @see #SCOPE_GLOBAL
+     */
+    public static final String PROPERTY_VALUE_SCOPE_GLOBAL = "global";
+
+    /**
+     * The value for {@link #PROPERTY_SCOPE} in the XML representing an activity scope.
+     *
+     * @see #getScope()
+     * @see #SCOPE_ACTIVITY
+     */
+    public static final String PROPERTY_VALUE_SCOPE_ACTIVITY = "activity";
+
+    /**
+     * A value returned from {@link #getScope()} that indicates it is a globally scoped app
+     * function.
+     *
+     * <p>There can be at most one function with the same {@link AppFunctionName} available with
+     * this scope.
+     *
+     * <p>The function remains registered until it is explicitly unregistered or the process
+     * terminates.
+     */
+    public static final int SCOPE_GLOBAL = 0;
+
+    /**
+     * A value returned from {@link #getScope()} that indicates it is a activity scoped app
+     * function.
+     *
+     * <p>Multiple instances of the same function (with the same {@link AppFunctionName}) can
+     * exist simultaneously, each associated with a different activity instance identified by an
+     * {@link AppFunctionActivityId}.
+     *
+     * <p>To discover the specific activities where an activity-scoped function is currently
+     * registered, see {@link AppFunctionManager#getAppFunctionStates} and {@link
+     * AppFunctionManager#getAppFunctionActivityStates}.
+     *
+     * <p>To execute an activity-scoped function, see {@link
+     * ExecuteAppFunctionRequest#setActivityId}.
+     *
+     * <p>The function remains registered until it is explicitly unregistered or the activity is
+     * destroyed.
+     *
+     * @see AppFunctionActivityId
+     */
+    public static final int SCOPE_ACTIVITY = 1;
+
+    @IntDef({SCOPE_GLOBAL, SCOPE_ACTIVITY})
+    @Retention(RetentionPolicy.SOURCE)
+    @interface Scope {}
+
+    /**
      * Internal property which stores service name which should be used to execute App Function.
      * {@link #DYNAMIC_APP_FUNCTIONS_SERVICE_NAME} is set for dynamic app functions.
      *
@@ -201,6 +268,36 @@ public final class AppFunctionMetadata implements AbstractAppFunctionMetadata, P
     }
 
     /**
+     * Returns the scope of the app function.
+     *
+     * <p>The scope determines the function's lifecycle and uniqueness rules. Depending on the
+     * scope, there could be at most one or multiple functions registered in the system with the
+     * same {@link AppFunctionName}.
+     */
+    @Scope
+    public int getScope() {
+        String xmlValue = getMetadataDocument().getPropertyString(PROPERTY_SCOPE);
+        return scopeXmlValueToScope(xmlValue);
+    }
+
+    @Scope
+    static int scopeXmlValueToScope(@NonNull String xmlValue) {
+        return switch (xmlValue) {
+            case PROPERTY_VALUE_SCOPE_GLOBAL -> SCOPE_GLOBAL;
+            case PROPERTY_VALUE_SCOPE_ACTIVITY -> SCOPE_ACTIVITY;
+            default -> throw new IllegalStateException("Unexpected value: " + xmlValue);
+        };
+    }
+
+    static String scopeToScopeXmlValue(@Scope int scope) {
+        return switch (scope) {
+            case SCOPE_GLOBAL -> PROPERTY_VALUE_SCOPE_GLOBAL;
+            case SCOPE_ACTIVITY -> PROPERTY_VALUE_SCOPE_ACTIVITY;
+            default -> throw new IllegalStateException("Unexpected value: " + scope);
+        };
+    }
+
+    /**
      * Returns the app function's metadata as a {@link GenericDocument}.
      *
      * <p>Client-defined properties can be retrieved using the {@link GenericDocument} property
@@ -219,12 +316,13 @@ public final class AppFunctionMetadata implements AbstractAppFunctionMetadata, P
     public boolean equals(Object o) {
         if (this == o) return true;
         if (!(o instanceof AppFunctionMetadata that)) return false;
-        return getMetadataDocument().equals(that.getMetadataDocument());
+        return getMetadataDocument().equals(that.getMetadataDocument())
+                && getPackageMetadata().equals(that.getPackageMetadata());
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(getMetadataDocument());
+        return Objects.hash(getMetadataDocument(), getPackageMetadata());
     }
 
     @Override

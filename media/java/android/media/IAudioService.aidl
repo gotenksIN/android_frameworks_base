@@ -875,7 +875,7 @@ interface IAudioService {
 
     @EnforcePermission("MODIFY_AUDIO_SETTINGS_PRIVILEGED")
     @JavaPassthrough(annotation="@android.annotation.RequiresPermission(android.Manifest.permission.MODIFY_AUDIO_SETTINGS_PRIVILEGED)")
-    void setEnableHardening(in boolean shouldEnable);
+    void setHardeningOverride(in int hardeningOverride);
 
     @EnforcePermission("BLUETOOTH_PRIVILEGED")
     @JavaPassthrough(annotation="@android.annotation.RequiresPermission(android.Manifest.permission.BLUETOOTH_PRIVILEGED)")

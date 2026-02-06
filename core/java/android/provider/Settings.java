@@ -3805,11 +3805,9 @@ public final class Settings {
                 final @CanBeCURRENT @UserIdInt int userId) {
             final boolean isSelf = (userId == UserHandle.myUserId());
             final AttributionSource attributionSource = cr.getAttributionSource();
-            final int deviceId =
-                    android.companion.virtualdevice.flags.Flags.deviceAwareSettingsOverride()
-                            && android.permission.flags.Flags.deviceAwarePermissionApisEnabled()
-                            && attributionSource != null
-                            ? attributionSource.getDeviceId() : Context.DEVICE_ID_DEFAULT;
+            final int deviceId = android.permission.flags.Flags.deviceAwarePermissionApisEnabled()
+                    && attributionSource != null
+                    ? attributionSource.getDeviceId() : Context.DEVICE_ID_DEFAULT;
             final GenerationTracker.Key key = new GenerationTracker.Key(name, deviceId);
             final boolean useCache = isSelf && !isInSystemServer();
             boolean needsGenerationTracker = false;
@@ -14124,7 +14122,7 @@ public final class Settings {
          */
         @Readable
         @FlaggedApi(com.android.text.flags.Flags.FLAG_SPLIT_SHOW_PASSWORDS_TO_TOUCH_AND_PHYSICAL)
-        public static final String TEXT_SHOW_PASSWORD_TOUCH = "show_passwords_touch";
+        public static final String TEXT_SHOW_PASSWORD_TOUCH = "show_password_touch";
 
         /**
          * Setting to showing password characters from physical inputs in text editors.
@@ -14133,7 +14131,7 @@ public final class Settings {
          */
         @Readable
         @FlaggedApi(com.android.text.flags.Flags.FLAG_SPLIT_SHOW_PASSWORDS_TO_TOUCH_AND_PHYSICAL)
-        public static final String TEXT_SHOW_PASSWORD_PHYSICAL = "show_passwords_physical";
+        public static final String TEXT_SHOW_PASSWORD_PHYSICAL = "show_password_physical";
 
         /**
          * Whether personal context is enabled.

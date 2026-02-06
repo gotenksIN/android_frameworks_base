@@ -496,8 +496,11 @@ public final class InputMethodManagerService implements IInputMethodManagerImpl.
                     final var menuItem = new IImeSwitcherMenu.Item();
                     menuItem.imeName = item.mImeName;
                     menuItem.subtypeName = item.mSubtypeName;
+                    menuItem.subtypeShortLabel = item.mSubtypeShortLabel;
+                    menuItem.subtypeIconResId = item.mSubtypeIconResId;
                     menuItem.layoutName = item.mLayoutName;
                     menuItem.imeId = item.mImi.getId();
+                    menuItem.imePackageName = item.mImi.getPackageName();
                     menuItem.subtypeIndex = item.mSubtypeIndex;
                     menuItems.add(menuItem);
                 }
@@ -2751,11 +2754,12 @@ public final class InputMethodManagerService implements IInputMethodManagerImpl.
         final var bindingController = getInputMethodBindingController(userId);
         final InputMethodInfo imi = InputMethodSettingsRepository.get(userId).getMethodMap()
                 .get(imeId);
-        if (bindingController.getSupportsStylusHandwriting() != imi.supportsStylusHandwriting()) {
+        if (imi != null && bindingController.getSupportsStylusHandwriting()
+                != imi.supportsStylusHandwriting()) {
             bindingController.setSupportsStylusHandwriting(imi.supportsStylusHandwriting());
             InputMethodManager.invalidateLocalStylusHandwritingAvailabilityCaches();
         }
-        if (bindingController.getSupportsConnectionlessStylusHandwriting()
+        if (imi != null && bindingController.getSupportsConnectionlessStylusHandwriting()
                 != imi.supportsConnectionlessStylusHandwriting()) {
             bindingController.setSupportsConnectionlessStylusHandwriting(
                     imi.supportsConnectionlessStylusHandwriting());

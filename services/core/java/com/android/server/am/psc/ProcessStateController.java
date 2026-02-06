@@ -26,6 +26,7 @@ import static android.app.ProcessMemoryState.HOSTING_COMPONENT_TYPE_BROADCAST_RE
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_OOM_ADJ;
 import static com.android.server.am.psc.Constants.SCHED_GROUP_UNDEFINED;
 
+import android.annotation.ElapsedRealtimeLong;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.UserIdInt;
@@ -45,6 +46,7 @@ import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.server.ServiceThread;
 import com.android.server.am.Flags;
+import com.android.server.am.psc.Constants.SchedGroup;
 import com.android.server.am.psc.annotation.RequiresEnclosingBatchSession;
 import com.android.server.wm.WindowProcessController;
 
@@ -601,6 +603,74 @@ public class ProcessStateController {
         mOomAdjuster.setUidTempAllowlistStateLSP(uid, allowList);
     }
 
+    /**
+     * Set whether the given UID is currently idle.
+     */
+    @GuardedBy({"mLock", "mProcLock"})
+    public void setUidIdle(@NonNull UidRecordInternal uidRec, boolean idle) {
+        uidRec.setIdle(idle);
+    }
+
+    /**
+     * Set whether the given UID is idle at the last round of computation.
+     */
+    @GuardedBy({"mLock", "mProcLock"})
+    public void setUidSetIdle(@NonNull UidRecordInternal uidRec, boolean idle) {
+        uidRec.setSetIdle(idle);
+    }
+
+    /**
+     * Set the last time the given UID became idle.
+     */
+    @GuardedBy({"mLock", "mProcLock"})
+    public void setUidLastIdleTime(@NonNull UidRecordInternal uidRec,
+            @ElapsedRealtimeLong long lastIdleTime) {
+        uidRec.setLastIdleTime(lastIdleTime);
+    }
+
+    /**
+     * Set the current process state for a UID.
+     */
+    @VisibleForTesting
+    @GuardedBy({"mLock", "mProcLock"})
+    public void setUidCurProcState(@NonNull UidRecordInternal uidRec, int curProcState) {
+        uidRec.setCurProcState(curProcState);
+    }
+
+    /**
+     * Set the last round's process state for a UID.
+     */
+    @VisibleForTesting
+    @GuardedBy({"mLock", "mProcLock"})
+    public void setUidSetProcState(@NonNull UidRecordInternal uidRec, int setProcState) {
+        uidRec.setSetProcState(setProcState);
+    }
+
+    /**
+     * Set the current process state sequence number for a UID.
+     */
+    @VisibleForTesting
+    @GuardedBy({"mLock", "mProcLock"})
+    public void setUidCurProcStateSeq(@NonNull UidRecordInternal uidRec, long curProcStateSeq) {
+        uidRec.setCurProcStateSeq(curProcStateSeq);
+    }
+
+    /**
+     * Set whether the given UID is currently on the allow list.
+     */
+    @GuardedBy({"mLock", "mProcLock"})
+    public void setUidCurAllowListed(@NonNull UidRecordInternal uidRec, boolean allowListed) {
+        uidRec.setCurAllowListed(allowListed);
+    }
+
+    /**
+     * Set whether the given UID is on the allow list at the last round of computation.
+     */
+    @GuardedBy({"mLock", "mProcLock"})
+    public void setUidSetAllowListed(@NonNull UidRecordInternal uidRec, boolean allowListed) {
+        uidRec.setSetAllowListed(allowListed);
+    }
+
     /*********************** Process Miscellaneous Events **********************/
     /**
      * Note whether the given process has been killed.
@@ -932,6 +1002,16 @@ public class ProcessStateController {
     }
 
     /**
+     * Updates the flags for a given connection record.
+     *
+     * @return {@code true} if the flags were changed, {@code false} otherwise.
+     */
+    @GuardedBy("mLock")
+    public boolean updateConnectionFlags(@NonNull ConnectionRecordInternal cr, long flags) {
+        return cr.updateFlags(flags);
+    }
+
+    /**
      * Note whether an executing service should be considered in the foreground or not.
      */
     @GuardedBy("mLock")
@@ -1094,9 +1174,10 @@ public class ProcessStateController {
      * used.
      */
     @GuardedBy("mLock")
-    public void noteBroadcastDeliveryStarted(@NonNull ProcessRecordInternal proc, int schedGroup) {
+    public void noteBroadcastDeliveryStarted(@NonNull ProcessRecordInternal proc,
+            @SchedGroup int schedGroup) {
         final boolean prevReceivingState = proc.getReceivers().isReceivingBroadcast();
-        final int prevSchedGroup = proc.getReceivers().getBroadcastReceiverSchedGroup();
+        final @SchedGroup int prevSchedGroup = proc.getReceivers().getBroadcastReceiverSchedGroup();
         if (prevReceivingState && prevSchedGroup == schedGroup) {
             // isReceiveBroadcast is already true and the schedGroup is not changing, skip.
             return;
@@ -1117,7 +1198,7 @@ public class ProcessStateController {
     @GuardedBy("mLock")
     public void noteBroadcastDeliveryEnded(@NonNull ProcessRecordInternal proc) {
         final boolean prevReceivingState = proc.getReceivers().isReceivingBroadcast();
-        final int prevSchedGroup = proc.getReceivers().getBroadcastReceiverSchedGroup();
+        final @SchedGroup int prevSchedGroup = proc.getReceivers().getBroadcastReceiverSchedGroup();
         if (!prevReceivingState && prevSchedGroup == SCHED_GROUP_UNDEFINED) {
             // isReceiveBroadcast is already false and the schedGroup is already undefined, skip.
             return;

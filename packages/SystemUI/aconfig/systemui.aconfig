@@ -768,16 +768,6 @@ flag {
 }
 
 flag {
-    name: "glanceable_hub_enabled_by_default"
-    namespace: "systemui"
-    description: "Enable glanceable hub by default (this flag is intended to enable GH for DF only)."
-    bug: "428215526"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
   name: "glanceable_hub_v2"
   namespace: "systemui"
   description: "Gates the refreshed glanceable hub experience that also brings the glanceable hub to mobile phones"
@@ -884,6 +874,13 @@ flag {
     namespace: "systemui"
     description: "Enables inline notifications settings access."
     bug: "456554989"
+}
+
+flag {
+    name: "internet_dialog_delegate_legacy_deprecation"
+    namespace: "systemui"
+    description: "Replacing InternetDialogDelegateLegacy by InternetDetailsContentManager."
+    bug: "467481923"
 }
 
 flag {
@@ -1388,15 +1385,15 @@ flag {
 flag {
     name: "qs_wifi_config"
     namespace: "systemui"
-    description: "Enables the multi-user WiFi configuration UI in Interent detailed tiles. This flag depends on qs_tile_detailed_view flag"
+    description: "Obsolete, use qs_wifi_multiuser instead"
     bug: "402214828"
 }
 
 flag {
-   name: "record_issue_qs_tile"
-   namespace: "systemui"
-   description: "Replace Record Trace QS Tile with expanded Record Issue QS Tile"
-   bug: "305049544"
+    name: "qs_wifi_multiuser"
+    namespace: "systemui"
+    description: "Enables the multi-user WiFi configuration UI in Interent detailed tiles. This flag depends on qs_tile_detailed_view flag"
+    bug: "402214828"
 }
 
 flag {
@@ -1502,6 +1499,16 @@ flag {
 }
 
 flag {
+    name: "screen_recording_service_fix"
+    namespace: "systemui"
+    description: "Fixes microphone access in ScreenRecordingService"
+    bug: "412572612"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "screenshot_disable_long_screenshot_for_system_shade"
     namespace: "systemui"
     description: "Disable long screenshot when the system shade is expanded."
@@ -1546,13 +1553,6 @@ flag {
   metadata {
     purpose: PURPOSE_BUGFIX
   }
-}
-
-flag {
-  name: "shade_window_goes_around"
-  namespace: "systemui"
-  description: "Enables the shade window to move between displays"
-  bug: "362719719"
 }
 
 flag {

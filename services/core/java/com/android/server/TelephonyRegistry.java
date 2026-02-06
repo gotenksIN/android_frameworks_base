@@ -4140,6 +4140,11 @@ public class TelephonyRegistry extends ITelephonyRegistry.Stub {
 
         synchronized (mRecords) {
             if (validatePhoneId(phoneId)) {
+                if (Objects.equals(mNetworkSecurityEvents.get(phoneId), events)) {
+                    if (VDBG) log("Ignoring duplicate network security events notification.");
+                    return;
+                }
+                mNetworkSecurityEvents.set(phoneId, events);
                 if (events.isEmpty()) {
                     loge(
                             "NetworkSecurityEvent is empty, subId=" + subId
@@ -4147,11 +4152,6 @@ public class TelephonyRegistry extends ITelephonyRegistry.Stub {
                     // Listeners shouldn't be updated for empty events.
                     return;
                 }
-                if (Objects.equals(mNetworkSecurityEvents.get(phoneId), events)) {
-                    if (VDBG) log("Ignoring duplicate network security events notification.");
-                    return;
-                }
-                mNetworkSecurityEvents.set(phoneId, events);
 
                 for (Record r : mRecords) {
                     if (r.matchTelephonyCallbackEvent(

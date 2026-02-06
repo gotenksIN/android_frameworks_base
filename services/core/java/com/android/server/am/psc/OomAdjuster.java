@@ -22,11 +22,11 @@
 package com.android.server.am.psc;
 
 import static android.app.ActivityManager.PROCESS_CAPABILITY_ALL;
-import static android.app.ActivityManager.PROCESS_CAPABILITY_INSTRUMENTATION_DEFAULTS;
 import static android.app.ActivityManager.PROCESS_CAPABILITY_BFSL;
 import static android.app.ActivityManager.PROCESS_CAPABILITY_CPU_TIME;
 import static android.app.ActivityManager.PROCESS_CAPABILITY_FOREGROUND_AUDIO_CONTROL;
 import static android.app.ActivityManager.PROCESS_CAPABILITY_IMPLICIT_CPU_TIME;
+import static android.app.ActivityManager.PROCESS_CAPABILITY_INSTRUMENTATION_DEFAULTS;
 import static android.app.ActivityManager.PROCESS_CAPABILITY_NONE;
 import static android.app.ActivityManager.PROCESS_STATE_BOUND_FOREGROUND_SERVICE;
 import static android.app.ActivityManager.PROCESS_STATE_BOUND_TOP;
@@ -150,6 +150,7 @@ import com.android.server.am.EventLogTags;
 import com.android.server.am.Flags;
 import com.android.server.am.ProcessList;
 import com.android.server.am.UidRecord;
+import com.android.server.am.psc.Constants.SchedGroup;
 import com.android.server.am.psc.PlatformCompatCache.CachedCompatChangeId;
 import com.android.server.wm.WindowProcessController;
 
@@ -1745,7 +1746,7 @@ public abstract class OomAdjuster {
         private boolean mForegroundActivities;
         private boolean mHasVisibleActivities;
         private int mProcState;
-        private int mSchedGroup;
+        private @SchedGroup int mSchedGroup;
         private int mProcessStateCurTop;
         private String mAdjType;
         private boolean mReportDebugMsgs;
@@ -1759,7 +1760,7 @@ public abstract class OomAdjuster {
         @GuardedBy("this.OomAdjuster.mServiceLock")
         void computeOomAdjFromActivitiesIfNecessary(ProcessRecordInternal app, int adj,
                 boolean foregroundActivities, boolean hasVisibleActivities, int procState,
-                int schedGroup, int processCurTop, boolean reportDebugMsgs) {
+                @SchedGroup int schedGroup, int processCurTop, boolean reportDebugMsgs) {
             if (app.getCachedAdj() != INVALID_ADJ) {
                 return;
             }
@@ -1804,7 +1805,7 @@ public abstract class OomAdjuster {
         /** Initializes the calculator for a new process evaluation. */
         @VisibleForTesting
         public void initialize(ProcessRecordInternal app, int adj, boolean foregroundActivities,
-                boolean hasVisibleActivities, int procState, int schedGroup,
+                boolean hasVisibleActivities, int procState, @SchedGroup int schedGroup,
                 int processStateCurTop, boolean reportDebugMsgs) {
             this.mApp = app;
             this.mAdj = adj;
@@ -2026,7 +2027,8 @@ public abstract class OomAdjuster {
      * @return The proposed change to the schedGroup.
      */
     @GuardedBy({"mServiceLock", "mProcLock"})
-    protected int setIntermediateAdjLSP(ProcessRecordInternal app, int adj, int schedGroup) {
+    protected @SchedGroup int setIntermediateAdjLSP(ProcessRecordInternal app, int adj,
+            @SchedGroup int schedGroup) {
         app.setCurRawAdj(adj);
 
         adj = applyBindAboveClientToAdj(app.getServices().isHasAboveClient(), adj);
@@ -2078,7 +2080,8 @@ public abstract class OomAdjuster {
     }
 
     @GuardedBy({"mServiceLock", "mProcLock"})
-    protected void setIntermediateSchedGroupLSP(ProcessRecordInternal state, int schedGroup) {
+    protected void setIntermediateSchedGroupLSP(ProcessRecordInternal state,
+            @SchedGroup int schedGroup) {
         // Put bound foreground services in a special sched group for additional
         // restrictions on screen off
         if (state.getCurProcState() >= PROCESS_STATE_BOUND_FOREGROUND_SERVICE
@@ -2417,7 +2420,7 @@ public abstract class OomAdjuster {
         boolean success = true;
         int changes = 0;
         applyOomAdjLSP(state, isBatchingOomAdj);
-        final int curSchedGroup = state.getCurrentSchedulingGroup();
+        final @SchedGroup int curSchedGroup = state.getCurrentSchedulingGroup();
         if (state.getWaitingToKill() != null && !state.getReceivers().isReceivingBroadcast()
                 && ActivityManager.isProcStateBackground(state.getCurProcState())
                 && !state.getHasStartedServices()) {
@@ -2571,7 +2574,7 @@ public abstract class OomAdjuster {
     /** Sets the initial process state and scheduling group for a newly attaching process. */
     @GuardedBy({"mServiceLock", "mProcLock"})
     void setAttachingProcessStatesLSP(ProcessRecordInternal app) {
-        int initialSchedGroup = SCHED_GROUP_DEFAULT;
+        @SchedGroup int initialSchedGroup = SCHED_GROUP_DEFAULT;
         int initialProcState = PROCESS_STATE_CACHED_EMPTY;
             // Avoid freezing a freshly attached process.
         int initialCapability = ALL_CPU_TIME_CAPABILITIES;

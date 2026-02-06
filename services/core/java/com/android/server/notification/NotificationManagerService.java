@@ -89,6 +89,8 @@ import static android.app.NotificationManager.Policy.SUPPRESSED_EFFECT_PEEK;
 import static android.app.NotificationManager.Policy.SUPPRESSED_EFFECT_SCREEN_OFF;
 import static android.app.NotificationManager.Policy.SUPPRESSED_EFFECT_SCREEN_ON;
 import static android.app.NotificationManager.Policy.SUPPRESSED_EFFECT_STATUS_BAR;
+import static android.app.NotificationManager.ALLOWED_NAS_ADJUSTMENT_KEYS_CHANGED;
+import static android.app.NotificationManager.SUPPORTED_NAS_ADJUSTMENT_KEYS_CHANGED;
 import static android.app.NotificationManager.zenModeFromInterruptionFilter;
 import static android.app.StatusBarManager.ACTION_KEYGUARD_PRIVATE_NOTIFICATIONS_CHANGED;
 import static android.app.StatusBarManager.EXTRA_KM_PRIVATE_NOTIFS_ALLOWED;
@@ -718,7 +720,8 @@ public class NotificationManagerService extends SystemService {
     private PostNotificationTrackerFactory mPostNotificationTrackerFactory;
 
     private LockPatternUtils mLockUtils;
-    private AppLockInternal mAppLockInternal;
+    // TODO(b/464052878): Make mAppLockInternal @NonNull when App Lock flags are removed.
+    @Nullable private AppLockInternal mAppLockInternal;
     final AppLockInternal.PackageLockedStateListener mPackageLockedStateListener =
             new AppLockInternal.PackageLockedStateListener() {
                 @Override
@@ -3597,24 +3600,29 @@ public class NotificationManagerService extends SystemService {
             }
         } else if (phase == SystemService.PHASE_ACTIVITY_MANAGER_READY) {
             mSnoozeHelper.scheduleRepostsForPersistedNotifications(System.currentTimeMillis());
-            if (android.security.Flags.appLockCore()) {
+            if (android.security.Flags.appLockApis() && android.security.Flags.appLockCore()) {
                 Trace.beginSection(TAG + ".onBootPhase_AMReady_appLock");
                 // App Lock services gets registered by the ActivityManagerService, and then needs
                 // to initialize the map of App Lock locked states. Wait until it's ready.
                 mAppLockInternal = LocalServices.getService(AppLockInternal.class);
-                synchronized (mNotificationLock) {
-                    final SparseArray<Set<String>> appLockEnabledPackages =
-                            mAppLockInternal.getAppLockEnabledPackages();
-                    mAppLockLockedPackages.clear();
-                    for (int i = 0; i < appLockEnabledPackages.size(); i++) {
-                        final int userId = appLockEnabledPackages.keyAt(i);
-                        final Set<String> packages = appLockEnabledPackages.valueAt(i);
-                        if (packages != null) {
-                            mAppLockLockedPackages.put(userId, new ArraySet<>(packages));
+                if (mAppLockInternal == null) {
+                    Slog.wtf(TAG, "AppLockInternal is null");
+                } else {
+                    synchronized (mNotificationLock) {
+                        final SparseArray<Set<String>> appLockEnabledPackages =
+                                mAppLockInternal.getAppLockEnabledPackages();
+                        mAppLockLockedPackages.clear();
+                        for (int i = 0; i < appLockEnabledPackages.size(); i++) {
+                            final int userId = appLockEnabledPackages.keyAt(i);
+                            final Set<String> packages = appLockEnabledPackages.valueAt(i);
+                            if (packages != null) {
+                                mAppLockLockedPackages.put(userId, new ArraySet<>(packages));
+                            }
                         }
                     }
+                    mAppLockInternal.registerPackageLockedStateListener(
+                            mPackageLockedStateListener);
                 }
-                mAppLockInternal.registerPackageLockedStateListener(mPackageLockedStateListener);
                 Trace.endSection();
             }
         } else if (phase == SystemService.PHASE_DEVICE_SPECIFIC_SERVICES_READY) {
@@ -4719,6 +4727,11 @@ public class NotificationManagerService extends SystemService {
                             NotificationManagerService.this::reclassifyNotificationLocked);
                 }
             }
+            getContext().sendBroadcastAsUser(
+                    new Intent(ALLOWED_NAS_ADJUSTMENT_KEYS_CHANGED)
+                            .putExtra(Intent.EXTRA_USER_ID, userId)
+                            .addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT),
+                    UserHandle.SYSTEM, STATUS_BAR_SERVICE);
             handleSavePolicyFile();
         }
 
@@ -4741,6 +4754,11 @@ public class NotificationManagerService extends SystemService {
                 applyNotificationUpdateForUserProfiles(userId,
                         NotificationManagerService.this::unsummarizeNotificationLocked);
             }
+            getContext().sendBroadcastAsUser(
+                    new Intent(ALLOWED_NAS_ADJUSTMENT_KEYS_CHANGED)
+                            .putExtra(Intent.EXTRA_USER_ID, userId)
+                            .addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT),
+                    UserHandle.SYSTEM, STATUS_BAR_SERVICE);
             handleSavePolicyFile();
         }
 
@@ -4769,14 +4787,13 @@ public class NotificationManagerService extends SystemService {
             } finally {
                 Binder.restoreCallingIdentity(identity);
             }
-            handleSavePolicyFile();
         }
 
         @Override
         public @NonNull List<String> getUnsupportedAdjustmentTypes() {
             checkCallerIsSystemOrSystemUiOrShell();
             synchronized (mNotificationLock) {
-                return new ArrayList(mAssistants.getUnsupportedAdjustments(
+                return new ArrayList<>(mAssistants.getUnsupportedAdjustments(
                         UserHandle.getUserId(Binder.getCallingUid())));
             }
         }
@@ -13760,6 +13777,10 @@ public class NotificationManagerService extends SystemService {
                 disabledAdjustments.add(key);
             }
             mNasUnsupported.put(userId, disabledAdjustments);
+            mContext.sendBroadcastAsUser(
+                    new Intent(SUPPORTED_NAS_ADJUSTMENT_KEYS_CHANGED)
+                            .addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT),
+                    UserHandle.SYSTEM, STATUS_BAR_SERVICE);
             handleSavePolicyFile();
         }
 

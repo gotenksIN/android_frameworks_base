@@ -23,6 +23,7 @@ import android.graphics.Rect
 import android.os.IBinder
 import android.platform.test.annotations.DisableFlags
 import android.platform.test.annotations.EnableFlags
+import android.platform.test.flag.junit.SetFlagsRule
 import android.testing.AndroidTestingRunner
 import android.view.Display
 import android.window.WindowContainerToken
@@ -39,6 +40,7 @@ import com.google.common.truth.Truth.assertThat
 import junit.framework.Assert.assertFalse
 import junit.framework.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.mockito.Mock
@@ -70,6 +72,8 @@ class DragPositioningCallbackUtilityTest {
     @Mock private lateinit var mockResources: Resources
 
     @Mock private lateinit var mockPinnedController: PinnedLayerController
+
+    @get:Rule val setFlagsRule = SetFlagsRule()
 
     @Before
     fun setup() {
@@ -550,6 +554,42 @@ class DragPositioningCallbackUtilityTest {
                 mockWindowDecoration,
                 /* canEnterDesktopMode= */ false,
             )
+        )
+        assertThat(repositionTaskBounds.left).isEqualTo(STARTING_BOUNDS.left)
+        assertThat(repositionTaskBounds.top).isEqualTo(STARTING_BOUNDS.top)
+        assertThat(repositionTaskBounds.right).isEqualTo(STARTING_BOUNDS.right)
+        assertThat(repositionTaskBounds.bottom).isEqualTo(STARTING_BOUNDS.bottom)
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_RESPECT_SYSTEM_DEFAULT_MIN_SIZE)
+    fun testTinyAppRequestedMinSize_changeBoundsInDesktopModeLessThanMin_respectSystemDefault() {
+        // Set app-requested min size to a very small value.
+        initializeTaskInfo(taskMinWidth = 1, taskMinHeight = 1)
+        // Set system-default min size to a larger value.
+        whenever(mockResources.getDimensionPixelSize(R.dimen.desktop_mode_minimum_window_width))
+            .thenReturn(50)
+        whenever(mockResources.getDimensionPixelSize(R.dimen.desktop_mode_minimum_window_height))
+            .thenReturn(50)
+
+        val startingPoint =
+            PointF(STARTING_BOUNDS.right.toFloat(), STARTING_BOUNDS.bottom.toFloat())
+        val repositionTaskBounds = Rect(STARTING_BOUNDS)
+        // Shrink height and width to 10px. Even if the new size is allowed by the app-requested
+        // min size, the system default min size should block the resize.
+        val newX = STARTING_BOUNDS.right.toFloat() - 90
+        val newY = STARTING_BOUNDS.bottom.toFloat() - 90
+        val delta = DragPositioningCallbackUtility.calculateDelta(newX, newY, startingPoint)
+
+        DragPositioningCallbackUtility.changeBounds(
+            CTRL_TYPE_RIGHT or CTRL_TYPE_BOTTOM,
+            repositionTaskBounds,
+            STARTING_BOUNDS,
+            STABLE_BOUNDS,
+            delta,
+            mockDisplayController,
+            mockWindowDecoration,
+            /* canEnterDesktopMode= */ true,
         )
         assertThat(repositionTaskBounds.left).isEqualTo(STARTING_BOUNDS.left)
         assertThat(repositionTaskBounds.top).isEqualTo(STARTING_BOUNDS.top)

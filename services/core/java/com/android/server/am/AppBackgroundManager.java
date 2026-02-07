@@ -95,6 +95,7 @@ public class AppBackgroundManager {
     private static final int PID_NOT_FOUND = -1;
     private static final int BINDER_FREEZE_FAILED = -2;
     private static final int SKIP_FREEZE = -3;
+    private static final int FOREGROUND_SERVICE_ACTIVE = -4;
 
 // QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
     private Object mPhenotypeFlagLock = new Object();
@@ -251,7 +252,7 @@ public class AppBackgroundManager {
     private void handlePackageUninstalled(String packageName, int userId) {
         if (mUsePackageLevelFreezer) {
             mPackageFreezerManager.removeAppPids(packageName);
-            mPackageFreezerManager.removePendingList(packageName);
+            mPackageFreezerManager.removePendingProcessesByPackage(packageName);
         }
 
         if (mUseRestrictBgAutoStart) {
@@ -632,7 +633,7 @@ public class AppBackgroundManager {
                     for (int i=0; i<pList.size(); i++) {
                         ProcessRecord pr = pList.get(i);
                         if (pr == null || pr.getPid() <= 0) {
-                            mPackageFreezerManager.removeProcessFromPendingList(pr);
+                            mPackageFreezerManager.removePendingProcess(pr);
                             continue;
                         }
 
@@ -644,13 +645,23 @@ public class AppBackgroundManager {
                                             + pr.processName + " from pending list.");
                                 }
                                 pr.setDebugging(true);
-                                mPackageFreezerManager.removeProcessFromPendingList(pr);
+                                mPackageFreezerManager.removePendingProcess(pr);
                                 mPackageFreezerManager.appendAppPids(pr.info.packageName, pr);
                                 break;
                             case BINDER_FREEZE_FAILED:
-                                if (mUseDebug) {
-                                    Slog.d(TAG, "Binder freeze failed for process: "
-                                            + pr.processName + ", will retry later");
+                            case FOREGROUND_SERVICE_ACTIVE:
+                                if (mPackageFreezerManager.isFreezeRetryLimitReached(pr)) {
+                                    Slog.w(TAG, "Give up freezing " + pr.processName +
+                                            " after " + PackageLevelFreezer.MAX_FREEZE_RETRIES
+                                            + " retries.");
+                                    mPackageFreezerManager.removePendingProcess(pr);
+                                } else {
+                                    mPackageFreezerManager.incrementFreezeAttempt(pr);
+                                    if (mUseDebug) {
+                                        Slog.d(TAG, "Binder freeze failed for " + pr.processName +
+                                            ", retrying later (attempt " +
+                                            mPackageFreezerManager.getFreezeRetryCount(pr) + ")");
+                                    }
                                 }
                                 break;
                             default:
@@ -658,7 +669,7 @@ public class AppBackgroundManager {
                                     Slog.d(TAG, "Freeze failed for process: "
                                             + pr.processName + ", removing from pending list");
                                 }
-                                mPackageFreezerManager.removeProcessFromPendingList(pr);
+                                mPackageFreezerManager.removePendingProcess(pr);
                                 break;
                         }
                     }
@@ -667,6 +678,9 @@ public class AppBackgroundManager {
                     final SparseArray<ProcessRecord> pids =
                             mPackageFreezerManager.findRelatedPids(packageName);
 
+                    if (pids == null || pids.size() == 0) {
+                        break;
+                    }
                     if (mUseDebug) {
                         String trace = "Start freeze \"" + packageName + "\" application. ";
                         Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, trace);
@@ -689,14 +703,24 @@ public class AppBackgroundManager {
                                 pr.setDebugging(true);
                                 break;
                             case BINDER_FREEZE_FAILED:
-                                Slog.w(TAG, "Add to pending list for freezing again later: "
+                                Slog.w(TAG, "Binder freeze failed, add to pending list: "
                                         + pr.processName);
-                                mPackageFreezerManager.appendPendingList(pr);
+                                mPackageFreezerManager.appendPendingList(pr,
+                                            "Binder Transaction Pending");
+                                toRemove.add(pid);
+                                break;
+                            case FOREGROUND_SERVICE_ACTIVE:
+                                Slog.w(TAG, "Foregroung service active, add to pending list: "
+                                        + pr.processName);
+                                mPackageFreezerManager.appendPendingList(pr,
+                                            "Foreground Service Active");
                                 toRemove.add(pid);
                                 break;
                             default:
                                 Slog.e(TAG, "Freeze failed for process: " + pr.processName);
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
                                 toRemove.add(pid);
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
                                 break;
                         }
                     }
@@ -705,9 +729,11 @@ public class AppBackgroundManager {
                         pids.remove(toRemove.get(i));
                     }
 
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
                     if (pids.size() > 0) {
                         mPackageFreezerManager.addAppPids(packageName, pids);
                     }
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
 
                     if (mUseDebug) {
                         Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
@@ -1170,7 +1196,7 @@ public class AppBackgroundManager {
                                         processName, state.getCurAdj()));
                         Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
                     }
-                    return SKIP_FREEZE;
+                    return FOREGROUND_SERVICE_ACTIVE;
 // QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
                 }
             }
@@ -1436,37 +1462,89 @@ public class AppBackgroundManager {
     }
 
     public class PackageLevelFreezer {
-        private final Map<String, SparseArray<ProcessRecord>> mAppPids = new HashMap<>();
-        public List<ProcessRecord> mPendingFreezeList = new ArrayList<>();
-        public final Object mPendingFreezeListLock = new Object();
-        private final Object mAppPidsLock = new Object();
+        private class PendingInfo {
+            String mReason;
+            int mRetryCount;
 
-        public void appendPendingList(ProcessRecord app) {
+            PendingInfo(String reason) {
+                mReason = reason;
+                mRetryCount = 1;
+            }
+        }
+
+        private final Map<String, SparseArray<ProcessRecord>> mAppPids = new HashMap<>();
+        private final Map<ProcessRecord, PendingInfo> mPendingFreezeMap = new ArrayMap<>();
+        private final Object mPendingFreezeLock = new Object();
+        private final Object mAppPidsLock = new Object();
+        public static final int MAX_FREEZE_RETRIES = 2;
+
+        public void appendPendingList(ProcessRecord app, String reason) {
             if (app == null) {
                 return;
             }
-            synchronized (mPendingFreezeListLock) {
-                mPendingFreezeList.add(app);
+
+            synchronized (mPendingFreezeLock) {
+                PendingInfo info = mPendingFreezeMap.get(app);
+                if (info == null) {
+                    mPendingFreezeMap.put(app, new PendingInfo(reason));
+                } else {
+                    if (mUseDebug) {
+                        Slog.d(TAG, "Process " + app.processName + " already pending. Old reason: "
+                                + info.mReason + ", New reason: " + reason);
+                    }
+                    info.mReason = reason;
+                }
             }
         }
 
         public List<ProcessRecord> getPendingList() {
-            synchronized (mPendingFreezeListLock) {
-                return new ArrayList<>(mPendingFreezeList);
+            synchronized (mPendingFreezeLock) {
+                return new ArrayList<>(mPendingFreezeMap.keySet());
             }
         }
 
-        public void removePendingList(String packageName) {
+        public String getPendingFreezeReason(ProcessRecord app) {
+            synchronized (mPendingFreezeLock) {
+                PendingInfo info = mPendingFreezeMap.get(app);
+                return (info != null) ? info.mReason : "unknown";
+            }
+        }
+
+        public void incrementFreezeAttempt(ProcessRecord app) {
+            synchronized (mPendingFreezeLock) {
+                PendingInfo info = mPendingFreezeMap.get(app);
+                if (info != null) {
+                    info.mRetryCount++;
+                }
+            }
+        }
+
+        public int getFreezeRetryCount(ProcessRecord app) {
+            synchronized (mPendingFreezeLock) {
+                PendingInfo info = mPendingFreezeMap.get(app);
+                return (info != null) ? info.mRetryCount : 0;
+            }
+        }
+
+        public void removePendingProcessesByPackage(String packageName) {
             if (packageName == null) {
                 return;
             }
-            synchronized (mPendingFreezeListLock) {
-                Iterator<ProcessRecord> iterator = mPendingFreezeList.iterator();
+
+            synchronized (mPendingFreezeLock) {
+                Iterator<Map.Entry<ProcessRecord, PendingInfo>> iterator =
+                        mPendingFreezeMap.entrySet().iterator();
                 while (iterator.hasNext()) {
-                    ProcessRecord app = iterator.next();
-                    if (app != null && packageName.equals(app.info.packageName)) {
+                    Map.Entry<ProcessRecord, PendingInfo> entry = iterator.next();
+                    ProcessRecord app = entry.getKey();
+
+                    if (app != null && app.info != null
+                            && packageName.equals(app.info.packageName)) {
                         if (mUseDebug) {
-                            Slog.d(TAG, "Removing process from pending list: " + app.processName);
+                            PendingInfo info = entry.getValue();
+                            Slog.d(TAG, "Removing process " + app.processName
+                                    + " (reason: " + info.mReason
+                                    + ", retries: " + info.mRetryCount + ")");
                         }
                         iterator.remove();
                     }
@@ -1474,12 +1552,23 @@ public class AppBackgroundManager {
             }
         }
 
-        public boolean removeProcessFromPendingList(ProcessRecord app) {
+        public boolean isFreezeRetryLimitReached(ProcessRecord app) {
+            synchronized (mPendingFreezeLock) {
+                PendingInfo info = mPendingFreezeMap.get(app);
+                if (info == null) {
+                    return false;
+                }
+                return info.mRetryCount > MAX_FREEZE_RETRIES;
+            }
+        }
+
+        public boolean removePendingProcess(ProcessRecord app) {
             if (app == null) {
                 return false;
             }
-            synchronized (mPendingFreezeListLock) {
-                return mPendingFreezeList.remove(app);
+
+            synchronized (mPendingFreezeLock) {
+                return mPendingFreezeMap.remove(app) != null;
             }
         }
 
@@ -1560,7 +1649,7 @@ public class AppBackgroundManager {
                 return;
             }
 
-            removePendingList(packageName);
+            removePendingProcessesByPackage(packageName);
             if (!containsApp(packageName)) {
                 if (mUseDebug) {
                     Slog.d(TAG, "Skipping unfreeze request for " + packageName
@@ -1579,14 +1668,76 @@ public class AppBackgroundManager {
         }
 // QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
 
-        public void unfreezeAllPackageLevel() {
+        public void unfreezeAllFrozenPackages() {
+            List<String> packagesToUnfreeze;
+
             synchronized (mAppPidsLock) {
-                for (String packageName: mAppPids.keySet()) {
-                    unfreezePackageLevel(packageName);
+                if (mAppPids.isEmpty()) {
+                    return;
                 }
+                packagesToUnfreeze = new ArrayList<>(mAppPids.keySet());
+            }
+
+            for (String packageName : packagesToUnfreeze) {
+                unfreezePackageLevel(packageName);
             }
         }
 // QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
+        public void dump(PrintWriter pw, String prefix) {
+            pw.print(prefix);
+            pw.println("PACKAGE LEVEL FREEZER:");
+
+            String innerPrefix = prefix + "  ";
+            String doubleInnerPrefix = prefix + "    ";
+
+            synchronized (mAppPidsLock) {
+                if (mAppPids.isEmpty()) {
+                    pw.print(innerPrefix);
+                    pw.println("No packages currently frozen");
+                } else {
+                    pw.print(innerPrefix);
+                    pw.println(mAppPids.size() + " package(s) frozen:");
+
+                    for (Map.Entry<String, SparseArray<ProcessRecord>> entry: mAppPids.entrySet()){
+                        String packageName = entry.getKey();
+                        SparseArray<ProcessRecord> processes = entry.getValue();
+
+                        pw.print(innerPrefix);
+                        pw.println("Package: " + packageName
+                                + " (" + processes.size() + " processes)");
+
+                        for (int i = 0; i < processes.size(); i++) {
+                            ProcessRecord app = processes.valueAt(i);
+                            pw.print(doubleInnerPrefix);
+                            pw.println("- PID: " + app.getPid() + ", Process: " + app.processName);
+                        }
+                    }
+                }
+            }
+
+            synchronized (mPendingFreezeLock) {
+                if (mPendingFreezeMap.isEmpty()) {
+                    pw.print(innerPrefix);
+                    pw.println("No pending processes");
+                } else {
+                    pw.print(innerPrefix);
+                    pw.println("Pending processes (" + mPendingFreezeMap.size() + "):");
+
+                    for (Map.Entry<ProcessRecord, PendingInfo> entry: mPendingFreezeMap.entrySet()){
+                        ProcessRecord app = entry.getKey();
+                        PendingInfo info = entry.getValue();
+
+                        pw.print(doubleInnerPrefix);
+                        pw.print("- PID: "); pw.print(app.getPid());
+                        pw.print(", Process: "); pw.print(app.processName);
+                        pw.print(", Pkg: "); pw.print(app.info.packageName);
+                        pw.print(", Reason: "); pw.print(info.mReason);
+                        pw.print(", Retries: "); pw.println(info.mRetryCount);
+                    }
+                }
+            }
+            pw.println();
+        }
     }
 
     private void freezePackageLevel(String packageName) {
@@ -1598,8 +1749,8 @@ public class AppBackgroundManager {
     }
 
 // QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
-    private void unfreezeAllPackageLevel() {
-        mPackageFreezerManager.unfreezeAllPackageLevel();
+    private void unfreezeAllFrozenPackages() {
+        mPackageFreezerManager.unfreezeAllFrozenPackages();
     }
 
 // QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
@@ -1658,6 +1809,35 @@ public class AppBackgroundManager {
                 }
             }
         }
+
+        public void dump(PrintWriter pw, String prefix) {
+            pw.print(prefix);
+            pw.println("AUTO START MANAGEMENT:");
+
+            String innerPrefix = prefix + "  ";
+            String doubleInnerPrefix = prefix + "    ";
+
+            synchronized (mLock) {
+                if (mMainProcState.isEmpty()) {
+                    pw.print(innerPrefix);
+                    pw.println("No packages with auto-start restrictions");
+                } else {
+                    pw.print(innerPrefix);
+                    pw.println(mMainProcState.size()
+                            + " package(s) with auto-start restrictions:");
+
+                    for (Map.Entry<String, Boolean> entry : mMainProcState.entrySet()) {
+                        String packageName = entry.getKey();
+                        boolean allowed = entry.getValue();
+
+                        pw.print(doubleInnerPrefix);
+                        pw.println("Package: " + packageName +
+                                " (auto-start " + (allowed ? "allowed" : "blocked") + ")");
+                    }
+                }
+            }
+            pw.println();
+        }
     }
 
     public void setPackageAutoStartAllowed(String packageName) {
@@ -1698,7 +1878,7 @@ public class AppBackgroundManager {
         // unfreeze the frozen processes
         Slog.e(TAG, "--- Handle ui fluency mode disbaled ---");
         clearAutoStartMap();
-        unfreezeAllPackageLevel();
+        unfreezeAllFrozenPackages();
     }
 
     public ArrayList<Integer> getProcsKeepaliveWeight(ArrayList<ProcessRecord> Procs) {
@@ -1863,63 +2043,13 @@ public class AppBackgroundManager {
         pw.println();
 
         // Package level freezer status
-        if (usePackageLevelFreezer()) {
-            pw.println("PACKAGE LEVEL FREEZER:");
-            synchronized (mPackageFreezerManager.mAppPidsLock) {
-                if (mPackageFreezerManager.mAppPids.isEmpty()) {
-                    pw.println("  No packages currently frozen");
-                } else {
-                    pw.println("  " + mPackageFreezerManager.mAppPids.size()
-                            + " package(s) frozen:");
-                    for (Map.Entry<String, SparseArray<ProcessRecord>> entry :
-                            mPackageFreezerManager.mAppPids.entrySet()) {
-                        String packageName = entry.getKey();
-                        SparseArray<ProcessRecord> processes = entry.getValue();
-                        pw.println("    Package: " + packageName +
-                                " (processes: " + processes.size() + ")");
-                        for (int i = 0; i < processes.size(); i++) {
-                            ProcessRecord app = processes.valueAt(i);
-                            pw.println("      - PID: " + app.getPid() +
-                                    ", Process: " + app.processName);
-                        }
-                    }
-                }
-            }
-
-            // Pending list
-            synchronized (mPackageFreezerManager.mPendingFreezeListLock) {
-                if (!mPackageFreezerManager.mPendingFreezeList.isEmpty()) {
-                    pw.println("  Pending processes for freezing (" +
-                            mPackageFreezerManager.mPendingFreezeList.size() + "):");
-                    for (ProcessRecord app : mPackageFreezerManager.mPendingFreezeList) {
-                        pw.println("    - PID: " + app.getPid() +
-                                ", Process: " + app.processName +
-                                ", Package: " + app.info.packageName);
-                    }
-                }
-            }
-            pw.println();
+        if (mUsePackageLevelFreezer) {
+            mPackageFreezerManager.dump(pw, "");
         }
 
         // Auto start management status
         if (mUseRestrictBgAutoStart) {
-            pw.println("AUTO START MANAGEMENT:");
-            synchronized (mAutoStartManagement.mLock) {
-                if (mAutoStartManagement.mMainProcState.isEmpty()) {
-                    pw.println("  No packages with auto-start restrictions");
-                } else {
-                    pw.println("  " + mAutoStartManagement.mMainProcState.size() +
-                            " package(s) with auto-start restrictions:");
-                    for (Map.Entry<String, Boolean> entry :
-                            mAutoStartManagement.mMainProcState.entrySet()) {
-                        String packageName = entry.getKey();
-                        boolean allowed = entry.getValue();
-                        pw.println("    Package: " + packageName +
-                                " (auto-start " + (allowed ? "allowed" : "blocked") + ")");
-                    }
-                }
-            }
-            pw.println();
+            mAutoStartManagement.dump(pw, "");
         }
 
         // Keepalive management status

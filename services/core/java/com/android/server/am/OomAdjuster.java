@@ -4477,9 +4477,6 @@ public class OomAdjuster {
     @GuardedBy({"mService", "mProcLock"})
     void updateAppFreezeStateLSP(ProcessRecord app, @OomAdjReason int oomAdjReason,
             boolean immediate, int oldOomAdj) {
-        if (AppBackgroundManager.getInstance().usePackageLevelFreezer()) {
-            return;
-        }
         if (!mCachedAppOptimizer.useFreezer()) {
             return;
         }
@@ -4549,9 +4546,6 @@ public class OomAdjuster {
 
     @GuardedBy("mService")
     void unfreezeTemporarily(ProcessRecord app, @OomAdjReason int reason) {
-        if (AppBackgroundManager.getInstance().usePackageLevelFreezer()) {
-            return;
-        }
         if (!mCachedAppOptimizer.useFreezer()) {
             return;
         }

@@ -144,7 +144,7 @@ class WifiTileDataInteractorTest(flags: FlagsParameterization) : SysuiTestCase()
 
             val expectedModel =
                 WifiTileModel.Inactive(
-                    icon = WifiTileIconModel(R.drawable.ic_signal_wifi_off),
+                    icon = WifiTileIconModel(R.drawable.ic_wifi_off),
                     secondaryLabel = null,
                 )
             assertThat(tileData).isEqualTo(expectedModel)
@@ -160,7 +160,7 @@ class WifiTileDataInteractorTest(flags: FlagsParameterization) : SysuiTestCase()
 
             val expectedModel =
                 WifiTileModel.Inactive(
-                    icon = WifiTileIconModel(WifiIcons.WIFI_NO_SIGNAL),
+                    icon = WifiTileIconModel(R.drawable.vd_wifi),
                     secondaryLabel = "Networks unavailable",
                 )
 
@@ -177,7 +177,7 @@ class WifiTileDataInteractorTest(flags: FlagsParameterization) : SysuiTestCase()
 
             val expectedModel =
                 WifiTileModel.Active(
-                    icon = WifiTileIconModel(WifiIcons.WIFI_NO_SIGNAL),
+                    icon = WifiTileIconModel(R.drawable.ic_wifi_connecting),
                     secondaryLabel = "Scanning for Wi‑Fi...",
                 )
 

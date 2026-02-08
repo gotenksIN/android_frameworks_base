@@ -60,6 +60,7 @@ import com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_DESKTOP_MODE
 import com.android.wm.shell.shared.FocusTransitionListener
 import com.android.wm.shell.shared.annotations.ShellBackgroundThread
 import com.android.wm.shell.shared.annotations.ShellMainThread
+import com.android.wm.shell.shared.annotations.ShellMainThreadImmediate
 import com.android.wm.shell.shared.desktopmode.DesktopState
 import com.android.wm.shell.sysui.ShellController
 import com.android.wm.shell.transition.FocusTransitionObserver
@@ -83,7 +84,7 @@ import kotlinx.coroutines.MainCoroutineDispatcher
 class DesktopTilingWindowDecoration(
     private var context: Context,
     @ShellMainThread private val mainDispatcher: MainCoroutineDispatcher,
-    @ShellMainThread private val mainScope: CoroutineScope,
+    @ShellMainThreadImmediate private val mainImmediateScope: CoroutineScope,
     @ShellBackgroundThread private val bgScope: CoroutineScope,
     private val syncQueue: SyncTransactionQueue,
     private val displayController: DisplayController,
@@ -156,6 +157,7 @@ class DesktopTilingWindowDecoration(
     private var isDarkMode = false
     private var isResizing = false
     private var isTilingFocused = false
+    @VisibleForTesting var isLaunchInProgress = false
     private var hiddenByOverviewAnimation = false
     private lateinit var configuration: Configuration
     private var dividerWidth: Int = 0
@@ -177,7 +179,7 @@ class DesktopTilingWindowDecoration(
                 displayController,
                 taskResourceLoader,
                 mainDispatcher,
-                mainScope,
+                mainImmediateScope,
                 bgScope,
                 transactionSupplier,
             )
@@ -570,6 +572,10 @@ class DesktopTilingWindowDecoration(
             }
             explodedViewTopTaskId = null
         }
+
+        if (isLaunchInProgress) {
+            mainExecutor.execute { isLaunchInProgress = false }
+        }
     }
 
     private fun handleTaskBroughtToFront(taskId: Int) {
@@ -614,7 +620,7 @@ class DesktopTilingWindowDecoration(
         val displayController: DisplayController,
         private val taskResourceLoader: WindowDecorTaskResourceLoader,
         @ShellMainThread val mainDispatcher: MainCoroutineDispatcher,
-        @ShellMainThread val mainScope: CoroutineScope,
+        @ShellMainThreadImmediate val mainImmediateScope: CoroutineScope,
         @ShellBackgroundThread val bgScope: CoroutineScope,
         val transactionSupplier: Supplier<Transaction>,
     ) {
@@ -641,7 +647,7 @@ class DesktopTilingWindowDecoration(
                     displayController = displayController,
                     taskResourceLoader = taskResourceLoader,
                     mainDispatcher = mainDispatcher,
-                    mainScope = mainScope,
+                    mainImmediateScope = mainImmediateScope,
                     parentSurface = windowDecoration.taskSurface,
                     surfaceControlTransactionSupplier = transactionSupplier,
                     taskInfo = taskInfo,
@@ -692,7 +698,9 @@ class DesktopTilingWindowDecoration(
         isFocusedOnDisplay: Boolean,
         isFocusedGlobally: Boolean,
     ) {
-        moveTiledPairToFront(runningTaskInfo.taskId, isFocusedOnDisplay)
+        if (!isLaunchInProgress) {
+            moveTiledPairToFront(runningTaskInfo.taskId, isFocusedOnDisplay)
+        }
     }
 
     // Only called if [taskInfo] relates to a focused task
@@ -766,6 +774,10 @@ class DesktopTilingWindowDecoration(
 
     fun onExplodedViewReorder(topTaskId: Int) {
         explodedViewTopTaskId = topTaskId
+    }
+
+    fun onTaskLaunchStarted() {
+        isLaunchInProgress = true
     }
 
     fun resetTilingSession(shouldPersistTilingData: Boolean = false) {

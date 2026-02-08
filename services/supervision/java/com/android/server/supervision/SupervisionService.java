@@ -28,11 +28,13 @@ import static android.content.pm.PackageInstaller.SessionParams.MAX_PACKAGE_NAME
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
 import static android.provider.Settings.Secure.BROWSER_CONTENT_FILTERS_ENABLED;
 import static android.provider.Settings.Secure.SEARCH_CONTENT_FILTERS_ENABLED;
+
 import static com.android.internal.util.Preconditions.checkCallAuthorization;
 
 import android.annotation.CallbackExecutor;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.RequiresPermission;
 import android.annotation.SuppressLint;
 import android.annotation.UserIdInt;
 import android.app.KeyguardManager;
@@ -77,6 +79,7 @@ import android.os.UserManager;
 import android.provider.Settings;
 import android.util.ArrayMap;
 import android.util.SparseArray;
+
 import com.android.internal.R;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
@@ -96,6 +99,7 @@ import com.android.server.appbinding.finders.SupervisionAppServiceFinder;
 import com.android.server.pm.UserManagerInternal;
 import com.android.server.supervision.SupervisionUserData.PolicyData;
 import com.android.server.utils.Slogf;
+
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
 import java.util.ArrayList;
@@ -149,6 +153,8 @@ public class SupervisionService extends ISupervisionManager.Stub {
 
     @GuardedBy("getLockObject()")
     final SupervisionSettings mSupervisionSettings = SupervisionSettings.getInstance();
+
+    private boolean mAllowBypassingSupervisionRoleQualification = false;
 
     public SupervisionService(Context context) {
         this(new Injector(context.createAttributionContext(SupervisionLog.TAG)));
@@ -304,9 +310,23 @@ public class SupervisionService extends ISupervisionManager.Stub {
     }
 
     @Override
+    @RequiresPermission(MANAGE_ROLE_HOLDERS)
     public boolean shouldAllowBypassingSupervisionRoleQualification() {
         enforcePermission(MANAGE_ROLE_HOLDERS);
+        if (!Flags.enableSupervisionManagerPolicyApis()) {
+            return shouldAllowBypassingSupervisionRoleQualificationBasedOnState();
+        }
 
+        if (hasNonTestDefaultUsers()) {
+            return false;
+        }
+
+        synchronized (getLockObject()) {
+            return mAllowBypassingSupervisionRoleQualification;
+        }
+    }
+
+    private boolean shouldAllowBypassingSupervisionRoleQualificationBasedOnState() {
         if (hasNonTestDefaultUsers()) {
             return false;
         }
@@ -318,6 +338,15 @@ public class SupervisionService extends ISupervisionManager.Stub {
         }
 
         return true;
+    }
+
+    @Override
+    @RequiresPermission(BYPASS_ROLE_QUALIFICATION)
+    public void setShouldAllowBypassingSupervisionRoleQualification(boolean allowBypassing) {
+        enforcePermission(BYPASS_ROLE_QUALIFICATION);
+        synchronized (getLockObject()) {
+            mAllowBypassingSupervisionRoleQualification = allowBypassing;
+        }
     }
 
     private boolean hasAnySupervisionApprovalMethods(@UserIdInt int userId) {
@@ -697,6 +726,10 @@ public class SupervisionService extends ISupervisionManager.Stub {
         try (var pw = new IndentingPrintWriter(printWriter, "  ")) {
             pw.println("SupervisionService state:");
             pw.increaseIndent();
+
+            pw.println("bypassingRoleQualification: "
+                    + mAllowBypassingSupervisionRoleQualification);
+            pw.println();
 
             List<UserInfo> users = mInjector.getUserManagerInternal().getUsers(false);
             synchronized (getLockObject()) {
@@ -1127,18 +1160,25 @@ public class SupervisionService extends ISupervisionManager.Stub {
      * @return A list of the supervision role holders that were removed.
      */
     private List<String> updateSupervisionRoleHolders(@UserIdInt int userId) {
-        List<String> newRoleHolders =
+        List<String> allSupervisionRoleHolders =
+                new ArrayList<String>(
+                        mInjector.getRoleHoldersAsUser(
+                                ROLE_SYSTEM_SUPERVISION, UserHandle.of(userId)));
+
+        List<String> supervisionRoleHolders =
                 new ArrayList<String>(
                         mInjector.getRoleHoldersAsUser(ROLE_SUPERVISION, UserHandle.of(userId)));
-        newRoleHolders.addAll(
-                mInjector.getRoleHoldersAsUser(ROLE_SYSTEM_SUPERVISION, UserHandle.of(userId)));
+        allSupervisionRoleHolders.addAll(supervisionRoleHolders);
 
         synchronized (getLockObject()) {
             SupervisionUserData data = getUserDataLocked(userId);
             List<String> removedRoleHolders = new ArrayList<>(data.supervisionRoleHolders);
-            removedRoleHolders.removeAll(newRoleHolders);
+            removedRoleHolders.removeAll(allSupervisionRoleHolders);
             data.supervisionRoleHolders.clear();
-            data.supervisionRoleHolders.addAll(newRoleHolders);
+            data.supervisionRoleHolders.addAll(allSupervisionRoleHolders);
+            if (Flags.verifySupervisionRoleHoldersBeforeDestroyingEscrowToken()) {
+                data.escrowTokenRequired = !supervisionRoleHolders.isEmpty();
+            }
             mSupervisionSettings.saveUserData();
             return removedRoleHolders;
         }
@@ -1476,8 +1516,9 @@ public class SupervisionService extends ISupervisionManager.Stub {
             if (!Flags.verifySupervisionRoleHoldersBeforeDestroyingEscrowToken()) {
                 return false;
             }
-            final UserHandle user = UserHandle.of(userId);
-            return !mInjector.getRoleHoldersAsUser(ROLE_SUPERVISION, user).isEmpty();
+            synchronized (getLockObject()) {
+                return getUserDataLocked(userId).escrowTokenRequired;
+            }
         }
     }
 

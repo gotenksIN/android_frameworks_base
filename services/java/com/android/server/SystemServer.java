@@ -44,7 +44,6 @@ import android.app.admin.DevicePolicySafetyChecker;
 import android.app.appfunctions.AppFunctionManagerConfiguration;
 import android.app.usage.UsageStatsManagerInternal;
 import android.content.ComponentName;
-import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageItemInfo;
@@ -184,6 +183,7 @@ import com.android.server.display.DisplayManagerService;
 import com.android.server.display.color.ColorDisplayService;
 import com.android.server.dreams.DreamManagerService;
 import com.android.server.emergency.EmergencyAffordanceService;
+import com.android.server.files.FilesService;
 import com.android.server.flags.FeatureFlagsService;
 import com.android.server.gpu.GpuService;
 import com.android.server.grammaticalinflection.GrammaticalInflectionService;
@@ -269,10 +269,10 @@ import com.android.server.security.FileIntegrityService;
 import com.android.server.security.KeyAttestationApplicationIdProviderService;
 import com.android.server.security.KeyChainSystemService;
 import com.android.server.security.advancedprotection.AdvancedProtectionService;
-import com.android.server.security.authenticationpolicy.AgentAuthService;
 import com.android.server.security.authenticationpolicy.AuthenticationPolicyService;
 import com.android.server.security.authenticationpolicy.SecureLockDeviceService;
 import com.android.server.security.authenticationpolicy.WatchRangingService;
+import com.android.server.security.authenticationpolicy.agent.AgentAuthService;
 import com.android.server.security.intrusiondetection.IntrusionDetectionService;
 import com.android.server.security.rkp.RemoteProvisioningService;
 import com.android.server.selectiontoolbar.SelectionToolbarManagerService;
@@ -532,7 +532,6 @@ public final class SystemServer implements Dumpable {
     private DisplayManagerService mDisplayManagerService;
     private PackageManagerService mPackageManagerService;
     private PackageManager mPackageManager;
-    private ContentResolver mContentResolver;
     private EntropyMixer mEntropyMixer;
     private DataLoaderManagerService mDataLoaderManagerService;
     private long mIncrementalServiceHandle = 0;
@@ -1674,8 +1673,6 @@ public final class SystemServer implements Dumpable {
             mEntropyMixer = new EntropyMixer(context);
             t.traceEnd();
 
-            mContentResolver = context.getContentResolver();
-
             // The AccountManager must come before the ContentService
             t.traceBegin("StartAccountManagerService");
             mSystemServiceManager.startService(AccountManagerService.Lifecycle.class);
@@ -1980,6 +1977,16 @@ public final class SystemServer implements Dumpable {
                     reportWtf("starting StorageStatsService", e);
                 }
                 t.traceEnd();
+
+                if (android.app.privatecompute.flags.Flags.enablePccFrameworkSupport()) {
+                    t.traceBegin("StartFilesService");
+                    try {
+                        mSystemServiceManager.startService(FilesService.class);
+                    } catch (Throwable e) {
+                        reportWtf("starting FilesService", e);
+                    }
+                    t.traceEnd();
+                }
             }
         }
 
@@ -2877,7 +2884,7 @@ public final class SystemServer implements Dumpable {
                     mSystemServiceManager.startService(WatchRangingService.Lifecycle.class);
                     t.traceEnd();
                 }
-                if (android.hardware.biometrics.Flags.agentAuthApi()) {
+                if (android.companion.Flags.supportAiAgent()) {
                     t.traceBegin("AgentAuthService.Lifecycle");
                     mSystemServiceManager.startService(AgentAuthService.Lifecycle.class);
                     t.traceEnd();
@@ -3283,8 +3290,7 @@ public final class SystemServer implements Dumpable {
                 HsumBootUserInitializer.createInstance(mUserManagerService, mActivityManagerService,
                         // NOTE: there is no need to pass the whole dpms because it just need to
                         // to check if the device is managed (at boot time).
-                        mPackageManagerService, dpms.isDeviceManaged(), mContentResolver,
-                        mSystemContext);
+                        mPackageManagerService, dpms.isDeviceManaged(), mSystemContext);
         if (hsumBootUserInitializer != null) {
             t.traceBegin("HsumBootUserInitializer.init");
             hsumBootUserInitializer.init(t);

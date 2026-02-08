@@ -105,6 +105,7 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.server.ServiceThread;
 import com.android.server.am.Flags;
 import com.android.server.am.ProcessList;
+import com.android.server.am.psc.Constants.SchedGroup;
 import com.android.server.wm.ActivityServiceConnectionsHolder;
 
 import java.lang.annotation.Retention;
@@ -1242,7 +1243,7 @@ public class OomAdjusterImpl extends OomAdjuster {
         // Determine the importance of the process, starting with most
         // important to least, and assign an appropriate OOM adjustment.
         int adj;
-        int schedGroup;
+        @SchedGroup int schedGroup;
         int procState;
         int capability = PROCESS_CAPABILITY_NONE;
 
@@ -1863,7 +1864,7 @@ public class OomAdjusterImpl extends OomAdjuster {
 
         int adj = app.getCurRawAdj();
         int procState = app.getCurRawProcState();
-        int schedGroup = app.getCurrentSchedulingGroup();
+        @SchedGroup int schedGroup = app.getCurrentSchedulingGroup();
         int capability = app.getCurCapability();
 
         final int prevRawAdj = adj;

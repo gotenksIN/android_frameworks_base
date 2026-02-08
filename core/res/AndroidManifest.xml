@@ -907,7 +907,10 @@
     <protected-broadcast android:name="android.intent.action.STOP_VOICE_COMMAND" />
 
     <!-- Added in 26Q2 -->
+    <protected-broadcast android:name="android.app.action.ALLOWED_NAS_ADJUSTMENT_KEYS_CHANGED" />
+    <protected-broadcast android:name="android.app.action.SUPPORTED_NAS_ADJUSTMENT_KEYS_CHANGED" />
     <protected-broadcast android:name="android.telephony.action.STK_SETUP_EVENT_LIST" />
+    <protected-broadcast android:name="android.intent.action.PERSONAL_CONTEXT_MODE_CHANGED" />
 
     <!-- Added in 26Q4 -->
     <protected-broadcast android:name="android.app.action.DYNAMIC_BUNDLE_MODIFIED" />
@@ -2719,6 +2722,17 @@
         android:protectionLevel="internal|role|recents"
         android:featureFlag="android.security.app_lock_apis" />
 
+    <!-- @TestApi
+         Allows a test application to set App Lock enablement state for other applications.
+         Intended for test only.
+         <p>Protection level: signature
+         @hide
+         @FlaggedApi(android.security.Flags.FLAG_APP_LOCK_APIS)
+    -->
+    <permission android:name="android.permission.TEST_LOCK_APPS"
+        android:protectionLevel="signature"
+        android:featureFlag="android.security.app_lock_apis" />
+
     <!-- @SystemApi
          @hide
          @FlaggedApi("android.content.pm.quarantined_enabled")
@@ -3126,6 +3140,20 @@
         android:name="android.permission.MANAGE_READ_SCREEN_CONTEXT_REQUEST"
         android:protectionLevel="signature|installer"
         android:featureFlag="android.permission.flags.assist_settings_privacy_improvements_enabled" />
+
+    <!-- Allows an application to change an application's personal context mode setting.
+
+        <p>This permission is needed to enable or disable personal context data for an application
+        through the {@link android.service.personalcontext.PersonalContextManager
+        #setPersonalContextModeEnabled(String, boolean)} API.
+
+         <p>Protection level: signature
+         @FlaggedApi(android.service.personalcontext.Flags.FLAG_ENABLE_PERSONAL_CONTEXT_SERVICE)
+     -->
+    <permission
+        android:name="android.permission.CHANGE_PERSONAL_CONTEXT_MODE"
+        android:protectionLevel="signature"
+        android:featureFlag="android.service.personalcontext.enable_personal_context_service" />
 
     <!-- ======================================== -->
     <!-- Permissions for factory reset protection -->
@@ -7931,12 +7959,9 @@
     <permission android:name="android.permission.MANAGE_SUBSCRIPTION_PLANS"
         android:protectionLevel="signature|privileged" />
 
-    <!-- @SystemApi @hide Allows for reading subscription plan fields for status and end date.
-         @FlaggedApi(com.android.internal.telephony.flags.Flags.FLAG_SUBSCRIPTION_PLAN_ALLOW_STATUS_AND_END_DATE)
-    -->
+    <!-- @SystemApi @hide Allows for reading subscription plan fields for status and end date. -->
     <permission android:name="android.permission.READ_SUBSCRIPTION_PLANS"
         android:protectionLevel="signature|privileged"
-        android:featureFlag="com.android.internal.telephony.flags.subscription_plan_allow_status_and_end_date"
         android:permissionFlags="allowedInPrivateComputeCore" />
 
     <!-- C2DM permission.

@@ -114,11 +114,11 @@ class InternalObserverCallbackRouterTest {
             )
         )
 
-        assertThat(callback1.changedFunctionNames)
-            .isEqualTo(listOf(AppFunctionName("testPackage1", "id1")))
-        assertThat(callback2.changedFunctionNames)
-            .isEqualTo(listOf(AppFunctionName("testPackage2", "id2")))
-        assertThat(callback3.changedFunctionNames).isNull()
+        assertThat(callback1.changedPackageNames)
+            .containsExactly("testPackage1")
+        assertThat(callback2.changedPackageNames)
+            .containsExactly("testPackage2")
+        assertThat(callback3.changedPackageNames).isNull()
     }
 
     @Test
@@ -152,16 +152,11 @@ class InternalObserverCallbackRouterTest {
             )
         )
 
-        assertThat(callback1.changedFunctionNames)
-            .isEqualTo(
-                listOf(
-                    AppFunctionName("testPackage1", "id1"),
-                    AppFunctionName("testPackage2", "id2"),
-                )
-            )
-        assertThat(callback2.changedFunctionNames)
-            .isEqualTo(listOf(AppFunctionName("testPackage2", "id2")))
-        assertThat(callback3.changedFunctionNames).isNull()
+        assertThat(callback1.changedPackageNames)
+            .containsExactly("testPackage1", "testPackage2")
+        assertThat(callback2.changedPackageNames)
+            .containsExactly("testPackage2")
+        assertThat(callback3.changedPackageNames).isNull()
     }
 
     @Test
@@ -196,14 +191,12 @@ class InternalObserverCallbackRouterTest {
             )
         )
 
-        assertThat(callback1.changedFunctionNames)
-            .isEqualTo(
-                listOf(
-                    AppFunctionName("testPackage1", "id1"),
-                    AppFunctionName("testPackage2", "id2"),
-                )
+        assertThat(callback1.changedPackageNames)
+            .containsExactly(
+                "testPackage1",
+                "testPackage2",
             )
-        assertThat(callback2.changedFunctionNames).isNull()
+        assertThat(callback2.changedPackageNames).isNull()
     }
 
     @Test
@@ -238,9 +231,7 @@ class InternalObserverCallbackRouterTest {
             )
         )
 
-        assertThat(callback1.changedFunctionNames).isNull()
-        assertThat(callback1.changedPackageNames).isEqualTo(listOf("testPackage1"))
-        assertThat(callback2.changedFunctionNames).isNull()
+        assertThat(callback1.changedPackageNames).containsExactly("testPackage1")
         assertThat(callback2.changedPackageNames).isNull()
     }
 
@@ -262,7 +253,6 @@ class InternalObserverCallbackRouterTest {
             )
         )
 
-        assertThat(callback1.changedFunctionNames).isNull()
         assertThat(callback1.changedPackageNames).isNull()
     }
 
@@ -271,9 +261,9 @@ class InternalObserverCallbackRouterTest {
         val callback1 = TestInternalCallback()
         val searchSpec1 =
             AppFunctionSearchSpec.Builder()
-                .setPackageNames(listOf("testPackage1"))
+                .setPackageNames(setOf("testPackage1"))
                 .setFunctionNames(
-                    listOf(
+                    setOf(
                         AppFunctionName("testPackage1", "id1"),
                         AppFunctionName("testPackage2", "id2"),
                     )
@@ -298,9 +288,9 @@ class InternalObserverCallbackRouterTest {
         val callback1 = TestInternalCallback()
         val searchSpec1 =
             AppFunctionSearchSpec.Builder()
-                .setPackageNames(listOf("testPackage1"))
+                .setPackageNames(setOf("testPackage1"))
                 .setFunctionNames(
-                    listOf(
+                    setOf(
                         AppFunctionName("testPackage1", "id1"),
                         AppFunctionName("testPackage2", "id2"),
                     )
@@ -320,8 +310,8 @@ class InternalObserverCallbackRouterTest {
             )
         )
 
-        assertThat(callback1.changedFunctionNames)
-            .containsExactly(AppFunctionName("testPackage1", "id1"))
+        assertThat(callback1.changedPackageNames)
+            .containsExactly("testPackage1")
     }
 
     @Test
@@ -329,9 +319,9 @@ class InternalObserverCallbackRouterTest {
         val callback1 = TestInternalCallback()
         val searchSpec1 =
             AppFunctionSearchSpec.Builder()
-                .setPackageNames(listOf("testPackage3"))
+                .setPackageNames(setOf("testPackage3"))
                 .setFunctionNames(
-                    listOf(
+                    setOf(
                         AppFunctionName("testPackage1", "id1"),
                         AppFunctionName("testPackage2", "id2"),
                     )
@@ -356,9 +346,9 @@ class InternalObserverCallbackRouterTest {
         val callback1 = TestInternalCallback()
         val searchSpec1 =
             AppFunctionSearchSpec.Builder()
-                .setPackageNames(listOf("testPackage3"))
+                .setPackageNames(setOf("testPackage3"))
                 .setFunctionNames(
-                    listOf(
+                    setOf(
                         AppFunctionName("testPackage1", "id1"),
                         AppFunctionName("testPackage2", "id2"),
                     )
@@ -378,7 +368,7 @@ class InternalObserverCallbackRouterTest {
             )
         )
 
-        assertThat(callback1.changedFunctionNames).isNull()
+        assertThat(callback1.changedPackageNames).isNull()
     }
 
     @Test
@@ -387,7 +377,7 @@ class InternalObserverCallbackRouterTest {
         val searchSpec1 =
             AppFunctionSearchSpec.Builder()
                 .setFunctionNames(
-                    listOf(
+                    setOf(
                         AppFunctionName("testPackage1", "id1"),
                         AppFunctionName("testPackage2", "id2"),
                     )
@@ -417,7 +407,7 @@ class InternalObserverCallbackRouterTest {
         val searchSpec1 =
             AppFunctionSearchSpec.Builder()
                 .setFunctionNames(
-                    listOf(
+                    setOf(
                         AppFunctionName("testPackage1", "id1"),
                         AppFunctionName("testPackage2", "id2"),
                     )
@@ -437,11 +427,8 @@ class InternalObserverCallbackRouterTest {
             )
         )
 
-        assertThat(callback1.changedFunctionNames)
-            .containsExactly(
-                AppFunctionName("testPackage1", "id1"),
-                AppFunctionName("testPackage2", "id2"),
-            )
+        assertThat(callback1.changedPackageNames)
+            .containsExactly("testPackage1", "testPackage2")
     }
 
     @Test
@@ -449,7 +436,7 @@ class InternalObserverCallbackRouterTest {
         val callback1 = TestInternalCallback()
         val searchSpec1 =
             AppFunctionSearchSpec.Builder()
-                .setPackageNames(listOf("testPackage1", "testPackage2"))
+                .setPackageNames(setOf("testPackage1", "testPackage2"))
                 .build()
         val callbacksRouter = InternalObserverCallbackRouter(testExecutorService)
         callbacksRouter.addCallback(callback1, searchSpec1)
@@ -474,7 +461,7 @@ class InternalObserverCallbackRouterTest {
         val callback1 = TestInternalCallback()
         val searchSpec1 =
             AppFunctionSearchSpec.Builder()
-                .setPackageNames(listOf("testPackage1", "testPackage2"))
+                .setPackageNames(setOf("testPackage1", "testPackage2"))
                 .build()
 
         val callbacksRouter = InternalObserverCallbackRouter(testExecutorService)
@@ -490,10 +477,10 @@ class InternalObserverCallbackRouterTest {
             )
         )
 
-        assertThat(callback1.changedFunctionNames)
+        assertThat(callback1.changedPackageNames)
             .containsExactly(
-                AppFunctionName("testPackage1", "id1"),
-                AppFunctionName("testPackage2", "id2"),
+                "testPackage1",
+                "testPackage2",
             )
     }
 
@@ -528,9 +515,9 @@ class InternalObserverCallbackRouterTest {
                 setOf("testPackage1/id1"),
             )
         )
-        assertThat(callback1.changedFunctionNames).isNull()
-        assertThat(callback2.changedFunctionNames)
-            .containsExactly(AppFunctionName("testPackage1", "id1"))
+        assertThat(callback1.changedPackageNames).isNull()
+        assertThat(callback2.changedPackageNames)
+            .containsExactly("testPackage1")
     }
 
     @Test
@@ -560,7 +547,6 @@ class InternalObserverCallbackRouterTest {
             )
         )
         assertThat(callback1.changedPackageNames).isNull()
-        assertThat(callback1.changedFunctionNames).isNull()
     }
 
     fun onEnabledStatesChanged_packageMatch_routesToMatchingCallbacks() {
@@ -575,9 +561,9 @@ class InternalObserverCallbackRouterTest {
 
         callbacksRouter.onEnabledStatesChanged(setOf(AppFunctionName("testPackage1", "id1")))
 
-        assertThat(callback1.changedFunctionNames)
+        assertThat(callback1.stateChangedFunctionNames)
             .isEqualTo(listOf(AppFunctionName("testPackage1", "id1")))
-        assertThat(callback2.changedFunctionNames).isNull()
+        assertThat(callback2.stateChangedFunctionNames).isNull()
     }
 
     fun onEnabledStatesChanged_functionMatch_routesToMatchingCallbacks() {
@@ -599,9 +585,9 @@ class InternalObserverCallbackRouterTest {
 
         callbacksRouter.onEnabledStatesChanged(setOf(AppFunctionName("testPackage1", "id1")))
 
-        assertThat(callback1.changedFunctionNames)
-            .isEqualTo(listOf(AppFunctionName("testPackage1", "id1")))
-        assertThat(callback2.changedFunctionNames).isNull()
+        assertThat(callback1.changedPackageNames)
+            .isEqualTo("testPackage1")
+        assertThat(callback2.changedPackageNames).isNull()
     }
 
     fun onEnabledStatesChanged_noMatch_doesNotRoute() {
@@ -623,8 +609,8 @@ class InternalObserverCallbackRouterTest {
 
         callbacksRouter.onEnabledStatesChanged(setOf(AppFunctionName("testPackage3", "id3")))
 
-        assertThat(callback1.changedFunctionNames).isNull()
-        assertThat(callback2.changedFunctionNames).isNull()
+        assertThat(callback1.stateChangedFunctionNames).isNull()
+        assertThat(callback2.stateChangedFunctionNames).isNull()
     }
 
     private fun createMockSearchSpec(
@@ -639,15 +625,15 @@ class InternalObserverCallbackRouterTest {
 
     class TestInternalCallback() : IObserveAppFunctionChangesCallback {
         var changedPackageNames: List<String>? = null
-        var changedFunctionNames: List<AppFunctionName>? = null
+        var stateChangedFunctionNames: List<AppFunctionName>? = null
         val binder = Binder((binderId++).toString())
 
-        override fun onAppFunctionsChanged(appFunctions: List<AppFunctionName>) {
-            changedFunctionNames = appFunctions
+        override fun onPackagesChanged(changedPackageNames: List<String>) {
+            this.changedPackageNames = changedPackageNames
         }
 
-        override fun onPackagesChanged(packageNames: List<String>) {
-            changedPackageNames = packageNames
+        override fun onAppFunctionStatesChanged(appFunctions: List<AppFunctionName>) {
+            stateChangedFunctionNames = appFunctions
         }
 
         override fun asBinder(): IBinder {

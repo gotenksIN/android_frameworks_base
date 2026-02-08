@@ -233,6 +233,7 @@ class ActivityStarter {
     private TaskDisplayArea mPreferredTaskDisplayArea;
     @WindowingMode
     private int mPreferredWindowingMode;
+    private boolean mIsTaskMoveDisallowed;
 
     private Task mInTask;
     private TaskFragment mInTaskFragment;
@@ -787,6 +788,7 @@ class ActivityStarter {
         mSourceRecord = starter.mSourceRecord;
         mPreferredTaskDisplayArea = starter.mPreferredTaskDisplayArea;
         mPreferredWindowingMode = starter.mPreferredWindowingMode;
+        mIsTaskMoveDisallowed = starter.mIsTaskMoveDisallowed;
 
         mInTask = starter.mInTask;
         mInTaskFragment = starter.mInTaskFragment;
@@ -884,7 +886,8 @@ class ActivityStarter {
                 }
             }
 
-            if (mRequest.intent != null && Build.isDebuggable()) {
+            if (com.android.window.flags.Flags.logStartActivityIntent()
+                    && mRequest.intent != null && Build.isDebuggable()) {
                 // For lab debug device usages.
                 ProtoLog.d(WM_DEBUG_ACTIVITY_START_INTENT,
                         "Execute activity start request:\nIntent=%s\nIsExported=%s",
@@ -2091,6 +2094,10 @@ class ActivityStarter {
                 return START_CANNOT_GUARANTEE_TASK_MOVABILITY;
             }
 
+            if (mIsTaskMoveDisallowed) {
+                return START_CANNOT_GUARANTEE_TASK_MOVABILITY;
+            }
+
             if (mPreferredTaskDisplayArea == null
                     || !mPreferredTaskDisplayArea.getIsTaskMoveAllowed()) {
                 return START_CANNOT_GUARANTEE_TASK_MOVABILITY;
@@ -2336,6 +2343,7 @@ class ActivityStarter {
         if (mLaunchParams.mNeedsSafeRegionBounds != null) {
             r.setNeedsSafeRegionBounds(mLaunchParams.mNeedsSafeRegionBounds);
         }
+        mIsTaskMoveDisallowed = mLaunchParams.mIsTaskMoveDisallowed;
     }
 
     private TaskDisplayArea computeSuggestedLaunchDisplayArea(
@@ -2411,13 +2419,20 @@ class ActivityStarter {
                         mSourceRecord != null ? mSourceRecord.getDisplayId() : DEFAULT_DISPLAY;
                 final boolean isResultExpected = r.resultTo != null;
                 final Supplier<IntentSender> intentSender = () -> {
+                    // You can't create an IntentSender (it will crash) if you set the
+                    // PendingIntentBackgroundActivityStartMode since it's meant for the pending
+                    // intent sender. Instead, remove the option and let the sender set the start
+                    // mode.
+                    ActivityOptions intentSenderOptions =
+                            getActivityOptionsWithDefaultStartMode(mOptions,
+                                    mRequest.callingPackage);
                     IIntentSender target = mService.getIntentSenderLocked(
                             ActivityManager.INTENT_SENDER_ACTIVITY, mRequest.callingPackage,
                             mRequest.callingFeatureId, mCallingUid, r.mUserId,
                             /* token= */ null, /* resultCode= */ null, /* requestCode= */ 0,
                             new Intent[]{ mIntent }, new String[]{ r.resolvedType },
                             FLAG_CANCEL_CURRENT | FLAG_ONE_SHOT,
-                            mOptions == null ? null : mOptions.toBundle());
+                            intentSenderOptions == null ? null : intentSenderOptions.toBundle());
                     return new IntentSender(target);
                 };
                 if (!displayContent.mDwpcHelper
@@ -2437,6 +2452,33 @@ class ActivityStarter {
         }
 
         return START_SUCCESS;
+    }
+
+    /**
+     * Returns the activity options without the start mode set, if the start mode is not
+     * SYSTEM_DEFINED.
+     */
+    @Nullable
+    private static ActivityOptions getActivityOptionsWithDefaultStartMode(
+            @Nullable ActivityOptions options, String callingPackage) {
+        if (options == null) {
+            return null;
+        }
+        if (android.companion.virtualdevice.flags.Flags.removeStartModeFromBlockedIntents()
+                && options.getPendingIntentBackgroundActivityStartMode()
+                        != ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_SYSTEM_DEFINED) {
+            Slog.d(TAG, "Resetting option "
+                    + "setPendingIntentBackgroundActivityStartMode("
+                    + options.getPendingIntentBackgroundActivityStartMode()
+                    + ") to SYSTEM_DEFINED for the activity started by ("
+                    + callingPackage
+                    + ")");
+            ActivityOptions optionsCopy = new ActivityOptions(options.toBundle());
+            optionsCopy.setPendingIntentBackgroundActivityStartMode(
+                    ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_SYSTEM_DEFINED);
+            return optionsCopy;
+        }
+        return options;
     }
 
     /**
@@ -2759,6 +2801,7 @@ class ActivityStarter {
         mSourceRecord = null;
         mPreferredTaskDisplayArea = null;
         mPreferredWindowingMode = WINDOWING_MODE_UNDEFINED;
+        mIsTaskMoveDisallowed = false;
 
         mInTask = null;
         mInTaskFragment = null;
@@ -2815,6 +2858,7 @@ class ActivityStarter {
                 ? mLaunchParams.mPreferredTaskDisplayArea
                 : mRootWindowContainer.getDefaultTaskDisplayArea();
         mPreferredWindowingMode = mLaunchParams.mWindowingMode;
+        mIsTaskMoveDisallowed = mLaunchParams.mIsTaskMoveDisallowed;
 
         mLaunchMode = r.launchMode;
 

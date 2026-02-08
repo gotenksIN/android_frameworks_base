@@ -171,6 +171,7 @@ import android.util.DisplayMetrics;
 import android.util.IntArray;
 import android.util.Log;
 import android.util.SparseIntArray;
+import android.util.TimeUtils;
 import android.util.TypedValue;
 import android.view.AccessibilityIterators.TextSegmentIterator;
 import android.view.ActionMode;
@@ -12127,15 +12128,8 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             getInterestingRect(mTempRect, line);
             mTempRect.offset(mScrollX, mScrollY);
 
-            boolean requestRectangleOnScreenResult;
-            if (android.view.accessibility.Flags.requestRectangleWithSource()) {
-                requestRectangleOnScreenResult = requestRectangleOnScreen(mTempRect, false,
-                        View.RECTANGLE_ON_SCREEN_REQUEST_SOURCE_TEXT_CURSOR);
-            } else {
-                requestRectangleOnScreenResult = requestRectangleOnScreen(mTempRect);
-            }
-
-            if (requestRectangleOnScreenResult) {
+            if (requestRectangleOnScreen(mTempRect, false,
+                    View.RECTANGLE_ON_SCREEN_REQUEST_SOURCE_TEXT_CURSOR)) {
                 changed = true;
             }
         }
@@ -16582,7 +16576,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         private Choreographer.FrameCallback mTickCallback = new Choreographer.FrameCallback() {
             @Override
             public void doFrame(long frameTimeNanos) {
-                tick();
+                tick(frameTimeNanos);
             }
         };
 
@@ -16590,8 +16584,8 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             @Override
             public void doFrame(long frameTimeNanos) {
                 mStatus = MARQUEE_RUNNING;
-                mLastAnimationMs = mChoreographer.getFrameTime();
-                tick();
+                mLastAnimationMs = frameTimeNanos / TimeUtils.NANOS_PER_MS;
+                tick(frameTimeNanos);
             }
         };
 
@@ -16607,7 +16601,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             }
         };
 
-        void tick() {
+        void tick(long frameTimeNanos) {
             if (mStatus != MARQUEE_RUNNING) {
                 return;
             }
@@ -16617,7 +16611,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             final TextView textView = mView.get();
             if (textView != null && textView.isAggregatedVisible()
                     && (textView.isFocused() || textView.isSelected())) {
-                long currentMs = mChoreographer.getFrameTime();
+                long currentMs = frameTimeNanos / TimeUtils.NANOS_PER_MS;
                 long deltaMs = currentMs - mLastAnimationMs;
                 mLastAnimationMs = currentMs;
                 float deltaPx = deltaMs * mPixelsPerMs;

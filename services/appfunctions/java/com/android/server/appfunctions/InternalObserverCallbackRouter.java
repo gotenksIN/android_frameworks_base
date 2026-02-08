@@ -61,6 +61,11 @@ class InternalObserverCallbackRouter {
     }
 
     public void onDocumentChanged(@NonNull DocumentChangeInfo documentChangeInfo) {
+        // TODO: b/481659383 - Batch change notifications.
+        // 1. In case both functions and top-level documents change we will receive two
+        // notifications as AppSearch groups changes by schema, but we should only notify once.
+        // 2. For each package, we will receive at least one notification or two at most. We can
+        // batch these to provide a list of changed packages within a timeframe.
         Runnable runnable =
                 () -> {
                     if (isAppFunctionStaticMetadataSchema(documentChangeInfo.getSchemaName())) {
@@ -81,7 +86,7 @@ class InternalObserverCallbackRouter {
                         String changedPackageName =
                                 getPackageNameFromSchemaName(documentChangeInfo.getSchemaName());
                         if (changedPackageName != null) {
-                            onPackagesChanged(Set.of(changedPackageName));
+                            onPackageLevelChange(Set.of(changedPackageName));
                         }
                     }
                 };
@@ -102,7 +107,7 @@ class InternalObserverCallbackRouter {
                             changedPackageNames.add(changedPackageName);
                         }
                     }
-                    onPackagesChanged(changedPackageNames);
+                    onPackageLevelChange(changedPackageNames);
                 };
         try {
             var unused = mExecutor.submit(runnable);
@@ -121,13 +126,13 @@ class InternalObserverCallbackRouter {
     //  example in case of dynamic app functions that are registered/unregistered in a composable.
     public void onEnabledStatesChanged(@NonNull Set<AppFunctionName> changedFunctionNames) {
         try {
-            var unused = mExecutor.submit(() -> onAppFunctionsChanged(changedFunctionNames));
+            var unused = mExecutor.submit(() -> onAppFunctionStatesChanged(changedFunctionNames));
         } catch (RejectedExecutionException ex) {
             Slog.w(TAG, "Failed to run onEnabledStateChanged due to executor shutdown.", ex);
         }
     }
 
-    private void onPackagesChanged(@NonNull Set<String> changedPackageNames) {
+    private void onPackageLevelChange(@NonNull Set<String> changedPackageNames) {
         Set<InternalCallbackWrapper> callbacksToNotify;
         synchronized (mInternalCallbacksLock) {
             // Make a copy before iterating over the callbacks to prevent deadlocks.
@@ -158,6 +163,30 @@ class InternalObserverCallbackRouter {
             callbacksToNotify = new ArraySet<>(mInternalCallbacks);
         }
         for (InternalCallbackWrapper internalCallbackWrapper : callbacksToNotify) {
+            Set<String> filteredPackageNames = new ArraySet<>();
+            for (AppFunctionName functionName : changedFunctionNames) {
+                if (internalCallbackWrapper.isObservedFunction(functionName)) {
+                    filteredPackageNames.add(functionName.getPackageName());
+                }
+            }
+            if (!filteredPackageNames.isEmpty()) {
+                try {
+                    internalCallbackWrapper.mInternalCallback.onPackagesChanged(
+                            new ArrayList<>(filteredPackageNames));
+                } catch (RemoteException e) {
+                    Slog.e(TAG, "Failed to execute callback#onAppFunctionsChanged.", e);
+                }
+            }
+        }
+    }
+
+    private void onAppFunctionStatesChanged(@NonNull Set<AppFunctionName> changedFunctionNames) {
+        Set<InternalCallbackWrapper> callbacksToNotify;
+        synchronized (mInternalCallbacksLock) {
+            // Make a copy before iterating over the callbacks to prevent deadlocks.
+            callbacksToNotify = new ArraySet<>(mInternalCallbacks);
+        }
+        for (InternalCallbackWrapper internalCallbackWrapper : callbacksToNotify) {
             Set<AppFunctionName> filteredNames = new ArraySet<>();
             for (AppFunctionName functionName : changedFunctionNames) {
                 if (internalCallbackWrapper.isObservedFunction(functionName)) {
@@ -166,10 +195,10 @@ class InternalObserverCallbackRouter {
             }
             if (!filteredNames.isEmpty()) {
                 try {
-                    internalCallbackWrapper.mInternalCallback.onAppFunctionsChanged(
+                    internalCallbackWrapper.mInternalCallback.onAppFunctionStatesChanged(
                             new ArrayList<>(filteredNames));
                 } catch (RemoteException e) {
-                    Slog.e(TAG, "Failed to execute callback#onAppFunctionsChanged.", e);
+                    Slog.e(TAG, "Failed to execute callback#onAppFunctionStatesChanged.", e);
                 }
             }
         }

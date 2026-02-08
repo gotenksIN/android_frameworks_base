@@ -56,8 +56,16 @@ interface IPersonalContextManager {
     oneway void publishInsightSurfaceHints(
         in List<ContextHintWrapper> hints, in InsightSurfaceClientInfo clientInfo, int userId);
 
+    oneway void showAttribution(in ContextInsightWrapper insight);
+
     oneway void reportEvent(in InsightEvent event, int userId);
 
     oneway void reportFeedback(
         in ContextInsightWrapper insight, in Bundle partialFeedback, int userId);
+
+    boolean isPersonalContextModeEnabled(in String packageName, int userId);
+
+    // Avoiding oneway so that get and set have a consistent ordering.
+    @EnforcePermission("CHANGE_PERSONAL_CONTEXT_MODE")
+    void setPersonalContextModeEnabled(in String packageName, int userId, boolean enabled);
 }

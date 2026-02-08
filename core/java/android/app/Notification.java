@@ -5027,6 +5027,7 @@ public class Notification implements Parcelable
         private ContrastColorUtil mColorUtil;
         private boolean mIsLegacy;
         private boolean mIsLegacyInitialized;
+        @Nullable private UserProfileBadgeProvider mUserProfileBadgeProvider;
 
         /**
          * Caches an instance of StandardTemplateParams. Note that this may have been used before,
@@ -6425,6 +6426,19 @@ public class Notification implements Parcelable
             return this;
         }
 
+        /**
+         * Sets the profile badge provider for this notification.
+         *
+         * @param provider the profile badge provider for this notification.
+         * @return the same Builder
+         * @hide
+         */
+        @VisibleForTesting
+        public Builder setUserProfileBadgeProvider(@Nullable UserProfileBadgeProvider provider) {
+            mUserProfileBadgeProvider = provider;
+            return this;
+        }
+
         private void bindPhishingAlertIcon(RemoteViews contentView, StandardTemplateParams p) {
             contentView.setDrawableTint(
                     R.id.phishing_alert,
@@ -6433,12 +6447,25 @@ public class Notification implements Parcelable
                     PorterDuff.Mode.SRC_ATOP);
         }
 
+        /**
+         * Returns the profile badge for this notification.
+         *
+         * @hide
+         */
+        public Bitmap getProfileBadge() {
+            if (mUserProfileBadgeProvider != null) {
+                return mUserProfileBadgeProvider.getProfileBadge(mContext);
+            } else {
+                return Notification.getProfileBadge(mContext);
+            }
+        }
+
         private void bindProfileBadge(RemoteViews contentView, StandardTemplateParams p) {
             if (richOngoingImprovements() && p.mHideProfileBadge) {
                 return;
             }
 
-            Bitmap profileBadge = Notification.getProfileBadge(mContext);
+            final Bitmap profileBadge = getProfileBadge();
 
             if (profileBadge != null) {
                 contentView.setImageViewBitmap(R.id.profile_badge, profileBadge);
@@ -6447,10 +6474,16 @@ public class Notification implements Parcelable
                     contentView.setDrawableTint(R.id.profile_badge, false,
                             getTextColor(p), PorterDuff.Mode.SRC_ATOP);
                 }
-                contentView.setContentDescription(
-                        R.id.profile_badge,
-                        mContext.getSystemService(UserManager.class)
-                                .getProfileAccessibilityString(mContext.getUserId()));
+                final String profileAccessibilityString;
+                if (mUserProfileBadgeProvider != null) {
+                    profileAccessibilityString =
+                            mUserProfileBadgeProvider.getProfileAccessibilityString(mContext);
+                } else {
+                    profileAccessibilityString =
+                            mContext.getSystemService(UserManager.class)
+                                    .getProfileAccessibilityString(mContext.getUserId());
+                }
+                contentView.setContentDescription(R.id.profile_badge, profileAccessibilityString);
             }
         }
 
@@ -7279,10 +7312,16 @@ public class Notification implements Parcelable
          */
         private record ActionButton(Action action, int originalIndex) { }
 
+        /**
+         * @param supportCustomColors whether colors set via full-width style or semantic annotation
+         *     spans in the action text will be used to color the button background (or border)
+         *     if the action is emphasized.
+         */
         private record ActionButtons(
-                List<ActionButton> actions, boolean edgeToEdge, boolean emphasized) {
+                List<ActionButton> actions, boolean edgeToEdge, boolean emphasized,
+                boolean supportCustomColors) {
             private static final ActionButtons EMPTY =
-                    new ActionButtons(List.of(), false, false);
+                    new ActionButtons(List.of(), false, false, false);
         }
 
         /**
@@ -7360,7 +7399,9 @@ public class Notification implements Parcelable
             }
 
             boolean emphasizedEdgeToEdge = isPromotedOngoing || isPseudoFsi || isCallStyle;
-            return new ActionButtons(candidates, emphasizedEdgeToEdge, emphasizedEdgeToEdge);
+            boolean supportCustomColors = isPseudoFsi || isCallStyle; // but not other RONs.
+            return new ActionButtons(candidates, emphasizedEdgeToEdge, emphasizedEdgeToEdge,
+                    supportCustomColors);
         }
 
         @FlaggedApi(Flags.FLAG_API_NOTIFICATION_ACTION_CUSTOM)
@@ -7371,7 +7412,8 @@ public class Notification implements Parcelable
                 boolean actionHasValidInput = hasValidRemoteInput(action.action);
                 validRemoteInput |= actionHasValidInput;
 
-                final RemoteViews button = createActionButtonView(action, actions.emphasized(), p);
+                final RemoteViews button = createActionButtonView(action, actions.emphasized(),
+                        actions.supportCustomColors(), p);
                 if (actionHasValidInput && !actions.emphasized()) {
                     // Clear the drawable
                     button.setInt(R.id.action0, "setBackgroundResource", 0);
@@ -7388,7 +7430,7 @@ public class Notification implements Parcelable
 
         @FlaggedApi(Flags.FLAG_API_NOTIFICATION_ACTION_CUSTOM)
         private RemoteViews createActionButtonView(ActionButton actionButton,
-                boolean emphasizedMode, StandardTemplateParams p) {
+                boolean emphasizedMode, boolean supportCustomColor, StandardTemplateParams p) {
             Action action = actionButton.action;
             final boolean tombstone = (action.actionIntent == null);
             final boolean showIcon =
@@ -7410,9 +7452,8 @@ public class Notification implements Parcelable
             if (emphasizedMode) {
                 button.setBoolean(R.id.action0, "setEnabled", !tombstone);
 
-                // TODO: b/461472579 - useColorFromActionTitle should always be true?
                 EmphasizedButtonColors colors = resolveEmphasisColors(action, p,
-                        /* useColorFromActionTitle= */ true, tombstone);
+                        supportCustomColor, tombstone);
 
                 button.setColorStateList(R.id.action0, "setButtonBackground",
                         ColorStateList.valueOf(colors.background));
@@ -7498,8 +7539,10 @@ public class Notification implements Parcelable
                 if (customColor != null) {
                     backgroundColor = Colors.ensureMinimalContrast(customColor,
                             notifBackgroundColor);
-                    textColor = Colors.ensureTextContrast(colors.getPrimaryEmphasisText(),
-                            backgroundColor);
+                    // For custom color background, use white/black-ish for text. This will also
+                    // ensure necessary contrast.
+                    textColor = ContrastColorUtil.resolvePrimaryColor(mContext,
+                            backgroundColor, mInNightMode);
                 } else {
                     backgroundColor = colors.getPrimaryEmphasisBackground();
                     textColor = colors.getPrimaryEmphasisText();
@@ -8995,8 +9038,7 @@ public class Notification implements Parcelable
      * @hide
      */
     public boolean isColorized() {
-        return isColorizedRequested()
-                && (hasColorizedPermission() || isFgsOrUij() || isPromotedOngoing());
+        return isColorizedRequested() && (hasColorizedPermission() || isFgsOrUij());
     }
 
     /**
@@ -12545,7 +12587,7 @@ public class Notification implements Parcelable
             bindMetricStyleMetrics(contentView, p, metricsToBind, isExpandedView);
 
             if (useLabelAsTitle) {
-                contentView.setTextViewText(MetricView.VIEWS.getFirst().labelId(), "");
+                contentView.setViewVisibility(MetricView.VIEWS.getFirst().labelId(), View.GONE);
             }
 
             return contentView;
@@ -12566,6 +12608,7 @@ public class Notification implements Parcelable
                     final CharSequence metricLabel = getMetricLabel(metric, isExpandedView);
 
                     mBuilder.setTextColor(contentView, metricView.labelId(), p);
+                    contentView.setViewVisibility(metricView.labelId(), View.VISIBLE);
                     contentView.setTextViewText(metricView.labelId(), metricLabel);
 
                     // Choose the view (text/chronometer) to show and its visual appearance.
@@ -18524,6 +18567,31 @@ public class Notification implements Parcelable
     }
 
     /**
+     * A provider for the profile badge.
+     * @hide
+     */
+    public interface UserProfileBadgeProvider {
+        /**
+         * Returns the profile badge for the user of the given context.
+         *
+         * @param context The context of the app that is to be badged.
+         * @return The profile badge for the given user, or null if no badge is available.
+         */
+        @Nullable
+        Bitmap getProfileBadge(@NonNull Context context);
+
+        /**
+         * Returns the profile badge accessibility string for the user of the given context.
+         *
+         * @param context The context of the app that is to be badged.
+         * @return The profile badge accessibility string for the given user, or null if no badge is
+         *     available.
+         */
+        @Nullable
+        String getProfileAccessibilityString(@NonNull Context context);
+    }
+
+    /**
      * A utility which stores and calculates the palette of colors used to color notifications.
      * @hide
      */
@@ -18875,7 +18943,7 @@ public class Notification implements Parcelable
 
         @FlaggedApi(Flags.FLAG_API_NOTIFICATION_ACTION_CUSTOM)
         @ColorInt
-        int getPrimaryEmphasisBackground() {
+        public int getPrimaryEmphasisBackground() {
             return mPrimaryEmphasisBackground;
         }
 

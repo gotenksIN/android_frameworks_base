@@ -4108,6 +4108,24 @@
     <!-- Message of notification shown when contaminant is no longer detected on the USB port. [CHAR LIMIT=NONE] -->
     <string name="usb_contaminant_not_detected_message">Phone no longer detects liquid or debris.</string>
 
+    <!-- Title of notification shown when new devices are added while screen is locked. [CHAR LIMIT=NONE] -->
+    <string name="usb_authorization_notify_on_screenlock_title">New USB device connected</string>
+    <!-- Message of notification shown when a single new device is added while screen is locked. [CHAR LIMIT=NONE] -->
+    <string name="usb_authorization_notify_on_screenlock_message">Sign in to trust this USB device and start using it.</string>
+    <!-- Message of notification shown when multiple new devices are added while screen is locked. [CHAR LIMIT=NONE] -->
+    <string name="usb_authorization_notify_on_screenlock_message_multiple">Sign in to trust these USB devices and start using them.</string>
+    <!-- Title of notification shown to tell user to finish logging in to trust a single new device. [CHAR LIMIT=NONE] -->
+    <string name="usb_authorization_notify_finish_logging_in_title">New USB device connected</string>
+    <!-- Message of notification shown to tell user to finish logging in to trust a single new device. [CHAR LIMIT=NONE] -->
+    <string name="usb_authorization_notify_finish_logging_in_message">Sign in within <xliff:g id="num_seconds" example="60">%1$d</xliff:g> seconds to fully trust this USB device. If you don\'t, you\'ll have to disconnect and reconnect it.</string>
+    <!-- Title of notification shown to tell user to finish logging in to trust multiple new devices. [CHAR LIMIT=NONE] -->
+    <string name="usb_authorization_notify_finish_logging_in_title_multiple">New USB devices connected</string>
+    <!-- Message of notification shown to tell user to finish logging in to trust multiple new devices. [CHAR LIMIT=NONE] -->
+    <string name="usb_authorization_notify_finish_logging_in_message_multiple">Sign in within <xliff:g id="num_seconds" example="60">%1$d</xliff:g> seconds to fully trust these USB devices. If you don\'t, you\'ll have to disconnect and reconnect them.</string>
+
+    <!-- Text shown when viewing channel settings for notifications related to a usb device authorization -->
+    <string name="notification_channel_usb_authorization">USB Device Authorization</string>
+
     <!-- Title of notification shown to indicate that bug report is being collected. -->
     <string name="taking_remote_bugreport_notification_title">Taking bug report\u2026</string>
     <!-- Title of notification shown to ask for user consent for sharing a bugreport that was requested remotely by the IT administrator. -->
@@ -5857,7 +5875,7 @@
     </string>
     <!-- Message shown on the system-provided BiometricPrompt, informing the user the app they're trying to open is locked by App Lock. [CHAR LIMIT=NONE] -->
     <string name="locked_app_biometric_prompt_description">
-        <xliff:g id="app_name" example="Gmail">%1$s</xliff:g> is locked
+        This app is protected with app lock
     </string>
     <!-- Message shown on the system-provided activity, informing the user who is using an external display that the app they're trying to open needs to be unlocked on their other device. [CHAR LIMIT=NONE] -->
     <string name="locked_app_external_display_message">
@@ -5892,6 +5910,10 @@
     <!-- An informational item explaining that widgets and shortcuts for a locked app will be removed. [CHAR LIMIT=60] -->
     <string name="app_lock_edu_dialog_info_widgets">
         Widgets and shortcuts will be removed
+    </string>
+    <!-- An informational item explaining that AI apps and services may still access data from a locked app. [CHAR LIMIT=200] -->
+    <string name="app_lock_edu_dialog_info_ai_disclaimer">
+        AI agents and services you’ve allowed to access %1$s will still be able to access its data
     </string>
     <!-- Text for the primary action button in the main App Lock user education dialog to confirm locking the app. [CHAR LIMIT=20] -->
     <string name="app_lock_edu_dialog_button_lock">
@@ -7081,6 +7103,8 @@
     <string name="satellite_messaging_location_disabled_notification_title">Satellite messaging not available</string>
     <!-- Notification summary when location settings is disabled. [CHAR LIMIT=NONE] -->
     <string name="satellite_messaging_location_disabled_notification_summary">To check if satellite messaging is available in this country or region, turn on location settings</string>
+    <!-- The satellite indicator to be shown on the status bar, settings, quick settings, and landing pages. [CHAR LIMIT=5] -->
+    <string name="satellite_indicator">SAT</string>
 
     <!-- Fingerprint dangling notification title -->
     <string name="fingerprint_dangling_notification_title">Set up Fingerprint Unlock again</string>

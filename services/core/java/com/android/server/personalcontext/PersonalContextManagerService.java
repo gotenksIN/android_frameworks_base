@@ -18,12 +18,15 @@ package com.android.server.personalcontext;
 
 import static java.util.Collections.emptySet;
 
+import android.annotation.EnforcePermission;
 import android.annotation.PermissionManuallyEnforced;
 import android.annotation.RequiresNoPermission;
 import android.annotation.UserIdInt;
 import android.app.ActivityManagerInternal;
 import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.content.pm.PackageManagerInternal;
 import android.database.ContentObserver;
 import android.os.Binder;
 import android.os.Bundle;
@@ -46,6 +49,7 @@ import android.service.personalcontext.hint.NotificationHint;
 import android.service.personalcontext.hint.TextClassificationHint;
 import android.service.personalcontext.insight.ContextInsight;
 import android.service.personalcontext.insight.ContextInsightWrapper;
+import android.service.personalcontext.insight.interaction.AttributionDetails;
 import android.service.personalcontext.insight.interaction.InsightEvent;
 import android.util.Log;
 import android.util.Slog;
@@ -60,6 +64,7 @@ import com.android.internal.util.DumpUtils;
 import com.android.server.SystemService;
 import com.android.server.notification.NotificationManagerInternal;
 import com.android.server.personalcontext.component.Refiner;
+import com.android.server.personalcontext.component.Renderer;
 import com.android.server.personalcontext.embedded.EmbeddedInsightRenderer;
 import com.android.server.personalcontext.notifications.ContextActionResolver;
 import com.android.server.personalcontext.notifications.NotificationActionFactory;
@@ -154,17 +159,20 @@ public class PersonalContextManagerService extends SystemService {
     private final ContextLogger mLogger = new ContextLogger();
 
     private final ActivityManagerInternal mActivityManager;
+    private final PackageManagerInternal mPackageManager;
     private final PersonalContextManagerInternal mInternalService = new LocalService();
     public PersonalContextManagerService(Context context) {
         super(context);
 
         mActivityManager = getLocalService(ActivityManagerInternal.class);
+        mPackageManager = getLocalService(PackageManagerInternal.class);
     }
 
     @Override
     public void onStart() {
         publishBinderService(
-                PersonalContextManager.PERSONAL_CONTEXT_SERVICE, new BinderService(this));
+                PersonalContextManager.PERSONAL_CONTEXT_SERVICE,
+                new BinderService(this, mPackageManager));
         publishLocalService(PersonalContextManagerInternal.class, mInternalService);
         Slog.i(TAG, "Personal Context Service started");
     }
@@ -182,7 +190,7 @@ public class PersonalContextManagerService extends SystemService {
             Slog.i(TAG, "Creating new state for user " + userId);
             Context userContext = getContext().createContextAsUser(user.getUserHandle(), 0);
             final ContextComponentManager componentManager =
-                    new ContextComponentManager(userContext);
+                    new ContextComponentManager(userContext, user.getUserHandle());
             final ContextComponentMonitor monitor = new ContextComponentMonitor(componentManager);
             final HintInvalidationUnderstander hintInvalidationUnderstander =
                     new HintInvalidationUnderstander(
@@ -476,10 +484,13 @@ public class PersonalContextManagerService extends SystemService {
     @VisibleForTesting
     static final class BinderService extends IPersonalContextManager.Stub {
         private final WeakReference<PersonalContextManagerService> mService;
+        private final PackageManagerInternal mPackageManager;
 
         @VisibleForTesting
-        BinderService(PersonalContextManagerService service) {
+        BinderService(
+                PersonalContextManagerService service, PackageManagerInternal packageManager) {
             mService = new WeakReference<>(service);
+            mPackageManager = packageManager;
         }
 
         private PersonalContextManagerService getService() {
@@ -503,6 +514,41 @@ public class PersonalContextManagerService extends SystemService {
                                         + " callingUserId="
                                         + callingUserId);
             }
+        }
+
+        @PermissionManuallyEnforced
+        @Override
+        public boolean isPersonalContextModeEnabled(String packageName, int userId) {
+            final int callingUid = Binder.getCallingUid();
+
+            // Manifest.permission.QUERY_ALL_PACKAGES permission is enforced inside package manager.
+            return Boolean.TRUE.equals(
+                    Binder.withCleanCallingIdentity(
+                            () -> {
+                                int personalContextMode =
+                                        mPackageManager.getPersonalContextMode(
+                                                packageName, callingUid, userId);
+                                return personalContextMode
+                                                == PackageManager.PERSONAL_CONTEXT_MODE_UNSET
+                                        || personalContextMode
+                                                == PackageManager.PERSONAL_CONTEXT_MODE_USER_ON;
+                            }));
+        }
+
+        @EnforcePermission(android.Manifest.permission.CHANGE_PERSONAL_CONTEXT_MODE)
+        @Override
+        public void setPersonalContextModeEnabled(String packageName, int userId, boolean enabled) {
+            setPersonalContextModeEnabled_enforcePermission();
+            final int callingUid = Binder.getCallingUid();
+            Binder.withCleanCallingIdentity(
+                    () -> {
+                        int mode =
+                                enabled
+                                        ? PackageManager.PERSONAL_CONTEXT_MODE_USER_ON
+                                        : PackageManager.PERSONAL_CONTEXT_MODE_USER_OFF;
+                        mPackageManager.setPersonalContextMode(
+                                packageName, callingUid, userId, mode);
+                    });
         }
 
         @PermissionManuallyEnforced
@@ -660,6 +706,15 @@ public class PersonalContextManagerService extends SystemService {
 
         @PermissionManuallyEnforced
         @Override
+        public void showAttribution(ContextInsightWrapper insight) {
+            final AttributionDetails attributionDetails =
+                    insight.getContextInsight().getAttributionDetails();
+
+            // TODO(b/475328786): Handle showing the attribution.
+        }
+
+        @PermissionManuallyEnforced
+        @Override
         protected void dump(
                 @NonNull FileDescriptor fd, @NonNull PrintWriter fout, @Nullable String[] args) {
             final PersonalContextManagerService service = getService();
@@ -697,11 +752,18 @@ public class PersonalContextManagerService extends SystemService {
                 return;
             }
 
+            final HashSet<RenderToken> rendererTokens = new HashSet<>();
+
+            for (Renderer renderer : userState.componentManager.getRenderersWithProperties(
+                    Renderer.PROPERTY_CAN_RECEIVE_NOTIFICATION_INSIGHTS)) {
+                rendererTokens.add(renderer.mintRenderToken());
+            }
+
             startRefinerWorkflow(
                     user.getIdentifier(),
                     Process.myPid(),
                     Set.of(new NotificationHint.Builder(event).build()),
-                    Set.of(userState.notificationActionRenderer().mintRenderToken()),
+                    rendererTokens,
                     Collections.emptySet());
         }
 

@@ -343,7 +343,6 @@ public class PipTransitionState {
                 || mState == PipTransitionState.SCHEDULED_ENTER_PIP;
     }
 
-
     void setSwipePipToHomeState(@Nullable SurfaceControl overlayLeash,
             @NonNull Rect appBounds) {
         mInSwipePipToHomeTransition = true;
@@ -372,7 +371,9 @@ public class PipTransitionState {
      * Sets the SurfaceControl leash for the currently pinned PiP task.
      */
     public void setPinnedTaskLeash(@Nullable SurfaceControl leash) {
-        if (!com.android.window.flags.Flags.releaseAllTransitionSurfaces()) {
+        if (!com.android.window.flags.Flags.releaseAllTransitionSurfaces()
+                // mixpatcher handles leash cleanup itself
+                && !com.android.window.flags.Flags.transitMixpatcherBase()) {
             mPinnedTaskLeash = leash;
             return;
         }

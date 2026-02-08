@@ -3727,6 +3727,11 @@
     <string name="config_usbResolverActivity" translatable="false"
             >com.android.systemui/com.android.systemui.usb.UsbResolverActivity</string>
 
+    <!-- Component name of the activity to select the activity to start when a usb device is plugged
+         in. -->
+    <string name="config_usbAuthorizationActivity" translatable="false"
+            >com.android.systemui/com.android.systemui.usb.UsbAuthorizationActivity</string>
+
     <!-- Component name of the activity used to inform a user about a sensor privacy state chage. -->
     <string name="config_sensorStateChangedActivity" translatable="false"></string>
 
@@ -8020,8 +8025,14 @@
      <!-- Whether to enable app launch blur -->
     <bool name="config_enableAppLaunchBlur">true</bool>
 
+    <!-- Whether the native_serial service is supported by this device. -->
+    <bool name="config_supportNativeSerialService">false</bool>
+
     <!-- Whether Airplane Mode sync is supported by this device. -->
     <bool name="config_supportAirplaneModeSync">true</bool>
+
+    <!-- Enable wallpaper local color extraction by default -->
+    <bool name="config_enableWallpaperLocalColorExtraction">true</bool>
 
     <!-- Whether to allow content restriction device policy bypassing. -->
     <bool name="config_allowContentRestrictionDevicePolicyBypassing">false</bool>

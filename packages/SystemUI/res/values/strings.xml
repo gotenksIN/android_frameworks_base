@@ -195,6 +195,9 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="title_usb_accessory">USB accessory</string>
 
+    <!-- Prompt for the USB dialog's always allow button [CHAR LIMIT=20] -->
+    <string name="usb_device_dialog_always_allow_button">Always allow</string>
+
     <!-- Prompt for the USB dialog's allow only this time button [CHAR LIMIT=20] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -249,6 +252,33 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="usb_debugging_secondary_user_message">The user currently signed in to this device can\'t turn on USB debugging. To use this feature, switch to an admin user.</string>
+
+    <!-- Title of notification shown when a new USB device needs user authorization. -->
+    <string name="usb_authorization_title">Allow USB device to connect?</string>
+
+    <!-- Title of notification shown when a new USB device needs user authorization. -->
+    <string name="usb_authorization_title_multi">Allow USB devices to connect?</string>
+
+    <!-- Message of notification shown when a new USB device needs user authorization. -->
+    <string name="usb_authorization_message">The following device was connected to your <xliff:g id="name" example="My Pixel 8 Pro">%1$s</xliff:g>:</string>
+
+    <!-- Message of notification shown when a new USB device needs user authorization. -->
+    <string name="usb_authorization_message_multi">The following devices were connected to your <xliff:g id="name" example="My Pixel 8 Pro">%1$s</xliff:g>:</string>
+
+    <!-- Message of notification shown when a new USB device needs user authorization before first unlock. -->
+    <string name="usb_authorization_message_untrusted">The following device was connected to your <xliff:g id="name" example="My Pixel 8 Pro">%1$s</xliff:g>. This device will only be trusted after you sign in.</string>
+
+    <!-- Message of notification shown when a new USB device needs user authorization before first unlock. -->
+    <string name="usb_authorization_message_multi_untrusted">The following devices were connected to your <xliff:g id="name" example="My Pixel 8 Pro">%1$s</xliff:g>. These devices will only be trusted after you sign in.</string>
+
+    <!-- String used for an USB device with an empty product name -->
+    <string name="usb_authorization_unknown_device">Unknown product (<xliff:g id="vendor_id">%1$04X</xliff:g>:<xliff:g id="product_id">%2$04X</xliff:g>)</string>
+
+    <!-- Button label for allowing new USB device. [CHAR LIMIT=20] -->
+    <string name="usb_authorization_allow">Allow</string>
+
+    <!-- Button label for denying new USB device. [CHAR LIMIT=20] -->
+    <string name="usb_authorization_deny">Don\'t allow</string>
 
     <!-- Title of confirmation dialog for wireless debugging [CHAR LIMIT=80] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -454,6 +484,10 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screenshot_dismiss_work_profile">Dismiss work profile message</string>
+    <!-- Label for UI element which allows opening the screenshot in the Files app [CHAR LIMIT=30] -->
+    <string name="screenshot_open_in_folder_label">Folder</string>
+    <!-- Content description indicating that tapping the element will allow opening the screenshot in the Files app [CHAR LIMIT=NONE] -->
+    <string name="screenshot_open_in_folder_description">Open screenshot in Files</string>
     <!-- Content description indicating that the view is a preview of the screenshot that was just taken [CHAR LIMIT=NONE] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -1729,6 +1763,9 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="accessibility_status_bar_input_method_indicator">Keyboard</string>
+
+    <!-- Title of the large-screen version of the pop-up dialog in which the user switches keyboard or input method. [CHAR LIMIT=NONE] -->
+    <string name="input_method_switcher_title_large_screen">Keyboard</string>
 
     <!-- The overflow indicator shown when a group has more notification inside the group than the visible ones. An example is "+ 3" [CHAR LIMIT=5] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -7518,4 +7555,21 @@
     <string name="accessibility_hearing_device_right_battery_level">R battery %1$s</string>
     <!-- Notification channel name for hearing device status [CHAR LIMIT=NONE] -->
     <string name="accessibility_hearing_device_notification_channel_name">Hearing Device Status</string>
+
+    <!-- Label for the 'Edit' action in the more options menu. Tapping this takes you to the edit accessibility shortcuts page. [CHAR LIMIT=NONE] -->
+    <string name="more_options_edit">Edit</string>
+    <!-- Label for the 'Move' action in the more options menu. This action allows the user to change the position of the floating menu. [CHAR LIMIT=NONE] -->
+    <string name="more_options_move">Move</string>
+    <!-- Label for the action to remove all items from the floating menu, found in the more options menu. [CHAR LIMIT=NONE] -->
+    <string name="more_options_remove_all">Remove all</string>
+    <!-- Label for the 'More options' button in the floating menu, which opens a pop up window with more actions. [CHAR LIMIT=NONE] -->
+    <string name="floating_menu_more_options_label">More options</string>
+
+    <!-- Dream contextual setup -->
+    <!-- Title for the dream contextual setup bottom sheet. [CHAR LIMIT=NONE] -->
+    <string name="dream_setup_title">Set up screen saver</string>
+    <!-- Label for the "Not now" button in the dream contextual setup bottom sheet. [CHAR LIMIT=20] -->
+    <string name="dream_setup_button_not_now">Not now</string>
+    <!-- Label for the "Set up" button in the dream contextual setup bottom sheet. [CHAR LIMIT=20] -->
+    <string name="dream_setup_button_setup">Set up</string>
 </resources>

@@ -179,6 +179,7 @@
     <!-- Screen Recording -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SYSTEM_EXEMPTED" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.CAPTURE_AUDIO_OUTPUT"/>
     <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
@@ -572,6 +573,7 @@
 
         <service
             android:name=".screenrecord.service.ScreenRecordingService"
+            android:foregroundServiceType="systemExempted|microphone"
             android:exported="false" />
 
         <service android:name=".screenrecord.RecordingService"
@@ -657,6 +659,15 @@
 
         <!-- started from UsbDeviceSettingsManager -->
         <activity android:name=".usb.UsbResolverActivity"
+            android:exported="true"
+            android:permission="android.permission.MANAGE_USB"
+            android:theme="@style/Theme.SystemUI.Dialog.Alert"
+            android:finishOnCloseSystemDialogs="true"
+            android:excludeFromRecents="true">
+        </activity>
+
+        <!-- started from UsbDeviceSettingsManager -->
+        <activity android:name=".usb.UsbAuthorizationActivity"
             android:exported="true"
             android:permission="android.permission.MANAGE_USB"
             android:theme="@style/Theme.SystemUI.Dialog.Alert"
@@ -832,7 +843,7 @@
         <!-- AppFunctions -->
         <activity android:name=".appfunctions.trampoline.AppFunctionExecutorProxy"
             android:exported="true"
-            android:permission="android.permission.EXECUTE_APP_FUNCTIONS"
+            android:permission="android.permission.EXECUTE_APP_FUNCTIONS_SYSTEM"
             android:excludeFromRecents="true"
             android:theme="@android:style/Theme.NoDisplay">
         </activity >
@@ -939,7 +950,8 @@
             android:finishOnCloseSystemDialogs="true"
             android:launchMode="singleInstance"
             android:excludeFromRecents="true"
-            android:exported="true">
+            android:exported="true"
+            android:showForAllUsers="true">
             <intent-filter>
                 <action android:name="com.android.intent.action.SHOW_BRIGHTNESS_DIALOG" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -1101,6 +1113,18 @@
             android:turnScreenOn="true"
             android:exported="false">
         </activity>
+
+        <!-- Contextual setup activity for dreams/screensavers. -->
+        <activity
+            android:name=".dreams.ui.activity.DreamSetupActivity"
+            android:theme="@style/Theme.Transparent"
+            android:label=""
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:finishOnTaskLaunch="true"
+            android:showWhenLocked="true"
+            android:showForAllUsers="true"
+            />
 
         <service
             android:name="com.android.systemui.communal.widgets.GlanceableHubWidgetManagerService"

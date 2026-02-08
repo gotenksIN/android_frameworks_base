@@ -89,6 +89,7 @@ import com.android.systemui.dagger.SysUISingleton;
 // QTI_END: 2023-03-02: Android_UI: SystemUI: Support side car 5G icon
 
 // QTI_BEGIN: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
+import com.qti.extphone.AuxiliaryRadioIconInfo;
 import com.qti.extphone.Client;
 import com.qti.extphone.ExtTelephonyManager;
 import com.qti.extphone.IExtPhoneCallback;
@@ -143,6 +144,8 @@ public class FiveGServiceClient {
 // QTI_BEGIN: 2023-06-05: Android_UI: SystemUI: Fix ConcurrentModificationException
     final SparseArray<CopyOnWriteArrayList<IFiveGStateListener>> mStatesListeners =
             new SparseArray<>();
+    final ArrayList<AuxiliaryListener> mAuxiliaryListeners =
+            Lists.newArrayList();
 // QTI_END: 2023-06-05: Android_UI: SystemUI: Fix ConcurrentModificationException
 // QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
     private final SparseArray<FiveGServiceState> mCurrentServiceStates = new SparseArray<>();
@@ -159,6 +162,7 @@ public class FiveGServiceClient {
     private boolean mIsConnectInProgress = false;
 // QTI_END: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
     private boolean mIsSupportRadioIcon = false;
+    private boolean mIsAuxiliaryRadioIconSupported = false;
 // QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
 
     public static class FiveGServiceState{
@@ -323,6 +327,29 @@ public class FiveGServiceClient {
 // QTI_BEGIN: 2019-04-29: Android_UI: SystemUI: Display 5G in carrier name for 5G NSA
     }
 
+    public void registerAuxiliaryListener(AuxiliaryListener listener) {
+        for (int i = 0; i < mAuxiliaryListeners.size(); i++) {
+            if (mAuxiliaryListeners.get(i) == listener) {
+                return;
+            }
+        }
+        mAuxiliaryListeners.add(listener);
+
+        if (!isServiceConnected()) {
+            connectService();
+        } else {
+            try {
+                mExtTelephonyManager.getAuxiliaryRadioIconInfo(mClient);
+            } catch (RemoteException e) {
+                Log.d(TAG, "registerAuxiliaryListener: Exception = " + e);
+            }
+        }
+    }
+
+    public void unregisterAuxiliaryListener(AuxiliaryListener listener) {
+        mAuxiliaryListeners.remove(listener);
+    }
+
 // QTI_END: 2019-04-29: Android_UI: SystemUI: Display 5G in carrier name for 5G NSA
 // QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
     public void registerListener(int phoneId, IFiveGStateListener listener) {
@@ -427,24 +454,35 @@ public class FiveGServiceClient {
 // QTI_END: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
             mIsSupportRadioIcon =
                     mExtTelephonyManager.isFeatureSupported(ExtTelephonyManager.FEATURE_RADIO_ICON);
-            Log.d(TAG, "mIsSupportRadioIcon = " + mIsSupportRadioIcon);
+            mIsAuxiliaryRadioIconSupported =
+                    mExtTelephonyManager.isFeatureSupported(
+                            ExtTelephonyManager.FEATURE_AUXILIARY_RADIO_ICON_INFO);
+            Log.d(TAG, "mIsSupportRadioIcon = " + mIsSupportRadioIcon
+                    + " mIsAuxiliaryRadioIconSupported = " + mIsAuxiliaryRadioIconSupported);
             // Choose whether to listen to radioEvents based on whether the RadioIcon
             // feature is supported.
-            int[] events = mIsSupportRadioIcon ? new int[] {
-                    ExtPhoneCallbackListener.EVENT_GET_RADIO_ICON_RESPONSE,
-                    ExtPhoneCallbackListener.EVENT_ON_RADIO_ICON_CHANGE,
-                    ExtPhoneCallbackListener.EVENT_ON_CIWLAN_AVAILABLE}
-                    : new int[] {
-// QTI_BEGIN: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
-                    ExtPhoneCallbackListener.EVENT_ON_NR_ICON_TYPE,
-// QTI_END: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
-// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
-                    ExtPhoneCallbackListener.EVENT_QUERY_NR_ICON_RESPONSE,
-                    ExtPhoneCallbackListener.EVENT_ON_NR_ICON_CHANGE,
-// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
-// QTI_BEGIN: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
-                    ExtPhoneCallbackListener.EVENT_ON_CIWLAN_AVAILABLE};
-// QTI_END: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
+            ArrayList<Integer> eventsList = new ArrayList<>();
+            if (mIsSupportRadioIcon) {
+                eventsList.add(ExtPhoneCallbackListener.EVENT_GET_RADIO_ICON_RESPONSE);
+                eventsList.add(ExtPhoneCallbackListener.EVENT_ON_RADIO_ICON_CHANGE);
+            } else {
+                eventsList.add(ExtPhoneCallbackListener.EVENT_ON_NR_ICON_TYPE);
+
+                eventsList.add(ExtPhoneCallbackListener.EVENT_QUERY_NR_ICON_RESPONSE);
+                eventsList.add(ExtPhoneCallbackListener.EVENT_ON_NR_ICON_CHANGE);
+            }
+            eventsList.add(ExtPhoneCallbackListener.EVENT_ON_CIWLAN_AVAILABLE);
+
+            if (mIsAuxiliaryRadioIconSupported) {
+                eventsList.add(ExtPhoneCallbackListener.EVENT_ON_AUXILIARY_RADIO_ICON_INFO_CHANGE);
+                eventsList.add(
+                        ExtPhoneCallbackListener.EVENT_ON_AUXILIARY_RADIO_ICON_INFO_RESPONSE);
+            }
+
+            int[] events = new int[eventsList.size()];
+            for (int i = 0; i < eventsList.size(); i++) {
+                events[i] = eventsList.get(i);
+            }
 
 // QTI_BEGIN: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
             mServiceConnected = true;
@@ -456,6 +494,11 @@ public class FiveGServiceClient {
 // QTI_END: 2023-01-09: Telephony: FR84002: Re-design ExtTelephonyManager interface
 // QTI_BEGIN: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
             initFiveGServiceState();
+            try {
+                mExtTelephonyManager.getAuxiliaryRadioIconInfo(mClient);
+            } catch (RemoteException e) {
+                Log.d(TAG, "registerAuxiliaryListener: Exception = " + e);
+            }
             Log.d(TAG, "Client = " + mClient);
         }
         @Override
@@ -803,6 +846,26 @@ public class FiveGServiceClient {
             notifyListenersIfNecessary(slotId);
         }
 // QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
+
+        @Override
+        public void onAuxiliaryRadioIconInfoChange(AuxiliaryRadioIconInfo auxIconInfo) {
+            Log.d(TAG, "onAuxiliaryRadioIconInfoChange: auxIconInfo = " + auxIconInfo);
+            for (AuxiliaryListener listener : mAuxiliaryListeners) {
+                listener.onAuxiliaryRadioIconInfoChange(auxIconInfo);
+            }
+        }
+
+        @Override
+        public void onAuxiliaryRadioIconInfoResponse(Token token, Status status,
+                                                           AuxiliaryRadioIconInfo auxIconInfo) {
+            Log.d(TAG, "onAuxiliaryRadioIconInfoResponse: token = " + token
+                    + ", status = " + status + ", auxIconInfo = " + auxIconInfo);
+            if (status.get() == Status.SUCCESS) {
+                for (AuxiliaryListener listener : mAuxiliaryListeners) {
+                    listener.onAuxiliaryRadioIconInfoChange(auxIconInfo);
+                }
+            }
+        }
     };
 
     public interface IFiveGStateListener {
@@ -812,6 +875,10 @@ public class FiveGServiceClient {
         public default void onCiwlanAvailableChanged(boolean available) {}
 // QTI_END: 2024-01-30: Android_UI: SystemUI: Implementation for MSIM C_IWLAN feature
 // QTI_BEGIN: 2018-07-10: Android_UI: SystemUI: Display 5G information
+    }
+
+    public interface AuxiliaryListener {
+        default void onAuxiliaryRadioIconInfoChange(AuxiliaryRadioIconInfo auxIconInfo) {}
     }
 }
 // QTI_END: 2018-07-10: Android_UI: SystemUI: Display 5G information

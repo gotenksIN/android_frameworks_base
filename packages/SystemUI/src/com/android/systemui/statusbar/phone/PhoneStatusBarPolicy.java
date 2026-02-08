@@ -71,6 +71,7 @@ import com.android.systemui.statusbar.policy.DataSaverController;
 import com.android.systemui.statusbar.policy.DataSaverController.Listener;
 import com.android.systemui.statusbar.policy.DeviceProvisionedController;
 import com.android.systemui.statusbar.policy.DeviceProvisionedController.DeviceProvisionedListener;
+import com.android.systemui.statusbar.policy.FiveGServiceClient;
 import com.android.systemui.statusbar.policy.HotspotController;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.statusbar.policy.LocationController;
@@ -85,6 +86,7 @@ import com.android.systemui.statusbar.policy.domain.model.ZenModeInfo;
 import com.android.systemui.util.RingerModeTracker;
 import com.android.systemui.util.kotlin.JavaAdapter;
 import com.android.systemui.util.time.DateFormatUtil;
+import com.qti.extphone.AuxiliaryRadioIconInfo;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -169,9 +171,12 @@ public class PhoneStatusBarPolicy
     private boolean mCurrentUserSetup;
 
     private boolean mProfileIconVisible = false;
+    private final String mSlotTurboDsda;
 
     private BluetoothController mBluetooth;
     private AlarmManager.AlarmClockInfo mNextAlarm;
+
+    private final FiveGServiceClient mFiveGServiceClient;
 
     @Inject
     public PhoneStatusBarPolicy(StatusBarIconController iconController,
@@ -195,7 +200,7 @@ public class PhoneStatusBarPolicy
             PrivacyLogger privacyLogger,
             ConnectedDisplayInteractor connectedDisplayInteractor,
             ZenModeInteractor zenModeInteractor,
-            JavaAdapter javaAdapter
+            JavaAdapter javaAdapter, FiveGServiceClient fiveGServiceClient
     ) {
         mIconController = iconController;
         mCommandQueue = commandQueue;
@@ -226,6 +231,8 @@ public class PhoneStatusBarPolicy
         mPrivacyLogger = privacyLogger;
         mZenModeInteractor = zenModeInteractor;
         mJavaAdapter = javaAdapter;
+        mFiveGServiceClient = fiveGServiceClient;
+        mSlotTurboDsda = resources.getString(R.string.status_bar_turbo_dsda);
 
         mSlotConnectedDisplay = resources.getString(
                 com.android.internal.R.string.status_bar_connected_display);
@@ -347,6 +354,9 @@ public class PhoneStatusBarPolicy
         mIconController.setIcon(mSlotScreenRecord, R.drawable.stat_sys_screen_record, null);
         mIconController.setIconVisibility(mSlotScreenRecord, false);
 
+        mIconController.setIcon(mSlotTurboDsda, R.drawable.ic_turbo_dsda, null);
+        mIconController.setIconVisibility(mSlotTurboDsda, false);
+
         mRotationLockController.addCallback(this);
         mBluetooth.addCallback(this);
         mProvisionedController.addCallback(this);
@@ -365,6 +375,10 @@ public class PhoneStatusBarPolicy
         mLocationController.addCallback(this);
         mJavaAdapter.alwaysCollectFlow(mConnectedDisplayInteractor.getConnectedDisplayState(),
                 this::onConnectedDisplayAvailabilityChanged);
+        if (mFiveGServiceClient != null) {
+            mFiveGServiceClient.registerAuxiliaryListener(mAuxiliaryListener);
+        }
+
 
         mCommandQueue.addCallback(this);
     }
@@ -804,4 +818,17 @@ public class PhoneStatusBarPolicy
 
         mIconController.setIconVisibility(mSlotConnectedDisplay, visible);
     }
+
+    private final FiveGServiceClient.AuxiliaryListener mAuxiliaryListener =
+            new FiveGServiceClient.AuxiliaryListener() {
+        @Override
+        public void onAuxiliaryRadioIconInfoChange(AuxiliaryRadioIconInfo auxIconInfo) {
+            mHandler.post(() -> {
+                Log.d(TAG, "onAuxiliaryRadioIconInfoChange: " + auxIconInfo.getDsdaCategory());
+                mIconController.setIconVisibility(mSlotTurboDsda,
+                    auxIconInfo.getDsdaCategory() == AuxiliaryRadioIconInfo.DSDA_CATEGORY_TURBO);
+                }
+            );
+        }
+    };
 }

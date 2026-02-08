@@ -48,6 +48,7 @@ import com.android.systemui.statusbar.phone.ui.StatusBarIconController
 import com.android.systemui.statusbar.policy.BluetoothController
 import com.android.systemui.statusbar.policy.DataSaverController
 import com.android.systemui.statusbar.policy.DeviceProvisionedController
+import com.android.systemui.statusbar.policy.FiveGServiceClient
 import com.android.systemui.statusbar.policy.HotspotController
 import com.android.systemui.statusbar.policy.KeyguardStateController
 import com.android.systemui.statusbar.policy.LocationController
@@ -128,6 +129,7 @@ class PhoneStatusBarPolicyTest : SysuiTestCase() {
     private lateinit var ringerModeTracker: RingerModeTracker
     @Mock private lateinit var privacyItemController: PrivacyItemController
     @Mock private lateinit var privacyLogger: PrivacyLogger
+    @Mock private lateinit var fiveGServiceClient: FiveGServiceClient
     @Captor
     private lateinit var alarmCallbackCaptor:
         ArgumentCaptor<NextAlarmController.NextAlarmChangeCallback>
@@ -397,6 +399,7 @@ class PhoneStatusBarPolicyTest : SysuiTestCase() {
             fakeConnectedDisplayStateProvider,
             kosmos.zenModeInteractor,
             kosmos.javaAdapter,
+            fiveGServiceClient,
         )
     }
 

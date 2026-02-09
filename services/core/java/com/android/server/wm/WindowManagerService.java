@@ -1561,7 +1561,7 @@ public class WindowManagerService extends IWindowManager.Stub
         mSystemPerformanceHinter = new SystemPerformanceHinter(mContext, displayId -> {
             synchronized (mGlobalLock) {
                 DisplayContent dc = mRoot.getDisplayContent(displayId);
-                return (dc != null && !dc.isSystemPerformanceHinterDisabled())
+                return (dc != null && !dc.isOptimizedForPower())
                         ? dc.getSurfaceControl() : null;
             }
         }, mTransactionFactory);
@@ -8851,16 +8851,17 @@ public class WindowManagerService extends IWindowManager.Stub
         }
 
         @Override
-        public void disableSystemPerformanceHinter(int displayId) {
+        public void enablePowerOptimizations(int displayId, boolean enable) {
             synchronized (mGlobalLock) {
                 final DisplayContent dc = mRoot.getDisplayContent(displayId);
                 if (dc == null) {
-                    Slog.e(TAG, "Failed to disable SystemPerformanceHinter"
+                    Slog.e(TAG, "Failed to change power optimizations"
                             + " for display: " + displayId
+                            + " enable:" + enable
                             + " - DisplayContent not found.");
                     return;
                 }
-                dc.disableSystemPerformanceHinter();
+                dc.enablePowerOptimizations(enable);
             }
         }
 

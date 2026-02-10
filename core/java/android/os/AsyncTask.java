@@ -36,6 +36,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import android.util.BoostFramework;
 
 /**
  * <p>AsyncTask was intended to enable proper and easy use of the UI thread. However, the most
@@ -212,12 +213,17 @@ public abstract class AsyncTask<Params, Progress, Result> {
     private static final int MAXIMUM_POOL_SIZE = 20;
     private static final int BACKUP_POOL_SIZE = 5;
     private static final int KEEP_ALIVE_SECONDS = 3;
+    private static final long INCREASE_STACK_SIZE_BY = (3 * 1024 * 1024); //incresad stack_size by 3MB
+    private static final String ASYNCTASK_USE_INCREASED_STACK_SIZE = "vendor.asynctask.use_increased_stack_size";
+    private static BoostFramework mPerf = new BoostFramework();
 
     private static final ThreadFactory sThreadFactory = new ThreadFactory() {
         private final AtomicInteger mCount = new AtomicInteger(1);
 
         public Thread newThread(Runnable r) {
-            return new Thread(r, "AsyncTask #" + mCount.getAndIncrement());
+            boolean useIncreasedStackSize = Boolean.valueOf(mPerf.perfGetProp(ASYNCTASK_USE_INCREASED_STACK_SIZE, "false"));
+            long stack_size = (useIncreasedStackSize) ? INCREASE_STACK_SIZE_BY : 0;
+            return new Thread(null, r, "AsyncTask #" + mCount.getAndIncrement(), stack_size);
         }
     };
 

@@ -2660,7 +2660,10 @@ public class AudioDeviceBroker {
             // what has been communicated to audio policy manager. The device
             // returned by requestedCommunicationDevice() can be a placeholder SCO device if legacy
             // APIs are used to start SCO audio.
-            AudioDeviceAttributes device = mBtHelper.getHeadsetAudioDevice();
+            boolean mVoipLeaWarEnabled =
+                    SystemProperties.getBoolean("persist.enable.bluetooth.voipleawar", false);
+            AudioDeviceAttributes device = mVoipLeaWarEnabled
+                    ? mBtHelper.getHeadsetAudioDummyDevice() : mBtHelper.getHeadsetAudioDevice();
             if (device != null) {
                 return device;
             }

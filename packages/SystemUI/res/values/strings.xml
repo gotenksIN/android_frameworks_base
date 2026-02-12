@@ -2277,6 +2277,8 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="quick_settings_screen_record_label">Screen record</string>
+    <!-- QuickSettings: Screen capture tile [CHAR LIMIT=NONE] -->
+    <string name="quick_settings_screen_capture_label">Screen capture</string>
     <!-- QuickSettings: Text to prompt the user to begin a new recording [CHAR LIMIT=20] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->

@@ -1698,6 +1698,7 @@ public class CachedAppOptimizer {
             opt.setFrozen(false);
             mAm.mProcessStateController.setIsZramWrittenBack(app, false);
             mFrozenProcesses.delete(pid);
+            mAm.mProcessStateController.setFrozenProcessCount(mFrozenProcesses.size());
         } catch (Exception e) {
             Slog.e(TAG_AM, "Unable to unfreeze " + pid + " " + app.processName
                     + ". This might cause inconsistency or UI hangs.");
@@ -1799,6 +1800,7 @@ public class CachedAppOptimizer {
             }
 
             mFrozenProcesses.delete(app.getPid());
+            mAm.mProcessStateController.setFrozenProcessCount(mFrozenProcesses.size());
         }
     }
 
@@ -2779,6 +2781,7 @@ public class CachedAppOptimizer {
                     opt.setFrozen(true);
                     opt.setHasCollectedFrozenPSS(false);
                     mFrozenProcesses.put(pid, proc);
+                    mAm.mProcessStateController.setFrozenProcessCount(mFrozenProcesses.size());
                 } catch (Exception e) {
                     Slog.w(TAG_AM, "Unable to freeze " + pid + " " + name);
                 }
@@ -3202,5 +3205,9 @@ public class CachedAppOptimizer {
     public void addFrozenProcessListener(ProcessRecord app, Executor executor,
             FrozenProcessListener listener) {
         app.mOptRecord.addFrozenProcessListener(executor, listener);
+    }
+
+    public int getFrozenProcessCount() {
+        return mFrozenProcesses.size();
     }
 }

@@ -2660,10 +2660,12 @@ public class AudioDeviceBroker {
             // what has been communicated to audio policy manager. The device
             // returned by requestedCommunicationDevice() can be a placeholder SCO device if legacy
             // APIs are used to start SCO audio.
+// QTI_BEGIN: 2026-01-13: Bluetooth: Bthelper: use dummy address for active sco device if voip war enabled
             boolean mVoipLeaWarEnabled =
                     SystemProperties.getBoolean("persist.enable.bluetooth.voipleawar", false);
             AudioDeviceAttributes device = mVoipLeaWarEnabled
                     ? mBtHelper.getHeadsetAudioDummyDevice() : mBtHelper.getHeadsetAudioDevice();
+// QTI_END: 2026-01-13: Bluetooth: Bthelper: use dummy address for active sco device if voip war enabled
             if (device != null) {
                 return device;
             }

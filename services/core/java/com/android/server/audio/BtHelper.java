@@ -1107,16 +1107,20 @@ public class BtHelper {
             return new AudioDeviceAttributes(AudioSystem.DEVICE_OUT_BLUETOOTH_SCO, "");
         }
         String address = btDevice.getAddress();
+// QTI_BEGIN: 2026-01-13: Bluetooth: Bthelper: use dummy address for active sco device if voip war enabled
         String dummyAddress = "00:00:00:00:00:00";
         String name = "";
         if (!address.equals(dummyAddress)) {
             name = getName(btDevice);
         }
+// QTI_END: 2026-01-13: Bluetooth: Bthelper: use dummy address for active sco device if voip war enabled
         if (!BluetoothAdapter.checkBluetoothAddress(address)) {
             address = "";
         }
+// QTI_BEGIN: 2026-01-13: Bluetooth: Bthelper: use dummy address for active sco device if voip war enabled
         BluetoothClass btClass = dummyAddress.equals(address) ? null :
                                  btDevice.getBluetoothClass();
+// QTI_END: 2026-01-13: Bluetooth: Bthelper: use dummy address for active sco device if voip war enabled
         int nativeType = AudioSystem.DEVICE_OUT_BLUETOOTH_SCO;
         if (btClass != null) {
             switch (btClass.getDeviceClass()) {
@@ -1203,6 +1207,7 @@ public class BtHelper {
         if (Objects.equals(btDevice, previousActiveDevice)) {
             return;
         }
+// QTI_BEGIN: 2026-01-13: Bluetooth: Bthelper: use dummy address for active sco device if voip war enabled
         boolean mVoipLeaWarEnabled =
                 SystemProperties.getBoolean("persist.enable.bluetooth.voipleawar", false);
 
@@ -1255,6 +1260,7 @@ public class BtHelper {
                 Log.i(TAG, "In setBtScoActiveDevice(), calling resetBluetoothSco()");
                 resetBluetoothSco();
             }
+// QTI_END: 2026-01-13: Bluetooth: Bthelper: use dummy address for active sco device if voip war enabled
         }
     }
 

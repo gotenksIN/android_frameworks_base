@@ -1108,7 +1108,9 @@ class ActivityStarter {
 // QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
 
             AppBackgroundManager appBgManager = AppBackgroundManager.getInstance();
+// QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
             if (appBgManager != null && aInfo != null) {
+// QTI_BEGIN: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer
                 appBgManager.handleActivityStart(aInfo.applicationInfo);
             }
 // QTI_END: 2025-12-09: Performance: Introduce restrictions on BG process restart and package-level freezer

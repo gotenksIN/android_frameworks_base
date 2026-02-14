@@ -698,10 +698,8 @@ public class CarrierTextManagerTest extends SysuiTestCase {
                         /* isValidated= */ false,
                         /* level= */ 0,
                         /* ssid= */ "",
-// QTI_BEGIN: 2025-02-26: WLAN: SystemUI: Show wifistandard in SystemUI.
                         /* hotspotDeviceType= */ WifiNetworkModel.HotspotDeviceType.NONE,
                         /* wifiStandard= */0));
-// QTI_END: 2025-02-26: WLAN: SystemUI: Show wifistandard in SystemUI.
         assertTrue(mWifiRepository.isWifiConnectedWithValidSsid());
 
         mKeyguardUpdateMonitor.mServiceStates = new HashMap<>();
@@ -740,10 +738,8 @@ public class CarrierTextManagerTest extends SysuiTestCase {
                         /* isValidated= */ false,
                         /* level= */ 0,
                         /* ssid= */ "",
-// QTI_BEGIN: 2025-02-26: WLAN: SystemUI: Show wifistandard in SystemUI.
                         /* hotspotDeviceType= */ WifiNetworkModel.HotspotDeviceType.NONE,
                         /* wifiStandard= */0));
-// QTI_END: 2025-02-26: WLAN: SystemUI: Show wifistandard in SystemUI.
         assertTrue(mWifiRepository.isWifiConnectedWithValidSsid());
 
         mKeyguardUpdateMonitor.mServiceStates = new HashMap<>();

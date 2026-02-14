@@ -4944,6 +4944,17 @@ public abstract class Context {
     public static final String POWER_STATS_SERVICE = "powerstats";
 
     /**
+     * Use with {@link #getSystemService(String)} to retrieve a {@link
+     * android.uilatencystats.UiLatencyStatsManager} for accessing UI latency stats
+     * service.
+     *
+     * @hide
+     * @see #getSystemService(String)
+     */
+    @FlaggedApi(com.android.server.ui_latency_stats.Flags.FLAG_UI_LATENCY_STATS_SERVICE)
+    public static final String UI_LATENCY_STATS_SERVICE = "ui_latency_stats";
+
+    /**
      * Use with {@link #getSystemService(String)} to retrieve a
      * {@link android.os.RecoverySystem} for accessing the recovery system
      * service.
@@ -5028,13 +5039,13 @@ public abstract class Context {
 
     /**
      * Use with {@link #getSystemService(String)} to retrieve a
-     * {@link android.os.storage.FilesManager} for handling file operations.
+     * {@link android.os.storage.FileManager} for handling file operations.
      *
      * @see #getSystemService(String)
-     * @see android.os.storage.FilesManager
+     * @see android.os.storage.FileManager
      */
     @FlaggedApi(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
-    public static final String FILES_SERVICE = "files";
+    public static final String FILE_SERVICE = "file";
 
     /**
      * Use with {@link #getSystemService(String)} to retrieve a

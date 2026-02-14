@@ -2570,6 +2570,9 @@ class SettingsProtoDumpUtil {
                 Settings.Secure.SCREENSAVER_COMPONENTS,
                 SecureSettingsProto.Screensaver.COMPONENTS);
         dumpSetting(s, p,
+                Settings.Secure.SCREENSAVER_ACTIVE_COMPONENT,
+                SecureSettingsProto.Screensaver.ACTIVE_COMPONENT);
+        dumpSetting(s, p,
                 Settings.Secure.SCREENSAVER_ACTIVATE_ON_DOCK,
                 SecureSettingsProto.Screensaver.ACTIVATE_ON_DOCK);
         dumpSetting(s, p,

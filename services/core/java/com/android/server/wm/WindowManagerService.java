@@ -28,6 +28,7 @@ import static android.Manifest.permission.STATUS_BAR_SERVICE;
 import static android.Manifest.permission.WRITE_SECURE_SETTINGS;
 import static android.app.ActivityManagerInternal.ALLOW_FULL_ONLY;
 import static android.app.ActivityManagerInternal.ALLOW_NON_FULL;
+import static android.app.ActivityTaskManager.INVALID_TASK_ID;
 import static android.app.AppOpsManager.OP_SYSTEM_ALERT_WINDOW;
 import static android.app.StatusBarManager.DISABLE_MASK;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM;
@@ -136,6 +137,7 @@ import static com.android.server.wm.AppCompatConfiguration.LETTERBOX_BACKGROUND_
 import static com.android.server.wm.AppCompatConfiguration.LETTERBOX_BACKGROUND_APP_COLOR_BACKGROUND_FLOATING;
 import static com.android.server.wm.AppCompatConfiguration.LETTERBOX_BACKGROUND_SOLID_COLOR;
 import static com.android.server.wm.AppCompatConfiguration.LETTERBOX_BACKGROUND_WALLPAPER;
+import static com.android.server.wm.RootWindowContainer.MATCH_ATTACHED_TASK_ONLY;
 import static com.android.server.wm.RootWindowContainer.MATCH_ATTACHED_TASK_OR_RECENT_TASKS;
 import static com.android.server.wm.SensitiveContentPackages.PackageInfo;
 import static com.android.server.wm.SurfaceAnimator.ANIMATION_TYPE_ALL;
@@ -193,8 +195,6 @@ import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.Region;
 import android.hardware.HardwareBuffer;
-import android.hardware.configstore.V1_0.OptionalBool;
-import android.hardware.configstore.V1_1.ISurfaceFlingerConfigs;
 import android.hardware.devicestate.DeviceState;
 import android.hardware.devicestate.DeviceStateManager;
 import android.hardware.display.DisplayManager;
@@ -6087,43 +6087,11 @@ public class WindowManagerService extends IWindowManager.Stub
     // Keep logic in sync with SurfaceFlingerProperties.cpp
     // Consider exposing properties via ISurfaceComposer instead.
     private static boolean queryWideColorGamutSupport() {
-        boolean defaultValue = false;
-        Optional<Boolean> hasWideColorProp = SurfaceFlingerProperties.has_wide_color_display();
-        if (hasWideColorProp.isPresent()) {
-            return hasWideColorProp.get();
-        }
-        try {
-            ISurfaceFlingerConfigs surfaceFlinger = ISurfaceFlingerConfigs.getService();
-            OptionalBool hasWideColor = surfaceFlinger.hasWideColorDisplay();
-            if (hasWideColor != null) {
-                return hasWideColor.value;
-            }
-        } catch (RemoteException e) {
-            // Ignore, we're in big trouble if we can't talk to SurfaceFlinger's config store
-        } catch (NoSuchElementException e) {
-            return defaultValue;
-        }
-        return false;
+        return SurfaceFlingerProperties.has_wide_color_display().orElse(false);
     }
 
     private static boolean queryHdrSupport() {
-        boolean defaultValue = false;
-        Optional<Boolean> hasHdrProp = SurfaceFlingerProperties.has_HDR_display();
-        if (hasHdrProp.isPresent()) {
-            return hasHdrProp.get();
-        }
-        try {
-            ISurfaceFlingerConfigs surfaceFlinger = ISurfaceFlingerConfigs.getService();
-            OptionalBool hasHdr = surfaceFlinger.hasHDRDisplay();
-            if (hasHdr != null) {
-                return hasHdr.value;
-            }
-        } catch (RemoteException e) {
-            // Ignore, we're in big trouble if we can't talk to SurfaceFlinger's config store
-        } catch (NoSuchElementException e) {
-            return defaultValue;
-        }
-        return false;
+        return SurfaceFlingerProperties.has_HDR_display().orElse(false);
     }
 
     // Returns an input target which is mapped to the given input token. This can be a WindowState
@@ -7993,6 +7961,70 @@ public class WindowManagerService extends IWindowManager.Stub
         } catch (RemoteException e) {
             ProtoLog.w(WM_ERROR,
                     "requestScrollCapture: caught exception dispatching callback: %s", e);
+        } finally {
+            Binder.restoreCallingIdentity(token);
+        }
+    }
+
+    /**
+     * Dispatches a scroll to top command to the appropriate window on the given display.
+     *
+     * @param displayId The ID of the display.
+     * @param x The x-coordinate of the command in the display's coordinate space.
+     * @param targetTaskId The ID of the task that should receive the event, or -1 to use default
+     *                    focus logic.
+     */
+    @Override
+    @EnforcePermission(android.Manifest.permission.STATUS_BAR_SERVICE)
+    public void dispatchScrollToTop(int displayId, int x, int targetTaskId) {
+        dispatchScrollToTop_enforcePermission();
+        final long token = Binder.clearCallingIdentity();
+        try {
+            synchronized (mGlobalLock) {
+                final DisplayContent dc = mRoot.getDisplayContent(displayId);
+                if (dc == null) {
+                    Slog.w(TAG, "dispatchScrollToTop with invalid displayId=" + displayId);
+                    return;
+                }
+                final WindowState currentFocus = dc.mCurrentFocus;
+                WindowState target = null;
+                if (targetTaskId != INVALID_TASK_ID) {
+                    if (currentFocus != null && currentFocus.getTask().isTaskId(targetTaskId)) {
+                        target = currentFocus;
+                    } else {
+                        final Task task =
+                                mRoot.anyTaskForId(targetTaskId, MATCH_ATTACHED_TASK_ONLY);
+                        if (task != null) {
+                            target = task.getTopVisibleAppMainWindow();
+                        }
+                    }
+                }
+
+                if (target == null && currentFocus != null) {
+                    final Task task = currentFocus.getTask();
+                    if (task != null) {
+                        target = task.getTopVisibleAppWindowAt(x);
+                    }
+                    if (target == null) {
+                        target = currentFocus;
+                    }
+                }
+
+                if (target == null || target.mClient == null) {
+                    return;
+                }
+
+                try {
+                    final Task task = target.getTask();
+                    if (task != null) {
+                        task.moveToFront("scrollToTop");
+                    }
+                    int localX = (int) target.translateToWindowX(x);
+                    target.mClient.dispatchScrollToTop(localX);
+                } catch (RemoteException e) {
+                    // ignore
+                }
+            }
         } finally {
             Binder.restoreCallingIdentity(token);
         }

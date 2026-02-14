@@ -2139,10 +2139,7 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
         if (verifierPackageName == null) {
             return false;
         }
-        // Here we only care about the UID of the verifier app, so we don't do apps filter
-        final int verifierUid = snapshot.getPackageUidInternal(
-                verifierPackageName, 0 /* flags */, userId, SYSTEM_UID);
-        return UserHandle.isSameApp(callingUid, verifierUid);
+        return snapshot.isCallerSameApp(verifierPackageName, callingUid);
     }
 
     private boolean isCallerDeveloperVerificationPolicyDelegate(
@@ -2151,10 +2148,7 @@ public class PackageInstallerService extends IPackageInstaller.Stub implements
         if (delegatePackageName == null) {
             return false;
         }
-        // Here we only care about the UID of the delegate app, so we don't do apps filter
-        final int delegateUid = snapshot.getPackageUidInternal(
-                delegatePackageName, 0 /* flags */, userId, SYSTEM_UID);
-        return UserHandle.isSameApp(callingUid, delegateUid);
+        return snapshot.isCallerSameApp(delegatePackageName, callingUid);
     }
 
     @Override

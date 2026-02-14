@@ -35,6 +35,7 @@ import com.android.wm.shell.shared.annotations.ShellBackgroundThread
 import com.android.wm.shell.windowdecor.WindowDecorLinearLayout
 import com.android.wm.shell.windowdecor.WindowDecoration2
 import com.android.wm.shell.windowdecor.WindowDecorationActions
+import com.android.wm.shell.windowdecor.common.WindowDecorTaskResourceLoader
 import com.android.wm.shell.windowdecor.common.viewhost.WindowDecorViewHost
 import com.android.wm.shell.windowdecor.common.viewhost.WindowDecorViewHostSupplier
 import com.android.wm.shell.windowdecor.viewholder.AppPinnedViewHolder
@@ -53,6 +54,7 @@ class AppPinnedController(
     private val onTouchListener: View.OnTouchListener,
     private val onGenericMotionEventListener: View.OnGenericMotionListener,
     private val windowDecorationActions: WindowDecorationActions,
+    private val taskResourceLoader: WindowDecorTaskResourceLoader,
     taskOrganizer: ShellTaskOrganizer,
     @ShellBackgroundThread bgScope: CoroutineScope,
 ) :
@@ -83,7 +85,12 @@ class AppPinnedController(
                 },
                 onCloseWindow = { windowDecorationActions.onClose(taskInfo) },
             )
-            .also { viewHolder = it }
+            .also {
+                viewHolder = it
+                taskResourceLoader.getNameAndHeaderIcon(taskInfo) { name, _ ->
+                    viewHolder.setAppName(name)
+                }
+            }
     }
 
     override val captionType = CaptionType.APP_PINNED
@@ -112,7 +119,7 @@ class AppPinnedController(
                     wct,
                 )
 
-            viewHolder.bindData(AppPinnedViewHolder.AppPinnedData(taskInfo))
+            viewHolder.bindData(AppPinnedViewHolder.AppPinnedData(taskInfo, params.hasGlobalFocus))
             viewHolder.setTaskFocusState(params.hasGlobalFocus)
             return relayoutParams
         }

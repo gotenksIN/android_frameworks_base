@@ -90,7 +90,6 @@ import android.provider.DeviceConfig.OnPropertiesChangedListener;
 import android.provider.DeviceConfig.Properties;
 import android.provider.Settings;
 import android.text.TextUtils;
-import android.util.ArraySet;
 import android.util.EventLog;
 import android.util.IntArray;
 import android.util.Pair;
@@ -110,6 +109,7 @@ import com.android.internal.util.FrameworkStatsLog;
 import com.android.server.ServiceThread;
 import com.android.server.am.compaction.CompactionStatsManager;
 import com.android.server.am.compaction.SingleCompactionStats;
+import com.android.server.am.psc.Constants.OomAdjust;
 import com.android.server.am.psc.OomAdjuster;
 
 import dalvik.annotation.optimization.NeverCompile;
@@ -661,6 +661,7 @@ public class CachedAppOptimizer {
     public static BoostFramework mPerf = new BoostFramework();
 // QTI_END: 2020-04-17: Performance: AppCompaction
     public static boolean vendorCompactAll = false;
+    private final BinderfsStatsReader mBinderfsStatsReader;
 
     private final Freezer mFreezer;
 
@@ -688,6 +689,7 @@ public class CachedAppOptimizer {
         mTestCallback = callback;
         mSettingsObserver = new SettingsContentObserver();
         mProcLocksReader = new ProcLocksReader();
+        mBinderfsStatsReader = new BinderfsStatsReader();
         mFreezer = mAm.getFreezer();
 
         final Resources res = mAm.mContext.getResources();
@@ -1698,7 +1700,6 @@ public class CachedAppOptimizer {
             opt.setFrozen(false);
             mAm.mProcessStateController.setIsZramWrittenBack(app, false);
             mFrozenProcesses.delete(pid);
-            mAm.mProcessStateController.setFrozenProcessCount(mFrozenProcesses.size());
         } catch (Exception e) {
             Slog.e(TAG_AM, "Unable to unfreeze " + pid + " " + app.processName
                     + ". This might cause inconsistency or UI hangs.");
@@ -1800,7 +1801,6 @@ public class CachedAppOptimizer {
             }
 
             mFrozenProcesses.delete(app.getPid());
-            mAm.mProcessStateController.setFrozenProcessCount(mFrozenProcesses.size());
         }
     }
 
@@ -1854,7 +1854,7 @@ public class CachedAppOptimizer {
     }
 
     @GuardedBy({"mService", "mProcLock"})
-    void onOomAdjustChanged(int oldAdj, int newAdj, ProcessRecord app) {
+    void onOomAdjustChanged(@OomAdjust int oldAdj, @OomAdjust int newAdj, ProcessRecord app) {
         if (useCompaction()) {
             // Cancel any currently executing compactions
             // if the process moved out of cached state
@@ -2781,7 +2781,6 @@ public class CachedAppOptimizer {
                     opt.setFrozen(true);
                     opt.setHasCollectedFrozenPSS(false);
                     mFrozenProcesses.put(pid, proc);
-                    mAm.mProcessStateController.setFrozenProcessCount(mFrozenProcesses.size());
                 } catch (Exception e) {
                     Slog.w(TAG_AM, "Unable to freeze " + pid + " " + name);
                 }
@@ -3136,7 +3135,9 @@ public class CachedAppOptimizer {
 
     private void binderErrorInternal(IntArray pids) {
         // PIDs that run out of async binder buffer when being frozen
-        ArraySet<Integer> pidsAsync = (mFreezerBinderAsyncThreshold < 0) ? null : new ArraySet<>();
+        final int[] pidsWithAsync =
+                (mFreezerBinderAsyncThreshold < 0) ? null : new int[pids.size()];
+        int pidsWithAsyncCount = 0;
 
         Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, "binderErrorSync");
         for (int i = 0; i < pids.size(); i++) {
@@ -3154,8 +3155,8 @@ public class CachedAppOptimizer {
                 }
 
                 if ((freezeInfo & ASYNC_RECEIVED_WHILE_FROZEN) != 0) {
-                    if (pidsAsync != null) {
-                        pidsAsync.add(current);
+                    if (pidsWithAsync != null) {
+                        pidsWithAsync[pidsWithAsyncCount++] = current;
                     }
                     if (DEBUG_FREEZER) {
                         Slog.w(TAG_AM, "pid " + current
@@ -3174,14 +3175,16 @@ public class CachedAppOptimizer {
         // only true source for now. The following code checks all frozen PIDs. If any of them
         // is running out of async binder buffer, kill it. Otherwise it will be killed at a
         // later time when AMS unfreezes it, which causes race issues.
-        if (pidsAsync == null || pidsAsync.size() == 0) {
+        if (pidsWithAsyncCount == 0) {
             return;
         }
 
         Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, "binderErrorAsync");
-        new BinderfsStatsReader().handleFreeAsyncSpace(
+        final int[] pidsAsync = Arrays.copyOf(pidsWithAsync, pidsWithAsyncCount);
+        Arrays.sort(pidsAsync);
+        mBinderfsStatsReader.handleFreeAsyncSpace(
                 // Check if the frozen process has pending async calls
-                pidsAsync::contains,
+                pidsAsync,
 
                 // Kill the current process if it's running out of async binder space
                 (current, free) -> {
@@ -3205,9 +3208,5 @@ public class CachedAppOptimizer {
     public void addFrozenProcessListener(ProcessRecord app, Executor executor,
             FrozenProcessListener listener) {
         app.mOptRecord.addFrozenProcessListener(executor, listener);
-    }
-
-    public int getFrozenProcessCount() {
-        return mFrozenProcesses.size();
     }
 }

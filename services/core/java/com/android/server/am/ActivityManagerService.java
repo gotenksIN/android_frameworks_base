@@ -511,6 +511,7 @@ import com.android.server.ThreadPriorityBooster;
 import com.android.server.Watchdog;
 import com.android.server.am.LowMemDetector.MemFactor;
 import com.android.server.am.psc.ActiveUidsInternal;
+import com.android.server.am.psc.Constants.OomAdjust;
 import com.android.server.am.psc.OomAdjuster;
 import com.android.server.am.psc.OomAdjusterDebugLogger;
 import com.android.server.am.psc.ProcessListInternal.ProcessChangeItem;
@@ -4950,7 +4951,8 @@ public class ActivityManagerService extends IActivityManager.Stub
     private boolean forceStopPackageInternalLocked(String packageName, int appId,
             boolean callerWillRestart, boolean purgeCache, boolean doit,
             boolean evenPersistent, boolean uninstalling, boolean packageStateStopped,
-            @CanBeALL @UserIdInt int userId, String reasonString, int reason, int minOomAdj) {
+            @CanBeALL @UserIdInt int userId, String reasonString, int reason,
+            @OomAdjust int minOomAdj) {
         int i;
 
         if (userId == UserHandle.USER_ALL && packageName == null) {
@@ -5661,7 +5663,9 @@ public class ActivityManagerService extends IActivityManager.Stub
                     hostingRecord.getName(),
                     hostingRecord.getAction(),
                     HostingRecord.getHostingTypeIdStatsd(hostingRecord.getType()),
-                    HostingRecord.getTriggerTypeForStatsd(hostingRecord.getTriggerType()));
+                    HostingRecord.getTriggerTypeForStatsd(hostingRecord.getTriggerType()),
+                    hostingRecord.getCallerUid(),
+                    hostingRecord.getCallerProcessName());
         }
     }
 
@@ -9026,7 +9030,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                     throw new IllegalArgumentException(
                             "Render thread does not belong to process");
                 }
-                proc.setRenderThreadTid(tid);
+                mProcessStateController.setRenderThreadTid(proc, tid);
                 if (DEBUG_OOM_ADJ) {
                     Slog.d("UI_FIFO", "Set RenderThread tid " + tid + " for pid " + pid);
                 }
@@ -13200,7 +13204,7 @@ public class ActivityManagerService extends IActivityManager.Stub
             final ProcessRecord r = procs.get(i);
             final IApplicationThread thread;
             final int pid;
-            final int oomAdj;
+            final @OomAdjust int oomAdj;
             final boolean hasActivities;
             synchronized (mProcLock) {
                 thread = r.getThread();
@@ -13848,7 +13852,7 @@ public class ActivityManagerService extends IActivityManager.Stub
             final ProcessRecord r = procs.get(i);
             final IApplicationThread thread;
             final int pid;
-            final int oomAdj;
+            final @OomAdjust int oomAdj;
             final boolean hasActivities;
             synchronized (mProcLock) {
                 thread = r.getThread();
@@ -18066,7 +18070,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                     } else {
                         // We delay killing processes that are not in the background or running a
                         // receiver.
-                        pr.setWaitingToKill("remove task");
+                        mProcessStateController.setWaitingToKill(pr, "remove task");
                     }
 
                     // Send the profiling trigger. This is done both in cases where we kill
@@ -18595,7 +18599,8 @@ public class ActivityManagerService extends IActivityManager.Stub
 
         @Override
         public void startProcess(String processName, ApplicationInfo info, boolean knownToBeDead,
-                boolean isTop, String hostingType, ComponentName hostingName, boolean isPcc) {
+                boolean isTop, String hostingType, ComponentName hostingName, boolean isPcc,
+                int callerUid, String callerProcessName) {
             try {
                 if (Trace.isTagEnabled(Trace.TRACE_TAG_ACTIVITY_MANAGER)) {
                     Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, "startProcess:"
@@ -18606,7 +18611,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                     // started, the top priority can be applied immediately to avoid cpu being
                     // preempted by other processes before attaching the process of top app.
                     HostingRecord hostingRecord =
-                            new HostingRecord(hostingType, hostingName, isTop, isPcc);
+                            new HostingRecord(hostingType, hostingName, isTop, isPcc,
+                                    callerUid, callerProcessName);
                     ProcessRecord app = startProcessLocked(processName, info, knownToBeDead,
                             0 /* intentFlags */, hostingRecord,
                             ZYGOTE_POLICY_FLAG_LATENCY_SENSITIVE, false /* allowWhileBooting */,
@@ -20308,13 +20314,14 @@ public class ActivityManagerService extends IActivityManager.Stub
     final class OomAdjusterCallback implements OomAdjuster.Callback {
         @Override
         @GuardedBy({"ActivityManagerService.this", "ActivityManagerService.this.mProcLock"})
-        public void onOomAdjustChanged(int oldAdj, int newAdj, ProcessRecordInternal app) {
+        public void onOomAdjustChanged(@OomAdjust int oldAdj, @OomAdjust int newAdj,
+                ProcessRecordInternal app) {
             mCachedAppOptimizer.onOomAdjustChanged(oldAdj, newAdj, (ProcessRecord) app);
         }
 
         @Override
         public void onProcessFreezabilityChanged(ProcessRecordInternal app, boolean freezePolicy,
-                @OomAdjReason int oomAdjReason, boolean immediate, int oldOomAdj) {
+                @OomAdjReason int oomAdjReason, boolean immediate, @OomAdjust int oldOomAdj) {
             if (!mCachedAppOptimizer.useFreezer()) {
                 return;
             }
@@ -20722,11 +20729,6 @@ public class ActivityManagerService extends IActivityManager.Stub
         @Override
         public boolean isLastMemoryLevelNormal() {
             return mAppProfiler.isLastMemoryLevelNormal();
-        }
-
-        @Override
-        public int getFrozenProcessCount() {
-            return mCachedAppOptimizer.getFrozenProcessCount();
         }
     }
 

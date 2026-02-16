@@ -85,6 +85,8 @@ import android.app.wearable.IWearableSensingManager;
 import android.app.wearable.WearableSensingManager;
 import android.apphibernation.AppHibernationManager;
 import android.appwidget.AppWidgetManager;
+import android.attention.AttentionManager;
+import android.attention.IAttentionManager;
 import android.bluetooth.BluetoothFrameworkInitializer;
 import android.companion.CompanionDeviceManager;
 import android.companion.ICompanionDeviceManager;
@@ -242,8 +244,8 @@ import android.os.image.IDynamicSystemService;
 import android.os.incremental.IIncrementalService;
 import android.os.incremental.IncrementalManager;
 import android.os.profiling.anomaly.AnomalyDetectorFrameworkInitializer;
-import android.os.storage.FilesManager;
-import android.os.storage.IFilesService;
+import android.os.storage.FileManager;
+import android.os.storage.IFileService;
 import android.os.storage.StorageManager;
 import android.permission.LegacyPermissionManager;
 import android.permission.PermissionCheckerManager;
@@ -819,13 +821,13 @@ public final class SystemServiceRegistry {
             }});
 
         if (android.app.privatecompute.flags.Flags.enablePccFrameworkSupport()) {
-            registerService(Context.FILES_SERVICE, FilesManager.class,
-                    new CachedServiceFetcher<FilesManager>() {
+            registerService(Context.FILE_SERVICE, FileManager.class,
+                    new CachedServiceFetcher<FileManager>() {
                 @Override
-                public FilesManager createService(ContextImpl ctx) throws ServiceNotFoundException {
-                    IBinder b = ServiceManager.getServiceOrThrow(Context.FILES_SERVICE);
-                    IFilesService service = IFilesService.Stub.asInterface(b);
-                    return new FilesManager(ctx, service);
+                public FileManager createService(ContextImpl ctx) throws ServiceNotFoundException {
+                    IBinder b = ServiceManager.getServiceOrThrow(Context.FILE_SERVICE);
+                    IFileService service = IFileService.Stub.asInterface(b);
+                    return new FileManager(ctx, service);
                 }});
         }
 
@@ -2099,6 +2101,21 @@ public final class SystemServiceRegistry {
                         return new DynamicInstrumentationManager(ctx);
                     }
                 });
+
+        if (com.android.input.flags.Flags.enableAttentionServiceApis()) {
+            registerService(Context.ATTENTION_SERVICE, AttentionManager.class,
+                    new CachedServiceFetcher<>() {
+                        @Override
+                        public AttentionManager createService(ContextImpl ctx)
+                                throws ServiceNotFoundException {
+                            return new AttentionManager(
+                                    Objects.requireNonNull(IAttentionManager.Stub.asInterface(
+                                            ServiceManager.getService(
+                                                    Context.ATTENTION_SERVICE))));
+                        }
+                    });
+        }
+
 
         sInitializing = true;
         try {

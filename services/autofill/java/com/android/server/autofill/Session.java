@@ -990,7 +990,7 @@ final class Session
                 AutofillNoiseInjector autofillNoiseInjector = null;
                 if (stringRebuildApi() && mNoiseInjectionMasterSeed != null) {
                     autofillNoiseInjector = new AutofillNoiseInjector(
-                            mNoiseInjectionMasterSeed, structure.getActivityComponent());
+                            mNoiseInjectionMasterSeed, structure.getActivityComponent(), userId);
                 }
                 structure.sanitizeForParceling(true, autofillNoiseInjector);
 

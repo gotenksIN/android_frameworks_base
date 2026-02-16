@@ -29,6 +29,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.Arrays;
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 
 /**
@@ -58,6 +59,8 @@ public final class DelayedRestoreRequest implements Parcelable {
     /**
      * Restore that depends on the managed profile being provisioned indicated by the broadcast
      * action {@link android.app.admin.DeviceAdminReceiver#ACTION_PROFILE_PROVISIONING_COMPLETE}.
+     *
+     * Note: Work provisioning dependency is not supported yet.
      */
     public static final int TYPE_MANAGED_PROFILE_PROVISIONED = 4;
 
@@ -114,6 +117,23 @@ public final class DelayedRestoreRequest implements Parcelable {
     /** Returns the request type that this {@link DelayedRestoreRequest} is pending on. */
     public @Type int getType() {
         return mType;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+        DelayedRestoreRequest that = (DelayedRestoreRequest) o;
+        return mType == that.mType && Objects.equals(mPackageName, that.mPackageName);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(mType, mPackageName);
     }
 
     @Override

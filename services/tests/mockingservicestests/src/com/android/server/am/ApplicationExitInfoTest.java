@@ -25,6 +25,7 @@ import static android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_CACHE
 import static android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND;
 import static android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_FOREGROUND_SERVICE;
 import static android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_SERVICE;
+import static android.os.Process.INVALID_UID;
 
 import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
 
@@ -1314,9 +1315,10 @@ public class ApplicationExitInfoTest {
             final String dummyClassName = ".Foo";
             app.setHostingRecord(HostingRecord.byAppZygote(new ComponentName(
                     dummyPackageName, dummyClassName), "", definingUid, "",
-                    isNativeService));
+                    isNativeService,
+                    INVALID_UID /* callerUid */, null /* callerProcessName */));
         }
-        app.mServices.setConnectionGroup(connectionGroup);
+        ams.mProcessStateController.setConnectionGroup(app.mServices, connectionGroup);
         app.setReportedProcState(procState);
         app.mProfile.setLastMemInfo(spy(new Debug.MemoryInfo()));
         app.mProfile.setLastPss(pss);

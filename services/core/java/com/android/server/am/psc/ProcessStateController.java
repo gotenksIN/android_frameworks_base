@@ -46,6 +46,7 @@ import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.server.ServiceThread;
 import com.android.server.am.Flags;
+import com.android.server.am.psc.Constants.OomAdjust;
 import com.android.server.am.psc.Constants.SchedGroup;
 import com.android.server.am.psc.annotation.RequiresEnclosingBatchSession;
 import com.android.server.wm.WindowProcessController;
@@ -222,13 +223,6 @@ public class ProcessStateController {
 
     public void setFollowUpOomadjUpdateWaitDuration(long value) {
         mOomConstants.mFollowUpOomadjUpdateWaitDuration = value;
-    }
-
-    /**
-     * Sets the number of frozen processes.
-     */
-    public void setFrozenProcessCount(int count) {
-        mGlobalState.mFrozenProcessCount = count;
     }
 
     /**
@@ -416,7 +410,6 @@ public class ProcessStateController {
         private static final int NONE_DEBUG_UID = -1;
         private volatile int mDebugUid = NONE_DEBUG_UID;
         private volatile long mLastUserUnlockingUptime = 0;
-        private volatile int mFrozenProcessCount = 0;
 
         private void commitStagedState() {
             mUnlocking = mUnlockingStaged;
@@ -478,10 +471,6 @@ public class ProcessStateController {
 
         public long getLastUserUnlockingUptime() {
             return mLastUserUnlockingUptime;
-        }
-
-        public int getFrozenProcessCount() {
-            return mFrozenProcessCount;
         }
     }
 
@@ -701,10 +690,52 @@ public class ProcessStateController {
     }
 
     /**
+     * Note that the given process is waiting to be killed.
+     */
+    @GuardedBy("mLock")
+    public void setWaitingToKill(@NonNull ProcessRecordInternal proc,
+            @Nullable String waitingToKill) {
+        proc.setWaitingToKill(waitingToKill);
+    }
+
+    /**
+     * Note the render thread TID of the given process.
+     */
+    @GuardedBy({"mLock", "mProcLock"})
+    public void setRenderThreadTid(@NonNull ProcessRecordInternal proc, int tid) {
+        proc.setRenderThreadTid(tid);
+    }
+
+    /**
+     * Set the last time the given process was active.
+     */
+    @GuardedBy({"mLock", "mProcLock"})
+    public void setLastActivityTime(@NonNull ProcessRecordInternal proc, long lastActivityTime) {
+        proc.setLastActivityTime(lastActivityTime);
+    }
+
+    /**
+     * Note whether the given process is background restricted.
+     */
+    @GuardedBy("mLock")
+    public void setBackgroundRestricted(@NonNull ProcessRecordInternal proc, boolean restricted) {
+        proc.setBackgroundRestricted(restricted);
+    }
+
+    /**
+     * Sets the entry point for an isolated process.
+     */
+    @GuardedBy("mLock")
+    public void setIsolatedEntryPoint(@NonNull ProcessRecordInternal proc,
+            @Nullable String isolatedEntryPoint) {
+        proc.setIsolatedEntryPoint(isolatedEntryPoint);
+    }
+
+    /**
      * Set the maximum adj score a process can be assigned.
      */
     @GuardedBy("mLock")
-    public void setMaxAdj(@NonNull ProcessRecordInternal proc, int adj) {
+    public void setMaxAdj(@NonNull ProcessRecordInternal proc, @OomAdjust int adj) {
         proc.setMaxAdj(adj);
     }
 
@@ -1082,6 +1113,19 @@ public class ProcessStateController {
         psr.setHasAboveClient(hasAboveClient);
     }
 
+    /** Note the last group set by a connection. */
+    @GuardedBy("mLock")
+    public void setConnectionGroup(@NonNull ProcessServiceRecordInternal psr, int connectionGroup) {
+        psr.setConnectionGroup(connectionGroup);
+    }
+
+    /** Note the last importance set by a connection. */
+    @GuardedBy("mLock")
+    public void setConnectionImportance(@NonNull ProcessServiceRecordInternal psr,
+            int connectionImportance) {
+        psr.setConnectionImportance(connectionImportance);
+    }
+
     /**
      * Recompute whether a process has bound to a service with
      * {@link android.content.Context.BIND_ABOVE_CLIENT} or not.
@@ -1178,6 +1222,26 @@ public class ProcessStateController {
     public void updateHasTopStartedAlmostPerceptibleServices(
             @NonNull ProcessServiceRecordInternal psr) {
         psr.updateHasTopStartedAlmostPerceptibleServices();
+    }
+
+    /**
+     * Sets whether this process has services that were started while it was in the TOP state
+     * and are considered almost perceptible to the user.
+     */
+    @GuardedBy("mLock")
+    public void setHasTopStartedAlmostPerceptibleServices(
+            @NonNull ProcessServiceRecordInternal psr, boolean value) {
+        psr.setHasTopStartedAlmostPerceptibleServices(value);
+    }
+
+    /**
+     * Sets the uptime in milliseconds when the last request to bind to an almost perceptible
+     * service was made while this process was in the TOP state.
+     */
+    @GuardedBy("mLock")
+    public void setLastTopStartedAlmostPerceptibleBindRequestUptimeMs(
+            @NonNull ProcessServiceRecordInternal psr, long value) {
+        psr.setLastTopStartedAlmostPerceptibleBindRequestUptimeMs(value);
     }
 
     /************************ Broadcast Receiver State Events **************************/

@@ -126,7 +126,7 @@ import com.android.wm.shell.windowdecor.viewholder.AppHandleIdentifier;
 import com.android.wm.shell.windowdecor.viewholder.AppHandleViewHolder;
 import com.android.wm.shell.windowdecor.viewholder.AppHeaderViewHolder;
 import com.android.wm.shell.windowdecor.viewholder.WindowDecorationViewHolder;
-import com.android.wm.shell.windowdecor.viewholder.util.LargeAppHeaderDimensions;
+import com.android.wm.shell.windowdecor.viewholder.util.LargeHeaderDimensions;
 
 import kotlin.Pair;
 import kotlin.Unit;
@@ -1032,7 +1032,7 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
                         return Unit.INSTANCE;
                     },
                     mDesktopModeUiEventLogger,
-                    /* dimensions= */ new LargeAppHeaderDimensions(
+                    /* dimensions= */ new LargeHeaderDimensions(
                             mDecorWindowContext.getResources()),
                     mFocusTransitionObserver
                     );
@@ -1189,11 +1189,9 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
                 relayoutParams.mInputFeatures
                         |= WindowManager.LayoutParams.INPUT_FEATURE_NO_INPUT_CHANNEL;
             }
-            if (DesktopExperienceFlags.ENABLE_REMOVE_STATUS_BAR_INPUT_LAYER.isTrue()) {
-                // Add input feature spy flag if caption is an app handle so that input is not
-                // stolen when motion event exits caption view.
-                relayoutParams.mInputFeatures |= WindowManager.LayoutParams.INPUT_FEATURE_SPY;
-            }
+            // Add input feature spy flag if caption is an app handle so that input is not
+            // stolen when motion event exits caption view.
+            relayoutParams.mInputFeatures |= WindowManager.LayoutParams.INPUT_FEATURE_SPY;
         }
         if (isAppHeader
                 && desktopConfig.useWindowShadow(/* isFocusedWindow= */ hasGlobalFocus)) {
@@ -1645,8 +1643,7 @@ public class DesktopModeWindowDecoration extends WindowDecoration<WindowDecorLin
                 shouldShowGameControlsButton,
                 mDesktopState.isDesktopModeSupportedOnDisplay(mDisplay),
                 shouldShowRestartButton,
-                isBrowserApp,
-                openInAppOrBrowserIntent,
+                new HandleMenu.AppToWebData(isBrowserApp, openInAppOrBrowserIntent),
                 mDesktopModeUiEventLogger,
                 captionView,
                 mResult.mCaptionWidth,

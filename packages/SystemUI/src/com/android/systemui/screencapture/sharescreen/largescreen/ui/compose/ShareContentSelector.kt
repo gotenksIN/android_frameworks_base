@@ -63,10 +63,8 @@ fun ShareContentSelector(shareScreenViewModel: ScreenCaptureShareScreenViewModel
 
     Surface(color = MaterialTheme.colorScheme.surfaceBright, shape = RoundedCornerShape(20.dp)) {
         Column(
-            modifier =
-                Modifier.width(560.dp)
-                    .padding(start = 10.dp, top = 14.dp, end = 10.dp, bottom = 2.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            modifier = Modifier.width(560.dp).padding(horizontal = 10.dp, vertical = 14.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             val selectedItem by targetsViewModel.selectedTarget
             Text(
@@ -94,6 +92,19 @@ fun ShareContentSelector(shareScreenViewModel: ScreenCaptureShareScreenViewModel
                     preview = selectedItem?.thumbnail?.getOrNull()?.asImageBitmap(),
                     modifier = Modifier.weight(1f).height(140.dp).width(230.dp),
                     itemSelected = selectedItem != null,
+                    text =
+                        stringResource(
+                            when (targetsViewModel) {
+                                is AppContentsViewModel ->
+                                    R.string.screen_share_no_select_tab_thumbnail
+                                is RecentTasksViewModel ->
+                                    R.string.screen_share_no_select_app_thumbnail
+                                is DisplaysViewModel ->
+                                    R.string.screen_share_no_select_display_thumbnail
+                                else ->
+                                    throw IllegalArgumentException("Unknown TargetsViewModel type")
+                            }
+                        ),
                 )
             }
             DisclaimerText(targetsViewModel, shareScreenViewModel.requestingAppName)
@@ -109,6 +120,7 @@ private fun ItemPreview(
     preview: ImageBitmap?,
     modifier: Modifier = Modifier,
     itemSelected: Boolean,
+    text: String,
 ) {
     Box(
         modifier =
@@ -128,7 +140,7 @@ private fun ItemPreview(
             }
         } else {
             Text(
-                text = stringResource(R.string.screen_share_no_select_app_thumbnail),
+                text = text,
                 color = MaterialTheme.colorScheme.onPrimaryContainer,
                 style = MaterialTheme.typography.labelMedium,
             )
@@ -167,10 +179,7 @@ private fun AudioSwitch(targetsViewModel: TargetsViewModel) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween,
-        modifier =
-            Modifier.padding(start = 4.dp, top = 4.dp, end = 4.dp, bottom = 12.dp)
-                .height(24.dp)
-                .fillMaxWidth(),
+        modifier = Modifier.padding(horizontal = 4.dp, vertical = 0.dp).height(24.dp).fillMaxWidth(),
     ) {
         LoadingIcon(
             icon =
@@ -190,7 +199,10 @@ private fun AudioSwitch(targetsViewModel: TargetsViewModel) {
         Switch(
             checked = checked,
             onCheckedChange = targetsViewModel::setCaptureAudio,
-            modifier = Modifier.semantics { this.contentDescription = audioSwitchA11yDescription },
+            modifier =
+                Modifier.height(20.dp).width(40.dp).semantics {
+                    this.contentDescription = audioSwitchA11yDescription
+                },
             thumbContent =
                 if (checked) {
                     {

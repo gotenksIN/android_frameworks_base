@@ -29,7 +29,6 @@ import com.android.systemui.statusbar.quickactions.av.shared.model.SensorActivit
 import com.android.systemui.statusbar.quickactions.popups.ui.viewmodel.StatusBarPopupChipViewModel
 import com.android.systemui.statusbar.quickactions.ui.compose.ChipColors
 import com.android.systemui.statusbar.quickactions.ui.viewmodel.ChipIcon
-import com.android.systemui.statusbar.quickactions.ui.viewmodel.HoverBehavior
 import com.android.systemui.statusbar.quickactions.ui.viewmodel.QuickActionChipId
 import com.android.systemui.statusbar.quickactions.ui.viewmodel.QuickActionChipUiState
 import dagger.assisted.AssistedFactory
@@ -39,11 +38,13 @@ import kotlinx.coroutines.flow.map
 /** ViewModel for the VC Privacy Chip */
 class AvControlsChipViewModel
 @AssistedInject
-constructor(@DisplayAware avControlsChipInteractor: AvControlsChipInteractor) :
-    StatusBarPopupChipViewModel, ExclusiveActivatable() {
+constructor(
+    @DisplayAware avControlsChipInteractor: AvControlsChipInteractor,
+    private val popupViewModelFactory: AvControlsPopupViewModel.Factory,
+) : StatusBarPopupChipViewModel, ExclusiveActivatable() {
     companion object {
-        val CAMERA_DRAWABLE: Int = com.android.internal.R.drawable.perm_group_camera
-        val MICROPHONE_DRAWABLE: Int = com.android.internal.R.drawable.perm_group_microphone
+        val CAMERA_DRAWABLE: Int = R.drawable.gs_videocam_filled
+        val MICROPHONE_DRAWABLE: Int = R.drawable.gs_mic_filled
     }
 
     private val hydrator: Hydrator = Hydrator("AvControlsChipViewModel.hydrator")
@@ -67,11 +68,11 @@ constructor(@DisplayAware avControlsChipInteractor: AvControlsChipInteractor) :
                 QuickActionChipUiState.PopupChip(
                     chipId = chipId,
                     icons = icons(sensorActivityModel = sensorActivityModel),
-                    chipText = null,
+                    chipContent = null,
                     colors = ChipColors.AvControlsTheme,
-                    hoverBehavior = HoverBehavior.None,
                     contentDescription =
                         contentDescription(sensorActivityModel = sensorActivityModel),
+                    popupViewModelFactory = popupViewModelFactory,
                 )
         }
     }

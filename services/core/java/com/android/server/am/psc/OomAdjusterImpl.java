@@ -46,7 +46,6 @@ import static android.app.ActivityManager.PROCESS_STATE_TOP;
 import static android.app.ActivityManager.PROCESS_STATE_TOP_SLEEPING;
 import static android.app.ActivityManager.PROCESS_STATE_TRANSIENT_BACKGROUND;
 import static android.app.ActivityManager.PROCESS_STATE_UNKNOWN;
-import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_NONE;
 import static android.content.Context.BIND_TREAT_LIKE_VISIBLE_FOREGROUND_SERVICE;
 import static android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA;
 import static android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION;
@@ -59,9 +58,6 @@ import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_UID_OBSERVE
 import static com.android.server.am.ActivityManagerService.TAG_BACKUP;
 import static com.android.server.am.ActivityManagerService.TAG_OOM_ADJ;
 import static com.android.server.am.ActivityManagerService.TAG_UID_OBSERVERS;
-import static com.android.server.am.ProcessCachedOptimizerRecord.SHOULD_NOT_FREEZE_REASON_BINDER_ALLOW_OOM_MANAGEMENT;
-import static com.android.server.am.ProcessCachedOptimizerRecord.SHOULD_NOT_FREEZE_REASON_BIND_WAIVE_PRIORITY;
-import static com.android.server.am.ProcessCachedOptimizerRecord.SHOULD_NOT_FREEZE_REASON_UID_ALLOWLISTED;
 import static com.android.server.am.psc.Constants.BACKUP_APP_ADJ;
 import static com.android.server.am.psc.Constants.CACHED_APP_MAX_ADJ;
 import static com.android.server.am.psc.Constants.CACHED_APP_MIN_ADJ;
@@ -109,6 +105,7 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.server.ServiceThread;
 import com.android.server.am.Flags;
 import com.android.server.am.ProcessList;
+import com.android.server.am.psc.Constants.SchedGroup;
 import com.android.server.wm.ActivityServiceConnectionsHolder;
 
 import java.lang.annotation.Retention;
@@ -632,6 +629,12 @@ public class OomAdjusterImpl extends OomAdjuster {
             ProcessRecordNode.NODE_TYPE_ADJ, ADJ_SLOT_VALUES.length);
     private final OomAdjusterArgs mTmpOomAdjusterArgs = new OomAdjusterArgs();
 
+    private final CapabilityController mCapabilityController =
+            Flags.enableCapabilityControllerComputation() ? new CapabilityController() : null;
+    /** A list of edges for partial graph updates in {@link #partialUpdateProcessGraphLSP}. */
+    private final ArrayList<GraphEdge> mEdgesToUpdate =
+            Flags.enableCapabilityControllerComputation() ? new ArrayList<>() : null;
+
     void unlinkProcessRecordFromList(@NonNull ProcessRecordInternal app) {
         mProcessRecordProcStateNodes.unlink(app);
         mProcessRecordAdjNodes.unlink(app);
@@ -851,6 +854,13 @@ public class OomAdjusterImpl extends OomAdjuster {
             }
         }
 
+        // Capability computation needs updated process state values, so this should be after
+        // computeConnectionsLSP, where the process state computation is done. It also needs to
+        // be before updateAppUidRecIfNecessaryLSP because updated capabilities are read there.
+        if (Flags.enableCapabilityControllerComputation()) {
+            partialUpdateProcessGraphLSP(targets);
+        }
+
         // If all processes have an assigned adj, no need to calculate and assign cached adjs.
         if (needLruAdjust) {
             // TODO: b/319163103 - optimize cache adj assignment to not require the whole lru list.
@@ -868,6 +878,25 @@ public class OomAdjusterImpl extends OomAdjuster {
         }
 
         postUpdateOomAdjInnerLSP(oomAdjReason, activeUids, now, nowElapsed, oldTime, false);
+    }
+
+    /** Performs a partial update to the process graph from a set of target processes. */
+    @GuardedBy({"mServiceLock", "mProcLock"})
+    private void partialUpdateProcessGraphLSP(ArraySet<ProcessRecordInternal> targets) {
+        if (!mEdgesToUpdate.isEmpty()) {
+            Slog.e(TAG, "mEdgesToUpdate is not empty at the beginning of a partial update");
+            mEdgesToUpdate.clear();
+        }
+
+        for (int i = 0, size = targets.size(); i < size; i++) {
+            final ProcessRecordInternal target = targets.valueAt(i);
+            // TODO(b/466961280): Add other incoming service/provider binding edges.
+            mEdgesToUpdate.add(target.getProcessEdge());
+        }
+
+        // Only triggers computation without using its result.
+        mCapabilityController.update(mEdgesToUpdate);
+        mEdgesToUpdate.clear();
     }
 
     @GuardedBy({"mServiceLock", "mProcLock"})
@@ -907,7 +936,6 @@ public class OomAdjusterImpl extends OomAdjuster {
             final int prevProcState = target.getCurProcState();
             final int prevAdj = target.getCurRawAdj();
             final int prevCapability = target.getCurCapability();
-            final boolean prevShouldNotFreeze = target.shouldNotFreeze();
 
             args.mApp = target;
             // If target client is a reachable, reachables need to be reinited in case this
@@ -916,7 +944,7 @@ public class OomAdjusterImpl extends OomAdjuster {
             // If target lowered in importance, reachables need to be reinited because this
             // target may have been the source of a reachable's current importance.
             initReachables |= selfImportanceLoweredLSP(target, prevProcState, prevAdj,
-                    prevCapability, prevShouldNotFreeze);
+                    prevCapability);
 
             mProcessRecordProcStateNodes.offer(target);
             mProcessRecordAdjNodes.offer(target);
@@ -1081,7 +1109,7 @@ public class OomAdjusterImpl extends OomAdjuster {
      */
     @GuardedBy({"mServiceLock", "mProcLock"})
     private static boolean selfImportanceLoweredLSP(ProcessRecordInternal app, int prevProcState,
-            int prevAdj, int prevCapability, boolean prevShouldNotFreeze) {
+            int prevAdj, int prevCapability) {
         if (app.getCurProcState() > prevProcState) {
             return true;
         }
@@ -1089,10 +1117,6 @@ public class OomAdjusterImpl extends OomAdjuster {
             return true;
         }
         if ((app.getCurCapability() & prevCapability) != prevCapability)  {
-            return true;
-        }
-        if (!app.shouldNotFreeze() && prevShouldNotFreeze) {
-            // No long marked as should not freeze.
             return true;
         }
         return false;
@@ -1130,11 +1154,6 @@ public class OomAdjusterImpl extends OomAdjuster {
                 return false;
             }
         }
-
-        if (!host.shouldNotFreeze() && client.shouldNotFreeze()) {
-            // If the client is marked as should not freeze, so should the host.
-            return false;
-        }
         return true;
     }
 
@@ -1164,11 +1183,6 @@ public class OomAdjusterImpl extends OomAdjuster {
         app.setAdjTypeCode(ActivityManager.RunningAppProcessInfo.REASON_UNKNOWN);
         app.setAdjSource(null);
         app.setAdjTarget(null);
-
-        // If this UID is currently allowlisted, it should not be frozen.
-        final UidRecordInternal uidRec = app.getUidRecord();
-        app.setShouldNotFreeze(uidRec != null && uidRec.isCurAllowListed(), false /* dryRun */,
-                SHOULD_NOT_FREEZE_REASON_UID_ALLOWLISTED, mAdjSeq);
 
         final boolean reportDebugMsgs = DEBUG_OOM_ADJ_REASON || mGlobalState.isDebugEnabled(app);
 
@@ -1229,7 +1243,7 @@ public class OomAdjusterImpl extends OomAdjuster {
         // Determine the importance of the process, starting with most
         // important to least, and assign an appropriate OOM adjustment.
         int adj;
-        int schedGroup;
+        @SchedGroup int schedGroup;
         int procState;
         int capability = PROCESS_CAPABILITY_NONE;
 
@@ -1304,6 +1318,10 @@ public class OomAdjusterImpl extends OomAdjuster {
                 reportOomAdjMessageLocked(TAG_OOM_ADJ, "Making instrumentation: " + app);
             }
         } else if (isReceivingBroadcast(app)) {
+            // TODO: b/476480930 - Not every running receiver needs to elevated in importance.
+            //  Update this policy and the ProcessStateController API to distinguish different
+            //  importance receivers.
+
             // An app that is currently receiving a broadcast also
             // counts as being in the foreground for OOM killer purposes.
             // It's placed in a sched group based on the nature of the
@@ -1846,7 +1864,7 @@ public class OomAdjusterImpl extends OomAdjuster {
 
         int adj = app.getCurRawAdj();
         int procState = app.getCurRawProcState();
-        int schedGroup = app.getCurrentSchedulingGroup();
+        @SchedGroup int schedGroup = app.getCurrentSchedulingGroup();
         int capability = app.getCurCapability();
 
         final int prevRawAdj = adj;
@@ -1862,19 +1880,6 @@ public class OomAdjusterImpl extends OomAdjuster {
                     || clientProcState <= PROCESS_STATE_BOUND_TOP
                     || (clientProcState == PROCESS_STATE_FOREGROUND_SERVICE
                     && !client.isBackgroundRestricted()));
-        }
-
-        if (client.shouldNotFreeze()) {
-            // Propagate the shouldNotFreeze flag down the bindings.
-            if (app.setShouldNotFreeze(true, dryRun,
-                    app.shouldNotFreezeReason() | client.shouldNotFreezeReason(), mAdjSeq)) {
-                if (Flags.cpuTimeCapabilityBasedFreezePolicy()) {
-                    // Do nothing, capability updated check will handle the dryrun output.
-                } else {
-                    // Bail out early, as we only care about the return value for a dryrun.
-                    return true;
-                }
-            }
         }
 
         boolean trackedProcState = false;
@@ -1927,20 +1932,6 @@ public class OomAdjusterImpl extends OomAdjuster {
             }
             String adjType = null;
             if (cr.hasFlag(Context.BIND_ALLOW_OOM_MANAGEMENT)) {
-                // Similar to BIND_WAIVE_PRIORITY, keep it unfrozen.
-                if (clientAdj < CACHED_APP_MIN_ADJ) {
-                    if (app.setShouldNotFreeze(true, dryRun,
-                            app.shouldNotFreezeReason()
-                                    | SHOULD_NOT_FREEZE_REASON_BINDER_ALLOW_OOM_MANAGEMENT,
-                            mAdjSeq)) {
-                        if (Flags.cpuTimeCapabilityBasedFreezePolicy()) {
-                            // Do nothing, capability updated check will handle the dryrun output.
-                        } else {
-                            // Bail out early, as we only care about the return value for a dryrun.
-                            return true;
-                        }
-                    }
-                }
                 // Not doing bind OOM management, so treat
                 // this guy more like a started service.
                 if (app.getHasShownUi() && !isHomeProcess(app)) {
@@ -2162,28 +2153,6 @@ public class OomAdjusterImpl extends OomAdjuster {
                             + ProcessList.makeProcStateString(procState));
                 }
             }
-        } else { // BIND_WAIVE_PRIORITY == true
-            // BIND_WAIVE_PRIORITY bindings are special when it comes to the
-            // freezer. Processes bound via WPRI are expected to be running,
-            // but they are not promoted in the LRU list to keep them out of
-            // cached. As a result, they can freeze based on oom_adj alone.
-            // Normally, bindToDeath would fire when a cached app would die
-            // in the background, but nothing will fire when a running process
-            // pings a frozen process. Accordingly, any cached app that is
-            // bound by an unfrozen app via a WPRI binding has to remain
-            // unfrozen.
-            if (clientAdj < CACHED_APP_MIN_ADJ) {
-                if (app.setShouldNotFreeze(true, dryRun,
-                        app.shouldNotFreezeReason() | SHOULD_NOT_FREEZE_REASON_BIND_WAIVE_PRIORITY,
-                        mAdjSeq)) {
-                    if (Flags.cpuTimeCapabilityBasedFreezePolicy()) {
-                        // Do nothing, capability updated check will handle the dryrun output.
-                    } else {
-                        // Bail out early, as we only care about the return value for a dryrun.
-                        return true;
-                    }
-                }
-            }
         }
         if (cr.hasFlag(Context.BIND_TREAT_LIKE_ACTIVITY)) {
             if (!dryRun) {
@@ -2238,19 +2207,9 @@ public class OomAdjusterImpl extends OomAdjuster {
                 updated = true;
             }
 
-            if (Flags.cpuTimeCapabilityBasedFreezePolicy()) {
-                if ((capability != prevCapability)
-                        && ((capability & prevCapability) == prevCapability)) {
-                    updated = true;
-                }
-            } else {
-                // Ignore CPU related capabilities in comparison
-                final int curFiltered = capability & ~ALL_CPU_TIME_CAPABILITIES;
-                final int prevFiltered = prevCapability & ~ALL_CPU_TIME_CAPABILITIES;
-                if ((curFiltered != prevFiltered)
-                        && ((curFiltered & prevFiltered) == prevFiltered)) {
-                    updated = true;
-                }
+            if ((capability != prevCapability)
+                    && ((capability & prevCapability) == prevCapability)) {
+                updated = true;
             }
         }
 
@@ -2310,18 +2269,6 @@ public class OomAdjusterImpl extends OomAdjuster {
             // If the other app is cached for any reason, for purposes here
             // we are going to consider it empty.
             clientProcState = PROCESS_STATE_CACHED_EMPTY;
-        }
-        if (client.shouldNotFreeze()) {
-            // Propagate the shouldNotFreeze flag down the bindings.
-            if (app.setShouldNotFreeze(true, dryRun,
-                    app.shouldNotFreezeReason() | client.shouldNotFreezeReason(), mAdjSeq)) {
-                if (Flags.cpuTimeCapabilityBasedFreezePolicy()) {
-                    // Do nothing, capability updated check will handle the dryrun output.
-                } else {
-                    // Bail out early, as we only care about the return value for a dryrun.
-                    return true;
-                }
-            }
         }
 
         if (!dryRun) {
@@ -2400,19 +2347,9 @@ public class OomAdjusterImpl extends OomAdjuster {
                 return true;
             }
 
-            if (Flags.cpuTimeCapabilityBasedFreezePolicy()) {
-                if ((capability != prevCapability)
-                        && ((capability & prevCapability) == prevCapability)) {
-                    return true;
-                }
-            } else {
-                // Ignore CPU related capabilities in comparison
-                final int curFiltered = capability & ~ALL_CPU_TIME_CAPABILITIES;
-                final int prevFiltered = prevCapability & ~ALL_CPU_TIME_CAPABILITIES;
-                if ((curFiltered != prevFiltered)
-                        && ((curFiltered & prevFiltered) == prevFiltered)) {
-                    return true;
-                }
+            if ((capability != prevCapability)
+                    && ((capability & prevCapability) == prevCapability)) {
+                return true;
             }
         }
 

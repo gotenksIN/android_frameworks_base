@@ -19,10 +19,8 @@ package com.android.server.companion.datatransfer.continuity.tasks;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.companion.datatransfer.continuity.RemoteTask;
-import android.content.Context;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
-import android.graphics.drawable.Icon;
 import android.util.Slog;
 import com.android.server.companion.datatransfer.continuity.messages.RemoteTaskInfo;
 import java.util.Objects;
@@ -31,79 +29,79 @@ public class RemoteTaskFactory {
 
     private static final String TAG = RemoteTaskFactory.class.getSimpleName();
 
-    private final Icon mDefaultIcon;
-    private final PackageManager mPackageManager;
-
-    public RemoteTaskFactory(@NonNull Context context, @NonNull PackageManager packageManager) {
-        mPackageManager = Objects.requireNonNull(packageManager);
-        mDefaultIcon = Icon.createWithResource(context, android.R.drawable.sym_def_app_icon);
-    }
-
     @Nullable
-    public RemoteTask create(
+    public static RemoteTask create(
+            @NonNull PackageManager packageManager,
+            int userId,
             int associationId,
             @Nullable String associationDisplayName,
             @NonNull RemoteTaskInfo remoteTaskInfo) {
         Objects.requireNonNull(remoteTaskInfo);
 
-        if (!canTaskBeHandedOffLocally(remoteTaskInfo)) {
+        boolean canTaskBeHandedOffLocally =
+                canTaskBeHandedOffNatively(packageManager, remoteTaskInfo);
+        boolean canTaskBeHandedOffByBrowser =
+                canTaskBeHandedOffByBrowser(userId, packageManager, remoteTaskInfo);
+
+        if (!canTaskBeHandedOffLocally && !canTaskBeHandedOffByBrowser) {
             return null;
         }
 
+        String packageName =
+                canTaskBeHandedOffLocally
+                        ? remoteTaskInfo.packageName()
+                        : packageManager.getDefaultBrowserPackageNameAsUser(userId);
+
         return new RemoteTask.Builder(associationId, remoteTaskInfo.id())
-                .setPackageName(remoteTaskInfo.packageName())
-                .setLabel(getPackageLabel(remoteTaskInfo.packageName()))
+                .setPackageName(packageName)
+                .setLabel(getPackageLabel(packageManager, packageName))
                 .setLastUsedTimestampMillis(remoteTaskInfo.lastUsedTimeMillis())
                 .setAssociationDisplayName(associationDisplayName)
-                .setIcon(getPackageIcon(remoteTaskInfo.packageName()))
                 .setTaskInForeground(remoteTaskInfo.isInForeground())
                 .setHandoffEnabled(remoteTaskInfo.handoffOptions().isHandoffEnabled())
                 .build();
     }
 
     @Nullable
-    private String getPackageLabel(@NonNull String packageName) {
-        PackageInfo packageInfo = getPackageInfo(packageName);
+    private static String getPackageLabel(
+            @NonNull PackageManager packageManager, @NonNull String packageName) {
+        PackageInfo packageInfo = getPackageInfo(packageManager, packageName);
         if (packageInfo == null) {
             return null;
         }
 
-        return mPackageManager.getApplicationLabel(packageInfo.applicationInfo).toString();
+        return packageManager.getApplicationLabel(packageInfo.applicationInfo).toString();
     }
 
     @Nullable
-    private Icon getPackageIcon(@NonNull String packageName) {
-        PackageInfo packageInfo = getPackageInfo(packageName);
-        if (packageInfo == null) {
-            return mDefaultIcon;
-        }
-
-        if (packageInfo.applicationInfo.icon == 0) {
-            return mDefaultIcon;
-        }
-
-        return Icon.createWithResource(packageName, packageInfo.applicationInfo.icon);
-    }
-
-    @Nullable
-    private PackageInfo getPackageInfo(@NonNull String packageName) {
+    private static PackageInfo getPackageInfo(
+            @NonNull PackageManager packageManager, @NonNull String packageName) {
         try {
-            return mPackageManager.getPackageInfo(packageName, PackageManager.GET_META_DATA);
+            return packageManager.getPackageInfo(packageName, PackageManager.GET_META_DATA);
         } catch (PackageManager.NameNotFoundException e) {
             Slog.w(TAG, "Could not find package info for package: " + packageName);
             return null;
         }
     }
 
-    private boolean canTaskBeHandedOffLocally(@NonNull RemoteTaskInfo remoteTaskInfo) {
+    private static boolean canTaskBeHandedOffNatively(
+            @NonNull PackageManager packageManager, @NonNull RemoteTaskInfo remoteTaskInfo) {
         Objects.requireNonNull(remoteTaskInfo);
 
         if (!remoteTaskInfo.handoffOptions().isHandoffEnabled()) {
             return false;
         }
 
-        boolean isPackageInstalled = getPackageInfo(remoteTaskInfo.packageName()) != null;
-        return (isPackageInstalled && remoteTaskInfo.handoffOptions().isHandoffEnabled())
-                || !remoteTaskInfo.handoffOptions().requirePackageInstalled();
+        return getPackageInfo(packageManager, remoteTaskInfo.packageName()) != null;
+    }
+
+    private static boolean canTaskBeHandedOffByBrowser(
+            int userId,
+            @NonNull PackageManager packageManager,
+            @NonNull RemoteTaskInfo remoteTaskInfo) {
+        Objects.requireNonNull(remoteTaskInfo);
+        return packageManager.getDefaultBrowserPackageNameAsUser(userId) != null
+                && remoteTaskInfo.handoffOptions().isHandoffEnabled()
+                && !remoteTaskInfo.handoffOptions().requirePackageInstalled();
     }
 }

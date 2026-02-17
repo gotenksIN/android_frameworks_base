@@ -32,6 +32,9 @@ import com.android.server.LocalServices;
 import com.android.server.om.OverlayManagerInternal;
 import com.android.server.pm.UserManagerInternal;
 
+import com.google.ux.material.libmonet.dynamiccolor.ColorSpec.SpecVersion;
+import com.google.ux.material.libmonet.dynamiccolor.DynamicScheme.Platform;
+
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.List;
@@ -80,25 +83,33 @@ public class ThemeStateManager {
     @GuardedBy("mLock")
     private int mCurrentUserId = UserHandle.USER_NULL;
 
+    @GuardedBy("mLock")
+    private boolean mIsBooting = true;
+
     // We are storing states for users only. Profiles should target their parent users.
     @GuardedBy("mLock")
     private final SparseArray<ThemeStatePair> mThemeStates = new SparseArray<>();
 
     private final Context mContext;
     private final ScheduledExecutorService mSchedulerExecutor;
+    private final SpecVersion mSpecVersion;
+    private final Platform mPlatform;
 
     private UserManagerInternal mUserManager;
     private KeyguardManager mKeyguardManager;
     private ThemeOverlayHelper mThemeOverlayHelper;
 
-    ThemeStateManager(Context context) {
-        this(context, Executors.newSingleThreadScheduledExecutor());
+    ThemeStateManager(Context context, Platform platform, SpecVersion specVersion) {
+        this(context, Executors.newSingleThreadScheduledExecutor(), platform, specVersion);
     }
 
     @VisibleForTesting(visibility = VisibleForTesting.Visibility.PRIVATE)
-    ThemeStateManager(Context context, ScheduledExecutorService schedulerExecutor) {
+    ThemeStateManager(Context context, ScheduledExecutorService schedulerExecutor,
+            Platform platform, SpecVersion specVersion) {
         mSchedulerExecutor = schedulerExecutor;
         mContext = context;
+        mPlatform = platform;
+        mSpecVersion = specVersion;
     }
 
     // HANDLERS
@@ -120,6 +131,16 @@ public class ThemeStateManager {
         mCurrentUserId = LocalServices.getService(ActivityManagerInternal.class).getCurrentUserId();
     }
 
+    /**
+     * Called when the boot animation is dismissed.
+     */
+    void onBootAnimationDismissing() {
+        synchronized (mLock) {
+            Slog.d(TAG, "Boot animation dismissing, exiting boot phase.");
+            mIsBooting = false;
+        }
+    }
+
     @VisibleForTesting
     void setThemeOverlayHelper(ThemeOverlayHelper themeOverlayHelper) {
         mThemeOverlayHelper = themeOverlayHelper;
@@ -136,7 +157,12 @@ public class ThemeStateManager {
     public void onSeedColorChange(int userId, int seedColor, boolean fromForegroundApp) {
         ThemeStatePair statePair = getState(userId);
 
-        if (!fromForegroundApp && mKeyguardManager != null
+        boolean isBooting;
+        synchronized (mLock) {
+            isBooting = mIsBooting;
+        }
+
+        if (!isBooting && !fromForegroundApp && mKeyguardManager != null
                 && !mKeyguardManager.isDeviceLocked()) {
             statePair.setDeferUpdatesOnLock(true);
             Slog.w(TAG, "Wallpaper changed from background app, deferring color change");
@@ -262,14 +288,13 @@ public class ThemeStateManager {
             } else {
                 // CASE 3: userId is a new user
                 ThemeStatePair newState = new ThemeStatePair(userId, isSetup, seedColor, contrast,
-                        style);
+                        style, mSpecVersion, mPlatform);
                 int[] profiles = Objects.requireNonNullElse(
                         mUserManager.getProfileIds(userId, false), new int[0]);
 
                 for (int profileId : profiles) {
                     if (profileId != userId) {
-                        Slog.d(TAG,
-                                "Full user " + userId + " found existing profile " + profileId);
+                        Slog.d(TAG, "Full user " + userId + " found existing profile " + profileId);
                         newState.addProfile(profileId);
                     }
                 }
@@ -365,8 +390,13 @@ public class ThemeStateManager {
      */
     @VisibleForTesting(visibility = VisibleForTesting.Visibility.PRIVATE)
     void reevaluateSystemTheme() {
+        boolean isBooting;
+        synchronized (mLock) {
+            isBooting = mIsBooting;
+        }
+
         for (ThemeStatePair statePair : getPairsSnapshot()) {
-            if (!statePair.shouldUpdate()) {
+            if (!statePair.shouldUpdate(isBooting)) {
                 continue;
             }
 
@@ -389,19 +419,39 @@ public class ThemeStateManager {
                     return;
                 }
 
+                // TODO: b/477901630 (Move this color spec to MCU)
+                ThemeStatePair.OverlaySnapshot effectiveSnapshot = overlaySnapshot;
+                if (mPlatform == Platform.WATCH) {
+                    effectiveSnapshot = new ThemeStatePair.OverlaySnapshot(
+                            overlaySnapshot.userId(),
+                            overlaySnapshot.profiles(),
+                            overlaySnapshot.darkScheme(),
+                            overlaySnapshot.darkScheme(),
+                            overlaySnapshot.contentChanged()
+                    );
+                }
+
                 int currentUserId;
+                boolean localIsBooting;
                 synchronized (mLock) {
                     currentUserId = mCurrentUserId;
+                    localIsBooting = mIsBooting;
                 }
+
+                // Whenever to updated existing (register) overlays or just turn them on.
+                boolean shouldRegister = overlaySnapshot.contentChanged()
+                        || (localIsBooting && !statePair.isColorSchemeApplied(mContext));
 
                 mThemeOverlayHelper.applyCurrentStateOverlays(
                         /*statePair     */ overlaySnapshot,
-                        /*applyToSystem */ overlaySnapshot.userId() == currentUserId);
+                        /*applyToSystem */ overlaySnapshot.userId() == currentUserId,
+                        /*shouldRegister*/ shouldRegister);
 
                 statePair.clearTimer();
 
-                Slog.d(TAG, "Overlay application for user " + statePair.userId + " completed in "
-                        + (System.currentTimeMillis() - beginT) + "ms");
+                Slog.d(TAG,
+                        "Overlay application for user " + statePair.userId + " completed in " + (
+                                System.currentTimeMillis() - beginT) + "ms");
 
             }, DEBOUNCE_MS, TimeUnit.MILLISECONDS);
 

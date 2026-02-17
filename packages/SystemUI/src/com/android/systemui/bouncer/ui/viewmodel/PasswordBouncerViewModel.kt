@@ -16,6 +16,7 @@
 
 package com.android.systemui.bouncer.ui.viewmodel
 
+import android.view.inputmethod.InputMethodManager;
 import androidx.annotation.VisibleForTesting
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.clearText
@@ -79,7 +80,8 @@ constructor(
 
     val isMoreIndicatorsAndButtonsEnabled: Boolean
         get() =
-            Flags.moreIndicatorsAndButtonsOnPasswordBouncer() &&
+            (Flags.moreIndicatorsAndButtonsOnPasswordBouncer() ||
+                Flags.moreIndicatorsAndButtonsOnPasswordBouncer2()) &&
                 interactor.isImproveLargeScreenInteractionEnabled
 
     /**
@@ -129,8 +131,9 @@ constructor(
                         when (request) {
                             is OnImeSwitcherButtonClicked -> {
                                 inputMethodInteractor.showInputMethodPicker(
-                                    displayId = request.displayId,
                                     showAuxiliarySubtypes = false,
+                                    entryPoint = InputMethodManager.IM_PICKER_ENTRY_POINT_DEFAULT,
+                                    displayId = request.displayId,
                                 )
                             }
                             is OnImeDismissed -> {

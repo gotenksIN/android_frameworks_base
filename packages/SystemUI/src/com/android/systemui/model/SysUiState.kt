@@ -27,7 +27,6 @@ import com.android.systemui.log.table.Diffable
 import com.android.systemui.log.table.TableLogBufferFactory
 import com.android.systemui.log.table.TableRowLogger
 import com.android.systemui.model.SysUiState.SysUiStateCallback
-import com.android.systemui.shade.shared.flag.ShadeWindowGoesAround
 import com.android.systemui.shared.system.QuickStepContract
 import com.android.systemui.shared.system.QuickStepContract.SystemUiStateFlags
 import com.android.systemui.shared.system.QuickStepContract.getSystemUiStateString
@@ -98,6 +97,9 @@ interface SysUiState : Dumpable {
 
 private const val TAG = "SysUIState"
 
+// to enable: "adb shell setprop log.tag.SysUIState VERBOSE". It will output many stacktraces.
+private val VERBOSE_DEBUG = SysUiState.DEBUG || Log.isLoggable(TAG, Log.VERBOSE)
+
 open class SysUiStateImpl
 @AssistedInject
 constructor(
@@ -148,10 +150,19 @@ constructor(
 
     /** Methods to this call can be chained together before calling [.commitUpdate]. */
     override fun setFlag(@SystemUiStateFlags flag: Long, enabled: Boolean): SysUiState {
-        if (ShadeWindowGoesAround.isEnabled && bitCount(flag) > 1) {
+        if (bitCount(flag) > 1) {
             error("Flags should be a single bit.")
         }
         val toSet = flagWithOptionalOverrides(flag, enabled, displayId, sceneContainerPlugin)
+        if (VERBOSE_DEBUG) {
+            val overrideString =
+                if (toSet != enabled) " (was $enabled before optional overrides)" else ""
+            Log.v(
+                TAG,
+                "setFlag: flag=${getSystemUiStateString(flag)} enabled=$toSet$overrideString",
+                Throwable(),
+            )
+        }
         stateChange.setFlag(flag, toSet)
         return this
     }
@@ -173,12 +184,13 @@ constructor(
     /** Notify all those who are registered that the state has changed. */
     private fun notifyAndSetSystemUiStateChanged(newFlags: Long, oldFlags: Long) {
         if (newFlags != oldFlags) {
-            if (SysUiState.DEBUG) {
+            if (VERBOSE_DEBUG) {
                 Log.d(
                     TAG,
                     "SysUiState changed for displayId=$displayId: " +
                         "old=${getSystemUiStateString(oldFlags)} " +
                         "new=${getSystemUiStateString(newFlags)}",
+                    Throwable(),
                 )
             }
 

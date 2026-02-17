@@ -39,13 +39,60 @@ class Expandable(
         transitionSources.add(transitionSource)
     }
 
+    // Hide the source if the associated launch is visible
+    private var isSourceVisible: Boolean = true
+
+    private fun updateSourceVisibility(sourceVisible: Boolean) {
+        isSourceVisible = sourceVisible
+        transitionSources.forEach { source -> source.isSourceVisible = sourceVisible }
+    }
+
+    /**
+     * Registers a [TransitionSource] with this coordinator. This should be called when the source
+     * UI component becomes active (e.g., attached to window, composed, placed).
+     *
+     * @param source The [TransitionSource] to add.
+     */
+    fun addSource(source: TransitionSource) {
+        source.isSourceVisible = isSourceVisible
+        source.onSourceVisibilityChanged = this::updateSourceVisibility
+        transitionSources.add(source)
+    }
+
+    /**
+     * Unregisters a [TransitionSource] from this coordinator. This should be called when the source
+     * UI component becomes inactive (e.g., detached from window, disposed, unplaced) to prevent
+     * memory leaks.
+     *
+     * @param source The [TransitionSource] to remove.
+     */
+    fun removeSource(source: TransitionSource) {
+        transitionSources.remove(source)
+    }
+
+    private fun requiredTransitionSource(): TransitionSource? {
+        val source = transitionSources.firstOrNull()
+
+        // Assuming one 'transitionSource' is always available when dynamic resolution is off
+        if (!TransitionAnimator.dynamicTargetResolutionEnabled() && source == null) {
+            throw IllegalStateException(
+                "No TransitionSource found with dynamicTargetResolution flag disabled"
+            )
+        }
+        return source
+    }
+
     /**
      * Create a [DialogTransitionAnimator.Controller] that can be used to expand this [Expandable]
      * into a Dialog, or return `null` if this [Expandable] should not be animated (e.g. if it is
      * currently not attached or visible).
      */
     fun dialogTransitionController(cuj: DialogCuj? = null): DialogTransitionAnimator.Controller? {
-        return transitionSources.first().dialogTransitionController(cuj)
+        val controller = requiredTransitionSource()?.dialogTransitionController(cuj) ?: return null
+        return object : DialogTransitionAnimator.Controller by controller {
+            override val dialogIdentity: Any
+                get() = this@Expandable
+        }
     }
 
     fun activityTransitionController(
@@ -81,9 +128,8 @@ class Expandable(
         returnCujType: Int? = null,
         isEphemeral: Boolean = true,
     ): ActivityTransitionAnimator.Controller? {
-        return transitionSources
-            .first()
-            .activityTransitionController(
+        return requiredTransitionSource()
+            ?.activityTransitionController(
                 launchCujType,
                 cookie,
                 component,

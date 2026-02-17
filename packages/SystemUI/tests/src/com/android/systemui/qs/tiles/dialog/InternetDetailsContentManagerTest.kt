@@ -17,6 +17,7 @@
 package com.android.systemui.qs.tiles.dialog
 
 import android.content.Intent
+import android.graphics.drawable.Drawable
 import android.os.Handler
 import android.os.fakeExecutorHandler
 import android.platform.test.annotations.DisableFlags
@@ -27,12 +28,12 @@ import android.telephony.telephonyManager
 import android.testing.TestableLooper.RunWithLooper
 import android.view.LayoutInflater
 import android.view.View
+import android.widget.CompoundButton
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import androidx.test.annotation.UiThreadTest
-import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.dx.mockito.inline.extended.ExtendedMockito
 import com.android.internal.logging.UiEventLogger
@@ -45,12 +46,12 @@ import com.android.systemui.kosmos.testScope
 import com.android.systemui.res.R
 import com.android.systemui.statusbar.policy.KeyguardStateController
 import com.android.systemui.testKosmos
+import com.android.systemui.user.data.repository.fakeUserRepository
 import com.android.systemui.user.domain.interactor.SelectedUserInteractor
 import com.android.systemui.user.domain.interactor.fakeHeadlessSystemUserMode
 import com.android.systemui.util.concurrency.FakeExecutor
 import com.android.systemui.util.time.FakeSystemClock
 import com.android.wifitrackerlib.WifiEntry
-import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.common.truth.Truth.assertThat
 import org.junit.After
 import org.junit.Before
@@ -62,14 +63,19 @@ import org.mockito.kotlin.clearInvocations
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
+import platform.test.runner.parameterized.ParameterizedAndroidJunit4
+import platform.test.runner.parameterized.Parameters
 
 @SmallTest
-@RunWith(AndroidJUnit4::class)
+@RunWith(ParameterizedAndroidJunit4::class)
 @RunWithLooper(setAsMainLooper = true)
 @EnableSceneContainer
-@EnableFlags(Flags.FLAG_QS_TILE_DETAILED_VIEW)
+@EnableFlags(
+    Flags.FLAG_QS_TILE_DETAILED_VIEW,
+    Flags.FLAG_INTERNET_DIALOG_DELEGATE_LEGACY_DEPRECATION,
+)
 @UiThreadTest
-class InternetDetailsContentManagerTest : SysuiTestCase() {
+class InternetDetailsContentManagerTest(private val isInDialog: Boolean) : SysuiTestCase() {
     private val kosmos = testKosmos()
     private val handler: Handler = kosmos.fakeExecutorHandler
     private val testDispatcher = kosmos.testDispatcher
@@ -83,12 +89,13 @@ class InternetDetailsContentManagerTest : SysuiTestCase() {
     private val selectedUserInteractor = mock<SelectedUserInteractor>()
     private val keyguard: KeyguardStateController = mock<KeyguardStateController>()
     private val bgExecutor = FakeExecutor(FakeSystemClock())
+    private val userRepository = kosmos.fakeUserRepository
     private lateinit var internetDetailsContentManager: InternetDetailsContentManager
     private var ethernet: LinearLayout? = null
     private var mobileDataLayout: LinearLayout? = null
-    private var mobileToggleSwitch: MaterialSwitch? = null
+    private var mobileToggleSwitch: CompoundButton? = null
     private var wifiToggle: LinearLayout? = null
-    private var wifiToggleSwitch: MaterialSwitch? = null
+    private var wifiToggleSwitch: CompoundButton? = null
     private var wifiToggleSummary: TextView? = null
     private var connectedWifi: LinearLayout? = null
     private var wifiSettingsIcon: ImageView? = null
@@ -97,8 +104,8 @@ class InternetDetailsContentManagerTest : SysuiTestCase() {
     private var wifiScanNotify: LinearLayout? = null
     private var airplaneModeSummaryText: TextView? = null
     private var mockitoSession: MockitoSession? = null
-    private var sharedWifiButton: LinearLayout? = null
-    private var addNetworkButton: LinearLayout? = null
+    private var sharedWifiButton: View? = null
+    private var addNetworkButton: View? = null
     private lateinit var contentView: View
 
     @Before
@@ -119,6 +126,14 @@ class InternetDetailsContentManagerTest : SysuiTestCase() {
                 internetDetailsContentController.getMobileNetworkSummary(ArgumentMatchers.anyInt())
             )
             .thenReturn(MOBILE_NETWORK_SUMMARY)
+        val mockDrawable = mock<Drawable>()
+        whenever(mockDrawable.mutate()).thenReturn(mockDrawable)
+        whenever(
+                internetDetailsContentController.getSignalStrengthDrawable(
+                    ArgumentMatchers.anyInt()
+                )
+            )
+            .thenReturn(mockDrawable)
         whenever(internetDetailsContentController.isWifiEnabled).thenReturn(true)
         whenever(internetDetailsContentController.activeAutoSwitchNonDdsSubId)
             .thenReturn(SubscriptionManager.INVALID_SUBSCRIPTION_ID)
@@ -131,13 +146,19 @@ class InternetDetailsContentManagerTest : SysuiTestCase() {
     }
 
     private fun createView() {
-        contentView =
-            LayoutInflater.from(mContext).inflate(R.layout.internet_connectivity_details, null)
+        val layoutId =
+            if (isInDialog) {
+                R.layout.internet_connectivity_dialog
+            } else {
+                R.layout.internet_connectivity_details
+            }
+        contentView = LayoutInflater.from(mContext).inflate(layoutId, null)
         internetDetailsContentManager =
             InternetDetailsContentManager(
                 internetDetailsContentController,
                 canConfigMobileData = true,
                 canConfigWifi = true,
+                isInDialog = isInDialog,
                 uiEventLogger = mock<UiEventLogger>(),
                 handler = handler,
                 backgroundExecutor = bgExecutor,
@@ -145,9 +166,10 @@ class InternetDetailsContentManagerTest : SysuiTestCase() {
                 mainDispatcher = testDispatcher,
                 selectedUserInteractor = selectedUserInteractor,
                 hsum = kosmos.fakeHeadlessSystemUserMode,
+                userRepository = userRepository,
             )
 
-        internetDetailsContentManager.bind(contentView, testScope)
+        internetDetailsContentManager.bind(contentView, null, testScope)
         internetDetailsContentManager.adapter = internetAdapter
         internetDetailsContentManager.connectedWifiEntry = internetWifiEntry
         internetDetailsContentManager.wifiEntriesCount = wifiEntries.size
@@ -164,8 +186,8 @@ class InternetDetailsContentManagerTest : SysuiTestCase() {
         seeAll = contentView.requireViewById(R.id.see_all_layout)
         wifiScanNotify = contentView.requireViewById(R.id.wifi_scan_notify_layout)
         airplaneModeSummaryText = contentView.requireViewById(R.id.airplane_mode_summary)
-        sharedWifiButton = contentView.requireViewById(R.id.share_wifi_button)
-        addNetworkButton = contentView.requireViewById(R.id.add_network_button)
+        sharedWifiButton = contentView.findViewById(R.id.share_wifi_button)
+        addNetworkButton = contentView.findViewById(R.id.add_network_button)
     }
 
     @After
@@ -403,7 +425,7 @@ class InternetDetailsContentManagerTest : SysuiTestCase() {
     }
 
     @Test
-    @DisableFlags(Flags.FLAG_QS_WIFI_CONFIG)
+    @DisableFlags(Flags.FLAG_QS_WIFI_CONFIG, Flags.FLAG_QS_WIFI_MULTIUSER)
     fun updateContent_wifiOnAndHasInternetWifi_showConnectedWifi() {
         whenever(internetDetailsContentController.activeAutoSwitchNonDdsSubId).thenReturn(1)
         whenever(internetDetailsContentController.hasActiveSubIdOnDds()).thenReturn(true)
@@ -421,12 +443,12 @@ class InternetDetailsContentManagerTest : SysuiTestCase() {
             val secondaryLayout =
                 contentView.requireViewById<LinearLayout>(R.id.secondary_mobile_network_layout)
             assertThat(secondaryLayout.visibility).isEqualTo(View.GONE)
-            assertThat(addNetworkButton!!.visibility).isEqualTo(View.GONE)
+            addNetworkButton?.let { assertThat(it.visibility).isEqualTo(View.GONE) }
         }
     }
 
     @Test
-    @DisableFlags(Flags.FLAG_QS_WIFI_CONFIG)
+    @DisableFlags(Flags.FLAG_QS_WIFI_CONFIG, Flags.FLAG_QS_WIFI_MULTIUSER)
     fun updateContent_wifiOnAndNoConnectedWifi_hideConnectedWifi() {
         // The precondition WiFi ON is already in setUp()
         internetDetailsContentManager.connectedWifiEntry = null
@@ -439,12 +461,12 @@ class InternetDetailsContentManagerTest : SysuiTestCase() {
             internetDetailsContentManager.lifecycleOwner!!
         ) {
             assertThat(connectedWifi!!.visibility).isEqualTo(View.GONE)
-            assertThat(addNetworkButton!!.visibility).isEqualTo(View.GONE)
+            addNetworkButton?.let { assertThat(it.visibility).isEqualTo(View.GONE) }
         }
     }
 
     @Test
-    @DisableFlags(Flags.FLAG_QS_WIFI_CONFIG)
+    @DisableFlags(Flags.FLAG_QS_WIFI_CONFIG, Flags.FLAG_QS_WIFI_MULTIUSER)
     fun updateContent_wifiOnAndNoWifiEntry_showWifiListAndSeeAllArea() {
         // The precondition WiFi ON is already in setUp()
         internetDetailsContentManager.connectedWifiEntry = null
@@ -460,12 +482,12 @@ class InternetDetailsContentManagerTest : SysuiTestCase() {
             assertThat(wifiList!!.visibility).isEqualTo(View.VISIBLE)
             verify(internetAdapter).setMaxEntriesCount(3)
             assertThat(seeAll!!.visibility).isEqualTo(View.INVISIBLE)
-            assertThat(addNetworkButton!!.visibility).isEqualTo(View.GONE)
+            addNetworkButton?.let { assertThat(it.visibility).isEqualTo(View.GONE) }
         }
     }
 
     @Test
-    @DisableFlags(Flags.FLAG_QS_WIFI_CONFIG)
+    @DisableFlags(Flags.FLAG_QS_WIFI_CONFIG, Flags.FLAG_QS_WIFI_MULTIUSER)
     fun updateContent_wifiOnAndOneWifiEntry_showWifiListAndSeeAllArea() {
         // The precondition WiFi ON is already in setUp()
         internetDetailsContentManager.connectedWifiEntry = null
@@ -481,12 +503,12 @@ class InternetDetailsContentManagerTest : SysuiTestCase() {
             assertThat(wifiList!!.visibility).isEqualTo(View.VISIBLE)
             verify(internetAdapter).setMaxEntriesCount(3)
             assertThat(seeAll!!.visibility).isEqualTo(View.INVISIBLE)
-            assertThat(addNetworkButton!!.visibility).isEqualTo(View.GONE)
+            addNetworkButton?.let { assertThat(it.visibility).isEqualTo(View.GONE) }
         }
     }
 
     @Test
-    @DisableFlags(Flags.FLAG_QS_WIFI_CONFIG)
+    @DisableFlags(Flags.FLAG_QS_WIFI_CONFIG, Flags.FLAG_QS_WIFI_MULTIUSER)
     fun updateContent_wifiOnAndHasConnectedWifi_showAllWifiAndSeeAllArea() {
         // The preconditions WiFi ON and WiFi entries are already in setUp()
         internetDetailsContentManager.wifiEntriesCount = 0
@@ -501,12 +523,12 @@ class InternetDetailsContentManagerTest : SysuiTestCase() {
             assertThat(wifiList!!.visibility).isEqualTo(View.VISIBLE)
             verify(internetAdapter).setMaxEntriesCount(2)
             assertThat(seeAll!!.visibility).isEqualTo(View.INVISIBLE)
-            assertThat(addNetworkButton!!.visibility).isEqualTo(View.GONE)
+            addNetworkButton?.let { assertThat(it.visibility).isEqualTo(View.GONE) }
         }
     }
 
     @Test
-    @DisableFlags(Flags.FLAG_QS_WIFI_CONFIG)
+    @DisableFlags(Flags.FLAG_QS_WIFI_CONFIG, Flags.FLAG_QS_WIFI_MULTIUSER)
     fun updateContent_wifiOnAndHasMaxWifiList_showWifiListAndSeeAll() {
         // The preconditions WiFi ON and WiFi entries are already in setUp()
         internetDetailsContentManager.connectedWifiEntry = null
@@ -523,12 +545,12 @@ class InternetDetailsContentManagerTest : SysuiTestCase() {
             assertThat(wifiList!!.visibility).isEqualTo(View.VISIBLE)
             verify(internetAdapter).setMaxEntriesCount(3)
             assertThat(seeAll!!.visibility).isEqualTo(View.VISIBLE)
-            assertThat(addNetworkButton!!.visibility).isEqualTo(View.GONE)
+            addNetworkButton?.let { assertThat(it.visibility).isEqualTo(View.GONE) }
         }
     }
 
     @Test
-    @DisableFlags(Flags.FLAG_QS_WIFI_CONFIG)
+    @DisableFlags(Flags.FLAG_QS_WIFI_CONFIG, Flags.FLAG_QS_WIFI_MULTIUSER)
     fun updateContent_wifiOnAndHasBothWifiEntry_showBothWifiEntryAndSeeAll() {
         // The preconditions WiFi ON and WiFi entries are already in setUp()
         internetDetailsContentManager.wifiEntriesCount =
@@ -544,12 +566,12 @@ class InternetDetailsContentManagerTest : SysuiTestCase() {
             assertThat(wifiList!!.visibility).isEqualTo(View.VISIBLE)
             verify(internetAdapter).setMaxEntriesCount(2)
             assertThat(seeAll!!.visibility).isEqualTo(View.VISIBLE)
-            assertThat(addNetworkButton!!.visibility).isEqualTo(View.GONE)
+            addNetworkButton?.let { assertThat(it.visibility).isEqualTo(View.GONE) }
         }
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_QS_WIFI_CONFIG)
+    @EnableFlags(Flags.FLAG_QS_WIFI_MULTIUSER)
     fun updateContent_deviceLockedAndNoConnectedWifi_showWifiToggle() {
         // The preconditions WiFi entries are already in setUp()
         whenever(internetDetailsContentController.isDeviceLocked).thenReturn(true)
@@ -566,12 +588,12 @@ class InternetDetailsContentManagerTest : SysuiTestCase() {
             assertThat(connectedWifi!!.visibility).isEqualTo(View.GONE)
             assertThat(wifiList!!.visibility).isEqualTo(View.GONE)
             assertThat(seeAll!!.visibility).isEqualTo(View.GONE)
-            assertThat(addNetworkButton!!.visibility).isEqualTo(View.GONE)
+            addNetworkButton?.let { assertThat(it.visibility).isEqualTo(View.GONE) }
         }
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_QS_WIFI_CONFIG)
+    @EnableFlags(Flags.FLAG_QS_WIFI_MULTIUSER)
     fun updateContent_deviceLockedAndHasConnectedWifi_showWifiToggleWithBackground() {
         // The preconditions WiFi ON and WiFi entries are already in setUp()
         whenever(internetDetailsContentController.isDeviceLocked).thenReturn(true)
@@ -587,13 +609,16 @@ class InternetDetailsContentManagerTest : SysuiTestCase() {
             assertThat(connectedWifi!!.visibility).isEqualTo(View.GONE)
             assertThat(wifiList!!.visibility).isEqualTo(View.GONE)
             assertThat(seeAll!!.visibility).isEqualTo(View.GONE)
-            assertThat(addNetworkButton!!.visibility).isEqualTo(View.GONE)
+            addNetworkButton?.let { assertThat(it.visibility).isEqualTo(View.GONE) }
         }
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_QS_WIFI_CONFIG)
+    @EnableFlags(Flags.FLAG_QS_WIFI_MULTIUSER)
     fun updateContent_showAddNetworkButton() {
+        if (isInDialog) {
+            return
+        }
         // The preconditions WiFi ON and WiFi entries are already in setUp()
         internetDetailsContentManager.wifiEntriesCount =
             InternetDetailsContentController.MAX_WIFI_ENTRY_COUNT - 1
@@ -604,13 +629,16 @@ class InternetDetailsContentManagerTest : SysuiTestCase() {
         internetDetailsContentManager.internetContentData.observe(
             internetDetailsContentManager.lifecycleOwner!!
         ) {
-            assertThat(addNetworkButton!!.visibility).isEqualTo(View.VISIBLE)
+            addNetworkButton?.let { assertThat(it.visibility).isEqualTo(View.VISIBLE) }
         }
     }
 
     @Test
-    @DisableFlags(Flags.FLAG_QS_WIFI_CONFIG)
+    @DisableFlags(Flags.FLAG_QS_WIFI_CONFIG, Flags.FLAG_QS_WIFI_MULTIUSER)
     fun updateContent_notShowAddNetworkButtonWhenFlagDisabled() {
+        if (isInDialog) {
+            return
+        }
         // The preconditions WiFi ON and WiFi entries are already in setUp()
         internetDetailsContentManager.wifiEntriesCount =
             InternetDetailsContentController.MAX_WIFI_ENTRY_COUNT - 1
@@ -621,7 +649,7 @@ class InternetDetailsContentManagerTest : SysuiTestCase() {
         internetDetailsContentManager.internetContentData.observe(
             internetDetailsContentManager.lifecycleOwner!!
         ) {
-            assertThat(addNetworkButton!!.visibility).isEqualTo(View.GONE)
+            addNetworkButton?.let { assertThat(it.visibility).isEqualTo(View.GONE) }
         }
     }
 
@@ -673,10 +701,15 @@ class InternetDetailsContentManagerTest : SysuiTestCase() {
             internetDetailsContentManager.lifecycleOwner!!
         ) {
             val primaryLayout =
-                contentView.requireViewById<LinearLayout>(R.id.mobile_connected_layout)
+                if (isInDialog) {
+                    contentView.requireViewById<LinearLayout>(R.id.mobile_network_layout)
+                } else {
+                    contentView.requireViewById<LinearLayout>(R.id.mobile_connected_layout)
+                }
             val secondaryLayout =
                 contentView.requireViewById<LinearLayout>(R.id.secondary_mobile_network_layout)
 
+            bgExecutor.runAllReady()
             verify(internetDetailsContentController).getMobileNetworkSummary(1)
             assertThat(primaryLayout.background).isNotEqualTo(secondaryLayout.background)
         }
@@ -779,7 +812,7 @@ class InternetDetailsContentManagerTest : SysuiTestCase() {
     }
 
     @Test
-    @DisableFlags(Flags.FLAG_QS_WIFI_CONFIG)
+    @DisableFlags(Flags.FLAG_QS_WIFI_CONFIG, Flags.FLAG_QS_WIFI_MULTIUSER)
     fun onClickSeeMoreButton_clickSeeAll_verifyLaunchNetworkSetting() {
         seeAll!!.performClick()
 
@@ -788,7 +821,7 @@ class InternetDetailsContentManagerTest : SysuiTestCase() {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_QS_WIFI_CONFIG)
+    @EnableFlags(Flags.FLAG_QS_WIFI_MULTIUSER)
     fun onClickSeeMoreButton_clickSeeAll_verifExpandWifiList() {
         internetDetailsContentManager.hasSeeAllClicked = true
         internetDetailsContentManager.updateContent(false)
@@ -897,5 +930,11 @@ class InternetDetailsContentManagerTest : SysuiTestCase() {
         private const val MOBILE_NETWORK_SUMMARY = "Mobile Summary"
         private const val WIFI_TITLE = "Connected Wi-Fi Title"
         private const val WIFI_SUMMARY = "Connected Wi-Fi Summary"
+
+        @JvmStatic
+        @Parameters(name = "isInDialog={0}")
+        fun data(): Iterable<Any> {
+            return listOf(true, false)
+        }
     }
 }

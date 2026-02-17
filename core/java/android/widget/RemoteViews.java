@@ -3317,24 +3317,25 @@ public class RemoteViews implements Parcelable, Filter {
                         break;
                     case SHORT:
                         value = (short) values.get(RemoteViewsProto.ReflectionAction.SHORT_VALUE,
-                                0);
+                                (short) 0);
                         break;
                     case INT:
                         value = (int) values.get(RemoteViewsProto.ReflectionAction.INT_VALUE, 0);
                         break;
                     case LONG:
-                        value = (long) values.get(RemoteViewsProto.ReflectionAction.LONG_VALUE, 0);
+                        value = (long) values.get(RemoteViewsProto.ReflectionAction.LONG_VALUE, 0L);
                         break;
                     case FLOAT:
                         value = (float) values.get(RemoteViewsProto.ReflectionAction.FLOAT_VALUE,
-                                0);
+                                0F);
                         break;
                     case DOUBLE:
                         value = (double) values.get(RemoteViewsProto.ReflectionAction.DOUBLE_VALUE,
-                                0);
+                                0D);
                         break;
                     case CHAR:
-                        value = (char) values.get(RemoteViewsProto.ReflectionAction.CHAR_VALUE, 0);
+                        value = (char) values.get(RemoteViewsProto.ReflectionAction.CHAR_VALUE,
+                                (char) 0);
                         break;
                     case STRING:
                         value = (String) values.get(RemoteViewsProto.ReflectionAction.STRING_VALUE);
@@ -3862,7 +3863,7 @@ public class RemoteViews implements Parcelable, Filter {
                         (float) values.get(
                                 RemoteViewsProto
                                         .ComplexUnitDimensionReflectionAction.DIMENSION_VALUE,
-                                0),
+                                0F),
                         (int) values.get(RemoteViewsProto.ComplexUnitDimensionReflectionAction.UNIT,
                                 0));
             };
@@ -5109,9 +5110,8 @@ public class RemoteViews implements Parcelable, Filter {
         public void apply(View root, ViewGroup rootParent, ActionApplyParams params) {
             final TextView target = root.findViewById(mViewId);
             if (target == null) return;
-            final int resolvedPixels =  getScaledPixelsFromValueWithUnit(params,
-                    target.getResources().getDisplayMetrics(), mSize, mUnits,
-                    /* isOffset= */ false);
+            final float resolvedPixels = getScaledFloatingPixelsFromValueWithUnit(params,
+                    target.getResources().getDisplayMetrics(), mSize, mUnits);
             target.setTextSize(COMPLEX_UNIT_PX, resolvedPixels);
         }
 
@@ -5168,7 +5168,7 @@ public class RemoteViews implements Parcelable, Filter {
                         RemoteViewsProto.TextViewSizeAction.VIEW_ID);
                 return new TextViewSizeAction(viewId,
                         (int) values.get(RemoteViewsProto.TextViewSizeAction.UNITS, 0),
-                        (float) values.get(RemoteViewsProto.TextViewSizeAction.SIZE, 0));
+                        (float) values.get(RemoteViewsProto.TextViewSizeAction.SIZE, 0F));
             };
         }
     }
@@ -5308,10 +5308,10 @@ public class RemoteViews implements Parcelable, Filter {
                 int viewId = getAsIdentifier(resources, values,
                         RemoteViewsProto.ViewPaddingAction.VIEW_ID);
                 return new ViewPaddingAction(viewId,
-                        (float) values.get(RemoteViewsProto.ViewPaddingAction.LEFT, 0),
-                        (float) values.get(RemoteViewsProto.ViewPaddingAction.TOP, 0),
-                        (float) values.get(RemoteViewsProto.ViewPaddingAction.RIGHT, 0),
-                        (float) values.get(RemoteViewsProto.ViewPaddingAction.BOTTOM, 0),
+                        (float) values.get(RemoteViewsProto.ViewPaddingAction.LEFT, 0F),
+                        (float) values.get(RemoteViewsProto.ViewPaddingAction.TOP, 0F),
+                        (float) values.get(RemoteViewsProto.ViewPaddingAction.RIGHT, 0F),
+                        (float) values.get(RemoteViewsProto.ViewPaddingAction.BOTTOM, 0F),
                         (int) values.get(RemoteViewsProto.ViewPaddingAction.UNITS,
                                 COMPLEX_UNIT_PX));
             };
@@ -5970,9 +5970,8 @@ public class RemoteViews implements Parcelable, Filter {
                         radius = mValue == 0 ? 0 : target.getResources().getDimension(mValue);
                         break;
                     case VALUE_TYPE_COMPLEX_UNIT:
-                        radius = getScaledPixelsFromComplexValue(params,
-                                target.getResources().getDisplayMetrics(), mValue,
-                                /* isOffset= */ false);
+                        radius = getScaledFloatingPixelsFromComplexValue(params,
+                                target.getResources().getDisplayMetrics(), mValue);
                         break;
                     default:
                         radius = mValue;
@@ -11035,5 +11034,23 @@ public class RemoteViews implements Parcelable, Filter {
             DisplayMetrics displayMetrics, float value, int unit, boolean isOffset) {
         return getScaledPixelsFromComplexValue(params, displayMetrics,
                 TypedValue.createComplexDimension(value, unit), isOffset);
+    }
+
+    private static float getScaledFloatingPixelsFromComplexValue(ActionApplyParams params,
+            DisplayMetrics displayMetrics, int complexValue) {
+        if (Flags.widgetDisplayChanges() && params.hasOriginalDensity()
+                && TypedValue.getUnitFromComplexDimension(complexValue) == COMPLEX_UNIT_PX) {
+            final float scaleFactor = displayMetrics.density / params.originalDensity;
+            final float value = TypedValue.complexToFloat(complexValue);
+            complexValue = TypedValue.createComplexDimension(scaleFactor * value,
+                    COMPLEX_UNIT_PX);
+        }
+        return TypedValue.complexToDimension(complexValue, displayMetrics);
+    }
+
+    private static float getScaledFloatingPixelsFromValueWithUnit(ActionApplyParams params,
+            DisplayMetrics displayMetrics, float value, int unit) {
+        return getScaledFloatingPixelsFromComplexValue(params, displayMetrics,
+                TypedValue.createComplexDimension(value, unit));
     }
 }

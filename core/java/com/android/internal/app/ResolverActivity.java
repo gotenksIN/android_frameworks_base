@@ -34,6 +34,7 @@ import static android.app.admin.DevicePolicyResources.Strings.Core.RESOLVER_WORK
 import static android.content.Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT;
 import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
 import static android.content.PermissionChecker.PID_UNKNOWN;
+import static android.service.chooser.Flags.resolverRespectAutoLaunchSingleChoice;
 import static android.stats.devicepolicy.nano.DevicePolicyEnums.RESOLVER_EMPTY_STATE_NO_SHARING_TO_PERSONAL;
 import static android.stats.devicepolicy.nano.DevicePolicyEnums.RESOLVER_EMPTY_STATE_NO_SHARING_TO_WORK;
 import static android.view.WindowManager.LayoutParams.SYSTEM_FLAG_HIDE_NON_SYSTEM_OVERLAY_WINDOWS;
@@ -776,7 +777,7 @@ public class ResolverActivity extends Activity implements
     protected UserHandle getPersonalProfileUserHandle() {
         // When launched in single user mode, only personal tab is populated, so we use
         // tabOwnerUserHandleForLaunch as personal tab's user handle.
-        if (privateSpaceEnabled() && isLaunchedInSingleUserMode()) {
+        if (mIsIntentPicker && isLaunchedInSingleUserMode()) {
             return getTabOwnerUserHandleForLaunch();
         }
         return mPersonalProfileUserHandle;
@@ -849,7 +850,7 @@ public class ResolverActivity extends Activity implements
         // as owner, otherwise we always return PersonalProfile user as owner
         if (UserHandle.of(UserHandle.myUserId()).equals(getWorkProfileUserHandle())) {
             return mWorkProfileUserHandle;
-        } else if (privateSpaceEnabled() && isLaunchedAsPrivateProfile()) {
+        } else if (mIsIntentPicker && isLaunchedAsPrivateProfile()) {
             return mPrivateProfileUserHandle;
         }
         return mPersonalProfileUserHandle;
@@ -884,7 +885,7 @@ public class ResolverActivity extends Activity implements
 
     protected boolean shouldShowTabs() {
         // No Tabs are shown when launched in single user mode.
-        if (privateSpaceEnabled() && isLaunchedInSingleUserMode()) {
+        if (mIsIntentPicker && isLaunchedInSingleUserMode()) {
             return false;
         }
         return hasWorkProfile() && ENABLE_TABBED_VIEW;
@@ -1443,8 +1444,27 @@ public class ResolverActivity extends Activity implements
         }
         if (doPostProcessing) {
             maybeCreateHeader(listAdapter);
+            // Preselection must happen before resetButtonBar to ensure the buttons are activated.
+            maybePreselectTarget(listAdapter);
             resetButtonBar();
             onListRebuilt(listAdapter, rebuildCompleted);
+        }
+    }
+
+    /** Preselect the existing preferred activity (if any) if AutoLaunchSingleChoice is false */
+    protected void maybePreselectTarget(ResolverListAdapter listAdapter) {
+        // Only pre-select target when ResolverActivity is launched with a single intent otherwise
+        // there might be multiple items in the list might be preferred activities for different
+        // intents.
+        if (resolverRespectAutoLaunchSingleChoice() && mIntents.size() == 1
+                && !getIntent().getBooleanExtra(Intent.EXTRA_AUTO_LAUNCH_SINGLE_CHOICE, true)) {
+            for (int i = 0; i < listAdapter.getDisplayResolveInfoCount(); i++) {
+                if (listAdapter.getDisplayResolveInfo(i).isPreferredActivity()) {
+                    ((ListView) mMultiProfilePagerAdapter.getActiveAdapterView())
+                            .setItemChecked(i, true);
+                    break;
+                }
+            }
         }
     }
 
@@ -1961,7 +1981,10 @@ public class ResolverActivity extends Activity implements
      */
     private boolean maybeAutolaunchActivity() {
         int numberOfProfiles = mMultiProfilePagerAdapter.getItemCount();
-        if (numberOfProfiles == 1 && maybeAutolaunchIfSingleTarget()) {
+        if (resolverRespectAutoLaunchSingleChoice()
+                && !getIntent().getBooleanExtra(Intent.EXTRA_AUTO_LAUNCH_SINGLE_CHOICE, true)) {
+            return false;
+        } else if (numberOfProfiles == 1 && maybeAutolaunchIfSingleTarget()) {
             return true;
         } else if (numberOfProfiles == 2
                 && mMultiProfilePagerAdapter.getActiveListAdapter().isTabLoaded()
@@ -2512,6 +2535,7 @@ public class ResolverActivity extends Activity implements
         private final List<ResolveInfo> mResolveInfos = new ArrayList<>();
         private boolean mPinned;
         private boolean mFixedAtTop;
+        private boolean mPreferredActivity;
 
         public ResolvedComponentInfo(ComponentName name, Intent intent, ResolveInfo info) {
             this.name = name;
@@ -2567,6 +2591,14 @@ public class ResolverActivity extends Activity implements
 
         public void setFixedAtTop(boolean isFixedAtTop) {
             mFixedAtTop = isFixedAtTop;
+        }
+
+        public boolean isPreferredActivity() {
+            return mPreferredActivity;
+        }
+
+        public void setPreferredActivity(boolean isPreferredActivity) {
+            mPreferredActivity = isPreferredActivity;
         }
     }
 
@@ -2714,11 +2746,6 @@ public class ResolverActivity extends Activity implements
             userList.add(getCloneProfileUserHandle());
         }
         return userList;
-    }
-
-    private boolean privateSpaceEnabled() {
-        return mIsIntentPicker && android.os.Flags.allowPrivateProfile()
-                && android.multiuser.Flags.enablePrivateSpaceFeatures();
     }
 
     /**

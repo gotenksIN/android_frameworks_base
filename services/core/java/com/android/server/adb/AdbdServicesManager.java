@@ -20,6 +20,7 @@ import android.content.ContentResolver;
 import android.content.Context;
 import android.net.nsd.NsdManager;
 import android.net.nsd.NsdServiceInfo;
+import android.net.wifi.WifiManager;
 import android.os.SystemProperties;
 import android.provider.Settings;
 import android.util.Slog;
@@ -29,7 +30,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class AdbdServicesManager {
+public class AdbdServicesManager implements AdbdIServicesManager {
 
     private static final String TAG = AdbDebuggingManager.class.getSimpleName();
 
@@ -42,47 +43,49 @@ public class AdbdServicesManager {
 
     private final ContentResolver mContentResolver;
 
-    /** Callback for service registration results. */
-    interface RegistrationCallback {
-        /** A RegistrationCallback that does nothing. */
-        RegistrationCallback NO_OP =
-                new RegistrationCallback() {
-                    @Override
-                    public void onRegistrationFailed(NsdServiceInfo serviceInfo, int errorCode) {
-                        // No-op
-                    }
+    // To make sure the device keep on responding to mDNS probes even if the screen is off.
+    private final WifiManager.MulticastLock mAdbMulticastLock;
 
-                    @Override
-                    public void onServiceRegistered(NsdServiceInfo serviceInfo) {
-                        // No-op
-                    }
-                };
+    /** A RegistrationCallback that does nothing. */
+    private static final NsdManager.RegistrationListener NO_OP =
+            new NsdManager.RegistrationListener() {
+                @Override
+                public void onRegistrationFailed(NsdServiceInfo serviceInfo, int errorCode) {}
 
-        /** Called when service registration fails. */
-        void onRegistrationFailed(NsdServiceInfo serviceInfo, int errorCode);
+                @Override
+                public void onUnregistrationFailed(NsdServiceInfo serviceInfo, int errorCode) {}
 
-        /** Called when service is successfully registered. */
-        void onServiceRegistered(NsdServiceInfo serviceInfo);
-    }
+                @Override
+                public void onServiceRegistered(NsdServiceInfo serviceInfo) {}
 
-    AdbdServicesManager(Context context) {
+                @Override
+                public void onServiceUnregistered(NsdServiceInfo serviceInfo) {}
+            };
+
+    AdbdServicesManager(Context context, String purpose) {
         mNsdManager = context.getSystemService(NsdManager.class);
         mContentResolver = context.getContentResolver();
+        WifiManager wifiManager =
+                context.getApplicationContext().getSystemService(WifiManager.class);
+        mAdbMulticastLock = wifiManager.createMulticastLock("AdbMulticastLock-" + purpose);
+        mAdbMulticastLock.setReferenceCounted(false);
     }
 
     private String keyForService(String instanceName, String serviceType) {
         return instanceName + "." + serviceType;
     }
 
-    void registerService(String instanceName, String serviceType, int port) {
-        registerService(instanceName, serviceType, port, RegistrationCallback.NO_OP);
+    @Override
+    public void registerService(String instanceName, String serviceType, int port) {
+        registerService(instanceName, serviceType, port, NO_OP);
     }
 
-    void registerService(
+    @Override
+    public void registerService(
             String instanceName,
             String serviceType,
             int port,
-            RegistrationCallback registrationCallback) {
+            NsdManager.RegistrationListener registrationCallback) {
         String key = keyForService(instanceName, serviceType);
         if (mRegisteredServices.containsKey(key)) {
             AdbdRegistrationListener listener = mRegisteredServices.get(key);
@@ -117,9 +120,11 @@ public class AdbdServicesManager {
         }
 
         mRegisteredServices.put(key, listener);
+        checkMulticastLock();
     }
 
-    void unregisterService(String instanceName, String serviceType) {
+    @Override
+    public void unregisterService(String instanceName, String serviceType) {
         String key = keyForService(instanceName, serviceType);
         if (!mRegisteredServices.containsKey(key)) {
             Slog.i(TAG, "unregister service noop for" + key);
@@ -133,9 +138,11 @@ public class AdbdServicesManager {
             Slog.e(TAG, "Unable to unregister " + key, e);
         }
         mRegisteredServices.remove(key);
+        checkMulticastLock();
     }
 
-    void unregisterAll() {
+    @Override
+    public void unregisterAll() {
         for (AdbdRegistrationListener service : new ArrayList<>(mRegisteredServices.values())) {
             unregisterService(service.mInstanceName, service.mServiceType);
         }
@@ -143,7 +150,8 @@ public class AdbdServicesManager {
 
     // When an attribute has changed, we cannot just update the TXT since NsdManager does not
     // supports it. Instead, we republish all services (see b/445548047).
-    void onAttributeChanged() {
+    @Override
+    public void onAttributeChanged() {
         List<AdbdRegistrationListener> services = new ArrayList<>(mRegisteredServices.values());
         for (AdbdRegistrationListener service : services) {
             unregisterService(service.mInstanceName, service.mServiceType);
@@ -153,17 +161,27 @@ public class AdbdServicesManager {
         }
     }
 
+    private void checkMulticastLock() {
+        if (mRegisteredServices.isEmpty()) {
+            Slog.d(TAG, "Released multicast lock");
+            mAdbMulticastLock.release();
+        } else {
+            Slog.d(TAG, "Acquired multicast lock");
+            mAdbMulticastLock.acquire();
+        }
+    }
+
     private static class AdbdRegistrationListener implements NsdManager.RegistrationListener {
         final String mInstanceName;
         final String mServiceType;
         final int mPort;
-        final RegistrationCallback mRegistrationCallback;
+        final NsdManager.RegistrationListener mRegistrationCallback;
 
         private AdbdRegistrationListener(
                 String instanceName,
                 String serviceType,
                 int port,
-                RegistrationCallback registrationCallback) {
+                NsdManager.RegistrationListener registrationCallback) {
             mInstanceName = instanceName;
             mServiceType = serviceType;
             mPort = port;
@@ -179,6 +197,7 @@ public class AdbdServicesManager {
         @Override
         public void onUnregistrationFailed(NsdServiceInfo serviceInfo, int errorCode) {
             Slog.e(TAG, "Failed to unregister service (err=" + errorCode + "): " + serviceInfo);
+            mRegistrationCallback.onRegistrationFailed(serviceInfo, errorCode);
         }
 
         @Override
@@ -190,6 +209,7 @@ public class AdbdServicesManager {
         @Override
         public void onServiceUnregistered(NsdServiceInfo serviceInfo) {
             Slog.i(TAG, "Unregistered service '" + serviceInfo + "'");
+            mRegistrationCallback.onServiceUnregistered(serviceInfo);
         }
     }
 }

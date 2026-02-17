@@ -45,6 +45,8 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.android.systemui.res.R
 import com.android.systemui.screencapture.common.ui.compose.LoadingIcon
@@ -52,11 +54,13 @@ import com.android.systemui.screencapture.common.ui.compose.loadIcon
 import com.android.systemui.screencapture.common.ui.viewmodel.AppContentsViewModel
 import com.android.systemui.screencapture.common.ui.viewmodel.DisplaysViewModel
 import com.android.systemui.screencapture.common.ui.viewmodel.RecentTasksViewModel
-import com.android.systemui.screencapture.common.ui.viewmodel.TargetViewModel
 import com.android.systemui.screencapture.common.ui.viewmodel.TargetsViewModel
+import com.android.systemui.screencapture.sharescreen.ui.viewmodel.ScreenCaptureShareScreenViewModel
 
 @Composable
-fun ShareContentSelector(targetsViewModel: TargetsViewModel) {
+fun ShareContentSelector(shareScreenViewModel: ScreenCaptureShareScreenViewModel) {
+    val targetsViewModel = shareScreenViewModel.currentTargetsModel
+
     Surface(color = MaterialTheme.colorScheme.surfaceBright, shape = RoundedCornerShape(20.dp)) {
         Column(
             modifier =
@@ -92,8 +96,10 @@ fun ShareContentSelector(targetsViewModel: TargetsViewModel) {
                     itemSelected = selectedItem != null,
                 )
             }
-            DisclaimerText(targetsViewModel)
-            AudioSwitch(targetsViewModel, selectedItem)
+            DisclaimerText(targetsViewModel, shareScreenViewModel.requestingAppName)
+            if (targetsViewModel is AppContentsViewModel && shareScreenViewModel.isAudioRequested) {
+                AudioSwitch(targetsViewModel)
+            }
         }
     }
 }
@@ -131,16 +137,17 @@ private fun ItemPreview(
 }
 
 @Composable
-private fun DisclaimerText(targetsViewModel: TargetsViewModel) {
+private fun DisclaimerText(targetsViewModel: TargetsViewModel, requestingAppName: String) {
     Text(
         text =
             stringResource(
                 when (targetsViewModel) {
+                    is AppContentsViewModel -> R.string.screen_share_disclaimer_tab_sharing
+                    is RecentTasksViewModel -> R.string.screen_share_disclaimer_app_sharing
                     is DisplaysViewModel -> R.string.screen_share_disclaimer_full_screen_sharing
-                    // TODO(b/423708479) Fill the tab sharing legal text with potential text
-                    // refactoring.
-                    else -> R.string.screen_share_disclaimer_app_sharing
-                }
+                    else -> throw IllegalArgumentException("Unknown TargetsViewModel type")
+                },
+                requestingAppName,
             ),
         style = MaterialTheme.typography.labelMedium,
         modifier = Modifier.padding(start = 8.dp, end = 8.dp).fillMaxWidth(),
@@ -148,11 +155,14 @@ private fun DisclaimerText(targetsViewModel: TargetsViewModel) {
 }
 
 @Composable
-private fun AudioSwitch(
-    targetsViewModel: TargetsViewModel,
-    selectedTargetViewModel: TargetViewModel?,
-) {
+private fun AudioSwitch(targetsViewModel: TargetsViewModel) {
     val checked by targetsViewModel.captureAudio
+
+    val audioSwitchA11yDescription =
+        stringResource(
+            if (checked) R.string.screen_share_a11y_tab_audio_on
+            else R.string.screen_share_a11y_tab_audio_off
+        )
 
     Row(
         verticalAlignment = Alignment.CenterVertically,
@@ -180,7 +190,7 @@ private fun AudioSwitch(
         Switch(
             checked = checked,
             onCheckedChange = targetsViewModel::setCaptureAudio,
-            enabled = selectedTargetViewModel != null,
+            modifier = Modifier.semantics { this.contentDescription = audioSwitchA11yDescription },
             thumbContent =
                 if (checked) {
                     {

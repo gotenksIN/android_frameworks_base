@@ -1032,19 +1032,19 @@
         <flag name="mnc" value="0x0002" />
         <!-- The touchscreen has changed, for example the user has moved the
              app across displays with different touchscreen abilities. -->
-        <flag name="touchscreen" value="0x0004" />
+        <flag name="touchscreen" value="0x0008" />
         <!-- The keyboard type has changed, for example the user has plugged
              in an external keyboard. -->
-        <flag name="keyboard" value="0x0008" />
+        <flag name="keyboard" value="0x0010" />
         <!-- The keyboard or navigation accessibility has changed, for example
              the user has slid the keyboard out to expose it.  Note that
              despite its name, this applied to any accessibility: keyboard
              or navigation. -->
-        <flag name="keyboardHidden" value="0x0010" />
+        <flag name="keyboardHidden" value="0x0020" />
         <!-- The navigation type has changed.  Should never normally happen. -->
-        <flag name="navigation" value="0x0020" />
+        <flag name="navigation" value="0x0040" />
         <!-- The color mode of the screen has changed (color gamut or dynamic range). -->
-        <flag name="colorMode" value="0x0040" />
+        <flag name="colorMode" value="0x4000" />
     </attr>
 
     <!-- Specify one or more configuration changes that the activity will
@@ -1315,6 +1315,17 @@
          running in the foreground (such as a music app that is actively playing
          music via a service in the startForeground() state). -->
     <attr name="backupInForeground" format="boolean" />
+
+    <!-- Specifies the process that the backup agent will run in.
+         @FlaggedApi(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT) -->
+    <attr name="backupAgentProcess">
+        <!-- Specifies that the backup agent should run in the default main process of
+             the application that runs under the regular uid of the application. -->
+        <enum name="main" value="0" />
+        <!-- Specifies that the backup agent should run in the private compute core process
+             of the application -->
+        <enum name="privateComputeCore" value="1" />
+    </attr>
 
     <!-- The default install location defined by an application. -->
     <attr name="installLocation">
@@ -2193,6 +2204,7 @@
         <attr name="restoreNeedsApplication" />
         <attr name="restoreAnyVersion" />
         <attr name="backupInForeground" />
+        <attr name="backupAgentProcess" />
         <!-- Request that your application's processes be created with
              a large Dalvik heap.  This applies to <em>all</em> processes
              created for the application.  It only applies to the first
@@ -2702,6 +2714,12 @@
                  when the app has been granted the ACCESS_FINE_LOCATION and/or
                  ACCESS_COARSE_LOCATION permissions. -->
             <flag name="neverForLocation" value="0x00010000" />
+            <!-- Only applies to android.permission.ACCESS_FINE_LOCATION. When this flag is set,
+                 apps cannot request that permission through
+                 {@link Activity#requestPermissions(String[], int)}, and can only use location
+                 button to obtain it temporarily.
+                 -->
+            <flag name="onlyForLocationButton" value="0x00020000" />
         </attr>
         <!-- Optional: The resource ID for the purpose string. Only required when stated so by the
              {@link #AndroidManifestPermission permission} tag's <code>
@@ -3029,12 +3047,14 @@
 
     <!-- The <code>additional-certificate</code> specifies the SHA-256 digest of a static
          shared library's additional signing certificate. You need to use this tag if the
-         library is singed with more than one certificate.
+         library is signed with more than one certificate.
 
          <p>This appears as a child tag of the
          {@link #AndroidManifestUsesStaticLibrary uses-static-library} or
-         {@link #AndroidManifestUsesPackage uses-package} tag. -->
-    <declare-styleable name="AndroidManifestAdditionalCertificate" parent="AndroidManifestUsesStaticLibrary">
+         {@link #AndroidManifestUsesPackage uses-package} tag or
+         {@link #AndroidManifestAllowComponentAccessPackage package} tag. -->
+    <declare-styleable name="AndroidManifestAdditionalCertificate"
+        parent="AndroidManifestUsesStaticLibrary AndroidManifestAllowComponentAccessPackage">
         <!-- The SHA-256 digest of the library signing certificate. -->
         <attr name="certDigest" />
     </declare-styleable>

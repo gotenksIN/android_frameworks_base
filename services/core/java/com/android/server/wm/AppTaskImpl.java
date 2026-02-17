@@ -64,6 +64,7 @@ import android.os.Looper;
 import android.os.Parcel;
 import android.os.Process;
 import android.os.RemoteException;
+import android.os.Trace;
 import android.os.UserHandle;
 import android.util.Slog;
 import android.window.TransitionRequestInfo.WindowingLayerChange;
@@ -79,6 +80,7 @@ import java.util.Objects;
  */
 class AppTaskImpl extends IAppTask.Stub {
     private static final String TAG = "AppTaskImpl";
+    private static final String TRACE_WINDOWING_LAYER_NAME = "AppTaskImpl#requestWindowingLayer";
     /** Used to detect potential SysUI crash to reject the unhandled request. */
     @VisibleForTesting
     static final int WINDOWING_LAYER_CALLBACK_INVOKE_TIMEOUT_MS = 1000;
@@ -149,7 +151,8 @@ class AppTaskImpl extends IAppTask.Stub {
                 Task task = mService.mRootWindowContainer.anyTaskForId(mTaskId,
                         MATCH_ATTACHED_TASK_OR_RECENT_TASKS);
                 if (task == null) {
-                    throw new IllegalArgumentException("Unable to find task ID " + mTaskId);
+                    Slog.w(TAG, "Unable to find task ID " + mTaskId);
+                    return null;
                 }
                 return mService.getRecentTasks().createRecentTaskInfo(task,
                         false /* stripExtras */, true /* getTasksAllowed */);
@@ -466,6 +469,14 @@ class AppTaskImpl extends IAppTask.Stub {
                             callback);
                     return;
                 }
+                if (layer != WINDOWING_LAYER_NORMAL_APP && !task.isFocused()) {
+                    Slog.w(TAG, "Task is not focused, therefore the pinned windowing layer request "
+                            + "is rejected.");
+                    sendWindowingLayerResult(
+                            TaskWindowingLayerRequestHandler.RESULT_FAILED_BAD_STATE,
+                            callback);
+                    return;
+                }
 
                 final TransitionController controller = mService.getTransitionController();
                 final Transition transition = new Transition(TRANSIT_CHANGE, 0, controller,
@@ -485,10 +496,24 @@ class AppTaskImpl extends IAppTask.Stub {
                                     return;
                                 }
                             }
+
+                            final int cookieTraceId = transition.getSyncId();
+                            // Normal layer is always approved, no room for rejecting by Shell.
                             final ObservedRemoteCallback observedCallback =
-                                    new ObservedRemoteCallback(callback);
-                            transition.addTransitionEndedListener(() ->
-                                    rejectRequestIfNotHandledAfterTimeout(observedCallback));
+                                    layer == WINDOWING_LAYER_NORMAL_APP
+                                    ? null
+                                    : new ObservedRemoteCallback(callback);
+                            transition.addTransitionEndedListener(() -> {
+                                if (observedCallback != null) {
+                                    rejectRequestIfNotHandledAfterTimeout(observedCallback);
+                                } else {
+                                    sendWindowingLayerResult(
+                                            TaskWindowingLayerRequestHandler.RESULT_APPROVED,
+                                            callback);
+                                }
+                                Trace.endAsyncSection(TRACE_WINDOWING_LAYER_NAME, cookieTraceId);
+                            });
+                            Trace.beginAsyncSection(TRACE_WINDOWING_LAYER_NAME, cookieTraceId);
                             controller.requestStartWindowingLayerTransition(transition, task,
                                     new WindowingLayerChange(layer, observedCallback));
                             transition.setReady(task, true);

@@ -29,34 +29,38 @@ import androidx.compose.foundation.AndroidEmbeddedExternalSurface
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asAndroidPath
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asComposePath
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.toAndroidRectF
-import androidx.compose.ui.input.pointer.PointerEventType
-import androidx.compose.ui.input.pointer.changedToUp
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.IntSize
-import androidx.compose.ui.util.fastAll
-import androidx.core.graphics.toRegion
-import com.android.internal.R as internalR
+import androidx.compose.ui.unit.dp
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.lifecycle.rememberViewModel
 import com.android.systemui.res.R
 import com.android.systemui.screencapture.common.ScreenCaptureScope
 import com.android.systemui.screencapture.record.camera.ui.viewmodel.ScreenCaptureCameraTransformationViewModel
 import com.android.systemui.screencapture.record.camera.ui.viewmodel.ScreenCaptureCameraViewModel
+import com.android.systemui.screencapture.ui.viewmodel.ScreenCaptureOverlayUiDialogViewModel
 import com.android.systemui.statusbar.phone.EdgeToEdgeDialogDelegate
 import com.android.systemui.statusbar.phone.SystemUIDialogFactory
 import com.android.systemui.statusbar.phone.create
@@ -71,6 +75,7 @@ class ScreenCaptureOverlayUi
 constructor(
     @Application context: Context,
     dialogFactory: SystemUIDialogFactory,
+    dialogViewModel: ScreenCaptureOverlayUiDialogViewModel,
     private val cameraViewModelFactory: ScreenCaptureCameraViewModel.Factory,
     private val cameraTransformationViewModel: ScreenCaptureCameraTransformationViewModel.Factory,
 ) {
@@ -80,9 +85,14 @@ constructor(
             .create(
                 context = context,
                 theme = R.style.Theme_SystemUI_Dialog_ScreenCapture,
-                dialogDelegate = EdgeToEdgeDialogDelegate(),
+                dialogDelegate =
+                    EdgeToEdgeDialogDelegate(
+                        touchEvent = { _, event -> dialogViewModel.onTouchEvent(event) }
+                    ),
                 dismissOnDeviceLock = false,
+                isTransient = true,
             ) {
+                LaunchedEffect(dialogViewModel) { dialogViewModel.activate() }
                 DialogContent(it.window!!)
             }
             .apply {
@@ -97,13 +107,16 @@ constructor(
                 type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
                 title = "ScreenCaptureOverlayUi"
                 format = PixelFormat.TRANSLUCENT
-                layoutInDisplayCutoutMode =
-                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
-                fitInsetsTypes = 0
             }
         with(window) {
+            addFlags(
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                    WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
+                    WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED
+            )
             addPrivateFlags(WindowManager.LayoutParams.PRIVATE_FLAG_TRUSTED_OVERLAY)
-            setWindowAnimations(internalR.style.Animation_Toast)
+            setWindowAnimations(-1)
         }
     }
 
@@ -128,7 +141,7 @@ constructor(
         val display = LocalContext.current.display
         val viewModel =
             rememberViewModel("ScreenCaptureCameraViewModel") { cameraViewModelFactory.create() }
-        LaunchedEffect(display, viewModel) { viewModel.onDisplayReady(display) }
+        LightLaunchedEffect(display, viewModel) { viewModel.onDisplayReady(display) }
         val surfaceSize =
             viewModel.surfaceSize?.let { IntSize(width = it.width, height = it.height) }
         val shouldShowCamera = viewModel.shouldShowCamera
@@ -140,13 +153,9 @@ constructor(
                 rememberViewModel("ScreenCaptureCameraTransformationViewModel") {
                     cameraTransformationViewModel.create()
                 }
-            LaunchedEffect(
-                transformationViewModel.offsetX,
-                transformationViewModel.offsetY,
-                transformationViewModel.rotation,
-                transformationViewModel.scale,
-            ) {
-                transformationViewModel.fillRegion(outTouchableRegion)
+            var windowBounds: Rect by remember { mutableStateOf(Rect.Zero) }
+            LightLaunchedEffect(transformationViewModel.fillCameraInteractableRegionIndicator) {
+                transformationViewModel.fillCameraInteractableRegion(outTouchableRegion)
             }
 
             Box(
@@ -154,10 +163,16 @@ constructor(
                 modifier =
                     modifier
                         .fillMaxSize()
-                        .selfieTransformingModifier(
+                        .onGloballyPositioned { layoutCoordinates ->
+                            val layoutBounds = layoutCoordinates.boundsInWindow()
+                            windowBounds = layoutBounds
+                            transformationViewModel.onUiBoundsChanged(layoutBounds)
+                        }
+                        .selfieTransformableModifier(
                             viewModel = transformationViewModel,
                             isEverywhere = true,
-                        ),
+                        )
+                        .showDebugIfNeeded(transformationViewModel),
             ) {
                 val surfaceAlpha by
                     animateFloatAsState(
@@ -167,29 +182,11 @@ constructor(
                 AndroidEmbeddedExternalSurface(
                     surfaceSize = surfaceSize,
                     isOpaque = false,
+                    transform = transformationViewModel.surfaceTransformation,
                     modifier =
-                        Modifier.fillMaxWidth()
-                            .aspectRatio(surfaceSize.height.toFloat() / surfaceSize.width)
-                            .selfieTransformingModifier(
-                                viewModel = transformationViewModel,
-                                isEverywhere = false,
-                            )
-                            .onGloballyPositioned { layoutCoordinates ->
-                                transformationViewModel.bounds =
-                                    layoutCoordinates.boundsInWindow(false)
-                                transformationViewModel.fillRegion(outTouchableRegion)
-                            }
-                            .graphicsLayer {
-                                alpha = surfaceAlpha
-                                with(transformationViewModel) {
-                                    scaleX = scale
-                                    scaleY = scale
-                                    translationX = offsetX
-                                    translationY = offsetY
-                                    rotationZ = rotation
-                                }
-                            }
-                            .clickable { viewModel.onSurfaceClicked() },
+                        Modifier.fillMaxSmallDimension(windowBounds)
+                            .graphicsLayer { alpha = surfaceAlpha }
+                            .aspectRatio(surfaceSize.height.toFloat() / surfaceSize.width),
                 ) {
                     onSurface { surface, width, height ->
                         viewModel.onSurfaceReady(surface = surface, width = width, height = height)
@@ -203,32 +200,48 @@ constructor(
                         surface.onDestroyed { viewModel.onSurfaceDestroyed() }
                     }
                 }
+                Spacer(
+                    modifier =
+                        Modifier.fillMaxSmallDimension(windowBounds)
+                            .aspectRatio(surfaceSize.height.toFloat() / surfaceSize.width)
+                            .onGloballyPositioned { layoutCoordinates ->
+                                val boundsInWindow = layoutCoordinates.boundsInWindow(false)
+                                transformationViewModel.onSurfaceScreenBoundsUpdated(boundsInWindow)
+                            }
+                            .selfieTransformableModifier(
+                                viewModel = transformationViewModel,
+                                isEverywhere = false,
+                            )
+                            .graphicsLayer {
+                                translationX = transformationViewModel.offsetX
+                                translationY = transformationViewModel.offsetY
+                                rotationZ = transformationViewModel.rotation
+                                scaleX = transformationViewModel.scale
+                                scaleY = transformationViewModel.scale
+                            }
+                            .clickable(
+                                interactionSource = null,
+                                indication = null,
+                                onClick = { viewModel.onSurfaceClicked() },
+                            )
+                )
             }
         }
     }
 
-    private fun Modifier.selfieTransformingModifier(
+    private fun Modifier.fillMaxSmallDimension(bounds: Rect): Modifier {
+        return widthIn(max = 414.dp)
+            .then(if (bounds.width > bounds.height) fillMaxHeight() else fillMaxWidth())
+    }
+
+    private fun Modifier.selfieTransformableModifier(
         viewModel: ScreenCaptureCameraTransformationViewModel,
         isEverywhere: Boolean,
     ): Modifier {
-        if (isEverywhere == viewModel.transformableByTouchAnywhere) {
-            return pointerInput(Unit) {
-                    awaitPointerEventScope {
-                        while (true) {
-                            with(awaitPointerEvent()) {
-                                when {
-                                    type == PointerEventType.Press ->
-                                        viewModel.onTransformationStarted()
-                                    changes.fastAll { it.changedToUp() } ->
-                                        viewModel.onTransformationEnded()
-                                }
-                            }
-                        }
-                    }
-                }
-                .transformable(viewModel.state)
+        return if (isEverywhere == viewModel.transformableByTouchAnywhere) {
+            transformable(viewModel)
         } else {
-            return this
+            this
         }
     }
 
@@ -250,6 +263,19 @@ constructor(
     }
 }
 
+private fun Modifier.showDebugIfNeeded(vm: ScreenCaptureCameraTransformationViewModel): Modifier {
+    return if (vm.shouldShowTouchBounds) {
+        drawWithContent {
+            drawContent()
+            val path = vm.debugTouchBounds?.boundaryPath?.asComposePath() ?: return@drawWithContent
+            drawPath(path = path, color = Color.Red, alpha = 0.2f)
+        }
+    } else {
+        this
+    }
+}
+
+/** Runs [action] if the [condition] is met. */
 @Composable
 private fun ConditionalLaunchedEffect(condition: Boolean, action: suspend () -> Unit) {
     LaunchedEffect(condition) {
@@ -259,11 +285,18 @@ private fun ConditionalLaunchedEffect(condition: Boolean, action: suspend () -> 
     }
 }
 
-private fun ScreenCaptureCameraTransformationViewModel.fillRegion(region: Region) {
-    val boundsAsRegion = bounds.toAndroidRectF().toRegion()
-    if (transformableByTouchAnywhere) {
-        region.set(boundsAsRegion)
-    } else {
-        region.setPath(transformedBounds.asAndroidPath(), boundsAsRegion)
+@Composable
+private fun LightLaunchedEffect(key: Any?, action: () -> Unit) {
+    DisposableEffect(key) {
+        action()
+        onDispose {}
+    }
+}
+
+@Composable
+private fun LightLaunchedEffect(key1: Any?, key2: Any?, action: () -> Unit) {
+    DisposableEffect(key1, key2) {
+        action()
+        onDispose {}
     }
 }

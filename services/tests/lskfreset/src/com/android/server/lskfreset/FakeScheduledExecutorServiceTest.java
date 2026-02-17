@@ -30,6 +30,7 @@ import org.junit.runners.JUnit4;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledFuture;
@@ -221,6 +222,37 @@ public class FakeScheduledExecutorServiceTest {
     }
 
     @Test
+    public void testScheduleCallableWithCancelAndTimeout() throws InterruptedException {
+        AtomicInteger executions = new AtomicInteger(0);
+        ScheduledFuture<Integer> future =
+                mExecutor.schedule(
+                        () -> {
+                            executions.incrementAndGet();
+                            return 31415;
+                        },
+                        2,
+                        TimeUnit.SECONDS);
+        Thread futureGetThread =
+                new Thread(
+                        () -> {
+                            assertThrows(
+                                    CancellationException.class,
+                                    () -> future.get(1, TimeUnit.SECONDS));
+                        });
+        futureGetThread.start();
+        mExecutor.waitForNumTimeoutWaiters(1);
+        assertFalse(future.isDone());
+        assertFalse(future.isCancelled());
+        assertEquals(0, executions.get());
+        assertTrue(future.cancel(false));
+        futureGetThread.join();
+        assertTrue(future.isDone());
+        assertTrue(future.isCancelled());
+        assertEquals(0, mExecutor.fastForwardMillis(3000));
+        assertEquals(0, executions.get());
+    }
+
+    @Test
     public void testScheduleCallableWithNull() throws InterruptedException {
         AtomicInteger executions = new AtomicInteger(0);
         ScheduledFuture<Integer> future =
@@ -278,6 +310,109 @@ public class FakeScheduledExecutorServiceTest {
         assertEquals(0, mExecutor.fastForwardMillis(1000));
         assertTrue(future.isDone());
         assertEquals(1, executions.get());
+    }
+
+    @Test
+    public void testScheduleFixedRate() {
+        AtomicInteger fastExecutions = new AtomicInteger(0);
+        AtomicInteger slowExecutions = new AtomicInteger(0);
+        ScheduledFuture<?> futureFast =
+                mExecutor.scheduleAtFixedRate(
+                        () -> {
+                            fastExecutions.incrementAndGet();
+                        },
+                        1,
+                        1,
+                        TimeUnit.SECONDS);
+        ScheduledFuture<?> futureSlow =
+                mExecutor.scheduleAtFixedRate(
+                        () -> {
+                            slowExecutions.incrementAndGet();
+                        },
+                        1,
+                        2,
+                        TimeUnit.SECONDS);
+        assertFalse(futureFast.isDone());
+        assertFalse(futureSlow.isDone());
+        assertEquals(0, fastExecutions.get());
+        assertEquals(0, slowExecutions.get());
+        assertEquals(2, mExecutor.fastForwardMillis(1000));
+        assertFalse(futureFast.isDone());
+        assertFalse(futureSlow.isDone());
+        assertEquals(1, fastExecutions.get());
+        assertEquals(1, slowExecutions.get());
+        assertEquals(1, mExecutor.fastForwardMillis(1500));
+        assertFalse(futureFast.isDone());
+        assertFalse(futureSlow.isDone());
+        assertEquals(2, fastExecutions.get());
+        assertEquals(1, slowExecutions.get());
+        assertEquals(2, mExecutor.fastForwardMillis(500));
+        assertFalse(futureFast.isDone());
+        assertFalse(futureSlow.isDone());
+        assertEquals(3, fastExecutions.get());
+        assertEquals(2, slowExecutions.get());
+
+        assertEquals(2, mExecutor.shutdownNow().size());
+        assertTrue(futureFast.isDone());
+        assertTrue(futureSlow.isDone());
+        assertEquals(0, mExecutor.fastForwardMillis(1000));
+        assertEquals(0, mExecutor.fastForwardMillis(1000));
+        assertEquals(3, fastExecutions.get());
+        assertEquals(2, slowExecutions.get());
+    }
+
+    @Test
+    public void testScheduleFixedDelay() {
+        AtomicInteger fastExecutions = new AtomicInteger(0);
+        AtomicInteger slowExecutions = new AtomicInteger(0);
+        ScheduledFuture<?> futureFast =
+                mExecutor.scheduleWithFixedDelay(
+                        () -> {
+                            fastExecutions.incrementAndGet();
+                        },
+                        1,
+                        1,
+                        TimeUnit.SECONDS);
+        ScheduledFuture<?> futureSlow =
+                mExecutor.scheduleWithFixedDelay(
+                        () -> {
+                            slowExecutions.incrementAndGet();
+                        },
+                        1,
+                        2,
+                        TimeUnit.SECONDS);
+        assertFalse(futureFast.isDone());
+        assertFalse(futureSlow.isDone());
+        assertEquals(0, fastExecutions.get());
+        assertEquals(0, slowExecutions.get());
+        assertEquals(2, mExecutor.fastForwardMillis(1000));
+        assertFalse(futureFast.isDone());
+        assertFalse(futureSlow.isDone());
+        assertEquals(1, fastExecutions.get());
+        assertEquals(1, slowExecutions.get());
+        assertEquals(1, mExecutor.fastForwardMillis(1500));
+        assertFalse(futureFast.isDone());
+        assertFalse(futureSlow.isDone());
+        assertEquals(2, fastExecutions.get());
+        assertEquals(1, slowExecutions.get());
+        assertEquals(1, mExecutor.fastForwardMillis(500));
+        assertFalse(futureFast.isDone());
+        assertFalse(futureSlow.isDone());
+        assertEquals(2, fastExecutions.get());
+        assertEquals(2, slowExecutions.get());
+        assertEquals(1, mExecutor.fastForwardMillis(500));
+        assertFalse(futureFast.isDone());
+        assertFalse(futureSlow.isDone());
+        assertEquals(3, fastExecutions.get());
+        assertEquals(2, slowExecutions.get());
+
+        assertEquals(2, mExecutor.shutdownNow().size());
+        assertTrue(futureFast.isDone());
+        assertTrue(futureSlow.isDone());
+        assertEquals(0, mExecutor.fastForwardMillis(1000));
+        assertEquals(0, mExecutor.fastForwardMillis(1000));
+        assertEquals(3, fastExecutions.get());
+        assertEquals(2, slowExecutions.get());
     }
 
     @Test
@@ -549,6 +684,162 @@ public class FakeScheduledExecutorServiceTest {
     }
 
     @Test
+    public void testRunMultipleTasksAndCancelAll() throws InterruptedException {
+        AtomicInteger executions = new AtomicInteger(0);
+        ScheduledFuture<?> future1 =
+                mExecutor.schedule(
+                        () -> {
+                            executions.incrementAndGet();
+                        },
+                        1,
+                        TimeUnit.SECONDS);
+        ScheduledFuture<?> future2 =
+                mExecutor.schedule(
+                        () -> {
+                            executions.incrementAndGet();
+                        },
+                        1,
+                        TimeUnit.SECONDS);
+        ScheduledFuture<?> future3 =
+                mExecutor.schedule(
+                        () -> {
+                            executions.incrementAndGet();
+                        },
+                        2,
+                        TimeUnit.SECONDS);
+
+        assertFalse(future1.isDone());
+        assertFalse(future1.isCancelled());
+        assertFalse(future2.isDone());
+        assertFalse(future2.isCancelled());
+        assertFalse(future3.isDone());
+        assertFalse(future3.isCancelled());
+        assertEquals(0, executions.get());
+
+        assertTrue(future1.cancel(false));
+        assertTrue(future2.cancel(false));
+        assertEquals(0, mExecutor.fastForwardMillis(1000));
+        assertTrue(future1.isDone());
+        assertTrue(future1.isCancelled());
+        assertTrue(future2.isDone());
+        assertTrue(future2.isCancelled());
+        assertFalse(future3.isDone());
+        assertFalse(future3.isCancelled());
+        assertEquals(0, executions.get());
+
+        assertTrue(future1.cancel(false));
+        assertTrue(future2.cancel(false));
+        assertTrue(future3.cancel(false));
+        assertEquals(0, mExecutor.fastForwardMillis(1000));
+        assertTrue(future1.isDone());
+        assertTrue(future1.isCancelled());
+        assertTrue(future2.isDone());
+        assertTrue(future2.isCancelled());
+        assertTrue(future3.isDone());
+        assertTrue(future3.isCancelled());
+        assertEquals(0, executions.get());
+
+        Thread futureGetThread =
+                new Thread(
+                        () -> {
+                            try {
+                                assertThrows(CancellationException.class, () -> future1.get());
+                            } catch (Exception e) {
+                                fail("future2.get() threw unexpected exception: " + e);
+                            }
+                            try {
+                                assertThrows(CancellationException.class, () -> future2.get());
+                            } catch (Exception e) {
+                                fail("future2.get() threw unexpected exception: " + e);
+                            }
+                            try {
+                                assertThrows(CancellationException.class, () -> future3.get());
+                            } catch (Exception e) {
+                                fail("future2.get() threw unexpected exception: " + e);
+                            }
+                        });
+        futureGetThread.start();
+        futureGetThread.join();
+    }
+
+    @Test
+    public void testRunMultipleTasksAndCancelSome() throws InterruptedException {
+        AtomicInteger executions = new AtomicInteger(0);
+        ScheduledFuture<?> future1 =
+                mExecutor.schedule(
+                        () -> {
+                            executions.incrementAndGet();
+                        },
+                        1,
+                        TimeUnit.SECONDS);
+        ScheduledFuture<?> future2 =
+                mExecutor.schedule(
+                        () -> {
+                            executions.incrementAndGet();
+                        },
+                        1,
+                        TimeUnit.SECONDS);
+        ScheduledFuture<?> future3 =
+                mExecutor.schedule(
+                        () -> {
+                            executions.incrementAndGet();
+                        },
+                        2,
+                        TimeUnit.SECONDS);
+
+        assertFalse(future1.isDone());
+        assertFalse(future1.isCancelled());
+        assertFalse(future2.isDone());
+        assertFalse(future2.isCancelled());
+        assertFalse(future3.isDone());
+        assertFalse(future3.isCancelled());
+        assertEquals(0, executions.get());
+
+        assertTrue(future2.cancel(false));
+        assertEquals(1, mExecutor.fastForwardMillis(1000));
+        assertTrue(future1.isDone());
+        assertFalse(future1.isCancelled());
+        assertTrue(future2.isDone());
+        assertTrue(future2.isCancelled());
+        assertFalse(future3.isDone());
+        assertFalse(future3.isCancelled());
+        assertEquals(1, executions.get());
+
+        assertFalse(future1.cancel(false));
+        assertTrue(future2.cancel(false));
+        assertEquals(1, mExecutor.fastForwardMillis(1000));
+        assertTrue(future1.isDone());
+        assertFalse(future1.isCancelled());
+        assertTrue(future2.isDone());
+        assertTrue(future2.isCancelled());
+        assertTrue(future3.isDone());
+        assertFalse(future3.isCancelled());
+        assertEquals(2, executions.get());
+
+        Thread futureGetThread =
+                new Thread(
+                        () -> {
+                            try {
+                                assertNull(future1.get());
+                            } catch (Exception e) {
+                                fail("future1.get() threw unexpected exception: " + e);
+                            }
+                            try {
+                                assertThrows(CancellationException.class, () -> future2.get());
+                            } catch (Exception e) {
+                                fail("future2.get() threw unexpected exception: " + e);
+                            }
+                            try {
+                                assertNull(future3.get());
+                            } catch (Exception e) {
+                                fail("future3.get() threw unexpected exception: " + e);
+                            }
+                        });
+        futureGetThread.start();
+        futureGetThread.join();
+    }
+
+    @Test
     public void testScheduleNewTasksLater() {
         AtomicInteger executions = new AtomicInteger(0);
         ScheduledFuture<?> future1 =
@@ -603,6 +894,200 @@ public class FakeScheduledExecutorServiceTest {
     }
 
     @Test
+    public void testShutdown() {
+        assertFalse(mExecutor.isShutdown());
+        assertFalse(mExecutor.isTerminated());
+        mExecutor.shutdown();
+        assertTrue(mExecutor.isShutdown());
+        assertFalse(mExecutor.isTerminated());
+        assertEquals(0, mExecutor.fastForwardMillis(0));
+        assertTrue(mExecutor.isShutdown());
+        assertTrue(mExecutor.isTerminated());
+    }
+
+    @Test
+    public void testShutdownWithTasks() {
+        AtomicInteger executions = new AtomicInteger(0);
+        ScheduledFuture<?> future1 =
+                mExecutor.schedule(
+                        () -> {
+                            executions.incrementAndGet();
+                        },
+                        1,
+                        TimeUnit.SECONDS);
+        ScheduledFuture<?> future2 =
+                mExecutor.schedule(
+                        () -> {
+                            executions.incrementAndGet();
+                        },
+                        2,
+                        TimeUnit.SECONDS);
+
+        assertFalse(mExecutor.isShutdown());
+        assertFalse(mExecutor.isTerminated());
+        assertFalse(future1.isDone());
+        assertFalse(future1.isCancelled());
+        assertFalse(future2.isDone());
+        assertFalse(future2.isCancelled());
+        assertEquals(0, executions.get());
+
+        mExecutor.shutdown();
+        assertTrue(mExecutor.isShutdown());
+        assertFalse(mExecutor.isTerminated());
+        assertFalse(future1.isDone());
+        assertFalse(future1.isCancelled());
+        assertFalse(future2.isDone());
+        assertFalse(future2.isCancelled());
+        assertEquals(0, executions.get());
+
+        assertEquals(1, mExecutor.fastForwardMillis(1000));
+        assertTrue(mExecutor.isShutdown());
+        assertFalse(mExecutor.isTerminated());
+        assertTrue(future1.isDone());
+        assertFalse(future1.isCancelled());
+        assertFalse(future2.isDone());
+        assertFalse(future2.isCancelled());
+        assertEquals(1, executions.get());
+
+        assertEquals(1, mExecutor.fastForwardMillis(1000));
+        assertTrue(mExecutor.isShutdown());
+        assertTrue(mExecutor.isTerminated());
+        assertTrue(future1.isDone());
+        assertFalse(future1.isCancelled());
+        assertTrue(future2.isDone());
+        assertFalse(future2.isCancelled());
+        assertEquals(2, executions.get());
+
+        assertEquals(0, mExecutor.fastForwardMillis(1000));
+    }
+
+    @Test
+    public void testShutdownWithAwait() throws InterruptedException {
+        AtomicInteger executions = new AtomicInteger(0);
+        ScheduledFuture<?> future1 =
+                mExecutor.schedule(
+                        () -> {
+                            executions.incrementAndGet();
+                        },
+                        1,
+                        TimeUnit.SECONDS);
+        ScheduledFuture<?> future2 =
+                mExecutor.schedule(
+                        () -> {
+                            executions.incrementAndGet();
+                        },
+                        2,
+                        TimeUnit.SECONDS);
+
+        Thread awaitAndTimeoutThread =
+                new Thread(
+                        () -> {
+                            try {
+                                assertFalse(mExecutor.awaitTermination(1, TimeUnit.SECONDS));
+                            } catch (Exception e) {
+                                fail("awaitTermination(1s) threw unexpected exception: " + e);
+                            }
+                        });
+        awaitAndTimeoutThread.start();
+        Thread awaitAndSucceedThread =
+                new Thread(
+                        () -> {
+                            try {
+                                assertTrue(mExecutor.awaitTermination(2, TimeUnit.SECONDS));
+                            } catch (Exception e) {
+                                fail("awaitTermination(2s) threw unexpected exception: " + e);
+                            }
+                        });
+        awaitAndSucceedThread.start();
+        mExecutor.waitForNumTimeoutWaiters(2);
+
+        assertFalse(mExecutor.isShutdown());
+        assertFalse(mExecutor.isTerminated());
+        assertFalse(future1.isDone());
+        assertFalse(future1.isCancelled());
+        assertFalse(future2.isDone());
+        assertFalse(future2.isCancelled());
+        assertEquals(0, executions.get());
+
+        mExecutor.shutdown();
+        assertTrue(mExecutor.isShutdown());
+        assertFalse(mExecutor.isTerminated());
+        assertFalse(future1.isDone());
+        assertFalse(future1.isCancelled());
+        assertFalse(future2.isDone());
+        assertFalse(future2.isCancelled());
+        assertEquals(0, executions.get());
+
+        assertEquals(1, mExecutor.fastForwardMillis(1000));
+        assertTrue(mExecutor.isShutdown());
+        assertFalse(mExecutor.isTerminated());
+        assertTrue(future1.isDone());
+        assertFalse(future1.isCancelled());
+        assertFalse(future2.isDone());
+        assertFalse(future2.isCancelled());
+        assertEquals(1, executions.get());
+        awaitAndTimeoutThread.join();
+
+        assertEquals(1, mExecutor.fastForwardMillis(1000));
+        assertTrue(mExecutor.isShutdown());
+        assertTrue(mExecutor.isTerminated());
+        assertTrue(future1.isDone());
+        assertFalse(future1.isCancelled());
+        assertTrue(future2.isDone());
+        assertFalse(future2.isCancelled());
+        assertEquals(2, executions.get());
+        awaitAndSucceedThread.join();
+
+        assertEquals(0, mExecutor.fastForwardMillis(1000));
+    }
+
+    @Test
+    public void testShutdownNowWithTasks() {
+        AtomicInteger executions = new AtomicInteger(0);
+        ScheduledFuture<?> future1 =
+                mExecutor.schedule(
+                        () -> {
+                            executions.incrementAndGet();
+                        },
+                        1,
+                        TimeUnit.SECONDS);
+        ScheduledFuture<?> future2 =
+                mExecutor.schedule(
+                        () -> {
+                            executions.incrementAndGet();
+                        },
+                        2,
+                        TimeUnit.SECONDS);
+
+        assertFalse(mExecutor.isShutdown());
+        assertFalse(mExecutor.isTerminated());
+        assertFalse(future1.isDone());
+        assertFalse(future1.isCancelled());
+        assertFalse(future2.isDone());
+        assertFalse(future2.isCancelled());
+        assertEquals(0, executions.get());
+
+        List<Runnable> cancelled = mExecutor.shutdownNow();
+        assertEquals(2, cancelled.size());
+        assertTrue(mExecutor.isShutdown());
+        assertFalse(mExecutor.isTerminated());
+        assertTrue(future1.isDone());
+        assertTrue(future1.isCancelled());
+        assertTrue(future2.isDone());
+        assertTrue(future2.isCancelled());
+        assertEquals(0, executions.get());
+
+        assertEquals(0, mExecutor.fastForwardMillis(3000));
+        assertTrue(mExecutor.isShutdown());
+        assertTrue(mExecutor.isTerminated());
+        assertEquals(0, executions.get());
+        for (Runnable runnable : cancelled) {
+            runnable.run();
+        }
+        assertEquals(2, executions.get());
+    }
+
+    @Test
     public void testTaskSchedulesTask() {
         AtomicInteger executions = new AtomicInteger(0);
         List<ScheduledFuture<?>> futures = new ArrayList<>();
@@ -643,5 +1128,221 @@ public class FakeScheduledExecutorServiceTest {
         assertTrue(futures.get(0).isDone());
         assertTrue(futures.get(1).isDone());
         assertEquals(2, executions.get());
+    }
+
+    @Test
+    public void testInvokeAll() throws InterruptedException, ExecutionException {
+        AtomicInteger executions = new AtomicInteger(0);
+        List<Future<Integer>> futures = new ArrayList<>();
+        Thread invokeThread =
+                new Thread(
+                        () -> {
+                            try {
+                                futures.addAll(
+                                        mExecutor.invokeAll(
+                                                List.of(
+                                                        () -> {
+                                                            executions.incrementAndGet();
+                                                            return 1;
+                                                        },
+                                                        () -> {
+                                                            executions.incrementAndGet();
+                                                            return 2;
+                                                        },
+                                                        () -> {
+                                                            executions.incrementAndGet();
+                                                            return 3;
+                                                        })));
+
+                            } catch (Exception e) {
+                                fail("mExecutor.invokeAll() threw unexpected exception: " + e);
+                            }
+                        });
+        invokeThread.start();
+        mExecutor.waitForNumTasks(3);
+        assertEquals(3, mExecutor.fastForwardMillis(0));
+        invokeThread.join();
+        assertEquals(3, futures.size());
+        assertEquals(3, executions.get());
+        for (int i = 0; i < 3; ++i) {
+            Future<Integer> future = futures.get(i);
+            assertTrue(future.isDone());
+            int expectedValue = i + 1;
+            Thread getThread =
+                    new Thread(
+                            () -> {
+                                try {
+                                    assertEquals(expectedValue, future.get().intValue());
+                                } catch (Exception e) {
+                                    fail("future.get() threw unexpected exception: " + e);
+                                }
+                            });
+            getThread.start();
+            getThread.join();
+        }
+    }
+
+    @Test
+    public void testInvokeAllWithTimeout() throws InterruptedException {
+        AtomicInteger executions = new AtomicInteger(0);
+        List<Future<Integer>> futures = new ArrayList<>();
+        Thread invokeThread =
+                new Thread(
+                        () -> {
+                            try {
+                                futures.addAll(
+                                        mExecutor.invokeAll(
+                                                List.of(
+                                                        () -> {
+                                                            executions.incrementAndGet();
+                                                            return 1;
+                                                        },
+                                                        () -> {
+                                                            executions.incrementAndGet();
+                                                            return 2;
+                                                        },
+                                                        () -> {
+                                                            executions.incrementAndGet();
+                                                            return 3;
+                                                        }),
+                                                1,
+                                                TimeUnit.NANOSECONDS));
+
+                            } catch (Exception e) {
+                                fail("mExecutor.invokeAll() threw unexpected exception: " + e);
+                            }
+                        });
+        invokeThread.start();
+        mExecutor.waitForNumTasks(3);
+        assertEquals(3, mExecutor.fastForwardMillis(1));
+        invokeThread.join();
+        assertEquals(3, futures.size());
+        assertEquals(3, executions.get());
+        for (int i = 0; i < 3; ++i) {
+            Future<Integer> future = futures.get(i);
+            assertTrue(future.isDone());
+            int expectedValue = i + 1;
+            Thread getThread =
+                    new Thread(
+                            () -> {
+                                try {
+                                    assertEquals(expectedValue, future.get().intValue());
+                                } catch (Exception e) {
+                                    fail("future.get() threw unexpected exception: " + e);
+                                }
+                            });
+            getThread.start();
+            getThread.join();
+        }
+    }
+
+    @Test
+    public void testInvokeAny() throws InterruptedException {
+        AtomicInteger executions = new AtomicInteger(0);
+        List<Integer> results = new ArrayList<>();
+        Thread invokeThread =
+                new Thread(
+                        () -> {
+                            try {
+                                results.add(
+                                        mExecutor.invokeAny(
+                                                List.of(
+                                                        () -> {
+                                                            executions.incrementAndGet();
+                                                            return 1;
+                                                        },
+                                                        () -> {
+                                                            executions.incrementAndGet();
+                                                            return 2;
+                                                        },
+                                                        () -> {
+                                                            executions.incrementAndGet();
+                                                            return 3;
+                                                        })));
+                            } catch (Exception e) {
+                                fail("mExecutor.invokeAny() threw unexpected exception: " + e);
+                            }
+                        });
+        invokeThread.start();
+        mExecutor.waitForNumTasks(3);
+        assertEquals(3, mExecutor.fastForwardMillis(0));
+        invokeThread.join();
+        assertEquals(3, executions.get());
+        assertEquals(1, results.size());
+        assertEquals(1, results.get(0).intValue());
+    }
+
+    @Test
+    public void testInvokeAnySomeFail() throws InterruptedException {
+        AtomicInteger executions = new AtomicInteger(0);
+        List<Integer> results = new ArrayList<>();
+        Thread invokeThread =
+                new Thread(
+                        () -> {
+                            try {
+                                results.add(
+                                        mExecutor.invokeAny(
+                                                List.of(
+                                                        () -> {
+                                                            executions.incrementAndGet();
+                                                            throw new RuntimeException("testing");
+                                                        },
+                                                        () -> {
+                                                            executions.incrementAndGet();
+                                                            throw new RuntimeException("testing");
+                                                        },
+                                                        () -> {
+                                                            executions.incrementAndGet();
+                                                            return 3;
+                                                        })));
+                            } catch (Exception e) {
+                                fail("mExecutor.invokeAny() threw unexpected exception: " + e);
+                            }
+                        });
+        invokeThread.start();
+        mExecutor.waitForNumTasks(3);
+        assertEquals(3, mExecutor.fastForwardMillis(0));
+        invokeThread.join();
+        assertEquals(3, executions.get());
+        assertEquals(1, results.size());
+        assertEquals(3, results.get(0).intValue());
+    }
+
+    @Test
+    public void testInvokeAnyAllFail() throws InterruptedException {
+        AtomicInteger executions = new AtomicInteger(0);
+        Thread invokeThread =
+                new Thread(
+                        () -> {
+                            try {
+                                assertThrows(
+                                        ExecutionException.class,
+                                        () ->
+                                                mExecutor.invokeAny(
+                                                        List.of(
+                                                                () -> {
+                                                                    executions.incrementAndGet();
+                                                                    throw new RuntimeException(
+                                                                            "testing");
+                                                                },
+                                                                () -> {
+                                                                    executions.incrementAndGet();
+                                                                    throw new RuntimeException(
+                                                                            "testing");
+                                                                },
+                                                                () -> {
+                                                                    executions.incrementAndGet();
+                                                                    throw new RuntimeException(
+                                                                            "testing");
+                                                                })));
+                            } catch (Exception e) {
+                                fail("mExecutor.invokeAny() threw unexpected exception: " + e);
+                            }
+                        });
+        invokeThread.start();
+        mExecutor.waitForNumTasks(3);
+        assertEquals(3, mExecutor.fastForwardMillis(0));
+        invokeThread.join();
+        assertEquals(3, executions.get());
     }
 }

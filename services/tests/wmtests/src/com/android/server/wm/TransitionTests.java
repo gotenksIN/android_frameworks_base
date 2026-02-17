@@ -96,6 +96,7 @@ import android.os.RemoteException;
 import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.annotations.Presubmit;
+import android.platform.test.annotations.RequiresFlagsEnabled;
 import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.view.SurfaceControl;
@@ -1373,24 +1374,19 @@ public class TransitionTests extends WindowTestsBase {
         final InsetsSourceProvider navBarInsetsProvider = navBar.getControllableInsetProvider();
         assertNotNull(navBarInsetsProvider);
         final ActivityRecord app = createActivityRecord(mDisplayContent);
-        final Transition transition = app.mTransitionController.createTransition(TRANSIT_OPEN);
-        app.mTransitionController.requestStartTransition(transition, app.getTask(),
-                null /* remoteTransition */, null /* displayChange */);
-        transition.collectExistenceChange(app.getTask());
+        // Pretend there's an OPEN transition.
+        final TransitionController transitionController = mDisplayContent.mTransitionController;
+        spyOn(transitionController);
+        doReturn(TRANSIT_OPEN).when(transitionController).getCollectingTransitionType();
         mDisplayContent.setFixedRotationLaunchingAppUnchecked(app);
+        doCallRealMethod().when(transitionController).getCollectingTransitionType();
         final AsyncRotationController asyncRotationController =
                 mDisplayContent.getAsyncRotationController();
         assertNotNull(asyncRotationController);
         assertTrue(asyncRotationController.shouldFreezeInsetsPosition(statusBar));
-        assertTrue(app.getTask().inTransition());
 
-        player.start();
-        player.finish();
-        app.getTask().finishSync(mWm.mTransactionFactory.get(), app.getTask().getSyncGroup(),
-                false /* cancel */);
-
-        // The open transition is finished. Continue to play seamless display change transition,
-        // so the previous async rotation controller should still exist.
+        // Assume that the open transition is finished. The previous async rotation controller
+        // should exist when performing seamless display change transition.
         mDisplayContent.getDisplayRotation().setRotation(mDisplayContent.getRotation() + 1);
         mDisplayContent.setLastHasContent();
         mDisplayContent.requestChangeTransition(1 /* changes */, null /* displayChange */,
@@ -1399,11 +1395,11 @@ public class TransitionTests extends WindowTestsBase {
         assertNotNull(mDisplayContent.getAsyncRotationController());
 
         // The app is still in transition, so the callback should be no-op.
-        mDisplayContent.mTransitionController.dispatchLegacyAppTransitionFinished(app);
+        transitionController.dispatchLegacyAppTransitionFinished(app);
         assertTrue(mDisplayContent.hasTopFixedRotationLaunchingApp());
 
         // The bar was invisible so it is not handled by the controller. But if it becomes visible
-        // and drawn before the transition starts,
+        // and drawn before the transition starts, it should be hidden and fade in later.
         assertFalse(asyncRotationController.isTargetToken(navBar.mToken));
         navBar.finishDrawing(null /* postDrawTransaction */, Integer.MAX_VALUE);
         assertTrue(asyncRotationController.isTargetToken(navBar.mToken));
@@ -1411,9 +1407,11 @@ public class TransitionTests extends WindowTestsBase {
 
         player.startTransition();
         // Non-app windows should not be collected.
-        assertFalse(mDisplayContent.mTransitionController.isCollecting(statusBar.mToken));
+        assertFalse(transitionController.isCollecting(statusBar.mToken));
         // Avoid DeviceStateController disturbing the test by triggering another rotation change.
         doReturn(false).when(mDisplayContent).updateRotationUnchecked();
+        // Wait for the display change due to transition.shouldApplyOnDisplayThread().
+        waitHandlerIdle(mWm.mH);
 
         clearInvocations(mTransaction);
         onRotationTransactionReady(player, mTransaction).onTransactionCommitted();
@@ -1422,6 +1420,8 @@ public class TransitionTests extends WindowTestsBase {
         spyOn(navBarInsetsProvider);
         player.finish();
 
+        // An unrelated transition should not affect the controller.
+        requestTransition(app, TRANSIT_CHANGE);
         // The controller should be cleared if the target windows are drawn.
         statusBar.finishDrawing(mWm.mTransactionFactory.get(), Integer.MAX_VALUE);
         assertNull(mDisplayContent.getAsyncRotationController());
@@ -1852,10 +1852,17 @@ public class TransitionTests extends WindowTestsBase {
         // to complete pause.
         assertEquals(recent, taskRecent.getResumedActivity());
         assertFalse(taskRecent.startPausing(false /* uiSleeping */, appB /* resuming */, "test"));
-        // ActivityRecord#makeInvisible will add the invisible recent to the stopping list.
-        // So when the transition finished, the recent can still be notified to pause and stop.
+        // When the transition finished, the recent can still be notified to pause and stop.
+        controller.flushRunningTransitions();
         mDisplayContent.ensureActivitiesVisible(null /* starting */, true /* notifyClients */);
-        assertTrue(mSupervisor.mStoppingActivities.contains(recent));
+        if (com.android.window.flags.Flags.pauseInvisibleActivity()) {
+            // The invisible recent is immediately paused
+            assertEquals(null, taskRecent.getResumedActivity());
+            assertEquals(ActivityRecord.State.PAUSING, recent.getState());
+        } else {
+            // ActivityRecord#makeInvisible will add the invisible recent to the stopping list.
+            assertTrue(mSupervisor.mStoppingActivities.contains(recent));
+        }
     }
 
     @Test
@@ -1908,9 +1915,7 @@ public class TransitionTests extends WindowTestsBase {
         // No need to wait for the activity in transient hide task.
         assertEquals(WindowContainer.SYNC_STATE_NONE, app.mSyncState);
         // The recents transition can play without waiting for the redraw to complete.
-        if (com.android.window.flags.Flags.skipAddRecentsToSyncSet()) {
-            assertEquals(WindowContainer.SYNC_STATE_NONE, recent.mSyncState);
-        }
+        assertEquals(WindowContainer.SYNC_STATE_NONE, recent.mSyncState);
     }
 
     @Test
@@ -3454,6 +3459,37 @@ public class TransitionTests extends WindowTestsBase {
         assertTrue(ancestor.isDescendantOf(otherDisplay.getParent()));
     }
 
+
+    @Test
+    @EnableFlags(Flags.FLAG_REFINE_ANCESTOR_SEARCH_AND_BOUNDS)
+    public void testCommonAncestor_afterReparentToDisplay() {
+        final Task rootTask = createTask(mDisplayContent);
+        final Task toBackNestedTask = createTaskInRootTask(rootTask, 0);
+        final TaskFragment closeTaskFragment = createTaskFragmentWithActivity(toBackNestedTask);
+        final Task openNestedTask = createTaskInRootTask(rootTask, 0);
+        final TaskFragment openTaskFragment = createTaskFragmentWithActivity(openNestedTask);
+
+        final TaskDisplayArea tda = mDisplayContent.getDefaultTaskDisplayArea();
+        rootTask.setVisibleRequested(true);
+
+        final Transition.ChangeInfo taskChange = new Transition.ChangeInfo(toBackNestedTask,
+                true /* vis */, false /* exChg */);
+        taskChange.mStartParent = rootTask;
+        toBackNestedTask.reparent(tda, false /* onTop */);
+        toBackNestedTask.setVisibleRequested(false);
+        final ArrayList<Transition.ChangeInfo> sortedTargets = new ArrayList<>();
+        sortedTargets.add(new Transition.ChangeInfo(openTaskFragment, true /* vis*/ ,
+                false /* exChg */));
+        sortedTargets.add(new Transition.ChangeInfo(openNestedTask, true /* vis*/ ,
+                false /* exChg */));
+        sortedTargets.add(new Transition.ChangeInfo(closeTaskFragment, true /* vis*/ ,
+                false /* exChg */));
+        sortedTargets.add(taskChange);
+
+        WindowContainer ancestor = Transition.findCommonAncestor(sortedTargets, toBackNestedTask);
+        assertEquals(rootTask, ancestor);
+    }
+
     @Test
     public void testSetAlwaysOnTopChange() {
         final TransitionController controller = mDisplayContent.mTransitionController;
@@ -3584,6 +3620,87 @@ public class TransitionTests extends WindowTestsBase {
                 info.getChanges().stream()
                         .noneMatch(c -> (c.getFlags() & FLAG_MOVED_TO_TOP) == 1));
         player.finish();
+    }
+
+    @Test
+    @RequiresFlagsEnabled(com.android.graphics.surfaceflinger.flags
+                                                .Flags.FLAG_SET_CLIENT_DRAWN_CORNER_RADII)
+    public void testToggleClientDrawnRoundedCornersDuringTransition() {
+        final TransitionController controller = mDisplayContent.mTransitionController;
+        final TestTransitionPlayer player = registerTestTransitionPlayer();
+
+        final Task task = createTask(mDisplayContent);
+        doReturn(mMockT).when(task).getSyncTransaction();
+
+        final Transition transition = createTestTransition(TRANSIT_OPEN, controller);
+        controller.moveToCollecting(transition);
+        transition.collect(task);
+        transition.mChanges.get(task).mVisible = true;
+
+        controller.requestStartTransition(transition, task /*startTask*/,
+                null /*remote*/, null /*displayChange*/);
+
+        transition.onTransactionReady(transition.getSyncId(), mMockT);
+
+        // Verify that the optimization was disabled
+        verify(mMockT).toggleClientDrawnRoundedCornersOpt(eq(task.getSurfaceControl()), eq(false));
+        assertThat(controller.mRoundedCornerOptTasks).contains(task);
+
+        player.finish();
+
+        // Verify that the optimization was re-enabled
+        verify(mMockT).toggleClientDrawnRoundedCornersOpt(eq(task.getSurfaceControl()), eq(true));
+        assertThat(controller.mRoundedCornerOptTasks).isEmpty();
+    }
+
+    @Test
+    @RequiresFlagsEnabled(com.android.graphics.surfaceflinger.flags
+                                                .Flags.FLAG_SET_CLIENT_DRAWN_CORNER_RADII)
+    public void testCleanupRoundedCornerTasksOnAbort() {
+        final TransitionController controller = mDisplayContent.mTransitionController;
+        registerTestTransitionPlayer();
+
+        final Task task = createTask(mDisplayContent);
+        doReturn(mMockT).when(task).getSyncTransaction();
+
+        final Transition transition = createTestTransition(TRANSIT_OPEN, controller);
+        controller.moveToCollecting(transition);
+        transition.start();
+
+        transition.collect(task);
+        controller.onRoundedCornerOptDisabled(task);
+
+        // Abort the transition
+        transition.abort();
+
+        // Verify cleanup happened even on abort
+        verify(mMockT).toggleClientDrawnRoundedCornersOpt(eq(task.getSurfaceControl()), eq(true));
+        assertThat(controller.mRoundedCornerOptTasks).isEmpty();
+    }
+
+    @Test
+    @RequiresFlagsEnabled(com.android.graphics.surfaceflinger.flags
+                                                .Flags.FLAG_SET_CLIENT_DRAWN_CORNER_RADII)
+    public void testCleanupRoundedCornerTasksOnFlushRunningTransitions() {
+        final TransitionController controller = mDisplayContent.mTransitionController;
+        registerTestTransitionPlayer();
+
+        final Task task = createTask(mDisplayContent);
+        doReturn(mMockT).when(task).getSyncTransaction();
+
+        final Transition transition = createTestTransition(TRANSIT_OPEN, controller);
+        controller.moveToCollecting(transition);
+        transition.start();
+
+        transition.collect(task);
+        transition.mChanges.get(task).mVisible = true;
+        transition.onTransactionReady(transition.getSyncId(), mMockT);
+
+        controller.flushRunningTransitions();
+
+        // Verify cleanup happened even on abort
+        verify(mMockT).toggleClientDrawnRoundedCornersOpt(eq(task.getSurfaceControl()), eq(true));
+        assertThat(controller.mRoundedCornerOptTasks).isEmpty();
     }
 
     private void tryFinishTransitionSyncSet(Transition transition) {

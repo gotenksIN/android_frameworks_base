@@ -150,7 +150,7 @@ class SourceTransformer(
         // Insert bitmap representing which Number parameters are to be considered as
         // floating point numbers.
         // Out: ProtoLog.e(GROUP, 1234, 0, args)
-        newCall.arguments.add(2, IntegerLiteralExpr(typeMask))
+        newCall.arguments.add(2, LongLiteralExpr("${typeMask}L"))
         // Replace call to a stub method with an actual implementation.
         // Out: ProtoLogImpl.e(GROUP, 1234, 0, args)
         newCall.setScope(protoLogImplClassNode)
@@ -202,7 +202,17 @@ class SourceTransformer(
         // Append blank lines to preserve line numbering in file (to allow debugging)
         val parentRange = parentStmt.range.get()
         val newLines = parentRange.end.line - parentRange.begin.line
-        val newStmt = printedBlockStmt.substringBeforeLast('}') + ("\n".repeat(newLines)) + '}'
+
+        val contentBeforeBrace = printedBlockStmt.substringBeforeLast('}')
+
+        // Trim the trailing space only if the original statement spanned multiple lines.
+        val trimmedContent = if (newLines > 0) {
+            contentBeforeBrace.trimEnd()
+        } else {
+            contentBeforeBrace
+        }
+
+        val newStmt = trimmedContent + ("\n".repeat(newLines)) + '}'
         // pre-workaround code, see explanation below
 
         /**

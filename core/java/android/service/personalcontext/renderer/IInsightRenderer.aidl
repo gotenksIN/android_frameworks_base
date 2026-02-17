@@ -19,16 +19,12 @@ package android.service.personalcontext.renderer;
 import android.os.ParcelUuid;
 import android.service.personalcontext.insight.ContextInsightWrapper;
 import android.service.personalcontext.renderer.IGetFilterCallback;
-import android.service.personalcontext.renderer.RendererFilter;
 import android.service.personalcontext.RenderToken;
 
 /** @hide */
 oneway interface IInsightRenderer {
-    /**
-     * Called with a list of insights to render. isFirst will be true if this is the first renderer
-     * to see these insights.
-     */
-    void render(in ContextInsightWrapper insights);
+    /** Called with the insight to render. The associated RenderToken is provided. */
+    void render(in ContextInsightWrapper insight, in RenderToken renderToken);
 
     /** Provides configuration information to the renderer. */
     void configure(in ParcelUuid componentId);

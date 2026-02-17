@@ -293,7 +293,7 @@
     <string name="bugreport_option_full_title" msgid="7681035745950045690">"Täielik aruanne"</string>
     <string name="bugreport_option_full_summary" msgid="1975130009258435885">"Kasutage seda valikut süsteemihäirete minimeerimiseks, kui seade ei reageeri, on liiga aeglane või vajate aruande kõiki jaotisi. Teil ei lubata sisestada lisateavet ega jäädvustada lisaekraanipilte."</string>
     <string name="bugreport_countdown" msgid="6418620521782120755">"{count,plural, =1{Veaaruande jaoks ekraanipildi jäädvustamine # sekundi pärast.}other{Veaaruande jaoks ekraanipildi jäädvustamine # sekundi pärast.}}"</string>
-    <string name="bugreport_screenshot_success_toast" msgid="7986095104151473745">"Veaaruandega koos jäädvustati ekraanipilt"</string>
+    <string name="bugreport_screenshot_success_toast" msgid="7986095104151473745">"Veaaruandega jäädvustati ekraanipilt"</string>
     <string name="bugreport_screenshot_failure_toast" msgid="6736320861311294294">"Ekraanipildi jäädvustamine koos veaaruandega ebaõnnestus"</string>
     <string name="global_action_toggle_silent_mode" msgid="8464352592860372188">"Hääletu režiim"</string>
     <string name="global_action_silent_mode_on_status" msgid="2371892537738632013">"Heli on VÄLJAS"</string>
@@ -1123,6 +1123,7 @@
     <string name="lockscreen_access_pattern_cell_added_verbose" msgid="2931364927622563465">"Lisati lahter <xliff:g id="CELL_INDEX">%1$s</xliff:g>"</string>
     <string name="lockscreen_access_pattern_detected" msgid="3931150554035194012">"Muster on valmis"</string>
     <string name="lockscreen_access_pattern_area" msgid="1288780416685002841">"Mustri ala."</string>
+    <string name="lockscreen_access_pattern_cell_verbose" msgid="6670905066468035137">"Lahter <xliff:g id="CELL_INDEX">%1$s</xliff:g>"</string>
     <string name="keyguard_accessibility_widget_changed" msgid="7298011259508200234">"%1$s. Vidin %2$d/%3$d."</string>
     <string name="keyguard_accessibility_add_widget" msgid="8245795023551343672">"Vidina lisamine."</string>
     <string name="keyguard_accessibility_widget_empty_slot" msgid="544239307077644480">"Tühi"</string>
@@ -2006,6 +2007,7 @@
     <string name="managed_profile_label_badge_3" msgid="6882151970556391957">"3. töö <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="clone_profile_label_badge" msgid="1871997694718793964">"Rakenduse <xliff:g id="LABEL">%1$s</xliff:g> kloon"</string>
     <string name="private_profile_label_badge" msgid="1712086003787839183">"Privaatne <xliff:g id="LABEL">%1$s</xliff:g>"</string>
+    <string name="hsu_label_badge" msgid="1357272000281944932">"Süsteem <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="lock_to_app_unlock_pin" msgid="3890940811866290782">"Enne vabastamist küsi PIN-koodi"</string>
     <string name="lock_to_app_unlock_pattern" msgid="2694204070499712503">"Enne vabastamist küsi avamismustrit"</string>
     <string name="lock_to_app_unlock_password" msgid="9126722403506560473">"Enne vabastamist küsi parooli"</string>
@@ -2111,14 +2113,39 @@
     <string name="app_suspended_default_message" msgid="6451215678552004172">"<xliff:g id="APP_NAME_0">%1$s</xliff:g> pole praegu saadaval. Seda haldab rakendus <xliff:g id="APP_NAME_1">%2$s</xliff:g>."</string>
     <string name="app_suspended_more_details" msgid="211260942831587014">"Lisateave"</string>
     <string name="app_suspended_unsuspend_message" msgid="1665438589450555459">"Jätka rakendust"</string>
+    <string name="app_lock_add_screen_lock_button_text" msgid="9209013414563206600">"Lisa ekraanilukk"</string>
+    <string name="app_lock_add_screen_lock_message" msgid="6107009360675769892">"Teie ekraanilukk võib olla PIN-kood, muster või parool. Sellega avate oma seadme ja pääsete juurde lukustatud rakendustele."</string>
+    <string name="app_lock_add_screen_lock_title" msgid="6905612843620128689">"Esmalt lisage ekraanilukk"</string>
+    <string name="enable_app_lock_success_toast_message" msgid="3339622779190529987">"<xliff:g id="APP_NAME">%1$s</xliff:g> on lukustatud."</string>
+    <string name="enable_app_lock_failure_toast_message" msgid="1055838896510445566">"Rakendust <xliff:g id="APP_NAME">%1$s</xliff:g> ei saa lukustada."</string>
+    <string name="disable_app_lock_success_toast_message" msgid="70733620589071266">"Rakenduse lukk on rakenduselt <xliff:g id="APP_NAME">%1$s</xliff:g> eemaldatud."</string>
     <string name="locked_app_biometric_prompt_description" msgid="6853122652400451464">"<xliff:g id="APP_NAME">%1$s</xliff:g> on lukustatud"</string>
+    <string name="locked_app_external_display_message" msgid="5483884799685545338">"Kui soovite sellele rakendusele juurde pääseda sellel ekraanil, kinnitage esmalt teises seadmes oma isik."</string>
+    <string name="app_lock_edu_dialog_enable_app_lock_title" msgid="283314042336592322">"Kas lisada rakendusele <xliff:g id="APP_NAME">%1$s</xliff:g> rakenduse lukk?"</string>
+    <string name="app_lock_edu_dialog_description" msgid="8176807243219769518">"Teie turvalisuse huvides pääsete ainult teie sellele rakendusele juurde sõrmejälje ja näoga avamise või oma PIN-koodi abil."</string>
+    <string name="app_lock_edu_dialog_description_template" msgid="8563718120753342530">"Teie turvalisuse huvides pääsete ainult teie sellele rakendusele juurde järgmiste avamisviiside abil: %1$s või %2$s."</string>
+    <string name="app_lock_edu_dialog_description_template_no_biometrics" msgid="7122017109150633691">"Teie turvalisuse huvides pääsete ainult teie sellele rakendusele juurde järgmise avamisviisi abil: %1$s."</string>
+    <string name="app_lock_edu_dialog_info_header" msgid="5876120209204270990">"Rakenduse lukuga"</string>
+    <string name="app_lock_edu_dialog_info_notifications" msgid="1124438392204873305">"Märguande sisu peidetakse."</string>
+    <string name="app_lock_edu_dialog_info_widgets" msgid="8809009414650740872">"Vidinad ja otseteed eemaldatakse."</string>
+    <string name="app_lock_edu_dialog_button_lock" msgid="3914687128135704801">"Lisa rakenduse lukk"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_face" msgid="1348151645996748654">"Näoga avamine"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_fingerprint" msgid="5206107469561561455">"Sõrmejäljega avamine"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_fingerprint_and_face" msgid="7895807411323811641">"Sõrmejäljega või näoga avamine"</string>
+    <string name="app_lock_edu_dialog_lockscreen_password_name" msgid="8487096457702445059">"Parool"</string>
+    <string name="app_lock_edu_dialog_lockscreen_pattern_name" msgid="991436996281983547">"Muster"</string>
+    <string name="app_lock_edu_dialog_lockscreen_pin_name" msgid="6458607126966304795">"PIN-kood"</string>
+    <string name="app_lock_permission_review_dialog_title" msgid="5030286398974840579">"Teie fotosid võidakse ikkagi kuvada muudes rakendustes"</string>
+    <string name="app_lock_permission_review_dialog_sub_title" msgid="310758587817184145">"Rakendused juurdepääsuga teie fotodele"</string>
+    <string name="app_lock_permission_review_expand_app_list_button" msgid="3214809707125223273">"Kuva kõik"</string>
+    <string name="app_lock_permission_review_continue_button" msgid="4045066724173414043">"Jätka"</string>
     <string name="work_mode_off_title" msgid="6367463960165135829">"Kas lõpetada töörakenduste peatamine?"</string>
     <string name="work_mode_turn_on" msgid="5316648862401307800">"Lõpeta peatamine"</string>
     <string name="work_mode_emergency_call_button" msgid="6818855962881612322">"Hädaolukord"</string>
     <string name="set_up_screen_lock_title" msgid="8346083801616474030">"Seadistage ekraanilukk"</string>
     <string name="set_up_screen_lock_action_label" msgid="2687634803649209367">"Seadistage ekraanilukk"</string>
     <string name="private_space_set_up_screen_lock_message" msgid="1109956797005149814">"Seadistage oma privaatse ruumi jaoks seadmele ekraanilukk."</string>
-    <string name="private_space_set_up_screen_lock_for_reset" msgid="7817091386408432097">"Privaatse ruumi kustutamiseks määrake selles seadmes ekraanilukk"</string>
+    <string name="private_space_set_up_screen_lock_for_reset" msgid="7817091386408432097">"Privaatse ruumi kustutamiseks määrake selles seadmes ekraanilukk."</string>
     <string name="app_blocked_title" msgid="7353262160455028160">"Rakendus ei ole saadaval"</string>
     <string name="app_blocked_message" msgid="542972921087873023">"<xliff:g id="APP_NAME">%1$s</xliff:g> ei ole praegu saadaval."</string>
     <string name="app_streaming_blocked_title" msgid="6090945835898766139">"<xliff:g id="ACTIVITY">%1$s</xliff:g> ei ole saadaval"</string>
@@ -2592,6 +2619,8 @@
     <string name="satellite_messaging_unsupported_default_sms_app_notification_summary" msgid="17084124893763593">"Satelliidi teel sõnumite saatmiseks määrake Google Messages oma sõnumside vaikerakenduseks"</string>
     <string name="satellite_messaging_location_disabled_notification_title" msgid="7270641894250928494">"Satelliidipõhine sõnumside pole saadaval"</string>
     <string name="satellite_messaging_location_disabled_notification_summary" msgid="1450824950686221810">"Et kontrollida, kas satelliidipõhine sõnumside on selles riigis või piirkonnas saadaval, lülitage sisse asukohaseaded"</string>
+    <!-- no translation found for satellite_indicator (6846063647532086110) -->
+    <skip />
     <string name="fingerprint_dangling_notification_title" msgid="7362075195588639989">"Seadistage sõrmejäljega avamine uuesti"</string>
     <string name="fingerprint_dangling_notification_msg_1" msgid="5851784577768803510">"Sõrmejälge <xliff:g id="FINGERPRINT">%s</xliff:g> ei saa enam tuvastada."</string>
     <string name="fingerprint_dangling_notification_msg_2" msgid="7925203589860744456">"Sõrmejälgi <xliff:g id="FINGERPRINT_0">%1$s</xliff:g> ja <xliff:g id="FINGERPRINT_1">%2$s</xliff:g> ei saa enam tuvastada."</string>

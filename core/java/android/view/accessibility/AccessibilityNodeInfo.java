@@ -41,6 +41,7 @@ import android.os.Bundle;
 import android.os.IBinder;
 import android.os.Parcel;
 import android.os.Parcelable;
+import android.os.Process;
 import android.text.InputType;
 import android.text.Spannable;
 import android.text.SpannableStringBuilder;
@@ -1140,6 +1141,7 @@ public class AccessibilityNodeInfo implements Parcelable {
 
     // Data.
     private int mWindowId = AccessibilityWindowInfo.UNDEFINED_WINDOW_ID;
+    private int mEmbeddingHostWindowId = AccessibilityWindowInfo.UNDEFINED_WINDOW_ID;
     @UnsupportedAppUsage
     private long mSourceNodeId = UNDEFINED_NODE_ID;
     private long mParentNodeId = UNDEFINED_NODE_ID;
@@ -1353,12 +1355,49 @@ public class AccessibilityNodeInfo implements Parcelable {
     }
 
     /**
-     * Gets the id of the window from which the info comes from.
+     * Returns the id of the window that created this node.
+     *
+     * <p>
+     * <strong>Note:</strong> If this node comes from a window that is embedded in another window
+     * using {@link SurfaceView} then the return value is the id of the window that embeds this
+     * node's window.
      *
      * @return The window id.
      */
+    // Note: If this node's window is embedded in another window then this method returns that host
+    // window ID, so internal implementation logic should instead use #getRealWindowId() to get the
+    // ID of the actual window that owns this node.
     public int getWindowId() {
+        if (Flags.embeddedUiUsesHostWindowId()) {
+            if (mEmbeddingHostWindowId != AccessibilityWindowInfo.UNDEFINED_WINDOW_ID) {
+                return mEmbeddingHostWindowId;
+            }
+        }
         return mWindowId;
+    }
+
+    /**
+     * Returns the real id of the window that created this node.
+     *
+     * <p>
+     * <strong>Note:</strong> Use this for all internal implementation logic that needs access to
+     * the window, and not {@link #getWindowId()} nor {@link #getWindow()}. Those methods are the
+     * public APIs used by AccessibilityServices which may result in inaccurate results if used for
+     * internal node or window lookup logic.
+     *
+     * @hide
+     */
+    public int getRealWindowId() {
+        return mWindowId;
+    }
+
+    /**
+     * Sets the id of the window that embeds this node's window.
+     *
+     * @hide
+     */
+    public void setEmbeddingHostWindowId(int windowId) {
+        mEmbeddingHostWindowId = windowId;
     }
 
     /**
@@ -2264,13 +2303,26 @@ public class AccessibilityNodeInfo implements Parcelable {
      *
      * @see android.accessibilityservice.AccessibilityService#getWindows()
      */
+    // Note: If this node's window is embedded in another window then this method returns that host
+    // window, so internal implementation logic should instead use #getRealWindowId() and
+    // AccessibilityWindowManager to get the actual window of this node.
     public AccessibilityWindowInfo getWindow() {
         enforceSealed();
-        if (!canPerformRequestOverConnection(mConnectionId, mWindowId, mSourceNodeId)) {
+        final int windowId;
+        if (Flags.embeddedUiUsesHostWindowId()) {
+            if (mEmbeddingHostWindowId != AccessibilityWindowInfo.UNDEFINED_WINDOW_ID) {
+                windowId = mEmbeddingHostWindowId;
+            } else {
+                windowId = mWindowId;
+            }
+        } else {
+            windowId = mWindowId;
+        }
+        if (!canPerformRequestOverConnection(mConnectionId, windowId, mSourceNodeId)) {
             return null;
         }
         AccessibilityInteractionClient client = AccessibilityInteractionClient.getInstance();
-        return client.getWindow(mConnectionId, mWindowId);
+        return client.getWindow(mConnectionId, windowId);
     }
 
     /**
@@ -4353,7 +4405,11 @@ public class AccessibilityNodeInfo implements Parcelable {
     public void setTextSelection(int start, int end) {
         enforceNotSealed();
         if (Flags.a11ySelectionApi()) {
-            Selection selection =
+            // If invalid text selection flag is enabled and text selection is invalid, then set the
+            // selection to null.
+            Selection selection = (Flags.a11ySelectionApiInvalidTextSelection()
+                    && (start == UNDEFINED_SELECTION_INDEX || end == UNDEFINED_SELECTION_INDEX))
+                            ? null :
                     new Selection(
                             new SelectionPosition(this, start), new SelectionPosition(this, end));
             setSelection(selection);
@@ -4891,6 +4947,10 @@ public class AccessibilityNodeInfo implements Parcelable {
         fieldIndex++;
         if (mWindowId != DEFAULT.mWindowId) nonDefaultFields |= bitAt(fieldIndex);
         fieldIndex++;
+        if (mEmbeddingHostWindowId != DEFAULT.mEmbeddingHostWindowId) {
+            nonDefaultFields |= bitAt(fieldIndex);
+        }
+        fieldIndex++;
         if (mParentNodeId != DEFAULT.mParentNodeId) nonDefaultFields |= bitAt(fieldIndex);
         fieldIndex++;
         if (mLabelForId != DEFAULT.mLabelForId) nonDefaultFields |= bitAt(fieldIndex);
@@ -5060,6 +5120,7 @@ public class AccessibilityNodeInfo implements Parcelable {
         if (isBitSet(nonDefaultFields, fieldIndex++)) parcel.writeInt(isSealed() ? 1 : 0);
         if (isBitSet(nonDefaultFields, fieldIndex++)) parcel.writeLong(mSourceNodeId);
         if (isBitSet(nonDefaultFields, fieldIndex++)) parcel.writeInt(mWindowId);
+        if (isBitSet(nonDefaultFields, fieldIndex++)) parcel.writeInt(mEmbeddingHostWindowId);
         if (isBitSet(nonDefaultFields, fieldIndex++)) parcel.writeLong(mParentNodeId);
         if (isBitSet(nonDefaultFields, fieldIndex++)) parcel.writeLong(mLabelForId);
         if (isBitSet(nonDefaultFields, fieldIndex++)) parcel.writeLong(mLabeledById);
@@ -5271,6 +5332,7 @@ public class AccessibilityNodeInfo implements Parcelable {
         mTraversalAfter = other.mTraversalAfter;
         mMinDurationBetweenContentChanges = other.mMinDurationBetweenContentChanges;
         mWindowId = other.mWindowId;
+        mEmbeddingHostWindowId = other.mEmbeddingHostWindowId;
         mConnectionId = other.mConnectionId;
         mUniqueId = other.mUniqueId;
         mBoundsInParent.set(other.mBoundsInParent);
@@ -5401,6 +5463,7 @@ public class AccessibilityNodeInfo implements Parcelable {
                 : DEFAULT.mSealed;
         if (isBitSet(nonDefaultFields, fieldIndex++)) mSourceNodeId = parcel.readLong();
         if (isBitSet(nonDefaultFields, fieldIndex++)) mWindowId = parcel.readInt();
+        if (isBitSet(nonDefaultFields, fieldIndex++)) mEmbeddingHostWindowId = parcel.readInt();
         if (isBitSet(nonDefaultFields, fieldIndex++)) mParentNodeId = parcel.readLong();
         if (isBitSet(nonDefaultFields, fieldIndex++)) mLabelForId = parcel.readLong();
         if (isBitSet(nonDefaultFields, fieldIndex++)) mLabeledById = parcel.readLong();
@@ -5792,6 +5855,8 @@ public class AccessibilityNodeInfo implements Parcelable {
         if (DEBUG) {
             builder.append("; sourceNodeId: 0x").append(Long.toHexString(mSourceNodeId));
             builder.append("; windowId: 0x").append(Long.toHexString(mWindowId));
+            builder.append("; embeddingHostWindowId: 0x")
+                    .append(Long.toHexString(mEmbeddingHostWindowId));
             builder.append("; accessibilityViewId: 0x")
                     .append(Long.toHexString(getAccessibilityViewId(mSourceNodeId)));
             builder.append("; virtualDescendantId: 0x")

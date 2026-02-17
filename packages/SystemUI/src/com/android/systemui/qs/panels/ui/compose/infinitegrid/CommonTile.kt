@@ -148,8 +148,9 @@ fun LargeTileContent(
                 Modifier.size(CommonTileDefaults.ToggleTargetSize).thenIf(isDualTarget) {
                     Modifier.borderOnFocus(color = focusBorderColor, iconShape.topEnd)
                         .clip(iconShape)
-                        .verticalSquish(squishiness)
                         .drawBehind { drawRect(animatedBackgroundColor) }
+                        // apply the squish effect after the bg is drawn
+                        .verticalSquish(squishiness)
                         .combinedClickable(
                             onClick = toggleClick!!,
                             onLongClick = onLongClick,
@@ -260,10 +261,11 @@ fun SmallTileContent(
                 is Icon.Resource -> context.getDrawable(icon.resId)
             }
         }
+
+    // Skip initial animation, icons should animate only as the state change
+    // and not when first composed
+    var shouldSkipInitialAnimation by remember { mutableStateOf(true) }
     if (loadedDrawable is Animatable) {
-        // Skip initial animation, icons should animate only as the state change
-        // and not when first composed
-        var shouldSkipInitialAnimation by remember { mutableStateOf(true) }
         LaunchedEffect(Unit) { shouldSkipInitialAnimation = animateToEnd }
 
         val painter =
@@ -433,6 +435,18 @@ object CommonTileDefaults {
         @Composable
         @ReadOnlyComposable
         get() = dimensionResource(id = R.dimen.common_tile_default_inactive_tile_corner_radius)
+
+    /** Dimensions for focus rings with wide corners */
+    val TileDetailsEntryWideCornerRadius: Dp
+        @Composable
+        @ReadOnlyComposable
+        get() = dimensionResource(id = R.dimen.focus_ring_wide_corner_radius)
+
+    /** Dimensions for focus rings with tight corners */
+    val TileDetailsEntryTightCornerRadius: Dp
+        @Composable
+        @ReadOnlyComposable
+        get() = dimensionResource(id = R.dimen.focus_ring_tight_corner_radius)
 
     // The size of the icon in the tile with an icon and a label.
     val LargeTileIconSize: Dp

@@ -17,26 +17,32 @@
 package com.android.settingslib.metadata.preferencesapi
 
 import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import androidx.annotation.StringRes
 import androidx.fragment.app.Fragment
+import com.android.settingslib.datastore.Permissions
+import com.android.settingslib.datastore.and
+import com.android.settingslib.datastore.or
 import com.android.settingslib.metadata.KeyParametersSchema
 import com.android.settingslib.metadata.PreferenceHierarchy
+import com.android.settingslib.metadata.PreferenceMetadata
 import com.android.settingslib.metadata.PreferenceScreenMetadata
-import com.android.settingslib.metadata.preferencesapi.ExceptionMessagesFormatter.getExceptionMessageMultipleDefines
-import com.android.settingslib.metadata.preferencesapi.ExceptionMessagesFormatter.getExceptionMessageWrongOrder
+import com.android.settingslib.metadata.preferencesapi.Utils.getExceptionMessageMultipleDefines
+import com.android.settingslib.metadata.preferencesapi.Utils.getExceptionMessageWrongOrder
 import com.android.settingslib.metadata.preferencesapi.category.Category
 import com.android.settingslib.metadata.ValidatedKeyParameters
-import com.android.settingslib.metadata.preferencesapi.ExceptionMessagesFormatter.EXCEPTION_MESSAGE_NO_PARAMETER_DEFINED
-import com.android.settingslib.metadata.preferencesapi.ExceptionMessagesFormatter.getExceptionMessageMultipleParametersDefined
+import com.android.settingslib.metadata.preferencesapi.Utils.EXCEPTION_MESSAGE_NO_PARAMETER_DEFINED
+import com.android.settingslib.metadata.preferencesapi.Utils.getExceptionMessageMultipleParametersDefined
+import com.android.settingslib.metadata.preferencesapi.preconditions.Allowed
 import com.android.settingslib.metadata.preferencesapi.preconditions.ApiPreconditions
 import com.android.settingslib.metadata.preferencesapi.types.ApiType
-import com.android.settingslib.metadata.preferencesapi.types.GeneratedParameterType
-import com.android.settingslib.metadata.preferencesapi.types.GeneratedTypeContext
+import com.android.settingslib.metadata.preferencesapi.types.FiniteOptionsType
 import com.android.settingslib.metadata.preferenceHierarchy
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.asFlow
+import kotlinx.coroutines.runBlocking
 import kotlin.collections.mutableListOf
 import kotlin.reflect.KClass
 
@@ -55,7 +61,7 @@ class ParameterizationConfig {
         val name: String,
         @StringRes val purpose: Int,
         val required: Boolean,
-        val type: GeneratedParameterType
+        val type: FiniteOptionsType<String>
     )
 
     internal val parameters = mutableMapOf<String, ApiParameterDefinition>()
@@ -75,7 +81,7 @@ class ParameterizationConfig {
         name: String,
         @StringRes purpose: Int,
         required: Boolean = false,
-        type: GeneratedParameterType
+        type: FiniteOptionsType<String>
     ) {
         if (parameters.containsKey(name)) {
             throw IllegalArgumentException("Parameter '$name' is already defined.")
@@ -108,12 +114,17 @@ class ParameterizationConfig {
  * Container for all information and preferences on a Settings screen which is intended to be
  * exposed via API using 2026 "Lightweight" way.
  */
-abstract class PreferencesApiScreen(
+abstract class PreferencesApiScreen private constructor(
     override val key: String,
     val topLevelSettingsCategory: Category,
-    val fragment: KClass<out Fragment>,
+    val fragment: KClass<out Fragment>?,
     override val purpose: Int,
     val alreadyPartiallyMigrated: KClass<*>? = null,
+    /**
+     * The route prefix for screens implemented using the Settings Platform Architecture (SPA).
+     * This is only relevant if this screen's UI is implemented using SPA.
+     */
+    val spaRoutePrefix: String?,
 ) : PreferenceScreenMetadata, ProvidesParametersNonStatically {
     init {
         if (alreadyPartiallyMigrated != null) {
@@ -123,7 +134,29 @@ abstract class PreferencesApiScreen(
         }
     }
 
-    override fun fragmentClass(): Class<out Fragment>? = fragment.java
+    /**
+     * Constructor for screens implemented using a traditional Android [Fragment].
+     */
+    constructor(
+        key: String,
+        topLevelSettingsCategory: Category,
+        fragment: KClass<out Fragment>,
+        purpose: Int,
+        alreadyPartiallyMigrated: KClass<*>? = null,
+    ) : this(key, topLevelSettingsCategory, fragment, purpose, alreadyPartiallyMigrated, null)
+
+    /**
+     * Constructor for screens implemented using the Settings Platform Architecture (SPA).
+     */
+    constructor(
+        key: String,
+        topLevelSettingsCategory: Category,
+        spaRoutePrefix: String,
+        purpose: Int,
+        alreadyPartiallyMigrated: KClass<*>? = null,
+    ) : this(key, topLevelSettingsCategory, null, purpose, alreadyPartiallyMigrated, spaRoutePrefix)
+
+    override fun fragmentClass(): Class<out Fragment>? = fragment?.java
 
     override fun isFlagEnabled(context: Context): Boolean =
         flag?.check() ?: super.isFlagEnabled(context)
@@ -140,21 +173,45 @@ abstract class PreferencesApiScreen(
             }
         }
 
+    override fun getLaunchIntent(context: Context, metadata: PreferenceMetadata?): Intent? {
+        val opContext = ApiOperationContext(
+            context = context,
+            parameters = keyParameters ?: ValidatedKeyParameters.EMPTY,
+        )
+
+        // TODO(b/469317113): This should run asynchronously
+        val checkScreenPreconditions =
+            runBlocking { screenPreconditions?.check(opContext) } ?: Allowed
+
+        if (checkScreenPreconditions != Allowed) {
+            return null
+        }
+
+        return super.getLaunchIntent(context, metadata)
+    }
+
     var flag: FlagConfig? = null
     var parametersSchema: KeyParametersSchema? = null
-    var screenPermissions: PermissionsConfig? = null
+    var screenPermissions: Permissions? = null
     var screenPreconditions: PreconditionsConfig? = null
 
     override val keyParameters: ValidatedKeyParameters?
         get() = if (::screenParameters.isInitialized) screenParameters else super.keyParameters
 
+    private var cachedLaunchScreenExtra: Bundle? = null
+
     override val launchScreenExtra: Bundle
         get() {
+            // Return cached version if available
+            cachedLaunchScreenExtra?.let { return it }
+
             val bundle = super.launchScreenExtra ?: Bundle()
-            val keyParameters = keyParameters ?: return bundle
+            val keyParams = keyParameters ?: return bundle
 
-            prepareScreenExtras?.invoke(keyParameters, bundle)
+            prepareScreenExtras?.invoke(keyParams, bundle)
 
+            // Cache the result
+            cachedLaunchScreenExtra = bundle
             return bundle
         }
 
@@ -177,7 +234,7 @@ abstract class PreferencesApiScreen(
      *     type = AnyString
      * ) {
      *     flag { Flags.FooBarFlag() }
-     *     permissions(listOf(Manifest.permission.PERMISSION))
+     *     permissions(Manifest.permission.PERMISSION)
      *     preconditions("My precondition description") { context ->
      *         if (conditionFoo(context)) {
      *             Allowed
@@ -187,7 +244,7 @@ abstract class PreferencesApiScreen(
      *     }
      *
      *     get {
-     *         permissions(listOf(Manifest.permission.PERMISSION_GET))
+     *         permissions(Manifest.permission.PERMISSION_GET)
      *         preconditions("My get precondition description") { context ->
      *             if (conditionBar(context)) {
      *                 Allowed
@@ -203,7 +260,7 @@ abstract class PreferencesApiScreen(
      *     }
      *
      *     set {
-     *         permissions(listOf(Manifest.permission.PERMISSION_SET))
+     *         permissions(Manifest.permission.PERMISSION_SET)
      *         preconditions("My set precondition description") { context ->
      *             if (conditionFooBar(context)) {
      *                 Allowed
@@ -251,6 +308,8 @@ abstract class PreferencesApiScreen(
      */
     fun initializeParameters(keyParameters: ValidatedKeyParameters) {
         screenParameters = keyParameters
+        // Ensure the cache is cleared if parameters are re-initialized
+        cachedLaunchScreenExtra = null
     }
 
     /**
@@ -324,9 +383,9 @@ abstract class PreferencesApiScreen(
             val parameterToUse = scope.parameters.values.first()
 
             this@PreferencesApiScreen.allPossibleParameters = { context ->
-                parameterToUse.type.lambda.invoke(GeneratedTypeContext(context)).map { parameterOption ->
+                parameterToUse.type.getOptions(context).map { parameterOption ->
                     this@PreferencesApiScreen.parametersSchema!!.prepare(
-                        parameterToUse.name to parameterOption.value
+                        parameterToUse.name to parameterOption.first
                     )
                 }
             }
@@ -335,7 +394,10 @@ abstract class PreferencesApiScreen(
         }
     }
 
-    protected fun permissions(permissions: List<String>) {
+    /**
+     * Declares the permissions for this preference screen.
+     */
+    protected fun permissions(permissions: Permissions) {
         if (screenPermissions != null) {
             error(getExceptionMessageMultipleDefines("permissions"))
         }
@@ -344,13 +406,43 @@ abstract class PreferencesApiScreen(
             error(getExceptionMessageWrongOrder("permissions"))
         }
 
-        screenPermissions = PermissionsConfig(permissions)
+        screenPermissions = permissions
     }
+
+    /**
+     * Declares the permissions for this preference screen.
+     */
+    protected fun permissions(permission: String) {
+        permissions(Permissions.allOf(permission))
+    }
+
+    /** Create a [Permissions] which requires two permissions. */
+    infix fun String.and(other: String): Permissions = Permissions.allOf(this, other)
+
+    /** Create a [Permissions] which requires either of two permissions. */
+    infix fun String.or(other: String): Permissions = Permissions.anyOf(this, other)
+
+    /** Create a [Permissions] which requires two permissions. */
+    infix fun String.and(other: Permissions): Permissions = Permissions.allOf(this) and other
+
+    /** Create a [Permissions] which requires either of two permissions. */
+    infix fun String.or(other: Permissions): Permissions = Permissions.anyOf(this) or other
 
     protected fun preconditions(
         @StringRes description: Int,
         lambda: suspend ApiOperationContext.() -> ApiPreconditions
     ) {
+        setPreconditions(PreconditionsConfig(description, lambda))
+    }
+
+    protected fun preconditions(
+        description: String,
+        lambda: suspend ApiOperationContext.() -> ApiPreconditions
+    ) {
+        setPreconditions(PreconditionsConfig(description, lambda))
+    }
+
+    private fun setPreconditions(config: PreconditionsConfig) {
         if (screenPreconditions != null) {
             error(getExceptionMessageMultipleDefines("preconditions"))
         }
@@ -359,7 +451,7 @@ abstract class PreferencesApiScreen(
             error(getExceptionMessageWrongOrder("preconditions"))
         }
 
-        screenPreconditions = PreconditionsConfig(description, lambda)
+        screenPreconditions = config
     }
 
     companion object {

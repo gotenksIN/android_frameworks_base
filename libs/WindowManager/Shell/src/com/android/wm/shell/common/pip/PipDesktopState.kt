@@ -93,10 +93,10 @@ class PipDesktopState(
         logD(
             "isPipInDesktopMode isAnyDeskActive=%b isDisplayDesktopFirst=%b",
             desktopUserRepositoriesOptional.get().current.isAnyDeskActive(displayId),
-            rootTaskDisplayAreaOrganizer.isDisplayDesktopFirst(displayId),
+            isDisplayDesktopFirst(displayId),
         )
         return desktopUserRepositoriesOptional.get().current.isAnyDeskActive(displayId) ||
-            rootTaskDisplayAreaOrganizer.isDisplayDesktopFirst(displayId)
+            isDisplayDesktopFirst(displayId)
     }
 
     /** Returns whether the display with the given id is a Desktop-first display. */
@@ -107,21 +107,17 @@ class PipDesktopState(
      * Returns whether PiP is allowed to free-float (can be placed anywhere on the screen, but will
      * snap to edge if dragged past display bounds, and doesn't stash) by checking the following:
      * - ENABLE_DESKTOP_WINDOWING_FREE_FLOATING_PIP flag is enabled
-     * - The PiP is in an active Desktop Mode session
      * - The display that PiP is active in is a Desktop-first display
      */
     fun isFreeFloatingPipEnabled(): Boolean {
-        val isPipInDesktopMode = isPipInDesktopMode()
         val displayId = pipDisplayLayoutState.displayId
         logD(
-            "isFreeFloatingPipEnabled flag=%b isPipInDesktopMode=%b isDisplayDesktopFirst=%b",
+            "isFreeFloatingPipEnabled displayId=%d flag=%b isDisplayDesktopFirst=%b",
+            displayId,
             Flags.enableDesktopWindowingFreeFloatingPip(),
-            isPipInDesktopMode,
-            rootTaskDisplayAreaOrganizer.isDisplayDesktopFirst(displayId),
+            isDisplayDesktopFirst(displayId),
         )
-        return Flags.enableDesktopWindowingFreeFloatingPip() &&
-            isPipInDesktopMode &&
-            rootTaskDisplayAreaOrganizer.isDisplayDesktopFirst(displayId)
+        return Flags.enableDesktopWindowingFreeFloatingPip() && isDisplayDesktopFirst(displayId)
     }
 
     /** Returns whether Recents is in the middle of animating. */
@@ -183,6 +179,8 @@ class PipDesktopState(
     /** Returns the id associated with the display where PiP window is in. */
     fun getCurrentDisplayId(): Int = pipDisplayLayoutState.displayId
 
+    // TODO(b/478792808): Remove suppression
+    @SuppressWarnings("ProtoLogNonConstantFormat")
     private fun logD(msg: String, vararg arguments: Any?) {
         ProtoLog.d(ShellProtoLogGroup.WM_SHELL_PICTURE_IN_PICTURE, "%s: $msg", TAG, *arguments)
     }

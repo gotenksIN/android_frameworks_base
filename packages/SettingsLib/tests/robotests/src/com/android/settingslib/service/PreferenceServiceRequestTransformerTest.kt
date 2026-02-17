@@ -48,6 +48,7 @@ import com.android.settingslib.graph.rangeValueProto
 import com.android.settingslib.graph.textProto
 import com.android.settingslib.graph.toProto
 import com.android.settingslib.metadata.PreferenceCoordinate
+import com.android.settingslib.metadata.ReadWritePermit
 import com.android.settingslib.metadata.SensitivityLevel
 import com.google.common.truth.Truth.assertThat
 import org.junit.Rule
@@ -96,6 +97,75 @@ class PreferenceServiceRequestTransformerTest {
                                 title = textProto { string = "title2" }
                                 enabled = false
                             }
+                        },
+                    )
+                )
+            }
+        }
+        val graphProto = PreferenceGraphProto.newBuilder().putScreens("screen", screen).build()
+
+        val fResult = transformCatalystGetMetadataResponse(context, graphProto)
+        with(fResult) {
+            assertThat(resultCode).isEqualTo(MetadataResult.RESULT_OK)
+            assertThat(metadataList.size).isEqualTo(2)
+        }
+        assertThat(
+            fResult.metadataList.any {
+                it.key == "key1" &&
+                        it.screenKey == "screen" &&
+                        it.title == "title1" &&
+                        it.isEnabled
+            }
+        )
+            .isTrue()
+        assertThat(
+            fResult.metadataList.any {
+                it.key == "key2" &&
+                        it.screenKey == "screen" &&
+                        it.title == "title2" &&
+                        !it.isEnabled
+            }
+        )
+            .isTrue()
+    }
+
+    @Test
+    fun transformCatalystGetMetadataResponse_withEmptyPreferenceOrGroupProto_returnsFrameworkResponseWithSuccess() {
+        val screen = preferenceScreenProto {
+            root = preferenceGroupProto {
+                addAllPreferences(
+                    listOf(
+                        preferenceOrGroupProto {
+                            group = preferenceGroupProto {
+                                addAllPreferences(
+                                    listOf(
+                                        preferenceOrGroupProto {
+
+                                        },
+                                        preferenceOrGroupProto {
+                                            preference = preferenceProto {
+                                                key = "key1"
+                                                title = textProto { string = "title1" }
+                                                enabled = true
+                                            }
+                                        },
+                                        preferenceOrGroupProto {
+
+                                        }
+                                    )
+
+                                )
+                            }
+                        },
+                        preferenceOrGroupProto {
+                            preference = preferenceProto {
+                                key = "key2"
+                                title = textProto { string = "title2" }
+                                enabled = false
+                            }
+                        },
+                        preferenceOrGroupProto {
+
                         },
                     )
                 )
@@ -198,6 +268,38 @@ class PreferenceServiceRequestTransformerTest {
             assertThat(type).isEqualTo(SettingsPreferenceValue.TYPE_BOOLEAN)
             assertThat(booleanValue).isTrue()
         }
+    }
+
+    @Test
+    fun transformCatalystGetValueResponse_stringValueTypePreference_returnsValidFrameworkResponse() {
+        val getResultProto = preferenceProto {
+            key = "preference_key"
+            persistent = true
+            sensitivityLevel = SensitivityLevel.LOW_SENSITIVITY
+            readWritePermit = ReadWritePermit.make(
+                readPermit = ReadWritePermit.ALLOW,
+                writePermit = ReadWritePermit.ALLOW
+            )
+            value = preferenceValueProto {
+                stringValue = "hello"
+            }
+            valueDescriptor = preferenceValueDescriptorProto {
+                stringType = true
+            }
+        }
+        val fRequest = GetValueRequest.Builder("screen_key", "preference_key").build()
+        val cResult =
+            PreferenceGetterResponse(
+                emptyMap(),
+                mapOf(
+                    PreferenceCoordinate(fRequest.screenKey, fRequest.preferenceKey) to
+                        getResultProto
+                ),
+            )
+        val fResult = transformCatalystGetValueResponse(context, fRequest, cResult)
+        assertThat(fResult!!.resultCode).isEqualTo(GetValueResult.RESULT_OK)
+        assertThat(fResult.value?.type).isEqualTo(SettingsPreferenceValue.TYPE_STRING)
+        assertThat(fResult.value?.stringValue).isEqualTo("hello")
     }
 
     @Test
@@ -317,7 +419,7 @@ class PreferenceServiceRequestTransformerTest {
     }
 
     @Test
-    fun transformFrameworkSetValueRequest_typeString_returnsNull() {
+    fun transformFrameworkSetValueRequest_typeString_returnsValidCatalystRequest() {
         val fRequest =
             SetValueRequest.Builder(
                 "screen",
@@ -328,7 +430,12 @@ class PreferenceServiceRequestTransformerTest {
             )
                 .build()
         val cRequest = transformFrameworkSetValueRequest(fRequest)
-        assertThat(cRequest).isNull()
+        with(cRequest!!) {
+            assertThat(screenKey).isEqualTo(fRequest.screenKey)
+            assertThat(key).isEqualTo(fRequest.preferenceKey)
+            assertThat(value.hasStringValue()).isTrue()
+            assertThat(value.stringValue).isEqualTo("value")
+        }
     }
 
     @Test

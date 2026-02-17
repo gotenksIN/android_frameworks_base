@@ -27,7 +27,7 @@ val Kosmos.mobileUiAdapter by
     Kosmos.Fixture {
       MobileUiAdapter(
           statusBarIconController,
-          mobileIconsViewModel,
+          { mobileIconsViewModel },
           mobileViewLogger,
           applicationCoroutineScope,
           mock<TelephonyManager>(),

@@ -348,8 +348,8 @@
     <string name="user_owner_app_label" msgid="1553595155465750298">"Passer à <xliff:g id="APP_NAME">%1$s</xliff:g> dans le profil personnel"</string>
     <string name="managed_profile_app_label" msgid="367401088383965725">"Passer à <xliff:g id="APP_NAME">%1$s</xliff:g> dans le profil professionnel"</string>
     <string name="permgrouplab_contacts" msgid="7443702399615347952">"Contacts et comptes"</string>
-    <string name="permgroupdesc_contacts" msgid="2001771388402758264">"accédez à vos contacts et consultez la liste de vos comptes qui peuvent enregistrer des contacts sur cet appareil"</string>
-    <string name="permgrouplab_location" msgid="1858277002233964394">"Position"</string>
+    <string name="permgroupdesc_contacts" msgid="2001771388402758264">"Accéder à vos contacts et consulter la liste de vos comptes qui peuvent enregistrer des contacts sur cet appareil"</string>
+    <string name="permgrouplab_location" msgid="1858277002233964394">"Localisation"</string>
     <string name="permgroupdesc_location" msgid="1995955142118450685">"accéder à la position de cet appareil"</string>
     <string name="permgrouplab_calendar" msgid="6426860926123033230">"Agenda"</string>
     <string name="permgroupdesc_calendar" msgid="6762751063361489379">"accéder à votre agenda"</string>
@@ -1128,6 +1128,7 @@
     <string name="lockscreen_access_pattern_cell_added_verbose" msgid="2931364927622563465">"Cellule <xliff:g id="CELL_INDEX">%1$s</xliff:g> ajoutée"</string>
     <string name="lockscreen_access_pattern_detected" msgid="3931150554035194012">"Schéma terminé."</string>
     <string name="lockscreen_access_pattern_area" msgid="1288780416685002841">"Zone du schéma"</string>
+    <string name="lockscreen_access_pattern_cell_verbose" msgid="6670905066468035137">"Cellule <xliff:g id="CELL_INDEX">%1$s</xliff:g>"</string>
     <string name="keyguard_accessibility_widget_changed" msgid="7298011259508200234">"%1$s. Widget %2$d sur %3$d."</string>
     <string name="keyguard_accessibility_add_widget" msgid="8245795023551343672">"Ajouter un widget"</string>
     <string name="keyguard_accessibility_widget_empty_slot" msgid="544239307077644480">"Vide"</string>
@@ -1839,7 +1840,7 @@
     <string name="accessibility_shortcut_label_gesture" msgid="7987298674836890931">"geste"</string>
     <string name="accessibility_shortcut_label_quick_settings" msgid="6851280333772213611">"paramètres rapides"</string>
     <string name="accessibility_shortcut_label_triple_tap" msgid="9058975959054454796">"toucher trois fois"</string>
-    <string name="accessibility_shortcut_label_top_row_key" msgid="1488840908672437180">"touche d\'accessibilité"</string>
+    <string name="accessibility_shortcut_label_top_row_key" msgid="1488840908672437180">"la touche d\'accessibilité"</string>
     <string name="accessibility_uncheck_legacy_item_warning" msgid="8047830891064817447">"<xliff:g id="SERVICE_NAME">%s</xliff:g> a été désactivé"</string>
     <string name="edit_accessibility_shortcut_menu_button" msgid="8885752738733772935">"Modifier les raccourcis"</string>
     <string name="done_accessibility_shortcut_menu_button" msgid="3668407723770815708">"OK"</string>
@@ -2011,6 +2012,7 @@
     <string name="managed_profile_label_badge_3" msgid="6882151970556391957">"3e <xliff:g id="LABEL">%1$s</xliff:g> professionnel(le)"</string>
     <string name="clone_profile_label_badge" msgid="1871997694718793964">"Clone de <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="private_profile_label_badge" msgid="1712086003787839183">"<xliff:g id="LABEL">%1$s</xliff:g> privé"</string>
+    <string name="hsu_label_badge" msgid="1357272000281944932">"Système : <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="lock_to_app_unlock_pin" msgid="3890940811866290782">"Demander le NIP avant d\'annuler l\'épinglage"</string>
     <string name="lock_to_app_unlock_pattern" msgid="2694204070499712503">"Demander le schéma de déverrouillage avant d\'annuler l\'épinglage"</string>
     <string name="lock_to_app_unlock_password" msgid="9126722403506560473">"Demander le mot de passe avant d\'annuler l\'épinglage"</string>
@@ -2116,13 +2118,38 @@
     <string name="app_suspended_default_message" msgid="6451215678552004172">"L\'appli <xliff:g id="APP_NAME_0">%1$s</xliff:g> n\'est pas accessible pour le moment. Ceci est géré par <xliff:g id="APP_NAME_1">%2$s</xliff:g>."</string>
     <string name="app_suspended_more_details" msgid="211260942831587014">"En savoir plus"</string>
     <string name="app_suspended_unsuspend_message" msgid="1665438589450555459">"Réactiver l\'appli"</string>
+    <string name="app_lock_add_screen_lock_button_text" msgid="9209013414563206600">"Ajouter le verrouillage de l\'écran"</string>
+    <string name="app_lock_add_screen_lock_message" msgid="6107009360675769892">"Le verrouillage de votre écran peut être un NIP, un schéma ou un mot de passe. Vous l\'utiliserez pour déverrouiller votre appareil et accéder aux applis verrouillées."</string>
+    <string name="app_lock_add_screen_lock_title" msgid="6905612843620128689">"Ajoutez d\'abord un verrouillage de l\'écran"</string>
+    <string name="enable_app_lock_success_toast_message" msgid="3339622779190529987">"L\'appli <xliff:g id="APP_NAME">%1$s</xliff:g> est verrouillée"</string>
+    <string name="enable_app_lock_failure_toast_message" msgid="1055838896510445566">"Impossible de verrouiller <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
+    <string name="disable_app_lock_success_toast_message" msgid="70733620589071266">"Le verrou d\'appli a été retiré de l\'appli <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="locked_app_biometric_prompt_description" msgid="6853122652400451464">"L\'appli <xliff:g id="APP_NAME">%1$s</xliff:g> est verrouillée"</string>
+    <string name="locked_app_external_display_message" msgid="5483884799685545338">"Pour accéder à l\'appli sur cet écran, confirmez d\'abord votre identité sur votre autre appareil"</string>
+    <string name="app_lock_edu_dialog_enable_app_lock_title" msgid="283314042336592322">"Activer le verrou d\'appli à <xliff:g id="APP_NAME">%1$s</xliff:g>?"</string>
+    <string name="app_lock_edu_dialog_description" msgid="8176807243219769518">"Pour votre sécurité, vous êtes la seule personne à pouvoir accéder à cette appli avec le Déverrouillage par empreinte digitale et par reconnaissance faciale ou votre NIP"</string>
+    <string name="app_lock_edu_dialog_description_template" msgid="8563718120753342530">"Pour votre sécurité, vous êtes la seule personne à pouvoir accéder à cette appli par les moyens suivants : %1$s ou votre %2$s"</string>
+    <string name="app_lock_edu_dialog_description_template_no_biometrics" msgid="7122017109150633691">"Pour votre sécurité, vous êtes la seule personne à pouvoir accéder à cette appli avec votre %1$s"</string>
+    <string name="app_lock_edu_dialog_info_header" msgid="5876120209204270990">"Avec le verrou d\'appli"</string>
+    <string name="app_lock_edu_dialog_info_notifications" msgid="1124438392204873305">"Le contenu des notifications sera masqué"</string>
+    <string name="app_lock_edu_dialog_info_widgets" msgid="8809009414650740872">"Les widgets et les raccourcis seront retirés"</string>
+    <string name="app_lock_edu_dialog_button_lock" msgid="3914687128135704801">"Activer verrou appli"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_face" msgid="1348151645996748654">"Déverr. rec. faciale"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_fingerprint" msgid="5206107469561561455">"Déverrouillage par empreinte digitale"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_fingerprint_and_face" msgid="7895807411323811641">"Empreinte digitale/Déverr. rec. faciale"</string>
+    <string name="app_lock_edu_dialog_lockscreen_password_name" msgid="8487096457702445059">"Mot de passe"</string>
+    <string name="app_lock_edu_dialog_lockscreen_pattern_name" msgid="991436996281983547">"Schéma"</string>
+    <string name="app_lock_edu_dialog_lockscreen_pin_name" msgid="6458607126966304795">"NIP"</string>
+    <string name="app_lock_permission_review_dialog_title" msgid="5030286398974840579">"Vos photos peuvent toujours s\'afficher dans d\'autres applis"</string>
+    <string name="app_lock_permission_review_dialog_sub_title" msgid="310758587817184145">"Applis ayant accès à vos photos"</string>
+    <string name="app_lock_permission_review_expand_app_list_button" msgid="3214809707125223273">"Tout afficher"</string>
+    <string name="app_lock_permission_review_continue_button" msgid="4045066724173414043">"Continuer"</string>
     <string name="work_mode_off_title" msgid="6367463960165135829">"Réactiver les applis pros?"</string>
     <string name="work_mode_turn_on" msgid="5316648862401307800">"Réactiver"</string>
     <string name="work_mode_emergency_call_button" msgid="6818855962881612322">"Urgence"</string>
     <string name="set_up_screen_lock_title" msgid="8346083801616474030">"Config. verrouillage d\'écran"</string>
     <string name="set_up_screen_lock_action_label" msgid="2687634803649209367">"Config. verrouillage d\'écran"</string>
-    <string name="private_space_set_up_screen_lock_message" msgid="1109956797005149814">"Configurez verrouillage de l\'écran pour utiliser Espace privé"</string>
+    <string name="private_space_set_up_screen_lock_message" msgid="1109956797005149814">"Configurez un verrouillage de l\'écran pour utiliser l\'espace privé"</string>
     <string name="private_space_set_up_screen_lock_for_reset" msgid="7817091386408432097">"Réglez le verrouillage de l\'écran pour supprimer l\'espace privé"</string>
     <string name="app_blocked_title" msgid="7353262160455028160">"L\'appli n\'est pas accessible"</string>
     <string name="app_blocked_message" msgid="542972921087873023">"<xliff:g id="APP_NAME">%1$s</xliff:g> n\'est pas accessible pour le moment."</string>
@@ -2597,6 +2624,8 @@
     <string name="satellite_messaging_unsupported_default_sms_app_notification_summary" msgid="17084124893763593">"Pour envoyer des messages par satellite, définissez Messages de Google comme appli de messagerie par défaut"</string>
     <string name="satellite_messaging_location_disabled_notification_title" msgid="7270641894250928494">"La messagerie par satellite n\'est pas accessible"</string>
     <string name="satellite_messaging_location_disabled_notification_summary" msgid="1450824950686221810">"Pour vérifier si la messagerie par satellite est accessible dans ce pays ou cette région, activez les paramètres de localisation"</string>
+    <!-- no translation found for satellite_indicator (6846063647532086110) -->
+    <skip />
     <string name="fingerprint_dangling_notification_title" msgid="7362075195588639989">"Configurer le Déverrouillage par empreinte digitale à nouveau"</string>
     <string name="fingerprint_dangling_notification_msg_1" msgid="5851784577768803510">"L\'empreinte digitale <xliff:g id="FINGERPRINT">%s</xliff:g> ne peut plus être reconnue."</string>
     <string name="fingerprint_dangling_notification_msg_2" msgid="7925203589860744456">"Les empreintes digitales <xliff:g id="FINGERPRINT_0">%1$s</xliff:g> et <xliff:g id="FINGERPRINT_1">%2$s</xliff:g> ne peuvent plus être reconnues."</string>

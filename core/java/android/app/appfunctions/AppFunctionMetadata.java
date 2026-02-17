@@ -15,20 +15,18 @@
  */
 package android.app.appfunctions;
 
-import static android.app.appfunctions.AppFunctionManager.APP_FUNCTION_STATE_DEFAULT;
-import static android.app.appfunctions.AppFunctionManager.APP_FUNCTION_STATE_ENABLED;
-import static android.app.appfunctions.AppFunctionRuntimeMetadata.PROPERTY_ENABLED;
 import static android.app.appfunctions.flags.Flags.FLAG_ENABLE_DYNAMIC_APP_FUNCTIONS;
 
-import static java.util.Objects.requireNonNull;
-
 import android.annotation.FlaggedApi;
+import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.appsearch.GenericDocument;
 import android.os.Parcel;
 import android.os.Parcelable;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import java.util.Objects;
 
 /**
@@ -122,6 +120,70 @@ public final class AppFunctionMetadata implements AbstractAppFunctionMetadata, P
     public static final String PROPERTY_ENABLED_BY_DEFAULT = "enabledByDefault";
 
     /**
+     * Property name for the scope of this function.
+     *
+     * <p>This name identifies the app function's scope property in the XML file that declares app
+     * functions.
+     *
+     * @see #getScope()
+     */
+    public static final String PROPERTY_SCOPE = "scope";
+
+    /**
+     * The value for {@link #PROPERTY_SCOPE} in the XML representing a global scope.
+     *
+     * @see #getScope()
+     * @see #SCOPE_GLOBAL
+     */
+    public static final String PROPERTY_VALUE_SCOPE_GLOBAL = "global";
+
+    /**
+     * The value for {@link #PROPERTY_SCOPE} in the XML representing an activity scope.
+     *
+     * @see #getScope()
+     * @see #SCOPE_ACTIVITY
+     */
+    public static final String PROPERTY_VALUE_SCOPE_ACTIVITY = "activity";
+
+    /**
+     * A value returned from {@link #getScope()} that indicates it is a globally scoped app
+     * function.
+     *
+     * <p>There can be at most one function with the same {@link AppFunctionName} available with
+     * this scope.
+     *
+     * <p>The function remains registered until it is explicitly unregistered or the process
+     * terminates.
+     */
+    public static final int SCOPE_GLOBAL = 0;
+
+    /**
+     * A value returned from {@link #getScope()} that indicates it is a activity scoped app
+     * function.
+     *
+     * <p>Multiple instances of the same function (with the same {@link AppFunctionName}) can
+     * exist simultaneously, each associated with a different activity instance identified by an
+     * {@link AppFunctionActivityId}.
+     *
+     * <p>To discover the specific activities where an activity-scoped function is currently
+     * registered, see {@link AppFunctionManager#getAppFunctionStates} and {@link
+     * AppFunctionManager#getAppFunctionActivityStates}.
+     *
+     * <p>To execute an activity-scoped function, see {@link
+     * ExecuteAppFunctionRequest#setActivityId}.
+     *
+     * <p>The function remains registered until it is explicitly unregistered or the activity is
+     * destroyed.
+     *
+     * @see AppFunctionActivityId
+     */
+    public static final int SCOPE_ACTIVITY = 1;
+
+    @IntDef({SCOPE_GLOBAL, SCOPE_ACTIVITY})
+    @Retention(RetentionPolicy.SOURCE)
+    @interface Scope {}
+
+    /**
      * Internal property which stores service name which should be used to execute App Function.
      * {@link #DYNAMIC_APP_FUNCTIONS_SERVICE_NAME} is set for dynamic app functions.
      *
@@ -154,20 +216,17 @@ public final class AppFunctionMetadata implements AbstractAppFunctionMetadata, P
     @NonNull private final AppFunctionName mAppFunctionName;
     @Nullable private final AppFunctionSchemaMetadata mAppFunctionSchemaMetadata;
     @NonNull private final AppFunctionPackageMetadata mAppFunctionPackageMetadata;
-    private final boolean mIsEnabled;
 
     private AppFunctionMetadata(
             @NonNull AppFunctionName appFunctionName,
             @Nullable AppFunctionSchemaMetadata appFunctionSchemaMetadata,
             @NonNull AppFunctionPackageMetadata appFunctionPackageMetadata,
-            @NonNull GenericDocument appFunctionMetadataDocument,
-            boolean isEnabled) {
+            @NonNull GenericDocument appFunctionMetadataDocument) {
         mAppFunctionName = appFunctionName;
         mAppFunctionSchemaMetadata = appFunctionSchemaMetadata;
         mAppFunctionPackageMetadata = appFunctionPackageMetadata;
         mAppFunctionMetadataDocumentWrapper =
                 new GenericDocumentWrapper(appFunctionMetadataDocument);
-        mIsEnabled = isEnabled;
     }
 
     private AppFunctionMetadata(Parcel in) {
@@ -177,38 +236,6 @@ public final class AppFunctionMetadata implements AbstractAppFunctionMetadata, P
                 Objects.requireNonNull(AppFunctionPackageMetadata.CREATOR.createFromParcel(in));
         mAppFunctionMetadataDocumentWrapper =
                 Objects.requireNonNull(GenericDocumentWrapper.CREATOR.createFromParcel(in));
-        mIsEnabled = in.readBoolean();
-    }
-
-    /**
-     * Creates a new instance of AppFunctionMetadata using the given function and package metadata.
-     *
-     * @throws IllegalArgumentException if the provided {@link GenericDocument}s are not in the
-     *     right format.
-     * @hide
-     */
-    public static AppFunctionMetadata create(
-            @NonNull GenericDocument appFunctionStaticMetadataDocument,
-            @NonNull GenericDocument appFunctionRuntimeMetadataDocument,
-            @NonNull AppFunctionPackageMetadata appFunctionPackageMetadata) {
-        requireNonNull(appFunctionStaticMetadataDocument);
-        requireNonNull(appFunctionRuntimeMetadataDocument);
-        requireNonNull(appFunctionPackageMetadata);
-        String qualifiedFunctionId = requireNonNull(appFunctionStaticMetadataDocument.getId());
-        AppFunctionName appFunctionName =
-                new AppFunctionName(
-                        appFunctionPackageMetadata.getPackageName(),
-                        qualifiedFunctionId.substring(qualifiedFunctionId.indexOf('/') + 1));
-        AppFunctionSchemaMetadata schemaMetadata =
-                getAppFunctionSchemaMetadataOrNull(appFunctionStaticMetadataDocument);
-        boolean isEnabled =
-                isEnabled(appFunctionStaticMetadataDocument, appFunctionRuntimeMetadataDocument);
-        return new AppFunctionMetadata(
-                appFunctionName,
-                schemaMetadata,
-                appFunctionPackageMetadata,
-                appFunctionStaticMetadataDocument,
-                isEnabled);
     }
 
     /**
@@ -241,14 +268,33 @@ public final class AppFunctionMetadata implements AbstractAppFunctionMetadata, P
     }
 
     /**
-     * Whether the app function is enabled.
+     * Returns the scope of the app function.
      *
-     * <p>The default enabled status is specified by the {@link PROPERTY_ENABLED_BY_DEFAULT} tag in
-     * the app function XML. Apps can change this status at runtime using {@link
-     * AppFunctionManager#setAppFunctionEnabled}.
+     * <p>The scope determines the function's lifecycle and uniqueness rules. Depending on the
+     * scope, there could be at most one or multiple functions registered in the system with the
+     * same {@link AppFunctionName}.
      */
-    public boolean isEnabled() {
-        return mIsEnabled;
+    @Scope
+    public int getScope() {
+        String xmlValue = getMetadataDocument().getPropertyString(PROPERTY_SCOPE);
+        return scopeXmlValueToScope(xmlValue);
+    }
+
+    @Scope
+    static int scopeXmlValueToScope(@NonNull String xmlValue) {
+        return switch (xmlValue) {
+            case PROPERTY_VALUE_SCOPE_GLOBAL -> SCOPE_GLOBAL;
+            case PROPERTY_VALUE_SCOPE_ACTIVITY -> SCOPE_ACTIVITY;
+            default -> throw new IllegalStateException("Unexpected value: " + xmlValue);
+        };
+    }
+
+    static String scopeToScopeXmlValue(@Scope int scope) {
+        return switch (scope) {
+            case SCOPE_GLOBAL -> PROPERTY_VALUE_SCOPE_GLOBAL;
+            case SCOPE_ACTIVITY -> PROPERTY_VALUE_SCOPE_ACTIVITY;
+            default -> throw new IllegalStateException("Unexpected value: " + scope);
+        };
     }
 
     /**
@@ -270,12 +316,13 @@ public final class AppFunctionMetadata implements AbstractAppFunctionMetadata, P
     public boolean equals(Object o) {
         if (this == o) return true;
         if (!(o instanceof AppFunctionMetadata that)) return false;
-        return getMetadataDocument().equals(that.getMetadataDocument());
+        return getMetadataDocument().equals(that.getMetadataDocument())
+                && getPackageMetadata().equals(that.getPackageMetadata());
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(getMetadataDocument());
+        return Objects.hash(getMetadataDocument(), getPackageMetadata());
     }
 
     @Override
@@ -302,7 +349,6 @@ public final class AppFunctionMetadata implements AbstractAppFunctionMetadata, P
         dest.writeTypedObject(mAppFunctionSchemaMetadata, flags);
         mAppFunctionPackageMetadata.writeToParcel(dest, flags);
         mAppFunctionMetadataDocumentWrapper.writeToParcel(dest, flags);
-        dest.writeBoolean(mIsEnabled);
     }
 
     @Override
@@ -324,13 +370,34 @@ public final class AppFunctionMetadata implements AbstractAppFunctionMetadata, P
         return new AppFunctionSchemaMetadata(category, name, version);
     }
 
-    private static boolean isEnabled(
-            @NonNull GenericDocument appFunctionStaticMetadataDocument,
-            @NonNull GenericDocument appFunctionRuntimeMetadataDocument) {
-        long enabled = appFunctionRuntimeMetadataDocument.getPropertyLong(PROPERTY_ENABLED);
-        if (enabled != APP_FUNCTION_STATE_DEFAULT) {
-            return enabled == APP_FUNCTION_STATE_ENABLED;
+    /** @hide */
+    public static final class Builder {
+        private final GenericDocument mStaticDocument;
+        private final AppFunctionPackageMetadata mPackageMetadata;
+
+        /** The builder to create {@link AppFunctionMetadata}. */
+        public Builder(
+                @NonNull GenericDocument staticDocument,
+                @NonNull AppFunctionPackageMetadata packageMetadata) {
+            mStaticDocument = Objects.requireNonNull(staticDocument);
+            mPackageMetadata = Objects.requireNonNull(packageMetadata);
         }
-        return appFunctionStaticMetadataDocument.getPropertyBoolean(PROPERTY_ENABLED_BY_DEFAULT);
+
+        /**
+         * Builds {@link AppFunctionPackageMetadata}.
+         *
+         * @throws IllegalArgumentException If unable to build metadata from the provided arguments.
+         */
+        public AppFunctionMetadata build() throws IllegalArgumentException {
+            Objects.requireNonNull(mStaticDocument);
+            Objects.requireNonNull(mPackageMetadata);
+
+            AppFunctionName appFunctionName =
+                    AppFunctionName.fromQualifiedId(mStaticDocument.getId());
+            AppFunctionSchemaMetadata schemaMetadata =
+                    getAppFunctionSchemaMetadataOrNull(mStaticDocument);
+            return new AppFunctionMetadata(
+                    appFunctionName, schemaMetadata, mPackageMetadata, mStaticDocument);
+        }
     }
 }

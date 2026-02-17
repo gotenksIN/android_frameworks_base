@@ -645,7 +645,7 @@
     <string name="permdesc_uwb_ranging" msgid="2519723069604307055">"Sallii sovelluksen määrittää UVB-taajuutta käyttävien laitteiden sijainnin suhteessa toisiinsa"</string>
     <string name="permlab_nearby_wifi_devices" msgid="392774237063608500">"käyttää lähellä olevia Wi-Fi-laitteita"</string>
     <string name="permdesc_nearby_wifi_devices" msgid="3054307728646332906">"Sallii sovelluksen ilmoittaa ja määrittää lähellä olevien Wi-Fi-laitteiden suhteellisen sijainnin sekä yhdistää niihin"</string>
-    <string name="permlab_access_local_network" msgid="3420360767259066877">"pääsy lähiverkon laitteisiin"</string>
+    <string name="permlab_access_local_network" msgid="3420360767259066877">"pääsy paikallisen verkon laitteisiin"</string>
     <string name="permdesc_access_local_network" msgid="6364679803386822638">"Sallii sovelluksen käyttää paikallisen verkon laitteita"</string>
     <string name="permlab_use_loopback_interface" msgid="8032765172835686213">"käytä silmukkarajapintaa"</string>
     <string name="permdesc_use_loopback_interface" msgid="47684087751145157">"Antaa sovelluksen olla yhteydessä muihin sovelluksiin silmukkarajapinnan kautta"</string>
@@ -1123,6 +1123,7 @@
     <string name="lockscreen_access_pattern_cell_added_verbose" msgid="2931364927622563465">"Solu <xliff:g id="CELL_INDEX">%1$s</xliff:g> lisätty"</string>
     <string name="lockscreen_access_pattern_detected" msgid="3931150554035194012">"Kuvio valmis"</string>
     <string name="lockscreen_access_pattern_area" msgid="1288780416685002841">"Kuvioalue."</string>
+    <string name="lockscreen_access_pattern_cell_verbose" msgid="6670905066468035137">"Solu <xliff:g id="CELL_INDEX">%1$s</xliff:g>"</string>
     <string name="keyguard_accessibility_widget_changed" msgid="7298011259508200234">"%1$s. Widget %2$d/%3$d."</string>
     <string name="keyguard_accessibility_add_widget" msgid="8245795023551343672">"Lisää widget."</string>
     <string name="keyguard_accessibility_widget_empty_slot" msgid="544239307077644480">"Tyhjä"</string>
@@ -1845,7 +1846,7 @@
     <string name="one_handed_mode_feature_name" msgid="2334330034828094891">"Yhden käden moodi"</string>
     <string name="reduce_bright_colors_feature_name" msgid="3222994553174604132">"Erittäin himmeä"</string>
     <string name="hearing_aids_feature_name" msgid="1125892105105852542">"Kuulolaitteet"</string>
-    <string name="autoclick_feature_name" msgid="4056260617171267864">"Automaattinen klikkaus (viiveaika)"</string>
+    <string name="autoclick_feature_name" msgid="4056260617171267864">"Automaattiklikkaukset (viiveaika)"</string>
     <string name="mouse_keys_feature_name" msgid="3362643216513384542">"Hiirenohjausnäppäimet"</string>
     <string name="hearing_device_status_disconnected" msgid="497547752953543832">"Yhteys katkaistu"</string>
     <string name="hearing_device_status_connected" msgid="2149385149669918764">"Yhdistetty"</string>
@@ -2006,6 +2007,7 @@
     <string name="managed_profile_label_badge_3" msgid="6882151970556391957">"Kolmas <xliff:g id="LABEL">%1$s</xliff:g>, työ"</string>
     <string name="clone_profile_label_badge" msgid="1871997694718793964">"Kloonaa <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="private_profile_label_badge" msgid="1712086003787839183">"Yksityinen <xliff:g id="LABEL">%1$s</xliff:g>"</string>
+    <string name="hsu_label_badge" msgid="1357272000281944932">"Järjestelmä<xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="lock_to_app_unlock_pin" msgid="3890940811866290782">"Pyydä PIN ennen irrotusta"</string>
     <string name="lock_to_app_unlock_pattern" msgid="2694204070499712503">"Pyydä lukituksenpoistokuvio ennen irrotusta"</string>
     <string name="lock_to_app_unlock_password" msgid="9126722403506560473">"Pyydä salasana ennen irrotusta"</string>
@@ -2111,13 +2113,38 @@
     <string name="app_suspended_default_message" msgid="6451215678552004172">"<xliff:g id="APP_NAME_0">%1$s</xliff:g> ei ole juuri nyt saatavilla. Tästä vastaa <xliff:g id="APP_NAME_1">%2$s</xliff:g>."</string>
     <string name="app_suspended_more_details" msgid="211260942831587014">"Lue lisää"</string>
     <string name="app_suspended_unsuspend_message" msgid="1665438589450555459">"Peru keskeytys"</string>
+    <string name="app_lock_add_screen_lock_button_text" msgid="9209013414563206600">"Lisää näytön lukitus"</string>
+    <string name="app_lock_add_screen_lock_message" msgid="6107009360675769892">"Näytön lukitus voi olla PIN-koodi, kuvio tai salasana. Tätä käytetään laitteen lukituksen avaamiseen ja lukittujen sovellusten käyttöön."</string>
+    <string name="app_lock_add_screen_lock_title" msgid="6905612843620128689">"Lisää ensin näytön lukitus"</string>
+    <string name="enable_app_lock_success_toast_message" msgid="3339622779190529987">"<xliff:g id="APP_NAME">%1$s</xliff:g> on lukittu"</string>
+    <string name="enable_app_lock_failure_toast_message" msgid="1055838896510445566">"<xliff:g id="APP_NAME">%1$s</xliff:g> ei ole lukittavissa"</string>
+    <string name="disable_app_lock_success_toast_message" msgid="70733620589071266">"Sovelluslukitus poistettu tältä: <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="locked_app_biometric_prompt_description" msgid="6853122652400451464">"<xliff:g id="APP_NAME">%1$s</xliff:g> on lukittu"</string>
+    <string name="locked_app_external_display_message" msgid="5483884799685545338">"Jos haluat käyttää sovellusta tällä näytöllä, vahvista ensin henkilöllisyytesi toisella laitteella"</string>
+    <string name="app_lock_edu_dialog_enable_app_lock_title" msgid="283314042336592322">"Lisätäänkö sovelluslukitus tälle: <xliff:g id="APP_NAME">%1$s</xliff:g>?"</string>
+    <string name="app_lock_edu_dialog_description" msgid="8176807243219769518">"Turvallisuussyistä vain sinä voit käyttää sovellusta sormenjälki- ja kasvojentunnistusavauksella tai PIN-koodilla"</string>
+    <string name="app_lock_edu_dialog_description_template" msgid="8563718120753342530">"Turvallisuussyistä vain sinä voit käyttää sovellusta näillä: %1$s tai %2$s"</string>
+    <string name="app_lock_edu_dialog_description_template_no_biometrics" msgid="7122017109150633691">"Turvallisuussyistä vain sinä voit käyttää sovellusta tällä: %1$s"</string>
+    <string name="app_lock_edu_dialog_info_header" msgid="5876120209204270990">"Sovelluslukituksella"</string>
+    <string name="app_lock_edu_dialog_info_notifications" msgid="1124438392204873305">"Ilmoitusten sisältö piilotetaan"</string>
+    <string name="app_lock_edu_dialog_info_widgets" msgid="8809009414650740872">"Widgetit ja pikakuvakkeet poistetaan"</string>
+    <string name="app_lock_edu_dialog_button_lock" msgid="3914687128135704801">"Lisää sovellusluk."</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_face" msgid="1348151645996748654">"Kasvojentunnistusav."</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_fingerprint" msgid="5206107469561561455">"Sormenjälkiavaus"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_fingerprint_and_face" msgid="7895807411323811641">"Sormenjälki- tai kasvojentunnistusavaus"</string>
+    <string name="app_lock_edu_dialog_lockscreen_password_name" msgid="8487096457702445059">"Salasana"</string>
+    <string name="app_lock_edu_dialog_lockscreen_pattern_name" msgid="991436996281983547">"Kuvio"</string>
+    <string name="app_lock_edu_dialog_lockscreen_pin_name" msgid="6458607126966304795">"PIN-koodi"</string>
+    <string name="app_lock_permission_review_dialog_title" msgid="5030286398974840579">"Kuvat voivat edelleen näkyä muissa sovelluksissa"</string>
+    <string name="app_lock_permission_review_dialog_sub_title" msgid="310758587817184145">"Sovellukset, joilla on pääsy kuviisi"</string>
+    <string name="app_lock_permission_review_expand_app_list_button" msgid="3214809707125223273">"Näytä kaikki"</string>
+    <string name="app_lock_permission_review_continue_button" msgid="4045066724173414043">"Jatka"</string>
     <string name="work_mode_off_title" msgid="6367463960165135829">"Laita työsovellukset päälle?"</string>
     <string name="work_mode_turn_on" msgid="5316648862401307800">"Laita päälle"</string>
     <string name="work_mode_emergency_call_button" msgid="6818855962881612322">"Hätätilanne"</string>
-    <string name="set_up_screen_lock_title" msgid="8346083801616474030">"Näytön lukituksen asettaminen"</string>
-    <string name="set_up_screen_lock_action_label" msgid="2687634803649209367">"Aseta näytön lukitus"</string>
-    <string name="private_space_set_up_screen_lock_message" msgid="1109956797005149814">"Edellyttää näytön lukitusta"</string>
+    <string name="set_up_screen_lock_title" msgid="8346083801616474030">"Valitse näytön lukitus"</string>
+    <string name="set_up_screen_lock_action_label" msgid="2687634803649209367">"Valitse näytön lukitus"</string>
+    <string name="private_space_set_up_screen_lock_message" msgid="1109956797005149814">"Jos haluat käyttää yksityistä tilaa, valitse laitteelle näytön lukitus"</string>
     <string name="private_space_set_up_screen_lock_for_reset" msgid="7817091386408432097">"Jos haluat poistaa yksityisen tilan, lisää laitteelle näytön lukitus"</string>
     <string name="app_blocked_title" msgid="7353262160455028160">"Sovellus ei ole käytettävissä"</string>
     <string name="app_blocked_message" msgid="542972921087873023">"<xliff:g id="APP_NAME">%1$s</xliff:g> ei ole nyt käytettävissä."</string>
@@ -2300,7 +2327,7 @@
     <string name="car_loading_profile" msgid="8219978381196748070">"Ladataan"</string>
     <string name="file_count" msgid="3220018595056126969">"{count,plural, =1{{file_name} + # tiedosto}other{{file_name} + # tiedostoa}}"</string>
     <string name="chooser_no_direct_share_targets" msgid="1511722103987329028">"Ei suosituksia kenelle jakaa"</string>
-    <string name="chooser_all_apps_button_label" msgid="3230427756238666328">"Sovellusluettelo"</string>
+    <string name="chooser_all_apps_button_label" msgid="3230427756238666328">"Sovelluslista"</string>
     <string name="usb_device_resolve_prompt_warn" msgid="325871329788064199">"Sovellus ei ole saanut tallennuslupaa mutta voi tallentaa ääntä tämän USB-laitteen avulla."</string>
     <string name="accessibility_system_action_home_label" msgid="3234748160850301870">"Aloitusnäyttö"</string>
     <string name="accessibility_system_action_back_label" msgid="4205361367345537608">"Takaisin"</string>
@@ -2592,6 +2619,8 @@
     <string name="satellite_messaging_unsupported_default_sms_app_notification_summary" msgid="17084124893763593">"Jos haluat lähettää viestejä satelliitin kautta, aseta Google Messages oletusviestisovellukseksi"</string>
     <string name="satellite_messaging_location_disabled_notification_title" msgid="7270641894250928494">"Satelliittiviestintä ei ole käytettävissä"</string>
     <string name="satellite_messaging_location_disabled_notification_summary" msgid="1450824950686221810">"Voit tarkistaa, onko satelliittiviestit saatavilla tällä alueella, laittamalla sijaintiasetukset päälle"</string>
+    <!-- no translation found for satellite_indicator (6846063647532086110) -->
+    <skip />
     <string name="fingerprint_dangling_notification_title" msgid="7362075195588639989">"Ota sormenjälkiavaus uudelleen käyttöön"</string>
     <string name="fingerprint_dangling_notification_msg_1" msgid="5851784577768803510">"<xliff:g id="FINGERPRINT">%s</xliff:g> ei enää ole tunnistettavissa."</string>
     <string name="fingerprint_dangling_notification_msg_2" msgid="7925203589860744456">"<xliff:g id="FINGERPRINT_0">%1$s</xliff:g> ja <xliff:g id="FINGERPRINT_1">%2$s</xliff:g> eivät enää ole tunnistettavissa."</string>

@@ -18,19 +18,22 @@ package com.android.extensions.computercontrol;
 
 import android.annotation.CallbackExecutor;
 import android.annotation.DurationMillisLong;
+import android.annotation.IntDef;
 import android.annotation.IntRange;
+import android.annotation.SuppressLint;
 import android.app.Activity;
+import android.app.AppInteractionAttribution;
 import android.app.Notification;
 import android.app.PendingIntent;
-import android.companion.virtual.computercontrol.ComputerControlSession.Action;
-import android.companion.virtual.computercontrol.ComputerControlSession.SessionBlockReason;
-import android.companion.virtual.computercontrol.ComputerControlSession.SessionCloseReason;
 import android.companion.virtual.computercontrol.InteractiveMirror;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentSender;
 import android.media.Image;
+import android.media.ImageReader;
+import android.os.CancellationSignal;
+import android.os.OutcomeReceiver;
 import android.util.Size;
 import android.view.accessibility.AccessibilityWindowInfo;
 import android.view.inputmethod.InputConnection;
@@ -39,6 +42,10 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.List;
@@ -56,6 +63,148 @@ import java.util.concurrent.Executor;
  * resources and reduce the system-wide impact computer control sessions can have.</p>
  */
 public final class ComputerControlSession implements AutoCloseable {
+
+    /**
+     * Unknown session creation error.
+     */
+    public static final int ERROR_UNKNOWN =
+            android.companion.virtual.computercontrol.ComputerControlSession.ERROR_UNKNOWN;
+
+    /**
+     * Error code indicating that a new session cannot be created because the maximum number of
+     * allowed concurrent sessions has been reached.
+     *
+     * <p>This is a transient error and the session creation request can be retried later.</p>
+     */
+    public static final int ERROR_SESSION_LIMIT_REACHED =
+            android.companion.virtual.computercontrol.ComputerControlSession
+                    .ERROR_SESSION_LIMIT_REACHED;
+
+    /**
+     * Error code indicating that a new session cannot be created because the device is currently
+     * locked.
+     *
+     * <p>This is a transient error and the session creation request can be retried later.</p>
+     *
+     * @see android.app.KeyguardManager#isDeviceLocked()
+     */
+    public static final int ERROR_DEVICE_LOCKED =
+            android.companion.virtual.computercontrol.ComputerControlSession.ERROR_DEVICE_LOCKED;
+
+    /**
+     * Error code indicating that the user did not approve the creation of a new session.
+     */
+    public static final int ERROR_PERMISSION_DENIED =
+            android.companion.virtual.computercontrol.ComputerControlSession
+                    .ERROR_PERMISSION_DENIED;
+
+    /** @hide */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef(prefix = "ERROR_", value = {
+            ERROR_UNKNOWN,
+            ERROR_SESSION_LIMIT_REACHED,
+            ERROR_DEVICE_LOCKED,
+            ERROR_PERMISSION_DENIED})
+    @Target({ElementType.TYPE_PARAMETER, ElementType.TYPE_USE})
+    public @interface SessionCreationError {
+    }
+
+    /**
+     * Unknown session close reason.
+     */
+    public static final int CLOSE_REASON_UNKNOWN =
+            android.companion.virtual.computercontrol.ComputerControlSession.CLOSE_REASON_UNKNOWN;
+
+    /**
+     * Close reason indicating the session was closed by the caller.
+     *
+     * @see ComputerControlSession#close()
+     */
+    public static final int CLOSE_REASON_CALLER_INITIATED =
+            android.companion.virtual.computercontrol.ComputerControlSession
+                    .CLOSE_REASON_CALLER_INITIATED;
+
+    /**
+     * Close reason indicating the session was closed by the user during an auth flow or to take
+     * control of the app under automation, etc.
+     */
+    public static final int CLOSE_REASON_USER_INITIATED =
+            android.companion.virtual.computercontrol.ComputerControlSession
+                    .CLOSE_REASON_USER_INITIATED;
+
+    /**
+     * Close reason indicating the session timed out.
+     */
+    public static final int CLOSE_REASON_SESSION_TIMED_OUT =
+            android.companion.virtual.computercontrol.ComputerControlSession
+                    .CLOSE_REASON_SESSION_TIMED_OUT;
+
+    /**
+     * Close reason indicating that the session became empty.
+     */
+    public static final int CLOSE_REASON_SESSION_EMPTY =
+            android.companion.virtual.computercontrol.ComputerControlSession
+                    .CLOSE_REASON_SESSION_EMPTY;
+
+    /** @hide */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef(prefix = "CLOSE_REASON_", value = {
+            CLOSE_REASON_UNKNOWN,
+            CLOSE_REASON_CALLER_INITIATED,
+            CLOSE_REASON_USER_INITIATED,
+            CLOSE_REASON_SESSION_TIMED_OUT,
+            CLOSE_REASON_SESSION_EMPTY,
+    })
+    @Target({ElementType.TYPE_PARAMETER, ElementType.TYPE_USE})
+    public @interface SessionCloseReason {
+    }
+
+    /**
+     * Unknown session block reason.
+     */
+    public static final int BLOCK_REASON_UNKNOWN =
+            android.companion.virtual.computercontrol.ComputerControlSession.BLOCK_REASON_UNKNOWN;
+
+    /**
+     * Reason indicating that the session was blocked due to secure content being present.
+     */
+    public static final int BLOCK_REASON_SECURE_CONTENT =
+            android.companion.virtual.computercontrol.ComputerControlSession
+                    .BLOCK_REASON_SECURE_CONTENT;
+
+    /**
+     * Reason indicating that the session was blocked due to a disallowed activity being launched
+     * in the session.
+     */
+    public static final int BLOCK_REASON_DISALLOWED_ACTIVITY_LAUNCH =
+            android.companion.virtual.computercontrol.ComputerControlSession
+                    .BLOCK_REASON_DISALLOWED_ACTIVITY_LAUNCH;
+
+    /** @hide */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef(prefix = "BLOCK_REASON_", value = {
+            BLOCK_REASON_UNKNOWN,
+            BLOCK_REASON_SECURE_CONTENT,
+            BLOCK_REASON_DISALLOWED_ACTIVITY_LAUNCH})
+    @Target({ElementType.TYPE_PARAMETER, ElementType.TYPE_USE})
+    public @interface SessionBlockReason {
+    }
+
+    /**
+     * Computer control action that performs back navigation.
+     */
+    public static final int ACTION_GO_BACK =
+            android.companion.virtual.computercontrol.ComputerControlSession.ACTION_GO_BACK;
+
+    /** @hide */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef(prefix = "ACTION_", value = {
+            ACTION_GO_BACK,
+    })
+    @Target({ElementType.TYPE_PARAMETER, ElementType.TYPE_USE})
+    public @interface Action {
+    }
+
     private static final long DEFAULT_STABILITY_TIMEOUT_MS = 500L;
 
     private final android.companion.virtual.computercontrol.ComputerControlSession mSession;
@@ -99,18 +248,137 @@ public final class ComputerControlSession implements AutoCloseable {
     }
 
     /**
-     * Screenshot the current display content.
+     * Screenshot the current display content synchronously.
      *
-     * <p>The behavior is similar to {@link android.media.ImageReader#acquireLatestImage}, meaning
-     * that any previously acquired images should be released before attempting to acquire new ones.
-     * </p>
+     * <p>The behavior is similar to {@link ImageReader#acquireLatestImage}, meaning that any
+     * previously acquired images should be released before attempting to acquire new ones.</p>
+     *
+     * NOTE: This is a blocking call! If a screenshot is not immediately available, this method
+     * will block until the next frame is produced, or until the method times out. A successful
+     * screenshot acquisition could take in the order of 10s of milliseconds if one is not
+     * immediately available.
      *
      * @return A screenshot of the current display content, or {@code null} if no screenshot is
      *   currently available.
+     * @deprecated Use {@link #requestScreenshot(Executor, OutcomeReceiver, CancellationSignal)}
+     *   instead.
      */
     @Nullable
     public Image getScreenshot() {
         return mSession.getScreenshot();
+    }
+
+    /**
+     * Exception used to indicate how a screenshot request failed.
+     */
+    public static class ScreenshotException extends Exception {
+
+        /** An unknown error occurred when processing this screenshot request. */
+        public static final int ERROR_UNKNOWN =
+                android.companion.virtual.computercontrol.ComputerControlSession
+                        .ScreenshotException.ERROR_UNKNOWN;
+
+        /** The request to receive a screenshot timed out. */
+        public static final int ERROR_TIMEOUT =
+                android.companion.virtual.computercontrol.ComputerControlSession
+                        .ScreenshotException.ERROR_TIMEOUT;
+
+        /** The request to receive a screenshot was cancelled. */
+        public static final int ERROR_CANCELED =
+                android.companion.virtual.computercontrol.ComputerControlSession
+                        .ScreenshotException.ERROR_CANCELED;
+
+        /** The session is in a state where taking screenshots is prohibited. */
+        public static final int ERROR_PROHIBITED =
+                android.companion.virtual.computercontrol.ComputerControlSession
+                        .ScreenshotException.ERROR_PROHIBITED;
+
+        /** The session encountered an internal error, and the client may try again later. */
+        public static final int ERROR_INTERNAL =
+                android.companion.virtual.computercontrol.ComputerControlSession
+                        .ScreenshotException.ERROR_INTERNAL;
+
+        /** The session encountered a remote error. */
+        public static final int ERROR_REMOTE =
+                android.companion.virtual.computercontrol.ComputerControlSession
+                        .ScreenshotException.ERROR_REMOTE;
+
+        /** A previous request to receive a screenshot is still active. */
+        public static final int ERROR_DUPLICATE_REQUEST =
+                android.companion.virtual.computercontrol.ComputerControlSession
+                        .ScreenshotException.ERROR_DUPLICATE_REQUEST;
+
+        /** The screenshot request was successful, but the screenshot is unchanged. */
+        public static final int ERROR_SCREEN_UNCHANGED =
+                android.companion.virtual.computercontrol.ComputerControlSession
+                        .ScreenshotException.ERROR_SCREEN_UNCHANGED;
+
+        @ErrorCode
+        private final int mErrorCode;
+
+        /**
+         * Get the error code that describes the failure mode.
+         */
+        @ErrorCode
+        public int getErrorCode() {
+            return mErrorCode;
+        }
+
+        /** @hide */
+        @IntDef(value = {
+                ERROR_UNKNOWN,
+                ERROR_TIMEOUT,
+                ERROR_CANCELED,
+                ERROR_PROHIBITED,
+                ERROR_INTERNAL,
+                ERROR_REMOTE,
+                ERROR_DUPLICATE_REQUEST,
+        })
+        @Retention(RetentionPolicy.SOURCE)
+        public @interface ErrorCode {
+        }
+
+        /** @hide */
+        public ScreenshotException(@ErrorCode int errorCode) {
+            super("errorCode=" + errorCode);
+            mErrorCode = errorCode;
+        }
+    }
+
+    /**
+     * Requests a screenshot of the current display content asynchronously.
+     *
+     * <p>This is a one-shot operation. A new screenshot request must be made for each screenshot.
+     *
+     * <p>The behavior is similar to {@link ImageReader#acquireLatestImage}, meaning that any
+     * previously acquired images should be released before attempting to acquire new ones.
+     *
+     * <p>Only one screenshot request can be active at a time. If a new screenshot is requested
+     * while a previous one is still pending, the new request will be rejected.
+     *
+     * @param executor The executor on which the callback will be invoked.
+     * @param receiver The outcome receiver callback to be invoked when the screenshot is available
+     *                or encounters any issues.
+     *
+     * @see ScreenshotException
+     */
+    @SuppressLint("SamShouldBeLast")
+    public void requestScreenshot(@NonNull @CallbackExecutor Executor executor,
+            @NonNull OutcomeReceiver<Image, ScreenshotException> receiver,
+            @Nullable CancellationSignal cancellationSignal) {
+        mSession.requestScreenshot(executor, new OutcomeReceiver<>() {
+                    @Override
+                    public void onResult(Image result) {
+                        receiver.onResult(result);
+                    }
+
+            @Override
+            public void onError(
+                    @NonNull android.companion.virtual.computercontrol.ComputerControlSession
+                            .ScreenshotException error) {
+                receiver.onError(new ScreenshotException(error.getErrorCode()));
+            }
+        }, cancellationSignal);
     }
 
     /**
@@ -174,6 +442,8 @@ public final class ComputerControlSession implements AutoCloseable {
 
     /**
      * Returns an {@link InteractiveMirror} which mirrors this {@link ComputerControlSession}.
+     *
+     * @hide
      */
     public InteractiveMirror createInteractiveMirror() {
         return mSession.createInteractiveMirror();
@@ -322,15 +592,24 @@ public final class ComputerControlSession implements AutoCloseable {
     public static class Params {
         @NonNull private final Context mContext;
         @NonNull private final String mName;
+        private final int mTargetExtensionVersion;
         @NonNull private final List<String> mTargetPackageNames;
         @Nullable private final PendingIntent mPreviewIntent;
+        @Nullable private final AppInteractionAttribution mAppInteractionAttribution;
 
-        private Params(@NonNull Context context, @NonNull String name,
-                @NonNull List<String> targetPackageNames, @Nullable PendingIntent previewIntent) {
+        private Params(
+                @NonNull Context context,
+                @NonNull String name,
+                int targetExtensionVersion,
+                @NonNull List<String> targetPackageNames,
+                @Nullable PendingIntent previewIntent,
+                @Nullable AppInteractionAttribution appInteractionAttribution) {
             mContext = context;
             mName = name;
+            mTargetExtensionVersion = targetExtensionVersion;
             mTargetPackageNames = targetPackageNames;
             mPreviewIntent = previewIntent;
+            mAppInteractionAttribution = appInteractionAttribution;
         }
 
         /**
@@ -351,6 +630,13 @@ public final class ComputerControlSession implements AutoCloseable {
         }
 
         /**
+         * Returns the target extension version of the computer control session.
+         */
+        public int getTargetExtensionVersion() {
+            return mTargetExtensionVersion;
+        }
+
+        /**
          * Returns the package names of the applications that may be automated during this session.
          *
          * @see Builder#setTargetPackageNames(List)
@@ -365,10 +651,22 @@ public final class ComputerControlSession implements AutoCloseable {
          * none is set.
          *
          * @see Builder#setPreviewIntent(PendingIntent)
+         * @hide
          */
         @Nullable
         public PendingIntent getPreviewIntent() {
             return mPreviewIntent;
+        }
+
+        /**
+         * Returns the attribution for the app interaction that triggered the creation of this
+         * session.
+         *
+         * @see Builder#setAppInteractionAttribution(AppInteractionAttribution)
+         */
+        @Nullable
+        public AppInteractionAttribution getAppInteractionAttribution() {
+            return mAppInteractionAttribution;
         }
 
         /**
@@ -377,8 +675,10 @@ public final class ComputerControlSession implements AutoCloseable {
         public static class Builder {
             @NonNull private final Context mContext;
             private String mName;
+            private int mTargetExtensionVersion = 0;
             private List<String> mTargetPackageNames = Collections.emptyList();
             private PendingIntent mPreviewIntent;
+            private AppInteractionAttribution mAppInteractionAttribution;
 
             /**
              * Create a new Builder.
@@ -393,6 +693,15 @@ public final class ComputerControlSession implements AutoCloseable {
             @NonNull
             public Builder setName(@NonNull String name) {
                 mName = name;
+                return this;
+            }
+
+            /**
+             * Set the target extension version of the computer control session.
+             */
+            @NonNull
+            public Builder setTargetExtensionVersion(int targetExtensionVersion) {
+                mTargetExtensionVersion = targetExtensionVersion;
                 return this;
             }
 
@@ -422,11 +731,26 @@ public final class ComputerControlSession implements AutoCloseable {
             }
 
             /**
-             * Build a computer control session.
+             * Sets the attribution for the app interaction that triggered the creation of this
+             * session.
              */
             @NonNull
+            public Builder setAppInteractionAttribution(
+                    @Nullable AppInteractionAttribution appInteractionAttribution) {
+                mAppInteractionAttribution = appInteractionAttribution;
+                return this;
+            }
+
+            /** Build a computer control session. */
+            @NonNull
             public Params build() {
-                return new Params(mContext, mName, mTargetPackageNames, mPreviewIntent);
+                return new Params(
+                        mContext,
+                        mName,
+                        mTargetExtensionVersion,
+                        mTargetPackageNames,
+                        mPreviewIntent,
+                        mAppInteractionAttribution);
             }
         }
     }
@@ -451,7 +775,7 @@ public final class ComputerControlSession implements AutoCloseable {
         void onSessionCreated(@NonNull ComputerControlSession session);
 
         /** Called when the session failed to be created. */
-        void onSessionCreationFailed(int errorCode);
+        void onSessionCreationFailed(@SessionCreationError int errorCode);
 
         /**
          * Called when the session has been closed.

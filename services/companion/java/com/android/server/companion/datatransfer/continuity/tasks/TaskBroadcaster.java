@@ -17,12 +17,25 @@
 package com.android.server.companion.datatransfer.continuity.tasks;
 
 import android.annotation.NonNull;
+import android.annotation.Nullable;
+import android.app.ActivityManager.RunningTaskInfo;
+import android.app.ActivityTaskManager;
+import android.app.AppOpsManager;
+import android.app.HandoffActivityParams;
 import android.app.TaskStackListener;
+import android.content.Context;
+import android.content.pm.PackageManager.NameNotFoundException;
 import android.os.RemoteException;
+import android.os.Trace;
 import android.util.Slog;
+import com.android.server.LocalServices;
 import com.android.server.companion.datatransfer.continuity.connectivity.TaskContinuityMessenger;
+import com.android.server.companion.datatransfer.continuity.messages.HandoffOptions;
+import com.android.server.companion.datatransfer.continuity.messages.RemoteTaskInfo;
+import com.android.server.companion.datatransfer.continuity.messages.TaskContinuityMessage;
 import com.android.server.companion.datatransfer.continuity.messages.TaskStackBroadcastMessage;
 import com.android.server.wm.ActivityTaskManagerInternal;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -35,20 +48,24 @@ public class TaskBroadcaster extends TaskStackListener
 
     private static final String TAG = TaskBroadcaster.class.getSimpleName();
 
+    private final int mUserId;
     private final TaskContinuityMessenger mTaskContinuityMessenger;
-    private final RunningTaskFetcher mRunningTaskFetcher;
+    private final Context mContext;
 
     public TaskBroadcaster(
-            @NonNull TaskContinuityMessenger taskContinuityMessenger,
-            @NonNull RunningTaskFetcher runningTaskFetcher) {
+            int userId,
+            @NonNull Context context,
+            @NonNull TaskContinuityMessenger taskContinuityMessenger) {
 
+        mUserId = userId;
         mTaskContinuityMessenger = Objects.requireNonNull(taskContinuityMessenger);
-        mRunningTaskFetcher = Objects.requireNonNull(runningTaskFetcher);
+        mContext = Objects.requireNonNull(context);
     }
 
-    public void onDeviceConnected(int associationId) {
-        Slog.v(TAG, "Transport connected for association id: " + associationId);
+    public void onDeviceConnected() {
+        Trace.traceBegin(Trace.TRACE_TAG_SYSTEM_SERVER, "onDeviceConnected");
         broadcastTaskStack();
+        Trace.traceEnd(Trace.TRACE_TAG_SYSTEM_SERVER);
     }
 
     @Override
@@ -70,7 +87,86 @@ public class TaskBroadcaster extends TaskStackListener
     }
 
     private void broadcastTaskStack() {
+        TaskStackBroadcastMessage.Builder taskStackBroadcastMessageBuilder =
+                new TaskStackBroadcastMessage.Builder();
+        List<RunningTaskInfo> runningTaskInfos =
+                ((ActivityTaskManager) mContext.getSystemService(Context.ACTIVITY_TASK_SERVICE))
+                        .getTasks(Integer.MAX_VALUE, true);
+        if (runningTaskInfos != null) {
+            for (RunningTaskInfo taskInfo : runningTaskInfos) {
+                RemoteTaskInfo remoteTaskInfo = createRemoteTaskInfo(taskInfo);
+                if (remoteTaskInfo != null) {
+                    taskStackBroadcastMessageBuilder.addRemoteTask(remoteTaskInfo);
+                }
+            }
+        }
+
         mTaskContinuityMessenger.sendMessage(
-                new TaskStackBroadcastMessage(mRunningTaskFetcher.getRunningTasks()));
+                new TaskContinuityMessage.Builder()
+                        .setTaskStackBroadcastMessage(taskStackBroadcastMessageBuilder.build())
+                        .build());
+    }
+
+    @Nullable
+    private RemoteTaskInfo createRemoteTaskInfo(@Nullable RunningTaskInfo taskInfo) {
+        if (taskInfo == null) {
+            return null;
+        }
+
+        if (taskInfo.userId != mUserId) {
+            Slog.w(TAG, "Task " + taskInfo.taskId + " is not for user " + mUserId);
+            return null;
+        }
+
+        if (taskInfo.baseActivity == null || taskInfo.baseActivity.getPackageName() == null) {
+            Slog.w(TAG, "Package name is null for task: " + taskInfo.taskId);
+            return null;
+        }
+
+        if (!isContinueAcrossDevicesAllowedForPackage(taskInfo.baseActivity.getPackageName())) {
+            Slog.w(
+                    TAG,
+                    "AppOpsManager.OP_CONTINUE_ACROSS_DEVICES is not allowed for task: "
+                            + taskInfo.taskId);
+            return null;
+        }
+
+        ActivityTaskManagerInternal activityTaskManagerInternal =
+                LocalServices.getService(ActivityTaskManagerInternal.class);
+        if (!activityTaskManagerInternal.isHandoffEnabledForTask(taskInfo.taskId)) {
+            return null;
+        }
+
+        RemoteTaskInfo.Builder remoteTaskInfoBuilder =
+                new RemoteTaskInfo.Builder()
+                        .setId(taskInfo.taskId)
+                        .setPackageName(taskInfo.baseActivity.getPackageName())
+                        .setIsInForeground(taskInfo.isFocused)
+                        .setLastUsedTimeMillis(taskInfo.lastActiveTime);
+
+        HandoffOptions.Builder handoffOptionsBuilder =
+                new HandoffOptions.Builder().setHandoffEnabled(true);
+        HandoffActivityParams params =
+                activityTaskManagerInternal.getHandoffActivityParamsForTask(taskInfo.taskId);
+        if (params != null) {
+            handoffOptionsBuilder.setRequirePackageInstalled(
+                    params.isAllowHandoffWithoutPackageInstalled());
+        }
+
+        return remoteTaskInfoBuilder.setHandoffOptions(handoffOptionsBuilder.build()).build();
+    }
+
+    private boolean isContinueAcrossDevicesAllowedForPackage(@NonNull String packageName) {
+        try {
+            return ((AppOpsManager) mContext.getSystemService(Context.APP_OPS_SERVICE))
+                            .checkOpNoThrow(
+                                    AppOpsManager.OP_CONTINUE_ACROSS_DEVICES,
+                                    mContext.getPackageManager().getPackageUid(packageName, 0),
+                                    packageName)
+                    != AppOpsManager.MODE_IGNORED;
+        } catch (NameNotFoundException e) {
+            Slog.w(TAG, "Failed to note op for package: " + packageName, e);
+            return false;
+        }
     }
 }

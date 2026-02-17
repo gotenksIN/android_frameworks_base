@@ -1626,7 +1626,7 @@ public class AppOpsService extends IAppOpsService.Stub {
 
     private void onUidProcessDeath(int uid) {
         synchronized (this) {
-            if (!mUidStates.contains(uid) || !Flags.finishRunningOpsForKilledPackages()) {
+            if (!mUidStates.contains(uid)) {
                 return;
             }
             final SparseLongArray chainsToFinish = new SparseLongArray();
@@ -4466,6 +4466,10 @@ public class AppOpsService extends IAppOpsService.Stub {
         } catch (SecurityException e) {
             logVerifyAndGetBypassFailure(proxiedUid, e, "finishOperation");
             return;
+        }
+
+        if (Process.isPrivateComputeCoreUid(proxiedUid)) {
+            proxiedUid = mContext.getPackageManager().getAppUidForPrivateComputeCoreUid(proxiedUid);
         }
 
         synchronized (this) {

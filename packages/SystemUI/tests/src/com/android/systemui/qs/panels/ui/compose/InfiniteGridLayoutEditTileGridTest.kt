@@ -36,6 +36,7 @@ import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
 import androidx.compose.ui.test.performScrollToNode
 import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipeUp
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.compose.theme.PlatformTheme
@@ -44,13 +45,13 @@ import com.android.systemui.SysuiTestCase
 import com.android.systemui.compose.modifiers.resIdToTestTag
 import com.android.systemui.flags.DisableSceneContainer
 import com.android.systemui.haptics.msdl.tileHapticsViewModelFactory
+import com.android.systemui.integration.SystemUiIntegrationTest
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.collectLastValue
 import com.android.systemui.kosmos.runTest
 import com.android.systemui.kosmos.useUnconfinedTestDispatcher
 import com.android.systemui.qs.composefragment.dagger.usingMediaInComposeFragment
 import com.android.systemui.qs.flags.QsSplitInternetTile
-import com.android.systemui.qs.panels.data.repository.defaultLargeTilesRepository
 import com.android.systemui.qs.panels.domain.interactor.iconTilesInteractor
 import com.android.systemui.qs.panels.ui.compose.infinitegrid.InfiniteGridLayout
 import com.android.systemui.qs.panels.ui.viewmodel.InfiniteGridViewModel
@@ -70,6 +71,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 
 @SmallTest
+@SystemUiIntegrationTest
 @RunWith(AndroidJUnit4::class)
 class InfiniteGridLayoutEditTileGridTest : SysuiTestCase() {
 
@@ -103,9 +105,7 @@ class InfiniteGridLayoutEditTileGridTest : SysuiTestCase() {
             editModeViewModel.startEditing()
             usingMediaInComposeFragment = false
         }
-        kosmos.run {
-            iconTilesInteractor.setLargeTiles(defaultLargeTilesRepository.defaultLargeTiles)
-        }
+        kosmos.run { iconTilesInteractor.setLargeTiles(initialLargeTiles) }
     }
 
     @Composable
@@ -210,6 +210,10 @@ class InfiniteGridLayoutEditTileGridTest : SysuiTestCase() {
             composeRule
                 .onNodeWithTag(AVAILABLE_TILES_GRID_TEST_TAG)
                 .performScrollToNode(hasText("rotation"))
+                .performTouchInput {
+                    // Perform additional scroll to make sure the tile is above the nav bar
+                    swipeUp(startY = centerY, endY = top)
+                }
             composeRule.onNodeWithText("rotation").performClick()
             composeRule.waitForIdle()
 
@@ -352,6 +356,13 @@ class InfiniteGridLayoutEditTileGridTest : SysuiTestCase() {
         private val AVAILABLE_TILES_GRID_TEST_TAG = resIdToTestTag("AvailableTilesGrid")
         private const val OPTIONS_DROP_DOWN_TEST_TAG = "OptionsDropdown"
         private val internetTileSpec = if (QsSplitInternetTile.isEnabled) "wifi" else "internet"
+        private val initialLargeTiles =
+            setOf(
+                TileSpec.create(internetTileSpec),
+                TileSpec.create("bt"),
+                TileSpec.create("dnd"),
+                TileSpec.create("cast"),
+            )
         private val TestEditTiles =
             listOf(
                 TileSpec.create(internetTileSpec),

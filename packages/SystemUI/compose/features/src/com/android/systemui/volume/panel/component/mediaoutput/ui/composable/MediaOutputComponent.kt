@@ -40,7 +40,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
@@ -56,11 +58,11 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.android.compose.animation.Expandable
-import com.android.compose.modifiers.thenIf
-import com.android.systemui.Flags
 import com.android.systemui.common.ui.compose.Icon
 import com.android.systemui.common.ui.compose.toColor
 import com.android.systemui.compose.modifiers.sysuiResTag
+import com.android.systemui.qs.panels.ui.compose.infinitegrid.CommonTileDefaults.TileDetailsEntryTightCornerRadius
+import com.android.systemui.qs.ui.compose.borderOnFocus
 import com.android.systemui.res.R
 import com.android.systemui.volume.panel.component.mediaoutput.ui.viewmodel.ConnectedDeviceViewModel
 import com.android.systemui.volume.panel.component.mediaoutput.ui.viewmodel.DeviceIconViewModel
@@ -91,8 +93,13 @@ class MediaOutputComponent @Inject constructor(private val viewModel: MediaOutpu
 
         Expandable(
             modifier =
-                Modifier.fillMaxWidth()
-                    .height(if (Flags.volumeRedesign()) 56.dp else 80.dp)
+                modifier
+                    .borderOnFocus(
+                        MaterialTheme.colorScheme.secondary,
+                        CornerSize(TileDetailsEntryTightCornerRadius),
+                    )
+                    .fillMaxWidth()
+                    .height(56.dp)
                     .semantics {
                         liveRegion = LiveRegionMode.Polite
                         this.onClick(label = clickLabel) {
@@ -101,14 +108,7 @@ class MediaOutputComponent @Inject constructor(private val viewModel: MediaOutpu
                         }
                     },
             color = style.backgroundColor,
-            shape =
-                RoundedCornerShape(
-                    if (Flags.volumeRedesign()) {
-                        12.dp
-                    } else {
-                        28.dp
-                    }
-                ),
+            shape = RoundedCornerShape(12.dp),
             useModifierBasedImplementation = true,
             onClick =
                 if (enabled) {
@@ -118,10 +118,7 @@ class MediaOutputComponent @Inject constructor(private val viewModel: MediaOutpu
                 },
         ) { _ ->
             Row(
-                modifier =
-                    Modifier.fillMaxHeight().thenIf(!Flags.volumeRedesign()) {
-                        Modifier.padding(start = 24.dp, end = 16.dp)
-                    },
+                modifier = Modifier.fillMaxHeight(),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 connectedDeviceViewModel?.let {
@@ -177,7 +174,7 @@ class MediaOutputComponent @Inject constructor(private val viewModel: MediaOutpu
             }
         Box(
             modifier =
-                modifier.size(if (Flags.volumeRedesign()) 56.dp else 48.dp).motionTestValues {
+                modifier.size(56.dp).motionTestValues {
                     isTransitionIdle exportAs
                         MediaOutputComponentMotionTestKeys.isIconTransitionIdle
                 },

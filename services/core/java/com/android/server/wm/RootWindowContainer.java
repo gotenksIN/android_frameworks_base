@@ -436,7 +436,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
     }
 
     private final Consumer<WindowState> mCloseSystemDialogsConsumer = w -> {
-        if (w.mHasSurface) {
+        if (w.isVisible()) {
             try {
                 w.mClient.closeSystemDialogs(mCloseSystemDialogsReason);
             } catch (RemoteException e) {
@@ -467,7 +467,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         // Go through the children in z-order starting at the top-most
         for (int i = mChildren.size() - 1; i >= 0; --i) {
             final DisplayContent dc = mChildren.get(i);
-            if ((dc.isRemoved() || dc.isRemoving())) {
+            if ((dc.isRemovedOrInvalid() || dc.isRemoving())) {
                 continue;
             }
             changed |= dc.updateFocusedWindowLocked(mode, updateInputWindows, topFocusedDisplayId);
@@ -1690,7 +1690,7 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
         }
 
         final DisplayContent display = taskDisplayArea.getDisplayContent();
-        if (display == null || display.isRemoved() || !display.isHomeSupported()) {
+        if (display == null || display.isRemovedOrInvalid() || !display.isHomeSupported()) {
             // Can't launch home on display that doesn't support home.
             return false;
         }
@@ -1788,27 +1788,42 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
 
     /**
      * @return a list of {@link ActivityAssistInfo} of the visible activities in the given display.
+     *
+     * <p>NOTE: This includes all visible activities, even if one is paused, which means it is
+     * behind a translucent container.
+     */
+    List<ActivityAssistInfo> getTopVisibleActivityAssistInfos(int displayId) {
+        final List<ActivityAssistInfo> topVisibleActivityAssistInfos = new ArrayList<>();
+        final List<ActivityRecord> topVisibleActivities = getTopVisibleActivities(displayId);
+        for (int i = 0; i < topVisibleActivities.size(); i++) {
+            topVisibleActivityAssistInfos.add(new ActivityAssistInfo(topVisibleActivities.get(i)));
+        }
+        return topVisibleActivityAssistInfos;
+    }
+
+    /**
+     * @return a list of {@link ActivityRecord} of the visible activities in the given display.
      * Visible activities in the focused root Task are at the front of the list.
      *
      * <p>NOTE: This includes all visible activities, even if one is paused, which means it is
      * behind a translucent container.
      */
-    List<ActivityAssistInfo> getTopVisibleActivities(int displayId) {
-        final ArrayList<ActivityAssistInfo> topVisibleActivities = new ArrayList<>();
+    List<ActivityRecord> getTopVisibleActivities(int displayId) {
+        final ArrayList<ActivityRecord> topVisibleActivities = new ArrayList<>();
         final DisplayContent dc =
                 displayId != INVALID_DISPLAY ? getDisplayContent(displayId) : null;
         final Task topFocusedRootTask =
                 dc != null ? dc.getFocusedRootTask() : getTopDisplayFocusedRootTask();
 
-        final ArrayList<ActivityAssistInfo> visibleActivitiesInFocusedRoot = new ArrayList<>();
+        final ArrayList<ActivityRecord> visibleActivitiesInFocusedRoot = new ArrayList<>();
         final Consumer<ActivityRecord> collectFromFocusedRoot = activity -> {
             if (activity.isVisibleRequested()) {
-                visibleActivitiesInFocusedRoot.add(new ActivityAssistInfo(activity));
+                visibleActivitiesInFocusedRoot.add(activity);
             }
         };
         final Consumer<ActivityRecord> collectFromNonFocusedRoot = activity -> {
             if (activity.isVisibleRequested()) {
-                topVisibleActivities.add(new ActivityAssistInfo(activity));
+                topVisibleActivities.add(activity);
             }
         };
         final Consumer<Task> collectFromDisplay = rootTask -> {
@@ -2950,10 +2965,6 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             // Drop any cached DisplayInfos associated with this display id - the values are now
             // out of date given this display added event.
             mWmService.mPossibleDisplayInfoMapper.removePossibleDisplayInfos(displayId);
-
-            // We serve a map from display IDs to respective values, so we need to notify client
-            // when the display is added.
-            mService.onTaskMoveAllowedChanged();
         }
     }
 
@@ -2991,7 +3002,8 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             if (displayContent == null) {
                 return;
             }
-            if (DesktopExperienceFlags.ENABLE_DISPLAY_DISCONNECT_INTERACTION.isTrue()) {
+            if (DesktopExperienceFlags.ENABLE_DISPLAY_DISCONNECT_INTERACTION.isTrue()
+                    && !displayContent.shouldDestroyContentOnRemove()) {
                 final Transition transition = new Transition(TRANSIT_CLOSE,
                         TRANSIT_FLAG_DISPLAY_LEVEL_TRANSITION, mTransitionController,
                         mWmService.mSyncEngine);
@@ -3016,14 +3028,14 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             } else {
                 removeDisplayContent(displayContent);
             }
-
-            // We serve a map from display IDs to respective values, so we need to notify client
-            // when the display is removed.
-            mService.onTaskMoveAllowedChanged();
         }
     }
 
-    private void removeDisplayContent(DisplayContent displayContent) {
+    /**
+     * Remove the DisplayContent; to be used when the Display is disconnected, hence why
+     * we ignore the DisplayContent validity.
+     */
+    void removeDisplayContent(DisplayContent displayContent) {
         if (displayContent.isRemoving() || displayContent.isRemoved()) {
             Slog.e(TAG, "DisplayContent already removed or removing.");
             return;

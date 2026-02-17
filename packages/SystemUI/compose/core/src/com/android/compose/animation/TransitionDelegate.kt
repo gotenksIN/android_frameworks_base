@@ -64,6 +64,11 @@ class TransitionDelegate(
 
     private val transitionSource: TransitionSource by lazy {
         object : TransitionSource {
+
+            override var isSourceVisible: Boolean = true
+
+            override var onSourceVisibilityChanged: (Boolean) -> Unit = {}
+
             override fun activityTransitionController(
                 launchCujType: Int?,
                 cookie: ActivityTransitionAnimator.TransitionCookie?,
@@ -131,7 +136,7 @@ class TransitionDelegate(
     fun dialogController(cuj: DialogCuj?): DialogTransitionAnimator.Controller {
         return object : DialogTransitionAnimator.Controller {
             override val viewRoot: ViewRootImpl? = composeViewRoot.viewRootImpl
-            override val sourceIdentity: Any = this@TransitionDelegate
+            override val dialogIdentity: Any = this@TransitionDelegate
             override val cuj: DialogCuj? = cuj
 
             override fun startDrawingInOverlayOf(viewGroup: ViewGroup) {

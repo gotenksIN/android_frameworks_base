@@ -16,12 +16,14 @@
 
 package com.android.systemui.accessibility.shortcutchooser.domain.interactor
 
+import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.os.UserHandle
 import android.platform.test.annotations.DisableFlags
 import android.platform.test.annotations.EnableFlags
+import android.provider.Settings
 import android.view.Display.DEFAULT_DISPLAY
 import android.view.Display.INVALID_DISPLAY
 import android.view.accessibility.Flags as AccessibilityFlags
@@ -37,6 +39,7 @@ import com.android.systemui.accessibility.shortcutchooser.shared.model.DialogReq
 import com.android.systemui.broadcast.broadcastDispatcher
 import com.android.systemui.broadcast.mockBroadcastSender
 import com.android.systemui.coroutines.collectLastValue
+import com.android.systemui.display.data.repository.displayRepository
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.collectLastValue
 import com.android.systemui.kosmos.runTest
@@ -63,6 +66,7 @@ class ShortcutChooserDialogInteractorTest : SysuiTestCase() {
     private companion object {
         const val TALKBACK_TARGET_NAME = "fakeTalkBackTargetName"
         const val MAGNIFICATION_TARGET_NAME = "fakeMagnificationTargetName"
+        const val HSU_EXCLUDED_TARGET_NAME = "fakeHsuExcludedTargetName"
     }
 
     private val kosmos = testKosmosNew()
@@ -72,11 +76,13 @@ class ShortcutChooserDialogInteractorTest : SysuiTestCase() {
     private val Kosmos.underTest by
         Kosmos.Fixture {
             ShortcutChooserDialogInteractor(
+                context,
                 mockRepository,
-                broadcastDispatcher,
-                mockBroadcastSender,
+                displayRepository,
                 userRepository,
                 fakeHeadlessSystemUserMode,
+                broadcastDispatcher,
+                mockBroadcastSender,
             )
         }
 
@@ -192,6 +198,26 @@ class ShortcutChooserDialogInteractorTest : SysuiTestCase() {
         }
 
     @Test
+    fun getDialogContextByDisplayId_externalDisplayIdRequested_returnExpectedContext() =
+        kosmos.runTest {
+            // Mock the default application context's displayId is 0.
+            val mockApplicationContext = mock<Context>()
+            whenever(mockApplicationContext.displayId).thenReturn(DEFAULT_DISPLAY)
+            // The dialog displayId is 2.
+            val externalDisplayId = 2
+            displayRepository.addDisplay(externalDisplayId)
+            val externalDisplay = displayRepository.getDisplay(externalDisplayId)!!
+            val mockDisplayContext = mock<Context>()
+            whenever(mockApplicationContext.createDisplayContext(externalDisplay))
+                .thenReturn(mockDisplayContext)
+
+            val result =
+                underTest.getDialogContextByDisplayId(externalDisplayId, mockApplicationContext)
+
+            assertThat(result).isEqualTo(mockDisplayContext)
+        }
+
+    @Test
     fun enableShortcutForTarget_topRowKeyType_enableMagnification() =
         kosmos.runTest {
             val shortcutType = UserShortcutType.TOP_ROW_KEY
@@ -216,7 +242,7 @@ class ShortcutChooserDialogInteractorTest : SysuiTestCase() {
         }
 
     @Test
-    fun enableShortcutForAllTargets_enablesUnassignedShortcuts() =
+    fun enableShortcutForAllAllowedTargets_enablesUnassignedShortcuts() =
         kosmos.runTest {
             val shortcutType = UserShortcutType.QUICK_ACCESS
             val targetName1 = "com.android.test/TestService1"
@@ -229,10 +255,84 @@ class ShortcutChooserDialogInteractorTest : SysuiTestCase() {
             whenever(mockRepository.getAllAccessibilityTargetsInfo(shortcutType))
                 .thenReturn(targets)
 
-            underTest.enableShortcutForAllTargets(shortcutType)
+            underTest.enableShortcutForAllAllowedTargets(shortcutType)
 
             verify(mockRepository)
                 .enableShortcutsForTargets(eq(true), eq(shortcutType), eq(setOf(targetName2)))
+        }
+
+    @Test
+    fun enableShortcutForAllAllowedTargets_doesNotEnableShortcutsNeedingWarning() =
+        kosmos.runTest {
+            val shortcutType = UserShortcutType.QUICK_ACCESS
+            val targetName1 = "com.android.test/TestService1"
+            val targetName2 = "com.android.test/TestService2"
+            val targets =
+                listOf(
+                    createTargetModel(shortcutType, targetName1, isAssigned = false),
+                    createTargetModel(shortcutType, targetName2, isAssigned = false),
+                )
+            whenever(mockRepository.getAllAccessibilityTargetsInfo(shortcutType))
+                .thenReturn(targets)
+            whenever(mockRepository.isServiceWarningRequired(targets[0])).thenReturn(false)
+            whenever(mockRepository.isServiceWarningRequired(targets[1])).thenReturn(true)
+
+            underTest.enableShortcutForAllAllowedTargets(shortcutType)
+
+            verify(mockRepository)
+                .enableShortcutsForTargets(eq(true), eq(shortcutType), eq(setOf(targetName1)))
+        }
+
+    @Test
+    fun enableShortcutForAllAllowedTargets_isCompletedFullUser_doesNotExcludeTargets() =
+        kosmos.runTest {
+            val shortcutType = UserShortcutType.QUICK_ACCESS
+            val targetName1 = "com.android.test/TestService1"
+            val targetName2 = HSU_EXCLUDED_TARGET_NAME
+            val targets =
+                listOf(
+                    createTargetModel(shortcutType, targetName1, isAssigned = false),
+                    createTargetModel(shortcutType, targetName2, isAssigned = false),
+                )
+            whenever(mockRepository.getAllAccessibilityTargetsInfo(shortcutType))
+                .thenReturn(targets)
+            whenever(mockRepository.hsuExcludedTargets).thenReturn(listOf(HSU_EXCLUDED_TARGET_NAME))
+            fakeHeadlessSystemUserMode.setIsHeadlessSystemUser(false)
+            setOobeCompleted(true)
+            assertThat(underTest.isCompletedFullUser()).isTrue()
+
+            underTest.enableShortcutForAllAllowedTargets(shortcutType)
+
+            verify(mockRepository)
+                .enableShortcutsForTargets(
+                    eq(true),
+                    eq(shortcutType),
+                    eq(setOf(targetName1, targetName2)),
+                )
+        }
+
+    @Test
+    fun enableShortcutForAllAllowedTargets_notCompletedFullUser_excludesTargets() =
+        kosmos.runTest {
+            val shortcutType = UserShortcutType.QUICK_ACCESS
+            val targetName1 = "com.android.test/TestService1"
+            val targetName2 = HSU_EXCLUDED_TARGET_NAME
+            val targets =
+                listOf(
+                    createTargetModel(shortcutType, targetName1, isAssigned = false),
+                    createTargetModel(shortcutType, targetName2, isAssigned = false),
+                )
+            whenever(mockRepository.getAllAccessibilityTargetsInfo(shortcutType))
+                .thenReturn(targets)
+            whenever(mockRepository.hsuExcludedTargets).thenReturn(listOf(HSU_EXCLUDED_TARGET_NAME))
+            fakeHeadlessSystemUserMode.setIsHeadlessSystemUser(true)
+            setOobeCompleted(true)
+            assertThat(underTest.isCompletedFullUser()).isFalse()
+
+            underTest.enableShortcutForAllAllowedTargets(shortcutType)
+
+            verify(mockRepository)
+                .enableShortcutsForTargets(eq(true), eq(shortcutType), eq(setOf(targetName1)))
         }
 
     @Test
@@ -287,6 +387,38 @@ class ShortcutChooserDialogInteractorTest : SysuiTestCase() {
             assertThat(userHandleArgumentCaptor.firstValue).isEqualTo(UserHandle.SYSTEM)
         }
 
+    @Test
+    fun isCompletedFullUser_notHSU_notOOBE_returnsTrue() =
+        kosmos.runTest {
+            fakeHeadlessSystemUserMode.setIsHeadlessSystemUser(false)
+            setOobeCompleted(true)
+            assertThat(underTest.isCompletedFullUser()).isTrue()
+        }
+
+    @Test
+    fun isCompletedFullUser_isHSU_notOOBE_returnsFalse() =
+        kosmos.runTest {
+            fakeHeadlessSystemUserMode.setIsHeadlessSystemUser(true)
+            setOobeCompleted(true)
+            assertThat(underTest.isCompletedFullUser()).isFalse()
+        }
+
+    @Test
+    fun isCompletedFullUser_notHSU_isOOBE_returnsFalse() =
+        kosmos.runTest {
+            fakeHeadlessSystemUserMode.setIsHeadlessSystemUser(false)
+            setOobeCompleted(false)
+            assertThat(underTest.isCompletedFullUser()).isFalse()
+        }
+
+    @Test
+    fun isCompletedFullUser_isHSU_isOOBE_returnsFalse() =
+        kosmos.runTest {
+            fakeHeadlessSystemUserMode.setIsHeadlessSystemUser(true)
+            setOobeCompleted(false)
+            assertThat(underTest.isCompletedFullUser()).isFalse()
+        }
+
     private fun Kosmos.sendIntentBroadcast(@UserShortcutType shortcutType: Int, displayId: Int) {
         Intent()
             .apply {
@@ -314,5 +446,12 @@ class ShortcutChooserDialogInteractorTest : SysuiTestCase() {
             isAssigned = isAssigned,
             isToggleable = true,
             isStateOn = false,
+        )
+
+    private fun setOobeCompleted(completed: Boolean) =
+        Settings.Secure.putInt(
+            context.contentResolver,
+            Settings.Secure.USER_SETUP_COMPLETE,
+            if (completed) 1 else 0,
         )
 }

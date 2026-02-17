@@ -437,6 +437,31 @@ public final class InputMethodManager {
     public static final int SHOW_IM_PICKER_MODE_EXCLUDE_AUXILIARY_SUBTYPES = 2;
 
     /**
+     * The entry point where the IME Switcher Menu was requested from.
+     * @hide
+     */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef({
+        IM_PICKER_ENTRY_POINT_DEFAULT,
+        IM_PICKER_ENTRY_POINT_STATUS_BAR_CHIP,
+    })
+    public @interface IMPickerEntryPoint {}
+
+    /**
+     * The default entry point value, currently used to group most entry points for the IME
+     * Switcher Menu (e.g. IME navigation bar, taskbar, public API).
+     * @hide
+     */
+    public static final int IM_PICKER_ENTRY_POINT_DEFAULT = 0;
+
+    /**
+     * The entry point where the IME Switcher Menu was requested from the IME chip on the desktop
+     * status bar.
+     * @hide
+     */
+    public static final int IM_PICKER_ENTRY_POINT_STATUS_BAR_CHIP = 1;
+
+    /**
      * Always return {@code true} when {@link #hideSoftInputFromWindow(IBinder, int)} and
      * {@link #hideSoftInputFromWindow(IBinder, int, ResultReceiver, int, ImeTracker.Token)} is
      * called.
@@ -1180,7 +1205,7 @@ public final class InputMethodManager {
                                 Log.w(TAG, "Ignoring onBind: cur seq=" + curBindSequence
                                         + ", given seq=" + res.sequence);
                             }
-                            if (res.channel != null && res.channel != mCurChannel) {
+                            if (res.channel != null) {
                                 res.channel.dispose();
                             }
                             return;
@@ -1235,7 +1260,7 @@ public final class InputMethodManager {
                                 }
                             }
                             mCurId = res.id; // for @UnsupportedAppUsage
-                        } else if (res.channel != null && res.channel != mCurChannel) {
+                        } else if (res.channel != null) {
                             res.channel.dispose();
                         }
                         switch (res.result) {
@@ -1312,7 +1337,7 @@ public final class InputMethodManager {
                                 Log.w(TAG, "Ignoring onBind: cur seq=" + curBindSequence
                                         + ", given seq=" + res.sequence);
                             }
-                            if (res.channel != null && res.channel != mCurChannel) {
+                            if (res.channel != null) {
                                 res.channel.dispose();
                             }
                             return;
@@ -2681,7 +2706,7 @@ public final class InputMethodManager {
      *
      * @param windowToken The token of the window that is making the request,
      * as returned by {@link View#getWindowToken() View.getWindowToken()}.
-     * @return <p>For apps targeting Android {@link Build.VERSION_CODES.BAKLAVA}, onwards, it
+     * @return <p>For apps targeting Android {@link Build.VERSION_CODES#BAKLAVA}, onwards, it
      * will always return {@code true}. To see when the IME is hidden, use
      * {@link View.OnApplyWindowInsetsListener} and verify the provided {@link WindowInsets} for
      * the visibility of IME.
@@ -4739,15 +4764,18 @@ public final class InputMethodManager {
      * Shows the input method chooser dialog from system.
      *
      * @param showAuxiliarySubtypes Set true to show auxiliary input methods.
+     * @param entryPoint The entry point where the chooser dialog was requested from.
      * @param displayId The ID of the display where the chooser dialog should be shown.
      * @hide
      */
     @RequiresPermission(Manifest.permission.WRITE_SECURE_SETTINGS)
-    public void showInputMethodPickerFromSystem(boolean showAuxiliarySubtypes, int displayId) {
+    public void showInputMethodPickerFromSystem(boolean showAuxiliarySubtypes,
+            @IMPickerEntryPoint int entryPoint, int displayId) {
         final int mode = showAuxiliarySubtypes
                 ? SHOW_IM_PICKER_MODE_INCLUDE_AUXILIARY_SUBTYPES
                 : SHOW_IM_PICKER_MODE_EXCLUDE_AUXILIARY_SUBTYPES;
-        IInputMethodManagerGlobalInvoker.showInputMethodPickerFromSystem(mode, displayId);
+        IInputMethodManagerGlobalInvoker.showInputMethodPickerFromSystem(
+                mode, entryPoint, displayId);
     }
 
     @GuardedBy("mH")

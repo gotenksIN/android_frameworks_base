@@ -52,6 +52,7 @@ import static com.android.server.wm.TaskFragment.EMBEDDED_DIM_AREA_PARENT_TASK;
 import static com.android.server.wm.TaskFragment.TASK_FRAGMENT_VISIBILITY_VISIBLE_BEHIND_TRANSLUCENT;
 import static com.android.server.wm.WindowContainer.POSITION_BOTTOM;
 import static com.android.server.wm.WindowContainer.POSITION_TOP;
+import static com.android.server.wm.testing.Assert.assertThrows;
 
 import static com.google.common.truth.Truth.assertThat;
 
@@ -95,6 +96,7 @@ import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.annotations.Presubmit;
 import android.util.DisplayMetrics;
+import android.util.TypedValue;
 import android.util.Xml;
 import android.view.DisplayInfo;
 import android.view.SurfaceControl;
@@ -1059,10 +1061,9 @@ public class TaskTests extends WindowTestsBase {
         final Task fullscreenTask = new TaskBuilder(mSupervisor).build();
         final Rect originalTaskBounds = new Rect(fullscreenTask.getBounds());
         final ActivityInfo aInfo = new ActivityInfo();
-        aInfo.windowLayout = new ActivityInfo.WindowLayout(0 /* width */, 0 /* widthFraction */,
-                0 /* height */, 0 /* heightFraction */, 0 /* gravity */,
-                originalTaskBounds.width() * 2 /* minWidth */,
-                originalTaskBounds.height() * 2 /* minHeight */);
+        aInfo.windowLayout = createWindowLayoutWithMinSize(originalTaskBounds.width() * 2,
+                originalTaskBounds.height() * 2, mContext.getResources().getDisplayMetrics(),
+                TypedValue.COMPLEX_UNIT_PX);
         fullscreenTask.setMinDimensions(aInfo);
         fullscreenTask.onConfigurationChanged(fullscreenTask.getParent().getConfiguration());
 
@@ -1817,6 +1818,38 @@ public class TaskTests extends WindowTestsBase {
     }
 
     @Test
+    public void getPreservedRootTaskIfEnabled_nonOrganizedTask_returnsNull() {
+        final Task task = getTestTask();
+        final Task preservedRootTask = task.getPreservedRootTaskIfEnabled();
+        assertNull(preservedRootTask);
+    }
+
+    @Test
+    public void getPreservedRootTaskIfEnabled_preservationNotRequested_returnsNull() {
+        final Task rootTask = createTask(mDisplayContent);
+        rootTask.mCreatedByOrganizer = true;
+        final Task leafTask = createTaskInRootTask(rootTask, 0 /* userId */);
+        final Task preservedRootTask = leafTask.getPreservedRootTaskIfEnabled();
+        assertNull(preservedRootTask);
+    }
+
+    @Test
+    public void getPreservedRootTaskIfEnabled_rootTaskEnablesLeafPreservation_returnsRootTask() {
+        final Task rootTask = createTask(mDisplayContent);
+        rootTask.mCreatedByOrganizer = true;
+        rootTask.mPreserveLeafTaskIfRelaunch = true;
+        final Task leafTask = createTaskInRootTask(rootTask, 0 /* userId */);
+
+        final Task preservedRootTask = leafTask.getPreservedRootTaskIfEnabled();
+
+        if (com.android.window.flags.Flags.enablePreserveLeafTaskIfRelaunch()) {
+            assertEquals(rootTask, preservedRootTask);
+        } else {
+            assertNull(preservedRootTask);
+        }
+    }
+
+    @Test
     public void testSetPreserveLeafTaskIfRelaunch_organizedTask_setsFlag() {
         final Task task = getTestTask();
         task.mCreatedByOrganizer = true;
@@ -2289,26 +2322,28 @@ public class TaskTests extends WindowTestsBase {
 
     @Test
     public void testAllowRelingquish_updateMinDimensions() {
+        createWindowLayoutWithMinSize(500, 1000, mContext.getResources().getDisplayMetrics(),
+                TypedValue.COMPLEX_UNIT_PX);
         // r0 allows relingquish
         final ActivityRecord r0 = new ActivityBuilder(mAtm)
                 .setCreateTask(true)
-                .setWindowLayout(new ActivityInfo.WindowLayout(
-                        0, 0, 0, 0, 0, 500 /* minWidth */, 1000 /* minHeight*/))
+                .setWindowLayout(createWindowLayoutWithMinSize(500, 1000,
+                        mContext.getResources().getDisplayMetrics(), TypedValue.COMPLEX_UNIT_PX))
                 .setActivityFlags(FLAG_RELINQUISH_TASK_IDENTITY)
                 .build();
         final Task task = r0.getTask();
 
-        assertEquals(500, task.mMinWidth);
-        assertEquals(1000, task.mMinHeight);
+        assertEquals(500, task.getMinWidth());
+        assertEquals(1000, task.getMinHeight());
 
         final ActivityRecord r1 = new ActivityBuilder(mAtm)
                 .setTask(task)
-                .setWindowLayout(new ActivityInfo.WindowLayout(
-                        0, 0, 0, 0, 0, 1000 /* minWidth */, 500 /* minHeight*/))
+                .setWindowLayout(createWindowLayoutWithMinSize(1000, 500,
+                        mContext.getResources().getDisplayMetrics(), TypedValue.COMPLEX_UNIT_PX))
                 .build();
 
-        assertEquals(1000, task.mMinWidth);
-        assertEquals(500, task.mMinHeight);
+        assertEquals(1000, task.getMinWidth());
+        assertEquals(500, task.getMinHeight());
     }
 
     @Test
@@ -2316,22 +2351,22 @@ public class TaskTests extends WindowTestsBase {
         // r0 disallows relingquish
         final ActivityRecord r0 = new ActivityBuilder(mAtm)
                 .setCreateTask(true)
-                .setWindowLayout(new ActivityInfo.WindowLayout(
-                        0, 0, 0, 0, 0, 500 /* minWidth */, 1000 /* minHeight*/))
+                .setWindowLayout(createWindowLayoutWithMinSize(500, 1000,
+                        mContext.getResources().getDisplayMetrics(), TypedValue.COMPLEX_UNIT_PX))
                 .build();
         final Task task = r0.getTask();
 
-        assertEquals(500, task.mMinWidth);
-        assertEquals(1000, task.mMinHeight);
+        assertEquals(500, task.getMinWidth());
+        assertEquals(1000, task.getMinHeight());
 
         final ActivityRecord r1 = new ActivityBuilder(mAtm)
                 .setTask(task)
-                .setWindowLayout(new ActivityInfo.WindowLayout(
-                        0, 0, 0, 0, 0, 1000 /* minWidth */, 500 /* minHeight*/))
+                .setWindowLayout(createWindowLayoutWithMinSize(1000, 500,
+                        mContext.getResources().getDisplayMetrics(), TypedValue.COMPLEX_UNIT_PX))
                 .build();
 
-        assertEquals(500, task.mMinWidth);
-        assertEquals(1000, task.mMinHeight);
+        assertEquals(500, task.getMinWidth());
+        assertEquals(1000, task.getMinHeight());
     }
 
     @Test
@@ -2584,18 +2619,6 @@ public class TaskTests extends WindowTestsBase {
     }
 
     @Test
-    @EnableFlags({android.security.Flags.FLAG_APP_LOCK_APIS,
-            android.security.Flags.FLAG_APP_LOCK_CORE})
-    public void testCreateTask_registersToAppLockController() {
-        final AppLockController appLockController = mWm.mAppLockController;
-        spyOn(appLockController);
-
-        final Task task = getTestTask();
-
-        verify(appLockController).registerTask(task);
-    }
-
-    @Test
     public void testBuilder_notCreatedByOrganizer_ignoreInsetsAndAppCompatRoundedCornersDefault() {
         final Task task = new Task.Builder(mAtm)
                 .setWindowingMode(WINDOWING_MODE_MULTI_WINDOW)
@@ -2619,6 +2642,42 @@ public class TaskTests extends WindowTestsBase {
 
         assertTrue(task.shouldIgnoreInsets());
         assertTrue(task.disableAppCompatRoundedCorners());
+    }
+
+    @EnableFlags(Flags.FLAG_IMPROVE_OCCLUSION_CALCULATION)
+    @Test
+    public void testFillTestInfo_isActivityStackTransparent_withTransparentEmbeddedActivity() {
+        final Task task = createTask(mDisplayContent);
+        final TaskFragment primaryTf = createTaskFragmentWithActivity(task);
+        final TaskFragment secondaryTf = createTaskFragmentWithActivity(task);
+        final ActivityRecord primaryActivity = primaryTf.getTopMostActivity();
+        final ActivityRecord secondaryActivity = secondaryTf.getTopMostActivity();
+        primaryTf.setWindowingMode(WINDOWING_MODE_MULTI_WINDOW);
+        primaryTf.setBounds(new Rect(0, 0, 500, 1000));
+        secondaryTf.setWindowingMode(WINDOWING_MODE_MULTI_WINDOW);
+        secondaryTf.setBounds(new Rect(500, 0, 1000, 1000));
+        primaryTf.setAdjacentTaskFragments(
+                new TaskFragment.AdjacentSet(primaryTf, secondaryTf));
+
+        doReturn(true).when(primaryActivity).occludesParent(anyBoolean());
+        doReturn(false).when(secondaryActivity).occludesParent(anyBoolean());
+
+        final ActivityManager.RunningTaskInfo info = new ActivityManager.RunningTaskInfo();
+        task.fillTaskInfo(info);
+
+        assertTrue(info.isActivityStackTransparent);
+    }
+
+    @EnableFlags(Flags.FLAG_VISIBILITY_MANAGEMENT_IN_BUBBLE_ROOT)
+    @Test
+    public void testIsVisibilityBarrier_failAddChild() {
+        final Task visibilityBarrier = new Task.Builder(mAtm)
+                .setIsVisibilityBarrier(true)
+                .build();
+        final ActivityRecord r = createActivityRecord(mDisplayContent);
+
+        assertThrows(IllegalStateException.class,
+                () -> r.reparent(visibilityBarrier, POSITION_TOP));
     }
 
     private Task getTestTask() {

@@ -339,6 +339,8 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
 
     private static final String ATTR_CE_DATA_INODE = "ceDataInode";
     private static final String ATTR_DE_DATA_INODE = "deDataInode";
+    private static final String ATTR_PCC_CE_DATA_INODE = "pccCeDataInode";
+    private static final String ATTR_PCC_DE_DATA_INODE = "pccDeDataInode";
     private static final String ATTR_INSTALLED = "inst";
     private static final String ATTR_STOPPED = "stopped";
     private static final String ATTR_NOT_LAUNCHED = "nl";
@@ -372,6 +374,8 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
     private static final String ATTR_HARMFUL_APP_WARNING = "harmful-app-warning";
     private static final String ATTR_SPLASH_SCREEN_THEME = "splash-screen-theme";
     private static final String ATTR_MIN_ASPECT_RATIO = "min-aspect-ratio";
+    private static final String ATTR_VIRTUAL_GAMEPAD_USER_OPTION = "virtual-gamepad-user-option";
+    private static final String ATTR_PERSONAL_CONTEXT_MODE = "personal-context-mode";
 
     private static final String ATTR_PACKAGE_NAME = "packageName";
     private static final String ATTR_BUILD_FINGERPRINT = "buildFingerprint";
@@ -975,9 +979,7 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
             ret.setRestrictUpdateHash(p.getRestrictUpdateHash());
             ret.setScannedAsStoppedSystemApp(p.isScannedAsStoppedSystemApp());
             ret.setInstallSource(p.getInstallSource());
-            if (Flags.fixEnableSystemPackageWithSharedUid()) {
-                ret.setSharedUserAppId(p.getSharedUserAppId());
-            }
+            ret.setSharedUserAppId(p.getSharedUserAppId());
         }
         mDisabledSysPackages.remove(name);
         return ret;
@@ -1014,7 +1016,7 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
                 .setAppId(uid);
         if ((uid == Process.INVALID_UID && isSdkLibrary && Flags.disallowSdkLibsToBeApps())
                 || mAppIds.registerExistingAppId(uid, p, name)
-                || (Flags.fixEnableSystemPackageWithSharedUid() && hasSharedUser)) {
+                || hasSharedUser) {
             mPackages.put(name, p);
             return p;
         }
@@ -1182,7 +1184,12 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
                                     + "installed=%b)",
                                     pkgName, installUserId, user.toFullString(), installed);
                         }
-                        pkgSetting.setUserState(user.id, 0, 0, COMPONENT_ENABLED_STATE_DEFAULT,
+                        pkgSetting.setUserState(user.id,
+                                0 /*ceDataInode*/,
+                                0 /*deDataInode*/,
+                                0 /*pccCeDataInode*/,
+                                0 /*pccDeDataInode*/,
+                                COMPONENT_ENABLED_STATE_DEFAULT,
                                 installed,
                                 true /*stopped*/,
                                 true /*notLaunched*/,
@@ -1201,7 +1208,9 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
                                 0 /*firstInstallTime*/,
                                 PackageManager.USER_MIN_ASPECT_RATIO_UNSET,
                                 null /*archiveState*/,
-                                false /*appLockEnabled*/
+                                false /*appLockEnabled*/,
+                                PackageManager.VIRTUAL_GAMEPAD_USER_OPTION_UNSET,
+                                PackageManager.PERSONAL_CONTEXT_MODE_UNSET
                         );
                     }
                 }
@@ -1922,7 +1931,10 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
                         // consider all applications to be installed.
                         for (PackageSetting pkg : mPackages.values()) {
                             pkg.setUserState(userId, pkg.getCeDataInode(userId),
-                                    pkg.getDeDataInode(userId), COMPONENT_ENABLED_STATE_DEFAULT,
+                                    pkg.getDeDataInode(userId),
+                                    pkg.getPccCeDataInode(userId),
+                                    pkg.getPccDeDataInode(userId),
+                                    COMPONENT_ENABLED_STATE_DEFAULT,
                                     true  /*installed*/,
                                     false /*stopped*/,
                                     false /*notLaunched*/,
@@ -1941,7 +1953,9 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
                                     0 /*firstInstallTime*/,
                                     PackageManager.USER_MIN_ASPECT_RATIO_UNSET,
                                     null /*archiveState*/,
-                                    false /*appLockEnabled*/
+                                    false /*appLockEnabled*/,
+                                    PackageManager.VIRTUAL_GAMEPAD_USER_OPTION_UNSET,
+                                    PackageManager.PERSONAL_CONTEXT_MODE_UNSET
                             );
                         }
                         return;
@@ -1988,6 +2002,10 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
                                 parser.getAttributeLong(null, ATTR_CE_DATA_INODE, 0);
                         final long deDataInode =
                                 parser.getAttributeLong(null, ATTR_DE_DATA_INODE, 0);
+                        final long pccCeDataInode =
+                                parser.getAttributeLong(null, ATTR_PCC_CE_DATA_INODE, 0);
+                        final long pccDeDataInode =
+                                parser.getAttributeLong(null, ATTR_PCC_DE_DATA_INODE, 0);
                         final boolean installed =
                                 parser.getAttributeBoolean(null, ATTR_INSTALLED, true);
                         final boolean stopped =
@@ -2043,6 +2061,12 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
                         final int minAspectRatio = parser.getAttributeInt(null,
                                 ATTR_MIN_ASPECT_RATIO,
                                 PackageManager.USER_MIN_ASPECT_RATIO_UNSET);
+                        final int virtualGamepadUserOption = parser.getAttributeInt(null,
+                                ATTR_VIRTUAL_GAMEPAD_USER_OPTION,
+                                PackageManager.VIRTUAL_GAMEPAD_USER_OPTION_UNSET);
+                        final int personalContextMode = parser.getAttributeInt(null,
+                                ATTR_PERSONAL_CONTEXT_MODE,
+                                PackageManager.PERSONAL_CONTEXT_MODE_UNSET);
 
                         ArraySet<String> enabledComponents = null;
                         ArraySet<String> disabledComponents = null;
@@ -2117,14 +2141,16 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
                             setBlockUninstallLPw(userId, name, true);
                         }
                         ps.setUserState(
-                                userId, ceDataInode, deDataInode, enabled, installed, stopped,
+                                userId, ceDataInode, deDataInode, pccCeDataInode, pccDeDataInode,
+                                enabled, installed, stopped,
                                 notLaunched, hidden, distractionFlags, suspendParamsMap, instantApp,
                                 virtualPreload, enabledCaller, enabledComponents,
                                 disabledComponents, installReason, uninstallReason,
                                 harmfulAppWarning, splashScreenTheme,
                                 firstInstallTime != 0 ? firstInstallTime
                                         : origFirstInstallTimes.getOrDefault(name, 0L),
-                                minAspectRatio, archiveState, appLockEnabled);
+                                minAspectRatio, archiveState, appLockEnabled,
+                                virtualGamepadUserOption, personalContextMode);
                         mDomainVerificationManager.setLegacyUserState(name, userId, verifState);
                     } else if (tagName.equals("preferred-activities")) {
                         readPreferredActivitiesLPw(parser, userId);
@@ -2487,6 +2513,14 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
                             serializer.attributeLong(null, ATTR_DE_DATA_INODE,
                                     ustate.getDeDataInode());
                         }
+                        if (ustate.getPccCeDataInode() != 0) {
+                            serializer.attributeLong(null, ATTR_PCC_CE_DATA_INODE,
+                                    ustate.getPccCeDataInode());
+                        }
+                        if (ustate.getPccDeDataInode() != 0) {
+                            serializer.attributeLong(null, ATTR_PCC_DE_DATA_INODE,
+                                    ustate.getPccDeDataInode());
+                        }
                         if (!ustate.isInstalled()) {
                             serializer.attributeBoolean(null, ATTR_INSTALLED, false);
                         }
@@ -2545,6 +2579,16 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
                                 != PackageManager.USER_MIN_ASPECT_RATIO_UNSET) {
                             serializer.attributeInt(null, ATTR_MIN_ASPECT_RATIO,
                                     ustate.getMinAspectRatio());
+                        }
+                        if (ustate.getVirtualGamepadUserOption()
+                                != PackageManager.VIRTUAL_GAMEPAD_USER_OPTION_UNSET) {
+                            serializer.attributeInt(null, ATTR_VIRTUAL_GAMEPAD_USER_OPTION,
+                                    ustate.getVirtualGamepadUserOption());
+                        }
+                        if (ustate.getPersonalContextMode()
+                                != PackageManager.PERSONAL_CONTEXT_MODE_UNSET) {
+                            serializer.attributeInt(null, ATTR_PERSONAL_CONTEXT_MODE,
+                                    ustate.getPersonalContextMode());
                         }
                         if (ustate.isSuspended()) {
                             for (int i = 0; i < ustate.getSuspendParams().size(); i++) {
@@ -5641,6 +5685,10 @@ public final class Settings implements Watchable, Snappable, ResilientAtomicFile
             pw.print(userState.getCeDataInode());
             pw.print(" deDataInode=");
             pw.print(userState.getDeDataInode());
+            pw.print(" pccCeDataInode=");
+            pw.print(userState.getPccCeDataInode());
+            pw.print(" pccDeDataInode=");
+            pw.print(userState.getPccDeDataInode());
             pw.print(" installed=");
             pw.print(userState.isInstalled());
             pw.print(" hidden=");

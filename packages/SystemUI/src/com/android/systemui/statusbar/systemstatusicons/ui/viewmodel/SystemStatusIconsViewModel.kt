@@ -27,8 +27,10 @@ import com.android.systemui.statusbar.systemstatusicons.bluetooth.ui.viewmodel.B
 import com.android.systemui.statusbar.systemstatusicons.connecteddisplay.ui.viewmodel.ConnectedDisplayIconViewModel
 import com.android.systemui.statusbar.systemstatusicons.datasaver.ui.viewmodel.DataSaverIconViewModel
 import com.android.systemui.statusbar.systemstatusicons.devicesatellite.ui.viewmodel.DeviceBasedSatelliteIconViewModel
+import com.android.systemui.statusbar.systemstatusicons.domain.interactor.ExternalSystemStatusIconInteractor
 import com.android.systemui.statusbar.systemstatusicons.domain.interactor.OrderedIconSlotNamesInteractor
 import com.android.systemui.statusbar.systemstatusicons.ethernet.ui.viewmodel.EthernetIconViewModel
+import com.android.systemui.statusbar.systemstatusicons.heaset.ui.viewmodel.HeadsetIconViewModel
 import com.android.systemui.statusbar.systemstatusicons.hotspot.ui.viewmodel.HotspotIconViewModel
 import com.android.systemui.statusbar.systemstatusicons.mobile.ui.viewmodel.MobileSystemStatusIconsViewModel
 import com.android.systemui.statusbar.systemstatusicons.profile.ui.viewmodel.ManagedProfileIconViewModel
@@ -43,6 +45,8 @@ import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
@@ -52,17 +56,28 @@ import kotlinx.coroutines.launch
  * This ViewModel is responsible for orchestrating the display of various system status icons.
  * Exposes a consolidated list of icons.
  */
-class SystemStatusIconsViewModel
+interface SystemStatusIconsViewModel {
+    /** A list of view models for all system status icons. Should be a hydrated value. */
+    val iconViewModels: List<SystemStatusIconViewModel>
+
+    interface Factory {
+        fun create(context: Context): SystemStatusIconsViewModel
+    }
+}
+
+class SystemStatusIconsViewModelImpl
 @AssistedInject
 constructor(
     @Assisted context: Context,
     orderedIconSlotNamesInteractor: OrderedIconSlotNamesInteractor,
+    externalSystemStatusIconInteractor: ExternalSystemStatusIconInteractor,
     airplaneModeIconViewModelFactory: AirplaneModeIconViewModel.Factory,
     bluetoothIconViewModelFactory: BluetoothIconViewModel.Factory,
     connectedDisplayIconViewModelFactory: ConnectedDisplayIconViewModel.Factory,
     dataSaverIconViewModelFactory: DataSaverIconViewModel.Factory,
     deviceBasedSatelliteIconViewModelFactory: DeviceBasedSatelliteIconViewModel.Factory,
     ethernetIconViewModelFactory: EthernetIconViewModel.Factory,
+    headsetIconsViewModelFactory: HeadsetIconViewModel.Factory,
     hotspotIconViewModelFactory: HotspotIconViewModel.Factory,
     managedProfileIconViewModelFactory: ManagedProfileIconViewModel.Factory,
     mobileSystemStatusIconsViewModelFactory: MobileSystemStatusIconsViewModel.Factory,
@@ -73,7 +88,7 @@ constructor(
     vpnIconViewModelFactory: VpnIconViewModel.Factory,
     wifiIconViewModelFactory: WifiIconViewModel.Factory,
     zenModeIconViewModelFactory: ZenModeIconViewModel.Factory,
-) : ExclusiveActivatable() {
+) : ExclusiveActivatable(), SystemStatusIconsViewModel {
 
     init {
         SystemStatusIconsInCompose.expectInNewMode()
@@ -91,6 +106,7 @@ constructor(
         deviceBasedSatelliteIconViewModelFactory.create(context)
     }
     private val ethernetIcon by lazy { ethernetIconViewModelFactory.create(context) }
+    private val headsetIcon by lazy { headsetIconsViewModelFactory.create(context) }
     private val hotspotIcon by lazy { hotspotIconViewModelFactory.create(context) }
     private val managedProfileIcon by lazy { managedProfileIconViewModelFactory.create(context) }
     private val mobileIcons by lazy { mobileSystemStatusIconsViewModelFactory.create(context) }
@@ -102,6 +118,17 @@ constructor(
     private val wifiIcon by lazy { wifiIconViewModelFactory.create(context) }
     private val zenModeIcon by lazy { zenModeIconViewModelFactory.create(context) }
 
+    private val externalIconViewModels: Flow<List<SystemStatusIconViewModel.External>> =
+        externalSystemStatusIconInteractor.icons.map { icons ->
+            icons.map { icon ->
+                object : SystemStatusIconViewModel.External {
+                    override val slotName = icon.slotName
+                    override val statusBarIcon = icon.icon
+                    override val visible = true
+                }
+            }
+        }
+
     private val unOrderedIconViewModels: List<SystemStatusIconViewModel> by lazy {
         listOf(
             airplaneModeIcon,
@@ -110,6 +137,7 @@ constructor(
             dataSaverIcon,
             deviceSatelliteIcon,
             ethernetIcon,
+            headsetIcon,
             hotspotIcon,
             managedProfileIcon,
             mobileIcons,
@@ -127,13 +155,22 @@ constructor(
         unOrderedIconViewModels.associateBy { it.slotName }
     }
 
-    val iconViewModels by
+    private val internalIconViewModels: Flow<List<SystemStatusIconViewModel>> =
+        orderedIconSlotNamesInteractor.orderedIconSlotNames.map { slotNames ->
+            sortViewModelsBySlotNames(slotNames.toSet())
+        }
+
+    override val iconViewModels by
         hydrator.hydratedStateOf(
             traceName = "iconViewModels",
             initialValue = emptyList(),
             source =
-                orderedIconSlotNamesInteractor.orderedIconSlotNames.map { slotNames ->
-                    sortViewModelsBySlotNames(slotNames.toSet())
+                combine(externalIconViewModels, internalIconViewModels) {
+                    externalIcons,
+                    internalIcons ->
+                    // Put external at the beginning because they're the lowest priority, so they
+                    // should get ellipsized first.
+                    externalIcons + internalIcons
                 },
         )
 
@@ -147,6 +184,7 @@ constructor(
             launch { dataSaverIcon.activate() }
             launch { deviceSatelliteIcon.activate() }
             launch { ethernetIcon.activate() }
+            launch { headsetIcon.activate() }
             launch { hotspotIcon.activate() }
             launch { managedProfileIcon.activate() }
             launch { mobileIcons.activate() }
@@ -174,7 +212,7 @@ constructor(
     }
 
     @AssistedFactory
-    interface Factory {
-        fun create(context: Context): SystemStatusIconsViewModel
+    interface Factory : SystemStatusIconsViewModel.Factory {
+        override fun create(context: Context): SystemStatusIconsViewModelImpl
     }
 }

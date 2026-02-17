@@ -64,6 +64,7 @@ import androidx.test.filters.SmallTest;
 
 import com.android.internal.R;
 import com.android.internal.widget.CachingIconView;
+import com.android.systemui.flags.EnableSceneContainer;
 import com.android.systemui.SysuiTestCase;
 import com.android.systemui.SysuiTestableContext;
 import com.android.systemui.kosmos.KosmosJavaAdapter;
@@ -78,7 +79,6 @@ import com.android.systemui.statusbar.notification.headsup.PinnedStatus;
 import com.android.systemui.statusbar.notification.icon.IconPack;
 import com.android.systemui.statusbar.notification.row.ExpandableView.OnHeightChangedListener;
 import com.android.systemui.statusbar.notification.row.wrapper.NotificationViewWrapper;
-import com.android.systemui.statusbar.notification.shared.NotificationBundleUi;
 import com.android.systemui.statusbar.notification.stack.NotificationChildrenContainer;
 import com.android.systemui.statusbar.phone.KeyguardBypassController;
 
@@ -114,6 +114,31 @@ public class ExpandableNotificationRowTest extends SysuiTestCase {
                         changedRow.setChildrenExpanded(expanded);
                     }
                 });
+    }
+
+    @Test
+    @EnableSceneContainer
+    public void canShowHeadsUp_onKeyguard_isHeadsUpState_returnsTrue() {
+        ExpandableNotificationRow row = mKosmos.createRow();
+        StatusBarStateController statusBarStateController = mKosmos.getStatusBarStateController();
+        KeyguardBypassController bypassController = mKosmos.getKeyguardBypassController();
+
+        // GIVEN: Keyguard is showing, dozing is false (waking up), bypass is false
+        row.setOnKeyguard(true);
+        when(statusBarStateController.isDozing()).thenReturn(false);
+        when(bypassController.getBypassEnabled()).thenReturn(false);
+
+        // GIVEN: We are trying to save space
+        row.setSaveSpaceOnLockscreen(true);
+
+        // GIVEN: the row is heads up
+        row.setHeadsUp(true);
+
+        // WHEN
+        boolean canShow = row.canShowHeadsUp();
+
+        // THEN: show HUN layout instead of collapsed layout
+        assertTrue(canShow);
     }
 
     @Test
@@ -171,30 +196,6 @@ public class ExpandableNotificationRowTest extends SysuiTestCase {
         when(keyguardBypassControllerMock.getBypassEnabled()).thenReturn(false);
 
         assertFalse(row.canShowHeadsUp());
-    }
-
-    @Test
-    @DisableFlags(NotificationBundleUi.FLAG_NAME)
-    public void testUpdateBackgroundColors_isRecursive() throws Exception {
-        ExpandableNotificationRow group = mKosmos.createRowGroup();
-        group.setTintColor(Color.RED);
-        group.getChildNotificationAt(0).setTintColor(Color.GREEN);
-        group.getChildNotificationAt(1).setTintColor(Color.BLUE);
-
-        assertThat(group.getCurrentBackgroundTint()).isEqualTo(Color.RED);
-        assertThat(group.getChildNotificationAt(0).getCurrentBackgroundTint())
-                .isEqualTo(Color.GREEN);
-        assertThat(group.getChildNotificationAt(1).getCurrentBackgroundTint())
-                .isEqualTo(Color.BLUE);
-
-        group.updateBackgroundColors();
-
-        int resetTint = group.getCurrentBackgroundTint();
-        assertThat(resetTint).isNotEqualTo(Color.RED);
-        assertThat(group.getChildNotificationAt(0).getCurrentBackgroundTint())
-                .isEqualTo(resetTint);
-        assertThat(group.getChildNotificationAt(1).getCurrentBackgroundTint())
-                .isEqualTo(resetTint);
     }
 
     @Test
@@ -266,7 +267,6 @@ public class ExpandableNotificationRowTest extends SysuiTestCase {
     }
 
     @Test
-    @EnableFlags(NotificationBundleUi.FLAG_NAME)
     public void testGroupWithinGroupIntrinsicHeightCalculationWhenGroupExpanded() throws Exception {
         // GIVEN a group within a group
         final ExpandableNotificationRow bundle = mKosmos.createRowBundle(
@@ -290,7 +290,6 @@ public class ExpandableNotificationRowTest extends SysuiTestCase {
     }
 
     @Test
-    @EnableFlags(NotificationBundleUi.FLAG_NAME)
     public void testGroupWithinGroupIntrinsicHeightCalculationWhenGroupCollapsed() {
         // GIVEN a group within a group
         final ExpandableNotificationRow bundle = mKosmos.createRowBundle(
@@ -314,7 +313,6 @@ public class ExpandableNotificationRowTest extends SysuiTestCase {
     }
 
     @Test
-    @EnableFlags(NotificationBundleUi.FLAG_NAME)
     public void testGroupsInsideBundles_clickableWhenExpanded() throws Exception {
         // GIVEN a group within a group
         final ExpandableNotificationRow bundle = mKosmos.createRowBundle(
@@ -607,9 +605,7 @@ public class ExpandableNotificationRowTest extends SysuiTestCase {
 
         group.setDismissUsingRowTranslationX(false, false);
         group.setTranslation(50);
-        IconPack icons = NotificationBundleUi.isEnabled()
-                ? group.getEntryAdapter().getIcons()
-                : group.getEntryLegacy().getIcons();
+        IconPack icons = group.getEntryAdapter().getIcons();
 
         assertEquals(50, -icons.getShelfIcon().getScrollX());
 
@@ -625,22 +621,6 @@ public class ExpandableNotificationRowTest extends SysuiTestCase {
         Assert.assertFalse(group.isExpanded());
         group.setUserExpanded(true);
         Assert.assertTrue(group.isExpanded());
-    }
-
-    @Test
-    @DisableFlags(NotificationBundleUi.FLAG_NAME)
-    public void testGetIsNonblockable() throws Exception {
-        ExpandableNotificationRow row = mKosmos.createRow();
-        row.setEntryLegacy(null);
-
-        assertTrue(row.getIsNonblockable());
-
-        NotificationEntry entry = mock(NotificationEntry.class);
-
-        Mockito.doReturn(false, true).when(entry).isBlockable();
-        row.setEntryLegacy(entry);
-        assertTrue(row.getIsNonblockable());
-        assertFalse(row.getIsNonblockable());
     }
 
     @Test
@@ -953,79 +933,6 @@ public class ExpandableNotificationRowTest extends SysuiTestCase {
 
         // THEN
         assertThat(row.isExpanded()).isFalse();
-    }
-
-    @Test
-    @DisableFlags(NotificationBundleUi.FLAG_NAME)
-    public void isExpanded_sensitivePromotedNotification_notExpanded() throws Exception {
-        // GIVEN
-        final ExpandableNotificationRow row = mKosmos.createPromotedOngoingRow();
-        row.setSensitive(/* sensitive= */true, /* hideSensitive= */false);
-        row.setHideSensitiveForIntrinsicHeight(/* hideSensitive= */true);
-
-        // THEN
-        assertThat(row.isExpanded()).isFalse();
-    }
-
-    @Test
-    @DisableFlags(NotificationBundleUi.FLAG_NAME)
-    public void isExpanded_promotedNotificationNotOnKeyguard_expanded() throws Exception {
-        // GIVEN
-        final ExpandableNotificationRow row = mKosmos.createPromotedOngoingRow();
-        row.setOnKeyguard(false);
-
-        // THEN
-        assertThat(row.isExpanded()).isTrue();
-    }
-
-    @Test
-    @DisableFlags(NotificationBundleUi.FLAG_NAME)
-    public void isExpanded_promotedNotificationAllowOnKeyguard_expanded() throws Exception {
-        // GIVEN
-        final ExpandableNotificationRow row = mKosmos.createPromotedOngoingRow();
-        row.setOnKeyguard(true);
-
-        // THEN
-        assertThat(row.isExpanded(/* allowOnKeyguard = */ true)).isTrue();
-    }
-
-    @Test
-    @DisableFlags(NotificationBundleUi.FLAG_NAME)
-    public void isExpanded_promotedNotificationIgnoreLockscreenConstraints_expanded()
-            throws Exception {
-        // GIVEN
-        final ExpandableNotificationRow row = mKosmos.createPromotedOngoingRow();
-        row.setOnKeyguard(true);
-        row.setIgnoreLockscreenConstraints(true);
-
-        // THEN
-        assertThat(row.isExpanded()).isTrue();
-    }
-
-    @Test
-    @DisableFlags(NotificationBundleUi.FLAG_NAME)
-    public void isExpanded_promotedNotificationSaveSpaceOnLockScreen_notExpanded()
-            throws Exception {
-        // GIVEN
-        final ExpandableNotificationRow row = mKosmos.createPromotedOngoingRow();
-        row.setOnKeyguard(true);
-        row.setSaveSpaceOnLockscreen(true);
-
-        // THEN
-        assertThat(row.isExpanded()).isFalse();
-    }
-
-    @Test
-    @DisableFlags(NotificationBundleUi.FLAG_NAME)
-    public void isExpanded_promotedNotificationNotSaveSpaceOnLockScreen_expanded()
-            throws Exception {
-        // GIVEN
-        final ExpandableNotificationRow row = mKosmos.createPromotedOngoingRow();
-        row.setOnKeyguard(true);
-        row.setSaveSpaceOnLockscreen(false);
-
-        // THEN
-        assertThat(row.isExpanded()).isTrue();
     }
 
     @Test

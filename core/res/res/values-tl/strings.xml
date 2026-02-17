@@ -1123,6 +1123,7 @@
     <string name="lockscreen_access_pattern_cell_added_verbose" msgid="2931364927622563465">"Idinagdag ang cell <xliff:g id="CELL_INDEX">%1$s</xliff:g>"</string>
     <string name="lockscreen_access_pattern_detected" msgid="3931150554035194012">"Nakumpleto ang pattern"</string>
     <string name="lockscreen_access_pattern_area" msgid="1288780416685002841">"Bahagi ng pattern."</string>
+    <string name="lockscreen_access_pattern_cell_verbose" msgid="6670905066468035137">"Cell <xliff:g id="CELL_INDEX">%1$s</xliff:g>"</string>
     <string name="keyguard_accessibility_widget_changed" msgid="7298011259508200234">"%1$s. Widget %2$d ng %3$d."</string>
     <string name="keyguard_accessibility_add_widget" msgid="8245795023551343672">"Magdagdag ng widget."</string>
     <string name="keyguard_accessibility_widget_empty_slot" msgid="544239307077644480">"Walang laman"</string>
@@ -2006,6 +2007,7 @@
     <string name="managed_profile_label_badge_3" msgid="6882151970556391957">"Pangatlong <xliff:g id="LABEL">%1$s</xliff:g> sa Trabaho"</string>
     <string name="clone_profile_label_badge" msgid="1871997694718793964">"I-clone ang <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="private_profile_label_badge" msgid="1712086003787839183">"Pribadong <xliff:g id="LABEL">%1$s</xliff:g>"</string>
+    <string name="hsu_label_badge" msgid="1357272000281944932">"System <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="lock_to_app_unlock_pin" msgid="3890940811866290782">"Humingi ng PIN bago mag-unpin"</string>
     <string name="lock_to_app_unlock_pattern" msgid="2694204070499712503">"Humingi ng pattern sa pag-unlock bago mag-unpin"</string>
     <string name="lock_to_app_unlock_password" msgid="9126722403506560473">"Humingi ng password bago mag-unpin"</string>
@@ -2111,7 +2113,32 @@
     <string name="app_suspended_default_message" msgid="6451215678552004172">"Hindi available ang <xliff:g id="APP_NAME_0">%1$s</xliff:g> sa ngayon. Pinamamahalaan ito ng <xliff:g id="APP_NAME_1">%2$s</xliff:g>."</string>
     <string name="app_suspended_more_details" msgid="211260942831587014">"Matuto pa"</string>
     <string name="app_suspended_unsuspend_message" msgid="1665438589450555459">"I-unpause ang app"</string>
+    <string name="app_lock_add_screen_lock_button_text" msgid="9209013414563206600">"Magdagdag ng screen lock"</string>
+    <string name="app_lock_add_screen_lock_message" msgid="6107009360675769892">"Puwedeng PIN, pattern, o password ang iyong screen lock. Gagamitin mo ito para i-unlock ang iyong device at i-access ang mga naka-lock na app."</string>
+    <string name="app_lock_add_screen_lock_title" msgid="6905612843620128689">"Una, magdagdag ng screen lock"</string>
+    <string name="enable_app_lock_success_toast_message" msgid="3339622779190529987">"Naka-lock ang <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
+    <string name="enable_app_lock_failure_toast_message" msgid="1055838896510445566">"Hindi ma-lock ang <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
+    <string name="disable_app_lock_success_toast_message" msgid="70733620589071266">"Inalis ang Lock ng App sa <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="locked_app_biometric_prompt_description" msgid="6853122652400451464">"Naka-lock ang <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
+    <string name="locked_app_external_display_message" msgid="5483884799685545338">"Para ma-access ang app sa display na ito, i-verify muna na ikaw ito sa isa mo pang device"</string>
+    <string name="app_lock_edu_dialog_enable_app_lock_title" msgid="283314042336592322">"Magdagdag ng lock ng app sa <xliff:g id="APP_NAME">%1$s</xliff:g>?"</string>
+    <string name="app_lock_edu_dialog_description" msgid="8176807243219769518">"Para sa iyong seguridad, ikaw lang ang makaka-access sa app na ito gamit ang Pag-unlock Gamit ang Fingerprint at Mukha o ang PIN mo"</string>
+    <string name="app_lock_edu_dialog_description_template" msgid="8563718120753342530">"Para sa iyong seguridad, ikaw lang ang puwedeng mag-access sa app na ito gamit ang %1$s o ang %2$s mo"</string>
+    <string name="app_lock_edu_dialog_description_template_no_biometrics" msgid="7122017109150633691">"Para sa iyong seguridad, ikaw lang ang makaka-access sa app na ito gamit ang %1$s mo"</string>
+    <string name="app_lock_edu_dialog_info_header" msgid="5876120209204270990">"Gumagamit ng lock ng app"</string>
+    <string name="app_lock_edu_dialog_info_notifications" msgid="1124438392204873305">"Itatago ang content ng notification"</string>
+    <string name="app_lock_edu_dialog_info_widgets" msgid="8809009414650740872">"Aalisin ang mga widget at shortcut"</string>
+    <string name="app_lock_edu_dialog_button_lock" msgid="3914687128135704801">"Idagdag ang app lock"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_face" msgid="1348151645996748654">"Pag-unlock Gamit ang Mukha"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_fingerprint" msgid="5206107469561561455">"Pag-unlock Gamit ang Fingerprint"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_fingerprint_and_face" msgid="7895807411323811641">"Pag-unlock Gamit ang Fingerprint o Mukha"</string>
+    <string name="app_lock_edu_dialog_lockscreen_password_name" msgid="8487096457702445059">"Password"</string>
+    <string name="app_lock_edu_dialog_lockscreen_pattern_name" msgid="991436996281983547">"Pattern"</string>
+    <string name="app_lock_edu_dialog_lockscreen_pin_name" msgid="6458607126966304795">"PIN"</string>
+    <string name="app_lock_permission_review_dialog_title" msgid="5030286398974840579">"Posibleng lumabas pa rin ang mga larawan mo sa iba pang app"</string>
+    <string name="app_lock_permission_review_dialog_sub_title" msgid="310758587817184145">"Mga app na may access sa mga larawan mo"</string>
+    <string name="app_lock_permission_review_expand_app_list_button" msgid="3214809707125223273">"Tingnan lahat"</string>
+    <string name="app_lock_permission_review_continue_button" msgid="4045066724173414043">"Magpatuloy"</string>
     <string name="work_mode_off_title" msgid="6367463960165135829">"I-unpause ang mga work app?"</string>
     <string name="work_mode_turn_on" msgid="5316648862401307800">"I-unpause"</string>
     <string name="work_mode_emergency_call_button" msgid="6818855962881612322">"Emergency"</string>
@@ -2592,6 +2619,8 @@
     <string name="satellite_messaging_unsupported_default_sms_app_notification_summary" msgid="17084124893763593">"Para magpadala ng mensahe sa pamamagitan ng satellite, itakda ang Google Messages bilang iyong default na app sa pagmemensahe"</string>
     <string name="satellite_messaging_location_disabled_notification_title" msgid="7270641894250928494">"Hindi available ang satellite messaging"</string>
     <string name="satellite_messaging_location_disabled_notification_summary" msgid="1450824950686221810">"Para tingnan kung available ang satellite messaging sa bansa o rehiyong ito, i-on ang mga setting ng lokasyon"</string>
+    <!-- no translation found for satellite_indicator (6846063647532086110) -->
+    <skip />
     <string name="fingerprint_dangling_notification_title" msgid="7362075195588639989">"I-set up ulit ang Pag-unlock Gamit ang Fingerprint"</string>
     <string name="fingerprint_dangling_notification_msg_1" msgid="5851784577768803510">"Hindi na makilala ang <xliff:g id="FINGERPRINT">%s</xliff:g>."</string>
     <string name="fingerprint_dangling_notification_msg_2" msgid="7925203589860744456">"Hindi na makilala ang <xliff:g id="FINGERPRINT_0">%1$s</xliff:g> at <xliff:g id="FINGERPRINT_1">%2$s</xliff:g>."</string>

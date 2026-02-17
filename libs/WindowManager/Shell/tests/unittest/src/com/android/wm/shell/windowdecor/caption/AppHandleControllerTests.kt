@@ -138,6 +138,8 @@ class AppHandleControllerTests : ShellTestCase() {
                 shellTaskOrganizer = mockTaskOrganizer,
                 launcherApps = mock(),
                 shellInit = shellInit,
+                shellController = mock(),
+                shellCommandHandler = mock(),
             )
         whenever(mockAssistContentRequester.requestAssistContent(anyInt(), any())).thenAnswer {
             invocation ->
@@ -189,6 +191,7 @@ class AppHandleControllerTests : ShellTestCase() {
                 shouldShowNewWindowButton = anyBoolean(),
                 shouldShowManageWindowsButton = anyBoolean(),
                 shouldShowChangeAspectRatioButton = anyBoolean(),
+                shouldShowGameControlsButton = anyBoolean(),
                 shouldShowDesktopModeButton = anyBoolean(),
                 shouldShowRestartButton = anyBoolean(),
                 isBrowserApp = anyBoolean(),

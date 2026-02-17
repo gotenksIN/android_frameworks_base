@@ -17,8 +17,12 @@
 package com.android.server.display.mode;
 
 import static android.hardware.display.DisplayManager.DISPLAY_CATEGORY_ALL_INCLUDING_DISABLED;
+import static android.hardware.display.DisplayManager.HDR_PREFERENCE_HDR_ALLOWED;
+import static android.hardware.display.DisplayManager.HDR_PREFERENCE_SDR_ONLY;
 import static android.hardware.display.DisplayManagerInternal.REFRESH_RATE_LIMIT_HIGH_BRIGHTNESS_MODE;
 import static android.os.PowerManager.BRIGHTNESS_INVALID_FLOAT;
+import static android.view.Display.Mode.FLAG_ANISOTROPY_CORRECTION;
+import static android.view.Display.Mode.FLAG_ARR_RENDER_RATE;
 import static android.view.Display.Mode.FLAG_SIZE_OVERRIDE;
 import static android.view.Display.Mode.INVALID_MODE_ID;
 
@@ -27,6 +31,7 @@ import static com.android.server.display.DisplayDeviceConfig.DEFAULT_LOW_REFRESH
 import android.annotation.IntegerRes;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.SuppressLint;
 import android.content.ContentResolver;
 import android.content.Context;
 import android.content.res.Resources;
@@ -51,6 +56,7 @@ import android.os.PowerManager;
 import android.os.RemoteException;
 import android.os.ServiceManager;
 import android.os.SystemClock;
+import android.os.SystemProperties;
 import android.os.Temperature;
 import android.os.UserHandle;
 import android.provider.DeviceConfig;
@@ -125,6 +131,7 @@ public class DisplayModeDirector {
     private static final int MSG_REFRESH_RATE_IN_HBM_SUNLIGHT_CHANGED = 7;
     private static final int MSG_REFRESH_RATE_IN_HBM_HDR_CHANGED = 8;
     private static final int MSG_SWITCH_USER = 9;
+    private static final int MSG_USER_PREFERRED_HDR_MODE = 10;
 
     private final Object mLock = new Object();
     private final Context mContext;
@@ -300,8 +307,12 @@ public class DisplayModeDirector {
 
             List<Display.Mode> availableModes = new ArrayList<>();
             availableModes.add(defaultMode);
-            VoteSummary primarySummary = new VoteSummary(isVrrSupportedLocked(displayId),
-                    mLoggingEnabled, mSupportsFrameRateOverride);
+            VoteSummary primarySummary =
+                    new VoteSummary(
+                            isVrrSupportedLocked(displayId),
+                            mLoggingEnabled,
+                            mSupportsFrameRateOverride,
+                            mInjector.isUserPreferredHdrModeAllowed());
             int lowestConsideredPriority = Vote.MIN_PRIORITY;
             int highestConsideredPriority = Vote.MAX_PRIORITY;
 
@@ -340,8 +351,12 @@ public class DisplayModeDirector {
                 lowestConsideredPriority++;
             }
 
-            VoteSummary appRequestSummary = new VoteSummary(isVrrSupportedLocked(displayId),
-                    mLoggingEnabled, mSupportsFrameRateOverride);
+            VoteSummary appRequestSummary =
+                    new VoteSummary(
+                            isVrrSupportedLocked(displayId),
+                            mLoggingEnabled,
+                            mSupportsFrameRateOverride,
+                            mInjector.isUserPreferredHdrModeAllowed());
 
             appRequestSummary.applyVotes(votes,
                     Vote.APP_REQUEST_REFRESH_RATE_RANGE_PRIORITY_CUTOFF,
@@ -530,6 +545,20 @@ public class DisplayModeDirector {
     }
 
     /**
+     * Sets the Display mode vote summary based on user-set HDR preference
+     *
+     * @param displayId id of the display to apply HDR preference vote
+     * @param hdrPreference HDR preference to decide the mode vote summary to apply
+     */
+    public void setUserPreferredHdrMode(
+            int displayId, @DisplayManager.HdrPreference int hdrPreference) {
+        synchronized (mLock) {
+            mHandler.obtainMessage(MSG_USER_PREFERRED_HDR_MODE, displayId, hdrPreference)
+                    .sendToTarget();
+        }
+    }
+
+    /**
      * Retrieve the Vote for the given display and priority. Intended only for testing purposes.
      *
      * @param displayId the display to query for
@@ -642,6 +671,11 @@ public class DisplayModeDirector {
             default:
                 return "Unknown SwitchingType " + type;
         }
+    }
+
+    @VisibleForTesting
+    void injectHasArrSupport(SparseBooleanArray hasArrSupport) {
+        mHasArrSupport = hasArrSupport;
     }
 
     @VisibleForTesting
@@ -798,7 +832,18 @@ public class DisplayModeDirector {
                         mSettingsObserver.updateRefreshRateSettingLocked();
                         mSettingsObserver.updateModeSwitchingTypeSettingLocked();
                     }
+                    break;
                 }
+
+                case MSG_USER_PREFERRED_HDR_MODE:
+                    int displayId = msg.arg1;
+                    int hdrPreference = msg.arg2;
+                    DisplayInfo displayInfo = mDisplayObserver.getDisplayInfo(displayId);
+                    if (displayInfo != null) {
+                        mDisplayObserver.updateUserSettingAllowedHdrMode(
+                                displayInfo, hdrPreference);
+                    }
+                    break;
             }
         }
     }
@@ -1221,12 +1266,20 @@ public class DisplayModeDirector {
             // used to predict if we're going to be doing frequent refresh rate switching, and if
             // so, enable the brightness observer. The logic here is more complicated and fragile
             // than necessary, and we should improve it. See b/156304339 for more info.
-            Vote peakVote = peakRefreshRate == 0f
-                    ? null
-                    : Vote.forPhysicalRefreshRates(0f,
-                            Math.max(minRefreshRate, peakRefreshRate));
-            mVotesStorage.updateVote(displayId, Vote.PRIORITY_USER_SETTING_PEAK_REFRESH_RATE,
-                    peakVote);
+            if (!isVrrSupportedLocked(displayId)) {
+                Vote peakVote = peakRefreshRate == 0f
+                        ? null
+                        : Vote.forPhysicalRefreshRates(0f,
+                                Math.max(minRefreshRate, peakRefreshRate));
+                mVotesStorage.updateVote(displayId, Vote.PRIORITY_USER_SETTING_PEAK_REFRESH_RATE,
+                        peakVote);
+            } else { // VRR supported: remove any refresh rate limitations.
+                // due to race condition this method might be called before hasArr flags are updated
+                // this could lead to situation when PRIORITY_USER_SETTING_PEAK_REFRESH_RATE is set
+                // whith default RR for VRR display and never changed/removed.
+                mVotesStorage.updateVote(displayId, Vote.PRIORITY_USER_SETTING_PEAK_REFRESH_RATE,
+                        null);
+            }
             Vote peakRenderVote = peakRefreshRate == 0f
                     ? null
                     : Vote.forRenderFrameRates(0f, Math.max(minRefreshRate, peakRefreshRate));
@@ -1464,8 +1517,9 @@ public class DisplayModeDirector {
             updateDisplayModes(displayId, displayInfo);
             updateHasArrSupport(displayId, displayInfo);
             updateLayoutLimitedFrameRate(displayId, displayInfo);
-            updateUserSettingDisplayPreferredSize(displayInfo);
+            updateUserSettingDisplayPreferredMode(displayInfo);
             updateDisplaysPeakRefreshRateAndResolution(displayInfo);
+            updateUserSettingAllowedHdrMode(displayInfo);
         }
 
         @Override
@@ -1480,6 +1534,7 @@ public class DisplayModeDirector {
             updateLayoutLimitedFrameRate(displayId, null);
             removeUserSettingDisplayPreferredSize(displayId);
             removeDisplaysPeakRefreshRateAndResolution(displayId);
+            removeUserSettingAllowedHdrMode(displayId);
             unregisterExternalDisplay(displayId);
         }
 
@@ -1501,7 +1556,8 @@ public class DisplayModeDirector {
             updateHasArrSupport(displayId, displayInfo);
             updateDisplayModes(displayId, displayInfo);
             updateLayoutLimitedFrameRate(displayId, displayInfo);
-            updateUserSettingDisplayPreferredSize(displayInfo);
+            updateUserSettingDisplayPreferredMode(displayInfo);
+            updateUserSettingAllowedHdrMode(displayInfo);
         }
 
         private void registerExternalDisplay(DisplayInfo displayInfo) {
@@ -1551,51 +1607,107 @@ public class DisplayModeDirector {
         }
 
         private void removeUserSettingDisplayPreferredSize(int displayId) {
-            mVotesStorage.updateVote(displayId, Vote.PRIORITY_USER_SETTING_DISPLAY_PREFERRED_SIZE,
-                    null);
+            mVotesStorage.updateVote(displayId,
+                    Vote.PRIORITY_USER_SETTING_DISPLAY_PREFERRED_OPTIONS, null);
         }
 
-        private void updateUserSettingDisplayPreferredSize(@Nullable DisplayInfo info) {
+        private void updateUserSettingDisplayPreferredMode(@Nullable DisplayInfo info) {
             if (info == null) {
                 return;
             }
 
-            var preferredMode = findDisplayPreferredMode(info);
+            Display.Mode preferredMode = findMode(info, info.userPreferredModeId);
+
             if (preferredMode == null) {
                 removeUserSettingDisplayPreferredSize(info.displayId);
                 return;
             }
 
-            if (info.type == Display.TYPE_EXTERNAL && !isRefreshRateSynchronizationEnabled()) {
-                mVotesStorage.updateVote(info.displayId,
-                        Vote.PRIORITY_USER_SETTING_DISPLAY_PREFERRED_SIZE,
-                        Vote.forSizeAndPhysicalRefreshRatesRange(
-                                /* minWidth */ preferredMode.getPhysicalWidth(),
-                                /* minHeight */ preferredMode.getPhysicalHeight(),
-                                /* width */ preferredMode.getPhysicalWidth(),
-                                /* height */ preferredMode.getPhysicalHeight(),
-                                /* minRefreshRate */ preferredMode.getRefreshRate(),
-                                /* maxRefreshRate */ preferredMode.getRefreshRate()));
+            Vote sizeVote = null;
+            Vote renderRateVote = null;
+            Vote refreshRateVote = null;
+
+            if ((preferredMode.getFlags() & (FLAG_SIZE_OVERRIDE)) != 0) {
+                // no mode switch, only limit render rate
+                renderRateVote = Vote.forRenderFrameRates(0f, preferredMode.getRefreshRate());
+            } else if ((preferredMode.getFlags() & (FLAG_ANISOTROPY_CORRECTION)) != 0) {
+                // find parent mode
+                preferredMode = findMode(info, preferredMode.getParentModeId());
+                if (preferredMode != null) {
+                    // switch set parent mode
+                    refreshRateVote = Vote.forPhysicalRefreshRates(preferredMode.getRefreshRate());
+                    sizeVote = Vote.forSize(
+                            preferredMode.getPhysicalWidth(), preferredMode.getPhysicalHeight());
+                }
+            } else if ((preferredMode.getFlags() & (FLAG_ARR_RENDER_RATE)) != 0) {
+                // switch resolution and verify render rate is achievable
+                renderRateVote = Vote.forRequestedRefreshRate(preferredMode.getRefreshRate());
+                sizeVote = Vote.forSize(
+                        preferredMode.getPhysicalWidth(), preferredMode.getPhysicalHeight());
             } else {
-                mVotesStorage.updateVote(info.displayId,
-                        Vote.PRIORITY_USER_SETTING_DISPLAY_PREFERRED_SIZE,
-                        Vote.forSize(/* width */ preferredMode.getPhysicalWidth(),
-                                /* height */ preferredMode.getPhysicalHeight()));
+                refreshRateVote = Vote.forPhysicalRefreshRates(preferredMode.getRefreshRate());
+                sizeVote = Vote.forSize(
+                        preferredMode.getPhysicalWidth(), preferredMode.getPhysicalHeight());
+            }
+
+            // switch only resolution for external display if rr sync is on
+            if (isRefreshRateSynchronizationEnabled() && info.type == Display.TYPE_EXTERNAL) {
+                refreshRateVote = null;
+                renderRateVote = null;
+            }
+
+            // rr switch for other than external display is handled separately
+            if (info.type != Display.TYPE_EXTERNAL) {
+                refreshRateVote = null;
+            }
+
+            mVotesStorage.updateVote(info.displayId,
+                    Vote.PRIORITY_USER_SETTING_DISPLAY_PREFERRED_OPTIONS,
+                    Vote.forVotes(Arrays.asList(sizeVote, renderRateVote, refreshRateVote)));
+
+        }
+
+        private void updateUserSettingAllowedHdrMode(DisplayInfo info) {
+            int hdrPreference = mInjector.getUserPreferredHdrMode(info.displayId);
+            updateUserSettingAllowedHdrMode(info, hdrPreference);
+        }
+
+        private void updateUserSettingAllowedHdrMode(
+                DisplayInfo info, @DisplayManager.HdrPreference int hdrPreference) {
+            if (!mInjector.isUserPreferredHdrModeAllowed() || info.type == Display.TYPE_INTERNAL) {
+                // User-preference for HDR mode is not supported on internal display
+                removeUserSettingAllowedHdrMode(info.displayId);
+                return;
+            }
+
+            if (mLoggingEnabled) {
+                Slog.d(
+                        TAG,
+                        "Update display#" + info.displayId + " HDR preference: " + hdrPreference);
+            }
+            switch (hdrPreference) {
+                case HDR_PREFERENCE_SDR_ONLY:
+                    mVotesStorage.updateVote(info.displayId, Vote.PRIORITY_USER_SETTING_HDR_MODE,
+                            Vote.forHdrPreference(/* allowHdr= */ false));
+                    break;
+                case HDR_PREFERENCE_HDR_ALLOWED:
+                    mVotesStorage.updateVote(info.displayId, Vote.PRIORITY_USER_SETTING_HDR_MODE,
+                            Vote.forHdrPreference(/* allowHdr= */ true));
+                    break;
             }
         }
 
-        @Nullable
-        private Display.Mode findDisplayPreferredMode(@NonNull DisplayInfo info) {
-            if (info.userPreferredModeId == INVALID_MODE_ID) {
+        private void removeUserSettingAllowedHdrMode(int displayId) {
+            mVotesStorage.updateVote(displayId, Vote.PRIORITY_USER_SETTING_HDR_MODE, null);
+        }
+
+        private Display.Mode findMode(@NonNull DisplayInfo info, int modeId) {
+            if (modeId == INVALID_MODE_ID) {
                 return null;
             }
             for (var mode : info.supportedModes) {
-                if (mode.getModeId() == info.userPreferredModeId) {
-                    if ((mode.getFlags() & FLAG_SIZE_OVERRIDE) != 0) {
-                        return null;
-                    } else {
-                        return mode;
-                    }
+                if (mode.getModeId() == modeId) {
+                    return mode;
                 }
             }
             return null;
@@ -1696,7 +1808,6 @@ public class DisplayModeDirector {
                 mHasArrSupport.put(displayId, info.hasArrSupport);
             }
         }
-
     }
 
     /**
@@ -3065,6 +3176,7 @@ public class DisplayModeDirector {
     }
 
     interface Injector {
+
         Uri PEAK_REFRESH_RATE_URI = Settings.System.getUriFor(Settings.System.PEAK_REFRESH_RATE);
         Uri MIN_REFRESH_RATE_URI = Settings.System.getUriFor(Settings.System.MIN_REFRESH_RATE);
 
@@ -3098,10 +3210,14 @@ public class DisplayModeDirector {
 
         boolean isDozeState(Display d);
 
+        @DisplayManager.HdrPreference int getUserPreferredHdrMode(int displayId);
+
         boolean registerThermalEventListener(IThermalEventListener listener);
         void unregisterThermalEventListener(IThermalEventListener listener);
 
         boolean supportsFrameRateOverride();
+
+        boolean isUserPreferredHdrModeAllowed();
 
         DisplayManagerInternal getDisplayManagerInternal();
 
@@ -3121,11 +3237,19 @@ public class DisplayModeDirector {
 
     @VisibleForTesting
     static class RealInjector implements Injector {
+        private static final String SYSPROP_ENABLE_HDR_MODE_SPLITTING =
+                "persist.sys.display.enable_hdr_mode_splitting";
         private final Context mContext;
         private DisplayManager mDisplayManager;
 
+        // If true, display modes are split based on supportedHdrTypes, and will always have SDR
+        // variant of a HDR-capable mode
+        private final boolean mIsHdrModeSplittingEnabled;
+
         RealInjector(Context context) {
             mContext = context;
+            mIsHdrModeSplittingEnabled =
+                    SystemProperties.getBoolean(SYSPROP_ENABLE_HDR_MODE_SPLITTING, false);
         }
 
         @Override
@@ -3210,6 +3334,12 @@ public class DisplayModeDirector {
             return Display.isDozeState(d.getState());
         }
 
+        @SuppressLint("AndroidFrameworkRequiresPermission")
+        @Override
+        public int getUserPreferredHdrMode(int displayId) {
+            return getDisplayManager().getUserPreferredHdrMode(displayId);
+        }
+
         @Override
         public boolean registerThermalEventListener(IThermalEventListener listener) {
             IThermalService thermalService = getThermalService();
@@ -3243,6 +3373,12 @@ public class DisplayModeDirector {
         @Override
         public boolean supportsFrameRateOverride() {
             return SurfaceFlingerProperties.enable_frame_rate_override().orElse(true);
+        }
+
+        @Override
+        public boolean isUserPreferredHdrModeAllowed() {
+            return com.android.window.flags.Flags.enableUserPreferredHdrMode()
+                    && mIsHdrModeSplittingEnabled;
         }
 
         @Override

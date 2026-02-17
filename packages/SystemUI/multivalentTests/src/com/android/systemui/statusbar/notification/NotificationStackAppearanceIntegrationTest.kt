@@ -33,13 +33,10 @@ import com.android.systemui.kosmos.runTest
 import com.android.systemui.scene.domain.interactor.sceneInteractor
 import com.android.systemui.scene.shared.model.Overlays
 import com.android.systemui.scene.shared.model.Scenes
-import com.android.systemui.scene.shared.model.fakeSceneDataSource
 import com.android.systemui.shade.domain.interactor.enableDualShade
 import com.android.systemui.shade.domain.interactor.enableSingleShade
 import com.android.systemui.statusbar.notification.stack.shared.model.ShadeScrimBounds
 import com.android.systemui.statusbar.notification.stack.shared.model.ShadeScrimShape
-import com.android.systemui.statusbar.notification.stack.ui.viewmodel.NotificationTransitionThresholds.EXPANSION_FOR_DELAYED_STACK_FADE_IN
-import com.android.systemui.statusbar.notification.stack.ui.viewmodel.NotificationTransitionThresholds.EXPANSION_FOR_MAX_SCRIM_ALPHA
 import com.android.systemui.statusbar.notification.stack.ui.viewmodel.notificationScrollViewModel
 import com.android.systemui.statusbar.notification.stack.ui.viewmodel.notificationsPlaceholderViewModel
 import com.android.systemui.testKosmos
@@ -57,10 +54,7 @@ class NotificationStackAppearanceIntegrationTest : SysuiTestCase() {
 
     private val kosmos =
         testKosmos().apply {
-            fakeFeatureFlagsClassic.apply {
-                set(Flags.FULL_SCREEN_USER_SWITCHER, false)
-                set(Flags.NSSL_DEBUG_LINES, false)
-            }
+            fakeFeatureFlagsClassic.apply { set(Flags.FULL_SCREEN_USER_SWITCHER, false) }
         }
 
     @Test
@@ -222,162 +216,5 @@ class NotificationStackAppearanceIntegrationTest : SysuiTestCase() {
             assertThat(maxAlpha).isEqualTo(0f)
             notificationsPlaceholderViewModel.setAlphaForBrightnessMirror(1f)
             assertThat(maxAlpha).isEqualTo(1f)
-        }
-
-    @Test
-    fun shadeExpansion_goneToShade() =
-        kosmos.runTest {
-            enableSingleShade()
-            val transitionState =
-                MutableStateFlow<ObservableTransitionState>(
-                    ObservableTransitionState.Idle(currentScene = Scenes.Gone)
-                )
-            sceneInteractor.setTransitionState(transitionState)
-            val expandFraction by collectLastValue(notificationScrollViewModel.expandFraction)
-            assertThat(expandFraction).isEqualTo(0f)
-
-            fakeSceneDataSource.changeScene(toScene = Scenes.Gone)
-            val isScrollable by collectLastValue(notificationScrollViewModel.isScrollable)
-            assertThat(isScrollable).isFalse()
-
-            fakeSceneDataSource.pause()
-
-            sceneInteractor.changeScene(Scenes.Shade, "reason")
-            val transitionProgress = MutableStateFlow(0f)
-            transitionState.value =
-                ObservableTransitionState.Transition(
-                    fromScene = Scenes.Gone,
-                    toScene = Scenes.Shade,
-                    currentScene = flowOf(Scenes.Shade),
-                    progress = transitionProgress,
-                    isInitiatedByUserInput = false,
-                    isUserInputOngoing = flowOf(false),
-                )
-            val steps = 10
-            repeat(steps) { repetition ->
-                val progress = (1f / steps) * (repetition + 1)
-                transitionProgress.value = progress
-                assertThat(expandFraction).isWithin(0.01f).of(progress)
-            }
-
-            fakeSceneDataSource.unpause(expectedScene = Scenes.Shade)
-            assertThat(expandFraction).isWithin(0.01f).of(1f)
-            assertThat(isScrollable).isTrue()
-        }
-
-    @Test
-    fun shadeExpansion_idleOnLockscreen() =
-        kosmos.runTest {
-            sceneInteractor.setTransitionState(
-                flowOf(ObservableTransitionState.Idle(currentScene = Scenes.Lockscreen))
-            )
-            val expandFraction by collectLastValue(notificationScrollViewModel.expandFraction)
-            assertThat(expandFraction).isEqualTo(1f)
-
-            fakeSceneDataSource.changeScene(toScene = Scenes.Lockscreen)
-            val isScrollable by collectLastValue(notificationScrollViewModel.isScrollable)
-            assertThat(isScrollable).isFalse()
-        }
-
-    @Test
-    fun shadeExpansion_idleOnQs() =
-        kosmos.runTest {
-            enableSingleShade()
-            sceneInteractor.setTransitionState(
-                flowOf(ObservableTransitionState.Idle(currentScene = Scenes.QuickSettings))
-            )
-            val expandFraction by collectLastValue(notificationScrollViewModel.expandFraction)
-            assertThat(expandFraction).isEqualTo(1f)
-
-            fakeSceneDataSource.changeScene(toScene = Scenes.QuickSettings)
-            val isScrollable by collectLastValue(notificationScrollViewModel.isScrollable)
-            assertThat(isScrollable).isFalse()
-        }
-
-    @Test
-    fun shadeExpansion_shadeToQs() =
-        kosmos.runTest {
-            enableSingleShade()
-            val transitionState =
-                MutableStateFlow<ObservableTransitionState>(
-                    ObservableTransitionState.Idle(currentScene = Scenes.Shade)
-                )
-            sceneInteractor.setTransitionState(transitionState)
-            val expandFraction by collectLastValue(notificationScrollViewModel.expandFraction)
-            assertThat(expandFraction).isEqualTo(1f)
-
-            fakeSceneDataSource.changeScene(toScene = Scenes.Shade)
-            val isScrollable by collectLastValue(notificationScrollViewModel.isScrollable)
-            assertThat(isScrollable).isTrue()
-
-            fakeSceneDataSource.pause()
-
-            sceneInteractor.changeScene(Scenes.QuickSettings, "reason")
-            val transitionProgress = MutableStateFlow(0f)
-            transitionState.value =
-                ObservableTransitionState.Transition(
-                    fromScene = Scenes.Shade,
-                    toScene = Scenes.QuickSettings,
-                    currentScene = flowOf(Scenes.QuickSettings),
-                    progress = transitionProgress,
-                    isInitiatedByUserInput = false,
-                    isUserInputOngoing = flowOf(false),
-                )
-            val steps = 10
-            repeat(steps) { repetition ->
-                val progress = (1f / steps) * (repetition + 1)
-                transitionProgress.value = progress
-                assertThat(expandFraction).isEqualTo(1f)
-            }
-
-            fakeSceneDataSource.unpause(expectedScene = Scenes.QuickSettings)
-            assertThat(expandFraction).isEqualTo(1f)
-            assertThat(isScrollable).isFalse()
-        }
-
-    @Test
-    fun shadeExpansion_goneToQs() =
-        kosmos.runTest {
-            enableSingleShade()
-            val transitionState =
-                MutableStateFlow<ObservableTransitionState>(
-                    ObservableTransitionState.Idle(currentScene = Scenes.Gone)
-                )
-            sceneInteractor.setTransitionState(transitionState)
-            val expandFraction by collectLastValue(notificationScrollViewModel.expandFraction)
-            assertThat(expandFraction).isEqualTo(0f)
-
-            fakeSceneDataSource.changeScene(toScene = Scenes.Gone)
-            val isScrollable by collectLastValue(notificationScrollViewModel.isScrollable)
-            assertThat(isScrollable).isFalse()
-
-            fakeSceneDataSource.pause()
-
-            sceneInteractor.changeScene(Scenes.QuickSettings, "reason")
-            val transitionProgress = MutableStateFlow(0f)
-            transitionState.value =
-                ObservableTransitionState.Transition(
-                    fromScene = Scenes.Gone,
-                    toScene = Scenes.QuickSettings,
-                    currentScene = flowOf(Scenes.QuickSettings),
-                    progress = transitionProgress,
-                    isInitiatedByUserInput = false,
-                    isUserInputOngoing = flowOf(false),
-                )
-            val steps = 10
-            repeat(steps) { repetition ->
-                val progress = (1f / steps) * (repetition + 1)
-                transitionProgress.value = progress
-                assertThat(expandFraction)
-                    .isEqualTo(
-                        (progress / EXPANSION_FOR_MAX_SCRIM_ALPHA -
-                                EXPANSION_FOR_DELAYED_STACK_FADE_IN)
-                            .coerceIn(0f, 1f)
-                    )
-            }
-
-            fakeSceneDataSource.unpause(expectedScene = Scenes.QuickSettings)
-            assertThat(expandFraction).isEqualTo(1f)
-            assertThat(isScrollable).isFalse()
         }
 }

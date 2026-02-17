@@ -64,14 +64,6 @@ flag {
 }
 
 flag {
-    name: "enable_invalidate_check_thread"
-    namespace: "toolkit"
-    description: "Enable checkThread call in ViewRootImpl#onDescendentInvalidated"
-    bug: "333752000"
-    is_fixed_read_only: true
-}
-
-flag {
     name: "disable_draw_wake_lock"
     namespace: "wear_frameworks"
     description: "Disable Draw Wakelock starting U."
@@ -103,6 +95,7 @@ flag {
     description: "Deprecate SurfaceView z order control APIs."
     bug: "341021569"
     is_fixed_read_only: true
+    is_exported: true
 }
 
 flag {
@@ -127,6 +120,7 @@ flag {
     description: "Implement listener pattern for WindowInspector#getGlobalWindowViews."
     bug: "394397033"
     is_fixed_read_only: false
+    is_exported: true
 }
 
 flag {
@@ -145,6 +139,17 @@ flag {
     description: "Recover from buffer stuffing multiple times within the same animation"
     bug: "441566552"
     is_fixed_read_only: false
+}
+
+flag {
+    name: "buffer_stuffing_recovery_threshold"
+    namespace: "window_surfaces"
+    description: "Set a threshold to bound how much frame delay can be incurred during an animation"
+    bug: "395989945"
+    is_fixed_read_only: false
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -172,9 +177,42 @@ flag {
 }
 
 flag {
+    name: "scroll_to_top"
+    namespace: "systemui"
+    description: "Enable scroll to top feature."
+    bug: "467959711"
+    is_exported: true
+}
+
+flag {
     name: "surface_view_set_blur_regions"
     namespace: "core_graphics"
     description: "Add API to set blur regions for SurfaceView"
     is_exported: true
     bug: "425418052"
+}
+
+flag {
+    name: "surface_view_max_hdr_headroom"
+    namespace: "core_graphics"
+    description: "Enable SurfaceView max HDR headroom API"
+    bug: "416494780"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "atomic_traversal_barrier"
+    namespace: "system_performance"
+    description: "Control whether traversal sync barriers are stored in atomics."
+    bug: "464275874"
+}
+
+flag {
+  name: "called_from_wrong_thread_listener_api"
+  is_exported: true
+  namespace: "system_performance"
+  description: "Guards View#setEnforceThreadChecks"
+  bug: "464275874"
 }

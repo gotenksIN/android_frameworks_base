@@ -19,6 +19,7 @@ package com.android.server.devicepolicy.handlers;
 import android.annotation.NonNull;
 import android.app.admin.metadata.EnumPolicyMetadata;
 import android.app.admin.metadata.ListPolicyMetadata;
+import android.app.admin.metadata.LongPolicyMetadata;
 import android.app.admin.metadata.PolicyMetadata;
 import android.app.admin.metadata.StringPolicyMetadata;
 
@@ -42,12 +43,15 @@ public abstract class PolicyValidator<T> {
 
                     if (!enumPolicy.getAllowedValues().contains(value)) {
                         throw new IllegalArgumentException(
-                                "Unsupported value "
-                                        + value
-                                        + " for policy "
-                                        + policy.getId());
+                                "Unsupported value " + value + " for policy " + policy.getId());
                     }
                 }
+            };
+
+    private static final PolicyValidator<Long> LONG_POLICY_VALIDATOR =
+            new PolicyValidator<Long>() {
+                @Override
+                public void validate(@NonNull Long value, @NonNull PolicyMetadata<Long> policy) {}
             };
 
     private static final PolicyValidator<String> STRING_POLICY_VALIDATOR =
@@ -59,25 +63,26 @@ public abstract class PolicyValidator<T> {
 
                     if (!stringPolicy.isEmptyStringAllowed() && value.isEmpty()) {
                         throw new IllegalArgumentException(
-                            "Empty string is not allowed for policy " + policy.getId()
-                        );
+                                "Empty string is not allowed for policy " + policy.getId());
                     }
                 }
             };
 
-    /**
-     * Returns a validator that can handle values of the given policy.
-     */
+    /** Returns a validator that can handle values of the given policy. */
     @SuppressWarnings({"rawtypes", "unchecked"})
     public static <T> PolicyValidator<T> getInstance(PolicyMetadata<T> policy) {
-        return (PolicyValidator<T>) switch (policy) {
-            case EnumPolicyMetadata e -> ENUM_POLICY_VALIDATOR;
-            case StringPolicyMetadata s -> STRING_POLICY_VALIDATOR;
-            // Need to use a raw type here since we can't extract the element E of T=List<E>.
-            case ListPolicyMetadata l -> getListInstance(l);
-            default -> throw new UnsupportedOperationException(
-                    "Unsupported policy: " + policy.getId().getId());
-        };
+        return (PolicyValidator<T>)
+                switch (policy) {
+                    case EnumPolicyMetadata e -> ENUM_POLICY_VALIDATOR;
+                    case StringPolicyMetadata s -> STRING_POLICY_VALIDATOR;
+                    case LongPolicyMetadata l -> LONG_POLICY_VALIDATOR;
+                    // Need to use a raw type here since we can't extract the element E of
+                    // T=List<E>.
+                    case ListPolicyMetadata l -> getListInstance(l);
+                    default ->
+                            throw new UnsupportedOperationException(
+                                    "Unsupported policy: " + policy.getId().getId());
+                };
     }
 
     private static final PolicyValidator<List<String>> LIST_OF_STRING_POLICY_VALIDATOR =
@@ -88,11 +93,13 @@ public abstract class PolicyValidator<T> {
         // Cast is safe since metadata already checked the type when building.
         // Can't cast to PolicyValidator<List<T>> since List<T> is not a superclass of List<String>
         // (and other list types at the same time), we need to use a raw class instead.
-        return (PolicyValidator) switch (listPolicy.getElementMetadata()) {
-            case StringPolicyMetadata s -> LIST_OF_STRING_POLICY_VALIDATOR;
-            default -> throw new UnsupportedOperationException(
-                    "Unsupported list policy: " + listPolicy.getId().getId());
-        };
+        return (PolicyValidator)
+                switch (listPolicy.getElementMetadata()) {
+                    case StringPolicyMetadata s -> LIST_OF_STRING_POLICY_VALIDATOR;
+                    default ->
+                            throw new UnsupportedOperationException(
+                                    "Unsupported list policy: " + listPolicy.getId().getId());
+                };
     }
 
     /**
@@ -104,16 +111,14 @@ public abstract class PolicyValidator<T> {
 
     private static class ListPolicyValidator<T> extends PolicyValidator<List<T>> {
         @Override
-        public void validate(
-                @NonNull List<T> value, @NonNull PolicyMetadata<List<T>> policy) {
+        public void validate(@NonNull List<T> value, @NonNull PolicyMetadata<List<T>> policy) {
             // This validator is only used for `ListPolicyMetadata`, so nobody should ever
             // pass anything else in.
             var listPolicy = (ListPolicyMetadata) policy;
 
             if (value.isEmpty() && !listPolicy.isEmptyListAllowed()) {
                 throw new IllegalArgumentException(
-                        "Empty list is not allowed for policy "
-                                + policy.getId().getId());
+                        "Empty list is not allowed for policy " + policy.getId().getId());
             }
 
             var elementValidator = getInstance(listPolicy.getElementMetadata());

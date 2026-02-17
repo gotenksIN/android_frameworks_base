@@ -43,8 +43,6 @@ import static android.os.UserHandle.USER_NULL;
 import static android.view.SurfaceControl.Transaction;
 import static android.view.WindowInsets.Type.InsetsType;
 import static android.view.WindowManager.LayoutParams.INVALID_WINDOW_TYPE;
-import static android.window.DesktopModeFlags.ENABLE_CAPTION_COMPAT_INSET_FORCE_CONSUMPTION;
-
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_ANIM;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_ORIENTATION;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_SYNC_ENGINE;
@@ -396,10 +394,13 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
             throw new IllegalArgumentException("The local insets source is using an unsupported"
                     + " source: " + provider);
         }
-        source.updateSideHint(getBounds()).setBoundingRects(provider.getBoundingRects());
-        if (ENABLE_CAPTION_COMPAT_INSET_FORCE_CONSUMPTION.isTrue()) {
-            source.setFlags(provider.getFlags());
+        source.updateSideHint(getBounds());
+        if (com.android.window.flags.Flags.improveFluidResizingPerformance()) {
+            source.setBoundingRects(provider.getInsetsBoundingRects());
+        } else {
+            source.setBoundingRects(provider.getBoundingRects());
         }
+        source.setFlags(provider.getFlags());
         if (mInsetsOwnerDeathRecipientMap == null) {
             mInsetsOwnerDeathRecipientMap = new ArrayMap<>();
         }
@@ -661,15 +662,6 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
             if (mParent != null && mParent.mDisplayContent != null
                     && mDisplayContent != mParent.mDisplayContent) {
                 onDisplayChanged(mParent.mDisplayContent);
-            } else if ((mParent == null || mParent.mDisplayContent == null)
-                    && asDisplayContent() == null
-                    && mDisplayContent != null) {
-                // This window container is detached from a display, but calling
-                // onDisplayChanged(null) causes NPE. Losing a window container that can host
-                // movable tasks means the task move allowed value of the old DisplayContent may
-                // change, so explicitly notify it.
-                // TODO(b/422700507): make onDisplayChanged(null) work
-                mDisplayContent.onDescendantsTaskMoveAllowedChanged();
             }
             onParentChanged(mParent, oldParent);
         }
@@ -754,18 +746,27 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
             t.setLayer(mSurfaceControl, mLastLayer);
         }
 
-        for (int i = 0; i < mChildren.size(); i++)  {
-            SurfaceControl sc = mChildren.get(i).getSurfaceControl();
-            if (sc != null) {
-                t.reparent(sc, mSurfaceControl);
-            }
-        }
+        migrateChildrenToNewSurfaceControl(t);
 
         if (mOverlayHost != null) {
             mOverlayHost.setParent(t, mSurfaceControl);
         }
 
         scheduleAnimation();
+    }
+
+    /** Called when {@link #mSurfaceControl} is recreated. */
+    void migrateChildrenToNewSurfaceControl(SurfaceControl.Transaction t) {
+        final boolean useSyncTransaction = t == mSyncTransaction;
+        for (int i = 0; i < mChildren.size(); i++)  {
+            final WindowContainer<?> child = mChildren.get(i);
+            final SurfaceControl sc = child.mSurfaceControl;
+            if (sc != null) {
+                final SurfaceControl.Transaction childT =
+                        useSyncTransaction ? child.getSyncTransaction() : t;
+                childT.reparent(sc, mSurfaceControl);
+            }
+        }
     }
 
     // Temp. holders for a chain of containers we are currently processing.
@@ -1063,7 +1064,10 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
         if (mParent != null) {
             mParent.onDescendantOverrideConfigurationChanged();
         }
+        dispatchBoundsChangeCallbacksIfNeeded(diff);
+    }
 
+    void dispatchBoundsChangeCallbacksIfNeeded(int diff) {
         if (diff == BOUNDS_CHANGE_NONE) {
             return;
         }
@@ -1095,14 +1099,6 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
         if (mDisplayContent != null && displayContentChanged) {
             if (asWindowState() == null) {
                 mTransitionController.collect(this);
-            }
-        }
-        if (mIsTaskMoveAllowed && displayContentChanged) {
-            if (mDisplayContent != null) {
-                mDisplayContent.onDescendantsTaskMoveAllowedChanged();
-            }
-            if (dc != null) {
-                dc.onDescendantsTaskMoveAllowedChanged();
             }
         }
         mDisplayContent = dc;
@@ -3365,6 +3361,14 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
         return RemoteToken.fromBinder(binder).getContainer();
     }
 
+    @NonNull
+    RemoteToken getOrCreateRemoteToken() {
+        if (mRemoteToken == null) {
+            mRemoteToken = new RemoteToken(this);
+        }
+        return mRemoteToken;
+    }
+
     static class RemoteToken extends IWindowContainerToken.Stub {
 
         final WeakReference<WindowContainer> mWeakRef;
@@ -3791,9 +3795,6 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
         }
 
         mIsTaskMoveAllowed = isTaskMoveAllowed;
-        if (mDisplayContent != null) {
-            mDisplayContent.onDescendantsTaskMoveAllowedChanged();
-        }
     }
 
     boolean getIsTaskMoveAllowed() {
@@ -3828,8 +3829,8 @@ class WindowContainer<E extends WindowContainer> extends ConfigurationContainer<
     boolean canHoldSelfMovableTasks() {
         // Is a TaskDisplayArea or a root Task.
         // Keep these types in sync with types we are traversing in
-        // DisplayContent#updateIsTaskMoveAllowedOnDisplay.
+        // DisplayContent#isTaskMoveAllowedOnDisplay.
         return (asTaskDisplayArea() != null) || (asTask() != null && asTask().isRootTask());
     }
-    // LINT.ThenChange(DisplayContent.java:updateIsTaskMoveAllowedOnDisplay)
+    // LINT.ThenChange(DisplayContent.java:isTaskMoveAllowedOnDisplay)
 }

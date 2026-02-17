@@ -25,6 +25,12 @@ interface BubbleHelper {
     /** Gets the [WindowContainerToken] of the Bubble root Task. */
     fun getAppBubbleRootTaskToken(): WindowContainerToken?
 
+    /** Gets the [WindowContainerToken] of the Bubble visibility barrier. */
+    fun getAppBubbleVisibilityBarrierToken(): WindowContainerToken?
+
+    /** Gets the id for the Bubble root task. */
+    fun getAppBubbleRootTaskId(): Int
+
     /** Whether the given Task id is the Bubble root Task. */
     fun isAppBubbleRootTask(taskId: Int): Boolean
 

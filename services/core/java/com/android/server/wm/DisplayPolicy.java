@@ -20,6 +20,7 @@ package com.android.server.wm;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_RECENTS;
 // QTI_END: 2019-01-29: Core: Revert "Temporarily revert am, wm, and policy servers to upstream QP1A.181202.001"
 import static android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM;
+import static android.view.Display.INVALID_DISPLAY;
 import static android.internal.perfetto.protos.Windowmanagerservice.DecorInsetsInfoProto.OVERRIDE_CONFIG_FRAME;
 import static android.internal.perfetto.protos.Windowmanagerservice.DecorInsetsInfoProto.OVERRIDE_CONFIG_INSETS;
 import static android.internal.perfetto.protos.Windowmanagerservice.DecorInsetsInfoProto.OVERRIDE_NON_DECOR_FRAME;
@@ -44,7 +45,6 @@ import static android.internal.perfetto.protos.Windowmanagerservice.DisplayPolic
 import static android.internal.perfetto.protos.Windowmanagerservice.SystemBarVisibilityOverrideProto.CALLER;
 import static android.internal.perfetto.protos.Windowmanagerservice.SystemBarVisibilityOverrideProto.SHOW;
 import static android.internal.perfetto.protos.Windowmanagerservice.SystemBarVisibilityOverrideProto.HIDE;
-import static android.view.Display.INVALID_DISPLAY;
 import static android.view.InsetsFrameProvider.SOURCE_ARBITRARY_RECTANGLE;
 import static android.view.InsetsFrameProvider.SOURCE_CONTAINER_BOUNDS;
 import static android.view.InsetsFrameProvider.SOURCE_DISPLAY;
@@ -92,7 +92,6 @@ import static android.view.WindowManagerGlobal.ADD_MULTIPLE_SINGLETON;
 import static android.view.WindowManagerGlobal.ADD_OKAY;
 import static android.view.WindowManagerPolicyConstants.ACTION_HDMI_PLUGGED;
 import static android.view.WindowManagerPolicyConstants.EXTRA_HDMI_PLUGGED_STATE;
-import static android.window.DesktopExperienceFlags.ENABLE_RESTRICT_FREEFORM_HIDDEN_SYSTEM_BARS_TO_FILLING_TASKS;
 import static android.window.DisplayAreaOrganizer.FEATURE_UNDEFINED;
 
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_ANIM;
@@ -162,7 +161,6 @@ import android.view.WindowManagerGlobal;
 import android.view.accessibility.AccessibilityManager;
 import android.window.ClientWindowFrames;
 import android.window.DesktopExperienceFlags;
-import android.window.DesktopModeFlags;
 
 import com.android.internal.R;
 import com.android.internal.annotations.VisibleForTesting;
@@ -1050,7 +1048,10 @@ public class DisplayPolicy {
                 mContext, () -> {
             synchronized (mLock) {
                 onConfigurationChanged();
-                if (!com.android.window.flags.Flags.enableTransientGestureInSystemUi()) {
+                if (com.android.window.flags.Flags.enableTransientGestureInSystemUi()) {
+                    StatusBarManagerInternal statusBar = getStatusBarManagerInternal();
+                    if (statusBar != null) statusBar.onConfigurationChanged();
+                } else {
                     mSystemGestures.onConfigurationChanged();
                 }
                 mDisplayContent.updateSystemGestureExclusion();
@@ -1790,7 +1791,10 @@ public class DisplayPolicy {
     }
 
     void onDisplayInfoChanged(DisplayInfo info) {
-        if (!com.android.window.flags.Flags.enableTransientGestureInSystemUi()) {
+        if (com.android.window.flags.Flags.enableTransientGestureInSystemUi()) {
+            StatusBarManagerInternal statusBar = getStatusBarManagerInternal();
+            if (statusBar != null) statusBar.onDisplayInfoChanged();
+        } else {
             mSystemGestures.onDisplayInfoChanged(info);
         }
     }
@@ -2207,7 +2211,10 @@ public class DisplayPolicy {
         // Update the latest display size, cutout.
         mDisplayContent.requestDisplayUpdate(() -> {
             onConfigurationChanged();
-            if (!com.android.window.flags.Flags.enableTransientGestureInSystemUi()) {
+            if (com.android.window.flags.Flags.enableTransientGestureInSystemUi()) {
+                StatusBarManagerInternal statusBar = getStatusBarManagerInternal();
+                if (statusBar != null) statusBar.onConfigurationChanged();
+            } else {
                 mSystemGestures.onConfigurationChanged();
             }
         });
@@ -3141,23 +3148,19 @@ public class DisplayPolicy {
                 defaultTaskDisplayArea.getRootTask(task -> task.isVisible()
                         && task.getTopLeafTask().hasAdjacentTask())
                         != null;
-        final Task topFreeformTask =
-                ENABLE_RESTRICT_FREEFORM_HIDDEN_SYSTEM_BARS_TO_FILLING_TASKS.isTrue()
-                        ? defaultTaskDisplayArea.getTask(task ->
-                                task.getWindowingMode() == WINDOWING_MODE_FREEFORM
+        final Task topFreeformTask = defaultTaskDisplayArea.getTask(
+                task ->
+                        task.getWindowingMode() == WINDOWING_MODE_FREEFORM
                                 // Must be filling to avoid container-only roots, such as
                                 // created-by-organizer desk roots.
-                                && task.hasFillingContent())
-                        : defaultTaskDisplayArea
-                                .getTopRootTaskInWindowingMode(WINDOWING_MODE_FREEFORM);
+                                && task.hasFillingContent());
         final boolean freeformRootTaskVisible = topFreeformTask != null
                 && topFreeformTask.isVisible();
         final boolean inNonFullscreenFreeformMode = freeformRootTaskVisible
                 && !topFreeformTask.getBounds().equals(mDisplayContent.getBounds());
         // Always show status/nav bar for non-fullscreen multi window (excluding PiP).
         final boolean showSystemBarsByLegacyPolicy = adjacentTasksVisible
-                || (DesktopModeFlags.ENABLE_FULLY_IMMERSIVE_IN_DESKTOP.isTrue()
-                ? inNonFullscreenFreeformMode : freeformRootTaskVisible);
+                || inNonFullscreenFreeformMode;
 
         getInsetsPolicy().updateSystemBars(
                 win,
@@ -3693,7 +3696,7 @@ public class DisplayPolicy {
             return;
         }
 
-        if (!mDisplayContent.isRemoved()) {
+        if (!mDisplayContent.isRemovedOrInvalid()) {
             mDisplayContent.unregisterPointerEventListener(mPointerLocationView);
         }
 

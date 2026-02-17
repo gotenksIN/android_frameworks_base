@@ -529,6 +529,9 @@ abstract class AbstractAccessibilityServiceConnection extends IAccessibilityServ
             Slog.e(LOG_TAG, "Observing motion events requires permission "
                     + ACCESSIBILITY_MOTION_EVENT_OBSERVING);
             info.setObservedMotionEventSources(0);
+            if (Flags.resetMotionEventSourcesOnDeniedPermission()) {
+                info.setMotionEventSources(0);
+            }
         }
         final long identity = Binder.clearCallingIdentity();
         try {
@@ -1861,7 +1864,7 @@ abstract class AbstractAccessibilityServiceConnection extends IAccessibilityServ
 
         final boolean includeNotImportantViews = (mFetchFlags
                 & AccessibilityNodeInfo.FLAG_SERVICE_REQUESTS_INCLUDE_NOT_IMPORTANT_VIEWS) != 0;
-        if ((event.getWindowId() != AccessibilityWindowInfo.UNDEFINED_WINDOW_ID)
+        if ((event.getRealWindowId() != AccessibilityWindowInfo.UNDEFINED_WINDOW_ID)
                 && !event.isImportantForAccessibility()
                 && !includeNotImportantViews) {
             return false;

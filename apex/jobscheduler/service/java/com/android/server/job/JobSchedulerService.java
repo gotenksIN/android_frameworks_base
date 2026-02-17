@@ -19,6 +19,7 @@ package com.android.server.job;
 import static android.Manifest.permission.INTERACT_ACROSS_USERS_FULL;
 import static android.Manifest.permission.MANAGE_ACTIVITY_TASKS;
 import static android.app.job.JobParameters.OVERRIDE_HANDLE_ABANDONED_JOBS;
+import static android.app.privatecompute.flags.Flags.enablePccFrameworkSupport;
 import static android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED;
 import static android.content.pm.PackageManager.COMPONENT_ENABLED_STATE_DISABLED_USER;
 import static android.text.format.DateUtils.HOUR_IN_MILLIS;
@@ -1738,8 +1739,7 @@ public class JobSchedulerService extends com.android.server.SystemService
             int userId, @Nullable String namespace, String tag) {
         // Rate limit excessive schedule() calls.
         final String servicePkg = job.getService().getPackageName();
-        if (job.isPersisted() && (Flags.enforceScheduleLimitToProxyJobs()
-                || (packageName == null || packageName.equals(servicePkg)))) {
+        if (job.isPersisted()) {
             // limit excessive schedule calls for persisted jobs.
             final String pkg = packageName == null ? servicePkg : packageName;
             if (!mQuotaTracker.isWithinQuota(userId, pkg, QUOTA_TRACKER_SCHEDULE_PERSISTED_TAG)) {
@@ -4999,7 +4999,9 @@ public class JobSchedulerService extends com.android.server.SystemService
                 if (si == null) {
                     throw new IllegalArgumentException("No such service " + service);
                 }
-                if (si.applicationInfo.uid != uid) {
+                final int serviceUid = enablePccFrameworkSupport() ? si.getUid() :
+                        si.applicationInfo.uid;
+                if (serviceUid != uid) {
                     throw new IllegalArgumentException("uid " + uid +
                             " cannot schedule job in " + service.getPackageName());
                 }
@@ -6165,15 +6167,6 @@ public class JobSchedulerService extends com.android.server.SystemService
             pw.println();
             pw.print(Flags.FLAG_DO_NOT_FORCE_RUSH_EXECUTION_AT_BOOT,
                     Flags.doNotForceRushExecutionAtBoot());
-            pw.println();
-            pw.print(android.app.job.Flags.FLAG_GET_PENDING_JOB_REASONS_API,
-                    android.app.job.Flags.getPendingJobReasonsApi());
-            pw.println();
-            pw.print(android.app.job.Flags.FLAG_GET_PENDING_JOB_REASONS_HISTORY_API,
-                    android.app.job.Flags.getPendingJobReasonsHistoryApi());
-            pw.println();
-            pw.print(android.app.job.Flags.FLAG_ADD_TYPE_INFO_TO_WAKELOCK_TAG,
-                    android.app.job.Flags.addTypeInfoToWakelockTag());
             pw.println();
             pw.print(android.app.job.Flags.FLAG_GET_PENDING_JOB_REASON_STATS_API,
                     android.app.job.Flags.getPendingJobReasonStatsApi());

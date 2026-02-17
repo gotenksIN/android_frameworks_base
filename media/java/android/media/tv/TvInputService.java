@@ -153,6 +153,19 @@ public abstract class TvInputService extends Service {
     public static final int PRIORITY_HINT_USE_CASE_TYPE_RECORD = 500;
 
     /**
+     * Key for session ID, represents the value maps to the unique sessionId created by TIF
+     * when session is created.
+     * This key must be included in {@link Session#notifySessionEvent(String, Bundle)}'s bundle key
+     * if event type is {@link #EVENT_SESSION_ID_SYNC}.
+     * @hide
+     */
+    public static final String EXTRA_SESSION_ID = "session_id";
+    /**
+     * Session event to sync session id between TV input service and application through TvView.
+     * @hide
+     */
+    public static final String EVENT_SESSION_ID_SYNC = "session_id_sync";
+    /**
      * Handler instance to handle request from TV Input Manager Service. Should be run in the main
      * looper to be synchronously run with {@code Session.mHandler}.
      */
@@ -593,7 +606,8 @@ public abstract class TvInputService extends Service {
          * Dispatches an event to the application using this session.
          *
          * @param eventType The type of the event.
-         * @param eventArgs Optional arguments of the event.
+         * @param eventArgs Optional arguments of the event, must include {@link #EXTRA_SESSION_ID}
+         *                  if event type is {@link #EVENT_SESSION_ID_SYNC}.
          * @hide
          */
         @SystemApi
@@ -632,6 +646,36 @@ public abstract class TvInputService extends Service {
                         if (DEBUG) Log.d(TAG, "notifyChannelRetuned");
                         if (mSessionCallback != null) {
                             mSessionCallback.onChannelRetuned(channelUri);
+                        }
+                    } catch (RemoteException e) {
+                        Log.w(TAG, "error in notifyChannelRetuned", e);
+                    }
+                }
+            });
+        }
+
+        /**
+         * Informs the application that the current channel is re-tuned for some reason and the
+         * session now displays the content from a new channel. This function takes in an additional
+         * args parameter to pass to the application to handle special cases such as HBBTV quiet
+         * tune. {@link TvInputService.Session#notifyChannelRetuned(Uri)} should be preferred over
+         * this function in most cases. This should be only used if there are special use cases that
+         * absolutely require additional arguments to be passed to the application.
+         *
+         * @param channelUri The URI of the new channel.
+         * @param args Optional arguments of the event.
+         *
+         * @hide
+         */
+        public void notifyChannelRetuned(final Uri channelUri, final Bundle args) {
+            executeOrPostRunnableOnMainThread(new Runnable() {
+                @MainThread
+                @Override
+                public void run() {
+                    try {
+                        if (DEBUG) Log.d(TAG, "notifyChannelRetuned");
+                        if (mSessionCallback != null) {
+                            mSessionCallback.onChannelRetunedWithExtraInfo(channelUri, args);
                         }
                     } catch (RemoteException e) {
                         Log.w(TAG, "error in notifyChannelRetuned", e);

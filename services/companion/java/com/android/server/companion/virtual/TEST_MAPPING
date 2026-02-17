@@ -38,6 +38,10 @@
   ],
   "postsubmit": [
     {
+      // TODO: b/454903475 - Move to presubmit once bug is fixed.
+      "name": "CtsVirtualDevicesComputerControlTests"
+    },
+    {
       "name": "CtsMediaAudioTestCases_cts_audiofocuswithvdmtest"
     },
     {

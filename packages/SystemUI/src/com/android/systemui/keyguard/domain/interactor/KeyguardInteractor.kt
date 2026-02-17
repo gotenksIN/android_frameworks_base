@@ -19,6 +19,7 @@ import android.app.StatusBarManager
 import android.graphics.Point
 import android.util.Log
 import android.util.MathUtils
+import androidx.compose.runtime.Stable
 import com.android.internal.widget.LockPatternUtils
 import com.android.systemui.bouncer.data.repository.KeyguardBouncerRepository
 import com.android.systemui.common.shared.model.NotificationContainerBounds
@@ -53,12 +54,12 @@ import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.shade.ShadeDisplayAware
 import com.android.systemui.shade.data.repository.ShadeConfigRepository
 import com.android.systemui.shade.data.repository.ShadeRepository
-import com.android.systemui.shade.domain.interactor.ShadeInteractor
 import com.android.systemui.util.kotlin.sample
 import com.android.systemui.wallpapers.domain.interactor.WallpaperFocalAreaInteractor
 import javax.inject.Inject
 import javax.inject.Provider
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
@@ -86,6 +87,8 @@ import kotlinx.coroutines.flow.transform
 /**
  * Encapsulates business-logic related to the keyguard but not to a more specific part within it.
  */
+@OptIn(ExperimentalCoroutinesApi::class)
+@Stable
 @SysUISingleton
 class KeyguardInteractor
 @Inject
@@ -105,7 +108,6 @@ constructor(
     private val fromAlternateBouncerTransitionInteractor:
         Provider<FromAlternateBouncerTransitionInteractor>,
     private val lockPatternUtils: LockPatternUtils,
-    private val shadeInteractor: Provider<ShadeInteractor>,
     @Application applicationScope: CoroutineScope,
 ) {
     // TODO(b/296118689): move to a repository
@@ -166,11 +168,7 @@ constructor(
      */
     val dozeAmount: Flow<Float> =
         isAodAvailable.flatMapLatest { isAodAvailable ->
-            if (isAodAvailable) {
-                keyguardTransitionInteractor.transitionValue(AOD)
-            } else {
-                keyguardTransitionInteractor.transitionValue(DOZING)
-            }
+            keyguardTransitionInteractor.transitionValue(if (isAodAvailable) AOD else DOZING)
         }
 
     /** Doze transition information. */
@@ -262,6 +260,12 @@ constructor(
     @Deprecated("Use KeyguardTransitionInteractor + KeyguardState.GONE")
     val isKeyguardGoingAway: SharedFlow<Boolean> = repository.isKeyguardGoingAway.asSharedFlow()
 
+    /**
+     * Whether keyguard is enabled (security is not set to None and no app/adb commands have
+     * disabled it).
+     */
+    val isKeyguardEnabled: StateFlow<Boolean> = repository.isKeyguardEnabled
+
     /** Keyguard can be clipped at the top as the shade is dragged */
     val topClippingBounds: Flow<Int?> by lazy {
         combineTransform(
@@ -289,7 +293,7 @@ constructor(
     @JvmField
     val primaryBouncerShowing: StateFlow<Boolean> =
         if (SceneContainerFlag.isEnabled) {
-                sceneInteractorProvider.get().transitionState.map {
+                sceneInteractorProvider.get().transitionStateFlow.map {
                     it.isIdle(Overlays.Bouncer) || it.isTransitioning(to = Overlays.Bouncer)
                 }
             } else {

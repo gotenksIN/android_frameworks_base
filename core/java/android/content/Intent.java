@@ -1938,7 +1938,7 @@ public class Intent implements Parcelable, Cloneable {
      * Used as an int extra field with {@link #ACTION_INSTALL_PACKAGE} and
      * {@link #ACTION_VIEW} to indicate the uid of the package that initiated the install
      * Currently only a system app that hosts the provider authority "downloads" or holds the
-     * permission {@link android.Manifest.permission.MANAGE_DOCUMENTS} can use this.
+     * permission {@link android.Manifest.permission#MANAGE_DOCUMENTS} can use this.
      * @hide
      */
     @SystemApi
@@ -5609,6 +5609,29 @@ public class Intent implements Parcelable, Cloneable {
     @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
     public static final String ACTION_UNARCHIVE_PACKAGE = "android.intent.action.UNARCHIVE_PACKAGE";
 
+    /**
+     * Broadcast Action: Sent when the personal context data collection mode of an application is
+     * changed.
+     *
+     * <p>This broadcast is sent to the application for which the setting was modified as well as
+     * the configured content capture service whenever a call to {@link
+     * android.service.personalcontext.PersonalContextManager#setPersonalContextModeEnabled(String,
+     * boolean)} changes an application's personal context data collection setting.
+     *
+     * <p>The package name of the application is included in the {@link #EXTRA_PACKAGE_NAME} extra.
+     *
+     * <p>The current personal context collection state of an application can be retrieved by
+     * calling {@link
+     * android.service.personalcontext.PersonalContextManager#isPersonalContextModeEnabled(String)}.
+     *
+     * <p class="note">This is a protected intent that can only be sent by the system.
+     */
+    @FlaggedApi(android.service.personalcontext.Flags.FLAG_ENABLE_PERSONAL_CONTEXT_SERVICE)
+    @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
+    @BroadcastBehavior(protectedBroadcast = true)
+    public static final String ACTION_PERSONAL_CONTEXT_MODE_CHANGED =
+            "android.intent.action.PERSONAL_CONTEXT_MODE_CHANGED";
+
     // ---------------------------------------------------------------------
     // ---------------------------------------------------------------------
     // Standard intent categories (see addCategory()).
@@ -7226,7 +7249,7 @@ public class Intent implements Parcelable, Cloneable {
      *
      * @see #ACTION_PICK
      * @see #setData(Uri)
-     * @see android.provider.ContactsPickerSessionContract.ACTION_PICK_CONTACTS
+     * @see android.provider.ContactsPickerSessionContract#ACTION_PICK_CONTACTS
      */
     @FlaggedApi(android.content.flags.Flags.FLAG_ENABLE_SYSTEM_CONTACTS_PICKER)
     public static final String EXTRA_USE_SYSTEM_CONTACTS_PICKER =

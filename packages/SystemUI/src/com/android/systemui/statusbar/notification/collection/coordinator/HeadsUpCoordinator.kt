@@ -25,7 +25,6 @@ import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.statusbar.NotificationRemoteInputManager
 import com.android.systemui.statusbar.chips.notification.domain.interactor.StatusBarNotificationChipsInteractor
 import com.android.systemui.statusbar.chips.uievents.StatusBarChipsUiEventLogger
-import com.android.systemui.statusbar.notification.NotifPipelineFlags
 import com.android.systemui.statusbar.notification.collection.BundleEntry
 import com.android.systemui.statusbar.notification.collection.GroupEntry
 import com.android.systemui.statusbar.notification.collection.ListEntry
@@ -56,7 +55,6 @@ import com.android.systemui.statusbar.notification.logKey
 import com.android.systemui.statusbar.notification.row.NotificationActionClickManager
 import com.android.systemui.statusbar.notification.shared.GroupHunAnimationFix
 import com.android.systemui.statusbar.notification.shared.LaunchNewFsiOnUpdate
-import com.android.systemui.statusbar.notification.shared.NotificationBundleUi
 import com.android.systemui.statusbar.notification.stack.BUCKET_HEADS_UP
 import com.android.systemui.util.concurrency.DelayableExecutor
 import com.android.systemui.util.time.SystemClock
@@ -94,7 +92,6 @@ constructor(
     private val mRemoteInputManager: NotificationRemoteInputManager,
     private val notificationActionClickManager: NotificationActionClickManager,
     private val mLaunchFullScreenIntentProvider: LaunchFullScreenIntentProvider,
-    private val mFlags: NotifPipelineFlags,
     private val statusBarNotificationChipsInteractor: StatusBarNotificationChipsInteractor,
     private val statusBarChipsUiEventLogger: StatusBarChipsUiEventLogger,
     @IncomingHeader private val mIncomingHeaderController: NodeController,
@@ -119,11 +116,7 @@ constructor(
         pipeline.addOnBeforeFinalizeFilterListener(::onBeforeFinalizeFilter)
         pipeline.addPromoter(mNotifPromoter)
         pipeline.addNotificationLifetimeExtender(mLifetimeExtender)
-        if (NotificationBundleUi.isEnabled) {
-            notificationActionClickManager.addActionClickListener(mActionPressListener)
-        } else {
-            mRemoteInputManager.addActionPressListener(mActionPressListener)
-        }
+        notificationActionClickManager.addActionClickListener(mActionPressListener)
 
         applicationScope.launch {
             statusBarNotificationChipsInteractor.promotedNotificationChipTapEvent.collect {
@@ -165,7 +158,7 @@ constructor(
                 // showing as heads up, then we should stop showing it.
                 shouldHeadsUpEver = !isCurrentlyHeadsUp,
                 shouldHeadsUpAgain = !isCurrentlyHeadsUp,
-                isPinnedByUser = true,
+                isFromUserAction = true,
                 isHeadsUpEntry = isCurrentlyHeadsUp,
                 isBinding = isEntryBinding(entry),
             )
@@ -181,8 +174,8 @@ constructor(
         }
     }
 
-    private fun onHeadsUpViewBound(entry: NotificationEntry, isPinnedByUser: Boolean) {
-        mHeadsUpManager.showNotification(entry, isPinnedByUser)
+    private fun onHeadsUpViewBound(entry: NotificationEntry, isFromUserOpenAction: Boolean) {
+        mHeadsUpManager.showNotification(entry, isFromUserOpenAction)
         mEntriesBindingUntil.remove(entry.key)
     }
 
@@ -499,7 +492,7 @@ constructor(
                     if (posted.isHeadsUpEntry) {
                         val pinnedStatus =
                             if (posted.shouldHeadsUpAgain) {
-                                if (posted.isPinnedByUser) {
+                                if (posted.isFromUserAction) {
                                     PinnedStatus.PinnedByUser
                                 } else {
                                     PinnedStatus.PinnedBySystem
@@ -512,7 +505,7 @@ constructor(
                 } else { // shouldHeadsUpEver = false
                     if (posted.isHeadsUpEntry) {
                         if (
-                            posted.isPinnedByUser ||
+                            posted.isFromUserAction ||
                                 mHeadsUpManager.canRemoveImmediately(posted.entry.key)
                         ) {
                             // We don't want this to be interrupting anymore, let's remove it.
@@ -550,11 +543,15 @@ constructor(
     }
 
     private fun bindForAsyncHeadsUp(posted: PostedEntry) {
-        val isPinnedByUser = posted.isPinnedByUser
+        val isFromUserOpenAction = posted.isFromUserAction
         // TODO: Add a guarantee to bindHeadsUpView of some kind of callback if the bind is
         //  cancelled so that we don't need to have this sad timeout hack.
         mEntriesBindingUntil[posted.key] = mNow + BIND_TIMEOUT
-        mHeadsUpViewBinder.bindHeadsUpView(posted.entry, isPinnedByUser, this::onHeadsUpViewBound)
+        mHeadsUpViewBinder.bindHeadsUpView(
+            posted.entry,
+            isFromUserOpenAction,
+            this::onHeadsUpViewBound,
+        )
     }
 
     private fun evaluateNewFullScreenIntent(entry: NotificationEntry) {
@@ -1038,7 +1035,7 @@ constructor(
         var wasUpdatedBy: UpdateSource?,
         var shouldHeadsUpEver: Boolean,
         var shouldHeadsUpAgain: Boolean,
-        var isPinnedByUser: Boolean = false,
+        var isFromUserAction: Boolean = false,
         var isHeadsUpEntry: Boolean,
         var isBinding: Boolean,
     ) {

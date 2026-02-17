@@ -163,6 +163,7 @@ flag {
   bug: "361260253"
   # This feature does not support runtime flag switch which leads crash in System UI.
   is_fixed_read_only: true
+  is_exported: true
 }
 
 flag {
@@ -270,6 +271,7 @@ flag {
     namespace: "text"
     description: "Feature flag for inserting new font family in front of an existing font family"
     bug: "447199827"
+    is_exported: true
 }
 
 flag {
@@ -277,4 +279,12 @@ flag {
     namespace: "systemui"
     description: "Splits the 'Show passwords' setting into two new settings: one for touch inputs and one for physical inputs."
     bug: "417951523"
+    is_exported: true
+}
+
+flag {
+  name: "lazy_hyphenator_init"
+  namespace: "text"
+  description: "Initialize hyphenator lazily"
+  bug: "473856914"
 }

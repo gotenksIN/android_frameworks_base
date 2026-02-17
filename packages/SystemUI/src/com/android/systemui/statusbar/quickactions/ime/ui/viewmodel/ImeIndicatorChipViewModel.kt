@@ -28,6 +28,7 @@ import com.android.systemui.res.R
 import com.android.systemui.statusbar.quickactions.ime.domain.interactor.ImeIndicatorChipInteractor
 import com.android.systemui.statusbar.quickactions.ime.shared.model.ImeIndicatorChipModel
 import com.android.systemui.statusbar.quickactions.popups.ui.viewmodel.StatusBarPopupChipViewModel
+import com.android.systemui.statusbar.quickactions.ui.viewmodel.ChipContent
 import com.android.systemui.statusbar.quickactions.ui.viewmodel.ChipIcon
 import com.android.systemui.statusbar.quickactions.ui.viewmodel.QuickActionChipId
 import com.android.systemui.statusbar.quickactions.ui.viewmodel.QuickActionChipUiState
@@ -58,8 +59,6 @@ constructor(
             return QuickActionChipUiState.Hidden(QuickActionChipId.ImeIndicator)
         }
 
-        // TODO(b/458557858): Determine what to set as the accessible name when there is a selected
-        // subtype.
         val subtypeIcon =
             model.selectedSubtype?.icon?.let { subtypeIcon ->
                 android.graphics.drawable.Icon.createWithResource(
@@ -94,8 +93,12 @@ constructor(
         return QuickActionChipUiState.PopupChip(
             chipId = QuickActionChipId.ImeIndicator,
             icons = icons,
-            chipText = chipText,
+            chipContent = chipText?.let { ChipContent.Text(it) },
             showPopup = { imeIndicatorChipInteractor.showInputMethodPicker(displayId) },
+            contentDescription =
+                ContentDescription.Resource(
+                    R.string.accessibility_status_bar_input_method_indicator
+                ),
         )
     }
 

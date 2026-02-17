@@ -139,9 +139,8 @@ public class TaskOrganizer extends WindowOrganizer {
     public void onTaskInfoChanged(@NonNull ActivityManager.RunningTaskInfo taskInfo) {}
 
     @BinderThread
-    public void onBackPressedOnTaskRoot(@NonNull ActivityManager.RunningTaskInfo taskInfo,
-            boolean isFromMoveActivityTaskToBack, boolean isOptInOnBackInvoked,
-            boolean hasOpaqueSibling) {}
+    public void onBackOnTaskRoot(@NonNull ActivityManager.RunningTaskInfo taskInfo,
+            boolean isFromBackPress, boolean isOptInOnBackInvoked, boolean hasOpaqueSibling) {}
 
     /** @hide */
     @BinderThread
@@ -203,14 +202,14 @@ public class TaskOrganizer extends WindowOrganizer {
     /**
      * Creates a persistent Task.
      * @param params The creation params
-     * @return the WindowContainerToken of the newly created Task. This can be {@code null} if the
+     * @return the TaskAppearedInfo of the newly created Task. This can be {@code null} if the
      * Task creation fails in the system server (e.g., due to invalid displayId).
      *
      * @see #deleteTask for removal.
      */
     @RequiresPermission(android.Manifest.permission.MANAGE_ACTIVITY_TASKS)
     @Nullable
-    public WindowContainerToken createTask(@NonNull TaskCreationParams params) {
+    public TaskAppearedInfo createTask(@NonNull TaskCreationParams params) {
         try {
             return mTaskOrganizerController.createTask(params);
         } catch (RemoteException e) {
@@ -384,13 +383,12 @@ public class TaskOrganizer extends WindowOrganizer {
             mExecutor.execute(() -> TaskOrganizer.this.onTaskInfoChanged(info));
         }
 
-        @Override
-        public void onBackPressedOnTaskRoot(
-                ActivityManager.RunningTaskInfo info, boolean isFromMoveActivityTaskToBack,
+        public void onBackOnTaskRoot(
+                ActivityManager.RunningTaskInfo info, boolean isFromBackPress,
                 boolean isOptInOnBackInvoked, boolean hasOpaqueSibling) {
             mExecutor.execute(
-                    () -> TaskOrganizer.this.onBackPressedOnTaskRoot(
-                            info, isFromMoveActivityTaskToBack, isOptInOnBackInvoked,
+                    () -> TaskOrganizer.this.onBackOnTaskRoot(
+                            info, isFromBackPress, isOptInOnBackInvoked,
                             hasOpaqueSibling));
         }
 

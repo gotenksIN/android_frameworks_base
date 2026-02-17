@@ -24,6 +24,7 @@ import static android.content.pm.PackageManager.DELETE_KEEP_DATA;
 import static android.content.pm.PackageManager.DELETE_SUCCEEDED;
 import static android.content.pm.PackageManager.MATCH_KNOWN_PACKAGES;
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
+import static android.os.Process.SYSTEM_UID;
 import static android.os.UserHandle.USER_ALL;
 
 import static com.android.server.pm.PackageManagerService.DEBUG_COMPRESSION;
@@ -37,6 +38,7 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SpecialUsers.CanBeALL;
 import android.annotation.UserIdInt;
+import android.app.AppLockInternal;
 import android.app.AppOpsManager;
 import android.app.ApplicationExitInfo;
 import android.content.Intent;
@@ -67,6 +69,7 @@ import android.util.SparseBooleanArray;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.util.ArrayUtils;
 import com.android.internal.util.Preconditions;
+import com.android.server.LocalServices;
 import com.android.server.pm.pkg.AndroidPackage;
 import com.android.server.pm.pkg.ArchiveState;
 import com.android.server.pm.pkg.PackageStateInternal;
@@ -631,9 +634,16 @@ final class DeletePackageHelper {
                     ? 0
                     : ps.getUserStateOrDefault(nextUserId).getFirstInstallTimeMillis();
 
+            // Preserve App Lock state in case of DELETE_KEEP_DATA
+            final boolean appLockEnablementState = android.security.Flags.appLockApis()
+                    && (flags & PackageManager.DELETE_KEEP_DATA) != 0
+                    && ps.getUserStateOrDefault(nextUserId).isAppLockEnabled();
+
             ps.setUserState(nextUserId,
                     ps.getCeDataInode(nextUserId),
                     ps.getDeDataInode(nextUserId),
+                    ps.getPccCeDataInode(nextUserId),
+                    ps.getPccDeDataInode(nextUserId),
                     COMPONENT_ENABLED_STATE_DEFAULT,
                     false /*installed*/,
                     true /*stopped*/,
@@ -653,7 +663,9 @@ final class DeletePackageHelper {
                     firstInstallTime,
                     PackageManager.USER_MIN_ASPECT_RATIO_UNSET,
                     archiveState,
-                    false /*appLockEnabled*/);
+                    appLockEnablementState,
+                    PackageManager.VIRTUAL_GAMEPAD_USER_OPTION_UNSET,
+                    PackageManager.PERSONAL_CONTEXT_MODE_UNSET);
         }
         mPm.mSettings.writeKernelMappingLPr(ps);
     }
@@ -726,6 +738,25 @@ final class DeletePackageHelper {
         final String packageName = versionedPackage.getPackageName();
         final long versionCode = versionedPackage.getLongVersionCode();
 
+        if (android.security.Flags.appLockApis() && android.security.Flags.appLockCore()) {
+            final boolean isAppLockEnabled = LocalServices.getService(AppLockInternal.class)
+                    .isPackageAppLockEnabled(packageName, userId);
+            if (isAppLockEnabled && callingUid != SYSTEM_UID) {
+                mPm.mHandler.post(() -> {
+                    try {
+                        Slog.w(TAG, "Not removing package " + packageName
+                                    + ": protected by App Lock");
+                        observer.onPackageDeleted(
+                                packageName, PackageManager.DELETE_FAILED_INTERNAL_ERROR,
+                                "protected by App Lock");
+                    } catch (RemoteException e) {
+                        // no-op
+                    }
+                });
+                return;
+            }
+        }
+
         try {
             if (mPm.mInjector.getLocalService(ActivityTaskManagerInternal.class)
                     .isBaseOfLockedTask(packageName)) {
@@ -796,6 +827,22 @@ final class DeletePackageHelper {
                     mPm.mHandler.post(() -> {
                         try {
                             Slog.w(TAG, "Attempted to delete protected package: " + packageName);
+                            observer.onPackageDeleted(packageName,
+                                    PackageManager.DELETE_FAILED_INTERNAL_ERROR, null);
+                        } catch (RemoteException re) {
+                            // no-op
+                        }
+                    });
+                    return;
+                }
+
+                if (Flags.protectSystemRequiredPackages()
+                        && mPm.isRequiredSystemPackageThatCallerCannotControl(
+                                snapshot, packageName, callingUid)) {
+                    mPm.mHandler.post(() -> {
+                        try {
+                            Slog.w(TAG, "Attempted to delete system required package: "
+                                    + packageName + ", callingUid: " + callingUid);
                             observer.onPackageDeleted(packageName,
                                     PackageManager.DELETE_FAILED_INTERNAL_ERROR, null);
                         } catch (RemoteException re) {

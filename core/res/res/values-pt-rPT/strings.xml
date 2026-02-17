@@ -1124,6 +1124,7 @@
     <string name="lockscreen_access_pattern_cell_added_verbose" msgid="2931364927622563465">"Célula <xliff:g id="CELL_INDEX">%1$s</xliff:g> adicionada"</string>
     <string name="lockscreen_access_pattern_detected" msgid="3931150554035194012">"Padrão concluído"</string>
     <string name="lockscreen_access_pattern_area" msgid="1288780416685002841">"Área da sequência."</string>
+    <string name="lockscreen_access_pattern_cell_verbose" msgid="6670905066468035137">"Célula <xliff:g id="CELL_INDEX">%1$s</xliff:g>"</string>
     <string name="keyguard_accessibility_widget_changed" msgid="7298011259508200234">"%1$s. Widget %2$d de %3$d."</string>
     <string name="keyguard_accessibility_add_widget" msgid="8245795023551343672">"Adicionar widget."</string>
     <string name="keyguard_accessibility_widget_empty_slot" msgid="544239307077644480">"Vazio"</string>
@@ -1844,7 +1845,7 @@
     <string name="color_inversion_feature_name" msgid="2672824491933264951">"Inversão de cores"</string>
     <string name="color_correction_feature_name" msgid="7975133554160979214">"Correção da cor"</string>
     <string name="one_handed_mode_feature_name" msgid="2334330034828094891">"Modo para uma mão"</string>
-    <string name="reduce_bright_colors_feature_name" msgid="3222994553174604132">"Mais escuro"</string>
+    <string name="reduce_bright_colors_feature_name" msgid="3222994553174604132">"Escurecimento extra"</string>
     <string name="hearing_aids_feature_name" msgid="1125892105105852542">"Dispositivos auditivos"</string>
     <string name="autoclick_feature_name" msgid="4056260617171267864">"Clique automático (tempo de permanência)"</string>
     <string name="mouse_keys_feature_name" msgid="3362643216513384542">"Teclas do rato"</string>
@@ -2007,6 +2008,7 @@
     <string name="managed_profile_label_badge_3" msgid="6882151970556391957">"3.º <xliff:g id="LABEL">%1$s</xliff:g> de trabalho"</string>
     <string name="clone_profile_label_badge" msgid="1871997694718793964">"Clonar <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="private_profile_label_badge" msgid="1712086003787839183">"<xliff:g id="LABEL">%1$s</xliff:g> privado"</string>
+    <string name="hsu_label_badge" msgid="1357272000281944932">"Sistema <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="lock_to_app_unlock_pin" msgid="3890940811866290782">"Pedir PIN antes de soltar"</string>
     <string name="lock_to_app_unlock_pattern" msgid="2694204070499712503">"Pedir padrão de desbloqueio antes de soltar"</string>
     <string name="lock_to_app_unlock_password" msgid="9126722403506560473">"Pedir palavra-passe antes de soltar"</string>
@@ -2112,7 +2114,32 @@
     <string name="app_suspended_default_message" msgid="6451215678552004172">"A app <xliff:g id="APP_NAME_0">%1$s</xliff:g> não está disponível neste momento. A app <xliff:g id="APP_NAME_1">%2$s</xliff:g> gere esta definição."</string>
     <string name="app_suspended_more_details" msgid="211260942831587014">"Saiba mais"</string>
     <string name="app_suspended_unsuspend_message" msgid="1665438589450555459">"Retomar app"</string>
+    <string name="app_lock_add_screen_lock_button_text" msgid="9209013414563206600">"Adicionar bloqueio de ecrã"</string>
+    <string name="app_lock_add_screen_lock_message" msgid="6107009360675769892">"O bloqueio de ecrã pode ser um PIN, um padrão ou uma palavra-passe. Vai usá-lo para desbloquear o dispositivo e aceder a apps bloqueadas."</string>
+    <string name="app_lock_add_screen_lock_title" msgid="6905612843620128689">"Primeiro, adicione um bloqueio de ecrã"</string>
+    <string name="enable_app_lock_success_toast_message" msgid="3339622779190529987">"A app <xliff:g id="APP_NAME">%1$s</xliff:g> está bloqueada"</string>
+    <string name="enable_app_lock_failure_toast_message" msgid="1055838896510445566">"Não é possível bloquear a app <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
+    <string name="disable_app_lock_success_toast_message" msgid="70733620589071266">"O bloqueio de apps foi removido da app <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="locked_app_biometric_prompt_description" msgid="6853122652400451464">"A app <xliff:g id="APP_NAME">%1$s</xliff:g> está bloqueada"</string>
+    <string name="locked_app_external_display_message" msgid="5483884799685545338">"Para aceder à app neste ecrã, comece por validar a sua identidade no seu outro dispositivo"</string>
+    <string name="app_lock_edu_dialog_enable_app_lock_title" msgid="283314042336592322">"Adicionar o bloqueio de apps à app <xliff:g id="APP_NAME">%1$s</xliff:g>?"</string>
+    <string name="app_lock_edu_dialog_description" msgid="8176807243219769518">"Para sua segurança, só pode aceder a esta app com o Desbloqueio facial e por impressão digital ou com o seu PIN"</string>
+    <string name="app_lock_edu_dialog_description_template" msgid="8563718120753342530">"Para sua segurança, só pode aceder a esta app com %1$s ou com o seu %2$s"</string>
+    <string name="app_lock_edu_dialog_description_template_no_biometrics" msgid="7122017109150633691">"Para sua segurança, só pode aceder a esta app com o seu %1$s"</string>
+    <string name="app_lock_edu_dialog_info_header" msgid="5876120209204270990">"Com bloqueio de apps"</string>
+    <string name="app_lock_edu_dialog_info_notifications" msgid="1124438392204873305">"O conteúdo das notificações vai ser ocultado"</string>
+    <string name="app_lock_edu_dialog_info_widgets" msgid="8809009414650740872">"Os widgets e os atalhos vão ser removidos"</string>
+    <string name="app_lock_edu_dialog_button_lock" msgid="3914687128135704801">"Adic. bloq. de apps"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_face" msgid="1348151645996748654">"Desbloqueio facial"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_fingerprint" msgid="5206107469561561455">"Desbloqueio por impressão digital"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_fingerprint_and_face" msgid="7895807411323811641">"Desbloqueio facial/por impressão digital"</string>
+    <string name="app_lock_edu_dialog_lockscreen_password_name" msgid="8487096457702445059">"Palavra-passe"</string>
+    <string name="app_lock_edu_dialog_lockscreen_pattern_name" msgid="991436996281983547">"Padrão"</string>
+    <string name="app_lock_edu_dialog_lockscreen_pin_name" msgid="6458607126966304795">"PIN"</string>
+    <string name="app_lock_permission_review_dialog_title" msgid="5030286398974840579">"As suas fotos ainda podem ser apresentadas noutras apps"</string>
+    <string name="app_lock_permission_review_dialog_sub_title" msgid="310758587817184145">"Apps com acesso às suas fotos"</string>
+    <string name="app_lock_permission_review_expand_app_list_button" msgid="3214809707125223273">"Ver tudo"</string>
+    <string name="app_lock_permission_review_continue_button" msgid="4045066724173414043">"Continuar"</string>
     <string name="work_mode_off_title" msgid="6367463960165135829">"Retomar apps de trabalho?"</string>
     <string name="work_mode_turn_on" msgid="5316648862401307800">"Retomar"</string>
     <string name="work_mode_emergency_call_button" msgid="6818855962881612322">"Emergência"</string>
@@ -2593,6 +2620,8 @@
     <string name="satellite_messaging_unsupported_default_sms_app_notification_summary" msgid="17084124893763593">"Para enviar mensagens por satélite, defina a app Mensagens Google como a sua app de mensagens predefinida"</string>
     <string name="satellite_messaging_location_disabled_notification_title" msgid="7270641894250928494">"Mensagens por satélite não disponíveis"</string>
     <string name="satellite_messaging_location_disabled_notification_summary" msgid="1450824950686221810">"Para verificar se as mensagens por satélite estão disponíveis neste país ou região, ative as definições de localização"</string>
+    <!-- no translation found for satellite_indicator (6846063647532086110) -->
+    <skip />
     <string name="fingerprint_dangling_notification_title" msgid="7362075195588639989">"Configure o Desbloqueio por impressão digital novamente"</string>
     <string name="fingerprint_dangling_notification_msg_1" msgid="5851784577768803510">"Já não é possível reconhecer <xliff:g id="FINGERPRINT">%s</xliff:g>."</string>
     <string name="fingerprint_dangling_notification_msg_2" msgid="7925203589860744456">"Já não é possível reconhecer <xliff:g id="FINGERPRINT_0">%1$s</xliff:g> e <xliff:g id="FINGERPRINT_1">%2$s</xliff:g>."</string>

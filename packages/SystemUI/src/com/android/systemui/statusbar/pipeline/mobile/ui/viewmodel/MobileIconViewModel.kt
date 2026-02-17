@@ -29,7 +29,6 @@ import android.telephony.TelephonyManager
 import com.android.settingslib.mobile.TelephonyIcons
 // QTI_END: 2025-04-07: Android_UI: SystemUI: Readapt Mobile Icon Features For Kairos(1/2)
 import com.android.settingslib.R as settingsLibR
-import com.android.systemui.Flags.statusBarStaticInoutIndicators
 import com.android.systemui.common.shared.model.ContentDescription
 import com.android.systemui.common.shared.model.Icon
 import com.android.systemui.log.table.logDiffsForTable
@@ -46,6 +45,7 @@ import com.android.systemui.statusbar.pipeline.mobile.domain.model.SignalIconMod
 import com.android.systemui.statusbar.pipeline.mobile.ui.model.MobileContentDescription
 import com.android.systemui.statusbar.pipeline.shared.ConnectivityConstants
 import com.android.systemui.statusbar.pipeline.shared.data.model.DataActivityModel
+import com.android.systemui.statusbar.systemstatusicons.SystemStatusIconsInCompose
 import com.android.systemui.util.kotlin.mapDirect
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
@@ -406,7 +406,7 @@ private class CellularIconViewModel(
             .map { it?.hasActivityOut ?: false }
             .stateIn(scope, SharingStarted.WhileSubscribed(), false)
     override val activityContainerVisible: Flow<Boolean> =
-        if (statusBarStaticInoutIndicators()) {
+        if (SystemStatusIconsInCompose.isEnabled) {
                 flowOf(constants.shouldShowActivityConfig)
             } else {
                 activity.map { it != null && (it.hasActivityIn || it.hasActivityOut) }

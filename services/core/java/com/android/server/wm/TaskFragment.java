@@ -95,6 +95,7 @@ import android.util.BoostFramework;
 import android.util.DebugUtils;
 import android.util.DisplayMetrics;
 import android.util.Slog;
+import android.util.TypedValue;
 import android.util.proto.ProtoOutputStream;
 import android.view.DisplayInfo;
 import android.view.SurfaceControl;
@@ -196,6 +197,8 @@ class TaskFragment extends WindowContainer<WindowContainer> {
      *
      * @see #mMinWidth
      * @see #mMinHeight
+     * @see #mComplexMinWidth
+     * @see #mComplexMinHeight
      */
     static final int INVALID_MIN_SIZE = -1;
 
@@ -213,16 +216,36 @@ class TaskFragment extends WindowContainer<WindowContainer> {
 // QTI_END: 2021-11-22: Performance: perf: Move ActivityResumeTrigger based on refactored code.
 
     /**
+     * @deprecated Use {@link #getMinWidth} instead.
      * Minimal width of this task fragment when it's resizeable. {@link #INVALID_MIN_SIZE} means it
      * should use the default minimal width.
+     * TODO(b/438420596): remove this after flag cleanup.
      */
-    int mMinWidth;
+    @Deprecated
+    protected int mMinWidth;
 
     /**
+     * @deprecated Use {@link #getMinHeight} instead.
      * Minimal height of this task fragment when it's resizeable. {@link #INVALID_MIN_SIZE} means it
      * should use the default minimal height.
+     * TODO(b/438420596): remove this after flag cleanup.
      */
-    int mMinHeight;
+    @Deprecated
+    protected int mMinHeight;
+
+    /**
+     * Minimal width of this task fragment when it's resizeable in complex format.
+     * {@link #INVALID_MIN_SIZE} means it should use the default minimal width.
+     * Use {@link TaskFragment#getMinWidth} to resolve it to a pixel value.
+     */
+    protected int mComplexMinWidth;
+
+    /**
+     * Minimal height of this task fragment when it's resizeable.
+     * {@link #INVALID_MIN_SIZE} means it should use the default minimal height.
+     * Use {@link TaskFragment#getMinHeight} to resolve it to a pixel value.
+     */
+    protected int mComplexMinHeight;
 
     final Dimmer mDimmer = new Dimmer(this);
 
@@ -848,7 +871,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         if (task == null || taskFragBounds.equals(task.getBounds())) {
             return false;
         }
-        final Point minDimensions = activity.getMinDimensions();
+        final Point minDimensions = activity.getMinDimensions(getDisplayContent());
         if (minDimensions == null) {
             return false;
         }
@@ -1185,8 +1208,8 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         if (!isAttached() || isForceHidden() || isForceTranslucent()) {
             return true;
         }
-        return !mAtmService.mVisibilityHelper.isOpaque(
-                this, starting, true /* ignoringKeyguard */, true /* ignoringInvisibleActivity */);
+        return !mAtmService.mVisibilityHelper.isOpaque(this, starting, true /* ignoringKeyguard */,
+                true /* ignoringInvisibleActivity */, true /* ignoringFinishing */);
     }
 
     /**
@@ -1199,7 +1222,9 @@ class TaskFragment extends WindowContainer<WindowContainer> {
             return true;
         }
         // Including finishing Activity if the TaskFragment is becoming invisible in the transition.
-        return !mAtmService.mVisibilityHelper.isOpaque(this);
+        return !mAtmService.mVisibilityHelper.isOpaque(this, null /* starting */,
+                true /* ignoringKeyguard */, false /* ignoringInvisibleActivity */,
+                false /* ignoringFinishing */);
     }
 
     /**
@@ -1211,7 +1236,8 @@ class TaskFragment extends WindowContainer<WindowContainer> {
             return true;
         }
         return !mAtmService.mVisibilityHelper.isOpaque(this, /* starting */ null,
-                false /* ignoringKeyguard */, true /* ignoringInvisibleActivity */);
+                false /* ignoringKeyguard */, true /* ignoringInvisibleActivity */,
+                true /* ignoringFinishing */);
     }
 
     @Override
@@ -1347,6 +1373,18 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         ActivityRecord next = topRunningActivity(true /* focusableOnly */);
         if (next == null || !next.canResumeByCompat()) {
             return false;
+        }
+
+        if (mWmService.mAppLockController != null
+                && mWmService.mAppLockController.isActivityLockedByAppLockLocked(next)) {
+            // The top activity is locked by App Lock. Instead of resuming it, intercept the resume
+            // and show the App Lock overlay. This is the "just-in-time" locking mechanism, refer to
+            // AppLockOverlayController.
+            ProtoLog.d(WM_DEBUG_STATES, "resumeTopActivity: next activity %s is locked by App"
+                    + " Lock, launching overlay", next);
+
+            mWmService.mAppLockController.addLockedByAppLockActivityOverlayLocked(next);
+            return true;
         }
 
         if (!skipPause && !mRootWindowContainer.allPausedActivitiesComplete()) {
@@ -1843,36 +1881,15 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         mAtmService.updateCpuStats();
 
         boolean pauseImmediately = false;
-        boolean shouldAutoPip = false;
-        if (resuming != null) {
-            // We do not want to trigger auto-PiP upon launch of a translucent activity.
-            final boolean resumingOccludesParent = resuming.occludesParent();
-
-            if (ActivityTaskManagerService.isPip2ExperimentEnabled()) {
-                // If a new task is being launched, then mark the existing top activity as
-                // supporting picture-in-picture while pausing only if the starting activity
-                // would not be considered an overlay on top of the current activity
-                // (eg. not fullscreen, or the assistant)
-                Task.enableEnterPipOnTaskSwitch(prev, resuming.getTask(),
-                        resuming, resuming.getOptions());
-            }
-
-            // Resuming the new resume activity only if the previous activity can't go into Pip
-            // since we want to give Pip activities a chance to enter Pip before resuming the
-            // next activity.
-            final boolean lastResumedCanPip = prev.checkEnterPictureInPictureState(
-                    "shouldAutoPipWhilePausing", userLeaving);
-            if (prev.supportsEnterPipOnTaskSwitch && userLeaving
-                    && resumingOccludesParent && lastResumedCanPip
-                    && prev.pictureInPictureArgs.isAutoEnterEnabled()) {
-                shouldAutoPip = true;
-            } else if (!lastResumedCanPip) {
-                // If the flag RESUME_WHILE_PAUSING is set, then continue to schedule the previous
-                // activity to be paused.
-                pauseImmediately = (resuming.info.flags & FLAG_RESUME_WHILE_PAUSING) != 0;
-            } else {
-                // The previous activity may still enter PIP even though it did not allow auto-PIP.
-            }
+        final boolean shouldAutoPip = shouldAutoPip(resuming, prev, userLeaving);
+        final boolean lastResumedCanPip = prev.checkEnterPictureInPictureState(
+                "shouldAutoPipWhilePausing", userLeaving);
+        if (!shouldAutoPip && !lastResumedCanPip && resuming != null) {
+            // If the flag RESUME_WHILE_PAUSING is set, then continue to schedule the previous
+            // activity to be paused.
+            pauseImmediately = (resuming.info.flags & FLAG_RESUME_WHILE_PAUSING) != 0;
+        } else {
+            // The previous activity may still enter PIP even though it did not allow auto-PIP.
         }
 
         if (prev.attachedToProcess()) {
@@ -1940,6 +1957,33 @@ class TaskFragment extends WindowContainer<WindowContainer> {
             }
             return false;
         }
+    }
+
+    private boolean shouldAutoPip(@Nullable ActivityRecord resuming, @NonNull ActivityRecord prev,
+            boolean userLeaving) {
+        // We do not want to trigger auto-PiP upon launch of a translucent activity.
+        final boolean prevIsGettingOccluded = (resuming != null)
+                ? resuming.occludesParent()
+                : !this.shouldBeVisible(null /* starting */);
+
+        if (ActivityTaskManagerService.isPip2ExperimentEnabled() && resuming != null) {
+            // If a new task is being launched, then mark the existing top activity as
+            // supporting picture-in-picture while pausing only if the starting activity
+            // would not be considered an overlay on top of the current activity
+            // (eg. not fullscreen, or the assistant)
+            Task.enableEnterPipOnTaskSwitch(prev, resuming.getTask(),
+                    resuming, resuming.getOptions());
+        }
+
+        // Resuming the new resume activity only if the previous activity can't go into Pip
+        // since we want to give Pip activities a chance to enter Pip before resuming the
+        // next activity.
+        final boolean lastResumedCanPip = prev.checkEnterPictureInPictureState(
+                "shouldAutoPipWhilePausing", userLeaving);
+
+        return prev.supportsEnterPipOnTaskSwitch && userLeaving
+                && prevIsGettingOccluded && lastResumedCanPip
+                && prev.pictureInPictureArgs.isAutoEnterEnabled();
     }
 
     void schedulePauseActivity(ActivityRecord prev, boolean userLeaving,
@@ -2028,10 +2072,9 @@ class TaskFragment extends WindowContainer<WindowContainer> {
 
         if (prev != null) {
             prev.resumeKeyDispatchingLocked();
-            if (prev.isVisibleRequested()) {
-                mRootWindowContainer.ensureActivitiesVisible(resuming);
-            }
         }
+
+        mRootWindowContainer.ensureActivitiesVisible(resuming);
 
         // Notify when the task stack has changed, but only if visibilities changed (not just
         // focus). Also if there is an active root pinned task - we always want to notify it about
@@ -2293,7 +2336,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
         }
 
         final ActivityRecord rootActivity = task.getRootActivity();
-        return tda.supportsActivityMinWidthHeightMultiWindow(mMinWidth, mMinHeight,
+        return tda.supportsActivityMinWidthHeightMultiWindow(getMinWidth(), getMinHeight(),
                 rootActivity != null ? rootActivity.info : null);
     }
 
@@ -2883,7 +2926,7 @@ class TaskFragment extends WindowContainer<WindowContainer> {
             if (a.finishing) {
                 return;
             }
-            final Point minDimensions = a.getMinDimensions();
+            final Point minDimensions = a.getMinDimensions(getDisplayContent());
             if (minDimensions == null) {
                 return;
             }
@@ -2972,17 +3015,44 @@ class TaskFragment extends WindowContainer<WindowContainer> {
     }
 
     /**
-     * Sets {@link #mMinWidth} and {@link #mMinWidth} to this TaskFragment.
+     * Sets min size dimensions to this TaskFragment.
      * It is usually set from the parent {@link Task} when adding the TaskFragment to the window
      * hierarchy.
      */
-    void setMinDimensions(int minWidth, int minHeight) {
+    void setMinDimensions(int minWidth, int minHeight, int complexMinWidth,
+            int complexMinHeight) {
         if (asTask() != null) {
             throw new UnsupportedOperationException("This method must not be used to Task. The "
                     + " minimum dimension of Task should be passed from Task constructor.");
         }
         mMinWidth = minWidth;
         mMinHeight = minHeight;
+        mComplexMinWidth = complexMinWidth;
+        mComplexMinHeight = complexMinHeight;
+    }
+
+    int getMinWidth() {
+        if (!Flags.runtimeDensityResolutionForWindowLayoutBugfix()) {
+            return mMinWidth;
+        }
+        return getDisplayContent() == null
+                ? INVALID_MIN_SIZE
+                : TypedValue.complexToDimensionPixelSize(
+                        mComplexMinWidth,
+                        getDisplayContent().getDisplayMetrics()
+        );
+    }
+
+    int getMinHeight() {
+        if (!Flags.runtimeDensityResolutionForWindowLayoutBugfix()) {
+            return mMinHeight;
+        }
+        return getDisplayContent() == null
+                ? INVALID_MIN_SIZE
+                : TypedValue.complexToDimensionPixelSize(
+                        mComplexMinHeight,
+                        getDisplayContent().getDisplayMetrics()
+                );
     }
 
     /**
@@ -3376,8 +3446,8 @@ class TaskFragment extends WindowContainer<WindowContainer> {
 
         proto.write(DISPLAY_ID, getDisplayId());
         proto.write(ACTIVITY_TYPE, getActivityType());
-        proto.write(MIN_WIDTH, mMinWidth);
-        proto.write(MIN_HEIGHT, mMinHeight);
+        proto.write(MIN_WIDTH, getMinWidth());
+        proto.write(MIN_HEIGHT, getMinHeight());
 
         proto.end(token);
     }

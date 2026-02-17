@@ -97,6 +97,7 @@ import com.android.internal.protolog.ProtoLog;
 import com.android.internal.util.function.pooled.PooledLambda;
 import com.android.server.Watchdog;
 import com.android.server.am.psc.AsyncBatchSession;
+import com.android.server.am.psc.Constants.SchedGroup;
 import com.android.server.am.psc.ProcessRecordInternal;
 import com.android.server.art.ReasonMapping;
 import com.android.server.grammaticalinflection.GrammaticalInflectionManagerInternal;
@@ -171,7 +172,7 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
     // process of launching the app)
     private IApplicationThread mThread;
     // Currently desired scheduling class
-    private volatile int mCurSchedGroup;
+    private volatile @SchedGroup int mCurSchedGroup;
     // Currently computed process state
     private volatile int mCurProcState = PROCESS_STATE_NONEXISTENT;
     // Last reported process state;
@@ -396,7 +397,8 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         mListener = listener;
         mAtm = atm;
         mBgLaunchController = new BackgroundLaunchProcessController(
-                atm::hasActiveVisibleWindow, atm.getBackgroundActivityStartCallback());
+                atm::hasActiveVisibleWindow, atm::hasActiveVisibleNotPinnedWindow,
+                atm.getBackgroundActivityStartCallback());
 
         boolean isSysUiPackage = info.packageName.equals(
                 mAtm.getSysUiServiceComponentLocked().getPackageName());
@@ -442,7 +444,7 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
         return mThread != null;
     }
 
-    int getCurrentSchedulingGroup() {
+    @SchedGroup int getCurrentSchedulingGroup() {
         return mCurSchedGroup;
     }
 
@@ -2186,7 +2188,7 @@ public class WindowProcessController extends ConfigurationContainer<Configuratio
     }
 
     @Override
-    public void onCurrentSchedulingGroupChanged(int curSchedGroup) {
+    public void onCurrentSchedulingGroupChanged(@SchedGroup int curSchedGroup) {
         mCurSchedGroup = curSchedGroup;
     }
 

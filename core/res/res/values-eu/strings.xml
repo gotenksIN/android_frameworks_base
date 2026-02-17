@@ -1123,6 +1123,7 @@
     <string name="lockscreen_access_pattern_cell_added_verbose" msgid="2931364927622563465">"Gehitu da <xliff:g id="CELL_INDEX">%1$s</xliff:g> puntua"</string>
     <string name="lockscreen_access_pattern_detected" msgid="3931150554035194012">"Eredua osatu da"</string>
     <string name="lockscreen_access_pattern_area" msgid="1288780416685002841">"Eredua marrazteko eremua."</string>
+    <string name="lockscreen_access_pattern_cell_verbose" msgid="6670905066468035137">"<xliff:g id="CELL_INDEX">%1$s</xliff:g> gelaxka"</string>
     <string name="keyguard_accessibility_widget_changed" msgid="7298011259508200234">"%1$s. %2$d/%3$d widgeta."</string>
     <string name="keyguard_accessibility_add_widget" msgid="8245795023551343672">"Gehitu widgeta."</string>
     <string name="keyguard_accessibility_widget_empty_slot" msgid="544239307077644480">"Hutsik"</string>
@@ -2006,6 +2007,7 @@
     <string name="managed_profile_label_badge_3" msgid="6882151970556391957">"Laneko 3. <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="clone_profile_label_badge" msgid="1871997694718793964">"<xliff:g id="LABEL">%1$s</xliff:g> aplikazioaren klona"</string>
     <string name="private_profile_label_badge" msgid="1712086003787839183">"<xliff:g id="LABEL">%1$s</xliff:g> pribatua"</string>
+    <string name="hsu_label_badge" msgid="1357272000281944932">"Sistema: <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="lock_to_app_unlock_pin" msgid="3890940811866290782">"Eskatu PINa aingura kendu aurretik"</string>
     <string name="lock_to_app_unlock_pattern" msgid="2694204070499712503">"Eskatu desblokeatzeko eredua aingura kendu aurretik"</string>
     <string name="lock_to_app_unlock_password" msgid="9126722403506560473">"Eskatu pasahitza aingura kendu aurretik"</string>
@@ -2111,7 +2113,32 @@
     <string name="app_suspended_default_message" msgid="6451215678552004172">"<xliff:g id="APP_NAME_0">%1$s</xliff:g> ez dago erabilgarri une honetan. Haren erabilgarritasuna <xliff:g id="APP_NAME_1">%2$s</xliff:g> aplikazioak kudeatzen du."</string>
     <string name="app_suspended_more_details" msgid="211260942831587014">"Lortu informazio gehiago"</string>
     <string name="app_suspended_unsuspend_message" msgid="1665438589450555459">"Kendu pausaldia"</string>
+    <string name="app_lock_add_screen_lock_button_text" msgid="9209013414563206600">"Gehitu pantailaren blokeoa"</string>
+    <string name="app_lock_add_screen_lock_message" msgid="6107009360675769892">"Pantailaren blokeoa PIN, eredu edo pasahitz bat izan daiteke. Gailua desblokeatzeko eta blokeatutako aplikazioak atzitzeko erabiliko duzu."</string>
+    <string name="app_lock_add_screen_lock_title" msgid="6905612843620128689">"Lehenik, gehitu pantailaren blokeoa"</string>
+    <string name="enable_app_lock_success_toast_message" msgid="3339622779190529987">"<xliff:g id="APP_NAME">%1$s</xliff:g> blokeatuta dago"</string>
+    <string name="enable_app_lock_failure_toast_message" msgid="1055838896510445566">"Ezin da blokeatu <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
+    <string name="disable_app_lock_success_toast_message" msgid="70733620589071266">"Kendu da blokeoa <xliff:g id="APP_NAME">%1$s</xliff:g> aplikaziotik"</string>
     <string name="locked_app_biometric_prompt_description" msgid="6853122652400451464">"<xliff:g id="APP_NAME">%1$s</xliff:g> blokeatuta dago"</string>
+    <string name="locked_app_external_display_message" msgid="5483884799685545338">"Aplikazioa pantaila honetan atzitzeko, egiaztatu zeu zarela beste gailua darabilena"</string>
+    <string name="app_lock_edu_dialog_enable_app_lock_title" msgid="283314042336592322">"Blokeo bat gehitu nahi duzu <xliff:g id="APP_NAME">%1$s</xliff:g> aplikazioan?"</string>
+    <string name="app_lock_edu_dialog_description" msgid="8176807243219769518">"Segurtasuna bermatzeko, zeuk soilik atzi dezakezu aplikazioa hatz-marka eta aurpegi bidez desblokeatzeko eginbidearekin edo PINarekin"</string>
+    <string name="app_lock_edu_dialog_description_template" msgid="8563718120753342530">"Segurtasuna bermatzeko, zeuk soilik atzi dezakezu aplikazioa %1$s edo %2$s erabilita"</string>
+    <string name="app_lock_edu_dialog_description_template_no_biometrics" msgid="7122017109150633691">"Segurtasuna bermatzeko, zeuk soilik atzi dezakezu aplikazioa %1$s erabilita"</string>
+    <string name="app_lock_edu_dialog_info_header" msgid="5876120209204270990">"Aplikazioen blokeoarekin"</string>
+    <string name="app_lock_edu_dialog_info_notifications" msgid="1124438392204873305">"Jakinarazpenen edukia ezkutatuta egongo da"</string>
+    <string name="app_lock_edu_dialog_info_widgets" msgid="8809009414650740872">"Widgetak eta lasterbideak kendu egingo dira"</string>
+    <string name="app_lock_edu_dialog_button_lock" msgid="3914687128135704801">"Gehitu aplikazioen blokeoa"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_face" msgid="1348151645996748654">"Aurpegi bidez desblokeatzea"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_fingerprint" msgid="5206107469561561455">"Hatz-marka bidez desblokeatzea"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_fingerprint_and_face" msgid="7895807411323811641">"Hatz-marka/Aurpegi bidez desblokeatzea"</string>
+    <string name="app_lock_edu_dialog_lockscreen_password_name" msgid="8487096457702445059">"Pasahitza"</string>
+    <string name="app_lock_edu_dialog_lockscreen_pattern_name" msgid="991436996281983547">"Eredua"</string>
+    <string name="app_lock_edu_dialog_lockscreen_pin_name" msgid="6458607126966304795">"PINa"</string>
+    <string name="app_lock_permission_review_dialog_title" msgid="5030286398974840579">"Baliteke argazkiak beste aplikazio batzuetan agertzea"</string>
+    <string name="app_lock_permission_review_dialog_sub_title" msgid="310758587817184145">"Argazkiak atzi ditzaketen aplikazioak"</string>
+    <string name="app_lock_permission_review_expand_app_list_button" msgid="3214809707125223273">"Ikusi guztiak"</string>
+    <string name="app_lock_permission_review_continue_button" msgid="4045066724173414043">"Egin aurrera"</string>
     <string name="work_mode_off_title" msgid="6367463960165135829">"Laneko aplikazioak berraktibatu?"</string>
     <string name="work_mode_turn_on" msgid="5316648862401307800">"Berraktibatu"</string>
     <string name="work_mode_emergency_call_button" msgid="6818855962881612322">"Larrialdia"</string>
@@ -2592,6 +2619,8 @@
     <string name="satellite_messaging_unsupported_default_sms_app_notification_summary" msgid="17084124893763593">"Satelite bidez mezuak trukatzeko, ezarri Google-ren Mezuak mezularitza-aplikazio lehenetsi gisa"</string>
     <string name="satellite_messaging_location_disabled_notification_title" msgid="7270641894250928494">"Satelite bidezko mezularitza ez dago erabilgarri"</string>
     <string name="satellite_messaging_location_disabled_notification_summary" msgid="1450824950686221810">"Herrialde edo lurralde honetan satelite bidezko mezularitza erabilgarri dagoen egiaztatzeko, aktibatu kokapen-ezarpenak"</string>
+    <!-- no translation found for satellite_indicator (6846063647532086110) -->
+    <skip />
     <string name="fingerprint_dangling_notification_title" msgid="7362075195588639989">"Konfiguratu berriro hatz-marka bidez desblokeatzeko eginbidea"</string>
     <string name="fingerprint_dangling_notification_msg_1" msgid="5851784577768803510">"<xliff:g id="FINGERPRINT">%s</xliff:g> ez da ezagutzen jada."</string>
     <string name="fingerprint_dangling_notification_msg_2" msgid="7925203589860744456">"<xliff:g id="FINGERPRINT_0">%1$s</xliff:g> eta <xliff:g id="FINGERPRINT_1">%2$s</xliff:g> ez dira ezagutzen jada."</string>

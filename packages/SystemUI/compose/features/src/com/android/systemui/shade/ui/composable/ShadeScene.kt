@@ -30,8 +30,8 @@ import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.systemBars
 import androidx.compose.foundation.layout.wrapContentHeight
@@ -57,7 +57,10 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.dimensionResource
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.fastCoerceAtLeast
 import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.android.compose.animation.scene.ContentScope
@@ -69,10 +72,12 @@ import com.android.compose.animation.scene.UserActionResult
 import com.android.compose.animation.scene.animateContentFloatAsState
 import com.android.compose.animation.scene.rememberMutableSceneTransitionLayoutState
 import com.android.compose.animation.scene.transitions
+import com.android.compose.gesture.effect.OffsetOverscrollEffect
 import com.android.compose.gesture.effect.rememberOffsetOverscrollEffect
 import com.android.compose.gesture.gesturesDisabled
 import com.android.compose.lifecycle.LaunchedEffectWithLifecycle
 import com.android.compose.modifiers.animateContentSizeNoClip
+import com.android.compose.modifiers.height
 import com.android.compose.modifiers.padding
 import com.android.compose.modifiers.thenIf
 import com.android.internal.jank.InteractionJankMonitor
@@ -115,6 +120,7 @@ import kotlinx.coroutines.flow.Flow
 object Shade {
     object Elements {
         val ShadeElement = ElementKey("ShadeElement")
+        val ShadeHeader = ElementKey("ShadeHeader")
         val BackgroundScrim =
             ElementKey("ShadeBackgroundScrim", contentPicker = LowestZIndexContentPicker)
     }
@@ -264,10 +270,12 @@ private fun ContentScope.SingleShade(
 
     val onlyPunchHolesInThisScene =
         layoutState.isTransitioningBetween(Scenes.Gone, Scenes.Shade) ||
-            layoutState.isTransitioning(from = Scenes.Lockscreen, to = Scenes.Shade)
+            layoutState.isTransitioningBetween(Scenes.Lockscreen, Scenes.Shade)
     val mediaInRow = viewModel.showMediaInRow
     val notificationStackPadding = dimensionResource(id = R.dimen.notification_side_paddings)
-    val navBarHeight = WindowInsets.systemBars.asPaddingValues().calculateBottomPadding()
+
+    val systemBarsPadding = WindowInsets.systemBars.asPaddingValues()
+    val navBarHeight = { systemBarsPadding.calculateBottomPadding() }
 
     val shadeHorizontalPadding =
         dimensionResource(id = R.dimen.notification_panel_margin_horizontal)
@@ -276,8 +284,8 @@ private fun ContentScope.SingleShade(
         modifier =
             modifier.thenIf(onlyPunchHolesInThisScene) {
                 // Render the scene to an offscreen buffer so that BlendMode.DstOut only clears this
-                // scene (and not the one under it). It is used to saves the LS content from being
-                // cut out during the LS -> Shade transition.
+                // scene (and not the one under it). It saves the LS content (e.g. the clock) from
+                // being cut out during the LS -> Shade transition.
                 Modifier.graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
             }
     ) {
@@ -290,6 +298,18 @@ private fun ContentScope.SingleShade(
             }
         val scrollingContentOverscrollEffect = rememberOffsetOverscrollEffect()
         val shortContentOverscrollEffect = rememberOffsetOverscrollEffect()
+
+        // This lambda is automatically remembered by the compiler, staying stable and preventing
+        // unnecessary recompositions while still reacting to overscroll changes.
+        val visualOffsetProvider: Density.() -> Int = {
+            val totalOverscroll =
+                scrollingContentOverscrollEffect.overscrollDistance +
+                    shortContentOverscrollEffect.overscrollDistance +
+                    (((verticalOverscrollEffect as? OffsetOverscrollEffect)?.overscrollDistance)
+                        ?: 0f)
+
+            OffsetOverscrollEffect.computeOffset(density = this, totalOverscroll)
+        }
 
         ShadePanelScrim(viewModel.isTransparencyEnabled)
         SingleShadeNestedScrollLayout(
@@ -306,7 +326,11 @@ private fun ContentScope.SingleShade(
             shortContentOverscrollEffect = shortContentOverscrollEffect,
             jankMonitor = jankMonitor,
             statusBarHeader = {
-                CollapsedShadeHeader(viewModel = headerViewModel, isSplitShade = false)
+                CollapsedShadeHeader(
+                    viewModel = headerViewModel,
+                    isSplitShade = false,
+                    modifier = Modifier.element(Shade.Elements.ShadeHeader),
+                )
             },
             mediaAndQqsHeader = {
                 val qqsLayoutPaddingBottom = 16.dp
@@ -315,6 +339,11 @@ private fun ContentScope.SingleShade(
                 MediaAndQqsLayout(
                     modifier =
                         Modifier.element(QuickSettings.Elements.QuickQuickSettingsAndMedia)
+                            .offset {
+                                // Centering offset when the shade is being dragged down.
+                                val down = visualOffsetProvider().fastCoerceAtLeast(0)
+                                IntOffset(x = 0, y = down / 2)
+                            }
                             .padding(bottom = qqsLayoutPaddingBottom)
                             .padding(horizontal = qsHorizontalMargin),
                     tiles =
@@ -387,7 +416,7 @@ private fun ContentScope.SingleShade(
                     onEmptySpaceClick =
                         viewModel::onEmptySpaceClicked.takeIf { viewModel.isEmptySpaceClickable },
                     modifier = Modifier.padding(horizontal = shadeHorizontalPadding),
-                    onStackHeightChanged = { onContentHeightChanged.invoke(it) },
+                    onStackHeightChanged = onContentHeightChanged,
                 )
             },
             cutoutInsetsProvider = {
@@ -401,7 +430,7 @@ private fun ContentScope.SingleShade(
         Box(
             modifier =
                 Modifier.align(Alignment.BottomCenter)
-                    .height(navBarHeight)
+                    .height { navBarHeight().roundToPx() }
                     // Intercepts touches, prevents the scrollable container behind from scrolling.
                     .clickable(interactionSource = null, indication = null) { /* do nothing */ }
         )
@@ -495,9 +524,10 @@ private fun ContentScope.SplitShade(
                 modifier =
                     // unfoldTranslationXForStartSide may be updated every frame, so only read value
                     // in the layout phase by using lambda.
-                    Modifier.padding(
-                        horizontal = { viewModel.unfoldTranslationXForStartSide.roundToInt() }
-                    ),
+                    Modifier.element(Shade.Elements.ShadeHeader)
+                        .padding(
+                            horizontal = { viewModel.unfoldTranslationXForStartSide.roundToInt() }
+                        ),
             )
 
             Row(modifier = Modifier.fillMaxWidth().weight(1f)) {
@@ -604,7 +634,7 @@ private fun ContentScope.SplitShade(
                     viewModel = notificationsPlaceholderViewModel,
                     jankMonitor = jankMonitor,
                     stackTopPadding = notificationStackPadding,
-                    stackBottomPadding = notificationStackPadding,
+                    stackBottomPadding = { notificationStackPadding },
                     shouldFillMaxHeight = true,
                     shouldPunchHoleBehindScrim = false,
                     isTransparencyEnabled = viewModel.isTransparencyEnabled,

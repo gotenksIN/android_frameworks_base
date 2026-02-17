@@ -169,6 +169,7 @@ android_library {
         "androidx.datastore_datastore",
         "androidx.dynamicanimation_dynamicanimation",
         "androidx.recyclerview_recyclerview",
+        "androidx.tracing_tracing",
         "com_android_launcher3_flags_lib",
         "com_android_wm_shell_flags_lib",
         "PlatformAnimationLib",
@@ -179,6 +180,7 @@ android_library {
         "lottie",
         "mechanics",
         "perfetto_trace_java_protos",
+        "dynamiccolors",
     ],
     libs: [
         // Soong fails to automatically add this dependency because all the
@@ -193,6 +195,11 @@ android_library {
     manifest: "AndroidManifest.xml",
     plugins: ["dagger2-compiler"],
     use_resource_processor: true,
+    lint: {
+        extra_check_modules: [
+            "ProtoLogLintChecker",
+        ],
+    },
 }
 
 java_defaults {

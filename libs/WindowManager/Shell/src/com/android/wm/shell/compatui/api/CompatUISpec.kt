@@ -29,6 +29,7 @@ import com.android.wm.shell.protolog.ShellProtoLogGroup
 /**
  * Defines the predicates to invoke for understanding if a component can be created or destroyed.
  */
+@SuppressWarnings("ProtoLogNonConstantFormat")
 class CompatUILifecyclePredicates(
     // Predicate evaluating to true if the component needs to be created
     val creationPredicate: (CompatUIInfo, CompatUISharedState) -> Boolean,
@@ -38,6 +39,8 @@ class CompatUILifecyclePredicates(
     val stateBuilder: (CompatUIInfo, CompatUISharedState) -> CompatUIComponentState? = { _, _ ->
         null
     },
+    // Invoked after the removal of a component. It contains clean up code.
+    val onRemoval: (CompatUIInfo, CompatUISharedState) -> Unit = { _, _ -> },
 )
 
 /** Type for the function responsible to get the position of the ComponentUI */
@@ -77,6 +80,8 @@ data class CompatUILayout(
 )
 
 /** Describes each compat ui component to the framework. */
+// TODO(b/478792808): Remove suppression
+@SuppressWarnings("ProtoLogNonConstantFormat")
 class CompatUISpec(
     val log: (String) -> Unit = { str -> ProtoLog.v(ShellProtoLogGroup.WM_SHELL_COMPAT_UI, str) },
     // Unique name for the component. It's used for debug and for generating the

@@ -50,8 +50,13 @@
 #include "utils/ForceDark.h"
 #include "utils/RingBuffer.h"
 
+#ifdef __ANDROID__
+#include <gui/SurfaceComposerClient.h>
+#endif
+
 namespace android {
 
+class BLASTBufferQueue;
 class SurfaceStats;
 
 namespace uirenderer {
@@ -136,10 +141,30 @@ public:
     void setHardwareBuffer(AHardwareBuffer* buffer);
     void setSurface(ANativeWindow* window, bool enableTimeout = true);
     void setSurfaceControl(sp<SurfaceControl> surfaceControl);
+
+    void setBLASTBufferQueue(const sp<BLASTBufferQueue>& surfaceControl);
+
+#ifdef __ANDROID__
+    bool syncNextTransaction(std::function<void(SurfaceComposerClient::Transaction*)>, bool);
+    void mergeWithNextTransaction(SurfaceComposerClient::Transaction*, uint64_t);
+    void applyPendingTransactions(uint64_t);
+    void clearSyncTransaction();
+    SurfaceComposerClient::Transaction* gatherPendingTransactions(uint64_t);
+#endif
+    void updateRenderTargetSize(uint64_t width, uint64_t height);
+
     bool pauseSurface();
     void setStopped(bool stopped);
     bool isStopped() { return mStopped || !hasOutputTarget(); }
-    bool hasOutputTarget() const { return mNativeSurface.get() || mHardwareBuffer; }
+    bool hasOutputTarget() const {
+        if (mNativeSurface.get() || mHardwareBuffer) return true;
+#ifdef __ANDROID__
+        if (mSurfaceControl != nullptr) {
+            return true;
+        }
+#endif
+        return false;
+    }
     void allocateBuffers();
 
     void setLightAlpha(uint8_t ambientShadowAlpha, uint8_t spotShadowAlpha);
@@ -156,6 +181,7 @@ public:
 
     // IFrameCallback, Choreographer-driven frame callback entry point
     virtual void doFrame() override;
+    virtual std::chrono::nanoseconds getExpectedDuration() override;
     void prepareAndDraw(RenderNode* node);
 
     void buildLayer(RenderNode* node);
@@ -247,6 +273,8 @@ public:
     void setSyncDelayDuration(nsecs_t duration);
 
     void startHintSession();
+
+    void setHintSessionEnabled(bool enabled);
 
     static bool shouldDither();
 
@@ -386,6 +414,7 @@ private:
     std::function<void()> mPrepareSurfaceControlForWebviewCallback;
 
     std::shared_ptr<HintSessionWrapper> mHintSessionWrapper;
+    bool mIsHintSessionEnabled = true;
     nsecs_t mLastDequeueBufferDuration = 0;
     nsecs_t mSyncDelayDuration = 0;
     nsecs_t mIdleDuration = 0;
@@ -407,6 +436,8 @@ private:
      *    used. All other nodes are treated in MODE_RT, using their main displaylists.
      */
     void determineColors(const RenderNode* target);
+
+    int64_t mExpectedFrameCallbackDuration;
 };
 
 } /* namespace renderthread */

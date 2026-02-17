@@ -47,6 +47,7 @@ class PinnedLayerHandler(
     shellInit: ShellInit,
     private val transitions: Transitions,
     private val pinnedLayerController: PinnedLayerController,
+    private val pinnedLayerUiState: PinnedLayerUiState,
     private val normalLayerController: NormalAppLayerController,
     private val desktopUserRepositories: DesktopUserRepositories?,
     private val desktopTasksController: DesktopTasksController?,
@@ -128,17 +129,14 @@ class PinnedLayerHandler(
             isSwitchingToAnotherLayer,
         )
         if (isClosePinnedRequest || isSwitchingToAnotherLayer) {
+            // Reparenting must happen first because WCT operations order matters, otherwise AoT
+            // is not cleared.
+            moveToAnotherLayerIfNeeded(transition, triggerTask, windowingLayerChange, wct)
+
             val targetUnpinType = resolveTargetUnpinType(request)
             wct.merge(
                 pinnedLayerController.unpinTask(transition, triggerTask, targetUnpinType),
                 true,
-            )
-
-            moveToAnotherLayerIfNeeded(
-                transition,
-                triggerTask,
-                windowingLayerChange,
-                wct,
             )
         }
 
@@ -277,6 +275,9 @@ class PinnedLayerHandler(
                     startTransaction,
                     finishTransaction,
                     finishCallback,
+                    onAnimationStart = pinnedLayerUiState::onResizeMoveStarted,
+                    onAnimationUpdate = pinnedLayerUiState::onResizeMoveUpdated,
+                    onAnimationEnd = pinnedLayerUiState::onResizeMoveEnded,
                 )
             animator.start()
             return true
@@ -312,7 +313,7 @@ class PinnedLayerHandler(
         request: TransitionRequestInfo,
         outWct: WindowContainerTransaction,
     ) {
-        pinnedLayerController.currentPinnedTask?.let {
+        pinnedLayerController.getCurrentPinnedTask()?.let {
             outWct.merge(
                 pinnedLayerController.unpinTask(transition, it, UnpinStrategy.CLOSE),
                 /* transfer= */ true,
@@ -322,7 +323,7 @@ class PinnedLayerHandler(
 
     /** @return `true` if there is a task that is currently pinned and visible. */
     fun hasActivePinnedTask(): Boolean {
-        return pinnedLayerController.currentPinnedTask != null
+        return pinnedLayerController.getCurrentPinnedTask() != null
     }
 
     /**

@@ -24,7 +24,6 @@ import static com.android.server.companion.utils.PermissionsUtils.enforceCallerI
 
 import android.annotation.EnforcePermission;
 import android.annotation.NonNull;
-import android.companion.CompanionDeviceManager;
 import android.companion.datatransfer.continuity.IHandoffFeatureStateListener;
 import android.companion.datatransfer.continuity.IHandoffRequestCallback;
 import android.companion.datatransfer.continuity.IRemoteTaskListener;
@@ -32,15 +31,10 @@ import android.companion.datatransfer.continuity.ITaskContinuityManager;
 import android.content.Context;
 import android.os.Binder;
 import com.android.server.SystemService;
-import com.android.server.companion.datatransfer.continuity.connectivity.TaskContinuityMessenger;
-import com.android.server.companion.datatransfer.continuity.connectivity.TaskContinuityMessengerCache;
 import com.android.server.companion.datatransfer.continuity.handoff.HandoffController;
 import com.android.server.companion.datatransfer.continuity.handoff.HandoffControllerCache;
-import com.android.server.companion.datatransfer.continuity.settings.HandoffPolicyManager;
 import com.android.server.companion.datatransfer.continuity.settings.HandoffPreferenceStore;
 import com.android.server.companion.datatransfer.continuity.settings.HandoffSettingsManager;
-import com.android.server.companion.datatransfer.continuity.tasks.TaskSyncController;
-import com.android.server.companion.datatransfer.continuity.tasks.TaskSyncControllerCache;
 import java.util.Objects;
 
 /**
@@ -50,33 +44,19 @@ import java.util.Objects;
  */
 public final class TaskContinuityManagerService extends SystemService {
 
-    private static final String TAG = "TaskContinuityManagerService";
+    private static final String TAG = TaskContinuityManagerService.class.getSimpleName();
 
-    private final MultiUserResourceCache<TaskSyncController> mTaskSyncControllerCache;
     private final MultiUserResourceCache<HandoffController> mHandoffControllerCache;
     private HandoffPreferenceStore mHandoffPreferenceStore;
-    private HandoffPolicyManager mHandoffPolicyManager;
     private HandoffSettingsManager mHandoffSettingsManager;
-    private final MultiUserResourceCache<TaskContinuityMessenger> mTaskContinuityMessengerCache;
     private TaskContinuityManagerServiceImpl mTaskContinuityManagerService;
 
     public TaskContinuityManagerService(Context context) {
         super(context);
 
         mHandoffPreferenceStore = new HandoffPreferenceStore();
-        mHandoffPolicyManager = new HandoffPolicyManager();
-        mHandoffSettingsManager =
-                new HandoffSettingsManager(mHandoffPreferenceStore, mHandoffPolicyManager);
-        mTaskContinuityMessengerCache =
-                new TaskContinuityMessengerCache(
-                        Objects.requireNonNull(
-                                context.getSystemService(CompanionDeviceManager.class)),
-                        Objects.requireNonNull(context.getMainExecutor()));
-        mTaskSyncControllerCache = new TaskSyncControllerCache(context,
-                mTaskContinuityMessengerCache);
-        mHandoffControllerCache =
-                new HandoffControllerCache(
-                        context, mTaskContinuityMessengerCache, mTaskSyncControllerCache);
+        mHandoffSettingsManager = new HandoffSettingsManager(mHandoffPreferenceStore);
+        mHandoffControllerCache = new HandoffControllerCache(context);
     }
 
     @Override
@@ -96,7 +76,7 @@ public final class TaskContinuityManagerService extends SystemService {
         public void registerRemoteTaskListener(int userId, @NonNull IRemoteTaskListener listener) {
             registerRemoteTaskListener_enforcePermission();
             enforceCallerIsSystemOrCanInteractWithUserId(getContext(), userId);
-            mTaskSyncControllerCache
+            mHandoffControllerCache
                     .getOrCreateResource(userId)
                     .registerTaskListener(Objects.requireNonNull(listener));
         }
@@ -107,7 +87,7 @@ public final class TaskContinuityManagerService extends SystemService {
                 int userId, @NonNull IRemoteTaskListener listener) {
             unregisterRemoteTaskListener_enforcePermission();
             enforceCallerIsSystemOrCanInteractWithUserId(getContext(), userId);
-            mTaskSyncControllerCache
+            mHandoffControllerCache
                     .getOrCreateResource(userId)
                     .unregisterTaskListener(Objects.requireNonNull(listener));
         }
@@ -184,10 +164,8 @@ public final class TaskContinuityManagerService extends SystemService {
 
     private void updateHandoffEnablementForUser(int userId) {
         if (mHandoffSettingsManager.isHandoffActiveForUser(userId)) {
-            mTaskSyncControllerCache.getOrCreateResource(userId).enable();
             mHandoffControllerCache.getOrCreateResource(userId).enable();
         } else {
-            mTaskSyncControllerCache.getOrCreateResource(userId).disable();
             mHandoffControllerCache.getOrCreateResource(userId).disable();
         }
     }

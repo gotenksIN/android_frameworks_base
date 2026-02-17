@@ -160,12 +160,6 @@ interface HeadsUpManager : Dumpable {
     fun setExpanded(key: String, row: ExpandableNotificationRow, expanded: Boolean)
 
     /**
-     * Set an entry to be expanded and therefore stick in the heads up area if it's pinned until
-     * it's collapsed again.
-     */
-    fun setExpanded(entry: NotificationEntry, expanded: Boolean)
-
-    /**
      * Sets whether an entry's guts are exposed and therefore it should stick in the heads up area
      * if it's pinned until it's hidden again.
      */
@@ -222,10 +216,10 @@ interface HeadsUpManager : Dumpable {
      * the notification to be managed.
      *
      * @param entry entry to show
-     * @param isPinnedByUser true if the notification was pinned by the user and false if the
+     * @param isFromUserOpenAction true if the notification was pinned by the user and false if the
      *   notification was pinned by the system.
      */
-    fun showNotification(entry: NotificationEntry, isPinnedByUser: Boolean = false)
+    fun showNotification(entry: NotificationEntry, isFromUserOpenAction: Boolean = false)
 
     fun snooze()
 
@@ -321,8 +315,6 @@ class HeadsUpManagerEmptyImpl @Inject constructor() : HeadsUpManager {
     override fun setAnimationStateHandler(handler: AnimationStateHandler) {}
 
     override fun setExpanded(key: String, row: ExpandableNotificationRow, expanded: Boolean) {}
-
-    override fun setExpanded(entry: NotificationEntry, expanded: Boolean) {}
 
     override fun setGutsShown(entry: NotificationEntry, gutsShown: Boolean) {}
 

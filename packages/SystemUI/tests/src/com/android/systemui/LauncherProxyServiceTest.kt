@@ -57,6 +57,7 @@ import com.android.systemui.settings.UserTracker
 import com.android.systemui.shade.ShadeViewController
 import com.android.systemui.shade.display.StatusBarTouchShadeDisplayPolicy
 import com.android.systemui.shade.display.domain.interactor.ShadeExpansionTargetDisplayInteractor
+import com.android.systemui.shade.domain.interactor.ShadeModeInteractor
 import com.android.systemui.shared.recents.ILauncherProxy
 import com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_NAVIGATION_BAR_DISABLED
 import com.android.systemui.shared.system.QuickStepContract.SYSUI_STATE_WAKEFULNESS_MASK
@@ -155,6 +156,7 @@ class LauncherProxyServiceTest : SysuiTestCase() {
     @Mock private lateinit var backAnimation: Optional<BackAnimation>
     private lateinit var desktopState: FakeDesktopState
     private val fakeHeadlessSystemUserMode = HeadlessSystemUserModeFake()
+    @Mock private lateinit var shadeModeInteractor: ShadeModeInteractor
 
     @Before
     fun setUp() {
@@ -327,7 +329,6 @@ class LauncherProxyServiceTest : SysuiTestCase() {
         }
 
     @Test
-    @EnableFlags(Flags.FLAG_SHADE_WINDOW_GOES_AROUND)
     @DisableFlags(Flags.FLAG_KEYGUARD_WM_STATE_REFACTOR)
     fun updateSystemUiStateFlags_updatesAllNavBars() =
         kosmos.testScope.runTest {
@@ -349,7 +350,6 @@ class LauncherProxyServiceTest : SysuiTestCase() {
 
     @Test
     @EnableFlags(
-        Flags.FLAG_SHADE_WINDOW_GOES_AROUND,
         Flags.FLAG_SCENE_CONTAINER,
         Flags.FLAG_MEDIA_CONTROLS_IN_COMPOSE,
         Flags.FLAG_KEYGUARD_WM_STATE_REFACTOR,
@@ -380,7 +380,6 @@ class LauncherProxyServiceTest : SysuiTestCase() {
 
     @Test
     @EnableFlags(
-        Flags.FLAG_SHADE_WINDOW_GOES_AROUND,
         Flags.FLAG_SCENE_CONTAINER,
         Flags.FLAG_MEDIA_CONTROLS_IN_COMPOSE,
         Flags.FLAG_KEYGUARD_WM_STATE_REFACTOR,
@@ -404,7 +403,6 @@ class LauncherProxyServiceTest : SysuiTestCase() {
         }
 
     @Test
-    @EnableFlags(Flags.FLAG_SHADE_WINDOW_GOES_AROUND)
     @DisableFlags(Flags.FLAG_SCENE_CONTAINER, Flags.FLAG_KEYGUARD_WM_STATE_REFACTOR)
     fun onStatusBarTouchEvent_withoutSceneFlag_onDifferentDisplayTouch_ignoresInput() =
         kosmos.testScope.runTest {
@@ -425,7 +423,6 @@ class LauncherProxyServiceTest : SysuiTestCase() {
         }
 
     @Test
-    @EnableFlags(Flags.FLAG_SHADE_WINDOW_GOES_AROUND)
     @DisableFlags(Flags.FLAG_SCENE_CONTAINER, Flags.FLAG_KEYGUARD_WM_STATE_REFACTOR)
     fun onStatusBarTouchEvent_withoutSceneFlag_dispatchesToShadeDisplayPolicy() =
         kosmos.testScope.runTest {
@@ -446,7 +443,6 @@ class LauncherProxyServiceTest : SysuiTestCase() {
         }
 
     @Test
-    @EnableFlags(Flags.FLAG_SHADE_WINDOW_GOES_AROUND)
     @DisableFlags(Flags.FLAG_SCENE_CONTAINER, Flags.FLAG_KEYGUARD_WM_STATE_REFACTOR)
     fun onStatusBarTouchEvent_withoutSceneFlag_onSameDisplayTouch_handlesInput() =
         kosmos.testScope.runTest {
@@ -500,6 +496,7 @@ class LauncherProxyServiceTest : SysuiTestCase() {
             kosmos.displayRepository,
             desktopState,
             fakeHeadlessSystemUserMode,
+            shadeModeInteractor,
         )
     }
 }

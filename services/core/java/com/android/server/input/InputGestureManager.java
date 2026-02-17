@@ -18,15 +18,14 @@ package com.android.server.input;
 
 import static android.hardware.input.InputGestureData.createKeyTrigger;
 
+import static com.android.hardware.input.Flags.enableContextualInputTrigger;
 import static com.android.hardware.input.Flags.enableColorInversionKeyGestures;
 import static com.android.hardware.input.Flags.enableContextualSearchDesktopEntrypoints;
 import static com.android.hardware.input.Flags.enableNoteTakingKeyboardShortcut;
 import static com.android.hardware.input.Flags.enablePartialScreenshotKeyboardShortcut;
 import static com.android.hardware.input.Flags.enableQuickSettingsPanelShortcut;
 import static com.android.hardware.input.Flags.enableSelectToSpeakKeyGestures;
-import static com.android.hardware.input.Flags.enableTalkbackAndMagnifierKeyGestures;
 import static com.android.hardware.input.Flags.enableTalkbackKeyGestures;
-import static com.android.hardware.input.Flags.enableVoiceAccessKeyGestures;
 import static com.android.hardware.input.Flags.keyboardBacklightShortcuts;
 
 import android.annotation.NonNull;
@@ -91,7 +90,8 @@ final class InputGestureManager {
             createKeyTrigger(KeyEvent.KEYCODE_V, KeyEvent.META_CTRL_ON),
             createKeyTrigger(KeyEvent.KEYCODE_X, KeyEvent.META_CTRL_ON),
             createKeyTrigger(KeyEvent.KEYCODE_Z, KeyEvent.META_CTRL_ON),
-            createKeyTrigger(KeyEvent.KEYCODE_Y, KeyEvent.META_CTRL_ON)
+            createKeyTrigger(KeyEvent.KEYCODE_Y, KeyEvent.META_CTRL_ON),
+            createKeyTrigger(KeyEvent.KEYCODE_LANGUAGE_SWITCH, KeyEvent.META_SHIFT_ON)
     ));
 
     public InputGestureManager(Context context) {
@@ -228,14 +228,12 @@ final class InputGestureManager {
                             /* allowCaptureByFocusedWindow = */true
                     ));
         }
-        if (enableTalkbackAndMagnifierKeyGestures()) {
-            systemShortcuts.add(
-                    createKeyGesture(KeyEvent.KEYCODE_M,
-                            KeyEvent.META_META_ON | KeyEvent.META_ALT_ON,
-                            KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_MAGNIFICATION,
-                            /* allowCaptureByFocusedWindow = */true
-                    ));
-        }
+        systemShortcuts.add(
+                createKeyGesture(KeyEvent.KEYCODE_M,
+                        KeyEvent.META_META_ON | KeyEvent.META_ALT_ON,
+                        KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_MAGNIFICATION,
+                        /* allowCaptureByFocusedWindow = */true
+                ));
         if (enableTalkbackKeyGestures()) {
             systemShortcuts.add(
                     createKeyGesture(KeyEvent.KEYCODE_T,
@@ -244,15 +242,13 @@ final class InputGestureManager {
                             /* allowCaptureByFocusedWindow = */true
                     ));
         }
-        if (enableVoiceAccessKeyGestures()) {
-            systemShortcuts.add(
-                    createKeyGesture(
-                            KeyEvent.KEYCODE_V,
-                            KeyEvent.META_META_ON | KeyEvent.META_ALT_ON,
-                            KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_VOICE_ACCESS,
-                            /* allowCaptureByFocusedWindow = */true
-                    ));
-        }
+        systemShortcuts.add(
+                createKeyGesture(
+                        KeyEvent.KEYCODE_V,
+                        KeyEvent.META_META_ON | KeyEvent.META_ALT_ON,
+                        KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_VOICE_ACCESS,
+                        /* allowCaptureByFocusedWindow = */true
+                ));
         systemShortcuts.add(
                 createKeyGesture(
                         KeyEvent.KEYCODE_LEFT_BRACKET,
@@ -382,6 +378,15 @@ final class InputGestureManager {
                             KeyEvent.META_META_ON | KeyEvent.META_CTRL_ON,
                             KeyGestureEvent.KEY_GESTURE_TYPE_OPEN_NOTES,
                             /* allowCaptureByFocusedWindow = */true
+                    ));
+        }
+        if (enableContextualInputTrigger()) {
+            systemShortcuts.add(
+                    createKeyGesture(
+                            KeyEvent.KEYCODE_K,
+                            KeyEvent.META_META_ON,
+                            KeyGestureEvent.KEY_GESTURE_TYPE_CONTEXTUAL_INPUT,
+                            /* allowCaptureByFocusedWindow = */false
                     ));
         }
         synchronized (mGestureLock) {

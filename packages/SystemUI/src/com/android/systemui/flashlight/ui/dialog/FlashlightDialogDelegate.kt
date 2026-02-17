@@ -33,9 +33,11 @@ import com.android.compose.PlatformOutlinedButton
 import com.android.compose.dialog.AlertDialogContent
 import com.android.compose.theme.PlatformTheme
 import com.android.internal.jank.InteractionJankMonitor
+import com.android.systemui.Flags
 import com.android.systemui.animation.DialogCuj
 import com.android.systemui.animation.DialogTransitionAnimator
 import com.android.systemui.animation.Expandable
+import com.android.systemui.animation.TransitionAnimator
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.flashlight.flags.FlashlightStrength
@@ -110,9 +112,12 @@ constructor(
         //  as a workaround, we remember the original theme and keep it on recomposition.
         val isCurrentlyInDarkTheme = isSystemInDarkTheme()
         val cachedDarkTheme = remember { isCurrentlyInDarkTheme }
+        // TODO(b/474600479): Remove remember val and PlatformTheme wrapper once flag is advanced.
+        val isDarkTheme =
+            if (Flags.dialogBackgroundRefresh()) isCurrentlyInDarkTheme else cachedDarkTheme
         val flashlightSliderViewModel =
             rememberViewModel("FlashlightSliderViewModel") { viewModelFactory.create() }
-        PlatformTheme(isDarkTheme = cachedDarkTheme) {
+        PlatformTheme(isDarkTheme = isDarkTheme) {
             AlertDialogContent(
                 modifier = Modifier.semantics { testTagsAsResourceId = true },
                 title = {
@@ -164,8 +169,17 @@ constructor(
                 ?.dialogTransitionController(
                     DialogCuj(InteractionJankMonitor.CUJ_SHADE_DIALOG_OPEN, INTERACTION_JANK_TAG)
                 )
-                ?.let { controller -> dialogTransitionAnimator.show(currentDialog!!, controller) }
-                ?: currentDialog!!.show()
+                ?.let { controller ->
+                    if (TransitionAnimator.dynamicTargetResolutionEnabled()) {
+                        dialogTransitionAnimator.show(
+                            currentDialog!!,
+                            expandable::dialogTransitionController,
+                            controller.cuj,
+                        )
+                    } else {
+                        dialogTransitionAnimator.show(currentDialog!!, controller)
+                    }
+                } ?: currentDialog!!.show()
         }
 
         return currentDialog!!

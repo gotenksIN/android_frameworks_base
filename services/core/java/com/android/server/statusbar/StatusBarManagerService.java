@@ -106,7 +106,6 @@ import android.view.WindowInsets;
 import android.view.WindowInsets.Type.InsetsType;
 import android.view.WindowInsetsController.Appearance;
 import android.view.WindowInsetsController.Behavior;
-import android.window.DesktopExperienceFlags.DesktopExperienceFlag;
 
 import com.android.internal.R;
 import com.android.internal.annotations.GuardedBy;
@@ -133,13 +132,11 @@ import com.android.server.UiThread;
 import com.android.server.inputmethod.InputMethodManagerInternal;
 import com.android.server.notification.NotificationDelegate;
 import com.android.server.pm.UserManagerInternal;
-import com.android.server.pm.UserManagerService;
 import com.android.server.policy.GlobalActionsProvider;
 import com.android.server.power.ShutdownCheckPoints;
 import com.android.server.power.ShutdownThread;
 import com.android.server.UiThread;
 import com.android.server.wm.ActivityTaskManagerInternal;
-import com.android.systemui.shared.Flags;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -189,12 +186,6 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
     @EnabledAfter(targetSdkVersion = Build.VERSION_CODES.TIRAMISU)
     static final long REQUEST_LISTENING_OTHER_USER_NOOP = 242194868L;
 
-    private static final DesktopExperienceFlag STATUS_BAR_CONNECTED_DISPLAYS =
-            new DesktopExperienceFlag(
-                    Flags::statusBarConnectedDisplays,
-                    /* shouldOverrideByDevOption= */ true,
-                    Flags.FLAG_STATUS_BAR_CONNECTED_DISPLAYS);
-
     private final Context mContext;
 
     private final Handler mHandler = new Handler();
@@ -238,7 +229,6 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
     private IOverlayManager mOverlayManager;
 
     private final boolean mVisibleBackgroundUsersEnabled;
-    private final UserManagerService mUserManager;
 
     private class DeathRecipient implements IBinder.DeathRecipient {
         public void binderDied() {
@@ -375,7 +365,6 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
         mSessionMonitor = new SessionMonitor(mContext);
 
         mVisibleBackgroundUsersEnabled = isVisibleBackgroundUsersEnabled();
-        mUserManager = UserManagerService.getInstance();
     }
 
     /**
@@ -854,6 +843,30 @@ public class StatusBarManagerService extends IStatusBarService.Stub implements D
         @Override
         public void passThroughShellCommand(String[] args, FileDescriptor fd) {
             StatusBarManagerService.this.passThroughShellCommand(args, fd);
+        }
+
+        @Override
+        public void onDisplayInfoChanged() {
+            IStatusBar bar = mBar;
+            if (bar != null) {
+                try {
+                    bar.onDisplayInfoChanged();
+                } catch (RemoteException e) {
+                    Slog.e(TAG, "onDisplayInfoChanged", e);
+                }
+            }
+        }
+
+        @Override
+        public void onConfigurationChanged() {
+            IStatusBar bar = mBar;
+            if (bar != null) {
+                try {
+                    bar.onConfigurationChanged();
+                } catch (RemoteException e) {
+                    Slog.e(TAG, "onConfigucrationChanged", e);
+                }
+            }
         }
     };
 

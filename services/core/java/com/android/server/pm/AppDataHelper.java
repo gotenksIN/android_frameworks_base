@@ -261,15 +261,28 @@ public class AppDataHelper {
 
             final long ceDataInode = createAppDataResult.ceDataInode;
             final long deDataInode = createAppDataResult.deDataInode;
+            final long pccCeDataInode = createAppDataResult.pccCeDataInode;
+            final long pccDeDataInode = createAppDataResult.pccDeDataInode;
 
-            if ((flags & StorageManager.FLAG_STORAGE_CE) != 0 && ceDataInode != -1) {
+            if ((flags & StorageManager.FLAG_STORAGE_CE) != 0) {
                 synchronized (mPm.mLock) {
-                    ps.setCeDataInode(ceDataInode, userId);
+                    if (ceDataInode != -1) {
+                        ps.setCeDataInode(ceDataInode, userId);
+                    }
+                    if (pccCeDataInode != -1) {
+                        ps.setPccCeDataInode(pccCeDataInode, userId);
+                    }
                 }
             }
-            if ((flags & StorageManager.FLAG_STORAGE_DE) != 0 && deDataInode != -1) {
+
+            if ((flags & StorageManager.FLAG_STORAGE_DE) != 0) {
                 synchronized (mPm.mLock) {
-                    ps.setDeDataInode(deDataInode, userId);
+                    if (deDataInode != -1) {
+                        ps.setDeDataInode(deDataInode, userId);
+                    }
+                    if (pccDeDataInode != -1) {
+                        ps.setPccDeDataInode(pccDeDataInode, userId);
+                    }
                 }
             }
 
@@ -355,6 +368,36 @@ public class AppDataHelper {
         }
     }
 
+    /**
+     * Destroy PCC directories for the given PackageSetting and list of users
+     */
+    @GuardedBy("mPm.mInstallLock")
+    public void destroyPccData(PackageSetting packageSetting, int storageFlags, int[] users) {
+        int[] usersInstalledOrHasData = packageSetting.queryUsersInstalledOrHasData(users);
+        for (int userId : usersInstalledOrHasData) {
+            try {
+                long pccCeDataInode = packageSetting.getPccCeDataInode(userId);
+                if (pccCeDataInode > 0) {
+                    mInstaller.destroyPccData(
+                            packageSetting.getVolumeUuid(),
+                            packageSetting.getPackageName(),
+                            userId,
+                            storageFlags,
+                            pccCeDataInode
+                    );
+                    Slog.d(TAG,
+                            "Destroyed PCC data for "
+                                    + packageSetting.getPackageName() + " u" + userId);
+                }
+            } catch (Installer.InstallerException e) {
+                logCriticalInfo(Log.WARN, "Failed to destroy PCC data for "
+                        + packageSetting.getPackageName()
+                        + " u" + userId + ": " + e.getMessage());
+
+            }
+        }
+    }
+
     @GuardedBy("mPm.mInstallLock")
     void reconcileAppsDataLI(String volumeUuid, int userId, @StorageManager.StorageFlags int flags,
             boolean migrateAppData) {
@@ -412,7 +455,8 @@ public class AppDataHelper {
                     logCriticalInfo(Log.WARN, "Destroying " + file + " due to: " + e);
                     try {
                         mInstaller.destroyAppData(volumeUuid, packageName, userId,
-                                StorageManager.FLAG_STORAGE_CE, 0);
+                                StorageManager.FLAG_STORAGE_CE, /* ceDataInode= */ 0,
+                                /* pccCeDataInode= */ 0);
                     } catch (Installer.InstallerException e2) {
                         logCriticalInfo(Log.WARN, "Failed to destroy: " + e2);
                     }
@@ -434,7 +478,8 @@ public class AppDataHelper {
                     logCriticalInfo(Log.WARN, "Destroying " + file + " due to: " + e);
                     try {
                         mInstaller.destroyAppData(volumeUuid, packageName, userId,
-                                StorageManager.FLAG_STORAGE_DE, 0);
+                                StorageManager.FLAG_STORAGE_DE, /* ceDataInode= */ 0,
+                                /* pccCeDataInode= */ 0);
                     } catch (Installer.InstallerException e2) {
                         logCriticalInfo(Log.WARN, "Failed to destroy: " + e2);
                     }
@@ -581,9 +626,12 @@ public class AppDataHelper {
         for (int realUserId : mPm.resolveUserIds(userId)) {
             final long ceDataInode = (packageStateInternal != null)
                     ? packageStateInternal.getUserStateOrDefault(realUserId).getCeDataInode() : 0;
+            final long pccCeDataInode = (packageStateInternal != null)
+                    ? packageStateInternal.getUserStateOrDefault(realUserId).getPccCeDataInode()
+                    : 0;
             try {
                 mInstaller.clearAppData(volumeUuid, packageName, realUserId,
-                        flags, ceDataInode);
+                        flags, ceDataInode, pccCeDataInode);
             } catch (Installer.InstallerException e) {
                 Slog.w(TAG, String.valueOf(e));
             }
@@ -614,9 +662,12 @@ public class AppDataHelper {
         for (int realUserId : mPm.resolveUserIds(userId)) {
             final long ceDataInode = (packageStateInternal != null)
                     ? packageStateInternal.getUserStateOrDefault(realUserId).getCeDataInode() : 0;
+            final long pccCeDataInode = (packageStateInternal != null)
+                    ? packageStateInternal.getUserStateOrDefault(realUserId).getPccCeDataInode()
+                    : 0;
             try {
                 mInstaller.destroyAppData(volumeUuid, packageName, realUserId,
-                        flags, ceDataInode);
+                        flags, ceDataInode, pccCeDataInode);
             } catch (Installer.InstallerException e) {
                 Slog.w(TAG, String.valueOf(e));
             }

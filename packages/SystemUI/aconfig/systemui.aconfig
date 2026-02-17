@@ -44,17 +44,17 @@ flag {
 }
 
 flag {
+    name: "aod_notif_icon_outline"
+    namespace: "systemui"
+    description: "Adds a hairline circle around the app icon for promoted notifications on AOD."
+    bug: "475234641"
+}
+
+flag {
   name: "aosp_posture_detection"
   namespace: "systemui"
   description: "Enables an AOSP-based posture detection algorithm using device accelerometer data"
   bug: "456482519"
-}
-
-flag {
-  name: "app_clips_backlinks"
-  namespace: "systemui"
-  description: "Enables Backlinks improvement feature in App Clips"
-  bug: "300307759"
 }
 
 flag {
@@ -96,17 +96,6 @@ flag {
     namespace: "systemui"
     description: "Updates to button animations and font changes for bouncer, bouncer_ui_revamp will cover only the blur changes."
     bug: "376491880"
-}
-
-flag {
-    name: "brightness_icons_refresh"
-    namespace: "systemui"
-    description: "Replaces the brightness slider icon for the rounded ones"
-    bug: "456222699"
-    is_fixed_read_only: true
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -171,6 +160,16 @@ flag {
 }
 
 flag {
+    name: "communal_accessibility_resize"
+    namespace: "systemui"
+    description: "Allows users to resize communal hub widgets by single-point actions."
+    bug: "431683508"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
   name: "communal_bouncer_do_not_modify_plugin_open"
   namespace: "systemui"
   description: "do not modify notification shade when handling bouncer expansion."
@@ -181,10 +180,13 @@ flag {
 }
 
 flag {
-    name: "communal_edit_mode_accessibility_resize"
-    namespace: "systemui"
-    description: "Allows users to resize communal hub widgets by single-point actions."
-    bug: "431683508"
+  name: "communal_hub_cancel_add_widget"
+  namespace: "systemui"
+  description: "Enable cancel button to cancel adding a new widget to the communal hub"
+  bug: "424268360"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
 }
 
 flag {
@@ -246,14 +248,6 @@ flag {
 }
 
 flag {
-    name: "coroutine_tracing"
-    namespace: "systemui"
-    description: "Adds thread-local data to System UI's global coroutine scopes to "
-        "allow for tracing of coroutine continuations using System UI's tracinglib"
-    bug: "289353932"
-}
-
-flag {
     name: "decouple_view_controller_in_animlib"
     namespace: "systemui"
     description: "Decouple view and controller in AnimLib."
@@ -293,6 +287,16 @@ flag {
     namespace: "systemui"
     description: "Enables improved notification UX for Desktop."
     bug: "456554989"
+}
+
+flag {
+    name: "dialog_background_refresh"
+    namespace: "systemui"
+    description: "Enable refreshing the background of SystemUIDialogs when the theme changes between light and dark mode"
+    bug: "474600479"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -515,6 +519,13 @@ flag {
 }
 
 flag {
+    name: "enable_note_hsum_dev_option_fix"
+    namespace: "note"
+    description: "Enables a fix to ensure notes developer option works for HSUM users."
+    bug: "462400157"
+}
+
+flag {
     name: "enable_note_in_action_corner"
     namespace: "note"
     description: "Enables note as a selectable option in the action corner customization."
@@ -658,16 +669,6 @@ flag {
 }
 
 flag {
-    name: "fix_cast_dialog_flicker"
-    namespace: "systemui"
-    description: "Fix a flicker in activity launch animations originating from the Cast QS dialog"
-    bug: "437996864"
-    metadata {
-       purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "fix_dialog_anim_collapse_flicker"
     namespace: "systemui"
     description: "Fix a flicker in bluetooth tile when it is tapping during dialog collapse animation"
@@ -767,16 +768,6 @@ flag {
 }
 
 flag {
-    name: "glanceable_hub_enabled_by_default"
-    namespace: "systemui"
-    description: "Enable glanceable hub by default (this flag is intended to enable GH for DF only)."
-    bug: "428215526"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
   name: "glanceable_hub_v2"
   namespace: "systemui"
   description: "Gates the refreshed glanceable hub experience that also brings the glanceable hub to mobile phones"
@@ -825,16 +816,6 @@ flag {
     metadata {
       purpose: PURPOSE_BUGFIX
     }
-}
-
-flag {
-    name: "heads_up_style_provider_display_aware"
-    namespace: "systemui"
-    description: "Make HeadsUpStyleProvider display aware"
-    bug: "432401846"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-   }
 }
 
 flag {
@@ -893,6 +874,13 @@ flag {
     namespace: "systemui"
     description: "Enables inline notifications settings access."
     bug: "456554989"
+}
+
+flag {
+    name: "internet_dialog_delegate_legacy_deprecation"
+    namespace: "systemui"
+    description: "Replacing InternetDialogDelegateLegacy by InternetDetailsContentManager."
+    bug: "467481923"
 }
 
 flag {
@@ -1004,26 +992,6 @@ flag {
   namespace: "systemui"
   description: "Enables low light clock dream experience on mobile phones"
   bug: "378174125"
-}
-
-flag {
-    name: "low_light_dream_hysteresis"
-    namespace: "systemui"
-    description: "Enables hysteresis in the low light dream debounce algorithm to prevent rapid switching."
-    bug: "447857169"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "lowlight_clock_set_brightness"
-    namespace: "systemui"
-    description: "Sets brightness to minimum when using lowlight clock"
-    bug: "419096438"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
 }
 
 flag {
@@ -1207,13 +1175,6 @@ flag {
 }
 
 flag {
-  name: "notification_bundle_ui"
-  namespace: "systemui"
-  description: "Three-level group UI for notification bundles"
-  bug: "367996732"
-}
-
-flag {
    name: "notification_children_container_min_height"
    namespace: "systemui"
    description: "Enforce a minimum height for the NotificationChildrenContainer"
@@ -1370,10 +1331,10 @@ flag {
 }
 
 flag {
-    name: "qs_material_expressive_tiles"
+    name: "qs_edit_mode_hover_fixes"
     namespace: "systemui"
-    description: "Uses the Material Expressive button groups for QS tiles."
-    bug: "419309247"
+    description: "Various fixes for the hover states of the quick settings edit mode"
+    bug: "435626373"
     metadata {
       purpose: PURPOSE_BUGFIX
     }
@@ -1394,30 +1355,10 @@ flag {
 }
 
 flag {
-    name: "qs_power_icon_refresh"
-    namespace: "systemui"
-    description: "Replaces the footer power icon with a heavier weight"
-    bug: "452644748"
-    is_fixed_read_only: true
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "qs_sizes_in_tile_request_dialog"
     namespace: "systemui"
     description: "Allows for selecting a tile's size in the tile request dialog."
     bug: "445464782"
-}
-
-flag {
-
-    name: "qs_split_internet_tile"
-    namespace: "systemui"
-    description: "Splits the Internet tile into Wifi (with internet info) + Mobile Data."
-    bug: "201143076"
-    is_fixed_read_only: true
 }
 
 flag {
@@ -1444,15 +1385,15 @@ flag {
 flag {
     name: "qs_wifi_config"
     namespace: "systemui"
-    description: "Enables the multi-user WiFi configuration UI in Interent detailed tiles. This flag depends on qs_tile_detailed_view flag"
+    description: "Obsolete, use qs_wifi_multiuser instead"
     bug: "402214828"
 }
 
 flag {
-   name: "record_issue_qs_tile"
-   namespace: "systemui"
-   description: "Replace Record Trace QS Tile with expanded Record Issue QS Tile"
-   bug: "305049544"
+    name: "qs_wifi_multiuser"
+    namespace: "systemui"
+    description: "Enables the multi-user WiFi configuration UI in Interent detailed tiles. This flag depends on qs_tile_detailed_view flag"
+    bug: "402214828"
 }
 
 flag {
@@ -1463,6 +1404,16 @@ flag {
    metadata {
      purpose: PURPOSE_BUGFIX
    }
+}
+
+flag {
+    name: "remove_launch_display_id_override"
+    namespace: "systemui"
+    description: "Remove the launchDisplayId override when launching pending intents, allowing launches on secondary displays"
+    bug: "467894356"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -1520,6 +1471,13 @@ flag {
 }
 
 flag {
+    name: "rich_aod_media"
+    namespace: "pixel_display"
+    description: "Enables Rich AOD media"
+    bug: "448453632"
+}
+
+flag {
    name: "run_fingerprint_detect_on_dismissible_keyguard"
    namespace: "systemui"
    description: "Run fingerprint detect instead of authenticate if the keyguard is dismissible."
@@ -1538,6 +1496,16 @@ flag {
     namespace: "systemui"
     description: "Enables the new screen recording UX"
     bug: "410901215"
+}
+
+flag {
+    name: "screen_recording_service_fix"
+    namespace: "systemui"
+    description: "Fixes microphone access in ScreenRecordingService"
+    bug: "412572612"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -1568,13 +1536,6 @@ flag {
 }
 
 flag {
-    name: "screenshot_policy_split_and_desktop_mode"
-    namespace: "systemui"
-    description: "Improves screenshot policy handling for split screen and desktop mode."
-    bug: "365597999"
-}
-
-flag {
   name: "secondary_user_widget_host"
   namespace: "systemui"
   description: "Host communal widgets in the current secondary user on HSUM."
@@ -1592,13 +1553,6 @@ flag {
   metadata {
     purpose: PURPOSE_BUGFIX
   }
-}
-
-flag {
-  name: "shade_window_goes_around"
-  namespace: "systemui"
-  description: "Enables the shade window to move between displays"
-  bug: "362719719"
 }
 
 flag {
@@ -1667,13 +1621,6 @@ flag {
    namespace: "systemui"
    description: "Relocate Smartspace to bottom of the Lock Screen"
    bug: "316212788"
-}
-
-flag {
-    name: "smartspace_viewpager2"
-    namespace: "systemui"
-    description: "Use viewpager2 in Smartspace"
-    bug: "259566300"
 }
 
 flag {
@@ -1826,16 +1773,6 @@ flag {
 }
 
 flag {
-    name: "status_bar_rudimentary_battery"
-    namespace: "systemui"
-    description: "Bugfix flag to control the percentage-outside-battery behavior"
-    bug: "408730362"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "status_bar_show_icons_in_secure_camera"
     namespace: "systemui"
     description: "Show status bar icons in secure camera if user swipes down from top of screen"
@@ -1843,14 +1780,6 @@ flag {
     metadata {
       purpose: PURPOSE_BUGFIX
     }
-}
-
-flag {
-    name: "status_bar_static_inout_indicators"
-    namespace: "systemui"
-    description: "(Upstream request) Always show the network activity inout indicators and "
-        "prefer using alpha to distinguish network activity."
-    bug: "310715220"
 }
 
 flag {
@@ -1879,6 +1808,25 @@ flag {
 }
 
 flag {
+    name: "status_icons_in_compose_refresh"
+    namespace: "systemui"
+    description: "Build time flag for status icons in compose refresh"
+    bug: "391605373"
+    is_fixed_read_only: true
+}
+
+flag {
+    name: "stl_fling_animation_consume_overshoot"
+    namespace: "systemui"
+    description: "Animates the fling including overshoot in NestedDraggable, instead of delegating"
+        " to nested scroll containers. Workaround for b/469714374"
+    bug: "470340805"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "stl_user_action_gesture"
     namespace: "systemui"
     description: "Enables internal support for the UserActionGesture interface in STL"
@@ -1886,10 +1834,13 @@ flag {
 }
 
 flag {
-   name: "switch_user_on_bg"
-   namespace: "systemui"
-   description: "Does user switching on a background thread"
-   bug: "284095720"
+    name: "synchronized_queue_cascade_notify"
+    namespace: "systemui"
+    description: "Cascade notify() in SynchornizedLinkedBlockingQueue to prevent waking up all threads unnecessarily"
+    bug: "470412661"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
 }
 
 flag {
@@ -1928,13 +1879,18 @@ flag {
 }
 
 flag {
-    name: "update_user_switcher_background"
+    name: "touchpad_gesture_tutorial_updates"
     namespace: "systemui"
-    description: "Decide whether to update user switcher in background thread."
-    bug: "322745650"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
+    description: "Updates the touchpad gesture tutorial to reflect the latest gesture and "
+            "animation changes"
+    bug: "456784841"
+}
+
+flag {
+  name: "upright_charging_dreams_setup"
+  namespace: "systemui"
+  description: "Trigger a setup component based on the first time the user is upright + charging"
+  bug: "473859719"
 }
 
 flag {
@@ -1942,20 +1898,6 @@ flag {
   namespace: "systemui"
   description: "Use compose's AndroidUiDispatcher as default"
   bug: "460414443"
-}
-
-flag {
-    name: "use_systemui_views_for_system_toolbar"
-    namespace: "permissions"
-    description: "Use the views moved into system ui from the framework for the system selection toolbar."
-    bug: "450977221"
-}
-
-flag {
-    name: "volume_redesign"
-    namespace: "systemui"
-    description: "Enables Volume visuals update"
-    bug: "368308908"
 }
 
 flag {

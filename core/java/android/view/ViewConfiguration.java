@@ -36,6 +36,9 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.RemoteException;
 import android.os.StrictMode;
+// QTI_BEGIN: 2026-01-22: Performance: touch: support tunable scroll touch slop.
+import android.os.SystemProperties;
+// QTI_END: 2026-01-22: Performance: touch: support tunable scroll touch slop.
 import android.provider.Settings;
 import android.util.DisplayMetrics;
 import android.util.LongSparseArray;
@@ -199,6 +202,13 @@ public class ViewConfiguration {
      */
     private static final int DOUBLE_TAP_TOUCH_SLOP = TOUCH_SLOP;
 
+// QTI_BEGIN: 2026-01-22: Performance: touch: support tunable scroll touch slop.
+    /**
+     * Add new system property to set touch slop.
+     */
+    private static final String KEY_TOUCH_SLOP = "ro.view.configuration.touch.slop";
+
+// QTI_END: 2026-01-22: Performance: touch: support tunable scroll touch slop.
     /**
      * Distance a touch can wander before we think the user is attempting a paged scroll
      * (in dips)
@@ -548,7 +558,9 @@ public class ViewConfiguration {
         }
 
         mFadingMarqueeEnabled = res.getBoolean(R.bool.config_ui_enableFadingMarquee);
-        mTouchSlop = res.getDimensionPixelSize(R.dimen.config_viewConfigurationTouchSlop);
+// QTI_BEGIN: 2026-01-22: Performance: touch: support tunable scroll touch slop.
+        mTouchSlop = resolveTouchSlop(res);
+// QTI_END: 2026-01-22: Performance: touch: support tunable scroll touch slop.
         mHandwritingSlop = res.getDimensionPixelSize(
                 R.dimen.config_viewConfigurationHandwritingSlop);
         mHoverSlop = res.getDimensionPixelSize(R.dimen.config_viewConfigurationHoverSlop);
@@ -618,6 +630,29 @@ public class ViewConfiguration {
         mDeviceId = context.getDeviceId();
     }
 
+// QTI_BEGIN: 2026-01-22: Performance: touch: support tunable scroll touch slop.
+    /**
+     * Returns touch slop px.
+     * @hide
+     */
+    private static int resolveTouchSlop(Resources res) {
+        final int defaultTouchSlopPx =
+                res.getDimensionPixelSize(R.dimen.config_viewConfigurationTouchSlop);
+        final int propValDp = SystemProperties.getInt(KEY_TOUCH_SLOP, -1);
+
+        if (propValDp < 1) {
+            return defaultTouchSlopPx;
+        } else {
+            final float pxF = TypedValue.applyDimension(
+                    TypedValue.COMPLEX_UNIT_DIP,
+                    (float) propValDp,
+                    res.getDisplayMetrics());
+            final int touchSlopPx = Math.round(pxF);
+            return Math.min(touchSlopPx, defaultTouchSlopPx);
+        }
+    }
+
+// QTI_END: 2026-01-22: Performance: touch: support tunable scroll touch slop.
     /**
      * Returns a configuration for the specified visual {@link Context}. The configuration depends
      * on various parameters of the {@link Context}, like the dimension of the display or the
@@ -797,7 +832,6 @@ public class ViewConfiguration {
      *
      * @return the duration in milliseconds of the text cursor blink interval
      */
-    @FlaggedApi(android.view.accessibility.Flags.FLAG_TEXT_CURSOR_BLINK_INTERVAL)
     public int getTextCursorBlinkIntervalMillis() {
         int value = getSettingValue(Settings.Secure.ACCESSIBILITY_TEXT_CURSOR_BLINK_INTERVAL_MS,
                 sResourceCache.getDefaultTextCursorBlinkInterval());
@@ -1740,10 +1774,6 @@ public class ViewConfiguration {
         }
 
         private static Resources getCurrentResources() {
-            if (!android.companion.virtualdevice.flags.Flags
-                    .migrateViewconfigurationConstantsToResources()) {
-                return null;
-            }
             Application application = ActivityThread.currentApplication();
             Context context = application != null ? application.getApplicationContext() : null;
             return context != null ? context.getResources() : null;

@@ -19,14 +19,27 @@ package com.android.wm.shell.windowdecor
 import android.graphics.PointF
 import android.graphics.Rect
 import android.os.Handler
+import android.os.IBinder
 import android.os.Looper
+import android.view.SurfaceControl
+import android.view.WindowManager
+import android.window.DesktopExperienceFlags
+import android.window.TransitionInfo
+import android.window.TransitionRequestInfo
+import android.window.WindowContainerTransaction
+import com.android.internal.jank.Cuj
+import com.android.internal.jank.InteractionJankMonitor
 import com.android.wm.shell.common.DisplayController
-import com.android.wm.shell.shared.desktopmode.DesktopState
+import com.android.wm.shell.desktopmode.DesktopModeEventLogger.Companion.ResizeTrigger
+import com.android.wm.shell.desktopmode.DesktopModeEventLogger.Companion.getInputMethodType
+import com.android.wm.shell.desktopmode.DesktopTasksController
+import com.android.wm.shell.desktopmode.DesktopUserRepositories
 import com.android.wm.shell.transition.Transitions
 import com.android.wm.shell.windowdecor.DragPositioningCallback.CTRL_TYPE_BOTTOM
 import com.android.wm.shell.windowdecor.DragPositioningCallback.CTRL_TYPE_LEFT
 import com.android.wm.shell.windowdecor.DragPositioningCallback.CTRL_TYPE_RIGHT
 import com.android.wm.shell.windowdecor.DragPositioningCallback.CTRL_TYPE_TOP
+import java.util.concurrent.TimeUnit
 
 /**
  * Orchestrator class for handling task drag-resizing and drag-moving operations.
@@ -40,16 +53,24 @@ import com.android.wm.shell.windowdecor.DragPositioningCallback.CTRL_TYPE_TOP
  * @param taskResizer The [TaskResizer] implementation to use for drag-resize operations.
  * @param transitions The [Transitions] controller for handling window transitions.
  * @param handler The handler for the main shell thread.
+ * @param desktopTasksController The controller for desktop mode windowing logic and transitions.
+ * @param desktopUserRepositories The repository for desktop mode per-user data.
  */
 class ResizeTaskPositioner(
     private val windowDecoration: WindowDecorationWrapper,
     private val displayController: DisplayController,
-    private val desktopState: DesktopState,
     private val taskMover: TaskMover,
     private val taskResizer: TaskResizer,
     private val transitions: Transitions,
     private val handler: Handler,
-) : TaskPositioner {
+    private val desktopTasksController: DesktopTasksController,
+    private val desktopUserRepositories: DesktopUserRepositories,
+    private val interactionJankMonitor: InteractionJankMonitor,
+) : TaskPositioner, Transitions.TransitionHandler {
+    // The TaskPositioner interface requires the add and remove DragEventListener methods,
+    // making this the central manager of the listener list.
+    private val resizeEventListeners =
+        mutableListOf<DragPositioningCallbackUtility.DragEventListener>()
     private var dragSession: DragSession? = null
     private val isResizing: Boolean
         get() =
@@ -68,69 +89,217 @@ class ResizeTaskPositioner(
         inputMethodType: Int,
     ): Rect {
         val taskBounds = Rect(windowDecoration.taskInfo.configuration.windowConfiguration.bounds)
+        val rotation = windowDecoration.taskInfo.configuration.windowConfiguration.displayRotation
+        val resizeTrigger =
+            if (
+                ctrlType == CTRL_TYPE_BOTTOM ||
+                    ctrlType == CTRL_TYPE_TOP ||
+                    ctrlType == CTRL_TYPE_RIGHT ||
+                    ctrlType == CTRL_TYPE_LEFT
+            ) {
+                ResizeTrigger.EDGE
+            } else {
+                ResizeTrigger.CORNER
+            }
+        val inputMethod = getInputMethodType(inputMethodType)
+
         val newDragSession =
             DragSession(
                     windowDecoration,
-                    displayController,
-                    desktopState,
                     ctrlType = ctrlType,
                     taskBoundsAtDragStart = Rect(taskBounds),
                     repositionTaskBounds = Rect(taskBounds),
                     repositionStartPoint = PointF(x, y),
+                    rotation = rotation,
+                    hasFirstMoveEventConsumed = false,
+                    resizeTrigger = resizeTrigger,
+                    inputMethod = inputMethod,
+                    resizeEventListeners = resizeEventListeners,
                 )
-                .also { dragSession = it }
+                .also {
+                    dragSession = it
+                    if (DesktopExperienceFlags.ENABLE_BOUNDS_RESTORING_ON_DRAG_EXIT.isTrue) {
+                        val profile =
+                            desktopUserRepositories.getProfile(windowDecoration.taskInfo.userId)
+                        it.desktopRepository = profile
+                        it.shouldRestoreBoundsOnMove =
+                            profile.hasBoundsBeforeSnapOrMaximize(windowDecoration.taskInfo)
+                    }
+                }
 
-        val rotation = windowDecoration.taskInfo.configuration.windowConfiguration.displayRotation
-        newDragSession.rotation = rotation
         displayController
             .getDisplayLayout(windowDecoration.taskInfo.displayId)
             ?.getStableBounds(newDragSession.stableBounds)
 
-        return if (isResizing) {
-            taskResizer.onResizeStart(newDragSession, x, y)
-        } else {
-            taskMover.onMoveStart(newDragSession, x, y)
+        if (isResizing) {
+            taskResizer.onResizeStart(newDragSession)
+            // Capture CUJ for re-sizing window in DW mode.
+            interactionJankMonitor.begin(
+                createLongTimeoutJankConfigBuilder(Cuj.CUJ_DESKTOP_MODE_RESIZE_WINDOW)
+            )
         }
+
+        return Rect(newDragSession.repositionTaskBounds)
     }
 
     override fun onDragPositioningMove(displayId: Int, x: Float, y: Float): Rect {
         check(Looper.myLooper() == handler.looper) {
             "This method must run on the shell main thread."
         }
+        val session = checkNotNull(dragSession) { "DragSession must not be null during a move." }
 
-        return if (isResizing) {
-            taskResizer.onResizeUpdate(x, y)
+        if (isResizing) {
+            taskResizer.onResizeUpdate(session, x, y)
         } else {
-            taskMover.onMoveUpdate(displayId, x, y)
+            taskMover.onMoveUpdate(session, displayId, x, y)?.let {
+                session.pendingBoundsRestoreTransition =
+                    transitions.startTransition(WindowManager.TRANSIT_CHANGE, it, this)
+            }
         }
+
+        if (!session.hasFirstMoveEventConsumed) {
+            // Update taskbar rounding once the drag/resize has registered a move event - in case
+            // the moved task is no longer maximized. Only call this once per resize/drag so we
+            // don't call into Launcher with each drag/resize frame to try to update the taskbar.
+            desktopTasksController.updateTaskbarRoundingOnTaskResize(
+                displayId,
+                windowDecoration.taskInfo.taskId,
+                Rect(session.repositionTaskBounds),
+            )
+            session.hasFirstMoveEventConsumed = true
+
+            if (!isResizing) {
+                // Begin window drag CUJ instrumentation only when drag position moves.
+                interactionJankMonitor.begin(
+                    createLongTimeoutJankConfigBuilder(Cuj.CUJ_DESKTOP_MODE_DRAG_WINDOW)
+                )
+            }
+        }
+
+        return Rect(session.repositionTaskBounds)
     }
 
     override fun onDragPositioningEnd(displayId: Int, x: Float, y: Float): Rect {
-        val resultBounds =
-            if (isResizing) {
-                taskResizer.onResizeEnd(x, y)
-            } else {
-                taskMover.onMoveEnd(displayId, x, y)
+        val session =
+            checkNotNull(dragSession) { "DragSession must not be null when ending a drag." }
+        if (isResizing) {
+            val wct = taskResizer.onResizeEnd(session, x, y)
+            wct?.let {
+                session.dragResizeEndTransition =
+                    transitions.startTransition(WindowManager.TRANSIT_CHANGE, it, this).also { t ->
+                        desktopTasksController.onDragResizeTransitionStarted(t)
+                    }
             }
+                ?: run {
+                    // If no transition is started, clear the session now.
+                    dragSession = null
+                }
+        } else {
+            taskMover.onMoveEnd(session, displayId, x, y)
+            dragSession = null
+        }
 
-        dragSession = null
-
-        return resultBounds
+        return Rect(session.repositionTaskBounds)
     }
 
     override fun close() {
-        transitions.unregisterObserver(taskResizer)
+        // TODO(b/465979009): Remove this API after TaskPositioner refactor.
+        // Its original purpose was to unregister DisplayWindowListener for topology changes, which
+        // is now handled by TaskMover.
     }
 
     override fun isResizingOrAnimating(): Boolean {
-        return taskResizer.isResizingOrAnimating()
+        return dragSession?.isResizingOrAnimatingResize ?: false
     }
 
     override fun addDragEventListener(
         dragEventListener: DragPositioningCallbackUtility.DragEventListener
-    ) {}
+    ) {
+        resizeEventListeners.add(dragEventListener)
+    }
 
     override fun removeDragEventListener(
         dragEventListener: DragPositioningCallbackUtility.DragEventListener
-    ) {}
+    ) {
+        resizeEventListeners.remove(dragEventListener)
+    }
+
+    override fun startAnimation(
+        transition: IBinder,
+        info: TransitionInfo,
+        startTransaction: SurfaceControl.Transaction,
+        finishTransaction: SurfaceControl.Transaction,
+        finishCallback: Transitions.TransitionFinishCallback,
+    ): Boolean {
+        for (change in info.changes) {
+            if (change.taskInfo == null) {
+                // Ignore non-task (e.g., display, activity) changes.
+                continue
+            }
+            val sc = change.leash
+            val endBounds = change.endAbsBounds
+            val endPosition = change.endRelOffset
+            startTransaction
+                .setWindowCrop(sc, endBounds.width(), endBounds.height())
+                .setPosition(sc, endPosition.x.toFloat(), endPosition.y.toFloat())
+            finishTransaction
+                .setWindowCrop(sc, endBounds.width(), endBounds.height())
+                .setPosition(sc, endPosition.x.toFloat(), endPosition.y.toFloat())
+        }
+        startTransaction.apply()
+
+        dragSession?.let {
+            if (it.pendingBoundsRestoreTransition == transition) {
+                it.pendingBoundsRestoreTransition = null
+            } else if (it.dragResizeEndTransition == transition) {
+                taskResizer.cleanup(it)
+                dragSession = null
+            }
+        }
+
+        finishCallback.onTransitionFinished(null)
+        interactionJankMonitor.end(Cuj.CUJ_DESKTOP_MODE_RESIZE_WINDOW)
+        return true
+    }
+
+    /**
+     * We should never reach this as this handler's transitions are only started from shell
+     * explicitly.
+     */
+    override fun handleRequest(
+        transition: IBinder,
+        request: TransitionRequestInfo,
+    ): WindowContainerTransaction? {
+        return null
+    }
+
+    override fun onTransitionConsumed(
+        transition: IBinder,
+        aborted: Boolean,
+        finishTransaction: SurfaceControl.Transaction?,
+    ) {
+        dragSession?.let {
+            if (it.dragResizeEndTransition == transition) {
+                taskResizer.cleanup(it)
+                dragSession = null
+            }
+        }
+    }
+
+    private fun createLongTimeoutJankConfigBuilder(
+        @com.android.internal.jank.Cuj.CujType cujType: Int
+    ) =
+        InteractionJankMonitor.Configuration.Builder.withSurface(
+                cujType,
+                windowDecoration.decorWindowContext,
+                windowDecoration.taskSurface,
+                handler,
+            )
+            .setTimeout(LONG_CUJ_TIMEOUT_MS)
+
+    companion object {
+        // Timeout used for resize and drag CUJs, this is longer than the default timeout to avoid
+        // timing out in the middle of a resize or drag action.
+        private val LONG_CUJ_TIMEOUT_MS = TimeUnit.SECONDS.toMillis(/* duration= */ 10L)
+    }
 }

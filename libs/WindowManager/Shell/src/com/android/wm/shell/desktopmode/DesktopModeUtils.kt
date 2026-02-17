@@ -23,6 +23,7 @@ import android.app.ActivityManager.RunningTaskInfo
 import android.app.ActivityOptions
 import android.app.TaskInfo
 import android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK
 import android.content.Intent.FLAG_ACTIVITY_MULTIPLE_TASK
@@ -190,7 +191,7 @@ fun calculateMaximizeBounds(displayLayout: DisplayLayout, taskInfo: RunningTaskI
     } else {
         // if non-resizable then calculate max bounds according to aspect ratio
         val activityAspectRatio = calculateAspectRatio(taskInfo)
-        val captionInsets = taskInfo.freeformCaptionInsets
+        val captionInsets = taskInfo.freeformCaptionInsets(displayLayout)
         val newSize =
             maximizeSizeGivenAspectRatio(
                 taskInfo,
@@ -541,6 +542,20 @@ private fun positionInScreen(desiredSize: Size, stableBounds: Rect): Rect =
  * Gets the freeform caption insets if task was eligible for exclude caption insets from app bounds
  * compatibility treatment. Returns 0 if no compatibility treatment was applied.
  */
+fun TaskInfo.freeformCaptionInsets(displayLayout: DisplayLayout): Int {
+    if (com.android.window.flags.Flags.refactorCaptionSandboxingToCore()) {
+        if (appCompatTaskInfo.hasIsExcludeCaptionInsets()) {
+            return displayLayout.captionBarHeight()
+        }
+        return 0
+    }
+    return this.freeformCaptionInsets
+}
+
+/**
+ * Gets the freeform caption insets if task was eligible for exclude caption insets from app bounds
+ * compatibility treatment. Returns 0 if no compatibility treatment was applied.
+ */
 val TaskInfo.freeformCaptionInsets: Int
     get() =
         configuration.windowConfiguration.appBounds?.let {
@@ -594,3 +609,8 @@ private fun TaskInfo.hasPortraitTopActivity(screenOrientation: Int?): Boolean {
 private fun TaskInfo.hasFullscreenOverride(): Boolean =
     appCompatTaskInfo.isUserFullscreenOverrideEnabled ||
         appCompatTaskInfo.isSystemFullscreenOverrideEnabled
+
+/** Gets the component name to be used for remembered bounds. */
+val TaskInfo.componentNameForRememberedBounds: ComponentName?
+    // Prioritize realActivity to properly handle TWA apps.
+    get() = realActivity ?: baseActivity

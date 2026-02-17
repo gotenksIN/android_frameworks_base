@@ -17,9 +17,14 @@ package com.android.server.pm;
 
 import static android.content.ComponentName.unflattenFromString;
 
+import static com.android.server.pm.GenericAllowlist.STATUS_ALLOWED_ALLOWLISTING_DISABLED_BY_SHELL_CMD;
+import static com.android.server.pm.GenericAllowlist.STATUS_ALLOWED_ALLOWLISTING_DISABLED_WHILE_DEVICE_IS_PROVISIONING;
+
 import android.content.ComponentName;
 
 import com.android.server.pm.GenericAllowlist.AllowlistMode;
+
+import com.google.common.collect.ImmutableSet;
 
 public final class UserActivitiesAllowlistTest
         extends GenericAllowlistTestCase<UserActivitiesAllowlist, ComponentName> {
@@ -59,6 +64,14 @@ public final class UserActivitiesAllowlistTest
     protected UserActivitiesAllowlist createAllowlist(@AllowlistMode int mode,
             String... configAllowlist) {
         return new UserActivitiesAllowlist(mode, configAllowlist);
+    }
+
+    @Override
+    protected ImmutableSet<Integer> getOverridingStatuses() {
+        return ImmutableSet.of(
+                STATUS_ALLOWED_ALLOWLISTING_DISABLED_BY_SHELL_CMD,
+                STATUS_ALLOWED_ALLOWLISTING_DISABLED_WHILE_DEVICE_IS_PROVISIONING
+                );
     }
 
     @Override

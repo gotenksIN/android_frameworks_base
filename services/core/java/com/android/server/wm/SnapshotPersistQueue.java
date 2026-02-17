@@ -72,7 +72,7 @@ class SnapshotPersistQueue {
     private final UserManagerInternal mUserManagerInternal;
     private boolean mShutdown;
     final int mMaxTotalStoreQueue;
-    final ConvertingRecord mConvertingRecord = new ConvertingRecord();
+    final ProcessingRecord mProcessingRecord = new ProcessingRecord();
 
     SnapshotPersistQueue() {
         mUserManagerInternal = LocalServices.getService(UserManagerInternal.class);
@@ -288,7 +288,7 @@ class SnapshotPersistQueue {
                         SystemClock.sleep(DELAY_MS);
                     }
                 }
-                mConvertingRecord.reset();
+                mProcessingRecord.reset();
                 synchronized (mLock) {
                     final boolean writeQueueEmpty = mWriteQueue.isEmpty();
                     if (!writeQueueEmpty && !mPaused) {
@@ -357,7 +357,7 @@ class SnapshotPersistQueue {
         if (!mUserManagerInternal.isUserUnlocked(userId) || mShutdown) {
             return false;
         }
-        if (mConvertingRecord.isProcess(taskId, userId)) {
+        if (mProcessingRecord.matches(taskId, userId, false /* deleting*/)) {
             return true;
         }
         // Only peek the up-coming one
@@ -366,6 +366,20 @@ class SnapshotPersistQueue {
             return item != null && item.mId == taskId && item.mUserId == userId
                     && item.mLowResSnapshotConsumer != null;
         }
+    }
+
+    boolean isDeleting(int taskId, int userId) {
+        if (mProcessingRecord.matches(taskId, userId, true /* deleting*/)) {
+            return true;
+        }
+        synchronized (mLock) {
+            for (WriteQueueItem item : mWriteQueue) {
+                if (item instanceof DeleteWriteQueueItem dq) {
+                    return dq.mId == taskId && dq.mUserId == userId;
+                }
+            }
+        }
+        return false;
     }
 
     void updateKnownLowResSnapshotIfPossible(int id, TaskSnapshot lowResSnapshot) {
@@ -418,7 +432,7 @@ class SnapshotPersistQueue {
         @Override
         void onProcess() {
             if (mLowResSnapshotConsumer != null) {
-                mConvertingRecord.processing(mId, mUserId);
+                mProcessingRecord.processing(mId, mUserId, false /* deleting*/);
             }
         }
 
@@ -509,60 +523,84 @@ class SnapshotPersistQueue {
             if (swBitmap == null) {
                 return false;
             }
-            final File file = mPersistInfoProvider.getHighResolutionBitmapFile(mId, mUserId);
-            try (FileOutputStream fos = new FileOutputStream(file)) {
-                swBitmap.compress(Flags.respectRequestedTaskSnapshotResolution() ? PNG : JPEG,
-                        COMPRESS_QUALITY, fos);
-            } catch (IOException e) {
-                Slog.e(TAG, "Unable to open " + file + " for persisting.", e);
-                return false;
-            }
+            try {
+                // Process low resolution snapshot before high resolution snapshot. Because process
+                // low-res snapshot is much faster than high-res snapshot, if any caller wants to
+                // get low-res, it can get snapshot as soon as possible.
+                if (mLowResSnapshotConsumer != null) {
+                    final Bitmap lowResBitmap = createLowResBitmap(swBitmap);
+                    final boolean writeSuccess = writeBitmap(lowResBitmap, false /* highRes */);
+                    mLowResSnapshotConsumer.accept(new LowResSnapshotSupplier() {
+                        @Override
+                        public TaskSnapshot getLowResSnapshot() {
+                            if (!writeSuccess) {
+                                abort();
+                                return null;
+                            }
+                            if (mKnownLowResSnapshot != null) {
+                                lowResBitmap.recycle();
+                                return mKnownLowResSnapshot;
+                            }
+                            final TaskSnapshot result = TaskSnapshotConvertUtil
+                                    .convertLowResSnapshot(mSnapshot, lowResBitmap);
+                            lowResBitmap.recycle();
+                            return result;
+                        }
 
-            if (!mPersistInfoProvider.enableLowResSnapshots()) {
+                        @Override
+                        public void abort() {
+                            lowResBitmap.recycle();
+                            removeKnownLowResSnapshot();
+                        }
+                    });
+                    if (!writeSuccess) {
+                        return false;
+                    }
+                    return writeBitmap(swBitmap, true /* highRes */);
+                }
+
+                if (!writeBitmap(swBitmap, true /* highRes */)) {
+                    return false;
+                }
+
+                if (!mPersistInfoProvider.enableLowResSnapshots()) {
+                    return true;
+                }
+
+                final Bitmap lowResBitmap = createLowResBitmap(swBitmap);
+                final boolean result = writeBitmap(lowResBitmap, false /* highRes */);
+                lowResBitmap.recycle();
+                removeKnownLowResSnapshot();
+                return result;
+            } finally {
                 swBitmap.recycle();
-                return true;
             }
+        }
 
+        private Bitmap createLowResBitmap(Bitmap highResBitmap) {
             final int width = mSnapshot.getHardwareBufferWidth();
             final int height = mSnapshot.getHardwareBufferHeight();
-            final Bitmap lowResBitmap = Bitmap.createScaledBitmap(swBitmap,
+            return Bitmap.createScaledBitmap(highResBitmap,
                     (int) (width * mPersistInfoProvider.lowResScaleFactor()),
                     (int) (height * mPersistInfoProvider.lowResScaleFactor()),
                     true /* filter */);
-            swBitmap.recycle();
+        }
 
-            final File lowResFile = mPersistInfoProvider.getLowResolutionBitmapFile(mId, mUserId);
-            try (FileOutputStream lowResFos = new FileOutputStream(lowResFile)) {
-                lowResBitmap.compress(JPEG, COMPRESS_QUALITY, lowResFos);
+        private boolean writeBitmap(Bitmap swBitmap, boolean highRes) {
+            final File bitmapFile = highRes
+                    ? mPersistInfoProvider.getHighResolutionBitmapFile(mId, mUserId)
+                    : mPersistInfoProvider.getLowResolutionBitmapFile(mId, mUserId);
+            try (FileOutputStream fos = new FileOutputStream(bitmapFile)) {
+                if (highRes) {
+                    swBitmap.compress(Flags.onlyCacheLowResTaskSnapshot() ? PNG : JPEG,
+                            COMPRESS_QUALITY, fos);
+                } else {
+                    swBitmap.compress(JPEG, COMPRESS_QUALITY, fos);
+                }
             } catch (IOException e) {
-                Slog.e(TAG, "Unable to open " + lowResFile + " for persisting.", e);
+                Slog.e(TAG, "Unable to open " + bitmapFile + " for persisting.", e);
                 return false;
             }
-            if (mLowResSnapshotConsumer != null) {
-                mLowResSnapshotConsumer.accept(new LowResSnapshotSupplier() {
-                    @Override
-                    public TaskSnapshot getLowResSnapshot() {
-                        if (mKnownLowResSnapshot != null) {
-                            lowResBitmap.recycle();
-                            return mKnownLowResSnapshot;
-                        }
-                        final TaskSnapshot result = TaskSnapshotConvertUtil
-                                .convertLowResSnapshot(mSnapshot, lowResBitmap);
-                        lowResBitmap.recycle();
-                        return result;
-                    }
-
-                    @Override
-                    public void abort() {
-                        lowResBitmap.recycle();
-                        removeKnownLowResSnapshot();
-                    }
-                });
-            } else {
-                lowResBitmap.recycle();
-                removeKnownLowResSnapshot();
-            }
-
             return true;
         }
 
@@ -637,6 +675,11 @@ class SnapshotPersistQueue {
         }
 
         @Override
+        void onProcess() {
+            mProcessingRecord.processing(mId, mUserId, true /* deleting*/);
+        }
+
+        @Override
         boolean isDuplicateOrExclusiveItem(WriteQueueItem testItem) {
             if (testItem instanceof StoreWriteQueueItem) {
                 final StoreWriteQueueItem swqi = (StoreWriteQueueItem) testItem;
@@ -665,22 +708,25 @@ class SnapshotPersistQueue {
         }
     }
 
-    // The current writing task.
-    private static class ConvertingRecord {
+    // The current processing task.
+    private static class ProcessingRecord {
         int mTaskId;
         int mUserId;
+        // If true, perform a delete operation; if false, perform a write operation.
+        boolean mDeleting;
 
         void reset() {
-            processing(0, 0);
+            processing(0, 0, false /* deleting */);
         }
 
-        synchronized void processing(int taskId, int userId) {
+        synchronized void processing(int taskId, int userId, boolean deleting) {
             mTaskId = taskId;
             mUserId = userId;
+            mDeleting = deleting;
         }
 
-        synchronized boolean isProcess(int taskId, int userId) {
-            return mTaskId == taskId && mUserId == userId;
+        synchronized boolean matches(int taskId, int userId, boolean deleting) {
+            return mTaskId == taskId && mUserId == userId && mDeleting == deleting;
         }
     }
 }

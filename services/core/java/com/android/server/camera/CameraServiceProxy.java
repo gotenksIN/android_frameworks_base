@@ -855,8 +855,8 @@ public class CameraServiceProxy extends SystemService
         }
 
         /**
-         * Placeholder method to fetch the system state for autoframing.
-         * TODO: b/260617354
+         * This is a placeholder for a feature to override autoframing based on system state.
+         * The feature was not implemented. See b/260617354 for context.
          */
         @Override
         public int getAutoframingOverride(String packageName) {
@@ -957,12 +957,12 @@ public class CameraServiceProxy extends SystemService
                 return;
             }
 
-            boolean enableLights = (mode != AudioRestriction.VIBRATION_SOUND);
+            boolean mutedLights = (mode == AudioRestriction.VIBRATION_SOUND);
             LightsManager lm = LocalServices.getService(LightsManager.class);
             if (lm != null) {
-                lm.setEnabledState(enableLights);
+                lm.setMutedState(mutedLights);
                 if (DEBUG) {
-                    Slog.d(TAG, "Setting lights to: " + enableLights + ", mode: " + mode);
+                    Slog.d(TAG, "Muting lights: " + mutedLights + ", mode: " + mode);
                 }
             } else {
                 Slog.w(TAG, "Unable to find the Lights service");
@@ -1204,7 +1204,11 @@ public class CameraServiceProxy extends SystemService
         if (!Flags.fixManagedProfilesReceiver()) {
             return;
         }
+        updateBroadcastReceiver(from, to);
+    }
 
+    @VisibleForTesting
+    void updateBroadcastReceiver(@Nullable TargetUser from, TargetUser to) {
         // TODO(b/442009819): optimize code below so it only registers the receiver when the to user
         // can have profiles
 

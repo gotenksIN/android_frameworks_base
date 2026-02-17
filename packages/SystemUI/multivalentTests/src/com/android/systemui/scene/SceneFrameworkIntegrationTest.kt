@@ -26,6 +26,7 @@ import com.android.compose.animation.scene.OverlayKey
 import com.android.compose.animation.scene.SceneKey
 import com.android.compose.animation.scene.Swipe
 import com.android.compose.animation.scene.UserActionResult
+import com.android.compose.animation.scene.content.state.TransitionState
 import com.android.internal.R
 import com.android.internal.util.emergencyAffordanceManager
 import com.android.systemui.SysuiTestCase
@@ -39,12 +40,14 @@ import com.android.systemui.bouncer.ui.viewmodel.bouncerOverlayContentViewModel
 import com.android.systemui.deviceentry.data.repository.fakeDeviceEntryRepository
 import com.android.systemui.deviceentry.domain.interactor.deviceEntryInteractor
 import com.android.systemui.flags.EnableSceneContainer
+import com.android.systemui.integration.SystemUiIntegrationTest
 import com.android.systemui.keyguard.KeyguardViewMediator
 import com.android.systemui.keyguard.data.repository.fakeKeyguardRepository
 import com.android.systemui.keyguard.ui.viewmodel.lockscreenUserActionsViewModel
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.collectLastValue
 import com.android.systemui.kosmos.currentValue
+import com.android.systemui.kosmos.runCurrent
 import com.android.systemui.kosmos.runTest
 import com.android.systemui.kosmos.testScope
 import com.android.systemui.kosmos.verifyCurrent
@@ -59,6 +62,8 @@ import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.scene.shared.model.fakeSceneDataSource
 import com.android.systemui.scene.ui.viewmodel.SceneContainerViewModel
 import com.android.systemui.shade.domain.interactor.enableSingleShade
+import com.android.systemui.shade.domain.interactor.shadeModeInteractor
+import com.android.systemui.shade.shared.model.ShadeMode
 import com.android.systemui.shade.ui.viewmodel.shadeSceneContentViewModel
 import com.android.systemui.shade.ui.viewmodel.shadeUserActionsViewModel
 import com.android.systemui.statusbar.pipeline.mobile.data.repository.fakeMobileConnectionsRepository
@@ -74,8 +79,8 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.advanceTimeBy
+import org.junit.Assume.assumeTrue
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -102,6 +107,7 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 @RunWithLooper
 @EnableSceneContainer
+@SystemUiIntegrationTest
 class SceneFrameworkIntegrationTest : SysuiTestCase() {
 
     private val kosmos = testKosmos()
@@ -130,10 +136,10 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
             sceneContainerViewModel.activateIn(testScope)
 
             assertWithMessage("Initial scene key mismatch!")
-                .that(currentValue(sceneContainerViewModel.currentScene))
+                .that(sceneContainerViewModel.currentScene)
                 .isEqualTo(sceneContainerConfig.initialSceneKey)
             assertWithMessage("Initial scene container visibility mismatch!")
-                .that(currentValue { sceneContainerViewModel.isVisible })
+                .that(sceneContainerViewModel.isVisible)
                 .isTrue()
         }
 
@@ -405,9 +411,12 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
         }
 
     @Test
-    @Ignore("b/462133799")
     fun swipeDownOnShade_goesToQuickSettings() =
         kosmos.runTest {
+            val shadeMode by collectLastValue(shadeModeInteractor.shadeMode)
+            // The transition to Scenes.QuickSettings is only available in Single shade mode.
+            assumeTrue(shadeMode is ShadeMode.Single)
+
             emulateUserDrivenSceneTransition(to = Scenes.Shade)
             assertCurrentScene(Scenes.Shade)
             val actions by collectLastValue(shadeUserActionsViewModel.actions)
@@ -425,7 +434,7 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
      */
     private fun Kosmos.assertCurrentScene(expected: SceneKey) {
         assertWithMessage("Current scene mismatch!")
-            .that(currentValue(sceneContainerViewModel.currentScene))
+            .that(sceneContainerViewModel.currentScene)
             .isEqualTo(expected)
     }
 
@@ -535,6 +544,7 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
 
             // End the transition and report the change.
             transitionState.value = ObservableTransitionState.Idle(toScene)
+            fakeSceneDataSource.transitionState = TransitionState.Idle(toScene)
         }
 
         if (addedOverlays.isNotEmpty() || removedOverlays.isNotEmpty()) {
@@ -568,6 +578,7 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
 
             // End the transition and report the change, taking any scene transition into account.
             transitionState.value = ObservableTransitionState.Idle(toScene, toOverlays)
+            fakeSceneDataSource.transitionState = TransitionState.Idle(toScene, toOverlays)
         }
 
         fakeSceneDataSource.unpause(force = true)
@@ -575,9 +586,9 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
         assertWithMessage(
                 "Visibility mismatch after transition from $fromScene to $toScene and $fromOverlays to $toOverlays!"
             )
-            .that(currentValue { sceneContainerViewModel.isVisible })
+            .that(sceneContainerViewModel.isVisible)
             .isEqualTo(expectedVisible)
-        assertThat(currentValue(sceneContainerViewModel.currentScene)).isEqualTo(toScene)
+        assertThat(sceneContainerViewModel.currentScene).isEqualTo(toScene)
         assertThat(currentValue(sceneInteractor.currentOverlays)).isEqualTo(toOverlays)
     }
 
@@ -709,6 +720,7 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
         fakeMobileConnectionsRepository.isAnySimSecure.value = false
 
         setAuthMethod(authMethodAfterSimUnlock, enableLockscreen)
+        runCurrent()
     }
 
     /** Changes device wakefulness state from asleep to awake, going through intermediary states. */
@@ -719,6 +731,7 @@ class SceneFrameworkIntegrationTest : SysuiTestCase() {
             .isFalse()
 
         powerInteractor.setAwakeForTest()
+        runCurrent()
     }
 
     /** Changes device wakefulness state from awake to asleep, going through intermediary states. */

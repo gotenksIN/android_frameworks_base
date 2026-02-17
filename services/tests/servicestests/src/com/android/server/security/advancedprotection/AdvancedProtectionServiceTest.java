@@ -45,6 +45,7 @@ import android.security.advancedprotection.AdvancedProtectionFeature.Provisionin
 import android.security.advancedprotection.AdvancedProtectionManager;
 import android.security.advancedprotection.AdvancedProtectionManager.FeatureId;
 import android.security.advancedprotection.IAdvancedProtectionCallback;
+import android.security.advancedprotection.IAdvancedProtectionFeatureCallback;
 
 import androidx.annotation.NonNull;
 
@@ -137,6 +138,58 @@ public class AdvancedProtectionServiceTest {
         assertTrue(callbackCaptor.get());
     }
 
+    @EnableFlags(Flags.FLAG_AAPM_API_V2)
+    @Test
+    public void testEnableProtection_withFeatures_canBeForcedEnabled() throws IOException {
+        // TODO: Fix issue where if a config is not mocked, it does not pull the actual file on test device.
+        mockSystemConfigWithFeatures();
+        AdvancedProtectionHook hook = createHook(/* isAvailable */ false, null);
+        AdvancedProtectionProvider provider = createProvider();
+        AdvancedProtectionStore store = createAdvancedProtectionStore();
+        AdvancedProtectionService service = createService(hook, provider, store);
+
+        List<AdvancedProtectionFeature> features =
+                service.getAdvancedProtectionFeatures(/* featureIds */ null);
+
+        assertDoesNotContain(features, HOOK_ID);
+        assertDoesNotContain(features, PROVIDER_ID);
+
+        service.setAdbProvisioned(HOOK_ID, true);
+        service.setAdbProvisioned(PROVIDER_ID, true);
+        mockSystemConfigWithFeatures();
+        AdvancedProtectionService rebootedService = createService(hook, provider, store);
+        List<AdvancedProtectionFeature> rebootedFeatures =
+                rebootedService.getAdvancedProtectionFeatures(/* featureIds */ null);
+
+        assertContainsInAnyOrder(rebootedFeatures, HOOK_ID, PROVIDER_ID);
+    }
+
+    @EnableFlags(Flags.FLAG_AAPM_API_V2)
+    @Test
+    public void testEnableProtection_withFeatures_canBeForcedDisabled() throws IOException {
+        // TODO: Fix issue where if a config is not mocked, it does not pull the actual file on test device.
+        mockSystemConfigWithFeatures(HOOK_NAME, PROVIDER_NAME);
+        AdvancedProtectionHook hook = createHook(/* isAvailable */ true, null);
+        AdvancedProtectionProvider provider = createProvider();
+        AdvancedProtectionStore store = createAdvancedProtectionStore();
+        AdvancedProtectionService service = createService(hook, provider, store);
+
+        List<AdvancedProtectionFeature> features =
+                service.getAdvancedProtectionFeatures(/* featureIds */ null);
+
+        assertContainsInAnyOrder(features, HOOK_ID, PROVIDER_ID);
+
+        service.setAdbProvisioned(HOOK_ID, false);
+        service.setAdbProvisioned(PROVIDER_ID, false);
+        mockSystemConfigWithFeatures(HOOK_NAME, PROVIDER_NAME);
+        AdvancedProtectionService rebootedService = createService(hook, provider, store);
+        List<AdvancedProtectionFeature> rebootedFeatures =
+                rebootedService.getAdvancedProtectionFeatures(/* featureIds */ null);
+
+        assertDoesNotContain(rebootedFeatures, HOOK_ID);
+        assertDoesNotContain(rebootedFeatures, PROVIDER_ID);
+    }
+
     @Test
     public void testEnableProtection_withFeature_notAvailable() {
         AtomicBoolean callbackCalledCaptor = new AtomicBoolean(false);
@@ -147,6 +200,48 @@ public class AdvancedProtectionServiceTest {
         mLooper.dispatchNext();
 
         assertFalse(callbackCalledCaptor.get());
+    }
+
+    @EnableFlags(Flags.FLAG_AAPM_API_V2)
+    @Test
+    public void testEnableProtection_withFeature_notProvisioned() {
+        AtomicBoolean callbackCalledCaptor = new AtomicBoolean(false);
+        AdvancedProtectionHook hook = createHook(/* isAvailable */ true, callbackCalledCaptor);
+        AdvancedProtectionService service = createService(hook, null);
+        service.updateAdvancedProtectionFeaturesProvisioning(null, new int[] {HOOK_ID});
+
+        service.setAdvancedProtectionEnabled(true);
+        mLooper.dispatchAll();
+
+        assertFalse(callbackCalledCaptor.get());
+    }
+
+    @DisableFlags(Flags.FLAG_AAPM_API_V2)
+    @Test
+    public void testEnableProtection_withFeature_v2Disabled_provisioningIgnored() {
+        AtomicBoolean callbackCalledCaptor = new AtomicBoolean(false);
+        AdvancedProtectionHook hook = createHook(/* isAvailable */ true, callbackCalledCaptor);
+        AdvancedProtectionService service = createService(hook, null);
+        service.updateAdvancedProtectionFeaturesProvisioning(null, new int[] {HOOK_ID});
+
+        service.setAdvancedProtectionEnabled(true);
+        mLooper.dispatchAll();
+
+        assertTrue(callbackCalledCaptor.get());
+    }
+
+    @EnableFlags(Flags.FLAG_AAPM_API_V2)
+    @Test
+    public void testEnableProtection_withFeature_provisioned() {
+        AtomicBoolean callbackCalledCaptor = new AtomicBoolean(false);
+        AdvancedProtectionHook hook = createHook(/* isAvailable */ true, callbackCalledCaptor);
+        AdvancedProtectionService service = createService(hook, null);
+        service.updateAdvancedProtectionFeaturesProvisioning(new int[] {HOOK_ID}, null);
+
+        service.setAdvancedProtectionEnabled(true);
+        mLooper.dispatchAll();
+
+        assertTrue(callbackCalledCaptor.get());
     }
 
     @Test
@@ -204,6 +299,61 @@ public class AdvancedProtectionServiceTest {
         assertFalse(callbackCalledCaptor.get());
     }
 
+    @EnableFlags(Flags.FLAG_AAPM_API_V2)
+    @Test
+    public void testRegisterFeatureCallback() throws RemoteException {
+        AtomicBoolean callbackCaptor = new AtomicBoolean(false);
+        AdvancedProtectionProvider provider = createProvider();
+        IAdvancedProtectionFeatureCallback callback =
+                createFeatureCallback(callbackCaptor, PROVIDER_ID);
+        AdvancedProtectionService service = createService(null, provider);
+        service.setAdvancedProtectionEnabled(true);
+        mLooper.dispatchAll();
+
+        service.registerAdvancedProtectionFeatureCallback(new int[] {PROVIDER_ID}, callback);
+        mLooper.dispatchAll();
+
+        assertTrue(callbackCaptor.get());
+
+        service.setAdvancedProtectionEnabled(false);
+        mLooper.dispatchAll();
+
+        assertFalse(callbackCaptor.get());
+    }
+
+    @EnableFlags(Flags.FLAG_AAPM_API_V2)
+    @Test
+    public void testUnregisterFeatureCallback() throws RemoteException {
+        AtomicBoolean callbackCalledCaptor = new AtomicBoolean(false);
+        AdvancedProtectionProvider provider = createProvider();
+        IAdvancedProtectionFeatureCallback callback =
+                createFeatureCallback(callbackCalledCaptor, PROVIDER_ID);
+        AdvancedProtectionService service = createService(null, provider);
+
+        service.setAdvancedProtectionEnabled(true);
+        service.registerAdvancedProtectionFeatureCallback(new int[] {PROVIDER_ID}, callback);
+        mLooper.dispatchAll();
+        callbackCalledCaptor.set(false);
+
+        service.unregisterAdvancedProtectionFeatureCallback(callback);
+        service.setAdvancedProtectionEnabled(false);
+        mLooper.dispatchAll();
+
+        assertFalse(callbackCalledCaptor.get());
+    }
+
+    @EnableFlags(Flags.FLAG_AAPM_API_V2)
+    @Test
+    public void testRegisterFeatureCallback_invalidFeatureId_throwsException() {
+        IAdvancedProtectionFeatureCallback callback =
+                createFeatureCallback(new AtomicBoolean(false), PROVIDER_ID);
+        AdvancedProtectionService service = createService(null, null);
+
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> service.registerAdvancedProtectionFeatureCallback(new int[] {-1}, callback));
+    }
+
     @DisableFlags(Flags.FLAG_AAPM_API_V2)
     @Test
     public void testGetFeatures() {
@@ -217,9 +367,38 @@ public class AdvancedProtectionServiceTest {
         assertContainsInAnyOrder(features, HOOK_ID, PROVIDER_ID);
     }
 
+    @EnableFlags(Flags.FLAG_AAPM_API_V2)
+    @Test
+    public void testGetFeatures_canBeAdbDeprovisioned() throws IOException {
+        AdvancedProtectionHook hook = createHook(/* isAvailable */ true, /* callbackCaptor */ null);
+        mockSystemConfigWithFeatures(HOOK_NAME);
+        AdvancedProtectionService service = createService(hook, null);
+        service.setAdbProvisioned(HOOK_ID, false);
+
+        List<AdvancedProtectionFeature> features =
+                service.getAdvancedProtectionFeatures(/* featureIds */ null);
+
+        assertDoesNotContain(features, HOOK_ID);
+    }
+
+    @EnableFlags(Flags.FLAG_AAPM_API_V2)
+    @Test
+    public void testGetFeatures_featureNotAvailable_canBeAdbProvisioned() throws IOException {
+        AdvancedProtectionHook hook =
+                createHook(/* isAvailable */ false, /* callbackCaptor */ null);
+        AdvancedProtectionService service = createService(hook, null);
+        service.setAdbProvisioned(HOOK_ID, true);
+
+        List<AdvancedProtectionFeature> features =
+                service.getAdvancedProtectionFeatures(/* featureIds */ null);
+
+        assertProvisioningMode(
+                features, HOOK_ID, AdvancedProtectionFeature.PROVISIONING_MODE_PROVISIONED_BY_ADB);
+    }
+
     @DisableFlags(Flags.FLAG_AAPM_API_V2)
     @Test
-    public void testGetFeatures_featureNotAvailable() {
+    public void testGetFeatures_featureNotAvailable() throws IOException {
         AdvancedProtectionHook hook =
                 createHook(/* isAvailable */ false, /* callbackCaptor */ null);
         AdvancedProtectionProvider provider = createProvider();
@@ -280,10 +459,11 @@ public class AdvancedProtectionServiceTest {
     @EnableFlags(Flags.FLAG_AAPM_API_V2)
     @Test
     public void testGetFeatures_featuresNotAvailableInHookAndConfig() throws IOException {
+        // TODO: Fix issue where if a config is not mocked, it does not pull the actual file on device.
+        mockSystemConfigWithFeatures();
         AdvancedProtectionHook hook =
                 createHook(/* isAvailable */ false, /* callbackCaptor */ null);
         AdvancedProtectionProvider provider = createProvider();
-        mockSystemConfigWithFeatures();
         AdvancedProtectionService service = createService(hook, provider);
 
         List<AdvancedProtectionFeature> features =
@@ -503,10 +683,7 @@ public class AdvancedProtectionServiceTest {
         List<AdvancedProtectionFeature> features =
                 service.getAdvancedProtectionFeatures(/* featureIds */ null);
 
-        assertProvisioningMode(
-                features,
-                HOOK_ID,
-                AdvancedProtectionFeature.PROVISIONING_MODE_DEPROVISIONED_BY_ADB);
+        assertDoesNotContain(features, HOOK_ID);
     }
 
     @EnableFlags(Flags.FLAG_AAPM_API_V2)
@@ -630,6 +807,19 @@ public class AdvancedProtectionServiceTest {
         };
     }
 
+    private IAdvancedProtectionFeatureCallback createFeatureCallback(
+            AtomicBoolean callbackCaptor, @FeatureId int featureId) {
+        return new IAdvancedProtectionFeatureCallback.Stub() {
+            @Override
+            public void onFeatureEnabledChanged(List<AdvancedProtectionFeature> features) {
+                features.stream()
+                        .filter(f -> f.getId() == featureId)
+                        .findFirst()
+                        .ifPresent(f -> callbackCaptor.set(f.isEnabled()));
+            }
+        };
+    }
+
     private AdvancedProtectionHook createHook(
             boolean isAvailable, @Nullable AtomicBoolean callbackCaptor) {
         return createHook(HOOK_ID, isAvailable, callbackCaptor);
@@ -691,102 +881,23 @@ public class AdvancedProtectionServiceTest {
     }
 
     private AdvancedProtectionService createService(
-            AdvancedProtectionHook hook, AdvancedProtectionProvider provider) {
+            AdvancedProtectionHook hook,
+            AdvancedProtectionProvider provider) {
+        return new AdvancedProtectionService(
+                mContext,
+                createAdvancedProtectionStore(),
+                mUserManager,
+                mLooper.getLooper(),
+                mPermissionEnforcer,
+                hook,
+                provider,
+                mInjector);
+    }
 
-        AdvancedProtectionStore store =
-                new AdvancedProtectionStore(mContext) {
-                    private boolean mAdvancedProtectionModeEnabled = false;
-                    private boolean mUsbDataProtectionEnabled = false;
-                    private Map<Integer, Boolean> mFeatureIdToAdminProvisioned = new HashMap<>();
-                    private Map<Integer, Boolean> mFeatureIdToAdbProvisioned = new HashMap<>();
-
-                    @Override
-                    void saveAdvancedProtectionModeEnabled(boolean enabled) {
-                        mAdvancedProtectionModeEnabled = enabled;
-                    }
-
-                    @Override
-                    boolean retrieveAdvancedProtectionModeEnabled() {
-                        return mAdvancedProtectionModeEnabled;
-                    }
-
-                    @Override
-                    void saveUsbDataProtectionEnabled(boolean enabled) {
-                        mUsbDataProtectionEnabled = enabled;
-                    }
-
-                    @Override
-                    boolean retrieveUsbDataProtectionEnabled() {
-                        return mUsbDataProtectionEnabled;
-                    }
-
-                    @Override
-                    void saveFeatureAdminProvisioned(
-                            @FeatureId int featureId, boolean isProvisioned) {
-                        mFeatureIdToAdminProvisioned.put(featureId, isProvisioned);
-                    }
-
-                    @Override
-                    Boolean retrieveFeatureAdminProvisioned(@FeatureId int featureId) {
-                        return mFeatureIdToAdminProvisioned.get(featureId);
-                    }
-
-                    @Override
-                    void saveFeatureAdbProvisioned(
-                            @FeatureId int featureId, boolean isProvisioned) {
-                        mFeatureIdToAdbProvisioned.put(featureId, isProvisioned);
-                    }
-
-                    @Override
-                    Boolean retrieveFeatureAdbProvisioned(@FeatureId int featureId) {
-                        return mFeatureIdToAdbProvisioned.get(featureId);
-                    }
-
-                    @Override
-                    void removeFeatureAdbProvisioning(@FeatureId int featureId) {
-                        mFeatureIdToAdbProvisioned.remove(featureId);
-                    }
-
-                    @Override
-                    void saveEnabledChangeTime(long value) {
-                        // Do nothing
-                    }
-
-                    @Override
-                    long retrieveEnabledChangeTime() {
-                        return 0;
-                    }
-
-                    @Override
-                    void saveDialogShown(
-                            int featureId,
-                            int type,
-                            boolean learnMoreClicked,
-                            int hoursSinceEnabled) {
-                        // Do nothing
-                    }
-
-                    @Override
-                    int retrieveLastDialogFeatureId() {
-                        return -1;
-                    }
-
-                    @Override
-                    int retrieveLastDialogType() {
-                        return -1;
-                    }
-
-                    @Override
-                    boolean retrieveLastDialogLearnMoreClicked() {
-                        return false;
-                    }
-
-                    @Override
-                    int retrieveLastDialogHoursSinceEnabled() {
-                        return -1;
-                    }
-                };
-
+    private AdvancedProtectionService createService(
+            AdvancedProtectionHook hook,
+            AdvancedProtectionProvider provider,
+            AdvancedProtectionStore store) {
         return new AdvancedProtectionService(
                 mContext,
                 store,
@@ -796,5 +907,95 @@ public class AdvancedProtectionServiceTest {
                 hook,
                 provider,
                 mInjector);
+    }
+
+    private AdvancedProtectionStore createAdvancedProtectionStore() {
+        return new AdvancedProtectionStore(mContext) {
+            private boolean mAdvancedProtectionModeEnabled = false;
+            private boolean mUsbDataProtectionEnabled = false;
+            private Map<Integer, Boolean> mFeatureIdToAdminProvisioned = new HashMap<>();
+            private Map<Integer, Boolean> mFeatureIdToAdbProvisioned = new HashMap<>();
+
+            @Override
+            void saveAdvancedProtectionModeEnabled(boolean enabled) {
+                mAdvancedProtectionModeEnabled = enabled;
+            }
+
+            @Override
+            boolean retrieveAdvancedProtectionModeEnabled() {
+                return mAdvancedProtectionModeEnabled;
+            }
+
+            @Override
+            void saveUsbDataProtectionEnabled(boolean enabled) {
+                mUsbDataProtectionEnabled = enabled;
+            }
+
+            @Override
+            boolean retrieveUsbDataProtectionEnabled() {
+                return mUsbDataProtectionEnabled;
+            }
+
+            @Override
+            void saveFeatureAdminProvisioned(@FeatureId int featureId, boolean isProvisioned) {
+                mFeatureIdToAdminProvisioned.put(featureId, isProvisioned);
+            }
+
+            @Override
+            Boolean retrieveFeatureAdminProvisioned(@FeatureId int featureId) {
+                return mFeatureIdToAdminProvisioned.get(featureId);
+            }
+
+            @Override
+            void saveFeatureAdbProvisioned(@FeatureId int featureId, boolean isProvisioned) {
+                mFeatureIdToAdbProvisioned.put(featureId, isProvisioned);
+            }
+
+            @Override
+            Boolean retrieveFeatureAdbProvisioned(@FeatureId int featureId) {
+                return mFeatureIdToAdbProvisioned.get(featureId);
+            }
+
+            @Override
+            void removeFeatureAdbProvisioning(@FeatureId int featureId) {
+                mFeatureIdToAdbProvisioned.remove(featureId);
+            }
+
+            @Override
+            void saveEnabledChangeTime(long value) {
+                // Do nothing
+            }
+
+            @Override
+            long retrieveEnabledChangeTime() {
+                return 0;
+            }
+
+            @Override
+            void saveDialogShown(
+                    int featureId, int type, boolean learnMoreClicked, int hoursSinceEnabled) {
+                // Do nothing
+            }
+
+            @Override
+            int retrieveLastDialogFeatureId() {
+                return -1;
+            }
+
+            @Override
+            int retrieveLastDialogType() {
+                return -1;
+            }
+
+            @Override
+            boolean retrieveLastDialogLearnMoreClicked() {
+                return false;
+            }
+
+            @Override
+            int retrieveLastDialogHoursSinceEnabled() {
+                return -1;
+            }
+        };
     }
 }

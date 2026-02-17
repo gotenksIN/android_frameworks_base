@@ -18,14 +18,11 @@ package android.hardware.display;
 
 import static android.hardware.display.DisplayManagerGlobal.EVENT_DISPLAY_STATE_CHANGED;
 import static android.hardware.display.DisplayManagerGlobal.INTERNAL_EVENT_FLAG_DISPLAY_REFRESH_RATE;
-import static android.hardware.display.DisplayManagerGlobal.INTERNAL_EVENT_FLAG_DISPLAY_SNAPSHOT;
 import static android.hardware.display.DisplayManagerGlobal.INTERNAL_EVENT_FLAG_DISPLAY_STATE;
 
 import static org.junit.Assert.assertArrayEquals;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
-import static org.mockito.AdditionalMatchers.aryEq;
-import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
@@ -40,11 +37,13 @@ import android.content.Context;
 import android.hardware.display.DisplayManagerGlobal.DisplayIdsCache;
 import android.os.Handler;
 import android.os.RemoteException;
+import android.platform.test.annotations.EnableFlags;
 import android.platform.test.annotations.Presubmit;
 import android.platform.test.annotations.RequiresFlagsDisabled;
 import android.platform.test.annotations.RequiresFlagsEnabled;
 import android.platform.test.flag.junit.CheckFlagsRule;
 import android.platform.test.flag.junit.DeviceFlagsValueProvider;
+import android.platform.test.flag.junit.SetFlagsRule;
 import android.view.Display;
 import android.view.DisplayInfo;
 
@@ -85,6 +84,8 @@ public class DisplayManagerGlobalTest {
     @Rule
     public final CheckFlagsRule mCheckFlagsRule =
             DeviceFlagsValueProvider.createCheckFlagsRule();
+    @Rule
+    public final SetFlagsRule mSetFlagsRule = new SetFlagsRule();
 
     private static final long DISPLAY_CHANGE_EVENTS =
             DisplayManagerGlobal.INTERNAL_EVENT_FLAG_DISPLAY_BASIC_CHANGED
@@ -127,21 +128,9 @@ public class DisplayManagerGlobalTest {
 
     @Test
     public void testDisplayListenerIsCalled_WhenDisplayEventOccurs() throws RemoteException {
-        testDisplayListenerIsCalled_WhenDisplayEventOccursInternal(/* withSnapshot= */ false);
-    }
-
-    @Test
-    @RequiresFlagsEnabled(Flags.FLAG_DISPLAY_LISTENER_SNAPSHOT)
-    public void testDisplayListenerIsCalled_WhenDisplayEventOccurs_withSnapshot()
-            throws RemoteException {
-        testDisplayListenerIsCalled_WhenDisplayEventOccursInternal(/* withSnapshot= */ true);
-    }
-
-    private void testDisplayListenerIsCalled_WhenDisplayEventOccursInternal(boolean withSnapshot)
-            throws RemoteException {
+        mDisplayManagerGlobal.disableLocalDisplayInfoCaches();
         mDisplayManagerGlobal.registerDisplayListener(mDisplayListener, mHandler,
-                ALL_DISPLAY_EVENTS
-                        | (withSnapshot ? INTERNAL_EVENT_FLAG_DISPLAY_SNAPSHOT : 0),
+                ALL_DISPLAY_EVENTS,
                 /* packageName= */ null,
                 /* isEventFilterExplicit */ true);
         Mockito.verify(mDisplayManager)
@@ -154,11 +143,6 @@ public class DisplayManagerGlobalTest {
         int displayId = 1;
         callback.onDisplayEvent(displayId, DisplayManagerGlobal.EVENT_DISPLAY_ADDED);
         waitForHandler();
-        if (withSnapshot) {
-            Mockito.verify(mDisplayListener, never()).onDisplayConnectedSnapshot(any());
-            Mockito.verify(mDisplayListener).onDisplayAddedSnapshot(
-                    aryEq(new int[] { Display.DEFAULT_DISPLAY }));
-        }
         Mockito.verify(mDisplayListener).onDisplayAdded(eq(displayId));
         Mockito.verifyNoMoreInteractions(mDisplayListener);
 
@@ -212,21 +196,10 @@ public class DisplayManagerGlobalTest {
             Flags.FLAG_COMMITTED_STATE_SEPARATE_EVENT
     })
     public void testDisplayEventsAreHandledInCorrectOrder() throws RemoteException {
-        testDisplayEventsAreHandledInCorrectOrderInternal(/* withSnapshot= */ false);
+        testDisplayEventsAreHandledInCorrectOrderInternal();
     }
 
-    @Test
-    @RequiresFlagsEnabled({
-            Flags.FLAG_DISPLAY_LISTENER_PERFORMANCE_IMPROVEMENTS,
-            Flags.FLAG_COMMITTED_STATE_SEPARATE_EVENT,
-            Flags.FLAG_DISPLAY_LISTENER_SNAPSHOT
-    })
-    public void testDisplayEventsAreHandledInCorrectOrder_withSnapshot() throws RemoteException {
-        testDisplayEventsAreHandledInCorrectOrderInternal(/* withSnapshot= */ true);
-    }
-
-    private void testDisplayEventsAreHandledInCorrectOrderInternal(boolean withSnapshot)
-            throws RemoteException {
+    private void testDisplayEventsAreHandledInCorrectOrderInternal() throws RemoteException {
         // Register a listener for all possible events.
         long allInternalEvents =
                 DisplayManagerGlobal.INTERNAL_EVENT_FLAG_TOPOLOGY_UPDATED
@@ -238,8 +211,7 @@ public class DisplayManagerGlobalTest {
                         | DisplayManagerGlobal.INTERNAL_EVENT_FLAG_DISPLAY_COMMITTED_STATE_CHANGED
                         | DisplayManagerGlobal.INTERNAL_EVENT_FLAG_DISPLAY_HDR_SDR_RATIO_CHANGED
                         | DisplayManagerGlobal.INTERNAL_EVENT_FLAG_DISPLAY_BRIGHTNESS_CHANGED
-                        | DisplayManagerGlobal.INTERNAL_EVENT_FLAG_DISPLAY_REMOVED
-                        | (withSnapshot ? INTERNAL_EVENT_FLAG_DISPLAY_SNAPSHOT : 0);
+                        | DisplayManagerGlobal.INTERNAL_EVENT_FLAG_DISPLAY_REMOVED;
 
         mDisplayManagerGlobal.registerDisplayListener(mDisplayListener, mHandler,
                 allInternalEvents, /* packageName= */ null,
@@ -266,11 +238,6 @@ public class DisplayManagerGlobalTest {
                         | DisplayManagerGlobal.EVENT_DISPLAY_REMOVED
                         | DisplayManagerGlobal.EVENT_DISPLAY_DISCONNECTED;
 
-        if (withSnapshot) {
-            var defaultDisplaySnapshot = new int[] { Display.DEFAULT_DISPLAY };
-            callback.onDisplaySnapshot(defaultDisplaySnapshot, defaultDisplaySnapshot);
-        }
-
         // Trigger the event.
         callback.onDisplayEvent(displayId, allEventsMask);
         waitForHandler();
@@ -278,12 +245,6 @@ public class DisplayManagerGlobalTest {
         // Verify the order of callbacks. The order should be based on the event's integer value,
         // not the order they were OR'd into the mask.
         InOrder inOrder = inOrder(mDisplayListener);
-        if (withSnapshot) {
-            inOrder.verify(mDisplayListener).onDisplayConnectedSnapshot(
-                    aryEq(new int[] { Display.DEFAULT_DISPLAY }));
-            inOrder.verify(mDisplayListener).onDisplayAddedSnapshot(
-                    aryEq(new int[] { Display.DEFAULT_DISPLAY }));
-        }
         inOrder.verify(mDisplayListener).onDisplayConnected(eq(displayId));
         inOrder.verify(mDisplayListener).onDisplayAdded(eq(displayId));
         // BASIC_CHANGED, REFRESH_RATE_CHANGED, STATE_CHANGED, COMMITTED_STATE_CHANGED
@@ -511,7 +472,6 @@ public class DisplayManagerGlobalTest {
     }
 
     @Test
-    @RequiresFlagsEnabled(Flags.FLAG_DISPLAY_TOPOLOGY)
     public void testTopologyListenerIsCalled_WhenTopologyUpdateOccurs() throws RemoteException {
         mDisplayManagerGlobal.registerTopologyListener(mExecutor, mTopologyListener,
                 /* packageName= */ null);
@@ -576,26 +536,6 @@ public class DisplayManagerGlobalTest {
     }
 
     @Test
-    @RequiresFlagsEnabled(Flags.FLAG_DISPLAY_LISTENER_SNAPSHOT)
-    public void testMapFiltersToInternalEventFlag_snapshotOn() {
-        // Test snapshot event filter.
-        assertEquals(INTERNAL_EVENT_FLAG_DISPLAY_SNAPSHOT,
-                mDisplayManagerGlobal
-                        .mapFiltersToInternalEventFlag(DisplayManager.EVENT_TYPE_DISPLAY_SNAPSHOT,
-                                0));
-    }
-
-    @Test
-    @RequiresFlagsDisabled(Flags.FLAG_DISPLAY_LISTENER_SNAPSHOT)
-    public void testMapFiltersToInternalEventFlag_snapshotOff() {
-        // Test snapshot event filter.
-        assertEquals(0,
-                mDisplayManagerGlobal
-                        .mapFiltersToInternalEventFlag(DisplayManager.EVENT_TYPE_DISPLAY_SNAPSHOT,
-                                0));
-    }
-
-    @Test
     @RequiresFlagsEnabled(Flags.FLAG_COMMITTED_STATE_SEPARATE_EVENT)
     public void test_mapPrivateEventCommittedStateChanged_flagEnabled() {
         // Test public flags mapping
@@ -630,6 +570,22 @@ public class DisplayManagerGlobalTest {
         cache.updateCacheLocked(2, DisplayManagerGlobal.EVENT_DISPLAY_ADDED
                         | DisplayManagerGlobal.EVENT_DISPLAY_CONNECTED);
         assertExpectedCache(cache, new int[] { 0, 2 }, new int[] { 0, 2 });
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_DISPLAY_IDS_CACHE_VALIDATION)
+    public void testConnectedEventForLocallyControlledDisplay_doesNotStopLocalControl() {
+        var cache = initDisplayIdsCache(/*enableConnectedCache=*/ true, /*enableAddedCache=*/ true);
+        cache.injectLocked(2);
+        var mask = cache.updateCacheLocked(2, DisplayManagerGlobal.EVENT_DISPLAY_CONNECTED);
+        assertEquals("Out mask must contain CONNECTED",
+                DisplayManagerGlobal.EVENT_DISPLAY_CONNECTED, mask);
+
+        assertExpectedCache(cache, new int[] { 0, 1, 2 }, new int[] { 0, 2 });
+        mask = cache.updateCacheLocked(2, DisplayManagerGlobal.EVENT_DISPLAY_ADDED);
+        assertEquals("Out mask must contain ADDED",
+                DisplayManagerGlobal.EVENT_DISPLAY_ADDED, mask);
+        assertExpectedCache(cache, new int[] { 0, 1, 2 }, new int[] { 0, 2 });
     }
 
     @Test
@@ -705,6 +661,25 @@ public class DisplayManagerGlobalTest {
         assertExpectedCache(cache, new int[] { 0, 1, 2 }, null);
         cache.evictLocked(1);
         assertExpectedCache(cache, new int[] { 0, 2 }, null);
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_NULL_DISPLAY_INFO_CACHE)
+    public void getDisplayInfo_cachesNullResultsFromService() throws Exception {
+        int testDisplayId = 123;
+
+        doReturn(null).when(mDisplayManager).getDisplayInfo(testDisplayId);
+
+        // First call, triggers the binder call.
+        DisplayInfo info1 = mDisplayManagerGlobal.getDisplayInfo(testDisplayId);
+        assertNull("First call should return null as mocked", info1);
+        verify(mDisplayManager, times(1)).getDisplayInfo(testDisplayId);
+
+        // Second call to getDisplayInfo, should retrieve the cached null value.
+        DisplayInfo info2 = mDisplayManagerGlobal.getDisplayInfo(testDisplayId);
+        assertNull("Second call should also return null", info2);
+        // no additional binder calls to getDisplayInfo
+        verify(mDisplayManager, times(1)).getDisplayInfo(testDisplayId);
     }
 
     private void assertExpectedCache(DisplayIdsCache cache, @Nullable int[] connectedIds,

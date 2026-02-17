@@ -117,6 +117,9 @@ public final class Display {
     private DisplayInfo mDisplayInfo; // never null
     private boolean mIsValid;
 
+    private List<FrameRateVelocityPoint> mCachedFrameRateVelocityMapping;
+    private DisplayInfo mLastCachedDisplayInfo;
+
     // Temporary display metrics structure used for compatibility mode.
     private final DisplayMetrics mTempMetrics = new DisplayMetrics();
 
@@ -344,7 +347,7 @@ public final class Display {
     /**
      * Flag: Indicates that the display maintains its own focus and touch mode.
      *
-     * This flag is similar to {@link com.android.internal.R.bool.config_perDisplayFocusEnabled} in
+     * This flag is similar to {@link com.android.internal.R.bool#config_perDisplayFocusEnabled} in
      * behavior, but only applies to the specific display instead of system-wide to all displays.
      *
      * Note: The display must be trusted in order to have its own focus.
@@ -1429,7 +1432,7 @@ public final class Display {
     /**
      * Retrieves the View frame rate / velocity mapping specifications
      * defined in the framework configuration.
-     * For example, 120 frame per second / 300 pixels per second
+     * For example, 120 frame per second / 300 dp (density-independent pixels) per second
      *
      * <p>
      * This is primarily for flinging use cases in components like RecyclerView,
@@ -1461,8 +1464,21 @@ public final class Display {
     public List<FrameRateVelocityPoint> getFrameRateVelocityMapping() {
         synchronized (mLock) {
             updateDisplayInfoLocked();
-            // Return an unmodifiable view of the list
-            return Collections.unmodifiableList(mDisplayInfo.frameRateVelocityMapping);
+            if (mCachedFrameRateVelocityMapping != null
+                    && mLastCachedDisplayInfo == mDisplayInfo) {
+                return mCachedFrameRateVelocityMapping;
+            }
+
+            // 1. check the value from the display info
+            if (!mDisplayInfo.frameRateVelocityMapping.isEmpty()) {
+                mCachedFrameRateVelocityMapping = Collections.unmodifiableList(
+                        mDisplayInfo.frameRateVelocityMapping);
+            } else {
+                // Should not happen as FrameRateVelocityData ensures a default is always present
+                mCachedFrameRateVelocityMapping = Collections.emptyList();
+            }
+            mLastCachedDisplayInfo = mDisplayInfo;
+            return mCachedFrameRateVelocityMapping;
         }
     }
 
@@ -2728,6 +2744,15 @@ public final class Display {
             return mWidth == width &&
                     mHeight == height &&
                     Float.floatToIntBits(mPeakRefreshRate) == Float.floatToIntBits(refreshRate);
+        }
+
+        /**
+         * Returns {@code true} if this mode matches the given parameters.
+         *
+         * @hide
+         */
+        public boolean matches(int width, int height) {
+            return mWidth == width && mHeight == height;
         }
 
         /**

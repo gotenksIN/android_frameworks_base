@@ -33,7 +33,6 @@ import com.android.systemui.statusbar.notification.headsup.AvalancheController
 import com.android.systemui.statusbar.notification.headsup.HeadsUpAnimator
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow
 import com.android.systemui.statusbar.notification.row.ExpandableView
-import com.android.systemui.statusbar.notification.shared.NotificationBundleUi
 import com.android.systemui.statusbar.notification.shared.NotificationHeadsUpCycling
 import com.android.systemui.statusbar.phone.StatusBarKeyguardViewManager
 import com.android.systemui.statusbar.ui.fakeSystemBarUtilsProxy
@@ -134,7 +133,6 @@ class StackScrollAlgorithmTest(flags: FlagsParameterization) : SysuiTestCase() {
         whenever(notificationShelf.viewState).thenReturn(ExpandableViewState())
         whenever(notificationRow.key).thenReturn("key")
         whenever(notificationRow.viewState).thenReturn(ExpandableViewState())
-        whenever(notificationRow.entryLegacy).thenReturn(notificationEntry)
         whenever(notificationRow.entryAdapter).thenReturn(notificationEntryAdapter)
         whenever(notificationRow.roundableState)
             .thenReturn(RoundableState(notificationRow, notificationRow, 0f))
@@ -151,7 +149,6 @@ class StackScrollAlgorithmTest(flags: FlagsParameterization) : SysuiTestCase() {
     }
 
     @Test
-    @EnableFlags(NotificationBundleUi.FLAG_NAME)
     fun getGapHeightForChild_returnsBundleGapHeight_whenChildIsBundle() {
         // Assemble
         val child = mock<ExpandableNotificationRow>()
@@ -176,7 +173,6 @@ class StackScrollAlgorithmTest(flags: FlagsParameterization) : SysuiTestCase() {
     }
 
     @Test
-    @EnableFlags(NotificationBundleUi.FLAG_NAME)
     fun getGapHeightForChild_returnsBundleGapHeight_whenPreviousChildIsBundle() {
         // Assemble
         val child = mock<View>()
@@ -420,7 +416,6 @@ class StackScrollAlgorithmTest(flags: FlagsParameterization) : SysuiTestCase() {
     }
 
     @Test
-    @EnableFlags(NotificationBundleUi.FLAG_NAME)
     fun getGapHeightForChild_returnsBundleExpandedGapHeight_whenChildIsExpandedBundle() {
         // Assemble
         val child = mock<ExpandableNotificationRow>()
@@ -446,7 +441,6 @@ class StackScrollAlgorithmTest(flags: FlagsParameterization) : SysuiTestCase() {
     }
 
     @Test
-    @EnableFlags(NotificationBundleUi.FLAG_NAME)
     fun getGapHeightForChild_returnsBundleExpandedGapHeight_whenPreviousChildIsExpandedBundle() {
         // Assemble
         val child = mock<View>()
@@ -675,6 +669,28 @@ class StackScrollAlgorithmTest(flags: FlagsParameterization) : SysuiTestCase() {
         assertThat(notificationRow.viewState.zTranslation).isEqualTo(baseZ + headsUpZ)
         // And: HUN maintained its full height
         assertThat(notificationRow.viewState.height).isEqualTo(intrinsicHunHeight)
+    }
+
+    @Test
+    @EnableSceneContainer
+    fun resetViewStates_hunInStack_hasElevation() {
+        // Given: the shade is open, QS is not open, and the content is scrolled such that the HUN
+        // overlaps some of it
+        fakeHunInShade(
+            headsUpTop = 100f,
+            stackScrollTop = -200f,
+            stackBottom = 4000f,
+            collapsedHeight = 100,
+            intrinsicHeight = 300,
+        )
+        ambientState.qsExpansionFraction = 0f
+        whenever(notificationRow.isAboveShelf).thenReturn(true)
+
+        // When
+        stackScrollAlgorithm.resetViewStates(ambientState, 0)
+
+        // Then: HUN Z translation is higher than the base Z
+        assertThat(notificationRow.viewState.zTranslation).isGreaterThan(baseZ)
     }
 
     @Test
@@ -1988,6 +2004,38 @@ class StackScrollAlgorithmTest(flags: FlagsParameterization) : SysuiTestCase() {
         assertThat(notificationRow.viewState.yTranslation).isEqualTo(expectedY)
     }
 
+    @Test
+    @EnableSceneContainer
+    fun resetViewStates_stackOnLockscreen_fadingFromDoze() {
+        ambientState.fakeShowingStackOnLockscreen()
+        ambientState.dozeAmount = 0.1f
+
+        whenever(notificationRow.isHeadsUpState).thenReturn(false)
+
+        stackScrollAlgorithm.initView(context)
+
+        stackScrollAlgorithm.resetViewStates(ambientState, /* speedBumpIndex= */ 0)
+
+        assertThat(notificationRow.viewState.alpha).isEqualTo(1f - ambientState.dozeAmount)
+    }
+
+    @Test
+    @EnableSceneContainer
+    fun resetViewStates_stackOnLockscreen_fadingFromShade() {
+        ambientState.fakeShowingStackOnLockscreen()
+        ambientState.dozeAmount = 0.0f
+        ambientState.lockscreenStackFadeInProgress = 0.2f
+
+        whenever(notificationRow.isHeadsUpState).thenReturn(false)
+
+        stackScrollAlgorithm.initView(context)
+
+        stackScrollAlgorithm.resetViewStates(ambientState, /* speedBumpIndex= */ 0)
+
+        assertThat(notificationRow.viewState.alpha)
+            .isEqualTo(ambientState.lockscreenStackFadeInProgress)
+    }
+
     private fun createHunViewMock(
         isShadeOpen: Boolean,
         fullyVisible: Boolean,
@@ -1996,9 +2044,6 @@ class StackScrollAlgorithmTest(flags: FlagsParameterization) : SysuiTestCase() {
         mock<ExpandableNotificationRow>().apply {
             val childViewStateMock = createHunChildViewState(isShadeOpen, fullyVisible)
             whenever(this.viewState).thenReturn(childViewStateMock)
-            if (!NotificationBundleUi.isEnabled) {
-                whenever(this.entryLegacy).thenReturn(notificationEntry)
-            }
 
             whenever(this.mustStayOnScreen()).thenReturn(true)
             whenever(this.headerVisibleAmount).thenReturn(headerVisibleAmount)

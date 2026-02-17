@@ -35,6 +35,7 @@ import com.android.internal.logging.MetricsLogger;
 import com.android.systemui.animation.DialogCuj;
 import com.android.systemui.animation.DialogTransitionAnimator;
 import com.android.systemui.animation.Expandable;
+import com.android.systemui.animation.TransitionAnimator;
 import com.android.systemui.dagger.qualifiers.Background;
 import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.flags.FeatureFlags;
@@ -50,6 +51,7 @@ import com.android.systemui.qs.pipeline.domain.interactor.PanelInteractor;
 import com.android.systemui.qs.tileimpl.QSTileImpl;
 import com.android.systemui.res.R;
 import com.android.systemui.screencapture.common.shared.model.ScreenCaptureUiParameters;
+import com.android.systemui.screencapture.common.shared.model.ScreenCaptureUiSource;
 import com.android.systemui.screencapture.domain.interactor.ScreenCaptureUiInteractor;
 import com.android.systemui.screencapture.record.domain.interactor.ScreenCaptureRecordFeaturesInteractor;
 import com.android.systemui.screenrecord.ScreenRecordUxController;
@@ -142,7 +144,8 @@ public class ScreenRecordTile extends QSTileImpl<QSTile.BooleanState>
                     instanceof ScreenRecordingStatus.Stopped) {
                 mUiHandler.post(() -> mActivityStarter.executeRunnableDismissingKeyguard(
                         () -> mScreenCaptureUiInteractor.show(
-                                new ScreenCaptureUiParameters.Record()
+                                new ScreenCaptureUiParameters.Record(),
+                                ScreenCaptureUiSource.QUICK_SETTINGS_TILE
                         ),
                         /* cancelAction= */ null,
                         /* dismissShade= */ true,
@@ -174,8 +177,20 @@ public class ScreenRecordTile extends QSTileImpl<QSTile.BooleanState>
                                 InteractionJankMonitor.CUJ_SHADE_DIALOG_OPEN,
                                 INTERACTION_JANK_TAG));
                 if (controller != null) {
-                    mDialogTransitionAnimator.show(dialog,
-                            controller, /* animateBackgroundBoundsChange= */ true);
+                    if (TransitionAnimator.Companion.dynamicTargetResolutionEnabled()) {
+                        mDialogTransitionAnimator.show(
+                                dialog,
+                                expandable::dialogTransitionController,
+                                controller.getCuj(),
+                                /* animateBackgroundBoundsChange= */ true
+                        );
+                    } else {
+                        mDialogTransitionAnimator.show(
+                                dialog,
+                                controller,
+                                /* animateBackgroundBoundsChange= */ true
+                        );
+                    }
                 } else {
                     dialog.show();
                 }

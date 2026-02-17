@@ -805,6 +805,7 @@ aidl_interface {
         "android/hardware/usb/UsbAuthorizationStatus.aidl",
         "android/hardware/usb/UsbAuthorizationSystemState.aidl",
         "android/hardware/usb/UsbAuthDeviceInfo.aidl",
+        "android/hardware/usb/IUsbAuthEventsListener.aidl",
         "android/hardware/usb/IUsbAuthManager.aidl",
     ],
     backend: {
@@ -832,6 +833,7 @@ filegroup {
 filegroup {
     name: "framework-telecom-core-shared-srcs",
     srcs: [
+        "android/util/IndentingPrintWriter.java",
         "com/android/internal/os/SomeArgs.java",
     ],
 }
@@ -899,6 +901,7 @@ filegroup {
         "android/os/binder/IBinderStatsConsumerService.aidl",
         "android/os/binder/BinderCallsStats.aidl",
         "android/os/binder/BinderSpamStats.aidl",
+        "android/os/binder/SingleSecondBinderStats.aidl",
     ],
     visibility: ["//frameworks/native/libs/binder"],
 }
@@ -991,6 +994,14 @@ java_system_features_srcs {
     visibility: ["//visibility:private"],
 }
 
+filegroup {
+    name: "systemfeatures-gen-proguard",
+    srcs: [":systemfeatures-gen-srcs{.proguardFlagsFiles}"],
+    // TODO(b/203143243): Adjust visibility and apply these rules by default for
+    // `platform_apis: true` targets.
+    visibility: ["//frameworks/base/services"],
+}
+
 aidl_interface {
     name: "activitymanager_structured_aidl",
     unstable: true,
@@ -1051,4 +1062,21 @@ filegroup {
     srcs: [
         "android/app/admin/metadata/*.java",
     ],
+}
+
+aidl_interface {
+    name: "attentionmanager_native_aidl",
+    srcs: [
+        "android/attention/InteractionState.aidl",
+    ],
+    host_supported: true,
+    unstable: true,
+    backend: {
+        java: {
+            enabled: true,
+        },
+        cpp: {
+            enabled: true,
+        },
+    },
 }

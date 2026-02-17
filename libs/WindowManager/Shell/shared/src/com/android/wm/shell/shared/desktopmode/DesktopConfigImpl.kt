@@ -21,17 +21,14 @@ import android.content.Context
 import android.os.SystemProperties
 import android.util.IndentingPrintWriter
 import android.window.DesktopExperienceFlags
-import android.window.DesktopModeFlags
 import com.android.internal.R
 import com.android.internal.annotations.VisibleForTesting
 import com.android.wm.shell.shared.desktopmode.DesktopConfigImpl.Companion.WINDOW_DECOR_PRE_WARM_SIZE
 import java.io.PrintWriter
 
 @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
-class DesktopConfigImpl(
-    private val context: Context,
-    private val desktopState: DesktopState,
-) : DesktopConfig {
+class DesktopConfigImpl(private val context: Context, private val desktopState: DesktopState) :
+    DesktopConfig {
 
     constructor(context: Context) : this(context, DesktopState.fromContext(context))
 
@@ -57,8 +54,6 @@ class DesktopConfigImpl(
 
     override val windowDecorScvhPoolSize: Int
         get() {
-            if (!DesktopModeFlags.ENABLE_DESKTOP_WINDOWING_SCVH_CACHE.isTrue) return 0
-
             if (maxTaskLimit > 0) return maxTaskLimit
 
             // TODO: b/368032552 - task limit equal to 0 means unlimited. Figure out what the pool
@@ -160,8 +155,7 @@ class DesktopConfigImpl(
         /**
          * Sysprop declaring whether to enable drag-to-maximize for desktop windows.
          *
-         * If it is not defined, then `R.integer.config_dragToMaximizeInDesktopMode`
-         * is used.
+         * If it is not defined, then `R.integer.config_dragToMaximizeInDesktopMode` is used.
          */
         private const val ENABLE_DRAG_TO_MAXIMIZE_SYS_PROP =
             "persist.wm.debug.enable_drag_to_maximize"

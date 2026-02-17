@@ -18,6 +18,7 @@ package android.media.quality;
 
 
 import android.annotation.FlaggedApi;
+import android.annotation.IntDef;
 import android.annotation.StringDef;
 import android.media.tv.flags.Flags;
 
@@ -37,7 +38,8 @@ public class MediaQualityContract {
             LEVEL_LOW,
             LEVEL_MEDIUM,
             LEVEL_HIGH,
-            LEVEL_OFF
+            LEVEL_OFF,
+            LEVEL_USER
     })
     public @interface Level {}
 
@@ -71,6 +73,14 @@ public class MediaQualityContract {
      * <p>This level represents that the corresponding feature is turned off.
      */
     public static final String LEVEL_OFF = "level_off";
+
+    /**
+     * User level option for a parameter.
+     *
+     * <p>This level represents that the corresponding feature is controlled by the user.
+     */
+    @FlaggedApi(Flags.FLAG_MEDIA_QUALITY_FW_C)
+    public static final String LEVEL_USER = "level_user";
 
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
@@ -329,6 +339,31 @@ public class MediaQualityContract {
      */
     @FlaggedApi(Flags.FLAG_MEDIA_QUALITY_FW_C)
     public static final String COLOR_SPACE_OFF = "OFF";
+
+    /**
+     * Defines the supported display panel technology types.
+     * <p>
+     * This is used with
+     * {@link android.media.quality.MediaQualityManager#usesDisplayTechnology(int)}
+     * to query if a specific panel technology is used by the device.
+     *
+     * <p>More panel technologies will be added here in the future.
+     * @hide
+     */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef(prefix = { "PANEL_TECHNOLOGY" }, value = {
+            PANEL_TECHNOLOGY_OLED
+    })
+    public @interface PanelTechnology {}
+
+    /**
+     * Display panel technology for OLED (Organic Light Emitting Diode).
+     * <p>OLED displays are known for their high contrast ratios and deep blacks.
+     *
+     * Corresponds to PanelTechnologyType.OLED in the HAL.
+     */
+    @FlaggedApi(Flags.FLAG_MEDIA_QUALITY_FW_C)
+    public static final int PANEL_TECHNOLOGY_OLED = 0;
 
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
@@ -706,6 +741,53 @@ public class MediaQualityContract {
      */
     @FlaggedApi(Flags.FLAG_MEDIA_QUALITY_FW_C)
     public static final String SOUND_STYLE_AUTO = "AUTO";
+
+    /**
+     * Defines the allowed values for the 3D mode parameter.
+     * <p>
+     * 3D mode specifies the format of the incoming stereoscopic video signal,
+     * allowing the display to correctly interpret and render the separate images
+     * intended for the left and right eyes. The mode typically corresponds to
+     * common 3D formats such as Side-by-Side, Top-and-Bottom, or Frame Packing.
+     *
+     * @hide
+     */
+    @Retention(RetentionPolicy.SOURCE)
+    @StringDef(prefix = "THREE_D_MODE_", value = {
+            THREE_D_MODE_OFF,
+            THREE_D_MODE_SIDE_BY_SIDE,
+            THREE_D_MODE_TOP_AND_BOTTOM,
+            THREE_D_MODE_FRAME_PACKING,
+    })
+    public @interface ThreeDModeValue {}
+
+    /**
+     * Disables 3D mode.
+     */
+    @FlaggedApi(Flags.FLAG_MEDIA_QUALITY_FW_C)
+    public static final String THREE_D_MODE_OFF = "off";
+
+    /**
+     * Side-by-side 3D mode, where the left and right views are in the same
+     * frame, placed horizontally next to each other.
+     */
+    @FlaggedApi(Flags.FLAG_MEDIA_QUALITY_FW_C)
+    public static final String THREE_D_MODE_SIDE_BY_SIDE = "side_by_side";
+
+    /**
+     * Top-and-bottom 3D mode, where the left and right views are in the same
+     * frame, placed vertically on top of each other.
+     */
+    @FlaggedApi(Flags.FLAG_MEDIA_QUALITY_FW_C)
+    public static final String THREE_D_MODE_TOP_AND_BOTTOM = "top_and_bottom";
+
+    /**
+     * Frame packing 3D mode, where left and right eye views are packed into
+     * a single frame. This format typically provides full resolution for
+     * each eye.
+     */
+    @FlaggedApi(Flags.FLAG_MEDIA_QUALITY_FW_C)
+    public static final String THREE_D_MODE_FRAME_PACKING = "frame_packing";
 
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
@@ -2027,6 +2109,61 @@ public class MediaQualityContract {
         public static final String PARAMETER_STREAM_STATUS =
                 "stream_status";
 
+        /**
+         * Adjusts the 'MEMC' (Motion Estimation, Motion Compensation) effect.
+         *
+         * <p>Possible values:
+         * <ul>
+         * <li>{@link #LEVEL_OFF}
+         * <li>{@link #LEVEL_LOW}
+         * <li>{@link #LEVEL_MEDIUM}
+         * <li>{@link #LEVEL_HIGH}
+         * <li>{@link #LEVEL_USER}
+         * </ul>
+         *
+         * <p>The default value is {@link #LEVEL_OFF}.
+         *
+         * <p>Type: STRING
+         */
+        @FlaggedApi(Flags.FLAG_MEDIA_QUALITY_FW_C)
+        public static final String PARAMETER_MEMC_EFFECT = "memc_effect";
+
+        /**
+         * Adjusts the 'Deblur' component of MEMC. The range is from 0 to 10.
+         * <p>Type: INTEGER
+         */
+        @FlaggedApi(Flags.FLAG_MEDIA_QUALITY_FW_C)
+        public static final String PARAMETER_MEMC_DEBLUR = "memc_deblur";
+
+        /**
+         * Adjusts the 'De-judder' component of MEMC. The range is from 0 to 10.
+         * <p>Type: INTEGER
+         */
+        @FlaggedApi(Flags.FLAG_MEDIA_QUALITY_FW_C)
+        public static final String PARAMETER_MEMC_DEJUDDER = "memc_dejudder";
+
+        /**
+         * Enables a mode to play content at its original frame rate.
+         * <p>Type: BOOLEAN
+         */
+        @FlaggedApi(Flags.FLAG_MEDIA_QUALITY_FW_C)
+        public static final String PARAMETER_ORIGINAL_FRAMERATE = "original_framerate";
+
+        /**
+         * Selects the 3D display mode based on the source format.
+         * <p>Type: STRING
+         * <p>See {@link ThreeDModeValue} for possible values.
+         */
+        @FlaggedApi(Flags.FLAG_MEDIA_QUALITY_FW_C)
+        public static final String PARAMETER_3D_MODE = "3d_mode";
+
+        /**
+         * Controls the conversion from a 3D source to a 2D image.
+         * <p>Type: STRING
+         * <p>See {@link ThreeDModeValue} for possible values.
+         */
+        @FlaggedApi(Flags.FLAG_MEDIA_QUALITY_FW_C)
+        public static final String PARAMETER_3D_TO_2D = "3d_to_2d";
 
         private PictureQuality() {
         }
@@ -2079,9 +2216,14 @@ public class MediaQualityContract {
         public static final String PARAMETER_SURROUND_SOUND = "surround_sound";
 
         /**
-         * @hide
+         * Equalizer can fine-tune the audio output by adjusting the loudness of different
+         * frequency bands;
+         * Normally each band have a value of -50 to 50.
+         *
+         * <p>Type: String
          */
-        public static final String PARAMETER_EQUALIZER_DETAIL = "equalizer_detail";
+        @FlaggedApi(Flags.FLAG_MEDIA_QUALITY_FW_C)
+        public static final String PARAMETER_EQUALIZER_SETTINGS = "equalizer_settings";
 
         /**
          * Enable/disable speaker output.
@@ -2140,8 +2282,25 @@ public class MediaQualityContract {
         public static final String PARAMETER_DTS_DRC = "dts_drc";
 
         /**
-         * @hide
+         * Key used to enable or disable Dolby Audio Processing (DAP).
+         *
+         * <p><b>Value Type:</b> String</p>
+         * <p><b>Valid Values:</b>
+         * <ul>
+         * <li>{@code "on"} - Enables Dolby post-processing (volume leveling, dialogue enhancement,
+         * surround virtualization).</li>
+         * <li>{@code "off"} - Disables processing (audio is passed through without modification).
+         * </li>
+         * </ul>
+         * </p>
+         * <p><b>Default Value:</b> {@code "off"}</p>
+         *
+         * <p>When set to {@code "on"}, the audio engine applies the currently configured
+         * Dolby profile to the output mix. When set to {@code "off"}, the system operates
+         * in a "passthrough" or reference mode, preserving the original dynamic range
+         * and frequency response of the content.</p>
          */
+        @FlaggedApi(Flags.FLAG_MEDIA_QUALITY_FW_C)
         public static final String PARAMETER_DOLBY_AUDIO_PROCESSING = "dolby_audio_processing";
 
         /**
@@ -2233,8 +2392,20 @@ public class MediaQualityContract {
         public static final String PARAMETER_DIALOGUE_ENHANCER = "dialogue_enhancer";
 
         /**
-         * @hide
+         * Enable/disable DTS Virtual:X.
+         *
+         * <p>DTS Virtual:X is an audio post-processing technology that provides an immersive
+         * listening experience by virtualizing a height and surround soundstage from any input
+         * source. When enabled, it aims to create a wider and taller sound field, enhancing
+         * spatial perception without the need for additional speakers.
+         *
+         * <p>Type: BOOLEAN
+         * <p>Possible values: {@code true} to enable, {@code false} to disable.
+         * The default value is {@code false}.
+         * <p>
+         * Note: When this set to false, other dts relate parameter should also be false.
          */
+        @FlaggedApi(Flags.FLAG_MEDIA_QUALITY_FW_C)
         public static final String PARAMETER_DTS_VIRTUAL_X = "dts_virtual_x";
 
         /**
@@ -2336,11 +2507,120 @@ public class MediaQualityContract {
         public static final String PARAMETER_DIGITAL_OUTPUT_MODE = "digital_output_mode";
 
         /**
-         * @hide
+         * The sound style of this profile.
+         * <p>Must be one of the following values, defined in {@link SoundQuality.SoundStyleValue}:
+         * <ul>
+         *   <li>{@link #SOUND_STYLE_USER}</li>
+         *   <li>{@link #SOUND_STYLE_STANDARD}</li>
+         *   <li>{@link #SOUND_STYLE_VIVID}</li>
+         *   <li>{@link #SOUND_STYLE_SPORTS}</li>
+         *   <li>{@link #SOUND_STYLE_MOVIE}</li>
+         *   <li>{@link #SOUND_STYLE_MUSIC}</li>
+         *   <li>{@link #SOUND_STYLE_NEWS}</li>
+         *   <li>{@link #SOUND_STYLE_AUTO}</li>
+         * </ul>
+         * The default value is {@link #SOUND_STYLE_STANDARD}.
+         *
+         * <p>Type: STRING
          */
+        @FlaggedApi(Flags.FLAG_MEDIA_QUALITY_FW_C)
         public static final String PARAMETER_SOUND_STYLE = "sound_style";
 
+        /**
+         * Adjusts the left/right audio balance for the built-in speakers.
+         * The range is -50 (left) to 50 (right), with 0 being centered.
+         * <p>Type: INTEGER
+         */
+        @FlaggedApi(Flags.FLAG_MEDIA_QUALITY_FW_C)
+        public static final String PARAMETER_BALANCE_SPEAKER = "balance_speaker";
 
+        /**
+         * Adjusts the left/right audio balance for a connected Bluetooth device.
+         * The range is -50 (left) to 50 (right), with 0 being centered.
+         * <p>Type: INTEGER
+         */
+        @FlaggedApi(Flags.FLAG_MEDIA_QUALITY_FW_C)
+        public static final String PARAMETER_BALANCE_BLUETOOTH = "balance_bluetooth";
+
+        /**
+         * Adjusts the left/right audio balance for a connected headphone.
+         * The range is -50 (left) to 50 (right), with 0 being centered.
+         * <p>Type: INTEGER
+         */
+        @FlaggedApi(Flags.FLAG_MEDIA_QUALITY_FW_C)
+        public static final String PARAMETER_BALANCE_HEADPHONES = "balance_headphones";
+
+        /**
+         * Toggles the High-Resolution Audio path, which offers better-than-CD quality
+         * playback with higher sampling rates and/or bit depth.
+         * <p>Type: BOOLEAN
+         */
+        @FlaggedApi(Flags.FLAG_MEDIA_QUALITY_FW_C)
+        public static final String PARAMETER_HI_RES_AUDIO = "hi_res_audio";
+
+        /**
+         * Reports the audio latency of the connected Bluetooth (BT) media device in microseconds.
+         * This value can be used by A/V sync logic to maintain lip-sync.
+         * <p>Type: INTEGER
+         */
+        @FlaggedApi(Flags.FLAG_MEDIA_QUALITY_FW_C)
+        public static final String PARAMETER_BT_LATENCY_US = "bt_latency_us";
+
+        /**
+         * Controls the output routing of the Audio Description track to the internal speakers.
+         * <p>If set to {@code true}, the AD track will be mixed with the main audio
+         * and played through the device's built-in speakers.</p>
+         * <p><b>Dependency:</b> This setting is ignored if the device does not have
+         * internal speakers or if audio routing is forcibly overridden by system policy.</p>
+         */
+        @FlaggedApi(Flags.FLAG_MEDIA_QUALITY_FW_C)
+        public static final String PARAMETER_AD_SPEAKER_ENABLE = "ad_speaker_enable";
+
+        /**
+         * Controls the output routing of the Audio Description track to connected headphones.
+         * <p>If set to {@code true}, the AD track will be mixed and played through
+         * wired or Bluetooth headsets.</p>
+         * <p><b>Note:</b> This enables independent consumption of AD content if the
+         * audio engine supports dual-routing (e.g., AD on headphones, Main Audio on speakers).</p>
+         */
+        @FlaggedApi(Flags.FLAG_MEDIA_QUALITY_FW_C)
+        public static final String PARAMETER_AD_HEADPHONE_ENABLE = "ad_headphone_enable";
+
+        /**
+         * Sets the relative volume gain for the Audio Description track.
+         *
+         * <p><b>Unit:</b> Integer Percentage (0-100)</p>
+         * <p><b>Default:</b> Typically defaults to 50 or the system-wide accessibility volume
+         * preference.</p>
+         *
+         * <p>This value controls the mixing level of the secondary audio stream (AD)
+         * before it is combined with the main program audio.
+         * <ul>
+         * <li>{@code 0}: AD track is muted.</li>
+         * <li>{@code 100}: AD track is at maximum mixing volume.</li>
+         * </ul>
+         * </p>
+         *
+         * Range: An integer between 0 and 100.
+         */
+        @FlaggedApi(Flags.FLAG_MEDIA_QUALITY_FW_C)
+        public static final String PARAMETER_AD_VOLUME = "ad_volume";
+
+        /**
+         * Enables automatic Pan and Fade (Ducking) behavior for the main audio.
+         * <p>When set to {@code true}, the audio engine will apply standard broadcast mixing rules:
+         * <ul>
+         * <li><b>Fade:</b> The main program audio volume is lowered ("ducked") when
+         * audio description is present to ensure the narrator is intelligible.</li>
+         * <li><b>Pan:</b> The main audio may be spatially shifted (e.g., to background channels)
+         * to center the audio description track.</li>
+         * </ul>
+         * </p>
+         * * <p>If set to {@code false}, the AD track is mixed simply as an overlay without
+         * modifying the volume or position of the main audio track.</p>
+         */
+        @FlaggedApi(Flags.FLAG_MEDIA_QUALITY_FW_C)
+        public static final String PARAMETER_PAN_FADE_ENABLE = "pan_fade_enable";
 
         private SoundQuality() {
         }

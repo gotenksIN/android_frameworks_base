@@ -454,7 +454,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
     }
 
     private boolean canPlaceEntityOnDisplay(int displayId, int callingPid, int callingUid,
-            Task task, ActivityInfo activityInfo) {
+            @Nullable Task task, @Nullable ActivityInfo activityInfo) {
         if (displayId == DEFAULT_DISPLAY) {
             // No restrictions for the default display.
             return true;
@@ -935,11 +935,11 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
             }
 
             final int applicationInfoUid =
-                    (r.info.applicationInfo != null) ? r.info.applicationInfo.uid : -1;
-            if ((r.mUserId != proc.mUserId) || (r.info.applicationInfo.uid != applicationInfoUid)) {
+                    (r.info.applicationInfo != null) ? r.info.getUid() : -1;
+            if ((r.mUserId != proc.mUserId) || (r.info.getUid() != applicationInfoUid)) {
                 Slog.wtf(TAG,
                         "User ID for activity changing for " + r
-                                + " appInfo.uid=" + r.info.applicationInfo.uid
+                                + " appInfo.uid=" + r.info.getUid()
                                 + " info.ai.uid=" + applicationInfoUid
                                 + " old=" + r.app + " new=" + proc);
             }
@@ -1361,7 +1361,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
 
     /** Check if caller is allowed to launch activities on specified display. */
     boolean isCallerAllowedToLaunchOnDisplay(int callingPid, int callingUid, int launchDisplayId,
-            ActivityInfo aInfo) {
+            @Nullable ActivityInfo aInfo) {
         ProtoLog.d(WM_DEBUG_TASKS, "Launch on display check: displayId=%d callingPid=%d "
                 + "callingUid=%d", launchDisplayId, callingPid, callingUid);
 
@@ -1372,7 +1372,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
 
         final DisplayContent displayContent =
                 mRootWindowContainer.getDisplayContentOrCreate(launchDisplayId);
-        if (displayContent == null || displayContent.isRemoved()) {
+        if (displayContent == null || displayContent.isRemovedOrInvalid()) {
             Slog.w(TAG, "Launch on display check: display not found");
             return false;
         }
@@ -1407,7 +1407,7 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
         if (!display.isTrusted()) {
             // Limit launching on untrusted displays because their contents can be read from Surface
             // by apps that created them.
-            if ((aInfo.flags & ActivityInfo.FLAG_ALLOW_EMBEDDED) == 0) {
+            if (aInfo == null || (aInfo.flags & ActivityInfo.FLAG_ALLOW_EMBEDDED) == 0) {
                 ProtoLog.d(WM_DEBUG_TASKS, "Launch on display check: disallow launch on "
                         + "virtual display for not-embedded activity.");
                 return false;
@@ -2171,7 +2171,8 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
     }
 
     @Override
-    public void onRecentTaskRemoved(Task task, boolean wasTrimmed, boolean killProcess) {
+    public void onRecentTaskRemoved(Task task, boolean wasTrimmed, boolean killProcess,
+            @Nullable Task replacingTask) {
         if (wasTrimmed) {
             // Task was trimmed from the recent tasks list -- remove the active task record as well
             // since the user won't really be able to go back to it
@@ -2417,13 +2418,9 @@ public class ActivityTaskSupervisor implements RecentTasks.Callbacks {
         finishEnteringSleep();
     }
 
-    @VisibleForTesting
-    void finishEnteringSleep() {
+    private void finishEnteringSleep() {
         // End power mode launch before going sleep
         mService.endPowerMode(ActivityTaskManagerService.POWER_MODE_REASON_ALL);
-
-        // Rank task layers to make sure the {@link Task#mLayerRank} is updated.
-        mRootWindowContainer.rankTaskLayers();
 
         removeSleepTimeouts();
 

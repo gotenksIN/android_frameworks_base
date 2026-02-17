@@ -20,17 +20,12 @@ import static android.os.Process.FIRST_APPLICATION_UID;
 import static com.android.ravenwood.common.RavenwoodInternalUtils.parseNullableInt;
 import static com.android.ravenwood.common.RavenwoodInternalUtils.withDefault;
 
-import static org.junit.Assert.assertNotNull;
-
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.ActivityThread;
 import android.app.LoadedApk;
 import android.app.RavenwoodAppDriver;
-import android.app.ResourcesManager;
-import android.content.res.Resources;
 import android.os.Build;
-import android.view.DisplayAdjustments;
 
 import com.android.internal.annotations.GuardedBy;
 import com.android.ravenwood.RavenwoodVmState;
@@ -124,9 +119,6 @@ public final class RavenwoodEnvironment {
 
     @GuardedBy("mLock")
     private final Map<String, File> mAppDataDirs = new HashMap<>();
-
-    @GuardedBy("mLock")
-    private final Map<String, Resources> mPackagesToResources = new HashMap<>();
 
     /**
      * Constructor. There should be only simple initialization here. More complicated
@@ -261,6 +253,11 @@ public final class RavenwoodEnvironment {
     }
 
     @NonNull
+    public File getBugreportDir() {
+        return new File(getEnvVar("RAVENWOOD_BUGREPORT_DIR", mTempDir.toString()));
+    }
+
+    @NonNull
     public File getArtifactsDir() {
         return mArtifactsDir;
     }
@@ -301,41 +298,6 @@ public final class RavenwoodEnvironment {
     }
 
     /**
-     * Get the resources for a given package's resources.
-     *
-     * @param packageName package name, or "android" to load the system resources.
-     */
-    public Resources loadResources(@NonNull String packageName) {
-        synchronized (mLock) {
-            final var cached = mPackagesToResources.get(packageName);
-            if (cached != null) {
-                return cached;
-            }
-            final var loaded = loadResourcesInnerLocked(packageName);
-            mPackagesToResources.put(packageName, loaded);
-            return loaded;
-        }
-    }
-
-    @GuardedBy("mLock")
-    private Resources loadResourcesInnerLocked(@NonNull String packageName) {
-        final var apk = getResourcesApkFile(packageName);
-        final var emptyPaths = new String[0];
-
-        ResourcesManager.getInstance().initializeApplicationPaths(
-                apk.getAbsolutePath(), emptyPaths);
-
-        final var ret = ResourcesManager.getInstance().getResources(null, apk.getAbsolutePath(),
-                emptyPaths, emptyPaths, emptyPaths,
-                emptyPaths, null, null,
-                new DisplayAdjustments().getCompatibilityInfo(),
-                RavenwoodDriver.class.getClassLoader(), null);
-
-        assertNotNull(ret);
-        return ret;
-    }
-
-    /**
      * Get the resource APK file for a given package's resources.
      * @param packageName package name, or "android" to load the system resources.
      */
@@ -373,7 +335,14 @@ public final class RavenwoodEnvironment {
 
     /** Reads a per-module environmental boolean variable. */
     public boolean getBoolEnvVar(String keyName) {
-        return "1".equals(getEnvVar(keyName, ""));
+        return getBoolEnvVar(keyName, false);
+    }
+
+    /**
+     * Reads a per-module environmental boolean variable with a default value.
+     */
+    public boolean getBoolEnvVar(String keyName, boolean defValue) {
+        return "1".equals(getEnvVar(keyName, defValue ? "1" : ""));
     }
 
     /**
@@ -381,7 +350,71 @@ public final class RavenwoodEnvironment {
      * @DisabledOnRavenwood tests in log or in atest output.
      */
     public boolean isHidingDisabledTests() {
-        return getBoolEnvVar("RAVENWOOD_HIDE_DISABLED_TESTS");
+        return getBoolEnvVar("RAVENWOOD_HIDE_DISABLED_TESTS") && !isDumpingTestsOnly();
+    }
+
+    /**
+     * Returns a regex that can filter what tests to run.
+     */
+    public String getRunFilterRegex() {
+        return getEnvVar("RAVENWOOD_FILTER_REGEX", null);
+    }
+
+    /** If true, we skip tests marked as "large" in the enablement policy file. */
+    public boolean isSkippingLargeTests() {
+        return getBoolEnvVar("RAVENWOOD_SKIP_LARGE_TESTS");
+    }
+
+    /**
+     * If this is true, we skip all test methods, while still keeping the classes enabled.
+     *
+     * This is used to just dump all test names. If this is true, {@link #isHidingDisabledTests}
+     * will always false.
+     */
+    public boolean isDumpingTestsOnly() {
+        return getBoolEnvVar("RAVENWOOD_DUMP_TESTS_ONLY");
+    }
+
+    private static final int DEFAULT_SLOW_TIMEOUT_SECONDS = 10;
+
+    /**
+     * If a test takes more time than this timeout, we'll dump all the thread stacks at this
+     * timeout.
+     *
+     * Note, this timeout will _not_ stop the test, as there isn't really a clean way to do it.
+     * It'll merely print stacktraces.
+     *
+     * Returns 0 if the timeout should be disabled.
+     */
+    public int getSlowTestTimeoutSeconds() {
+        if (RavenwoodImplUtils.isDebuggerAttached()) {
+            // If the debugger is attached, never do it.
+            return 0;
+        }
+        return getIntEnvVar("RAVENWOOD_SLOW_TIMEOUT_SECONDS", DEFAULT_SLOW_TIMEOUT_SECONDS);
+    }
+
+    private static final int DEFAULT_DIE_TIMEOUT_SECONDS = 60 * 60 * 1; // 1 hour
+
+    /**
+     * If a test takes more time than this timeout, we'll dump all the thread stacks at this
+     * timeout _and crash the current process_.
+     *
+     * Returns 0 if the timeout should be disabled.
+     */
+    public int getDieTimeoutSeconds() {
+        if (RavenwoodImplUtils.isDebuggerAttached()) {
+            // If the debugger is attached, never do it.
+            return 0;
+        }
+        return getIntEnvVar("RAVENWOOD_DIE_TIMEOUT_SECONDS", DEFAULT_DIE_TIMEOUT_SECONDS);
+    }
+
+    /**
+     * When calling a dump() method on the main thread, we use this timeout.
+     */
+    public int getDumpTimeout() {
+        return getIntEnvVar("RAVENWOOD_DUMP_TIMEOUT_SECONDS", 2);
     }
 
     /** Reads a per-module environmental int variable. */

@@ -70,6 +70,16 @@ flag {
 }
 
 flag {
+  name: "app_compat_enable_blur_wallpaper_in_shell"
+  namespace: "large_screen_experiences_app_compat"
+  description: "Enables blur wallpaper in the letterbox implementation in Shell."
+  bug: "480962329"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
   name: "app_compat_refactoring"
   namespace: "large_screen_experiences_app_compat"
   description: "Whether the changes about app compat refactoring are enabled./n"
@@ -78,16 +88,6 @@ flag {
                  "freeform windowing mode."
   bug: "309593314"
   is_fixed_read_only: true
-}
-
-flag {
-  name: "app_compat_refactoring_rounded_corners"
-  namespace: "large_screen_experiences_app_compat"
-  description: "Whether the rounded corners refactoring for letterboxing in shell is enabled./n"
-  bug: "375124280"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
 }
 
 flag {
@@ -188,17 +188,6 @@ flag {
   description: "Whether the API for forcing apps to be universal resizable on virtual display is available"
   bug: "372848702"
   is_exported: true
-}
-
-flag {
-  name: "restore_user_aspect_ratio_settings_using_service"
-  namespace: "large_screen_experiences_app_compat"
-  description: "Whether a system service should handle setting restored user aspect ratio settings for apps that install after SUW is complete."
-  bug: "413014252"
-  is_fixed_read_only: true
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
 }
 
 flag {

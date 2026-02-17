@@ -22,15 +22,20 @@ import android.annotation.Nullable;
 import android.annotation.SystemApi;
 import android.app.Service;
 import android.content.Intent;
+import android.os.Bundle;
 import android.os.IBinder;
 import android.os.ParcelUuid;
 import android.os.RemoteException;
+import android.service.personalcontext.ComponentIdProvider;
 import android.service.personalcontext.Flags;
 import android.service.personalcontext.PersonalContextManager;
 import android.service.personalcontext.hint.ContextHint;
 import android.service.personalcontext.hint.ContextHintWithSignature;
+import android.service.personalcontext.hint.ContextHintWithSignatureWrapper;
+import android.service.personalcontext.hint.HintFilter;
 import android.service.personalcontext.insight.ContextInsight;
-import android.service.personalcontext.refiner.HintFilter;
+import android.service.personalcontext.insight.ContextInsightWrapper;
+import android.service.personalcontext.insight.interaction.InsightEvent;
 import android.service.personalcontext.refiner.IGetFilterCallback;
 import android.service.personalcontext.refiner.IRefineCallback;
 import android.service.personalcontext.refiner.IRefiner;
@@ -70,13 +75,21 @@ public abstract class ContextUnderstanderService extends Service {
         onConnected();
     }
 
-    /** @hide */
     @NonNull
     public final UUID getComponentId() {
         if (mComponentId == null) {
             throw new IllegalStateException("Service has not been configured yet");
         }
         return mComponentId;
+    }
+
+    /** Returns a {@link ComponentIdProvider} for this component. */
+    @NonNull
+    public final ComponentIdProvider getComponentIdProvider() {
+        if (mComponentId == null) {
+            throw new IllegalStateException("Service has not been configured yet");
+        }
+        return () -> mComponentId;
     }
 
     @Override
@@ -115,20 +128,6 @@ public abstract class ContextUnderstanderService extends Service {
     public abstract void onUnderstand(@NonNull List<ContextHintWithSignature> hints);
 
     /**
-     * @deprecated use {@link #understood(ContextInsight)}
-     */
-    @Deprecated
-    public final void understood(@NonNull List<ContextInsight> insights) {
-        if (mPersonalContextManager == null) {
-            mPersonalContextManager = getSystemService(PersonalContextManager.class);
-        }
-        if (mPersonalContextManager == null) {
-            throw new IllegalStateException("Personal Context Manager service is not running");
-        }
-        mPersonalContextManager.publishInsight(insights);
-    }
-
-    /**
      * Feeds a {@link ContextInsight} into the Personal Context system.
      *
      * <p>Most understanders will want to respond to calls to {@link #onUnderstand} inline when all
@@ -143,7 +142,30 @@ public abstract class ContextUnderstanderService extends Service {
      * can be re-attempted in a few seconds, once system services have started.
      */
     public final void understood(@NonNull ContextInsight insight) {
-        understood(List.of(insight));
+        if (mPersonalContextManager == null) {
+            mPersonalContextManager = getSystemService(PersonalContextManager.class);
+        }
+        if (mPersonalContextManager == null) {
+            throw new IllegalStateException("Personal Context Manager service is not running");
+        }
+        mPersonalContextManager.publishInsight(List.of(insight));
+    }
+
+    /** Override this method to receive logging events for actions taken on the insight. */
+    public void onHandleEvent(@NonNull String packageName, @NonNull InsightEvent event) {
+        // Do nothing by default.
+    }
+
+    /**
+     * Override this method to revieve user feedback on an insight.
+     *
+     * @see android.service.personalcontext.insight.interaction.FeedbackRequest
+     *
+     * @param insight {@link ContextInsight} that the user feedback is related to
+     * @param feedback information about the requested feedback and user responses
+     */
+    public void onHandleUserFeedback(@NonNull ContextInsight insight, @NonNull Bundle feedback) {
+        // Do nothing by default.
     }
 
     private static final class Binder extends IRefiner.Stub {
@@ -169,17 +191,32 @@ public abstract class ContextUnderstanderService extends Service {
         }
 
         @Override
-        public void refine(List<ContextHintWithSignature> inputHints, IRefineCallback callback)
+        public void refine(
+                List<ContextHintWithSignatureWrapper> inputHints, IRefineCallback callback)
                 throws RemoteException {
             // Report that hints were refined right away so that the core doesn't wait around.
             callback.onHintsRefined(Collections.emptyList());
 
-            getServiceOrThrow().onUnderstand(inputHints);
+            getServiceOrThrow().onUnderstand(
+                    ContextHintWithSignatureWrapper.unwrapList(inputHints));
         }
 
         @Override
         public void getFilter(IGetFilterCallback callback) throws RemoteException {
             callback.updateFilter(getServiceOrThrow().onInitializeFilter());
+        }
+
+        @Override
+        public void handleEvent(String packageName, InsightEvent event) throws RemoteException {
+            getServiceOrThrow().onHandleEvent(packageName, event);
+        }
+
+        @Override
+        public void handleFeedback(ContextInsightWrapper insight, Bundle feedback)
+                throws RemoteException {
+            getServiceOrThrow().onHandleUserFeedback(
+                    insight.getContextInsight(),
+                    feedback);
         }
     }
 }

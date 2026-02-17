@@ -150,6 +150,23 @@ flag {
   bug: "344050265"
 }
 
+flag {
+  name: "ignore_duplicate_bindings"
+  namespace: "backstage_power"
+  description: "Ignores duplicate bindings to the same NotificationListenerService."
+  bug: "434679743"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+  name: "favorites_incoming_call_lights"
+  namespace: "notifications"
+  description: "Apply priority_notification lights for incoming calls from favorites."
+  bug: "480207922"
+}
+
 # Start: Flags that have been cleaned up in code but must remain defined for CTS
 
 flag {

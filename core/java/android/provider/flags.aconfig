@@ -111,6 +111,7 @@ flag {
     name: "expose_vpn_app_exclusion_settings"
     namespace: "android_settings"
     description: "Allows VpnManager-based apps to launch a Settings screen to select apps excluded from the VPN"
+    is_exported: true
     bug: "459584692"
 }
 
@@ -123,13 +124,10 @@ flag {
     bug: "440464827"
 }
 
-#OWNER=pdxt
 flag {
-    name: "enable_redacted_value_for_readable"
-    namespace: "app_compat"
-    description: "Allows returning a redacted value from Readable annotation"
-    bug: "440232200"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
+    name: "enable_on_volume_record_changed_listener"
+    is_exported: false
+    namespace: "documentsui"
+    description: "Enables an ExternalStorageProvider listener for onVolumeChanged."
+    bug: "350615090"
 }

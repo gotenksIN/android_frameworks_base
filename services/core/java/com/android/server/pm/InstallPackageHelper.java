@@ -23,6 +23,7 @@ package com.android.server.pm;
 import static android.app.privatecompute.flags.Flags.enablePccFrameworkSupport;
 import static android.content.pm.Flags.allowUpdatedVersionBetterThanApkInApex;
 import static android.content.pm.Flags.disallowSdkLibsToBeApps;
+import static android.content.pm.Flags.trustSystemApkSignatures;
 import static android.content.pm.PackageManager.APP_METADATA_SOURCE_APK;
 import static android.content.pm.PackageManager.APP_METADATA_SOURCE_INSTALLER;
 import static android.content.pm.PackageManager.APP_METADATA_SOURCE_UNKNOWN;
@@ -477,8 +478,14 @@ final class InstallPackageHelper {
 
 
         if (pkgAlreadyExists && oldPkgSetting.getPccId() > 0 && !parsedPackage.hasPccComponents()) {
+            Slog.i(TAG,
+                    "Package " + oldPkgSetting.getPackageName()
+                            + " is no longer a PCC package. Cleaning up.");
             mPm.mSettings.removePccIdLPw(oldPkgSetting.getPccId());
             pkgSetting.setPccId(Process.INVALID_UID);
+
+            mAppDataHelper.destroyPccData(
+                    oldPkgSetting, FLAG_STORAGE_CE | FLAG_STORAGE_DE, allUsers);
         }
 
       if(android.content.pm.Flags.verifiedDexopt()){
@@ -1140,11 +1147,11 @@ final class InstallPackageHelper {
     void doPostDexopt(List<ReconciledPackage> reconciledPackages,
             List<InstallRequest> requests, Map<String, Boolean> createdAppId,
             MoveInfo moveInfo, long acquireTime) {
-        boolean isDexoptSuccess = true;
+        boolean isDexoptCompleted = true;
         for (InstallRequest request : requests) {
             request.onWaitDexoptFinished();
             if (request.getReturnCode() != PackageManager.INSTALL_SUCCEEDED) {
-                isDexoptSuccess = false;
+                isDexoptCompleted = false;
             }
         }
 
@@ -1156,7 +1163,7 @@ final class InstallPackageHelper {
                 releaseWakeLock(acquireTime, requests.size());
             };
 
-            if (!isDexoptSuccess) {
+            if (!isDexoptCompleted) {
                 postCommitActions.accept(false);
                 return;
             }
@@ -1165,7 +1172,7 @@ final class InstallPackageHelper {
         } else {
             boolean success = false;
             try {
-                if (isDexoptSuccess && commitInstallPackages(reconciledPackages)) {
+                if (isDexoptCompleted && commitInstallPackages(reconciledPackages)) {
                     success = true;
                 }
             } finally {
@@ -2308,19 +2315,18 @@ final class InstallPackageHelper {
                         for (int currentUser : allUsers) {
                             if (!ps.getInstantApp(currentUser)) {
                                 // can't downgrade from full to instant
-                                Slog.w(TAG,
+                                throw new PrepareFailure(
+                                        PackageManager.INSTALL_FAILED_SESSION_INVALID,
                                         "Can't replace full app with instant app: " + pkgName11
                                                 + " for user: " + currentUser);
-                                throw new PrepareFailure(
-                                        PackageManager.INSTALL_FAILED_SESSION_INVALID);
                             }
                         }
                     } else if (!ps.getInstantApp(request.getUserId())) {
                         // can't downgrade from full to instant
-                        Slog.w(TAG, "Can't replace full app with instant app: " + pkgName11
-                                + " for user: " + request.getUserId());
                         throw new PrepareFailure(
-                                PackageManager.INSTALL_FAILED_SESSION_INVALID);
+                                PackageManager.INSTALL_FAILED_SESSION_INVALID,
+                                "Can't replace full app with instant app: " + pkgName11
+                                        + " for user: " + request.getUserId());
                     }
                 }
             }
@@ -4583,21 +4589,26 @@ final class InstallPackageHelper {
      */
     private boolean optimisticallyRegisterAppIds(@NonNull InstallRequest installRequest)
             throws PackageManagerException {
-        boolean created = false;
-        final PackageSetting ps = installRequest.getScannedPackageSetting();
-        if (!installRequest.isExistingSettingCopied() || installRequest.needsNewAppId()) {
-            synchronized (mPm.mLock) {
-                // THROWS: when we can't allocate a user id. add call to check if there's
-                // enough space to ensure we won't throw; otherwise, don't modify state
-                created |= mPm.mSettings.registerAppIdLPw(ps,
-                        installRequest.needsNewAppId());
+        Trace.traceBegin(TRACE_TAG_PACKAGE_MANAGER, "optimisticallyRegisterAppIds");
+        try {
+            boolean created = false;
+            final PackageSetting ps = installRequest.getScannedPackageSetting();
+            if (!installRequest.isExistingSettingCopied() || installRequest.needsNewAppId()) {
+                synchronized (mPm.mLock) {
+                    // THROWS: when we can't allocate a user id. add call to check if there's
+                    // enough space to ensure we won't throw; otherwise, don't modify state
+                    created |= mPm.mSettings.registerAppIdLPw(ps,
+                            installRequest.needsNewAppId());
+                }
             }
-        }
-        synchronized (mPm.mLock) {
-            created |= mPm.mSettings.registerPccIdLPw(ps);
-        }
+            synchronized (mPm.mLock) {
+                created |= mPm.mSettings.registerPccIdLPw(ps);
+            }
 
-        return created;
+            return created;
+        } finally {
+            Trace.traceEnd(TRACE_TAG_PACKAGE_MANAGER);
+        }
     }
 
     /**
@@ -4867,7 +4878,9 @@ final class InstallPackageHelper {
                     final ParseTypeImpl input = ParseTypeImpl.forDefaultParsing();
                     final ParseResult<SigningDetails> result =
                             ParsingPackageUtils.getSigningDetails(input, parsedPackage,
-                                    false /*skipVerify*/);
+                                    // It is safe to skip the full verification here because the APK
+                                    // is in an immutable partition secured by dm-verity.
+                                    Flags.trustSystemApkSignatures() /*skipVerify*/);
                     if (result.isError()) {
                         throw new PrepareFailure("Failed collect during scanPackageForInitLI",
                                 result.getException());

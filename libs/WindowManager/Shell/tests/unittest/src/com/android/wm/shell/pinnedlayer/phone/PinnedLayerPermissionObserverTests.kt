@@ -33,10 +33,12 @@ import androidx.test.filters.SmallTest
 import androidx.test.platform.app.InstrumentationRegistry
 import com.android.window.flags.Flags
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer
+import com.android.wm.shell.ShellTaskOrganizer
 import com.android.wm.shell.ShellTestCase
 import com.android.wm.shell.TestRunningTaskInfoBuilder
 import com.android.wm.shell.TestShellExecutor
 import com.android.wm.shell.common.MultiDisplayDragMoveIndicatorController
+import com.android.wm.shell.desktopmode.FakeShellDesktopState
 import com.android.wm.shell.desktopmode.WindowDragTransitionHandler
 import com.android.wm.shell.pinnedlayer.phone.PinnedLayerController.UnpinStrategy
 import com.android.wm.shell.shared.TransactionPool
@@ -84,6 +86,7 @@ class PinnedLayerPermissionObserverTests : ShellTestCase() {
     @Mock
     private lateinit var multiDisplayDragMoveIndicatorController:
         MultiDisplayDragMoveIndicatorController
+    @Mock private lateinit var shellTaskOrganizer: ShellTaskOrganizer
 
     private val uid = Binder.getCallingUid()
     private val shellExecutor = ObservedTestShellExecutor()
@@ -91,6 +94,7 @@ class PinnedLayerPermissionObserverTests : ShellTestCase() {
     private lateinit var pinnedLayerPermissionObserver: PinnedLayerPermissionObserver
     private lateinit var appOpsManager: AppOpsManager
     private lateinit var desktopState: FakeDesktopState
+    private lateinit var shellDesktopState: FakeShellDesktopState
 
     @Before
     fun setup() {
@@ -98,13 +102,16 @@ class PinnedLayerPermissionObserverTests : ShellTestCase() {
 
         desktopState = FakeDesktopState()
         desktopState.canEnterDesktopMode = true
+        shellDesktopState = FakeShellDesktopState(desktopState)
+        shellDesktopState.canBeWindowDropTarget = true
 
         pinnedLayerController =
             PinnedLayerController(
                 shellInit,
                 transitions,
-                desktopState,
+                shellDesktopState,
                 rootTaskDisplayAreaOrganizer,
+                shellTaskOrganizer,
                 presentationController,
                 windowDragTransitionHandler,
                 pinnedWindowRepositionAnimationHandler,

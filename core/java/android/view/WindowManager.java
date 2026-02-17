@@ -970,6 +970,36 @@ public interface WindowManager extends ViewManager {
 
     /**
      * Application level {@link android.content.pm.PackageManager.Property PackageManager.Property}
+     * for an app to inform the system that it needs to be opted-out from the compatibility
+     * treatment that sandboxes the {@link android.content.res.Configuration } API when caption
+     * insets are force consumed.
+     *
+     * <p>The treatment can be enabled by device manufacturers for applications that don't handle
+     * consumption of {@link WindowInsets.Type#captionBar } insets which can lead to top or bottom
+     * UI elements being cropped. The treatment will sandbox
+     * {@link android.content.res.Configuration#screenHeightDp } to exclude caption insets.
+     *
+     * <p>Setting this property to {@code false} informs the system that the application
+     * must be opted-out from the exclude caption insets from app bounds treatment even if
+     * the device manufacturer has opted the app into the treatment.
+     *
+     * <p>Not setting this property at all, or setting this property to {@code true} has no effect.
+     *
+     * <p><b>Syntax:</b>
+     * <pre>
+     * &lt;application&gt;
+     *   &lt;property
+     *     android:name="android.window.PROPERTY_COMPAT_ALLOW_EXCLUDE_CAPTION_INSETS"
+     *     android:value="false"/&gt;
+     * &lt;/application&gt;
+     * </pre>
+     */
+    @FlaggedApi(Flags.FLAG_EXCLUDE_CAPTION_INSETS_OPT_OUT_API)
+    String PROPERTY_COMPAT_ALLOW_EXCLUDE_CAPTION_INSETS =
+            "android.window.PROPERTY_COMPAT_ALLOW_EXCLUDE_CAPTION_INSETS";
+
+    /**
+     * Application level {@link android.content.pm.PackageManager.Property PackageManager.Property}
      * for an app to inform the system that the application can be opted-in or opted-out from the
      * compatibility treatment that enables sending a fake focus event for unfocused resumed
      * split-screen activities. This is needed because some game engines wait to get focus before
@@ -2277,12 +2307,18 @@ public interface WindowManager extends ViewManager {
         public static final int TYPE_APPLICATION_MEDIA_OVERLAY  = FIRST_SUB_WINDOW + 4;
 
         /**
-         * Window type: a above sub-panel on top of an application window and it's
+         * Window type: an above sub-panel on top of an application window and it's
          * sub-panel windows. These windows are displayed on top of their attached window
          * and any {@link #TYPE_APPLICATION_SUB_PANEL} panels.
          * @hide
          */
         public static final int TYPE_APPLICATION_ABOVE_SUB_PANEL = FIRST_SUB_WINDOW + 5;
+
+        /**
+         * Window type: a caption bar on top of an application window.
+         * @hide
+         */
+        public static final int TYPE_APPLICATION_CAPTION_BAR = FIRST_SUB_WINDOW + 6;
 
         /**
          * End of types of sub-windows.
@@ -3347,6 +3383,12 @@ public interface WindowManager extends ViewManager {
         public int flags;
 
         /**
+         * Flag to indicate that this window disables the performance hint session.
+         * @hide
+         */
+        public static final int PRIVATE_FLAG_DISABLE_PERFORMANCE_HINT = 1 << 0;
+
+        /**
          * In the system process, we globally do not use hardware acceleration
          * because there are many threads doing UI there and they conflict.
          * If certain parts of the UI that really do want to use hardware
@@ -3621,6 +3663,7 @@ public interface WindowManager extends ViewManager {
          * @hide
          */
         @IntDef(flag = true, prefix="PRIVATE_FLAG_", value = {
+                PRIVATE_FLAG_DISABLE_PERFORMANCE_HINT,
                 PRIVATE_FLAG_FORCE_HARDWARE_ACCELERATED,
                 PRIVATE_FLAG_WANTS_OFFSET_NOTIFICATIONS,
                 SYSTEM_FLAG_SHOW_FOR_ALL_USERS,
@@ -3661,6 +3704,10 @@ public interface WindowManager extends ViewManager {
          */
         @UnsupportedAppUsage
         @ViewDebug.ExportedProperty(flagMapping = {
+                @ViewDebug.FlagToString(
+                        mask = PRIVATE_FLAG_DISABLE_PERFORMANCE_HINT,
+                        equals = PRIVATE_FLAG_DISABLE_PERFORMANCE_HINT,
+                        name = "DISABLE_PERFORMANCE_HINT"),
                 @ViewDebug.FlagToString(
                         mask = PRIVATE_FLAG_FORCE_HARDWARE_ACCELERATED,
                         equals = PRIVATE_FLAG_FORCE_HARDWARE_ACCELERATED,
@@ -4873,6 +4920,14 @@ public interface WindowManager extends ViewManager {
         public boolean isSystemApplicationOverlay() {
             return (privateFlags & PRIVATE_FLAG_SYSTEM_APPLICATION_OVERLAY)
                     == PRIVATE_FLAG_SYSTEM_APPLICATION_OVERLAY;
+        }
+
+        /**
+         * Returns if this window disables the performance hint session.
+         * @hide
+         */
+        public boolean isPerfHintSessionDisabled() {
+            return (privateFlags & PRIVATE_FLAG_DISABLE_PERFORMANCE_HINT) != 0;
         }
 
         /**

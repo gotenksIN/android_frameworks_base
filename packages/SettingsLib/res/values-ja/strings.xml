@@ -216,7 +216,7 @@
     <string name="launch_defaults_some" msgid="3631650616557252926">"一部のリンクをデフォルトで開くよう設定済みです"</string>
     <string name="launch_defaults_none" msgid="8049374306261262709">"デフォルトで開く対応リンクはありません"</string>
     <string name="tts_settings" msgid="8130616705989351312">"テキスト読み上げの設定"</string>
-    <string name="tts_settings_title" msgid="7602210956640483039">"テキスト読み上げの設定"</string>
+    <string name="tts_settings_title" msgid="7602210956640483039">"テキスト読み上げの設⁠定"</string>
     <string name="tts_default_rate_title" msgid="3964187817364304022">"音声の速度"</string>
     <string name="tts_default_rate_summary" msgid="3781937042151716987">"テキストの読み上げ速度"</string>
     <string name="tts_default_pitch_title" msgid="6988592215554485479">"音の高さ"</string>
@@ -268,7 +268,7 @@
     <string name="apn_settings_not_available" msgid="1147111671403342300">"このユーザーはアクセスポイント名設定を利用できません"</string>
     <string name="enable_adb" msgid="8072776357237289039">"USB デバッグ"</string>
     <string name="enable_adb_summary" msgid="3711526030096574316">"USB 接続時にデバッグモードにする"</string>
-    <string name="clear_adb_keys" msgid="3010148733140369917">"USB デバッグの許可を取り消し"</string>
+    <string name="clear_adb_keys" msgid="2696065439790970581">"USB デバッグの許可を取り消し"</string>
     <string name="enable_adb_wireless" msgid="6973226350963971018">"ワイヤレス デバッグ"</string>
     <string name="enable_adb_wireless_summary" msgid="7344391423657093011">"Wi-Fi 接続時にデバッグモードにする"</string>
     <string name="adb_wireless_error" msgid="721958772149779856">"エラー"</string>
@@ -293,6 +293,10 @@
     <string name="adb_wireless_verifying_qrcode_text" msgid="6123192424916029207">"デバイスをペア設定しています…"</string>
     <string name="adb_qrcode_pairing_device_failed_msg" msgid="6936292092592914132">"デバイスをペア設定できませんでした。QR コードが間違っているか、デバイスが同じネットワークに接続されていません。"</string>
     <string name="adb_wireless_ip_addr_preference_title" msgid="8335132107715311730">"IP アドレスとポート"</string>
+    <!-- no translation found for adb_wireless_unavailable_not_allowed (83310404140556806) -->
+    <skip />
+    <!-- no translation found for adb_wireless_unavailable_disconnected (8819105186435736128) -->
+    <skip />
     <string name="adb_wireless_qrcode_pairing_title" msgid="1906409667944674707">"QR コードをスキャン"</string>
     <string name="adb_wireless_qrcode_pairing_description" msgid="6014121407143607851">"QR コードをスキャンして Wi-Fi 経由でデバイスをペア設定します"</string>
     <string name="adb_wireless_no_network_msg" msgid="2365795244718494658">"Wi-Fi ネットワークに接続してください"</string>
@@ -366,7 +370,7 @@
     <string name="adb_warning_message" msgid="8145270656419669221">"USB デバッグは開発専用に設計されています。パソコンとデバイスの間でデータをコピーする場合や、アプリを通知なしでデバイスにインストールする場合、ログデータを読み取る場合に使用できます。"</string>
     <string name="adbwifi_warning_title" msgid="727104571653031865">"ワイヤレス デバッグを許可しますか？"</string>
     <string name="adbwifi_warning_message" msgid="8005936574322702388">"ワイヤレス デバッグは開発専用に設計されています。パソコンとデバイスの間でデータをコピーする場合や、アプリを通知なしでデバイスにインストールする場合、ログデータを読み取る場合に使用できます。"</string>
-    <string name="adb_keys_warning_message" msgid="2968555274488101220">"以前に許可したすべてのパソコンからの USB デバッグへのアクセスを取り消しますか？"</string>
+    <string name="adb_keys_warning_message" msgid="7827514623080777814">"以前に許可したすべてのパソコンからの USB デバッグへのアクセスを取り消しますか？"</string>
     <string name="dev_settings_warning_title" msgid="8251234890169074553">"開発用の設定を許可しますか？"</string>
     <string name="dev_settings_warning_message" msgid="37741686486073668">"これらの設定は開発専用に設計されています。そのためデバイスやデバイス上のアプリが故障したり正常に動作しなくなったりするおそれがあります。"</string>
     <string name="verify_apps_over_usb_title" msgid="6031809675604442636">"USB 経由のアプリも検証"</string>
@@ -664,7 +668,7 @@
     <string name="user_add_profile_item_title" msgid="3111051717414643029">"制限付きプロファイル"</string>
     <string name="user_add_user_title" msgid="5457079143694924885">"新しいユーザーを追加しますか？"</string>
     <string name="user_add_user_message_long" msgid="1527434966294733380">"追加したユーザーとは、このデバイスを共有できます。各ユーザーには独自のスペースが作成され、アプリや壁紙などをカスタマイズできます。Wi-Fi など、すべてのユーザーに影響するデバイス設定を変更することもできます。\n\n新しいユーザーは各自でスペースをセットアップする必要があります。\n\nアプリの更新は、すべてのユーザーが行えます。ユーザー補助機能の設定とサービスは新しいユーザーに引き継がれないことがあります。"</string>
-    <string name="user_add_user_message_short" msgid="3295959985795716166">"新しく追加したユーザーは各自でスペースをセットアップする必要があります。\n\nすべてのユーザーがアプリを更新でき、その影響は他のユーザーにも及びます。"</string>
+    <string name="user_add_user_message_short" msgid="3295959985795716166">"新しく追加されたユーザーは各自でスペースをセットアップする必要があります。\n\nすべてのユーザーがアプリを更新でき、その影響は他のユーザーにも及びます。"</string>
     <string name="user_grant_admin_title" msgid="5157031020083343984">"このユーザーを管理者にしますか？"</string>
     <string name="user_grant_admin_message" msgid="1673791931033486709">"管理者には、他のユーザーにはない特別な権限が与えられます。管理者は、すべてのユーザーの管理、このデバイスの更新やリセット、設定の変更、インストール済みのすべてのアプリの確認、他のユーザーに対する管理者権限の許可や取り消しを行えます。"</string>
     <string name="user_grant_admin_button" msgid="5441486731331725756">"管理者にする"</string>
@@ -686,7 +690,7 @@
     <string name="add_user_failed" msgid="4809887794313944872">"新しいユーザーを作成できませんでした"</string>
     <string name="add_guest_failed" msgid="8074548434469843443">"新しいゲストを作成できませんでした"</string>
     <string name="user_nickname" msgid="262624187455825083">"ニックネーム"</string>
-    <string name="edit_user_info_message" msgid="6677556031419002895">"選択した名前と写真は、このデバイスを使用しているすべてのユーザーが見ることができます。"</string>
+    <string name="edit_user_info_message" msgid="6677556031419002895">"選択した名前と写真は、このデバイスを使用するすべてのユーザーに表示されます。"</string>
     <string name="user_add_user" msgid="7876449291500212468">"ユーザーを追加"</string>
     <string name="guest_new_guest" msgid="3482026122932643557">"ゲストを追加"</string>
     <string name="guest_exit_guest" msgid="5908239569510734136">"ゲストを削除"</string>
@@ -703,7 +707,7 @@
     <string name="grant_admin" msgid="4323199171790522574">"はい、管理者にします"</string>
     <string name="not_grant_admin" msgid="3557849576157702485">"いいえ、管理者にしません"</string>
     <string name="guest_exit_dialog_button" msgid="1736401897067442044">"終了"</string>
-    <string name="guest_exit_dialog_title_non_ephemeral" msgid="7675327443743162986">"ゲストアクティビティの保存"</string>
+    <string name="guest_exit_dialog_title_non_ephemeral" msgid="7675327443743162986">"ゲスト アクティビティを保存"</string>
     <string name="guest_exit_dialog_message_non_ephemeral" msgid="223385323235719442">"現在のセッションのアクティビティの保存や、すべてのアプリとデータの削除を行えます"</string>
     <string name="guest_exit_clear_data_button" msgid="3425812652180679014">"削除"</string>
     <string name="guest_exit_save_data_button" msgid="3690974510644963547">"保存"</string>

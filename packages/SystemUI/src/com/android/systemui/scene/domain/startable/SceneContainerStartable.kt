@@ -18,7 +18,6 @@ package com.android.systemui.scene.domain.startable
 
 import android.app.StatusBarManager
 import android.os.PowerManager
-import android.view.Display
 import android.view.SurfaceControl
 import com.android.compose.animation.scene.ObservableTransitionState
 import com.android.compose.animation.scene.OverlayKey
@@ -47,6 +46,7 @@ import com.android.systemui.deviceentry.domain.interactor.DeviceUnlockedInteract
 import com.android.systemui.deviceentry.shared.model.DeviceUnlockSource
 import com.android.systemui.kairos.internal.util.fastForEach
 import com.android.systemui.keyguard.DismissCallbackRegistry
+import com.android.systemui.keyguard.WindowManagerLockscreenVisibilityManager
 import com.android.systemui.keyguard.domain.interactor.KeyguardDismissActionInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardEnabledInteractor
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
@@ -56,7 +56,10 @@ import com.android.systemui.keyguard.domain.interactor.KeyguardSurfaceBehindInte
 import com.android.systemui.keyguard.domain.interactor.KeyguardWakeDirectlyToGoneInteractor
 import com.android.systemui.keyguard.domain.interactor.ShowWhileAwakeReason
 import com.android.systemui.keyguard.domain.interactor.TrustInteractor
+import com.android.systemui.keyguard.shared.model.BiometricUnlockMode
 import com.android.systemui.keyguard.shared.model.KeyguardState
+import com.android.systemui.keyguard.shared.model.KeyguardTransitionKeys.AodToGoneTransition
+import com.android.systemui.keyguard.shared.model.KeyguardTransitionKeys.WithAnimationOverLockscreen
 import com.android.systemui.log.table.TableLogBuffer
 import com.android.systemui.model.SceneContainerPlugin
 import com.android.systemui.model.SceneContainerPluginImpl
@@ -64,12 +67,13 @@ import com.android.systemui.model.StateChange
 import com.android.systemui.model.SysUiState
 import com.android.systemui.plugins.FalsingManager
 import com.android.systemui.plugins.FalsingManager.FalsingBeliefListener
+import com.android.systemui.power.data.model.PowerButtonLaunchEvent
 import com.android.systemui.power.domain.interactor.PowerInteractor
-import com.android.systemui.power.shared.model.WakeSleepReason
 import com.android.systemui.scene.data.model.asIterable
 import com.android.systemui.scene.data.model.peek
 import com.android.systemui.scene.domain.SceneFrameworkTableLog
 import com.android.systemui.scene.domain.interactor.DisabledContentInteractor
+import com.android.systemui.scene.domain.interactor.OnBootTransitionInteractor
 import com.android.systemui.scene.domain.interactor.SceneBackInteractor
 import com.android.systemui.scene.domain.interactor.SceneInteractor
 import com.android.systemui.scene.domain.startable.SceneContainerStartable.HideOverlayCommand.HideSome
@@ -79,13 +83,11 @@ import com.android.systemui.scene.shared.logger.SceneLogger
 import com.android.systemui.scene.shared.model.Overlays
 import com.android.systemui.scene.shared.model.SceneFamilies
 import com.android.systemui.scene.shared.model.Scenes
-import com.android.systemui.scene.shared.model.TransitionKeys.ShadeExpandedToAlwaysOnDisplay
+import com.android.systemui.scene.shared.model.TransitionKeys.ToAlwaysOnDisplay
 import com.android.systemui.scene.shared.model.isKeyguardScene
 import com.android.systemui.shade.domain.interactor.ShadeDisplaysInteractor
 import com.android.systemui.shade.domain.interactor.ShadeInteractor
 import com.android.systemui.shade.domain.interactor.ShadeModeInteractor
-import com.android.systemui.shade.shared.flag.ShadeWindowGoesAround
-import com.android.systemui.statusbar.NotificationLockscreenUserManager
 import com.android.systemui.statusbar.NotificationShadeWindowController
 import com.android.systemui.statusbar.SysuiStatusBarStateController
 import com.android.systemui.statusbar.VibratorHelper
@@ -167,29 +169,26 @@ constructor(
     @SceneFrameworkTableLog private val tableLogBuffer: TableLogBuffer,
     private val trustInteractor: TrustInteractor,
     private val sysuiStateInteractor: SysUIStateDisplaysInteractor,
-    private val shadeDisplaysInteractor: Lazy<ShadeDisplaysInteractor>,
+    shadeDisplaysInteractor: Lazy<ShadeDisplaysInteractor>,
     private val surfaceBehindInteractor: KeyguardSurfaceBehindInteractor,
-    private val lockscreenUserManager: NotificationLockscreenUserManager,
     private val keyguardDismissActionInteractor: KeyguardDismissActionInteractor,
     private val wakeDirectlyToGoneInteractor: KeyguardWakeDirectlyToGoneInteractor,
     private val keyguardShowWhileAwakeInteractor: KeyguardShowWhileAwakeInteractor,
+    private val windowManagerLockscreenVisibilityManager: WindowManagerLockscreenVisibilityManager,
+    private val bootInteractor: OnBootTransitionInteractor,
 ) : CoreStartable {
     private val centralSurfaces: CentralSurfaces?
         get() = centralSurfacesOptLazy.get().getOrNull()
 
     private val authInteractionProperties = AuthInteractionProperties()
 
-    private val shadePendingDisplayId: Flow<Int> =
-        if (ShadeWindowGoesAround.isEnabled) {
-            shadeDisplaysInteractor.get().pendingDisplayId
-        } else {
-            flowOf(Display.DEFAULT_DISPLAY)
-        }
+    private val shadePendingDisplayId: Flow<Int> = shadeDisplaysInteractor.get().pendingDisplayId
 
     override fun start() {
         if (SceneContainerFlag.isEnabled) {
             sceneLogger.logFrameworkEnabled(isEnabled = true)
             applicationScope.launch { hydrateTableLogBuffer() }
+            maybeShowLockscreenOnStart()
             hydrateVisibility()
             automaticallySwitchScenes()
             hydrateSystemUiState()
@@ -208,7 +207,7 @@ constructor(
             hydrateActivityTransitionAnimationState()
             lockWhenDeviceBecomesUntrusted()
             lockWhenKeyguardShowWhenAwake()
-            hydrateLockScreenUserManager()
+            showDismissibleKeyguardWhenFolded()
             wakeFromDozingOnContentChange()
         } else {
             sceneLogger.logFrameworkEnabled(isEnabled = false)
@@ -228,14 +227,7 @@ constructor(
                 }
 
                 printSection("Framework state") {
-                    println("isVisible", sceneInteractor.isVisible.value)
-                    println("currentScene", sceneInteractor.currentScene.value.debugName)
-                    println(
-                        "currentOverlays",
-                        sceneInteractor.currentOverlays.value.joinToString(", ") { overlay ->
-                            overlay.debugName
-                        },
-                    )
+                    sceneInteractor.dump(this)
                     println("backStack", sceneBackInteractor.backStack.value)
                     println("shadeMode", shadeModeInteractor.shadeMode.value)
                 }
@@ -297,83 +289,40 @@ constructor(
         }
     }
 
-    /** Updates the visibility of the scene container. */
+    private fun <T> CoroutineScope.reportEvents(
+        from: Flow<T>,
+        eventBuilder: (T) -> SceneInteractor.Event,
+    ) {
+        launch { from.collect { sceneInteractor.handleEvent(eventBuilder(it)) } }
+    }
+
+    /**
+     * Updates states in [SceneInteractor] that it needs to calculate the visibility of the scene
+     * container.
+     */
     private fun hydrateVisibility() {
         applicationScope.launch {
-            combine(
-                    deviceProvisioningInteractor.isDeviceProvisioned,
-                    deviceUnlockedInteractor.deviceUnlockStatus,
-                ) { isProvisioned, unlockStatus ->
-                    isProvisioned || !unlockStatus.isUnlocked
+            coroutineScope {
+                reportEvents(deviceProvisioningInteractor.isDeviceProvisioned) {
+                    SceneInteractor.Event.DeviceProvisioningChange(it)
                 }
-                .distinctUntilChanged()
-                .flatMapLatest { isAllowedToBeVisible ->
-                    if (isAllowedToBeVisible) {
-                        combine(
-                                sceneInteractor.transitionState,
-                                headsUpInteractor.isHeadsUpOrAnimatingAway,
-                                alternateBouncerInteractor.isVisible,
-                                surfaceBehindInteractor.isAnimatingSurface,
-                            ) {
-                                transitionState,
-                                isHeadsUpOrAnimatingAway,
-                                isAlternateBouncerVisible,
-                                isAnimatingSurface ->
-                                val isCommunalShowing =
-                                    transitionState.isTransitioningFromOrTo(Scenes.Communal) ||
-                                        transitionState.isIdle(Scenes.Communal)
 
-                                val inTransition =
-                                    transitionState is ObservableTransitionState.Transition
-                                val visibilityForTransitionState =
-                                    when (transitionState) {
-                                        is ObservableTransitionState.Idle -> {
-                                            if (
-                                                transitionState.currentScene != Scenes.Gone &&
-                                                    transitionState.currentScene !=
-                                                        Scenes.Occluded &&
-                                                    transitionState.currentScene != Scenes.Dream
-                                            ) {
-                                                true to "scene is not Gone, Occluded, or Dream"
-                                            } else if (
-                                                transitionState.currentOverlays.isNotEmpty()
-                                            ) {
-                                                true to "overlay is shown"
-                                            } else if (
-                                                transitionState.currentScene == Scenes.Occluded
-                                            ) {
-                                                false to "occluded"
-                                            } else {
-                                                false to "scene is Gone and no overlays are shown"
-                                            }
-                                        }
-                                        is ObservableTransitionState.Transition -> {
-                                            true to "in transition"
-                                        }
-                                    }
+                reportEvents(deviceUnlockedInteractor.deviceUnlockStatus) {
+                    SceneInteractor.Event.DeviceUnlockChange(it.isUnlocked)
+                }
 
-                                when {
-                                    isCommunalShowing ->
-                                        true to "on or transitioning to/from communal"
-                                    isAnimatingSurface -> true to "animating surface behind"
-                                    isHeadsUpOrAnimatingAway -> true to "showing a HUN"
-                                    isAlternateBouncerVisible -> true to "showing alternate bouncer"
-                                    // We need to be visible during transitions, even if occlusion
-                                    // would otherwise result in being invisible, so that all
-                                    // transitions get a chance to complete.
-                                    inTransition && visibilityForTransitionState.first ->
-                                        true to visibilityForTransitionState.second
-                                    else -> visibilityForTransitionState
-                                }
-                            }
-                            .distinctUntilChanged()
-                    } else {
-                        flowOf(false to "Device not provisioned and unlocked")
-                    }
+                reportEvents(headsUpInteractor.isHeadsUpOrAnimatingAway) {
+                    SceneInteractor.Event.HeadsUpNotificationVisibilityChange(it)
                 }
-                .collect { (isVisible, loggingReason) ->
-                    sceneInteractor.setVisible(isVisible, loggingReason)
+
+                reportEvents(alternateBouncerInteractor.isVisible) {
+                    SceneInteractor.Event.AlternateBouncerVisibilityChange(it)
                 }
+
+                reportEvents(surfaceBehindInteractor.isAnimatingSurface) {
+                    SceneInteractor.Event.SurfaceBehindAnimationChange(it)
+                }
+            }
         }
     }
 
@@ -384,7 +333,6 @@ constructor(
         handleSimUnlock()
         handleDeviceUnlockStatus()
         handlePowerState()
-        handleShadeTouchability()
         handleDisableFlags()
     }
 
@@ -475,7 +423,7 @@ constructor(
             deviceUnlockedInteractor.deviceUnlockStatus
                 .map { deviceUnlockStatus ->
                     val (renderedScenes: List<SceneKey>, renderedOverlays: Set<OverlayKey>) =
-                        when (val transitionState = sceneInteractor.transitionState.value) {
+                        when (val transitionState = sceneInteractor.transitionStateFlow.value) {
                             is ObservableTransitionState.Idle ->
                                 listOf(transitionState.currentScene) to
                                     transitionState.currentOverlays
@@ -537,6 +485,10 @@ constructor(
                             if (isOnCommunal || isOnLockscreen || !leaveShadeOpen) {
                                 SwitchSceneCommand.SwitchToScene(
                                     targetSceneKey = Scenes.Gone,
+                                    transitionKey =
+                                        WithAnimationOverLockscreen.takeIf {
+                                            willAnimateDismissAction
+                                        },
                                     loggingReason =
                                         "device was unlocked while alternate bouncer" +
                                             " was showing and shade didn't need to be left open",
@@ -585,13 +537,32 @@ constructor(
                                         loggingReason = loggingReason,
                                         instantlySnapScenes = true,
                                     )
-                                } else if (willAnimateDismissAction) {
+                                } else if (
+                                    willAnimateDismissAction ||
+                                        // If we're switching to Gone mid-transition from Ls ->
+                                        // Bouncer, we'll want to animate the scene change to
+                                        // avoid a jump-cut from partially visible LS/Bouncer to
+                                        // Gone.
+                                        sceneInteractor.transitionStateFlow.value.isTransitioning(
+                                            from = Scenes.Lockscreen,
+                                            to = Overlays.Bouncer,
+                                        )
+                                ) {
+                                    // Do not snap to scene here or this will break the notification
+                                    // animation, but instantly hide the bouncer to prevent any
+                                    // unwanted overlap
+                                    sceneInteractor.instantlyHideOverlay(
+                                        Overlays.Bouncer,
+                                        "Instant hide bouncer for animation",
+                                    )
                                     SwitchSceneCommand.SwitchToScene(
                                         targetSceneKey = Scenes.Gone,
                                         hideOverlays = HideOverlayCommand.HideAll,
+                                        transitionKey =
+                                            WithAnimationOverLockscreen.takeIf {
+                                                willAnimateDismissAction
+                                            },
                                         loggingReason = loggingReason,
-                                        // Do not snap to scene here or this will break the
-                                        // notification animation
                                         instantlySnapScenes = false,
                                     )
                                 } else {
@@ -645,6 +616,16 @@ constructor(
                                     true ->
                                     SwitchSceneCommand.SwitchToScene(
                                         targetSceneKey = Scenes.Gone,
+                                        transitionKey =
+                                            when {
+                                                willAnimateDismissAction ->
+                                                    WithAnimationOverLockscreen
+                                                BiometricUnlockMode.isWakeAndDismiss(
+                                                    keyguardInteractor.biometricUnlockState.value
+                                                        .mode
+                                                ) -> AodToGoneTransition
+                                                else -> null
+                                            },
                                         loggingReason =
                                             "device was unlocked while lockscreen" +
                                                 " with bypass enabled or using an active" +
@@ -699,6 +680,7 @@ constructor(
                                 hideOverlays = command.hideOverlays,
                                 loggingReason = command.loggingReason,
                                 instantlySnapScenes = command.instantlySnapScenes,
+                                transitionKey = command.transitionKey,
                             )
                         }
                         is SwitchSceneCommand.NoOp -> Unit
@@ -709,36 +691,28 @@ constructor(
 
     private fun handlePowerState() {
         applicationScope.launch {
-            powerInteractor.detailedWakefulness.collect { wakefulness ->
-                // Detect a double-tap-power-button gesture that was started while the device was
-                // still awake.
-                if (wakefulness.isAsleep()) return@collect
-                if (!wakefulness.powerButtonLaunchGestureTriggered) return@collect
-                if (wakefulness.lastSleepReason != WakeSleepReason.POWER_BUTTON) return@collect
-
-                // If we're mid-transition from Gone to Lockscreen due to the first power button
-                // press, then unlock the device if needed and return to Gone.
-                val transition: ObservableTransitionState.Transition? =
-                    sceneInteractor.transitionState.value as? ObservableTransitionState.Transition
-
+            powerInteractor.powerButtonLaunchEvents.collect {
+                // If we were entered when the gesture started, we can unlock and return to Gone. We
+                // also should do this if we launched while not entered, but can wake directly to
+                // Gone (we should never end up Occluded in this case).
                 if (
-                    transition != null &&
-                        transition.fromContent == Scenes.Gone &&
-                        transition.toContent == Scenes.Lockscreen
+                    it == PowerButtonLaunchEvent.LAUNCH_FROM_ENTERED ||
+                        wakeDirectlyToGoneInteractor.canWakeDirectlyToGone.value
                 ) {
-                    // Immediately re-unlock the device - this is the first authoritative signal
-                    // that we've decided this is a power button launch gesture from Gone.
                     deviceUnlockedInteractor.unlockNowForPowerButtonGesture(
-                        "double-tap power gesture while coming from gone"
+                        "double-tap power gesture arrived and we were asleep/waking from " +
+                            "entered"
                     )
                     switchToScene(
                         targetSceneKey = Scenes.Gone,
                         loggingReason = "double-tap power gesture",
+                        instantlySnapScenes = true,
+                        forDoubleTapPowerGesture = true,
                     )
-                } else if (occlusionInteractor.shouldTransitionFromPowerButtonGesture()) {
+                } else if (it == PowerButtonLaunchEvent.LAUNCH_FROM_NOT_ENTERED) {
                     switchToScene(
                         Scenes.Occluded,
-                        "double tap power while not doing gone -> lockscreen",
+                        "double tap power while not entered when going to sleep",
                     )
                 }
             }
@@ -749,24 +723,23 @@ constructor(
                     alternateBouncerInteractor.hide()
                     dismissCallbackRegistry.notifyDismissCancelled()
                     val isAodAvailable = keyguardInteractor.isAodAvailable.value
-                    val isShadeAnyExpanded = shadeInteractor.isShadeAnyExpanded.value
 
                     switchToScene(
                         targetSceneKey = Scenes.Lockscreen,
                         loggingReason = "device is starting to sleep",
-                        transitionKey =
-                            ShadeExpandedToAlwaysOnDisplay.takeIf {
-                                isShadeAnyExpanded && isAodAvailable
-                            },
+                        transitionKey = ToAlwaysOnDisplay.takeIf { isAodAvailable },
                         keyguardState = getKeyguardStateForWakefulness(isAwake = false),
                         freezeAndAnimateToCurrentState = !isAodAvailable,
-                        instantlySnapScenes = isShadeAnyExpanded && isAodAvailable,
                     )
                 } else {
                     if (wakeDirectlyToGoneInteractor.canWakeDirectlyToGone.value) {
                         switchToScene(
                             targetSceneKey = Scenes.Gone,
-                            loggingReason = "device is waking up while we can wake directly to gone",
+                            loggingReason =
+                                "device is waking up while we can wake directly to gone",
+                            // If we're waking directly to Gone from DOZING (no AOD), there's
+                            // nothing visible on screen to animate out, so we should snap.
+                            instantlySnapScenes = !keyguardInteractor.isAodAvailable.value,
                         )
                     } else if (
                         authenticationInteractor.get().authenticationMethod.value ==
@@ -788,29 +761,26 @@ constructor(
                 }
             }
         }
-    }
 
-    private fun handleShadeTouchability() {
         applicationScope.launch {
-            repeatWhen(deviceEntryInteractor.isDeviceEntered.map { !it }) {
-                // Run logic only when the device isn't entered.
-                repeatWhen(
-                    sceneInteractor.transitionState.map { !it.isTransitioning(to = Scenes.Gone) }
-                ) {
-                    // Run logic only when not transitioning to gone.
-                    shadeInteractor.isShadeTouchable
-                        .distinctUntilChanged()
-                        .filter { !it }
-                        .collect {
-                            switchToScene(
-                                targetSceneKey = Scenes.Lockscreen,
-                                keyguardState = getKeyguardStateForWakefulness(isAwake = false),
-                                loggingReason =
-                                    "device became non-interactive (SceneContainerStartable)",
-                            )
-                        }
+            // Mainly used for tests that are frequently changing keyguard enabled state. There is a
+            // race condition on wake up, where checks for suppression happen on background threads
+            // that lead to calls to wakeDirectlyToGoneInteractor.canWakeDirectlyToGone.value
+            // retrieving the value too early. See [KeyguardEnabledInteractor#isKeyguardSuppressed]
+            combine(
+                    wakeDirectlyToGoneInteractor.shouldSuppressKeyguard,
+                    wakeDirectlyToGoneInteractor.canWakeDirectlyToGone,
+                    ::Pair,
+                )
+                .collect { (shouldSuppressKeyguard, canWakeDirectlyToGone) ->
+                    if (shouldSuppressKeyguard && canWakeDirectlyToGone) {
+                        switchToScene(
+                            targetSceneKey = Scenes.Gone,
+                            loggingReason = "keyguard suppressed and can wake to gone",
+                            instantlySnapScenes = !keyguardInteractor.isAodAvailable.value,
+                        )
+                    }
                 }
-            }
         }
     }
 
@@ -892,19 +862,21 @@ constructor(
     private fun hydrateSystemUiState() {
         applicationScope.launch {
             combine(
-                    sceneInteractor.transitionState
+                    sceneInteractor.transitionStateFlow
                         .mapNotNull { it as? ObservableTransitionState.Idle }
                         .distinctUntilChanged(),
-                    sceneInteractor.isVisible,
+                    sceneInteractor.isVisibleFlow,
                     shadePendingDisplayId,
                     sceneBackInteractor.backStack,
-                ) { idleState, isVisible, displayId, backStack ->
+                    shadeModeInteractor.shadeMode,
+                ) { idleState, isVisible, displayId, backStack, shadeMode ->
                     displayId to
                         SceneContainerPlugin.SceneContainerPluginState(
                             scene = idleState.currentScene,
                             sceneBehind = backStack.peek(),
                             overlays = idleState.currentOverlays,
                             isVisible = isVisible,
+                            shadeMode = shadeMode,
                         )
                 }
                 .map { (displayId, sceneContainerPluginState) ->
@@ -925,7 +897,7 @@ constructor(
 
     private fun hydrateWindowController() {
         applicationScope.launch {
-            sceneInteractor.transitionState
+            sceneInteractor.transitionStateFlow
                 .map {
                     !it.isIdle(Scenes.Gone) ||
                         // We must be idle on Gone here, so we check if the overlays are empty
@@ -936,7 +908,11 @@ constructor(
         }
 
         applicationScope.launch {
-            combine(deviceEntryInteractor.isDeviceEntered, sceneInteractor.transitionState, ::Pair)
+            combine(
+                    deviceEntryInteractor.isDeviceEntered,
+                    sceneInteractor.transitionStateFlow,
+                    ::Pair,
+                )
                 .map { (isDeviceEntered, transitionState) ->
                     !isDeviceEntered ||
                         transitionState.isTransitioningSets(
@@ -1019,7 +995,7 @@ constructor(
                 .map { !it.isUnlocked }
                 .flatMapLatest { isDeviceLocked ->
                     if (isDeviceLocked) {
-                        sceneInteractor.transitionState
+                        sceneInteractor.transitionStateFlow
                             .mapNotNull { it as? ObservableTransitionState.Idle }
                             .map { it.currentScene to it.currentOverlays }
                             .distinctUntilChanged()
@@ -1056,7 +1032,7 @@ constructor(
 
     private fun handleBouncerOverscroll() {
         applicationScope.launch {
-            sceneInteractor.transitionState
+            sceneInteractor.transitionStateFlow
                 // Only consider transitions.
                 .filterIsInstance<ObservableTransitionState.Transition>()
                 // Only consider user-initiated (e.g. drags) that go from bouncer to lockscreen.
@@ -1134,6 +1110,11 @@ constructor(
                             )
                         }
                     }
+                    if (!occluded) {
+                        sceneBackInteractor.removeOccludedSceneOnBackStack(
+                            reason = "removing occluded from backstack, if present"
+                        )
+                    }
                 }
         }
     }
@@ -1160,6 +1141,7 @@ constructor(
         freezeAndAnimateToCurrentState: Boolean = false,
         hideOverlays: HideOverlayCommand = HideOverlayCommand.HideAll,
         instantlySnapScenes: Boolean = false,
+        forDoubleTapPowerGesture: Boolean = false,
     ) {
         if (hideOverlays is HideSome) {
             hideOverlays.overlays.fastForEach { overlay ->
@@ -1168,12 +1150,22 @@ constructor(
         }
 
         if (instantlySnapScenes) {
-            sceneInteractor.snapToScene(
-                toScene = targetSceneKey,
-                keyguardState = keyguardState,
-                loggingReason = loggingReason,
-                hideAllOverlays = hideOverlays == HideOverlayCommand.HideAll,
-            )
+            if (forDoubleTapPowerGesture) {
+                // Special case to skip validation, since unlock flows may not emit by the time the
+                // scene transition starts.
+                sceneInteractor.snapToGoneForUnlockedPowerLaunchGesture(
+                    keyguardState = keyguardState,
+                    loggingReason = loggingReason,
+                    hideAllOverlays = hideOverlays == HideOverlayCommand.HideAll,
+                )
+            } else {
+                sceneInteractor.snapToScene(
+                    toScene = targetSceneKey,
+                    keyguardState = keyguardState,
+                    loggingReason = loggingReason,
+                    hideAllOverlays = hideOverlays == HideOverlayCommand.HideAll,
+                )
+            }
         } else {
             sceneInteractor.changeScene(
                 toScene = targetSceneKey,
@@ -1222,7 +1214,7 @@ constructor(
      */
     private fun refreshLockscreenEnabled() {
         applicationScope.launch {
-            sceneInteractor.transitionState
+            sceneInteractor.transitionStateFlow
                 .map { it.isTransitioning(to = Scenes.Lockscreen) }
                 .distinctUntilChanged()
                 .filter { it }
@@ -1289,19 +1281,26 @@ constructor(
         }
     }
 
-    private fun hydrateLockScreenUserManager() {
+    /**
+     * Handles showing the keyguard (but *not* locking) when a foldable device is folded when the
+     * "swipe up to continue using apps on fold" (or whatever that setting is currently called) is
+     * enabled.
+     *
+     * This should only happen if we're enabled, and unlike other reasons for showing keyguard while
+     * it's disabled, should not cause us to re-show keyguard when it's re-enabled if it was
+     * disabled when this request came in (since this wasn't explicitly a request to secure the
+     * device).
+     */
+    private fun showDismissibleKeyguardWhenFolded() {
         applicationScope.launch {
-            deviceUnlockedInteractor.deviceUnlockStatus
-                .map { it.isUnlocked }
-                .distinctUntilChanged()
+            keyguardShowWhileAwakeInteractor.showWhileAwakeEvents
+                .filter { it == ShowWhileAwakeReason.FOLDED_WITH_SWIPE_UP_TO_CONTINUE }
                 .collect {
-                    // If the device has just become locked, notify Notifications
-                    // so they can make sure redaction is immediately applied: b/440335509
-                    // If the device has just become UNlocked, *don't* notify Notifications,
-                    // because doing so will cause notifications to briefly flash the
-                    // unredacted version during the unlock animation: b/454362854
-                    if (!it) {
-                        lockscreenUserManager.updatePublicMode()
+                    if (
+                        keyguardEnabledInteractor.isKeyguardEnabled.value &&
+                            !occlusionInteractor.isKeyguardOccluded.value
+                    ) {
+                        switchToScene(Scenes.Lockscreen, "folded with swipe up to continue")
                     }
                 }
         }
@@ -1314,7 +1313,7 @@ constructor(
     private fun wakeFromDozingOnContentChange() {
         applicationScope.launch {
             launch {
-                sceneInteractor.transitionState
+                sceneInteractor.transitionStateFlow
                     .filter {
                         it.isTransitioning(from = Scenes.Lockscreen) ||
                             !it.isIdle(Scenes.Lockscreen)
@@ -1328,6 +1327,17 @@ constructor(
                     }
             }
         }
+    }
+
+    private fun maybeShowLockscreenOnStart() {
+        // This needs to happen immediately upon start(), we can't wait for onSystemReady,
+        // onBootCompleted, or any more reasonable events, since otherwise unlocked app content
+        // may be visible during boot. Once those events come through, the
+        // WindowManagerLockscreenVisibilityViewModel will take over.
+        windowManagerLockscreenVisibilityManager.setLockscreenShowing(
+            bootInteractor.showLockscreenOnBoot(),
+            "initial lockscreen visibility on start()",
+        )
     }
 
     /**
@@ -1357,6 +1367,7 @@ constructor(
             val loggingReason: String,
             val hideOverlays: HideOverlayCommand = HideOverlayCommand.HideAll,
             val instantlySnapScenes: Boolean = false,
+            val transitionKey: TransitionKey? = null,
         ) : SwitchSceneCommand
     }
 

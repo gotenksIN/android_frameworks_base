@@ -31,6 +31,7 @@ import static com.google.common.truth.Truth.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.eq;
@@ -64,11 +65,14 @@ import android.platform.test.flag.junit.SetFlagsRule;
 import android.provider.Settings;
 import android.testing.TestableLooper;
 import android.util.ArraySet;
+import android.view.MenuInflater;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.view.WindowMetrics;
 import android.view.accessibility.AccessibilityManager;
+import android.widget.PopupMenu;
 
 import androidx.dynamicanimation.animation.DynamicAnimation;
 import androidx.dynamicanimation.animation.SpringAnimation;
@@ -82,7 +86,11 @@ import com.android.settingslib.bluetooth.HearingAidDeviceManager;
 import com.android.systemui.Flags;
 import com.android.systemui.SysuiTestCase;
 import com.android.systemui.SysuiTestableContext;
+import com.android.systemui.accessibility.Magnification;
+import com.android.systemui.accessibility.floatingmenu.MenuViewLayer.LayerIndex;
 import com.android.systemui.accessibility.utils.TestUtils;
+import com.android.systemui.inputdevice.data.repository.FakePointerDeviceRepository;
+import com.android.systemui.keyboard.data.repository.FakeKeyboardRepository;
 import com.android.systemui.navigationbar.NavigationModeController;
 import com.android.systemui.res.R;
 import com.android.systemui.util.settings.SecureSettings;
@@ -111,8 +119,8 @@ public class MenuViewLayerTest extends SysuiTestCase {
     private static final String SELECT_TO_SPEAK_PACKAGE_NAME = "com.google.android.marvin.talkback";
     private static final String SELECT_TO_SPEAK_SERVICE_NAME =
             "com.google.android.accessibility.selecttospeak.SelectToSpeakService";
-    private static final ComponentName TEST_SELECT_TO_SPEAK_COMPONENT_NAME = new ComponentName(
-            SELECT_TO_SPEAK_PACKAGE_NAME, SELECT_TO_SPEAK_SERVICE_NAME);
+    private static final ComponentName TEST_SELECT_TO_SPEAK_COMPONENT_NAME =
+            new ComponentName(SELECT_TO_SPEAK_PACKAGE_NAME, SELECT_TO_SPEAK_SERVICE_NAME);
 
     private static final int DISPLAY_WINDOW_WIDTH = 1080;
     private static final int DISPLAY_WINDOW_HEIGHT = 2340;
@@ -135,18 +143,12 @@ public class MenuViewLayerTest extends SysuiTestCase {
     @Rule
     public SetFlagsRule mSetFlagsRule = new SetFlagsRule();
 
-    @Spy
-    private SysuiTestableContext mSpyContext = getContext();
-    @Mock
-    private IAccessibilityFloatingMenu mFloatingMenu;
-    @Mock
-    private WindowManager mStubWindowManager;
-    @Mock
-    private AccessibilityManager mStubAccessibilityManager;
-    @Mock
-    private HearingAidDeviceManager mHearingAidDeviceManager;
-    @Mock
-    private PackageManager mMockPackageManager;
+    @Spy private SysuiTestableContext mSpyContext = getContext();
+    @Mock private IAccessibilityFloatingMenu mFloatingMenu;
+    @Mock private WindowManager mStubWindowManager;
+    @Mock private AccessibilityManager mStubAccessibilityManager;
+    @Mock private HearingAidDeviceManager mHearingAidDeviceManager;
+    @Mock private PackageManager mMockPackageManager;
     private final SecureSettings mSecureSettings = TestUtils.mockSecureSettings(mContext);
 
     private final NotificationManager mMockNotificationManager = mock(NotificationManager.class);
@@ -158,26 +160,54 @@ public class MenuViewLayerTest extends SysuiTestCase {
     public void setUp() throws Exception {
         mSpyContext.addMockSystemService(Context.NOTIFICATION_SERVICE, mMockNotificationManager);
 
+        FakeKeyboardRepository keyboardRepository = new FakeKeyboardRepository();
+        FakePointerDeviceRepository pointerDeviceRepository = new FakePointerDeviceRepository();
+
         final Rect mDisplayBounds = new Rect();
-        mDisplayBounds.set(/* left= */ 0, /* top= */ 0, DISPLAY_WINDOW_WIDTH,
-                DISPLAY_WINDOW_HEIGHT);
-        mWindowMetrics = spy(
-                new WindowMetrics(mDisplayBounds, fakeDisplayInsets(), /* density = */ 0.0f));
+        mDisplayBounds.set(
+                /* left= */ 0, /* top= */ 0, DISPLAY_WINDOW_WIDTH, DISPLAY_WINDOW_HEIGHT);
+        mWindowMetrics =
+                spy(new WindowMetrics(mDisplayBounds, fakeDisplayInsets(), /* density= */ 0.0f));
         doReturn(mWindowMetrics).when(mStubWindowManager).getCurrentWindowMetrics();
 
-        mMenuViewModel = new MenuViewModel(
-                mSpyContext, mStubAccessibilityManager, mSecureSettings, mHearingAidDeviceManager);
-        MenuViewAppearance menuViewAppearance = new MenuViewAppearance(
-                mSpyContext, mStubWindowManager);
-        mMenuView = spy(
-                new MenuView(mSpyContext, mMenuViewModel, menuViewAppearance, mSecureSettings));
+        mMenuViewModel =
+                spy(
+                        new MenuViewModel(
+                                mSpyContext,
+                                mStubAccessibilityManager,
+                                mSecureSettings,
+                                mHearingAidDeviceManager,
+                                keyboardRepository,
+                                pointerDeviceRepository));
+        MenuViewAppearance menuViewAppearance =
+                new MenuViewAppearance(mSpyContext, mStubWindowManager);
+        mMenuView =
+                spy(
+                        new MenuView(
+                                mSpyContext,
+                                mMenuViewModel,
+                                menuViewAppearance,
+                                mSecureSettings,
+                                mock(Magnification.class)));
         // Ensure tests don't actually update metrics.
         doNothing().when(mMenuView).incrementTexMetric(any());
 
-        mMenuViewLayer = spy(new MenuViewLayer(mSpyContext, mStubWindowManager,
-                mStubAccessibilityManager, mMenuViewModel, menuViewAppearance, mMenuView,
-                mFloatingMenu, mSecureSettings, mock(NavigationModeController.class)));
-        mMenuAnimationController = mMenuView.getMenuAnimationController();
+        MenuAnimationController realController = mMenuView.getMenuAnimationController();
+        mMenuAnimationController = spy(realController);
+        doReturn(mMenuAnimationController).when(mMenuView).getMenuAnimationController();
+
+        mMenuViewLayer =
+                spy(
+                        new MenuViewLayer(
+                                mSpyContext,
+                                mStubWindowManager,
+                                mStubAccessibilityManager,
+                                mMenuViewModel,
+                                menuViewAppearance,
+                                mMenuView,
+                                mFloatingMenu,
+                                mSecureSettings,
+                                mock(NavigationModeController.class)));
 
         doNothing().when(mSpyContext).startActivity(any());
         doNothing().when(mSpyContext).startActivityAsUser(any(), any());
@@ -424,6 +454,75 @@ public class MenuViewLayerTest extends SysuiTestCase {
         assertThat(mMenuViewModel.getDockTooltipVisibilityData().getValue()).isFalse();
     }
 
+    @Test
+    public void onMoreOptionsClicked_edit_dispatchesEditAction() {
+        final View mockView = mock(View.class);
+        final PopupMenu mockPopupMenu = mock(PopupMenu.class);
+        final MenuInflater mockMenuInflater = mock(MenuInflater.class);
+        final ArgumentCaptor<PopupMenu.OnMenuItemClickListener> listenerCaptor =
+                ArgumentCaptor.forClass(PopupMenu.OnMenuItemClickListener.class);
+        final MenuItem mockMenuItem = mock(MenuItem.class);
+        when(mockMenuItem.getItemId()).thenReturn(R.id.action_edit);
+        when(mockPopupMenu.getMenu()).thenReturn(mock(android.view.Menu.class));
+        when(mockPopupMenu.getMenuInflater()).thenReturn(mockMenuInflater);
+        doReturn(mockPopupMenu).when(mMenuViewLayer).createPopupMenu(any(), eq(mockView));
+
+        mMenuViewLayer.onMoreOptionsClicked(mockView);
+
+        verify(mockPopupMenu).getMenuInflater();
+        verify(mockMenuInflater).inflate(eq(R.menu.more_options_menu), any());
+        verify(mockPopupMenu).show();
+        verify(mockPopupMenu).setOnMenuItemClickListener(listenerCaptor.capture());
+        listenerCaptor.getValue().onMenuItemClick(mockMenuItem);
+        verify(mMenuViewLayer).gotoEditScreen();
+    }
+
+    @Test
+    public void onMoreOptionsClicked_move_cyclesPosition() {
+        final View mockView = mock(View.class);
+        final PopupMenu mockPopupMenu = mock(PopupMenu.class);
+        final MenuInflater mockMenuInflater = mock(MenuInflater.class);
+        final ArgumentCaptor<PopupMenu.OnMenuItemClickListener> listenerCaptor =
+                ArgumentCaptor.forClass(PopupMenu.OnMenuItemClickListener.class);
+        final MenuItem mockMenuItem = mock(MenuItem.class);
+        when(mockMenuItem.getItemId()).thenReturn(R.id.action_move);
+        when(mockPopupMenu.getMenu()).thenReturn(mock(android.view.Menu.class));
+        when(mockPopupMenu.getMenuInflater()).thenReturn(mockMenuInflater);
+        doReturn(mockPopupMenu).when(mMenuViewLayer).createPopupMenu(any(), eq(mockView));
+
+        mMenuViewLayer.onMoreOptionsClicked(mockView);
+
+        verify(mockPopupMenu).getMenuInflater();
+        verify(mockMenuInflater).inflate(eq(R.menu.more_options_menu), any());
+        verify(mockPopupMenu).setOnMenuItemClickListener(listenerCaptor.capture());
+        listenerCaptor.getValue().onMenuItemClick(mockMenuItem);
+        verify(mockPopupMenu).show();
+        verify(mMenuViewModel).cycleMenuPosition();
+    }
+
+    @Test
+    public void onMoreOptionsClicked_removeAll_dismissesMenu() {
+        final View mockView = mock(View.class);
+        final PopupMenu mockPopupMenu = mock(PopupMenu.class);
+        final MenuInflater mockMenuInflater = mock(MenuInflater.class);
+        final ArgumentCaptor<PopupMenu.OnMenuItemClickListener> listenerCaptor =
+                ArgumentCaptor.forClass(PopupMenu.OnMenuItemClickListener.class);
+        final MenuItem mockMenuItem = mock(MenuItem.class);
+        when(mockMenuItem.getItemId()).thenReturn(R.id.action_remove_all);
+        when(mockPopupMenu.getMenu()).thenReturn(mock(android.view.Menu.class));
+        when(mockPopupMenu.getMenuInflater()).thenReturn(mockMenuInflater);
+        doReturn(mockPopupMenu).when(mMenuViewLayer).createPopupMenu(any(), eq(mockView));
+
+        mMenuViewLayer.onMoreOptionsClicked(mockView);
+
+        verify(mockPopupMenu).getMenuInflater();
+        verify(mockMenuInflater).inflate(eq(R.menu.more_options_menu), any());
+        verify(mockPopupMenu).setOnMenuItemClickListener(listenerCaptor.capture());
+        listenerCaptor.getValue().onMenuItemClick(mockMenuItem);
+        verify(mockPopupMenu).show();
+        verify(mFloatingMenu).hide();
+    }
+
     /** Simplified AccessibilityTarget for testing MenuViewLayer. */
     private static class TestAccessibilityTarget extends AccessibilityTarget {
         TestAccessibilityTarget(Context context, int uid) {
@@ -521,4 +620,53 @@ public class MenuViewLayerTest extends SysuiTestCase {
                 any(), any(PackageManager.ResolveInfoFlags.class))).thenReturn(resolveInfos);
     }
 
+    @Test
+    public void cycleMenuPosition_triggersCorrectMovementsInSequence() {
+        clearInvocations(mMenuAnimationController);
+
+        mMenuViewModel.cycleMenuPosition();
+        verify(mMenuAnimationController).moveToBottomLeftPosition();
+        clearInvocations(mMenuAnimationController);
+
+        mMenuViewModel.cycleMenuPosition();
+        verify(mMenuAnimationController).moveToTopLeftPosition();
+        clearInvocations(mMenuAnimationController);
+
+        mMenuViewModel.cycleMenuPosition();
+        verify(mMenuAnimationController).moveToTopRightPosition();
+        clearInvocations(mMenuAnimationController);
+
+        mMenuViewModel.cycleMenuPosition();
+        verify(mMenuAnimationController).moveToBottomRightPosition();
+        clearInvocations(mMenuAnimationController);
+
+        mMenuViewModel.cycleMenuPosition();
+        verify(mMenuAnimationController).moveToBottomLeftPosition();
+    }
+
+    @Test
+    public void onAttachedToWindow_initialState_doesNotTriggerSnapToCorner() {
+        verify(mMenuAnimationController, never()).moveToTopLeftPosition();
+        verify(mMenuAnimationController, never()).moveToTopRightPosition();
+        verify(mMenuAnimationController, never()).moveToBottomLeftPosition();
+        verify(mMenuAnimationController, never()).moveToBottomRightPosition();
+    }
+
+    @Test
+    public void cycleThenDragThenAttach_staysAtDragPosition() {
+        mMenuViewModel.cycleMenuPosition();
+        verify(mMenuAnimationController).moveToBottomLeftPosition();
+        clearInvocations(mMenuAnimationController);
+
+        PointF dragPosition = new PointF(500, 500);
+        mMenuAnimationController.moveAndPersistPosition(dragPosition);
+
+        mMenuViewLayer.onDetachedFromWindow();
+        mMenuViewLayer.onAttachedToWindow();
+
+        verify(mMenuAnimationController, never()).moveToTopLeftPosition();
+        verify(mMenuAnimationController, never()).moveToTopRightPosition();
+        verify(mMenuAnimationController, never()).moveToBottomLeftPosition();
+        verify(mMenuAnimationController, never()).moveToBottomRightPosition();
+    }
 }

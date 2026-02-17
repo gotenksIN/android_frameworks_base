@@ -35,8 +35,6 @@ import static android.view.InsetsSource.ID_IME;
 import static android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE;
 import static android.view.WindowManager.LayoutParams.TYPE_INPUT_METHOD;
 
-import static com.android.window.flags.Flags.relativeInsets;
-
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.ActivityTaskManager;
@@ -419,23 +417,6 @@ class InsetsPolicy {
             }
         }
 
-        if (!relativeInsets() && (!attrs.isFullscreen() || attrs.getFitInsetsTypes() != 0)) {
-            if (state == originalState) {
-                state = new InsetsState(originalState);
-            }
-            // Explicitly exclude floating windows from receiving caption insets. This is because we
-            // hard code caption insets for windows due to a synchronization issue that leads to
-            // flickering that bypasses insets frame calculation, which consequently needs us to
-            // remove caption insets from floating windows.
-            // TODO(b/254128050): Remove this workaround after we find a way to update window frames
-            //  and caption insets frames simultaneously.
-            for (int i = state.sourceSize() - 1; i >= 0; i--) {
-                if (state.sourceAt(i).getType() == Type.captionBar()) {
-                    state.removeSourceAt(i);
-                }
-            }
-        }
-
         final SparseArray<InsetsSourceProvider> providers = mStateController.getSourceProviders();
         final int windowType = attrs.type;
         for (int i = providers.size() - 1; i >= 0; i--) {
@@ -464,6 +445,9 @@ class InsetsPolicy {
             }
             final InsetsState newState = new InsetsState();
             newState.set(state, types);
+            if ((types & WindowInsets.Type.displayCutout()) == 0) {
+                newState.setDisplayCutout(DisplayCutout.NO_CUTOUT);
+            }
             state = newState;
         }
 

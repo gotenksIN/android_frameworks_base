@@ -16,6 +16,7 @@
 
 package com.android.systemui.statusbar.quickactions.av.ui.viewmodel
 
+import com.android.systemui.display.dagger.SystemUIDisplaySubcomponent.DisplayAware
 import com.android.systemui.lifecycle.HydratedActivatable
 import com.android.systemui.statusbar.quickactions.av.domain.interactor.AvControlsChipInteractor
 import com.android.systemui.statusbar.quickactions.av.domain.interactor.DesktopEffectInteractor
@@ -30,7 +31,7 @@ import kotlinx.coroutines.flow.map
 class AvControlsPanelContentViewModel
 @AssistedInject
 constructor(
-    val avControlsChipInteractor: AvControlsChipInteractor,
+    @DisplayAware val avControlsChipInteractor: AvControlsChipInteractor,
     val desktopEffectInteractor: DesktopEffectInteractor,
     val sensorActivityViewModelFactory: SensorActivityViewModel.Factory,
     val cameraGlobalSwitchViewModelFactory: CameraGlobalSwitchViewModel.Factory,
@@ -88,7 +89,8 @@ constructor(
 
     /** True if live captions button should be displayed */
     val showLiveCaptionsButton: Boolean by
-        showControl(Sensor.MICROPHONE) { it.liveCaptionsSupported }
+        desktopEffectInteractor.model
+            .map { it.liveCaptionsSupported }
             .hydratedStateOf(initialValue = false)
 
     /** A factory to be used to create view model instances. */

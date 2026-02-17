@@ -54,8 +54,6 @@ import android.graphics.Insets;
 import android.graphics.Rect;
 import android.os.Binder;
 import android.os.RemoteException;
-import android.platform.test.annotations.DisableFlags;
-import android.platform.test.annotations.EnableFlags;
 import android.platform.test.annotations.Presubmit;
 import android.view.DisplayCutout;
 import android.util.proto.ProtoOutputStream;
@@ -70,7 +68,6 @@ import android.view.WindowInsets.Type.InsetsType;
 import androidx.test.filters.SmallTest;
 
 import com.android.server.statusbar.StatusBarManagerInternal;
-import com.android.window.flags.Flags;
 
 import com.google.protobuf.InvalidProtocolBufferException;
 
@@ -125,22 +122,6 @@ public class InsetsPolicyTest extends WindowTestsBase {
     }
 
     @Test
-    @DisableFlags(Flags.FLAG_ENABLE_FULLY_IMMERSIVE_IN_DESKTOP)
-    public void testControlsForDispatch_freeformTaskVisible() {
-        addStatusBar();
-        addNavigationBar();
-
-        final WindowState win = newWindowBuilder("app", TYPE_APPLICATION).setActivityType(
-                ACTIVITY_TYPE_STANDARD).setWindowingMode(WINDOWING_MODE_FREEFORM).setDisplay(
-                mDisplayContent).build();
-        final InsetsSourceControl[] controls = addWindowAndGetControlsForDispatch(win);
-
-        // The app must not control any system bars.
-        assertNull(controls);
-    }
-
-    @Test
-    @EnableFlags(Flags.FLAG_ENABLE_FULLY_IMMERSIVE_IN_DESKTOP)
     public void testControlsForDispatch_fullscreenFreeformTaskVisible() {
         addStatusBar();
         addNavigationBar();
@@ -157,7 +138,6 @@ public class InsetsPolicyTest extends WindowTestsBase {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_FULLY_IMMERSIVE_IN_DESKTOP)
     public void testControlsForDispatch_nonFullscreenFreeformTaskVisible() {
         addStatusBar();
         addNavigationBar();
@@ -1010,6 +990,30 @@ public class InsetsPolicyTest extends WindowTestsBase {
         assertNull("Pinned window should not get IME insets", resultState.peekSource(ID_IME));
     }
 
+    @SetupWindows(addWindows = W_ACTIVITY)
+    @Test
+    public void testEnforceInsetsPolicyForTarget_pinnedWindow() {
+        final int displayCutoutId = InsetsSource.createId(this, 0, displayCutout());
+        final InsetsState originalState = new InsetsState();
+        originalState.getOrCreateSource(displayCutoutId, displayCutout());
+        originalState.setDisplayCutout(
+                new DisplayCutout(
+                        Insets.of(0, 10, 0, 0),
+                        null,
+                        new Rect(0, 0, 10, 10),
+                        null,
+                        null));
+        mAppWindow.setWindowingMode(WINDOWING_MODE_PINNED);
+        final InsetsPolicy policy = mDisplayContent.getInsetsPolicy();
+        final InsetsState newState = policy.enforceInsetsPolicyForTarget(mAppWindow, originalState);
+        assertNull(
+                "Pinned window must not get display cutout insets.",
+                newState.peekSource(displayCutoutId));
+        assertEquals(
+                "Pinned window must not get display cutout.",
+                DisplayCutout.NO_CUTOUT,
+                newState.getDisplayCutout());
+    }
 
     private WindowState addNavigationBar() {
         final Binder owner = new Binder();

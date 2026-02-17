@@ -121,6 +121,9 @@ public class SliderPreference extends Preference {
             mTrackingTouch = false;
             if ((int) slider.getValue() != mSliderValue) {
                 syncValueInternal(slider);
+
+                // After slider is dragged, also update start and end buttons
+                notifyChanged();
             }
             if (mExtraTouchListener != null) {
                 mExtraTouchListener.onStopTrackingTouch(slider);
@@ -749,7 +752,10 @@ public class SliderPreference extends Preference {
 
         iconFrame.setOnClickListener((view) -> {
             if (mSliderValue > mMin) {
-                setValue(mSliderValue - mSliderIncrement);
+                final int newValue = mSliderValue - mSliderIncrement;
+                if (callChangeListener(newValue)) {
+                    setValue(newValue);
+                }
             }
         });
 
@@ -783,7 +789,10 @@ public class SliderPreference extends Preference {
 
         iconFrame.setOnClickListener((view) -> {
             if (mSliderValue < mMax) {
-                setValue(mSliderValue + mSliderIncrement);
+                final int newValue = mSliderValue + mSliderIncrement;
+                if (callChangeListener(newValue)) {
+                    setValue(newValue);
+                }
             }
         });
 

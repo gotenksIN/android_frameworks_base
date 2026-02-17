@@ -41,7 +41,6 @@ import static com.google.common.truth.Truth.assertThat;
 
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.AdditionalMatchers.not;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyLong;
@@ -60,6 +59,7 @@ import static org.mockito.Mockito.when;
 
 import android.annotation.SuppressLint;
 import android.app.ActivityOptions;
+import android.app.AppInteractionAttribution;
 import android.app.AppOpsManager;
 import android.app.IApplicationThread;
 import android.companion.virtual.ActivityPolicyExemption;
@@ -165,6 +165,11 @@ public class ComputerControlSessionImplTest {
             TARGET_CLASS);
     private static final ComponentName BLOCKED_COMPONENT = new ComponentName(
             UNDECLARED_TARGET_PACKAGE, ".Activity");
+    private static final AppInteractionAttribution APP_INTERACTION_ATTRIBUTION =
+            new AppInteractionAttribution.Builder(
+                            AppInteractionAttribution.INTERACTION_TYPE_USER_QUERY)
+                    .build();
+
     @FunctionalInterface
     private interface Interactor {
         void interact(ComputerControlSessionImpl t) throws Exception;
@@ -253,6 +258,8 @@ public class ComputerControlSessionImplTest {
     private ArgumentCaptor<VirtualDeviceManager.ActivityListener> mActivityListenerArgumentCaptor;
     @Captor
     private ArgumentCaptor<SurfaceControl> mSurfaceControlArgumentCaptor;
+    @Captor
+    private ArgumentCaptor<Consumer<Boolean>> mWindowsDrawnCallbackCaptor;
 
     private SurfaceControl.Transaction mTransaction;
     private AutoCloseable mMockitoSession;
@@ -262,6 +269,7 @@ public class ComputerControlSessionImplTest {
             new ComputerControlSessionParams.Builder()
                     .setName(ComputerControlSessionImplTest.class.getSimpleName())
                     .setTargetPackageNames(TARGET_PACKAGE_NAMES)
+                    .setAppInteractionAttribution(APP_INTERACTION_ATTRIBUTION)
                     .build();
     private final Context mContext =
             spy(new ContextWrapper(
@@ -594,12 +602,6 @@ public class ComputerControlSessionImplTest {
     }
 
     @Test
-    public void createSession_setsForceShowTouchesOnDisplay() {
-        createComputerControlSession(mDefaultParams);
-        verify(mInputManagerInternal).setForceShowTouchesOnDisplay(VIRTUAL_DISPLAY_ID, true);
-    }
-
-    @Test
     public void launchApplication_launchesApplication() throws RemoteException {
         createComputerControlSession(mDefaultParams);
         when(mOwnerPackageManager.queryIntentActivities(any(), any()))
@@ -794,6 +796,7 @@ public class ComputerControlSessionImplTest {
         verify(returnedMirrorSurface).copyFrom(eq(mSurfaceControlArgumentCaptor.getValue()), any());
         assertThat(mSurfaceControlArgumentCaptor.getValue()).isNotEqualTo(mirrorSurface);
         verify(mTransaction).setDropInputMode(eq(mirrorSurface), eq(DropInputMode.ALL));
+        verify(mInputManagerInternal).setForceShowTouchesOnDisplay(VIRTUAL_DISPLAY_ID, true);
     }
 
     @Test
@@ -826,6 +829,7 @@ public class ComputerControlSessionImplTest {
 
         verify(displayMirror).close();
         verify(mTransaction).remove(mSurfaceControlArgumentCaptor.getValue());
+        verify(mInputManagerInternal).setForceShowTouchesOnDisplay(VIRTUAL_DISPLAY_ID, false);
     }
 
     @Test
@@ -836,6 +840,7 @@ public class ComputerControlSessionImplTest {
                 .thenReturn(displayMirror1);
         IInteractiveMirror mirror1 = mSession.createInteractiveMirror(new SurfaceControl());
         assertThat(mirror1).isNotNull();
+        verify(mInputManagerInternal).setForceShowTouchesOnDisplay(VIRTUAL_DISPLAY_ID, true);
         final var displayMirror2 = mockDisplayMirror();
         when(mWindowManagerInternal.createMirrorForDisplayContent(VIRTUAL_DISPLAY_ID))
                 .thenReturn(displayMirror2);
@@ -848,6 +853,7 @@ public class ComputerControlSessionImplTest {
 
         verify(displayMirror1).close();
         verify(displayMirror2).close();
+        verify(mInputManagerInternal).setForceShowTouchesOnDisplay(VIRTUAL_DISPLAY_ID, false);
     }
 
     @Test
@@ -939,7 +945,7 @@ public class ComputerControlSessionImplTest {
                 .noteAppInteraction(
                         eq(AGENT_PACKAGE),
                         eq(TEST_COMPONENT.getPackageName()),
-                        isNull(),
+                        eq(APP_INTERACTION_ATTRIBUTION),
                         anyLong(),
                         eq(USER_ID));
     }
@@ -1096,25 +1102,26 @@ public class ComputerControlSessionImplTest {
     }
 
     @Test
-    public void notifyActivityListener_beforeInitialization_setsNullSurface()
+    public void notifyActivityListener_beforeInitialization_doesNotSetSurface()
             throws RemoteException {
         createComputerControlSessionWithoutInitializing(mDefaultParams, GLOBAL_TIMEOUT_MILLIS);
         verify(mVirtualDevice).addActivityListener(any(),
                 mActivityListenerArgumentCaptor.capture());
 
         mActivityListenerArgumentCaptor.getValue().onDisplayEmpty(VIRTUAL_DISPLAY_ID);
-        verify(mVirtualDisplay).setSurface(isNull());
+        verify(mVirtualDisplay, never()).setSurface(any());
     }
 
     @Test
-    public void blockedState_updatesDisplaySurface() throws Exception {
+    public void blockedState_doesNotUpdateDisplaySurface() throws Exception {
         createComputerControlSession(mDefaultParams);
         clearInvocations(mVirtualDisplay);
 
         try (InBlockedState inBlockedState = new InBlockedState()) {
-            verify(mVirtualDisplay).setSurface(not(eq(mClientSurface)));
+            // Entering the blocked state should not trigger a new surface update
+            verify(mVirtualDisplay, never()).setSurface(any());
         }
-        verify(mVirtualDisplay).setSurface(eq(mClientSurface));
+        verify(mVirtualDisplay, never()).setSurface(any());
     }
 
     @Test
@@ -1204,6 +1211,139 @@ public class ComputerControlSessionImplTest {
         verify(mLifecycleCallback,
                 timeout(CLOSE_ON_DISPLAY_EMPTY_TIMEOUT_MS * 2).times(0))
                 .onClosed(anyInt());
+    }
+
+    @Test
+    public void requestScreenshot_enablesHardwareRendererOutput() throws RemoteException {
+        createComputerControlSession(mDefaultParams);
+        when(mWindowManagerInternal.requestHardwareRendererOutputEnabled(anyInt(), anyLong(), any(),
+                any())).thenReturn(true);
+
+        boolean result = mSession.requestScreenshot();
+
+        assertThat(result).isTrue();
+        verify(mWindowManagerInternal).requestHardwareRendererOutputEnabled(eq(VIRTUAL_DISPLAY_ID),
+                eq(1000L), any(), any());
+    }
+
+    @Test
+    public void requestScreenshot_inBlockedState_returnsTrue() throws Exception {
+        createComputerControlSession(mDefaultParams);
+
+        when(mWindowManagerInternal.requestHardwareRendererOutputEnabled(
+                anyInt(), anyLong(), any(), any())).thenReturn(true);
+
+        try (InBlockedState inBlockedState = new InBlockedState()) {
+            boolean result = mSession.requestScreenshot();
+            assertThat(result).isTrue();
+            verify(mWindowManagerInternal).requestHardwareRendererOutputEnabled(
+                    eq(VIRTUAL_DISPLAY_ID), anyLong(), any(), any());
+        }
+    }
+
+    @Test
+    public void requestScreenshot_alreadyWaiting_returnsFalse() throws RemoteException {
+        createComputerControlSession(mDefaultParams);
+        when(mWindowManagerInternal.requestHardwareRendererOutputEnabled(anyInt(), anyLong(), any(),
+                any())).thenReturn(true);
+
+        mSession.requestScreenshot();
+        boolean result = mSession.requestScreenshot();
+
+        assertThat(result).isFalse();
+        verify(mWindowManagerInternal, times(1)).requestHardwareRendererOutputEnabled(
+                anyInt(), anyLong(), any(), any());
+    }
+
+    @Test
+    public void requestScreenshot_callbackDisablesHardwareRendererOutput() throws RemoteException {
+        createComputerControlSession(mDefaultParams);
+        when(mWindowManagerInternal.requestHardwareRendererOutputEnabled(anyInt(), anyLong(), any(),
+                any())).thenReturn(true);
+
+        mSession.requestScreenshot();
+
+        verify(mWindowManagerInternal).requestHardwareRendererOutputEnabled(anyInt(), anyLong(),
+                mWindowsDrawnCallbackCaptor.capture(), any());
+
+        Consumer<Boolean> callback = mWindowsDrawnCallbackCaptor.getValue();
+        callback.accept(true);
+
+        verify(mWindowManagerInternal)
+                .requestHardwareRendererOutputDisabled(eq(VIRTUAL_DISPLAY_ID));
+
+        // Should be able to request again
+        mSession.requestScreenshot();
+        verify(mWindowManagerInternal, times(2)).requestHardwareRendererOutputEnabled(
+                anyInt(), anyLong(), any(), any());
+    }
+
+    @Test
+    public void requestScreenshot_withInteractiveMirror_doesNotDisableHardwareRendererOutput()
+            throws Exception {
+        createComputerControlSession(mDefaultParams);
+        when(mWindowManagerInternal.requestHardwareRendererOutputEnabled(anyInt(), anyLong(), any(),
+                any())).thenReturn(true);
+        setupMockMirror();
+
+        IInteractiveMirror mirror = mSession.createInteractiveMirror(new SurfaceControl());
+        assertThat(mirror).isNotNull();
+
+        mSession.requestScreenshot();
+        verify(mWindowManagerInternal, times(2)).requestHardwareRendererOutputEnabled(
+                anyInt(), anyLong(), mWindowsDrawnCallbackCaptor.capture(), any());
+
+        Consumer<Boolean> callback = mWindowsDrawnCallbackCaptor.getValue();
+        callback.accept(true);
+
+        verify(mWindowManagerInternal, never()).requestHardwareRendererOutputDisabled(anyInt());
+    }
+
+    @Test
+    public void createInteractiveMirror_enablesHardwareRendererOutput() throws Exception {
+        createComputerControlSession(mDefaultParams);
+        setupMockMirror();
+
+        mSession.createInteractiveMirror(new SurfaceControl());
+
+        verify(mWindowManagerInternal).requestHardwareRendererOutputEnabled(eq(VIRTUAL_DISPLAY_ID),
+                eq(0L), any(), any());
+    }
+
+    @Test
+    public void closeInteractiveMirror_disablesHardwareRendererOutput() throws Exception {
+        createComputerControlSession(mDefaultParams);
+        setupMockMirror();
+        IInteractiveMirror mirror = mSession.createInteractiveMirror(new SurfaceControl());
+        clearInvocations(mWindowManagerInternal);
+
+        mirror.close();
+
+        verify(mWindowManagerInternal)
+                .requestHardwareRendererOutputDisabled(eq(VIRTUAL_DISPLAY_ID));
+    }
+
+    @Test
+    public void closeInteractiveMirror_pendingScreenshot_doesNotDisableHardwareRendererOutput()
+            throws Exception {
+        createComputerControlSession(mDefaultParams);
+        when(mWindowManagerInternal.requestHardwareRendererOutputEnabled(anyInt(), anyLong(), any(),
+                any())).thenReturn(true);
+        setupMockMirror();
+
+        IInteractiveMirror mirror = mSession.createInteractiveMirror(new SurfaceControl());
+        mSession.requestScreenshot();
+        clearInvocations(mWindowManagerInternal);
+
+        mirror.close();
+
+        verify(mWindowManagerInternal, never()).requestHardwareRendererOutputDisabled(anyInt());
+    }
+
+    private void setupMockMirror() {
+        WindowManagerInternal.DisplayMirror displayMirror = mockDisplayMirror();
+        when(mWindowManagerInternal.createMirrorForDisplayContent(VIRTUAL_DISPLAY_ID))
+                .thenReturn(displayMirror);
     }
 
     /** A default way to enter the blocked state to test block state functionality. */

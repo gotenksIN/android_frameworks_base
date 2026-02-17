@@ -16,11 +16,11 @@
 
 package com.android.wm.shell.flicker.bubbles.testcase
 
-import androidx.test.filters.FlakyTest
 import com.android.wm.shell.flicker.bubbles.utils.BubbleFlickerSubjects
 import com.android.wm.shell.flicker.bubbles.utils.FlickerAssertionHelper.assertLayerAlphaChangeConsistently
 import com.android.wm.shell.flicker.bubbles.utils.FlickerAssertionHelper.assertLayerMoveInSingleDirection
 import com.android.wm.shell.flicker.bubbles.utils.FlickerAssertionHelper.assertLayerResizeConsistently
+import org.junit.Assume.assumeTrue
 import org.junit.Test
 
 /**
@@ -66,7 +66,6 @@ interface AppAnimateInTestCases : BubbleFlickerSubjects {
      * Verifies the [testApp] layer's alpha value only increases (optional if the spec wants to keep
      * alpha unchanged).
      */
-    @FlakyTest(bugId = 456051408)
     @Test
     fun appLayerFadeIn() {
         assertLayerAlphaChangeConsistently(
@@ -76,19 +75,24 @@ interface AppAnimateInTestCases : BubbleFlickerSubjects {
         )
     }
 
-    /**
-     * Verifies the [testApp] layer's bounds don't jump around (optional if the spec wants to keep
-     * bounds unchanged).
-     */
-    @FlakyTest(bugId = 456051408)
+    /** Verifies that [testApp] resizes consistently. */
     @Test
-    fun appLayerAnimateIn() {
-        assertLayerMoveInSingleDirection(
+    fun appLayerResizeConsistently() {
+        // On phone, the Bubble expand animation goes to right, and then back left a little, which
+        // may shrink a little.
+        assumeTrue(isTablet)
+        assertLayerResizeConsistently(
             layersTraceSubject = layersTraceSubject,
             layerMatcher = testApp,
         )
+    }
 
-        assertLayerResizeConsistently(
+    /** Verifies that [testApp] only moves in one direction (no jumping around) when visible. */
+    @Test
+    fun appLayerMoveInSingleDirection() {
+        // On phone, the Bubble expand animation goes to right, and then back left a little.
+        assumeTrue(isTablet)
+        assertLayerMoveInSingleDirection(
             layersTraceSubject = layersTraceSubject,
             layerMatcher = testApp,
         )

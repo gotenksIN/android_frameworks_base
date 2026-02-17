@@ -108,6 +108,20 @@ import java.util.function.IntConsumer;
  * <p>VirtualDeviceManager enables interactive sharing of capabilities between the host Android
  * device and a remote device.
  *
+ * <p>A device only supports VirtualDeviceManager if it enables it via {@code
+ * config_enableVirtualDeviceManager}. Otherwise {@code Context#getSystemService
+ * (VirtualDeviceManager.class)} will return {@code null}.
+ *
+ * <p>VirtualDeviceManager provides support for the ComputerControl feature in Android. For a
+ * device to support the ComputerControl feature, the device needs to:
+ * <ul>
+ *     <li>Enable support for feature {@code android.software.activities_on_secondary_displays}</li>
+ *     <li>Enable support for VirtualDeviceManager {@code config_enableVirtualDeviceManager}</li>
+ *     <li>Preload the ComputerControl extensions library {@code com.android.extensions
+ *     .computercontrol}</li>
+ *     <li>Preload the platform application {@code VirtualDeviceManager}</li>
+ * </ul>
+ *
  * <p class="note">Not to be confused with the Android Studio's Virtual Device Manager, which allows
  * for device emulation.
  */
@@ -117,6 +131,9 @@ import java.util.function.IntConsumer;
 public final class VirtualDeviceManager {
 
     private static final String TAG = "VirtualDeviceManager";
+
+    /** @hide */
+    public static final int COMPUTER_CONTROL_VERSION = 5;
 
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
@@ -242,7 +259,7 @@ public final class VirtualDeviceManager {
      * @hide
      */
     @RequiresPermission(allOf = {Manifest.permission.ACCESS_COMPUTER_CONTROL,
-            Manifest.permission.POST_NOTIFICATIONS})
+            Manifest.permission.POST_NOTIFICATIONS}, conditional = true)
     public void requestComputerControlSession(
             @NonNull ComputerControlSessionParams params,
             @NonNull @CallbackExecutor Executor executor,
@@ -431,6 +448,21 @@ public final class VirtualDeviceManager {
                     it.remove();
                 }
             }
+        }
+    }
+
+    /**
+     * Returns whether the computer control functionality is available for the caller.
+     * @hide
+     */
+    public boolean isComputerControlAvailable() {
+        if (mService == null) {
+            return false;
+        }
+        try {
+            return mService.isComputerControlAvailable(mContext.getAttributionSource());
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
         }
     }
 
@@ -981,7 +1013,6 @@ public final class VirtualDeviceManager {
          * @see #removeActivityPolicyExemption(ActivityPolicyExemption)
          * @see #setDevicePolicy
          */
-        @FlaggedApi(Flags.FLAG_ACTIVITY_CONTROL_API)
         public void addActivityPolicyExemption(@NonNull ActivityPolicyExemption exemption) {
             mVirtualDeviceInternal.addActivityPolicyExemption(Objects.requireNonNull(exemption));
         }
@@ -996,7 +1027,6 @@ public final class VirtualDeviceManager {
          * @see #addActivityPolicyExemption(ActivityPolicyExemption)
          * @see #setDevicePolicy
          */
-        @FlaggedApi(Flags.FLAG_ACTIVITY_CONTROL_API)
         public void removeActivityPolicyExemption(@NonNull ActivityPolicyExemption exemption) {
             mVirtualDeviceInternal.removeActivityPolicyExemption(Objects.requireNonNull(exemption));
         }
@@ -1018,7 +1048,6 @@ public final class VirtualDeviceManager {
          * @see VirtualDeviceParams#POLICY_TYPE_RECENTS
          * @see VirtualDeviceParams#POLICY_TYPE_ACTIVITY
          */
-        @FlaggedApi(Flags.FLAG_ACTIVITY_CONTROL_API)
         public void setDevicePolicy(
                 @VirtualDeviceParams.DynamicDisplayPolicyType int policyType,
                 @VirtualDeviceParams.DevicePolicy int devicePolicy,
@@ -1180,12 +1209,8 @@ public final class VirtualDeviceManager {
          * @see android.view.InputDevice#SOURCE_ROTARY_ENCODER
          */
         @NonNull
-        @FlaggedApi(Flags.FLAG_VIRTUAL_ROTARY)
         public VirtualRotaryEncoder createVirtualRotaryEncoder(
                 @NonNull VirtualRotaryEncoderConfig config) {
-            if (!Flags.virtualRotary()) {
-                throw new UnsupportedOperationException("Virtual rotary support not enabled");
-            }
             return mVirtualDeviceInternal.createVirtualRotaryEncoder(config);
         }
 
@@ -1457,7 +1482,6 @@ public final class VirtualDeviceManager {
          * @see VirtualDeviceParams#POLICY_TYPE_ACTIVITY
          * @see VirtualDevice#addActivityPolicyExemption(ActivityPolicyExemption)
          */
-        @FlaggedApi(Flags.FLAG_ACTIVITY_CONTROL_API)
         default void onActivityLaunchBlocked(int displayId, @NonNull ComponentName componentName,
                 @NonNull UserHandle user, @Nullable IntentSender intentSender) {}
 
@@ -1473,7 +1497,6 @@ public final class VirtualDeviceManager {
          * @see Display#FLAG_SECURE
          * @see WindowManager.LayoutParams#FLAG_SECURE
          */
-        @FlaggedApi(Flags.FLAG_ACTIVITY_CONTROL_API)
         default void onSecureWindowShown(int displayId, @NonNull ComponentName componentName,
                 @NonNull UserHandle user) {}
 
@@ -1489,7 +1512,6 @@ public final class VirtualDeviceManager {
          * @see Display#FLAG_SECURE
          * @see WindowManager.LayoutParams#FLAG_SECURE
          */
-        @FlaggedApi(Flags.FLAG_ACTIVITY_CONTROL_API)
         default void onSecureWindowHidden(int displayId) {}
 
         /**

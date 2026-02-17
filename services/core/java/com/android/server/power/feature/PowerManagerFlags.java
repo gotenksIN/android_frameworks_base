@@ -39,19 +39,9 @@ public class PowerManagerFlags {
             Flags.FLAG_ENABLE_EARLY_SCREEN_TIMEOUT_DETECTOR,
             Flags::enableEarlyScreenTimeoutDetector);
 
-    private final FlagState mImproveWakelockLatency = new FlagState(
-            Flags.FLAG_IMPROVE_WAKELOCK_LATENCY,
-            Flags::improveWakelockLatency
-    );
-
     private final FlagState mPerDisplayWakeByTouch = new FlagState(
             Flags.FLAG_PER_DISPLAY_WAKE_BY_TOUCH,
             Flags::perDisplayWakeByTouch
-    );
-
-    private final FlagState mPolicyReasonInDisplayPowerRequest = new FlagState(
-            Flags.FLAG_POLICY_REASON_IN_DISPLAY_POWER_REQUEST,
-            Flags::policyReasonInDisplayPowerRequest
     );
 
     private final FlagState mLockOnUnplug =
@@ -61,9 +51,6 @@ public class PowerManagerFlags {
     private final FlagState mDisableFrozenProcessWakelocks =
             new FlagState(Flags.FLAG_DISABLE_FROZEN_PROCESS_WAKELOCKS,
                     Flags::disableFrozenProcessWakelocks);
-
-    private final FlagState mForceDisableWakelocks =
-            new FlagState(Flags.FLAG_FORCE_DISABLE_WAKELOCKS, Flags::forceDisableWakelocks);
 
     private final FlagState mEnableAppWakelockDataSource =
             new FlagState(Flags.FLAG_ENABLE_APP_WAKELOCK_DATA_SOURCE,
@@ -88,24 +75,10 @@ public class PowerManagerFlags {
     }
 
     /**
-     * @return Whether to improve the wakelock acquire/release latency or not
-     */
-    public boolean improveWakelockLatency() {
-        return mImproveWakelockLatency.isEnabled();
-    }
-
-    /**
      * @return Whether per-display wake by touch is enabled or not.
      */
     public boolean isPerDisplayWakeByTouchEnabled() {
         return mPerDisplayWakeByTouch.isEnabled();
-    }
-
-    /**
-     * @return Whether the wakefulness reason is populated in DisplayPowerRequest.
-     */
-    public boolean isPolicyReasonInDisplayPowerRequestEnabled() {
-        return mPolicyReasonInDisplayPowerRequest.isEnabled();
     }
 
     /**
@@ -127,13 +100,6 @@ public class PowerManagerFlags {
      */
     public boolean isDisableFrozenProcessWakelocksEnabled() {
         return mDisableFrozenProcessWakelocks.isEnabled();
-    }
-
-    /**
-     * @return Whether the feature to force disable wakelocks is enabled
-     */
-    public boolean isForceDisableWakelocksEnabled() {
-        return mForceDisableWakelocks.isEnabled();
     }
 
     /**
@@ -165,11 +131,9 @@ public class PowerManagerFlags {
     public void dump(PrintWriter pw) {
         pw.println("PowerManagerFlags:");
         pw.println(" " + mEarlyScreenTimeoutDetectorFlagState);
-        pw.println(" " + mImproveWakelockLatency);
         pw.println(" " + mPerDisplayWakeByTouch);
         pw.println(" " + mLockOnUnplug);
         pw.println(" " + mDisableFrozenProcessWakelocks);
-        pw.println(" " + mForceDisableWakelocks);
         pw.println(" " + mEnableAppWakelockDataSource);
         pw.println(" " + mPartialSleepWakelocks);
         pw.println(" " + mSeparateTimeoutsFlicker);

@@ -20,11 +20,14 @@ import android.Manifest;
 import android.annotation.FlaggedApi;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
+import android.annotation.Nullable;
 import android.annotation.RequiresPermission;
 import android.annotation.SdkConstant;
 import android.annotation.SdkConstant.SdkConstantType;
+import android.annotation.SuppressLint;
 import android.annotation.SystemApi;
 import android.annotation.TestApi;
+import android.app.AppOpsManager;
 import android.app.admin.DevicePolicyManager;
 import android.compat.annotation.ChangeId;
 import android.compat.annotation.EnabledAfter;
@@ -37,6 +40,7 @@ import android.content.Intent;
 import android.database.ContentObserver;
 import android.database.Cursor;
 import android.database.sqlite.SqliteWrapper;
+import android.database.sqlite.SQLiteQueryBuilder;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -156,6 +160,8 @@ public final class Telephony {
          * <P>Type: INTEGER</P>
          * @hide
          */
+        @TestApi
+        @FlaggedApi(Flags.FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES)
         public static final String READ_RESTRICTION_COLUMN_NAME = "read_restriction";
 
         /**
@@ -175,21 +181,191 @@ public final class Telephony {
          * {@link #READ_RESTRICTION_MASK} in the {@link #READ_RESTRICTION_COLUMN_NAME}.
          * @hide
          */
+        @TestApi
+        @FlaggedApi(Flags.FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES)
         public static final class ReadRestrictionValues {
+            /**
+             * Not instantiable.
+             * @hide
+             */
+            private ReadRestrictionValues() {}
+
             /**
              * The message is restricted and can be accessed only by apps with a read restricted
              * messages app op.
              * @hide
              */
+            @TestApi
+            @FlaggedApi(Flags.FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES)
             public static final int READ_RESTRICTION_RESTRICTED = 1 << READ_RESTRICTION_SHIFT;
         }
 
         /**
-         * Boolean bundle entry that specifies the read access restriction for the message. It's
-         * immutable and can be set to set only when a new sms or pdu message is inserted and the
-         * writer has the {@link AppOpsManager#OP_WRITE_RESTRICTED_MESSAGES} app op, otherwise it
-         * defaults to false. A restricted message can be accessed only by apps
-         * with a {@link AppOpsManager#OP_READ_RESTRICTED_MESSAGES} app op.
+         * Verifies that the client has permission to write restricted messages and computes the
+         * read_restriction column value for the message to be inserted. Removes the
+         * ReadRestriction.RESTRICTED key from the values.
+         *
+         * If the flag {@link Flags#FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES} is disabled, this
+         * method will return 0, representing an unrestricted message.
+         *
+         * @hide
+         */
+        public static int computeReadRestrictionValueOnInsert(ContentValues values,
+                boolean canWriteRestrictedMessages) {
+            if (!Flags.secureAccessToRestrictedRcsMessages()) {
+                return 0;
+            }
+            if (values.containsKey(ReadRestriction.READ_RESTRICTION_COLUMN_NAME)) {
+                throw new UnsupportedOperationException(
+                        "Read restriction column cannot be set by the client.");
+            }
+            if (!canWriteRestrictedMessages && values.containsKey(ReadRestriction.RESTRICTED)) {
+                throw new UnsupportedOperationException(
+                        "Client does not have permission to write restricted messages.");
+            }
+            int readRestrictionValue = (values.containsKey(ReadRestriction.RESTRICTED)
+                    && values.getAsBoolean(ReadRestriction.RESTRICTED) == true)
+                    ? ReadRestriction.ReadRestrictionValues.READ_RESTRICTION_RESTRICTED : 0;
+            values.remove(ReadRestriction.RESTRICTED);
+            return readRestrictionValue;
+        }
+
+        /**
+         * Verifies that the client has permission to update the read restriction value for the
+         * message to be updated. The message can be only be updated to unrestricted state.
+         * Removes the ReadRestriction.RESTRICTED key from the values.
+         *
+         * If the flag {@link Flags#FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES} is disabled, this
+         * method will return empty value - null.
+         *
+         * @return null if the read restriction value is not updated or 0 if it should be updated
+         * to unrestricted state.
+         * @hide
+         */
+        public static Integer computeReadRestrictionValueOnUpdate(ContentValues values,
+                boolean canWriteRestrictedMessages) {
+            if (!Flags.secureAccessToRestrictedRcsMessages()) {
+                return null;
+            }
+            if (values.containsKey(ReadRestriction.READ_RESTRICTION_COLUMN_NAME)) {
+                throw new UnsupportedOperationException(
+                        "Read restriction column cannot be updated by the client.");
+            }
+            if (!values.containsKey(ReadRestriction.RESTRICTED)) {
+                return null;
+            }
+            if (!canWriteRestrictedMessages) {
+                throw new UnsupportedOperationException(
+                        "Client does not have permission to write restricted messages.");
+            }
+            if (values.getAsBoolean(ReadRestriction.RESTRICTED)) {
+                throw new UnsupportedOperationException(
+                        "Message cannot be updated to restricted after it is inserted.");
+            }
+            values.remove(ReadRestriction.RESTRICTED);
+            return 0;
+        }
+
+        /**
+         * Appends the {@link #RESTRICTED} column value to the query builder to make sure only apps
+         * with appropriate permissions can access restricted messages. Otherwise, the restricted
+         * messages will be filtered out. If the view name is null, the query uses
+         * {@link #RESTRICTED} as the column name.
+         *
+         * If the flag {@link Flags#FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES} is disabled,
+         * the query will not be modified, because the client can read all messages.
+         *
+         * @param qb The SQLiteQueryBuilder to construct the query with.
+         * @param restrictedViewName The name of the view to query. If null, the query will just use
+         * the restricted column name. Selected view must contain the {@link #RESTRICTED} column.
+         * The accepted values are: "pdu_restricted", "sms_restricted", "pdu_baseline",
+         * "sms_baseline".
+         * @param canReadRestrictedMessages Whether the caller can read restricted messages. If
+         * false, the restricted messages will be filtered out.
+         * @hide
+         */
+        public static void appendRestrictedToQuery(@NonNull SQLiteQueryBuilder qb,
+                @Nullable String restrictedViewName, boolean canReadRestrictedMessages) {
+            if (Flags.secureAccessToRestrictedRcsMessages() && !canReadRestrictedMessages) {
+                final String restrictedColumnName = restrictedViewName == null
+                        ? RESTRICTED
+                        : (restrictedViewName + "." + RESTRICTED);
+                qb.appendWhereStandalone(restrictedColumnName + " = 0");
+            }
+        }
+
+        /**
+         * Appends the {@link #RESTRICTED} column value to the query builder
+         * to filter out restricted messages if the caller does not have the
+         * {@link AppOpsManager#OP_READ_RESTRICTED_MESSAGES} app op.
+         *
+         * If the flag {@link Flags#FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES} is disabled,
+         * the query will not be modified, because the client can read all messages.
+         *
+         * @param qb The SQLiteQueryBuilder to construct the query with.
+         * @param joinAssignmentClause Join assignment clause to join a table with the view that has
+         * the {@link #RESTRICTED} column "pdu_baseline._id=part.mid"
+         * @param restrictedViewName The name of the view to query. Selected view must contain the
+         * {@link #RESTRICTED} column. The accepted values are: "pdu_restricted", "sms_restricted",
+         * "pdu_baseline" and "sms_baseline".
+         * @param canReadRestrictedMessages Whether the caller can read restricted messages. If
+         * false, the restricted messages will be filtered out.
+         * @hide
+         */
+        public static void appendRestrictedToQuery(@NonNull SQLiteQueryBuilder qb,
+                @NonNull String joinAssignmentClause,
+                @NonNull String restrictedViewName,
+                boolean canReadRestrictedMessages) {
+            if (Flags.secureAccessToRestrictedRcsMessages() && !canReadRestrictedMessages) {
+                final String restrictedColumnName = restrictedViewName + "." + RESTRICTED;
+                String whereClause = "EXISTS (SELECT 1 FROM " + restrictedViewName
+                    + " WHERE " + joinAssignmentClause + " AND " + restrictedColumnName + " = 0)";
+                qb.appendWhereStandalone(whereClause);
+            }
+        }
+
+        /**
+         * Appends the {@link #READ_RESTRICTION_COLUMN_NAME} column value to the query builder
+         * to filter out restricted messages if the caller does not have the
+         * {@link AppOpsManager#OP_READ_RESTRICTED_MESSAGES} app op.
+         *
+         * If the flag {@link Flags#FLAG_SECURE_ACCESS_TO_RESTRICTED_RCS_MESSAGES} is disabled,
+         * the query will not be modified, because the client can read all messages.
+         *
+         * @param qb The SQLiteQueryBuilder to construct the query with.
+         * @param tableName The name of the table to query. If null, the query will just use the
+         * {@link #READ_RESTRICTION_COLUMN_NAME} column name. Selected table must contain the
+         * {@link #READ_RESTRICTION_COLUMN_NAME} column. The accepted values are: "pdu", "sms",
+         * "threads", "canonical_addresses".
+         * @param canReadRestrictedMessages Whether the caller can read restricted messages. If
+         * false, the restricted messages will be filtered out.
+         * @hide
+         */
+        public static void appendReadRestrictionToQuery(@NonNull SQLiteQueryBuilder qb,
+                @Nullable String tableName, boolean canReadRestrictedMessages) {
+            if (Flags.secureAccessToRestrictedRcsMessages() && !canReadRestrictedMessages) {
+                final String readRestrictionColumnName = tableName == null
+                        ? READ_RESTRICTION_COLUMN_NAME
+                        : (tableName + "." + READ_RESTRICTION_COLUMN_NAME);
+                final int readRestrictionMask = ReadRestrictionValues.READ_RESTRICTION_RESTRICTED;
+                qb.appendWhereStandalone(readRestrictionColumnName + " & " + readRestrictionMask
+                        + " = 0");
+            }
+        }
+
+        /**
+         * Specifies if the message is restricted.
+         *
+         * This column can be set to {@code true} only when a new sms or pdu message is inserted and
+         * the writer has the {@link AppOpsManager#OP_WRITE_RESTRICTED_MESSAGES} app op. Otherwise
+         * it is set to {@code false}.
+         *
+         * A restricted message is only visible to the apps with a
+         * {@link AppOpsManager#OP_READ_RESTRICTED_MESSAGES} app op.
+         *
+         * This column is present in the following views: "sms_all", "sms_restricted", "pdu_all" and
+         * "pdu_restricted".
+         *
          * <p>Type: BOOLEAN</p>
          * @hide
          */
@@ -353,10 +529,16 @@ public final class Telephony {
         public static final String CREATOR = "creator";
 
         /**
-         * Bit shift for the OTP subtype information.
+         * A helper constant bit shift for the OTP subtype information.
          * @hide
          */
         public static final int OTP_SUBTYPE_SHIFT = 8;
+
+        /**
+         * Mask for OTP type information.
+         * @hide
+         */
+        public static final int OTP_TYPE_MASK = 0xFF;
 
         /**
          * Mask for OTP subtype information.
@@ -367,6 +549,22 @@ public final class Telephony {
         /**
          * The body of the message contains an otp code. This should only be applied by the SMS
          * provider itself.
+         *
+         * <p>The integer value represents bit fields indicating whether the body contains an OTP
+         * and if so, what type of OTP message it contains.
+         *
+         * <p>Bit 0-7 are reserved for high-level OTP status:
+         * <ul>
+         *   <li>Bit 0: Set if the body contains an OTP code, unset otherwise.
+         *   <li>Bit 1: Set if the determination of the presence of an OTP is still pending.
+         * </ul>
+         *
+         * <p>Bit 8-15 are reserved for indicating the subtype of the OTP:
+         * <ul>
+         *   <li>Bit 0: Set for SMS Retriever OTP.
+         *   <li>Bit 1: Set for Web OTP.
+         * </ul>
+         * Note that if all the subtype field is unset, then it is regarded as a Generic OTP.
          *
          * <P>Type: INTEGER</P>
          * @hide
@@ -400,7 +598,13 @@ public final class Telephony {
         public static final int OTP_TYPE_PENDING = 2;
 
         /**
-         * The message is SMS Retriever OTP.
+         * The message does not have any OTP subtype (e.g. a generic OTP).
+         * @hide
+         */
+        public static final int OTP_SUBTYPE_NONE = 0 << OTP_SUBTYPE_SHIFT;
+
+        /**
+         * The message is an SMS Retriever OTP.
          * @hide
          */
         @FlaggedApi(android.view.flags.Flags.FLAG_REDACT_OTP_APP_COMPAT_API)
@@ -424,6 +628,25 @@ public final class Telephony {
          * @hide
          */
         public static final String READ_RESTRICTION = ReadRestriction.READ_RESTRICTION_COLUMN_NAME;
+
+        /**
+         * The {@code transaction-id} of the message.
+         * <p>
+         * This column is used by the default messaging app to associate an internal transaction
+         * identifier with a specific SMS message record in the database.
+         * </p><p>
+         * The platform stores the value provided in this column but treats it as an opaque field.
+         * It does not interpret, validate or use the contents of this column for any platform
+         * logic.
+         * </p><p>
+         *
+         * <P>Type: TEXT</P>
+         */
+        @FlaggedApi(Flags.FLAG_MESSAGE_PROMOTION)
+        // TODO(b/478827787): Suppress the IntentName lint check because TRANSACTION_ID is a column
+        //  name, not an Intent action.
+        @SuppressLint("IntentName")
+        public static final String TRANSACTION_ID = "tr_id";
 
         /**
          * The priority of the message.

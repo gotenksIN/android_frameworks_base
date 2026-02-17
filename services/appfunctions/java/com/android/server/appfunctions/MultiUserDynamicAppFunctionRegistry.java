@@ -17,17 +17,25 @@
 package com.android.server.appfunctions;
 
 import android.annotation.NonNull;
+import android.annotation.Nullable;
+import android.app.appfunctions.AppFunctionActivityId;
+import android.app.appfunctions.AppFunctionActivityState;
+import android.app.appfunctions.AppFunctionName;
 import android.app.appfunctions.ExecuteAppFunctionAidlRequest;
 import android.app.appfunctions.IAppFunctionExecutor;
 import android.app.appfunctions.SafeOneTimeExecuteAppFunctionCallback;
 import android.os.Build;
 import android.os.ICancellationSignal;
 import android.os.UserHandle;
+import android.util.ArraySet;
 import android.util.Log;
 import android.util.SparseArray;
 
 import com.android.internal.annotations.GuardedBy;
 import com.android.server.SystemService;
+
+import java.util.List;
+import java.util.Objects;
 
 /**
  * Manages the lifecycle of app functions registered at runtime cross user. Creates a per user
@@ -60,12 +68,18 @@ public final class MultiUserDynamicAppFunctionRegistry {
      *
      * <p>This will create registry for this {@code user}.
      */
-    public void onUserUnlocked(@NonNull SystemService.TargetUser user) {
-        maybePrintDebugLog("onUserUnlocked: " + user.getUserIdentifier());
+    public void onUserUnlocked(
+            @NonNull AppFunctionMetadataObserver metadataObserver,
+            @NonNull SystemService.TargetUser user) {
+        maybePrintDebugLog("onUserUnlocked: " + user.getUserIdentifier(), null);
         synchronized (mCrossUserLock) {
             if (!mPerUserRegistrations.contains(user.getUserIdentifier())) {
                 mPerUserRegistrations.put(
-                        user.getUserIdentifier(), new DynamicAppFunctionRegistry());
+                        user.getUserIdentifier(),
+                        new DynamicAppFunctionRegistry(
+                                unregisteredFunctionNames ->
+                                        metadataObserver.onEnabledStatesChanged(
+                                                user.getUserHandle(), unregisteredFunctionNames)));
             }
         }
     }
@@ -76,64 +90,87 @@ public final class MultiUserDynamicAppFunctionRegistry {
      * <p>This will delete cache for {@code user}.
      */
     public void onUserStopped(@NonNull SystemService.TargetUser user) {
-        maybePrintDebugLog("onUserStopped: " + user.getUserIdentifier());
+        maybePrintDebugLog("onUserStopped: " + user.getUserIdentifier(), null);
         synchronized (mCrossUserLock) {
             mPerUserRegistrations.remove(user.getUserIdentifier());
         }
     }
 
     /**
-     * Registers an app function with the registry.
-     * @param packageName Name of the package containing the app function.
-     * @param functionIdentifier Identifier of the app function.
-     * @param session Executor of the app function.
-     * @param userHandle Handle of the user to register the app function for.
-     * @throws IllegalStateException If the app function is already registered or user was not
-     *      unlocked.
+     * Registers one or more app functions, making them available for execution for a specific user
+     * as a single atomic operation.
+     *
+     * <p>This method associates the provided function identifiers with the client's execution
+     * session. As long as the registration is active, calls to execute these functions will be
+     * routed to the provided {@code session}.
+     *
+     * @param packageName Name of the package that owns the app functions.
+     * @param functionIdentifiers A list of unique identifiers for the app functions to register.
+     * @param executor The client's executor, an {@link IAppFunctionExecutor} binder used to invoke
+     *     the function implementation in the client's process.
+     * @param userHandle The user for whom the app functions are being registered.
+     * @param scopeIds Identifiers of the registration source corresponding to each
+     *     functionIdentifier.
+     * @throws IllegalStateException if any of the function identifiers are already registered for
+     *     this package and user, or if the specified user has not been unlocked. No function
+     *     identifiers from the list will be registered in this case.
      */
-    public void registerAppFunction(
-            String packageName,
-            String functionIdentifier,
-            IAppFunctionExecutor session,
-            UserHandle userHandle) {
-        maybePrintDebugLog("registerAppFunction: " + packageName + "/" + functionIdentifier);
+    public void registerAppFunctions(
+            @NonNull String packageName,
+            @NonNull List<String> functionIdentifiers,
+            @NonNull IAppFunctionExecutor executor,
+            @NonNull UserHandle userHandle,
+            @NonNull List<RegistrationScopeId> scopeIds) {
+        maybePrintDebugLog("registerAppFunction for " + packageName + " :", functionIdentifiers);
         getPerUserRegistry(userHandle)
-                .registerAppFunction(packageName, functionIdentifier, session);
+                .registerAppFunctions(packageName, functionIdentifiers, executor, scopeIds);
     }
 
     /**
-     * Unregisters app function with the registry.
-     * @param packageName Name of the package containing the app function.
-     * @param functionIdentifier Identifier of the app function.
-     * @param session Executor of the app function.
-     * @param userHandle Handle of the user to register the app function for.
-     * @throws IllegalStateException If {@code userHandle} was not unlocked.
+     * Unregisters one or more app functions, making them unavailable for execution.
+     *
+     * <p>This removes the association between the function identifiers and the client's execution
+     * session. If a function is not currently registered, the request to unregister it will be
+     * silently ignored.
+     *
+     * @param packageName Name of the package that owns the app functions.
+     * @param functionIdentifiers A list of identifiers for the app functions to unregister.
+     * @param executor The client's executor that was used for registration. The system verifies
+     *     this to ensure that only the original registrant can unregister the function.
+     * @param userHandle The user for whom the app functions should be unregistered.
+     * @param scopeIds Identifiers of the registration source corresponding to each
+     *     functionIdentifier.
+     * @throws IllegalStateException if the specified {@code userHandle} has not been unlocked.
      */
-    public void unregisterAppFunction(
-            String packageName,
-            String functionIdentifier,
-            IAppFunctionExecutor session,
-            UserHandle userHandle) {
-        maybePrintDebugLog("unregisterAppFunction: " + packageName + "/" + functionIdentifier);
+    public void unregisterAppFunctions(
+            @NonNull String packageName,
+            @NonNull List<String> functionIdentifiers,
+            @NonNull IAppFunctionExecutor executor,
+            @NonNull UserHandle userHandle,
+            @NonNull List<RegistrationScopeId> scopeIds) {
+        maybePrintDebugLog("unregisterAppFunction " + packageName + ": ", functionIdentifiers);
         getPerUserRegistry(userHandle)
-                .unregisterAppFunction(packageName, functionIdentifier, session);
+                .unregisterAppFunctions(packageName, functionIdentifiers, executor, scopeIds);
     }
 
     /**
-     * Checks if dynamic app function is enabled.
+     * Checks if dynamic app function is registered.
+     *
      * @param packageName Name of the package containing the app function.
      * @param functionIdentifier Identifier of the app function.
      * @param userHandle Handle of the user to register the app function for.
-     * @return True if the app function is enabled, false otherwise.
+     * @return True if the app function is registered, false otherwise.
      * @throws IllegalStateException If the user was not unlocked.
      */
-    public boolean isAppFunctionEnabled(
+    public boolean isAppFunctionRegistered(
             String packageName, String functionIdentifier, UserHandle userHandle) {
-        return getPerUserRegistry(userHandle).isAppFunctionEnabled(packageName, functionIdentifier);
+        return getPerUserRegistry(userHandle)
+                .isAppFunctionRegistered(packageName, functionIdentifier);
     }
 
     /**
      * Executes an app function.
+     *
      * @param request Request to execute.
      * @param safeExecuteAppFunctionCallback Callback to report results to.
      * @param cancellationTransport The cancellation signal.
@@ -150,6 +187,65 @@ public final class MultiUserDynamicAppFunctionRegistry {
                         cancellationTransport);
     }
 
+    /**
+     * Returns the currently registered {@link android.app.appfunctions.AppFunctionActivityId}s for
+     * a given {@code functionName}.
+     *
+     * @param functionName Name of the app function to search for.
+     * @param userHandle Handle of the user where the app function is registered.
+     * @return ArraySet of {@link android.app.appfunctions.AppFunctionActivityId}s which registered
+     *     the given function. Null of no activities registered the function or the function is
+     *     registered with a global scope.
+     */
+    @Nullable
+    public ArraySet<AppFunctionActivityId> getRegisteredActivityIds(
+            @NonNull AppFunctionName functionName, @NonNull UserHandle userHandle) {
+        return getPerUserRegistry(userHandle).getRegisteredActivityIds(functionName);
+    }
+
+    @NonNull
+    public List<AppFunctionActivityState> getAppFunctionActivityStates(
+            @NonNull List<AppFunctionActivityId> activityIds, @NonNull UserHandle userHandle) {
+        return getPerUserRegistry(userHandle).getAppFunctionActivityStates(activityIds);
+    }
+
+    public static class RegistrationScopeId {
+        @Nullable private final AppFunctionActivityId mAppFunctionActivityId;
+
+        public static final RegistrationScopeId GLOBAL_SCOPE = new RegistrationScopeId(null);
+
+        public RegistrationScopeId(@Nullable AppFunctionActivityId appFunctionActivityId) {
+            mAppFunctionActivityId = appFunctionActivityId;
+        }
+
+        @Nullable
+        public AppFunctionActivityId getAppFunctionActivityId() {
+            return mAppFunctionActivityId;
+        }
+
+        @Override
+        public String toString() {
+            return "ActivitySourceId{" + mAppFunctionActivityId + "}";
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hashCode(mAppFunctionActivityId);
+        }
+
+        @Override
+        public boolean equals(@Nullable Object obj) {
+            if (this == obj) {
+                return true;
+            }
+            if (!(obj instanceof RegistrationScopeId)) {
+                return false;
+            }
+            return Objects.equals(
+                    mAppFunctionActivityId, ((RegistrationScopeId) obj).mAppFunctionActivityId);
+        }
+    }
+
     @NonNull
     private DynamicAppFunctionRegistry getPerUserRegistry(UserHandle userHandle) {
         synchronized (mCrossUserLock) {
@@ -161,9 +257,14 @@ public final class MultiUserDynamicAppFunctionRegistry {
         }
     }
 
-    private static void maybePrintDebugLog(String message) {
+    private static void maybePrintDebugLog(
+            @NonNull String message, @Nullable List<String> identifiers) {
         if (DEBUG) {
-            Log.d(TAG, message);
+            if (identifiers == null) {
+                Log.d(TAG, message);
+                return;
+            }
+            Log.d(TAG, message + String.join(", ", identifiers));
         }
     }
 }

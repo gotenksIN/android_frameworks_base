@@ -29,6 +29,14 @@
       "keywords": ["device"]
     },
     {
+      "name": "WMShellExplicitFlickerTestsBubbles-CollapseBubbleAppViaClickBubbleIconAfterSwitchTest",
+      "keywords": ["device"]
+    },
+    {
+      "name": "WMShellExplicitFlickerTestsBubbles-CollapseBubbleAppViaClickBubbleIconTest",
+      "keywords": ["device"]
+    },
+    {
       "name": "WMShellExplicitFlickerTestsBubbles-CollapseBubbleAppViaTouchOutsideTest",
       "keywords": ["device"]
     },
@@ -107,19 +115,19 @@
       "keywords": ["device"]
     },
     {
+      "name": "WMShellExplicitFlickerTestsBubbles-FinishExpandedBubbleToExpandCollapsedTest",
+      "keywords": ["device"]
+    },
+    {
+      "name": "WMShellExplicitFlickerTestsBubbles-LaunchMultipleBubbleTest",
+      "keywords": ["device"]
+    },
+    {
+      "name": "WMShellExplicitFlickerTestsBubbles-LaunchNewTaskFromBubbleTest",
+      "keywords": ["device"]
+    },
+    {
       "name": "WMShellExplicitFlickerTestsBubbles-ExpandedBubbleAppMoveTest",
-      "keywords": ["device"]
-    },
-    {
-      "name": "WMShellExplicitFlickerTestsBubbles-ScrollableBubbleAppTest",
-      "keywords": ["device"]
-    },
-    {
-      "name": "WMShellExplicitFlickerTestsBubbles-SwitchBetweenBubblesTest",
-      "keywords": ["device"]
-    },
-    {
-      "name": "WMShellExplicitFlickerTestsBubbles-SwitchBetweenBubblesTwiceTest",
       "keywords": ["device"]
     },
     {
@@ -152,6 +160,34 @@
     },
     {
       "name": "WMShellExplicitFlickerTestsBubbles-RelaunchBubbleToFullscreenViaTaskbarShortcutTest",
+      "keywords": ["device"]
+    },
+    {
+      "name": "WMShellExplicitFlickerTestsBubbles-RelaunchVisibleFullscreenAppToBubbleTest",
+      "keywords": ["device"]
+    },
+    {
+      "name": "WMShellExplicitFlickerTestsBubbles-RelaunchVisibleSplitAppToBubbleTest",
+      "keywords": ["device"]
+    },
+    {
+      "name": "WMShellExplicitFlickerTestsBubbles-RelaunchVisibleSplitAppToBubbleTrampolineTest",
+      "keywords": ["device"]
+    },
+    {
+      "name": "WMShellExplicitFlickerTestsBubbles-ScrollableBubbleAppTest",
+      "keywords": ["device"]
+    },
+    {
+      "name": "WMShellExplicitFlickerTestsBubbles-SwitchBetweenBubblesTest",
+      "keywords": ["device"]
+    },
+    {
+      "name": "WMShellExplicitFlickerTestsBubbles-SwitchBetweenBubblesTwiceTest",
+      "keywords": ["device"]
+    },
+    {
+      "name": "WMShellExplicitFlickerTestsBubbles-SwitchToOverflowBubbleTest",
       "keywords": ["device"]
     }
   ]

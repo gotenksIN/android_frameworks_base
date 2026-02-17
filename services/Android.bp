@@ -69,6 +69,9 @@ system_optimized_java_defaults {
                     // Ensure classes referenced in the framework-res manifest
                     // and implemented in system_server are kept.
                     ":framework-res{.aapt.proguardOptionsFile}",
+                    // Allow stripping of `hasSystemFeature(...)` guarded code based on compile-time
+                    // feature definitions.
+                    ":systemfeatures-gen-proguard",
                 ],
                 trace_references_from: select(soong_config_variable("ANDROID", "system_server_trace_refs"), {
                     any @ trace_refs: trace_refs,
@@ -135,6 +138,7 @@ filegroup {
         ":services.coverage-sources",
         ":services.credentials-sources",
         ":services.devicepolicy-sources",
+        ":services.files-sources",
         ":services.lskfreset-sources",
         ":services.midi-sources",
         ":services.musicsearch-sources",
@@ -339,6 +343,7 @@ java_library {
     static_libs: [
         "services.core",
         "services.accessibility",
+        "services.aiseal",
         "services.appprediction",
         "services.appwidget",
         "services.autofill",
@@ -353,6 +358,7 @@ java_library {
         "services.credentials",
         "services.devicepolicy",
         "services.flags",
+        "services.files",
         "services.lskfreset",
         "services.midi",
         "services.musicsearch",
@@ -395,6 +401,7 @@ java_library {
         "service-permission.stubs.system_server",
         "service-rkp.stubs.system_server",
         "service-sdksandbox.stubs.system_server",
+        "service-telecom.stubs.system_server",
     ],
 
     // Uncomment to enable output of certain warnings (deprecated, unchecked)
@@ -455,6 +462,7 @@ system_java_library {
 
     required: [
         "libukey2_jni_shared",
+        "libtrust_token_jni",
         "core.protolog.pb",
         "libusb4_policies_jni",
     ],

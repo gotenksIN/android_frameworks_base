@@ -21,13 +21,18 @@ import android.annotation.Nullable;
 import android.annotation.SystemApi;
 import android.app.Service;
 import android.content.Intent;
+import android.os.Bundle;
 import android.os.IBinder;
 import android.os.ParcelUuid;
 import android.os.RemoteException;
 import android.service.personalcontext.Flags;
 import android.service.personalcontext.hint.ContextHint;
 import android.service.personalcontext.hint.ContextHintWithSignature;
+import android.service.personalcontext.hint.ContextHintWithSignatureWrapper;
 import android.service.personalcontext.hint.ContextHintWrapper;
+import android.service.personalcontext.hint.HintFilter;
+import android.service.personalcontext.insight.ContextInsightWrapper;
+import android.service.personalcontext.insight.interaction.InsightEvent;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -138,10 +143,12 @@ public abstract class HintRefinerService extends Service {
         }
 
         @Override
-        public void refine(List<ContextHintWithSignature> inputHints, IRefineCallback callback)
+        public void refine(
+                List<ContextHintWithSignatureWrapper> inputHints, IRefineCallback callback)
                 throws RemoteException {
             getServiceOrThrow().onRefine(
-                    ContextHintWithSignature.unwrapList(inputHints),
+                    ContextHintWithSignature.unwrapList(
+                            ContextHintWithSignatureWrapper.unwrapList(inputHints)),
                     hints -> {
                         try {
                             callback.onHintsRefined(ContextHintWrapper.wrapList(hints));
@@ -154,6 +161,16 @@ public abstract class HintRefinerService extends Service {
         @Override
         public void getFilter(IGetFilterCallback callback) throws RemoteException {
             callback.updateFilter(getServiceOrThrow().onInitializeFilter());
+        }
+
+        @Override
+        public void handleEvent(String packageName, InsightEvent event) {
+            throw new UnsupportedOperationException("Can not handle insight events in a refiner");
+        }
+
+        @Override
+        public void handleFeedback(ContextInsightWrapper insight, Bundle feedback) {
+            throw new UnsupportedOperationException("Can not handle user feedback in a refiner");
         }
     }
 }

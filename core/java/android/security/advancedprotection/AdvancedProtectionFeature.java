@@ -28,6 +28,22 @@ import java.lang.annotation.RetentionPolicy;
 /**
  * An advanced protection feature providing protections.
  *
+ * <p>This class represents the state of a specific feature, including whether it is enabled and its
+ * provisioning status.
+ *
+ * <p>Advanced Protection features are controlled by three concepts:
+ *
+ * <ul>
+ *   <li><b>Availability</b>: Whether the feature is supported by the device's hardware and software
+ *       configuration.
+ *   <li><b>Provisioning</b>: Whether the feature is authorized for use. Features can be provisioned
+ *       by default, by a Feature Admin, or for testing purposes.
+ *   <li><b>Enabled</b>: Whether the feature is currently active and enforcing protections.
+ * </ul>
+ *
+ * <p>A feature is considered <b>enabled</b> only if it is <b>available</b>, <b>provisioned</b>, and
+ * Advanced Protection is globally enabled on the device.
+ *
  * @hide
  */
 @SystemApi
@@ -98,6 +114,7 @@ public final class AdvancedProtectionFeature implements Parcelable {
     public @interface ProvisioningMode {}
 
     private final int mId;
+    private final boolean mEnabled;
     private final @ProvisioningMode int mProvisioningMode;
 
     /**
@@ -106,12 +123,12 @@ public final class AdvancedProtectionFeature implements Parcelable {
      *
      * @param id Feature identifier. It is used by Settings screens to display information about
      *     this feature.
-     * @deprecated Use {@link #AdvancedProtectionFeature(int, int)} instead.
+     * @deprecated Use {@link #AdvancedProtectionFeature(int, boolean, int)} instead.
      */
     @FlaggedApi(android.security.Flags.FLAG_AAPM_API_V2)
     @Deprecated
     public AdvancedProtectionFeature(@AdvancedProtectionManager.FeatureId int id) {
-        this(id, PROVISIONING_MODE_PROVISIONED_BY_DEFAULT);
+        this(id, true, PROVISIONING_MODE_PROVISIONED_BY_DEFAULT);
     }
 
     /**
@@ -120,17 +137,22 @@ public final class AdvancedProtectionFeature implements Parcelable {
      *
      * @param id Feature identifier. It is used by Settings screens to display information about
      *     this feature.
+     * @param enabled Whether the feature is enabled.
      * @param provisioningMode Provisioning mode of the feature.
      */
     @FlaggedApi(android.security.Flags.FLAG_AAPM_API_V2)
     public AdvancedProtectionFeature(
-            @AdvancedProtectionManager.FeatureId int id, @ProvisioningMode int provisioningMode) {
+            @AdvancedProtectionManager.FeatureId int id,
+            boolean enabled,
+            @ProvisioningMode int provisioningMode) {
         mId = id;
+        mEnabled = enabled;
         mProvisioningMode = provisioningMode;
     }
 
     private AdvancedProtectionFeature(Parcel in) {
         mId = in.readInt();
+        mEnabled = in.readBoolean();
         mProvisioningMode = in.readInt();
     }
 
@@ -140,11 +162,23 @@ public final class AdvancedProtectionFeature implements Parcelable {
     }
 
     /**
+     * Returns whether this feature is currently enabled.
+     *
+     * <p>An enabled feature is actively enforcing protections. This requires the feature to be
+     * available, provisioned, and for Advanced Protection to be globally enabled.
+     */
+    @FlaggedApi(android.security.Flags.FLAG_AAPM_API_V2)
+    public boolean isEnabled() {
+        return mEnabled;
+    }
+
+    /**
      * Returns whether this feature is provisioned.
      *
-     * <p>A feature is provisioned to indicate that it can be used on the device.
+     * <p>Provisioning indicates that the feature is authorized for use on this device.
      *
-     * <p>This does not indicate whether the feature is currently enabled or disabled.
+     * <p>Note: A provisioned feature is not necessarily enabled. It will only be enabled if
+     * Advanced Protection is active and the feature is available on the device.
      */
     @FlaggedApi(android.security.Flags.FLAG_AAPM_API_V2)
     public boolean isProvisioned() {
@@ -154,8 +188,8 @@ public final class AdvancedProtectionFeature implements Parcelable {
     /**
      * Returns the provisioning mode of this feature.
      *
-     * <p>This indicates whether the feature is provisioned or deprovisioned, and who provisioned or
-     * deprovisioned it.
+     * <p>This indicates whether the feature is provisioned or not, and which entity is responsible
+     * for provisioning.
      */
     @FlaggedApi(android.security.Flags.FLAG_AAPM_API_V2)
     @ProvisioningMode
@@ -171,6 +205,7 @@ public final class AdvancedProtectionFeature implements Parcelable {
     @Override
     public void writeToParcel(@NonNull Parcel dest, int flags) {
         dest.writeInt(mId);
+        dest.writeBoolean(mEnabled);
         dest.writeInt(mProvisioningMode);
     }
 

@@ -46,6 +46,10 @@
     <string name="usb_accessory_confirm_prompt" msgid="5728408382798643421">"هل تريد فتح تطبيق \"<xliff:g id="APPLICATION">%1$s</xliff:g>\" لإدارة <xliff:g id="USB_ACCESSORY">%2$s</xliff:g>؟"</string>
     <string name="usb_accessory_uri_prompt" msgid="6756649383432542382">"‏لا يعمل أي تطبيق مثبت مع ملحق UEB هذا. مزيد من المعلومات عن هذا الملحق على <xliff:g id="URL">%1$s</xliff:g>."</string>
     <string name="title_usb_accessory" msgid="1236358027511638648">"‏ملحق USB"</string>
+    <!-- no translation found for usb_device_dialog_always_allow_button (7426535342650638393) -->
+    <skip />
+    <string name="usb_device_dialog_allow_only_this_time_button" msgid="3653881633944232491">"هذه المرّة فقط"</string>
+    <string name="usb_device_dialog_cancel_button" msgid="9050554648474787233">"إلغاء"</string>
     <string name="label_view" msgid="6815442985276363364">"عرض"</string>
     <string name="always_use_device" msgid="210535878779644679">"فتح تطبيق \"<xliff:g id="APPLICATION">%1$s</xliff:g>\" دائمًا عند توصيل <xliff:g id="USB_DEVICE">%2$s</xliff:g>"</string>
     <string name="always_use_accessory" msgid="1977225429341838444">"فتح تطبيق \"<xliff:g id="APPLICATION">%1$s</xliff:g>\" دائمًا عند توصيل <xliff:g id="USB_ACCESSORY">%2$s</xliff:g>"</string>
@@ -91,7 +95,8 @@
     <string name="screenshot_failed_to_save_text" msgid="7232739948999195960">"يتعذّر حفظ لقطة الشاشة."</string>
     <string name="screenshot_failed_to_capture_text" msgid="7818288545874407451">"يحظر التطبيق أو تحظر مؤسستك التقاط لقطات شاشة"</string>
     <string name="screenshot_blocked_by_admin" msgid="5486757604822795797">"حَظَر مشرف تكنولوجيا المعلومات عملية أخذ لقطات للشاشة."</string>
-    <string name="screenshot_copy_description" msgid="2857172429942249976">"نسخ لقطة الشاشة إلى الحافظة"</string>
+    <string name="screenshot_copy_label" msgid="3551237076438128722">"نسخ"</string>
+    <string name="screenshot_copy_description" msgid="2890150686381938858">"زر \"نسخ لقطة الشاشة إلى الحافظة\""</string>
     <string name="screenshot_edit_label" msgid="8754981973544133050">"تعديل"</string>
     <string name="screenshot_edit_description" msgid="7802378587672433507">"زر تعديل لقطة الشاشة"</string>
     <string name="screenshot_share_label" msgid="1653061117238861559">"مشاركة"</string>
@@ -134,6 +139,8 @@
     <string name="screenrecord_ongoing_screen_and_audio" msgid="5351133763125180920">"جارٍ تسجيل الشاشة والصوت"</string>
     <string name="screenrecord_taps_label" msgid="1595690528298857649">"إظهار اللمسات على الشاشة"</string>
     <string name="screenrecord_stop_label" msgid="72699670052087989">"إيقاف"</string>
+    <string name="screenrecord_stop_description" msgid="4656717003438764637">"إيقاف التسجيل"</string>
+    <string name="screenrecord_start_description" msgid="8173864933793754995">"بدء التسجيل"</string>
     <string name="screenrecord_share_label" msgid="5025590804030086930">"مشاركة"</string>
     <string name="screenrecord_save_title" msgid="1886652605520893850">"تم حفظ تسجيل الشاشة"</string>
     <string name="screenrecord_save_text" msgid="3008973099800840163">"انقر لعرض التسجيل"</string>
@@ -149,13 +156,16 @@
     <string name="screen_record_single_app_no_recents" msgid="1023249803854209330">"تطبيق واحد (يُرجى فتح أي تطبيق لاختياره)"</string>
     <string name="screen_record_record_device_audio_label" msgid="5363057443124085198">"تسجيل صوت الجهاز"</string>
     <string name="screen_record_record_microphone_label" msgid="4685753707185662381">"التسجيل من الميكروفون"</string>
+    <string name="screen_record_record_audio_during_recording_warning" msgid="1240590393919102946">"لا يمكن تغيير إعدادات الصوت أثناء التسجيل"</string>
     <string name="screen_record_should_show_camera_label" msgid="159628971484931357">"عرض كاميرا السيلفي"</string>
     <string name="screen_record_should_show_touches_label" msgid="2203962566795833783">"عرض أماكن اللمس"</string>
     <string name="screen_record_capture_target_choose_app" msgid="3524481083640900931">"يُرجى اختيار تطبيق لتسجيل محتوى شاشته"</string>
+    <string name="screen_record_settings" msgid="2377267679200139285">"إعدادات تسجيل الشاشة"</string>
+    <string name="screen_record_markup" msgid="5583986085046693669">"وضع علامات"</string>
     <string name="screen_record_video_saved" msgid="1345283626390232282">"تم حفظ الفيديو"</string>
     <string name="screen_record_video_deleted" msgid="30786214839944540">"تم حذف الفيديو"</string>
     <string name="screen_record_undo" msgid="7942716736019800870">"تراجع"</string>
-    <string name="screen_record_take_another" msgid="8071412867905614800">"تسجيل الشاشة مجددًا"</string>
+    <string name="screen_record_take_another" msgid="5877933424208100617">"جديد"</string>
     <string name="screen_record_edit" msgid="8733014191240769309">"تعديل"</string>
     <string name="screen_record_delete" msgid="1023421937978254537">"حذف"</string>
     <string name="screen_record_delete_dialog_title" msgid="5868561491974057044">"حذف هذا التسجيل؟"</string>
@@ -164,6 +174,7 @@
     <string name="screen_record_pause" msgid="1715012292444967776">"إيقاف مؤقت"</string>
     <string name="screen_record_mute" msgid="8111682249858638168">"كتم الصوت"</string>
     <string name="screen_record_unmute" msgid="2207912659365156472">"إعادة الصوت"</string>
+    <string name="screen_record_video_preview_elapsed_time_a11y_template" formatted="false" msgid="969599623785875798">"‫<xliff:g id="ELAPSED_TIME">%1$s</xliff:g> من <xliff:g id="DURATION">%2$s</xliff:g>"</string>
     <string name="screen_capture_blocked_by_admin" msgid="1751756953683506644">"حظرَ مشرف تكنولوجيا المعلومات إمكانية تصوير الشاشة"</string>
     <string name="screen_capture_fullscreen_screenshot_button" msgid="3173749413928507877">"أخْذ لقطة للشاشة بأكملها"</string>
     <string name="screen_capture_fullscreen_record_button" msgid="5697594296042198690">"تسجيل الشاشة بأكملها"</string>
@@ -171,21 +182,60 @@
     <string name="screen_capture_record_region_selection_button" msgid="3699353194755563053">"تسجيل المنطقة المحدّدة"</string>
     <string name="screen_capture_toolbar_screenshot_button" msgid="5676585348709494125">"لقطة شاشة"</string>
     <string name="screen_capture_toolbar_record_button" msgid="7533814143351870339">"تسجيل"</string>
+    <string name="screen_capture_region_box_top_left_handle_description" msgid="3619310281612042126">"المقبض في أعلى اليمين: يمكنك استخدام مفاتيح الأسهم لتغيير الحجم"</string>
+    <string name="screen_capture_region_box_top_right_handle_description" msgid="7732373569053287436">"المقبض في أعلى اليسار: يمكنك استخدام مفاتيح الأسهم لتغيير الحجم"</string>
+    <string name="screen_capture_region_box_bottom_right_handle_description" msgid="5444943380877006881">"المقبض في أسفل اليسار: يمكنك استخدام مفاتيح الأسهم لتغيير الحجم"</string>
+    <string name="screen_capture_region_box_bottom_left_handle_description" msgid="6095764656409143184">"المقبض في أسفل اليمين: يمكنك استخدام مفاتيح الأسهم لتغيير الحجم"</string>
     <string name="screen_share_toolbar_share_button" msgid="9182050596136815833">"مشاركة"</string>
     <string name="screen_share_no_select_app_thumbnail" msgid="1630012401570567430">"يُرجى اختيار تطبيق لمشاركته"</string>
     <string name="screen_share_audio_sharing_text" msgid="7829391478284315787">"مشاركة الصوت"</string>
     <string name="screen_share_app_window_sharing_title" msgid="2063554880747318383">"نافذة \"مشاركة التطبيق\""</string>
     <string name="screen_share_tab_sharing_title" msgid="1178046793832072728">"مشاركة علامة التبويب"</string>
     <string name="screen_share_entire_screen_sharing_title" msgid="9093580141248337998">"مشاركة الشاشة بأكملها"</string>
-    <string name="screen_share_disclaimer_app_sharing" msgid="4191319837838590771">"‏بعد مشاركة تطبيق، سيتمكّن \"[APP NAME]\" من رؤية أي محتوى معروض أو مشغَّل عليه، لذا يُرجى توخي الحذر بشأن معلوماتك الخاصة، مثل كلمات المرور وتفاصيل الدفع والرسائل والصور والمقاطع الصوتية والفيديوهات."</string>
-    <string name="screen_share_disclaimer_full_screen_sharing" msgid="6445373139864031364">"‏بعد مشاركة شاشتك بأكملها، سيتمكّن \"[APP NAME]\" من رؤية أي محتوى معروض عليها، لذا يُرجى توخي الحذر بشأن معلوماتك الخاصة، مثل كلمات المرور وتفاصيل الدفع والرسائل والصور والمقاطع الصوتية والفيديوهات."</string>
+    <string name="screen_share_disclaimer_app_sharing" msgid="1839029004749224549">"بعد مشاركة تطبيق، سيتمكّن \"<xliff:g id="APP_NAME">%1$s</xliff:g>\" من رؤية أي محتوى معروض أو مشغَّل عليه، لذا يُرجى توخي الحذر بشأن معلوماتك الحساسة."</string>
+    <string name="screen_share_disclaimer_tab_sharing" msgid="3811486274577713101">"بعد مشاركة علامة تبويب، سيتمكّن \"<xliff:g id="APP_NAME">%1$s</xliff:g>\" من رؤية أي محتوى معروض عليها، لذا يُرجى توخي الحذر بشأن معلوماتك الحساسة."</string>
+    <string name="screen_share_disclaimer_full_screen_sharing" msgid="5173795016606926338">"بعد مشاركة شاشتك بأكملها، سيتمكّن \"<xliff:g id="APP_NAME">%1$s</xliff:g>\" من رؤية أي محتوى معروض عليها، لذا يُرجى توخي الحذر بشأن معلوماتك الحساسة."</string>
+    <string name="screen_share_a11y_announcement" msgid="8938007210094494367">"لمشاركة علامات تبويب أو تطبيقات أو الشاشة بأكملها، يجب اختيارها ثم الضغط على \"مشاركة\"."</string>
+    <string name="screen_share_cancel_announcement" msgid="5940879227647436383">"انتهت محاولة بدء مشاركة الشاشة، ولم تتم مشاركتها مع أي مستخدِم."</string>
+    <string name="screen_share_a11y_sharing_app" msgid="3445421300603336524">"جارٍ الآن مشاركة تطبيق: \"<xliff:g id="APP_NAME">%1$s</xliff:g>\". ويمكنك استخدام مؤشر الخصوصية لإنهاء المشاركة."</string>
+    <string name="screen_share_a11y_sharing_tab" msgid="2963542572740628746">"جارٍ الآن مشاركة علامة التبويب: \"<xliff:g id="TAB_TITLE">%1$s</xliff:g>\". ويمكنك استخدام مؤشر الخصوصية لإنهاء المشاركة."</string>
+    <string name="screen_share_a11y_sharing_display" msgid="5919924998949424031">"جارٍ الآن مشاركة شاشة: \"<xliff:g id="DISPLAY_NAME">%1$s</xliff:g>\". ويمكنك استخدام مؤشر الخصوصية لإنهاء المشاركة."</string>
+    <string name="screen_share_a11y_stopped_sharing_app" msgid="6928492106881188404">"تم إيقاف مشاركة محتوى التطبيق \"<xliff:g id="APP_NAME">%1$s</xliff:g>\". ولم تتم مشاركة الشاشة مع أي مستخدم."</string>
+    <string name="screen_share_a11y_stopped_sharing_tab" msgid="5929089339684027985">"تم إيقاف مشاركة علامة التبويب \"<xliff:g id="TAB_TITLE">%1$s</xliff:g>\". ولم تتم مشاركة الشاشة مع أي مستخدم."</string>
+    <string name="screen_share_a11y_stopped_sharing_display" msgid="121502117308433983">"تم إيقاف مشاركة الشاشة \"<xliff:g id="DISPLAY_NAME">%1$s</xliff:g>\" ولم تتم مشاركتها مع أي مستخدم."</string>
+    <!-- no translation found for screen_share_a11y_close_button (8017115316741874857) -->
+    <skip />
+    <!-- no translation found for screen_share_a11y_tab_button_unselected (5363622532939787310) -->
+    <skip />
+    <!-- no translation found for screen_share_a11y_tab_button_selected (4304681826101817704) -->
+    <skip />
+    <!-- no translation found for screen_share_a11y_app_button_unselected (4539549394242556282) -->
+    <skip />
+    <!-- no translation found for screen_share_a11y_app_button_selected (6049272377472922732) -->
+    <skip />
+    <!-- no translation found for screen_share_a11y_fullscreen_button_unselected (2492516552817892989) -->
+    <skip />
+    <!-- no translation found for screen_share_a11y_fullscreen_button_selected (6706822615908429473) -->
+    <skip />
+    <!-- no translation found for screen_share_a11y_share_button_off (2004866083045967602) -->
+    <skip />
+    <!-- no translation found for screen_share_a11y_share_button_on (1311279200212158833) -->
+    <skip />
+    <!-- no translation found for screen_share_a11y_item_unselected (7479321583507874795) -->
+    <skip />
+    <!-- no translation found for screen_share_a11y_item_selected (2538971376128528640) -->
+    <skip />
+    <!-- no translation found for screen_share_a11y_tab_audio_on (7240792268381508075) -->
+    <skip />
+    <!-- no translation found for screen_share_a11y_tab_audio_off (8545238601433952854) -->
+    <skip />
     <string name="screen_capture_toolbar_app_window_button_screenshot_a11y" msgid="1357560392667941303">"أخْذ لقطة شاشة للنافذة"</string>
     <string name="screen_capture_toolbar_app_window_button_record_a11y" msgid="8984966592912823394">"تسجيل النافذة"</string>
     <string name="screen_capture_toolbar_region_button_screenshot_a11y" msgid="2102262602357521192">"أخْذ لقطة شاشة للمنطقة المحدّدة"</string>
     <string name="screen_capture_toolbar_region_button_record_a11y" msgid="6829009792885846867">"تسجيل المنطقة المحدّدة"</string>
     <string name="screen_capture_toolbar_fullscreen_button_screenshot_a11y" msgid="8699983355979869210">"أخْذ لقطة للشاشة بأكملها"</string>
     <string name="screen_capture_toolbar_fullscreen_button_record_a11y" msgid="852148867883959158">"تسجيل الشاشة بأكملها"</string>
-    <string name="screen_capture_toolbar_settings_button_a11y" msgid="8014446956996739704">"إعدادات تصوير الشاشة"</string>
+    <string name="screen_capture_toolbar_settings_button_a11y" msgid="8014446956996739704">"إعدادات لقطة الشاشة"</string>
     <string name="screen_capture_post_recording_shelf_share_button_a11y" msgid="2907313384921655711">"مشاركة تسجيل الشاشة"</string>
     <string name="screen_capture_post_recording_shelf_folder_button_a11y" msgid="4217075254383938093">"فتح تسجيل الشاشة في مدير الملفات"</string>
     <string name="screen_capture_post_recording_shelf_delete_button_a11y" msgid="8519897681775354217">"حذف تسجيل الشاشة"</string>
@@ -196,6 +246,7 @@
     <string name="screen_capture_front_camera" msgid="1214647538302639358">"الكاميرا الأمامية"</string>
     <string name="screen_capture_region_dimensions" msgid="2317064050253056256">"‫<xliff:g id="WIDTH">%1$d</xliff:g> × <xliff:g id="HEIGHT">%2$d</xliff:g>"</string>
     <string name="screen_share_privacy_indicator_stop_sharing" msgid="2297045039651417274">"إيقاف المشاركة"</string>
+    <string name="share_screen_privacy_indicator_accessibility_label" msgid="8748931450480306816">"ميزة \"مشاركة الشاشة\" مفعَّلة. ويمكنك استخدام مؤشر الخصوصية لإنهاء المشاركة."</string>
     <string name="share_to_app_chip_accessibility_label" msgid="4210256229976947065">"جارِ مشاركة محتوى الشاشة"</string>
     <string name="share_to_app_chip_accessibility_label_generic" msgid="5517431657924536133">"مشاركة المحتوى"</string>
     <string name="share_to_app_stop_dialog_title" msgid="9212915050910250438">"هل تريد إيقاف مشاركة الشاشة؟"</string>
@@ -380,7 +431,9 @@
     <string name="accessibility_clear_all" msgid="970525598287244592">"محو جميع الإشعارات."</string>
     <string name="accessibility_notification_bell" msgid="7149451526721220526">"الإشعارات"</string>
     <string name="accessibility_status_bar_assistant_icon" msgid="1174898709836451013">"‏مساعد Google"</string>
-    <string name="accessibility_status_bar_input_method_indicator" msgid="4316411266975554038">"أسلوب الإدخال"</string>
+    <string name="accessibility_status_bar_input_method_indicator" msgid="4911669064186093506">"لوحة المفاتيح"</string>
+    <!-- no translation found for input_method_switcher_title_large_screen (8490419050265486980) -->
+    <skip />
     <string name="notification_group_overflow_indicator" msgid="7605120293801012648">"+ <xliff:g id="NUMBER">%s</xliff:g>"</string>
     <string name="notification_group_overflow_description" msgid="7176322877233433278">"{count,plural, =1{إشعار واحد آخر بداخل المجموعة.}zero{# إشعار آخر بداخل المجموعة.}two{إشعاران آخران بداخل المجموعة.}few{# إشعارات أخرى بداخل المجموعة.}many{# إشعارًا آخر بداخل المجموعة.}other{# إشعار آخر بداخل المجموعة.}}"</string>
     <string name="accessibility_rotation_lock_on_landscape" msgid="936972553861524360">"تم قفل الشاشة في الاتجاه الأفقي."</string>
@@ -930,14 +983,14 @@
     <string name="notification_guts_recs_summary" msgid="8391881843238947007">"النشرات الإخبارية والوسائط المقترَحة والمزيد"</string>
     <string name="notification_onboarding_summaries_turn_on" msgid="3831339570984683297">"يمكنك تفعيل الميزة من خلال \"الإعدادات\""</string>
     <string name="notification_onboarding_summaries_message" msgid="6061524903176459064">"يمكن الآن تلخيص المحادثات الطويلة لتقديم ملخّصات سريعة"</string>
+    <string name="notification_onboarding_summaries_message_with_apps" msgid="5320980333818238465">"يمكن لجهازك وتطبيقاتك الآن تلخيص المحادثات الطويلة لتقديم ملخّصات سريعة"</string>
     <string name="notification_onboarding_bundles_message" msgid="4612908213178622912">"تعمل ميزة \"منظّم الإشعارات\" على جمع الإشعارات ذات الأولوية المنخفضة وكتم صوتها. ويمكنك إضافة المزيد من الفئات في \"الإعدادات\"."</string>
     <string name="notification_bundle_header_counter" msgid="5515532701569242265">"{count,plural, =1{إشعار واحد}zero{‫# إشعار}two{إشعاران}few{‫# إشعارات}many{‫# إشعارًا}other{‫# إشعار}}"</string>
     <string name="notification_bundle_header_joined_description" msgid="4517556837418088139">"<xliff:g id="NAME">%1$s</xliff:g>، <xliff:g id="NUM_NOTIFICATIONS">%2$s</xliff:g>"</string>
     <string name="inline_done_button" msgid="6043094985588909584">"تمّ"</string>
     <string name="inline_ok_button" msgid="603075490581280343">"تطبيق"</string>
     <string name="inline_turn_off_notifications" msgid="2653064779176881329">"إيقاف"</string>
-    <!-- no translation found for bridged_device_type_unknown (8435318668271946936) -->
-    <skip />
+    <string name="bridged_device_type_unknown" msgid="8435318668271946936">"جهاز"</string>
     <string name="bridged_device_type_phone" msgid="7971199513068521770">"الهاتف"</string>
     <string name="bridged_device_type_tablet" msgid="7403330807933649592">"الجهاز اللوحي"</string>
     <string name="bridged_device_type_laptop" msgid="8027976360936787349">"الكمبيوتر المحمول"</string>
@@ -1204,7 +1257,7 @@
     <string name="accessibility_shortcutchooser_toprow_tutorial_dialog_positive_button_text" msgid="7095579813773247709">"إضافة ميزات"</string>
     <string name="accessibility_shortcutchooser_editor_dialog_title" msgid="7881631878787325869">"إعداد \"<xliff:g id="ID_1">%1$s</xliff:g>\""</string>
     <string name="accessibility_shortcutchooser_done_button" msgid="5288975589451082156">"تم"</string>
-    <string name="accessibility_shortcutchooser_picker_dialog_title" msgid="6067291073174568750">"اختيار عنصر"</string>
+    <string name="accessibility_shortcutchooser_picker_dialog_title" msgid="6067291073174568750">"اختَر ميزة"</string>
     <string name="accessibility_shortcutchooser_edit_button" msgid="1924449663239985111">"تعديل"</string>
     <string name="accessibility_quick_access_dialog_title" msgid="8792322423145117379">"تسهيل الاستخدام"</string>
     <string name="tuner_lock_screen" msgid="2267383813241144544">"شاشة القفل"</string>
@@ -1218,7 +1271,7 @@
     <string name="lockscreen_shortcut_right" msgid="4138414674531853719">"اختصار اليمين"</string>
     <string name="lockscreen_unlock_left" msgid="1417801334370269374">"اختصار اليسار يلغي أيضًا تأمين"</string>
     <string name="lockscreen_unlock_right" msgid="4658008735541075346">"اختصار اليمين يلغي أيضًا تأمين"</string>
-    <string name="lockscreen_none" msgid="4710862479308909198">"بدون"</string>
+    <string name="lockscreen_none" msgid="4710862479308909198">"بدون اختصار"</string>
     <string name="tuner_launch_app" msgid="3906265365971743305">"تشغيل <xliff:g id="APP">%1$s</xliff:g>"</string>
     <string name="tuner_other_apps" msgid="7767462881742291204">"تطبيقات أخرى"</string>
     <string name="tuner_circle" msgid="5270591778160525693">"دائرة"</string>
@@ -1350,7 +1403,7 @@
     <string name="accessibility_floating_button_action_remove_menu" msgid="6730432848162552135">"إزالة"</string>
     <string name="accessibility_floating_button_action_double_tap_to_toggle" msgid="7976492639670692037">"إيقاف/تفعيل"</string>
     <string name="accessibility_floating_button_action_edit" msgid="1688227814600463987">"تعديل"</string>
-    <string name="quick_controls_title" msgid="6839108006171302273">"التحكم بالجهاز"</string>
+    <string name="quick_controls_title" msgid="6839108006171302273">"أدوات التحكم بالجهاز"</string>
     <string name="controls_providers_title" msgid="6879775889857085056">"اختيار تطبيق لإضافة عناصر التحكّم"</string>
     <string name="controls_number_of_favorites" msgid="4481806788981836355">"{count,plural, =1{تمت إضافة عنصر تحكّم واحد.}zero{تمت إضافة # عنصر تحكّم.}two{تمت إضافة عنصرَي تحكّم.}few{تمت إضافة # عناصر تحكّم.}many{تمت إضافة # عنصر تحكّم.}other{تمت إضافة # عنصر تحكّم.}}"</string>
     <string name="controls_removed" msgid="3731789252222856959">"تمت الإزالة"</string>
@@ -1517,7 +1570,7 @@
     <string name="wifi_wont_autoconnect_for_now" msgid="5782282612749867762">"‏لن يتم الاتصال بشبكة Wi-Fi تلقائيًا في الوقت الحالي."</string>
     <string name="see_all_networks" msgid="3773666844913168122">"عرض الكل"</string>
     <string name="to_switch_networks_disconnect_ethernet" msgid="6698111101156951955">"للتبديل بين الشبكات، يجب فصل إيثرنت."</string>
-    <string name="wifi_scan_notify_message" msgid="3753839537448621794">"‏لتحسين تجربتك على الجهاز، يظل بإمكان التطبيقات والخدمات البحث عن شبكات Wi‑Fi في أي وقت، حتى عند إيقاف شبكة Wi‑Fi. وبإمكانك تغيير هذا الخيار في إعدادات البحث عن شبكات Wi-Fi. "<annotation id="link">"تغيير"</annotation></string>
+    <string name="wifi_scan_notify_message" msgid="3753839537448621794">"‏لتحسين تجربتك على الجهاز، يظل بإمكان التطبيقات والخدمات البحث عن شبكات Wi‑Fi في أي وقت، حتى عند إيقاف إعداد Wi‑Fi. وبإمكانك تغيير هذا الخيار في إعدادات البحث عن شبكات Wi-Fi. "<annotation id="link">"تغيير"</annotation></string>
     <string name="turn_off_airplane_mode" msgid="8425587763226548579">"إيقاف وضع الطيران"</string>
     <string name="qs_tile_request_dialog_text" msgid="3501359944139877694">"يريد تطبيق <xliff:g id="APPNAME">%1$s</xliff:g> إضافة المربّع التالي إلى \"الإعدادات السريعة\""</string>
     <string name="qs_tile_request_dialog_text_with_size" msgid="732578771040573291">"يريد \"<xliff:g id="APPNAME">%1$s</xliff:g>\" إضافة مربّع إلى \"الإعدادات السريعة\". يُرجى اختيار حجم المربّع للمتابعة."</string>
@@ -1780,8 +1833,58 @@
     <string name="accessibility_close_overlay_action" msgid="3581095146209387670">"رجوع"</string>
     <string name="ambient_cue_autofill_action" msgid="9213025887835308128">"الملء التلقائي"</string>
     <string name="ambient_cue_expand_action" msgid="6803711089932959312">"توسيع"</string>
-    <string name="location_button_text_share_precise_location" msgid="5341882050169860712">"مشاركة الموقع الجغرافي الدقيق"</string>
-    <string name="location_button_text_use_precise_location" msgid="3499475231656390476">"استخدام الموقع الجغرافي الدقيق"</string>
-    <string name="location_button_text_near_precise_location" msgid="3607275724182981412">"بالقرب من الموقع الجغرافي الدقيق"</string>
     <string name="location_button_text_precise_location" msgid="4441259889842542799">"الموقع الجغرافي الدقيق"</string>
+    <string name="location_button_text_use_precise_location" msgid="3499475231656390476">"استخدام الموقع الجغرافي الدقيق"</string>
+    <string name="location_button_text_share_precise_location" msgid="5341882050169860712">"مشاركة الموقع الجغرافي الدقيق"</string>
+    <string name="location_button_text_near_my_precise_location" msgid="7590342799002942963">"بالقرب من موقعي الجغرافي الدقيق"</string>
+    <string name="location_button_text_near_your_precise_location" msgid="3792598666253599055">"بالقرب من موقعك الجغرافي الدقيق"</string>
+    <string name="privacy_chip_use_string" msgid="979159484631969073">"<xliff:g id="SENSOR">%1$s</xliff:g> قيد الاستخدام"</string>
+    <string name="privacy_chip_use_string_with_app" msgid="6807216002072346877">"<xliff:g id="SENSOR">%1$s</xliff:g> قيد الاستخدام بواسطة \"<xliff:g id="APP">%2$s</xliff:g>\""</string>
+    <string name="privacy_chip_camera_and_mic_text" msgid="6254449489859255607">"الكاميرا والميكروفون"</string>
+    <string name="av_panel_title" msgid="455230832870768515">"الخصوصية"</string>
+    <string name="sensor_activity_header" msgid="2145727448786698035">"يمكنك الاطّلاع على التطبيقات التي تستخدم هذه الأذونات حاليًا أو استخدمتها مؤخرًا."</string>
+    <string name="sensor_activity_see_all_access_button" msgid="8005330122289549048">"عرض كل أذونات الوصول"</string>
+    <string name="sensor_activity_camera_label" msgid="4260675418606211259">"الكاميرا"</string>
+    <string name="sensor_activity_microphone_label" msgid="4012136402420177411">"الميكروفون"</string>
+    <string name="sensor_activity_manage_access_button" msgid="1275701280501357102">"إدارة أذونات الوصول"</string>
+    <string name="sensor_activity_close_app_button" msgid="6907314738150753330">"إغلاق التطبيق"</string>
+    <string name="sensor_activity_back_button_cd" msgid="6894532284650291222">"رجوع"</string>
+    <string name="privacy_chip_apps_using_sensor_suffix" msgid="527247786536767096">"و<xliff:g id="COUNT">%1$d</xliff:g> غيره"</string>
+    <string name="privacy_chip_camera_in_use" msgid="5163494654848590528">"الكاميرا قيد الاستخدام"</string>
+    <string name="privacy_chip_mic_in_use" msgid="1586091297556363367">"الميكروفون قيد الاستخدام"</string>
+    <string name="privacy_chip_camera_mic_in_use" msgid="5179267787210197484">"الكاميرا والميكروفون قيد الاستخدام"</string>
+    <string name="av_camera_portrait_touch_up" msgid="5191856296212427203">"تحسين صورة الوجه"</string>
+    <string name="av_mic_label" msgid="5427348054144789879">"الميكروفون"</string>
+    <string name="av_camera_label" msgid="7719772172590702343">"الكاميرا"</string>
+    <string name="av_camera_blur_drill_in_title" msgid="2250600375798981511">"تمويه الخلفية"</string>
+    <string name="av_camera_blur_off" msgid="3170334995799202022">"تمويه الخلفية غير مفعّل"</string>
+    <string name="av_camera_blur_light" msgid="5666055368940059418">"تمويه خفيف للخلفية"</string>
+    <string name="av_camera_blur_full" msgid="3276351992811619332">"تمويه كامل للخلفية"</string>
+    <string name="av_camera_improve_lighting" msgid="1540549414296669133">"تحسين الإضاءة"</string>
+    <string name="av_camera_face_retouch" msgid="45890971969486224">"تحسين صورة الوجه"</string>
+    <string name="av_camera_framing" msgid="5108462267843042492">"التكبير التلقائي"</string>
+    <string name="av_studio_mic" msgid="2614843492629357766">"ميكروفون استوديو"</string>
+    <string name="av_studio_look" msgid="621893522645557619">"مُحسِّن الصورة الذكي"</string>
+    <string name="av_studio_look_effects" msgid="4105109585851068415">"‏عدد التأثيرات: %d"</string>
+    <string name="av_blur" msgid="405131343487260171">"تمويه"</string>
+    <string name="av_live_captions" msgid="7819416886586903077">"النسخ النصي التلقائي"</string>
+    <string name="accessibility_hearing_device_battery_level" msgid="1032601787487328432">"‏البطارية: ‎%s"</string>
+    <string name="accessibility_hearing_device_left_right_battery_level" msgid="5327672450604052979">"‏بطارية السماعة اليسرى: ‎%1$s    اليمنى: ‎%2$s"</string>
+    <string name="accessibility_hearing_device_left_battery_level" msgid="327961080394238636">"‏بطارية السماعة اليسرى: ‎%1$s"</string>
+    <string name="accessibility_hearing_device_right_battery_level" msgid="7598843215226414563">"‏بطارية السماعة اليمنى: ‎%1$s"</string>
+    <string name="accessibility_hearing_device_notification_channel_name" msgid="7365020777623709400">"حالة سماعة الأذن الطبية"</string>
+    <!-- no translation found for more_options_edit (6337988646114341329) -->
+    <skip />
+    <!-- no translation found for more_options_move (2226159413422979066) -->
+    <skip />
+    <!-- no translation found for more_options_remove_all (194855000797536179) -->
+    <skip />
+    <!-- no translation found for floating_menu_more_options_label (7859269790323628599) -->
+    <skip />
+    <!-- no translation found for dream_setup_title (7996530071414508238) -->
+    <skip />
+    <!-- no translation found for dream_setup_button_not_now (8028385323668620805) -->
+    <skip />
+    <!-- no translation found for dream_setup_button_setup (4755361016017554826) -->
+    <skip />
 </resources>

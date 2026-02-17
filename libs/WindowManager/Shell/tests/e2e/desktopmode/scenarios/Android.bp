@@ -70,18 +70,16 @@ test_module_config {
     base: "FunctionalTestsDesktopMode",
     test_suites: ["device-tests"],
     exclude_filters: [
-        "com.android.wm.shell.functional.DisableDisplayMirroringSwitchTest",
-        "com.android.wm.shell.functional.EnableDisplayMirroringSwitchTest",
         "com.android.wm.shell.functional.appcompat.DialogStaysInsideDesktopAppTest",
         "com.android.wm.shell.functional.appcompat.ResizeActivityEmbeddedAppToMinimumWindowTest",
         "com.android.wm.shell.functional.appcompat.RestartSizeCompatAppInDesktopMode",
         "com.android.wm.shell.functional.appcompat.ShowAppDialogInDesktopModeTest",
         "com.android.wm.shell.functional.appcompat.ShowQuickShareDialogFromQuickSettingsTest",
+        "com.android.wm.shell.functional.apptoweb.AppToWebFirstRunDialogTest",
+        "com.android.wm.shell.functional.clientfullscreenrequest.FullscreenModeRequestFromDesktopAndBackTest",
         "com.android.wm.shell.functional.drag.DragAppWindowMultiWindowAndPipTest",
+        "com.android.wm.shell.functional.drag.DragAppWindowMultiWindowTest",
         "com.android.wm.shell.functional.drag.DragAppWindowSingleWindowTest",
-        "com.android.wm.shell.functional.exit.ExitDesktopToFullScreenWithAppHeaderMenuTest",
-        "com.android.wm.shell.functional.exit.ExitDesktopToSplitScreenWithAppHeaderMenuTest",
-        "com.android.wm.shell.functional.exit.ExitDesktopWithDragToTopDragZoneTest",
         "com.android.wm.shell.functional.externaldisplay.DragMoveWindowToNextDisplayTest",
         "com.android.wm.shell.functional.externaldisplay.MaximizeAppWindowWithDragToTopDragZoneInDesktopFirstTest",
         "com.android.wm.shell.functional.externaldisplay.MoveToNextDisplayProjectedTest",
@@ -105,6 +103,10 @@ test_module_config {
         "com.android.wm.shell.functional.fundamentals.enter.EnterDesktopWithDragWindowsLimitTest",
         "com.android.wm.shell.functional.fundamentals.enter.EnterSplitScreenWithAppHandleMenuTest",
         "com.android.wm.shell.functional.fundamentals.enter.EnterSplitScreenWithDragTest",
+        "com.android.wm.shell.functional.fundamentals.exit.ExitDesktopToFullScreenWithAppHeaderMenuTest",
+        "com.android.wm.shell.functional.fundamentals.exit.ExitDesktopToSplitScreenWithAppHeaderMenuTest",
+        "com.android.wm.shell.functional.fundamentals.exit.ExitDesktopWithDragToTopDragZoneTest",
+        "com.android.wm.shell.functional.fundamentals.focus.FocusAppByDragResizeTest",
         "com.android.wm.shell.functional.fundamentals.focus.FocusAppFromAllAppsTest",
         "com.android.wm.shell.functional.fundamentals.focus.FocusAppFromTaskbarOverflowTest",
         "com.android.wm.shell.functional.fundamentals.focus.FocusAppFromTaskbarTest",
@@ -176,20 +178,6 @@ test_module_config {
 }
 
 test_module_config {
-    name: "FunctionalTestsDesktopMode-DisableDisplayMirroringSwitchTest",
-    base: "FunctionalTestsDesktopMode",
-    test_suites: ["device-tests"],
-    include_filters: ["com.android.wm.shell.functional.DisableDisplayMirroringSwitchTest"],
-}
-
-test_module_config {
-    name: "FunctionalTestsDesktopMode-EnableDisplayMirroringSwitchTest",
-    base: "FunctionalTestsDesktopMode",
-    test_suites: ["device-tests"],
-    include_filters: ["com.android.wm.shell.functional.EnableDisplayMirroringSwitchTest"],
-}
-
-test_module_config {
     name: "FunctionalTestsDesktopMode-appcompat-DialogStaysInsideDesktopAppTest",
     base: "FunctionalTestsDesktopMode",
     test_suites: ["device-tests"],
@@ -222,6 +210,13 @@ test_module_config {
     base: "FunctionalTestsDesktopMode",
     test_suites: ["device-tests"],
     include_filters: ["com.android.wm.shell.functional.appcompat.ShowQuickShareDialogFromQuickSettingsTest"],
+}
+
+test_module_config {
+    name: "FunctionalTestsDesktopMode-apptoweb-AppToWebFirstRunDialogTest",
+    base: "FunctionalTestsDesktopMode",
+    test_suites: ["device-tests"],
+    include_filters: ["com.android.wm.shell.functional.apptoweb.AppToWebFirstRunDialogTest"],
 }
 
 test_module_config {
@@ -425,6 +420,13 @@ test_module_config {
     base: "FunctionalTestsDesktopMode",
     test_suites: ["device-tests"],
     include_filters: ["com.android.wm.shell.functional.fundamentals.exit.ExitDesktopWithDragToTopDragZoneTest"],
+}
+
+test_module_config {
+    name: "FunctionalTestsDesktopMode-fundamentals-focus-FocusAppByDragResizeTest",
+    base: "FunctionalTestsDesktopMode",
+    test_suites: ["device-tests"],
+    include_filters: ["com.android.wm.shell.functional.fundamentals.focus.FocusAppByDragResizeTest"],
 }
 
 test_module_config {
@@ -656,13 +658,6 @@ test_module_config {
     base: "FunctionalTestsDesktopMode",
     test_suites: ["device-tests"],
     include_filters: ["com.android.wm.shell.functional.mediaprojection.StartAppMediaProjectionWithMaxDesktopWindowsTest"],
-}
-
-test_module_config {
-    name: "FunctionalTestsDesktopMode-mediaprojection-StartAppScreenRecordingFromNotificationTest",
-    base: "FunctionalTestsDesktopMode",
-    test_suites: ["device-tests"],
-    include_filters: ["com.android.wm.shell.functional.mediaprojection.StartAppScreenRecordingFromNotificationTest"],
 }
 
 test_module_config {

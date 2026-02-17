@@ -119,7 +119,7 @@ public final class SubscriptionPlan implements Parcelable {
 
     /** Value indicating data rate is unknown. */
     @FlaggedApi(Flags.FLAG_SUBSCRIPTION_PLAN_ENHANCEMENT)
-    public static final int BITRATE_UNKNOWN = -1;
+    public static final long BITRATE_UNKNOWN = -1;
 
     /** Value indicating a timestamp is unknown. */
     public static final long TIME_UNKNOWN = -1;
@@ -141,7 +141,6 @@ public final class SubscriptionPlan implements Parcelable {
      * This is the default value, used when the carrier is unable to provide the current status
      * of the subscription.
      */
-    @FlaggedApi(Flags.FLAG_SUBSCRIPTION_PLAN_ALLOW_STATUS_AND_END_DATE)
     public static final int SUBSCRIPTION_STATUS_UNKNOWN = 0;
 
     /**
@@ -150,7 +149,6 @@ public final class SubscriptionPlan implements Parcelable {
      * This indicates that the subscription is in good standing and all services are available
      * to the user.
      */
-    @FlaggedApi(Flags.FLAG_SUBSCRIPTION_PLAN_ALLOW_STATUS_AND_END_DATE)
     public static final int SUBSCRIPTION_STATUS_ACTIVE = 1;
 
     /**
@@ -159,7 +157,6 @@ public final class SubscriptionPlan implements Parcelable {
      * This status means the subscription is not currently in service. This could be because it
      * has been canceled, has expired, or has not yet been activated.
      */
-    @FlaggedApi(Flags.FLAG_SUBSCRIPTION_PLAN_ALLOW_STATUS_AND_END_DATE)
     public static final int SUBSCRIPTION_STATUS_INACTIVE = 2;
 
     /**
@@ -169,7 +166,6 @@ public final class SubscriptionPlan implements Parcelable {
      * features or limitations than a standard subscription. After the trial period ends, the
      * status will typically change to active or inactive.
      */
-    @FlaggedApi(Flags.FLAG_SUBSCRIPTION_PLAN_ALLOW_STATUS_AND_END_DATE)
     public static final int SUBSCRIPTION_STATUS_TRIAL = 3;
 
     /**
@@ -179,7 +175,6 @@ public final class SubscriptionPlan implements Parcelable {
      * issues, a user's request, or a violation of the carrier's terms of service. Services are
      * unavailable, but the subscription can typically be reactivated.
      */
-    @FlaggedApi(Flags.FLAG_SUBSCRIPTION_PLAN_ALLOW_STATUS_AND_END_DATE)
     public static final int SUBSCRIPTION_STATUS_SUSPENDED = 4;
 
     /** @hide */
@@ -295,7 +290,7 @@ public final class SubscriptionPlan implements Parcelable {
     public static final int PLAN_TYPE_TETHERING = 10;
 
     /**
-     * Value indicating that the SubscriptionPlan ID is not available.
+     * Value indicating that the SubscriptionPlan ID is not specified.
      */
     @FlaggedApi(Flags.FLAG_SUBSCRIPTION_PLAN_ENHANCEMENT)
     public static final int UNSPECIFIED_ID = -1;
@@ -434,7 +429,7 @@ public final class SubscriptionPlan implements Parcelable {
      * The value may be {@link #BITRATE_UNKNOWN} if this information is not available from the
      * carrier or not applicable to the plan.
      */
-    private final int mStreamingAppMaxDownlinkKbps;
+    private final long mStreamingAppMaxDownlinkKbps;
 
     /**
      * The maximum upstream bitrate for streaming applications on this subscription plan, in
@@ -448,7 +443,7 @@ public final class SubscriptionPlan implements Parcelable {
      *
      * @see #BITRATE_UNKNOWN
      */
-    private final int mStreamingAppMaxUplinkKbps;
+    private final long mStreamingAppMaxUplinkKbps;
 
 
     /**
@@ -556,8 +551,8 @@ public final class SubscriptionPlan implements Parcelable {
         mSubscriptionStatus = in.readInt();
         mTypes = Arrays.stream(in.createIntArray())
                 .boxed().collect(Collectors.toUnmodifiableSet());
-        mStreamingAppMaxDownlinkKbps = in.readInt();
-        mStreamingAppMaxUplinkKbps = in.readInt();
+        mStreamingAppMaxDownlinkKbps = in.readLong();
+        mStreamingAppMaxUplinkKbps = in.readLong();
         mDataUsageResetTime = RecurrenceRule.convertZonedDateTime(in.readString());
         mId = in.readInt();
     }
@@ -579,8 +574,8 @@ public final class SubscriptionPlan implements Parcelable {
         dest.writeIntArray(mNetworkTypes.stream().mapToInt(Integer::intValue).toArray());
         dest.writeInt(mSubscriptionStatus);
         dest.writeIntArray(mTypes.stream().mapToInt(Integer::intValue).toArray());
-        dest.writeInt(mStreamingAppMaxDownlinkKbps);
-        dest.writeInt(mStreamingAppMaxUplinkKbps);
+        dest.writeLong(mStreamingAppMaxDownlinkKbps);
+        dest.writeLong(mStreamingAppMaxUplinkKbps);
         dest.writeString(RecurrenceRule.convertZonedDateTime(mDataUsageResetTime));
         dest.writeInt(mId);
     }
@@ -720,7 +715,6 @@ public final class SubscriptionPlan implements Parcelable {
      *
      * @return The plan's end date as a {@link ZonedDateTime}, or {@code null} if unavailable.
      */
-    @FlaggedApi(Flags.FLAG_SUBSCRIPTION_PLAN_ALLOW_STATUS_AND_END_DATE)
     @Nullable
     public ZonedDateTime getPlanEndDate() {
         // ZonedDateTime is immutable, so no need to create a defensive copy.
@@ -869,7 +863,6 @@ public final class SubscriptionPlan implements Parcelable {
      * @see #SUBSCRIPTION_STATUS_TRIAL
      * @see #SUBSCRIPTION_STATUS_SUSPENDED
      */
-    @FlaggedApi(Flags.FLAG_SUBSCRIPTION_PLAN_ALLOW_STATUS_AND_END_DATE)
     @SubscriptionStatus
     public int getSubscriptionStatus() {
         return mSubscriptionStatus;
@@ -890,7 +883,7 @@ public final class SubscriptionPlan implements Parcelable {
      *
      * @hide
      */
-    public int getStreamingAppMaxDownlinkKbps() {
+    public long getStreamingAppMaxDownlinkKbps() {
         return mStreamingAppMaxDownlinkKbps;
     }
 
@@ -909,7 +902,7 @@ public final class SubscriptionPlan implements Parcelable {
      *
      * @hide
      */
-    public int getStreamingAppMaxUplinkKbps() {
+    public long getStreamingAppMaxUplinkKbps() {
         return mStreamingAppMaxUplinkKbps;
     }
 
@@ -1130,7 +1123,7 @@ public final class SubscriptionPlan implements Parcelable {
          * The value may be {@link #BITRATE_UNKNOWN} if this information is not available from the
          * carrier or not applicable to the plan.
          */
-        private int mStreamingAppMaxDownlinkKbps = BITRATE_UNKNOWN;
+        private long mStreamingAppMaxDownlinkKbps = BITRATE_UNKNOWN;
 
         /**
          * The maximum upstream bitrate for streaming applications, in kilobits per second (Kbps)
@@ -1145,7 +1138,7 @@ public final class SubscriptionPlan implements Parcelable {
          * The value may be {@link #BITRATE_UNKNOWN} if this information is not available from the
          * carrier or not applicable to the plan.
          */
-        private int mStreamingAppMaxUplinkKbps = BITRATE_UNKNOWN;
+        private long mStreamingAppMaxUplinkKbps = BITRATE_UNKNOWN;
 
         /**
          * The time at which the data usage allowance resets.
@@ -1399,7 +1392,6 @@ public final class SubscriptionPlan implements Parcelable {
          *
          * @param subscriptionStatus the current subscription status
          */
-        @FlaggedApi(Flags.FLAG_SUBSCRIPTION_PLAN_ALLOW_STATUS_AND_END_DATE)
         @NonNull
         public Builder setSubscriptionStatus(@SubscriptionStatus int subscriptionStatus) {
             if (subscriptionStatus < SUBSCRIPTION_STATUS_UNKNOWN
@@ -1419,7 +1411,7 @@ public final class SubscriptionPlan implements Parcelable {
          */
         @FlaggedApi(Flags.FLAG_SUBSCRIPTION_PLAN_ENHANCEMENT)
         @NonNull
-        public Builder setStreamingAppMaxDownlinkKbps(int downlinkKbps) {
+        public Builder setStreamingAppMaxDownlinkKbps(long downlinkKbps) {
             mStreamingAppMaxDownlinkKbps = downlinkKbps;
             return this;
         }
@@ -1432,7 +1424,7 @@ public final class SubscriptionPlan implements Parcelable {
          */
         @FlaggedApi(Flags.FLAG_SUBSCRIPTION_PLAN_ENHANCEMENT)
         @NonNull
-        public Builder setStreamingAppMaxUplinkKbps(int uplinkKbps) {
+        public Builder setStreamingAppMaxUplinkKbps(long uplinkKbps) {
             mStreamingAppMaxUplinkKbps = uplinkKbps;
             return this;
         }

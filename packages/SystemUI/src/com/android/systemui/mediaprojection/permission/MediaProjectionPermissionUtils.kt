@@ -74,16 +74,17 @@ object MediaProjectionPermissionUtils {
     }
 
     fun getConnectedDisplays(displayManager: DisplayManager?): List<Display> {
-        if (!Flags.mediaProjectionConnectedDisplay()) {
-            return emptyList()
-        }
-        if (!Flags.mediaProjectionConnectedDisplayScreenSharing()) {
-            return emptyList()
-        }
         if (displayManager == null) {
             return emptyList()
         }
-        return displayManager.displays.filter {
+        return filterProjectableConnectedDisplays(displayManager.displays.asIterable())
+    }
+
+    fun filterProjectableConnectedDisplays(displays: Iterable<Display>): List<Display> {
+        if (!Flags.mediaProjectionConnectedDisplay()) {
+            return emptyList()
+        }
+        return displays.filter {
             it.displayId != Display.DEFAULT_DISPLAY &&
                 (!filterDeviceTypeFlag || it.type in RECORDABLE_DISPLAY_TYPES)
         }

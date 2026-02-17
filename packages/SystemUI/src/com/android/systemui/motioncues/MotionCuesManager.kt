@@ -17,7 +17,8 @@
 package com.android.systemui.motioncues
 
 import android.app.motioncues.IMotionCuesCallback
-import android.app.motioncues.MotionCuesData
+import android.app.motioncues.MotionCuesVisualStyle
+import android.app.motioncues.MotionCuesService.SERVICE_INTERFACE
 import android.app.motioncues.MotionCuesService.EXTRA_API_CALLBACK
 import android.app.motioncues.MotionCuesSettings
 import android.content.ComponentName
@@ -29,7 +30,10 @@ import android.util.Log
 import android.view.WindowManager
 import com.android.systemui.CoreStartable
 import com.android.systemui.dagger.SysUISingleton
+import com.android.systemui.dagger.qualifiers.Main
+import com.android.systemui.settings.UserTracker
 import com.android.systemui.statusbar.CommandQueue
+import java.util.concurrent.Executor
 import javax.inject.Inject
 
 /**
@@ -40,8 +44,10 @@ import javax.inject.Inject
 class MotionCuesManager @Inject constructor(
     private val context: Context,
     private val commandQueue: CommandQueue,
-    val motionCuesUi: MotionCuesUi
-) : CoreStartable, CommandQueue.Callbacks {
+    val motionCuesUi: MotionCuesUi,
+    private val userTracker: UserTracker,
+    @Main private val mainExecutor: Executor
+) : CoreStartable, CommandQueue.Callbacks, UserTracker.Callback {
     companion object {
         private const val TAG = "MotionCuesManager"
     }
@@ -93,7 +99,7 @@ class MotionCuesManager @Inject constructor(
         }
 
         val motionCuesIntent =
-            Intent().apply {
+            Intent(SERVICE_INTERFACE).apply {
                 component = componentName
                 putExtra(EXTRA_API_CALLBACK, motionCuesCallback.asBinder())
             }
@@ -136,6 +142,12 @@ class MotionCuesManager @Inject constructor(
 
     override fun start() {
         commandQueue.addCallback(this)
+        userTracker.addCallback(this, mainExecutor)
+    }
+
+    override fun onUserChanged(newUser: Int, userContext: Context) {
+        Log.i(TAG, "Ending Motion Cues Session on user change.")
+        endMotionCuesSession()
     }
 
     private inner class MotionCuesCallbackImpl : IMotionCuesCallback.Stub() {
@@ -143,8 +155,8 @@ class MotionCuesManager @Inject constructor(
             motionCuesUi.updateBubblePos(dx, dy)
         }
 
-        override fun updateMotionCuesData(motionCuesData: MotionCuesData) {
-            motionCuesUi.updateMotionCuesData(motionCuesData)
+        override fun updateMotionCuesVisualStyle(motionCuesVisualStyle: MotionCuesVisualStyle) {
+            motionCuesUi.updateMotionCuesVisualStyle(motionCuesVisualStyle)
         }
     }
 }

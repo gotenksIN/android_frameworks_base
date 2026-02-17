@@ -22,6 +22,7 @@ import android.annotation.Nullable;
 import android.app.appfunctions.AppFunctionAidlSearchSpec;
 import android.app.appfunctions.AppFunctionName;
 import android.app.appfunctions.AppFunctionSearchSpec;
+import android.app.appfunctions.flags.Flags;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
@@ -29,7 +30,6 @@ import android.content.pm.PackageManagerInternal;
 import android.os.Binder;
 import android.util.ArraySet;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -46,6 +46,68 @@ public final class VisibilityHelperImpl implements VisibilityHelper {
         mPmInternal = Objects.requireNonNull(packageManagerInternal);
     }
 
+    @Override
+    public boolean isAppFunctionVisible(
+            @NonNull AppFunctionName appFunctionName,
+            @NonNull String callingPackage,
+            int callingUid,
+            int callingPid) {
+        if (callingPackage.equals(appFunctionName.getPackageName())) {
+            return true;
+        }
+
+        final long token = Binder.clearCallingIdentity();
+        try {
+            if (!hasPermissionsToQueryRuntimeMetadata(callingUid, callingPid)) {
+                return false;
+            }
+            return mPmInternal.canQueryPackage(callingUid, appFunctionName.getPackageName());
+        } finally {
+            Binder.restoreCallingIdentity(token);
+        }
+    }
+
+    @NonNull
+    @Override
+    public Set<AppFunctionName> filterVisibleAppFunctions(
+            @NonNull Set<AppFunctionName> functionNames,
+            @NonNull String callingPackageName,
+            int callingUid,
+            int callingPid) {
+        Objects.requireNonNull(functionNames);
+        Objects.requireNonNull(callingPackageName);
+
+        final long token = Binder.clearCallingIdentity();
+        try {
+            if (hasPermissionsToQueryRuntimeMetadata(callingUid, callingPid)) {
+                if (mContext.checkPermission(
+                                Manifest.permission.QUERY_ALL_PACKAGES, callingPid, callingUid)
+                        == PackageManager.PERMISSION_GRANTED) {
+                    return new ArraySet<>(functionNames);
+                } else {
+                    Set<AppFunctionName> visibleFunctionNames = new ArraySet<>();
+                    for (AppFunctionName functionName : functionNames) {
+                        if (mPmInternal.canQueryPackage(
+                                callingUid, functionName.getPackageName())) {
+                            visibleFunctionNames.add(functionName);
+                        }
+                    }
+                    return visibleFunctionNames;
+                }
+            }
+
+            Set<AppFunctionName> selfFunctionNames = new ArraySet<>();
+            for (AppFunctionName functionName : functionNames) {
+                if (functionName.getPackageName().equals(callingPackageName)) {
+                    selfFunctionNames.add(functionName);
+                }
+            }
+            return selfFunctionNames;
+        } finally {
+            Binder.restoreCallingIdentity(token);
+        }
+    }
+
     @Nullable
     @Override
     public AppFunctionSearchSpec applyVisiblePackageFilter(
@@ -53,21 +115,19 @@ public final class VisibilityHelperImpl implements VisibilityHelper {
         Objects.requireNonNull(aidlSearchSpec);
 
         AppFunctionSearchSpec clientSearchSpec = aidlSearchSpec.getClientSearchSpec();
-        List<String> originalSearchPackages = clientSearchSpec.getPackageNames();
-        List<AppFunctionName> originalSearchFunctions = clientSearchSpec.getFunctionNames();
+        Set<String> originalSearchPackages = clientSearchSpec.getPackageNames();
+        Set<AppFunctionName> originalSearchFunctions = clientSearchSpec.getFunctionNames();
 
         final long token = Binder.clearCallingIdentity();
         try {
-            // First base case, if the caller doesn't have EXECUTE_APP_FUNCTIONS permission, it
-            // can only sees the function from its own package
-            if (mContext.checkPermission(
-                            Manifest.permission.EXECUTE_APP_FUNCTIONS, callingPid, callingUid)
-                    != PackageManager.PERMISSION_GRANTED) {
+            // First base case, if the caller doesn't have permissions to view
+            // AppFunctionRuntimeMetadata, it can only see the function from its own package
+            if (!hasPermissionsToQueryRuntimeMetadata(callingUid, callingPid)) {
                 Set<String> visiblePackages = new ArraySet<>();
                 visiblePackages.add(aidlSearchSpec.getCallingPackageName());
-                List<String> filteredPackages =
+                Set<String> filteredPackages =
                         getFilteredPackages(visiblePackages, originalSearchPackages);
-                List<AppFunctionName> filteredFunctionNames =
+                Set<AppFunctionName> filteredFunctionNames =
                         getFilteredFunctionNames(visiblePackages, originalSearchFunctions);
                 if (isInvalidSearch(filteredPackages, filteredFunctionNames)) {
                     return null;
@@ -91,9 +151,8 @@ public final class VisibilityHelperImpl implements VisibilityHelper {
 
         Set<String> visiblePackages =
                 getVisiblePackages(callingUid, aidlSearchSpec.getTargetUserId());
-        List<String> filteredPackages =
-                getFilteredPackages(visiblePackages, originalSearchPackages);
-        List<AppFunctionName> filteredFunctionNames =
+        Set<String> filteredPackages = getFilteredPackages(visiblePackages, originalSearchPackages);
+        Set<AppFunctionName> filteredFunctionNames =
                 getFilteredFunctionNames(visiblePackages, originalSearchFunctions);
         if (isInvalidSearch(filteredPackages, filteredFunctionNames)) {
             return null;
@@ -104,10 +163,32 @@ public final class VisibilityHelperImpl implements VisibilityHelper {
                 .build();
     }
 
+    private boolean hasPermissionsToQueryRuntimeMetadata(int callingUid, int callingPid) {
+        if (Flags.enableAppFunctionPermissionV2()
+                && mContext.checkPermission(
+                                Manifest.permission.DISCOVER_APP_FUNCTIONS, callingPid, callingUid)
+                        == PackageManager.PERMISSION_GRANTED) {
+            return true;
+        }
+
+        if (Flags.enableAppFunctionPermissionV2()
+                && mContext.checkPermission(
+                                Manifest.permission.EXECUTE_APP_FUNCTIONS_SYSTEM,
+                                callingPid,
+                                callingUid)
+                        == PackageManager.PERMISSION_GRANTED) {
+            return true;
+        }
+
+        return mContext.checkPermission(
+                        Manifest.permission.EXECUTE_APP_FUNCTIONS, callingPid, callingUid)
+                == PackageManager.PERMISSION_GRANTED;
+    }
+
     @NonNull
-    private List<String> getFilteredPackages(
-            @NonNull Set<String> visiblePackages, @Nullable List<String> originalPackages) {
-        ArrayList<String> updatedPackages = new ArrayList<>();
+    private Set<String> getFilteredPackages(
+            @NonNull Set<String> visiblePackages, @Nullable Set<String> originalPackages) {
+        ArraySet<String> updatedPackages = new ArraySet<>();
         if (originalPackages == null) {
             // Missing package means search all packages, therefore use all visible packages here
             updatedPackages.addAll(visiblePackages);
@@ -122,12 +203,12 @@ public final class VisibilityHelperImpl implements VisibilityHelper {
     }
 
     @Nullable
-    private List<AppFunctionName> getFilteredFunctionNames(
+    private Set<AppFunctionName> getFilteredFunctionNames(
             @NonNull Set<String> visiblePackages,
-            @Nullable List<AppFunctionName> originalFunctionNames) {
-        ArrayList<AppFunctionName> updatedFunctionNames = null;
+            @Nullable Set<AppFunctionName> originalFunctionNames) {
+        ArraySet<AppFunctionName> updatedFunctionNames = null;
         if (originalFunctionNames != null) {
-            updatedFunctionNames = new ArrayList<>();
+            updatedFunctionNames = new ArraySet<>();
             for (AppFunctionName functionName : originalFunctionNames) {
                 if (visiblePackages.contains(functionName.getPackageName())) {
                     updatedFunctionNames.add(functionName);
@@ -160,7 +241,7 @@ public final class VisibilityHelperImpl implements VisibilityHelper {
      * since it would always return empty search result.
      */
     private boolean isInvalidSearch(
-            @NonNull List<String> packageNames, @Nullable List<AppFunctionName> functionNames) {
+            @NonNull Set<String> packageNames, @Nullable Set<AppFunctionName> functionNames) {
         return packageNames.isEmpty() || (functionNames != null && functionNames.isEmpty());
     }
 }

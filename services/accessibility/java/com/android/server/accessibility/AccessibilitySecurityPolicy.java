@@ -211,7 +211,7 @@ public class AccessibilitySecurityPolicy {
             // the accessibility layer reports which are windows
             // that a sighted user can touch.
             default: {
-                return isRetrievalAllowingWindowLocked(userId, event.getWindowId());
+                return isRetrievalAllowingWindowLocked(userId, event.getRealWindowId());
             }
         }
     }
@@ -459,11 +459,9 @@ public class AccessibilitySecurityPolicy {
         if (userId != mAccessibilityUserManager.getCurrentUserIdLocked()) {
             final long identity = Binder.clearCallingIdentity();
             try {
-                if (android.multiuser.Flags.allowSupervisingProfile()) {
-                    UserInfo userInfo = mUserManager.getUserInfo(userId);
-                    if (userInfo != null && userInfo.isSupervisingProfile()) {
-                        return mAccessibilityUserManager.getCurrentUserIdLocked();
-                    }
+                UserInfo userInfo = mUserManager.getUserInfo(userId);
+                if (userInfo != null && userInfo.isSupervisingProfile()) {
+                    return mAccessibilityUserManager.getCurrentUserIdLocked();
                 }
                 UserInfo parent = mUserManager.getProfileParent(userId);
                 if (parent != null) {

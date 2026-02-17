@@ -28,6 +28,8 @@ package com.android.systemui.statusbar.pipeline.mobile.data
 import android.content.Intent
 import android.telephony.ServiceState
 import android.telephony.SignalStrength
+import android.telephony.SubscriptionManager.EXTRA_SUBSCRIPTION_INDEX
+import android.telephony.SubscriptionManager.INVALID_SUBSCRIPTION_ID
 import android.telephony.TelephonyDisplayInfo
 import android.telephony.TelephonyManager
 import android.telephony.satellite.NtnSignalStrength
@@ -182,28 +184,18 @@ class MobileInputLogger @Inject constructor(@MobileInputLog private val buffer: 
         )
     }
 
-// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
-// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
     fun logOnRadioIconTypeChanged(radioIconType: Int, is6Rx : Boolean, subId: Int) {
-// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
-// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
         buffer.log(
             TAG,
             LogLevel.INFO,
             {
                 int1 = subId
-// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
                 str1 = radioIconType.toString()
-// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
 // QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
                 bool1 = is6Rx
 // QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
             },
-// QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
-// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
             { "onRadioIconTypeChanged: subId=$int1 radioIconType=$str1 is6Rx=$bool1" },
-// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
-// QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
         )
     }
 
@@ -252,6 +244,7 @@ class MobileInputLogger @Inject constructor(@MobileInputLog private val buffer: 
     }
 
     fun logServiceProvidersUpdatedBroadcast(intent: Intent) {
+        val subId = intent.getIntExtra(EXTRA_SUBSCRIPTION_INDEX, INVALID_SUBSCRIPTION_ID)
         val showSpn = intent.getBooleanExtra(TelephonyManager.EXTRA_SHOW_SPN, false)
         val spn = intent.getStringExtra(TelephonyManager.EXTRA_SPN)
         val dataSpn = intent.getStringExtra(TelephonyManager.EXTRA_DATA_SPN)
@@ -262,6 +255,7 @@ class MobileInputLogger @Inject constructor(@MobileInputLog private val buffer: 
             TAG,
             LogLevel.INFO,
             {
+                int1 = subId
                 bool1 = showSpn
                 str1 = spn
                 str2 = dataSpn
@@ -270,7 +264,35 @@ class MobileInputLogger @Inject constructor(@MobileInputLog private val buffer: 
             },
             {
                 "Intent: ACTION_SERVICE_PROVIDERS_UPDATED." +
-                    " showSpn=$bool1 spn=$str1 dataSpn=$str2 showPlmn=$bool2 plmn=$str3"
+                    " subId=$int1 showSpn=$bool1 spn=$str1 dataSpn=$str2 showPlmn=$bool2 plmn=$str3"
+            },
+        )
+    }
+
+    fun logServiceProvidersUpdatedBroadcastSkipped(subId: Int, intent: Intent) {
+        val intentSubId = intent.getIntExtra(EXTRA_SUBSCRIPTION_INDEX, INVALID_SUBSCRIPTION_ID)
+        val showSpn = intent.getBooleanExtra(TelephonyManager.EXTRA_SHOW_SPN, false)
+        val spn = intent.getStringExtra(TelephonyManager.EXTRA_SPN)
+        val dataSpn = intent.getStringExtra(TelephonyManager.EXTRA_DATA_SPN)
+        val showPlmn = intent.getBooleanExtra(TelephonyManager.EXTRA_SHOW_PLMN, false)
+        val plmn = intent.getStringExtra(TelephonyManager.EXTRA_PLMN)
+
+        buffer.log(
+            TAG,
+            LogLevel.INFO,
+            {
+                int1 = subId
+                int2 = intentSubId
+                bool1 = showSpn
+                str1 = spn
+                str2 = dataSpn
+                bool2 = showPlmn
+                str3 = plmn
+            },
+            {
+                "Intent: ACTION_SERVICE_PROVIDERS_UPDATED skipped. subId=$int1" +
+                    " intentSubId=$int2 showSpn=$bool1" +
+                    " spn=$str1 dataSpn=$str2 showPlmn=$bool2 plmn=$str3"
             },
         )
     }

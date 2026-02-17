@@ -25,6 +25,7 @@ import com.android.compose.animation.scene.ContentKey
 import com.android.compose.animation.scene.OverlayKey
 import com.android.compose.animation.scene.SceneKey
 import com.android.compose.animation.scene.content.state.TransitionState
+import com.android.systemui.Flags.spatialModelBouncerPushback
 import com.android.systemui.communal.domain.interactor.CommunalSettingsInteractor
 import com.android.systemui.communal.shared.model.CommunalBackgroundType
 import com.android.systemui.deviceentry.domain.interactor.DeviceEntryInteractor
@@ -43,11 +44,8 @@ import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import javax.inject.Named
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 
 /**
@@ -81,38 +79,30 @@ constructor(
     private val ambientModeSupported: Boolean by
         wallpaperInteractor.wallpaperSupportsAmbientMode.hydratedStateOf(false)
 
-    private val windowRootViewBlurSupported: Boolean by
-        windowRootViewBlurInteractor.isBlurCurrentlySupported.hydratedStateOf()
-
-    private fun onBlurApplied(blurEffect: BlurEffect) {
-        windowRootViewBlurInteractor.onBlurApplied(blurEffect.radius.toInt())
-    }
-
-    private val isPersistentEarlyWakeupRequired: Flow<Boolean> =
-        windowRootViewBlurInteractor.isBlurCurrentlySupported
-            .flatMapLatest { blurSupported ->
-                if (blurSupported) {
-                    combine(
-                        deviceEntryInteractor.isDeviceEntered,
-                        shadeInteractor.isUserInteracting,
-                        shadeInteractor.isAnyExpanded,
-                    ) { isDeviceEntered, userDraggingShade, anyExpanded ->
-                        !isDeviceEntered || userDraggingShade || anyExpanded
-                    }
-                } else {
-                    flowOf(false)
-                }
-            }
-            .distinctUntilChanged()
-
     override suspend fun onActivated() {
-        blurChoreographer.registerOnBlurAppliedListener(::onBlurApplied)
+        blurChoreographer.registerOnBlurAppliedListener { blurEffect ->
+            windowRootViewBlurInteractor.onBlurApplied(blurEffect.radius.toInt())
+        }
+
         windowRootViewBlurInteractor.registerShadeBlurChangedListener {
             v("Applying blur requested by shade", it.radius, it.scale)
             applyBlur(it)
         }
 
-        isPersistentEarlyWakeupRequired.collect { blurChoreographer.setPersistentEarlyWakeup(it) }
+        combine(
+                windowRootViewBlurInteractor.isBlurCurrentlySupported,
+                deviceEntryInteractor.isDeviceEntered,
+                shadeInteractor.isUserInteracting,
+                shadeInteractor.isAnyExpanded,
+            ) { blurSupported, isDeviceEntered, userDraggingShade, anyExpanded ->
+                if (blurSupported) {
+                    !isDeviceEntered || userDraggingShade || anyExpanded
+                } else {
+                    false
+                }
+            }
+            .distinctUntilChanged()
+            .collect { blurChoreographer.setPersistentEarlyWakeup(it) }
     }
 
     override suspend fun onDeactivated() {
@@ -150,15 +140,15 @@ constructor(
                         } else {
                             blurConfig.minBlurRadiusPx
                         }
-
                     Scenes.Lockscreen ->
                         if (
                             ambientModeSupported &&
                                 keyguardTransitionInteractor.currentKeyguardState.value == AOD
-                        )
+                        ) {
                             blurConfig.maxBlurRadiusPx / 2
-                        else blurConfig.minBlurRadiusPx
-
+                        } else {
+                            blurConfig.minBlurRadiusPx
+                        }
                     Scenes.QuickSettings -> blurConfig.maxBlurRadiusPx
                     Scenes.Shade -> blurConfig.maxBlurRadiusPx
                     Scenes.Dream -> blurConfig.minBlurRadiusPx
@@ -181,30 +171,48 @@ constructor(
     ): Float = lerp(startBlurRadius, endBlurRadius, transitionProgress)
 
     private fun computeBackgroundBlurScale(state: TransitionState): Float {
-        return when {
-            state is TransitionState.Transition.ChangeScene ->
-                1.0f -
+        return 1f -
+            when {
+                state is TransitionState.Transition.ChangeScene ->
                     when {
                         state.fromScene == Scenes.Lockscreen && state.toScene == Scenes.Communal ->
                             state.progress * BLUR_SCALE_COMMUNAL
-
                         state.fromScene == Scenes.Communal ->
-                            (1 - state.progress) * BLUR_SCALE_COMMUNAL
-
+                            (1f - state.progress) * BLUR_SCALE_COMMUNAL
                         else -> 0f
                     }
-
-            state is TransitionState.Idle && state.currentScene == Scenes.Communal -> 0.95f
-            else -> 1.0f
-        }
+                state is TransitionState.Transition.ShowOrHideOverlay &&
+                    spatialModelBouncerPushback() ->
+                    when {
+                        state.fromContent == Scenes.Lockscreen &&
+                            state.toContent == Overlays.Bouncer ->
+                            state.progress * BLUR_SCALE_BOUNCER
+                        state.fromContent == Overlays.Bouncer &&
+                            (state.toContent == Scenes.Lockscreen ||
+                                state.toContent == Scenes.Gone) ->
+                            (1f - state.progress) * BLUR_SCALE_BOUNCER
+                        else -> 0f
+                    }
+                state is TransitionState.Idle ->
+                    when {
+                        state.currentScene == Scenes.Communal -> BLUR_SCALE_COMMUNAL
+                        spatialModelBouncerPushback() &&
+                            state.currentScene == Scenes.Lockscreen &&
+                            state.currentOverlays.contains(Overlays.Bouncer) -> BLUR_SCALE_BOUNCER
+                        else -> 0f
+                    }
+                else -> 0f
+            }
     }
 
     private fun applyBlur(blurEffect: BlurEffect) {
-        if (windowRootViewBlurSupported) {
-            blurChoreographer.applyBlur(blurEffect)
-        } else {
-            blurChoreographer.applyBlur(BlurEffect(0f, 1f))
-        }
+        blurChoreographer.applyBlur(
+            if (windowRootViewBlurInteractor.isBlurCurrentlySupported.value) {
+                blurEffect
+            } else {
+                BlurEffect(0f, 1f)
+            }
+        )
     }
 
     private fun TransitionState.Transition.ShowOrHideOverlay.toBlurRadius(
@@ -294,6 +302,7 @@ constructor(
 
     companion object {
         private const val BLUR_SCALE_COMMUNAL = 0.05f
+        private const val BLUR_SCALE_BOUNCER = 0.05f
         private const val TAG = "SceneTransitionBlur"
         private val isLoggable
             get() = Log.isLoggable(TAG, Log.VERBOSE) || Build.IS_ENG

@@ -50,14 +50,15 @@ import com.android.internal.logging.InstanceId;
 import com.android.internal.protolog.ProtoLog;
 import com.android.launcher3.icons.BitmapInfo;
 import com.android.launcher3.icons.BubbleIconFactory;
+import com.android.users.UserType;
 import com.android.wm.shell.bubbles.bar.BubbleBarExpandedView;
 import com.android.wm.shell.bubbles.bar.BubbleBarLayerView;
 import com.android.wm.shell.bubbles.model.BubbleIcon;
+import com.android.wm.shell.bubbles.transitions.BubbleTransitions;
 import com.android.wm.shell.common.ComponentUtils;
 import com.android.wm.shell.shared.annotations.ShellMainThread;
 import com.android.wm.shell.shared.bubbles.BubbleInfo;
 import com.android.wm.shell.shared.bubbles.ParcelableFlyoutMessage;
-import com.android.wm.shell.shared.bubbles.UserType;
 import com.android.wm.shell.shared.bubbles.logging.BubbleLog;
 import com.android.wm.shell.taskview.TaskView;
 
@@ -488,6 +489,7 @@ public class Bubble implements BubbleViewProvider {
                 isImportantConversation(),
                 getParcelableFlyoutMessage(),
                 isApp(),
+                isChat(),
                 mUserType);
     }
 
@@ -699,8 +701,7 @@ public class Bubble implements BubbleViewProvider {
      * Sets whether to perform inflation on the same thread as the caller. This method should only
      * be used in tests, not in production.
      */
-    @VisibleForTesting
-    void setInflateSynchronously(boolean inflateSynchronously) {
+    public void setInflateSynchronously(boolean inflateSynchronously) {
         mInflateSynchronously = inflateSynchronously;
     }
 
@@ -728,11 +729,6 @@ public class Bubble implements BubbleViewProvider {
         return getCurrentTransition() != null && getCurrentTransition().isJumpcutBubbleSwitching();
     }
 
-    /** Whether this transition is for switching from one bubble to another. */
-    public boolean isBubbleSwitching() {
-        return getCurrentTransition() != null && getCurrentTransition().isBubbleSwitching();
-    }
-
     /**
      * Sets whether this bubble is considered text changed. This method is purely for
      * testing.
@@ -755,7 +751,7 @@ public class Bubble implements BubbleViewProvider {
      * @param skipInflation whether to skip inflating expanded views. true for overflow bubbles.
      * @param bubbleViewInfoTaskFactory factory for creating {@link BubbleViewInfoTask} jobs.
      */
-    void inflate(BubbleViewInfoTask.Callback callback,
+    public void inflate(BubbleViewInfoTask.Callback callback,
             Context context,
             BubbleExpandedViewManager expandedViewManager,
             BubbleTaskViewFactory taskViewFactory,
@@ -906,8 +902,8 @@ public class Bubble implements BubbleViewProvider {
 
     /**
      * @return the icon set on BubbleMetadata, if it exists. This is only non-null for bubbles
-     * created via a PendingIntent. This is null for bubbles created by a shortcut, as we use the
-     * icon from the shortcut.
+     * created via a PendingIntent. For bubbles created by a shortcut, this can be from the
+     * activity/app info or null. In the null case, we use the icon from the shortcut.
      */
     @Nullable
     public Icon getIcon() {
@@ -1156,7 +1152,7 @@ public class Bubble implements BubbleViewProvider {
      * Returns the pending intent used to populate the bubble.
      */
     @Nullable
-    PendingIntent getPendingIntent() {
+    public PendingIntent getPendingIntent() {
         return mPendingIntent;
     }
 

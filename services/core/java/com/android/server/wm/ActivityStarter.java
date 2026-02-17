@@ -32,6 +32,7 @@ import static android.app.ActivityManager.isStartResultSuccessful;
 import static android.app.ActivityTaskManager.INVALID_TASK_ID;
 import static android.app.PendingIntent.FLAG_CANCEL_CURRENT;
 import static android.app.PendingIntent.FLAG_ONE_SHOT;
+import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
 import static android.app.WindowConfiguration.WINDOWING_MODE_UNDEFINED;
 import static android.content.Intent.FLAG_ACTIVITY_CLEAR_TASK;
 import static android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP;
@@ -47,6 +48,7 @@ import static android.content.Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED;
 import static android.content.Intent.FLAG_ACTIVITY_RETAIN_IN_RECENTS;
 import static android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP;
 import static android.content.Intent.FLAG_ACTIVITY_TASK_ON_HOME;
+import static android.content.Intent.URI_INTENT_SCHEME;
 import static android.content.pm.ActivityInfo.DOCUMENT_LAUNCH_ALWAYS;
 import static android.content.pm.ActivityInfo.FLAG_SHOW_FOR_ALL_USERS;
 import static android.content.pm.ActivityInfo.LAUNCH_SINGLE_INSTANCE;
@@ -63,10 +65,12 @@ import static android.view.WindowManager.TRANSIT_FLAG_AVOID_MOVE_TO_FRONT;
 import static android.view.WindowManager.TRANSIT_OPEN;
 import static android.window.TaskFragmentOperation.OP_TYPE_START_ACTIVITY_IN_TASK_FRAGMENT;
 
+import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_ACTIVITY_START_INTENT;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_CONFIGURATION;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_TASKS;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS;
 import static com.android.internal.util.FrameworkStatsLog.INTENT_REDIRECT_BLOCKED;
+import static com.android.server.pm.GenericAllowlist.AllowlistStatus;
 import static com.android.server.pm.PackageArchiver.isArchivingEnabled;
 import static com.android.server.wm.ActivityRecord.State.RESUMED;
 import static com.android.server.wm.ActivityTaskManagerDebugConfig.DEBUG_PERMISSIONS_REVIEW;
@@ -123,6 +127,7 @@ import android.content.pm.ResolveInfo;
 import android.content.pm.UserInfo;
 import android.content.res.Configuration;
 import android.os.Binder;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.OperationCanceledException;
@@ -150,6 +155,7 @@ import com.android.server.am.ActivityManagerService.IntentCreatorToken;
 import com.android.server.am.PendingIntentRecord;
 import com.android.server.pm.InstantAppResolver;
 import com.android.server.pm.PackageArchiver;
+import com.android.server.pm.UserActivitiesAllowlist;
 import com.android.server.power.ShutdownCheckPoints;
 import com.android.server.statusbar.StatusBarManagerInternal;
 import com.android.server.uri.NeededUriGrants;
@@ -227,6 +233,7 @@ class ActivityStarter {
     private TaskDisplayArea mPreferredTaskDisplayArea;
     @WindowingMode
     private int mPreferredWindowingMode;
+    private boolean mIsTaskMoveDisallowed;
 
     private Task mInTask;
     private TaskFragment mInTaskFragment;
@@ -464,6 +471,15 @@ class ActivityStarter {
          * to adjust launch parameters for transitions originating from home.
          */
         boolean mLaunchOriginatedFromHome;
+
+        /**
+         * Indicates whether the activity was allowlisted for the user.
+         *
+         * <p>NOTE: It's only used for metrics purposes and it doesn't affect the start result -
+         * it's needed because the allowlist status is checked on {@code executeRequest(...)},
+         * and might need to be reported on {@code handleStartResult(...)} (when it was allowed).
+         */
+        @AllowlistStatus int userAllowlistStatus = UserActivitiesAllowlist.STATUS_UNKNOWN;
 
         /**
          * Ensure constructed request matches reset instance.
@@ -772,6 +788,7 @@ class ActivityStarter {
         mSourceRecord = starter.mSourceRecord;
         mPreferredTaskDisplayArea = starter.mPreferredTaskDisplayArea;
         mPreferredWindowingMode = starter.mPreferredWindowingMode;
+        mIsTaskMoveDisallowed = starter.mIsTaskMoveDisallowed;
 
         mInTask = starter.mInTask;
         mInTaskFragment = starter.mInTaskFragment;
@@ -867,6 +884,15 @@ class ActivityStarter {
                                 || Intent.ACTION_REBOOT.equals(intentAction))) {
                     ShutdownCheckPoints.recordCheckPoint(intentAction, callingPackage, null);
                 }
+            }
+
+            if (com.android.window.flags.Flags.logStartActivityIntent()
+                    && mRequest.intent != null && Build.isDebuggable()) {
+                // For lab debug device usages.
+                ProtoLog.d(WM_DEBUG_ACTIVITY_START_INTENT,
+                        "Execute activity start request:\nIntent=%s\nIsExported=%s",
+                        mRequest.intent.toUri(URI_INTENT_SCHEME),
+                        mRequest.activityInfo != null && mRequest.activityInfo.exported);
             }
 
             int res = START_CANCELED;
@@ -1533,6 +1559,13 @@ class ActivityStarter {
                 .setSourceRecord(sourceRecord)
                 .build();
 
+        // Reset the launch-behind flag to avoid making it visible if the activity launch should
+        // be blocked.
+        if (r.mLaunchTaskBehind && balVerdict.blocks()) {
+            Slog.w(TAG, "Disallowed launching behind for a background launch");
+            r.mLaunchTaskBehind = false;
+        }
+
         mLastStartActivityRecord = r;
 
         if (r.appTimeTracker == null && sourceRecord != null) {
@@ -1583,7 +1616,7 @@ class ActivityStarter {
         mLastStartActivityResult = startActivityUnchecked(r, sourceRecord, voiceSession,
                 request.voiceInteractor, startFlags, checkedOptions,
                 inTask, inTaskFragment, balVerdict, intentGrants, realCallingUid,
-                transition, isIndependent);
+                transition, isIndependent, request.userAllowlistStatus);
 
         // Because the pending-intent usage in the waitAsyncStart hack "exits" ATMS into
         // AMS and re-enters, this can be nested.
@@ -1743,7 +1776,7 @@ class ActivityStarter {
             TaskFragment inTaskFragment,
             BalVerdict balVerdict,
             NeededUriGrants intentGrants, int realCallingUid, Transition transition,
-            boolean isIndependentLaunch) {
+            boolean isIndependentLaunch, @AllowlistStatus int allowlistStatus) {
         int result = START_CANCELED;
         final Task startedActivityRootTask;
 
@@ -1773,7 +1806,7 @@ class ActivityStarter {
             } finally {
                 Trace.traceEnd(Trace.TRACE_TAG_WINDOW_MANAGER);
                 startedActivityRootTask = handleStartResult(r, options, result, isIndependentLaunch,
-                        remoteTransition, transition);
+                        remoteTransition, transition, allowlistStatus);
             }
         } finally {
             mService.continueWindowLayout();
@@ -1799,7 +1832,8 @@ class ActivityStarter {
      */
     private @Nullable Task handleStartResult(@NonNull ActivityRecord started,
             ActivityOptions options, int result, boolean isIndependentLaunch,
-            RemoteTransition remoteTransition, Transition transition) {
+            RemoteTransition remoteTransition, Transition transition,
+            @AllowlistStatus int allowlistStatus) {
         final boolean userLeaving = mSupervisor.mUserLeaving;
         mSupervisor.mUserLeaving = false;
         final Task currentRootTask = started.getRootTask();
@@ -1962,7 +1996,7 @@ class ActivityStarter {
 
         // TODO(b/412177078): remove null check once hsuAllowlistActivities() is gone
         if (mUserHelper != null) {
-            mUserHelper.logActivityStarted(started, isStarted);
+            mUserHelper.logActivityStarted(started, isStarted, allowlistStatus);
         }
 
         return startedActivityRootTask;
@@ -2032,8 +2066,7 @@ class ActivityStarter {
             }
             // When running transient transition, the transient launch target should keep on top.
             // So disallow the transient hide activity to move itself to front, e.g. trampoline.
-            if (!avoidMoveToFront() && (mService.mHomeProcess == null
-                    || mService.mHomeProcess.mUid != realCallingUid)
+            if (!avoidMoveToFront() && !r.launchedFromSystemSurface()
                     && (prevTopTask != null && prevTopTask.isActivityTypeHomeOrRecents())
                     && r.mTransitionController.isTransientHide(targetTask)) {
                 mCanMoveToFrontCode = MOVE_TO_FRONT_AVOID_LEGACY;
@@ -2058,6 +2091,10 @@ class ActivityStarter {
 
         if (mOptions != null && mOptions.isMovableTaskRequired()) {
             if (!newTask) {
+                return START_CANNOT_GUARANTEE_TASK_MOVABILITY;
+            }
+
+            if (mIsTaskMoveDisallowed) {
                 return START_CANNOT_GUARANTEE_TASK_MOVABILITY;
             }
 
@@ -2306,6 +2343,7 @@ class ActivityStarter {
         if (mLaunchParams.mNeedsSafeRegionBounds != null) {
             r.setNeedsSafeRegionBounds(mLaunchParams.mNeedsSafeRegionBounds);
         }
+        mIsTaskMoveDisallowed = mLaunchParams.mIsTaskMoveDisallowed;
     }
 
     private TaskDisplayArea computeSuggestedLaunchDisplayArea(
@@ -2380,19 +2418,23 @@ class ActivityStarter {
                 final int launchingFromDisplayId =
                         mSourceRecord != null ? mSourceRecord.getDisplayId() : DEFAULT_DISPLAY;
                 final boolean isResultExpected = r.resultTo != null;
-                Supplier<IntentSender> intentSender = null;
-                if (android.companion.virtualdevice.flags.Flags.activityControlApi()) {
-                    intentSender = () -> {
-                        IIntentSender target = mService.getIntentSenderLocked(
-                                ActivityManager.INTENT_SENDER_ACTIVITY, mRequest.callingPackage,
-                                mRequest.callingFeatureId, mCallingUid, r.mUserId,
-                                /* token= */ null, /* resultCode= */ null, /* requestCode= */ 0,
-                                new Intent[]{ mIntent }, new String[]{ r.resolvedType },
-                                FLAG_CANCEL_CURRENT | FLAG_ONE_SHOT,
-                                mOptions == null ? null : mOptions.toBundle());
-                        return new IntentSender(target);
-                    };
-                }
+                final Supplier<IntentSender> intentSender = () -> {
+                    // You can't create an IntentSender (it will crash) if you set the
+                    // PendingIntentBackgroundActivityStartMode since it's meant for the pending
+                    // intent sender. Instead, remove the option and let the sender set the start
+                    // mode.
+                    ActivityOptions intentSenderOptions =
+                            getActivityOptionsWithDefaultStartMode(mOptions,
+                                    mRequest.callingPackage);
+                    IIntentSender target = mService.getIntentSenderLocked(
+                            ActivityManager.INTENT_SENDER_ACTIVITY, mRequest.callingPackage,
+                            mRequest.callingFeatureId, mCallingUid, r.mUserId,
+                            /* token= */ null, /* resultCode= */ null, /* requestCode= */ 0,
+                            new Intent[]{ mIntent }, new String[]{ r.resolvedType },
+                            FLAG_CANCEL_CURRENT | FLAG_ONE_SHOT,
+                            intentSenderOptions == null ? null : intentSenderOptions.toBundle());
+                    return new IntentSender(target);
+                };
                 if (!displayContent.mDwpcHelper
                         .canActivityBeLaunched(r.info, r.intent, targetWindowingMode,
                                 launchingFromDisplayId, newTask, isResultExpected, intentSender)) {
@@ -2410,6 +2452,33 @@ class ActivityStarter {
         }
 
         return START_SUCCESS;
+    }
+
+    /**
+     * Returns the activity options without the start mode set, if the start mode is not
+     * SYSTEM_DEFINED.
+     */
+    @Nullable
+    private static ActivityOptions getActivityOptionsWithDefaultStartMode(
+            @Nullable ActivityOptions options, String callingPackage) {
+        if (options == null) {
+            return null;
+        }
+        if (android.companion.virtualdevice.flags.Flags.removeStartModeFromBlockedIntents()
+                && options.getPendingIntentBackgroundActivityStartMode()
+                        != ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_SYSTEM_DEFINED) {
+            Slog.d(TAG, "Resetting option "
+                    + "setPendingIntentBackgroundActivityStartMode("
+                    + options.getPendingIntentBackgroundActivityStartMode()
+                    + ") to SYSTEM_DEFINED for the activity started by ("
+                    + callingPackage
+                    + ")");
+            ActivityOptions optionsCopy = new ActivityOptions(options.toBundle());
+            optionsCopy.setPendingIntentBackgroundActivityStartMode(
+                    ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_SYSTEM_DEFINED);
+            return optionsCopy;
+        }
+        return options;
     }
 
     /**
@@ -2732,6 +2801,7 @@ class ActivityStarter {
         mSourceRecord = null;
         mPreferredTaskDisplayArea = null;
         mPreferredWindowingMode = WINDOWING_MODE_UNDEFINED;
+        mIsTaskMoveDisallowed = false;
 
         mInTask = null;
         mInTaskFragment = null;
@@ -2788,6 +2858,7 @@ class ActivityStarter {
                 ? mLaunchParams.mPreferredTaskDisplayArea
                 : mRootWindowContainer.getDefaultTaskDisplayArea();
         mPreferredWindowingMode = mLaunchParams.mWindowingMode;
+        mIsTaskMoveDisallowed = mLaunchParams.mIsTaskMoveDisallowed;
 
         mLaunchMode = r.launchMode;
 
@@ -3205,7 +3276,8 @@ class ActivityStarter {
                         mStartActivity.appTimeTracker, DEFER_RESUME,
                         "bringingFoundTaskToFront");
                 mMovedToFront = !wasTopOfVisibleRootTask;
-            } else {
+            } else if (com.android.window.flags.Flags.enableBubbleRootTask()
+                        || intentActivity.getWindowingMode() != WINDOWING_MODE_PINNED) {
                 // TODO(b/199997762): Consider leaving all reparent operation of organized tasks
                 //  to task organizer.
                 intentTask.mTransitionController.collectExistenceChange(intentTask);
@@ -3387,7 +3459,8 @@ class ActivityStarter {
             case EMBEDDING_DISALLOWED_MIN_DIMENSION_VIOLATION: {
                 errMsg = "Cannot embed " + mStartActivity
                         + ". TaskFragment's bounds:" + taskFragment.getBounds()
-                        + ", minimum dimensions:" + mStartActivity.getMinDimensions();
+                        + ", minimum dimensions:" + mStartActivity.getMinDimensions(
+                                taskFragment.getDisplayContent());
                 break;
             }
             case EMBEDDING_DISALLOWED_UNTRUSTED_HOST: {

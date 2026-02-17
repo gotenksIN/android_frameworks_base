@@ -16,13 +16,13 @@
 
 package com.android.systemui.statusbar.notification.row
 
-import android.platform.test.annotations.DisableFlags
-import android.platform.test.annotations.EnableFlags
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
-import com.android.systemui.Flags
 import com.android.systemui.SysuiTestCase
-import com.android.systemui.statusbar.data.repository.FakeStatusBarModeRepository
+import com.android.systemui.display.data.repository.createFakeDisplaySubcomponent
+import com.android.systemui.display.data.repository.displaySubcomponentPerDisplayRepository
+import com.android.systemui.statusbar.data.repository.FakeStatusBarModePerDisplayRepository
+import com.android.systemui.testKosmos
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -34,46 +34,25 @@ class HeadsUpStyleProviderImplTest : SysuiTestCase() {
     private val primaryDisplayId = 0
     private val secondaryDisplayId = 1
 
-    private val statusBarModeRepository = FakeStatusBarModeRepository()
-    private val defaultDisplayRepository = statusBarModeRepository.forDisplay(primaryDisplayId)
-    private val secondaryDisplayRepository = statusBarModeRepository.forDisplay(secondaryDisplayId)
+    private val defaultDisplayRepository = FakeStatusBarModePerDisplayRepository()
+    private val secondaryDisplayRepository = FakeStatusBarModePerDisplayRepository()
+    private val kosmos =
+        testKosmos().apply {
+            displaySubcomponentPerDisplayRepository.add(
+                primaryDisplayId,
+                createFakeDisplaySubcomponent(statusBarModeRepo = { defaultDisplayRepository }),
+            )
+            displaySubcomponentPerDisplayRepository.add(
+                secondaryDisplayId,
+                createFakeDisplaySubcomponent(statusBarModeRepo = { secondaryDisplayRepository }),
+            )
+        }
 
-    private val headsUpStyleProvider = HeadsUpStyleProviderImpl(statusBarModeRepository)
-
-    @Test
-    @DisableFlags(Flags.FLAG_HEADS_UP_STYLE_PROVIDER_DISPLAY_AWARE)
-    fun shouldApplyCompactStyle_flagDisabled_defaultDisplayInImmersiveMode_returnsTrue() {
-        defaultDisplayRepository.isInFullscreenMode.value = true
-
-        val result = headsUpStyleProvider.shouldApplyCompactStyle(secondaryDisplayId)
-
-        assertThat(result).isTrue()
-    }
-
-    @Test
-    @DisableFlags(Flags.FLAG_HEADS_UP_STYLE_PROVIDER_DISPLAY_AWARE)
-    fun shouldApplyCompactStyle_flagDisabled_defaultDisplayNotInImmersiveMode_returnsFalse() {
-        defaultDisplayRepository.isInFullscreenMode.value = false
-
-        val result = headsUpStyleProvider.shouldApplyCompactStyle(secondaryDisplayId)
-
-        assertThat(result).isFalse()
-    }
+    private val headsUpStyleProvider =
+        HeadsUpStyleProviderImpl(kosmos.displaySubcomponentPerDisplayRepository)
 
     @Test
-    @DisableFlags(Flags.FLAG_HEADS_UP_STYLE_PROVIDER_DISPLAY_AWARE)
-    fun shouldApplyCompactStyle_flagDisabled_secondaryDisplayImmersive_usesDefaultAndReturnsFalse() {
-        secondaryDisplayRepository.isInFullscreenMode.value = true
-        defaultDisplayRepository.isInFullscreenMode.value = false
-
-        val result = headsUpStyleProvider.shouldApplyCompactStyle(secondaryDisplayId)
-
-        assertThat(result).isFalse()
-    }
-
-    @Test
-    @EnableFlags(Flags.FLAG_HEADS_UP_STYLE_PROVIDER_DISPLAY_AWARE)
-    fun shouldApplyCompactStyle_flagEnabled_primaryDisplayInImmersiveMode_returnsTrue() {
+    fun shouldApplyCompactStyle_primaryDisplayInImmersiveMode_returnsTrue() {
         defaultDisplayRepository.isInFullscreenMode.value = true
 
         val result = headsUpStyleProvider.shouldApplyCompactStyle(primaryDisplayId)
@@ -82,8 +61,7 @@ class HeadsUpStyleProviderImplTest : SysuiTestCase() {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_HEADS_UP_STYLE_PROVIDER_DISPLAY_AWARE)
-    fun shouldApplyCompactStyle_flagEnabled_primaryDisplayNotInImmersiveMode_returnsFalse() {
+    fun shouldApplyCompactStyle_primaryDisplayNotInImmersiveMode_returnsFalse() {
         defaultDisplayRepository.isInFullscreenMode.value = false
 
         val result = headsUpStyleProvider.shouldApplyCompactStyle(primaryDisplayId)
@@ -92,8 +70,7 @@ class HeadsUpStyleProviderImplTest : SysuiTestCase() {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_HEADS_UP_STYLE_PROVIDER_DISPLAY_AWARE)
-    fun shouldApplyCompactStyle_flagEnabled_secondaryDisplayInImmersiveMode_returnsTrue() {
+    fun shouldApplyCompactStyle_secondaryDisplayInImmersiveMode_returnsTrue() {
         secondaryDisplayRepository.isInFullscreenMode.value = true
 
         val result = headsUpStyleProvider.shouldApplyCompactStyle(secondaryDisplayId)
@@ -102,8 +79,7 @@ class HeadsUpStyleProviderImplTest : SysuiTestCase() {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_HEADS_UP_STYLE_PROVIDER_DISPLAY_AWARE)
-    fun shouldApplyCompactStyle_flagEnabled_secondaryDisplayNotInImmersiveMode_returnsFalse() {
+    fun shouldApplyCompactStyle_secondaryDisplayNotInImmersiveMode_returnsFalse() {
         secondaryDisplayRepository.isInFullscreenMode.value = false
 
         val result = headsUpStyleProvider.shouldApplyCompactStyle(secondaryDisplayId)

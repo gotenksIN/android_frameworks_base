@@ -22,6 +22,8 @@ import android.platform.test.annotations.EnableFlags
 import android.security.Flags.FLAG_LOCKSCREEN_INDICATE_DUPLICATE_GUESSES
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
+import com.android.internal.logging.latencyTracker
+import com.android.internal.util.LatencyTracker
 import com.android.internal.widget.LockPatternUtils
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.authentication.data.repository.FakeAuthenticationRepository
@@ -41,6 +43,7 @@ import com.android.systemui.user.data.repository.fakeUserRepository
 import com.google.common.truth.Truth.assertThat
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runCurrent
@@ -48,6 +51,9 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Assert
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.kotlin.inOrder
+import org.mockito.kotlin.never
+import org.mockito.kotlin.verify
 
 @SmallTest
 @RunWith(AndroidJUnit4::class)
@@ -157,6 +163,8 @@ class AuthenticationInteractorTest : SysuiTestCase() {
             kosmos.fakeAuthenticationRepository.setAuthenticationMethod(Password)
 
             assertFailed(underTest.authenticate("alohomora".toList()))
+            verify(kosmos.latencyTracker, never())
+                .onActionStart(LatencyTracker.ACTION_LOCKSCREEN_UNLOCK)
         }
 
     @Test
@@ -180,6 +188,21 @@ class AuthenticationInteractorTest : SysuiTestCase() {
                 )
 
             assertFailed(underTest.authenticate(wrongPattern))
+            verify(kosmos.latencyTracker, never())
+                .onActionStart(LatencyTracker.ACTION_LOCKSCREEN_UNLOCK)
+        }
+
+    @Test
+    fun authenticate_whenCancelled_endsLatencyTracking() =
+        testScope.runTest {
+            kosmos.fakeAuthenticationRepository.pauseCredentialChecking()
+            val job = launch { underTest.authenticate(FakeAuthenticationRepository.DEFAULT_PIN) }
+            runCurrent()
+            job.cancel()
+            runCurrent()
+
+            verify(kosmos.latencyTracker)
+                .onActionEnd(LatencyTracker.ACTION_CHECK_CREDENTIAL_UNLOCKED)
         }
 
     @Test
@@ -641,11 +664,31 @@ class AuthenticationInteractorTest : SysuiTestCase() {
         assertThat(underTest.lockoutEndTime).isNull()
         assertThat(kosmos.fakeAuthenticationRepository.lockoutStartedReportCount).isEqualTo(0)
         assertThat(failedAuthenticationAttempts).isEqualTo(0)
+
+        inOrder(kosmos.latencyTracker) {
+            with(kosmos.latencyTracker) {
+                verify(this).onActionStart(LatencyTracker.ACTION_CHECK_CREDENTIAL)
+                verify(this).onActionStart(LatencyTracker.ACTION_CHECK_CREDENTIAL_UNLOCKED)
+                verify(this).onActionEnd(LatencyTracker.ACTION_CHECK_CREDENTIAL)
+                verify(this).onActionEnd(LatencyTracker.ACTION_CHECK_CREDENTIAL_UNLOCKED)
+                verify(this).onActionStart(LatencyTracker.ACTION_LOCKSCREEN_UNLOCK)
+            }
+        }
     }
 
     private fun assertFailed(authenticationResult: AuthenticationResult) {
         assertThat(authenticationResult).isEqualTo(AuthenticationResult.FAILED)
         assertThat(onAuthenticationResult).isFalse()
+
+        inOrder(kosmos.latencyTracker) {
+            with(kosmos.latencyTracker) {
+                verify(this).onActionStart(LatencyTracker.ACTION_CHECK_CREDENTIAL)
+                verify(this).onActionStart(LatencyTracker.ACTION_CHECK_CREDENTIAL_UNLOCKED)
+                verify(this, never()).onActionEnd(LatencyTracker.ACTION_CHECK_CREDENTIAL)
+                verify(this, never()).onActionEnd(LatencyTracker.ACTION_CHECK_CREDENTIAL_UNLOCKED)
+                verify(this, never()).onActionStart(LatencyTracker.ACTION_LOCKSCREEN_UNLOCK)
+            }
+        }
     }
 
     private fun assertSkipped(

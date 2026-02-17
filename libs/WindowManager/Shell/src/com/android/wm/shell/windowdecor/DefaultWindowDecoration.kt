@@ -17,7 +17,9 @@
 package com.android.wm.shell.windowdecor
 
 import android.app.ActivityManager.RunningTaskInfo
+import android.app.compat.CompatChanges
 import android.content.Context
+import android.content.pm.ActivityInfo
 import android.content.pm.ActivityInfo.CONFIG_FONT_SCALE
 import android.content.pm.ActivityInfo.CONFIG_LOCALE
 import android.content.pm.ActivityInfo.CONFIG_UI_MODE
@@ -50,6 +52,7 @@ import android.window.WindowContainerTransaction
 import androidx.annotation.VisibleForTesting
 import com.android.app.tracing.traceSection
 import com.android.internal.policy.DesktopModeCompatPolicy
+import com.android.window.flags.Flags
 import com.android.wm.shell.R
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer
 import com.android.wm.shell.ShellTaskOrganizer
@@ -67,6 +70,7 @@ import com.android.wm.shell.desktopmode.WindowDecorCaptionRepository
 import com.android.wm.shell.pinnedlayer.phone.PinnedLayerController
 import com.android.wm.shell.shared.annotations.ShellBackgroundThread
 import com.android.wm.shell.shared.annotations.ShellMainThread
+import com.android.wm.shell.shared.annotations.ShellMainThreadImmediate
 import com.android.wm.shell.shared.desktopmode.DesktopConfig
 import com.android.wm.shell.shared.desktopmode.DesktopState
 import com.android.wm.shell.shared.split.SplitScreenConstants.SPLIT_POSITION_BOTTOM_OR_RIGHT
@@ -93,7 +97,6 @@ import com.android.wm.shell.windowdecor.common.viewhost.WindowDecorViewHostSuppl
 import com.android.wm.shell.windowdecor.extension.getDimensionPixelSize
 import com.android.wm.shell.windowdecor.extension.isDragResizable
 import com.android.wm.shell.windowdecor.extension.isFullscreen
-import com.android.wm.shell.windowdecor.extension.isPinned
 import com.android.wm.shell.windowdecor.extension.isTransparentCaptionBarAppearance
 import com.android.wm.shell.windowdecor.viewholder.AppHeaderViewHolder
 import kotlinx.coroutines.CoroutineScope
@@ -120,6 +123,7 @@ constructor(
     @ShellMainThread private val mainExecutor: ShellExecutor,
     @ShellMainThread private val mainDispatcher: MainCoroutineDispatcher,
     @ShellMainThread private val mainScope: CoroutineScope,
+    @ShellMainThreadImmediate private val mainImmediateScope: CoroutineScope,
     @ShellBackgroundThread private val bgExecutor: ShellExecutor,
     @ShellBackgroundThread private val bgScope: CoroutineScope,
     private val transitions: Transitions,
@@ -204,8 +208,8 @@ constructor(
     private val captionType
         get() = captionController?.captionType ?: CaptionController.CaptionType.NO_CAPTION
 
-    val maximizeMenuController: MaximizeMenuController?
-        get() = captionController?.maximizeMenuController
+    val layoutMenuController: LayoutMenuController?
+        get() = captionController?.layoutMenuController
 
     val handleMenuController: HandleMenuController?
         get() = captionController?.handleMenuController
@@ -225,9 +229,9 @@ constructor(
     var isDragging = false
         set(value) {
             field = value
-            // If we are dragging, close the maximize menu if it's open
+            // If we are dragging, close the layout menu if it's open
             if (value) {
-                maximizeMenuController?.closeMaximizeMenu()
+                layoutMenuController?.closeLayoutMenu()
             }
         }
 
@@ -301,6 +305,21 @@ constructor(
         decorationContainerSurface?.let { updateDragResizeListenerIfNeeded(it) }
     }
 
+    private fun isFluidResizingApp(): Boolean {
+        if (!desktopConfig.isVeiledResizeEnabled) {
+            return true
+        }
+        if (!Flags.enableFluidResizingForListedApps()) {
+            return false
+        }
+        val baseActivity = taskInfo.baseActivity ?: return false
+        return CompatChanges.isChangeEnabled(
+            ActivityInfo.ENABLE_FLUID_RESIZING,
+            baseActivity.getPackageName(),
+            userContext.getUser(),
+        )
+    }
+
     /** Updates all window decorations, including any existing caption. */
     override fun relayout(
         taskInfo: RunningTaskInfo,
@@ -319,7 +338,7 @@ constructor(
         // transitions to resize the task, so onTaskInfoChanged relayouts is the only way to make
         // sure the crop is set correctly.
         val shouldSetTaskVisibilityPositionAndCrop =
-            !desktopConfig.isVeiledResizeEnabled && taskDragResizer?.isResizingOrAnimating() == true
+            isFluidResizingApp() && taskDragResizer?.isResizingOrAnimating() == true
 
         // For headers only (i.e. in freeform): use |applyStartTransactionOnDraw| so that the
         // transaction (that applies task crop) is synced with the buffer transaction (that draws
@@ -488,7 +507,7 @@ constructor(
                 // through and dismiss the modal, even when the caption touchable region is not
                 // being limited.
                 inputFeatures = inputFeatures or WindowManager.LayoutParams.INPUT_FEATURE_SPY
-            } else if (DesktopModeFlags.ENABLE_CAPTION_COMPAT_INSET_FORCE_CONSUMPTION.isTrue) {
+            } else {
                 if (shouldExcludeCaptionFromAppBounds) {
                     shouldSetAppBounds = true
                 } else {
@@ -523,7 +542,7 @@ constructor(
         // TODO: b/301119301 - consider moving the config data needed for diffs to relayout params
         // instead of using a whole Configuration as a parameter.
         val windowDecorConfig =
-            if (DesktopModeFlags.ENABLE_APP_HEADER_WITH_TASK_DENSITY.isTrue && isAppHeader) {
+            if (isAppHeader) {
                 // Should match the density of the task. The task may have had its density
                 // overridden
                 // to be different that SysUI's.
@@ -707,7 +726,7 @@ constructor(
             // If the task is being dragged, the caption should not be hidden so that it continues
             // receiving input
             showCaption = true
-        } else if (DesktopModeFlags.ENABLE_FULLY_IMMERSIVE_IN_DESKTOP.isTrue && inFullImmersive) {
+        } else if (inFullImmersive) {
             showCaption = isStatusBarVisible && !isKeyguardVisibleAndOccluded
 
             if (!taskInfo.isFreeform) {
@@ -768,11 +787,7 @@ constructor(
                     decorWindowContext,
                     WindowManagerGlobal.getWindowSession(),
                     mainExecutor,
-                    if (DesktopModeFlags.ENABLE_DRAG_RESIZE_SET_UP_IN_BG_THREAD.isTrue) {
-                        bgExecutor
-                    } else {
-                        mainExecutor
-                    },
+                    bgExecutor,
                     taskInfo,
                     handler,
                     choreographer,
@@ -869,7 +884,7 @@ constructor(
                     displayController = displayController,
                     taskResourceLoader = taskResourceLoader,
                     mainDispatcher = mainDispatcher,
-                    mainScope = mainScope,
+                    mainImmediateScope = mainImmediateScope,
                     parentSurface = taskSurface,
                     surfaceControlTransactionSupplier = surfaceControlTransactionSupplier,
                     taskInfo = taskInfo,

@@ -22,16 +22,22 @@ import static java.util.Collections.emptyList;
 
 import android.content.ComponentName;
 import android.content.Context;
+import android.os.Looper;
 import android.view.accessibility.AccessibilityManager;
 
+import androidx.lifecycle.FlowLiveDataConversions;
 import androidx.lifecycle.LiveData;
+import androidx.lifecycle.MediatorLiveData;
 import androidx.lifecycle.MutableLiveData;
-import androidx.lifecycle.Transformations;
 
 import com.android.internal.accessibility.dialog.AccessibilityTarget;
 import com.android.settingslib.bluetooth.HearingAidDeviceManager;
+import com.android.systemui.Flags;
+import com.android.systemui.inputdevice.data.repository.PointerDeviceRepository;
+import com.android.systemui.keyboard.data.repository.KeyboardRepository;
 import com.android.systemui.util.settings.SecureSettings;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -39,8 +45,10 @@ import java.util.List;
  * the menu view{@link MenuView}.
  */
 public class MenuViewModel implements MenuInfoRepository.OnContentsChanged {
-    private final MutableLiveData<List<AccessibilityTarget>> mTargetFeaturesData =
+    private final MutableLiveData<List<AccessibilityTarget>> mOriginalTargets =
             new MutableLiveData<>(emptyList());
+    private final MediatorLiveData<List<AccessibilityTarget>> mMenuTargets =
+            new MediatorLiveData<>();
     private final MutableLiveData<Integer> mSizeTypeData = new MutableLiveData<>();
     private final MutableLiveData<MenuFadeEffectInfo> mFadeEffectInfoData =
             new MutableLiveData<>();
@@ -50,21 +58,95 @@ public class MenuViewModel implements MenuInfoRepository.OnContentsChanged {
     private final MutableLiveData<Position> mPercentagePositionData = new MutableLiveData<>();
     private final MutableLiveData<Integer> mHearingDeviceStatusData = new MutableLiveData<>(
             HearingAidDeviceManager.ConnectionStatus.NO_DEVICE_BONDED);
-    private final LiveData<Integer> mHearingDeviceTargetIndex = Transformations.map(
-            mTargetFeaturesData, this::getHearingDeviceTargetIndex);
+    private final MediatorLiveData<Integer> mHearingDeviceTargetIndex =  new MediatorLiveData<>(-1);
+    private final MutableLiveData<MenuPosition> mPositionData =
+            new MutableLiveData<>();
 
     private final MenuInfoRepository mInfoRepository;
+    private final MoreOptionsTarget mMoreOptionsTarget;
 
-    MenuViewModel(Context context, AccessibilityManager accessibilityManager,
-            SecureSettings secureSettings, HearingAidDeviceManager hearingAidDeviceManager) {
-        mInfoRepository = new MenuInfoRepository(context,
-                accessibilityManager, /* settingsContentsChanged= */ this, secureSettings,
-                hearingAidDeviceManager);
+    private MenuPosition mLastMenuPosition = MenuPosition.BOTTOM_RIGHT;
+
+    MenuViewModel(
+            Context context,
+            AccessibilityManager accessibilityManager,
+            SecureSettings secureSettings,
+            HearingAidDeviceManager hearingAidDeviceManager,
+            KeyboardRepository keyboardRepository,
+            PointerDeviceRepository pointerDeviceRepository) {
+        mInfoRepository =
+                new MenuInfoRepository(
+                        context,
+                        accessibilityManager,
+                        /* settingsContentsChanged= */ this,
+                        secureSettings,
+                        hearingAidDeviceManager);
+        mMoreOptionsTarget = new MoreOptionsTarget(context);
+
+        setupTargetFeaturesObservation(keyboardRepository, pointerDeviceRepository);
+        setupHearingDeviceMonitoring();
+    }
+
+    private void setupTargetFeaturesObservation(
+            KeyboardRepository keyboardRepository,
+            PointerDeviceRepository pointerDeviceRepository) {
+        if (!Flags.floatingMenuMoreOptions()) {
+            mMenuTargets.addSource(mOriginalTargets, mMenuTargets::setValue);
+            return;
+        }
+
+        LiveData<Boolean> isKeyboardConnected =
+                FlowLiveDataConversions.asLiveData(keyboardRepository.isAnyKeyboardConnected());
+        LiveData<Boolean> isPointerDeviceConnected =
+                FlowLiveDataConversions.asLiveData(
+                        pointerDeviceRepository.isAnyPointerDeviceConnected());
+
+        mMenuTargets.addSource(mOriginalTargets, targets -> recalculateTargetFeatures(
+                targets,
+                isKeyboardConnected.getValue(),
+                isPointerDeviceConnected.getValue()));
+        mMenuTargets.addSource(isKeyboardConnected, connected -> recalculateTargetFeatures(
+                mOriginalTargets.getValue(),
+                connected,
+                isPointerDeviceConnected.getValue()));
+        mMenuTargets.addSource(isPointerDeviceConnected, connected -> recalculateTargetFeatures(
+                mOriginalTargets.getValue(),
+                isKeyboardConnected.getValue(),
+                connected));
+    }
+
+    private void setupHearingDeviceMonitoring() {
+        mHearingDeviceTargetIndex.addSource(
+                mMenuTargets,
+                targets -> mHearingDeviceTargetIndex.setValue(
+                        getHearingDeviceTargetIndex(targets)));
+    }
+
+    private void recalculateTargetFeatures(
+            List<AccessibilityTarget> targets,
+            Boolean isKeyboardConnected,
+            Boolean isPointerDeviceConnected) {
+        if (targets == null) {
+            targets = emptyList();
+        }
+
+        boolean hasInputDevice = Boolean.TRUE.equals(isKeyboardConnected)
+                || Boolean.TRUE.equals(isPointerDeviceConnected);
+        boolean shouldShowMoreOptions = Flags.floatingMenuMoreOptions() && hasInputDevice;
+
+        if (!shouldShowMoreOptions) {
+            mMenuTargets.setValue(targets);
+            return;
+        }
+
+        List<AccessibilityTarget> updatedTargets = new ArrayList<>(targets);
+        updatedTargets.add(mMoreOptionsTarget);
+        mMenuTargets.setValue(updatedTargets);
     }
 
     @Override
     public void onTargetFeaturesChanged(List<AccessibilityTarget> newTargetFeatures) {
-        mTargetFeaturesData.setValue(newTargetFeatures);
+        mOriginalTargets.setValue(newTargetFeatures);
     }
 
     @Override
@@ -89,6 +171,15 @@ public class MenuViewModel implements MenuInfoRepository.OnContentsChanged {
 
     void updateMenuSavingPosition(Position percentagePosition) {
         mInfoRepository.updateMenuSavingPosition(percentagePosition);
+        // LiveData updates must happen on the main thread.
+        // If we are already on the main thread (e.g., in tests), use setValue() for
+        // synchronous updates to avoid race conditions. Otherwise, use postValue()
+        // to safely update from background threads (e.g., animation callbacks).
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            mPositionData.setValue(null);
+        } else {
+            mPositionData.postValue(null);
+        }
     }
 
     void updateDockTooltipVisibility(boolean hasSeen) {
@@ -119,6 +210,29 @@ public class MenuViewModel implements MenuInfoRepository.OnContentsChanged {
         return mPercentagePositionData;
     }
 
+    LiveData<MenuPosition> getPositionData() {
+        return mPositionData;
+    }
+
+    void cycleMenuPosition() {
+        MenuPosition currentPosition = mPositionData.getValue();
+
+        if (currentPosition == null) {
+            currentPosition = mLastMenuPosition;
+        }
+
+        MenuPosition nextPosition = switch (currentPosition) {
+            case BOTTOM_RIGHT -> MenuPosition.BOTTOM_LEFT;
+            case BOTTOM_LEFT -> MenuPosition.TOP_LEFT;
+            case TOP_LEFT -> MenuPosition.TOP_RIGHT;
+            case TOP_RIGHT -> MenuPosition.BOTTOM_RIGHT;
+            case null -> MenuPosition.BOTTOM_RIGHT;
+        };
+
+        mLastMenuPosition = nextPosition;
+        mPositionData.setValue(nextPosition);
+    }
+
     LiveData<Integer> getSizeTypeData() {
         mInfoRepository.loadMenuSizeType(mSizeTypeData::setValue);
         return mSizeTypeData;
@@ -130,8 +244,8 @@ public class MenuViewModel implements MenuInfoRepository.OnContentsChanged {
     }
 
     LiveData<List<AccessibilityTarget>> getTargetFeaturesData() {
-        mInfoRepository.loadMenuTargetFeatures(mTargetFeaturesData::setValue);
-        return mTargetFeaturesData;
+        mInfoRepository.loadMenuTargetFeatures(mOriginalTargets::setValue);
+        return mMenuTargets;
     }
 
     LiveData<Integer> loadHearingDeviceStatus() {

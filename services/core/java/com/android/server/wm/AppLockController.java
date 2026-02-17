@@ -21,6 +21,7 @@ import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_APP_LOCK;
 import android.annotation.NonNull;
 import android.app.AppLockInternal;
 import android.content.Context;
+import android.os.Trace;
 import android.os.UserHandle;
 import android.util.ArraySet;
 import android.util.SparseArray;
@@ -42,6 +43,8 @@ import java.util.Set;
  * @hide
  */
 final class AppLockController {
+
+    private static final String TAG = "AppLockController";
 
     private final Context mContext;
     private final ActivityTaskManagerService mAtmService;
@@ -86,42 +89,47 @@ final class AppLockController {
                 @Override
                 public void onPackageLockedStateChanged(@NonNull String packageName, int userId,
                         boolean locked) {
-                    Objects.requireNonNull(packageName);
+                    Trace.beginSection(TAG + ".onPackageLockedStateChanged");
+                    try {
+                        Objects.requireNonNull(packageName);
 
-                    synchronized (mWmService.mGlobalLock) {
-                        ProtoLog.d(WM_DEBUG_APP_LOCK, "onPackageLockedByAppLockStateChanged: %s,"
-                                + " userId=%d, locked=%b", packageName, userId, locked);
+                        synchronized (mWmService.mGlobalLock) {
+                            ProtoLog.d(WM_DEBUG_APP_LOCK, "onPackageLockedByAppLockStateChanged:"
+                                    + " %s, userId=%d, locked=%b", packageName, userId, locked);
 
-                        ArraySet<String> lockedPackages = mAppLockLockedPackages.get(userId);
-                        if (locked) {
-                            if (lockedPackages == null) {
-                                lockedPackages = new ArraySet<>();
-                                mAppLockLockedPackages.put(userId, lockedPackages);
+                            ArraySet<String> lockedPackages = mAppLockLockedPackages.get(userId);
+                            if (locked) {
+                                if (lockedPackages == null) {
+                                    lockedPackages = new ArraySet<>();
+                                    mAppLockLockedPackages.put(userId, lockedPackages);
+                                }
+                                lockedPackages.add(packageName);
+
+                                mAppLockOverlayController.lockActivitiesTasksForAppLock(packageName,
+                                        userId);
+                            } else {
+                                if (lockedPackages == null) {
+                                    // The package is not locked, so there is nothing to do.
+                                    return;
+                                }
+                                lockedPackages.remove(packageName);
+                                if (lockedPackages.isEmpty()) {
+                                    mAppLockLockedPackages.remove(userId);
+                                }
+
+                                // When a package is unlocked, there is no need to explicitly remove
+                                // any overlays. The LockedAppActivity is responsible for finishing
+                                // itself when it detects that the package is no longer locked.
                             }
-                            lockedPackages.add(packageName);
 
-                            mAppLockOverlayController.lockActivitiesTasksForAppLockLocked(
-                                    packageName, userId);
-                        } else {
-                            if (lockedPackages == null) {
-                                // The package is not locked, so there is nothing to do.
-                                return;
-                            }
-                            lockedPackages.remove(packageName);
-                            if (lockedPackages.isEmpty()) {
-                                mAppLockLockedPackages.remove(userId);
-                            }
-
-                            // When a package is unlocked, there is no need to explicitly remove any
-                            // overlays. The LockedAppActivity is responsible for finishing itself
-                            // when it detects that the package is no longer locked.
+                            mWmService.mRoot.forAllWindows(w -> {
+                                if (packageName.equals(w.getOwningPackage())) {
+                                    w.setHiddenWhileLockedByAppLock(locked);
+                                }
+                            }, false);
                         }
-
-                        mWmService.mRoot.forAllWindows(w -> {
-                            if (packageName.equals(w.getOwningPackage())) {
-                                w.setHiddenWhileLockedByAppLock(locked);
-                            }
-                        }, false);
+                    } finally {
+                        Trace.endSection();
                     }
                 }
             };
@@ -133,24 +141,34 @@ final class AppLockController {
     final PackageMonitor mPackageMonitor = new PackageMonitor() {
         @Override
         public void onPackageAppLockEnabled(String packageName) {
-            super.onPackageAppLockEnabled(packageName);
+            Trace.beginSection(TAG + ".onPackageAppLockEnabled");
+            try {
+                super.onPackageAppLockEnabled(packageName);
 
-            final int userId = getChangingUserId();
-            ProtoLog.d(WM_DEBUG_APP_LOCK, "onPackageAppLockEnabled: packageName=%s, userId=%d",
-                    packageName, userId);
-            getRecentTasks().onPackageAppLockEnabledChanged(packageName, userId,
-                    /* enabled= */ true);
+                final int userId = getChangingUserId();
+                ProtoLog.d(WM_DEBUG_APP_LOCK, "onPackageAppLockEnabled: packageName=%s, userId=%d",
+                        packageName, userId);
+                getRecentTasks().onPackageAppLockEnabledChanged(packageName, userId,
+                        /* enabled= */ true);
+            } finally {
+                Trace.endSection();
+            }
         }
 
         @Override
         public void onPackageAppLockDisabled(String packageName) {
-            super.onPackageAppLockDisabled(packageName);
+            Trace.beginSection(TAG + ".onPackageAppLockDisabled");
+            try {
+                super.onPackageAppLockDisabled(packageName);
 
-            final int userId = getChangingUserId();
-            ProtoLog.d(WM_DEBUG_APP_LOCK, "onPackageAppLockDisabled: packageName=%s, userId=%d",
-                    packageName, userId);
-            getRecentTasks().onPackageAppLockEnabledChanged(packageName, userId,
-                    /* enabled= */ false);
+                final int userId = getChangingUserId();
+                ProtoLog.d(WM_DEBUG_APP_LOCK, "onPackageAppLockDisabled: packageName=%s, userId=%d",
+                        packageName, userId);
+                getRecentTasks().onPackageAppLockEnabledChanged(packageName, userId,
+                        /* enabled= */ false);
+            } finally {
+                Trace.endSection();
+            }
         }
     };
 
@@ -173,26 +191,32 @@ final class AppLockController {
      * {@link com.android.server.SystemService#PHASE_SYSTEM_SERVICES_READY}.
      */
     void systemReady() {
-        mPackageMonitor.register(mContext, UserHandle.ALL, BackgroundThread.getHandler());
+        Trace.beginSection(TAG + ".systemReady");
+        try {
+            mPackageMonitor.register(mContext, UserHandle.ALL, BackgroundThread.getHandler());
 
-        final AppLockInternal appLockInternal = LocalServices.getService(AppLockInternal.class);
-        if (appLockInternal == null) {
-            // This is a precautionary measure to avoid any potential system crashes or bootloops.
-            ProtoLog.wtf(WM_DEBUG_APP_LOCK, "AppLockInternal is null");
-            return;
-        }
-        appLockInternal.registerPackageLockedStateListener(mAppLockLockedPackageStateListener);
-        synchronized (mWmService.mGlobalLock) {
-            final SparseArray<Set<String>> appLockEnabledPackages =
-                    appLockInternal.getAppLockEnabledPackages();
-            mAppLockLockedPackages.clear();
-            for (int i = 0; i < appLockEnabledPackages.size(); i++) {
-                final int userId = appLockEnabledPackages.keyAt(i);
-                final Set<String> packages = appLockEnabledPackages.valueAt(i);
-                if (packages != null) {
-                    mAppLockLockedPackages.put(userId, new ArraySet<>(packages));
+            final AppLockInternal appLockInternal = LocalServices.getService(AppLockInternal.class);
+            if (appLockInternal == null) {
+                // This is a precautionary measure to avoid any potential system crashes or
+                // bootloops.
+                ProtoLog.wtf(WM_DEBUG_APP_LOCK, "AppLockInternal is null");
+                return;
+            }
+            appLockInternal.registerPackageLockedStateListener(mAppLockLockedPackageStateListener);
+            synchronized (mWmService.mGlobalLock) {
+                final SparseArray<Set<String>> appLockEnabledPackages =
+                        appLockInternal.getAppLockEnabledPackages();
+                mAppLockLockedPackages.clear();
+                for (int i = 0; i < appLockEnabledPackages.size(); i++) {
+                    final int userId = appLockEnabledPackages.keyAt(i);
+                    final Set<String> packages = appLockEnabledPackages.valueAt(i);
+                    if (packages != null) {
+                        mAppLockLockedPackages.put(userId, new ArraySet<>(packages));
+                    }
                 }
             }
+        } finally {
+            Trace.endSection();
         }
     }
 
@@ -216,10 +240,64 @@ final class AppLockController {
     }
 
     /**
-     * Registers the given task with the {@link AppLockOverlayController}. Refer to
-     * {@link AppLockOverlayController#registerTask(Task)} for documentation.
+     * Returns {@code true} if the given activity is currently in a locked state by App Lock.
+     *
+     * <p>This method checks if the activity's package is currently locked and verifies that
+     * there are no other visible, unlocked tasks for the same package (which would indicate
+     * an active, unlocked session).
+     *
+     * @param activity the activity to check for the App Lock locked state
+     * @return {@code true} if the activity is locked
      */
-    void registerTask(Task task) {
-        mAppLockOverlayController.registerTask(task);
+    @GuardedBy("mWmService.mGlobalLock")
+    boolean isActivityLockedByAppLockLocked(@NonNull ActivityRecord activity) {
+        Objects.requireNonNull(activity);
+
+        if (activity.finishing) {
+            return false;
+        }
+        // TODO(b/462423789): Remove hasVisibleTask check once AppLockLocalService listens to task
+        //  visibility changes.
+        final String packageName = activity.packageName;
+        final int userId = activity.mUserId;
+        return packageName != null
+                && isPackageLockedByAppLockLocked(packageName, userId)
+                && !mAppLockOverlayController.hasVisibleNonLockedTaskForPackage(packageName,
+                userId);
+    }
+
+    /**
+     * Adds the activity-level overlay on top of the given {@code activity} with the
+     * {@link AppLockOverlayController}. Refer to
+     * {@link AppLockOverlayController#addLockedByAppLockActivityOverlay(ActivityRecord)} for
+     * documentation.
+     */
+    @GuardedBy("mWmService.mGlobalLock")
+    void addLockedByAppLockActivityOverlayLocked(@NonNull ActivityRecord activity) {
+        Objects.requireNonNull(activity);
+
+        mAppLockOverlayController.addLockedByAppLockActivityOverlay(activity);
+    }
+
+    /**
+     * Returns a set of package names that currently have a visible App Lock overlay for the
+     * specified user.
+     *
+     * <p>This delegates to {@link AppLockOverlayController} to scan visible activities. This is
+     * used in multi-window scenarios to identify all apps that are pending authentication. When
+     * a user authenticates one app, this list can be used to simultaneously authenticate all
+     * other visible locked apps, reducing user friction.
+     *
+     * @param userId The user ID for whom to find packages with visible App Lock overlay.
+     * @return A set of package names corresponding to the visible App Lock overlay.
+     */
+    @GuardedBy("mWmService.mGlobalLock")
+    Set<String> getPackagesWithVisibleAppLockOverlayLocked(int userId) {
+        Trace.beginSection(TAG + ".getPackagesWithVisibleAppLockOverlayLocked");
+        try {
+            return mAppLockOverlayController.getPackagesWithVisibleAppLockOverlay(userId);
+        } finally {
+            Trace.endSection();
+        }
     }
 }

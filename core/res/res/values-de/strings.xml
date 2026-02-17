@@ -1123,6 +1123,7 @@
     <string name="lockscreen_access_pattern_cell_added_verbose" msgid="2931364927622563465">"Punkt <xliff:g id="CELL_INDEX">%1$s</xliff:g> hinzugefügt"</string>
     <string name="lockscreen_access_pattern_detected" msgid="3931150554035194012">"Muster abgeschlossen"</string>
     <string name="lockscreen_access_pattern_area" msgid="1288780416685002841">"Bereich für Muster"</string>
+    <string name="lockscreen_access_pattern_cell_verbose" msgid="6670905066468035137">"Zelle <xliff:g id="CELL_INDEX">%1$s</xliff:g>"</string>
     <string name="keyguard_accessibility_widget_changed" msgid="7298011259508200234">"%1$s. Widget %2$d von %3$d."</string>
     <string name="keyguard_accessibility_add_widget" msgid="8245795023551343672">"Widget hinzufügen"</string>
     <string name="keyguard_accessibility_widget_empty_slot" msgid="544239307077644480">"Leer"</string>
@@ -2006,6 +2007,7 @@
     <string name="managed_profile_label_badge_3" msgid="6882151970556391957">"3. <xliff:g id="LABEL">%1$s</xliff:g> (geschäftlich)"</string>
     <string name="clone_profile_label_badge" msgid="1871997694718793964">"Klon <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="private_profile_label_badge" msgid="1712086003787839183">"<xliff:g id="LABEL">%1$s</xliff:g> (privat)"</string>
+    <string name="hsu_label_badge" msgid="1357272000281944932">"System – <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="lock_to_app_unlock_pin" msgid="3890940811866290782">"Vor dem Beenden nach PIN fragen"</string>
     <string name="lock_to_app_unlock_pattern" msgid="2694204070499712503">"Vor dem Beenden nach Entsperrungsmuster fragen"</string>
     <string name="lock_to_app_unlock_password" msgid="9126722403506560473">"Vor dem Beenden nach Passwort fragen"</string>
@@ -2087,10 +2089,10 @@
     <string name="call_notification_ongoing_text" msgid="3880832933933020875">"Aktueller Anruf"</string>
     <string name="call_notification_screening_text" msgid="8396931408268940208">"Filter für eingehenden Anruf"</string>
     <string name="default_notification_channel_label" msgid="3697928973567217330">"Unkategorisiert"</string>
-    <string name="promotional_notification_channel_label" msgid="7414844730492860233">"Werbeaktionen"</string>
+    <string name="promotional_notification_channel_label" msgid="7414844730492860233">"Werbung"</string>
     <string name="social_notification_channel_label" msgid="106520267132019945">"Soziale Netzwerke"</string>
-    <string name="news_notification_channel_label" msgid="4299937455247883311">"Neuigkeiten"</string>
-    <string name="recs_notification_channel_label" msgid="4731685669194175453">"Vorgeschlagen"</string>
+    <string name="news_notification_channel_label" msgid="4299937455247883311">"Aktuelles"</string>
+    <string name="recs_notification_channel_label" msgid="4731685669194175453">"Vorschläge"</string>
     <string name="importance_from_user" msgid="2782756722448800447">"Du hast die Wichtigkeit dieser Benachrichtigungen festgelegt."</string>
     <string name="importance_from_person" msgid="4235804979664465383">"Diese Benachrichtigung ist aufgrund der beteiligten Personen wichtig."</string>
     <string name="notification_history_title_placeholder" msgid="7748630986182249599">"Benutzerdefinierte App-Benachrichtigung"</string>
@@ -2111,7 +2113,32 @@
     <string name="app_suspended_default_message" msgid="6451215678552004172">"<xliff:g id="APP_NAME_0">%1$s</xliff:g> ist momentan nicht verfügbar. Dies wird über die App \"<xliff:g id="APP_NAME_1">%2$s</xliff:g>\" verwaltet."</string>
     <string name="app_suspended_more_details" msgid="211260942831587014">"Weitere Informationen"</string>
     <string name="app_suspended_unsuspend_message" msgid="1665438589450555459">"Pausierung der App aufheben"</string>
+    <string name="app_lock_add_screen_lock_button_text" msgid="9209013414563206600">"Displaysperre hinzufügen"</string>
+    <string name="app_lock_add_screen_lock_message" msgid="6107009360675769892">"Als Displaysperre kannst du eine PIN, ein Muster oder ein Passwort festlegen. Du verwendest sie, um dein Gerät zu entsperren und auf gesperrte Apps zuzugreifen."</string>
+    <string name="app_lock_add_screen_lock_title" msgid="6905612843620128689">"Du musst zuerst eine Displaysperre hinzufügen"</string>
+    <string name="enable_app_lock_success_toast_message" msgid="3339622779190529987">"<xliff:g id="APP_NAME">%1$s</xliff:g> ist gesperrt"</string>
+    <string name="enable_app_lock_failure_toast_message" msgid="1055838896510445566">"<xliff:g id="APP_NAME">%1$s</xliff:g> kann nicht gesperrt werden"</string>
+    <string name="disable_app_lock_success_toast_message" msgid="70733620589071266">"Die App-Sperre wurde aus <xliff:g id="APP_NAME">%1$s</xliff:g> entfernt"</string>
     <string name="locked_app_biometric_prompt_description" msgid="6853122652400451464">"<xliff:g id="APP_NAME">%1$s</xliff:g> ist gesperrt"</string>
+    <string name="locked_app_external_display_message" msgid="5483884799685545338">"Wenn du über dieses Display auf die App zugreifen möchtest, musst du zuerst auf deinem anderen Gerät deine Identität bestätigen"</string>
+    <string name="app_lock_edu_dialog_enable_app_lock_title" msgid="283314042336592322">"App-Sperre für <xliff:g id="APP_NAME">%1$s</xliff:g> hinzufügen?"</string>
+    <string name="app_lock_edu_dialog_description" msgid="8176807243219769518">"Aus Sicherheitsgründen kannst nur du mit der Entsperrung per Fingerabdruck und Gesichtserkennung oder deiner PIN auf diese App zugreifen"</string>
+    <string name="app_lock_edu_dialog_description_template" msgid="8563718120753342530">"Aus Sicherheitsgründen kannst nur du mit der %1$s oder deiner %2$s auf diese App zugreifen"</string>
+    <string name="app_lock_edu_dialog_description_template_no_biometrics" msgid="7122017109150633691">"Aus Sicherheitsgründen kannst nur du mit deiner %1$s auf diese App zugreifen"</string>
+    <string name="app_lock_edu_dialog_info_header" msgid="5876120209204270990">"Mit App-Sperre"</string>
+    <string name="app_lock_edu_dialog_info_notifications" msgid="1124438392204873305">"Der Inhalt von Benachrichtigungen wird ausgeblendet"</string>
+    <string name="app_lock_edu_dialog_info_widgets" msgid="8809009414650740872">"Widgets und Verknüpfungen werden entfernt"</string>
+    <string name="app_lock_edu_dialog_button_lock" msgid="3914687128135704801">"App-Sperre hinzufügen"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_face" msgid="1348151645996748654">"Gesichtsentsperrung"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_fingerprint" msgid="5206107469561561455">"Entsperrung per Fingerabdruck"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_fingerprint_and_face" msgid="7895807411323811641">"Fingerabdruck- oder Gesichtsentsperrung"</string>
+    <string name="app_lock_edu_dialog_lockscreen_password_name" msgid="8487096457702445059">"Passwort"</string>
+    <string name="app_lock_edu_dialog_lockscreen_pattern_name" msgid="991436996281983547">"Muster"</string>
+    <string name="app_lock_edu_dialog_lockscreen_pin_name" msgid="6458607126966304795">"PIN"</string>
+    <string name="app_lock_permission_review_dialog_title" msgid="5030286398974840579">"Deine Fotos werden möglicherweise weiterhin in anderen Apps angezeigt"</string>
+    <string name="app_lock_permission_review_dialog_sub_title" msgid="310758587817184145">"Apps mit Zugriff auf deine Fotos"</string>
+    <string name="app_lock_permission_review_expand_app_list_button" msgid="3214809707125223273">"Alle ansehen"</string>
+    <string name="app_lock_permission_review_continue_button" msgid="4045066724173414043">"Weiter"</string>
     <string name="work_mode_off_title" msgid="6367463960165135829">"Geschäftliche Apps nicht mehr pausieren?"</string>
     <string name="work_mode_turn_on" msgid="5316648862401307800">"Nicht mehr pausieren"</string>
     <string name="work_mode_emergency_call_button" msgid="6818855962881612322">"Notruf"</string>
@@ -2267,7 +2294,7 @@
     <string name="nas_upgrade_notification_enable_action" msgid="3046406808378726874">"OK"</string>
     <string name="nas_upgrade_notification_disable_action" msgid="3794833210043497982">"Ausschalten"</string>
     <string name="nas_upgrade_notification_learn_more_action" msgid="7011130656195423947">"Weitere Informationen"</string>
-    <string name="nas_upgrade_notification_learn_more_content" msgid="3735480566983530650">"Die adaptiven Benachrichtigungen wurden in Android 12 durch die Funktion „Erweiterte Benachrichtigungen“ ersetzt. Diese Funktion zeigt Vorschläge für Aktionen und Antworten an und sortiert Benachrichtigungen.\n\nDie Funktion hat Zugriff auf alle Benachrichtigungen, darunter auch personenbezogene Daten wie Namen von Kontakten und Nachrichten. Außerdem kann sie auf Benachrichtigungen antworten oder diese schließen und so unter anderem Anrufe entgegennehmen oder „Bitte nicht stören“ steuern."</string>
+    <string name="nas_upgrade_notification_learn_more_content" msgid="3735480566983530650">"Die adaptiven Benachrichtigungen wurden in Android 12 durch die Funktion „Optimierte Benachrichtigungen“ ersetzt. Diese Funktion zeigt Vorschläge für Aktionen und Antworten an und sortiert Benachrichtigungen.\n\nDie Funktion hat Zugriff auf alle Benachrichtigungen, darunter auch personenbezogene Daten wie Namen von Kontakten und Nachrichten. Außerdem kann sie auf Benachrichtigungen antworten oder diese schließen und so unter anderem Anrufe entgegennehmen oder „Bitte nicht stören“ steuern."</string>
     <string name="dynamic_mode_notification_channel_name" msgid="2986926422100223328">"Infomitteilung zum Ablaufmodus"</string>
     <string name="dynamic_mode_notification_title" msgid="1388718452788985481">"Energiesparmodus aktiviert"</string>
     <string name="dynamic_mode_notification_summary" msgid="1639031262484979689">"Reduzierung der Akkunutzung, um die Akkulaufzeit zu verlängern"</string>
@@ -2592,6 +2619,8 @@
     <string name="satellite_messaging_unsupported_default_sms_app_notification_summary" msgid="17084124893763593">"Wenn du Nachrichten per Satellit senden möchtest, musst du Google Messages als Standard-Messaging-App festlegen"</string>
     <string name="satellite_messaging_location_disabled_notification_title" msgid="7270641894250928494">"„Nachrichten per Satellit“ nicht verfügbar"</string>
     <string name="satellite_messaging_location_disabled_notification_summary" msgid="1450824950686221810">"Wenn du wissen möchtest, ob „Nachrichten per Satellit“ in diesem Land oder dieser Region verfügbar ist, aktiviere die Standorteinstellungen"</string>
+    <!-- no translation found for satellite_indicator (6846063647532086110) -->
+    <skip />
     <string name="fingerprint_dangling_notification_title" msgid="7362075195588639989">"Entsperrung per Fingerabdruck neu einrichten"</string>
     <string name="fingerprint_dangling_notification_msg_1" msgid="5851784577768803510">"<xliff:g id="FINGERPRINT">%s</xliff:g> wird nicht mehr erkannt."</string>
     <string name="fingerprint_dangling_notification_msg_2" msgid="7925203589860744456">"<xliff:g id="FINGERPRINT_0">%1$s</xliff:g> und <xliff:g id="FINGERPRINT_1">%2$s</xliff:g> werden nicht mehr erkannt."</string>

@@ -33,7 +33,6 @@ import android.view.View
 import android.view.View.OnLongClickListener
 import android.view.WindowInsets
 import android.window.DesktopExperienceFlags
-import android.window.DesktopModeFlags
 import android.window.TaskSnapshot
 import android.window.WindowContainerTransaction
 import com.android.app.tracing.traceSection
@@ -63,17 +62,18 @@ import com.android.wm.shell.shared.desktopmode.DesktopState
 import com.android.wm.shell.splitscreen.SplitScreenController
 import com.android.wm.shell.transition.FocusTransitionObserver
 import com.android.wm.shell.transition.Transitions
-import com.android.wm.shell.windowdecor.DefaultMaximizeMenuFactory
+import com.android.wm.shell.windowdecor.DefaultLayoutMenuFactory
 import com.android.wm.shell.windowdecor.DesktopHeaderManageWindowsMenu
 import com.android.wm.shell.windowdecor.HandleMenu
 import com.android.wm.shell.windowdecor.HandleMenu.Companion.shouldShowChangeAspectRatioButton
+import com.android.wm.shell.windowdecor.HandleMenu.Companion.shouldShowGameControlsButton
 import com.android.wm.shell.windowdecor.HandleMenu.Companion.shouldShowRestartButton
 import com.android.wm.shell.windowdecor.HandleMenu.HandleMenuFactory
 import com.android.wm.shell.windowdecor.HandleMenuController
+import com.android.wm.shell.windowdecor.LayoutMenu
+import com.android.wm.shell.windowdecor.LayoutMenuController
+import com.android.wm.shell.windowdecor.LayoutMenuFactory
 import com.android.wm.shell.windowdecor.ManageWindowsMenuController
-import com.android.wm.shell.windowdecor.MaximizeMenu
-import com.android.wm.shell.windowdecor.MaximizeMenuController
-import com.android.wm.shell.windowdecor.MaximizeMenuFactory
 import com.android.wm.shell.windowdecor.WindowDecorLinearLayout
 import com.android.wm.shell.windowdecor.WindowDecoration2.RelayoutParams
 import com.android.wm.shell.windowdecor.WindowDecorationActions
@@ -127,7 +127,7 @@ class AppHeaderController(
     private val onCaptionGenericMotionListener: View.OnGenericMotionListener,
     private val appToWebRepository: AppToWebRepository,
     private val focusTransitionObserver: FocusTransitionObserver,
-    private val maximizeMenuFactory: MaximizeMenuFactory = DefaultMaximizeMenuFactory,
+    private val layoutMenuFactory: LayoutMenuFactory = DefaultLayoutMenuFactory,
     private val handleMenuFactory: HandleMenuFactory = HandleMenuFactory,
     private val appHeaderViewHolderFactory: AppHeaderViewHolder.Factory =
         AppHeaderViewHolder.DefaultFactory(),
@@ -144,7 +144,7 @@ class AppHeaderController(
         taskOrganizer,
         bgScope,
     ),
-    MaximizeMenuController,
+    LayoutMenuController,
     HandleMenuController,
     ManageWindowsMenuController {
 
@@ -154,15 +154,15 @@ class AppHeaderController(
 
     private var handleMenu: HandleMenu? = null
     private var openByDefaultDialog: OpenByDefaultDialog? = null
-    private var maximizeMenu: MaximizeMenu? = null
+    private var layoutMenu: LayoutMenu? = null
     private var manageWindowsMenu: DesktopHeaderManageWindowsMenu? = null
 
-    override val maximizeMenuController = this
+    override val layoutMenuController = this
     override val handleMenuController = this
     override val manageWindowsMenuController = this
 
-    override val isMaximizeMenuActive: Boolean
-        get() = maximizeMenu != null
+    override val isLayoutMenuActive: Boolean
+        get() = layoutMenu != null
 
     private var handleMenuCreationJob: Job? = null
     override val isHandleMenuActive: Boolean
@@ -180,10 +180,7 @@ class AppHeaderController(
     private val taskPositionInParent
         get() = taskInfo.positionInParent
 
-    private val display
-        get() = displayController.getDisplay(taskInfo.displayId)
-
-    private val closeMaximizeWindowRunnable = Runnable { closeMaximizeMenu() }
+    private val closeMaximizeWindowRunnable = Runnable { closeLayoutMenu() }
     private val isEducationOrHandleReportingEnabled =
         Flags.enableDesktopWindowingAppHandleEducation() ||
             DesktopExperienceFlags.ENABLE_DESKTOP_WINDOWING_APP_TO_WEB_EDUCATION_INTEGRATION
@@ -191,7 +188,7 @@ class AppHeaderController(
             DesktopExperienceFlags.ENABLE_APP_HANDLE_POSITION_REPORTING.isTrue
     private val dimensions = LargeAppHeaderDimensions(decorWindowContext.resources)
 
-    private var isMaximizeMenuHovered = false
+    private var isLayoutMenuHovered = false
     private var isAppHeaderMaximizeButtonHovered = false
     private var loadAppInfoJob: Job? = null
 
@@ -220,7 +217,7 @@ class AppHeaderController(
             // signal in this case).
             if (!isTaskFocused && isAppHeaderMaximizeButtonHovered) {
                 setAppHeaderMaximizeButtonHovered(hovered = false)
-                onMaximizeButtonHoverExit()
+                onLayoutButtonHoverExit()
             }
 
             // Check for relevant configuration changes
@@ -261,14 +258,14 @@ class AppHeaderController(
                 openByDefaultDialog?.relayout(taskInfo)
             }
 
-            updateMaximizeMenu(startT)
+            updateLayoutMenu(startT)
 
             updateViewHolder(params.hasGlobalFocus)
 
             if (!params.hasGlobalFocus) {
                 closeHandleMenu()
                 closeManageWindowsMenu()
-                closeMaximizeMenu()
+                closeLayoutMenu()
             }
 
             notifyCaptionStateChanged()
@@ -329,16 +326,16 @@ class AppHeaderController(
         windowDecorCaptionRepository.notifyCaptionChanged(captionState)
     }
 
-    private fun updateMaximizeMenu(startT: SurfaceControl.Transaction) {
-        if (!taskInfo.isDragResizable(inFullImmersive) || !isMaximizeMenuActive) return
+    private fun updateLayoutMenu(startT: SurfaceControl.Transaction) {
+        if (!taskInfo.isDragResizable(inFullImmersive) || !isLayoutMenuActive) return
         if (!taskInfo.isVisible()) {
-            closeMaximizeMenu()
+            closeLayoutMenu()
         } else {
-            maximizeMenu?.positionMenu(startT)
+            layoutMenu?.positionMenu(startT)
         }
     }
 
-    private fun calculateMaximizeMenuPosition(menuWidth: Int, menuHeight: Int): Point {
+    private fun calculateLayoutMenuPosition(menuWidth: Int, menuHeight: Int): Point {
         val position = Point()
         val displayLayout =
             displayController.getDisplayLayout(taskInfo.displayId) ?: return position
@@ -369,15 +366,15 @@ class AppHeaderController(
         return Point(menuLeft, menuTop)
     }
 
-    /** Create and display maximize menu window */
-    override fun createMaximizeMenu() {
-        if (isMaximizeMenuActive) return
+    /** Create and display layout menu window */
+    override fun createLayoutMenu() {
+        if (isLayoutMenuActive) return
         desktopModeUiEventLogger.log(
             taskInfo,
             DesktopUiEventEnum.DESKTOP_WINDOW_MAXIMIZE_BUTTON_REVEAL_MENU,
         )
-        maximizeMenu =
-            maximizeMenuFactory
+        layoutMenu =
+            layoutMenuFactory
                 .create(
                     syncQueue = syncQueue,
                     rootTdaOrganizer = rootTaskDisplayAreaOrganizer,
@@ -386,7 +383,7 @@ class AppHeaderController(
                     taskInfo = taskInfo,
                     decorWindowContext = decorWindowContext,
                     positionSupplier = { width, height ->
-                        calculateMaximizeMenuPosition(width, height)
+                        calculateLayoutMenuPosition(width, height)
                     },
                     transactionSupplier = surfaceControlTransactionSupplier,
                     desktopModeUiEventLogger = desktopModeUiEventLogger,
@@ -394,16 +391,14 @@ class AppHeaderController(
                 .apply {
                     show(
                         isTaskInImmersiveMode = inFullImmersive,
-                        showImmersiveOption =
-                            DesktopModeFlags.ENABLE_FULLY_IMMERSIVE_IN_DESKTOP.isTrue &&
-                                taskInfo.requestingImmersive,
+                        showImmersiveOption = taskInfo.requestingImmersive,
                         showSnapOptions = taskInfo.isResizeable,
                         onHoverListener = { hovered: Boolean ->
-                            isMaximizeMenuHovered = hovered
-                            onMaximizeHoverStateChanged()
+                            isLayoutMenuHovered = hovered
+                            onLayoutButtonHoverStateChanged()
                         },
-                        onOutsideTouchListener = { closeMaximizeMenu() },
-                        onMaximizeMenuClickedListener = { closeMaximizeMenu() },
+                        onOutsideTouchListener = { closeLayoutMenu() },
+                        onLayoutMenuClickedListener = { closeLayoutMenu() },
                     )
                 }
     }
@@ -411,17 +406,17 @@ class AppHeaderController(
     /** Set whether the app header's maximize button is hovered. */
     override fun setAppHeaderMaximizeButtonHovered(hovered: Boolean) {
         isAppHeaderMaximizeButtonHovered = hovered
-        onMaximizeHoverStateChanged()
+        onLayoutButtonHoverStateChanged()
     }
 
     /**
-     * Called when either one of the maximize button in the app header or the maximize menu has
+     * Called when either one of the maximize button in the app header or the layout menu has
      * changed its hover state.
      */
-    override fun onMaximizeHoverStateChanged() {
-        if (!isMaximizeMenuHovered && !isAppHeaderMaximizeButtonHovered) {
+    override fun onLayoutButtonHoverStateChanged() {
+        if (!isLayoutMenuHovered && !isAppHeaderMaximizeButtonHovered) {
             // Neither is hovered, close the menu.
-            if (isMaximizeMenuActive) {
+            if (isLayoutMenuActive) {
                 mainHandler.postDelayed(closeMaximizeWindowRunnable, CLOSE_MAXIMIZE_MENU_DELAY_MS)
             }
             return
@@ -430,14 +425,14 @@ class AppHeaderController(
         mainHandler.removeCallbacks(closeMaximizeWindowRunnable)
     }
 
-    /** Close the maximize menu window if open. */
-    override fun closeMaximizeMenu() {
-        maximizeMenu?.close {
+    /** Close the layout menu window if open. */
+    override fun closeLayoutMenu() {
+        layoutMenu?.close {
             // Request the accessibility service to refocus on the maximize button after closing
             // the menu.
             a11yFocusMaximizeButton()
         }
-        maximizeMenu = null
+        layoutMenu = null
     }
 
     /** Request direct a11y focus on the maximize button */
@@ -465,20 +460,17 @@ class AppHeaderController(
             )
     }
 
-    private fun canOpenMaximizeMenu(animatingTaskResizeOrReposition: Boolean): Boolean =
-        if (!DesktopModeFlags.ENABLE_FULLY_IMMERSIVE_IN_DESKTOP.isTrue) {
-            !animatingTaskResizeOrReposition
-        } else {
-            val inImmersiveAndRequesting = inFullImmersive && taskInfo.requestingImmersive
-            !animatingTaskResizeOrReposition && !inImmersiveAndRequesting
-        }
+    private fun canOpenLayoutMenu(animatingTaskResizeOrReposition: Boolean): Boolean {
+        val inImmersiveAndRequesting = inFullImmersive && taskInfo.requestingImmersive
+        return !animatingTaskResizeOrReposition && !inImmersiveAndRequesting
+    }
 
     /**
      * Called when there is a [MotionEvent.ACTION_HOVER_EXIT] on the maximize window button.
      *
      * TODO(b/409648813): Move all hover logic to view holder
      */
-    override fun onMaximizeButtonHoverExit() {
+    override fun onLayoutButtonHoverExit() {
         viewHolder.onMaximizeWindowHoverExit()
     }
 
@@ -487,7 +479,7 @@ class AppHeaderController(
      *
      * TODO(b/409648813): Move all hover logic to view holder
      */
-    override fun onMaximizeButtonHoverEnter() {
+    override fun onLayoutButtonHoverEnter() {
         viewHolder.onMaximizeWindowHoverEnter()
     }
 
@@ -524,6 +516,8 @@ class AppHeaderController(
             multiInstanceHelper.supportsMultiInstanceSplit(taskInfo.baseActivity, taskInfo.userId)
         val shouldShowManageWindowsButton = supportsMultiInstance && minimumInstancesFound
         val shouldShowChangeAspectRatioButton = shouldShowChangeAspectRatioButton(taskInfo)
+        val shouldShowGameControlsButton =
+            shouldShowGameControlsButton(decorWindowContext, taskInfo)
         val shouldShowRestartButton = shouldShowRestartButton(taskInfo)
         viewHolder.onHandleMenuOpened()
         handleMenu =
@@ -545,6 +539,7 @@ class AppHeaderController(
                     shouldShowNewWindowButton = supportsMultiInstance,
                     shouldShowManageWindowsButton = shouldShowManageWindowsButton,
                     shouldShowChangeAspectRatioButton = shouldShowChangeAspectRatioButton,
+                    shouldShowGameControlsButton = shouldShowGameControlsButton,
                     shouldShowDesktopModeButton =
                         desktopState.isDesktopModeSupportedOnDisplay(display),
                     shouldShowRestartButton = shouldShowRestartButton,
@@ -645,7 +640,7 @@ class AppHeaderController(
                     isTaskMaximized(taskInfo, displayLayout),
                     inFullImmersive,
                     hasGlobalFocus,
-                    canOpenMaximizeMenu(animatingTaskResizeOrReposition),
+                    canOpenLayoutMenu(animatingTaskResizeOrReposition),
                     isCaptionVisible,
                 )
             )
@@ -666,7 +661,7 @@ class AppHeaderController(
                 onCaptionButtonClickListener = onCaptionButtonClickListener,
                 onLongClickListener = onLongClickListener,
                 onCaptionGenericMotionListener = onCaptionGenericMotionListener,
-                onMaximizeHoverAnimationFinishedListener = { createMaximizeMenu() },
+                onMaximizeHoverAnimationFinishedListener = { createLayoutMenu() },
                 desktopModeUiEventLogger = desktopModeUiEventLogger,
                 dimensions = dimensions,
                 focusTransitionObserver = focusTransitionObserver,
@@ -767,7 +762,7 @@ class AppHeaderController(
         loadAppInfoJob?.cancel()
         closeHandleMenu()
         closeManageWindowsMenu()
-        closeMaximizeMenu()
+        closeLayoutMenu()
         viewHolder.close()
         if (desktopState.canEnterDesktopMode && isEducationOrHandleReportingEnabled) {
             notifyNoCaption()

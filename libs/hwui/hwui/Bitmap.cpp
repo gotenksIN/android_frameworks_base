@@ -23,12 +23,13 @@
 #include "Bitmap.h"
 
 #include <android-base/file.h>
+#include <utils/Trace.h>
 
 #include "FeatureFlags.h"
 #include "HardwareBitmapUploader.h"
+#include "OutOfProcessRendering.h"
 #include "Properties.h"
 #include "utils/Color.h"
-#include <utils/Trace.h>
 
 #ifdef __ANDROID__  // Layoutlib does not support render thread
 #include <com_android_graphics_surfaceflinger_flags.h>
@@ -391,6 +392,7 @@ Bitmap::Bitmap(AHardwareBuffer* buffer, const SkImageInfo& info, size_t rowBytes
     setImmutable();  // HW bitmaps are always immutable
     mImage = SkImages::DeferredFromAHardwareBuffer(buffer, mInfo.alphaType(),
                                                    mInfo.refColorSpace());
+    uirenderer::oopr::registerBuffer(GraphicBuffer::fromAHardwareBuffer(buffer), mImage);
     traceBitmapCreate();
 }
 #endif
@@ -415,6 +417,7 @@ Bitmap::~Bitmap() {
             break;
         case PixelStorageType::Hardware:
 #ifdef __ANDROID__ // Layoutlib does not support hardware acceleration
+            uirenderer::oopr::deregisterBuffer(mImage);
             auto buffer = mPixelStorage.hardware.buffer;
             AHardwareBuffer_release(buffer);
             mPixelStorage.hardware.buffer = nullptr;
@@ -497,18 +500,17 @@ sk_sp<SkImage> Bitmap::makeImage() {
     sk_sp<SkImage> image = mImage;
     if (!image) {
         SkASSERT(!isHardware());
+        SkBitmap skiaBitmap;
+        skiaBitmap.setInfo(info(), rowBytes());
+        skiaBitmap.setPixelRef(sk_ref_sp(this), 0, 0);
         // Note we don't cache in this case, because the raster image holds a pointer to this Bitmap
         // internally and ~Bitmap won't be invoked.
         // TODO: refactor Bitmap to not derive from SkPixelRef, which would allow caching here.
 #ifdef __ANDROID__
-        SkBitmap skiaBitmap;
-        skiaBitmap.setInfo(info(), rowBytes());
-        skiaBitmap.setPixelRef(sk_ref_sp(this), 0, 0);
         // pinnable images are only supported with the Ganesh GPU backend compiled in.
         image = SkImages::PinnableRasterFromBitmap(skiaBitmap);
 #else
-        image = SkImages::RasterFromPixmap(SkPixmap(info(), pixels(), rowBytes()),
-                                           nullptr, nullptr);
+        image = SkImages::RasterFromBitmapNoCopy(skiaBitmap);
 #endif
     }
     return image;

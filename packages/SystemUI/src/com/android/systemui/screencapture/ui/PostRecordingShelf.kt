@@ -20,8 +20,12 @@ import android.graphics.drawable.Icon
 import android.net.Uri
 import android.view.Display
 import android.view.Gravity
+import android.view.View
+import android.view.ViewGroup
 import android.view.Window
 import android.view.WindowManager
+import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityManager
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.spring
@@ -58,7 +62,6 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.android.compose.modifiers.padding
 import com.android.systemui.common.shared.model.ContentDescription
@@ -71,8 +74,8 @@ import com.android.systemui.screencapture.common.ui.compose.PostCaptureToastBar
 import com.android.systemui.screencapture.common.ui.compose.loadIcon
 import com.android.systemui.screencapture.common.ui.viewmodel.DrawableLoaderViewModel
 import com.android.systemui.screencapture.record.smallscreen.ui.PostRecordSnackbarDialogs
-import com.android.systemui.screencapture.record.smallscreen.ui.viewmodel.PostRecordingViewModel
-import com.android.systemui.statusbar.phone.EdgeToEdgeDialogDelegate
+import com.android.systemui.screencapture.record.smallscreen.ui.viewmodel.PostRecordingActionsViewModel
+import com.android.systemui.screencapture.record.smallscreen.ui.viewmodel.PostRecordingImmediateVideoViewModel
 import com.android.systemui.statusbar.phone.SystemUIDialog
 import com.android.systemui.statusbar.phone.SystemUIDialog.DIALOG_WINDOW_TYPE
 import com.android.systemui.statusbar.phone.SystemUIDialogFactory
@@ -81,6 +84,8 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -92,8 +97,10 @@ constructor(
     @Application private val context: Context,
     @Assisted private val display: Display,
     private val dialogFactory: SystemUIDialogFactory,
-    private val viewModelFactory: PostRecordingViewModel.Factory,
+    private val actionsViewModelFactory: PostRecordingActionsViewModel.Factory,
+    private val videoViewModelFactory: PostRecordingImmediateVideoViewModel.Factory,
     private val postRecordSnackbarDialogs: PostRecordSnackbarDialogs,
+    private val accessibilityManager: AccessibilityManager,
 ) {
     private val visibleState = MutableTransitionState(false)
     private val dialog: SystemUIDialog =
@@ -101,14 +108,11 @@ constructor(
             .create(
                 context.createWindowContext(display, DIALOG_WINDOW_TYPE, null),
                 theme = R.style.Theme_SystemUI_Dialog,
-                dialogDelegate = EdgeToEdgeDialogDelegate(),
-            ) {
-                DialogContent(uri = uri, thumbnail = thumbnail)
+            ) { dialogInstance ->
+                DialogContent(uri = uri, thumbnail = thumbnail, window = dialogInstance.window)
             }
             .apply {
                 setupWindow(window!!)
-                setCancelable(false)
-                setCanceledOnTouchOutside(false)
                 setOnDismissListener { visibleState.targetState = false }
             }
 
@@ -129,7 +133,7 @@ constructor(
     }
 
     @Composable
-    private fun DialogContent(uri: Uri, thumbnail: Icon?) {
+    private fun DialogContent(uri: Uri, thumbnail: Icon?, window: Window?) {
         var isConfirmDeletionDialogShowing by remember { mutableStateOf(false) }
         if (!visibleState.targetState && visibleState.isIdle) {
             SideEffect {
@@ -139,22 +143,48 @@ constructor(
             }
         }
 
+        val coroutineScope = rememberCoroutineScope()
+
+        var timeoutJob by remember { mutableStateOf<Job?>(null) }
+
+        fun resetTimeout() {
+            timeoutJob?.cancel()
+            timeoutJob = coroutineScope.launch { scheduleTimeout() }
+        }
+
+        window!!.decorView.accessibilityDelegate =
+            object : View.AccessibilityDelegate() {
+                override fun onRequestSendAccessibilityEvent(
+                    host: ViewGroup,
+                    child: View,
+                    event: AccessibilityEvent,
+                ): Boolean {
+                    if (event.eventType == AccessibilityEvent.TYPE_VIEW_ACCESSIBILITY_FOCUSED) {
+                        resetTimeout()
+                    }
+                    return super.onRequestSendAccessibilityEvent(host, child, event)
+                }
+            }
+
         LaunchedEffect(visibleState.targetState, isConfirmDeletionDialogShowing) {
             if (visibleState.targetState && !isConfirmDeletionDialogShowing) {
-                delay(DEFAULT_TIMEOUT)
-                hide()
+                resetTimeout()
+            } else {
+                // If the deletion dialog shows, stop the timer entirely
+                timeoutJob?.cancel()
             }
         }
 
-        val coroutineScope = rememberCoroutineScope()
-        val postRecordingViewModel =
+        val actionsViewModel =
             rememberViewModel("PostRecordingShelf#viewModel") {
-                viewModelFactory.create(uri, display.displayId)
+                actionsViewModelFactory.create(uri, display.displayId)
             }
-        val parentUri = postRecordingViewModel.parentUri
+        val videoViewModel =
+            rememberViewModel("PostRecordingShelf#viewModel") { videoViewModelFactory.create(uri) }
+        val parentUri = actionsViewModel.parentUri
         val shareIcon =
             loadIcon(
-                    viewModel = postRecordingViewModel,
+                    viewModel = actionsViewModel,
                     resId = R.drawable.ic_screenshot_share,
                     contentDescription =
                         ContentDescription.Loaded(
@@ -166,7 +196,7 @@ constructor(
                 .value
         val folderIcon =
             loadIcon(
-                    viewModel = postRecordingViewModel,
+                    viewModel = actionsViewModel,
                     resId = R.drawable.ic_screen_capture_folder,
                     contentDescription =
                         ContentDescription.Loaded(
@@ -178,7 +208,7 @@ constructor(
                 .value
         val deleteIcon =
             loadIcon(
-                    viewModel = postRecordingViewModel,
+                    viewModel = actionsViewModel,
                     resId = R.drawable.ic_screenshot_delete,
                     contentDescription =
                         ContentDescription.Loaded(
@@ -195,7 +225,7 @@ constructor(
                         ActionButtonGroupItem(
                             icon = shareIcon,
                             onClick = {
-                                postRecordingViewModel.share()
+                                actionsViewModel.share()
                                 hide()
                             },
                         )
@@ -207,7 +237,7 @@ constructor(
                                 icon = folderIcon,
                                 onClick = {
                                     coroutineScope.launch {
-                                        postRecordingViewModel.openInFolder()
+                                        actionsViewModel.openInFolder()
                                         hide()
                                     }
                                 },
@@ -225,13 +255,13 @@ constructor(
                                         postRecordingConfirmDeletion(
                                             dialogFactory,
                                             context,
-                                            postRecordingViewModel,
+                                            actionsViewModel,
                                             display,
                                         )
                                     ) {
                                         hide()
                                         postRecordSnackbarDialogs.showVideoDeleted(
-                                            postRecordingViewModel.videoUri,
+                                            videoViewModel.recording.uri,
                                             display,
                                         )
                                     }
@@ -244,27 +274,24 @@ constructor(
             }
 
         Box(
-            modifier = Modifier.fillMaxSize().safeDrawingPadding(),
+            modifier =
+                Modifier.fillMaxSize()
+                    .clickable(onClick = { hide() }, indication = null, interactionSource = null)
+                    .safeDrawingPadding(),
             contentAlignment = Alignment.BottomStart,
         ) {
             AnimatedVisibility(
                 visibleState = visibleState,
                 enter =
-                    fadeIn(animationSpec = spring<Float>()) +
-                        slideInHorizontally(
-                            animationSpec = spring<IntOffset>(),
-                            initialOffsetX = { -it },
-                        ),
+                    fadeIn(animationSpec = spring()) +
+                        slideInHorizontally(animationSpec = spring(), initialOffsetX = { -it }),
                 exit =
-                    fadeOut(animationSpec = spring<Float>()) +
-                        slideOutHorizontally(
-                            animationSpec = spring<IntOffset>(),
-                            targetOffsetX = { -it },
-                        ),
+                    fadeOut(animationSpec = spring()) +
+                        slideOutHorizontally(animationSpec = spring(), targetOffsetX = { -it }),
             ) {
                 Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.Start) {
                     PostRecordingThumbnail(
-                        viewmodel = postRecordingViewModel,
+                        viewmodel = actionsViewModel,
                         preview = thumbnail?.bitmap?.asImageBitmap(),
                         modifier =
                             Modifier.clip(RoundedCornerShape(16.dp))
@@ -272,7 +299,7 @@ constructor(
                                 .width(200.dp)
                                 .height(128.dp)
                                 .clickable {
-                                    postRecordingViewModel.view()
+                                    actionsViewModel.view()
                                     hide()
                                 },
                     )
@@ -336,6 +363,21 @@ constructor(
                         modifier = Modifier.size(24.dp),
                     )
                 }
+            }
+        }
+    }
+
+    private suspend fun scheduleTimeout() {
+        val recommendedTimeout =
+            accessibilityManager.getRecommendedTimeoutMillis(
+                DEFAULT_TIMEOUT.inWholeMilliseconds.toInt(),
+                AccessibilityManager.FLAG_CONTENT_TEXT or AccessibilityManager.FLAG_CONTENT_CONTROLS,
+            )
+
+        coroutineScope {
+            launch {
+                delay(recommendedTimeout.toLong())
+                hide()
             }
         }
     }

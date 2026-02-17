@@ -17,8 +17,8 @@
 package android.content;
 
 import static android.app.appfunctions.flags.Flags.FLAG_ENABLE_APP_FUNCTION_MANAGER;
-import static android.app.ondeviceintelligence.flags.Flags.FLAG_ENABLE_ON_DEVICE_INTELLIGENCE_MODULE;
 import static android.app.lskfreset.flags.Flags.FLAG_ENABLE_LSKF_RESET_MANAGER;
+import static android.app.ondeviceintelligence.flags.Flags.FLAG_ENABLE_ON_DEVICE_INTELLIGENCE_MODULE;
 import static android.content.flags.Flags.FLAG_ENABLE_BIND_PACKAGE_ISOLATED_PROCESS;
 import static android.content.flags.Flags.FLAG_ENABLE_UPDATE_SERVICE_BINDINGS;
 import static android.security.Flags.FLAG_SECURE_LOCKDOWN;
@@ -763,6 +763,8 @@ public abstract class Context {
      *
      * @hide
      */
+    @TestApi
+    @SuppressWarnings("UnflaggedApi") // @TestApi without associated feature.
     public static final long BIND_ALLOW_FREEZE = 0x4_0000_0000L;
 
     /**
@@ -5026,6 +5028,16 @@ public abstract class Context {
 
     /**
      * Use with {@link #getSystemService(String)} to retrieve a
+     * {@link android.os.storage.FilesManager} for handling file operations.
+     *
+     * @see #getSystemService(String)
+     * @see android.os.storage.FilesManager
+     */
+    @FlaggedApi(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    public static final String FILES_SERVICE = "files";
+
+    /**
+     * Use with {@link #getSystemService(String)} to retrieve a
      * {@link android.app.AlarmManager} for receiving intents at a
      * time of your choosing.
      *
@@ -5561,6 +5573,7 @@ public abstract class Context {
      * {@link android.hardware.fingerprint.FingerprintManager} for handling management
      * of fingerprints.
      *
+     * @removed See {@link android.hardware.biometrics.BiometricPrompt}
      * @see #getSystemService(String)
      * @see android.hardware.fingerprint.FingerprintManager
      */
@@ -5749,12 +5762,13 @@ public abstract class Context {
     /**
      * Use with {@link #getSystemService(String)} to retrieve a
      * {@link com.android.server.attention.AttentionManagerService} for attention services.
+     * @hide
      *
      * @see #getSystemService(String)
-     * @see android.server.attention.AttentionManagerService
-     * @hide
+     * @see com.android.server.attention.AttentionManagerService
      */
-    @TestApi
+    @SystemApi
+    @FlaggedApi(com.android.input.flags.Flags.FLAG_ENABLE_ATTENTION_SERVICE_APIS)
     public static final String ATTENTION_SERVICE = "attention";
 
     /**
@@ -6824,12 +6838,12 @@ public abstract class Context {
 
     /**
      * Use with {@link #getSystemService(String)} to retrieve an
-     * {@link android.security.talisman.TalismanManager}.
+     * {@link android.security.trusttoken.TrustTokenManager}.
      * @see #getSystemService(String)
-     * @see android.security.talisman.TalismanManager
+     * @see android.security.trusttoken.TrustTokenManager
      * @hide
      */
-    public static final String TALISMAN_SERVICE = "talisman";
+    public static final String TRUST_TOKEN_SERVICE = "trust_token";
 
     /**
      * Use with {@link #getSystemService(String)} to retrieve an
@@ -7385,6 +7399,8 @@ public abstract class Context {
     @CheckResult(suggest="#enforcePermission(String,int,int,String)")
     @PackageManager.PermissionResult
     @PermissionMethod
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl",
+            comment = "Returns PERMISSION_DENIED by default on Ravenwood")
     public abstract int checkPermission(
             @NonNull @PermissionName String permission, int pid, int uid);
 
@@ -7392,6 +7408,8 @@ public abstract class Context {
     @SuppressWarnings("HiddenAbstractMethod")
     @PackageManager.PermissionResult
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl",
+            comment = "Returns PERMISSION_DENIED by default on Ravenwood")
     public abstract int checkPermission(@NonNull String permission, int pid, int uid,
             IBinder callerToken);
 
@@ -7419,6 +7437,8 @@ public abstract class Context {
     @CheckResult(suggest="#enforceCallingPermission(String,String)")
     @PackageManager.PermissionResult
     @PermissionMethod
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl",
+            comment = "Returns PERMISSION_DENIED by default on Ravenwood")
     public abstract int checkCallingPermission(@NonNull @PermissionName String permission);
 
     /**
@@ -7440,6 +7460,8 @@ public abstract class Context {
     @CheckResult(suggest="#enforceCallingOrSelfPermission(String,String)")
     @PackageManager.PermissionResult
     @PermissionMethod(orSelf = true)
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl",
+            comment = "Returns PERMISSION_DENIED by default on Ravenwood")
     public abstract int checkCallingOrSelfPermission(@NonNull @PermissionName String permission);
 
     /**
@@ -7454,6 +7476,8 @@ public abstract class Context {
      * @see #checkCallingPermission(String)
      */
     @PackageManager.PermissionResult
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl",
+            comment = "Returns PERMISSION_DENIED by default on Ravenwood")
     public abstract int checkSelfPermission(@NonNull String permission);
 
     /**
@@ -7469,6 +7493,8 @@ public abstract class Context {
      * @see #checkPermission(String, int, int)
      */
     @PermissionMethod
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl",
+            comment = "Returns PERMISSION_DENIED by default on Ravenwood")
     public abstract void enforcePermission(
             @NonNull @PermissionName String permission, int pid, int uid, @Nullable String message);
 
@@ -7491,6 +7517,8 @@ public abstract class Context {
      * @see #checkCallingPermission(String)
      */
     @PermissionMethod
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl",
+            comment = "Returns PERMISSION_DENIED by default on Ravenwood")
     public abstract void enforceCallingPermission(
             @NonNull @PermissionName String permission, @Nullable String message);
 
@@ -7508,6 +7536,8 @@ public abstract class Context {
      * @see #checkCallingOrSelfPermission(String)
      */
     @PermissionMethod(orSelf = true)
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl",
+            comment = "Returns PERMISSION_DENIED by default on Ravenwood")
     public abstract void enforceCallingOrSelfPermission(
             @NonNull @PermissionName String permission, @Nullable String message);
 
@@ -7533,6 +7563,24 @@ public abstract class Context {
     @CheckResult
     @PermissionRequestState
     public int getPermissionRequestState(@NonNull String permission) {
+        throw new RuntimeException("Not implemented. Must override in a subclass.");
+    }
+
+    /**
+     * Gets whether you should show UI with rationale before requesting a permission. If the
+     * permission does not exist on this SDK level or is not visible to this app, the method will
+     * return {@code false}.
+     *
+     * @param permission A permission your app wants to request.
+     * @return Whether you should show permission rationale UI.
+     *
+     * @see Activity#checkSelfPermission
+     * @see Activity#requestPermissions(String[], int)
+     * @see Activity#onRequestPermissionsResult(int, String[], int[])
+     */
+    @FlaggedApi(
+            android.permission.flags.Flags.FLAG_SHOULD_SHOW_PERMISSION_RATIONALE_IN_CONTEXT_ENABLED)
+    public boolean shouldShowRequestPermissionRationale(@NonNull String permission) {
         throw new RuntimeException("Not implemented. Must override in a subclass.");
     }
 
@@ -8172,6 +8220,7 @@ public abstract class Context {
      *
      * @return A {@link Context} with the given configuration override.
      */
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public abstract Context createConfigurationContext(
             @NonNull Configuration overrideConfiguration);
 
@@ -8498,6 +8547,7 @@ public abstract class Context {
      * @hide
      */
     @SuppressWarnings("HiddenAbstractMethod")
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl")
     public abstract DisplayAdjustments getDisplayAdjustments(int displayId);
 
     /**
@@ -8521,6 +8571,8 @@ public abstract class Context {
      * @hide
      */
     @Nullable
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl",
+            comment = "Always returns null for now, until we fully support Display")
     public Display getDisplayNoVerify() {
         throw new RuntimeException("Not implemented. Must override in a subclass.");
     }
@@ -8534,6 +8586,8 @@ public abstract class Context {
      */
     @SuppressWarnings("HiddenAbstractMethod")
     @TestApi
+    @RavenwoodSupported(type = SupportType.SUBCLASS, subclass = "ContextImpl",
+            comment = "Always returns DEFAULT_DISPLAY for now, until we fully support Display")
     public abstract int getDisplayId();
 
     /**

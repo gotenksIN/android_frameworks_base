@@ -509,6 +509,49 @@ public class BackNavigationControllerTests extends WindowTestsBase {
     }
 
     @Test
+    @EnableFlags(Flags.FLAG_FIX_CROSS_ACTIVITY_BACK_ANIMATION_IN_BUBBLES)
+    public void getAnimatablePrevActivities_taskOrganizerIntercepts_nonRootActivity() {
+        // Setup: Task with 2 activities, organizer intercepts back.
+        CrossActivityTestCase testCase = createTopTaskWithTwoActivities();
+        spyOn(mAtm.mTaskOrganizerController);
+        doReturn(true).when(mAtm.mTaskOrganizerController)
+                .shouldInterceptBackPressedOnRootTask(testCase.task);
+
+        // Action: Call getAnimatablePrevActivities for the top (non-root) activity.
+        final ArrayList<ActivityRecord> outPrevActivities = new ArrayList<>();
+        boolean predictable = BackNavigationController.getAnimatablePrevActivities(
+                testCase.task, testCase.recordFront, outPrevActivities);
+
+        // Verification: Animation should be allowed for a non-root activity even if the organizer
+        // intercepts.
+        assertTrue("Animation should be allowed for non-root activity", predictable);
+        // The method should find the previous activity as the destination.
+        assertTrue(outPrevActivities.contains(testCase.recordBack));
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_FIX_CROSS_ACTIVITY_BACK_ANIMATION_IN_BUBBLES)
+    public void getAnimatablePrevActivities_taskOrganizerIntercepts_rootActivity() {
+        // Setup: Task with 1 activity (which is the root), organizer intercepts back.
+        Task task = createTopTaskWithActivity();
+        ActivityRecord rootActivity = task.getTopMostActivity();
+        spyOn(mAtm.mTaskOrganizerController);
+        doReturn(true).when(mAtm.mTaskOrganizerController)
+                .shouldInterceptBackPressedOnRootTask(task);
+
+        // Action: Call getAnimatablePrevActivities for the root activity.
+        final ArrayList<ActivityRecord> outPrevActivities = new ArrayList<>();
+        boolean predictable = BackNavigationController.getAnimatablePrevActivities(
+                task, rootActivity, outPrevActivities);
+
+        // Verification: Animation should be prevented for the root activity because the organizer
+        // intercepts.
+        assertFalse("Animation should be prevented for root activity when organizer intercepts",
+                predictable);
+        assertTrue(outPrevActivities.isEmpty());
+    }
+
+    @Test
     public void backTypeDialogCloseWhenBackFromDialog() {
         DialogCloseTestCase testCase = createTopTaskWithActivityAndDialog();
         IOnBackInvokedCallback callback = withSystemCallback(testCase.task);
@@ -599,6 +642,48 @@ public class BackNavigationControllerTests extends WindowTestsBase {
         assertThat(typeToString(backNavigationInfo.getType()))
                 .isEqualTo(typeToString(BackNavigationInfo.TYPE_CALLBACK));
         assertThat(backNavigationInfo.getOnBackInvokedCallback()).isEqualTo(appCallback);
+    }
+
+    @Test
+    @EnableFlags({android.security.Flags.FLAG_APP_LOCK_APIS,
+            android.security.Flags.FLAG_APP_LOCK_CORE})
+    public void backNavigationToLockedActivity_disablesAnimation() {
+        CrossActivityTestCase testCase = createTopTaskWithTwoActivities();
+        withSystemCallback(testCase.task);
+        final AppLockController appLockController = mWm.mAppLockController;
+        spyOn(appLockController);
+
+        doReturn(true).when(appLockController).isPackageLockedByAppLockLocked(
+                testCase.recordBack.packageName, testCase.recordBack.mUserId);
+
+        BackNavigationInfo backNavigationInfo = startBackNavigation();
+
+        assertThat(backNavigationInfo).isNotNull();
+        assertThat(typeToString(backNavigationInfo.getType()))
+                .isEqualTo(typeToString(BackNavigationInfo.TYPE_CALLBACK));
+        assertThat(backNavigationInfo.isPrepareRemoteAnimation()).isFalse();
+    }
+
+    @Test
+    @EnableFlags({android.security.Flags.FLAG_APP_LOCK_APIS,
+            android.security.Flags.FLAG_APP_LOCK_CORE})
+    public void backNavigationToLockedActivity_overridesShowWhenLocked() {
+        CrossActivityTestCase testCase = createTopTaskWithTwoActivities();
+        withSystemCallback(testCase.task);
+        setupKeyguardOccluded();
+        final AppLockController appLockController = mWm.mAppLockController;
+        spyOn(appLockController);
+
+        doReturn(true).when(testCase.recordBack).canShowWhenLocked();
+        doReturn(true).when(appLockController).isPackageLockedByAppLockLocked(
+                testCase.recordBack.packageName, testCase.recordBack.mUserId);
+
+        BackNavigationInfo backNavigationInfo = startBackNavigation();
+
+        assertThat(backNavigationInfo).isNotNull();
+        assertThat(typeToString(backNavigationInfo.getType()))
+                .isEqualTo(typeToString(BackNavigationInfo.TYPE_CALLBACK));
+        assertThat(backNavigationInfo.isPrepareRemoteAnimation()).isFalse();
     }
 
     // TODO (b/259427810) Remove this test when we figure out new API
@@ -708,7 +793,6 @@ public class BackNavigationControllerTests extends WindowTestsBase {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_BACK_CALLBACK_FOR_FOCUSED_SURFACE_CONTROL_VIEW_HOST)
     public void registerCallbackFromEmbeddedWindow() {
         final WindowState window = newWindowBuilder("TestWindow", TYPE_APPLICATION).build();
         addToWindowMap(window, true);
@@ -728,7 +812,7 @@ public class BackNavigationControllerTests extends WindowTestsBase {
                         null /* hostWindow */, 0 /* callingUid */,
                         0 /* callingPid */, TYPE_APPLICATION_OVERLAY, 0 /* displayId */,
                         inputTransferToken, "inputHandleName", true /* isFocusable */);
-        embeddedWindow.openInputChannel(new InputChannel());
+        InputChannel channel = embeddedWindow.openInputChannel();
         mWm.mEmbeddedWindowController.add(mock(IBinder.class), embeddedWindow);
 
         final IOnBackInvokedCallback embedCallback = createOnBackInvokedCallback();
@@ -750,6 +834,7 @@ public class BackNavigationControllerTests extends WindowTestsBase {
         mWm.grantEmbeddedWindowFocus(mockSession, inputTransferToken, false /* grantFocus */);
         BackNavigationInfo backNavigationInfo2 = startBackNavigation();
         assertThat(backNavigationInfo2.getOnBackInvokedCallback()).isEqualTo(windowCallback);
+        channel.dispose();
     }
 
     @Test

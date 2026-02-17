@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+@file:Suppress("ktlint:standard:no-wildcard-imports")
+
 package com.android.server.permission.access.permission
 
 import android.Manifest
@@ -28,6 +30,7 @@ import android.permission.flags.Flags
 import android.util.Slog
 import com.android.internal.os.RoSystemProperties
 import com.android.internal.pm.permission.CompatibilityPermissionInfo
+import com.android.internal.pm.pkg.component.ParsedUsesPermission
 import com.android.modules.utils.BinaryXmlPullParser
 import com.android.modules.utils.BinaryXmlSerializer
 import com.android.server.permission.access.AccessState
@@ -38,8 +41,8 @@ import com.android.server.permission.access.PermissionUri
 import com.android.server.permission.access.SchemePolicy
 import com.android.server.permission.access.UidUri
 import com.android.server.permission.access.WriteMode
-import com.android.server.permission.access.collection.* // ktlint-disable no-wildcard-imports
-import com.android.server.permission.access.immutable.* // ktlint-disable no-wildcard-imports
+import com.android.server.permission.access.collection.*
+import com.android.server.permission.access.immutable.*
 import com.android.server.permission.access.util.andInv
 import com.android.server.permission.access.util.hasAnyBit
 import com.android.server.permission.access.util.hasBits
@@ -727,6 +730,9 @@ class AppIdPermissionPolicy : SchemePolicy() {
         if (Flags.accessLocalNetworkPermissionEnabled()) {
             clearNearbyDevicesPermissionsUserFlagsOnPackageUpdate(appId)
         }
+        if (Flags.locationButtonEnabled()) {
+            revokePermissionIfOnlyForLocationButtonOnPackageUpdate(appId)
+        }
     }
 
     private fun MutateStateScope.revokeStorageAndMediaPermissionsOnPackageUpdate(appId: Int) {
@@ -912,6 +918,31 @@ class AppIdPermissionPolicy : SchemePolicy() {
             }
         }
 
+    private fun MutateStateScope.revokePermissionIfOnlyForLocationButtonOnPackageUpdate(
+        appId: Int
+    ) {
+        val onlyForLocationButton =
+            allPackagesInAppId(appId) { packageState ->
+                val usesPermission =
+                    packageState.androidPackage!!
+                        .usesPermissionMapping[Manifest.permission.ACCESS_FINE_LOCATION]
+                        ?: return@allPackagesInAppId false
+                usesPermission.usesPermissionFlags.hasBits(
+                    ParsedUsesPermission.FLAG_ONLY_FOR_LOCATION_BUTTON
+                )
+            }
+        if (!onlyForLocationButton) {
+            return
+        }
+        newState.userStates.forEachIndexed { _, userId, _ ->
+            if (
+                isRuntimePermissionGranted(appId, userId, Manifest.permission.ACCESS_FINE_LOCATION)
+            ) {
+                revokeRuntimePermission(appId, userId, Manifest.permission.ACCESS_FINE_LOCATION)
+            }
+        }
+    }
+
     private fun GetStateScope.isRuntimePermissionGranted(
         appId: Int,
         userId: Int,
@@ -921,7 +952,7 @@ class AppIdPermissionPolicy : SchemePolicy() {
         return PermissionFlags.isAppOpGranted(flags)
     }
 
-    fun MutateStateScope.revokeRuntimePermission(
+    private fun MutateStateScope.revokeRuntimePermission(
         appId: Int,
         userId: Int,
         permissionName: String,
@@ -1081,7 +1112,10 @@ class AppIdPermissionPolicy : SchemePolicy() {
             // declare at least one valid purpose in its manifest before it can be granted. Note
             // that a flag state may have INSTALL_GRANTED and PURPOSE_REVOKED bits set, in which
             // case the permission will not be granted.
-            if (Flags.ppdInstallTimeEnabled() && permission.requiresPurposeTargetSdkVersion != NO_TARGET_SDK_VERSION) {
+            if (
+                Flags.ppdInstallTimeEnabled() &&
+                    permission.requiresPurposeTargetSdkVersion != NO_TARGET_SDK_VERSION
+            ) {
                 val hasValidPurpose =
                     requestingPackageStates.anyIndexed { _, it ->
                         hasValidPurposeForPackage(it.androidPackage!!, permission)
@@ -1656,6 +1690,18 @@ class AppIdPermissionPolicy : SchemePolicy() {
             }
         }
 
+    private inline fun MutateStateScope.allPackagesInAppId(
+        appId: Int,
+        state: AccessState = newState,
+        predicate: (PackageState) -> Boolean,
+    ): Boolean {
+        val packageNames = state.externalState.appIdPackageNames[appId]!!
+        return packageNames.allIndexed { _, packageName ->
+            val packageState = state.externalState.packageStates[packageName]!!
+            packageState.androidPackage != null && predicate(packageState)
+        }
+    }
+
     private inline fun MutateStateScope.anyPackageInAppId(
         appId: Int,
         state: AccessState = newState,
@@ -2070,7 +2116,9 @@ class AppIdPermissionPolicy : SchemePolicy() {
                 PermissionFlags.APP_OP_REVOKED or
                 PermissionFlags.ONE_TIME or
                 PermissionFlags.HIBERNATION or
-                PermissionFlags.USER_SELECTED
+                PermissionFlags.USER_SELECTED or
+                PermissionFlags.TRUSTED_UI_SHOWN or
+                PermissionFlags.TRUSTED_UI_CONSENTED
 
         /**
          * Mask for all permission flags that imply we shouldn't automatically modify the permission

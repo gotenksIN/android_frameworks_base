@@ -17,7 +17,6 @@
 package com.android.systemui.shade;
 
 import static android.content.res.Configuration.ORIENTATION_PORTRAIT;
-import static android.view.Display.TYPE_INTERNAL;
 
 import static com.android.systemui.display.data.repository.FakeDisplayRepositoryKt.display;
 import static com.android.systemui.log.LogBufferHelperKt.logcatLogBuffer;
@@ -44,7 +43,6 @@ import android.content.res.Resources;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.DisplayMetrics;
-import android.view.Display;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -62,6 +60,7 @@ import com.android.keyguard.KeyguardUpdateMonitor;
 import com.android.keyguard.dagger.KeyguardStatusBarViewComponent;
 import com.android.systemui.SysuiTestCase;
 import com.android.systemui.bouncer.domain.interactor.AlternateBouncerInteractor;
+import com.android.systemui.brightness.data.repository.BrightnessMirrorShowingRepository;
 import com.android.systemui.classifier.FalsingCollectorFake;
 import com.android.systemui.classifier.FalsingManagerFake;
 import com.android.systemui.common.domain.interactor.SysUIStateDisplaysInteractor;
@@ -99,7 +98,6 @@ import com.android.systemui.power.domain.interactor.PowerInteractor;
 import com.android.systemui.qs.composefragment.QSFragmentCompose;
 import com.android.systemui.res.R;
 import com.android.systemui.screenrecord.ScreenRecordUxController;
-import com.android.systemui.settings.brightness.data.repository.BrightnessMirrorShowingRepository;
 import com.android.systemui.shade.data.repository.FakeShadeRepository;
 import com.android.systemui.shade.data.repository.ShadeAnimationRepository;
 import com.android.systemui.shade.data.repository.ShadeRepository;
@@ -419,8 +417,7 @@ public class NotificationPanelViewControllerBaseTest extends SysuiTestCase {
             return null;
         }).when(mView).setOnTouchListener(any(NotificationPanelViewController.TouchHandler.class));
 
-        var displayMock = display(TYPE_INTERNAL, /* flags= */ 0, /* id= */Display.DEFAULT_DISPLAY,
-                /* state= */ null);
+        var displayMock = display();
         when(mView.getDisplay()).thenReturn(displayMock);
         // Any edge transition
         when(mKeyguardTransitionInteractor.transition(any()))

@@ -137,6 +137,7 @@ import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputMethod;
 import android.view.inputmethod.InputMethodInfo;
 import android.view.inputmethod.InputMethodManager;
+import android.view.inputmethod.InputMethodManager.IMPickerEntryPoint;
 import android.view.inputmethod.InputMethodSubtype;
 
 import com.android.internal.annotations.GuardedBy;
@@ -159,6 +160,7 @@ import com.android.internal.inputmethod.IInputMethodSessionCallback;
 import com.android.internal.inputmethod.IRemoteAccessibilityInputConnection;
 import com.android.internal.inputmethod.IRemoteComputerControlInputConnection;
 import com.android.internal.inputmethod.IRemoteInputConnection;
+import com.android.internal.inputmethod.ImeSwitcherMenuItemSafeList;
 import com.android.internal.inputmethod.ImeTracing;
 import com.android.internal.inputmethod.InlineSuggestionsRequestCallback;
 import com.android.internal.inputmethod.InlineSuggestionsRequestInfo;
@@ -166,7 +168,6 @@ import com.android.internal.inputmethod.InputBindResult;
 import com.android.internal.inputmethod.InputMethodDebug;
 import com.android.internal.inputmethod.InputMethodInfoSafeList;
 import com.android.internal.inputmethod.InputMethodNavButtonFlags;
-import com.android.internal.inputmethod.InputMethodSubtypeHandle;
 import com.android.internal.inputmethod.InputMethodSubtypeSafeList;
 import com.android.internal.inputmethod.SoftInputShowHideReason;
 import com.android.internal.inputmethod.StartInputFlags;
@@ -468,12 +469,15 @@ public final class InputMethodManagerService implements IInputMethodManagerImpl.
     interface ImeSwitcherMenu {
 
         void show(@NonNull List<ImeSubtypeListItem> items, @Nullable String selectedImeId,
-                int selectedSubtypeIndex, boolean isScreenLocked, int displayId,
-                @UserIdInt int userId);
+                int selectedSubtypeIndex, boolean isScreenLocked,
+                @IMPickerEntryPoint int entryPoint, int displayId, @UserIdInt int userId);
 
         void hide(int displayId, @UserIdInt int userId);
 
         boolean isShowing(@Nullable UserData userData);
+
+        void onImeAndSubtypeChanged(@Nullable String imeId, int subtypeIndex,
+                @Nullable Intent settingsIntent, @UserIdInt int userId);
 
         void dump(@NonNull Printer pw, @NonNull String prefix);
     }
@@ -483,7 +487,8 @@ public final class InputMethodManagerService implements IInputMethodManagerImpl.
         @Override
         public void show(@NonNull List<ImeSubtypeListItem> items, @Nullable String selectedImeId,
                 @IntRange(from = NOT_A_SUBTYPE_INDEX) int selectedSubtypeIndex,
-                boolean isScreenLocked, int displayId, @UserIdInt int userId) {
+                boolean isScreenLocked, @IMPickerEntryPoint int entryPoint, int displayId,
+                @UserIdInt int userId) {
             if (mIImeSwitcherMenu != null) {
                 final var menuItems = new ArrayList<IImeSwitcherMenu.Item>();
                 for (int i = 0; i < items.size(); i++) {
@@ -491,8 +496,11 @@ public final class InputMethodManagerService implements IInputMethodManagerImpl.
                     final var menuItem = new IImeSwitcherMenu.Item();
                     menuItem.imeName = item.mImeName;
                     menuItem.subtypeName = item.mSubtypeName;
+                    menuItem.subtypeShortLabel = item.mSubtypeShortLabel;
+                    menuItem.subtypeIconResId = item.mSubtypeIconResId;
                     menuItem.layoutName = item.mLayoutName;
                     menuItem.imeId = item.mImi.getId();
+                    menuItem.imePackageName = item.mImi.getPackageName();
                     menuItem.subtypeIndex = item.mSubtypeIndex;
                     menuItems.add(menuItem);
                 }
@@ -502,8 +510,9 @@ public final class InputMethodManagerService implements IInputMethodManagerImpl.
                 final var selectedImeSettingsIntent = selectedImi != null
                         ? selectedImi.createImeLanguageSettingsActivityIntent() : null;
                 try {
-                    mIImeSwitcherMenu.show(menuItems, selectedImeId, selectedSubtypeIndex,
-                            selectedImeSettingsIntent, isScreenLocked, displayId, userId);
+                    mIImeSwitcherMenu.show(ImeSwitcherMenuItemSafeList.create(menuItems),
+                            selectedImeId, selectedSubtypeIndex, selectedImeSettingsIntent,
+                            isScreenLocked, entryPoint, displayId, userId);
                 } catch (RemoteException e) {
                     Slog.w(TAG, "Failed show IME Switcher Menu for user: " + userId
                             + " on display: " + displayId, e);
@@ -525,6 +534,20 @@ public final class InputMethodManagerService implements IInputMethodManagerImpl.
         @Override
         public boolean isShowing(@Nullable UserData userData) {
             return userData != null && userData.mImeSwitcherMenuVisible;
+        }
+
+        @Override
+        public void onImeAndSubtypeChanged(@Nullable String imeId, int subtypeIndex,
+                @Nullable Intent settingsIntent, @UserIdInt int userId) {
+            if (mIImeSwitcherMenu != null) {
+                try {
+                    mIImeSwitcherMenu.notifyImeAndSubtypeChanged(imeId, subtypeIndex,
+                            settingsIntent, userId);
+                } catch (RemoteException e) {
+                    Slog.w(TAG, "Failed to notify IME Switcher Menu of new selected IME: " + imeId
+                            + " and subtype index: " + subtypeIndex + " for user: " + userId, e);
+                }
+            }
         }
 
         public void dump(@NonNull Printer pw, @NonNull String prefix) {
@@ -1572,9 +1595,9 @@ public final class InputMethodManagerService implements IInputMethodManagerImpl.
         // of "current IME user" at b/350386877.
         // TODO(b/356879517): Come up with a way to avoid this special handling.
         if (newUserData.mSubtypeForKeyboardLayoutMapping != null) {
-            final var subtypeHandleAndSubtype = newUserData.mSubtypeForKeyboardLayoutMapping;
+            final var imiAndSubtype = newUserData.mSubtypeForKeyboardLayoutMapping;
             mInputManagerInternal.onInputMethodSubtypeChangedForKeyboardLayoutMapping(
-                    newUserId, subtypeHandleAndSubtype.first, subtypeHandleAndSubtype.second);
+                    newUserId, imiAndSubtype.first, imiAndSubtype.second);
         }
 
         if (initialUserSwitch) {
@@ -2731,11 +2754,12 @@ public final class InputMethodManagerService implements IInputMethodManagerImpl.
         final var bindingController = getInputMethodBindingController(userId);
         final InputMethodInfo imi = InputMethodSettingsRepository.get(userId).getMethodMap()
                 .get(imeId);
-        if (bindingController.getSupportsStylusHandwriting() != imi.supportsStylusHandwriting()) {
+        if (imi != null && bindingController.getSupportsStylusHandwriting()
+                != imi.supportsStylusHandwriting()) {
             bindingController.setSupportsStylusHandwriting(imi.supportsStylusHandwriting());
             InputMethodManager.invalidateLocalStylusHandwritingAvailabilityCaches();
         }
-        if (bindingController.getSupportsConnectionlessStylusHandwriting()
+        if (imi != null && bindingController.getSupportsConnectionlessStylusHandwriting()
                 != imi.supportsConnectionlessStylusHandwriting()) {
             bindingController.setSupportsConnectionlessStylusHandwriting(
                     imi.supportsConnectionlessStylusHandwriting());
@@ -3129,21 +3153,19 @@ public final class InputMethodManagerService implements IInputMethodManagerImpl.
         final InputMethodSubtype normalizedSubtype =
                 subtype != null && subtype.isSuitableForPhysicalKeyboardLayoutMapping()
                         ? subtype : null;
-        final InputMethodSubtypeHandle newSubtypeHandle = normalizedSubtype != null
-                ? InputMethodSubtypeHandle.of(imi, normalizedSubtype) : null;
+        final InputMethodInfo normalizedImi = subtype != null ? imi : null;
 
         final var userData = getUserData(userId);
 
         // A workaround for b/356879517. KeyboardLayoutManager has relied on an implementation
         // detail that IMMS triggers this callback only for the current IME user.
         // TODO(b/357663774): Figure out how to better handle this scenario.
-        userData.mSubtypeForKeyboardLayoutMapping =
-                Pair.create(newSubtypeHandle, normalizedSubtype);
+        userData.mSubtypeForKeyboardLayoutMapping = Pair.create(normalizedImi, normalizedSubtype);
         if (userId != mCurrentImeUserId) {
             return;
         }
-        mInputManagerInternal.onInputMethodSubtypeChangedForKeyboardLayoutMapping(
-                userId, newSubtypeHandle, normalizedSubtype);
+        mInputManagerInternal.onInputMethodSubtypeChangedForKeyboardLayoutMapping(userId,
+                normalizedImi, normalizedSubtype);
     }
 
     @GuardedBy("ImfLock.class")
@@ -4244,11 +4266,8 @@ public final class InputMethodManagerService implements IInputMethodManagerImpl.
 
     @NonNull
     private int[] getProfileIds(@UserIdInt int userId) {
-        if (android.multiuser.Flags.allowSupervisingProfile()) {
-            return mUserManagerInternal.getProfileIds(userId, /* enabledOnly */ false,
-                    /* includeAlwaysVisible */ true);
-        }
-        return mUserManagerInternal.getProfileIds(userId, /* enabledOnly */ false);
+        return mUserManagerInternal.getProfileIds(userId, /* enabledOnly */ false,
+                /* includeAlwaysVisible */ true);
     }
 
     @GuardedBy("ImfLock.class")
@@ -4318,7 +4337,8 @@ public final class InputMethodManagerService implements IInputMethodManagerImpl.
                     ? userData.mCurClient.mSelfReportedDisplayId : DEFAULT_DISPLAY;
             mHandler.post(() -> {
                 synchronized (ImfLock.class) {
-                    showInputMethodPickerLocked(auxiliarySubtypeMode, displayId, userId);
+                    showInputMethodPickerLocked(auxiliarySubtypeMode,
+                            InputMethodManager.IM_PICKER_ENTRY_POINT_DEFAULT, displayId, userId);
                 }
             });
         }
@@ -4328,13 +4348,14 @@ public final class InputMethodManagerService implements IInputMethodManagerImpl.
             Manifest.permission.INTERACT_ACROSS_USERS_FULL,
             Manifest.permission.WRITE_SECURE_SETTINGS})
     @Override
-    public void showInputMethodPickerFromSystem(int auxiliarySubtypeMode, int displayId) {
+    public void showInputMethodPickerFromSystem(
+            int auxiliarySubtypeMode, @IMPickerEntryPoint int entryPoint, int displayId) {
         // Always call subtype picker, because subtype picker is a superset of input method
         // picker.
         mHandler.post(() -> {
             synchronized (ImfLock.class) {
                 final int userId = resolveImeUserIdFromDisplayIdLocked(displayId);
-                showInputMethodPickerLocked(auxiliarySubtypeMode, displayId, userId);
+                showInputMethodPickerLocked(auxiliarySubtypeMode, entryPoint, displayId, userId);
             }
         });
     }
@@ -4379,7 +4400,8 @@ public final class InputMethodManagerService implements IInputMethodManagerImpl.
             switchToNextInputMethodLocked(false /* onlyCurrentIme */, userData);
         } else {
             showInputMethodPickerFromSystem(
-                    InputMethodManager.SHOW_IM_PICKER_MODE_INCLUDE_AUXILIARY_SUBTYPES, displayId);
+                    InputMethodManager.SHOW_IM_PICKER_MODE_INCLUDE_AUXILIARY_SUBTYPES,
+                    InputMethodManager.IM_PICKER_ENTRY_POINT_DEFAULT, displayId);
         }
     }
 
@@ -4407,6 +4429,13 @@ public final class InputMethodManagerService implements IInputMethodManagerImpl.
             return;
         }
         Objects.requireNonNull(imeSwitcherMenu, "imeSwitcherMenu must not be null");
+        final int callingUserId = UserHandle.getCallingUserId();
+        if (callingUserId != UserHandle.USER_SYSTEM && mConcurrentMultiUserModeEnabled) {
+            // Skip registration for non-system user since multi-registration is not supported.
+            // TODO(b/477290989): remove skip logic with support of menu for concurrent multi-user.
+            Slog.w(TAG, "Attempting to register IME Switcher Menu for non-system user");
+            return;
+        }
         synchronized (ImfLock.class) {
             if (mIImeSwitcherMenu != null) {
                 throw new IllegalArgumentException("IME Switcher Menu already registered");
@@ -5169,8 +5198,8 @@ public final class InputMethodManagerService implements IInputMethodManagerImpl.
     }
 
     @GuardedBy("ImfLock.class")
-    private void showInputMethodPickerLocked(int auxiliarySubtypeMode, int displayId,
-            @UserIdInt int userId) {
+    private void showInputMethodPickerLocked(int auxiliarySubtypeMode,
+            @IMPickerEntryPoint int entryPoint, int displayId, @UserIdInt int userId) {
         final var userData = getUserData(userId);
         final boolean showAuxSubtypes;
         switch (auxiliarySubtypeMode) {
@@ -5224,7 +5253,7 @@ public final class InputMethodManagerService implements IInputMethodManagerImpl.
         }
 
         mImeSwitcherMenu.show(items, selectedImeId, selectedSubtypeIndex, isScreenLocked,
-                displayId, userId);
+                entryPoint, displayId, userId);
     }
 
     @SuppressWarnings("unchecked")
@@ -5772,6 +5801,15 @@ public final class InputMethodManagerService implements IInputMethodManagerImpl.
         }
 
         getUserData(userId).mSwitchingController.onInputMethodSubtypeChanged();
+        if (Flags.imeSwitcherMenuSystemui()) {
+            final var imeId = imi != null ? imi.getId() : null;
+            final int index = newSubtype != null
+                    ? SubtypeUtils.getSubtypeIndexFromHashCode(imi, newSubtype.hashCode())
+                    : NOT_A_SUBTYPE_INDEX;
+            final var settingsIntent = imi != null
+                    ? imi.createImeLanguageSettingsActivityIntent() : null;
+            mImeSwitcherMenu.onImeAndSubtypeChanged(imeId, index, settingsIntent, userId);
+        }
     }
 
     @GuardedBy("ImfLock.class")
@@ -5884,27 +5922,37 @@ public final class InputMethodManagerService implements IInputMethodManagerImpl.
 
         final var nextSubtype = nextItem.mSubtypeIndex > NOT_A_SUBTYPE_INDEX
                 ? nextItem.mImi.getSubtypeAt(nextItem.mSubtypeIndex) : null;
-        final var nextSubtypeHandle = InputMethodSubtypeHandle.of(nextItem.mImi, nextSubtype);
-        final InputMethodInfo nextImi = settings.getMethodMap().get(nextSubtypeHandle.getImeId());
+
+        // TODO(b/476928567): nextImi should be equivalent to nextItem.mImi in most cases, but this
+        //  is not guaranteed.
+        final InputMethodInfo nextImi = settings.getMethodMap().get(nextItem.mImi.getId());
         if (nextImi == null) {
+            Slog.e(TAG, "Switching controller's next IMI " + nextItem.mImi.getId()
+                    + " not found in settings");
             return;
         }
 
         final int subtypeCount = nextImi.getSubtypeCount();
         if (subtypeCount == 0) {
-            if (nextSubtypeHandle.equals(InputMethodSubtypeHandle.of(nextImi, null))) {
+            if (nextSubtype == null) {
                 setInputMethodLocked(nextImi.getId(), NOT_A_SUBTYPE_INDEX, userId);
+            } else {
+                Slog.e(TAG, "Switching controller's next IMI " + nextItem.mImi.getId()
+                        + " has 0 subtypes, but expected subtype " + nextSubtype);
             }
             return;
         }
 
         for (int i = 0; i < subtypeCount; ++i) {
-            if (nextSubtypeHandle.equals(
-                    InputMethodSubtypeHandle.of(nextImi, nextImi.getSubtypeAt(i)))) {
+            final var subtype = nextImi.getSubtypeAt(i);
+            if (Objects.equals(nextSubtype, subtype)) {
                 setInputMethodLocked(nextImi.getId(), i, userId);
                 return;
             }
         }
+
+        Slog.e(TAG, "Switching controller's next IMI " + nextItem.mImi.getId()
+                + " does not contain subtype " + nextSubtype);
     }
 
 

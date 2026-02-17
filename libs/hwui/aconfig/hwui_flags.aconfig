@@ -173,6 +173,7 @@ flag {
   namespace: "core_graphics"
   description: "Add two helper constants to SurfaceControl to improve @IntDef lint"
   bug: "413710706"
+  is_exported: true
 }
 
 flag {
@@ -200,6 +201,7 @@ flag {
   namespace: "core_graphics"
   description: "Add API for partial decoding of gainmap images with ImageDecoder"
   bug: "437807032"
+  is_exported: true
 }
 
 flag {
@@ -215,4 +217,24 @@ flag {
   is_exported: true
   description: "Set a default listener for ImageDecoder"
   bug: "447585785"
+}
+
+flag {
+  name: "edt_gradient_detection"
+  namespace: "accessibility"
+  description: "Add detection for the gradient lightness to improve the decision in expanded Dark theme"
+  bug: "418004794"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+  name: "use_prev_frame_duration_for_render_thread"
+  namespace: "core_graphics"
+  description: "Use previous frame duration for calculating render rate schedule time"
+  bug: "361682988"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
 }

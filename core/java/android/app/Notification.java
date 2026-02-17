@@ -4765,6 +4765,16 @@ public class Notification implements Parcelable
     }
 
     /**
+     * Returns the {@link RemoteInputHistoryItem}s provided to
+     * {@link Builder#setRemoteInputHistoryItems(RemoteInputHistoryItem[])}.
+     * @hide
+     */
+    public RemoteInputHistoryItem[] getRemoteInputHistoryItems() {
+        return getParcelableArrayFromBundle(extras, EXTRA_REMOTE_INPUT_HISTORY_ITEMS,
+                RemoteInputHistoryItem.class);
+    }
+
+    /**
      * Returns which type of notifications in a group are responsible for audibly alerting the
      * user.
      */
@@ -5017,6 +5027,7 @@ public class Notification implements Parcelable
         private ContrastColorUtil mColorUtil;
         private boolean mIsLegacy;
         private boolean mIsLegacyInitialized;
+        @Nullable private UserProfileBadgeProvider mUserProfileBadgeProvider;
 
         /**
          * Caches an instance of StandardTemplateParams. Note that this may have been used before,
@@ -6415,6 +6426,19 @@ public class Notification implements Parcelable
             return this;
         }
 
+        /**
+         * Sets the profile badge provider for this notification.
+         *
+         * @param provider the profile badge provider for this notification.
+         * @return the same Builder
+         * @hide
+         */
+        @VisibleForTesting
+        public Builder setUserProfileBadgeProvider(@Nullable UserProfileBadgeProvider provider) {
+            mUserProfileBadgeProvider = provider;
+            return this;
+        }
+
         private void bindPhishingAlertIcon(RemoteViews contentView, StandardTemplateParams p) {
             contentView.setDrawableTint(
                     R.id.phishing_alert,
@@ -6423,12 +6447,25 @@ public class Notification implements Parcelable
                     PorterDuff.Mode.SRC_ATOP);
         }
 
+        /**
+         * Returns the profile badge for this notification.
+         *
+         * @hide
+         */
+        public Bitmap getProfileBadge() {
+            if (mUserProfileBadgeProvider != null) {
+                return mUserProfileBadgeProvider.getProfileBadge(mContext);
+            } else {
+                return Notification.getProfileBadge(mContext);
+            }
+        }
+
         private void bindProfileBadge(RemoteViews contentView, StandardTemplateParams p) {
             if (richOngoingImprovements() && p.mHideProfileBadge) {
                 return;
             }
 
-            Bitmap profileBadge = Notification.getProfileBadge(mContext);
+            final Bitmap profileBadge = getProfileBadge();
 
             if (profileBadge != null) {
                 contentView.setImageViewBitmap(R.id.profile_badge, profileBadge);
@@ -6437,10 +6474,16 @@ public class Notification implements Parcelable
                     contentView.setDrawableTint(R.id.profile_badge, false,
                             getTextColor(p), PorterDuff.Mode.SRC_ATOP);
                 }
-                contentView.setContentDescription(
-                        R.id.profile_badge,
-                        mContext.getSystemService(UserManager.class)
-                                .getProfileAccessibilityString(mContext.getUserId()));
+                final String profileAccessibilityString;
+                if (mUserProfileBadgeProvider != null) {
+                    profileAccessibilityString =
+                            mUserProfileBadgeProvider.getProfileAccessibilityString(mContext);
+                } else {
+                    profileAccessibilityString =
+                            mContext.getSystemService(UserManager.class)
+                                    .getProfileAccessibilityString(mContext.getUserId());
+                }
+                contentView.setContentDescription(R.id.profile_badge, profileAccessibilityString);
             }
         }
 
@@ -6550,6 +6593,9 @@ public class Notification implements Parcelable
             final Bundle ex = mN.extras;
             updateBackgroundColor(contentView, p);
             bindNotificationHeader(contentView, p);
+            if (richOngoingImprovements()) {
+                updateToplineCentering(contentView, p);
+            }
             bindLargeIconAndApplyMargin(contentView, p, result);
             boolean showProgress = handleProgressBar(contentView, ex, p);
             boolean hasSecondLine = showProgress;
@@ -6612,6 +6658,12 @@ public class Notification implements Parcelable
             }
 
             return contentView;
+        }
+
+        private void updateToplineCentering(RemoteViews contentView,
+                StandardTemplateParams params) {
+            contentView.setBoolean(R.id.notification_header,
+                    "centerTopLine", shouldCenterTopLine(params));
         }
 
         private static void updateExpanderAlignment(RemoteViews contentView,
@@ -6771,7 +6823,7 @@ public class Notification implements Parcelable
             int iconMarginId = R.dimen.notification_2025_right_icon_content_margin;
             final float iconMarginDp = resources.getDimension(iconMarginId) / density;
             final float contentMarginDp = resources.getDimension(
-                    R.dimen.notification_content_margin_end) / density;
+                    R.dimen.notification_2025_margin) / density;
             float spaceForExpanderDp;
             if (mN.isPromotedOngoing() && !mParams.mHeaderless) {
                 // No expander is shown in promoted notifications
@@ -6901,6 +6953,47 @@ public class Notification implements Parcelable
                 bindBridgedIcon(contentView);
             }
             mN.mUsesStandardHeader = true;
+        }
+
+        private boolean shouldCenterTopLine(StandardTemplateParams params) {
+            // Center top line vertically in minimized and public header-only views
+            if (params.mViewType == StandardTemplateParams.VIEW_TYPE_MINIMIZED
+                    || params.mViewType == StandardTemplateParams.VIEW_TYPE_PUBLIC) {
+                return true;
+            }
+
+            if (!mN.isPromotedOngoing()) return false;
+            if (params.mViewType != StandardTemplateParams.VIEW_TYPE_EXPANDED) return false;
+
+            // MetricStyle and CallStyle never centers the top line.
+            if (mN.isStyle(Notification.MetricStyle.class)
+                    || mN.isStyle(Notification.CallStyle.class)) {
+                return false;
+            } else {
+                final boolean hasText = !TextUtils.isEmpty(params.mText);
+                final boolean hasSubText = !params.mHideSubText && !TextUtils.isEmpty(
+                        params.mSubText);
+
+                if (mN.isStyle(Notification.ProgressStyle.class)) {
+                    return !hasSubText && !hasText;
+                } else if (mN.getNotificationStyle() == null
+                        || mN.isStyle(Notification.BigTextStyle.class)) {
+                    boolean hasProgress = hasNormalProgress();
+                    return !hasSubText && !hasText && !hasProgress;
+                } else {
+                    final String newPromoteableType = mN.getNotificationStyle().getSimpleName();
+                    Log.w(TAG, "New Promotable Notification Type! it is "
+                            + newPromoteableType);
+                    return false;
+                }
+            }
+        }
+
+        private boolean hasNormalProgress() {
+            final Bundle ex = mN.extras;
+            final int max = ex.getInt(EXTRA_PROGRESS_MAX, 0);
+            final boolean ind = ex.getBoolean(EXTRA_PROGRESS_INDETERMINATE);
+            return max != 0 || ind;
         }
 
         private void bindBridgedIcon(RemoteViews contentView) {
@@ -7219,10 +7312,16 @@ public class Notification implements Parcelable
          */
         private record ActionButton(Action action, int originalIndex) { }
 
+        /**
+         * @param supportCustomColors whether colors set via full-width style or semantic annotation
+         *     spans in the action text will be used to color the button background (or border)
+         *     if the action is emphasized.
+         */
         private record ActionButtons(
-                List<ActionButton> actions, boolean edgeToEdge, boolean emphasized) {
+                List<ActionButton> actions, boolean edgeToEdge, boolean emphasized,
+                boolean supportCustomColors) {
             private static final ActionButtons EMPTY =
-                    new ActionButtons(List.of(), false, false);
+                    new ActionButtons(List.of(), false, false, false);
         }
 
         /**
@@ -7300,7 +7399,9 @@ public class Notification implements Parcelable
             }
 
             boolean emphasizedEdgeToEdge = isPromotedOngoing || isPseudoFsi || isCallStyle;
-            return new ActionButtons(candidates, emphasizedEdgeToEdge, emphasizedEdgeToEdge);
+            boolean supportCustomColors = isPseudoFsi || isCallStyle; // but not other RONs.
+            return new ActionButtons(candidates, emphasizedEdgeToEdge, emphasizedEdgeToEdge,
+                    supportCustomColors);
         }
 
         @FlaggedApi(Flags.FLAG_API_NOTIFICATION_ACTION_CUSTOM)
@@ -7311,7 +7412,8 @@ public class Notification implements Parcelable
                 boolean actionHasValidInput = hasValidRemoteInput(action.action);
                 validRemoteInput |= actionHasValidInput;
 
-                final RemoteViews button = createActionButtonView(action, actions.emphasized(), p);
+                final RemoteViews button = createActionButtonView(action, actions.emphasized(),
+                        actions.supportCustomColors(), p);
                 if (actionHasValidInput && !actions.emphasized()) {
                     // Clear the drawable
                     button.setInt(R.id.action0, "setBackgroundResource", 0);
@@ -7328,7 +7430,7 @@ public class Notification implements Parcelable
 
         @FlaggedApi(Flags.FLAG_API_NOTIFICATION_ACTION_CUSTOM)
         private RemoteViews createActionButtonView(ActionButton actionButton,
-                boolean emphasizedMode, StandardTemplateParams p) {
+                boolean emphasizedMode, boolean supportCustomColor, StandardTemplateParams p) {
             Action action = actionButton.action;
             final boolean tombstone = (action.actionIntent == null);
             final boolean showIcon =
@@ -7350,9 +7452,8 @@ public class Notification implements Parcelable
             if (emphasizedMode) {
                 button.setBoolean(R.id.action0, "setEnabled", !tombstone);
 
-                // TODO: b/461472579 - useColorFromActionTitle should always be true?
                 EmphasizedButtonColors colors = resolveEmphasisColors(action, p,
-                        /* useColorFromActionTitle= */ true, tombstone);
+                        supportCustomColor, tombstone);
 
                 button.setColorStateList(R.id.action0, "setButtonBackground",
                         ColorStateList.valueOf(colors.background));
@@ -7438,8 +7539,10 @@ public class Notification implements Parcelable
                 if (customColor != null) {
                     backgroundColor = Colors.ensureMinimalContrast(customColor,
                             notifBackgroundColor);
-                    textColor = Colors.ensureTextContrast(colors.getPrimaryEmphasisText(),
-                            backgroundColor);
+                    // For custom color background, use white/black-ish for text. This will also
+                    // ensure necessary contrast.
+                    textColor = ContrastColorUtil.resolvePrimaryColor(mContext,
+                            backgroundColor, mInNightMode);
                 } else {
                     backgroundColor = colors.getPrimaryEmphasisBackground();
                     textColor = colors.getPrimaryEmphasisText();
@@ -7481,8 +7584,7 @@ public class Notification implements Parcelable
         }
 
         private void displayRemoteInputHistory(RemoteViews contentView, StandardTemplateParams p) {
-            RemoteInputHistoryItem[] replyText = getParcelableArrayFromBundle(
-                    mN.extras, EXTRA_REMOTE_INPUT_HISTORY_ITEMS, RemoteInputHistoryItem.class);
+            RemoteInputHistoryItem[] replyText = mN.getRemoteInputHistoryItems();
             if (replyText != null && replyText.length > 0
                     && !TextUtils.isEmpty(replyText[0].getText())
                     && p.maxRemoteInputHistory > 0) {
@@ -7908,16 +8010,20 @@ public class Notification implements Parcelable
                     StandardTemplateParams p = mParams.reset()
                             .viewType(StandardTemplateParams.VIEW_TYPE_EXPANDED)
                             .allowTextWithProgress(true)
+                            .maybeUseMinimalHeader(this)
                             .fillTextsFrom(this);
-                    if (richOngoingImprovements() && mN.isPromotedOngoing()) {
-                        p.useMinimalHeader();
-                    }
                     result = applyStandardTemplateWithActions(getExpandedBaseLayoutResource(), p,
                             null /* result */);
                 }
             }
             makeHeaderExpanded(result);
             return result;
+        }
+
+        private boolean isTimeInTheFuture() {
+            final Instant notifWhen = Instant.ofEpochMilli(mN.getWhen());
+            final Instant now = Instant.now();
+            return notifWhen.isAfter(now);
         }
 
         // This code is executed on behalf of other apps' notifications, sometimes even by 3p apps,
@@ -7968,10 +8074,14 @@ public class Notification implements Parcelable
             resetNotificationHeader(header);
             bindNotificationHeader(header, p);
             updateHeaderBackgroundColor(header, p);
-            if (p.mViewType == StandardTemplateParams.VIEW_TYPE_MINIMIZED
-                    || p.mViewType == StandardTemplateParams.VIEW_TYPE_PUBLIC) {
-                // Center top line vertically in minimized and public header-only views
-                header.setBoolean(R.id.notification_header, "centerTopLine", true);
+            if (richOngoingImprovements()) {
+                updateToplineCentering(header, p);
+            } else {
+                if (p.mViewType == StandardTemplateParams.VIEW_TYPE_MINIMIZED
+                        || p.mViewType == StandardTemplateParams.VIEW_TYPE_PUBLIC) {
+                    // Center top line vertically in minimized and public header-only views
+                    header.setBoolean(R.id.notification_header, "centerTopLine", true);
+                }
             }
             return header;
         }
@@ -8928,8 +9038,7 @@ public class Notification implements Parcelable
      * @hide
      */
     public boolean isColorized() {
-        return isColorizedRequested()
-                && (hasColorizedPermission() || isFgsOrUij() || isPromotedOngoing());
+        return isColorizedRequested() && (hasColorizedPermission() || isFgsOrUij());
     }
 
     /**
@@ -9130,7 +9239,7 @@ public class Notification implements Parcelable
             } else {
                 Resources resources = context.getResources();
                 result.mTitleMarginSet.applyToView(template, R.id.notification_main_column,
-                        resources.getDimension(R.dimen.notification_content_margin_end)
+                        resources.getDimension(R.dimen.notification_2025_margin)
                                 / resources.getDisplayMetrics().density);
             }
             template.removeAllViewsExceptId(R.id.notification_main_column, R.id.progress);
@@ -9802,17 +9911,13 @@ public class Notification implements Parcelable
                     .viewType(StandardTemplateParams.VIEW_TYPE_EXPANDED)
                     .allowTextWithProgress(true)
                     .textViewId(R.id.big_text)
+                    .maybeUseMinimalHeader(mBuilder)
                     .fillTextsFrom(mBuilder);
-
-            boolean promoted = mBuilder.mN.isPromotedOngoing();
-            if (richOngoingImprovements() && promoted) {
-                p.useMinimalHeader();
-            }
 
             // Replace the text with the big text, but only if the big text is not empty.
             CharSequence bigTextText = mBuilder.processLegacyText(mBigText);
             // Ongoing promoted notifications are allowed to have styling.
-            if (!promoted) {
+            if (!mBuilder.mN.isPromotedOngoing()) {
                 bigTextText = normalizeBigText(stripStyling(bigTextText));
             }
             if (!TextUtils.isEmpty(bigTextText)) {
@@ -11201,9 +11306,7 @@ public class Notification implements Parcelable
             if (mBuilder.mActions.size() > 0) {
                 maxRows--;
             }
-            RemoteInputHistoryItem[] remoteInputHistory = getParcelableArrayFromBundle(
-                    mBuilder.mN.extras, EXTRA_REMOTE_INPUT_HISTORY_ITEMS,
-                    RemoteInputHistoryItem.class);
+            RemoteInputHistoryItem[] remoteInputHistory = mBuilder.mN.getRemoteInputHistoryItems();
             if (remoteInputHistory != null
                     && remoteInputHistory.length > NUMBER_OF_HISTORY_ALLOWED_UNTIL_REDUCTION) {
                 // Let's remove some messages to make room for the remote input history.
@@ -12388,11 +12491,16 @@ public class Notification implements Parcelable
                     .hideProgress(true)
                     .hideRightIcon(true)
                     .needsExtraTextMargin(false);
-            return buildMetricView(
+            final RemoteViews result = buildMetricView(
                     mBuilder.getCompactHeadsUpMetricLayoutResource(),
                     p,
                     /* isExpandedView = */ false,
                     getCompactHeadsUpMetrics());
+
+            result.setInt(R.id.extra_topline_content,
+                    "setGravity", Gravity.CENTER_VERTICAL);
+
+            return result;
         }
 
         private List<Metric> getCompactHeadsUpMetrics() {
@@ -12420,16 +12528,12 @@ public class Notification implements Parcelable
             final StandardTemplateParams p = mBuilder.mParams.reset()
                     .viewType(StandardTemplateParams.VIEW_TYPE_EXPANDED)
                     .hideProgress(true)
+                    .maybeUseMinimalHeader(mBuilder)
                     .fillTextsFrom(mBuilder)
                     .text(null)
                     .titleViewId(R.id.alt_title)
+                    .subTextViewId(R.id.header_text)  // reset default after maybeUseMinimalHeader
                     .hideRightIcon(true);
-
-            if (Flags.richOngoingImprovements() && mBuilder.mN.isPromotedOngoing()) {
-                // Use the minimal header style when promoted, but keep the subtext in the top line
-                // (even if it may be cramped).
-                p.useMinimalHeader().subTextViewId(R.id.header_text);
-            }
 
             final int expandedLayoutRes;
             if (mMetrics.size() == 1) {
@@ -12483,7 +12587,7 @@ public class Notification implements Parcelable
             bindMetricStyleMetrics(contentView, p, metricsToBind, isExpandedView);
 
             if (useLabelAsTitle) {
-                contentView.setTextViewText(MetricView.VIEWS.getFirst().labelId(), "");
+                contentView.setViewVisibility(MetricView.VIEWS.getFirst().labelId(), View.GONE);
             }
 
             return contentView;
@@ -12504,6 +12608,7 @@ public class Notification implements Parcelable
                     final CharSequence metricLabel = getMetricLabel(metric, isExpandedView);
 
                     mBuilder.setTextColor(contentView, metricView.labelId(), p);
+                    contentView.setViewVisibility(metricView.labelId(), View.VISIBLE);
                     contentView.setTextViewText(metricView.labelId(), metricLabel);
 
                     // Choose the view (text/chronometer) to show and its visual appearance.
@@ -14175,11 +14280,8 @@ public class Notification implements Parcelable
                     .viewType(StandardTemplateParams.VIEW_TYPE_EXPANDED)
                     .allowTextWithProgress(true)
                     .hideProgress(true)
+                    .maybeUseMinimalHeader(mBuilder)
                     .fillTextsFrom(mBuilder);
-
-            if (richOngoingImprovements() && mBuilder.mN.isPromotedOngoing()) {
-                p.useMinimalHeader();
-            }
 
             final int progressLayoutResId;
             if (Flags.apiNotificationActionCustom() && mBuilder.mN.isPromotedOngoing()) {
@@ -18426,13 +18528,15 @@ public class Notification implements Parcelable
          * Certain promoted notifications show a simplified version of the header. This also moves
          * the title to the top line.
          */
-        public StandardTemplateParams useMinimalHeader() {
-            if (Flags.richOngoingImprovements()) {
+        public StandardTemplateParams maybeUseMinimalHeader(Builder b) {
+            if (Flags.richOngoingImprovements() && b.mN.isPromotedOngoing()) {
+                boolean isTimeInTheFuture = b.isTimeInTheFuture();
+                boolean prefersSmallIcon = b.mN.extras.getBoolean(EXTRA_PREFER_SMALL_ICON);
                 titleViewId(R.id.alt_title);
                 subTextViewId(R.id.alt_subtext);
-                hideAppName(true);
-                hideTime(true);
-                hideProfileBadge(true);
+                hideAppName(!prefersSmallIcon);
+                hideProfileBadge(!prefersSmallIcon);
+                hideTime(!isTimeInTheFuture);
             }
             return this;
         }
@@ -18460,6 +18564,31 @@ public class Notification implements Parcelable
         @ColorInt
         @FlaggedApi(Flags.FLAG_API_NOTIFICATION_SEMANTIC_STYLE)
         int getSemanticColor(@SemanticStyle int style);
+    }
+
+    /**
+     * A provider for the profile badge.
+     * @hide
+     */
+    public interface UserProfileBadgeProvider {
+        /**
+         * Returns the profile badge for the user of the given context.
+         *
+         * @param context The context of the app that is to be badged.
+         * @return The profile badge for the given user, or null if no badge is available.
+         */
+        @Nullable
+        Bitmap getProfileBadge(@NonNull Context context);
+
+        /**
+         * Returns the profile badge accessibility string for the user of the given context.
+         *
+         * @param context The context of the app that is to be badged.
+         * @return The profile badge accessibility string for the given user, or null if no badge is
+         *     available.
+         */
+        @Nullable
+        String getProfileAccessibilityString(@NonNull Context context);
     }
 
     /**
@@ -18814,7 +18943,7 @@ public class Notification implements Parcelable
 
         @FlaggedApi(Flags.FLAG_API_NOTIFICATION_ACTION_CUSTOM)
         @ColorInt
-        int getPrimaryEmphasisBackground() {
+        public int getPrimaryEmphasisBackground() {
             return mPrimaryEmphasisBackground;
         }
 

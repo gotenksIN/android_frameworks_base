@@ -18,15 +18,31 @@ package android.service.personalcontext.insight;
 
 import static com.google.common.truth.Truth.assertThat;
 
+import static org.mockito.Mockito.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
+import android.content.Context;
 import android.os.Bundle;
 import android.os.Parcel;
+import android.service.personalcontext.ComponentIdProvider;
+import android.service.personalcontext.PersonalContextManager;
+import android.service.personalcontext.RenderToken;
 import android.service.personalcontext.hint.BundleHint;
+import android.service.personalcontext.insight.interaction.FeedbackRequest;
+import android.service.personalcontext.insight.interaction.InsightEvent;
 
 import androidx.test.filters.SmallTest;
 import androidx.test.runner.AndroidJUnit4;
 
 import org.junit.Test;
 import org.junit.runner.RunWith;
+import org.mockito.ArgumentCaptor;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
 
 @SmallTest
 @RunWith(AndroidJUnit4.class)
@@ -34,15 +50,31 @@ public class ContextInsightTest {
 
     @Test
     public void testContextInsightWrapperParcelUnparcel() {
+        final UUID componentId = UUID.randomUUID();
+        final FeedbackRequest feedbackRequest = new FeedbackRequest(
+                List.of(new FeedbackRequest.FeedbackField(
+                        FeedbackRequest.FEEDBACK_TYPE_APPROVAL, "thumbs", "Thumbs", null)));
+
+        final ComponentIdProvider understanderIdProvider = mock(ComponentIdProvider.class);
+        when(understanderIdProvider.getComponentId()).thenReturn(componentId);
+
         final int inputValue = 1234;
         final String dataKey = "test-key";
         final BundleHint hint = new BundleHint.Builder().build();
         hint.getDataBundle().putInt(dataKey, inputValue);
 
-        final BundleInsight insight = new BundleInsight.Builder().build();
+        final BundleInsight insight = new BundleInsight.Builder()
+                .setOriginatingComponentId(understanderIdProvider)
+                .setUserFeedbackRequest(feedbackRequest)
+                .build();
 
         ContextInsight outputInsight = assertParcelUnparcel(insight);
         assertThat(insight.getInsightId()).isEqualTo(outputInsight.getInsightId());
+        assertThat(insight.getOriginatingComponentId()).isEqualTo(componentId);
+        assertThat(insight.getCreationTime()).isGreaterThan(Instant.ofEpochMilli(0));
+        assertThat(insight.getCreationTime().toEpochMilli())
+                .isEqualTo(outputInsight.getCreationTime().toEpochMilli());
+        assertThat(insight.getUserFeedbackRequest()).isEqualTo(feedbackRequest);
     }
 
     @Test
@@ -52,13 +84,71 @@ public class ContextInsightTest {
         final Bundle data = new Bundle();
         data.putInt(dataKey, inputValue);
 
-        final BundleInsight insight = new BundleInsight.Builder().setDataBundle(data).build();
+        final BundleInsight insight = new BundleInsight.Builder()
+                .setDataBundle(data).build();
 
         ContextInsight outputInsight = assertParcelUnparcel(insight);
         assertThat(outputInsight).isInstanceOf(BundleInsight.class);
         final int outputValue = ((BundleInsight) outputInsight).getDataBundle().getInt(dataKey);
 
         assertThat(outputValue).isEqualTo(inputValue);
+    }
+
+    @Test
+    public void testLoggingEvent() {
+        final UUID understanderId = UUID.randomUUID();
+        final RenderToken renderToken = new RenderToken(UUID.randomUUID());
+        final Bundle extras = new Bundle();
+
+        extras.putString("hello", "world");
+
+        final ComponentIdProvider understanderIdProvider = mock(ComponentIdProvider.class);
+        final PersonalContextManager pcm = mock(PersonalContextManager.class);
+        final Context context = mock(Context.class);
+
+        when(understanderIdProvider.getComponentId()).thenReturn(understanderId);
+        when(context.getSystemService(eq(PersonalContextManager.class))).thenReturn(pcm);
+
+        final BundleInsight insight = new BundleInsight.Builder()
+                .setOriginatingComponentId(understanderIdProvider)
+                .build();
+
+        insight.reportEvent(context, InsightEvent.EVENT_SHOW, renderToken, extras);
+
+        final ArgumentCaptor<InsightEvent> eventCaptor =
+                ArgumentCaptor.forClass(InsightEvent.class);
+
+        verify(pcm).reportEvent(eventCaptor.capture());
+
+        final InsightEvent event = eventCaptor.getValue();
+
+        assertThat(event.getEventType()).isEqualTo(InsightEvent.EVENT_SHOW);
+        assertThat(event.getInsight().getOriginatingComponentId()).isEqualTo(understanderId);
+        assertThat(event.getTimestamp()).isNotEqualTo(0);
+        assertThat(event.getRenderToken()).isEqualTo(renderToken);
+        assertThat(event.getExtras().getString("hello")).isEqualTo("world");
+    }
+
+    @Test
+    public void testReportFeedback() {
+        final UUID understanderId = UUID.randomUUID();
+
+        final FeedbackRequest feedbackRequest = new FeedbackRequest(
+                List.of(new FeedbackRequest.FeedbackField(
+                        FeedbackRequest.FEEDBACK_TYPE_APPROVAL, "thumbs", "Thumbs", null)));
+        final ComponentIdProvider understanderIdProvider = mock(ComponentIdProvider.class);
+        final PersonalContextManager pcm = mock(PersonalContextManager.class);
+        final Context context = mock(Context.class);
+
+        when(understanderIdProvider.getComponentId()).thenReturn(understanderId);
+        when(context.getSystemService(eq(PersonalContextManager.class))).thenReturn(pcm);
+
+        final BundleInsight insight = new BundleInsight.Builder()
+                .setOriginatingComponentId(understanderIdProvider)
+                .setUserFeedbackRequest(feedbackRequest)
+                .build();
+
+        assertThat(insight.getUserFeedbackRequest()).isEqualTo(feedbackRequest);
     }
 
     /**

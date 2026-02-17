@@ -16,7 +16,10 @@
 
 package android.app.supervision;
 
+import static android.Manifest.permission.BYPASS_ROLE_QUALIFICATION;
 import static android.Manifest.permission.INTERACT_ACROSS_USERS;
+import static android.Manifest.permission.MANAGE_ROLE_HOLDERS;
+import static android.Manifest.permission.MANAGE_SUPERVISION;
 import static android.Manifest.permission.MANAGE_USERS;
 import static android.Manifest.permission.QUERY_USERS;
 import static android.permission.flags.Flags.FLAG_ENABLE_SYSTEM_SUPERVISION_ROLE_BEHAVIOR;
@@ -300,7 +303,7 @@ public class SupervisionManager {
      */
     @SystemApi
     @FlaggedApi(FLAG_ENABLE_SYSTEM_SUPERVISION_ROLE_BEHAVIOR)
-    @RequiresPermission(android.Manifest.permission.MANAGE_ROLE_HOLDERS)
+    @RequiresPermission(MANAGE_ROLE_HOLDERS)
     public boolean shouldAllowBypassingSupervisionRoleQualification() {
         if (mService != null) {
             try {
@@ -310,6 +313,26 @@ public class SupervisionManager {
             }
         }
         return false;
+    }
+
+    /**
+     * Sets whether bypassing role qualification is allowed for the supervision role.
+     *
+     * @param allowBypassing {@code true} if bypassing role qualification is allowed, {@code false}
+     *     otherwise.
+     * @hide
+     */
+    @TestApi
+    @FlaggedApi(Flags.FLAG_ENABLE_SUPERVISION_MANAGER_POLICY_APIS)
+    @RequiresPermission(BYPASS_ROLE_QUALIFICATION)
+    public void setShouldAllowBypassingSupervisionRoleQualification(boolean allowBypassing) {
+        if (mService != null) {
+            try {
+                mService.setShouldAllowBypassingSupervisionRoleQualification(allowBypassing);
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
     }
 
     /**
@@ -412,13 +435,12 @@ public class SupervisionManager {
      *
      * @return the list of policies
      * @see Policy
-     * @throws SecurityException if the caller does not hold the {@link
-     *     android.app.role.RoleManager#ROLE_SUPERVISION} or {@link
-     *     android.app.role.RoleManager#ROLE_SYSTEM_SUPERVISION} roles
+     * @throws SecurityException if the caller does not hold the required permissions
      * @hide
      */
     @SystemApi
     @FlaggedApi(Flags.FLAG_ENABLE_SUPERVISION_MANAGER_POLICY_APIS)
+    @RequiresPermission(MANAGE_SUPERVISION)
     @NonNull
     public List<Policy> getPolicies() {
         if (Flags.enableSupervisionManagerCache()) {
@@ -451,13 +473,12 @@ public class SupervisionManager {
      * @param policy the supervision policy to set
      * @see Policy
      * @throws IllegalStateException if the policy is invalid
-     * @throws SecurityException if the caller does not hold the {@link
-     *     android.app.role.RoleManager#ROLE_SUPERVISION} or {@link
-     *     android.app.role.RoleManager#ROLE_SYSTEM_SUPERVISION} roles
+     * @throws SecurityException if the caller does not hold the required permissions
      * @hide
      */
     @SystemApi
     @FlaggedApi(Flags.FLAG_ENABLE_SUPERVISION_MANAGER_POLICY_APIS)
+    @RequiresPermission(MANAGE_SUPERVISION)
     public void setPolicy(@NonNull Policy policy) {
         if (mService != null) {
             try {

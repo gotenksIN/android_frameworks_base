@@ -15,6 +15,8 @@
  */
 package com.android.server.notification;
 
+import static android.Manifest.permission.STATUS_BAR_SERVICE;
+import static android.app.NotificationManager.SUPPORTED_NAS_ADJUSTMENT_KEYS_CHANGED;
 import static android.os.UserHandle.USER_ALL;
 import static android.os.UserManager.USER_TYPE_PROFILE_MANAGED;
 import static android.service.notification.Adjustment.KEY_IMPORTANCE;
@@ -36,9 +38,11 @@ import static junit.framework.Assert.assertTrue;
 
 import static org.junit.Assert.assertNull;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
@@ -50,13 +54,16 @@ import android.Manifest;
 import android.app.ActivityManager;
 import android.app.Flags;
 import android.app.INotificationManager;
+import android.app.backup.BackupRestoreEventLogger;
 import android.content.ComponentName;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.IPackageManager;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.content.pm.ServiceInfo;
 import android.content.pm.UserInfo;
+import android.os.UserHandle;
 import android.os.UserManager;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.flag.junit.SetFlagsRule;
@@ -126,6 +133,8 @@ public class NotificationAssistantsTest extends UiServiceTestCase {
     NotificationManagerService mNm;
     @Mock
     private INotificationManager mINm;
+    @Mock
+    BackupRestoreEventLogger mLogger;
 
     NotificationAssistants mAssistants;
 
@@ -155,7 +164,7 @@ public class NotificationAssistantsTest extends UiServiceTestCase {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         serializer.setOutput(new BufferedOutputStream(baos), "utf-8");
         serializer.startDocument(null, true);
-        mAssistants.writeXml(serializer, false, userId);
+        mAssistants.writeXml(serializer, false, userId, null);
         serializer.endDocument();
         serializer.flush();
 
@@ -167,7 +176,7 @@ public class NotificationAssistantsTest extends UiServiceTestCase {
 
         parser.nextTag();
         mAssistants = spy(mNm.new NotificationAssistants(mContext, mLock, mUserProfiles, miPm));
-        mAssistants.readXml(parser, mNm::canUseManagedServices, false, USER_ALL);
+        mAssistants.readXml(parser, mNm::canUseManagedServices, false, USER_ALL, null);
     }
 
 
@@ -183,6 +192,11 @@ public class NotificationAssistantsTest extends UiServiceTestCase {
 
         LocalServices.removeServiceForTest(UserManagerInternal.class);
         LocalServices.addService(UserManagerInternal.class, mUmInternal);
+
+        doNothing().when(mContext).sendBroadcast(any(), anyString());
+        doNothing().when(mContext).sendBroadcastAsUser(any(), any());
+        doNothing().when(mContext).sendBroadcastAsUser(any(), any(), any());
+        doNothing().when(mContext).sendBroadcastMultiplePermissions(any(), any(), any(), any());
 
         mAssistants = spy(mNm.new NotificationAssistants(mContext, mLock, mUserProfiles, miPm));
         when(mNm.getBinderService()).thenReturn(mINm);
@@ -311,7 +325,7 @@ public class NotificationAssistantsTest extends UiServiceTestCase {
                 new ByteArrayInputStream(xml.toString().getBytes())), null);
 
         parser.nextTag();
-        mAssistants.readXml(parser, mNm::canUseManagedServices, false, USER_ALL);
+        mAssistants.readXml(parser, mNm::canUseManagedServices, false, USER_ALL, null);
 
         ArrayMap<Boolean, ArraySet<String>> approved = mAssistants.mApproved.get(0);
 
@@ -334,7 +348,7 @@ public class NotificationAssistantsTest extends UiServiceTestCase {
 
         parser.nextTag();
         mAssistants.readXml(parser, mNm::canUseManagedServices, true,
-                ActivityManager.getCurrentUser());
+                ActivityManager.getCurrentUser(), mLogger);
 
         ArrayMap<Boolean, ArraySet<String>> approved = mAssistants.mApproved.get(
                 ActivityManager.getCurrentUser());
@@ -359,7 +373,7 @@ public class NotificationAssistantsTest extends UiServiceTestCase {
                 new ByteArrayInputStream(xml.toString().getBytes())), null);
 
         parser.nextTag();
-        mAssistants.readXml(parser, mNm::canUseManagedServices, false, USER_ALL);
+        mAssistants.readXml(parser, mNm::canUseManagedServices, false, USER_ALL, null);
 
         verify(mAssistants, times(1)).upgradeUserSet();
         assertTrue(mAssistants.mIsUserChanged.get(0));
@@ -377,7 +391,7 @@ public class NotificationAssistantsTest extends UiServiceTestCase {
                 new ByteArrayInputStream(xml.toString().getBytes())), null);
 
         parser.nextTag();
-        mAssistants.readXml(parser, mNm::canUseManagedServices, false, USER_ALL);
+        mAssistants.readXml(parser, mNm::canUseManagedServices, false, USER_ALL, null);
 
         verify(mAssistants, times(0)).upgradeUserSet();
         assertTrue(isUserSetServicesEmpty(mAssistants, 0));
@@ -396,7 +410,7 @@ public class NotificationAssistantsTest extends UiServiceTestCase {
                 new ByteArrayInputStream(xml.toString().getBytes())), null);
 
         parser.nextTag();
-        mAssistants.readXml(parser, mNm::canUseManagedServices, false, USER_ALL);
+        mAssistants.readXml(parser, mNm::canUseManagedServices, false, USER_ALL, null);
 
         verify(mAssistants, times(0)).upgradeUserSet();
         assertTrue(isUserSetServicesEmpty(mAssistants, 0));
@@ -414,7 +428,7 @@ public class NotificationAssistantsTest extends UiServiceTestCase {
                 new ByteArrayInputStream(xml.toString().getBytes())), null);
 
         parser.nextTag();
-        mAssistants.readXml(parser, mNm::canUseManagedServices, false, USER_ALL);
+        mAssistants.readXml(parser, mNm::canUseManagedServices, false, USER_ALL, null);
 
         verify(mAssistants, times(1)).upgradeUserSet();
         assertTrue(isUserSetServicesEmpty(mAssistants, 0));
@@ -432,7 +446,7 @@ public class NotificationAssistantsTest extends UiServiceTestCase {
                 new ByteArrayInputStream(xml.toString().getBytes())), null);
 
         parser.nextTag();
-        mAssistants.readXml(parser, mNm::canUseManagedServices, false, USER_ALL);
+        mAssistants.readXml(parser, mNm::canUseManagedServices, false, USER_ALL, null);
 
         verify(mAssistants, times(1)).upgradeUserSet();
         assertTrue(isUserSetServicesEmpty(mAssistants, 0));
@@ -455,7 +469,7 @@ public class NotificationAssistantsTest extends UiServiceTestCase {
                 new ByteArrayInputStream(xml.toString().getBytes())), null);
 
         parser.nextTag();
-        mAssistants.readXml(parser, null, false, USER_ALL);
+        mAssistants.readXml(parser, null, false, USER_ALL, null);
 
         assertEquals(1, mAssistants.getAllowedComponents(0).size());
         assertEquals(new ArrayList(Arrays.asList(new ComponentName("a", "a"))),
@@ -472,7 +486,7 @@ public class NotificationAssistantsTest extends UiServiceTestCase {
         parser.setInput(new BufferedInputStream(
                 new ByteArrayInputStream(xml.toString().getBytes())), null);
         parser.nextTag();
-        mAssistants.readXml(parser, null, false, USER_ALL);
+        mAssistants.readXml(parser, null, false, USER_ALL, null);
 
         verify(mNm, never()).setDefaultAssistantForUser(anyInt());
         verify(mAssistants, times(1)).addApprovedList(
@@ -644,6 +658,10 @@ public class NotificationAssistantsTest extends UiServiceTestCase {
         assertThat(mAssistants.getUnsupportedAdjustments(userId)).contains(
                 Adjustment.KEY_NOT_CONVERSATION);
         assertThat(mAssistants.getUnsupportedAdjustments(userId).size()).isEqualTo(1);
+        verify(mContext).sendBroadcastAsUser(eqIntent(
+                new Intent(SUPPORTED_NAS_ADJUSTMENT_KEYS_CHANGED)
+                        .addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT)),
+                eq(UserHandle.SYSTEM), eq(STATUS_BAR_SERVICE));
     }
 
     @Test

@@ -30,12 +30,15 @@ import static android.app.ActivityManager.PROCESS_STATE_TRANSIENT_BACKGROUND;
 import static android.app.ActivityManager.PROCESS_STATE_UNKNOWN;
 import static android.content.ContentResolver.SCHEME_CONTENT;
 import static android.content.Intent.FILL_IN_ACTION;
+import static android.content.pm.ApplicationInfo.BACKUP_AGENT_PROCESS_MAIN;
+import static android.content.pm.ApplicationInfo.BACKUP_AGENT_PROCESS_PCC;
 import static android.os.PowerExemptionManager.REASON_DENIED;
 import static android.os.UserHandle.USER_ALL;
 import static android.util.DebugUtils.valueToString;
 
 import static androidx.test.platform.app.InstrumentationRegistry.getInstrumentation;
 
+import static com.android.dx.mockito.inline.extended.ExtendedMockito.doNothing;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doReturn;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.mock;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.mockitoSession;
@@ -58,6 +61,7 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.mockito.AdditionalMatchers.aryEq;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -68,6 +72,7 @@ import static org.mockito.ArgumentMatchers.nullable;
 import static org.mockito.Mockito.after;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.timeout;
@@ -96,13 +101,18 @@ import android.content.ContextWrapper;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
+import android.content.pm.ActivityInfo;
+import android.content.pm.AllowComponentAccessPolicyInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.IPackageManager;
 import android.content.pm.PackageManagerInternal;
 import android.content.pm.ServiceInfo;
+import android.content.pm.SignedPackage;
+import android.content.pm.SigningDetails;
 import android.graphics.Rect;
 import android.graphics.drawable.Icon;
 import android.net.Uri;
+import android.os.AppZygote;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -121,6 +131,7 @@ import android.os.instrumentation.IOffsetCallback;
 import android.os.instrumentation.MethodDescriptor;
 import android.permission.IPermissionManager;
 import android.platform.test.annotations.Presubmit;
+import android.platform.test.annotations.RequiresFlagsDisabled;
 import android.platform.test.annotations.RequiresFlagsEnabled;
 import android.platform.test.flag.junit.CheckFlagsRule;
 import android.platform.test.flag.junit.DeviceFlagsValueProvider;
@@ -134,6 +145,7 @@ import androidx.test.filters.SmallTest;
 import androidx.test.platform.app.InstrumentationRegistry;
 
 import com.android.dx.mockito.inline.extended.ExtendedMockito;
+import com.android.internal.os.SomeArgs;
 import com.android.sdksandbox.flags.Flags;
 import com.android.server.LocalServices;
 import com.android.server.am.BroadcastController.StickyBroadcast;
@@ -143,6 +155,7 @@ import com.android.server.am.UidObserverController.ChangeRecord;
 import com.android.server.appop.AppOpsService;
 import com.android.server.job.JobSchedulerInternal;
 import com.android.server.notification.NotificationManagerInternal;
+import com.android.server.pm.pkg.AndroidPackage;
 import com.android.server.privatecompute.PccSandboxManagerInternal;
 import com.android.server.wm.ActivityTaskManagerInternal;
 import com.android.server.wm.ActivityTaskManagerService;
@@ -239,6 +252,14 @@ public class ActivityManagerServiceTest {
 
     private static final long USAGE_STATS_INTERACTION = 10 * 60 * 1000L;
     private static final long SERVICE_USAGE_INTERACTION = 60 * 1000;
+    private static final String TEST_CALLER_PKG = "com.caller.package";
+    private static final int TEST_CALLER_UID = 10001;
+    private static final String TEST_TARGET_PKG = "com.target.package";
+    private static final int TEST_TARGET_UID = 10002;
+    private static final int TEST_USER_ID = 0;
+    private static final String SYSTEM_PKG = "android";
+    private static final String CERT_A = "CERT_A"; // For Caller
+    private static final String CERT_B = "CERT_B"; // For Target
 
     private static ProcessList.ProcessListSettingsListener sProcessListSettingsListener;
 
@@ -335,6 +356,34 @@ public class ActivityManagerServiceTest {
     }
 
     @Test
+    @RequiresFlagsEnabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_ALLOW_COMPONENT_ACCESS)
+    public void testValidateAssociation_SystemUid_BypassesCheck() {
+        // Setup a Target that blocks everyone
+        setupAllowComponentAccessPolicy(TEST_TARGET_PKG, TEST_USER_ID, List.of());
+        setupPackageSigning(TEST_TARGET_PKG, CERT_B);
+
+        boolean result = mAms.validateAssociationAllowedLocked(
+                SYSTEM_PKG, Process.SYSTEM_UID, TEST_TARGET_PKG, TEST_TARGET_UID,
+                ActivityManagerService.ASSOCIATION_TYPE_SERVICE, null);
+
+        assertTrue("System UID (1000) must always bypass checks", result);
+    }
+
+    @Test
+    @RequiresFlagsEnabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_ALLOW_COMPONENT_ACCESS)
+    public void testValidateAssociation_SameUid_BypassesCheck() {
+        // Setup a Target that blocks everyone
+        setupAllowComponentAccessPolicy(TEST_TARGET_PKG, TEST_USER_ID, List.of());
+        setupPackageSigning(TEST_TARGET_PKG, CERT_B);
+
+        boolean result = mAms.validateAssociationAllowedLocked(
+                TEST_TARGET_PKG, TEST_TARGET_UID, TEST_TARGET_PKG, TEST_TARGET_UID,
+                ActivityManagerService.ASSOCIATION_TYPE_SERVICE, null);
+
+        assertTrue("Same UID must always bypass checks", result);
+    }
+
+    @Test
     @RequiresFlagsEnabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
     public void testValidateAssociationAllowed_pccToRegular_isDelegatedToPccSandboxManager() {
         when(mMockPccSandboxManagerInternal.validateAssociationAllowed(
@@ -361,7 +410,212 @@ public class ActivityManagerServiceTest {
         assertTrue("Association between two regular UIDs with no restrictions is allowed", allowed);
     }
 
+    @Test
+    @RequiresFlagsEnabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_ALLOW_COMPONENT_ACCESS)
+    public void testValidateAssociation_ComponentAccess_NoPolicy_Allowed() {
+        setupAllowComponentAccessPolicy(TEST_CALLER_PKG, TEST_USER_ID, /* allowedPackages= */ null);
+        setupAllowComponentAccessPolicy(TEST_TARGET_PKG, TEST_USER_ID, /* allowedPackages= */ null);
 
+        setupPackageSigning(TEST_CALLER_PKG, CERT_A);
+        setupPackageSigning(TEST_TARGET_PKG, CERT_B);
+
+        boolean result =
+                mAms.validateAssociationAllowedLocked(
+                        TEST_CALLER_PKG, TEST_CALLER_UID, TEST_TARGET_PKG, TEST_TARGET_UID,
+                        ActivityManagerService.ASSOCIATION_TYPE_SERVICE, /* debugTag= */ null);
+
+        assertTrue("Association should be allowed when no policies exist", result);
+    }
+
+    @Test
+    @RequiresFlagsEnabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_ALLOW_COMPONENT_ACCESS)
+    public void testValidateAssociation_ComponentAccess_EgressBlock_Denied() {
+        List<SignedPackage> callerRules = List.of(createSignedPackage(
+                "com.trusted.service", /* cert= */ null));
+        setupAllowComponentAccessPolicy(TEST_CALLER_PKG, TEST_USER_ID, callerRules);
+        setupAllowComponentAccessPolicy(
+                TEST_TARGET_PKG, TEST_USER_ID,  /* allowedPackages= */ null);
+        setupPackageSigning(TEST_CALLER_PKG, CERT_A);
+        setupPackageSigning(TEST_TARGET_PKG, CERT_B);
+
+        boolean result =
+                mAms.validateAssociationAllowedLocked(
+                        TEST_CALLER_PKG, TEST_CALLER_UID, TEST_TARGET_PKG, TEST_TARGET_UID,
+                        ActivityManagerService.ASSOCIATION_TYPE_SERVICE, /* debugTag= */ null);
+
+        assertFalse("Caller's policy should block access to unknown target", result);
+    }
+
+    @Test
+    @RequiresFlagsEnabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_ALLOW_COMPONENT_ACCESS)
+    public void testValidateAssociation_ComponentAccess_IngressBlock_Denied() {
+        setupAllowComponentAccessPolicy(TEST_CALLER_PKG, TEST_USER_ID, /* allowedPackages= */ null);
+
+        List<SignedPackage> targetRules =
+                List.of(createSignedPackage("com.trusted.client", /* cert= */ null));
+        setupAllowComponentAccessPolicy(TEST_TARGET_PKG, TEST_USER_ID, targetRules);
+
+        setupPackageSigning(TEST_CALLER_PKG, CERT_A);
+        setupPackageSigning(TEST_TARGET_PKG, CERT_B);
+
+        boolean result =
+                mAms.validateAssociationAllowedLocked(
+                        TEST_CALLER_PKG, TEST_CALLER_UID, TEST_TARGET_PKG, TEST_TARGET_UID,
+                        ActivityManagerService.ASSOCIATION_TYPE_SERVICE, /* debugTag= */ null);
+
+        assertFalse("Target's policy should block access from unknown caller", result);
+    }
+
+    @Test
+    @RequiresFlagsEnabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_ALLOW_COMPONENT_ACCESS)
+    public void testValidateAssociation_ComponentAccess_MutualAllow_Allowed() {
+        setupAllowComponentAccessPolicy(
+                TEST_CALLER_PKG,
+                TEST_USER_ID,
+                List.of(createSignedPackage(TEST_TARGET_PKG, /* cert= */ null)));
+
+        setupAllowComponentAccessPolicy(
+                TEST_TARGET_PKG,
+                TEST_USER_ID,
+                List.of(createSignedPackage(TEST_CALLER_PKG, /* cert= */ null)));
+
+        setupPackageSigning(TEST_CALLER_PKG, CERT_A);
+        setupPackageSigning(TEST_TARGET_PKG, CERT_B);
+
+        boolean result =
+                mAms.validateAssociationAllowedLocked(
+                        TEST_CALLER_PKG, TEST_CALLER_UID, TEST_TARGET_PKG, TEST_TARGET_UID,
+                        ActivityManagerService.ASSOCIATION_TYPE_SERVICE, /* debugTag= */ null);
+
+        assertTrue("Mutual trust should pass", result);
+    }
+
+    @Test
+    @RequiresFlagsEnabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_ALLOW_COMPONENT_ACCESS)
+    public void testValidateAssociation_ComponentAccess_CertMismatch_Denied() {
+        List<SignedPackage> rules = List.of(createSignedPackage(TEST_CALLER_PKG, "CERT_OFFICIAL"));
+        setupAllowComponentAccessPolicy(TEST_TARGET_PKG, TEST_USER_ID, rules);
+        setupAllowComponentAccessPolicy(TEST_CALLER_PKG, TEST_USER_ID, /* allowedPackages= */ null);
+
+        setupPackageSigning(TEST_CALLER_PKG, "CERT_HACKED");
+        setupPackageSigning(TEST_TARGET_PKG, CERT_B);
+
+        boolean result =
+                mAms.validateAssociationAllowedLocked(
+                        TEST_CALLER_PKG, TEST_CALLER_UID, TEST_TARGET_PKG, TEST_TARGET_UID,
+                        ActivityManagerService.ASSOCIATION_TYPE_SERVICE, /* debugTag= */ null);
+
+        assertFalse("Certificate mismatch should block access", result);
+    }
+
+    @Test
+    @RequiresFlagsDisabled(
+            android.app.privatecompute.flags.Flags.FLAG_ENABLE_ALLOW_COMPONENT_ACCESS)
+    public void testValidateAssociation_ComponentAccess_FlagDisabled_IgnoresPolicy() {
+        List<SignedPackage> targetRules =
+                List.of(createSignedPackage("com.some.other.app", /* cert= */ null));
+        setupAllowComponentAccessPolicy(TEST_TARGET_PKG, TEST_USER_ID, targetRules);
+        setupAllowComponentAccessPolicy(TEST_CALLER_PKG, TEST_USER_ID, /* allowedPackages= */null);
+
+        setupPackageSigning(TEST_CALLER_PKG, CERT_A);
+        setupPackageSigning(TEST_TARGET_PKG, CERT_B);
+
+        boolean result =
+                mAms.validateAssociationAllowedLocked(
+                        TEST_CALLER_PKG, TEST_CALLER_UID, TEST_TARGET_PKG, TEST_TARGET_UID,
+                        ActivityManagerService.ASSOCIATION_TYPE_SERVICE, /* debugTag= */ null);
+
+        assertTrue("When flag is disabled, manifest policies must be ignored", result);
+    }
+    // ------------------------------------------------------------------------
+    // --- PCC Component Access Tests (Trusted Apps & Manifest Fallback) ------
+    // ------------------------------------------------------------------------
+
+    @Test
+    @RequiresFlagsEnabled({
+            android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT,
+            android.app.privatecompute.flags.Flags.FLAG_ENABLE_ALLOW_COMPONENT_ACCESS
+    })
+    public void testValidateAssociation_ComponentAccess_PccUidToTrustedApp_Allowed() {
+        setupAllowComponentAccessPolicy(TEST_TARGET_PKG, TEST_USER_ID, List.of());
+        setupPackageSigning(TEST_TARGET_PKG, CERT_B);
+
+        when(mMockPccSandboxManagerInternal.validateAssociationAllowed(
+                anyInt(), anyString(), anyInt(), anyString(), anyInt(), nullable(Bundle.class)))
+                .thenReturn(true);
+
+        when(mMockPccSandboxManagerInternal.isPccTrustedSystemComponent(
+                TEST_TARGET_UID, TEST_TARGET_PKG))
+                .thenReturn(true);
+
+        boolean result = mAms.validateAssociationAllowedLocked(
+                PCC_PACKAGE_1, PCC_UID_1, TEST_TARGET_PKG, TEST_TARGET_UID,
+                ActivityManagerService.ASSOCIATION_TYPE_SERVICE, /* debugTag= */ null);
+
+        assertTrue("PCC UID accessing a Trusted App should bypass "
+                + "component access restrictions", result);
+    }
+
+    @Test
+    @RequiresFlagsEnabled({
+            android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT,
+            android.app.privatecompute.flags.Flags.FLAG_ENABLE_ALLOW_COMPONENT_ACCESS
+    })
+    public void testValidateAssociation_ComponentAccess_PccUidToUntrustedApp_Denied() {
+        setupAllowComponentAccessPolicy(TEST_TARGET_PKG, TEST_USER_ID, List.of());
+        setupPackageSigning(TEST_TARGET_PKG, CERT_B);
+
+        when(mMockPccSandboxManagerInternal.validateAssociationAllowed(
+                anyInt(), anyString(), anyInt(), anyString(), anyInt(), nullable(Bundle.class)))
+                .thenReturn(true);
+
+        // Trusted App check fails -> Fallback to manifest (Denied)
+        when(mMockPccSandboxManagerInternal.isPccTrustedSystemComponent(
+                TEST_TARGET_UID, TEST_TARGET_PKG))
+                .thenReturn(false);
+
+        boolean result = mAms.validateAssociationAllowedLocked(
+                PCC_PACKAGE_1, PCC_UID_1, TEST_TARGET_PKG, TEST_TARGET_UID,
+                ActivityManagerService.ASSOCIATION_TYPE_SERVICE, /* debugTag= */ null);
+
+        assertFalse("PCC UID accessing an Untrusted App must respect "
+                + "component access restrictions (Deny)", result);
+    }
+
+    @Test
+    @RequiresFlagsEnabled({
+            android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT,
+            android.app.privatecompute.flags.Flags.FLAG_ENABLE_ALLOW_COMPONENT_ACCESS
+    })
+    public void testValidateAssociation_ComponentAccess_PccUidToUntrustedApp_AllowedByManifest() {
+        // Manifest explicitly allows PCC package
+        List<SignedPackage> targetRules =
+                List.of(createSignedPackage(PCC_PACKAGE_1, /* cert= */ null));
+        setupAllowComponentAccessPolicy(TEST_TARGET_PKG, TEST_USER_ID, targetRules);
+
+        // Mutual trust setup
+        List<SignedPackage> pccRules =
+                List.of(createSignedPackage(TEST_TARGET_PKG, /* cert= */ null));
+        setupAllowComponentAccessPolicy(PCC_PACKAGE_1, TEST_USER_ID, pccRules);
+        setupPackageSigning(TEST_TARGET_PKG, CERT_B);
+        setupPackageSigning(PCC_PACKAGE_1, CERT_A);
+
+        when(mMockPccSandboxManagerInternal.validateAssociationAllowed(
+                anyInt(), anyString(), anyInt(), anyString(), anyInt(), nullable(Bundle.class)))
+                .thenReturn(true);
+
+        // Trusted App check fails -> Fallback to manifest (Allowed)
+        when(mMockPccSandboxManagerInternal.isPccTrustedSystemComponent(
+                TEST_TARGET_UID, TEST_TARGET_PKG))
+                .thenReturn(false);
+
+        boolean result = mAms.validateAssociationAllowedLocked(
+                PCC_PACKAGE_1, PCC_UID_1, TEST_TARGET_PKG, TEST_TARGET_UID,
+                ActivityManagerService.ASSOCIATION_TYPE_SERVICE, /* debugTag= */ null);
+
+        assertTrue("PCC UID accessing an Untrusted App should be allowed"
+                        + " if the manifest explicitly permits it", result);
+    }
     private void mockNoteOperation() {
         SyncNotedAppOp allowed = new SyncNotedAppOp(AppOpsManager.MODE_ALLOWED,
                 AppOpsManager.OP_GET_USAGE_STATS, null, mContext.getPackageName());
@@ -793,8 +1047,8 @@ public class ActivityManagerServiceTest {
         CustomThread thread = new CustomThread(uidRec.networkStateLock);
         thread.startAndWait("Unexpected state for " + uidRec);
 
-        uidRec.setSetProcState(prevState);
-        uidRec.setCurProcState(curState);
+        mAms.mProcessStateController.setUidSetProcState(uidRec, prevState);
+        mAms.mProcessStateController.setUidCurProcState(uidRec, curState);
         final long beforeProcStateSeq = mAms.mProcessList.getProcStateSeqCounter();
 
         mAms.mProcessList.incrementProcStateSeqLSP(mAms.mProcessList.mActiveUids);
@@ -961,7 +1215,7 @@ public class ActivityManagerServiceTest {
         // If there is a request to use more CPU resource (e.g. camera), the current fifo process
         // should switch the capability of using fifo.
         final UidRecord uidRecord = addUidRecord(TEST_UID + 1, TEST_PACKAGE + 1);
-        uidRecord.setCurProcState(PROCESS_STATE_TOP);
+        mAms.mProcessStateController.setUidCurProcState(uidRecord, PROCESS_STATE_TOP);
         mAms.adjustFifoProcessesIfNeeded(uidRecord.getUid(), false /* allowSpecifiedFifo */);
         assertFalse(fifoProc.useFifoUiScheduling());
         mAms.adjustFifoProcessesIfNeeded(uidRecord.getUid(), true /* allowSpecifiedFifo */);
@@ -995,43 +1249,44 @@ public class ActivityManagerServiceTest {
         };
 
         // No change in uid state
-        uidRec.setSetProcState(PROCESS_STATE_RECEIVER);
-        uidRec.setCurProcState(PROCESS_STATE_RECEIVER);
+        mAms.mProcessStateController.setUidSetProcState(uidRec, PROCESS_STATE_RECEIVER);
+        mAms.mProcessStateController.setUidCurProcState(uidRec, PROCESS_STATE_RECEIVER);
         expectedBlockState = NETWORK_STATE_NO_CHANGE;
         assertEquals(errorMsg.apply(expectedBlockState),
                 expectedBlockState, mAms.mProcessList.getBlockStateForUid(uidRec));
 
         // Foreground to foreground
-        uidRec.setSetProcState(PROCESS_STATE_FOREGROUND_SERVICE);
-        uidRec.setCurProcState(PROCESS_STATE_BOUND_FOREGROUND_SERVICE);
+        mAms.mProcessStateController.setUidSetProcState(uidRec, PROCESS_STATE_FOREGROUND_SERVICE);
+        mAms.mProcessStateController.setUidCurProcState(uidRec,
+                PROCESS_STATE_BOUND_FOREGROUND_SERVICE);
         expectedBlockState = NETWORK_STATE_NO_CHANGE;
         assertEquals(errorMsg.apply(expectedBlockState),
                 expectedBlockState, mAms.mProcessList.getBlockStateForUid(uidRec));
 
         // Background to background
-        uidRec.setSetProcState(PROCESS_STATE_CACHED_ACTIVITY);
-        uidRec.setCurProcState(PROCESS_STATE_CACHED_EMPTY);
+        mAms.mProcessStateController.setUidSetProcState(uidRec, PROCESS_STATE_CACHED_ACTIVITY);
+        mAms.mProcessStateController.setUidCurProcState(uidRec, PROCESS_STATE_CACHED_EMPTY);
         expectedBlockState = NETWORK_STATE_NO_CHANGE;
         assertEquals(errorMsg.apply(expectedBlockState),
                 expectedBlockState, mAms.mProcessList.getBlockStateForUid(uidRec));
 
         // Background to background
-        uidRec.setSetProcState(PROCESS_STATE_NONEXISTENT);
-        uidRec.setCurProcState(PROCESS_STATE_CACHED_ACTIVITY);
+        mAms.mProcessStateController.setUidSetProcState(uidRec, PROCESS_STATE_NONEXISTENT);
+        mAms.mProcessStateController.setUidCurProcState(uidRec, PROCESS_STATE_CACHED_ACTIVITY);
         expectedBlockState = NETWORK_STATE_NO_CHANGE;
         assertEquals(errorMsg.apply(expectedBlockState),
                 expectedBlockState, mAms.mProcessList.getBlockStateForUid(uidRec));
 
         // Background to foreground
-        uidRec.setSetProcState(PROCESS_STATE_SERVICE);
-        uidRec.setCurProcState(PROCESS_STATE_FOREGROUND_SERVICE);
+        mAms.mProcessStateController.setUidSetProcState(uidRec, PROCESS_STATE_SERVICE);
+        mAms.mProcessStateController.setUidCurProcState(uidRec, PROCESS_STATE_FOREGROUND_SERVICE);
         expectedBlockState = NETWORK_STATE_BLOCK;
         assertEquals(errorMsg.apply(expectedBlockState),
                 expectedBlockState, mAms.mProcessList.getBlockStateForUid(uidRec));
 
         // Foreground to background
-        uidRec.setSetProcState(PROCESS_STATE_TOP);
-        uidRec.setCurProcState(PROCESS_STATE_LAST_ACTIVITY);
+        mAms.mProcessStateController.setUidSetProcState(uidRec, PROCESS_STATE_TOP);
+        mAms.mProcessStateController.setUidCurProcState(uidRec, PROCESS_STATE_LAST_ACTIVITY);
         expectedBlockState = NETWORK_STATE_UNBLOCK;
         assertEquals(errorMsg.apply(expectedBlockState),
                 expectedBlockState, mAms.mProcessList.getBlockStateForUid(uidRec));
@@ -1409,7 +1664,7 @@ public class ActivityManagerServiceTest {
         mAms.mUidObserverController.dispatchUidsChanged();
         for (int i = 0; i < pendingItemsForUids.size(); ++i) {
             final ChangeRecord item = pendingItemsForUids.get(i);
-            final UidRecord validateUidRecord =
+            final UidObserverController.ValidateUidRecord validateUidRecord =
                     mAms.mUidObserverController.getValidateUidsForTest().get(item.uid);
             if ((item.change & UidRecord.CHANGE_GONE) != 0) {
                 assertNull("validateUidRecord should be null since the change is either "
@@ -1418,11 +1673,8 @@ public class ActivityManagerServiceTest {
                 assertNotNull("validateUidRecord should not be null since the change is neither "
                         + "CHANGE_GONE nor CHANGE_GONE_IDLE", validateUidRecord);
                 assertEquals("processState: " + item.procState + " curProcState: "
-                        + validateUidRecord.getCurProcState() + " should have been equal",
-                        item.procState, validateUidRecord.getCurProcState());
-                assertEquals("processState: " + item.procState + " setProcState: "
-                        + validateUidRecord.getCurProcState() + " should have been equal",
-                        item.procState, validateUidRecord.getSetProcState());
+                        + validateUidRecord.getProcState() + " should have been equal",
+                        item.procState, validateUidRecord.getProcState());
                 if (item.change == UidRecord.CHANGE_IDLE) {
                     assertTrue("UidRecord.idle should be updated to true for CHANGE_IDLE",
                             validateUidRecord.isIdle());
@@ -1462,8 +1714,8 @@ public class ActivityManagerServiceTest {
     public void testEnqueueUidChangeLocked_dispatchUidsChanged() {
         final UidRecord uidRecord = new UidRecord(TEST_UID, mAms);
         final int expectedProcState = PROCESS_STATE_SERVICE;
-        uidRecord.setSetProcState(expectedProcState);
-        uidRecord.setCurProcStateSeq(TEST_PROC_STATE_SEQ1);
+        mAms.mProcessStateController.setUidSetProcState(uidRecord, expectedProcState);
+        mAms.mProcessStateController.setUidCurProcStateSeq(uidRecord, TEST_PROC_STATE_SEQ1);
 
         // Test with no pending uid records.
         for (int i = 0; i < UID_RECORD_CHANGES.length; ++i) {
@@ -1727,11 +1979,70 @@ public class ActivityManagerServiceTest {
         assertThat(thrown.getMessage()).isEqualTo("app ActivityThread is null");
     }
 
+    @Test
+    @RequiresFlagsEnabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    public void testGetActivityInfoForUser_PccUid() {
+        int pccUid = android.os.Process.FIRST_PCC_UID + 5;
+        ActivityInfo aInfo = new ActivityInfo();
+        aInfo.applicationInfo = new ApplicationInfo();
+        aInfo.applicationInfo.uid = 10123;
+        aInfo.applicationInfo.pccUid = pccUid;
+        aInfo.flags |= ActivityInfo.FLAG_RUN_IN_PCC_SANDBOX;
+
+        // Should return original aInfo because pccUid < PER_USER_RANGE
+        ActivityInfo result = mAms.getActivityInfoForUser(aInfo, 0);
+        assertEquals(aInfo, result);
+        assertEquals(pccUid, result.getUid());
+    }
+
+    @Test
+    @RequiresFlagsEnabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    public void testGetActivityInfoForUser_NormalUid() {
+        int appUid = 10123;
+        ActivityInfo aInfo = new ActivityInfo();
+        aInfo.applicationInfo = new ApplicationInfo();
+        aInfo.applicationInfo.uid = appUid;
+        aInfo.applicationInfo.pccUid = -1;
+
+        ActivityInfo result = mAms.getActivityInfoForUser(aInfo, 0);
+        assertEquals(aInfo, result);
+        assertEquals(appUid, result.getUid());
+    }
+
+    private void setupAllowComponentAccessPolicy(
+            String ownerPkg, int userId, List<SignedPackage> allowedPackages) {
+        AllowComponentAccessPolicyInfo policyInfo =
+                (allowedPackages == null)
+                        ? null
+                        : new AllowComponentAccessPolicyInfo(allowedPackages);
+
+        doReturn(policyInfo)
+                .when(mPackageManagerInternal)
+                .getAllowComponentAccessPolicyInfo(eq(ownerPkg), eq(userId));
+    }
+
+    private void setupPackageSigning(String pkgName, String sha256Cert) {
+        AndroidPackage mockPkg = mock(AndroidPackage.class);
+        SigningDetails mockSigning = mock(SigningDetails.class);
+
+        if (sha256Cert != null) {
+            byte[] certBytes = sha256Cert.getBytes();
+            lenient().when(mockSigning.hasSha256Certificate(aryEq(certBytes))).thenReturn(true);
+        }
+
+        lenient().when(mockPkg.getSigningDetails()).thenReturn(mockSigning);
+        lenient().when(mPackageManagerInternal.getPackage(eq(pkgName))).thenReturn(mockPkg);
+    }
+
+    private SignedPackage createSignedPackage(String pkg, String cert) {
+        return new SignedPackage(pkg, cert != null ? cert.getBytes() : /* certBytes= */ null);
+    }
+
     private void verifyWaitingForNetworkStateUpdate(long curProcStateSeq,
             long lastNetworkUpdatedProcStateSeq,
             final long procStateSeqToWait, boolean expectWait) throws Exception {
         final UidRecord record = new UidRecord(Process.myUid(), mAms);
-        record.setCurProcStateSeq(curProcStateSeq);
+        mAms.mProcessStateController.setUidCurProcStateSeq(record, curProcStateSeq);
         record.lastNetworkUpdatedProcStateSeq = lastNetworkUpdatedProcStateSeq;
         mAms.mProcessList.mActiveUids.put(Process.myUid(), record);
 
@@ -1965,6 +2276,54 @@ public class ActivityManagerServiceTest {
     }
 
     @Test
+    @RequiresFlagsEnabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    public void bindPccBackupAgent_usesPccUid()
+            throws Exception {
+        ActivityManagerService spyAms = spy(mAms);
+        ApplicationInfo applicationInfo = new ApplicationInfo();
+        applicationInfo.packageName = TEST_PACKAGE;
+        applicationInfo.processName = TEST_PACKAGE;
+        applicationInfo.uid = TEST_UID;
+        applicationInfo.pccUid = PCC_UID_1;
+        applicationInfo.backupAgentProcess = BACKUP_AGENT_PROCESS_PCC;
+        doReturn(applicationInfo).when(mPackageManager).getApplicationInfo(eq(TEST_PACKAGE),
+                anyLong(), anyInt());
+        ProcessRecord appRec = new ProcessRecord(mAms, applicationInfo, TAG, PCC_UID_1);
+
+        doReturn(appRec).when(spyAms).getProcessRecordLocked(eq(TEST_PACKAGE), eq(PCC_UID_1));
+        spyAms.bindBackupAgent(TEST_PACKAGE, ApplicationThreadConstants.BACKUP_MODE_FULL,
+                UserHandle.USER_SYSTEM,
+                BackupAnnotations.BackupDestination.CLOUD, /* shouldUseRestrictedMode= */
+                true);
+
+        verify(spyAms).getProcessRecordLocked(eq(TEST_PACKAGE), eq(PCC_UID_1));
+    }
+
+    @Test
+    @RequiresFlagsEnabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    public void bindMainBackupAgent_usesAppUid()
+            throws Exception {
+        ActivityManagerService spyAms = spy(mAms);
+        ApplicationInfo applicationInfo = new ApplicationInfo();
+        applicationInfo.packageName = TEST_PACKAGE;
+        applicationInfo.processName = TEST_PACKAGE;
+        applicationInfo.uid = TEST_UID;
+        applicationInfo.pccUid = PCC_UID_1;
+        applicationInfo.backupAgentProcess = BACKUP_AGENT_PROCESS_MAIN;
+        doReturn(applicationInfo).when(mPackageManager).getApplicationInfo(eq(TEST_PACKAGE),
+                anyLong(), anyInt());
+        ProcessRecord appRec = new ProcessRecord(mAms, applicationInfo, TAG, TEST_UID);
+
+        doReturn(appRec).when(spyAms).getProcessRecordLocked(eq(TEST_PACKAGE), eq(TEST_UID));
+        spyAms.bindBackupAgent(TEST_PACKAGE, ApplicationThreadConstants.BACKUP_MODE_FULL,
+                UserHandle.USER_SYSTEM,
+                BackupAnnotations.BackupDestination.CLOUD, /* shouldUseRestrictedMode= */
+                true);
+
+        verify(spyAms).getProcessRecordLocked(eq(TEST_PACKAGE), eq(TEST_UID));
+    }
+
+    @Test
     public void testCallsForegroundServiceOptionsWithDefault_throwsException()
             throws Exception {
         final ForegroundServiceDelegationOptions.Builder optionsBuilder =
@@ -1983,6 +2342,134 @@ public class ActivityManagerServiceTest {
         assertThat(e).hasMessageThat().isEqualTo(
             "Default is not allowed to be passed in. "
             + "Use a more specific Delegation Service Identifier!");
+    }
+
+    @Test
+    public void testServiceForegroundTimeoutAnrWarningMsg() {
+        doNothing()
+                .when(mActiveServices)
+                .serviceForegroundAnrWarning(any(ServiceRecord.class), anyInt(), anyLong());
+
+        ServiceRecord serviceRecord = mock(ServiceRecord.class);
+        int anrId = 10;
+        long elapsedTimeMs = 5000L;
+
+        SomeArgs args = SomeArgs.obtain();
+        args.arg1 = serviceRecord;
+        args.argi1 = anrId;
+        args.argl1 = elapsedTimeMs;
+
+        Message msg =
+                mAms.mHandler.obtainMessage(
+                        ActivityManagerService.SERVICE_FOREGROUND_TIMEOUT_ANR_WARNING_MSG);
+        msg.obj = args;
+
+        mAms.mHandler.handleMessage(msg);
+
+        verify(mActiveServices)
+                .serviceForegroundAnrWarning(eq(serviceRecord), eq(anrId), eq(elapsedTimeMs));
+    }
+
+    @Test
+    public void testServiceTimeoutWarningMsg() {
+        doNothing()
+                .when(mActiveServices)
+                .serviceTimeoutAnrWarning(any(ProcessRecord.class), anyInt(), anyLong());
+
+        ProcessRecord processRecord = mock(ProcessRecord.class);
+        int anrId = 10;
+        long elapsedTimeMs = 5000L;
+
+        SomeArgs args = SomeArgs.obtain();
+        args.arg1 = processRecord;
+        args.argi1 = anrId;
+        args.argl1 = elapsedTimeMs;
+
+        Message msg =
+                mAms.mHandler.obtainMessage(ActivityManagerService.SERVICE_TIMEOUT_WARNING_MSG);
+        msg.obj = args;
+
+        mAms.mHandler.handleMessage(msg);
+
+        verify(mActiveServices)
+                .serviceTimeoutAnrWarning(eq(processRecord), eq(anrId), eq(elapsedTimeMs));
+    }
+
+    @Test
+    public void testShortFgsAnrTimeoutWarningMsg() {
+        doNothing()
+                .when(mActiveServices)
+                .onShortFgsAnrTimeoutWarning(any(ServiceRecord.class), anyInt(), anyLong());
+
+        ServiceRecord serviceRecord = mock(ServiceRecord.class);
+        int anrId = 10;
+        long elapsedTimeMs = 5000L;
+
+        SomeArgs args = SomeArgs.obtain();
+        args.arg1 = serviceRecord;
+        args.argi1 = anrId;
+        args.argl1 = elapsedTimeMs;
+
+        Message msg =
+                mAms.mHandler.obtainMessage(
+                        ActivityManagerService.SERVICE_SHORT_FGS_ANR_TIMEOUT_WARNING_MSG);
+        msg.obj = args;
+
+        mAms.mHandler.handleMessage(msg);
+
+        verify(mActiveServices)
+                .onShortFgsAnrTimeoutWarning(eq(serviceRecord), eq(anrId), eq(elapsedTimeMs));
+    }
+
+    @Test
+    @RequiresFlagsEnabled(android.os.Flags.FLAG_NATIVE_APP_ZYGOTE)
+    public void testCreateAppZygoteForProcessIfNeeded_managedAndNative() throws Exception {
+        final int appUid = 10001;
+        final String packageName = "com.test.app";
+        final String processName = "com.test.app";
+
+        ApplicationInfo info = new ApplicationInfo();
+        info.packageName = packageName;
+        info.processName = processName;
+        info.uid = appUid;
+
+        mAms.mProcessList.mAppIsolatedUidRangeAllocator.getOrCreateIsolatedUidRangeLocked(
+                processName, appUid);
+
+        HostingRecord managedHostingRecord = HostingRecord.byAppZygote(
+                new ComponentName(packageName, "ManagedService"),
+                packageName, appUid, processName, false /* isNativeService */);
+        ProcessRecord managedApp = new ProcessRecord(mAms, info, processName, appUid);
+        managedApp.setHostingRecord(managedHostingRecord);
+
+        HostingRecord nativeHostingRecord = HostingRecord.byAppZygote(
+                new ComponentName(packageName, "NativeService"),
+                packageName, appUid, processName, true /* isNativeService */);
+        ProcessRecord nativeApp = new ProcessRecord(mAms, info, processName, appUid);
+        nativeApp.setHostingRecord(nativeHostingRecord);
+
+        spyOn(mAms.mProcessList);
+
+        AppZygote managedZygoteMock = mock(AppZygote.class);
+        AppZygote nativeZygoteMock = mock(AppZygote.class);
+
+        doReturn(info).when(managedZygoteMock).getAppInfo();
+        doReturn(info).when(nativeZygoteMock).getAppInfo();
+        doReturn(managedZygoteMock).when(mAms.mProcessList).newAppZygote(
+                any(), any(), anyInt(), anyInt(), anyInt(), eq(false), anyString());
+        doReturn(nativeZygoteMock).when(mAms.mProcessList).newAppZygote(
+                any(), any(), anyInt(), anyInt(), anyInt(), eq(true), anyString());
+
+        AppZygote managedZygote = mAms.mProcessList.createAppZygoteForProcessIfNeeded(managedApp);
+        assertEquals(managedZygoteMock, managedZygote);
+
+        AppZygote nativeZygote = mAms.mProcessList.createAppZygoteForProcessIfNeeded(nativeApp);
+        assertEquals(nativeZygoteMock, nativeZygote);
+
+        assertEquals(managedZygote,
+                mAms.mProcessList.mAppZygotes.get(processName + "_zygote", appUid));
+        assertEquals(nativeZygote,
+                mAms.mProcessList.mAppZygotes.get(processName + "_zygote_native", appUid));
     }
 
     private static class TestHandler extends Handler {

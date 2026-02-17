@@ -32,6 +32,7 @@ import android.view.SurfaceControl
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
+import android.view.accessibility.AccessibilityNodeInfo
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
@@ -49,6 +50,7 @@ import com.android.wm.shell.bubbles.animation.AnimatableScaleMatrix
 import com.android.wm.shell.bubbles.logging.BubbleLogger
 import com.android.wm.shell.bubbles.logging.BubbleSessionTracker
 import com.android.wm.shell.bubbles.logging.BubbleSessionTrackerImpl
+import com.android.wm.shell.bubbles.transitions.BubbleTransitions
 import com.android.wm.shell.bubbles.user.data.FakeBubbleUserResolver
 import com.android.wm.shell.common.FloatingContentCoordinator
 import com.android.wm.shell.common.TestShellExecutor
@@ -128,6 +130,7 @@ class BubbleStackViewTest {
                 bubbleLogger,
                 positioner,
                 BubbleEducationController(context),
+                FakeBubbleAppInfoProvider(),
                 shellExecutor,
                 shellExecutor,
             )
@@ -211,6 +214,27 @@ class BubbleStackViewTest {
         assertThat(lastUpdate).isNotNull()
         assertThat(lastUpdate!!.expandedChanged).isTrue()
         assertThat(lastUpdate!!.expanded).isTrue()
+    }
+
+    @Test
+    fun tapBubble_bubbleInvalidOnSmallScreens_shouldMoveToFullscreen() {
+        val bubble = createAndInflateBubble()
+
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            bubbleStackView.addBubble(bubble)
+        }
+
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+        assertThat(bubbleStackView.bubbleCount).isEqualTo(1)
+        bubble.setIsTaskValidToBubbleOnSmallScreen(false)
+
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            bubble.iconView!!.performClick()
+            assertThat(bubbleData.isExpanded).isFalse()
+            shellExecutor.flushAll()
+        }
+
+        verify(bubble.taskView).moveToFullscreen()
     }
 
     @Test
@@ -1192,7 +1216,6 @@ class BubbleStackViewTest {
         assertThat(bubbleStackView.bubbleCount).isEqualTo(0)
     }
 
-    @EnableFlags(Flags.FLAG_FIX_BUBBLES_ADD_SAME_BUBBLE_BEING_REMOVED)
     @Test
     fun removeLastBubble_whileExpanded_addBack() {
         val bubble = createAndInflateBubble()
@@ -1570,6 +1593,301 @@ class BubbleStackViewTest {
         assertThat(bubble1.isCleanupDeferred).isFalse()
     }
 
+    @Test
+    fun performAccessibilityAction_move_whenExpanded_setsPositionImmediately() {
+        // GIVEN an expanded bubble stack view with one bubble
+        val bubble = createAndInflateBubble()
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            bubbleStackView.addBubble(bubble)
+            bubbleStackView.setSelectedBubble(bubble)
+            bubbleData.isExpanded = true
+            bubbleStackView.isExpanded = true
+            shellExecutor.flushAll()
+        }
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+        PhysicsAnimatorTestUtils.blockUntilAnimationsEnd(
+            AnimatableScaleMatrix.SCALE_X,
+            AnimatableScaleMatrix.SCALE_Y,
+        )
+        assertThat(bubbleStackView.isExpanded).isTrue()
+        val stackBounds = positioner.getAllowableStackPositionRegion(bubbleStackView.bubbleCount)
+
+        // WHEN the move top left action is performed
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            bubbleStackView.performAccessibilityActionInternal(R.id.action_move_top_left, null)
+        }
+        // THEN the stack moves immediately
+        assertThat(bubbleStackView.stackPosition.x).isEqualTo(stackBounds.left)
+        assertThat(bubbleStackView.stackPosition.y).isEqualTo(stackBounds.top)
+
+        // WHEN the move top right action is performed
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            bubbleStackView.performAccessibilityActionInternal(R.id.action_move_top_right, null)
+        }
+        // THEN the stack moves immediately
+        assertThat(bubbleStackView.stackPosition.x).isEqualTo(stackBounds.right)
+        assertThat(bubbleStackView.stackPosition.y).isEqualTo(stackBounds.top)
+
+        // WHEN the move bottom left action is performed
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            bubbleStackView.performAccessibilityActionInternal(R.id.action_move_bottom_left, null)
+        }
+        // THEN the stack moves immediately
+        assertThat(bubbleStackView.stackPosition.x).isEqualTo(stackBounds.left)
+        assertThat(bubbleStackView.stackPosition.y).isEqualTo(stackBounds.bottom)
+
+        // WHEN the move bottom right action is performed
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            bubbleStackView.performAccessibilityActionInternal(R.id.action_move_bottom_right, null)
+        }
+        // THEN the stack moves immediately
+        assertThat(bubbleStackView.stackPosition.x).isEqualTo(stackBounds.right)
+        assertThat(bubbleStackView.stackPosition.y).isEqualTo(stackBounds.bottom)
+    }
+
+    @Test
+    fun verifyAccessibilityActions_collapsedStack() {
+        val bubble = createAndInflateBubble()
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            bubbleStackView.addBubble(bubble)
+            bubbleStackView.updateBubblesAccessibilityStates()
+        }
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+
+        assertThat(bubbleStackView.isExpanded).isFalse()
+
+        val info = AccessibilityNodeInfo()
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            bubbleStackView.onInitializeAccessibilityNodeInfo(info)
+        }
+
+        val actionIds = info.actionList.map { it.id }
+        assertThat(actionIds)
+            .containsAtLeast(
+                R.id.action_move_top_left,
+                R.id.action_move_top_right,
+                R.id.action_move_bottom_left,
+                R.id.action_move_bottom_right,
+                AccessibilityNodeInfo.AccessibilityAction.ACTION_DISMISS.id,
+                AccessibilityNodeInfo.AccessibilityAction.ACTION_EXPAND.id,
+            )
+        assertThat(actionIds)
+            .doesNotContain(AccessibilityNodeInfo.AccessibilityAction.ACTION_COLLAPSE.id)
+    }
+
+    @Test
+    fun verifyAccessibilityActions_expandedStack_selectedBubble() {
+        val bubble = createAndInflateBubble()
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            bubbleStackView.addBubble(bubble)
+            bubbleStackView.setSelectedBubble(bubble)
+            bubbleData.isExpanded = true
+            bubbleStackView.isExpanded = true
+            bubbleStackView.updateBubblesAccessibilityStates()
+        }
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+
+        val info = AccessibilityNodeInfo()
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            bubble.iconView!!.onInitializeAccessibilityNodeInfo(info)
+        }
+
+        val actionIds = info.actionList.map { it.id }
+        assertThat(actionIds)
+            .containsAtLeast(
+                AccessibilityNodeInfo.AccessibilityAction.ACTION_COLLAPSE.id,
+                AccessibilityNodeInfo.AccessibilityAction.ACTION_DISMISS.id,
+            )
+        assertThat(actionIds)
+            .doesNotContain(AccessibilityNodeInfo.AccessibilityAction.ACTION_EXPAND.id)
+    }
+
+    @Test
+    fun verifyAccessibilityActions_expandedStack_unselectedBubble() {
+        val bubble1 = createAndInflateChatBubble("key1")
+        val bubble2 = createAndInflateChatBubble("key2")
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            bubbleStackView.addBubble(bubble1)
+            bubbleStackView.addBubble(bubble2)
+            bubbleStackView.setSelectedBubble(bubble1)
+            bubbleData.isExpanded = true
+            bubbleStackView.isExpanded = true
+            bubbleStackView.updateBubblesAccessibilityStates()
+        }
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+
+        // bubble2 is unselected
+        val info = AccessibilityNodeInfo()
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            bubble2.iconView!!.onInitializeAccessibilityNodeInfo(info)
+        }
+
+        val actionIds = info.actionList.map { it.id }
+        assertThat(actionIds)
+            .containsAtLeast(
+                AccessibilityNodeInfo.AccessibilityAction.ACTION_EXPAND.id,
+                AccessibilityNodeInfo.AccessibilityAction.ACTION_DISMISS.id,
+            )
+        assertThat(actionIds)
+            .doesNotContain(AccessibilityNodeInfo.AccessibilityAction.ACTION_COLLAPSE.id)
+    }
+
+    @Test
+    fun verifyAccessibilityActions_expandedStack_selectedOverflow() {
+        val bubble = createAndInflateBubble()
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            bubbleStackView.addBubble(bubble)
+            bubbleStackView.showOverflow(true)
+            bubbleStackView.setSelectedBubble(bubbleData.overflow)
+            bubbleData.isExpanded = true
+            bubbleStackView.isExpanded = true
+            bubbleStackView.updateBubblesAccessibilityStates()
+        }
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+
+        val info = AccessibilityNodeInfo()
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            bubbleData.overflow.iconView!!.onInitializeAccessibilityNodeInfo(info)
+        }
+
+        val actionIds = info.actionList.map { it.id }
+        assertThat(actionIds).contains(AccessibilityNodeInfo.AccessibilityAction.ACTION_COLLAPSE.id)
+        assertThat(actionIds)
+            .doesNotContain(AccessibilityNodeInfo.AccessibilityAction.ACTION_EXPAND.id)
+        assertThat(actionIds)
+            .doesNotContain(AccessibilityNodeInfo.AccessibilityAction.ACTION_DISMISS.id)
+    }
+
+    @Test
+    fun verifyAccessibilityActions_expandedStack_unselectedOverflow() {
+        val bubble = createAndInflateBubble()
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            bubbleStackView.addBubble(bubble)
+            bubbleStackView.showOverflow(true)
+            bubbleStackView.setSelectedBubble(bubble)
+            bubbleData.isExpanded = true
+            bubbleStackView.isExpanded = true
+            bubbleStackView.updateBubblesAccessibilityStates()
+        }
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+
+        val info = AccessibilityNodeInfo()
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            bubbleData.overflow.iconView!!.onInitializeAccessibilityNodeInfo(info)
+        }
+
+        val actionIds = info.actionList.map { it.id }
+        assertThat(actionIds).contains(AccessibilityNodeInfo.AccessibilityAction.ACTION_EXPAND.id)
+        assertThat(actionIds)
+            .doesNotContain(AccessibilityNodeInfo.AccessibilityAction.ACTION_COLLAPSE.id)
+        assertThat(actionIds)
+            .doesNotContain(AccessibilityNodeInfo.AccessibilityAction.ACTION_DISMISS.id)
+    }
+
+    @Test
+    fun performAccessibilityAction_expand_whenCollapsed_expandStack() {
+        val bubble = createAndInflateBubble()
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            bubbleStackView.addBubble(bubble)
+            bubbleStackView.updateBubblesAccessibilityStates()
+        }
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+
+        assertThat(bubbleData.isExpanded).isFalse()
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            bubbleStackView.performAccessibilityAction(AccessibilityNodeInfo.ACTION_EXPAND, null)
+        }
+        assertThat(bubbleData.isExpanded).isTrue()
+    }
+
+    @Test
+    fun performAccessibilityAction_dismiss_whenCollapsed_dismissStack() {
+        val bubble = createAndInflateBubble()
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            bubbleStackView.addBubble(bubble)
+            bubbleStackView.updateBubblesAccessibilityStates()
+        }
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+
+        assertThat(bubbleData.hasBubbles()).isTrue()
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            bubbleStackView.performAccessibilityAction(AccessibilityNodeInfo.ACTION_DISMISS, null)
+        }
+        assertThat(bubbleData.hasBubbles()).isFalse()
+    }
+
+    @Test
+    fun performAccessibilityAction_collapseBubble_whenExpanded_collapseStack() {
+        val bubble = createAndInflateBubble()
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            bubbleStackView.addBubble(bubble)
+            bubbleStackView.setSelectedBubble(bubble)
+            bubbleData.isExpanded = true
+            bubbleStackView.snapToExpanded()
+            bubbleStackView.updateBubblesAccessibilityStates()
+        }
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+
+        assertThat(bubbleData.isExpanded).isTrue()
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            bubble.iconView!!.performAccessibilityAction(
+                AccessibilityNodeInfo.ACTION_COLLAPSE,
+                null,
+            )
+        }
+        assertThat(bubbleData.isExpanded).isFalse()
+    }
+
+    @Test
+    fun performAccessibilityAction_expandBubble_onUnselectedBubble_selectsBubble() {
+        val bubble1 = createAndInflateChatBubble("key1")
+        val bubble2 = createAndInflateChatBubble("key2")
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            bubbleStackView.addBubble(bubble1)
+            bubbleStackView.addBubble(bubble2)
+            bubbleStackView.setSelectedBubble(bubble2)
+            bubbleData.isExpanded = true
+            bubbleStackView.snapToExpanded()
+            bubbleStackView.updateBubblesAccessibilityStates()
+        }
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+
+        assertThat(bubbleData.selectedBubble).isEqualTo(bubble2)
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            // bubble1 is unselected, "expand" action selects it.
+            bubble1.iconView!!.performAccessibilityAction(AccessibilityNodeInfo.ACTION_EXPAND, null)
+        }
+        assertThat(bubbleData.selectedBubble).isEqualTo(bubble1)
+    }
+
+    @Test
+    fun performAccessibilityAction_dismissBubble_dismissesOneBubble() {
+        val bubble1 = createAndInflateChatBubble("key1")
+        val bubble2 = createAndInflateChatBubble("key2")
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            bubbleStackView.addBubble(bubble1)
+            bubbleStackView.addBubble(bubble2)
+            bubbleStackView.setSelectedBubble(bubble2)
+            bubbleData.isExpanded = true
+            bubbleStackView.snapToExpanded()
+            bubbleStackView.updateBubblesAccessibilityStates()
+        }
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync()
+
+        assertThat(bubbleData.hasBubbleInStackWithKey("key1")).isTrue()
+        assertThat(bubbleData.hasBubbleInStackWithKey("key2")).isTrue()
+        assertThat(bubbleStackView.isExpanded).isTrue()
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            bubble1.iconView!!.performAccessibilityAction(
+                AccessibilityNodeInfo.ACTION_DISMISS,
+                null,
+            )
+        }
+        assertThat(bubbleData.hasBubbleInStackWithKey("key1")).isFalse()
+        assertThat(bubbleData.hasBubbleInStackWithKey("key2")).isTrue()
+        assertThat(bubbleData.isExpanded).isTrue()
+    }
+
     private fun createAndInflateChatBubble(key: String): Bubble {
         val icon = Icon.createWithResource(context.resources, R.drawable.bubble_ic_overflow_button)
         val shortcutInfo = ShortcutInfo.Builder(context, "fakeId").setIcon(icon).build()
@@ -1637,8 +1955,6 @@ class BubbleStackViewTest {
         }
 
         override fun isGestureNavigationMode() = false
-
-        override fun applyBubbleExpandTransactionIfNeeded(bubble: Bubble) = false
     }
 
     private class FakeBubbleExpandListener : BubbleExpandListener {

@@ -33,6 +33,7 @@ import android.os.Bundle;
 import android.os.CancellationSignal;
 import android.os.IBinder;
 import android.os.ICancellationSignal;
+import android.os.OutcomeReceiver;
 import android.os.ParcelFileDescriptor;
 import android.os.RemoteException;
 import android.util.Log;
@@ -54,8 +55,8 @@ import java.util.function.Consumer;
  * The ContentSafetyManager provides access to content safety features.
  *
  * <p>It allows granted apps to manage content safety service configured on the device. Typical
- * calling pattern will be to {@link #checkContent} and {@link #isFeatureEnabled} checkFile against
- * sensitive content warnings.
+ * calling pattern will be to {@link #checkContentRequest} and {@link #isFeatureEnabledRequest}
+ * checkFile against sensitive content warnings.
  *
  * @hide
  */
@@ -63,7 +64,7 @@ import java.util.function.Consumer;
 @SystemService(Context.CONTENT_SAFETY_SERVICE)
 @FlaggedApi(FLAG_ENABLE_CONTENTSAFETY)
 public final class ContentSafetyManager {
-    public static final String TAG = "ContentSafety";
+    private static final String TAG = "ContentSafety";
     private final IContentSafetyManager mService;
     private final Context mContext;
 
@@ -144,71 +145,66 @@ public final class ContentSafetyManager {
     public static final int CONTENT_SAFETY_UNKNOWN = 0;
     /**
      * Indicates that the content check was successful and no sensitive content was detected.
-     * @hide
      */
     public static final int CONTENT_SAFETY_SUCCESS_NONE = 1;
     /**
      * Indicates that the content check was successful and sensitive content was detected.
-     * @hide
      */
     public static final int CONTENT_SAFETY_SUCCESS_SENSITIVE = 2;
     /**
      * Indicates that SANDBOXED service failed due to unspecified internal error.
-     * @hide
      */
     public static final int CONTENT_SAFETY_SANDBOXED_SERVICE_ERROR_UNKNOWN = 3;
     /**
      * Indicates that sandboxed service is not available and fail to connect.
-     * @hide
      */
     public static final int CONTENT_SAFETY_SANDBOXED_SERVICE_ERROR_NOT_AVAILABLE = 4;
     /**
      * Indicates that getFeature remote call is returning failure error code due to internal error.
-     * @hide
      */
     public static final int CONTENT_SAFETY_GET_FEATURE_ERROR = 5;
     /**
      * Indicates that loadFeature remote call is returning failure error code due to internal error.
-     * @hide
      */
     public static final int CONTENT_SAFETY_LOAD_FEATURE_ERROR = 6;
     /**
      * Indicates that downloaded feature from remote service is not opened with read-only mode.
-     * @hide
      */
     public static final int CONTENT_SAFETY_FEATURE_NOT_READ_ONLY_ERROR = 7;
     /**
      * Indicates that the input file descriptors provided by the client is not opened with
      * read-only mode.
-     * @hide
      */
     public static final int CONTENT_SAFETY_PAYLOAD_NOT_READ_ONLY_ERROR = 8;
     /**
      * Indicates that the remote content safety service received a cancelled signal.
-     * @hide
      */
     public static final int CONTENT_SAFETY_CHECK_CONTENT_CANCELLED = 9;
     /**
      * Indicates that checkContent remote call failed due to internal error and return
      * an error code.
-     * @hide
      */
     public static final int CONTENT_SAFETY_CHECK_CONTENT_ERROR = 10;
     /**
      * Indicates that trying to invoke the remote call checkContent failed.
-     * @hide
      */
     public static final int CONTENT_SAFETY_CHECK_CONTENT_INVOKE_ERROR = 11;
     /**
      * Indicates that trying to invoke the remote call getFeature failed.
-     * @hide
      */
     public static final int CONTENT_SAFETY_GET_FEATURE_INVOKE_ERROR = 12;
     /**
      * Indicates that to invoke the remote call loadFeature failed.
-     * @hide
      */
     public static final int CONTENT_SAFETY_LOAD_FEATURE_INVOKE_ERROR = 13;
+    /**
+     * Indicates that the remote call getFeature failed due to internal error.
+     */
+    public static final int CONTENT_SAFETY_GET_FEATURE_INTERNAL_ERROR = 14;
+    /**
+     * Indicates that the remote call loadFeature failed due to internal error.
+     */
+    public static final int CONTENT_SAFETY_LOAD_FEATURE_INTERNAL_ERROR = 15;
     /**
      * @hide
      */
@@ -230,6 +226,8 @@ public final class ContentSafetyManager {
                     CONTENT_SAFETY_CHECK_CONTENT_INVOKE_ERROR,
                     CONTENT_SAFETY_GET_FEATURE_INVOKE_ERROR,
                     CONTENT_SAFETY_LOAD_FEATURE_INVOKE_ERROR,
+                    CONTENT_SAFETY_GET_FEATURE_INTERNAL_ERROR,
+                    CONTENT_SAFETY_LOAD_FEATURE_INTERNAL_ERROR
             })
     public @interface CheckContentStatus{ }
 
@@ -258,7 +256,7 @@ public final class ContentSafetyManager {
      *     check content.
      */
     @RequiresPermission(Manifest.permission.CHECK_CONTENT_SAFETY)
-    public void checkContent(
+    public void requestCheckContent(
             @FeatureType int featureType,
             @NonNull @CheckContentParams Map<Integer, List<ParcelFileDescriptor>> input,
             @Nullable CancellationSignal cancellationSignal,
@@ -279,7 +277,7 @@ public final class ContentSafetyManager {
                                     }));
                 }};
 
-            mService.checkContent(
+            mService.requestCheckContent(
                     featureType,
                     packMapIntoBundle(input),
                     configureRemoteCancellationFuture(cancellationSignal, callbackExecutor),
@@ -344,52 +342,37 @@ public final class ContentSafetyManager {
      * @param featureType The safety {@link FeatureType} to check.
      * @param cancellationSignal signal to invoke cancellation or
      * @param callbackExecutor executor to run the callback on.
-     * @param isFeatureEnabledCallback to populate either feature is enabled or failure
+     * @param isFeatureEnabledOutcomeReceiver to populate either feature is enabled or failure
      *     status code .
      */
     @RequiresPermission(Manifest.permission.CHECK_CONTENT_SAFETY)
-    public void isFeatureEnabled(
+    public void requestIsFeatureEnabled(
             @FeatureType int featureType,
             @Nullable CancellationSignal cancellationSignal,
             @NonNull @CallbackExecutor Executor callbackExecutor,
-            @NonNull IsFeatureEnabledCallback
-                    isFeatureEnabledCallback) {
+            @NonNull OutcomeReceiver<Boolean, FeatureException>
+                    isFeatureEnabledOutcomeReceiver) {
         try {
             IIsFeatureEnabledCallback callback = new IIsFeatureEnabledCallback.Stub() {
                 @Override
                 public void onSuccess(boolean isFeatureEnabledResult) {
                     Binder.withCleanCallingIdentity(() -> callbackExecutor.execute(
-                            () -> isFeatureEnabledCallback.onSuccess(isFeatureEnabledResult)));
+                            () -> isFeatureEnabledOutcomeReceiver
+                                    .onResult(isFeatureEnabledResult)));
                 }
 
                 @Override
-                public void onFailure(int failureStatus) {
+                public void onFailure(int errorCode) {
                     Binder.withCleanCallingIdentity(() -> callbackExecutor.execute(
-                            () -> isFeatureEnabledCallback.onFailure(failureStatus)));
+                            () -> isFeatureEnabledOutcomeReceiver
+                                    .onError(new FeatureException(errorCode))));
                 }
             };
 
-            mService.isFeatureEnabled(
+            mService.requestIsFeatureEnabled(
                     featureType,
                     configureRemoteCancellationFuture(cancellationSignal, callbackExecutor),
                     callback);
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
-    }
-
-    /**
-     * Synchronous call to get the supported input types that can be provided to the
-     * API {@link ContentSafetyManager#checkContent}.
-     *
-     * @param featureType returning a list of the supported file types for the provided feature
-     *                   type
-     */
-    @RequiresPermission(Manifest.permission.CHECK_CONTENT_SAFETY)
-    public @NonNull SupportedTypesResult getSupportedInputTypes(@FeatureType int featureType) {
-
-        try {
-            return mService.getSupportedInputTypes(featureType);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }

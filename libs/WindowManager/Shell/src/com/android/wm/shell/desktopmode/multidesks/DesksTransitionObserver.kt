@@ -29,7 +29,6 @@ import android.window.TransitionInfo.FLAG_MOVED_TO_TOP
 import android.window.WindowContainerTransaction
 import com.android.app.tracing.traceSection
 import com.android.internal.protolog.ProtoLog
-import com.android.window.flags.Flags
 import com.android.wm.shell.common.DisplayController
 import com.android.wm.shell.desktopmode.DesktopModeEventLogger
 import com.android.wm.shell.desktopmode.DesktopModeEventLogger.Companion.EnterReason
@@ -387,13 +386,11 @@ class DesksTransitionObserver(
                                 when {
                                     // (1) When keyguard is appearing, so that we return to the
                                     // active desk when it unlocks.
-                                    Flags.keepDeskActiveOnKeyguardAppear() &&
-                                        isKeyguardAppearing(info) -> false
+                                    isKeyguardAppearing(info) -> false
                                     // (2) When a task is going full-immersive, this task is
                                     // considered "in" the desk, it just happens to occlude/stop
                                     // everything behind it.
-                                    Flags.makeFillingBoundsChangeEffectLifecycle() &&
-                                        hasFullImmersiveTask -> false
+                                    hasFullImmersiveTask -> false
                                     // Otherwise deactivate.
                                     else -> true
                                 }
@@ -409,8 +406,7 @@ class DesksTransitionObserver(
                                     // Disable if keyguard is appearing, the desk remains active so
                                     // that we can return to it, but we also don't want things
                                     // to launch in it while the keyguard is showing.
-                                    Flags.keepDeskActiveOnKeyguardAppear() &&
-                                        isKeyguardAppearing(info) -> true
+                                    isKeyguardAppearing(info) -> true
                                     else -> false
                                 }
 
@@ -673,10 +669,14 @@ class DesksTransitionObserver(
             token != null && c.container == token
         }
 
+    // TODO(b/478792808): Remove suppression
+    @SuppressWarnings("ProtoLogNonConstantFormat")
     private fun logD(msg: String, vararg arguments: Any?) {
         ProtoLog.d(WM_SHELL_DESKTOP_MODE, "%s: $msg", TAG, *arguments)
     }
 
+    // TODO(b/478792808): Remove suppression
+    @SuppressWarnings("ProtoLogNonConstantFormat")
     private fun logW(msg: String, vararg arguments: Any?) {
         ProtoLog.w(WM_SHELL_DESKTOP_MODE, "%s: $msg", TAG, *arguments)
     }

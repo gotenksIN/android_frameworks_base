@@ -16,6 +16,7 @@
 
 package com.android.server.contentrestriction;
 
+import static android.Manifest.permission.BYPASS_ROLE_QUALIFICATION;
 import static android.Manifest.permission.INTERACT_ACROSS_USERS;
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
 
@@ -46,6 +47,8 @@ import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.util.FunctionalUtils.RemoteExceptionIgnoringConsumer;
 import com.android.server.LocalServices;
 import com.android.internal.os.BackgroundThread;
+import com.android.internal.util.DumpUtils;
+import com.android.internal.util.IndentingPrintWriter;
 import com.android.server.LocalServices;
 import com.android.server.SystemService;
 import com.android.server.appbinding.AppBindingService;
@@ -55,6 +58,8 @@ import com.android.server.contentrestriction.ContentRestrictionSettings;
 import com.android.server.contentrestriction.ContentRestrictionUserData;
 import com.android.server.pm.UserManagerInternal;
 
+import java.io.FileDescriptor;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -65,8 +70,6 @@ import java.util.function.Consumer;
 
 /**
  * System service for handling content restrictions.
- *
- * @hide
  */
 public class ContentRestrictionService extends IContentRestrictionManager.Stub {
 
@@ -78,6 +81,8 @@ public class ContentRestrictionService extends IContentRestrictionManager.Stub {
     private final UserManagerInternal mUserManagerInternal;
     private final RoleObserver mRoleObserver;
     private final ContentRestrictionSettings mContentRestrictionSettings;
+
+    private boolean mAllowContentRestrictionDevicePolicyBypassing;
 
     final ContentRestrictionManagerInternal mInternal = new ContentRestrictionManagerInternalImpl();
 
@@ -104,6 +109,8 @@ public class ContentRestrictionService extends IContentRestrictionManager.Stub {
         mRoleObserver = new RoleObserver();
         mRoleObserver.register();
         mContentRestrictionSettings = new ContentRestrictionSettings();
+        mAllowContentRestrictionDevicePolicyBypassing = mContext.getResources().getBoolean(
+                com.android.internal.R.bool.config_allowContentRestrictionDevicePolicyBypassing);
     }
 
     @Override
@@ -142,7 +149,7 @@ public class ContentRestrictionService extends IContentRestrictionManager.Stub {
                 }
             };
 
-            dispatchContentRestricitionAppServiceEvent(userId, service -> {
+            dispatchContentRestrictionAppServiceEvent(userId, service -> {
                 if (service != null) {
                     service.onClassifyContent(content, systemCallback);
                 } else {
@@ -151,6 +158,27 @@ public class ContentRestrictionService extends IContentRestrictionManager.Stub {
                 }
             });
         });
+    }
+
+    @Override
+    @PermissionManuallyEnforced
+    public boolean isDevicePolicyBypassingEnabledForUser(@UserIdInt int userId) {
+        if (UserHandle.getUserId(Binder.getCallingUid()) != userId) {
+            enforcePermission(INTERACT_ACROSS_USERS);
+        }
+
+        return mAllowContentRestrictionDevicePolicyBypassing;
+    }
+
+    @Override
+    @PermissionManuallyEnforced
+    public void setDevicePolicyBypassingEnabledForUser(@UserIdInt int userId, boolean enabled) {
+        if (UserHandle.getUserId(Binder.getCallingUid()) != userId) {
+            enforcePermission(INTERACT_ACROSS_USERS);
+        }
+
+        enforcePermission(BYPASS_ROLE_QUALIFICATION);
+        mAllowContentRestrictionDevicePolicyBypassing = enabled;
     }
 
     private void dispatchIsContentAllowedCallback(IContentRestrictionCallback callback,
@@ -167,7 +195,7 @@ public class ContentRestrictionService extends IContentRestrictionManager.Stub {
         });
     }
 
-    private void dispatchContentRestricitionAppServiceEvent(
+    private void dispatchContentRestrictionAppServiceEvent(
             @UserIdInt int userId,
             @NonNull RemoteExceptionIgnoringConsumer<IContentRestrictionAppService> action) {
         mAppBindingService.dispatchAppServiceEvent(
@@ -178,14 +206,6 @@ public class ContentRestrictionService extends IContentRestrictionManager.Stub {
                         (IContentRestrictionAppService) connection.getServiceBinder();
                 action.accept(binder);
             });
-    }
-
-    private void setContentRestrictionEnabledInternal(@UserIdInt int userId, boolean enabled) {
-        synchronized (mLock) {
-            ContentRestrictionUserData data = mContentRestrictionSettings.getUserData(userId);
-            data.contentRestrictionEnabled = enabled;
-            mContentRestrictionSettings.saveUserData();
-        }
     }
 
     private void setContentRestrictionPackagesInternal(
@@ -199,6 +219,7 @@ public class ContentRestrictionService extends IContentRestrictionManager.Stub {
             } else {
                 data.contentRestrictionPackages.put(systemEntity, new ArrayList<>(packageNames));
             }
+            data.contentRestrictionEnabled = !data.contentRestrictionPackages.isEmpty();
             mContentRestrictionSettings.saveUserData();
         }
         updateContentRestrictionRoleHolders(userId);
@@ -287,11 +308,6 @@ public class ContentRestrictionService extends IContentRestrictionManager.Stub {
         }
 
         @Override
-        public void setContentRestrictionEnabledForUser(@UserIdInt int userId, boolean enabled) {
-            ContentRestrictionService.this.setContentRestrictionEnabledInternal(userId, enabled);
-        }
-
-        @Override
         public void setContentRestrictionPackages(
                 @UserIdInt int userId,
                 @Nullable List<String> packageNames,
@@ -324,6 +340,24 @@ public class ContentRestrictionService extends IContentRestrictionManager.Stub {
             synchronized (mLock) {
                 mContentRestrictionSettings.removeUserData(user.id);
             }
+        }
+    }
+
+    @Override
+    @PermissionManuallyEnforced
+    protected void dump(
+        @NonNull FileDescriptor fd, @NonNull PrintWriter printWriter, @Nullable String[] args) {
+        if (!DumpUtils.checkDumpPermission(mContext, TAG, printWriter)) {
+            return;
+        }
+
+        try (var pw = new IndentingPrintWriter(printWriter, "  ")) {
+            pw.println("ContentRestricitionService state:");
+            pw.increaseIndent();
+
+            pw.println("allowContentRestrictionDevicePolicyBypassing: "
+                    + mAllowContentRestrictionDevicePolicyBypassing);
+            pw.println();
         }
     }
 }

@@ -21,8 +21,14 @@ import static android.view.WindowManager.TRANSIT_CHANGE;
 import static android.view.WindowManager.TRANSIT_CLOSE;
 import static android.view.WindowManager.TRANSIT_FLAG_DISPLAY_LEVEL_TRANSITION;
 import static android.view.WindowManager.TRANSIT_NONE;
+import static android.view.WindowManager.TRANSIT_OPEN;
+import static android.view.WindowManager.TRANSIT_TO_BACK;
+import static android.view.WindowManager.TRANSIT_TO_FRONT;
 import static android.window.DesktopExperienceFlags.ENABLE_PARALLEL_CD_TRANSITIONS_DURING_RECENTS;
+import static android.window.TransitionInfo.FLAGS_IS_NON_APP_WINDOW;
+import static android.window.TransitionInfo.FLAG_IS_WALLPAPER;
 
+import static com.android.graphics.surfaceflinger.flags.Flags.setClientDrawnCornerRadii;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS_MIN;
 import static com.android.server.wm.ActivityTaskManagerService.POWER_MODE_REASON_CHANGE_DISPLAY;
 
@@ -66,6 +72,7 @@ import com.android.server.FgThread;
 import com.android.window.flags.Flags;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.function.Consumer;
 import java.util.function.LongConsumer;
 
@@ -170,10 +177,11 @@ class TransitionController {
     Transition mFinishingTransition;
 
     /**
-     * The windows that request to be invisible while it is in transition. After the transition
-     * is finished and the windows are no longer animating, their surfaces will be destroyed.
+     * List of tasks which were marked for disabling client-drawn rounded corners optimization
+     * in SurfaceFlinger. This is to prevent state-errors in clipping rounded corners when the
+     * corner radius is changing during a transition.
      */
-    final ArrayList<WindowState> mAnimatingExitWindows = new ArrayList<>();
+    final HashSet<Task> mRoundedCornerOptTasks = new HashSet<>();
 
     final Lock mRunningLock = new Lock();
 
@@ -297,6 +305,30 @@ class TransitionController {
         return mTransitionPlayers.isEmpty();
     }
 
+    void cleanupRoundedCornerDisableOptTasks() {
+        if (!setClientDrawnCornerRadii()) {
+            return;
+        }
+
+        for (Task task: mRoundedCornerOptTasks) {
+            if (task == null || isCollecting(task)
+                             || isParticipantOfPlayingTransition(task)) {
+                continue;
+            }
+
+            SurfaceControl sc = task.getSurfaceControl();
+            if (sc == null || !sc.isValid()) continue;
+
+            SurfaceControl.Transaction t = task.getSyncTransaction();
+            t.toggleClientDrawnRoundedCornersOpt(sc, /*enable = */ true);
+        }
+        mRoundedCornerOptTasks.clear();
+    }
+
+    void onRoundedCornerOptDisabled(Task task) {
+        mRoundedCornerOptTasks.add(task);
+    }
+
     private static void tryAbort(Transition transit, String stage) {
         // Need to be very defensive here. This often happens during "broken" periods of time
         // already (eg. sysui crashing) so there is chance that unrelated state is bad.
@@ -312,13 +344,12 @@ class TransitionController {
         // Temporarily clear so that nothing gets started/queued while flushing
         final ArrayList<TransitionPlayerRecord> temp = new ArrayList<>(mTransitionPlayers);
         mTransitionPlayers.clear();
-        final ArrayList<Transition> playing = new ArrayList<>(mPlayingTransitions);
-        mPlayingTransitions.clear();
         final ArrayList<Transition> waiting = new ArrayList<>(mWaitingTransitions);
         mWaitingTransitions.clear();
         final ArrayList<QueuedTransition> queued = new ArrayList<>(mQueuedTransitions);
         mQueuedTransitions.clear();
 
+        final ArrayList<Transition> playing = new ArrayList<>(mPlayingTransitions);
         // Clean-up/finish any playing transitions. Backwards since they can remove themselves.
         for (int i = playing.size() - 1; i >= 0; --i) {
             try {
@@ -327,6 +358,9 @@ class TransitionController {
                 Slog.wtf(TAG, "Exception during flush: cleanup playing transition #"
                         + playing.get(i).getSyncId(), e);
             }
+        }
+        if (!mPlayingTransitions.isEmpty()) {
+            Slog.e(TAG, "Unexpected playing transitions during flush: " + mPlayingTransitions);
         }
         // Clean up waiting transitions first since they technically started first.
         for (int i = waiting.size() - 1; i >= 0; --i) {
@@ -362,6 +396,8 @@ class TransitionController {
             // Restore the rest of the player stack
             mTransitionPlayers.addAll(temp);
         }
+
+        cleanupRoundedCornerDisableOptTasks();
     }
 
     /** @see #createTransition(int, int) */
@@ -460,6 +496,10 @@ class TransitionController {
     @Nullable ITransitionPlayer getTransitionPlayer() {
         if (!Flags.fallbackTransitionPlayer() && mTransitionPlayers.isEmpty()) return null;
         return mTransitionPlayers.getLast().mPlayer;
+    }
+
+    int getTransitionPlayerCount() {
+        return mTransitionPlayers.size();
     }
 
     boolean isShellTransitionsEnabled() {
@@ -945,7 +985,7 @@ class TransitionController {
             @Nullable TransitionRequestInfo.UserChange userChange,
             @Nullable TransitionRequestInfo.WindowingLayerChange windowingLayerChange,
             @Nullable TransitionRequestInfo.FullscreenRequestChange fullscreenRequestChange) {
-        if (mIsWaitingForDisplayEnabled) {
+        if (mIsWaitingForDisplayEnabled && !Flags.fallbackTransitionPlayer()) {
             ProtoLog.v(WmProtoLogGroups.WM_DEBUG_WINDOW_TRANSITIONS,
                     "Disabling player for transition #%d because display isn't enabled yet",
                     transition.getSyncId());
@@ -1178,21 +1218,13 @@ class TransitionController {
         }
         updateRunningRemoteAnimation(record, false /* isPlaying */);
         record.finishTransition(chain);
-        for (int i = mAnimatingExitWindows.size() - 1; i >= 0; i--) {
-            final WindowState w = mAnimatingExitWindows.get(i);
-            if (w.mAnimatingExit && w.mHasSurface && !w.inTransition()) {
-                w.onExitAnimationDone();
-            }
-            if (!w.mAnimatingExit || !w.mHasSurface) {
-                mAnimatingExitWindows.remove(i);
-            }
-        }
         mRunningLock.doNotifyLocked();
         // Run state-validation checks when no transitions are active anymore (Note: sometimes
         // finish can start a transition, so check afterwards -- eg. pip).
         if (!inTransition()) {
             validateStates();
             mAtm.mWindowManager.onAnimationFinished();
+            cleanupRoundedCornerDisableOptTasks();
         }
 
         // Make sure the surface visibility respects the hierarchy state (updateAnimatingState
@@ -1584,6 +1616,7 @@ class TransitionController {
                 mLatestOnTopTasksReported.clear();
             }
         }
+        cleanupRoundedCornerDisableOptTasks();
         // This is called during Transition.abort whose codepath will eventually check the queue
         // via sync-engine idle.
     }
@@ -2124,6 +2157,7 @@ class TransitionController {
                 throws RemoteException {
             ProtoLog.v(WM_DEBUG_WINDOW_TRANSITIONS_MIN, "Playing [FALLBACK] "
                     + "animation for #%d @%d", info.getDebugId(), info.getTrack());
+            setupStartState(info, t, finishT);
             t.apply();
             finishT.apply();
             mAtm.mH.post(() -> {
@@ -2132,7 +2166,7 @@ class TransitionController {
                             + "finished #%d @%d", info.getDebugId(), info.getTrack());
                     mAtm.getWindowOrganizerController().finishTransition(transitionToken,
                             null /* wct */);
-                } catch (RemoteException e) {
+                } catch (Exception e) {
                     Slog.e(TAG, "Error finishing transition from fallback", e);
                 }
             });
@@ -2141,14 +2175,26 @@ class TransitionController {
         @Override
         public void requestStartTransition(IBinder transitionToken, TransitionRequestInfo request)
                 throws RemoteException {
+            ProtoLog.v(WM_DEBUG_WINDOW_TRANSITIONS_MIN,
+                    "Transition requested [FALLBACK] (#%d): %s %s", request.getDebugId(),
+                    transitionToken, request);
+            // This is often wasted work; however, Fallback is only active during exceptional
+            // situations so debugging is more valuable than micro-optimization at this point.
+            final Throwable requestTrace = new Throwable();
             mAtm.mH.post(() -> {
                 try {
+                    final Transition transit = Transition.fromBinder(transitionToken);
+                    if (transit == null) {
+                        Slog.wtf(TAG, "Transition was lost (controller isn't tracking it). Stack "
+                                + "trace from original request:", requestTrace);
+                        return;
+                    }
                     ProtoLog.v(WM_DEBUG_WINDOW_TRANSITIONS_MIN,
-                            "Transition requested [FALLBACK] (#%d): %s %s", request.getDebugId(),
+                            "Starting transition [FALLBACK] (#%d): %s %s", request.getDebugId(),
                             transitionToken, request);
                     mAtm.getWindowOrganizerController().startTransition(transitionToken,
                             null /* wct */);
-                } catch (RemoteException e) {
+                } catch (Exception e) {
                     Slog.e(TAG, "Error starting transition from fallback", e);
                 }
             });
@@ -2157,6 +2203,28 @@ class TransitionController {
         @Override
         public void removeStartingWindow(StartingWindowRemovalInfo removalInfo)
                 throws RemoteException {
+        }
+
+        /**
+         * proxy of {@link com.android.wm.shell.transition.Transitions#setupStartState} but only
+         * concerned with visibility since it won't animate.
+         */
+        private static void setupStartState(@NonNull TransitionInfo info,
+                @NonNull SurfaceControl.Transaction t,
+                @NonNull SurfaceControl.Transaction finishT) {
+            for (int i = info.getChanges().size() - 1; i >= 0; --i) {
+                final TransitionInfo.Change change = info.getChanges().get(i);
+                if (change.hasFlags(FLAGS_IS_NON_APP_WINDOW & ~FLAG_IS_WALLPAPER)) continue;
+                final SurfaceControl leash = change.getLeash();
+                final int mode = info.getChanges().get(i).getMode();
+
+                if (mode == TRANSIT_OPEN || mode == TRANSIT_TO_FRONT || mode == TRANSIT_CHANGE) {
+                    t.show(leash);
+                    finishT.show(leash);
+                } else if (mode == TRANSIT_CLOSE || mode == TRANSIT_TO_BACK) {
+                    finishT.hide(leash);
+                }
+            }
         }
     }
 }

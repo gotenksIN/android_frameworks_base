@@ -71,12 +71,14 @@ import com.android.wm.shell.desktopmode.DesktopTasksController
 import com.android.wm.shell.desktopmode.DesktopTasksLimiter
 import com.android.wm.shell.desktopmode.DesktopUserRepositories
 import com.android.wm.shell.desktopmode.FakeShellDesktopState
+import com.android.wm.shell.desktopmode.SnapController
 import com.android.wm.shell.desktopmode.WindowDecorCaptionRepository
 import com.android.wm.shell.desktopmode.data.DesktopRepository
 import com.android.wm.shell.desktopmode.education.AppHandleEducationController
 import com.android.wm.shell.desktopmode.multidesks.DesksOrganizer
 import com.android.wm.shell.freeform.FreeformTaskTransitionStarter
 import com.android.wm.shell.pinnedlayer.phone.PinnedLayerController
+import com.android.wm.shell.pinnedlayer.phone.PinnedLayerUiState
 import com.android.wm.shell.recents.RecentsTransitionHandler
 import com.android.wm.shell.recents.RecentsTransitionStateListener
 import com.android.wm.shell.shared.desktopmode.FakeDesktopConfig
@@ -185,6 +187,10 @@ open class DesktopModeWindowDecorViewModelTestsBase : ShellTestCase() {
     private val mockUserProfileContexts = mock<UserProfileContexts>()
 
     protected val mockPinnedLayerController = mock<PinnedLayerController>()
+    protected val mockPinnedLayerUiState = mock<PinnedLayerUiState>()
+    protected val mockFluidTaskResizer = mock<FluidTaskResizer>()
+    protected val mockVeiledTaskResizer = mock<VeiledTaskResizer>()
+    protected val mockMultiDisplayTaskMover = mock<MultiDisplayTaskMover>()
 
     private val transactionFactory =
         Supplier<SurfaceControl.Transaction> { SurfaceControl.Transaction() }
@@ -200,6 +206,7 @@ open class DesktopModeWindowDecorViewModelTestsBase : ShellTestCase() {
     protected lateinit var desktopModeWindowDecorViewModel: DesktopModeWindowDecorViewModel
     protected lateinit var desktopModeCompatPolicy: DesktopModeCompatPolicy
     protected lateinit var captionVisibilityHelper: CaptionVisibilityHelper
+    protected lateinit var snapController: SnapController
 
     @Before
     fun earlySetUp() {
@@ -211,6 +218,7 @@ open class DesktopModeWindowDecorViewModelTestsBase : ShellTestCase() {
     fun setUpCommon() {
         spyContext = spy(mContext)
         spyContext.setMockPackageManager(packageManager)
+        snapController = SnapController()
         doNothing().`when`(spyContext).startActivity(any())
         doNothing().`when`(mockWindowDecoration).a11yAnnounceNewFocusedWindow()
         shellInit = ShellInit(testShellExecutor)
@@ -243,6 +251,7 @@ open class DesktopModeWindowDecorViewModelTestsBase : ShellTestCase() {
                 mock<MainCoroutineDispatcher>(),
                 mock<CoroutineScope>(),
                 mock<CoroutineScope>(),
+                mock<CoroutineScope>(),
                 bgExecutor,
                 shellInit,
                 mockShellCommandHandler,
@@ -269,7 +278,6 @@ open class DesktopModeWindowDecorViewModelTestsBase : ShellTestCase() {
                 mockRootTaskDisplayAreaOrganizer,
                 windowDecorByTaskIdSpy,
                 mockInteractionJankMonitor,
-                Optional.of(mockTasksLimiter),
                 mockAppHandleEducationController,
                 captionVisibilityHelper,
                 mockCaptionHandleRepository,
@@ -290,6 +298,11 @@ open class DesktopModeWindowDecorViewModelTestsBase : ShellTestCase() {
                 mockUserProfileContexts,
                 mockLockTaskChangeListener,
                 mockPinnedLayerController,
+                mockPinnedLayerUiState,
+                mockFluidTaskResizer,
+                mockVeiledTaskResizer,
+                mockMultiDisplayTaskMover,
+                snapController,
             )
         desktopModeWindowDecorViewModel.setSplitScreenController(mockSplitScreenController)
         desktopModeWindowDecorViewModel.setFreeformTaskTransitionStarter(
@@ -312,14 +325,19 @@ open class DesktopModeWindowDecorViewModelTestsBase : ShellTestCase() {
                     any(),
                     any(),
                     any(),
+                    any(),
+                    any(),
+                    any(),
                 )
             )
             .thenReturn(mockTaskPositioner)
 
         // InputChannel cannot be mocked because it passes to InputEventReceiver.
-        val inputChannels = InputChannel.openInputChannelPair(TAG)
-        inputChannels.first().dispose()
-        whenever(mockInputMonitor.inputChannel).thenReturn(inputChannels[1])
+        whenever(mockInputMonitor.inputChannel).thenAnswer {
+            val inputChannels = InputChannel.openInputChannelPair(TAG)
+            inputChannels.first().dispose()
+            inputChannels.last()
+        }
 
         shellInit.init()
 

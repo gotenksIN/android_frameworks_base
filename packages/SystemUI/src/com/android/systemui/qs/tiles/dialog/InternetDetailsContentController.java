@@ -42,8 +42,6 @@ import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.annotation.AnyThread;
 import android.content.BroadcastReceiver;
-// QTI_BEGIN: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
-// QTI_END: 2023-06-25: Telephony: Add an additional mobile data button support for dual data
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -140,10 +138,8 @@ import com.android.wifitrackerlib.WifiEntry;
 // QTI_BEGIN: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
 import com.qti.extphone.ExtTelephonyManager;
 // QTI_END: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
-// QTI_BEGIN: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
-// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
 import com.qti.extphone.RadioIconType;
-// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+// QTI_BEGIN: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
 import com.qti.extphone.ServiceCallback;
 
 // QTI_END: 2023-03-31: Telephony: Fix internet dialog behaviour during temp DDS switch
@@ -980,25 +976,15 @@ public class InternetDetailsContentController implements AccessPointController.A
 
     String getMobileNetworkSummary(int subId) {
         String networkTypeDescription = "";
-// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
         final FiveGServiceState fiveGState = getFiveGServiceState(subId);
         final int radioIconType = fiveGState.getRadioIconType();
-// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
-// QTI_BEGIN: 2025-03-27: Android_UI: SystemUI: Enhance Network Description
-// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
         if ((mCarrierNameCustomization.show5GAIcon() && radioIconType == RadioIconType.TYPE_5G_UWB)
                 || fiveGState.getRadioIconType() == RadioIconType.TYPE_LTE_NB_IOT) {
-// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
-// QTI_END: 2025-03-27: Android_UI: SystemUI: Enhance Network Description
-// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
             networkTypeDescription = mCarrierNameCustomization.getNetworkTypeDescription(subId);
-// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
-// QTI_BEGIN: 2025-03-27: Android_UI: SystemUI: Enhance Network Description
-// QTI_END: 2025-03-27: Android_UI: SystemUI: Enhance Network Description
 // QTI_BEGIN: 2024-05-28: Android_UI: SystemUI: Customize network type in InternetDialog
         }
-
 // QTI_END: 2024-05-28: Android_UI: SystemUI: Customize network type in InternetDialog
+
         if (TextUtils.isEmpty(networkTypeDescription)) {
             networkTypeDescription = getNetworkTypeDescription(mContext, mConfig, subId);
         }
@@ -1026,11 +1012,11 @@ public class InternetDetailsContentController implements AccessPointController.A
         String iconKey = null;
         if (isNsa(telephonyDisplayInfo)) {
             final FiveGServiceState fiveGState = getFiveGServiceState(subId);
-// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+// QTI_END: 2024-06-06: Android_UI: Add 5G override for internet dialog
             // RadioIconType includes NR and NB-IoT, so NB-IoT needs to be filtered out.
             if (!fiveGState.isRadioIconTypeValid()
                     || fiveGState.getRadioIconType() == RadioIconType.TYPE_LTE_NB_IOT) {
-// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+// QTI_BEGIN: 2024-06-06: Android_UI: Add 5G override for internet dialog
                 iconKey = toIconKey(telephonyDisplayInfo.getNetworkType());
             } else {
                 iconKey = getIconKey(telephonyDisplayInfo);

@@ -119,9 +119,9 @@ final class AppCompatCameraDisplayRotationPolicy implements AppCompatCameraState
     static boolean isPolicyEnabled(@NonNull DisplayContent displayContent) {
         return !(Flags.cameraCompatUnifyCameraPolicies()
                 && displayContent.mWmService.mAppCompatConfiguration
-                        .isCameraCompatSimulateRequestedOrientationTreatmentEnabled())
+                        .isCameraCompatSimReqOrientationTreatmentEnabled())
                 && displayContent.mWmService.mAppCompatConfiguration
-                        .isCameraCompatForceRotateTreatmentEnabledAtBuildTime();
+                        .isCameraCompatForceRotateTreatmentEnabled();
     }
 
     /**
@@ -307,10 +307,6 @@ final class AppCompatCameraDisplayRotationPolicy implements AppCompatCameraState
      */
     boolean isTreatmentEnabledForActivity(@Nullable ActivityRecord activity) {
         return isTreatmentEnabledForActivity(activity, /* mustBeFullscreen */ true);
-    }
-
-    boolean shouldCameraCompatControlOrientation(@NonNull ActivityRecord activity) {
-        return isCameraRunningAndWindowingModeEligible(activity, /* mustBeFullscreen= */ true);
     }
 
     boolean shouldCameraCompatControlAspectRatio(@NonNull ActivityRecord unusedActivity) {

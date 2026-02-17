@@ -283,7 +283,7 @@
     <string name="global_action_power_options" msgid="1185286119330160073">"Vypnúť"</string>
     <string name="global_action_restart" msgid="4678451019561687074">"Reštartovať"</string>
     <string name="global_action_emergency" msgid="1387617624177105088">"Tieseň"</string>
-    <string name="global_action_bug_report" msgid="5127867163044170003">"Hlásenie o chybách"</string>
+    <string name="global_action_bug_report" msgid="5127867163044170003">"Hlásenie o chybách"</string>
     <string name="global_action_feedback" msgid="3480836834202300036">"Spätná väzba"</string>
     <string name="global_action_logout" msgid="6093581310002476511">"Ukončiť reláciu"</string>
     <string name="global_action_screenshot" msgid="2610053466156478564">"Snímka obrazovky"</string>
@@ -295,7 +295,7 @@
     <string name="bugreport_option_full_title" msgid="7681035745950045690">"Úplné nahlásenie"</string>
     <string name="bugreport_option_full_summary" msgid="1975130009258435885">"Táto možnosť slúži na minimalizáciu zásahov do systému, keď zariadenie neodpovedá, je príliš pomalé alebo potrebujete zahrnúť všetky sekcie hlásenia. Neumožňuje zadať ďalšie podrobnosti ani vytvoriť dodatočné snímky obrazovky."</string>
     <string name="bugreport_countdown" msgid="6418620521782120755">"{count,plural, =1{Snímka obrazovky pre hlásenie chyby sa vytvorí o # sekundu.}few{Snímka obrazovky pre hlásenie chyby sa vytvorí o # sekundy.}many{Snímka obrazovky pre hlásenie chyby sa vytvorí o # sekundy.}other{Snímka obrazovky pre hlásenie chyby sa vytvorí o # sekúnd.}}"</string>
-    <string name="bugreport_screenshot_success_toast" msgid="7986095104151473745">"Bola vytvorená snímka obrazovky s hlásením chyby"</string>
+    <string name="bugreport_screenshot_success_toast" msgid="7986095104151473745">"Hlásenie chyby so snímkou obrazovky "</string>
     <string name="bugreport_screenshot_failure_toast" msgid="6736320861311294294">"Nepodarilo sa vytvoriť snímku obrazovky s hlásením chyby"</string>
     <string name="global_action_toggle_silent_mode" msgid="8464352592860372188">"Tichý režim"</string>
     <string name="global_action_silent_mode_on_status" msgid="2371892537738632013">"Zvuk je VYPNUTÝ."</string>
@@ -381,7 +381,7 @@
     <string name="permgrouplab_xr_tracking_sensitive" msgid="6574264227123545314">"Presné údaje o pohybe a okolí"</string>
     <string name="permgroupdesc_xr_tracking_sensitive" msgid="2480835734248509848">"presná kontrola okolia a sledovanie hlavy"</string>
     <string name="capability_title_canRetrieveWindowContent" msgid="7554282892101587296">"Načítať obsah okna"</string>
-    <string name="capability_desc_canRetrieveWindowContent" msgid="6195610527625237661">"Môžete preskúmať obsah okna, s ktorým pracujete."</string>
+    <string name="capability_desc_canRetrieveWindowContent" msgid="6195610527625237661">"Preskúmajte obsah okna, s ktorým pracujete."</string>
     <string name="capability_title_canRequestTouchExploration" msgid="327598364696316213">"Zapnúť funkciu Preskúmanie dotykom"</string>
     <string name="capability_desc_canRequestTouchExploration" msgid="4394677060796752976">"Po klepnutí na položku sa vysloví jej názov a obrazovku je možné preskúmať pomocou gest."</string>
     <string name="capability_title_canRequestFilterKeyEvents" msgid="2772371671541753254">"Sledovať zadávaný text"</string>
@@ -1125,6 +1125,7 @@
     <string name="lockscreen_access_pattern_cell_added_verbose" msgid="2931364927622563465">"Bola pridaná bunka <xliff:g id="CELL_INDEX">%1$s</xliff:g>"</string>
     <string name="lockscreen_access_pattern_detected" msgid="3931150554035194012">"Bezpečnostný vzor bol dokončený"</string>
     <string name="lockscreen_access_pattern_area" msgid="1288780416685002841">"Oblasť na zadanie bezpečnostného vzoru."</string>
+    <string name="lockscreen_access_pattern_cell_verbose" msgid="6670905066468035137">"Bunka <xliff:g id="CELL_INDEX">%1$s</xliff:g>"</string>
     <string name="keyguard_accessibility_widget_changed" msgid="7298011259508200234">"%1$s. Miniaplikácia %2$d z %3$d."</string>
     <string name="keyguard_accessibility_add_widget" msgid="8245795023551343672">"Pridať miniaplikáciu."</string>
     <string name="keyguard_accessibility_widget_empty_slot" msgid="544239307077644480">"Prázdne"</string>
@@ -2008,6 +2009,7 @@
     <string name="managed_profile_label_badge_3" msgid="6882151970556391957">"3. <xliff:g id="LABEL">%1$s</xliff:g> do práce"</string>
     <string name="clone_profile_label_badge" msgid="1871997694718793964">"Klonovať <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="private_profile_label_badge" msgid="1712086003787839183">"Súkromná aplikácia <xliff:g id="LABEL">%1$s</xliff:g>"</string>
+    <string name="hsu_label_badge" msgid="1357272000281944932">"Systém <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="lock_to_app_unlock_pin" msgid="3890940811866290782">"Pred odopnutím požiadať o číslo PIN"</string>
     <string name="lock_to_app_unlock_pattern" msgid="2694204070499712503">"Pred uvoľnením požiadať o bezpečnostný vzor"</string>
     <string name="lock_to_app_unlock_password" msgid="9126722403506560473">"Pred odopnutím požiadať o heslo"</string>
@@ -2113,7 +2115,32 @@
     <string name="app_suspended_default_message" msgid="6451215678552004172">"Aplikácia <xliff:g id="APP_NAME_0">%1$s</xliff:g> nie je momentálne k dispozícii. Spravuje to aplikácia <xliff:g id="APP_NAME_1">%2$s</xliff:g>."</string>
     <string name="app_suspended_more_details" msgid="211260942831587014">"Ďalšie informácie"</string>
     <string name="app_suspended_unsuspend_message" msgid="1665438589450555459">"Zrušiť pozastavenie aplikácie"</string>
+    <string name="app_lock_add_screen_lock_button_text" msgid="9209013414563206600">"Pridať zámku obrazovky"</string>
+    <string name="app_lock_add_screen_lock_message" msgid="6107009360675769892">"Zámka obrazovky môže byť PIN, vzor alebo heslo. Pomocou neho budete odomykať zariadenie a získavať prístup k uzamknutým aplikáciám."</string>
+    <string name="app_lock_add_screen_lock_title" msgid="6905612843620128689">"Najprv pridajte zámku obrazovky"</string>
+    <string name="enable_app_lock_success_toast_message" msgid="3339622779190529987">"Aplikácia <xliff:g id="APP_NAME">%1$s</xliff:g> je uzamknutá"</string>
+    <string name="enable_app_lock_failure_toast_message" msgid="1055838896510445566">"Aplikácia <xliff:g id="APP_NAME">%1$s</xliff:g> sa nedá uzamknúť"</string>
+    <string name="disable_app_lock_success_toast_message" msgid="70733620589071266">"Zámka bola z aplikácie <xliff:g id="APP_NAME">%1$s</xliff:g> odstránená"</string>
     <string name="locked_app_biometric_prompt_description" msgid="6853122652400451464">"Aplikácia <xliff:g id="APP_NAME">%1$s</xliff:g> je uzamknutá"</string>
+    <string name="locked_app_external_display_message" msgid="5483884799685545338">"Ak chcete mať prístup k aplikácii na tejto obrazovke, najprv overte svoju totožnosť v druhom zariadení"</string>
+    <string name="app_lock_edu_dialog_enable_app_lock_title" msgid="283314042336592322">"Chcete do aplikácie <xliff:g id="APP_NAME">%1$s</xliff:g> pridať zámku?"</string>
+    <string name="app_lock_edu_dialog_description" msgid="8176807243219769518">"Z bezpečnostných dôvodov máte k tejto aplikácii prístup iba vy pomocou odtlačku prsta, odomknutia tvárou alebo kódu PIN"</string>
+    <string name="app_lock_edu_dialog_description_template" msgid="8563718120753342530">"Z bezpečnostných dôvodov máte k tejto aplikácii prístup iba vy pomocou nasledujúcich metód: %1$s alebo %2$s"</string>
+    <string name="app_lock_edu_dialog_description_template_no_biometrics" msgid="7122017109150633691">"Z bezpečnostných dôvodov máte k tejto aplikácii prístup iba vy pomocou nasledujúcej metódy: %1$s"</string>
+    <string name="app_lock_edu_dialog_info_header" msgid="5876120209204270990">"So zámkou aplikácie"</string>
+    <string name="app_lock_edu_dialog_info_notifications" msgid="1124438392204873305">"Obsah upozornení bude skrytý"</string>
+    <string name="app_lock_edu_dialog_info_widgets" msgid="8809009414650740872">"Miniaplikácie a odkazy budú odstránené"</string>
+    <string name="app_lock_edu_dialog_button_lock" msgid="3914687128135704801">"Pridať zámku aplikácie"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_face" msgid="1348151645996748654">"Odomknutie tvárou"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_fingerprint" msgid="5206107469561561455">"Odomknutie odtlačkom prsta"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_fingerprint_and_face" msgid="7895807411323811641">"Odomknutie odtlačkom prsta alebo tvárou"</string>
+    <string name="app_lock_edu_dialog_lockscreen_password_name" msgid="8487096457702445059">"Heslo"</string>
+    <string name="app_lock_edu_dialog_lockscreen_pattern_name" msgid="991436996281983547">"Vzor"</string>
+    <string name="app_lock_edu_dialog_lockscreen_pin_name" msgid="6458607126966304795">"PIN"</string>
+    <string name="app_lock_permission_review_dialog_title" msgid="5030286398974840579">"Vaše fotky sa môžu naďalej zobrazovať v iných aplikáciách"</string>
+    <string name="app_lock_permission_review_dialog_sub_title" msgid="310758587817184145">"Aplikácie s prístupom k vašim fotkám"</string>
+    <string name="app_lock_permission_review_expand_app_list_button" msgid="3214809707125223273">"Zobraziť všetko"</string>
+    <string name="app_lock_permission_review_continue_button" msgid="4045066724173414043">"Pokračovať"</string>
     <string name="work_mode_off_title" msgid="6367463960165135829">"Zrušiť pozast. prac. aplikácií?"</string>
     <string name="work_mode_turn_on" msgid="5316648862401307800">"Zrušiť pozastavenie"</string>
     <string name="work_mode_emergency_call_button" msgid="6818855962881612322">"Tiesňová linka"</string>
@@ -2594,6 +2621,8 @@
     <string name="satellite_messaging_unsupported_default_sms_app_notification_summary" msgid="17084124893763593">"Ak chcete posielať správy cez satelit, nastavte Správy Google ako predvolený komunikátor"</string>
     <string name="satellite_messaging_location_disabled_notification_title" msgid="7270641894250928494">"Správy cez satelit nie sú k dispozícii"</string>
     <string name="satellite_messaging_location_disabled_notification_summary" msgid="1450824950686221810">"Ak chcete skontrolovať, či sú správy cez satelit v tejto krajine alebo regióne k dispozícii, zapnite nastavenia polohy"</string>
+    <!-- no translation found for satellite_indicator (6846063647532086110) -->
+    <skip />
     <string name="fingerprint_dangling_notification_title" msgid="7362075195588639989">"Znova nastavte odomknutie odtlačkom prsta"</string>
     <string name="fingerprint_dangling_notification_msg_1" msgid="5851784577768803510">"<xliff:g id="FINGERPRINT">%s</xliff:g> sa už nedari rozpoznať."</string>
     <string name="fingerprint_dangling_notification_msg_2" msgid="7925203589860744456">"<xliff:g id="FINGERPRINT_0">%1$s</xliff:g> a <xliff:g id="FINGERPRINT_1">%2$s</xliff:g> sa už nedari rozpoznať."</string>

@@ -17,13 +17,16 @@ package com.android.server.am.psc;
 
 import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_ACTIVITY;
 import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_BACKUP;
+import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_FINISH_RECEIVER;
 import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_SERVICE_BINDER_CALL;
+import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_START_RECEIVER;
 import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_UI_VISIBILITY;
 import static android.app.ProcessMemoryState.HOSTING_COMPONENT_TYPE_BROADCAST_RECEIVER;
 
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_OOM_ADJ;
 import static com.android.server.am.psc.Constants.SCHED_GROUP_UNDEFINED;
 
+import android.annotation.ElapsedRealtimeLong;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.UserIdInt;
@@ -43,6 +46,7 @@ import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.server.ServiceThread;
 import com.android.server.am.Flags;
+import com.android.server.am.psc.Constants.SchedGroup;
 import com.android.server.am.psc.annotation.RequiresEnclosingBatchSession;
 import com.android.server.wm.WindowProcessController;
 
@@ -599,7 +603,91 @@ public class ProcessStateController {
         mOomAdjuster.setUidTempAllowlistStateLSP(uid, allowList);
     }
 
+    /**
+     * Set whether the given UID is currently idle.
+     */
+    @GuardedBy({"mLock", "mProcLock"})
+    public void setUidIdle(@NonNull UidRecordInternal uidRec, boolean idle) {
+        uidRec.setIdle(idle);
+    }
+
+    /**
+     * Set whether the given UID is idle at the last round of computation.
+     */
+    @GuardedBy({"mLock", "mProcLock"})
+    public void setUidSetIdle(@NonNull UidRecordInternal uidRec, boolean idle) {
+        uidRec.setSetIdle(idle);
+    }
+
+    /**
+     * Set the last time the given UID became idle.
+     */
+    @GuardedBy({"mLock", "mProcLock"})
+    public void setUidLastIdleTime(@NonNull UidRecordInternal uidRec,
+            @ElapsedRealtimeLong long lastIdleTime) {
+        uidRec.setLastIdleTime(lastIdleTime);
+    }
+
+    /**
+     * Set the current process state for a UID.
+     */
+    @VisibleForTesting
+    @GuardedBy({"mLock", "mProcLock"})
+    public void setUidCurProcState(@NonNull UidRecordInternal uidRec, int curProcState) {
+        uidRec.setCurProcState(curProcState);
+    }
+
+    /**
+     * Set the last round's process state for a UID.
+     */
+    @VisibleForTesting
+    @GuardedBy({"mLock", "mProcLock"})
+    public void setUidSetProcState(@NonNull UidRecordInternal uidRec, int setProcState) {
+        uidRec.setSetProcState(setProcState);
+    }
+
+    /**
+     * Set the current process state sequence number for a UID.
+     */
+    @VisibleForTesting
+    @GuardedBy({"mLock", "mProcLock"})
+    public void setUidCurProcStateSeq(@NonNull UidRecordInternal uidRec, long curProcStateSeq) {
+        uidRec.setCurProcStateSeq(curProcStateSeq);
+    }
+
+    /**
+     * Set whether the given UID is currently on the allow list.
+     */
+    @GuardedBy({"mLock", "mProcLock"})
+    public void setUidCurAllowListed(@NonNull UidRecordInternal uidRec, boolean allowListed) {
+        uidRec.setCurAllowListed(allowListed);
+    }
+
+    /**
+     * Set whether the given UID is on the allow list at the last round of computation.
+     */
+    @GuardedBy({"mLock", "mProcLock"})
+    public void setUidSetAllowListed(@NonNull UidRecordInternal uidRec, boolean allowListed) {
+        uidRec.setSetAllowListed(allowListed);
+    }
+
     /*********************** Process Miscellaneous Events **********************/
+    /**
+     * Note whether the given process has been killed.
+     */
+    @GuardedBy({"mLock", "mProcLock"})
+    public void setKilled(@NonNull ProcessRecordInternal proc, boolean killed) {
+        proc.setKilled(killed);
+    }
+
+    /**
+     * Note whether the given process was killed by the activity manager.
+     */
+    @GuardedBy({"mLock", "mProcLock"})
+    public void setKilledByAm(@NonNull ProcessRecordInternal proc, boolean killedByAm) {
+        proc.setKilledByAm(killedByAm);
+    }
+
     /**
      * Set the maximum adj score a process can be assigned.
      */
@@ -709,13 +797,17 @@ public class ProcessStateController {
     }
 
     /**
-     * Note that the process is showing a toast.
+     * Forces a process to be considered important, e.g. while showing toasts.
+     *
+     * @param forcingToImportant A token representing the source and reason. Null to remove forcing.
+     * @return {@code true} if the token has changed.
      */
     @GuardedBy("mLock")
-    public void setForcingToImportant(@NonNull ProcessRecordInternal proc,
+    public boolean setForcingToImportant(@NonNull ProcessRecordInternal proc,
             @Nullable Object forcingToImportant) {
-        if (proc.getForcingToImportant() == forcingToImportant) return;
+        if (proc.getForcingToImportant() == forcingToImportant) return false;
         proc.setForcingToImportant(forcingToImportant);
+        return true;
     }
 
     /**
@@ -772,6 +864,17 @@ public class ProcessStateController {
     }
 
     /**
+     * Note that a process is expected to host at least the given number of content providers.
+     *
+     * @param proc The process record.
+     * @param capacity The minimum number of content providers the process is expected to host.
+     */
+    @GuardedBy("mLock")
+    public void ensurePublishedProviderCapacity(@NonNull ProcessRecordInternal proc, int capacity) {
+        proc.getProviders().ensureProviderCapacity(capacity);
+    }
+
+    /**
      * Sets the state indicating whether the given content provider has clients from external
      * processes.
      */
@@ -800,11 +903,13 @@ public class ProcessStateController {
 
     /**
      * Note that a process is no longer connected to a content provider.
+     *
+     * @return {@code true} if the connection was found and removed, {@code false} otherwise.
      */
     @GuardedBy("mLock")
-    public void removeProviderConnection(@NonNull ProcessRecordInternal client,
+    public boolean removeProviderConnection(@NonNull ProcessRecordInternal client,
             ContentProviderConnectionInternal cpc) {
-        client.getProviders().removeProviderConnection(cpc);
+        return client.getProviders().removeProviderConnection(cpc);
     }
 
     /*************************** Service State Events **************************/
@@ -894,6 +999,16 @@ public class ProcessStateController {
     public void removeAllConnections(@NonNull ProcessServiceRecordInternal psr) {
         psr.removeAllConnections();
         psr.removeAllSdkSandboxConnections();
+    }
+
+    /**
+     * Updates the flags for a given connection record.
+     *
+     * @return {@code true} if the flags were changed, {@code false} otherwise.
+     */
+    @GuardedBy("mLock")
+    public boolean updateConnectionFlags(@NonNull ConnectionRecordInternal cr, long flags) {
+        return cr.updateFlags(flags);
     }
 
     /**
@@ -1059,11 +1174,22 @@ public class ProcessStateController {
      * used.
      */
     @GuardedBy("mLock")
-    public void noteBroadcastDeliveryStarted(@NonNull ProcessRecordInternal proc, int schedGroup) {
+    public void noteBroadcastDeliveryStarted(@NonNull ProcessRecordInternal proc,
+            @SchedGroup int schedGroup) {
+        final boolean prevReceivingState = proc.getReceivers().isReceivingBroadcast();
+        final @SchedGroup int prevSchedGroup = proc.getReceivers().getBroadcastReceiverSchedGroup();
+        if (prevReceivingState && prevSchedGroup == schedGroup) {
+            // isReceiveBroadcast is already true and the schedGroup is not changing, skip.
+            return;
+        }
         proc.getReceivers().setIsReceivingBroadcast(true);
         proc.getReceivers().setBroadcastReceiverSchedGroup(schedGroup);
 
         proc.addHostingComponentType(HOSTING_COMPONENT_TYPE_BROADCAST_RECEIVER);
+
+        if (Flags.pscAutoUpdateBroadcastState()) {
+            runUpdate(proc, OOM_ADJ_REASON_START_RECEIVER);
+        }
     }
 
     /**
@@ -1071,10 +1197,20 @@ public class ProcessStateController {
      */
     @GuardedBy("mLock")
     public void noteBroadcastDeliveryEnded(@NonNull ProcessRecordInternal proc) {
+        final boolean prevReceivingState = proc.getReceivers().isReceivingBroadcast();
+        final @SchedGroup int prevSchedGroup = proc.getReceivers().getBroadcastReceiverSchedGroup();
+        if (!prevReceivingState && prevSchedGroup == SCHED_GROUP_UNDEFINED) {
+            // isReceiveBroadcast is already false and the schedGroup is already undefined, skip.
+            return;
+        }
         proc.getReceivers().setIsReceivingBroadcast(false);
         proc.getReceivers().setBroadcastReceiverSchedGroup(SCHED_GROUP_UNDEFINED);
 
         proc.clearHostingComponentType(HOSTING_COMPONENT_TYPE_BROADCAST_RECEIVER);
+
+        if (Flags.pscAutoUpdateBroadcastState()) {
+            runUpdate(proc, OOM_ADJ_REASON_FINISH_RECEIVER);
+        }
     }
 
     /**

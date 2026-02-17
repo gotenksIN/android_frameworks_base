@@ -18,6 +18,7 @@ package com.android.server.wm;
 
 import static android.app.AppOpsManager.OP_NONE;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_DREAM;
+import static android.app.WindowConfiguration.ACTIVITY_TYPE_HOME;
 import static android.app.WindowConfiguration.ACTIVITY_TYPE_STANDARD;
 import static android.app.WindowConfiguration.ROTATION_UNDEFINED;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM;
@@ -90,8 +91,10 @@ import android.os.UserHandle;
 import android.provider.Settings;
 import android.service.voice.IVoiceInteractionSession;
 import android.tools.function.Supplier;
+import android.util.DisplayMetrics;
 import android.util.MergedConfiguration;
 import android.util.SparseArray;
+import android.util.TypedValue;
 import android.view.Display;
 import android.view.DisplayInfo;
 import android.view.Gravity;
@@ -686,12 +689,30 @@ public class WindowTestsBase extends SystemServiceTestsBase {
         return newTaskDisplayArea;
     }
 
+    /** Gets the HOME root Task, and makes sure it is on top. */
+    Task getHomeRootTaskAndMoveToTop(TaskDisplayArea taskDisplayArea) {
+        final Task task = taskDisplayArea.getRootTask(WINDOWING_MODE_FULLSCREEN,
+                ACTIVITY_TYPE_HOME);
+        taskDisplayArea.positionChildAt(POSITION_TOP, task, false /* includingParents */);
+        return task;
+    }
+
     /**
      *  Creates a {@link Task} with a simple {@link ActivityRecord} and adds to the given
      *  {@link TaskDisplayArea}.
      */
-    Task createTaskWithActivity(TaskDisplayArea taskDisplayArea,
-            int windowingMode, int activityType, boolean onTop, boolean twoLevelTask) {
+    Task createTaskWithActivity(TaskDisplayArea taskDisplayArea, int windowingMode,
+            int activityType, boolean onTop) {
+        return createTaskWithActivity(taskDisplayArea, windowingMode, activityType, onTop,
+                false /* twoLevelTask */);
+    }
+
+    /**
+     *  Creates a {@link Task} with a simple {@link ActivityRecord} and adds to the given
+     *  {@link TaskDisplayArea}.
+     */
+    Task createTaskWithActivity(TaskDisplayArea taskDisplayArea, int windowingMode,
+            int activityType, boolean onTop, boolean twoLevelTask) {
         return createTask(taskDisplayArea, windowingMode, activityType,
                 onTop, true /* createActivity */, twoLevelTask,
                 false /* forceOpaque */, false /* shouldIgnoreInsets */,
@@ -737,6 +758,20 @@ public class WindowTestsBase extends SystemServiceTestsBase {
         } else {
             return builder.build();
         }
+    }
+
+    /** Creates a task as if from an organizer. */
+    Task createOrganizerTask(DisplayContent dc) {
+        final Task task = createTask(dc);
+        task.mCreatedByOrganizer = true;
+        return task;
+    }
+
+    /** Creates a task as if from an organizer. */
+    Task createOrganizerTask(DisplayContent dc, int windowingMode, int activityType) {
+        final Task task = createTask(dc.getDefaultTaskDisplayArea(), windowingMode, activityType);
+        task.mCreatedByOrganizer = true;
+        return task;
     }
 
     /** Creates a {@link Task} and adds to the given root {@link Task}. */
@@ -1181,6 +1216,22 @@ public class WindowTestsBase extends SystemServiceTestsBase {
                 displayContent -> displayContent.mMinSizeOfResizeableTaskDp = 1);
     }
 
+    /**
+     * Creates a {@link ActivityInfo.WindowLayout} with minimum dimensions specified in the given
+     * type, converting them to the complex unit format used by the system.
+     */
+    static ActivityInfo.WindowLayout createWindowLayoutWithMinSize(int minWidth,
+            int minHeight, DisplayMetrics metrics, @TypedValue.ComplexDimensionUnit int type) {
+        final int complexMinWidth =
+                TypedValue.createComplexDimension(minWidth, type);
+        final int complexMinHeight =
+                TypedValue.createComplexDimension(minHeight, type);
+        return new ActivityInfo.WindowLayout(
+                -1 /* complexWidth */, -1f /* widthFraction */, -1 /* complexHeight */,
+                -1f /* heightFraction */, 0 /* gravity */, complexMinWidth, complexMinHeight,
+                null /* windowLayoutAffinity */, metrics);
+    }
+
     static ComponentName getUniqueComponentName() {
         return getUniqueComponentName(DEFAULT_COMPONENT_PACKAGE_NAME);
     }
@@ -1595,6 +1646,7 @@ public class WindowTestsBase extends SystemServiceTestsBase {
         private boolean mIsForceOpaque = false;
         private boolean mShouldIgnoreInsets = false;
         private boolean mDisableAppCompatRoundedCorners = false;
+        private boolean mRemoveWithTaskOrganizer = false;
 
         TaskBuilder(ActivityTaskSupervisor supervisor) {
             mSupervisor = supervisor;
@@ -1706,6 +1758,11 @@ public class WindowTestsBase extends SystemServiceTestsBase {
             return this;
         }
 
+        TaskBuilder setRemoveWithTaskOrganizer(boolean removeWithTaskOrganizer) {
+            mRemoveWithTaskOrganizer = removeWithTaskOrganizer;
+            return this;
+        }
+
         Task build() {
             SystemServicesTestRule.checkHoldsLock(mSupervisor.mService.mGlobalLock);
 
@@ -1739,6 +1796,7 @@ public class WindowTestsBase extends SystemServiceTestsBase {
                     .setWindowingMode(mWindowingMode)
                     .setActivityInfo(mActivityInfo)
                     .setIntent(mIntent)
+                    .setRemoveWithTaskOrganizer(mRemoveWithTaskOrganizer)
                     .setOnTop(mOnTop)
                     .setVoiceSession(mVoiceSession)
                     .setCreatedByOrganizer(mCreatedByOrganizer)
@@ -1765,7 +1823,7 @@ public class WindowTestsBase extends SystemServiceTestsBase {
 
             // Create child activity.
             if (mCreateActivity) {
-                new ActivityBuilder(mSupervisor.mService)
+                ActivityRecord activity = new ActivityBuilder(mSupervisor.mService)
                         .setTask(task)
                         .setComponent(mComponent)
                         .build();
@@ -1774,6 +1832,7 @@ public class WindowTestsBase extends SystemServiceTestsBase {
                     // is added. Or {@link TaskDisplayArea#mPreferredTopFocusableRootTask} could be
                     // other root tasks (e.g. home root task).
                     task.moveToFront("createActivityTask");
+                    mTaskDisplayArea.getDisplayContent().setFocusedApp(activity);
                 } else {
                     task.moveToBack("createActivityTask", null);
                 }

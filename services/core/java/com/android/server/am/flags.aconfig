@@ -2,13 +2,6 @@ package: "com.android.server.am"
 container: "system"
 
 flag {
-    name: "fgs_abuse_detection"
-    namespace: "backstage_power"
-    description: "Detect abusive FGS behavior for certain types (camera, mic, media, location)."
-    bug: "295545575"
-}
-
-flag {
     name: "bfgs_managed_network_access"
     namespace: "backstage_power"
     description: "Restrict network access for certain applications in BFGS process state"
@@ -76,6 +69,13 @@ flag {
 }
 
 flag {
+    name: "memory_limiter_trigger"
+    namespace: "system_performance"
+    description: "Generate a ProfileManager trigger on over-memory events"
+    bug: "471000543"
+}
+
+flag {
     name: "oomadjuster_cached_app_tiers"
     namespace: "system_performance"
     is_fixed_read_only: true
@@ -116,16 +116,6 @@ flag {
 }
 
 flag {
-    name: "cpu_time_capability_based_freeze_policy"
-    namespace: "backstage_power"
-    description: "Use PROCESS_CAPABILITY_CPU_TIME and PROCESS_CAPABILITY_IMPLICIT_CPU_TIME to control process freeze state."
-    bug: "370817323"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "prototype_aggressive_freezing"
     namespace: "backstage_power"
     description: "Grant PROCESS_CAPABILITY_CPU_TIME to as many valid states and aggressively freeze other states"
@@ -140,6 +130,16 @@ flag {
     namespace: "backstage_power"
     description: "Enable capability controller computation with no side-effect"
     bug: "466961280"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "enable_procstate_controller_computation"
+    namespace: "backstage_power"
+    description: "Enable ProcStateController computation with no side-effect"
+    bug: "479360024"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -174,16 +174,6 @@ flag {
     namespace: "backstage_power"
     description: "Consolidate collectReachable usage to one implementation."
     bug: "364936739"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "syncmanager_off_main_thread"
-    namespace: "backstage_power"
-    description: "Move broadcast receivers off the main thread to reduce ANR chances"
-    bug: "409177829"
     metadata {
         purpose: PURPOSE_BUGFIX
     }
@@ -229,9 +219,9 @@ flag {
 }
 
 flag {
-    name: "rollout_computer_control"
+    name: "rollout_pixel_faceauth"
     namespace: "core_experiments_team_internal"
-    description: "Rolls out the computer_control namespace."
+    description: "Rolls out the pixel_faceauth namespace."
     bug: "436480687"
     metadata {
         purpose: PURPOSE_BUGFIX
@@ -319,6 +309,16 @@ flag {
 }
 
 flag {
+    name: "simplify_toast_importance"
+    namespace: "backstage_power"
+    description: "Simplifies the process importance mechanism for visible toasts"
+    bug: "473067328"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "battery_stats_log_combined_display_state"
     namespace: "backstage_power"
     description: "Logs atom for screen state for the most important display on device."
@@ -326,4 +326,55 @@ flag {
     metadata {
         purpose: PURPOSE_BUGFIX
     }
+}
+
+flag {
+    name: "use_safesetid_uid_policy2"
+    namespace: "backstage_power"
+    description: "Use SafeSetID to enforce UID policies instead of SELinux filters"
+    bug: "414893665"
+}
+
+flag {
+    name: "error_dialog_for_visible_background_users"
+    namespace: "multiuser"
+    description: "Show Error dialog for visible background user on their assigned display"
+    bug: "442905483"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "batch_power_manager_calls"
+    namespace: "backstage_power"
+    description: "Batch PowerManagerInternal calls to reduce the lock contention."
+    bug: "470251713"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "psc_auto_update_broadcast_state"
+    namespace: "backstage_power"
+    description: "Automatically trigger OomAdjuster updates from ProcessStateController on Broadcast state changes."
+    bug: "450079190"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "wear_use_default_max_cache_process"
+    namespace: "watch_software_performance"
+    description: "Use the default limit for max. number of cached apps (1024) instead of 32."
+    bug: "478278155"
+}
+
+flag {
+    name: "defer_service_restart_when_frozen"
+    namespace: "backstage_power"
+    description: "Defer service restart if all its binding clients are frozen."
+    bug: "478967958"
 }

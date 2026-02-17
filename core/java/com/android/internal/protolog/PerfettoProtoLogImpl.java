@@ -51,6 +51,7 @@ import android.os.ServiceManager;
 import android.os.ShellCommand;
 import android.os.SystemClock;
 import android.text.TextUtils;
+import android.tracing.perfetto.DataSource;
 import android.tracing.perfetto.DataSourceParams;
 import android.tracing.perfetto.InitArguments;
 import android.tracing.perfetto.Producer;
@@ -64,9 +65,7 @@ import android.util.proto.ProtoOutputStream;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.protolog.IProtoLogConfigurationService.RegisterClientArgs;
-import com.android.internal.protolog.ProtoLogDataSource.Instance.TracingFlushCallback;
-import com.android.internal.protolog.ProtoLogDataSource.Instance.TracingInstanceStartCallback;
-import com.android.internal.protolog.ProtoLogDataSource.Instance.TracingInstanceStopCallback;
+import com.android.internal.protolog.ProtoLogDataSource.Instance.ProtoLogTracingInstanceStartCallback;
 import com.android.internal.protolog.common.ILogger;
 import com.android.internal.protolog.common.IProtoLog;
 import com.android.internal.protolog.common.IProtoLogGroup;
@@ -76,19 +75,16 @@ import com.android.internal.protolog.common.LogLevel;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.util.ArrayDeque;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Queue;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -101,7 +97,9 @@ import java.util.stream.Stream;
  * A service for the ProtoLog logging system.
  */
 public abstract class PerfettoProtoLogImpl extends IProtoLogClient.Stub implements IProtoLog,
-        TracingInstanceStartCallback, TracingInstanceStopCallback, TracingFlushCallback {
+        ProtoLogTracingInstanceStartCallback,
+        ProtoLogDataSource.Instance.ProtoLogTracingInstanceStopCallback,
+        DataSource.TracingInstanceFlushCallback {
     private static final String LOG_TAG = "ProtoLog";
     public static final String NULL_STRING = "null";
     @VisibleForTesting
@@ -116,7 +114,10 @@ public abstract class PerfettoProtoLogImpl extends IProtoLogClient.Stub implemen
     @NonNull
     protected final ProtoLogDataSource mDataSource;
     @Nullable
+    @Deprecated
     private IProtoLogConfigurationService mConfigurationService;
+    @Nullable
+    private ProtoLogConfigurationClient mConfigurationClient;
 
     @NonNull
     private final Object mLogGroupsLock = new Object();
@@ -238,27 +239,42 @@ public abstract class PerfettoProtoLogImpl extends IProtoLogClient.Stub implemen
                 mDataSource.register(params);
             }
 
-            if (service != null) {
-                mConfigurationService = service;
-            } else if (mConfigurationService == null) {
-                mConfigurationService = getConfigurationService();
-            }
+            if (android.tracing.Flags.javaNativeProtolog()) {
+                if (mConfigurationClient == null) {
+                    mConfigurationClient = new ProtoLogConfigurationClient(getViewerConfigPath(),
+                            (enabled, groupsToToggle) -> {
+                                final ILogger logger = (message) -> Log.d(LOG_TAG, message);
+                                if (enabled) {
+                                    startLoggingToLogcat(groupsToToggle, logger);
+                                } else {
+                                    stopLoggingToLogcat(groupsToToggle, logger);
+                                }
+                            });
+                }
+                mConfigurationClient.start(groups, async, service);
+            } else {
+                if (service != null) {
+                    mConfigurationService = service;
+                } else if (mConfigurationService == null) {
+                    mConfigurationService = getConfigurationService();
+                }
 
-            if (mConfigurationService != null) {
-                try {
-                    var args = createConfigurationServiceRegisterClientArgs();
-                    args.groups = new String[groups.length];
-                    args.groupsDefaultLogcatStatus = new boolean[groups.length];
+                if (mConfigurationService != null) {
+                    try {
+                        var args = createConfigurationServiceRegisterClientArgs();
+                        args.groups = new String[groups.length];
+                        args.groupsDefaultLogcatStatus = new boolean[groups.length];
 
-                    for (var i = 0; i < groups.length; i++) {
-                        var group = groups[i];
-                        args.groups[i] = group.name();
-                        args.groupsDefaultLogcatStatus[i] = group.isLogToLogcat();
+                        for (var i = 0; i < groups.length; i++) {
+                            var group = groups[i];
+                            args.groups[i] = group.name();
+                            args.groupsDefaultLogcatStatus[i] = group.isLogToLogcat();
+                        }
+
+                        mConfigurationService.registerClient(this, args);
+                    } catch (RemoteException e) {
+                        Log.wtf(LOG_TAG, "Failed to register ProtoLog client", e);
                     }
-
-                    mConfigurationService.registerClient(this, args);
-                } catch (RemoteException e) {
-                    Log.wtf(LOG_TAG, "Failed to register ProtoLog client", e);
                 }
             }
 
@@ -298,14 +314,21 @@ public abstract class PerfettoProtoLogImpl extends IProtoLogClient.Stub implemen
             backgroundTasks.run();
         }
 
-        mDataSource.registerOnStartCallback(this);
-        mDataSource.registerOnFlushCallback(this);
-        mDataSource.registerOnStopCallback(this);
+        mDataSource.registerOnStartCallback(this::onTracingInstanceStart);
+        mDataSource.registerOnFlushCallback(this::onTracingFlush);
+        mDataSource.registerOnStopCallback(this::onTracingInstanceStop);
     }
 
     @Override
     public void registerGroups(@NonNull IProtoLogGroup... groups) {
         registerGroupsLocally(groups);
+
+        if (android.tracing.Flags.javaNativeProtolog()) {
+            if (mConfigurationClient != null) {
+                mConfigurationClient.addGroups(groups);
+            }
+            return;
+        }
 
         if (mConfigurationService != null) {
             // Because this will execute with a slight delay it means that we might be in sync with
@@ -374,6 +397,13 @@ public abstract class PerfettoProtoLogImpl extends IProtoLogClient.Stub implemen
     }
 
     private void disconnectFromConfigurationServiceAsync() {
+        if (android.tracing.Flags.javaNativeProtolog()) {
+            if (mConfigurationClient != null) {
+                mConfigurationClient.stop();
+            }
+            return;
+        }
+
         Objects.requireNonNull(mConfigurationService,
                 "A null ProtoLog Configuration Service was provided!");
 
@@ -395,7 +425,7 @@ public abstract class PerfettoProtoLogImpl extends IProtoLogClient.Stub implemen
     @VisibleForTesting
     @Override
     public void log(@NonNull LogLevel logLevel, @NonNull IProtoLogGroup group, long messageHash,
-            int paramsMask, @Nullable Object[] args) {
+            long paramsMask, @Nullable Object[] args) {
         log(logLevel, group, new Message(messageHash, paramsMask), args);
     }
 
@@ -447,6 +477,11 @@ public abstract class PerfettoProtoLogImpl extends IProtoLogClient.Stub implemen
 
     @Override
     public void toggleLogcat(boolean enabled, @NonNull String[] groups) {
+        if (android.tracing.Flags.javaNativeProtolog()) {
+            throw new RuntimeException("toggleLogcat should not be called on PerfettoProtoLogImpl"
+                    + " when javaNativeProtolog flag is enabled");
+        }
+
         final ILogger logger = (message) -> Log.d(LOG_TAG, message);
         if (enabled) {
             startLoggingToLogcat(groups, logger);
@@ -622,6 +657,11 @@ public abstract class PerfettoProtoLogImpl extends IProtoLogClient.Stub implemen
     @Deprecated
     abstract void dumpViewerConfig();
 
+    @Nullable
+    protected String getViewerConfigPath() {
+        return null;
+    }
+
     @NonNull
     abstract String getLogcatMessageString(@NonNull Message message);
 
@@ -680,7 +720,9 @@ public abstract class PerfettoProtoLogImpl extends IProtoLogClient.Stub implemen
                 // trace processing easier.
                 int argIndex = 0;
                 for (Object o : args) {
-                    int type = LogDataType.bitmaskToLogDataType(message.getMessageMask(), argIndex);
+                    long type =
+                            LogDataType.bitmaskToLogDataType(
+                                    message.getMessageMask(), argIndex);
                     if (type == LogDataType.STRING) {
                         needsIncrementalState = true;
                         if (o == null) {
@@ -1112,11 +1154,11 @@ public abstract class PerfettoProtoLogImpl extends IProtoLogClient.Stub implemen
     protected static class Message {
         @Nullable
         private final Long mMessageHash;
-        private final int mMessageMask;
+        private final long mMessageMask;
         @Nullable
         private final String mMessageString;
 
-        private Message(long messageHash, int messageMask) {
+        private Message(long messageHash, long messageMask) {
             this.mMessageHash = messageHash;
             this.mMessageMask = messageMask;
             this.mMessageString = null;
@@ -1129,7 +1171,7 @@ public abstract class PerfettoProtoLogImpl extends IProtoLogClient.Stub implemen
             this.mMessageString = messageString;
         }
 
-        private int getMessageMask() {
+        private long getMessageMask() {
             return mMessageMask;
         }
 

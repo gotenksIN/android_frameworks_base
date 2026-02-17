@@ -212,6 +212,7 @@ public final class CompanionDeviceManager {
             FLAG_TASK_CONTINUITY,
             FLAG_UNIVERSAL_MODES,
             FLAG_UNIVERSAL_CLIPBOARD,
+            FLAG_AIRPLANE_MODE,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface DataSyncTypes {}
@@ -219,35 +220,44 @@ public final class CompanionDeviceManager {
     /**
      * Used by {@link #enableSystemDataSyncForTypes(int, int)}}.
      * Sync call metadata like muting, ending and silencing a call.
+     * Enabled by default.
      */
     public static final int FLAG_CALL_METADATA = 1 << 0;
 
     /**
      * Used by {@link #enableSystemDataSyncForTypes(int, int)}}.
      * Synchronize task continuity data like open tasks, and enable this transport for Handoff.
+     * Disabled by default.
      */
     @FlaggedApi(Flags.FLAG_TASK_CONTINUITY)
     public static final int FLAG_TASK_CONTINUITY = 1 << 1;
 
     /**
      * Used by {@link #enableSystemDataSyncForTypes(int, int)}}.
-     * Synchronize contextual modes such as DND, bedtime mode, etc. for Mode Sync.
-     * @hide
+     * Synchronize user settings like contextual modes across devices.
+     * Disabled by default.
      */
-    @SystemApi
     @FlaggedApi(Flags.FLAG_ENABLE_DATA_SYNC)
-    @RequiresPermission(Manifest.permission.REQUEST_COMPANION_SELF_MANAGED)
     public static final int FLAG_UNIVERSAL_MODES = 1 << 2;
 
     /**
      * Used by {@link #enableSystemDataSyncForTypes(int, int)}}.
      * Synchronize copied content across devices for Universal Clipboard.
+     * Disabled by default.
      * @hide
      */
     @SystemApi
     @FlaggedApi(Flags.FLAG_ENABLE_DATA_SYNC)
     @RequiresPermission(Manifest.permission.REQUEST_COMPANION_SELF_MANAGED)
     public static final int FLAG_UNIVERSAL_CLIPBOARD = 1 << 3;
+
+    /**
+     * Used by {@link #enableSystemDataSyncForTypes(int, int)}}.
+     * Synchronize airplane mode state across devices.
+     * Disabled by default.
+     */
+    @FlaggedApi(Flags.FLAG_ENABLE_DATA_SYNC)
+    public static final int FLAG_AIRPLANE_MODE = 1 << 4;
 
     /**
      * The feature name for task continuity manager.
@@ -714,9 +724,9 @@ public final class CompanionDeviceManager {
         }
     }
 
+    // TODO(b/473574965): Update the javadoc after 26Q2 release.
     /**
-     * <p>Enable system data sync (it only supports call metadata sync for now).
-     * By default all supported system data types are enabled.</p>
+     * <p>Enable system data sync for an associated device.</p>
      *
      * <p>Calling this API requires a uses-feature
      * {@link PackageManager#FEATURE_COMPANION_DEVICE_SETUP} declaration in the manifest</p>
@@ -738,9 +748,9 @@ public final class CompanionDeviceManager {
         }
     }
 
+    // TODO(b/473574965): Update the javadoc after 26Q2 release.
     /**
-     * <p>Disable system data sync (it only supports call metadata sync for now).
-     * By default all supported system data types are enabled.</p>
+     * <p>Disable system data sync for an associated device.</p>
      *
      * <p>Calling this API requires a uses-feature
      * {@link PackageManager#FEATURE_COMPANION_DEVICE_SETUP} declaration in the manifest</p>
@@ -1508,7 +1518,7 @@ public final class CompanionDeviceManager {
      * <p>This method establishes a single listener for a given {@code serviceName}.
      * If a listener is already registered for the same service, it will be replaced.
      *
-     * If the caller relies on the {@link android.Manifest.permission.ACCESS_COMPANION_MESSAGE_PCC}
+     * If the caller relies on the {@link android.Manifest.permission#ACCESS_COMPANION_MESSAGE_PCC}
      * permission, the system requires that the targeted association has been verified as a
      * {@link AssociationInfo#isTrusted() trusted device}.
      *
@@ -2456,7 +2466,7 @@ public final class CompanionDeviceManager {
      *   </li>
      * </ul>
      *
-     * If the caller relies on the {@link android.Manifest.permission.ACCESS_COMPANION_MESSAGE_PCC}
+     * If the caller relies on the {@link android.Manifest.permission#ACCESS_COMPANION_MESSAGE_PCC}
      * permission, the system requires that the targeted association has been verified as a
      * {@link AssociationInfo#isTrusted() trusted device}.
      *
@@ -2561,6 +2571,27 @@ public final class CompanionDeviceManager {
 
         try {
             mService.setRequestActionAllowList(allowList);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Checks if a device is present for a given association id.
+     *
+     * @param associationId id of the device association
+     * @return {@code true} if the device is present, {@code false} otherwise.
+     * @hide
+     */
+    @RequiresPermission("android.Manifest.permission.MANAGE_COMPANION_DEVICES")
+    public boolean isDevicePresent(int associationId) {
+        if (mService == null) {
+            Log.w(TAG, "CompanionDeviceManager service is not available.");
+            return false;
+        }
+
+        try {
+            return mService.isDevicePresent(associationId);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }

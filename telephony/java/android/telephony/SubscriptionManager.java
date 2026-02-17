@@ -19,6 +19,8 @@ package android.telephony;
 import static android.net.NetworkPolicyManager.SUBSCRIPTION_OVERRIDE_CONGESTED;
 import static android.net.NetworkPolicyManager.SUBSCRIPTION_OVERRIDE_UNMETERED;
 
+import static java.util.Objects.requireNonNull;
+
 import android.Manifest;
 import android.annotation.BroadcastBehavior;
 import android.annotation.CallbackExecutor;
@@ -503,7 +505,7 @@ public class SubscriptionManager {
      * The slot-index for Bluetooth Remote-SIM subscriptions
      * @hide
      */
-    public static final int SLOT_INDEX_FOR_REMOTE_SIM_SUB = INVALID_SIM_SLOT_INDEX;
+    public static final int SLOT_INDEX_FOR_REMOTE_SIM_SUB = -2;
 
     /**
      * TelephonyProvider column name Subscription-type.
@@ -606,24 +608,32 @@ public class SubscriptionManager {
      * The name_source is unknown. (for initialization)
      * @hide
      */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_ENABLE_NEW_DISPLAY_NAME_APIS)
     public static final int NAME_SOURCE_UNKNOWN = SimInfo.NAME_SOURCE_UNKNOWN;
 
     /**
      * The name_source is from the carrier id.
      * @hide
      */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_ENABLE_NEW_DISPLAY_NAME_APIS)
     public static final int NAME_SOURCE_CARRIER_ID = SimInfo.NAME_SOURCE_CARRIER_ID;
 
     /**
      * The name_source is from SIM EF_SPN.
      * @hide
      */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_ENABLE_NEW_DISPLAY_NAME_APIS)
     public static final int NAME_SOURCE_SIM_SPN = SimInfo.NAME_SOURCE_SIM_SPN;
 
     /**
      * The name_source is from user input
      * @hide
      */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_ENABLE_NEW_DISPLAY_NAME_APIS)
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     public static final int NAME_SOURCE_USER_INPUT = SimInfo.NAME_SOURCE_USER_INPUT;
 
@@ -631,12 +641,16 @@ public class SubscriptionManager {
      * The name_source is carrier (carrier app, carrier config, etc.)
      * @hide
      */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_ENABLE_NEW_DISPLAY_NAME_APIS)
     public static final int NAME_SOURCE_CARRIER = SimInfo.NAME_SOURCE_CARRIER;
 
     /**
      * The name_source is from SIM EF_PNN.
      * @hide
      */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_ENABLE_NEW_DISPLAY_NAME_APIS)
     public static final int NAME_SOURCE_SIM_PNN = SimInfo.NAME_SOURCE_SIM_PNN;
 
     /** @hide */
@@ -1599,6 +1613,8 @@ public class SubscriptionManager {
      *
      * <p>This source is used to retrieve the phone number (MSISDN) from the Entitlement
      * Configuration Server as defined in GSMA TS.43.
+     * <p>Note: Access to {@link #PHONE_NUMBER_SOURCE_TS43} is restricted to
+     * privileged system components (e.g., Settings) or carrier privileged apps.
      */
     @FlaggedApi(Flags.FLAG_GET_PHONE_NUMBER_TS43_API)
     public static final int PHONE_NUMBER_SOURCE_TS43 = 4;
@@ -2645,10 +2661,11 @@ public class SubscriptionManager {
 
     /**
      * Set the display name for a subscription ID
-     * @param displayName the display name of SIM card
-     * @param subId the unique Subscritpion ID in database
+     * @param displayName the display name of SIM card. Must be a non-null string.
+     * @param subId the unique Subscription ID in database
      * @param nameSource SIM display name source
      * @return the number of records updated or < 0 if invalid subId
+     * @throws NullPointerException if {@code displayName} is {@code null}.
      * @hide
      */
     @RequiresPermission(Manifest.permission.MODIFY_PHONE_STATE)
@@ -2661,6 +2678,58 @@ public class SubscriptionManager {
         return setSubscriptionPropertyHelper(subId, "setDisplayName",
                 (iSub)-> iSub.setDisplayNameUsingSrc(displayName, subId, nameSource)
         );
+    }
+
+    /**
+     * Set the display name for a subscription.
+     *
+     * @param subId the unique Subscription ID in database
+     * @param displayName the display name of SIM card. Must be a non-null string.
+     * @param nameSource SIM display name source
+     *
+     * @throws NullPointerException if {@code displayName} is {@code null}.
+     * @throws IllegalArgumentException if {@code subId} is invalid.
+     * @throws UnsupportedOperationException If the device does not have
+     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_ENABLE_NEW_DISPLAY_NAME_APIS)
+    @RequiresPermission(Manifest.permission.MODIFY_PHONE_STATE)
+    public void setDisplayName(int subId, @NonNull String displayName,
+            @SimDisplayNameSource int nameSource) {
+        requireNonNull(displayName, "displayName");
+        if (VDBG) {
+            logd("[setDisplayName]+  displayName:" + displayName + " subId:" + subId
+                    + " nameSource:" + nameSource);
+        }
+        int result = setSubscriptionPropertyHelper(subId, "setDisplayName",
+                (iSub)-> iSub.setDisplayNameUsingSrc(displayName, subId, nameSource));
+        if (result < 0) {
+            throw new IllegalArgumentException("Invalid subscriptionId: " + subId);
+        }
+    }
+
+    /**
+     * Clear the display name for a subscription, resetting it to the default.
+     *
+     * @param subId the unique Subscription ID in database
+     * @param nameSource SIM display name source
+     *
+     * @throws IllegalArgumentException if {@code subId} is invalid.
+     * @throws UnsupportedOperationException If the device does not have
+     *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_ENABLE_NEW_DISPLAY_NAME_APIS)
+    @RequiresPermission(Manifest.permission.MODIFY_PHONE_STATE)
+    public void clearDisplayName(int subId, @SimDisplayNameSource int nameSource) {
+        int result = setDisplayName("", subId, nameSource);
+
+        if (result < 0) {
+            throw new IllegalArgumentException("Invalid subscriptionId: " + subId);
+        }
     }
 
     /**
@@ -2723,7 +2792,7 @@ public class SubscriptionManager {
     @Deprecated
     @Nullable
     public int[] getSubscriptionIds(int slotIndex) {
-        if (!isValidSlotIndex(slotIndex)) {
+        if (!isValidOrRemoteSlotIndex(slotIndex)) {
             return null;
         }
         return new int[]{getSubscriptionId(slotIndex)};
@@ -2745,7 +2814,7 @@ public class SubscriptionManager {
      */
     @Deprecated
     public static int[] getSubId(int slotIndex) {
-        if (!isValidSlotIndex(slotIndex)) {
+        if (!isValidOrRemoteSlotIndex(slotIndex)) {
             return null;
         }
         return new int[]{getSubscriptionId(slotIndex)};
@@ -2760,7 +2829,7 @@ public class SubscriptionManager {
      * inserted remote SIM subscription id will be returned.
      */
     public static int getSubscriptionId(int slotIndex) {
-        if (!isValidSlotIndex(slotIndex)) {
+        if (!isValidOrRemoteSlotIndex(slotIndex)) {
             return SubscriptionManager.INVALID_SUBSCRIPTION_ID;
         }
 
@@ -3012,6 +3081,10 @@ public class SubscriptionManager {
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.P, trackingBug = 115609023)
     public static boolean isValidSlotIndex(int slotIndex) {
         return slotIndex >= 0 && slotIndex < TelephonyManager.getDefault().getActiveModemCount();
+    }
+
+    private static boolean isValidOrRemoteSlotIndex(int slotIndex) {
+        return slotIndex == SLOT_INDEX_FOR_REMOTE_SIM_SUB || isValidSlotIndex(slotIndex);
     }
 
     /** @hide */
@@ -4658,6 +4731,31 @@ public class SubscriptionManager {
     }
 
     /**
+     * Called to retrieve the platform-managed SIM PINs to be backed up.
+     *
+     * @return data in byte[] to be backed up.
+     *
+     * @hide
+     */
+    @NonNull
+    @RequiresPermission(Manifest.permission.CONTROL_SIM_AUTO_PIN_MANAGEMENT)
+    public byte[] getAllPlatformManagedPins() {
+        try {
+            ISub iSub = TelephonyManager.getSubscriptionService();
+            if (iSub != null) {
+                return iSub.getAllPlatformManagedPinsForBackup();
+            } else {
+                throw new IllegalStateException("subscription service unavailable.");
+            }
+        } catch (RemoteException ex) {
+            if (!isSystemProcess()) {
+                ex.rethrowAsRuntimeException();
+            }
+        }
+        return new byte[0];
+    }
+
+    /**
      * Called during setup wizard restore flow to attempt to restore the backed up sim-specific
      * configs to device for all existing SIMs in the subscription database {@link SimInfo}.
      * Internally, it will store the backup data in an internal file. This file will persist on
@@ -4682,6 +4780,28 @@ public class SubscriptionManager {
             ISub iSub = TelephonyManager.getSubscriptionService();
             if (iSub != null) {
                 iSub.restoreAllSimSpecificSettingsFromBackup(data);
+            } else {
+                throw new IllegalStateException("subscription service unavailable.");
+            }
+        } catch (RemoteException ex) {
+            if (!isSystemProcess()) {
+                ex.rethrowAsRuntimeException();
+            }
+        }
+    }
+
+    /**
+     * Called during Setup Wizard to restore platform-managed SIM PINs.
+     * @param data Platform-managed SIM PINs blob.
+     *
+     * @hide
+     */
+    @RequiresPermission(Manifest.permission.CONTROL_SIM_AUTO_PIN_MANAGEMENT)
+    public void restorePlatformManagedSimPinsFromBackup(@NonNull byte[] data) {
+        try {
+            ISub iSub = TelephonyManager.getSubscriptionService();
+            if (iSub != null) {
+                iSub.restorePlatformManagedSimPins(data);
             } else {
                 throw new IllegalStateException("subscription service unavailable.");
             }
@@ -4718,6 +4838,9 @@ public class SubscriptionManager {
      * <p>The availability and correctness of the phone number depends on the underlying source
      * and the network etc. Additional verification is needed to use this number for
      * security-related or other sensitive scenarios.
+     *
+     * <p>Note:Access to {@link #PHONE_NUMBER_SOURCE_TS43} is restricted to privileged system
+     * components (e.g., Settings) or carrier privileged apps.
      *
      * @param subscriptionId the subscription ID, or {@link #DEFAULT_SUBSCRIPTION_ID}
      * for the default one.
@@ -4786,6 +4909,9 @@ public class SubscriptionManager {
      * <p>The availability and correctness of the phone number depends on the underlying source
      * and the network etc. Additional verification is needed to use this number for
      * security-related or other sensitive scenarios.
+     *
+     * <p>Note:Access to {@link #PHONE_NUMBER_SOURCE_TS43} is restricted to privileged system
+     * components (e.g., Settings) or carrier privileged apps.
      *
      * @param subscriptionId the subscription ID, or {@link #DEFAULT_SUBSCRIPTION_ID}
      *                       for the default one.

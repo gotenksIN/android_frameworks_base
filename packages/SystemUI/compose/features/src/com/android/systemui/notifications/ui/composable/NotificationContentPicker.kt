@@ -17,46 +17,51 @@
 package com.android.systemui.notifications.ui.composable
 
 import com.android.compose.animation.scene.ContentKey
-import com.android.systemui.scene.shared.model.SceneContainerConfig
+import com.android.systemui.scene.shared.model.Scenes
 import javax.inject.Inject
 
 interface NotificationContentPicker {
-    /** Returns a content from the provided [keys] or null. */
     fun pickContentFrom(keys: Set<ContentKey>): ContentKey?
 }
 
 /**
- * A content picker for [StackPlaceholderStateStorage] that selects the [ContentKey] with the
- * highest z index defined in [SceneContainerConfig].
+ * Picks content with highest z-order (top-most).
+ * Used for the main notification stack.
  */
-class StackPlaceholderContentPicker @Inject constructor(config: SceneContainerConfig) :
-    NotificationContentPicker {
-    /**
-     * The keys of contents sorted by z-order such that the last one renders on top of all previous
-     * ones.
-     */
-    private val contentKeysByZOrder by lazy { config.sceneKeys + config.overlayKeys }
+class StackPlaceholderContentPicker @Inject constructor(
+    private val sorter: ContentZOrderSorter
+) : NotificationContentPicker {
 
     override fun pickContentFrom(keys: Set<ContentKey>): ContentKey? {
-        // Select the content drawn on top.
-        return contentKeysByZOrder.lastOrNull { it in keys }
+        return sorter.getHighestZ(keys)
     }
 }
 
 /**
- * A content picker for [HeadsUpPlaceholderStateStorage] that selects the [ContentKey] with the
- * lowest z index defined in [SceneContainerConfig].
+ * Pick lowest z-order (bottom-most).
  */
-class HeadsUpPlaceholderContentPicker @Inject constructor(config: SceneContainerConfig) :
-    NotificationContentPicker {
-    /**
-     * The keys of contents sorted by z-order such that the last one renders on top of all previous
-     * ones.
-     */
-    private val contentKeysByZOrder by lazy { (config.sceneKeys + config.overlayKeys) }
+class LowestZContentPicker @Inject constructor(
+    private val sorter: ContentZOrderSorter
+) : NotificationContentPicker {
+    override fun pickContentFrom(keys: Set<ContentKey>): ContentKey? {
+        return sorter.getLowestZ(keys)
+    }
+}
+
+/**
+ * Apply HUN-specific rules before falling back to default behavior
+ */
+class HeadsUpPlaceholderContentPicker @Inject constructor(
+    private val defaultPicker: LowestZContentPicker
+) : NotificationContentPicker {
 
     override fun pickContentFrom(keys: Set<ContentKey>): ContentKey? {
-        // Select the content drawn at the bottom.
-        return contentKeysByZOrder.firstOrNull { it in keys }
+        // Pick shade (higher z than lockscreen/AOD) so that HUN gets
+        // expanded target bounds at start of transition
+        // to prevent jump cut at end of transition
+        if (Scenes.Lockscreen in keys && Scenes.Shade in keys) {
+            return Scenes.Shade
+        }
+        return defaultPicker.pickContentFrom(keys)
     }
 }

@@ -278,14 +278,6 @@ class Session extends IWindowSession.Stub implements IBinder.DeathRecipient {
     }
 
     @Override
-    public int addToDisplayWithoutInputChannel(IWindow window, WindowManager.LayoutParams attrs,
-            int viewVisibility, int displayId, WindowRelayoutResult result) {
-        return mService.addWindow(this, window, attrs, viewVisibility, displayId,
-                UserHandle.getUserId(mUid), WindowInsets.Type.defaultVisible(),
-                null /* outInputChannel */, result);
-    }
-
-    @Override
     public void remove(IBinder clientToken) {
         mService.removeClientToken(this, clientToken);
     }
@@ -670,8 +662,7 @@ class Session extends IWindowSession.Stub implements IBinder.DeathRecipient {
                 WallpaperController wallpaperController =
                         windowState.getDisplayContent().mWallpaperController;
                 if (mCanAlwaysUpdateWallpaper
-                        || windowState == wallpaperController.getWallpaperTarget()
-                        || windowState == wallpaperController.getPrevWallpaperTarget()) {
+                        || windowState == wallpaperController.getWallpaperTarget()) {
                     wallpaperController.sendWindowWallpaperCommandUnchecked(
                             windowState, action, x, y, z, extras);
                 }
@@ -982,9 +973,6 @@ class Session extends IWindowSession.Stub implements IBinder.DeathRecipient {
     @Override
     public void setOnBackInvokedCallbackInfoToEmbedded(InputTransferToken targetInputToken,
             OnBackInvokedCallbackInfo callbackInfo) {
-        if (!Flags.enableBackCallbackForFocusedSurfaceControlViewHost()) {
-            return;
-        }
         final long identity = Binder.clearCallingIdentity();
         if (!mCanAddInternalSystemWindow) {
             // Callers without INTERNAL_SYSTEM_WINDOW permission cannot register

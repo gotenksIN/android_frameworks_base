@@ -198,7 +198,6 @@ import java.util.List;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 
-
 /**
  * An activity is a single, focused thing that the user can do.  Almost all
  * activities interact with the user, so the Activity class takes care of
@@ -3337,14 +3336,16 @@ public class Activity extends ContextThemeWrapper
      * @param approvalCallback Optional callback, use {@code null} when not necessary. When the
      *                         request is approved or rejected, the callback will be triggered. This
      *                         will happen before any configuration change. The callback will be
-     *                         dispatched on the main thread. If the request is rejected, the
-     *                         Throwable provided will be an {@link IllegalStateException} with a
-     *                         detailed message can be retrieved by {@link Throwable#getMessage()}.
+     *                         dispatched on the main thread except on devices with API level 36.1
+     *                         or lower, where the behavior is undefined. If the request is
+     *                         rejected, the Throwable provided will be an
+     *                         {@link IllegalStateException} with a detailed message can be
+     *                         retrieved by {@link Throwable#getMessage()}.
      */
     public void requestFullscreenMode(@FullscreenModeRequest int request,
             @Nullable OutcomeReceiver<Void, Throwable> approvalCallback) {
         FullscreenRequestHandler.getInstance().requestFullscreenMode(
-                request, approvalCallback , getActivityToken());
+                request, approvalCallback, getActivityToken(), getMainExecutor());
     }
 
     /**
@@ -5969,12 +5970,15 @@ public class Activity extends ContextThemeWrapper
      *
      * @param permission A permission your app wants to request.
      * @return Whether you should show permission rationale UI.
-     *
      * @see #checkSelfPermission
      * @see #requestPermissions
      * @see #onRequestPermissionsResult
      */
+    @Override
     public boolean shouldShowRequestPermissionRationale(@NonNull String permission) {
+        if (Flags.shouldShowPermissionRationaleInContextEnabled()) {
+            return super.shouldShowRequestPermissionRationale(permission);
+        }
         return getPackageManager().shouldShowRequestPermissionRationale(permission);
     }
 
@@ -8121,6 +8125,18 @@ public class Activity extends ContextThemeWrapper
                 final Bitmap icon = Bitmap.createScaledBitmap(taskDescription.getIcon(), size, size,
                         true);
                 mTaskDescription.setIcon(Icon.createWithBitmap(icon));
+            }
+            // Scale the badge down to something reasonable if it is provided
+            final Icon badge = taskDescription.getBadge();
+            if (badge != null) {
+                if (badge.getType() == Icon.TYPE_BITMAP) {
+                    final int size = ActivityManager.getLauncherLargeIconSizeInner(this);
+                    final Bitmap bitmap =
+                            Bitmap.createScaledBitmap(badge.getBitmap(), size, size, true);
+                    mTaskDescription.setBadge(Icon.createWithBitmap(bitmap));
+                } else {
+                    mTaskDescription.setBadge(badge);
+                }
             }
         }
         if (mLastTaskDescriptionHashCode == mTaskDescription.hashCode()) {

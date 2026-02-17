@@ -24,7 +24,6 @@ import android.app.admin.DpcAuthority;
 import android.app.admin.RoleAuthority;
 import android.app.admin.SystemAuthority;
 import android.app.admin.UnknownAuthority;
-import android.app.admin.flags.Flags;
 import android.app.role.RoleManager;
 import android.content.ComponentName;
 import android.os.UserHandle;
@@ -54,15 +53,15 @@ import java.util.Set;
  * </ul>
  *
  */
-final class EnforcingAdmin {
+public final class EnforcingAdmin {
 
     static final String TAG = "EnforcingAdmin";
 
-    static final String ROLE_AUTHORITY_PREFIX = "role:";
-    static final String SYSTEM_AUTHORITY_PREFIX = "system:";
-    static final String DPC_AUTHORITY = "enterprise";
-    static final String DEVICE_ADMIN_AUTHORITY = "device_admin";
-    static final String DEFAULT_AUTHORITY = "default";
+    public static final String ROLE_AUTHORITY_PREFIX = "role:";
+    public static final String SYSTEM_AUTHORITY_PREFIX = "system:";
+    public static final String DPC_AUTHORITY = "enterprise";
+    public static final String DEVICE_ADMIN_AUTHORITY = "device_admin";
+    public static final String DEFAULT_AUTHORITY = "default";
 
     private static final String ATTR_PACKAGE_NAME = "package-name";
     private static final String ATTR_SYSTEM_ENTITY = "system-entity";
@@ -71,8 +70,6 @@ final class EnforcingAdmin {
     private static final String ATTR_AUTHORITIES_SEPARATOR = ";";
     private static final String ATTR_USER_ID = "user-id";
     private static final String ATTR_IS_ROLE = "is-role";
-    @Deprecated // It is no longer read and will be removed.
-    private static final String ATTR_IS_SYSTEM = "is-system";
 
     // This is needed for DPCs and active admins
     private final ComponentName mComponentName;
@@ -135,32 +132,14 @@ final class EnforcingAdmin {
         } else if (DeviceAdminAuthority.DEVICE_ADMIN_AUTHORITY.equals(authority)) {
             return createDeviceAdminEnforcingAdmin(admin.getComponentName(), userId);
         } else if (authority instanceof RoleAuthority roleAuthority) {
-            if (Flags.tightenAdminInstantiation()) {
-                return createRoleEnforcingAdmin(admin.getPackageName(), userId);
-            } else {
-                return new EnforcingAdmin(
-                        new AdminKey.Package(userId, admin.getPackageName()),
-                        admin.getComponentName(),
-                        true,
-                        new HashSet<>(roleAuthority.getRoles())
-                );
-            }
+            return createRoleEnforcingAdmin(admin.getPackageName(), userId);
         } else if (authority instanceof SystemAuthority systemAuthority) {
             return createSystemEnforcingAdmin(systemAuthority.getSystemEntity());
         }
-        if (Flags.tightenAdminInstantiation()) {
-            throw new IllegalArgumentException("Unknown admin type: " + admin);
-        } else {
-            return new EnforcingAdmin(
-                    new AdminKey.Package(userId, admin.getPackageName()),
-                    admin.getComponentName(),
-                    false, /* isRoleAuthority */
-                    Set.of()  /* authorities */
-            );
-        }
+        throw new IllegalArgumentException("Unknown admin type: " + admin);
     }
 
-    static String getRoleAuthorityOf(String roleName) {
+    public static String getRoleAuthorityOf(String roleName) {
         return ROLE_AUTHORITY_PREFIX + roleName;
     }
 
@@ -317,47 +296,17 @@ final class EnforcingAdmin {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         EnforcingAdmin other = (EnforcingAdmin) o;
-        if (Flags.packageAsAdminId()) {
-            return mAdminKey.equals(other.mAdminKey);
-        }
-        return Objects.equals(mAdminKey.getPackageName(), other.mAdminKey.getPackageName())
-                && Objects.equals(mAdminKey.getSystemEntity(), other.mAdminKey.getSystemEntity())
-                && Objects.equals(mComponentName, other.mComponentName)
-                && Objects.equals(mIsRoleAuthority, other.mIsRoleAuthority)
-                && (isSystemAuthority() == other.isSystemAuthority())
-                && hasMatchingAuthorities(this, other);
-    }
-
-    private static boolean hasMatchingAuthorities(EnforcingAdmin admin1, EnforcingAdmin admin2) {
-        if (admin1.mIsRoleAuthority && admin2.mIsRoleAuthority) {
-            return true;
-        }
-        return admin1.getAuthorities().equals(admin2.getAuthorities());
+        return mAdminKey.equals(other.mAdminKey);
     }
 
     @Override
     public int hashCode() {
-        if (Flags.packageAsAdminId()) {
-            return mAdminKey.hashCode();
-        }
-        if (mIsRoleAuthority) {
-            return Objects.hash(mAdminKey.getPackageName(), mAdminKey.getUserId());
-        } else if (isSystemAuthority()) {
-            return Objects.hash(mAdminKey.getSystemEntity());
-        } else {
-            return Objects.hash(
-                    mComponentName == null ? mAdminKey.getPackageName() : mComponentName,
-                    mAdminKey.getUserId(),
-                    getAuthorities());
-        }
+        return mAdminKey.hashCode();
     }
 
     void saveToXml(TypedXmlSerializer serializer) throws IOException {
         serializer.attribute(/* namespace= */ null, ATTR_PACKAGE_NAME, mAdminKey.getPackageName());
         serializer.attributeBoolean(/* namespace= */ null, ATTR_IS_ROLE, mIsRoleAuthority);
-        if (!Flags.dontWriteIsSystemAuthority()) {
-            serializer.attributeBoolean(/* namespace= */ null, ATTR_IS_SYSTEM, isSystemAuthority());
-        }
         serializer.attributeInt(/* namespace= */ null, ATTR_USER_ID, mAdminKey.getUserId());
         if (isSystemAuthority()) {
             serializer.attribute(
@@ -420,19 +369,10 @@ final class EnforcingAdmin {
             }
 
             // We've got a freak of an admin that should be impossible to create.
-            if (Flags.tightenAdminInstantiation()) {
-                Slogf.wtf(TAG,
-                        "Invalid EnforcingAdmin, package: %s, component: %s, authorities: %s",
-                        packageName, componentName, authoritiesStr);
-                return null;
-            } else {
-                return new EnforcingAdmin(
-                        new AdminKey.Package(userId, packageName),
-                        componentName,
-                        false, /* isRoleAuthority */
-                        new HashSet<>(Set.of(authorities))
-                );
-            }
+            Slogf.wtf(TAG,
+                    "Invalid EnforcingAdmin, package: %s, component: %s, authorities: %s",
+                    packageName, componentName, authoritiesStr);
+            return null;
         }
     }
 

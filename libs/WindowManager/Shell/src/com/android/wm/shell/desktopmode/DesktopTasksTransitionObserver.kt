@@ -54,7 +54,6 @@ class DesktopTasksTransitionObserver(
     private val desktopMixedTransitionHandler: DesktopMixedTransitionHandler,
     private val desktopWallpaperActivityTokenProvider: DesktopWallpaperActivityTokenProvider,
     private val displayController: DisplayController,
-    private val desktopImmersiveController: DesktopImmersiveController,
     desktopState: DesktopState,
     shellInit: ShellInit,
 ) : Transitions.TransitionObserver {
@@ -64,6 +63,7 @@ class DesktopTasksTransitionObserver(
     private var transitionToCloseWallpaper: CloseWallpaperTransition? = null
     private var closingTransitionToTransitionInfo = HashMap<IBinder, TransitionInfo>()
     private var currentProfileId: Int
+    private val pendingUserBoundsChangeTransitions = mutableSetOf<IBinder>()
 
     init {
         if (desktopState.canEnterDesktopMode) {
@@ -96,7 +96,7 @@ class DesktopTasksTransitionObserver(
             closingTransitionToTransitionInfo.put(transition, info)
         }
         removeWallpaperOnLastTaskClosingIfNeeded(transition, info)
-        updateLastPackageStateChange(info, transition)
+        updateRememberedBoundsIfNeeded(info, transition)
     }
 
     private fun containsClosingTaskInDesktop(info: TransitionInfo): Boolean {
@@ -192,12 +192,14 @@ class DesktopTasksTransitionObserver(
      */
     private fun removeClosingTasks(info: TransitionInfo) {
         val wct = WindowContainerTransaction()
+        // Keeping processes alive allows for faster (warm) future launches of the same apps.
+        val killProcess = !Flags.skipKillProcessForDesktopTaskCoreCloseTransition()
         info.changes
             .filter { it.mode == TRANSIT_CLOSE }
             .mapNotNull { it.taskInfo }
             .forEach { taskInfo ->
                 if (taskInfo.windowingMode != WINDOWING_MODE_FREEFORM) return@forEach
-                wct.removeTask(taskInfo.token)
+                wct.removeTask(taskInfo.token, /* removeFromRecents= */ true, killProcess)
                 ProtoLog.d(
                     WM_SHELL_DESKTOP_MODE,
                     "DesktopTasksTransitionObserver: removing closing task=%d fully",
@@ -268,10 +270,13 @@ class DesktopTasksTransitionObserver(
         }
     }
 
-    private fun updateLastPackageStateChange(info: TransitionInfo, transition: IBinder) {
+    private fun updateRememberedBoundsIfNeeded(info: TransitionInfo, transition: IBinder) {
         if (!Flags.enableRememberedBounds()) {
             return
         }
+        if (!pendingUserBoundsChangeTransitions.contains(transition)) return
+        pendingUserBoundsChangeTransitions.remove(transition)
+
         run forEachLoop@{
             info.changes.forEach { change ->
                 change.taskInfo?.let { taskInfo ->
@@ -280,6 +285,23 @@ class DesktopTasksTransitionObserver(
                     if (change.startAbsBounds == change.endAbsBounds) return@forEachLoop
                     // Is a freeform task.
                     if (!taskInfo.isFreeform) return@forEachLoop
+                    // TODO: b/477848767 - Remember only position if the task is unresizable.
+                    // Is resizable.
+                    if (!taskInfo.isResizeable) {
+                        logV(
+                            "Remembered bounds is NOT updated as task#%d is unresizable",
+                            taskInfo.taskId,
+                        )
+                        return@forEachLoop
+                    }
+                    if (taskInfo.appCompatTaskInfo?.hasIsExcludeCaptionInsets() == true) {
+                        logV(
+                            "Remembered bounds is NOT updated as task#%d has " +
+                                "isExcludeCaptionInsets",
+                            taskInfo.taskId,
+                        )
+                        return@forEachLoop
+                    }
 
                     val desktopRepository = desktopUserRepositories.getProfile(taskInfo.userId)
                     if (desktopRepository.isTaskInFullImmersiveState(taskInfo.taskId)) {
@@ -287,15 +309,11 @@ class DesktopTasksTransitionObserver(
                         // state.
                         return@forEachLoop
                     }
-                    if (desktopImmersiveController.isImmersiveChange(transition, change)) {
-                        // We don't update the remembered bounds on enter/exit immersive
-                        // transitions.
-                        return@forEachLoop
-                    }
 
                     val displayLayout =
                         displayController.getDisplayLayout(taskInfo.displayId) ?: return@forEachLoop
-                    val packageName = taskInfo.baseActivity?.packageName ?: return@forEachLoop
+                    val packageName =
+                        taskInfo.componentNameForRememberedBounds?.packageName ?: return@forEachLoop
                     val stableBounds =
                         Rect().apply { displayLayout.getStableBoundsForDesktopMode(this) }
                     val bounds = taskInfo.configuration.windowConfiguration.bounds
@@ -309,9 +327,34 @@ class DesktopTasksTransitionObserver(
                             bottom =
                                 (bounds.bottom - stableBounds.top) / stableBounds.height().toFloat()
                         }
+                    logV(
+                        "Remembered bounds for package=%s is updated as task#%d was resized to " +
+                            "%s: boundsRatio=%s",
+                        packageName,
+                        taskInfo.taskId,
+                        bounds,
+                        boundsRatio,
+                    )
                     desktopRepository.setRememberedBoundsRatio(packageName, boundsRatio)
                 }
             }
         }
+    }
+
+    fun addPendingUserBoundsChangeTransition(transition: IBinder) {
+        if (!Flags.enableRememberedBounds()) {
+            return
+        }
+        pendingUserBoundsChangeTransitions.add(transition)
+    }
+
+    // TODO(b/478792808): Remove suppression
+    @SuppressWarnings("ProtoLogNonConstantFormat")
+    private fun logV(msg: String, vararg arguments: Any?) {
+        ProtoLog.v(WM_SHELL_DESKTOP_MODE, "%s: $msg", TAG, *arguments)
+    }
+
+    private companion object {
+        const val TAG = "DesktopTasksTransitionObserver"
     }
 }

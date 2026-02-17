@@ -177,6 +177,14 @@ class MultiDisplayVeiledResizeTaskPositioner(
                     taskBoundsAtDragStart,
                 )
             }
+            // Events within the task bounds are handled by WMS#onPointerDownOutsideFocusLocked and
+            // WMS moves the focus to the touched window.
+            if (
+                Flags.moveTaskToFrontOnDragResizingBugfix() &&
+                    !taskBoundsAtDragStart.contains(x.toInt(), y.toInt())
+            ) {
+                desktopTasksController.moveTaskToFront(windowDecoration.taskInfo)
+            }
             // Capture CUJ for re-sizing window in DW mode.
             interactionJankMonitor.begin(
                 createLongTimeoutJankConfigBuilder(Cuj.CUJ_DESKTOP_MODE_RESIZE_WINDOW)
@@ -367,7 +375,8 @@ class MultiDisplayVeiledResizeTaskPositioner(
                     // Reset app bounds if app bounds were overridden.
                     wct.setAppBounds(windowDecoration.taskInfo.token, null)
                 }
-                transitions.startTransition(WindowManager.TRANSIT_CHANGE, wct, this)
+                val t = transitions.startTransition(WindowManager.TRANSIT_CHANGE, wct, this)
+                desktopTasksController.onDragResizeTransitionStarted(t)
             } else {
                 // If bounds haven't changed, perform necessary veil reset here as startAnimation
                 // won't be called.

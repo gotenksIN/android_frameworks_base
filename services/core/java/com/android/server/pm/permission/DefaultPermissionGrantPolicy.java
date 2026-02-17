@@ -621,11 +621,11 @@ final class DefaultPermissionGrantPolicy {
                 userId, STORAGE_PERMISSIONS, NOTIFICATION_PERMISSIONS);
 
         // Verifier
-        final String verifier = ArrayUtils.firstOrNull(getKnownPackages(
-                KnownPackages.PACKAGE_VERIFIER, userId));
-        grantSystemFixedPermissionsToSystemPackage(pm, verifier, userId, STORAGE_PERMISSIONS);
-        grantPermissionsToSystemPackage(pm, verifier, userId, PHONE_PERMISSIONS, SMS_PERMISSIONS,
-                NOTIFICATION_PERMISSIONS);
+        for (String verifier : getKnownPackages(KnownPackages.PACKAGE_VERIFIER, userId)) {
+            grantSystemFixedPermissionsToSystemPackage(pm, verifier, userId, STORAGE_PERMISSIONS);
+            grantPermissionsToSystemPackage(pm, verifier, userId, PHONE_PERMISSIONS,
+                    SMS_PERMISSIONS, NOTIFICATION_PERMISSIONS);
+        }
 
         // SetupWizard
         final String setupWizardPackage = ArrayUtils.firstOrNull(getKnownPackages(
@@ -663,6 +663,14 @@ final class DefaultPermissionGrantPolicy {
         grantSystemFixedPermissionsToSystemPackage(pm,
                 getDefaultProviderAuthorityPackage(MediaStore.AUTHORITY, userId), userId,
                 STORAGE_PERMISSIONS, NOTIFICATION_PERMISSIONS);
+
+        // Provide Camera and Microphone permission for Android System Photopicker for it's
+        // camera feature.
+        grantSystemFixedPermissionsToSystemPackage(pm,
+                getDefaultSystemHandlerActivityPackage(pm, MediaStore.ACTION_PICK_IMAGES, userId),
+                userId,
+                CAMERA_PERMISSIONS,
+                MICROPHONE_PERMISSIONS);
 
         // Downloads provider
         grantSystemFixedPermissionsToSystemPackage(pm,
@@ -760,6 +768,12 @@ final class DefaultPermissionGrantPolicy {
                 getDefaultSystemHandlerActivityPackageForCategory(pm,
                         Intent.CATEGORY_APP_CONTACTS, userId),
                 userId, CONTACTS_PERMISSIONS, PHONE_PERMISSIONS);
+
+        // Contacts picker
+        if (android.content.flags.Flags.enableSystemContactsPicker()) {
+            grantSystemFixedPermissionsToSystemPackage(pm,
+                    "com.android.contactspicker", userId, CONTACTS_PERMISSIONS);
+        }
 
         // Contacts provider sync adapters
         if (contactsSyncAdapterPackages != null) {
@@ -1402,13 +1416,21 @@ final class DefaultPermissionGrantPolicy {
                 // Honor the fixed/user-set flags of the source permission when a permission split
                 // is for migrating the same functionality towards a different name. See also
                 // b/465842402
-                int sourceFlags = switch (permission) {
-                    case HealthPermissions.READ_HEART_RATE -> pm.getPermissionFlags(
-                            Manifest.permission.BODY_SENSORS, pkg, user);
-                    case HealthPermissions.READ_HEALTH_DATA_IN_BACKGROUND -> pm.getPermissionFlags(
-                            Manifest.permission.BODY_SENSORS_BACKGROUND, pkg, user);
-                    default -> 0;
-                };
+                String sourcePermission =
+                        switch (permission) {
+                            case HealthPermissions.READ_HEART_RATE ->
+                                    Manifest.permission.BODY_SENSORS;
+                            case HealthPermissions.READ_HEALTH_DATA_IN_BACKGROUND ->
+                                    Manifest.permission.BODY_SENSORS_BACKGROUND;
+                            default -> null;
+                        };
+                boolean sourceGranted = false;
+                boolean sourceFixedOrUserSet = false;
+                if (sourcePermission != null) {
+                    sourceGranted = pm.isGranted(sourcePermission, pkg, user);
+                    sourceFixedOrUserSet =
+                            isFixedOrUserSet(pm.getPermissionFlags(sourcePermission, pkg, user));
+                }
 
                 // Certain flags imply that the permission's current state by the system or
                 // device/profile owner or the user. In these cases we do not want to clobber the
@@ -1417,7 +1439,7 @@ final class DefaultPermissionGrantPolicy {
                 // Unless the caller wants to override user choices. The override is
                 // to make sure we can grant the needed permission to the default
                 // sms and phone apps after the user chooses this in the UI.
-                if (!(isFixedOrUserSet(flags) || isFixedOrUserSet(sourceFlags))
+                if (!(isFixedOrUserSet(flags) || (!sourceGranted && sourceFixedOrUserSet))
                         || ignoreSystemPackage
                         || changingGrantForSystemFixed) {
                     // Never clobber policy fixed permissions.

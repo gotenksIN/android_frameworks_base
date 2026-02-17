@@ -22,6 +22,7 @@ import static android.view.WindowInsets.Type.statusBars;
 import static android.view.WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
 import static android.view.WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH;
 import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION;
+import static android.view.WindowManager.LayoutParams.TYPE_APPLICATION_CAPTION_BAR;
 import static android.view.WindowManager.TRANSIT_CHANGE;
 
 import android.annotation.NonNull;
@@ -381,7 +382,7 @@ public abstract class WindowDecoration<T extends View & TaskFocusStateConsumer>
                 new WindowManager.LayoutParams(
                         outResult.mCaptionWidth,
                         outResult.mCaptionHeight,
-                        TYPE_APPLICATION,
+                        TYPE_APPLICATION_CAPTION_BAR,
                         FLAG_NOT_FOCUSABLE,
                         PixelFormat.TRANSPARENT);
         lp.setTitle("Caption of Task=" + mTaskInfo.taskId);
@@ -509,15 +510,34 @@ public abstract class WindowDecoration<T extends View & TaskFocusStateConsumer>
         final Rect captionInsetsRect = new Rect(taskBounds);
         captionInsetsRect.bottom = captionInsetsRect.top + outResult.mCaptionHeight;
 
-        // Caption bounding rectangles: these are optional, and are used to present finer
-        // insets than traditional |Insets| to apps about where their content is occluded.
-        // These are in coordinates relative to the caption frame.
-        final List<Rect> boundingRects = CaptionRegionHelper.calculateBoundingRectsInsets(
-                decorWindowContext, localCaptionBounds, params.mOccludingElementsCalculator.get());
-
-        final WindowDecorationInsets newInsets = new WindowDecorationInsets(
-                mTaskInfo.token, mOwner, captionInsetsRect, taskBounds, boundingRects,
-                params.mInsetSourceFlags, params.mIsInsetSource, params.mShouldSetAppBounds);
+        final WindowDecorationInsets newInsets =
+                com.android.window.flags.Flags.improveFluidResizingPerformance()
+                        ? new WindowDecorationInsets(
+                                mTaskInfo.token, mOwner, captionInsetsRect, taskBounds,
+                                Collections.emptyList(),
+                                // Caption bounding rectangles: these are optional, and are used to
+                                // present finer insets than traditional |Insets| to apps about
+                                // where their content is occluded.
+                                // These are in coordinates relative to the caption frame.
+                                CaptionRegionHelper.calculateInsetsBoundingRectsInsets(
+                                        decorWindowContext,
+                                        localCaptionBounds,
+                                        params.mOccludingElementsCalculator.get()),
+                                params.mInsetSourceFlags, params.mIsInsetSource,
+                                params.mShouldSetAppBounds)
+                        : new WindowDecorationInsets(
+                                mTaskInfo.token, mOwner, captionInsetsRect, taskBounds,
+                                // Caption bounding rectangles: these are optional, and are used to
+                                // present finer insets than traditional |Insets| to apps about
+                                // where their content is occluded.
+                                // These are in coordinates relative to the caption frame.
+                                CaptionRegionHelper.calculateBoundingRectsInsets(
+                                        decorWindowContext,
+                                        localCaptionBounds,
+                                        params.mOccludingElementsCalculator.get()),
+                                Collections.emptyList(),
+                                params.mInsetSourceFlags, params.mIsInsetSource,
+                                params.mShouldSetAppBounds);
         if (!newInsets.equals(mWindowDecorationInsets)) {
             // Add or update this caption as an insets source.
             mWindowDecorationInsets = newInsets;
@@ -795,7 +815,8 @@ public abstract class WindowDecoration<T extends View & TaskFocusStateConsumer>
         final Rect captionInsets = new Rect(0, 0, 0, captionHeight);
         final WindowDecorationInsets newInsets = new WindowDecorationInsets(mTaskInfo.token,
                 mOwner, captionInsets, null  /* taskFrame */,
-                Collections.emptyList() /* boundingRects */, 0 /* flags */,
+                Collections.emptyList() /* boundingRects */,
+                Collections.emptyList() /* insetsBoundingRects */, 0 /* flags */,
                 true /* shouldAddCaptionInset */, false /* excludedFromAppBounds */);
         if (!newInsets.equals(mWindowDecorationInsets)) {
             mWindowDecorationInsets = newInsets;

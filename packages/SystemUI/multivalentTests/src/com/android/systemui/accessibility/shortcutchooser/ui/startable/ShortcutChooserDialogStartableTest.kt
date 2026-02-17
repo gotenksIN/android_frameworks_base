@@ -35,6 +35,7 @@ import androidx.compose.ui.test.junit4.createEmptyComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performScrollTo
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.internal.accessibility.common.ShortcutChooserDialogConstants
@@ -82,6 +83,8 @@ class ShortcutChooserDialogStartableTest : SysuiTestCase() {
             FakeAccessibilityShortcutsRepository.FAKE_TALKBACK_TARGET_NAME
         const val MAGNIFICATION_TARGET_NAME =
             FakeAccessibilityShortcutsRepository.FAKE_MAGNIFICATION_TARGET_NAME
+        const val UNTRUSTED_SERVICE_TARGET_NAME =
+            FakeAccessibilityShortcutsRepository.FAKE_UNTRUSTED_SERVICE_TARGET_NAME
     }
 
     @get:Rule val composeTestRule = createEmptyComposeRule()
@@ -102,18 +105,16 @@ class ShortcutChooserDialogStartableTest : SysuiTestCase() {
     @Before
     fun setUp() {
         setOobeCompleted(true)
-
-        onTeardown {
-            runOnMainThreadAndWaitForIdleSync { with(kosmos) { viewModel.dismissDialog() } }
-        }
     }
 
     @Test
-    fun start_doesNotShowDialogByDefault() = kosmos.runTest { assertCurrentDialog(DialogType.NONE) }
+    fun start_doesNotShowDialogByDefault() = runTestAndDismiss {
+        assertCurrentDialog(DialogType.NONE)
+    }
 
     @Test
     fun createDialog_topRowKey_noSelectedTargets_showInitialScreen_andClickCancelButton() =
-        kosmos.runTest {
+        runTestAndDismiss {
             underTest.start()
 
             sendIntentInMainThreadWaitForIdle()
@@ -131,18 +132,17 @@ class ShortcutChooserDialogStartableTest : SysuiTestCase() {
         }
 
     @Test
-    fun createDialog_hardware_noSelectedTargets_noDialog() =
-        kosmos.runTest {
-            underTest.start()
+    fun createDialog_hardware_noSelectedTargets_noDialog() = runTestAndDismiss {
+        underTest.start()
 
-            sendIntentInMainThreadWaitForIdle(UserShortcutType.HARDWARE)
+        sendIntentInMainThreadWaitForIdle(UserShortcutType.HARDWARE)
 
-            assertCurrentDialog(DialogType.NONE)
-        }
+        assertCurrentDialog(DialogType.NONE)
+    }
 
     @Test
     fun createDialog_topRowKey_noSelectedTargets_andClickAddFeatureButton_showEditTargetsDialog() =
-        kosmos.runTest {
+        runTestAndDismiss {
             underTest.start()
 
             sendIntentInMainThreadWaitForIdle()
@@ -157,7 +157,7 @@ class ShortcutChooserDialogStartableTest : SysuiTestCase() {
 
     @Test
     fun createDialog_topRowKey_editTargetsDialog_selectOneTarget_dismissDialog() =
-        kosmos.runTest {
+        runTestAndDismiss {
             underTest.start()
 
             sendIntentInMainThreadWaitForIdle()
@@ -173,7 +173,7 @@ class ShortcutChooserDialogStartableTest : SysuiTestCase() {
             assertThat(getSelectedTargetNames()).isEqualTo(setOf(TALKBACK_TARGET_NAME))
 
             // Finally click on Done button.
-            composeTestRule.onDoneButton().performClick()
+            composeTestRule.onDoneButton().performScrollAndClick()
             composeTestRule.waitForIdle()
 
             // Will dismiss the dialog, because there are less than two targets selected.
@@ -182,7 +182,7 @@ class ShortcutChooserDialogStartableTest : SysuiTestCase() {
 
     @Test
     fun createDialog_topRowKey_editTargetsDialog_selectTwoTarget_showToggleTargetsDialog() =
-        kosmos.runTest {
+        runTestAndDismiss {
             underTest.start()
 
             sendIntentInMainThreadWaitForIdle()
@@ -204,7 +204,7 @@ class ShortcutChooserDialogStartableTest : SysuiTestCase() {
                 .isEqualTo(setOf(TALKBACK_TARGET_NAME, MAGNIFICATION_TARGET_NAME))
 
             // Finally click on Done button.
-            composeTestRule.onDoneButton().performClick()
+            composeTestRule.onDoneButton().performScrollAndClick()
             composeTestRule.waitForIdle()
 
             // Will show Toggle targets dialog, because there are at least two targets selected.
@@ -212,35 +212,32 @@ class ShortcutChooserDialogStartableTest : SysuiTestCase() {
         }
 
     @Test
-    fun createDialog_hardware_oneSelectedTarget_noDialog() =
-        kosmos.runTest {
-            // Assume there is only one feature selected before pressing the key.
-            setTalkBackSelected(UserShortcutType.HARDWARE)
+    fun createDialog_hardware_oneSelectedTarget_noDialog() = runTestAndDismiss {
+        // Assume there is only one feature selected before pressing the key.
+        setTalkBackSelected(UserShortcutType.HARDWARE)
 
-            underTest.start()
+        underTest.start()
 
-            sendIntentInMainThreadWaitForIdle(UserShortcutType.HARDWARE)
+        sendIntentInMainThreadWaitForIdle(UserShortcutType.HARDWARE)
 
-            assertCurrentDialog(DialogType.NONE)
-        }
-
-    @Test
-    fun createDialog_topRowKey_oneSelectedTarget_noDialog() =
-        kosmos.runTest {
-            // Assume there is only one feature selected before pressing the key.
-            setTalkBackSelected()
-
-            underTest.start()
-
-            sendIntentInMainThreadWaitForIdle(UserShortcutType.TOP_ROW_KEY)
-            composeTestRule.waitForIdle()
-
-            assertCurrentDialog(DialogType.NONE)
-        }
+        assertCurrentDialog(DialogType.NONE)
+    }
 
     @Test
-    fun createDialog_topRowKey_twoSelectedTargets_showToggleScreen_andClickToggleableTargetRow_enablesFeatureAndLeavesDialogOpen() =
-        kosmos.runTest {
+    fun createDialog_topRowKey_oneSelectedTarget_noDialog() = runTestAndDismiss {
+        // Assume there is only one feature selected before pressing the key.
+        setTalkBackSelected()
+
+        underTest.start()
+
+        sendIntentInMainThreadWaitForIdle(UserShortcutType.TOP_ROW_KEY)
+
+        assertCurrentDialog(DialogType.NONE)
+    }
+
+    @Test
+    fun createDialog_topRowKey_twoSelectedTargets_showToggleScreen_andClickToggleableTargetRow_enablesFeatureAndClosesDialog() =
+        runTestAndDismiss {
             setTalkbackAndMagnificationSelected()
 
             underTest.start()
@@ -255,14 +252,14 @@ class ShortcutChooserDialogStartableTest : SysuiTestCase() {
             composeTestRule.onNodeWithTag(TALKBACK_TARGET_NAME).performClick()
             composeTestRule.waitForIdle()
 
-            // Will toggle Talkback feature on/off and leave the dialog open.
+            // Will toggle Talkback feature on/off and dismiss the dialog.
             assertThat(getEnabledTargetNames()).isEqualTo(setOf(TALKBACK_TARGET_NAME))
-            assertCurrentDialog(DialogType.TOGGLE_TARGETS)
+            assertCurrentDialog(DialogType.NONE)
         }
 
     @Test
     fun createDialog_topRowKey_twoSelectedTargets_showToggleScreen_andClickNonToggleableTargetRow_enablesFeatureAndClosesDialog() =
-        kosmos.runTest {
+        runTestAndDismiss {
             setTalkbackAndMagnificationSelected()
 
             underTest.start()
@@ -283,42 +280,40 @@ class ShortcutChooserDialogStartableTest : SysuiTestCase() {
         }
 
     @Test
-    fun createDialog_topRowKey_twoSelectedTargets_clickEditButton() =
-        kosmos.runTest {
-            setTalkbackAndMagnificationSelected()
+    fun createDialog_topRowKey_twoSelectedTargets_clickEditButton() = runTestAndDismiss {
+        setTalkbackAndMagnificationSelected()
 
-            underTest.start()
+        underTest.start()
 
-            sendIntentInMainThreadWaitForIdle()
+        sendIntentInMainThreadWaitForIdle()
 
-            // Click on the Edit button.
-            composeTestRule.onEditButton().performClick()
-            composeTestRule.waitForIdle()
+        // Click on the Edit button.
+        composeTestRule.onEditButton().performClick()
+        composeTestRule.waitForIdle()
 
-            // Will do the recomposition to the Edit targets dialog.
-            assertCurrentDialog(DialogType.EDIT_TARGETS)
-        }
+        // Will do the recomposition to the Edit targets dialog.
+        assertCurrentDialog(DialogType.EDIT_TARGETS)
+    }
 
     @Test
-    fun createDialog_topRowKey_twoSelectedTargets_clickDoneButton() =
-        kosmos.runTest {
-            setTalkbackAndMagnificationSelected()
+    fun createDialog_topRowKey_twoSelectedTargets_clickDoneButton() = runTestAndDismiss {
+        setTalkbackAndMagnificationSelected()
 
-            underTest.start()
+        underTest.start()
 
-            sendIntentInMainThreadWaitForIdle()
+        sendIntentInMainThreadWaitForIdle()
 
-            // Click on the Done button.
-            composeTestRule.onDoneButton().performClick()
-            composeTestRule.waitForIdle()
+        // Click on the Done button.
+        composeTestRule.onDoneButton().performScrollAndClick()
+        composeTestRule.waitForIdle()
 
-            // Will dismiss the dialog.
-            assertCurrentDialog(DialogType.NONE)
-        }
+        // Will dismiss the dialog.
+        assertCurrentDialog(DialogType.NONE)
+    }
 
     @Test
     fun createDialog_hardware_twoSelectedTargets_setupIncomplete_noEditButton() =
-        kosmos.runTest {
+        runTestAndDismiss {
             setOobeCompleted(false)
             setTalkbackAndMagnificationSelected(UserShortcutType.HARDWARE)
 
@@ -332,7 +327,7 @@ class ShortcutChooserDialogStartableTest : SysuiTestCase() {
 
     @Test
     fun createDialog_topRowKey_noSelectedTargets_setupIncomplete_sendBroadcast() =
-        kosmos.runTest {
+        runTestAndDismiss {
             setOobeCompleted(false)
 
             underTest.start()
@@ -345,7 +340,7 @@ class ShortcutChooserDialogStartableTest : SysuiTestCase() {
 
     @Test
     fun createDialog_topRowKey_twoSelectedTargets_setupIncomplete_sendBroadcast() =
-        kosmos.runTest {
+        runTestAndDismiss {
             setOobeCompleted(false)
             setTalkbackAndMagnificationSelected()
 
@@ -358,37 +353,35 @@ class ShortcutChooserDialogStartableTest : SysuiTestCase() {
         }
 
     @Test
-    fun createDialog_hardware_twoSelectedTargets_onLoginScreen_noEditButton() =
-        kosmos.runTest {
-            setOobeCompleted(true)
-            fakeHeadlessSystemUserMode.setIsHeadlessSystemUser(true)
-            setTalkbackAndMagnificationSelected(UserShortcutType.HARDWARE)
+    fun createDialog_hardware_twoSelectedTargets_onLoginScreen_noEditButton() = runTestAndDismiss {
+        setOobeCompleted(true)
+        fakeHeadlessSystemUserMode.setIsHeadlessSystemUser(true)
+        setTalkbackAndMagnificationSelected(UserShortcutType.HARDWARE)
 
-            underTest.start()
+        underTest.start()
 
-            sendIntentInMainThreadWaitForIdle(UserShortcutType.HARDWARE)
+        sendIntentInMainThreadWaitForIdle(UserShortcutType.HARDWARE)
 
-            assertCurrentDialog(DialogType.TOGGLE_TARGETS)
-            composeTestRule.onEditButton().assertDoesNotExist()
-        }
+        assertCurrentDialog(DialogType.TOGGLE_TARGETS)
+        composeTestRule.onEditButton().assertDoesNotExist()
+    }
 
     @Test
-    fun createDialog_topRowKey_noSelectedTargets_onLoginScreen_sendBroadcast() =
-        kosmos.runTest {
-            setOobeCompleted(true)
-            fakeHeadlessSystemUserMode.setIsHeadlessSystemUser(true)
+    fun createDialog_topRowKey_noSelectedTargets_onLoginScreen_sendBroadcast() = runTestAndDismiss {
+        setOobeCompleted(true)
+        fakeHeadlessSystemUserMode.setIsHeadlessSystemUser(true)
 
-            underTest.start()
+        underTest.start()
 
-            sendIntentInMainThreadWaitForIdle()
+        sendIntentInMainThreadWaitForIdle()
 
-            assertCurrentDialog(DialogType.NONE)
-            verify(mockBroadcastSender, times(1)).sendBroadcastAsUser(any(), any())
-        }
+        assertCurrentDialog(DialogType.NONE)
+        verify(mockBroadcastSender, times(1)).sendBroadcastAsUser(any(), any())
+    }
 
     @Test
     fun createDialog_topRowKey_twoSelectedTargets_onLoginScreen_sendBroadcast() =
-        kosmos.runTest {
+        runTestAndDismiss {
             setOobeCompleted(true)
             fakeHeadlessSystemUserMode.setIsHeadlessSystemUser(true)
             setTalkbackAndMagnificationSelected()
@@ -402,139 +395,133 @@ class ShortcutChooserDialogStartableTest : SysuiTestCase() {
         }
 
     @Test
-    fun createDialog_hardware_twoSelectedTargets_onLockScreen_noEditButton() =
-        kosmos.runTest {
-            setOobeCompleted(true)
-            fakeKeyguardRepository.setKeyguardShowing(true)
-            setTalkbackAndMagnificationSelected(UserShortcutType.HARDWARE)
+    fun createDialog_hardware_twoSelectedTargets_onLockScreen_noEditButton() = runTestAndDismiss {
+        setOobeCompleted(true)
+        fakeKeyguardRepository.setKeyguardShowing(true)
+        setTalkbackAndMagnificationSelected(UserShortcutType.HARDWARE)
 
-            underTest.start()
+        underTest.start()
 
-            sendIntentInMainThreadWaitForIdle(UserShortcutType.HARDWARE)
+        sendIntentInMainThreadWaitForIdle(UserShortcutType.HARDWARE)
 
-            assertCurrentDialog(DialogType.TOGGLE_TARGETS)
-            // No edit button because of lock screen.
-            composeTestRule.onEditButton().assertDoesNotExist()
-        }
-
-    @Test
-    fun createDialog_topRowKey_noSelectedTargets_onLockScreen_doNothing() =
-        kosmos.runTest {
-            setOobeCompleted(true)
-            fakeKeyguardRepository.setKeyguardShowing(true)
-
-            underTest.start()
-
-            sendIntentInMainThreadWaitForIdle()
-
-            assertCurrentDialog(DialogType.NONE)
-        }
+        assertCurrentDialog(DialogType.TOGGLE_TARGETS)
+        // No edit button because of lock screen.
+        composeTestRule.onEditButton().assertDoesNotExist()
+    }
 
     @Test
-    fun createDialog_topRowKey_twoSelectedTargets_onLockScreen_noEditButton() =
-        kosmos.runTest {
-            setOobeCompleted(true)
-            fakeKeyguardRepository.setKeyguardShowing(true)
-            setTalkbackAndMagnificationSelected()
+    fun createDialog_topRowKey_noSelectedTargets_onLockScreen_doNothing() = runTestAndDismiss {
+        setOobeCompleted(true)
+        fakeKeyguardRepository.setKeyguardShowing(true)
 
-            underTest.start()
+        underTest.start()
 
-            sendIntentInMainThreadWaitForIdle()
+        sendIntentInMainThreadWaitForIdle()
 
-            assertCurrentDialog(DialogType.TOGGLE_TARGETS)
-            // No edit button because of lock screen.
-            composeTestRule.onEditButton().assertDoesNotExist()
-        }
+        assertCurrentDialog(DialogType.NONE)
+    }
 
     @Test
-    fun createDialog_topRowKey_twoSelectedTargets_afterUnlock_showEditButton() =
-        kosmos.runTest {
-            setOobeCompleted(true)
-            fakeKeyguardRepository.setKeyguardShowing(true)
-            setTalkbackAndMagnificationSelected()
+    fun createDialog_topRowKey_twoSelectedTargets_onLockScreen_noEditButton() = runTestAndDismiss {
+        setOobeCompleted(true)
+        fakeKeyguardRepository.setKeyguardShowing(true)
+        setTalkbackAndMagnificationSelected()
 
-            underTest.start()
+        underTest.start()
 
-            sendIntentInMainThreadWaitForIdle()
+        sendIntentInMainThreadWaitForIdle()
 
-            assertCurrentDialog(DialogType.TOGGLE_TARGETS)
-            // No edit button because of lock screen.
-            composeTestRule.onEditButton().assertDoesNotExist()
+        assertCurrentDialog(DialogType.TOGGLE_TARGETS)
+        // No edit button because of lock screen.
+        composeTestRule.onEditButton().assertDoesNotExist()
+    }
 
-            viewModel.dismissDialog()
-            composeTestRule.waitForIdle()
+    @Test
+    fun createDialog_topRowKey_twoSelectedTargets_afterUnlock_showEditButton() = runTestAndDismiss {
+        setOobeCompleted(true)
+        fakeKeyguardRepository.setKeyguardShowing(true)
+        setTalkbackAndMagnificationSelected()
 
-            fakeKeyguardRepository.setKeyguardShowing(false)
+        underTest.start()
 
-            sendIntentInMainThreadWaitForIdle()
+        sendIntentInMainThreadWaitForIdle()
 
-            assertCurrentDialog(DialogType.TOGGLE_TARGETS)
-            composeTestRule.onEditButton().assertIsDisplayed()
-        }
+        assertCurrentDialog(DialogType.TOGGLE_TARGETS)
+        // No edit button because of lock screen.
+        composeTestRule.onEditButton().assertDoesNotExist()
+
+        viewModel.dismissDialog()
+        composeTestRule.waitForIdle()
+
+        fakeKeyguardRepository.setKeyguardShowing(false)
+
+        sendIntentInMainThreadWaitForIdle()
+
+        assertCurrentDialog(DialogType.TOGGLE_TARGETS)
+        composeTestRule.onEditButton().assertIsDisplayed()
+    }
 
     @Test
     @EnableFlags(SystemUIFlags.FLAG_LAUNCH_ACCESSIBILITY_QUICK_ACCESS_DIALOG_PERMISSION)
-    fun createDialog_quickAccess_allShortcutsEnabled() =
-        kosmos.runTest {
-            val shortcutType = UserShortcutType.QUICK_ACCESS
+    fun createDialog_quickAccess_allTrustedShortcutsEnabled() = runTestAndDismiss {
+        val shortcutType = UserShortcutType.QUICK_ACCESS
 
-            underTest.start()
+        underTest.start()
 
-            assertThat(
-                    accessibilityShortcutsRepository
-                        .getSelectedAccessibilityTargetsInfo(shortcutType)
-                        .map { it.targetName }
-                        .toSet()
-                )
-                .isEmpty()
+        assertThat(
+                accessibilityShortcutsRepository
+                    .getSelectedAccessibilityTargetsInfo(shortcutType)
+                    .map { it.targetName }
+                    .toSet()
+            )
+            .isEmpty()
 
-            sendIntentInMainThreadWaitForIdle(shortcutType)
+        sendIntentInMainThreadWaitForIdle(shortcutType)
 
-            assertThat(
-                    accessibilityShortcutsRepository
-                        .getSelectedAccessibilityTargetsInfo(shortcutType)
-                        .map { it.targetName }
-                        .toSet()
-                )
-                .isEqualTo(
-                    accessibilityShortcutsRepository
-                        .getAllAccessibilityTargetsInfo(shortcutType)
-                        .map { it.targetName }
-                        .toSet()
-                )
-        }
+        assertThat(
+                accessibilityShortcutsRepository
+                    .getSelectedAccessibilityTargetsInfo(shortcutType)
+                    .map { it.targetName }
+                    .toSet()
+            )
+            .isEqualTo(
+                accessibilityShortcutsRepository
+                    .getAllAccessibilityTargetsInfo(shortcutType)
+                    .map { it.targetName }
+                    .toSet()
+                    .minus(setOf(UNTRUSTED_SERVICE_TARGET_NAME))
+            )
+    }
 
     @Test
     @EnableFlags(SystemUIFlags.FLAG_LAUNCH_ACCESSIBILITY_QUICK_ACCESS_DIALOG_PERMISSION)
-    fun start_quickAccess_noDialogShownByDefault() =
-        kosmos.runTest {
-            underTest.start()
+    fun start_quickAccess_noDialogShownByDefault() = runTestAndDismiss {
+        underTest.start()
 
-            assertCurrentDialog(DialogType.NONE)
-        }
+        assertCurrentDialog(DialogType.NONE)
+    }
 
     @Test
     @DisableFlags(SystemUIFlags.FLAG_LAUNCH_ACCESSIBILITY_QUICK_ACCESS_DIALOG_PERMISSION)
-    fun createDialog_quickAccess_withFlagDisabled_doesNotShowDialog() =
-        kosmos.runTest {
-            underTest.start()
+    fun createDialog_quickAccess_withFlagDisabled_doesNotShowDialog() = runTestAndDismiss {
+        underTest.start()
 
-            sendIntentInMainThreadWaitForIdle(UserShortcutType.QUICK_ACCESS)
+        sendIntentInMainThreadWaitForIdle(UserShortcutType.QUICK_ACCESS)
 
-            assertCurrentDialog(DialogType.NONE)
-        }
+        assertCurrentDialog(DialogType.NONE)
+    }
 
     @Test
     @EnableFlags(SystemUIFlags.FLAG_LAUNCH_ACCESSIBILITY_QUICK_ACCESS_DIALOG_PERMISSION)
     fun createDialog_quickAccess_showsQuickAccessDialog_thenClickDoneButton_dismissesDialog() =
-        kosmos.runTest {
+        runTestAndDismiss {
             underTest.start()
 
             sendIntentInMainThreadWaitForIdle(UserShortcutType.QUICK_ACCESS)
 
             assertCurrentDialog(DialogType.QUICK_ACCESS)
 
-            composeTestRule.onDoneButton().performClick()
+            composeTestRule.onDoneButton().performScrollAndClick()
             composeTestRule.waitForIdle()
 
             assertCurrentDialog(DialogType.NONE)
@@ -542,38 +529,44 @@ class ShortcutChooserDialogStartableTest : SysuiTestCase() {
 
     @Test
     @EnableFlags(SystemUIFlags.FLAG_LAUNCH_ACCESSIBILITY_QUICK_ACCESS_DIALOG_PERMISSION)
-    fun createDialog_quickAccess_clickToggleableTarget_performsShortcut() =
-        kosmos.runTest {
-            underTest.start()
+    fun createDialog_quickAccess_clickToggleableTarget_performsShortcut() = runTestAndDismiss {
+        underTest.start()
 
-            sendIntentInMainThreadWaitForIdle(UserShortcutType.QUICK_ACCESS)
+        sendIntentInMainThreadWaitForIdle(UserShortcutType.QUICK_ACCESS)
 
-            assertCurrentDialog(DialogType.QUICK_ACCESS)
+        assertCurrentDialog(DialogType.QUICK_ACCESS)
+        assertThat(fakeRepository.isTargetEnabled(TALKBACK_TARGET_NAME)).isFalse()
+        val targetNode = composeTestRule.onNodeWithTag(TALKBACK_TARGET_NAME)
+        targetNode.assert(isToggleable())
+        targetNode.assertIsOff()
 
-            assertThat(fakeRepository.isTargetEnabled(TALKBACK_TARGET_NAME)).isFalse()
-            val targetNode = composeTestRule.onNodeWithText("Screen Reader")
-            targetNode.assert(isToggleable())
-            targetNode.assertIsOff()
+        targetNode.performClick()
+        composeTestRule.waitForIdle()
 
-            targetNode.performClick()
-            composeTestRule.waitForIdle()
+        assertCurrentDialog(DialogType.NONE)
+        assertThat(fakeRepository.isTargetEnabled(TALKBACK_TARGET_NAME)).isTrue()
 
-            assertThat(fakeRepository.isTargetEnabled(TALKBACK_TARGET_NAME)).isTrue()
-            targetNode.assertIsOn()
-            assertCurrentDialog(DialogType.QUICK_ACCESS)
+        sendIntentInMainThreadWaitForIdle(UserShortcutType.QUICK_ACCESS)
 
-            targetNode.performClick()
-            composeTestRule.waitForIdle()
+        assertCurrentDialog(DialogType.QUICK_ACCESS)
+        targetNode.assertIsOn()
 
-            assertThat(fakeRepository.isTargetEnabled(TALKBACK_TARGET_NAME)).isFalse()
-            targetNode.assertIsOff()
-            assertCurrentDialog(DialogType.QUICK_ACCESS)
-        }
+        targetNode.performClick()
+        composeTestRule.waitForIdle()
+
+        assertCurrentDialog(DialogType.NONE)
+        assertThat(fakeRepository.isTargetEnabled(TALKBACK_TARGET_NAME)).isFalse()
+
+        sendIntentInMainThreadWaitForIdle(UserShortcutType.QUICK_ACCESS)
+
+        assertCurrentDialog(DialogType.QUICK_ACCESS)
+        targetNode.assertIsOff()
+    }
 
     @Test
     @EnableFlags(SystemUIFlags.FLAG_LAUNCH_ACCESSIBILITY_QUICK_ACCESS_DIALOG_PERMISSION)
     fun createDialog_quickAccess_clickNotToggleableTarget_performsShortcutAndClosesDialog() =
-        kosmos.runTest {
+        runTestAndDismiss {
             underTest.start()
 
             sendIntentInMainThreadWaitForIdle(UserShortcutType.QUICK_ACCESS)
@@ -581,7 +574,7 @@ class ShortcutChooserDialogStartableTest : SysuiTestCase() {
             assertCurrentDialog(DialogType.QUICK_ACCESS)
 
             assertThat(fakeRepository.isTargetEnabled(MAGNIFICATION_TARGET_NAME)).isFalse()
-            val targetNode = composeTestRule.onNodeWithText("Magnification")
+            val targetNode = composeTestRule.onNodeWithTag(MAGNIFICATION_TARGET_NAME)
             targetNode.assert(isNotToggleable())
 
             targetNode.performClick()
@@ -589,6 +582,41 @@ class ShortcutChooserDialogStartableTest : SysuiTestCase() {
 
             assertThat(fakeRepository.isTargetEnabled(MAGNIFICATION_TARGET_NAME)).isTrue()
             assertCurrentDialog(DialogType.NONE)
+        }
+
+    @Test
+    @EnableFlags(SystemUIFlags.FLAG_LAUNCH_ACCESSIBILITY_QUICK_ACCESS_DIALOG_PERMISSION)
+    fun showWarningDialog_quickAccess_clickUntrustedTarget_showsWarningDialog() =
+        runTestAndDismiss {
+            val shortcutType = UserShortcutType.QUICK_ACCESS
+            val targetName = UNTRUSTED_SERVICE_TARGET_NAME
+
+            underTest.start()
+
+            sendIntentInMainThreadWaitForIdle(shortcutType)
+
+            assertCurrentDialog(DialogType.QUICK_ACCESS)
+
+            assertThat(fakeRepository.isTargetAssigned(shortcutType, targetName)).isFalse()
+            assertThat(fakeRepository.isTargetEnabled(targetName)).isFalse()
+            val targetNode = composeTestRule.onNodeWithTag(targetName)
+            targetNode.assertIsOff()
+
+            targetNode.performClick()
+            composeTestRule.waitForIdle()
+
+            composeTestRule.onWarningDialog().assertIsDisplayed()
+            assertThat(fakeRepository.isTargetAssigned(shortcutType, targetName)).isFalse()
+            assertThat(fakeRepository.isTargetEnabled(targetName)).isFalse()
+            targetNode.assertIsOff()
+
+            viewModel.dismissWarningDialog()
+            composeTestRule.waitForIdle()
+
+            composeTestRule.onWarningDialog().assertDoesNotExist()
+            assertThat(fakeRepository.isTargetAssigned(shortcutType, targetName)).isFalse()
+            assertThat(fakeRepository.isTargetEnabled(targetName)).isFalse()
+            targetNode.assertIsOff()
         }
 
     private fun Kosmos.sendIntentInMainThreadWaitForIdle(
@@ -688,6 +716,15 @@ class ShortcutChooserDialogStartableTest : SysuiTestCase() {
 
     private fun ComposeTestRule.onEditButton() = onNodeWithTag("edit_button")
 
+    /**
+     * Click on a button, with scrolling if necessary.
+     *
+     * Sometimes the number of targets causes the dialog to scroll, so we need to scroll to make the
+     * button visible for clicking.
+     */
+    private fun SemanticsNodeInteraction.performScrollAndClick() =
+        performScrollTo().assertIsDisplayed().performClick()
+
     private fun ComposeTestRule.onTutorialDialogTitle() =
         onNodeWithText(
             context.resources.getString(
@@ -715,6 +752,8 @@ class ShortcutChooserDialogStartableTest : SysuiTestCase() {
             context.resources.getString(R.string.accessibility_quick_access_dialog_title)
         )
 
+    private fun ComposeTestRule.onWarningDialog() = onNodeWithTag("service_warning_dialog")
+
     private fun SemanticsNodeInteraction.assertDialogVisibility(
         expectedDialogType: DialogType,
         assertDialogType: DialogType,
@@ -728,4 +767,18 @@ class ShortcutChooserDialogStartableTest : SysuiTestCase() {
 
     private fun isNotToggleable() =
         SemanticsMatcher("isNotToggleable") { node -> !isToggleable().matches(node) }
+
+    /** Runs the given test block and dismisses any dialog at the end. */
+    private fun runTestAndDismiss(block: suspend Kosmos.() -> Unit) =
+        kosmos.runTest {
+            try {
+                block()
+            } finally {
+                runOnMainThreadAndWaitForIdleSync {
+                    viewModel.dismissDialog()
+                    viewModel.dismissWarningDialog()
+                }
+                composeTestRule.waitForIdle()
+            }
+        }
 }

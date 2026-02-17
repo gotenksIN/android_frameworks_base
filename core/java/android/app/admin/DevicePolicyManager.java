@@ -63,6 +63,7 @@ import static android.app.admin.flags.Flags.FLAG_MULTI_USER_MANAGEMENT_USER_PROV
 import static android.app.admin.flags.Flags.FLAG_POLICY_STREAMLINING;
 import static android.app.admin.flags.Flags.FLAG_REMOVE_MANAGED_PROFILE_ENABLED;
 import static android.app.admin.flags.Flags.FLAG_SECONDARY_LOCKSCREEN_API_ENABLED;
+import static android.app.admin.flags.Flags.FLAG_SECURE_ADB_ROLE_BYPASSING;
 import static android.app.admin.flags.Flags.FLAG_SPLIT_CREATE_MANAGED_PROFILE_ENABLED;
 import static android.app.admin.flags.Flags.FLAG_ENABLE_NULLABLE_ADMIN_COMPONENT;
 import static android.app.admin.flags.Flags.onboardingBugreportV2Enabled;
@@ -1217,6 +1218,15 @@ public class DevicePolicyManager {
      * @hide
      */
     public static final long DEFAULT_STRONG_AUTH_TIMEOUT_MS = 72 * 60 * 60 * 1000; // 72h
+
+    /**
+     * Default and maximum timeout in milliseconds after which unlocking watch with weak auth times
+     * out, i.e. the user has to use a strong authentication method like password, PIN or pattern.
+     * This timeout applies to watches that have a Trust Agent enabled.
+     *
+     * @hide
+     */
+    public static final long DEFAULT_STRONG_AUTH_WATCH_TIMEOUT_MS = 14 * 24 * 60 * 60 * 1000; // 14d
 
     /**
      * A {@link android.os.Parcelable} extra of type {@link android.os.PersistableBundle} that is
@@ -3101,6 +3111,33 @@ public class DevicePolicyManager {
     @FlaggedApi(FLAG_MULTI_USER_MANAGEMENT_USER_PROVISIONING)
     public static final int STATUS_USER_HAS_PROFILE = 22;
 
+
+    /**
+     * Results code for {@link #checkProvisioningPrecondition}.
+     *
+     * <p> Returned for {@link #ACTION_PROVISION_MANAGED_DEVICE} and
+     * {@link #ACTION_PROVISION_MANAGED_PROFILE} when the DPC is not marked
+     * as test-only and a non-default Device Policy Management role holder exists.
+     *
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(FLAG_SECURE_ADB_ROLE_BYPASSING)
+    public static final int STATUS_NON_DEFAULT_DEVICE_POLICY_MANAGEMENT_ROLE_HOLDER_EXISTS = 23;
+
+    /**
+     * Result code for {@link #checkProvisioningPreCondition}.
+     *
+     * <p>Returned for {@link #ACTION_PROVISION_MULTI_USER_DEVICE} and
+     * {@link #ACTION_PROVISION_MULTI_USER_MANAGED_USER} when the device doesn't support multi user
+     * management.
+     *
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_MULTI_USER_MANAGEMENT_DEVICE_PROVISIONING)
+    public static final int STATUS_MULTI_USER_MANAGEMENT_NOT_SUPPORTED = 23;
+
     /**
      * Result codes for {@link #checkProvisioningPrecondition} indicating all the provisioning pre
      * conditions.
@@ -3119,6 +3156,7 @@ public class DevicePolicyManager {
             STATUS_HEADLESS_SINGLE_USER_MODE_ONLY_SUPPORTED_ON_FIRST_FULL_USER,
             STATUS_HEADLESS_SYSTEM_USER_MODE_REQUIRED, STATUS_OTHER_PROVISIONING_ERROR,
             STATUS_NOT_FULL_USER, STATUS_USER_HAS_PROFILE,
+            STATUS_NON_DEFAULT_DEVICE_POLICY_MANAGEMENT_ROLE_HOLDER_EXISTS,
     })
     public @interface ProvisioningPrecondition {}
 
@@ -6945,7 +6983,7 @@ public class DevicePolicyManager {
     public static final int WIPE_RESET_PROTECTION_DATA = 0x0002;
 
     /**
-     * Flag for {@link #wipeData(int)}: also erase the device's eUICC data.
+     * Flag for {@link #wipeDevice(int)}: also erase the device's eUICC data.
      */
     public static final int WIPE_EUICC = 0x0004;
 
@@ -6958,8 +6996,8 @@ public class DevicePolicyManager {
      * See {@link #wipeData(int, CharSequence)}
      *
      * @param flags Bit mask of additional options: currently supported flags are
-     *              {@link #WIPE_EXTERNAL_STORAGE}, {@link #WIPE_RESET_PROTECTION_DATA},
-     *              {@link #WIPE_EUICC} and {@link #WIPE_SILENTLY}.
+     *              {@link #WIPE_EXTERNAL_STORAGE}, {@link #WIPE_RESET_PROTECTION_DATA}
+     *              and {@link #WIPE_SILENTLY}.
      * @throws SecurityException if the calling application does not own an active
      *                           administrator
      *                           that uses {@link DeviceAdminInfo#USES_POLICY_WIPE_DATA} and is
@@ -6999,8 +7037,7 @@ public class DevicePolicyManager {
      * should use {@link #wipeDevice} instead.
      *
      * @param flags Bit mask of additional options: currently supported flags are
-     *            {@link #WIPE_EXTERNAL_STORAGE}, {@link #WIPE_RESET_PROTECTION_DATA} and
-     *            {@link #WIPE_EUICC}.
+     *            {@link #WIPE_EXTERNAL_STORAGE} and {@link #WIPE_RESET_PROTECTION_DATA}.
      * @param reason a string that contains the reason for wiping data, which can be
      *            presented to the user.
      * @throws SecurityException if the calling application does not own an active administrator
@@ -8882,6 +8919,10 @@ public class DevicePolicyManager {
      * device, for this user. After setting this, no applications running as this user will be able
      * to access any cameras on the device.
      * <p>
+     * Starting with Android {@link android.os.Build.VERSION_CODES#CINNAMON_BUN}, this method also
+     * blocks application access to external USB cameras that connect directly via the
+     * {@link android.hardware.usb.UsbConstants#USB_CLASS_VIDEO} interface.
+     * <p>
      * This method can be called on the {@link DevicePolicyManager} instance,
      * returned by {@link #getParentProfileInstance(ComponentName)}, where the caller must be
      * the profile owner of an organization-owned managed profile.
@@ -8943,6 +8984,10 @@ public class DevicePolicyManager {
     /**
      * Determine whether or not the device's cameras have been disabled for this user,
      * either by the calling admin, if specified, or all admins.
+     * <p>
+     * Starting with Android {@link android.os.Build.VERSION_CODES#CINNAMON_BUN}, this
+     * method also checks for external USB cameras that connect directly via the
+     * {@link android.hardware.usb.UsbConstants#USB_CLASS_VIDEO} interface.
      * <p>
      * This method can be called on the {@link DevicePolicyManager} instance,
      * returned by {@link #getParentProfileInstance(ComponentName)}, where the caller must be
@@ -18936,8 +18981,8 @@ public class DevicePolicyManager {
     /**
      * Gets the value of the given policy, as it was set by the caller.
      *
-     * <p>This does not return the effective policy value used on the device. Instead, this returns
-     * the value set by the caller.
+     * <p>Use {@link #getResolvedDeviceWidePolicy} and {@link #getResolvedPerUserPolicy} to get the
+     * resolved policy value used on the device. Instead, this returns the value set by the caller.
      *
      * @param id The policy identifier to retrieve. It must be one of the values inside {@link
      *     DevicePolicyIdentifier}.
@@ -18982,13 +19027,20 @@ public class DevicePolicyManager {
     }
 
     /**
-     * Returns the effective value of the given device-wide policy.
+     * Returns the resolved value of the given device-wide policy. The resolved value is the value
+     * that is currently being enforced on the device after conflict resolution has been performed
+     * between all the policies set by all admins at both the device and user scope. The value can
+     * change when the current user changes or when users log in or out.
+     *
+     * <p> Use {@link #getPolicy} to get the value set by the caller, which may differ.
      *
      * <p> Can only applied on a {@link #RESOURCE_DEVICE_WIDE} policy.
      *
+     * <p> Returns null when the policy is not set and no default value is defined.
+     *
      * @param id Which policy to retrieve.
      * @param <T> The type of the policy
-     * @return The effective value of the policy.
+     * @return The resolved value of the policy.
      * @throws IllegalArgumentException if the policy is not a device-wide resource.
      * @throws SecurityException If the caller does not have sufficient permissions to get the
      *      specified policy. Check the documentation of individual identifiers for more details.
@@ -19013,16 +19065,22 @@ public class DevicePolicyManager {
     }
 
     /**
-     * Returns the effective value of the given per-user policy.
+     * Returns the resolved value of the given per-user policy. The resolved value is the value
+     * that is currently being enforced on the device for the context user after conflict
+     * resolution has been performed between all the policies set by all admins at both the device
+     * and user scope.
      *
-     * <p> Can only applied on a {@link #RESOURCE_PER_USER} policy. Returns the effective policy
-     * value of the context user.
+     * <p> Use {@link #getPolicy} to get the value set by the caller, which may differ.
+     *
+     * <p> Can only applied on a {@link #RESOURCE_PER_USER} policy.
+     *
+     * <p> Returns null when the policy is not set and no default value is defined.
      *
      * @param id Which policy to retrieve.
      * @param <T> The type of the policy
-     * @return The effective value of the policy.
+     * @return The resolved value of the policy.
      * @throws IllegalArgumentException if the policy is not a per-user resource.
-     * throws SecurityException If the caller does not have sufficient permissions to get the
+     * @throws SecurityException If the caller does not have sufficient permissions to get the
      *      specified policy. Check the documentation of individual identifiers for more details.
      *      The QUERY_ADMIN_POLICY permission can in most cases be used to replace the per-policy
      *      permission, but the cros-user permission is still checked when querying a different
@@ -19096,6 +19154,21 @@ public class DevicePolicyManager {
     }
 
     /**
+     * Template free version of setPolicy for strings.
+     *
+     * @hide
+     */
+    @TestApi
+    @SuppressWarnings("UnflaggedApi") // @TestApi without associated feature.
+    public void setStringPolicy(
+            @NonNull String key,
+            @PolicyScope int scope,
+            @Nullable String value) {
+        // TODO(b/434920631): Remove this method and use {@link #setPolicy} in tests directly.
+        setPolicy(new PolicyIdentifier<String>(key), scope, value);
+    }
+
+    /**
      * Template free version of getPolicy for integers.
      * Returns '-1' if the policy is not set.
      *
@@ -19125,5 +19198,21 @@ public class DevicePolicyManager {
         //  directly.
         var result = getResolvedPerUserPolicy(new PolicyIdentifier<Integer>(key));
         return result == null ? -1 : result;
+    }
+
+    /**
+     * Template free version of getPolicy for strings.
+     * Returns null if the policy is not set.
+     *
+     * @hide
+     */
+    @Nullable
+    @TestApi
+    @SuppressWarnings("UnflaggedApi") // @TestApi without associated feature.
+    public String getStringPolicy(
+            @NonNull String key,
+            @PolicyScope int scope) {
+        // TODO(b/434920631): Remove this method and use {@link #getPolicy} in tests directly.
+        return getPolicy(new PolicyIdentifier<String>(key), scope);
     }
 }

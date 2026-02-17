@@ -30,8 +30,6 @@ import android.content.Intent;
 // QTI_BEGIN: 2018-08-02: Android_UI: SystemUI: Add new configuration for displaying Volte icon
 import android.content.IntentFilter;
 // QTI_END: 2018-08-02: Android_UI: SystemUI: Add new configuration for displaying Volte icon
-// QTI_BEGIN: 2018-02-18: SystemUI: Customize Signal Cluster
-// QTI_END: 2018-02-18: SystemUI: Customize Signal Cluster
 import android.database.ContentObserver;
 // QTI_BEGIN: 2023-07-12: Android_UI: SystemUI: Modify exclamation logic same as CR3503654 for ShadeCarrierGroupController
 import android.net.ConnectivityManager;
@@ -48,8 +46,6 @@ import android.os.Looper;
 import android.provider.Settings.Global;
 import android.telephony.CellSignalStrength;
 import android.telephony.CellSignalStrengthCdma;
-// QTI_BEGIN: 2019-07-16: Android_UI: SystemUI: Algin with Android SA solution
-// QTI_END: 2019-07-16: Android_UI: SystemUI: Algin with Android SA solution
 // QTI_BEGIN: 2019-02-19: Android_UI: SystemUI: Fix HD icon missing
 import android.telephony.ims.ImsMmTelManager;
 import android.telephony.ims.feature.MmTelFeature;
@@ -784,11 +780,7 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
         //Modem has centralized logic to display 5G icon based on carrier requirements
         //For 5G icon display, only query NrIconType reported by modem
 // QTI_END: 2020-03-31: Android_UI: SystemUI: Upgrade the logic of 5G icons
-// QTI_BEGIN: 2020-07-09: Android_UI: SystemUI: Remove deprecated code
-// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
         if ( mFiveGState.isRadioIconTypeValid() ) {
-// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
-// QTI_END: 2020-07-09: Android_UI: SystemUI: Remove deprecated code
 // QTI_BEGIN: 2020-03-31: Android_UI: SystemUI: Upgrade the logic of 5G icons
             mCurrentState.iconGroup = mFiveGState.getIconGroup();
         }else {
@@ -833,10 +825,8 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
 // QTI_BEGIN: 2022-02-27: Android_UI: SystemUI: Enable customization data icon
             if(!mCurrentState.connected) {
                 mCurrentState.iconGroup = TelephonyIcons.UNKNOWN;
-// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
-            }else if (mFiveGState.isRadioIconTypeValid()) {
-// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
 // QTI_END: 2022-02-27: Android_UI: SystemUI: Enable customization data icon
+            }else if (mFiveGState.isRadioIconTypeValid()) {
 // QTI_BEGIN: 2020-03-31: Android_UI: SystemUI: Upgrade the logic of 5G icons
                 mCurrentState.iconGroup = mFiveGState.getIconGroup();
 // QTI_END: 2020-03-31: Android_UI: SystemUI: Upgrade the logic of 5G icons
@@ -1076,9 +1066,9 @@ public class MobileSignalController extends SignalController<MobileState, Mobile
 
     private MobileIconGroup getRatIconGroup() {
         MobileIconGroup iconGroup = mDefaultIcons;
-// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+// QTI_END: 2020-10-19: Android_UI: SystemUI: Dds rat icon enhancement
         if ( mFiveGState.isRadioIconTypeValid() ) {
-// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+// QTI_BEGIN: 2020-10-19: Android_UI: SystemUI: Dds rat icon enhancement
             iconGroup = mFiveGState.getIconGroup();
         }else {
             iconGroup = getNetworkTypeIconGroup();

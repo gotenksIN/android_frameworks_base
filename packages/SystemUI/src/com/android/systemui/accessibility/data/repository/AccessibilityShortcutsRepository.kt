@@ -16,6 +16,7 @@
 
 package com.android.systemui.accessibility.data.repository
 
+import android.accessibilityservice.AccessibilityServiceInfo
 import android.annotation.SuppressLint
 import android.content.ComponentName
 import android.content.Context
@@ -24,11 +25,14 @@ import android.content.res.Resources
 import android.database.ContentObserver
 import android.hardware.input.KeyGestureEvent
 import android.os.Handler
+import android.provider.Settings
 import android.text.BidiFormatter
 import android.text.TextUtils
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityManager
+import com.android.internal.R as RI
 import com.android.internal.accessibility.common.ShortcutConstants.UserShortcutType
+import com.android.internal.accessibility.dialog.AccessibilityServiceTarget
 import com.android.internal.accessibility.dialog.AccessibilityTarget
 import com.android.internal.accessibility.dialog.AccessibilityTargetHelper
 import com.android.internal.accessibility.util.FrameworkObjectProvider
@@ -44,6 +48,7 @@ import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.keyboard.shortcut.data.repository.ShortcutHelperKeys
 import com.android.systemui.res.R
 import com.android.systemui.settings.UserTracker
+import com.android.systemui.shared.settings.data.repository.SecureSettingsRepository
 import com.android.systemui.util.settings.SecureSettings
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineDispatcher
@@ -126,6 +131,50 @@ interface AccessibilityShortcutsRepository {
     fun getSelectedAccessibilityTargets(
         @UserShortcutType shortcutType: Int
     ): Flow<List<AccessibilityTargetModel>>
+
+    /**
+     * Returns true if the accessibility service warning dialog should be shown for the given
+     * accessibility target.
+     *
+     * @param target The [AccessibilityTargetModel].
+     * @return True if the accessibility service warning dialog should be shown, false otherwise.
+     *   Also returns false if the target is not an accessibility service.
+     */
+    fun isServiceWarningRequired(target: AccessibilityTargetModel): Boolean
+
+    /**
+     * Returns the [AccessibilityServiceInfo] for the given accessibility target.
+     *
+     * @param target The [AccessibilityTargetModel].
+     * @return The [AccessibilityServiceInfo] if the target is an accessibility service, null
+     *   otherwise.
+     */
+    fun getAccessibilityServiceInfo(target: AccessibilityTargetModel): AccessibilityServiceInfo?
+
+    /**
+     * The list of accessibility targets that are excluded from showing up in the accessibility
+     * shortcut chooser dialog when the current user is the Headless System User.
+     */
+    val hsuExcludedTargets: List<String>
+
+    /**
+     * Setting specifying the accessibility service or feature to be toggled via the accessibility
+     * button in the navigation bar. This is either a flattened [ComponentName] or the class name of
+     * a system class implementing a supported accessibility feature.
+     *
+     * See: [Settings.Secure.ACCESSIBILITY_BUTTON_TARGET_COMPONENT]
+     *
+     * Value is null if nothing is selected.
+     */
+    val accessibilityButtonTargetComponent: Flow<String?>
+
+    /**
+     * Sets the accessibility service or feature to be toggled via the accessibility button in the
+     * navigation bar.
+     *
+     * @param target The flattened [ComponentName] of the target.
+     */
+    suspend fun setAccessibilityButtonTargetComponent(target: String)
 }
 
 @SysUISingleton
@@ -136,7 +185,9 @@ constructor(
     private val accessibilityManager: AccessibilityManager,
     private val packageManager: PackageManager,
     private val userTracker: UserTracker,
+    // TODO: b/480991693 - Refactor to use SecureSettingsRepository.
     private val secureSettings: SecureSettings,
+    private val secureSettingsRepository: SecureSettingsRepository,
     @param:Main private val resources: Resources,
     @param:Background private val backgroundDispatcher: CoroutineDispatcher,
     @param:Main private val handler: Handler,
@@ -371,6 +422,35 @@ constructor(
             }
             .conflate()
             .flowOn(backgroundDispatcher)
+
+    override fun isServiceWarningRequired(target: AccessibilityTargetModel) =
+        getAccessibilityServiceInfo(target)?.let {
+            accessibilityManager.isAccessibilityServiceWarningRequired(it)
+        } ?: false
+
+    override fun getAccessibilityServiceInfo(
+        target: AccessibilityTargetModel
+    ): AccessibilityServiceInfo? =
+        AccessibilityTargetHelper.getInstalledTargets(context, target.shortcutType)
+            .find { it.id == target.targetName }
+            ?.let { (it as? AccessibilityServiceTarget)?.accessibilityServiceInfo }
+
+    override val hsuExcludedTargets: List<String> by lazy {
+        resources.getStringArray(RI.array.hsu_accessibility_targets_blocklist).toList()
+    }
+
+    override val accessibilityButtonTargetComponent =
+        secureSettingsRepository.stringSetting(
+            Settings.Secure.ACCESSIBILITY_BUTTON_TARGET_COMPONENT,
+            defaultValue = null,
+        )
+
+    override suspend fun setAccessibilityButtonTargetComponent(target: String) {
+        secureSettingsRepository.setString(
+            Settings.Secure.ACCESSIBILITY_BUTTON_TARGET_COMPONENT,
+            target,
+        )
+    }
 
     private fun AccessibilityTarget.toAccessibilityTargetModel() =
         AccessibilityTargetModel(

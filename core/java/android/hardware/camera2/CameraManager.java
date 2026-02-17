@@ -50,7 +50,6 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.content.res.CameraCompatibilityInfo;
 import android.content.res.CompatibilityInfo;
-import android.graphics.Point;
 import android.hardware.CameraExtensionSessionStats;
 import android.hardware.CameraStatus;
 import android.hardware.ICameraService;
@@ -166,7 +165,6 @@ public final class CameraManager {
 
     private static final String CAMERA_OPEN_CLOSE_LISTENER_PERMISSION =
             "android.permission.CAMERA_OPEN_CLOSE_LISTENER";
-    private final boolean mHasOpenCloseListenerPermission;
 
     private VirtualDeviceManager mVirtualDeviceManager;
 
@@ -215,9 +213,6 @@ public final class CameraManager {
     public CameraManager(Context context) {
         synchronized(mLock) {
             mContext = context;
-            mHasOpenCloseListenerPermission =
-                    mContext.checkSelfPermission(CAMERA_OPEN_CLOSE_LISTENER_PERMISSION) ==
-                    PackageManager.PERMISSION_GRANTED;
         }
     }
 
@@ -376,7 +371,7 @@ public final class CameraManager {
      * part of a logical multi-camera device.</p>
      *
      * <p> If a new camera id becomes available through
-     * {@link AvailabilityCallback#onCameraUnavailable(String)}, clients can call
+     * {@link AvailabilityCallback#onCameraAvailable(String)}, clients can call
      * this method to check if new combinations of camera ids which can stream concurrently are
      * available.
      *
@@ -465,7 +460,8 @@ public final class CameraManager {
     public void registerAvailabilityCallback(@NonNull AvailabilityCallback callback,
             @Nullable Handler handler) {
         CameraManagerGlobal.get().registerAvailabilityCallback(callback,
-                CameraDeviceImpl.checkAndWrapHandler(handler), mHasOpenCloseListenerPermission,
+                CameraDeviceImpl.checkAndWrapHandler(handler),
+                hasOpenCloseListenerPermission(mContext),
                 mContext.getDeviceId(), getDevicePolicyFromContext(mContext));
     }
 
@@ -505,8 +501,13 @@ public final class CameraManager {
             throw new IllegalArgumentException("executor was null");
         }
         CameraManagerGlobal.get().registerAvailabilityCallback(callback, executor,
-                mHasOpenCloseListenerPermission, mContext.getDeviceId(),
+                hasOpenCloseListenerPermission(mContext), mContext.getDeviceId(),
                 getDevicePolicyFromContext(mContext));
+    }
+
+    private boolean hasOpenCloseListenerPermission(@NonNull Context context) {
+        return context.checkSelfPermission(CAMERA_OPEN_CLOSE_LISTENER_PERMISSION)
+                == PackageManager.PERMISSION_GRANTED;
     }
 
     /**
@@ -601,47 +602,23 @@ public final class CameraManager {
         Size ret = new Size(0, 0);
         DisplayManager displayManager = mContext.getSystemService(DisplayManager.class);
 
-        if (Flags.capMandatoryPreviewSizeToAllDisplays()) {
-            Display[] builtinDisplays = displayManager.getDisplays(
-                    DisplayManager.DISPLAY_CATEGORY_BUILT_IN_DISPLAYS);
-            for (Display display : builtinDisplays) {
-                Display.Mode[] supportedModes = display.getSupportedModes();
-                for (Display.Mode mode : supportedModes) {
-                    int width = mode.getPhysicalWidth();
-                    int height = mode.getPhysicalHeight();
-                    if (height > width) {
-                        width = height;
-                        height = mode.getPhysicalWidth();
-                    }
-                    if (width * height
-                                    > ret.getWidth() * ret.getHeight()) {
-                        ret = new Size(width, height);
-                    }
+        Display[] builtinDisplays = displayManager.getDisplays(
+                DisplayManager.DISPLAY_CATEGORY_BUILT_IN_DISPLAYS);
+        for (Display display : builtinDisplays) {
+            Display.Mode[] supportedModes = display.getSupportedModes();
+            for (Display.Mode mode : supportedModes) {
+                int width = mode.getPhysicalWidth();
+                int height = mode.getPhysicalHeight();
+                if (height > width) {
+                    width = height;
+                    height = mode.getPhysicalWidth();
                 }
-            }
-        } else {
-            try {
-                Display display = displayManager.getDisplay(Display.DEFAULT_DISPLAY);
-                if (display != null) {
-                    Point sz = new Point();
-                    display.getRealSize(sz);
-                    int width = sz.x;
-                    int height = sz.y;
-
-                    if (height > width) {
-                        height = width;
-                        width = sz.y;
-                    }
-
+                if (width * height
+                                > ret.getWidth() * ret.getHeight()) {
                     ret = new Size(width, height);
-                } else {
-                    Log.e(TAG, "Invalid default display!");
                 }
-            } catch (Exception e) {
-                Log.e(TAG, "getDisplaySize Failed. " + e);
             }
         }
-
         return ret;
     }
 
@@ -750,11 +727,11 @@ public final class CameraManager {
      * <p>Query the capabilities of a camera device. These capabilities are
      * immutable for a given camera.</p>
      *
-     * <p>The value of {@link CameraCharacteristics.SENSOR_ORIENTATION} will change for landscape
+     * <p>The value of {@link CameraCharacteristics#SENSOR_ORIENTATION} will change for landscape
      * cameras depending on whether overrideToPortrait is enabled. If enabled, these cameras will
      * appear to be portrait orientation instead, provided that the override is supported by the
      * camera device. Only devices that can be opened by {@link #openCamera} will report a changed
-     * {@link CameraCharacteristics.SENSOR_ORIENTATION}.</p>
+     * {@link CameraCharacteristics#SENSOR_ORIENTATION}.</p>
      *
      * @param cameraId The id of the camera device to query. This could be either a standalone
      * camera ID which can be directly opened by {@link #openCamera}, or a physical camera ID that
@@ -2370,15 +2347,39 @@ public final class CameraManager {
             }
         }
 
+        private void connectCameraServiceLocked() {
+            connectCameraServiceLocked(false /*resetListener*/);
+        }
+
         /**
          * Connect to the camera service if it's available, and set up listeners.
-         * If the service is already connected, do nothing.
+         *
+         * <p>If the service is already connected, do nothing if resetListener is false, reset self
+         * as the listener if resetListener is true.</p>
          *
          * <p>Sets mCameraService to a valid pointer or null if the connection does not succeed.</p>
          */
-        private void connectCameraServiceLocked() {
+
+        private void connectCameraServiceLocked(boolean resetListener) {
             // Only reconnect if necessary
-            if (mCameraService != null || sCameraServiceDisabled) return;
+            if (mCameraService != null) {
+                if (resetListener) {
+                    try {
+                        // Re-registering the listener forces the camera service to re-evaluate
+                        // permissions for onCameraOpened/onCameraClosed callbacks.
+                        mCameraService.removeListener(this);
+                        mCameraService.addListener(this);
+                    } catch (ServiceSpecificException e) {
+                        // Unexpected failure
+                        throw new IllegalStateException(
+                                "Failed to re-register a camera service listener", e);
+                    } catch (RemoteException e) {
+                        // Camera service is now down, leave mCameraService as null
+                    }
+                }
+                return;
+            }
+            if (sCameraServiceDisabled) return;
 
             Log.i(TAG, "Connecting to camera service");
 
@@ -3433,10 +3434,17 @@ public final class CameraManager {
         public void registerAvailabilityCallback(AvailabilityCallback callback, Executor executor,
                 boolean hasOpenCloseListenerPermission, int deviceId, int devicePolicy) {
             synchronized (mLock) {
-                // In practice, this permission doesn't change. So we don't need one flag for each
-                // callback object.
-                mHasOpenCloseListenerPermission = hasOpenCloseListenerPermission;
-                connectCameraServiceLocked();
+                // The CAMERA_OPEN_CLOSE_LISTENER permission can change dynamically for a process
+                // during testing (e.g. when adopting shell permissions). A listener reset is
+                // needed for the service to pick up the new permission state.
+                boolean listenerPermissionChanged = false;
+                if (hasOpenCloseListenerPermission != mHasOpenCloseListenerPermission) {
+                    if (Flags.resetListenerAfterAdoptShellPermission()) {
+                        listenerPermissionChanged = true;
+                    }
+                    mHasOpenCloseListenerPermission = hasOpenCloseListenerPermission;
+                }
+                connectCameraServiceLocked(listenerPermissionChanged);
 
                 callback.mDeviceId = deviceId;
                 callback.mDevicePolicy = devicePolicy;

@@ -41,6 +41,7 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import java.io.PrintWriter
+import java.util.concurrent.Executor
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.FlowPreview
@@ -81,11 +82,12 @@ constructor(
     @Assisted private val chipAnimationController: SystemEventChipAnimationController,
     @Assisted private val displayId: Int,
     private val statusBarWindowControllerStore: StatusBarWindowControllerStore,
-    dumpManager: DumpManager,
+    private val dumpManager: DumpManager,
     private val systemClock: SystemClock,
     @Assisted private val coroutineScope: CoroutineScope,
     private val logger: SystemStatusAnimationSchedulerLogger?,
     @Main private val mainCoroutineContext: CoroutineContext,
+    @Main private val mainExecutor: Executor,
 ) : SystemStatusAnimationScheduler {
 
     @AssistedFactory
@@ -127,6 +129,8 @@ constructor(
     /** The job that is controlling the animators when an event is cancelled. */
     private var eventCancellationJob: Job? = null
 
+    private val dumpableName: String
+
     init {
         coordinator.attachScheduler(this)
         val dumpableTagSuffix =
@@ -135,7 +139,8 @@ constructor(
             } else {
                 displayId.toString()
             }
-        dumpManager.registerCriticalDumpable("$TAG$dumpableTagSuffix", this)
+        dumpableName = "$TAG$dumpableTagSuffix"
+        dumpManager.registerCriticalDumpable(dumpableName, this)
 
         coroutineScope.launch(context = mainCoroutineContext) {
             // Wait for animationState to become ANIMATION_QUEUED and scheduledEvent to be non null.
@@ -156,6 +161,15 @@ constructor(
 
         coroutineScope.launch(context = mainCoroutineContext) {
             _animationState.collect { logger?.logAnimationStateUpdate(it) }
+        }
+    }
+
+    override fun stop() {
+        mainExecutor.execute {
+            coordinator.stopObserving()
+            listeners.clear()
+            chipAnimationController.stop()
+            dumpManager.unregisterDumpable(dumpableName)
         }
     }
 

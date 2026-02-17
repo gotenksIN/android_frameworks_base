@@ -53,11 +53,15 @@ import android.annotation.Nullable;
 import android.annotation.UptimeMillisLong;
 import android.app.Activity;
 import android.app.ActivityManager;
+import android.app.AnrTypes;
 import android.app.ApplicationExitInfo;
 import android.app.BroadcastOptions;
 import android.app.IApplicationThread;
+import android.app.RemoteServiceException;
 import android.app.UidObserver;
 import android.app.usage.UsageEvents.Event;
+import android.compat.annotation.ChangeId;
+import android.compat.annotation.Overridable;
 import android.content.ComponentName;
 import android.content.ContentResolver;
 import android.content.Intent;
@@ -96,6 +100,7 @@ import com.android.server.am.BroadcastProcessQueue.BroadcastConsumer;
 import com.android.server.am.BroadcastProcessQueue.BroadcastPredicate;
 import com.android.server.am.BroadcastProcessQueue.BroadcastRecordConsumer;
 import com.android.server.am.BroadcastRecord.DeliveryState;
+import com.android.server.am.psc.Constants.SchedGroup;
 import com.android.server.pm.UserJourneyLogger;
 import com.android.server.pm.UserManagerInternal;
 import com.android.server.utils.AnrTimer;
@@ -139,6 +144,15 @@ import java.util.function.Predicate;
  * </ol>
  */
 class BroadcastQueueImpl extends BroadcastQueue {
+    /**
+     * Enforce a limit on the number of enqueued broadcasts per UID and terminate the
+     * sender if this limit is exceeded.
+     */
+    @VisibleForTesting
+    @Overridable
+    @ChangeId
+    static final long ENFORCE_ENQUEUED_BROADCAST_LIMITS_FOR_SENDER = 469109889L;
+
     BroadcastQueueImpl(ActivityManagerService service, Handler handler,
             BroadcastConstants fgConstants, BroadcastConstants bgConstants) {
         this(service, handler, fgConstants, bgConstants, new BroadcastSkipPolicy(service),
@@ -282,6 +296,7 @@ class BroadcastQueueImpl extends BroadcastQueue {
     private static final int MSG_CHECK_PENDING_COLD_START_VALIDITY = 5;
     private static final int MSG_PROCESS_FREEZABLE_CHANGED = 6;
     private static final int MSG_UID_STATE_CHANGED = 7;
+    private static final int MSG_DELIVERY_TIMEOUT_WARNING = 8;
 
     private void enqueueUpdateRunningList() {
         mLocalHandler.removeMessages(MSG_UPDATE_RUNNING_LIST);
@@ -294,6 +309,15 @@ class BroadcastQueueImpl extends BroadcastQueue {
         switch (msg.what) {
             case MSG_UPDATE_RUNNING_LIST: {
                 updateRunningList();
+                return true;
+            }
+            case MSG_DELIVERY_TIMEOUT_WARNING: {
+                final SomeArgs args = (SomeArgs) msg.obj;
+                final BroadcastProcessQueue queue = (BroadcastProcessQueue) args.arg1;
+                final int anrId = args.argi1;
+                final long elapsedTimeMs = args.argl1;
+                args.recycle();
+                handleAnrWarning(queue, anrId, elapsedTimeMs);
                 return true;
             }
             case MSG_DELIVERY_TIMEOUT: {
@@ -565,10 +589,12 @@ class BroadcastQueueImpl extends BroadcastQueue {
             queue = nextQueue;
         }
 
-        // TODO: We need to update oomAdj early as this currently doesn't guarantee that the
-        // procState is updated correctly when the app is handling a broadcast.
-        if (updateOomAdj) {
-            mService.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_START_RECEIVER);
+        if (Flags.pscAutoUpdateBroadcastState()) {
+            // No need to manually trigger an update.
+        } else {
+            if (updateOomAdj) {
+                mService.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_START_RECEIVER);
+            }
         }
 
         checkPendingColdStartValidityLocked();
@@ -672,7 +698,11 @@ class BroadcastQueueImpl extends BroadcastQueue {
             // Now that we're running warm, we can finally request that OOM
             // adjust we've been waiting for
             notifyStartedRunning(queue);
-            mService.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_START_RECEIVER);
+            if (Flags.pscAutoUpdateBroadcastState()) {
+                // No need to manually trigger an update.
+            } else {
+                mService.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_START_RECEIVER);
+            }
 
             queue.traceProcessEnd();
             queue.traceProcessRunningBegin();
@@ -766,7 +796,7 @@ class BroadcastQueueImpl extends BroadcastQueue {
 
     @GuardedBy("mService")
     @Override
-    public int getPreferredSchedulingGroupLocked(@NonNull ProcessRecord app) {
+    public @SchedGroup int getPreferredSchedulingGroupLocked(@NonNull ProcessRecord app) {
         final BroadcastProcessQueue queue = getProcessQueue(app);
         if ((queue != null) && getRunningIndexOf(queue) >= 0) {
             return queue.getPreferredSchedulingGroupLocked();
@@ -796,25 +826,41 @@ class BroadcastQueueImpl extends BroadcastQueue {
             return;
         }
 
-        if (Flags.limitPendingBroadcastsPerSenderUid()) {
-            final int numPending = mHistory.getPendingBroadcastCountForSenderUid(r.callingUid);
+        if (Flags.limitPendingBroadcastsPerSenderUid() && r.callerApp != null) {
+            final int numPending = mHistory.getPendingBroadcastCountForSenderProcess(
+                    r.callingUid, r.callerApp.processName);
+            // Calculating the recent pending broadcasts count would require iterating through the
+            // pending broadcasts. So, only do it if the total pending are more than the limit.
             if (numPending >= mConstants.MAX_PENDING_BROADCASTS_PER_SENDER_UID) {
-                final long oldestPendingTime = mHistory.getOldestPendingBroadcastEnqueueTime(
-                        r.callingUid);
-                if (oldestPendingTime > SystemClock.uptimeMillis() - DateUtils.HOUR_IN_MILLIS) {
+                final long sinceTime = SystemClock.uptimeMillis() - DateUtils.HOUR_IN_MILLIS;
+                final int numRecentPending = mHistory.getPendingBroadcastCountForSenderProcessSince(
+                        r.callingUid, r.callerApp.processName, sinceTime);
+                if (numRecentPending >= mConstants.MAX_PENDING_BROADCASTS_PER_SENDER_UID) {
                     final StringBuilder sb = new StringBuilder();
-                    sb.append("Too many enqueued broadcasts from uid ")
-                            .append(r.callingUid)
+                    sb.append("Too many enqueued broadcasts from ")
+                            .append(r.callerApp.processName)
                             .append(".");
                     mHistory.appendPendingBroadcastsSummaryForUid(sb, r.callingUid);
-                    Slog.wtf(TAG, sb.toString());
-                    if (!UserHandle.isCore(r.callingUid) && r.callerApp != null) {
-                        r.callerApp.killLocked("Too many enqueued broadcasts",
-                                ApplicationExitInfo.REASON_EXCESSIVE_RESOURCE_USAGE,
-                                ApplicationExitInfo.SUBREASON_EXCESSIVE_ENQUEUED_BROADCASTS_COUNT,
-                                true /* noisy */);
+                    final String errorMsg = sb.toString();
+                    Slog.wtf(TAG, errorMsg);
+                    if (!UserHandle.isCore(r.callingUid)
+                            && shouldEnforceBroadcastSenderLimits(r.callerApp.info)) {
+                        mService.crashApplicationWithTypeWithExtrasLocked(r.callingUid,
+                                r.callerApp.getPid(), r.callerApp.info.packageName,
+                                r.callerApp.userId, errorMsg,
+                                true /* force */,
+                                RemoteServiceException.ExcessiveEnqueuedBroadcastsException.TYPE_ID,
+                                null /* extras */,
+                                ApplicationExitInfo.SUBREASON_EXCESSIVE_ENQUEUED_BROADCASTS_COUNT);
                         forEachMatchingBroadcast(QUEUE_PREDICATE_ANY,
-                                (testRecord, testIndex) -> r.callingUid == testRecord.callingUid,
+                                (testRecord, testIndex) -> {
+                                    if (testRecord.callerApp == null) {
+                                        return false;
+                                    }
+                                    return r.callingUid == testRecord.callingUid
+                                            && Objects.equals(r.callerApp.processName,
+                                                    testRecord.callerApp.processName);
+                                },
                                 mBroadcastConsumerSkipDueToExcessiveCount, true);
                         return;
                     }
@@ -827,6 +873,9 @@ class BroadcastQueueImpl extends BroadcastQueue {
         }
 
         final int cookie = traceBegin("enqueueBroadcast");
+        if (r.options != null && r.options.getDebugReason() != null) {
+            traceInstant("reason: " + r.options.getDebugReason());
+        }
         r.applySingletonPolicy(mService);
 
         applyDeliveryGroupPolicy(r);
@@ -890,6 +939,15 @@ class BroadcastQueueImpl extends BroadcastQueue {
         }
 
         traceEnd(cookie);
+    }
+
+    /**
+     * Checks if the calling app is subject to pending broadcast limits.
+     */
+    @GuardedBy("mService")
+    private boolean shouldEnforceBroadcastSenderLimits(@NonNull ApplicationInfo info) {
+        return mService.mPlatformCompat.isChangeEnabledInternalNoLogging(
+                ENFORCE_ENQUEUED_BROADCAST_LIMITS_FOR_SENDER, info);
     }
 
     @GuardedBy("mService")
@@ -1326,6 +1384,42 @@ class BroadcastQueueImpl extends BroadcastQueue {
         mAnrTimer.cancel(queue);
     }
 
+    private long calculateBroadcastTimeout(@NonNull BroadcastRecord broadcastRecord) {
+        return broadcastRecord.isForeground() ? mFgConstants.TIMEOUT : mBgConstants.TIMEOUT;
+    }
+
+    private void handleAnrWarning(
+            @NonNull BroadcastProcessQueue queue, int anrId, @UptimeMillisLong long elapsedTimeMs) {
+        final long softTimeoutMs;
+        Intent logIntent;
+        synchronized (mService) {
+            if (!queue.isActive()) {
+                logw("Ignoring handleAnrWarning; no active broadcast for " + queue);
+                return;
+            }
+
+            int index = queue.getActiveIndex();
+            final BroadcastRecord broadcastRecord = queue.getActive();
+            final Object receiver = broadcastRecord.receivers.get(index);
+
+            softTimeoutMs = calculateBroadcastTimeout(broadcastRecord);
+
+            logIntent =
+                    TimeoutRecord.createLogIntentForBroadcast(
+                            broadcastRecord.intent,
+                            getReceiverPackageName(receiver),
+                            getReceiverClassName(receiver));
+        }
+        String description = "Broadcast of " + logIntent.toString();
+        mService.notifyAnrWarning(
+                queue.uid,
+                anrId,
+                AnrTypes.ANR_TYPE_BROADCAST_OF_INTENT,
+                elapsedTimeMs,
+                softTimeoutMs,
+                description);
+    }
+
     private void deliveryTimeout(@NonNull BroadcastProcessQueue queue) {
         final int cookie = traceBegin("deliveryTimeout");
         synchronized (mService) {
@@ -1343,11 +1437,15 @@ class BroadcastQueueImpl extends BroadcastQueue {
 
     private class BroadcastAnrTimer extends AnrTimer<BroadcastProcessQueue> {
         BroadcastAnrTimer(@NonNull Handler handler) {
-            super(Objects.requireNonNull(handler),
-                    MSG_DELIVERY_TIMEOUT, "BROADCAST_TIMEOUT",
+            super(
+                    Objects.requireNonNull(handler),
+                    MSG_DELIVERY_TIMEOUT,
+                    "BROADCAST_TIMEOUT",
                     new AnrTimer.Args()
                             .extend(true)
-                            .longMethodTracing(Flags.enableLongMethodTracingOnAnrTimer()));
+                            .longMethodTracing(Flags.enableLongMethodTracingOnAnrTimer())
+                            .anrWarning(android.app.Flags.enableAnrWarningCallback())
+                            .anrWarningMessageId(MSG_DELIVERY_TIMEOUT_WARNING));
         }
 
         @Override
@@ -1499,9 +1597,11 @@ class BroadcastQueueImpl extends BroadcastQueue {
         // Emit all trace events for this process into a consistent track
         queue.runningTraceTrackName = TAG + ".mRunning[" + queueIndex + "]";
         queue.runningIndex = queueIndex;
-        queue.runningOomAdjusted = queue.isPendingManifest()
-                || queue.isPendingOrdered()
-                || queue.isPendingResultTo();
+        if (!Flags.pscAutoUpdateBroadcastState()) {
+            queue.runningOomAdjusted = queue.isPendingManifest()
+                    || queue.isPendingOrdered()
+                    || queue.isPendingResultTo();
+        }
 
         // If already warm, we can make OOM adjust request immediately;
         // otherwise we need to wait until process becomes warm
@@ -2137,15 +2237,25 @@ class BroadcastQueueImpl extends BroadcastQueue {
                 mService.updateLruProcessLocked(queue.app, false, null);
             }
 
-            mService.unfreezeTemporarily(queue.app,
-                    CachedAppOptimizer.UNFREEZE_REASON_START_RECEIVER);
+            if (Flags.pscAutoUpdateBroadcastState()) {
+                // No need to manually unfreeze, the update triggered in
+                // noteBroadcastDeliveryStarted should handle it.
+            } else {
+                mService.unfreezeTemporarily(queue.app,
+                        CachedAppOptimizer.UNFREEZE_REASON_START_RECEIVER);
+            }
 
             mService.mProcessStateController.noteBroadcastDeliveryStarted(queue.app,
                     queue.getPreferredSchedulingGroupLocked());
-            if (queue.runningOomAdjusted) {
-                mService.mProcessStateController.forceProcessStateUpTo(queue.app,
-                        ActivityManager.PROCESS_STATE_RECEIVER);
-                mService.enqueueOomAdjTargetLocked(queue.app);
+            if (Flags.pscAutoUpdateBroadcastState()) {
+                // No need to force the ProcState or enqueue, the update triggered in
+                // noteBroadcastDeliveryStarted should handle it.
+            } else {
+                if (queue.runningOomAdjusted) {
+                    mService.mProcessStateController.forceProcessStateUpTo(queue.app,
+                            ActivityManager.PROCESS_STATE_RECEIVER);
+                    mService.enqueueOomAdjTargetLocked(queue.app);
+                }
             }
         }
     }
@@ -2158,8 +2268,14 @@ class BroadcastQueueImpl extends BroadcastQueue {
     private void notifyStoppedRunning(@NonNull BroadcastProcessQueue queue) {
         if (queue.app != null) {
             mService.mProcessStateController.noteBroadcastDeliveryEnded(queue.app);
-            if (queue.runningOomAdjusted) {
-                mService.enqueueOomAdjTargetLocked(queue.app);
+
+            if (Flags.pscAutoUpdateBroadcastState()) {
+                // No need to enqueue, the update triggered in noteBroadcastDeliveryEnded should
+                // handle it.
+            } else {
+                if (queue.runningOomAdjusted) {
+                    mService.enqueueOomAdjTargetLocked(queue.app);
+                }
             }
         }
     }

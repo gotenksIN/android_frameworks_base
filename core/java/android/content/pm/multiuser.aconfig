@@ -32,20 +32,6 @@ flag {
 }
 
 flag {
-    name: "decouple_max_users_from_profiles"
-    namespace: "multiuser"
-    description: "Builds on consistent_max_users, but now config_multiuserMaximumUsers only applies to non-Guest non-Demo switchable users, not profiles."
-    bug: "394178333"
-}
-
-flag {
-    name: "max_users_in_car_is_for_secondary"
-    namespace: "multiuser"
-    description: "Update Car SystemUi and Settings to specify FULL_SECONDARY for max users (alongside consistent_max_users flag)."
-    bug: "394178333"
-}
-
-flag {
     name: "query_user_type_supported"
     namespace: "multiuser"
     description: "Infrastructure to determine whether a given user type is supported."
@@ -65,6 +51,16 @@ flag {
     namespace: "multiuser"
     description: "Allow using all cpu cores during a user switch."
     bug: "308105403"
+}
+
+flag {
+    name: "upgrade_user_summary_behaviour"
+    namespace: "multiuser"
+    description: "Make \"Not set up\" status reflect whether SUW has been completed instead of started."
+    bug: "463339398"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }
 
 # Begin Multiuser Widget flags #
@@ -216,14 +212,6 @@ flag {
   is_fixed_read_only: true
 }
 
-# This flag guards the private space feature and all its implementations excluding the APIs. APIs are guarded by android.os.Flags.allow_private_profile.
-flag {
-    name: "enable_private_space_features"
-    namespace: "profile_experiences"
-    description: "Enable the support for private space and all its sub-features"
-    bug: "286418785"
-}
-
 flag {
     name: "enable_permission_to_access_hidden_profiles"
     is_exported: true
@@ -244,34 +232,6 @@ flag {
     namespace: "multiuser"
     description: "Set power mode during a user switch."
     bug: "325249845"
-}
-
-flag {
-    name: "schedule_stop_of_background_user"
-    namespace: "multiuser"
-    description: "Schedule background users to be stopped at a future point. Infrastructure only."
-    bug: "330351042"
-}
-
-flag {
-    name: "schedule_stop_of_background_user_by_default"
-    namespace: "multiuser"
-    description: "Activates the background-stopping schedule of inactive users based on the time specified in the configuration."
-    bug: "330351042"
-}
-
-flag {
-    name: "stop_excess_for_background_starts"
-    namespace: "multiuser"
-    description: "Be more aggressive when stopping excess users, by triggering this even on background user starts and by allowing user 0's profiles to be stopped."
-    bug: "419867128"
-}
-
-flag {
-    name: "reschedule_stop_if_visible_activities"
-    namespace: "multiuser"
-    description: "Don't automatically stop a background user that has a top visible activity; instead, reschedule it to stop later"
-    bug: "423731424"
 }
 
 flag {
@@ -311,16 +271,6 @@ flag {
 }
 
 flag {
-    name: "restrict_quiet_mode_credential_bug_fix_to_managed_profiles"
-    namespace: "profile_experiences"
-    description: "Use user states to check the state of quiet mode for managed profiles only"
-    bug: "332812630"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
   name: "unicorn_mode_refactoring_for_hsum_read_only"
   namespace: "multiuser"
   description: "Refactorings related to unicorn mode to work on HSUM mode (Read only flag)"
@@ -340,13 +290,6 @@ flag {
 }
 
 flag {
-     name: "logout_user_api"
-     namespace: "multiuser"
-     description: "Add API to logout user"
-     bug: "350045389"
-}
-
-flag {
     name: "enable_moving_content_into_private_space"
     namespace: "profile_experiences"
     description: "Enable moving content into the Private Space"
@@ -354,12 +297,7 @@ flag {
     is_exported: true
 }
 
-flag {
-    name: "allow_supervising_profile"
-    namespace: "supervision"
-    description: "Enables support for new supervising user type"
-    bug: "389712089"
-}
+
 
 flag {
      name: "profiles_for_all"
@@ -405,6 +343,13 @@ flag {
 }
 
 flag {
+     name: "dont_show_other_users_apps_to_admin"
+     namespace: "multiuser"
+     description: "Disables showing other user apps to admin"
+     bug: "424786870"
+}
+
+flag {
     name: "setupwizard_username_population"
     namespace: "multiuser"
     description: "Ensures the user's account name is correctly populated and persisted during the Android Setup Wizard across all flows."
@@ -433,13 +378,6 @@ flag {
      namespace: "multiuser"
      description: "If the Headless System User is not an Admin user, also don't hackingly treat it as one either for bugreports."
      bug: "419105275"
-}
-
-flag {
-     name: "disallow_removing_last_admin_user"
-     namespace: "multiuser"
-     description: "Disallow the removal of a user, if it is the last admin user"
-     bug: "394970894"
 }
 
 flag {
@@ -478,15 +416,6 @@ flag {
      bug: "419086491"
 }
 
-flag {
-    name: "core_settings_multi_user"
-    namespace: "multiuser"
-    description: "Make CoreSettingsObserver multi-user aware."
-    bug: "439474431"
-    metadata {
-      purpose: PURPOSE_BUGFIX
-    }
-}
 
 flag {
      name: "user_removal_minor_apis_2026"
@@ -501,4 +430,11 @@ flag {
      namespace: "multiuser"
      description: "Perform authentication in the login app on desktop before switching to a user"
      bug: "448603243"
+}
+
+flag {
+    name: "hsu_app_management"
+    namespace: "multiuser"
+    description: "Enables managing apps installed on the headless system user (User 0) from the Settings app"
+    bug: "369617679"
 }

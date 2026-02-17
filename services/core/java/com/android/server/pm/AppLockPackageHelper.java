@@ -16,6 +16,7 @@
 
 package com.android.server.pm;
 
+import android.Manifest;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.ActivityOptions;
@@ -32,6 +33,7 @@ import android.os.Binder;
 import android.os.Build;
 import android.os.Process;
 import android.os.UserHandle;
+import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.Log;
 import android.util.Slog;
@@ -43,9 +45,11 @@ import com.android.server.LocalServices;
 import com.android.server.SystemConfig;
 import com.android.server.pm.pkg.AndroidPackage;
 import com.android.server.pm.pkg.PackageStateInternal;
+import com.android.server.pm.pkg.PackageUserStateInternal;
 import com.android.server.pm.pkg.mutate.PackageStateMutator;
 import com.android.server.pm.pkg.mutate.PackageUserStateWrite;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
 
@@ -255,11 +259,35 @@ public final class AppLockPackageHelper {
     }
 
     /**
+     * Returns a list of packages that have App Lock enabled.
+     *
+     * @param snapshot    Computer snapshot
+     * @param userId      User Id to set the App Lock enablement state for
+     * @return {@link List} of packages names that have App Lock enabled for the user
+     *
+     */
+    public List<String> getAppLockEnabledPackages(@NonNull Computer snapshot, int userId) {
+        final ArrayMap<String, ? extends PackageStateInternal> packageStates =
+                snapshot.getPackageStates();
+        final List<String> packages = new ArrayList<>();
+        for (int i = packageStates.size() - 1; i >= 0; i--) {
+            final PackageStateInternal ps = packageStates.valueAt(i);
+            final PackageUserStateInternal userState = ps.getUserStateOrDefault(userId);
+            final AndroidPackage pkg = ps.getPkg();
+            if (userState.isAppLockEnabled() && pkg != null && pkg.getPackageName() != null) {
+                packages.add(pkg.getPackageName());
+            }
+        }
+        return packages;
+    }
+
+    /**
      * Sets the App Lock enablement state for a given package and user.
      *
-     * <p>If the caller is neither {@link Process#SYSTEM_UID} nor {@link Process#ROOT_UID} this
-     * method will throw a {@link SecurityException} since only the system is allowed to change the
-     * App Lock enabled state.
+     * <p>If the caller is neither {@link Process#SYSTEM_UID} nor {@link Process#ROOT_UID}, and
+     * does not have {@link Manifest.permission#TEST_LOCK_APPS} this method will throw a
+     * {@link SecurityException} since only tests or the system are allowed to change the App Lock
+     * enabled state.
      *
      * <p>This method will write the new state to disk if the caller has the necessary
      * permissions and the new enablement state is different from the current state.
@@ -268,7 +296,7 @@ public final class AppLockPackageHelper {
      * this method will disable App Lock and return {@code true}. This will happen even if App Lock
      * is not supported for an app, since unsupported apps should not have App Lock enabled.
      *
-     * <p>If the caller is trying to enable App Lock but it can't be enabled, either because
+     * <p>If the caller is trying to enable App Lock, but it can't be enabled, either because
      * {@link #isAppLockSupported(String, int, Computer)} is {@code false} or because the device is
      * not currently secured with a device credential (e.g., PIN, pattern, or password), this method
      * will not set the target App Lock state and will return {@code false}.
@@ -284,14 +312,14 @@ public final class AppLockPackageHelper {
      * @return {@code true} if the App Lock enablement state was set to the passed in value for the
      *                      package and user, {@code false} otherwise
      * @throws SecurityException if the caller is neither {@link Process#SYSTEM_UID} nor
-     * {@link Process#ROOT_UID}
+     * {@link Process#ROOT_UID} and does not have {@link Manifest.permission#TEST_LOCK_APPS}
      */
     public boolean setPackageAppLockEnabled(@NonNull Supplier<Computer> snapshotSupplier,
-            String packageName, int userId, boolean enabled, int callingUid) {
+            String packageName, int userId, boolean enabled, int callingUid, int callingPid) {
         if (!UserHandle.isSameApp(callingUid, Process.SYSTEM_UID)
                 && !UserHandle.isSameApp(callingUid, Process.ROOT_UID)) {
-            throw new SecurityException(
-                    "setPackageAppLockEnabled can only be called by the system");
+            mContext.enforcePermission(Manifest.permission.TEST_LOCK_APPS, callingPid,
+                    callingUid, "setPackageAppLockEnabled can only be called by the system");
         }
 
         Computer snapshot = snapshotSupplier.get();

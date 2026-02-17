@@ -43,13 +43,12 @@ import static android.security.advancedprotection.AdvancedProtectionManager.ADVA
 import static android.view.Display.INVALID_DISPLAY;
 import static android.view.WindowManagerPolicyConstants.NAV_BAR_MODE_GESTURAL;
 import static android.view.accessibility.AccessibilityManager.FlashNotificationReason;
+import static android.view.accessibility.Flags.allowA11yButtonOnLargeScreen;
 import static android.view.accessibility.Flags.enableA11yTopRowShortcut;
 
 import static com.android.hardware.input.Flags.enableColorInversionKeyGestures;
 import static com.android.hardware.input.Flags.enableSelectToSpeakKeyGestures;
-import static com.android.hardware.input.Flags.enableTalkbackAndMagnifierKeyGestures;
 import static com.android.hardware.input.Flags.enableTalkbackKeyGestures;
-import static com.android.hardware.input.Flags.enableVoiceAccessKeyGestures;
 import static com.android.internal.accessibility.AccessibilityShortcutController.ACCESSIBILITY_HEARING_AIDS_COMPONENT_NAME;
 import static com.android.internal.accessibility.AccessibilityShortcutController.COLOR_INVERSION_COMPONENT_NAME;
 import static com.android.internal.accessibility.AccessibilityShortcutController.MAGNIFICATION_COMPONENT_NAME;
@@ -191,6 +190,7 @@ import com.android.internal.accessibility.AccessibilityShortcutController.ExtraD
 import com.android.internal.accessibility.AccessibilityShortcutController.FrameworkFeatureInfo;
 import com.android.internal.accessibility.AccessibilityShortcutController.LaunchableFrameworkFeatureInfo;
 import com.android.internal.accessibility.common.KeyGestureEventConstants;
+import com.android.internal.accessibility.common.MagnificationConstants;
 import com.android.internal.accessibility.common.ShortcutChooserDialogConstants;
 import com.android.internal.accessibility.common.ShortcutConstants;
 import com.android.internal.accessibility.common.ShortcutConstants.FloatingMenuSize;
@@ -696,15 +696,11 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
         if (enableSelectToSpeakKeyGestures()) {
             supportedGestures.add(KeyGestureEvent.KEY_GESTURE_TYPE_ACTIVATE_SELECT_TO_SPEAK);
         }
-        if (enableTalkbackAndMagnifierKeyGestures()) {
-            supportedGestures.add(KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_MAGNIFICATION);
-        }
+        supportedGestures.add(KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_MAGNIFICATION);
         if (enableTalkbackKeyGestures()) {
             supportedGestures.add(KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_SCREEN_READER);
         }
-        if (enableVoiceAccessKeyGestures()) {
-            supportedGestures.add(KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_VOICE_ACCESS);
-        }
+        supportedGestures.add(KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_VOICE_ACCESS);
         if (enableA11yTopRowShortcut()) {
             supportedGestures.add(
                     KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_TOP_ROW_ACCESSIBILITY_KEY);
@@ -1015,11 +1011,11 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
             setNonA11yToolNotificationToMatchSafetyCenter();
         }
 
-        if (android.security.Flags.extendAapmToA11yServices()) {
-            if (phase == SystemService.PHASE_BOOT_COMPLETED) {
+        if (phase == SystemService.PHASE_BOOT_COMPLETED) {
+            mDevicePolicyManager = mContext.getSystemService(DevicePolicyManager.class);
+            if (android.security.Flags.extendAapmToA11yServices()) {
                 mAdvancedProtectionManager =
                         mContext.getSystemService(AdvancedProtectionManager.class);
-                mDevicePolicyManager = mContext.getSystemService(DevicePolicyManager.class);
                 if (mAdvancedProtectionManager != null) {
                     mAdvancedProtectionManager.registerAdvancedProtectionCallback(
                             new HandlerExecutor(BackgroundThread.getHandler()),
@@ -1306,6 +1302,50 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                 safetyCenterReceiver, UserHandle.ALL, safetyCenterFilter, null, mMainHandler,
                 Context.RECEIVER_EXPORTED);
         mRegisteredBroadcaseReveivers.add(safetyCenterReceiver);
+
+        final IntentFilter dpmFilter = new IntentFilter();
+        dpmFilter.addAction(DevicePolicyManager.ACTION_DEVICE_POLICY_MANAGER_STATE_CHANGED);
+        final BroadcastReceiver dpmReceiver = new BroadcastReceiver() {
+            @Override
+            public void onReceive(Context context, Intent intent) {
+                final int currentUserId;
+                synchronized (mLock) {
+                    currentUserId = mCurrentUserId;
+                }
+                scheduleUpdatePermittedServices(currentUserId);
+            }
+        };
+        // This receiver is required to keep the mPermittedAccessibilityServices cache in sync
+        // with all Device Policy changes. While mAdvancedProtectionManager callback handles
+        // APM toggles, other admins (e.g. Enterprise) can also change permitted services,
+        // which triggers this broadcast but not the APM callback.
+        mContext.registerReceiverAsUser(
+                dpmReceiver, UserHandle.ALL, dpmFilter, null, mMainHandler,
+                Context.RECEIVER_EXPORTED);
+        mRegisteredBroadcaseReveivers.add(dpmReceiver);
+    }
+
+    @Nullable
+    private Set<String> getPermittedAccessibilityServices(int userId) {
+        if (mDevicePolicyManager == null) {
+            return null;
+        }
+        final List<String> permittedList = Binder.withCleanCallingIdentity(() ->
+                mDevicePolicyManager.getPermittedAccessibilityServices(userId));
+        return permittedList != null ? new HashSet<>(permittedList) : null;
+    }
+
+    private void scheduleUpdatePermittedServices(int userId) {
+        mMainHandler.post(() -> {
+            final Set<String> permittedServices = getPermittedAccessibilityServices(userId);
+            synchronized (mLock) {
+                final AccessibilityUserState userState = getUserStateLocked(userId);
+                userState.setPermittedAccessibilityServicesLocked(permittedServices);
+                if (userId == mCurrentUserId) {
+                    onUserStateChangedLocked(userState);
+                }
+            }
+        });
     }
 
     /**
@@ -1318,7 +1358,15 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
             // if this happen, we need to check the timing when registering the call back to APM
             return;
         }
-        if (!apmOn) {
+        if (apmOn) {
+            mDevicePolicyManager.addUserRestrictionGlobally(ADVANCED_PROTECTION_SYSTEM_ENTITY,
+                    UserManager.DISALLOW_NON_TOOL_ACCESSIBILITY_SERVICE);
+            if (DEBUG) {
+                Slog.v(LOG_TAG,
+                        "Added user restriction: UserManager"
+                                + ".DISALLOW_NON_TOOL_ACCESSIBILITY_SERVICE_GLOBALLY");
+            }
+        } else {
             mDevicePolicyManager.clearUserRestrictionGlobally(ADVANCED_PROTECTION_SYSTEM_ENTITY,
                     UserManager.DISALLOW_NON_TOOL_ACCESSIBILITY_SERVICE);
             if (DEBUG) {
@@ -1326,19 +1374,12 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                         "Cleared user restriction: UserManager"
                                 + ".DISALLOW_NON_TOOL_ACCESSIBILITY_SERVICE_GLOBALLY");
             }
-            return;
         }
-        mDevicePolicyManager.addUserRestrictionGlobally(ADVANCED_PROTECTION_SYSTEM_ENTITY,
-                UserManager.DISALLOW_NON_TOOL_ACCESSIBILITY_SERVICE);
-        if (DEBUG) {
-            Slog.v(LOG_TAG,
-                    "Added user restriction: UserManager"
-                            + ".DISALLOW_NON_TOOL_ACCESSIBILITY_SERVICE_GLOBALLY");
-        }
-
+        final int currentUserId;
         synchronized (mLock) {
-            onUserStateChangedLocked(getUserStateLocked(mCurrentUserId));
+            currentUserId = mCurrentUserId;
         }
+        scheduleUpdatePermittedServices(currentUserId);
     }
 
     /**
@@ -1513,8 +1554,16 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
         int resolvedUserId;
 
         synchronized (mLock) {
-            if (event.getWindowId() ==
-                AccessibilityWindowInfo.PICTURE_IN_PICTURE_ACTION_REPLACER_WINDOW_ID) {
+            if (android.view.accessibility.Flags.embeddedUiUsesHostWindowId()
+                    && mA11yWindowManager.isEmbeddedHierarchyWindowsLocked(
+                            event.getRealWindowId())) {
+                int hostWindowId =
+                        mA11yWindowManager.resolveParentWindowIdLocked(event.getRealWindowId());
+                event.setEmbeddingHostWindowId(hostWindowId);
+            }
+
+            if (event.getRealWindowId()
+                    == AccessibilityWindowInfo.PICTURE_IN_PICTURE_ACTION_REPLACER_WINDOW_ID) {
                 // The replacer window isn't shown to services. Move its events into the pip.
                 AccessibilityWindowInfo pip = mA11yWindowManager.getPictureInPictureWindowLocked();
                 if (pip != null) {
@@ -1537,7 +1586,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
             if (resolvedUserId == mCurrentUserId) {
                 if (mSecurityPolicy.canDispatchAccessibilityEventLocked(mCurrentUserId, event)) {
                     mA11yWindowManager.updateActiveAndAccessibilityFocusedWindowLocked(
-                            mCurrentUserId, event.getWindowId(), event.getSourceNodeId(),
+                            mCurrentUserId, event.getRealWindowId(), event.getSourceNodeId(),
                             event.getEventType(), event.getAction());
                     mSecurityPolicy.updateEventSourceLocked(event);
                     dispatchEvent = true;
@@ -1556,7 +1605,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
             // the computation for performance reasons.
             boolean shouldComputeWindows = false;
             int displayId = event.getDisplayId();
-            final int windowId = event.getWindowId();
+            final int windowId = event.getRealWindowId();
             if (windowId != AccessibilityWindowInfo.UNDEFINED_WINDOW_ID
                     && displayId == INVALID_DISPLAY) {
                 displayId = mA11yWindowManager.getDisplayIdByUserIdAndWindowId(
@@ -2390,6 +2439,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
         // parse outside of a lock, but after verifying userId
         parsedAccessibilityServiceInfos = parseAccessibilityServiceInfos(userId);
         parsedAccessibilityShortcutInfos = parseAccessibilityShortcutInfos(userId);
+        final Set<String> permittedServices = getPermittedAccessibilityServices(userId);
         Set<ComponentName> validA11yTileServices = AccessibilityTileUtils.getValidA11yTileServices(
                 mContext,
                 LocalServices.getService(PackageManagerInternal.class),
@@ -2413,6 +2463,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
             // The user changed.
             mCurrentUserId = userId;
             AccessibilityUserState userState = getCurrentUserStateLocked();
+            userState.setPermittedAccessibilityServicesLocked(permittedServices);
 
             readConfigurationForUserStateLocked(userState,
                     parsedAccessibilityServiceInfos, parsedAccessibilityShortcutInfos,
@@ -2661,7 +2712,15 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                     gestureTargets.addAll(softwareTargets);
                     softwareTargets.clear();
                 }
-                buttonMode = ACCESSIBILITY_BUTTON_MODE_FLOATING_MENU;
+
+                // Conditions to force floating menu mode:
+                // 1. Flag is off (original behavior): Always use floating menu in gestural nav.
+                // 2. Flag is on: Only use floating menu if nav bar can move (i.e. not persistent).
+                final boolean navBarCanMove = mContext.getResources().getBoolean(
+                        com.android.internal.R.bool.config_navBarCanMove);
+                if (!allowA11yButtonOnLargeScreen() || navBarCanMove) {
+                    buttonMode = ACCESSIBILITY_BUTTON_MODE_FLOATING_MENU;
+                }
             } else {
                 // Only change the current button mode if there are gesture targets
                 // (indicating the user came from gesture mode or is migrating)
@@ -4163,7 +4222,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                 name -> !userState.isShortcutTargetInstalledLocked(name));
         if (android.security.Flags.extendAapmToA11yServices()) {
             currentTargets.removeIf(
-                    name -> !userState.isShortcutTargetPermittedLocked(name, mCurrentUserId));
+                    name -> !userState.isShortcutTargetPermittedLocked(name));
         }
         if (shortcutType == QUICK_SETTINGS) {
             // Add the target if the a11y service is enabled and the tile exist in QS panel
@@ -4708,14 +4767,6 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                                 + "disabled by feature flag");
                 return;
             }
-            if (!enableTalkbackAndMagnifierKeyGestures()
-                    && shortcutTargets.contains(getTargetNameFromKeyGestureType(
-                    KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_MAGNIFICATION))) {
-                Slog.w(LOG_TAG,
-                        "KEY_GESTURE type magnification shortcuts are disabled by feature "
-                                + "flag");
-                return;
-            }
             if (!enableSelectToSpeakKeyGestures() && shortcutTargets.contains(
                     getTargetNameFromKeyGestureType(
                             KeyGestureEvent.KEY_GESTURE_TYPE_ACTIVATE_SELECT_TO_SPEAK
@@ -4730,14 +4781,6 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                             KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_SCREEN_READER))) {
                 Slog.w(LOG_TAG,
                         "KEY_GESTURE type TalkBack shortcuts are disabled by feature flag");
-                return;
-            }
-            if (!enableVoiceAccessKeyGestures() && shortcutTargets.contains(
-                    getTargetNameFromKeyGestureType(
-                        KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_VOICE_ACCESS))) {
-                Slog.w(LOG_TAG,
-                        "KEY_GESTURE type voice access shortcuts are "
-                                + "disabled by feature flag");
                 return;
             }
         }
@@ -5115,7 +5158,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
         if (event.getWindowChanges() == AccessibilityEvent.WINDOWS_CHANGE_ADDED) {
             // We need to ensure the window is available before sending pending
             // window_state_changed events.
-            sendPendingWindowStateChangedEventsForAvailableWindowLocked(event.getWindowId());
+            sendPendingWindowStateChangedEventsForAvailableWindowLocked(event.getRealWindowId());
         }
         sendAccessibilityEventLocked(event, mCurrentUserId);
     }
@@ -5631,11 +5674,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
             if (msg.what == MSG_SEND_KEY_EVENT_TO_INPUT_FILTER) {
                 KeyEvent event = (KeyEvent) msg.obj;
                 final int policyFlags = msg.arg1;
-                synchronized (mLock) {
-                    if (mHasInputFilter && mInputFilter != null) {
-                        mInputFilter.sendInputEvent(event, policyFlags);
-                    }
-                }
+                invokeWithInputFilter(filter -> filter.sendInputEvent(event, policyFlags));
                 event.recycle();
             }
         }
@@ -5809,7 +5848,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
 
                 // Invert magnification if needed.
                 final Pair<float[], MagnificationSpec> pair =
-                        getWindowTransformationMatrixAndMagnificationSpec(focus.getWindowId());
+                        getWindowTransformationMatrixAndMagnificationSpec(focus.getRealWindowId());
                 MagnificationSpec spec = null;
                 if (pair != null && pair.second != null) {
                     spec = new MagnificationSpec();
@@ -5824,7 +5863,8 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
 
                 //Clip to the window bounds.
                 Rect windowBounds = mTempRect1;
-                AccessibilityWindowInfo window = focus.getWindow();
+                AccessibilityWindowInfo window =
+                        mA11yWindowManager.findA11yWindowInfoByIdLocked(focus.getRealWindowId());
                 if (window != null) {
                     window.getBoundsInScreen(windowBounds);
                 }
@@ -6528,10 +6568,12 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
     }
 
     boolean readMagnificationFollowKeyboardLocked(AccessibilityUserState userState) {
+        // Default to true if magnification viewport prioritization is enabled to prevent viewport
+        // jitter. False otherwise.
         final boolean followKeyboardEnabled = Settings.Secure.getIntForUser(
                 mContext.getContentResolver(),
                 Settings.Secure.ACCESSIBILITY_MAGNIFICATION_FOLLOW_KEYBOARD_ENABLED,
-                0, userState.mUserId) == 1;
+                Flags.enableMagnificationViewportPrioritization() ? 1 : 0, userState.mUserId) == 1;
         if (followKeyboardEnabled != userState.isMagnificationFollowKeyboardEnabled()) {
             userState.setMagnificationFollowKeyboardEnabled(followKeyboardEnabled);
             mMagnificationController.setMagnificationFollowKeyboardEnabled(followKeyboardEnabled);
@@ -6552,15 +6594,15 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
 
     @GuardedBy("mLock")
     boolean readAlwaysOnMagnificationLocked(AccessibilityUserState userState) {
-        int alwaysOnSettingsDefaultValue = mContext.getResources().getBoolean(
-                com.android.internal.R.bool.config_magnification_always_on_enabled) ? 1 : 0;
-        final boolean isSettingsAlwaysOnEnabled = Settings.Secure.getIntForUser(
+        final boolean isAlwaysOnConfigSupported = mMagnificationController
+                .isAlwaysOnMagnificationConfigSupported();
+        // Settings on by default
+        final boolean isAlwaysOnSettingsEnabled = Settings.Secure.getIntForUser(
                 mContext.getContentResolver(),
                 Settings.Secure.ACCESSIBILITY_MAGNIFICATION_ALWAYS_ON_ENABLED,
-                alwaysOnSettingsDefaultValue, userState.mUserId) == 1;
-        final boolean isAlwaysOnFeatureFlagEnabled = mMagnificationController
-                .isAlwaysOnMagnificationFeatureFlagEnabled();
-        final boolean isAlwaysOnEnabled = isAlwaysOnFeatureFlagEnabled && isSettingsAlwaysOnEnabled;
+                MagnificationConstants.ALWAYS_ON_SETTINGS_PREFERENCE_DEFAULT_ENABLED,
+                userState.mUserId) == AccessibilityUtils.State.ON;
+        final boolean isAlwaysOnEnabled = isAlwaysOnConfigSupported && isAlwaysOnSettingsEnabled;
         if (isAlwaysOnEnabled != userState.isAlwaysOnMagnificationEnabled()) {
             userState.setAlwaysOnMagnificationEnabled(isAlwaysOnEnabled);
             mMagnificationController.setAlwaysOnMagnificationEnabled(isAlwaysOnEnabled);
@@ -6653,12 +6695,24 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                 AccessibilityManagerService::requestTouchExplorationInternal, this, displayId));
     }
 
-    private void requestTouchExplorationInternal(int displayId) {
+    private void invokeWithInputFilter(Consumer<AccessibilityInputFilter> consumer) {
+        AccessibilityInputFilter inputFilter = null;
         synchronized (mLock) {
             if (mHasInputFilter && mInputFilter != null) {
-                mInputFilter.requestTouchExploration(displayId);
+                if (Flags.releaseA11yLockBeforeInputFilterCall()) {
+                    inputFilter = mInputFilter;
+                } else {
+                    consumer.accept(mInputFilter);
+                }
             }
         }
+        if (inputFilter != null) {
+            consumer.accept(inputFilter);
+        }
+    }
+
+    private void requestTouchExplorationInternal(int displayId) {
+        invokeWithInputFilter(filter -> filter.requestTouchExploration(displayId));
     }
 
     @Override
@@ -6668,11 +6722,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
     }
 
     private void requestDraggingInternal(int displayId, int pointerId) {
-        synchronized (mLock) {
-            if (mHasInputFilter && mInputFilter != null) {
-                mInputFilter.requestDragging(displayId, pointerId);
-            }
-        }
+        invokeWithInputFilter(filter -> filter.requestDragging(displayId, pointerId));
     }
 
     @Override
@@ -6683,11 +6733,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
     }
 
     private void requestDelegatingInternal(int displayId) {
-        synchronized (mLock) {
-            if (mHasInputFilter && mInputFilter != null) {
-                mInputFilter.requestDelegating(displayId);
-            }
-        }
+        invokeWithInputFilter(filter -> filter.requestDelegating(displayId));
     }
 
     @Override
@@ -6773,11 +6819,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
     }
 
     private void onDoubleTapAndHoldInternal(int displayId) {
-        synchronized (mLock) {
-            if (mHasInputFilter && mInputFilter != null) {
-                mInputFilter.onDoubleTapAndHold(displayId);
-            }
-        }
+        invokeWithInputFilter(filter -> filter.onDoubleTapAndHold(displayId));
     }
 
     private void updateFocusAppearanceDataLocked(AccessibilityUserState userState) {
@@ -6968,7 +7010,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
 
         SendWindowStateChangedEventRunnable(@NonNull AccessibilityEvent event) {
             mPendingEvent = event;
-            mWindowId = event.getWindowId();
+            mWindowId = event.getRealWindowId();
         }
 
         @Override
@@ -7018,6 +7060,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                             parsedAccessibilityShortcutInfos,
                             userId
                     );
+            mManagerService.scheduleUpdatePermittedServices(userId);
             synchronized (mManagerService.getLock()) {
                 // Only the profile parent can install accessibility services.
                 // Therefore we ignore packages from linked profiles.
@@ -7063,6 +7106,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                             parsedAccessibilityShortcutInfos,
                             userId
                     );
+            mManagerService.scheduleUpdatePermittedServices(userId);
             synchronized (mManagerService.getLock()) {
                 if (userId != mManagerService.getCurrentUserIdLocked()) {
                     return;
@@ -7102,8 +7146,9 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
                         "packageName=" + packageName + ";uid=" + uid);
             }
 
+            final int userId = getChangingUserId();
+            mManagerService.scheduleUpdatePermittedServices(userId);
             synchronized (mManagerService.getLock()) {
-                final int userId = getChangingUserId();
                 // Only the profile parent can install accessibility services.
                 // Therefore we ignore packages from linked profiles.
                 if (userId != mManagerService.getCurrentUserIdLocked()) {
@@ -7189,7 +7234,7 @@ public class AccessibilityManagerService extends IAccessibilityManager.Stub
     private boolean postponeWindowStateEvent(AccessibilityEvent event) {
         synchronized (mLock) {
             final int resolvedWindowId = mA11yWindowManager.resolveParentWindowIdLocked(
-                    event.getWindowId());
+                    event.getRealWindowId());
             if (mA11yWindowManager.findWindowInfoByIdLocked(resolvedWindowId) != null) {
                 return false;
             }

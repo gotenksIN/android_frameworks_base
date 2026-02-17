@@ -26,11 +26,8 @@ import static com.google.common.util.concurrent.MoreExecutors.directExecutor;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyBoolean;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
@@ -46,7 +43,6 @@ import android.os.IMmd;
 import android.os.IMmdProcessWritebackCallback;
 import android.os.MessageQueue;
 import android.os.Process;
-import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.annotations.Presubmit;
 import android.platform.test.flag.junit.SetFlagsRule;
@@ -55,8 +51,8 @@ import android.text.TextUtils;
 
 import androidx.test.platform.app.InstrumentationRegistry;
 
-import com.android.modules.utils.testing.ExtendedMockitoRule;
 import com.android.internal.os.KernelAllocationStats;
+import com.android.modules.utils.testing.ExtendedMockitoRule;
 import com.android.modules.utils.testing.TestableDeviceConfig;
 import com.android.server.LocalServices;
 import com.android.server.ServiceThread;
@@ -208,6 +204,8 @@ public final class CachedAppOptimizerTest {
                     CachedAppOptimizer.DEFAULT_COMPACT_THROTTLE_MIN_OOM_ADJ);
             assertThat(mCachedAppOptimizerUnderTest.mCompactThrottleMaxOomAdj).isEqualTo(
                     CachedAppOptimizer.DEFAULT_COMPACT_THROTTLE_MAX_OOM_ADJ);
+            assertThat(mCachedAppOptimizerUnderTest.mZramWritebackEnabled).isEqualTo(
+                    CachedAppOptimizer.DEFAULT_ZRAM_WRITEBACK_ENABLED);
         }
 
 
@@ -277,6 +275,8 @@ public final class CachedAppOptimizerTest {
         DeviceConfig.setProperty(DeviceConfig.NAMESPACE_ACTIVITY_MANAGER_NATIVE_BOOT,
                 CachedAppOptimizer.KEY_USE_FREEZER, CachedAppOptimizer.DEFAULT_USE_FREEZER
                         ? "false" : "true", false);
+        DeviceConfig.setProperty(DeviceConfig.NAMESPACE_ACTIVITY_MANAGER,
+                CachedAppOptimizer.KEY_ZRAM_WRITEBACK_ENABLED, "true", false);
 
         // Then calling init will read and set that flag.
         mCachedAppOptimizerUnderTest.init();
@@ -304,6 +304,7 @@ public final class CachedAppOptimizerTest {
         assertThat(mCachedAppOptimizerUnderTest.mFullAnonRssThrottleKb).isEqualTo(
                 CachedAppOptimizer.DEFAULT_COMPACT_FULL_RSS_THROTTLE_KB + 1);
         assertThat(mCachedAppOptimizerUnderTest.mProcStateThrottle).containsExactly(1, 2, 3);
+        assertThat(mCachedAppOptimizerUnderTest.mZramWritebackEnabled).isTrue();
 
         Assume.assumeTrue(mAms.isAppFreezerSupported());
         if (mAms.isAppFreezerSupported()) {
@@ -768,6 +769,7 @@ public final class CachedAppOptimizerTest {
     @Test
     public void zramWritebackInitiated() throws Exception {
         initActivityManagerService();
+        setFlag(CachedAppOptimizer.KEY_ZRAM_WRITEBACK_ENABLED, "true", true);
         long[] rssAfter =
                 new long[]{/*totalRSS*/ 9000, /*fileRSS*/ 9000, /*anonRSS*/ 11000, /*swap*/9000};
         verifyZramWriteback(rssAfter, /*hasActivities*/ true, /*supportsZramOps*/ true,
@@ -779,6 +781,8 @@ public final class CachedAppOptimizerTest {
             com.android.server.am.Flags.FLAG_LOG_ZRAM_WRITEBACK_EVENTS})
     @Test
     public void zramWritebackNotInitiatedDueToSwapSize() throws Exception {
+        initActivityManagerService();
+        setFlag(CachedAppOptimizer.KEY_ZRAM_WRITEBACK_ENABLED, "true", true);
         // 200MB swap size
         long[] rssAfter =
                 new long[]{/*totalRSS*/ 9000, /*fileRSS*/ 9000, /*anonRSS*/ 11000, /*swap*/
@@ -792,10 +796,15 @@ public final class CachedAppOptimizerTest {
             com.android.server.am.Flags.FLAG_LOG_ZRAM_WRITEBACK_EVENTS})
     @Test
     public void zramWritebackNotInitiatedDueToGpuMemory() throws Exception {
+        initActivityManagerService();
+        setFlag(CachedAppOptimizer.KEY_ZRAM_WRITEBACK_ENABLED, "true", true);
         final int pid = 1;
+        final int gpuMemThreshold =
+                CachedAppOptimizer.DEFAULT_ZRAM_WRITEBACK_GPU_MEM_THRESHOLD_KB;
         KernelAllocationStats.ProcessGpuMem[] gpuAllocations =
                 new KernelAllocationStats.ProcessGpuMem[1];
-        gpuAllocations[0] = new KernelAllocationStats.ProcessGpuMem(pid, 1024);
+        gpuAllocations[0] = new KernelAllocationStats.ProcessGpuMem(
+                pid, gpuMemThreshold + 1);
         doReturn(gpuAllocations).when(mKernelAllocProvider).getGpuAllocations();
 
         long[] rssAfter =
@@ -809,8 +818,12 @@ public final class CachedAppOptimizerTest {
             com.android.server.am.Flags.FLAG_LOG_ZRAM_WRITEBACK_EVENTS})
     @Test
     public void zramWritebackNotInitiatedDueToDmaBuf() throws Exception {
+        initActivityManagerService();
+        setFlag(CachedAppOptimizer.KEY_ZRAM_WRITEBACK_ENABLED, "true", true);
         final int pid = 1;
-        doReturn(1024L).when(mKernelAllocProvider).getDmabufSizeForProcessKb(pid);
+        doReturn(CachedAppOptimizer.DEFAULT_ZRAM_WRITEBACK_DMABUF_MEM_THRESHOLD_KB + 1L)
+                .when(mKernelAllocProvider)
+                .getDmabufSizeForProcessKb(pid);
 
         long[] rssAfter =
                 new long[]{/*totalRSS*/ 9000, /*fileRSS*/ 9000, /*anonRSS*/ 11000, /*swap*/9000};
@@ -823,6 +836,8 @@ public final class CachedAppOptimizerTest {
             com.android.server.am.Flags.FLAG_LOG_ZRAM_WRITEBACK_EVENTS})
     @Test
     public void zramWritebackNotInitiatedNoActivities() throws Exception {
+        initActivityManagerService();
+        setFlag(CachedAppOptimizer.KEY_ZRAM_WRITEBACK_ENABLED, "true", true);
         long[] rssAfter =
                 new long[]{/*totalRSS*/ 9000, /*fileRSS*/ 9000, /*anonRSS*/ 11000, /*swap*/9000};
         verifyZramWriteback(rssAfter, /*hasActivities*/ false, /*supportsZramOps*/ true,
@@ -834,9 +849,24 @@ public final class CachedAppOptimizerTest {
             com.android.server.am.Flags.FLAG_LOG_ZRAM_WRITEBACK_EVENTS})
     @Test
     public void zramWritebackNotInitiatedNoZramOpsSupport() throws Exception {
+        initActivityManagerService();
+        setFlag(CachedAppOptimizer.KEY_ZRAM_WRITEBACK_ENABLED, "true", true);
         long[] rssAfter =
                 new long[]{/*totalRSS*/ 9000, /*fileRSS*/ 9000, /*anonRSS*/ 11000, /*swap*/9000};
         verifyZramWriteback(rssAfter, /*hasActivities*/ true, /*supportsZramOps*/ false,
+                /*shouldBeCalled*/ false);
+    }
+
+    @EnableFlags({
+            com.android.server.am.Flags.FLAG_ENABLE_ZRAM_WRITEBACK,
+            com.android.server.am.Flags.FLAG_LOG_ZRAM_WRITEBACK_EVENTS})
+    @Test
+    public void zramWritebackDisabledByDeviceConfig() throws Exception {
+        initActivityManagerService();
+        setFlag(CachedAppOptimizer.KEY_ZRAM_WRITEBACK_ENABLED, "false", true);
+        long[] rssAfter =
+                new long[]{/*totalRSS*/ 9000, /*fileRSS*/ 9000, /*anonRSS*/ 11000, /*swap*/9000};
+        verifyZramWriteback(rssAfter, /*hasActivities*/ true, /*supportsZramOps*/ true,
                 /*shouldBeCalled*/ false);
     }
 
@@ -1186,7 +1216,7 @@ public final class CachedAppOptimizerTest {
         assertTrue(mFreezeCounter.await(5, TimeUnit.SECONDS));
 
         // Mark as written back
-        app.setIsZramWrittenBack(true);
+        mAms.mProcessStateController.setIsZramWrittenBack(app, true);
         assertTrue(app.isZramWrittenBack());
 
         // Verify onZramWritebackStateChanged call
@@ -1240,74 +1270,6 @@ public final class CachedAppOptimizerTest {
         mFreezeCounter = new CountDownLatch(2);
         mCachedAppOptimizerUnderTest.forceFreezeForTest(app, false);
         assertTrue(mFreezeCounter.await(5, TimeUnit.SECONDS));
-    }
-
-    @EnableFlags(Flags.FLAG_CPU_TIME_CAPABILITY_BASED_FREEZE_POLICY)
-    @Test
-    public void shouldNotFreezeIgnored() throws InterruptedException {
-        mProcessDependencies.setRss(new long[] {
-                0 /*total_rss*/,
-                0 /*file*/,
-                0 /*anon*/,
-                0 /*swap*/,
-                0 /*shmem*/
-        });
-        mUseFreezer = true;
-        // Force the system to use the freezer
-        DeviceConfig.setProperty(DeviceConfig.NAMESPACE_ACTIVITY_MANAGER_NATIVE_BOOT,
-                CachedAppOptimizer.KEY_USE_FREEZER, "true", false);
-        mCachedAppOptimizerUnderTest.init();
-        initActivityManagerService();
-
-        int pid = 10000;
-        int uid = 2;
-        int pkgUid = 3;
-        final ProcessRecord app = makeProcessRecord(pid, uid, pkgUid, "p1", "app1");
-        app.setShouldNotFreeze(true, false, 0, 0);
-
-        assertNotNull(app.mOptRecord);
-        assertFalse(app.mOptRecord.isFrozen());
-
-        mFreezeCounter = new CountDownLatch(1);
-        mCachedAppOptimizerUnderTest.forceFreezeForTest(app, true);
-        waitForHandler();
-
-        assertTrue(mFreezeCounter.await(0, TimeUnit.SECONDS));
-        assertTrue(app.mOptRecord.isFrozen());
-    }
-
-    @DisableFlags(Flags.FLAG_CPU_TIME_CAPABILITY_BASED_FREEZE_POLICY)
-    @Test
-    public void shouldNotFreezeAbortsFreeze() throws InterruptedException {
-        mProcessDependencies.setRss(new long[] {
-                0 /*total_rss*/,
-                0 /*file*/,
-                0 /*anon*/,
-                0 /*swap*/,
-                0 /*shmem*/
-        });
-        mUseFreezer = true;
-        // Force the system to use the freezer
-        DeviceConfig.setProperty(DeviceConfig.NAMESPACE_ACTIVITY_MANAGER_NATIVE_BOOT,
-                CachedAppOptimizer.KEY_USE_FREEZER, "true", false);
-        mCachedAppOptimizerUnderTest.init();
-        initActivityManagerService();
-
-        int pid = 10000;
-        int uid = 2;
-        int pkgUid = 3;
-        final ProcessRecord app = makeProcessRecord(pid, uid, pkgUid, "p1", "app1");
-        app.setShouldNotFreeze(true, false, 0, 0);
-
-        assertNotNull(app.mOptRecord);
-        assertFalse(app.mOptRecord.isFrozen());
-
-        mFreezeCounter = new CountDownLatch(1);
-        mCachedAppOptimizerUnderTest.forceFreezeForTest(app, true);
-        waitForHandler();
-
-        assertFalse(mFreezeCounter.await(0, TimeUnit.SECONDS));
-        assertFalse(app.mOptRecord.isFrozen());
     }
 
     private void setFlag(String key, String value, boolean defaultValue) throws Exception {

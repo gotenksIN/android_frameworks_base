@@ -48,11 +48,7 @@ import com.android.systemui.statusbar.pipeline.mobile.data.repository.MobileConn
 import com.android.systemui.statusbar.pipeline.mobile.data.repository.MobileConnectionRepository.Companion.createNumberOfLevelsFlow
 import com.android.systemui.statusbar.pipeline.wifi.data.repository.WifiRepository
 import com.android.systemui.statusbar.pipeline.wifi.shared.model.WifiNetworkModel
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
-// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
 import com.qti.extphone.RadioIconType
-// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
 import javax.inject.Inject
 import kotlin.coroutines.CoroutineContext
 import kotlinx.coroutines.CoroutineScope
@@ -227,11 +223,7 @@ class CarrierMergedConnectionRepository(
     override val voiceNetworkType = MutableStateFlow(TelephonyManager.NETWORK_TYPE_UNKNOWN)
     override val dataNetworkType = MutableStateFlow(TelephonyManager.NETWORK_TYPE_UNKNOWN)
 // QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
-// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
     override val radioIconType = MutableStateFlow(RadioIconType.TYPE_NONE)
-// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
-// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
 // QTI_BEGIN: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons
     override val is6Rx = MutableStateFlow(false)
 // QTI_END: 2024-05-21: Android_UI: SystemUI: Add 6Rx icons support for NrIcons

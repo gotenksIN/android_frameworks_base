@@ -125,6 +125,8 @@ public final class AssociationInfo implements Parcelable {
     @NonNull
     private final Set<String> mExtraPermissions;
 
+    private final boolean mRemoteAiAgentSupported;
+
     /**
      * Creates a new Association.
      *
@@ -161,6 +163,7 @@ public final class AssociationInfo implements Parcelable {
         mMetadata = builder.mMetadata;
         mTimeMetadataSentMs = builder.mTimeMetadataSentMs;
         mExtraPermissions = builder.mExtraPermissions;
+        mRemoteAiAgentSupported = builder.mRemoteAiAgentSupported;
     }
 
     /**
@@ -292,7 +295,13 @@ public final class AssociationInfo implements Parcelable {
     }
 
     /**
-     * @return true if the association has been verified as a trusted device.
+     * <p>Returns whether an association is a trusted device.</p>
+     *
+     * <p>A trusted device is a device that has been verified as user-owned via a combination of
+     * successful secure connection establishment as well as an internal handshake involving a
+     * direct user confirmation (e.g. Displayed PIN comparison).</p>
+     *
+     * @return True if the device had successfully verified its connection. False otherwise.
      * @hide
      */
     public boolean isTrusted() {
@@ -319,7 +328,6 @@ public final class AssociationInfo implements Parcelable {
      * @return Enabled system data sync flags set via
      * {@link CompanionDeviceManager#enableSystemDataSyncForTypes(int, int)} (int, int)} and
      * {@link CompanionDeviceManager#disableSystemDataSyncForTypes(int, int)} (int, int)}.
-     * Or by default all flags are 1 (enabled).
      */
     public int getSystemDataSyncFlags() {
         return mSystemDataSyncFlags;
@@ -420,6 +428,14 @@ public final class AssociationInfo implements Parcelable {
     }
 
     /**
+     * @see AssociationRequest.Builder#setRemoteAiAgentSupported(boolean)
+     */
+    @FlaggedApi(Flags.FLAG_SUPPORT_AI_AGENT)
+    public boolean isRemoteAiAgentSupported() {
+        return mRemoteAiAgentSupported;
+    }
+
+    /**
      * Utility method for checking if the association represents a device with the given MAC
      * address.
      *
@@ -494,6 +510,7 @@ public final class AssociationInfo implements Parcelable {
                 + ", mMetadata=" + mMetadata
                 + ", mTimeMetadataSentMs=" + new Date(mTimeMetadataSentMs)
                 + ", mExtraPermissions=" + mExtraPermissions
+                + ", mRemoteAiAgentSupported=" + mRemoteAiAgentSupported
                 + '}';
     }
 
@@ -524,7 +541,8 @@ public final class AssociationInfo implements Parcelable {
                 && Objects.equals(mPackagesToNotify, that.mPackagesToNotify)
                 && BaseBundle.kindofEquals(mMetadata, that.mMetadata)
                 && mTimeMetadataSentMs == that.mTimeMetadataSentMs
-                && Objects.equals(mExtraPermissions, that.mExtraPermissions);
+                && Objects.equals(mExtraPermissions, that.mExtraPermissions)
+                && mRemoteAiAgentSupported == that.mRemoteAiAgentSupported;
     }
 
     private boolean isSameIcon(Icon iconA, Icon iconB) {
@@ -540,7 +558,7 @@ public final class AssociationInfo implements Parcelable {
                 mDeviceProfile, mAssociatedDevice, mSelfManaged, mNotifyOnDeviceNearby, mRevoked,
                 mPending, mTrusted, mTimeApprovedMs, mLastTimeConnectedMs, mSystemDataSyncFlags,
                 mTransportFlags, mDeviceIcon, mDeviceId, mPackagesToNotify, mMetadata,
-                mExtraPermissions);
+                mExtraPermissions, mRemoteAiAgentSupported);
     }
 
     @Override
@@ -584,6 +602,7 @@ public final class AssociationInfo implements Parcelable {
         dest.writePersistableBundle(mMetadata);
         dest.writeLong(mTimeMetadataSentMs);
         dest.writeStringList(new ArrayList<>(mExtraPermissions));
+        dest.writeBoolean(mRemoteAiAgentSupported);
     }
 
     private AssociationInfo(@NonNull Parcel in) {
@@ -619,6 +638,7 @@ public final class AssociationInfo implements Parcelable {
         mMetadata = in.readPersistableBundle();
         mTimeMetadataSentMs = in.readLong();
         mExtraPermissions = new HashSet<>(in.createStringArrayList());
+        mRemoteAiAgentSupported = in.readBoolean();
     }
 
     @NonNull
@@ -656,7 +676,8 @@ public final class AssociationInfo implements Parcelable {
         private boolean mTrusted;
         private long mTimeApprovedMs = System.currentTimeMillis();
         private long mLastTimeConnectedMs = Long.MAX_VALUE; // Never connected.
-        private int mSystemDataSyncFlags = -1; // By default, all system data sync is enabled.
+        // By default, only call metadata sync is enabled.
+        private int mSystemDataSyncFlags = CompanionDeviceManager.FLAG_CALL_METADATA;
         private int mTransportFlags;
         private Icon mDeviceIcon;
         private DeviceId mDeviceId;
@@ -664,6 +685,7 @@ public final class AssociationInfo implements Parcelable {
         private PersistableBundle mMetadata = new PersistableBundle(); // Empty bundle by default.
         private long mTimeMetadataSentMs;
         private Set<String> mExtraPermissions = new HashSet<>();
+        private boolean mRemoteAiAgentSupported;
 
         /** @hide */
         @TestApi
@@ -708,6 +730,7 @@ public final class AssociationInfo implements Parcelable {
             mMetadata = info.mMetadata;
             mTimeMetadataSentMs = info.mTimeMetadataSentMs;
             mExtraPermissions = info.mExtraPermissions;
+            mRemoteAiAgentSupported = info.mRemoteAiAgentSupported;
         }
 
         /** @hide */
@@ -889,6 +912,16 @@ public final class AssociationInfo implements Parcelable {
         @FlaggedApi(Flags.FLAG_ASSOCIATION_EXTRA_PERMISSION)
         public Builder setExtraPermissions(@NonNull Set<String> extraPermissions) {
             mExtraPermissions = extraPermissions;
+            return this;
+        }
+
+        /** @hide */
+        @TestApi
+        @NonNull
+        @SuppressLint("MissingGetterMatchingBuilder")
+        @FlaggedApi(Flags.FLAG_SUPPORT_AI_AGENT)
+        public Builder setRemoteAiAgentSupported(boolean remoteAiAgentSupported) {
+            mRemoteAiAgentSupported = remoteAiAgentSupported;
             return this;
         }
 

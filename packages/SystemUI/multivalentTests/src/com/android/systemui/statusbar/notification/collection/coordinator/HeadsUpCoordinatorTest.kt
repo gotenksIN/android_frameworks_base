@@ -61,7 +61,6 @@ import com.android.systemui.statusbar.notification.interruption.VisualInterrupti
 import com.android.systemui.statusbar.notification.interruption.VisualInterruptionDecisionProvider
 import com.android.systemui.statusbar.notification.row.mockNotificationActionClickManager
 import com.android.systemui.statusbar.notification.shared.LaunchNewFsiOnUpdate
-import com.android.systemui.statusbar.notification.shared.NotificationBundleUi
 import com.android.systemui.testKosmos
 import com.android.systemui.util.concurrency.FakeExecutor
 import com.android.systemui.util.mockito.withArgCaptor
@@ -104,7 +103,6 @@ class HeadsUpCoordinatorTest : SysuiTestCase() {
             remoteInputManager,
             mockNotificationActionClickManager,
             launchFullScreenIntentProvider,
-            mock(),
             statusBarNotificationChipsInteractor,
             statusBarChipsUiEventLogger,
             mock(),
@@ -195,15 +193,9 @@ class HeadsUpCoordinatorTest : SysuiTestCase() {
             onHeadsUpChangedListener = withArgCaptor {
                 verify(headsUpManager).addListener(capture())
             }
-            actionPressListener =
-                if (NotificationBundleUi.isEnabled) {
-                    withArgCaptor {
-                        verify(kosmos.mockNotificationActionClickManager)
-                            .addActionClickListener(capture())
-                    }
-                } else {
-                    withArgCaptor { verify(remoteInputManager).addActionPressListener(capture()) }
-                }
+            actionPressListener = withArgCaptor {
+                verify(kosmos.mockNotificationActionClickManager).addActionClickListener(capture())
+            }
             given(headsUpManager.allEntries).willAnswer { huns.stream() }
             given(headsUpManager.isHeadsUpEntry(anyString())).willAnswer { invocation ->
                 val key = invocation.getArgument<String>(0)
@@ -579,7 +571,7 @@ class HeadsUpCoordinatorTest : SysuiTestCase() {
             beforeFinalizeFilterListener.onBeforeFinalizeFilter(listOf(entry))
 
             finishBind(entry)
-            verify(headsUpManager).showNotification(entry, isPinnedByUser = true)
+            verify(headsUpManager).showNotification(entry, isFromUserOpenAction = true)
         }
 
     @Test
@@ -615,7 +607,7 @@ class HeadsUpCoordinatorTest : SysuiTestCase() {
 
             // THEN it's still shown as heads up
             finishBind(entry)
-            verify(headsUpManager).showNotification(entry, isPinnedByUser = true)
+            verify(headsUpManager).showNotification(entry, isFromUserOpenAction = true)
         }
 
     @Test
@@ -649,7 +641,7 @@ class HeadsUpCoordinatorTest : SysuiTestCase() {
 
             // THEN the promoted entry is shown as a HUN, *not* the new entry
             finishBind(promotedEntry)
-            verify(headsUpManager).showNotification(promotedEntry, isPinnedByUser = true)
+            verify(headsUpManager).showNotification(promotedEntry, isFromUserOpenAction = true)
 
             verify(headsUpViewBinder, never()).bindHeadsUpView(eq(entry), any(), any())
             verify(headsUpManager, never()).showNotification(eq(entry), any())
@@ -668,7 +660,7 @@ class HeadsUpCoordinatorTest : SysuiTestCase() {
 
             // THEN HUN is shown
             finishBind(entry)
-            verify(headsUpManager).showNotification(entry, isPinnedByUser = true)
+            verify(headsUpManager).showNotification(entry, isFromUserOpenAction = true)
             addHUN(entry)
 
             // WHEN chip is tapped again
@@ -1081,7 +1073,7 @@ class HeadsUpCoordinatorTest : SysuiTestCase() {
 
             // THEN the notification is shown
             finishBind(entry)
-            verify(headsUpManager).showNotification(entry, isPinnedByUser = false)
+            verify(headsUpManager).showNotification(entry, isFromUserOpenAction = false)
         }
 
     @Test
@@ -1121,7 +1113,7 @@ class HeadsUpCoordinatorTest : SysuiTestCase() {
 
             // THEN the notification is shown
             finishBind(entry)
-            verify(headsUpManager).showNotification(entry, isPinnedByUser = false)
+            verify(headsUpManager).showNotification(entry, isFromUserOpenAction = false)
         }
 
     @Test
@@ -1314,7 +1306,7 @@ class HeadsUpCoordinatorTest : SysuiTestCase() {
             // VERIFY that the FSI didn't happen, but that we do HUN
             verify(launchFullScreenIntentProvider, never()).launchFullScreenIntent(any())
             finishBind(entry)
-            verify(headsUpManager).showNotification(entry, isPinnedByUser = false)
+            verify(headsUpManager).showNotification(entry, isFromUserOpenAction = false)
         }
 
     @Test
@@ -1512,11 +1504,11 @@ class HeadsUpCoordinatorTest : SysuiTestCase() {
 
     private fun Kosmos.finishBind(entry: NotificationEntry) {
         verify(headsUpManager, never()).showNotification(eq(entry), any())
-        val isPinnedByUserCaptor = argumentCaptor<Boolean>()
+        val isFromUserOpenActionCaptor = argumentCaptor<Boolean>()
         withArgCaptor<HeadsUpViewBinder.HeadsUpBindCallback> {
                 verify(headsUpViewBinder)
-                    .bindHeadsUpView(eq(entry), isPinnedByUserCaptor.capture(), capture())
+                    .bindHeadsUpView(eq(entry), isFromUserOpenActionCaptor.capture(), capture())
             }
-            .onHeadsUpBindFinished(entry, isPinnedByUserCaptor.firstValue)
+            .onHeadsUpBindFinished(entry, isFromUserOpenActionCaptor.firstValue)
     }
 }

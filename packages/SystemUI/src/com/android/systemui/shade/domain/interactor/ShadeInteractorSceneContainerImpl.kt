@@ -30,6 +30,7 @@ import com.android.systemui.scene.shared.model.Overlays
 import com.android.systemui.scene.shared.model.SceneFamilies
 import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.scene.shared.model.TransitionKeys.Instant
+import com.android.systemui.scene.shared.model.TransitionKeys.ToAlwaysOnDisplay
 import com.android.systemui.scene.shared.model.TransitionKeys.ToSplitShade
 import com.android.systemui.shade.ShadeOverlayBoundsListener
 import com.android.systemui.shade.data.repository.ShadeRepository
@@ -83,7 +84,7 @@ constructor(
     override val isQsBypassingShade: Flow<Boolean> =
         shadeModeInteractor.shadeMode
             .flatMapLatestConflated { shadeMode ->
-                sceneInteractor.transitionState
+                sceneInteractor.transitionStateFlow
                     .map { state ->
                         when (state) {
                             is ObservableTransitionState.Idle -> false
@@ -348,7 +349,7 @@ constructor(
         sceneInteractor
             .resolveSceneFamily(sceneKey)
             .flatMapLatestConflated { resolvedSceneKey ->
-                sceneInteractor.transitionState
+                sceneInteractor.transitionStateFlow
                     .flatMapLatestConflated { state ->
                         when (state) {
                             is ObservableTransitionState.Idle ->
@@ -361,7 +362,13 @@ constructor(
                                 if (state.toContent == resolvedSceneKey) {
                                     state.progress
                                 } else if (state.fromContent == resolvedSceneKey) {
-                                    state.progress.map { progress -> 1 - progress }
+                                    if (state.key == ToAlwaysOnDisplay) {
+                                        // Keep the scene expanded during a transition to AOD,
+                                        // because it should fade out in place.
+                                        flowOf(1f)
+                                    } else {
+                                        state.progress.map { progress -> 1 - progress }
+                                    }
                                 } else {
                                     flowOf(0f)
                                 }
@@ -376,7 +383,7 @@ constructor(
      * with a scene that is pulled down from the top of the screen.
      */
     fun sceneBasedInteracting(sceneInteractor: SceneInteractor, sceneKey: SceneKey) =
-        sceneInteractor.transitionState
+        sceneInteractor.transitionStateFlow
             .flatMapLatestConflated { state ->
                 when (state) {
                     is ObservableTransitionState.Idle -> flowOf(false)
@@ -395,7 +402,7 @@ constructor(
      * amount float.
      */
     private fun overlayBasedExpansion(sceneInteractor: SceneInteractor, overlay: OverlayKey) =
-        sceneInteractor.transitionState
+        sceneInteractor.transitionStateFlow
             .flatMapLatestConflated { state ->
                 when (state) {
                     is ObservableTransitionState.Idle ->
@@ -404,7 +411,13 @@ constructor(
                         if (state.toContent == overlay) {
                             state.progress
                         } else if (state.fromContent == overlay) {
-                            state.progress.map { progress -> 1 - progress }
+                            if (state.key == ToAlwaysOnDisplay) {
+                                // Keep the scene expanded during a transition to AOD,
+                                // because it should fade out in place.
+                                flowOf(1f)
+                            } else {
+                                state.progress.map { progress -> 1 - progress }
+                            }
                         } else {
                             state.currentOverlays().map { if (overlay in it) 1f else 0f }
                         }
@@ -417,7 +430,7 @@ constructor(
      * with [overlay].
      */
     private fun overlayBasedInteracting(sceneInteractor: SceneInteractor, overlay: OverlayKey) =
-        sceneInteractor.transitionState
+        sceneInteractor.transitionStateFlow
             .map { state ->
                 when (state) {
                     is ObservableTransitionState.Idle -> false
@@ -431,7 +444,7 @@ constructor(
     /** Whether this content key is currently shown and in idle transition state. */
     private val ContentKey.isShownAndIdle: Flow<Boolean>
         get() {
-            return sceneInteractor.transitionState
+            return sceneInteractor.transitionStateFlow
                 .map { state ->
                     when (state) {
                         is ObservableTransitionState.Idle ->

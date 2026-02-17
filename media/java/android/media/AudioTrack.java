@@ -17,6 +17,7 @@
 package android.media;
 
 import static android.media.AudioManager.AUDIO_SESSION_ID_GENERATE;
+import static android.media.audiopolicy.Flags.multiZoneAudio;
 import static android.media.audio.Flags.FLAG_CODEC_PROVENANCE_API;
 import static android.media.audio.Flags.FLAG_ROUTED_DEVICE_IDS;
 import static android.media.audio.Flags.FLAG_PARTIAL_FLUSH_FOR_PCM_OFFLOAD;
@@ -531,6 +532,23 @@ public class AudioTrack extends PlayerBase
     @Retention(RetentionPolicy.SOURCE)
     public @interface FlushFromAccuracy {}
 
+    /**
+     * Constant flag value to indicate {@link #flushWrittenFramesFromPosition(long, int)}
+     * is supported.
+     *
+     * @see #flushWrittenFramesFromPosition(long, int)
+     * @see #getFlushWrittenFramesFromPositionSupport(AudioFormat, AudioAttributes)
+     */
+    @FlaggedApi(FLAG_PARTIAL_FLUSH_FOR_PCM_OFFLOAD)
+    public static final int FLUSH_WRITTEN_FRAMES_SUPPORTED = 1 << 0;
+
+    /** @hide */
+    @IntDef(flag = true, prefix = "FLUSH_WRITTEN_FRAMES", value = {
+            FLUSH_WRITTEN_FRAMES_SUPPORTED
+    })
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface FlushWrittenFramesSupport {}
+
     // keep in sync with system/media/audio/include/system/audio-base.h
     private static final int AUDIO_OUTPUT_FLAG_FAST = 0x4;
     private static final int AUDIO_OUTPUT_FLAG_DEEP_BUFFER = 0x8;
@@ -583,14 +601,6 @@ public class AudioTrack extends PlayerBase
      * Never {@link AudioFormat#SAMPLE_RATE_UNSPECIFIED}.
      */
     private int mSampleRate; // initialized by all constructors via audioParamCheck()
-    /**
-     * The number of audio output channels (1 is mono, 2 is stereo, etc.).
-     */
-    private int mChannelCount = 1;
-    /**
-     * The audio channel mask used for calling native AudioTrack
-     */
-    private int mChannelMask = AudioFormat.CHANNEL_OUT_MONO;
 
     /**
      * The type of the audio stream to play. See
@@ -606,16 +616,17 @@ public class AudioTrack extends PlayerBase
      * The way audio is consumed by the audio sink, one of MODE_STATIC or MODE_STREAM.
      */
     private int mDataLoadMode = MODE_STREAM;
-    /**
+     /**
      * The current channel position mask, as specified on AudioTrack creation.
-     * Can be set simultaneously with channel index mask {@link #mChannelIndexMask}.
+     * Can be set simultaneously with channel index mask in {@link #mChannelMasks}.
      * May be set to {@link AudioFormat#CHANNEL_INVALID} if a channel index mask is specified.
-     */
+      */
     private int mChannelConfiguration = AudioFormat.CHANNEL_OUT_MONO;
     /**
-     * The channel index mask if specified, otherwise 0.
+     * The audio channel masks used for calling native AudioTrack.
      */
-    private int mChannelIndexMask = 0;
+    private AudioFormat.ChannelMasks mChannelMasks = new AudioFormat.ChannelMasks(
+            AudioFormat.CHANNEL_OUT_MONO);
     /**
      * The encoding of the audio samples.
      * @see AudioFormat#ENCODING_PCM_8BIT
@@ -878,6 +889,11 @@ public class AudioTrack extends PlayerBase
             rate = 0;
         }
 
+        int channelAcnMask = 0;
+        if ((format.getPropertySetMask()
+                & AudioFormat.AUDIO_FORMAT_HAS_PROPERTY_CHANNEL_ACN_MASK) != 0) {
+            channelAcnMask = format.getChannelAcnMask();
+        }
         int channelIndexMask = 0;
         if ((format.getPropertySetMask()
                 & AudioFormat.AUDIO_FORMAT_HAS_PROPERTY_CHANNEL_INDEX_MASK) != 0) {
@@ -887,7 +903,7 @@ public class AudioTrack extends PlayerBase
         if ((format.getPropertySetMask()
                 & AudioFormat.AUDIO_FORMAT_HAS_PROPERTY_CHANNEL_MASK) != 0) {
             channelMask = format.getChannelMask();
-        } else if (channelIndexMask == 0) { // if no masks at all, use stereo
+        } else if (channelIndexMask == 0 && channelAcnMask == 0) { // if no masks at all, use stereo
             channelMask = AudioFormat.CHANNEL_OUT_FRONT_LEFT
                     | AudioFormat.CHANNEL_OUT_FRONT_RIGHT;
         }
@@ -895,7 +911,7 @@ public class AudioTrack extends PlayerBase
         if ((format.getPropertySetMask() & AudioFormat.AUDIO_FORMAT_HAS_PROPERTY_ENCODING) != 0) {
             encoding = format.getEncoding();
         }
-        audioParamCheck(rate, channelMask, channelIndexMask, encoding, mode);
+        audioParamCheck(rate, channelMask, channelIndexMask, channelAcnMask, encoding, mode);
         mOffloaded = offload;
         mStreamType = AudioSystem.STREAM_DEFAULT;
 
@@ -923,7 +939,7 @@ public class AudioTrack extends PlayerBase
         // native initialization
         try (ScopedParcelState attributionSourceState = attributionSource.asScopedParcelState()) {
             int initResult = native_setup(new WeakReference<AudioTrack>(this), mAttributes,
-                    sampleRate, mChannelMask, mChannelIndexMask, mAudioFormat,
+                    sampleRate, mChannelMasks, mAudioFormat,
                     mNativeBufferSizeInBytes, mDataLoadMode, session,
                     attributionSourceState.getParcel(), 0 /*nativeTrackInJavaObj*/, offload,
                     encapsulationMode, tunerConfiguration, getCurrentOpPackageName(),
@@ -942,7 +958,8 @@ public class AudioTrack extends PlayerBase
         if ((mAttributes.getFlags() & AudioAttributes.FLAG_HW_AV_SYNC) != 0) {
             int frameSizeInBytes;
             if (AudioFormat.isEncodingLinearFrames(mAudioFormat)) {
-                frameSizeInBytes = mChannelCount * AudioFormat.getBytesPerSample(mAudioFormat);
+                frameSizeInBytes = mChannelMasks.getChannelCount()
+                        * AudioFormat.getBytesPerSample(mAudioFormat);
             } else {
                 frameSizeInBytes = 1;
             }
@@ -1008,8 +1025,7 @@ public class AudioTrack extends PlayerBase
                 int initResult = native_setup(new WeakReference<AudioTrack>(this),
                         null /*mAttributes - NA*/,
                         rates /*sampleRate - NA*/,
-                        0 /*mChannelMask - NA*/,
-                        0 /*mChannelIndexMask - NA*/,
+                        null /*mChannelMasks - NA*/,
                         0 /*mAudioFormat - NA*/,
                         0 /*mNativeBufferSizeInBytes - NA*/,
                         0 /*mDataLoadMode - NA*/,
@@ -1184,6 +1200,15 @@ public class AudioTrack extends PlayerBase
             // keep reference, we only copy the data when building
             mAttributes = attributes;
             return this;
+        }
+
+        /**
+         * @hide
+         * Internal accessor function for retrieving the AudioAttributes directly from the
+         * AudioTrack.Builder.
+         */
+        public @Nullable AudioAttributes getAudioAttributes() {
+            return mAttributes;
         }
 
         /**
@@ -1497,10 +1522,22 @@ public class AudioTrack extends PlayerBase
                     throw new UnsupportedOperationException(
                             "Offload and low latency modes are incompatible");
                 }
-                if (AudioSystem.getDirectPlaybackSupport(mFormat, mAttributes)
-                        == AudioSystem.DIRECT_NOT_SUPPORTED) {
-                    throw new UnsupportedOperationException(
-                            "Cannot create AudioTrack, offload format / attributes not supported");
+                if (multiZoneAudio()) {
+                    AttributionSource attributionSource = mContext == null
+                            ? AttributionSource.myAttributionSource() :
+                            mContext.getAttributionSource();
+
+                    if (AudioSystem.getDirectPlaybackSupport(mFormat, mAttributes,
+                            attributionSource.getUid()) == AudioSystem.DIRECT_NOT_SUPPORTED) {
+                        throw new UnsupportedOperationException("Cannot create AudioTrack, "
+                                + "offload format / attributes not supported");
+                    }
+                } else {
+                    if (AudioSystem.getDirectPlaybackSupport(mFormat, mAttributes)
+                            == AudioSystem.DIRECT_NOT_SUPPORTED) {
+                        throw new UnsupportedOperationException("Cannot create AudioTrack, "
+                                + "offload format / attributes not supported");
+                    }
                 }
             }
 
@@ -1683,7 +1720,7 @@ public class AudioTrack extends PlayerBase
             throw new IllegalArgumentException("Illegal null AudioAttributes argument");
         }
         return native_is_direct_output_supported(format.getEncoding(), format.getSampleRate(),
-                format.getChannelMask(), format.getChannelIndexMask(),
+                format.getChannelMasks(),
                 attributes.getContentType(), attributes.getUsage(), attributes.getFlags());
     }
 
@@ -1922,13 +1959,13 @@ public class AudioTrack extends PlayerBase
     // Convenience method for the constructor's parameter checks.
     // This is where constructor IllegalArgumentException-s are thrown
     // postconditions:
-    //    mChannelCount is valid
-    //    mChannelMask is valid
+    //    mChannelMasks.getChannelCount() is valid
+    //    mChannelMasks masks are valid
     //    mAudioFormat is valid
     //    mSampleRate is valid
     //    mDataLoadMode is valid
     private void audioParamCheck(int sampleRateInHz, int channelConfig, int channelIndexMask,
-                                 int audioFormat, int mode) {
+                                 int channelAcnMask, int audioFormat, int mode) {
         //--------------
         // sample rate, note these values are subject to change
         if ((sampleRateInHz < AudioFormat.SAMPLE_RATE_HZ_MIN ||
@@ -1954,17 +1991,14 @@ public class AudioTrack extends PlayerBase
         case AudioFormat.CHANNEL_OUT_DEFAULT: //AudioFormat.CHANNEL_CONFIGURATION_DEFAULT
         case AudioFormat.CHANNEL_OUT_MONO:
         case AudioFormat.CHANNEL_CONFIGURATION_MONO:
-            mChannelCount = 1;
-            mChannelMask = AudioFormat.CHANNEL_OUT_MONO;
-            break;
+                channelConfig = AudioFormat.CHANNEL_OUT_MONO;
+                break;
         case AudioFormat.CHANNEL_OUT_STEREO:
         case AudioFormat.CHANNEL_CONFIGURATION_STEREO:
-            mChannelCount = 2;
-            mChannelMask = AudioFormat.CHANNEL_OUT_STEREO;
-            break;
+                channelConfig = AudioFormat.CHANNEL_OUT_STEREO;
+                break;
         default:
             if (channelConfig == AudioFormat.CHANNEL_INVALID && channelIndexMask != 0) {
-                mChannelCount = 0;
                 break; // channel index configuration only
             }
             if (!isMultichannelConfigSupported(channelConfig, audioFormat)) {
@@ -1972,12 +2006,9 @@ public class AudioTrack extends PlayerBase
                         "Unsupported channel mask configuration " + channelConfig
                         + " for encoding " + audioFormat);
             }
-            mChannelMask = channelConfig;
-            mChannelCount = AudioFormat.channelCountFromOutChannelMask(channelConfig);
         }
         // check the channel index configuration (if present)
-        mChannelIndexMask = channelIndexMask;
-        if (mChannelIndexMask != 0) {
+        if (channelIndexMask != 0) {
             // As of S, we accept up to 24 channel index mask.
             final int fullIndexMask = (1 << AudioSystem.FCC_24) - 1;
             final int channelIndexCount = Integer.bitCount(channelIndexMask);
@@ -1986,14 +2017,16 @@ public class AudioTrack extends PlayerBase
                             || channelIndexCount <= AudioSystem.OUT_CHANNEL_COUNT_MAX); // PCM
             if (!accepted) {
                 throw new IllegalArgumentException(
-                        "Unsupported channel index mask configuration " + channelIndexMask
+                        "Unsupported channel index mask configuration "
+                        + channelIndexMask
                         + " for encoding " + audioFormat);
             }
-            if (mChannelCount == 0) {
-                 mChannelCount = channelIndexCount;
-            } else if (mChannelCount != channelIndexCount) {
-                throw new IllegalArgumentException("Channel count must match");
-            }
+        }
+        mChannelMasks = new AudioFormat.ChannelMasks(
+                channelConfig, channelIndexMask, channelAcnMask);
+        if ((channelIndexMask != 0 || channelAcnMask != 0)
+                && mChannelMasks.getChannelCount() == 0) {
+            throw new IllegalArgumentException("Channel count must match");
         }
 
         //--------------
@@ -2100,7 +2133,7 @@ public class AudioTrack extends PlayerBase
 
     // Convenience method for the constructor's audio buffer size check.
     // preconditions:
-    //    mChannelCount is valid
+    //    mChannelMasks.getChannelCount() is valid
     //    mAudioFormat is valid
     // postcondition:
     //    mNativeBufferSizeInBytes is valid (multiple of frame size, positive)
@@ -2109,7 +2142,8 @@ public class AudioTrack extends PlayerBase
         //     To update when supporting compressed formats
         int frameSizeInBytes;
         if (AudioFormat.isEncodingLinearFrames(mAudioFormat)) {
-            frameSizeInBytes = mChannelCount * AudioFormat.getBytesPerSample(mAudioFormat);
+            frameSizeInBytes =
+                    mChannelMasks.getChannelCount() * AudioFormat.getBytesPerSample(mAudioFormat);
         } else {
             frameSizeInBytes = 1;
         }
@@ -2274,8 +2308,11 @@ public class AudioTrack extends PlayerBase
         if (mChannelConfiguration != AudioFormat.CHANNEL_INVALID) {
             builder.setChannelMask(mChannelConfiguration);
         }
-        if (mChannelIndexMask != AudioFormat.CHANNEL_INVALID /* 0 */) {
-            builder.setChannelIndexMask(mChannelIndexMask);
+        if (mChannelMasks.getIndexMask() != AudioFormat.CHANNEL_INVALID /* 0 */) {
+            builder.setChannelIndexMask(mChannelMasks.getIndexMask());
+        }
+        if (mChannelMasks.getAcnMask() != AudioFormat.CHANNEL_INVALID /* 0 */) {
+            builder.setChannelAcnMask(mChannelMasks.getAcnMask());
         }
         return builder.build();
     }
@@ -2306,7 +2343,7 @@ public class AudioTrack extends PlayerBase
      * Returns the configured number of channels.
      */
     public int getChannelCount() {
-        return mChannelCount;
+        return mChannelMasks.getChannelCount();
     }
 
     /**
@@ -3263,6 +3300,30 @@ public class AudioTrack extends PlayerBase
     }
 
     /**
+     * Returns a bit mask representing the current feature support for
+     * {@link #flushWrittenFramesFromPosition(long, int)} for the AudioTrack in offload mode
+     * that is created with the given {@link AudioFormat} and {@link AudioAttributes}.
+     *
+     * @param format the AudioFormat to create AudioTrack
+     * @param attributes the AudioAttributes to create AudioTrack
+     * @return a bitmask representing the {@link #flushWrittenFramesFromPosition(long, int)}
+     *     support level. If {@link #flushWrittenFramesFromPosition(long, int)} is not supported,
+     *     {@code 0} is returned.
+     *
+     * @see #flushWrittenFramesFromPosition(long, int)
+     */
+    @FlaggedApi(FLAG_PARTIAL_FLUSH_FOR_PCM_OFFLOAD)
+    public static @FlushWrittenFramesSupport int getFlushWrittenFramesFromPositionSupport(
+            @NonNull AudioFormat format,
+            @NonNull AudioAttributes attributes) {
+        Objects.requireNonNull(format);
+        Objects.requireNonNull(attributes);
+        return native_getFlushWrittenFramesFromPositionSupport(
+                format.getEncoding(), format.getSampleRate(), format.getChannelMasks(),
+                attributes);
+    }
+
+    /**
      * Flush all data from the given position.
      * <p> If this operation returns successfully, {@link #write} after a call to this method will
      * be written from frame position returned by this method. The method
@@ -3271,6 +3332,12 @@ public class AudioTrack extends PlayerBase
      * <p> This method is only allowed in offload mode ((i.e. tracks created with
      * {@link Builder#setOffloadedPlayback(boolean)} set to {@code true})). Applications can call
      * this function to flush data while it is actively playing.
+     *
+     * <p> Supporting this method relies on the device's capabilities. Call
+     * {@link #getFlushWrittenFramesFromPositionSupport(AudioFormat, AudioAttributes)} to query how
+     * this method is supported with the {@link AudioFormat} and {@link AudioAttributes} before
+     * creating the AudioTrack. If {@link #getFlushWrittenFramesFromPositionSupport} returns
+     * {@code 0}, UnsupportedOperationException will be thrown.
      *
      * <p> When clients request to flush from a certain position, the audio system will return the
      * actual flushed position based on the requested position, the requested flush accuracy, and
@@ -3290,10 +3357,12 @@ public class AudioTrack extends PlayerBase
      *     total written frames.
      * @return the actual flushed position or {@link #ERROR_BAD_VALUE} if the requested accuracy is
      *     {@link #FLUSH_FROM_ACCURACY_EXACT} and cannot flush from the requested position.
-     * @throws IllegalStateException if the AudioTrack is not initialized or
-     *     it is not an offload track.
-     * @throws IllegalArgumentException if it is not an offload track or {@code accuracy} is not
-     *     valid or {@code positionInFrames} is less than 0 or greater than the written frames.
+     * @throws IllegalStateException if the AudioTrack is not initialized.
+     * @throws IllegalArgumentException if {@code accuracy} is not valid or {@code positionInFrames}
+     *     is less than 0 or greater than the written frames.
+     * @throws UnsupportedOperationException if this method is not supported.
+     *
+     * @see #getFlushWrittenFramesFromPositionSupport(AudioFormat, AudioAttributes)
      */
     @CheckResult
     @FlaggedApi(FLAG_PARTIAL_FLUSH_FOR_PCM_OFFLOAD)
@@ -4648,14 +4717,15 @@ public class AudioTrack extends PlayerBase
     //--------------------
 
     private static native boolean native_is_direct_output_supported(int encoding, int sampleRate,
-            int channelMask, int channelIndexMask, int contentType, int usage, int flags);
+            Object /*AudioFormat.ChannelMasks*/ channelMasks,
+            int contentType, int usage, int flags);
 
     // post-condition: mStreamType is overwritten with a value
     //     that reflects the audio attributes (e.g. an AudioAttributes object with a usage of
     //     AudioAttributes.USAGE_MEDIA will map to AudioManager.STREAM_MUSIC
     private native final int native_setup(Object /*WeakReference<AudioTrack>*/ audiotrack_this,
             Object /*AudioAttributes*/ attributes,
-            int[] sampleRate, int channelMask, int channelIndexMask, int audioFormat,
+            int[] sampleRate, Object /*AudioFormat.ChannelMasks*/ channelMasks, int audioFormat,
             int buffSizeInBytes, int mode, int[] sessionId, @NonNull Parcel attributionSource,
             long nativeAudioTrack, boolean offload, int encapsulationMode,
             Object tunerConfiguration, @NonNull String opPackageName,
@@ -4761,6 +4831,9 @@ public class AudioTrack extends PlayerBase
     private native int native_setStartThresholdInFrames(int startThresholdInFrames);
     private native int native_getStartThresholdInFrames();
 
+    private static native int native_getFlushWrittenFramesFromPositionSupport(
+            int encoding, int sampleRate, @NonNull AudioFormat.ChannelMasks channelMasks,
+            @NonNull AudioAttributes attributes);
     private native long native_flushFromFrame(int accuracy, long positionInFrames);
 
     /**

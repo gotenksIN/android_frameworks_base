@@ -110,6 +110,7 @@ import android.util.SparseBooleanArray;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.WorkerThread;
 
 import com.android.compose.animation.scene.ObservableTransitionState;
 import com.android.internal.annotations.VisibleForTesting;
@@ -697,7 +698,9 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
      * Note that this method will filter out any subscription which is PROFILE_CLASS_PROVISIONING
      * and REMOTE SIMs. REMOTE SIMs use an invalid slot index (-1).
      */
-    public List<SubscriptionInfo> getSubscriptionInfo(boolean forceReload) {
+    @VisibleForTesting
+    @WorkerThread
+    List<SubscriptionInfo> getSubscriptionInfo(boolean forceReload) {
         List<SubscriptionInfo> sil = mSubscriptionInfo;
         if (sil == null || forceReload) {
             mSubscriptionInfo = mSubscriptionManager.getCompleteActiveSubscriptionInfoList()
@@ -2625,7 +2628,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
                     mAlternateBouncerInteractor.get().isVisible(),
                     this::onAlternateBouncerVisibilityChange);
             mJavaAdapter.get().alwaysCollectFlow(
-                    mSceneInteractor.get().getTransitionState(),
+                    mSceneInteractor.get().getTransitionStateFlow(),
                     this::onTransitionStateChanged
             );
         }
@@ -3011,7 +3014,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
     private boolean isPrimaryBouncerShowingOrWillBeShowing() {
         if (SceneContainerFlag.isEnabled()) {
             return isPrimaryBouncerShowingOrWillBeShowing(
-                    mSceneInteractor.get().getTransitionState().getValue());
+                    mSceneInteractor.get().getTransitionStateFlow().getValue());
         } else {
             return mPrimaryBouncerIsOrWillBeShowing;
         }
@@ -3020,7 +3023,7 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
     private boolean isPrimaryBouncerFullyShown() {
         if (SceneContainerFlag.isEnabled()) {
             return isPrimaryBouncerFullyShown(
-                    mSceneInteractor.get().getTransitionState().getValue());
+                    mSceneInteractor.get().getTransitionStateFlow().getValue());
         } else {
             return mPrimaryBouncerFullyShown;
         }
@@ -3512,6 +3515,9 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
      * Handle (@line #MSG_TIMEZONE_UPDATE}
      */
     private void handleTimeZoneUpdate(String timeZone) {
+        if (timeZone == null) {
+            return;
+        }
         Assert.isMainThread();
         mLogger.d("handleTimeZoneUpdate");
         for (int i = 0; i < mCallbacks.size(); i++) {
@@ -4492,5 +4498,39 @@ public class KeyguardUpdateMonitor implements TrustManager.TrustListener, CoreSt
             }
             Trace.endSection();
         });
+    }
+
+    /**
+     * Returns true if the SIM denoted by the subscription ID has its PIN managed by the platform,
+     * false otherwise.
+     *
+     * @param subId Subscription denoting the SIM to check.
+     * @return True if the PIN for the SIM is platform managed, false otherwise.
+     */
+    public boolean isSimPinPlatformManaged(int subId) {
+        if (!SubscriptionManager.isValidSubscriptionId(subId)) {
+            return false;
+        }
+
+        // Return false if the flag is set to false, because flagged API is not supposed to be
+        // called if the flag is not set.
+        // However, there is a risk that the flag has been previously enabled on the device
+        // and a SIM enrolled in automatic PIN management. In that case, the user need to have
+        // kept the PIN out-of-band.
+        if (!android.security.Flags.autoSimPinManagement()) {
+            return false;
+        }
+
+        // NOTE: Instead of querying the TelephonyManager, it is possible to store whether the PIN
+        // is platform-managed or not in the SimData class. The upside of doing so is that no
+        // queries are performed into the TelephonyManager for the check.
+        // The downside is that there are multiple call-sites where the SimData is constructed and
+        // all of them would have to be updated to ensure the state is stored correctly.
+        int simAutoPinManagementEnrollmentStatus = mTelephonyManager.createForSubscriptionId(
+                subId).getSimAutoPinManagementEnrollmentStatus();
+        Log.d(TAG, "Enrollment Status for Subscription " + subId + " is: "
+                + simAutoPinManagementEnrollmentStatus);
+        return simAutoPinManagementEnrollmentStatus
+                == TelephonyManager.SIM_PIN_ENROLLMENT_STATUS_PLATFORM_MANAGED;
     }
 }

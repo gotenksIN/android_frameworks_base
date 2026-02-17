@@ -19,7 +19,6 @@ package com.android.server.wm;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FREEFORM;
 import static android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN;
 import static android.app.WindowConfiguration.WINDOWING_MODE_MULTI_WINDOW;
-import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
 import static android.view.Display.INVALID_DISPLAY;
 
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.any;
@@ -46,8 +45,6 @@ import android.app.ActivityOptions;
 import android.content.ComponentName;
 import android.content.pm.ActivityInfo.WindowLayout;
 import android.graphics.Rect;
-import android.platform.test.annotations.DisableFlags;
-import android.platform.test.annotations.EnableFlags;
 import android.platform.test.annotations.Presubmit;
 import android.util.ArrayMap;
 import android.util.SparseArray;
@@ -94,7 +91,7 @@ public class LaunchParamsControllerTests extends WindowTestsBase {
 
         final ActivityRecord record = new ActivityBuilder(mAtm).build();
         final ActivityRecord source = new ActivityBuilder(mAtm).build();
-        final WindowLayout layout = new WindowLayout(0, 0, 0, 0, 0, 0, 0);
+        final WindowLayout layout = new LaunchParamsModifierTestsBase.WindowLayoutBuilder().build();
         final ActivityOptions options = mock(ActivityOptions.class);
         final Request request = new Request();
 
@@ -105,37 +102,9 @@ public class LaunchParamsControllerTests extends WindowTestsBase {
     }
 
     /**
-     * Makes sure controller passes stored params to modifiers.
-     */
-    @Test
-    @DisableFlags(com.android.wm.shell.Flags.FLAG_LIMIT_PERSISTED_LAUNCH_PARAMS_FREEFORM)
-    public void testStoredParamsRecovery() {
-        final LaunchParamsModifier positioner = mock(LaunchParamsModifier.class);
-        mController.registerModifier(positioner);
-
-        final ComponentName name = new ComponentName("com.android.foo", ".BarActivity");
-        final int userId = 0;
-        final ActivityRecord activity = new ActivityBuilder(mAtm).setComponent(name)
-                .setUid(userId).build();
-        final LaunchParams expected = new LaunchParams();
-        expected.mPreferredTaskDisplayArea = mock(TaskDisplayArea.class);
-        expected.mWindowingMode = WINDOWING_MODE_PINNED;
-        expected.mBounds.set(200, 300, 400, 500);
-        expected.mNeedsSafeRegionBounds = true;
-
-        mPersister.putLaunchParams(userId, name, expected);
-
-        mController.calculate(activity.getTask(), null /*layout*/, activity, null /*source*/,
-                null /*options*/, null /*request*/, PHASE_BOUNDS, new LaunchParams());
-        verify(positioner, times(1)).onCalculate(any(), any(), any(), any(), any(), any(),
-                anyInt(), eq(expected), any());
-    }
-
-    /**
      * Makes sure controller passes stored params to modifiers when it is supported.
      */
     @Test
-    @EnableFlags(com.android.wm.shell.Flags.FLAG_LIMIT_PERSISTED_LAUNCH_PARAMS_FREEFORM)
     public void testStoredParamsRecovery_taskSupports_paramsLoaded() {
         final ComponentName name = new ComponentName("com.android.foo", ".BarActivity");
         final int userId = 0;
@@ -158,6 +127,7 @@ public class LaunchParamsControllerTests extends WindowTestsBase {
         expected.mWindowingMode = WINDOWING_MODE_FREEFORM;
         expected.mBounds.set(200, 300, 400, 500);
         expected.mNeedsSafeRegionBounds = true;
+        expected.mIsTaskMoveDisallowed = true;
         mPersister.putLaunchParams(userId, name, expected);
 
         mController.calculate(task, null /*layout*/, task.topRunningActivity(), null /*source*/,
@@ -174,7 +144,6 @@ public class LaunchParamsControllerTests extends WindowTestsBase {
      * Makes sure controller does not pass stored params to modifiers when it is not supported.
      */
     @Test
-    @EnableFlags(com.android.wm.shell.Flags.FLAG_LIMIT_PERSISTED_LAUNCH_PARAMS_FREEFORM)
     public void testStoredParamsRecovery_taskDoesNotSupport_paramsNotLoaded() {
         final ComponentName name = new ComponentName("com.android.foo", ".BarActivity");
         final int userId = 0;
@@ -195,6 +164,7 @@ public class LaunchParamsControllerTests extends WindowTestsBase {
         storedParams.mWindowingMode = WINDOWING_MODE_FREEFORM;
         storedParams.mBounds.set(200, 300, 400, 500);
         storedParams.mNeedsSafeRegionBounds = true;
+        storedParams.mIsTaskMoveDisallowed = true;
 
         mPersister.putLaunchParams(userId, name, storedParams);
 
@@ -510,7 +480,7 @@ public class LaunchParamsControllerTests extends WindowTestsBase {
 
         final ActivityRecord record = new ActivityBuilder(mAtm).build();
         final ActivityRecord source = new ActivityBuilder(mAtm).build();
-        final WindowLayout layout = new WindowLayout(0, 0, 0, 0, 0, 0, 0);
+        final WindowLayout layout = new LaunchParamsModifierTestsBase.WindowLayoutBuilder().build();
         final ActivityOptions options = mock(ActivityOptions.class);
 
         mController.calculate(record.getTask(), layout, record, source, options, null/*request*/,

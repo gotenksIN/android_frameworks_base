@@ -95,8 +95,7 @@ import static com.android.server.wm.WindowTracingLogLevel.ALL;
 import static com.android.window.flags.Flags.FLAG_CAMERA_COMPAT_UNIFY_CAMERA_POLICIES;
 import static com.android.window.flags.Flags.FLAG_ENABLE_CAMERA_COMPAT_FOR_DESKTOP_WINDOWING;
 import static com.android.window.flags.Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE;
-import static com.android.window.flags.Flags.FLAG_ENABLE_TASK_MOVE_ALLOWED_LISTENER_API;
-import static com.android.window.flags.Flags.FLAG_ENABLE_WINDOW_REPOSITIONING_API;
+import static com.android.window.flags.Flags.FLAG_ENABLE_IS_TASK_MOVE_ALLOWED_ON_DISPLAY_API;
 import static com.android.window.flags.Flags.FLAG_FIX_TF_ADJACENT_FOCUS;
 
 import static com.google.common.truth.Truth.assertThat;
@@ -118,7 +117,6 @@ import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.spy;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
@@ -3239,7 +3237,8 @@ public class DisplayContentTests extends WindowTestsBase {
     }
 
     @Test
-    public void testHasAccessConsidersUserVisibilityForBackgroundVisibleUsers() {
+    @DisableFlags(Flags.FLAG_CURRENT_USER_ACCESS_UNASSIGNED_DISPLAYS)
+    public void testHasAccessConsidersUserVisibilityForBackgroundVisibleUsers_flagDisabled() {
         doReturn(true).when(UserManager::isVisibleBackgroundUsersEnabled);
         final int appId = 1234;
         final int userId1 = 11;
@@ -3257,7 +3256,8 @@ public class DisplayContentTests extends WindowTestsBase {
     }
 
     @Test
-    public void testHasAccessIgnoresUserVisibilityForPrivateDisplay() {
+    @DisableFlags(Flags.FLAG_CURRENT_USER_ACCESS_UNASSIGNED_DISPLAYS)
+    public void testHasAccessIgnoresUserVisibilityForPrivateDisplay_flagDisabled() {
         doReturn(true).when(UserManager::isVisibleBackgroundUsersEnabled);
         final int appId = 1234;
         final int userId2 = 12;
@@ -3272,6 +3272,42 @@ public class DisplayContentTests extends WindowTestsBase {
 
         verify(mWm.mUmInternal, never()).isUserVisible(userId2, displayId);
     }
+
+  @Test
+  @EnableFlags(Flags.FLAG_CURRENT_USER_ACCESS_UNASSIGNED_DISPLAYS)
+  public void testHasAccessConsidersUserVisibilityForBackgroundVisibleUsers() {
+    doReturn(true).when(UserManager::isVisibleBackgroundUsersEnabled);
+    final int appId = 1234;
+    final int userId1 = 11;
+    final int userId2 = 12;
+    final int uid1 = UserHandle.getUid(userId1, appId);
+    final int uid2 = UserHandle.getUid(userId2, appId);
+    final DisplayInfo displayInfo = new DisplayInfo(mDisplayInfo);
+    final DisplayContent dc = createNewDisplay(displayInfo);
+    int displayId = dc.getDisplayId();
+    doReturn(userId1).when(mWm.mUmInternal).getUserAssignedToDisplay(displayId);
+
+    assertTrue(dc.hasAccess(uid1));
+    assertFalse(dc.hasAccess(uid2));
+  }
+
+  @Test
+  @EnableFlags(Flags.FLAG_CURRENT_USER_ACCESS_UNASSIGNED_DISPLAYS)
+  public void testHasAccessIgnoresUserVisibilityForPrivateDisplay() {
+    doReturn(true).when(UserManager::isVisibleBackgroundUsersEnabled);
+    final int appId = 1234;
+    final int userId2 = 12;
+    final int uid2 = UserHandle.getUid(userId2, appId);
+    final DisplayInfo displayInfo = new DisplayInfo(mDisplayInfo);
+    displayInfo.flags = FLAG_PRIVATE;
+    displayInfo.ownerUid = uid2;
+    final DisplayContent dc = createNewDisplay(displayInfo);
+    int displayId = dc.getDisplayId();
+
+    assertTrue(dc.hasAccess(uid2));
+
+    verify(mWm.mUmInternal, never()).getUserAssignedToDisplay(displayId);
+  }
 
     @EnableFlags(FLAG_ENABLE_CAMERA_COMPAT_FOR_DESKTOP_WINDOWING)
     @Test
@@ -3468,8 +3504,7 @@ public class DisplayContentTests extends WindowTestsBase {
         assertEquals(320, dc.mBaseDisplayDensity);
     }
 
-    @EnableFlags(FLAG_ENABLE_WINDOW_REPOSITIONING_API)
-    @DisableFlags(FLAG_ENABLE_TASK_MOVE_ALLOWED_LISTENER_API)
+    @EnableFlags(FLAG_ENABLE_IS_TASK_MOVE_ALLOWED_ON_DISPLAY_API)
     @Test
     public void testIsTaskMoveAllowedOnDisplay_eagerCalculation() {
         final TaskDisplayArea taskDisplayArea = mDisplayContent.getDefaultTaskDisplayArea();
@@ -3492,40 +3527,6 @@ public class DisplayContentTests extends WindowTestsBase {
         assertFalse(mDisplayContent.isTaskMoveAllowedOnDisplay());
     }
 
-    @EnableFlags({FLAG_ENABLE_WINDOW_REPOSITIONING_API, FLAG_ENABLE_TASK_MOVE_ALLOWED_LISTENER_API})
-    @Test
-    public void testIsTaskMoveAllowedOnDisplay_lazyCalculation() {
-        final TaskDisplayArea taskDisplayArea = mDisplayContent.getDefaultTaskDisplayArea();
-        final Task rootTask =
-                taskDisplayArea.createRootTask(
-                        WINDOWING_MODE_FULLSCREEN, ACTIVITY_TYPE_STANDARD, ON_TOP);
-
-        // An update should go to ATMS since isTaskMoveAllowedOnDisplay changed.
-        taskDisplayArea.setIsTaskMoveAllowed(true);
-        assertTrue(mDisplayContent.isTaskMoveAllowedOnDisplay());
-        verify(mAtm).onTaskMoveAllowedChanged();
-
-        // No update should go to ATMS since isTaskMoveAllowedOnDisplay hasn't changed.
-        taskDisplayArea.setIsTaskMoveAllowed(true);
-        assertTrue(mDisplayContent.isTaskMoveAllowedOnDisplay());
-        verify(mAtm).onTaskMoveAllowedChanged();
-
-        // No update should go to ATMS since isTaskMoveAllowedOnDisplay hasn't changed.
-        rootTask.setIsTaskMoveAllowed(true);
-        assertTrue(mDisplayContent.isTaskMoveAllowedOnDisplay());
-        verify(mAtm).onTaskMoveAllowedChanged();
-
-        // No update should go to ATMS since isTaskMoveAllowedOnDisplay hasn't changed.
-        taskDisplayArea.setIsTaskMoveAllowed(false);
-        assertTrue(mDisplayContent.isTaskMoveAllowedOnDisplay());
-        verify(mAtm).onTaskMoveAllowedChanged();
-
-        // An update should go to ATMS since isTaskMoveAllowedOnDisplay changed.
-        rootTask.setIsTaskMoveAllowed(false);
-        assertFalse(mDisplayContent.isTaskMoveAllowedOnDisplay());
-        verify(mAtm, times(2)).onTaskMoveAllowedChanged();
-    }
-
     @Test
     public void testIsRemoved_nonDefaultDisplay_isNotValid() {
         final DisplayInfo displayInfo = new DisplayInfo(mDisplayInfo);
@@ -3533,7 +3534,7 @@ public class DisplayContentTests extends WindowTestsBase {
         final DisplayContent dc = createNewDisplay(displayInfo);
         spyOn(dc.mDisplay);
         doReturn(false).when(dc.mDisplay).isValid();
-        assertTrue(dc.isRemoved());
+        assertTrue(dc.isRemovedOrInvalid());
     }
 
     @Test

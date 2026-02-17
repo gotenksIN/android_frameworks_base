@@ -35,6 +35,7 @@ import com.android.wm.shell.desktopmode.DesktopModeTransitionTypes.TRANSIT_DESKT
 import com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_DESKTOP_MODE
 import com.android.wm.shell.transition.Transitions
 import com.android.wm.shell.windowdecor.OnTaskResizeAnimationListener
+import java.util.Optional
 import java.util.function.Supplier
 
 /** Handles the animation of quick resizing of desktop tasks. */
@@ -42,6 +43,7 @@ class ToggleResizeDesktopTaskTransitionHandler(
     private val transitions: Transitions,
     private val transactionSupplier: Supplier<SurfaceControl.Transaction>,
     private val interactionJankMonitor: InteractionJankMonitor,
+    private val desktopTasksTransitionObserver: Optional<DesktopTasksTransitionObserver>,
 ) : Transitions.TransitionHandler {
 
     private val rectEvaluator = RectEvaluator(Rect())
@@ -54,7 +56,13 @@ class ToggleResizeDesktopTaskTransitionHandler(
     constructor(
         transitions: Transitions,
         interactionJankMonitor: InteractionJankMonitor,
-    ) : this(transitions, Supplier { SurfaceControl.Transaction() }, interactionJankMonitor)
+        desktopTasksTransitionObserver: Optional<DesktopTasksTransitionObserver>,
+    ) : this(
+        transitions,
+        Supplier { SurfaceControl.Transaction() },
+        interactionJankMonitor,
+        desktopTasksTransitionObserver,
+    )
 
     /**
      * Starts a quick resize transition.
@@ -68,10 +76,14 @@ class ToggleResizeDesktopTaskTransitionHandler(
         wct: WindowContainerTransaction,
         taskLeashBounds: Rect? = null,
         callback: (() -> Unit)? = null,
+        isUserResize: Boolean = false,
     ) {
-        transitions.startTransition(TRANSIT_DESKTOP_MODE_TOGGLE_RESIZE, wct, this)
+        val t = transitions.startTransition(TRANSIT_DESKTOP_MODE_TOGGLE_RESIZE, wct, this)
         initialBounds = taskLeashBounds
         this.callback = callback
+        if (isUserResize) {
+            desktopTasksTransitionObserver.ifPresent { it.addPendingUserBoundsChangeTransition(t) }
+        }
     }
 
     fun setOnTaskResizeAnimationListener(listener: OnTaskResizeAnimationListener) {
@@ -107,11 +119,15 @@ class ToggleResizeDesktopTaskTransitionHandler(
                                 )
                                 .setWindowCrop(leash, startBounds.width(), startBounds.height())
                                 .show(leash)
-                            onTaskResizeAnimationListener.onAnimationStart(
-                                taskId,
-                                startTransaction,
-                                startBounds,
-                            )
+                            val applied =
+                                onTaskResizeAnimationListener.onAnimationStart(
+                                    taskId,
+                                    startTransaction,
+                                    startBounds,
+                                )
+                            if (!applied) {
+                                startTransaction.apply()
+                            }
                         },
                         onEnd = {
                             finishTransaction
@@ -139,7 +155,10 @@ class ToggleResizeDesktopTaskTransitionHandler(
                             .setWindowCrop(leash, rect.width(), rect.height())
                             .show(leash)
                             .setFrameTimeline(Choreographer.getInstance().getVsyncId())
-                        onTaskResizeAnimationListener.onBoundsChange(taskId, tx, rect)
+                        val applied = onTaskResizeAnimationListener.onBoundsChange(taskId, tx, rect)
+                        if (!applied) {
+                            tx.apply()
+                        }
                     }
                     start()
                 }
@@ -171,6 +190,8 @@ class ToggleResizeDesktopTaskTransitionHandler(
     private fun isValidTaskChange(change: TransitionInfo.Change): Boolean =
         change.taskInfo != null && change.taskInfo?.taskId != -1
 
+    // TODO(b/478792808): Remove suppression
+    @SuppressWarnings("ProtoLogNonConstantFormat")
     private fun logE(msg: String, vararg arguments: Any?) {
         ProtoLog.e(WM_SHELL_DESKTOP_MODE, "%s: $msg", TAG, *arguments)
     }

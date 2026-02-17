@@ -2730,6 +2730,18 @@
         <item>*|TONAL_SPOT|home_wallpaper</item>
     </string-array>
 
+    <!-- A list of legacy theme overlays that ThemeManagerService removes during the boot process.
+         Previously, these overlays were managed SystemUI but, because their ownership has moved to
+         the Android System, cleaning previous overlays up is necessary to prevent duplicate or
+         conflicting overlays from being active at the same time. If not removed, the system might
+         try to apply both the old and new overlays, leading to undefined color behavior.
+         Each item should be in the format "packageName|overlayName". -->
+    <string-array name="theming_legacy_overlays">
+        <item>com.android.systemui|neutral</item>
+        <item>com.android.systemui|accent</item>
+        <item>com.android.systemui|dynamic</item>
+    </string-array>
+
     <!-- National Language Identifier codes for the following two config items.
          (from 3GPP TS 23.038 V9.1.1 Table 6.2.1.2.4.1):
           0  - reserved
@@ -3301,6 +3313,10 @@
          away from them. -->
     <bool name="config_multiuserSkipKeyguardWhenSwitchingToUnlockedUsers">false</bool>
 
+    <!-- Whether the bouncer screen during initial user sign-in on desktop platforms should indicate
+         a neutral space (e.g. system instead of user's lockscreen wallpaper). -->
+    <bool name="config_multiuserNeutralSpace">false</bool>
+
     <!-- Whether to automatically switch to the designated Dock User (the user chosen for
          displaying dreams, etc.) after a timeout when the device is docked.  -->
     <bool name="config_enableTimeoutToDockUserWhenDocked">false</bool>
@@ -3375,6 +3391,11 @@
          This config is only relevant on Headless System User Mode (HSUM) devices. -->
     <bool name="config_canSwitchToHeadlessSystemUser">false</bool>
 
+    <!-- Whether to automatically hide user switching UI during setup.
+         If it's true and the device setup is not complete, then the user switching dialog is
+         skipped. -->
+    <bool name="config_hideUserSwitchingUiDuringSetup">false</bool>
+
     <!-- Whether this device supports multiple switchable users.
          Note that, even if false, multiple users such as profiles can still be supported since
          they are not switchable.
@@ -3400,14 +3421,20 @@
          This config has no effect if the device is not in HSUM.
          0 (Default): disabled
          1: enabled (allowlist read from arrays/hsu_allowlist_activities)
-         2: log-only (disabled, but logs what would be blocked if enabled)
     -->
     <integer name="config_hsuActivitiesAllowlistMode">0</integer>
-
 
     <!-- Whether multiple admins are allowed on the device. If set to true, new users can be created
          with admin privileges and admin privileges can be granted/revoked from existing users. -->
     <bool name="config_enableMultipleAdmins">false</bool>
+
+    <!-- Enables or disables multi-user management capabilities.
+         This is checked by DevicePolicyManager during provisioning. If set to false, provisioning
+         for multi-user managed device and users will fail.
+         Multi user management capabilities are only possible on Headless System User Mode (HSUM)
+         devices. -->
+    <bool name="config_enableMultiUserManagement">false</bool>
+
 
     <!-- Whether to start stopped users before their scheduled alarms. If set to true, users will be
          started in background before the alarm time so that it can go off. If false, alarms of
@@ -3699,6 +3726,11 @@
          in. -->
     <string name="config_usbResolverActivity" translatable="false"
             >com.android.systemui/com.android.systemui.usb.UsbResolverActivity</string>
+
+    <!-- Component name of the activity to select the activity to start when a usb device is plugged
+         in. -->
+    <string name="config_usbAuthorizationActivity" translatable="false"
+            >com.android.systemui/com.android.systemui.usb.UsbAuthorizationActivity</string>
 
     <!-- Component name of the activity used to inform a user about a sensor privacy state chage. -->
     <string name="config_sensorStateChangedActivity" translatable="false"></string>
@@ -4334,8 +4366,7 @@
          magnification settings and adjust the default magnification capability.  -->
     <bool name="config_magnification_area">true</bool>
 
-    <!-- The default value for always on magnification feature flag if the remote feature
-         flag does not exist -->
+    <!-- Whether to support always on magnification feature -->
     <bool name="config_magnification_always_on_enabled">true</bool>
 
     <!-- Whether to keep fullscreen magnification zoom level when context changes. -->
@@ -4725,6 +4756,14 @@
     <!-- The maximum number of actions that is supported for picture-in-picture. This number
          must be no less than 3 for back compatibility. -->
     <integer name="config_pictureInPictureMaxNumberOfActions">3</integer>
+
+    <!-- The maximum length of title in PictureInPictureParams that is supported for
+         picture-in-picture. -->
+    <integer name="config_pictureInPictureMaxTitleLength">1024</integer>
+
+    <!-- The maximum length of subtitle in PictureInPictureParams that is supported for
+         picture-in-picture. -->
+    <integer name="config_pictureInPictureMaxSubtitleLength">1024</integer>
 
     <!-- The behavior when an activity has not specified a preference to dock big overlays or not.
          Docking puts the activity side-by-side next to the big overlay windows. -->
@@ -5147,11 +5186,6 @@
      -->
     <string-array name="config_companionPermSyncEnabledCerts" translatable="false"></string-array>
 
-    <!-- Certificate digests for trusted apps that will be allowed to obtain the knownSigner
-         CompanionDeviceManager permissions to send PCC messages. The digest should be SHA-256 hash
-         of the signing certificate. -->
-    <string-array name="config_cdmKnownSignersPCC" translatable="false" />
-
     <!-- The package name for the default wellbeing app.
          This package must be trusted, as it has the permissions to control other applications
          on the device.
@@ -5202,6 +5236,17 @@
         -->
     <integer name="config_maxWearableSensingServiceConcurrentConnections">5</integer>
 
+    <!-- Component name for the default ContentSafetyService implementation. -->
+    <string name="config_defaultContentSafetyService" translatable="false"></string>
+
+    <!-- Component name for the default ContentSafetySandboxedService as an isolated service.-->
+    <string name="config_defaultContentSafetyIsolatedService" translatable="false"></string>
+
+    <!-- Component name for the default ContentSafetySandboxedService as a PCC service.-->
+    <string name="config_defaultContentSafetyPccService" translatable="false"></string>
+
+    <!-- Component name for the default ContentSafetySettingsService implementation. -->
+    <string name="config_defaultContentSafetySettingsService" translatable="false"></string>
 
     <!-- The component name for the default system on-device intelligence service, -->
     <string name="config_defaultOnDeviceIntelligenceService" translatable="false"></string>
@@ -5250,6 +5295,9 @@
          call captioning.
     -->
     <bool name="config_systemCaptionsServiceCallsEnabled" translatable="false"></bool>
+
+    <!-- Indicates whether the device supports easy reader caption settings. -->
+    <bool name="config_easyReaderCaptionsSupported">false</bool>
 
     <!-- The package name for the incident report approver app.
         This app is usually PermissionController or an app that replaces it.  When
@@ -5477,6 +5525,12 @@
 
     <!-- Volume level of in-call notification tone playback [0..1] -->
     <item name="config_inCallNotificationVolume" format="float" type="dimen">.10</item>
+
+    <!-- TV only: Number of consecutive long press volume keys required to adjust volume up/down -->
+    <integer name="config_tvLongPressVolumeKeysPerAdjustment">1</integer>
+
+    <!-- TV only: Scaling factor for volume up/down adjustments during long presses -->
+    <item name="config_tvLongPressVolumeAdjustmentScaleFactor" format="float" type="dimen">1.0</item>
 
     <!-- URI for in call notification sound -->
     <string translatable="false" name="config_inCallNotificationSound">/product/media/audio/ui/InCallNotification.ogg</string>
@@ -6278,6 +6332,9 @@
     <!-- The list of packages that will not use ANGLE as the GLES driver, overridden by RRO -->
     <string-array name="config_angleDenyList"></string-array>
 
+    <!-- Whether or not to enable ANGLE as default driver for all games, overridden by RRO -->
+    <bool name="config_angleForGamesEnabled">false</bool>
+
     <!-- The global list of packages that should not use ANGLE as the GLES driver, they should
          either not get modified or included in the device denylist above, and it's enforced by test
          com.android.angle.denylist.app.GtsAngleDenyListDriverTest-->
@@ -6467,10 +6524,6 @@
 
     <!-- If true, the wallpaper will scale regardless of the value of shouldZoomOutWallpaper() -->
     <bool name="config_alwaysScaleWallpaper">false</bool>
-
-    <!-- Set to true to offset the wallpaper when using multiple displays so that it's centered
-         at the same position as in the largest display.-->
-    <bool name="config_offsetWallpaperToCenterOfLargestDisplay">false</bool>
 
     <!-- Package name that will receive an explicit manifest broadcast for
          android.os.action.POWER_SAVE_MODE_CHANGED. -->
@@ -7544,15 +7597,13 @@
          when user turned off mobile data or data roaming during CIWLAN -->
     <integer name="config_maximumDelayTimeToDeactivateDataCall">7000</integer>
 
-    <!-- Certificate digests for trusted apps that will be allowed to obtain the knownSigner
-         permission for computer control access. The digest should be computed over the
-         DER encoding of the trusted certificate using the SHA-256 digest algorithm. -->
-    <string-array name="config_accessComputerControlKnownSigners">
-    </string-array>
-
-    <!-- Package names for trusted apps that will be allowed to automate any app using
-         computer control on debuggable builds. They still need to hold the ACCESS_COMPUTER_CONTROL
-         permission. This must be empty in non-debuggable (i.e., user) builds. -->
+    <!-- Package names for trusted development / testing apps that will be allowed to automate any
+         app using computer control on debuggable builds. They do not need to hold the
+         ACCESS_COMPUTER_CONTROL privileged permission. This must be empty in non-debuggable
+         (i.e., user) builds.
+         Each entry must be in <package_name:certificate_digest> format, where the certificate
+         digest is computed over the DER encoding of the trusted certificate using the SHA-256
+         digest algorithm. -->
     <string-array name="config_computerControlKnownSuperAgents" translatable="false">
     </string-array>
 
@@ -7871,10 +7922,10 @@
          and displaying other apps separately. -->
     <bool name="config_resolverActivityFilterLastUsed">true</bool>
 
-    <!--For App Function, this configuration lists package names grouped as "Device Settings".
-        Packages in this list share the same App Function access settings. In the UI, they are
-        presented as a single "Device Settings" item rather than individually. -->
-    <string-array name="config_appFunctionDeviceSettingsPackages" translatable="false">
+    <!--For App Interaction, this configuration lists package names grouped as "Device assistance".
+        Packages in this list share the same App Interaction history settings. In the UI, they are
+        presented as a single "Device assistance" item rather than individually. -->
+    <string-array name="config_appInteractionDeviceAssistancePackages" translatable="false">
     </string-array>
 
     <!-- Defines the default allowlist of package names for preloaded agents authorized to use App
@@ -7974,6 +8025,15 @@
      <!-- Whether to enable app launch blur -->
     <bool name="config_enableAppLaunchBlur">true</bool>
 
+    <!-- Whether the native_serial service is supported by this device. -->
+    <bool name="config_supportNativeSerialService">false</bool>
+
     <!-- Whether Airplane Mode sync is supported by this device. -->
     <bool name="config_supportAirplaneModeSync">true</bool>
+
+    <!-- Enable wallpaper local color extraction by default -->
+    <bool name="config_enableWallpaperLocalColorExtraction">true</bool>
+
+    <!-- Whether to allow content restriction device policy bypassing. -->
+    <bool name="config_allowContentRestrictionDevicePolicyBypassing">false</bool>
 </resources>

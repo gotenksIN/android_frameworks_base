@@ -196,6 +196,7 @@ applications that come with the platform
         <permission name="android.permission.UPDATE_CONFIG"/>
         <permission name="android.permission.SEND_SAFETY_CENTER_UPDATE" />
         <permission name="android.permission.MONITOR_DEFAULT_SMS_PACKAGE"/>
+        <permission name="android.permission.SUBSCRIBE_TO_KEYGUARD_LOCKED_STATE"/>
     </privapp-permissions>
 
     <privapp-permissions package="com.android.privatespace">
@@ -205,7 +206,6 @@ applications that come with the platform
 
     <privapp-permissions package="com.android.contactspicker">
         <permission name="android.permission.MANAGE_CONTACTS_PICKER_SESSION" />
-        <permission name="android.permission.INTERACT_ACROSS_USERS" />
     </privapp-permissions>
 
     <privapp-permissions package="com.android.providers.calendar">
@@ -278,6 +278,15 @@ applications that come with the platform
         <!-- Required so Telecom can check permission for data delivery -->
         <permission name="android.permission.UPDATE_APP_OPS_STATS"/>
         <permission name="android.permission.CHANGE_DEVICE_IDLE_TEMP_WHITELIST"/>
+    </privapp-permissions>
+
+    <privapp-permissions package="com.android.server.telecomui">
+        <permission name="android.permission.CALL_PRIVILEGED"/>
+        <permission name="android.permission.INTERACT_ACROSS_USERS"/>
+        <permission name="android.permission.MODIFY_PHONE_STATE"/>
+        <permission name="android.permission.STOP_APP_SWITCHES"/>
+        <permission name="android.permission.SUBSTITUTE_NOTIFICATION_APP_NAME"/>
+        <permission name="android.permission.WAKE_LOCK"/>
     </privapp-permissions>
 
     <privapp-permissions package="com.android.sharedstoragebackup">
@@ -695,6 +704,8 @@ applications that come with the platform
         <permission name="android.permission.CONFIGURE_ANOMALY_DETECTOR"/>
         <!-- Permission required for CTS test - CtsNpuManagerTestCases -->
         <permission name="android.permission.ACCESS_NPU_MODEL_MANAGER_API"/>
+        <!-- Permission required for CTS test - CtsNpuManagerTestCases -->
+        <permission name="android.permission.ATTRIBUTE_WORK_TO_OTHER_APPS"/>
         <!-- Permission required for CTS test - CtsProviderUiTestCases -->
         <permission name="android.permission.MANAGE_DOCUMENTS"/>
         <!-- Permission required for CTS test - StatusBarManagerTest -->
@@ -705,6 +716,16 @@ applications that come with the platform
         <permission name="android.permission.MANAGE_SERIAL_PORTS"/>
         <!-- Permission required for CTS test - CtsMotionCuesTestCases -->
         <permission name="android.permission.DRAW_MOTION_CUES" />
+        <!-- Permission required for CTS test - CtsNetTestCases -->
+        <permission name="android.permission.CREATE_APP_SPECIFIC_NETWORK" />
+        <!-- Permission required for CTS test - CtsTelephonyTestCases -->
+        <permission name="android.permission.BIND_ALTERNATIVE_MESSAGE_TRANSPORT_SERVICE"/>
+        <!-- Permission required for creating contacts picker sessions -->
+        <permission name="android.permission.MANAGE_CONTACTS_PICKER_SESSION" />
+        <!-- Permission required for App Lock CTS tests -->
+        <permission name="android.permission.TEST_LOCK_APPS"/>
+        <!-- Permission required for personal context settings testing  -->
+        <permission name="android.permission.CHANGE_PERSONAL_CONTEXT_MODE" />
     </privapp-permissions>
 
     <privapp-permissions package="com.android.soundpicker">
@@ -740,6 +761,7 @@ applications that come with the platform
         <permission name="android.permission.BIND_WALLPAPER"/>
         <permission name="android.permission.CUSTOMIZE_SYSTEM_UI"/>
         <permission name="android.permission.SET_WALLPAPER_DIM_AMOUNT"/>
+        <permission name="android.permission.UPDATE_THEME_SETTINGS"/>
     </privapp-permissions>
 
     <privapp-permissions package="com.android.dynsystem">
@@ -755,6 +777,7 @@ applications that come with the platform
         <permission name="android.permission.READ_SAFETY_CENTER_STATUS" />
         <permission name="android.permission.SEND_SAFETY_CENTER_UPDATE" />
         <permission name="android.permission.READ_SYSTEM_GRAMMATICAL_GENDER"/>
+        <permission name="android.permission.CONTROL_SIM_AUTO_PIN_MANAGEMENT"/>
     </privapp-permissions>
 
     <privapp-permissions package="com.android.bips">

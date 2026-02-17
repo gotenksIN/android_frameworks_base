@@ -25,8 +25,11 @@ import android.annotation.SystemApi;
 import android.hardware.security.keymint.TagType;
 import android.os.Process;
 import android.security.keymaster.KeymasterDefs;
+import android.security.keystore2.Flags;
+import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
 import java.security.spec.AlgorithmParameterSpec;
 import java.security.spec.ECParameterSpec;
 import java.security.spec.MGF1ParameterSpec;
@@ -192,6 +195,7 @@ public abstract class KeyProperties {
      * @hide
      */
     @Retention(RetentionPolicy.SOURCE)
+    @Target({ElementType.TYPE_USE})
     @StringDef(prefix = { "KEY_" }, value = {
         KEY_ALGORITHM_RSA,
         KEY_ALGORITHM_EC,
@@ -280,6 +284,12 @@ public abstract class KeyProperties {
                 return KeymasterDefs.KM_ALGORITHM_EC;
             } else if (KEY_ALGORITHM_RSA.equalsIgnoreCase(algorithm)) {
                 return KeymasterDefs.KM_ALGORITHM_RSA;
+            } else if (Flags.mldsaSupport()
+                    && (KEY_ALGORITHM_ML_DSA.equalsIgnoreCase(algorithm)
+                            || KEY_ALGORITHM_ML_DSA_65.equalsIgnoreCase(algorithm)
+                            || KEY_ALGORITHM_ML_DSA_87.equalsIgnoreCase(algorithm))) {
+                // TODO(b/462036047): Replace with KeymasterDefs constant when KeyMint V5 is frozen.
+                return KM_ALGORITHM_ML_DSA;
             } else {
                 throw new IllegalArgumentException("Unsupported key algorithm: " + algorithm);
             }
@@ -293,6 +303,9 @@ public abstract class KeyProperties {
                     return KEY_ALGORITHM_EC;
                 case KeymasterDefs.KM_ALGORITHM_RSA:
                     return KEY_ALGORITHM_RSA;
+                // TODO(b/462036047): Replace with KeymasterDefs constant when KeyMint V5 is frozen.
+                case KM_ALGORITHM_ML_DSA:
+                    return KEY_ALGORITHM_ML_DSA;
                 default:
                     throw new IllegalArgumentException(
                             "Unsupported key algorithm: " + keymasterAlgorithm);

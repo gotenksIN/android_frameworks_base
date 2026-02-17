@@ -18,9 +18,11 @@ package android.media.projection;
 
 import android.annotation.FlaggedApi;
 import android.graphics.Bitmap;
+import android.graphics.drawable.Icon;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.text.TextUtils;
+import android.util.Size;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -46,7 +48,9 @@ public final class MediaProjectionAppContent implements Parcelable {
 
     private final int mId;
     @Nullable
-    private final Bitmap mThumbnail;
+    private Bitmap mThumbnail;
+    @Nullable
+    private Icon mIcon;
     @NonNull
     private final CharSequence mTitle;
 
@@ -55,6 +59,7 @@ public final class MediaProjectionAppContent implements Parcelable {
         mId = builder.mId;
         mThumbnail = builder.mThumbnail;
         mTitle = builder.mTitle;
+        mIcon = builder.mIcon;
     }
 
     // Private constructor for Parcelable
@@ -62,6 +67,7 @@ public final class MediaProjectionAppContent implements Parcelable {
         mId = in.readInt();
         mThumbnail = in.readParcelable(Bitmap.class.getClassLoader(), Bitmap.class);
         mTitle = TextUtils.CHAR_SEQUENCE_CREATOR.createFromParcel(in);
+        mIcon = in.readParcelable(Icon.class.getClassLoader(), Icon.class);
     }
 
     @Override
@@ -69,6 +75,7 @@ public final class MediaProjectionAppContent implements Parcelable {
         dest.writeInt(mId);
         dest.writeParcelable(mThumbnail, flags);
         TextUtils.writeToParcel(mTitle, dest, flags);
+        dest.writeParcelable(mIcon, flags);
     }
 
 
@@ -80,11 +87,23 @@ public final class MediaProjectionAppContent implements Parcelable {
     }
 
     /**
-     * Returns the optional thumbnail representing the content.
+     * Returns the optional thumbnail representing the content. The thumbnail's goal is to give a
+     * preview of the shared content.
      */
     @Nullable
     public Bitmap getThumbnail() {
         return mThumbnail;
+    }
+
+    /**
+     * Returns the optional icon for the content to be displayed alongside the title.
+     *
+     * <p> The icon's goal is to represent the entity sharing the content such as the favicon of
+     * the website.
+     */
+    @Nullable
+    public Icon getIcon() {
+        return mIcon;
     }
 
     /**
@@ -117,6 +136,31 @@ public final class MediaProjectionAppContent implements Parcelable {
             };
 
     /**
+     * Optimize the resources in memory to fit the requested sizes.
+     * This might modify this instance of {@link MediaProjectionAppContent}
+     *
+     * @hide
+     */
+    public void optimizeResources(Size thumbnailSize, Size iconSize) {
+        if (mIcon != null) {
+            if (iconSize.getWidth() <= 0 && iconSize.getHeight() <= 0) {
+                mIcon = null;
+            } else {
+                mIcon.scaleDownIfNecessary(iconSize.getWidth(), iconSize.getHeight());
+            }
+
+        }
+        if (mThumbnail != null) {
+            if (thumbnailSize.getWidth() <= 0 && thumbnailSize.getHeight() <= 0) {
+                mThumbnail = null;
+            } else {
+                mThumbnail = Icon.scaleDownIfNecessary(mThumbnail, thumbnailSize.getWidth(),
+                        thumbnailSize.getHeight()).asShared();
+            }
+        }
+    }
+
+    /**
      * Builder for {@link MediaProjectionAppContent}.
      */
     public static final class Builder {
@@ -124,6 +168,8 @@ public final class MediaProjectionAppContent implements Parcelable {
         private final int mId;
         @Nullable
         private Bitmap mThumbnail = null;
+        @Nullable
+        private Icon mIcon = null;
         @NonNull
         private CharSequence mTitle = "";
 
@@ -158,6 +204,17 @@ public final class MediaProjectionAppContent implements Parcelable {
         @NonNull
         public Builder setTitle(@NonNull CharSequence title) {
             mTitle = Objects.requireNonNull(title);
+            return this;
+        }
+
+        /**
+         * Sets the icon to be displayed alongside the title
+         *
+         * @return This Builder instance for chaining
+         */
+        @NonNull
+        public Builder setIcon(@NonNull Icon icon) {
+            mIcon = Objects.requireNonNull(icon);
             return this;
         }
 

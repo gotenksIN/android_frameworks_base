@@ -350,4 +350,19 @@ public class ActivityOptions {
         public static final ComponentName COMPONENT = new ComponentName(FLICKER_APP_PACKAGE,
                 FLICKER_APP_PACKAGE + ".RequestFullscreenModeActivity");
     }
+
+    public static class ClickToFinishActivity {
+        public static final String LABEL = "ClickToFinishActivity";
+        public static final ComponentName COMPONENT = new ComponentName(FLICKER_APP_PACKAGE,
+                FLICKER_APP_PACKAGE + ".ClickToFinishActivity");
+
+        public static final String RES_ID_FINISH_BUTTON = "finish_self";
+    }
+
+    public static class WebIntentActivity {
+        public static final String LABEL = "WebIntentActivity";
+        public static final ComponentName COMPONENT = new ComponentName(FLICKER_APP_PACKAGE,
+                FLICKER_APP_PACKAGE + ".WebIntentActivity");
+        public static final String URL = "https://www.android.com";
+    }
 }

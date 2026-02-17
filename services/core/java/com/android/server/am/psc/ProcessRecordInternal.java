@@ -44,7 +44,8 @@ import android.util.TimeUtils;
 
 import com.android.internal.annotations.CompositeRWLock;
 import com.android.internal.annotations.GuardedBy;
-import com.android.server.am.ProcessCachedOptimizerRecord.ShouldNotFreezeReason;
+import com.android.server.am.Flags;
+import com.android.server.am.psc.Constants.SchedGroup;
 import com.android.server.am.psc.PlatformCompatCache.CachedCompatChangeId;
 
 import java.io.PrintWriter;
@@ -76,7 +77,7 @@ public abstract class ProcessRecordInternal {
          *
          * @param curSchedGroup The new mCurSchedGroup value.
          */
-        void onCurrentSchedulingGroupChanged(int curSchedGroup);
+        void onCurrentSchedulingGroupChanged(@SchedGroup int curSchedGroup);
 
         /**
          * Called when mCurProcState changes.
@@ -151,22 +152,6 @@ public abstract class ProcessRecordInternal {
 
     /** Returns whether this process has been scheduled for freezing. */
     public abstract boolean isPendingFreeze();
-
-    /**
-     * Returns the OOM adjustment sequence number when this process's
-     * {@link #shouldNotFreeze()} state was last updated.
-     */
-    public abstract int shouldNotFreezeAdjSeq();
-
-    /** Returns whether this process should be exempt from freezing. */
-    public abstract boolean shouldNotFreeze();
-
-    /** Sets whether this process should be exempt from freezing and records the reason. */
-    public abstract boolean setShouldNotFreeze(boolean shouldNotFreeze, boolean dryRun,
-            @ShouldNotFreezeReason int reason, int adjSeq);
-
-    /** Returns the aggregated reasons why this process is currently exempt from freezing. */
-    public abstract @ShouldNotFreezeReason int shouldNotFreezeReason();
 
     /** Sets whether we would like to clean-up UI resources for this process. */
     public abstract void setPendingUiClean(boolean pendingUiClean);
@@ -502,13 +487,13 @@ public abstract class ProcessRecordInternal {
      * Currently desired scheduling class.
      */
     @CompositeRWLock({"mServiceLock", "mProcLock"})
-    private int mCurSchedGroup = SCHED_GROUP_BACKGROUND;
+    private @SchedGroup int mCurSchedGroup = SCHED_GROUP_BACKGROUND;
 
     /**
      * Last set to background scheduling class.
      */
     @CompositeRWLock({"mServiceLock", "mProcLock"})
-    private int mSetSchedGroup = SCHED_GROUP_BACKGROUND;
+    private @SchedGroup int mSetSchedGroup = SCHED_GROUP_BACKGROUND;
 
     /**
      * Currently computed process state.
@@ -797,7 +782,7 @@ public abstract class ProcessRecordInternal {
     @GuardedBy("mServiceLock")
     private int mCachedProcState = ActivityManager.PROCESS_STATE_CACHED_EMPTY;
     @GuardedBy("mServiceLock")
-    private int mCachedSchedGroup = SCHED_GROUP_BACKGROUND;
+    private @SchedGroup int mCachedSchedGroup = SCHED_GROUP_BACKGROUND;
 
     @GuardedBy("mServiceLock")
     private boolean mScheduleLikeTopApp = false;
@@ -821,6 +806,17 @@ public abstract class ProcessRecordInternal {
     @CompositeRWLock({"mServiceLock", "mProcLock"})
     private long mLastActivityTime;
 
+    /**
+     * The node representation of this process in the process graph.
+     * This is {@code null} unless {@link Flags#enableCapabilityControllerComputation} is true.
+     */
+    private final GraphNode mGraphNode;
+    /**
+     * The intrinsic edge from the system to this process node in the process graph.
+     * This is {@code null} unless {@link Flags#enableCapabilityControllerComputation} is true.
+     */
+    private final ProcessEdge mProcessEdge;
+
     // TODO(b/425766486): Change to package-private after the OomAdjusterImpl class is moved to
     //                    the psc package.
     public final OomAdjusterImpl.ProcessRecordNode[] mLinkedNodes =
@@ -841,6 +837,14 @@ public abstract class ProcessRecordInternal {
         isolated = Process.isIsolatedUid(this.uid);
         mServiceLock = serviceLock;
         mProcLock = procLock;
+
+        if (Flags.enableCapabilityControllerComputation()) {
+            mGraphNode = new GraphNode(this);
+            mProcessEdge = new ProcessEdge(mGraphNode);
+        } else {
+            mGraphNode = null;
+            mProcessEdge = null;
+        }
     }
 
     /** Initializes the observers and the last time that the state of the process was changed. */
@@ -856,7 +860,7 @@ public abstract class ProcessRecordInternal {
     }
 
     @GuardedBy({"mServiceLock", "mProcLock"})
-    public void setKilled(boolean killed) {
+    void setKilled(boolean killed) {
         mKilled = killed;
     }
 
@@ -866,13 +870,13 @@ public abstract class ProcessRecordInternal {
     }
 
     @GuardedBy({"mServiceLock", "mProcLock"})
-    public void setKilledByAm(boolean killedByAm) {
+    void setKilledByAm(boolean killedByAm) {
         mKilledByAm = killedByAm;
     }
 
 
     @GuardedBy("mServiceLock")
-    public void setMaxAdj(int maxAdj) {
+    void setMaxAdj(int maxAdj) {
         mMaxAdj = maxAdj;
     }
 
@@ -1038,23 +1042,23 @@ public abstract class ProcessRecordInternal {
 
     /** Sets the current scheduling group for this process, and notifies the observer. */
     @GuardedBy({"mServiceLock", "mProcLock"})
-    public void setCurrentSchedulingGroup(int curSchedGroup) {
+    public void setCurrentSchedulingGroup(@SchedGroup int curSchedGroup) {
         mCurSchedGroup = curSchedGroup;
         mObserver.onCurrentSchedulingGroupChanged(mCurSchedGroup);
     }
 
     @GuardedBy(anyOf = {"mServiceLock", "mProcLock"})
-    public int getCurrentSchedulingGroup() {
+    public @SchedGroup int getCurrentSchedulingGroup() {
         return mCurSchedGroup;
     }
 
     @GuardedBy({"mServiceLock", "mProcLock"})
-    public void setSetSchedGroup(int setSchedGroup) {
+    public void setSetSchedGroup(@SchedGroup int setSchedGroup) {
         mSetSchedGroup = setSchedGroup;
     }
 
     @GuardedBy(anyOf = {"mServiceLock", "mProcLock"})
-    public int getSetSchedGroup() {
+    public @SchedGroup int getSetSchedGroup() {
         return mSetSchedGroup;
     }
 
@@ -1207,7 +1211,7 @@ public abstract class ProcessRecordInternal {
 
     /** Sets whether this process is currently showing top UI, and notifies the observer. */
     @GuardedBy("mServiceLock")
-    public void setHasTopUi(boolean hasTopUi) {
+    void setHasTopUi(boolean hasTopUi) {
         mHasTopUi = hasTopUi;
         mObserver.onHasTopUiChanged(mHasTopUi);
     }
@@ -1219,7 +1223,7 @@ public abstract class ProcessRecordInternal {
 
     /** Sets whether the process is currently showing overlay UI, and notifies the observer. */
     @GuardedBy("mServiceLock")
-    public void setHasOverlayUi(boolean hasOverlayUi) {
+    void setHasOverlayUi(boolean hasOverlayUi) {
         mHasOverlayUi = hasOverlayUi;
         mObserver.onHasOverlayUiChanged(mHasOverlayUi);
     }
@@ -1235,12 +1239,12 @@ public abstract class ProcessRecordInternal {
     }
 
     @GuardedBy("mServiceLock")
-    public void setIsRunningRemoteAnimation(boolean runningRemoteAnimation) {
+    void setIsRunningRemoteAnimation(boolean runningRemoteAnimation) {
         mRunningRemoteAnimation = runningRemoteAnimation;
     }
 
     @GuardedBy("mServiceLock")
-    public void setForcingToImportant(Object forcingToImportant) {
+    void setForcingToImportant(Object forcingToImportant) {
         mForcingToImportant = forcingToImportant;
     }
 
@@ -1483,12 +1487,12 @@ public abstract class ProcessRecordInternal {
     }
 
     @GuardedBy("mServiceLock")
-    public int getCachedSchedGroup() {
+    public @SchedGroup int getCachedSchedGroup() {
         return mCachedSchedGroup;
     }
 
     @GuardedBy("mServiceLock")
-    public void setCachedSchedGroup(int cachedSchedGroup) {
+    public void setCachedSchedGroup(@SchedGroup int cachedSchedGroup) {
         mCachedSchedGroup = cachedSchedGroup;
     }
 
@@ -1674,10 +1678,18 @@ public abstract class ProcessRecordInternal {
     }
 
     @GuardedBy("mServiceLock")
-    public void setIsZramWrittenBack(boolean isZramWrittenBack) {
+    void setIsZramWrittenBack(boolean isZramWrittenBack) {
         mIsZramWrittenBack = isZramWrittenBack;
     }
 
+    GraphNode getGraphNode() {
+        return mGraphNode;
+    }
+
+    /** Get the intrinsic edge from the system to this process node. */
+    ProcessEdge getProcessEdge() {
+        return mProcessEdge;
+    }
 
     /**
      * Lazily initiates and returns the track name for tracing.

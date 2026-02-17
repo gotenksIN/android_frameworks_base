@@ -1111,6 +1111,24 @@ public class PackageSetting extends SettingBase implements PackageStateInternal 
         onChanged();
     }
 
+    long getPccCeDataInode(int userId) {
+        return readUserState(userId).getPccCeDataInode();
+    }
+
+    long getPccDeDataInode(int userId) {
+        return readUserState(userId).getPccDeDataInode();
+    }
+
+    void setPccCeDataInode(long pccCeDataInode, int userId) {
+        modifyUserState(userId).setPccCeDataInode(pccCeDataInode);
+        onChanged();
+    }
+
+    void setPccDeDataInode(long pccDeDataInode, int userId) {
+        modifyUserState(userId).setPccDeDataInode(pccDeDataInode);
+        onChanged();
+    }
+
     boolean getStopped(int userId) {
         return readUserState(userId).isStopped();
     }
@@ -1171,7 +1189,8 @@ public class PackageSetting extends SettingBase implements PackageStateInternal 
         onChanged();
     }
 
-    void setUserState(int userId, long ceDataInode, long deDataInode, int enabled,
+    void setUserState(int userId, long ceDataInode, long deDataInode,
+                      long pccCeDataInode, long pccDeDataInode, int enabled,
                       boolean installed, boolean stopped, boolean notLaunched, boolean hidden,
                       int distractionFlags, ArrayMap<UserPackage, SuspendParams> suspendParams,
                       boolean instantApp, boolean virtualPreload, String lastDisableAppCaller,
@@ -1179,11 +1198,14 @@ public class PackageSetting extends SettingBase implements PackageStateInternal 
                       int installReason, int uninstallReason,
                       String harmfulAppWarning, String splashScreenTheme,
                       long firstInstallTime, int aspectRatio, ArchiveState archiveState,
-                      boolean appLockEnabled) {
+                      boolean appLockEnabled, int virtualGamepadUserOption,
+                      int personalContextMode) {
         modifyUserState(userId)
                 .setSuspendParams(suspendParams)
                 .setCeDataInode(ceDataInode)
                 .setDeDataInode(deDataInode)
+                .setPccCeDataInode(pccCeDataInode)
+                .setPccDeDataInode(pccDeDataInode)
                 .setEnabledState(enabled)
                 .setInstalled(installed)
                 .setStopped(stopped)
@@ -1202,13 +1224,16 @@ public class PackageSetting extends SettingBase implements PackageStateInternal 
                 .setFirstInstallTimeMillis(firstInstallTime)
                 .setMinAspectRatio(aspectRatio)
                 .setArchiveState(archiveState)
-                .setAppLockEnabled(appLockEnabled);
+                .setAppLockEnabled(appLockEnabled)
+                .setVirtualGamepadUserOption(virtualGamepadUserOption)
+                .setPersonalContextMode(personalContextMode);
         onChanged();
     }
 
     void setUserState(int userId, PackageUserStateInternal otherState) {
         setUserState(userId, otherState.getCeDataInode(), otherState.getDeDataInode(),
-                otherState.getEnabledState(), otherState.isInstalled(), otherState.isStopped(),
+                otherState.getPccCeDataInode(), otherState.getPccDeDataInode(),
+                otherState.getEnabledState(),  otherState.isInstalled(), otherState.isStopped(),
                 otherState.isNotLaunched(), otherState.isHidden(), otherState.getDistractionFlags(),
                 otherState.getSuspendParams() == null
                         ? null : otherState.getSuspendParams().untrackedStorage(),
@@ -1221,7 +1246,8 @@ public class PackageSetting extends SettingBase implements PackageStateInternal 
                 otherState.getInstallReason(), otherState.getUninstallReason(),
                 otherState.getHarmfulAppWarning(), otherState.getSplashScreenTheme(),
                 otherState.getFirstInstallTimeMillis(), otherState.getMinAspectRatio(),
-                otherState.getArchiveState(), otherState.isAppLockEnabled());
+                otherState.getArchiveState(), otherState.isAppLockEnabled(),
+                otherState.getVirtualGamepadUserOption(), otherState.getPersonalContextMode());
     }
 
     WatchedArraySet<String> getEnabledComponents(int userId) {
@@ -1537,7 +1563,7 @@ public class PackageSetting extends SettingBase implements PackageStateInternal 
      * @return True if package is still being loaded, false if the package is fully loaded.
      */
     public boolean isLoading() {
-        return Math.abs(1.0f - mLoadingProgress) >= 0.00000001f;
+        return PackageManagerServiceUtils.isLoading(mLoadingProgress);
     }
 
     public PackageSetting setLoadingProgress(float progress) {

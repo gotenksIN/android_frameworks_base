@@ -29,7 +29,6 @@ import android.hardware.display.DisplayManager
 import android.hardware.display.DisplayTopology
 import android.os.Bundle
 import android.platform.helpers.SysuiRestarter
-import android.platform.test.annotations.Postsubmit
 import android.platform.test.annotations.Presubmit
 import android.platform.test.annotations.RequiresFlagsEnabled
 import android.platform.test.flag.junit.DeviceFlagsValueProvider
@@ -61,6 +60,7 @@ import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.UiObject2
 import com.android.launcher3.tapl.LauncherInstrumentation
 import com.android.launcher3.tapl.TestHelpers
+import com.android.settings.flags.Flags as SettingsFlags
 import com.android.window.flags.Flags
 import com.android.wm.shell.shared.desktopmode.DesktopState
 import java.time.Duration
@@ -75,7 +75,6 @@ import org.junit.runner.RunWith
 import org.junit.runners.BlockJUnit4ClassRunner
 import platform.test.desktop.DesktopMouseTestRule
 import platform.test.desktop.LogicalDisplayPointPx
-import platform.test.desktop.ShadeDisplayGoesAroundTestRule
 import platform.test.desktop.SimulatedConnectedDisplayTestRule
 
 // TODO(b/416608975) - Move the utility methods to shared library or/and utilize existing library (
@@ -86,6 +85,7 @@ import platform.test.desktop.SimulatedConnectedDisplayTestRule
 /** Tests to verify the smoke test scenario defined in go/cd-smoke. */
 @RequiresFlagsEnabled(Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE)
 @RunWith(BlockJUnit4ClassRunner::class)
+@Presubmit
 class ConnectedDisplayCujSmokeTests {
 
     private val context = instrumentation.targetContext
@@ -111,9 +111,7 @@ class ConnectedDisplayCujSmokeTests {
 
     @get:Rule(order = 4) val connectedDisplayRule = SimulatedConnectedDisplayTestRule()
 
-    @get:Rule(order = 5) val shadeDisplayGoesAroundTestRule = ShadeDisplayGoesAroundTestRule()
-
-    @get:Rule(order = 6) val desktopMouseRule = DesktopMouseTestRule(/* deferSetup= */ true)
+    @get:Rule(order = 5) val desktopMouseRule = DesktopMouseTestRule(/* deferSetup= */ true)
 
     @Before
     fun setup() {
@@ -152,14 +150,38 @@ class ConnectedDisplayCujSmokeTests {
         resetTopology(externalDisplayId)
 
         // Navigate to display topology settings in Settings app
-        DeviceHelpers.waitForObj(By.text(CONNECTED_DEVICES_TEXT), timeout = UIAUTOMATOR_TIMEOUT) {
-                "Can't find a connected device on setting"
-            }
-            .click()
-        DeviceHelpers.waitForObj(By.text(EXTERNAL_DISPLAY_TEXT), timeout = UIAUTOMATOR_TIMEOUT) {
-                "Can't find a external display on setting"
-            }
-            .click()
+        if (shouldShowTopLevelDeviceCategory()) {
+            DeviceHelpers.waitForObj(By.text(DEVICE_TEXT), timeout = UIAUTOMATOR_TIMEOUT) {
+                    "Can't find a device on setting"
+                }
+                .click()
+            DeviceHelpers.waitForObj(By.text(DISPLAY_TEXT), timeout = UIAUTOMATOR_TIMEOUT) {
+                    "Can't find a display on setting"
+                }
+                .click()
+
+            // The new external display section is a list of available external displays.
+            val externalDisplay = displayManager.getDisplay(externalDisplayId)
+            DeviceHelpers.waitForObj(By.text(externalDisplay.name), timeout = UIAUTOMATOR_TIMEOUT) {
+                    "Can't find an external display on setting"
+                }
+                .click()
+        } else {
+            DeviceHelpers.waitForObj(
+                    By.text(CONNECTED_DEVICES_TEXT),
+                    timeout = UIAUTOMATOR_TIMEOUT,
+                ) {
+                    "Can't find a connected device on setting"
+                }
+                .click()
+            DeviceHelpers.waitForObj(
+                    By.text(EXTERNAL_DISPLAY_TEXT),
+                    timeout = UIAUTOMATOR_TIMEOUT,
+                ) {
+                    "Can't find an external display on setting"
+                }
+                .click()
+        }
 
         // Modify the topology.
         val paneObject =
@@ -209,7 +231,6 @@ class ConnectedDisplayCujSmokeTests {
     // > Connected devices > Connected Display
     @Test
     @ExtendedOnly
-    @Presubmit
     fun cuj1e() {
         cuj1()
     }
@@ -219,7 +240,6 @@ class ConnectedDisplayCujSmokeTests {
     @Test
     @ProjectedOnly
     @RequiresDevice
-    @Postsubmit
     fun cuj1p() {
         cuj1()
     }
@@ -227,7 +247,6 @@ class ConnectedDisplayCujSmokeTests {
     // Extended: When an ext. display is connected, Taskbar shows on both displays
     @Test
     @ExtendedOnly
-    @Presubmit
     fun cuj2e() {
         val externalDisplayId = setupTestDisplayAndWaitForTransitions()
 
@@ -239,7 +258,6 @@ class ConnectedDisplayCujSmokeTests {
     // the external monitor and they default to Desktop Windowing mode
     @Test
     @ExtendedOnly
-    @Presubmit
     fun cuj3e() {
         val externalDisplayId = setupTestDisplayAndWaitForTransitions()
 
@@ -255,7 +273,6 @@ class ConnectedDisplayCujSmokeTests {
     @Test
     @ProjectedOnly
     @RequiresDevice
-    @Postsubmit
     fun cuj3p() {
         val externalDisplayId = setupTestDisplayAndWaitForTransitions()
 
@@ -271,7 +288,6 @@ class ConnectedDisplayCujSmokeTests {
     @Test
     @ProjectedOnly
     @RequiresDevice
-    @Postsubmit
     fun cuj4p() {
         val externalDisplayId = setupTestDisplayAndWaitForTransitions()
 
@@ -290,7 +306,6 @@ class ConnectedDisplayCujSmokeTests {
     // on one
     @Test
     @ExtendedOnly
-    @Presubmit
     fun cuj5e() {
         // Specify launch windowing mode as desktop-first state is undefined here.
         context.startActivity(
@@ -312,7 +327,6 @@ class ConnectedDisplayCujSmokeTests {
     @Test
     @ProjectedOnly
     @RequiresDevice
-    @Postsubmit
     fun cuj5p() {
         launchAppFromAllApps(DEFAULT_DISPLAY, browserApp)
         verifyActivityState(browserApp, WINDOWING_MODE_FULLSCREEN, DEFAULT_DISPLAY, visible = true)
@@ -346,7 +360,6 @@ class ConnectedDisplayCujSmokeTests {
     // Extended: All window modes are supported on the connected display, including split screen
     @Test
     @ExtendedOnly
-    @Presubmit
     fun cuj6e() {
         cuj6()
     }
@@ -355,7 +368,6 @@ class ConnectedDisplayCujSmokeTests {
     @Test
     @ProjectedOnly
     @RequiresDevice
-    @Postsubmit
     fun cuj6p() {
         cuj6()
     }
@@ -365,7 +377,6 @@ class ConnectedDisplayCujSmokeTests {
     // tiles to the left
     @Test
     @ExtendedOnly
-    @Presubmit
     fun cuj7e() {
         // Specify launch windowing mode as desktop-first state is undefined here.
         context.startActivity(
@@ -403,7 +414,6 @@ class ConnectedDisplayCujSmokeTests {
     @Test
     @ProjectedOnly
     @RequiresDevice
-    @Postsubmit
     fun cuj7p() {
         // Clear all tasks
         RecentTasksUtils.clearAllVisibleRecentTasks(instrumentation)
@@ -449,7 +459,6 @@ class ConnectedDisplayCujSmokeTests {
     // isn’t in fullscreen
     @Test
     @ExtendedOnly
-    @Presubmit
     fun cuj8e() {
         val externalDisplayId = setupTestDisplayAndWaitForTransitions()
         desktopMouseRule.setupMouse()
@@ -487,7 +496,6 @@ class ConnectedDisplayCujSmokeTests {
     @Test
     @ProjectedOnly
     @RequiresDevice
-    @Postsubmit
     fun cuj9p() {
         browserApp.launchViaIntent()
         verifyActivityState(browserApp, WINDOWING_MODE_FULLSCREEN, DEFAULT_DISPLAY, visible = true)
@@ -528,7 +536,6 @@ class ConnectedDisplayCujSmokeTests {
     // ext.display (i.e. does not crash)
     @Test
     @ExtendedOnly
-    @Presubmit
     fun cuj10e() {
         cuj10()
     }
@@ -538,7 +545,6 @@ class ConnectedDisplayCujSmokeTests {
     @Test
     @ProjectedOnly
     @RequiresDevice
-    @Postsubmit
     fun cuj10p() {
         cuj10()
     }
@@ -770,6 +776,12 @@ class ConnectedDisplayCujSmokeTests {
         return externalDisplayId
     }
 
+    private fun shouldShowTopLevelDeviceCategory(): Boolean {
+        val flagValue = SettingsFlags.showTopLevelDeviceCategory()
+        val showCategory = Utils.getSettingsBoolean(CONFIG_SHOW_TOP_LEVEL_DEVICE) ?: false
+        return flagValue && showCategory
+    }
+
     private companion object {
         const val TASKBAR_RES_ID = "taskbar_view"
         const val STATUS_BAR_CONTAINER_RES_ID = "status_bar_container"
@@ -783,6 +795,9 @@ class ConnectedDisplayCujSmokeTests {
         const val DISPLAY_TOPOLOGY_PANE_CONTENT_RES_ID = "display_topology_pane_content"
         const val EXTERNAL_DISPLAY_TEXT = "External displays"
         const val CONNECTED_DEVICES_TEXT = "Connected devices"
+        const val CONFIG_SHOW_TOP_LEVEL_DEVICE = "config_show_top_level_device_category"
+        const val DEVICE_TEXT = "Device"
+        const val DISPLAY_TEXT = "Display"
         const val SETTINGS_PACKAGE = "com.android.settings"
         const val SCROLL_RETRY_MAX = 5
 

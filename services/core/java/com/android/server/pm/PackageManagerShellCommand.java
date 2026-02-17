@@ -1700,7 +1700,9 @@ class PackageManagerShellCommand extends ShellCommand {
             return 1;
         }
         if (!si.isStagedSessionReady() && !si.isStagedSessionFailed()) {
-            pw.println("Failure [timed out after " + timeoutMs + " ms]");
+            pw.println("Failure [timed out after " + timeoutMs + " ms]."
+                    + " Ending this command now but session is still being staged asynchronously."
+                    + " Use 'pm list staged-sessions' to check the session status later.");
             return 1;
         }
         if (!si.isStagedSessionReady()) {
@@ -2275,6 +2277,11 @@ class PackageManagerShellCommand extends ShellCommand {
                 // user set flag so it disables rather than reverting to system
                 // version of the app.
                 if (isSystem) {
+                    if (Binder.getCallingUid() != Process.ROOT_UID) {
+                        pw.println("Failure [only root can delete system app for a "
+                                + "particular user]");
+                        return 1;
+                    }
                     flags |= PackageManager.DELETE_SYSTEM_APP;
                 }
             }
@@ -2858,7 +2865,9 @@ class PackageManagerShellCommand extends ShellCommand {
     private boolean isVendorApp(String pkg) {
         try {
             final PackageInfo info = mInterface.getPackageInfo(
-                     pkg, PackageManager.MATCH_ANY_USER, UserHandle.USER_SYSTEM);
+                     pkg, PackageManager.MATCH_KNOWN_PACKAGES
+                     | PackageManager.MATCH_HIDDEN_UNTIL_INSTALLED_COMPONENTS,
+                     UserHandle.USER_SYSTEM);
             return info != null && info.applicationInfo.isVendor();
         } catch (RemoteException e) {
             return false;
@@ -2868,7 +2877,9 @@ class PackageManagerShellCommand extends ShellCommand {
     private boolean isProductApp(String pkg) {
         try {
             final PackageInfo info = mInterface.getPackageInfo(
-                    pkg, PackageManager.MATCH_ANY_USER, UserHandle.USER_SYSTEM);
+                    pkg, PackageManager.MATCH_KNOWN_PACKAGES
+                    | PackageManager.MATCH_HIDDEN_UNTIL_INSTALLED_COMPONENTS,
+                    UserHandle.USER_SYSTEM);
             return info != null && info.applicationInfo.isProduct();
         } catch (RemoteException e) {
             return false;
@@ -2878,7 +2889,9 @@ class PackageManagerShellCommand extends ShellCommand {
     private boolean isSystemExtApp(String pkg) {
         try {
             final PackageInfo info = mInterface.getPackageInfo(
-                    pkg, PackageManager.MATCH_ANY_USER, UserHandle.USER_SYSTEM);
+                    pkg, PackageManager.MATCH_KNOWN_PACKAGES
+                    | PackageManager.MATCH_HIDDEN_UNTIL_INSTALLED_COMPONENTS,
+                    UserHandle.USER_SYSTEM);
             return info != null && info.applicationInfo.isSystemExt();
         } catch (RemoteException e) {
             return false;
@@ -3429,10 +3442,6 @@ class PackageManagerShellCommand extends ShellCommand {
         String opt;
         while ((opt = getNextOption()) != null) {
             if ("--user-type".equals(opt)) {
-                if (!android.multiuser.Flags.consistentMaxUsers()) {
-                    getErrPrintWriter().println("Error: consistent_max_users flag is not enabled");
-                    return 1;
-                }
                 if (userType != null) {
                     getErrPrintWriter().println("Error: more than one user type was specified");
                     return 1;
@@ -3458,10 +3467,6 @@ class PackageManagerShellCommand extends ShellCommand {
 
     /** Implementation of get-remaining-user-count */
     public int runGetRemainingCreatableUserCount() throws RemoteException {
-        if (!android.multiuser.Flags.consistentMaxUsers()) {
-            getErrPrintWriter().println("Error: consistent_max_users flag is not enabled");
-            return 1;
-        }
         String userType = null;
         String opt;
         while ((opt = getNextOption()) != null) {
@@ -5202,17 +5207,13 @@ class PackageManagerShellCommand extends ShellCommand {
         pw.println("      --all: display all restrictions for the given user");
         pw.println("          This option is used without restriction key");
         pw.println("");
-        if (android.multiuser.Flags.consistentMaxUsers()) {
-            pw.println("  get-max-users [--user-type USER_TYPE]");
-            pw.println("    Returns the current maximum allowed number of users of type USER_TYPE.");
-            pw.println("    If USER_TYPE is not specified, will instead return the number of");
-            pw.println("    supported regular switchable users (excluding guest and demo users).");
-            pw.println("");
-            pw.println("  get-remaining-user-count --user-type USER_TYPE");
-            pw.println("    Returns the number of users of the given USER_TYPE that can be created.");
-        } else {
-            pw.println("  get-max-users");
-        }
+        pw.println("  get-max-users [--user-type USER_TYPE]");
+        pw.println("    Returns the current maximum allowed number of users of type USER_TYPE.");
+        pw.println("    If USER_TYPE is not specified, will instead return the number of");
+        pw.println("    supported regular switchable users (excluding guest and demo users).");
+        pw.println("");
+        pw.println("  get-remaining-user-count --user-type USER_TYPE");
+        pw.println("    Returns the number of users of the given USER_TYPE that can be created.");
         pw.println("");
         pw.println("  get-max-running-users");
         pw.println("");

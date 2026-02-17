@@ -44,12 +44,14 @@ import com.android.internal.accessibility.util.ShortcutUtils
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.accessibility.shortcutchooser.shared.model.AccessibilityTargetModel
 import com.android.systemui.concurrency.fakeExecutor
+import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.advanceUntilIdle
 import com.android.systemui.kosmos.runTest
 import com.android.systemui.kosmos.testDispatcher
 import com.android.systemui.kosmos.testScope
 import com.android.systemui.settings.userTracker
+import com.android.systemui.shared.settings.data.repository.fakeSecureSettingsRepository
 import com.android.systemui.testKosmosNew
 import com.android.systemui.util.settings.fakeSettings
 import com.google.common.truth.Truth.assertThat
@@ -83,6 +85,7 @@ class AccessibilityShortcutsRepositoryImplTest : SysuiTestCase() {
                 packageManager,
                 userTracker,
                 fakeSettings,
+                fakeSecureSettingsRepository,
                 mainResources,
                 testDispatcher,
                 fakeExecutorHandler,
@@ -574,6 +577,96 @@ class AccessibilityShortcutsRepositoryImplTest : SysuiTestCase() {
 
             assertThat(getContentObservers()).isEmpty()
         }
+
+    @Test
+    fun isServiceWarningRequired_untrustedService_returnsTrue() =
+        kosmos.runTest {
+            val serviceInfo = getMockAccessibilityServiceInfo("Test Service")
+            whenever(accessibilityManager.getInstalledAccessibilityServiceList())
+                .thenReturn(listOf(serviceInfo))
+            whenever(accessibilityManager.isAccessibilityServiceWarningRequired(serviceInfo))
+                .thenReturn(true)
+            val targetModel =
+                createAccessibilityTargetModel(serviceInfo.componentName.flattenToString())
+
+            assertThat(underTest.isServiceWarningRequired(targetModel)).isTrue()
+        }
+
+    @Test
+    fun isServiceWarningRequired_trustedService_returnsFalse() =
+        kosmos.runTest {
+            val serviceInfo = getMockAccessibilityServiceInfo("Test Service")
+            whenever(accessibilityManager.getInstalledAccessibilityServiceList())
+                .thenReturn(listOf(serviceInfo))
+            whenever(accessibilityManager.isAccessibilityServiceWarningRequired(serviceInfo))
+                .thenReturn(false)
+            val targetModel =
+                createAccessibilityTargetModel(serviceInfo.componentName.flattenToString())
+
+            assertThat(underTest.isServiceWarningRequired(targetModel)).isFalse()
+        }
+
+    @Test
+    fun isServiceWarningRequired_nonServiceTarget_returnsFalse() =
+        kosmos.runTest {
+            val targetModel = createAccessibilityTargetModel(MAGNIFICATION_CONTROLLER_NAME)
+
+            assertThat(underTest.isServiceWarningRequired(targetModel)).isFalse()
+        }
+
+    @Test
+    fun getAccessibilityServiceInfo_serviceTarget_returnsServiceInfo() =
+        kosmos.runTest {
+            val serviceInfo = getMockAccessibilityServiceInfo("Test Service")
+            whenever(accessibilityManager.getInstalledAccessibilityServiceList())
+                .thenReturn(listOf(serviceInfo))
+            val targetModel =
+                createAccessibilityTargetModel(serviceInfo.componentName.flattenToString())
+
+            val result = underTest.getAccessibilityServiceInfo(targetModel)
+
+            assertThat(result).isEqualTo(serviceInfo)
+        }
+
+    @Test
+    fun getAccessibilityServiceInfo_nonServiceTarget_returnsNull() =
+        kosmos.runTest {
+            val targetModel = createAccessibilityTargetModel(MAGNIFICATION_CONTROLLER_NAME)
+
+            val result = underTest.getAccessibilityServiceInfo(targetModel)
+
+            assertThat(result).isNull()
+        }
+
+    @Test
+    fun hsuExcludedTargets_accessingValue_doesNotThrowException() =
+        kosmos.runTest {
+            val unused = underTest.hsuExcludedTargets
+        }
+
+    @Test
+    fun accessibilityButtonTargetComponent_reflectsSecureSettings() =
+        kosmos.runTest {
+            val latestTarget by
+                testScope.collectLastValue(underTest.accessibilityButtonTargetComponent)
+
+            underTest.setAccessibilityButtonTargetComponent("TestService")
+            assertThat(latestTarget).isEqualTo("TestService")
+
+            underTest.setAccessibilityButtonTargetComponent("TestService2")
+            assertThat(latestTarget).isEqualTo("TestService2")
+        }
+
+    private fun createAccessibilityTargetModel(targetName: String) =
+        AccessibilityTargetModel(
+            shortcutType = UserShortcutType.HARDWARE,
+            targetName = targetName,
+            featureName = "Fake Feature",
+            icon = ColorDrawable(Color.RED),
+            isAssigned = false,
+            isToggleable = true,
+            isStateOn = false,
+        )
 
     private fun getMockAccessibilityServiceInfo(featureName: String): AccessibilityServiceInfo {
         val packageName = "com.android.test"

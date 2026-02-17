@@ -25,11 +25,8 @@ import android.annotation.SuppressLint;
 import android.annotation.TestApi;
 import android.app.compat.CompatChanges;
 import android.app.ActivityThread;
-import android.app.Instrumentation;
 import android.compat.annotation.ChangeId;
-import android.compat.annotation.Disabled;
 import android.compat.annotation.EnabledAfter;
-import android.compat.annotation.Overridable;
 import android.compat.annotation.UnsupportedAppUsage;
 import android.ravenwood.annotation.RavenwoodKeepWholeClass;
 import android.ravenwood.annotation.RavenwoodRedirect;
@@ -157,27 +154,27 @@ public final class MessageQueue {
 
     // This isn't named "getUseDeliQueue"; it's referenced from Message.java.
     static boolean getUseConcurrent() {
-        if (!sUseDeliQueueInitialized) {
-            // We may race and compute the underlying value more than once.
-            // This is fine because computeUseDeliQueue is idempotent.
-            final boolean useDeliQueue = computeUseDeliQueue();
-            sUseDeliQueue = useDeliQueue;
-            sUseDeliQueueInitialized = true;
-            return useDeliQueue;
-        }
+        // setUseDeliQueue() is always called when starting apps or system_server, but some tests
+        // create Loopers directly--in these cases, we still need to initialize sUseDeliQueue.
+        setUseDeliQueue(true);
         return sUseDeliQueue;
     }
 
-    /**
-     * @return human-readable string that identifies the implementation.
-     * @hide
-     */
-    public static String getImplName() {
-        return "deli:" + getUseConcurrent();
+    /** @hide */
+    public static void setUseDeliQueue(boolean enable) {
+        if (!sUseDeliQueueInitialized) {
+            if (!enable) {
+                sUseDeliQueue = false;
+            } else {
+                final boolean useDeliQueue = computeUseDeliQueue(enable);
+                sUseDeliQueue = useDeliQueue;
+            }
+        }
+        sUseDeliQueueInitialized = true;
     }
 
     @RavenwoodRedirect(bug = 454028089, reason = "change IDs are not initialized when we call it")
-    private static boolean computeUseDeliQueue() {
+    private static boolean computeUseDeliQueue(boolean enable) {
         if (CompatChanges.isChangeEnabled(USE_NEW_MESSAGEQUEUE)
                 || Flags.useConcurrentMessageQueueInApps()) {
             return true;
@@ -189,26 +186,17 @@ public final class MessageQueue {
             return false;
         }
 
-        // DeliQueue mode modifies behavior that is observable via reflection and is commonly
-        // used by tests.
-        // For now, we limit it to system processes to avoid breaking apps and their tests.
-        if (UserHandle.isCore(Process.myUid())) {
-            return true;
-        }
-
-        // Also explicitly allow SystemUI processes.
-        // SystemUI doesn't run in a core UID, but we want to give it the performance boost,
-        // and we know that it's safe to use the concurrent implementation in SystemUI.
-        if (processName.equals("com.android.systemui")
-                || processName.startsWith("com.android.systemui:")) {
-            return true;
-        }
-        // On Android distributions where SystemUI has a different process name,
-        // the above condition may need to be adjusted accordingly.
-
         // We can lift these restrictions in the future after we've made it possible for test
         // authors to test Looper and MessageQueue without resorting to reflection.
-        return false;
+        return enable;
+    }
+
+    /**
+     * @return human-readable string that identifies the implementation.
+     * @hide
+     */
+    public static String getImplName() {
+        return "deli:" + getUseConcurrent();
     }
 
     /* ------------------------------------------------------------------------------------------ */
@@ -359,6 +347,10 @@ public final class MessageQueue {
             mWaitState = WaitState.composeDeadline(now + INDEFINITE_TIMEOUT_MS, false);
         }
         setSkipEpollWaitForZeroTimeout(mPtr);
+    }
+
+    Thread getLooperThread() {
+        return mLooperThread;
     }
 
     // Disposes of the underlying message queue.
@@ -1092,11 +1084,16 @@ public final class MessageQueue {
      */
     public void resetForTest() {
         ActivityThread.throwIfNotInstrumenting();
+        onResetForTestCalled();
         if (sUseDeliQueue) {
             resetDeliQueue();
         } else {
             resetLegacy();
         }
+    }
+
+    @RavenwoodRedirect
+    private static void onResetForTestCalled() {
     }
 
     private void resetDeliQueue() {
@@ -1111,7 +1108,6 @@ public final class MessageQueue {
             removeAllFdRecords();
         }
         removeAllMessages();
-        mStack.drainFreelist();
 
         // We reset the sync barrier tokens to reflect the queue's state reset. This helps ensure
         // that the queue's behavior is deterministic in both individual tests and in a test suite.
@@ -1223,10 +1219,15 @@ public final class MessageQueue {
     @TestApi
     public int postSyncBarrier() {
         if (sUseDeliQueue) {
-            return postSyncBarrierDeliQueue();
+            return onSyncBarrierPosted(postSyncBarrierDeliQueue());
         } else {
-            return postSyncBarrierLegacy();
+            return onSyncBarrierPosted(postSyncBarrierLegacy());
         }
+    }
+
+    @RavenwoodRedirect
+    private int onSyncBarrierPosted(int token) {
+        return token;
     }
 
     private int postSyncBarrierDeliQueue() {
@@ -1311,6 +1312,11 @@ public final class MessageQueue {
         } else {
             removeSyncBarrierLegacy(token);
         }
+        onSyncBarrierRemoved(token);
+    }
+
+    @RavenwoodRedirect
+    private void onSyncBarrierRemoved(int token) {
     }
 
     private void removeSyncBarrierDeliQueue(int token) {

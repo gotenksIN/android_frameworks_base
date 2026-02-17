@@ -21,8 +21,13 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.compose.animation.scene.ObservableTransitionState
 import com.android.compose.animation.scene.ObservableTransitionState.Transition
+import com.android.compose.animation.scene.SceneKey
+import com.android.compose.animation.scene.TransitionKey
 import com.android.systemui.Flags.FLAG_DUAL_SHADE
 import com.android.systemui.SysuiTestCase
+import com.android.systemui.brightness.domain.interactor.brightnessMirrorShowingInteractor
+import com.android.systemui.deviceentry.data.repository.deviceEntryRepository
+import com.android.systemui.deviceentry.shared.model.DeviceUnlockStatus
 import com.android.systemui.flags.EnableSceneContainer
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.collectLastValue
@@ -32,10 +37,11 @@ import com.android.systemui.kosmos.testScope
 import com.android.systemui.kosmos.useUnconfinedTestDispatcher
 import com.android.systemui.lifecycle.activateIn
 import com.android.systemui.scene.data.repository.sceneContainerRepository
+import com.android.systemui.scene.domain.interactor.sceneInteractor
 import com.android.systemui.scene.domain.startable.sceneContainerStartable
 import com.android.systemui.scene.shared.model.Overlays
 import com.android.systemui.scene.shared.model.Scenes
-import com.android.systemui.settings.brightness.domain.interactor.brightnessMirrorShowingInteractor
+import com.android.systemui.scene.shared.model.TransitionKeys.ToAlwaysOnDisplay
 import com.android.systemui.shade.domain.interactor.disableDualShade
 import com.android.systemui.shade.domain.interactor.enableDualShade
 import com.android.systemui.shade.domain.interactor.enableSingleShade
@@ -46,6 +52,8 @@ import com.android.systemui.statusbar.notification.stack.data.repository.headsUp
 import com.android.systemui.statusbar.notification.stack.domain.interactor.notificationStackAppearanceInteractor
 import com.android.systemui.statusbar.notification.stack.shared.model.ShadeScrimBounds
 import com.android.systemui.statusbar.notification.stack.shared.model.ShadeScrimShape
+import com.android.systemui.statusbar.notification.stack.ui.viewmodel.NotificationTransitionThresholds.EXPANSION_FOR_DELAYED_STACK_FADE_IN
+import com.android.systemui.statusbar.notification.stack.ui.viewmodel.NotificationTransitionThresholds.EXPANSION_FOR_MAX_SCRIM_ALPHA
 import com.android.systemui.testKosmos
 import com.android.systemui.util.state.SynchronouslyObservableState
 import com.android.systemui.util.state.observableStateOf
@@ -270,68 +278,6 @@ class NotificationScrollViewModelTest : SysuiTestCase() {
         }
 
     @Test
-    fun expandOccluded_toNotifStack() =
-        kosmos.runTest {
-            val expectedFraction: Float = 0.5f
-            val expandFraction by collectLastValue(underTest.expandFraction)
-
-            enableSingleShade()
-            runCurrent()
-
-            // GIVEN a transition from Occluded to Shade scene
-            sceneContainerRepository.setTransitionState(
-                flowOf(
-                    Transition.ChangeScene(
-                        fromScene = Scenes.Occluded,
-                        toScene = Scenes.Shade,
-                        currentScene = flowOf(Scenes.Occluded),
-                        currentOverlays = emptySet(),
-                        progress = MutableStateFlow(expectedFraction),
-                        isInitiatedByUserInput = true,
-                        isUserInputOngoing = flowOf(true),
-                        previewProgress = flowOf(0f),
-                        isInPreviewStage = flowOf(false),
-                    )
-                )
-            )
-            runCurrent()
-
-            // THEN expandFraction is expectedFraction
-            assertThat(expandFraction).isEqualTo(expectedFraction)
-        }
-
-    @Test
-    fun expandNotifStack_toOccluded() =
-        kosmos.runTest {
-            val expectedFraction: Float = 0.5f
-            val expandFraction by collectLastValue(underTest.expandFraction)
-
-            enableSingleShade()
-            runCurrent()
-
-            // GIVEN a transition from Shade scene to Occluded
-            sceneContainerRepository.setTransitionState(
-                flowOf(
-                    Transition.ChangeScene(
-                        fromScene = Scenes.Shade,
-                        toScene = Scenes.Occluded,
-                        currentScene = flowOf(Scenes.Shade),
-                        currentOverlays = emptySet(),
-                        progress = MutableStateFlow(expectedFraction),
-                        isInitiatedByUserInput = true,
-                        isUserInputOngoing = flowOf(true),
-                        previewProgress = flowOf(0f),
-                        isInPreviewStage = flowOf(false),
-                    )
-                )
-            )
-            runCurrent()
-
-            // THEN expandFraction is expectedFraction
-            assertThat(expandFraction).isEqualTo(expectedFraction)
-        }
-
-    @Test
     fun suppressHeightUpdates_idleQuickSettings_EndHeightOnly() {
         kosmos.runTest {
             val suppressHeightUpdates by collectLastValue(underTest.suppressHeightUpdates)
@@ -553,6 +499,377 @@ class NotificationScrollViewModelTest : SysuiTestCase() {
             assertThat(suppressHeightUpdates)
                 .isEqualTo(NotificationScrollViewModel.HeightSuppressionState.None)
         }
+    }
+
+    @Test
+    fun shadeExpansion_goneToShade() =
+        kosmos.runTest {
+            val expandFraction by collectLastValue(notificationScrollViewModel.expandFraction)
+            val isScrollable by collectLastValue(notificationScrollViewModel.isScrollable)
+
+            // Setup: Unlock the device to allow switching to the Gone scene
+            unlockDevice()
+
+            enableSingleShade()
+            driveSceneTransition(
+                currentScene = Scenes.Gone,
+                targetScene = Scenes.Shade,
+                verifyIdleOnCurrentScene = {
+                    assertThat(expandFraction).isEqualTo(0f)
+                    assertThat(isScrollable).isFalse()
+                },
+                verifyTransitionStep = { progress ->
+                    assertThat(expandFraction).isEqualTo(progress)
+                },
+                verifyIdleOnTargetScene = {
+                    assertThat(expandFraction).isEqualTo(1f)
+                    assertThat(isScrollable).isTrue()
+                },
+            )
+        }
+
+    @Test
+    fun shadeExpansion_shadeToGone() =
+        kosmos.runTest {
+            val expandFraction by collectLastValue(notificationScrollViewModel.expandFraction)
+            val isScrollable by collectLastValue(notificationScrollViewModel.isScrollable)
+
+            // Setup: Unlock the device to allow switching to the Gone scene
+            unlockDevice()
+
+            enableSingleShade()
+            driveSceneTransition(
+                currentScene = Scenes.Shade,
+                targetScene = Scenes.Gone,
+                verifyIdleOnCurrentScene = {
+                    assertThat(expandFraction).isEqualTo(1f)
+                    assertThat(isScrollable).isTrue()
+                },
+                verifyTransitionStep = { progress ->
+                    assertThat(expandFraction).isEqualTo(1 - progress)
+                },
+                verifyIdleOnTargetScene = {
+                    assertThat(expandFraction).isEqualTo(0f)
+                    assertThat(isScrollable).isFalse()
+                },
+            )
+        }
+
+    @Test
+    fun shadeExpansion_shadeToQs() =
+        kosmos.runTest {
+            val expandFraction by collectLastValue(notificationScrollViewModel.expandFraction)
+            val isScrollable by collectLastValue(notificationScrollViewModel.isScrollable)
+
+            enableSingleShade()
+            driveSceneTransition(
+                currentScene = Scenes.Shade,
+                targetScene = Scenes.QuickSettings,
+                verifyIdleOnCurrentScene = {
+                    assertThat(expandFraction).isEqualTo(1f)
+                    assertThat(isScrollable).isTrue()
+                },
+                verifyTransitionStep = { _ -> assertThat(expandFraction).isEqualTo(1f) },
+                verifyIdleOnTargetScene = {
+                    assertThat(expandFraction).isEqualTo(1f)
+                    assertThat(isScrollable).isFalse()
+                },
+            )
+        }
+
+    @Test
+    fun shadeExpansion_qsToShade() =
+        kosmos.runTest {
+            val expandFraction by collectLastValue(notificationScrollViewModel.expandFraction)
+            val isScrollable by collectLastValue(notificationScrollViewModel.isScrollable)
+
+            enableSingleShade()
+            driveSceneTransition(
+                currentScene = Scenes.QuickSettings,
+                targetScene = Scenes.Shade,
+                verifyIdleOnCurrentScene = {
+                    assertThat(expandFraction).isEqualTo(1f)
+                    assertThat(isScrollable).isFalse()
+                },
+                verifyTransitionStep = { _ -> assertThat(expandFraction).isEqualTo(1f) },
+                verifyIdleOnTargetScene = {
+                    assertThat(expandFraction).isEqualTo(1f)
+                    assertThat(isScrollable).isTrue()
+                },
+            )
+        }
+
+    @Test
+    fun shadeExpansion_goneToQs() =
+        kosmos.runTest {
+            val expandFraction by collectLastValue(notificationScrollViewModel.expandFraction)
+            val isScrollable by collectLastValue(notificationScrollViewModel.isScrollable)
+
+            // Setup: Unlock the device to allow switching to the Gone scene
+            unlockDevice()
+
+            enableSingleShade()
+            driveSceneTransition(
+                currentScene = Scenes.Gone,
+                targetScene = Scenes.QuickSettings,
+                verifyIdleOnCurrentScene = {
+                    assertThat(expandFraction).isEqualTo(0f)
+                    assertThat(isScrollable).isFalse()
+                },
+                verifyTransitionStep = { progress ->
+                    assertThat(expandFraction)
+                        .isEqualTo(
+                            (progress / EXPANSION_FOR_MAX_SCRIM_ALPHA -
+                                    EXPANSION_FOR_DELAYED_STACK_FADE_IN)
+                                .coerceIn(0f, 1f)
+                        )
+                },
+                verifyIdleOnTargetScene = {
+                    assertThat(expandFraction).isEqualTo(1f)
+                    assertThat(isScrollable).isFalse()
+                },
+            )
+        }
+
+    @Test
+    fun shadeExpansion_goneToLockscreen() =
+        kosmos.runTest {
+            val expandFraction by collectLastValue(notificationScrollViewModel.expandFraction)
+
+            // Setup: Unlock the device to allow switching to the Gone scene
+            unlockDevice()
+
+            enableSingleShade()
+            driveSceneTransition(
+                currentScene = Scenes.Gone,
+                targetScene = Scenes.Lockscreen,
+                verifyIdleOnCurrentScene = { assertThat(expandFraction).isEqualTo(0f) },
+                verifyTransitionStep = { _ -> assertThat(expandFraction).isEqualTo(0f) },
+                verifyIdleOnTargetScene = { assertThat(expandFraction).isEqualTo(1f) },
+            )
+        }
+
+    @Test
+    fun shadeExpansion_lockscreenToGone() =
+        kosmos.runTest {
+            val expandFraction by collectLastValue(notificationScrollViewModel.expandFraction)
+
+            // Setup: Unlock the device to allow switching to the Gone scene
+            unlockDevice()
+
+            enableSingleShade()
+            driveSceneTransition(
+                currentScene = Scenes.Lockscreen,
+                targetScene = Scenes.Gone,
+                verifyIdleOnCurrentScene = { assertThat(expandFraction).isEqualTo(1f) },
+                verifyTransitionStep = { _ -> assertThat(expandFraction).isEqualTo(1f) },
+                verifyIdleOnTargetScene = { assertThat(expandFraction).isEqualTo(0f) },
+            )
+        }
+
+    @Test
+    fun shadeExpansion_lockscreenToShade() =
+        kosmos.runTest {
+            val expandFraction by collectLastValue(notificationScrollViewModel.expandFraction)
+
+            enableSingleShade()
+            driveSceneTransition(
+                currentScene = Scenes.Lockscreen,
+                targetScene = Scenes.Shade,
+                verifyIdleOnCurrentScene = { assertThat(expandFraction).isEqualTo(1f) },
+                verifyTransitionStep = { _ -> assertThat(expandFraction).isEqualTo(1f) },
+                verifyIdleOnTargetScene = { assertThat(expandFraction).isEqualTo(1f) },
+            )
+        }
+
+    @Test
+    fun shadeExpansion_shadeToLockscreen() =
+        kosmos.runTest {
+            val expandFraction by collectLastValue(notificationScrollViewModel.expandFraction)
+
+            enableSingleShade()
+            driveSceneTransition(
+                currentScene = Scenes.Shade,
+                targetScene = Scenes.Lockscreen,
+                verifyIdleOnCurrentScene = { assertThat(expandFraction).isEqualTo(1f) },
+                verifyTransitionStep = { progress ->
+                    assertThat(expandFraction).isWithin(0.01f).of(1f - progress)
+                },
+                verifyIdleOnTargetScene = { assertThat(expandFraction).isEqualTo(1f) },
+            )
+        }
+
+    @Test
+    fun shadeExpansion_shadeToAod() =
+        kosmos.runTest {
+            val expandFraction by collectLastValue(notificationScrollViewModel.expandFraction)
+
+            enableSingleShade()
+            driveSceneTransition(
+                transitionKey = ToAlwaysOnDisplay,
+                currentScene = Scenes.Shade,
+                targetScene = Scenes.Lockscreen,
+                verifyIdleOnCurrentScene = { assertThat(expandFraction).isEqualTo(1f) },
+                verifyTransitionStep = { assertThat(expandFraction).isEqualTo(1f) },
+                verifyIdleOnTargetScene = { assertThat(expandFraction).isEqualTo(1f) },
+            )
+        }
+
+    @Test
+    fun shadeExpansion_qsToAod() =
+        kosmos.runTest {
+            val expandFraction by collectLastValue(notificationScrollViewModel.expandFraction)
+
+            enableSingleShade()
+            driveSceneTransition(
+                transitionKey = ToAlwaysOnDisplay,
+                currentScene = Scenes.Shade,
+                targetScene = Scenes.Lockscreen,
+                verifyIdleOnCurrentScene = { assertThat(expandFraction).isEqualTo(1f) },
+                verifyTransitionStep = { assertThat(expandFraction).isEqualTo(1f) },
+                verifyIdleOnTargetScene = { assertThat(expandFraction).isEqualTo(1f) },
+            )
+        }
+
+    @Test
+    fun shadeExpansion_occludedToShade() =
+        kosmos.runTest {
+            val expandFraction by collectLastValue(notificationScrollViewModel.expandFraction)
+
+            enableSingleShade()
+            driveSceneTransition(
+                currentScene = Scenes.Occluded,
+                targetScene = Scenes.Shade,
+                verifyIdleOnCurrentScene = { assertThat(expandFraction).isEqualTo(0f) },
+                verifyTransitionStep = { progress ->
+                    assertThat(expandFraction).isEqualTo(progress)
+                },
+                verifyIdleOnTargetScene = { assertThat(expandFraction).isEqualTo(1f) },
+            )
+        }
+
+    @Test
+    fun shadeExpansion_shadeToOccluded() =
+        kosmos.runTest {
+            val expandFraction by collectLastValue(notificationScrollViewModel.expandFraction)
+
+            enableSingleShade()
+            driveSceneTransition(
+                currentScene = Scenes.Shade,
+                targetScene = Scenes.Occluded,
+                verifyIdleOnCurrentScene = { assertThat(expandFraction).isEqualTo(1f) },
+                verifyTransitionStep = { progress ->
+                    assertThat(expandFraction).isWithin(0.01f).of(1f - progress)
+                },
+                verifyIdleOnTargetScene = { assertThat(expandFraction).isEqualTo(0f) },
+            )
+        }
+
+    @Test
+    fun shadeExpansion_lockscreenToOccluded() =
+        kosmos.runTest {
+            val expandFraction by collectLastValue(notificationScrollViewModel.expandFraction)
+
+            enableSingleShade()
+            driveSceneTransition(
+                currentScene = Scenes.Lockscreen,
+                targetScene = Scenes.Occluded,
+                verifyIdleOnCurrentScene = { assertThat(expandFraction).isEqualTo(1f) },
+                verifyTransitionStep = { _ -> assertThat(expandFraction).isEqualTo(1f) },
+                verifyIdleOnTargetScene = { assertThat(expandFraction).isEqualTo(0f) },
+            )
+        }
+
+    @Test
+    fun shadeExpansion_occludedToLockscreen() =
+        kosmos.runTest {
+            val expandFraction by collectLastValue(notificationScrollViewModel.expandFraction)
+
+            enableSingleShade()
+            driveSceneTransition(
+                currentScene = Scenes.Occluded,
+                targetScene = Scenes.Lockscreen,
+                verifyIdleOnCurrentScene = { assertThat(expandFraction).isEqualTo(0f) },
+                verifyTransitionStep = { _ -> assertThat(expandFraction).isEqualTo(1f) },
+                verifyIdleOnTargetScene = { assertThat(expandFraction).isEqualTo(1f) },
+            )
+        }
+
+    @Test
+    fun shadeExpansion_lockscreenToCommunal() =
+        kosmos.runTest {
+            val expandFraction by collectLastValue(notificationScrollViewModel.expandFraction)
+
+            enableSingleShade()
+            driveSceneTransition(
+                currentScene = Scenes.Lockscreen,
+                targetScene = Scenes.Communal,
+                verifyIdleOnCurrentScene = { assertThat(expandFraction).isEqualTo(1f) },
+                verifyTransitionStep = { _ -> assertThat(expandFraction).isEqualTo(1f) },
+                verifyIdleOnTargetScene = { assertThat(expandFraction).isEqualTo(0f) },
+            )
+        }
+
+    @Test
+    fun shadeExpansion_communalToLockscreen() =
+        kosmos.runTest {
+            val expandFraction by collectLastValue(notificationScrollViewModel.expandFraction)
+
+            enableSingleShade()
+            driveSceneTransition(
+                currentScene = Scenes.Communal,
+                targetScene = Scenes.Lockscreen,
+                verifyIdleOnCurrentScene = { assertThat(expandFraction).isEqualTo(0f) },
+                verifyTransitionStep = { _ -> assertThat(expandFraction).isEqualTo(1f) },
+                verifyIdleOnTargetScene = { assertThat(expandFraction).isEqualTo(1f) },
+            )
+        }
+
+    private fun Kosmos.unlockDevice() {
+        deviceEntryRepository.deviceUnlockStatus.value =
+            DeviceUnlockStatus(isUnlocked = true, deviceUnlockSource = null)
+    }
+
+    private fun Kosmos.driveSceneTransition(
+        currentScene: SceneKey,
+        targetScene: SceneKey,
+        verifyIdleOnCurrentScene: () -> Unit,
+        verifyTransitionStep: (progress: Float) -> Unit,
+        verifyIdleOnTargetScene: () -> Unit,
+        transitionKey: TransitionKey? = null,
+    ) {
+        // Idle on current Scene
+        val transitionState =
+            MutableStateFlow<ObservableTransitionState>(
+                ObservableTransitionState.Idle(currentScene = currentScene)
+            )
+        sceneInteractor.snapToScene(currentScene, "Setup currentScene.")
+        sceneInteractor.setTransitionState(transitionState)
+        verifyIdleOnCurrentScene()
+
+        sceneInteractor.changeScene(targetScene, "Switch to targetScene.")
+        val transitionProgress = MutableStateFlow(0f)
+        transitionState.value =
+            Transition(
+                fromScene = currentScene,
+                toScene = targetScene,
+                currentScene = flowOf(targetScene),
+                progress = transitionProgress,
+                isInitiatedByUserInput = true,
+                isUserInputOngoing = flowOf(false),
+                key = transitionKey,
+            )
+        val steps = 10
+        repeat(steps) { repetition ->
+            // Transitioning to the target Scene
+            val progress = (1f / steps) * (repetition + 1)
+            transitionProgress.value = progress
+            verifyTransitionStep(progress)
+        }
+
+        // Idle on the target Scene
+        transitionState.value = ObservableTransitionState.Idle(currentScene = targetScene)
+        verifyIdleOnTargetScene()
     }
 
     private fun Kosmos.setBlur(isBlurred: Boolean) {

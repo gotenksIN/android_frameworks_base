@@ -47,6 +47,7 @@ import android.os.storage.StorageManager;
 import android.ravenwood.annotation.RavenwoodIgnore;
 import android.util.ArrayMap;
 import android.util.ArraySet;
+import android.util.Log;
 import android.util.Printer;
 import android.util.SparseArray;
 import android.util.proto.ProtoOutputStream;
@@ -77,6 +78,7 @@ import java.util.UUID;
  */
 @android.ravenwood.annotation.RavenwoodKeepWholeClass
 public class ApplicationInfo extends PackageItemInfo implements Parcelable {
+    private static final String TAG = ApplicationInfo.class.getSimpleName();
     private static final ForBoolean sForBoolean = Parcelling.Cache.getOrCreate(ForBoolean.class);
     private static final Parcelling.BuiltIn.ForStringSet sForStringSet =
             Parcelling.Cache.getOrCreate(Parcelling.BuiltIn.ForStringSet.class);
@@ -137,6 +139,36 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
      * <p>If android:allowBackup is set to false, this attribute is ignored.
      */
     public String backupAgentName;
+
+    /**
+     * Specifies the process that the backup agent will run in.
+     * @hide
+     */
+    public @BackupAgentProcess int backupAgentProcess = BACKUP_AGENT_PROCESS_MAIN;
+
+    /**
+     * Specifies that the backup agent should run in the default main process of the application
+     * that runs under the regular uid of the application.
+     * @hide
+     */
+    public static final int BACKUP_AGENT_PROCESS_MAIN = 0;
+
+    /**
+     * Specifies that the backup agent should run in a private compute core process of
+     * the application.
+     * @hide
+     */
+    public static final int BACKUP_AGENT_PROCESS_PCC = 1;
+
+    /** @hide */
+    @IntDef(
+            prefix = {"BACKUP_AGENT_PROCESS_"},
+            value = {
+                    BACKUP_AGENT_PROCESS_MAIN,
+                    BACKUP_AGENT_PROCESS_PCC,
+            })
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface BackupAgentProcess {}
 
     /**
      * An optional attribute that indicates the app supports automatic backup of app data.
@@ -1718,7 +1750,7 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
     /**
      * If {@code true} this app supports App Lock. This field is only set if the
      * {@link PackageManager#GET_APP_LOCK_INFO} was used when retrieving the application info and
-     * the caller has the {@link Manifest.permission.LOCK_APPS} permission, and will default to
+     * the caller has the {@link Manifest.permission#LOCK_APPS} permission, and will default to
      * {@code false}. To enable App Lock for a package, call
      * {@link PackageManager#getEnableAppLockIntentForPackage}.
      */
@@ -1729,7 +1761,7 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
     /**
      * App lock enablement state of an application. This field is only set if the
      * {@link PackageManager#GET_APP_LOCK_INFO} was used when retrieving the application info and
-     * the caller has the {@link Manifest.permission.LOCK_APPS} permission and will default to
+     * the caller has the {@link Manifest.permission#LOCK_APPS} permission and will default to
      * {@code false}. To enable App Lock for a package, call
      * {@link PackageManager#getEnableAppLockIntentForPackage}.
      */
@@ -2178,6 +2210,7 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         descriptionRes = orig.descriptionRes;
         uiOptions = orig.uiOptions;
         backupAgentName = orig.backupAgentName;
+        backupAgentProcess = orig.backupAgentProcess;
         fullBackupContent = orig.fullBackupContent;
         dataExtractionRulesRes = orig.dataExtractionRulesRes;
         crossProfile = orig.crossProfile;
@@ -2224,6 +2257,7 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         if (dest.maybeWriteSquashed(this)) {
             return;
         }
+        final int preWriteSize = dest.dataSize();
         super.writeToParcel(dest, parcelableFlags);
         dest.writeString8(taskAffinity);
         dest.writeString8(permission);
@@ -2281,6 +2315,7 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         dest.writeInt(installLocation);
         dest.writeString8(manageSpaceActivityName);
         dest.writeString8(backupAgentName);
+        dest.writeInt(backupAgentProcess);
         dest.writeInt(descriptionRes);
         dest.writeInt(uiOptions);
         dest.writeInt(fullBackupContent);
@@ -2324,6 +2359,23 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         dest.writeTypedArray(unalignedNativeLibraries, parcelableFlags);
 
         sForStringSet.parcel(mKnownActivityEmbeddingCerts, dest, flags);
+
+        final int elmSize = dest.dataSize() - preWriteSize;
+        // The warning threshold is consistent with BaseParceledListSlice implementation
+        if (elmSize > 16 * 1024) {
+            StringBuilder sb = new StringBuilder();
+            sb.append("Large ApplicationInfo parcel: size=").append(elmSize)
+                    .append(" package=").append(packageName);
+
+            if (splitSourceDirs != null) sb.append(" splits=").append(splitSourceDirs.length);
+            if (sharedLibraryFiles != null) {
+                sb.append(" sharedLibs=").append(sharedLibraryFiles.length);
+            }
+            if (resourceDirs != null) sb.append(" resDirs=").append(resourceDirs.length);
+            if (overlayPaths != null) sb.append(" overlayPaths=").append(resourceDirs.length);
+
+            Log.w(TAG, sb.toString());
+        }
     }
 
     public static final @android.annotation.NonNull Parcelable.Creator<ApplicationInfo> CREATOR
@@ -2395,6 +2447,7 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
         installLocation = source.readInt();
         manageSpaceActivityName = source.readString8();
         backupAgentName = source.readString8();
+        backupAgentProcess = source.readInt();
         descriptionRes = source.readInt();
         uiOptions = source.readInt();
         fullBackupContent = source.readInt();
@@ -3178,4 +3231,21 @@ public class ApplicationInfo extends PackageItemInfo implements Parcelable {
 // QTI_BEGIN: 2018-02-20: Performance: Activity Trigger frameworks support
     /** {@hide} */ public int canOverrideRes() { return overrideRes; }
 // QTI_END: 2018-02-20: Performance: Activity Trigger frameworks support
+
+    /**
+     * Returns whether the backup agent should run in pcc process.
+     * @hide
+     */
+    public boolean shouldBackupAgentRunInPccProcess() {
+        return android.app.privatecompute.flags.Flags.enablePccFrameworkSupport()
+                && backupAgentProcess == BACKUP_AGENT_PROCESS_PCC;
+    }
+
+    /**
+     * Returns the uid that the backup agent should run under.
+     * @hide
+     */
+    public int getBackupAgentUid() {
+        return shouldBackupAgentRunInPccProcess() ? pccUid : uid;
+    }
 }

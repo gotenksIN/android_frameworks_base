@@ -73,6 +73,7 @@ import android.app.admin.DevicePolicyManager;
 import android.app.admin.DevicePolicyManagerInternal;
 import android.app.admin.DeviceStateCache;
 import android.app.admin.PasswordMetrics;
+import android.app.supervision.SupervisionManagerInternal;
 import android.app.trust.IStrongAuthTracker;
 import android.app.trust.TrustManager;
 import android.content.BroadcastReceiver;
@@ -292,6 +293,7 @@ public class LockSettingsService extends ILockSettings.Stub {
     private final StorageManagerInternal mStorageManagerInternal;
     private final IActivityManager mActivityManager;
     private final SyntheticPasswordManager mSpManager;
+    private final SupervisionManagerInternal mSupervisionManagerInternal;
 
     private final KeyStore mKeyStore;
     private final KeyStoreAuthorization mKeyStoreAuthorization;
@@ -689,6 +691,10 @@ public class LockSettingsService extends ILockSettings.Stub {
         public void invalidateLockoutEndTimeCache() {
             LockPatternUtils.invalidateLockoutEndTimeCache();
         }
+
+        public SupervisionManagerInternal getSupervisionManagerInternal() {
+            return LocalServices.getService(SupervisionManagerInternal.class);
+        }
     }
 
     private class SoftwareRateLimiterInjector implements SoftwareRateLimiter.Injector {
@@ -768,6 +774,7 @@ public class LockSettingsService extends ILockSettings.Stub {
         mUserManager = injector.getUserManager();
         mStorageManager = injector.getStorageManager();
         mStorageManagerInternal = mInjector.getStorageManagerInternal();
+        mSupervisionManagerInternal = injector.getSupervisionManagerInternal();
         mStrongAuthTracker = injector.getStrongAuthTracker();
         mStrongAuthTracker.register(mStrongAuth);
         mGatekeeperPasswords = new LongSparseArray<>();
@@ -1838,33 +1845,68 @@ public class LockSettingsService extends ILockSettings.Stub {
     /**
      * Migrate profile lock so that the profile_pwd file is the authority for whether a profile has
      * a unified profile password. Cleans up the legacy child profile lock file after saving the
-     * profile_pwd file and synchronizing the filesystem.
+     * profile_pwd file and synchronizing the filesystem. Skipped if the profile_pwd already exists
+     * and is decryptable, indicating that migration has already been performed.
      *
      * <p>Invariant: if the migration completes without throwing an error, there will be no legacy
      * child profile lock files, nor keystore profile decrypt keys with legacy aliases.
+     *
+     * @return true if the migration was performed, false if it was skipped due to the profile_pwd
+     *     already existing.
      */
-    private void migrateChildProfileLockPasswordToProfileProtectorPwd(
+    @VisibleForTesting
+    boolean migrateChildProfileLockPasswordToProfileProtectorPwd(
             LockscreenCredential password, long parentSid, int profileId, long protectorId) {
-        if (getCredentialTypeInternal(profileId) == CREDENTIAL_TYPE_NONE) {
-            Slogf.w(
+        // Protect keystore/LockSettingsStorage from concurrent modification during migration.
+        synchronized (mSpManager) {
+            byte[] encryptedProfilePwd = mSpManager.loadProfilePassword(profileId, protectorId);
+            if (encryptedProfilePwd != null) {
+                try (LockscreenCredential existingProfilePwd =
+                        decryptProfilePassword(
+                                mKeyStore, profileId, protectorId, encryptedProfilePwd)) {
+                    if (existingProfilePwd.equals(password)) {
+                        // Migration already performed.
+                        return false;
+                    }
+                    // This should not happen, but if it does, we do not want to touch anything.
+                    throw new IllegalStateException(
+                            "Existing profile_pwd conflicts with the legacy password.");
+                } catch (GeneralSecurityException e) {
+                    // This should not happen, but if it's the case, proceed with encrypting the
+                    // retrieved password, since the existing one cannot be retrieved any way.
+                    Slogf.w(
+                            TAG,
+                            "Undecryptable profile_pwd found during migration from legacy format"
+                                + " for protector %016x belonging to profile user %d. Encrypting"
+                                + " retrieved password instead.",
+                            protectorId,
+                            profileId);
+                }
+            }
+            if (getCredentialTypeInternal(profileId) == CREDENTIAL_TYPE_NONE) {
+                Slogf.w(
+                        TAG,
+                        "Removing unexpected child profile lock for profile %d with NONE "
+                                + "credential.",
+                        profileId);
+                removeKeystoreProfileKeyLegacy(mKeyStore, profileId);
+                mStorage.removeChildProfileLock(profileId);
+                return false;
+            }
+            Slogf.i(
                     TAG,
-                    "Removing unexpected child profile lock for profile %d with NONE credential.",
+                    "Migrating child profile lock for profile %d to profile protector lock",
                     profileId);
-            removeKeystoreProfileKeyLegacy(mKeyStore, profileId);
-            mStorage.removeChildProfileLock(profileId);
-            return;
+            // Commit
+            mSpManager.encryptAndSaveProfilePassword(profileId, protectorId, parentSid, password);
+            mStorage.syncSyntheticPasswordState(profileId);
         }
-        Slogf.i(
-                TAG,
-                "Migrating child profile lock for profile %d to profile protector lock",
-                profileId);
-        // Commit
-        mSpManager.encryptAndSaveProfilePassword(profileId, protectorId, parentSid, password);
-        mStorage.syncSyntheticPasswordState(profileId);
 
         // Only clean up AFTER successful commit
         removeKeystoreProfileKeyLegacy(mKeyStore, profileId);
         mStorage.removeChildProfileLock(profileId);
+
+        return true;
     }
 
     /**
@@ -2646,69 +2688,85 @@ public class LockSettingsService extends ILockSettings.Stub {
         }
         Slogf.i(TAG, "Verifying lockscreen credential for user %d", userId);
 
-        final AuthenticationResult authResult;
+        AuthenticationResult authResult = null;
         VerifyCredentialResponse response;
 
-        synchronized (mSpManager) {
-            final long protectorId =
-                    isSpecialUserId(userId)
-                            ? SyntheticPasswordManager.NULL_PROTECTOR_ID
-                            : getCurrentLskfBasedProtectorId(userId);
-            final LskfIdentifier lskfId = new LskfIdentifier(userId, protectorId);
-            SoftwareRateLimiterResult res = mSoftwareRateLimiter.apply(lskfId, credential);
-            switch (res.code) {
-                case SoftwareRateLimiterResult.CONTINUE_TO_HARDWARE:
-                    break;
-                case SoftwareRateLimiterResult.RATE_LIMITED:
-                    return VerifyCredentialResponse.fromTimeout(res.timeout);
-                case SoftwareRateLimiterResult.CREDENTIAL_TOO_SHORT:
-                    return VerifyCredentialResponse.credTooShort();
-                case SoftwareRateLimiterResult.DUPLICATE_WRONG_GUESS:
-                    return VerifyCredentialResponse.credAlreadyTried();
-                default:
-                    return VerifyCredentialResponse.fromError();
-            }
-            if (isSpecialUserId(userId)) {
-                response =
-                        mSpManager.verifySpecialUserCredential(
-                                userId, getGateKeeperService(), credential, progressCallback);
-                if (response.isMatched() && userId == USER_FRP) {
-                    mStorage.deactivateFactoryResetProtectionWithoutSecret();
+        try {
+            synchronized (mSpManager) {
+                final long protectorId =
+                        isSpecialUserId(userId)
+                                ? SyntheticPasswordManager.NULL_PROTECTOR_ID
+                                : getCurrentLskfBasedProtectorId(userId);
+                final LskfIdentifier lskfId = new LskfIdentifier(userId, protectorId);
+                SoftwareRateLimiterResult res = mSoftwareRateLimiter.apply(lskfId, credential);
+                switch (res.code) {
+                    case SoftwareRateLimiterResult.CONTINUE_TO_HARDWARE:
+                        break;
+                    case SoftwareRateLimiterResult.RATE_LIMITED:
+                        return VerifyCredentialResponse.fromTimeout(res.timeout);
+                    case SoftwareRateLimiterResult.CREDENTIAL_TOO_SHORT:
+                        return VerifyCredentialResponse.credTooShort();
+                    case SoftwareRateLimiterResult.DUPLICATE_WRONG_GUESS:
+                        return VerifyCredentialResponse.credAlreadyTried();
+                    default:
+                        return VerifyCredentialResponse.fromError();
                 }
-                return reportResultToSoftwareRateLimiter(response, lskfId, credential);
-            }
-            authResult = mSpManager.unlockLskfBasedProtector(
-                    getGateKeeperService(), protectorId, credential, userId, progressCallback);
-            response = reportResultToSoftwareRateLimiter(authResult.response, lskfId, credential);
-
-            if (response.isMatched()) {
-                if ((flags & VERIFY_FLAG_WRITE_REPAIR_MODE_PW) != 0) {
-                    if (!mSpManager.writeRepairModeCredentialLocked(protectorId, userId)) {
-                        Slog.e(TAG, "Failed to write repair mode credential");
-                        return VerifyCredentialResponse.OTHER_ERROR;
+                if (isSpecialUserId(userId)) {
+                    response =
+                            mSpManager.verifySpecialUserCredential(
+                                    userId, getGateKeeperService(), credential, progressCallback);
+                    if (response.isMatched() && userId == USER_FRP) {
+                        mStorage.deactivateFactoryResetProtectionWithoutSecret();
                     }
+                    return reportResultToSoftwareRateLimiter(response, lskfId, credential);
                 }
-                // credential has matched
-                mBiometricDeferredQueue.addPendingLockoutResetForUser(userId,
-                        authResult.syntheticPassword.deriveGkPassword());
+                authResult =
+                        mSpManager.unlockLskfBasedProtector(
+                                getGateKeeperService(),
+                                protectorId,
+                                credential,
+                                userId,
+                                progressCallback);
+                response =
+                        reportResultToSoftwareRateLimiter(authResult.response, lskfId, credential);
+
+                if (response.isMatched()) {
+                    if ((flags & VERIFY_FLAG_WRITE_REPAIR_MODE_PW) != 0) {
+                        if (!mSpManager.writeRepairModeCredentialLocked(protectorId, userId)) {
+                            Slog.e(TAG, "Failed to write repair mode credential");
+                            return VerifyCredentialResponse.OTHER_ERROR;
+                        }
+                    }
+                    // credential has matched
+                    mBiometricDeferredQueue.addPendingLockoutResetForUser(
+                            userId, authResult.syntheticPassword.deriveGkPassword());
+                }
+            }
+            if (response.isMatched()) {
+                Slogf.i(TAG, "Successfully verified lockscreen credential for user %d", userId);
+                onCredentialVerified(
+                        authResult.syntheticPassword,
+                        PasswordMetrics.computeForCredential(credential),
+                        userId);
+                if ((flags & VERIFY_FLAG_REQUEST_GK_PW_HANDLE) != 0) {
+                    final long gkHandle =
+                            storeGatekeeperPasswordTemporarily(
+                                    authResult.syntheticPassword.deriveGkPassword());
+                    response =
+                            new VerifyCredentialResponse.Builder()
+                                    .setGatekeeperPasswordHandle(gkHandle)
+                                    .build();
+                }
+                sendCredentialsOnUnlockIfRequired(credential, userId);
+            } else if (response.hasTimeout() && response.getTimeoutAsDuration().isPositive()) {
+                requireStrongAuth(STRONG_AUTH_REQUIRED_AFTER_LOCKOUT, userId);
+            }
+            notifyLockSettingsStateListeners(response.isMatched(), userId);
+        } finally {
+            if (authResult != null && authResult.syntheticPassword != null) {
+                authResult.syntheticPassword.zeroize();
             }
         }
-        if (response.isMatched()) {
-            Slogf.i(TAG, "Successfully verified lockscreen credential for user %d", userId);
-            onCredentialVerified(authResult.syntheticPassword,
-                    PasswordMetrics.computeForCredential(credential), userId);
-            if ((flags & VERIFY_FLAG_REQUEST_GK_PW_HANDLE) != 0) {
-                final long gkHandle = storeGatekeeperPasswordTemporarily(
-                        authResult.syntheticPassword.deriveGkPassword());
-                response = new VerifyCredentialResponse.Builder()
-                        .setGatekeeperPasswordHandle(gkHandle)
-                        .build();
-            }
-            sendCredentialsOnUnlockIfRequired(credential, userId);
-        } else if (response.hasTimeout() && response.getTimeoutAsDuration().isPositive()) {
-            requireStrongAuth(STRONG_AUTH_REQUIRED_AFTER_LOCKOUT, userId);
-        }
-        notifyLockSettingsStateListeners(response.isMatched(), userId);
         return response;
     }
 
@@ -3925,6 +3983,10 @@ public class LockSettingsService extends ILockSettings.Stub {
         try {
             if (mInjector.getDeviceStateCache().isUserOrganizationManaged(userId)) {
                 Slog.i(TAG, "Organization managed users can have escrow token");
+                return;
+            }
+            if (mSupervisionManagerInternal.isEscrowTokenRequired(userId)) {
+                Slog.i(TAG, "Supervised users can have escrow token");
                 return;
             }
         } finally {

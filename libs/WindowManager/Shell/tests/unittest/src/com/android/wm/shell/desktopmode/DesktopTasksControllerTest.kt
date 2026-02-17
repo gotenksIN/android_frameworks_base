@@ -17,6 +17,7 @@
 package com.android.wm.shell.desktopmode
 
 import android.Manifest.permission.SYSTEM_ALERT_WINDOW
+import android.app.ActivityManager
 import android.app.ActivityManager.RecentTaskInfo
 import android.app.ActivityManager.RunningTaskInfo
 import android.app.ActivityOptions
@@ -110,8 +111,6 @@ import com.android.window.flags.Flags
 import com.android.window.flags.Flags.FLAG_CLOSE_FULLSCREEN_AND_SPLITSCREEN_KEYBOARD_SHORTCUT
 import com.android.window.flags.Flags.FLAG_ENABLE_DESKTOP_WINDOWING_MODE
 import com.android.window.flags.Flags.FLAG_ENABLE_DISPLAY_DISCONNECT_INTERACTION
-import com.android.window.flags.Flags.FLAG_ENABLE_DISPLAY_FOCUS_IN_SHELL_TRANSITIONS
-import com.android.window.flags.Flags.FLAG_ENABLE_FULLY_IMMERSIVE_IN_DESKTOP
 import com.android.window.flags.Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND
 import com.android.window.flags.Flags.FLAG_ENABLE_PER_DISPLAY_DESKTOP_WALLPAPER_ACTIVITY
 import com.android.wm.shell.R
@@ -137,7 +136,6 @@ import com.android.wm.shell.desktopmode.DesktopModeEventLogger.Companion.InputMe
 import com.android.wm.shell.desktopmode.DesktopModeEventLogger.Companion.MinimizeReason
 import com.android.wm.shell.desktopmode.DesktopModeEventLogger.Companion.ResizeTrigger
 import com.android.wm.shell.desktopmode.DesktopModeEventLogger.Companion.UnminimizeReason
-import com.android.wm.shell.desktopmode.DesktopTasksController.DesktopModeEntryExitTransitionListener
 import com.android.wm.shell.desktopmode.DesktopTasksController.SnapPosition
 import com.android.wm.shell.desktopmode.DesktopTasksController.TaskbarDesktopTaskListener
 import com.android.wm.shell.desktopmode.DesktopTestHelpers.createFreeformTask
@@ -163,6 +161,9 @@ import com.android.wm.shell.desktopmode.multidesks.DesksTransitionObserver
 import com.android.wm.shell.desktopmode.multidesks.PreserveDisplayRequestHandler
 import com.android.wm.shell.draganddrop.DragAndDropController
 import com.android.wm.shell.freeform.FreeformTaskTransitionStarter
+import com.android.wm.shell.fullscreen.FullscreenDisconnectHandler
+import com.android.wm.shell.pinnedlayer.phone.PinnedLayerController
+import com.android.wm.shell.pip2.phone.PipDisplayDisconnectHandler
 import com.android.wm.shell.pip2.phone.PipScheduler
 import com.android.wm.shell.pip2.phone.PipTransitionState
 import com.android.wm.shell.recents.RecentTasksController
@@ -305,7 +306,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     @Mock private lateinit var bubbleController: BubbleController
     @Mock private lateinit var resources: Resources
     @Mock
-    lateinit var desktopModeEnterExitTransitionListener: DesktopModeEntryExitTransitionListener
+    lateinit var desktopModeEnterExitTransitionListener: DesktopModeEnterExitTransitionListener
     @Mock private lateinit var userManager: UserManager
     @Mock
     private lateinit var desktopWallpaperActivityTokenProvider:
@@ -330,6 +331,11 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     @Mock private lateinit var lockTaskChangeListener: LockTaskChangeListener
     @Mock private lateinit var launcherApps: LauncherApps
     @Mock private lateinit var transitionStateHolder: TransitionStateHolder
+    @Mock private lateinit var fullscreenDisconnectHandler: FullscreenDisconnectHandler
+    @Mock private lateinit var pipDisconnectHandler: PipDisplayDisconnectHandler
+    @Mock private lateinit var pinnedLayerController: PinnedLayerController
+    @Mock private lateinit var desktopTasksTransitionObserver: DesktopTasksTransitionObserver
+    @Mock private lateinit var desktopAnimationConfiguration: DesktopAnimationConfiguration
 
     private lateinit var controller: DesktopTasksController
     private lateinit var shellInit: ShellInit
@@ -345,17 +351,19 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     private lateinit var shellDesktopState: FakeShellDesktopState
     private lateinit var desktopConfig: FakeDesktopConfig
     private lateinit var desksController: DesksController
+    private lateinit var snapController: SnapController
 
     private val shellExecutor = TestShellExecutor()
     private val bgExecutor = TestShellExecutor()
     private val testScope = TestScope()
+    private val testScopeImmediate = TestScope()
 
     // Mock running tasks are registered here so we can get the list from mock shell task organizer
     private val runningTasks = mutableListOf<RunningTaskInfo>()
 
-    private val DEFAULT_USER_ID = 0
+    private val DEFAULT_USER_ID = ActivityManager.getCurrentUser()
     private val DEFAULT_USER_WORK_PROFILE_ID = 100
-    private val SECONDARY_USER_ID = 11
+    private val SECONDARY_USER_ID = DEFAULT_USER_ID + 1
 
     private val SECONDARY_DISPLAY_ID = 1
     private val DISPLAY_DIMENSION_SHORT = 1600
@@ -399,6 +407,9 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
                     UserInfo(DEFAULT_USER_WORK_PROFILE_ID, "default_work", FLAG_PROFILE),
                 )
             )
+        whenever(desktopAnimationConfiguration.toDesktopAnimationDurationMs)
+            .thenReturn(TO_DESKTOP_ANIM_DURATION)
+
         userRepositories =
             DesktopUserRepositories(
                 shellInit,
@@ -411,6 +422,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
                 desktopState,
                 desktopConfig,
             )
+        snapController = SnapController()
         desktopTasksLimiter =
             DesktopTasksLimiter(
                 transitions,
@@ -418,6 +430,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
                 shellTaskOrganizer,
                 desksOrganizer,
                 desktopMixedTransitionHandler,
+                snapController,
                 MAX_TASK_LIMIT,
             )
         desktopModeCompatPolicy = spy(DesktopModeCompatPolicy(spyContext))
@@ -492,12 +505,19 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         whenever(splitScreenController.multiDisplayProvider).thenReturn(splitMultiDisplayProvider)
 
         desksController =
-            DesksController(shellController, userRepositories, desktopConfig, desktopState)
+            DesksController(
+                shellController,
+                userRepositories,
+                desktopConfig,
+                desktopState,
+                displayController,
+                desksOrganizer,
+                shellTaskOrganizer,
+            )
 
         controller = createController()
         controller.setSplitScreenController(splitScreenController)
         controller.freeformTaskTransitionStarter = freeformTaskTransitionStarter
-        controller.desktopModeEnterExitTransitionListener = desktopModeEnterExitTransitionListener
 
         displayDisconnectTransitionHandler =
             DisplayDisconnectTransitionHandler(
@@ -505,6 +525,9 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
                 shellInit = shellInit,
                 splitScreenController = Optional.of(splitScreenController),
                 desktopTasksController = Optional.of(controller),
+                fullscreenDisconnectHandler = Optional.of(fullscreenDisconnectHandler),
+                pinnedLayerController = Optional.of(pinnedLayerController),
+                pipDisplayDisconnectHandler = Optional.of(pipDisconnectHandler),
             )
 
         shellInit.init()
@@ -514,7 +537,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         recentsTransitionStateListener = captor.firstValue
 
         controller.taskbarDesktopTaskListener = taskbarDesktopTaskListener
-        controller.setSnapEventHandler(snapEventHandler)
+        snapController.start(snapEventHandler)
         controller.setPipScheduler(pipScheduler)
 
         taskRepository = userRepositories.current
@@ -525,11 +548,15 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         doReturn(HOME_LAUNCHER_PACKAGE_NAME)
             .whenever(desktopModeCompatPolicy)
             .getDefaultHomePackage(any())
+
+        whenever(pipDisconnectHandler.onDisplayDisconnect(anyInt(), anyInt()))
+            .thenReturn(WindowContainerTransaction())
     }
 
     private fun createController() =
         DesktopTasksController(
             context,
+            desktopAnimationConfiguration,
             shellInit,
             shellCommandHandler,
             shellController,
@@ -555,6 +582,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
             multiInstanceHelper,
             shellExecutor,
             testScope.backgroundScope,
+            testScopeImmediate.backgroundScope,
             bgExecutor,
             Optional.of(desktopTasksLimiter),
             recentTasksController,
@@ -584,6 +612,9 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
             launcherApps,
             transitionStateHolder,
             desksController,
+            desktopTasksTransitionObserver,
+            snapController,
+            desktopModeEnterExitTransitionListener,
         )
 
     @After
@@ -3040,10 +3071,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
-    @EnableFlags(
-        Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
-        Flags.FLAG_REMOVE_DESK_ON_LAST_TASK_REMOVAL,
-    )
+    @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
     fun moveToFullscreen_fromDesk_touchFirst_lastTaskInDesk_removesDesk() {
         val task = setUpFreeformTask()
         rootTaskDisplayAreaOrganizer.setTouchFirst(DEFAULT_DISPLAY)
@@ -3081,40 +3109,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
             )
         assertThat(wct.changes[task.token.asBinder()]?.windowingMode)
             .isEqualTo(WINDOWING_MODE_UNDEFINED)
-    }
-
-    @Test
-    @EnableFlags(Flags.FLAG_ENABLE_DESKTOP_WALLPAPER_ACTIVITY_FOR_SYSTEM_USER)
-    @DisableFlags(
-        Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
-        com.android.launcher3.Flags.FLAG_ENABLE_ALT_TAB_KQS_FLATENNING,
-        Flags.FLAG_REMOVE_DESK_ON_LAST_TASK_REMOVAL,
-    )
-    fun moveToFullscreen_tdaFullscreen_windowingModeUndefined_removesWallpaperActivity() {
-        desktopState.enterDesktopByDefaultOnFreeformDisplay = true
-        val homeTask = setUpHomeTask()
-        val task = setUpFreeformTask()
-        assertNotNull(rootTaskDisplayAreaOrganizer.getDisplayAreaInfo(DEFAULT_DISPLAY))
-            .configuration
-            .windowConfiguration
-            .windowingMode = WINDOWING_MODE_FULLSCREEN
-
-        controller.moveToFullscreen(task.taskId, transitionSource = UNKNOWN)
-
-        val wct = getLatestExitDesktopWct()
-        val taskChange = assertNotNull(wct.changes[task.token.asBinder()])
-        verify(desktopModeEnterExitTransitionListener)
-            .onExitDesktopModeTransitionStarted(
-                FULLSCREEN_ANIMATION_DURATION,
-                shouldEndUpAtHome = false,
-            )
-        assertThat(taskChange.windowingMode).isEqualTo(WINDOWING_MODE_UNDEFINED)
-        assertThat(wct.hierarchyOps).hasSize(3)
-        // Removes wallpaper activity when leaving desktop
-        wct.assertReorderAt(index = 0, wallpaperToken, toTop = false)
-        // Moves home task behind the fullscreen task
-        wct.assertReorderAt(index = 1, homeTask.getToken(), toTop = true)
-        wct.assertReorderAt(index = 2, task.getToken(), toTop = true)
     }
 
     @Test
@@ -3624,6 +3618,39 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
+    @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
+    fun handleRequest_minimizedFreeformTask_unminimizesTask() {
+        val deskId = 5
+        taskRepository.addDesk(displayId = DEFAULT_DISPLAY, deskId = deskId)
+        taskRepository.setActiveDesk(displayId = DEFAULT_DISPLAY, deskId = deskId)
+
+        val transition = Binder()
+        // Create a visible task so we stay in Desktop Mode when minimizing task under test.
+        setUpFreeformTask(displayId = DEFAULT_DISPLAY, deskId = deskId).also { markTaskVisible(it) }
+        val freeformTask = setUpFreeformTask(displayId = DEFAULT_DISPLAY, deskId = deskId)
+        taskRepository.minimizeTask(DEFAULT_DISPLAY, freeformTask.taskId)
+
+        controller.handleRequest(transition, createTransition(freeformTask, TRANSIT_OPEN))
+
+        verify(desksOrganizer).unminimizeTask(any(), eq(deskId), eq(freeformTask))
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
+    fun handleRequest_freeformTask_launchBringsToFront() {
+        val deskId = 5
+        taskRepository.addDesk(displayId = DEFAULT_DISPLAY, deskId = deskId)
+        taskRepository.setActiveDesk(displayId = DEFAULT_DISPLAY, deskId = deskId)
+
+        val transition = Binder()
+        val freeformTask = setUpFreeformTask(displayId = DEFAULT_DISPLAY, deskId = deskId)
+
+        controller.handleRequest(transition, createTransition(freeformTask, TRANSIT_OPEN))
+
+        verify(desksOrganizer).reorderTaskToFront(any(), eq(deskId), eq(freeformTask))
+    }
+
+    @Test
     fun moveTaskToFront_remoteTransition_usesOneshotHandler() {
         setUpHomeTask()
         val freeformTasks = List(MAX_TASK_LIMIT) { setUpFreeformTask() }
@@ -4065,7 +4092,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
-    @EnableFlags(FLAG_ENABLE_DISPLAY_FOCUS_IN_SHELL_TRANSITIONS)
     fun moveToNextDisplay_destinationGainGlobalFocus() {
         taskRepository.addDesk(displayId = SECOND_DISPLAY, deskId = SECOND_DISPLAY)
         // Set up two display ids
@@ -4277,10 +4303,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
-    @EnableFlags(
-        Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
-        Flags.FLAG_REMOVE_DESK_ON_LAST_TASK_REMOVAL,
-    )
+    @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
     fun moveToNextDisplay_wasLastTaskInSourceDesk_touchFirst_removesDesk() {
         rootTaskDisplayAreaOrganizer.setTouchFirst(DEFAULT_DISPLAY)
         val transition = Binder()
@@ -4316,7 +4339,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
-    @EnableFlags(FLAG_ENABLE_DISPLAY_FOCUS_IN_SHELL_TRANSITIONS)
     fun moveToNextDisplay_resetLauncherOnSourceDisplay() {
         taskRepository.addDesk(displayId = SECOND_DISPLAY, deskId = SECOND_DISPLAY)
         // Set up two display ids
@@ -4359,6 +4381,33 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         controller.moveToNextDisplay(task.taskId, EnterReason.UNKNOWN_ENTER)
 
         verify(taskbarDesktopTaskListener).onTaskbarCornerRoundingUpdate(anyBoolean(), anyInt())
+    }
+
+    @Test
+    fun returnToHomeOrOverview_sendsTaskbarRoundingUpdate() {
+        val transition = Binder()
+        val deskId = 0
+        whenever(transitions.startTransition(eq(TRANSIT_CHANGE), any(), anyOrNull()))
+            .thenReturn(transition)
+        val wct = WindowContainerTransaction()
+        val task = setUpFreeformTask(displayId = DEFAULT_DISPLAY, deskId = deskId)
+        taskRepository.addTaskToDesk(
+            displayId = DEFAULT_DISPLAY,
+            deskId = deskId,
+            taskId = task.taskId,
+            isVisible = true,
+            taskBounds = TASK_BOUNDS,
+        )
+        controller.performDesktopExitCleanUp(
+            wct = wct,
+            deskId = deskId,
+            displayId = DEFAULT_DISPLAY,
+            userId = task.userId,
+            willExitDesktop = true,
+            removingLastTaskId = null,
+            exitReason = ExitReason.RETURN_HOME_OR_OVERVIEW,
+        )
+        verify(taskbarDesktopTaskListener).onTaskbarCornerRoundingUpdate(false, DEFAULT_DISPLAY)
     }
 
     @Test
@@ -4760,10 +4809,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
-    @EnableFlags(
-        Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
-        Flags.FLAG_REMOVE_DESK_ON_LAST_TASK_REMOVAL,
-    )
+    @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
     fun onDesktopWindowClose_lastWindow_touchFirst_removesDesk() {
         rootTaskDisplayAreaOrganizer.setTouchFirst(DEFAULT_DISPLAY)
         val task = setUpFreeformTask()
@@ -4800,10 +4846,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
-    @EnableFlags(
-        Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
-        Flags.FLAG_REMOVE_DESK_ON_LAST_TASK_REMOVAL,
-    )
+    @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
     fun onDesktopWindowClose_lastWindow_touchFirst_addsPendingRemoveTransition() {
         rootTaskDisplayAreaOrganizer.setTouchFirst(DEFAULT_DISPLAY)
         val task = setUpFreeformTask()
@@ -5416,39 +5459,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
 
     @Test
     @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
-    @DisableFlags(Flags.FLAG_REMOVE_DESK_ON_LAST_TASK_REMOVAL)
-    fun handleRequest_fullscreenTaskThatWasInactiveInDesk_touchFirst_tracksDeskDeactivation() {
-        rootTaskDisplayAreaOrganizer.setTouchFirst(DEFAULT_DISPLAY)
-        // Set up and existing desktop task in an active desk.
-        val inactiveInDeskTask = setUpFreeformTask(displayId = DEFAULT_DISPLAY, deskId = 0)
-        taskRepository.setDeskInactive(deskId = 0)
-
-        // Now the task is launching as fullscreen.
-        inactiveInDeskTask.configuration.windowConfiguration.windowingMode =
-            WINDOWING_MODE_FULLSCREEN
-        val transition = Binder()
-        val wct = controller.handleRequest(transition, createTransition(inactiveInDeskTask))
-
-        // Desk is deactivated.
-        assertNotNull(wct, "should handle request")
-        verify(desksTransitionsObserver)
-            .addPendingTransition(
-                DeskTransition.DeactivateDesk(
-                    transition,
-                    userId = taskRepository.userId,
-                    deskId = 0,
-                    displayId = DEFAULT_DISPLAY,
-                    switchingUser = false,
-                    exitReason = ExitReason.FULLSCREEN_LAUNCH,
-                )
-            )
-    }
-
-    @Test
-    @EnableFlags(
-        Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
-        Flags.FLAG_REMOVE_DESK_ON_LAST_TASK_REMOVAL,
-    )
     fun handleRequest_fullscreenTaskThatWasInactiveInDesk_touchFirst_tracksDeskRemoval() {
         rootTaskDisplayAreaOrganizer.setTouchFirst(DEFAULT_DISPLAY)
         // Set up and existing desktop task in an active desk.
@@ -6231,18 +6241,22 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
-    fun handleRequest_recentsAnimationRunning_relaunchActiveTask_taskBecomesUndefined() {
-        // Set up a visible freeform task
-        val freeformTask = setUpFreeformTask()
-        markTaskVisible(freeformTask)
-
-        // Mark recents animation running
+    fun onRecentsInDesktopAnimationFinishing_launchOccurred_skipsDeactivation() {
+        val activeDeskId = 1
         recentsTransitionStateListener.onTransitionStateChanged(TRANSITION_STATE_ANIMATING)
 
-        // Should become undefined as the TDA is set to fullscreen. It will inherit from the TDA.
-        val result = controller.handleRequest(Binder(), createTransition(freeformTask))
-        assertThat(result?.changes?.get(freeformTask.token.asBinder())?.windowingMode)
-            .isEqualTo(WINDOWING_MODE_UNDEFINED)
+        val task = setUpFreeformTask()
+        val request = createTransition(task, type = TRANSIT_OPEN)
+        controller.handleRequest(Binder(), request)
+
+        controller.onRecentsInDesktopAnimationFinishing(
+            transition = Binder(),
+            finishWct = WindowContainerTransaction(),
+            returnToApp = false,
+            activeDeskIdOnRecentsStart = activeDeskId,
+        )
+
+        verify(desksOrganizer, never()).deactivateDesk(any(), eq(activeDeskId), anyBoolean())
     }
 
     @Test
@@ -6369,6 +6383,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
 
         val packageInfo = org.mockito.kotlin.mock<PackageInfo>()
         packageInfo.requestedPermissions = arrayOf(SYSTEM_ALERT_WINDOW)
+        packageInfo.requestedPermissionsFlags = intArrayOf(PackageInfo.REQUESTED_PERMISSION_GRANTED)
         whenever(
                 packageManager.getPackageInfoAsUser(
                     anyString(),
@@ -6525,10 +6540,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
-    @EnableFlags(
-        Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
-        Flags.FLAG_REMOVE_DESK_ON_LAST_TASK_REMOVAL,
-    )
+    @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
     fun handleRequest_systemUIActivityWithDisplayInFreeformTask_inDesktop_lastTask_tracksDeskRemoval() {
         rootTaskDisplayAreaOrganizer.setTouchFirst(DEFAULT_DISPLAY)
         val deskId = 5
@@ -7091,10 +7103,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
-    @EnableFlags(
-        Flags.FLAG_ENABLE_DESKTOP_FIRST_FULLSCREEN_REFOCUS_BUGFIX,
-        Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
-    )
+    @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
     fun handleRequest_fullscreenTaskRelaunch_desktopFirst_returnNull() {
         val tda = rootTaskDisplayAreaOrganizer.getDisplayAreaInfo(DEFAULT_DISPLAY)!!
         tda.configuration.windowConfiguration.windowingMode = WINDOWING_MODE_FREEFORM
@@ -7109,7 +7118,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
 
     @Test
     @EnableFlags(
-        Flags.FLAG_ENABLE_DESKTOP_FIRST_FULLSCREEN_REFOCUS_BUGFIX,
         Flags.FLAG_ENABLE_DESKTOP_FIRST_BASED_DEFAULT_TO_DESKTOP_BUGFIX,
         Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
     )
@@ -7124,10 +7132,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
-    @EnableFlags(
-        Flags.FLAG_ENABLE_DESKTOP_FIRST_FULLSCREEN_REFOCUS_BUGFIX,
-        Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
-    )
+    @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
     fun handleRequest_fullscreenTaskRelaunch_touchFirst_returnNull() {
         val tda = rootTaskDisplayAreaOrganizer.getDisplayAreaInfo(DEFAULT_DISPLAY)!!
         tda.configuration.windowConfiguration.windowingMode = WINDOWING_MODE_FULLSCREEN
@@ -7141,10 +7146,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
-    @EnableFlags(
-        Flags.FLAG_ENABLE_DESKTOP_FIRST_FULLSCREEN_REFOCUS_BUGFIX,
-        Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
-    )
+    @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
     fun handleRequest_backgroundFullscreenTaskRelaunch_touchFirst_moveToDesk() {
         val tda = rootTaskDisplayAreaOrganizer.getDisplayAreaInfo(DEFAULT_DISPLAY)!!
         tda.configuration.windowConfiguration.windowingMode = WINDOWING_MODE_FULLSCREEN
@@ -8297,7 +8299,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_CONNECTED_DISPLAYS_WINDOW_DRAG)
     fun onDesktopDragMove_callVisualIndicatorUpdateScheduler() {
         val task = setUpFreeformTask()
         val spyController = spy(controller)
@@ -8447,7 +8448,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_CONNECTED_DISPLAYS_WINDOW_DRAG)
     @DisableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
     fun onDesktopDragEnd_noIndicatorAndMoveToNewDisplay_reparent() {
         val task = setUpFreeformTask()
@@ -8494,7 +8494,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_CONNECTED_DISPLAYS_WINDOW_DRAG)
     fun onDesktopDragEnd_noBoundsChangeAndMoveToNewDisplay_reparentWct() {
         val task = setUpFreeformTask()
         val spyController = spy(controller)
@@ -8691,7 +8690,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
 
         // Assert that task is NOT updated via WCT
         verify(toggleResizeDesktopTaskTransitionHandler, never())
-            .startTransition(any(), any(), any())
+            .startTransition(any(), any(), any(), any())
         // Assert that task leash is updated via Surface Animations
         verify(mReturnToDragStartAnimator)
             .start(
@@ -8814,7 +8813,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
 
         // Assert that task is NOT updated via WCT
         verify(toggleResizeDesktopTaskTransitionHandler, never())
-            .startTransition(any(), any(), any())
+            .startTransition(any(), any(), any(), any())
         // Assert that task leash is updated via Surface Animations
         verify(mReturnToDragStartAnimator)
             .start(
@@ -9368,7 +9367,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         )
         // Assert that task is NOT updated via WCT
         verify(toggleResizeDesktopTaskTransitionHandler, never())
-            .startTransition(any(), any(), any())
+            .startTransition(any(), any(), any(), any())
 
         // Assert that task leash is updated via Surface Animations
         verify(mReturnToDragStartAnimator)
@@ -9426,7 +9425,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
 
         // Assert that task is NOT updated via WCT
         verify(toggleResizeDesktopTaskTransitionHandler, never())
-            .startTransition(any(), any(), any())
+            .startTransition(any(), any(), any(), any())
         verify(mockToast).show()
     }
 
@@ -9774,7 +9773,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
 
     @Test
     @EnableFlags(
-        Flags.FLAG_EXCLUDE_DESK_ROOTS_FROM_DESKTOP_TASKS,
         Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
         Flags.FLAG_ENABLE_INTERACTION_DEPENDENT_TAB_TEARING_BOUNDS,
     )
@@ -9793,7 +9791,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_EXCLUDE_DESK_ROOTS_FROM_DESKTOP_TASKS)
     fun onUnhandledDrag_crossDisplayDrag_noOpOnFocusedNonDesktopTask() {
         taskRepository.addDesk(displayId = SECOND_DISPLAY, deskId = SECOND_DISPLAY)
         taskRepository.setActiveDesk(displayId = SECOND_DISPLAY, deskId = SECOND_DISPLAY)
@@ -9813,7 +9810,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
-    @EnableFlags(FLAG_ENABLE_FULLY_IMMERSIVE_IN_DESKTOP)
     fun onTaskInfoChanged_inImmersiveUnrequestsImmersive_exits() {
         val task = setUpFreeformTask(DEFAULT_DISPLAY)
         taskRepository.setTaskInFullImmersiveState(DEFAULT_DISPLAY, task.taskId, immersive = true)
@@ -9825,7 +9821,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
-    @EnableFlags(FLAG_ENABLE_FULLY_IMMERSIVE_IN_DESKTOP)
     fun onTaskInfoChanged_notInImmersiveUnrequestsImmersive_noReExit() {
         val task = setUpFreeformTask(DEFAULT_DISPLAY)
         taskRepository.setTaskInFullImmersiveState(DEFAULT_DISPLAY, task.taskId, immersive = false)
@@ -9837,7 +9832,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
-    @EnableFlags(FLAG_ENABLE_FULLY_IMMERSIVE_IN_DESKTOP)
     fun onTaskInfoChanged_inImmersiveUnrequestsImmersive_inRecentsTransition_noExit() {
         val task = setUpFreeformTask(DEFAULT_DISPLAY)
         taskRepository.setTaskInFullImmersiveState(DEFAULT_DISPLAY, task.taskId, immersive = true)
@@ -10059,7 +10053,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_FULLY_IMMERSIVE_IN_DESKTOP)
     fun shouldPlayDesktopAnimation_notShowingDesktop_doesNotPlay() {
         taskRepository.setDeskInactive(deskId = 0)
         val triggerTask = setUpFullscreenTask(displayId = DEFAULT_DISPLAY)
@@ -10078,7 +10071,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_FULLY_IMMERSIVE_IN_DESKTOP)
     fun shouldPlayDesktopAnimation_notOpening_doesNotPlay() {
         val triggerTask = setUpFreeformTask(displayId = DEFAULT_DISPLAY)
         taskRepository.setTaskInFullImmersiveState(
@@ -10096,7 +10088,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_FULLY_IMMERSIVE_IN_DESKTOP)
     fun shouldPlayDesktopAnimation_notImmersive_doesNotPlay() {
         val triggerTask = setUpFreeformTask(displayId = DEFAULT_DISPLAY)
         taskRepository.setTaskInFullImmersiveState(
@@ -10114,7 +10105,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_FULLY_IMMERSIVE_IN_DESKTOP)
     fun shouldPlayDesktopAnimation_fullscreenEntersDesktop_plays() {
         // At least one freeform task to be in a desktop.
         val existingTask = setUpFreeformTask(displayId = DEFAULT_DISPLAY)
@@ -10135,7 +10125,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_FULLY_IMMERSIVE_IN_DESKTOP)
     fun shouldPlayDesktopAnimation_fullscreenStaysFullscreen_doesNotPlay() {
         val triggerTask = setUpFullscreenTask(displayId = DEFAULT_DISPLAY)
         taskRepository.setDeskInactive(deskId = 0)
@@ -10150,7 +10139,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_FULLY_IMMERSIVE_IN_DESKTOP)
     fun shouldPlayDesktopAnimation_freeformStaysInDesktop_plays() {
         // At least one freeform task to be in a desktop.
         val existingTask = setUpFreeformTask(displayId = DEFAULT_DISPLAY)
@@ -10171,7 +10159,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_FULLY_IMMERSIVE_IN_DESKTOP)
     fun shouldPlayDesktopAnimation_freeformExitsDesktop_doesNotPlay() {
         val triggerTask = setUpFreeformTask(displayId = DEFAULT_DISPLAY, active = false)
         taskRepository.setDeskInactive(deskId = 0)
@@ -10361,8 +10348,14 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     fun onDisplayDisconnect_desktopModeSupported_emptyDeskRemoved() {
         val defaultDisplayTask = setUpFreeformTask()
         val transition = Binder()
+        val secondDisplayLayout = mock(DisplayLayout::class.java)
+        whenever(displayController.getDisplayLayout(SECOND_DISPLAY)).thenReturn(secondDisplayLayout)
         taskRepository.addDesk(SECOND_DISPLAY, DISCONNECTED_DESK_ID)
         taskRepository.setActiveDesk(SECOND_DISPLAY, DISCONNECTED_DESK_ID)
+        val wctCaptor = argumentCaptor<WindowContainerTransaction>()
+        whenever(desksOrganizer.removeDesk(wctCaptor.capture(), anyInt(), anyInt())).thenAnswer {
+            wctCaptor.firstValue.removeTask(mock(WindowContainerToken::class.java))
+        }
 
         performDisplayDisconnectTransition(
             transition = transition,
@@ -10448,6 +10441,8 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
                 defaultDisplayTask.taskId
             }
         whenever(focusTransitionObserver.globallyFocusedTaskId).thenReturn(focusedTaskId)
+        whenever(fullscreenDisconnectHandler.onDisplayDisconnect(anyInt(), anyInt()))
+            .thenReturn(WindowContainerTransaction())
         var preserveRequested = false
         controller.preserveDisplayRequestHandler = PreserveDisplayRequestHandler {
             preserveRequested = true
@@ -10512,6 +10507,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
                 userId = taskRepository.userId,
             )
             runCurrent()
+            testScopeImmediate.runCurrent()
 
             verify(transitions).startTransition(anyInt(), wctCaptor.capture(), anyOrNull())
             val wct = wctCaptor.firstValue
@@ -10594,6 +10590,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
                 userId = taskRepository.userId,
             )
             runCurrent()
+            testScopeImmediate.runCurrent()
 
             verify(transitions).startTransition(anyInt(), wctCaptor.capture(), anyOrNull())
             verify(desksTransitionsObserver)
@@ -10664,6 +10661,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
                 userId = taskRepository.userId,
             )
             runCurrent()
+            testScopeImmediate.runCurrent()
 
             verify(transitions).startTransition(anyInt(), wctCaptor.capture(), anyOrNull())
             val wct = wctCaptor.firstValue
@@ -10723,6 +10721,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
                 userId = taskRepository.userId,
             )
             runCurrent()
+            testScopeImmediate.runCurrent()
 
             verify(transitions).startTransition(anyInt(), wctCaptor.capture(), anyOrNull())
             val wct = wctCaptor.firstValue
@@ -10781,6 +10780,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
                 userId = taskRepository.userId,
             )
             runCurrent()
+            testScopeImmediate.runCurrent()
 
             verify(transitions).startTransition(anyInt(), wctCaptor.capture(), anyOrNull())
             val wct = wctCaptor.firstValue
@@ -10839,7 +10839,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
                 preservedDisplay = preservedDisplay,
                 userId = taskRepository.userId,
             )
-            runCurrent()
+            testScopeImmediate.runCurrent()
 
             verify(pipScheduler).scheduleExitPipViaExpand(eq(true), eq(SECOND_DISPLAY_ON_RECONNECT))
         }
@@ -10891,11 +10891,25 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
                 preservedDisplay = preservedDisplay,
                 userId = taskRepository.userId,
             )
-            runCurrent()
+            testScopeImmediate.runCurrent()
 
             verify(pipScheduler, never())
                 .scheduleExitPipViaExpand(eq(true), eq(SECOND_DISPLAY_ON_RECONNECT))
         }
+
+    @Test
+    fun startLaunchTransition_notifiesSnapEventHandler() {
+        controller.startLaunchTransition(
+            transitionType = TRANSIT_OPEN,
+            wct = WindowContainerTransaction(),
+            launchingTaskId = null,
+            deskId = 0,
+            displayId = DEFAULT_DISPLAY,
+            userId = 0,
+        )
+
+        verify(snapEventHandler).onTaskLaunchStarted()
+    }
 
     @Test
     @EnableFlags(
@@ -11065,6 +11079,8 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     fun onRecentsInDesktopAnimationFinishing_returningToApp_noDeskDeactivation() {
         val overviewVisibilityListenerCaptor = argumentCaptor<OverviewVisibilityChangeListener>()
         whenever(shellController.isOverviewVisible(DEFAULT_DISPLAY)).thenReturn(true)
+        whenever(displayController.getDisplay(DEFAULT_DISPLAY))
+            .thenReturn(mock(Display::class.java))
         verify(shellController)
             .addOverviewVisibilityChangeListener(overviewVisibilityListenerCaptor.capture())
         overviewVisibilityListenerCaptor.lastValue.onOverviewShown(DEFAULT_DISPLAY)
@@ -11088,10 +11104,44 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     }
 
     @Test
+    @EnableFlags(
+        Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
+        Flags.FLAG_BETTER_DESK_DEACTIVATION_IN_RECENTS_TRANSITION,
+    )
+    fun onRecentsInDesktopAnimationFinishing_displayInvalid_noDeskDeactivation() {
+        val overviewVisibilityListenerCaptor = argumentCaptor<OverviewVisibilityChangeListener>()
+        whenever(shellController.isOverviewVisible(SECONDARY_DISPLAY_ID)).thenReturn(true)
+        verify(shellController)
+            .addOverviewVisibilityChangeListener(overviewVisibilityListenerCaptor.capture())
+        overviewVisibilityListenerCaptor.lastValue.onOverviewShown(SECONDARY_DISPLAY_ID)
+        val deskId = 2
+        taskRepository.addDesk(displayId = SECONDARY_DISPLAY_ID, deskId = deskId)
+        taskRepository.setActiveDesk(SECONDARY_DISPLAY_ID, deskId)
+        whenever(displayController.getDisplay(SECONDARY_DISPLAY_ID)).thenReturn(null)
+
+        val transition = Binder()
+        val finishWct = WindowContainerTransaction()
+        controller.onRecentsInDesktopAnimationFinishing(
+            transition = transition,
+            finishWct = finishWct,
+            returnToApp = false,
+            activeDeskIdOnRecentsStart = deskId,
+        )
+        overviewVisibilityListenerCaptor.lastValue.onOverviewHidden(SECONDARY_DISPLAY_ID)
+
+        verify(transitions, never()).startTransition(eq(TRANSIT_TO_BACK), any(), any())
+        verify(desksOrganizer, never()).deactivateDesk(any(), eq(deskId), any())
+        verify(desksTransitionsObserver, never())
+            .addPendingTransition(argThat { t -> t is DeskTransition.DeactivateDesk })
+    }
+
+    @Test
     @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
     fun onRecentsInDesktopAnimationFinishing_returningToApp_snapEventHandlerNotified() {
         val deskId = 0
         taskRepository.setActiveDesk(DEFAULT_DISPLAY, deskId)
+        whenever(displayController.getDisplay(DEFAULT_DISPLAY))
+            .thenReturn(mock(Display::class.java))
 
         val transition = Binder()
         val finishWct = WindowContainerTransaction()
@@ -11141,6 +11191,8 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         overviewVisibilityListenerCaptor.lastValue.onOverviewShown(DEFAULT_DISPLAY)
         val deskId = 0
         taskRepository.setDeskInactive(deskId)
+        whenever(displayController.getDisplay(DEFAULT_DISPLAY))
+            .thenReturn(mock(Display::class.java))
 
         val transition = Binder()
         val finishWct = WindowContainerTransaction()
@@ -11164,6 +11216,8 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     fun onRecentsInDesktopAnimationFinishing_deskStillActive_notReturningToDesk_deactivatesDesk_betterFlagDisabled() {
         val deskId = 0
         taskRepository.setActiveDesk(DEFAULT_DISPLAY, deskId)
+        whenever(displayController.getDisplay(DEFAULT_DISPLAY))
+            .thenReturn(mock(Display::class.java))
 
         val transition = Binder()
         val finishWct = WindowContainerTransaction()
@@ -11201,6 +11255,8 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         overviewVisibilityListenerCaptor.lastValue.onOverviewShown(DEFAULT_DISPLAY)
         val deskId = 0
         taskRepository.setActiveDesk(DEFAULT_DISPLAY, deskId)
+        whenever(displayController.getDisplay(DEFAULT_DISPLAY))
+            .thenReturn(mock(Display::class.java))
 
         val transition = Binder()
         val finishWct = WindowContainerTransaction()
@@ -11263,6 +11319,8 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
         overviewVisibilityListenerCaptor.lastValue.onOverviewShown(DEFAULT_DISPLAY)
         val deskId = 0
         taskRepository.setActiveDesk(DEFAULT_DISPLAY, deskId)
+        whenever(displayController.getDisplay(DEFAULT_DISPLAY))
+            .thenReturn(mock(Display::class.java))
 
         val transition = Binder()
         val finishWct = WindowContainerTransaction()
@@ -11588,6 +11646,132 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
 
     @Test
     @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
+    fun handleRequest_freeformTaskMove_fromMinimizedState_sameDisplay_staysMinimized_noZOrderChange() {
+        val stableBounds =
+            Rect(0, 0, DISPLAY_DIMENSION_LONG, DISPLAY_DIMENSION_SHORT - TASKBAR_FRAME_HEIGHT)
+        whenever(displayLayout.getStableBounds(any())).thenAnswer { i ->
+            (i.arguments.first() as Rect).set(stableBounds)
+        }
+
+        val task = setUpFreeformTask(bounds = DEFAULT_LANDSCAPE_BOUNDS)
+        taskRepository.minimizeTask(DEFAULT_DISPLAY, task.taskId)
+        val requestedBounds = Rect(DEFAULT_LANDSCAPE_BOUNDS).apply { inset(10, 20, 30, 40) }
+
+        val wct =
+            controller.handleRequest(
+                Binder(),
+                createTaskMoveTransition(task, task.displayId, requestedBounds),
+            )
+
+        assertNotNull(wct, "should handle request")
+        assertThat(findBoundsChange(wct, task)).isEqualTo(requestedBounds)
+        verify(desksOrganizer, never()).moveTaskToDesk(eq(wct), any(), any(), any())
+        verify(desksOrganizer, never()).unminimizeTask(eq(wct), any(), any())
+        verify(desksOrganizer, never()).reorderTaskToFront(eq(wct), any(), any())
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
+    fun handleRequest_freeformTaskMove_fromMinimizedState_crossDisplay_unminimizes() {
+        val stableBounds =
+            Rect(0, 0, DISPLAY_DIMENSION_LONG, DISPLAY_DIMENSION_SHORT - TASKBAR_FRAME_HEIGHT)
+        whenever(displayLayout.getStableBounds(any())).thenAnswer { i ->
+            (i.arguments.first() as Rect).set(stableBounds)
+        }
+
+        val task = setUpFreeformTask(bounds = DEFAULT_LANDSCAPE_BOUNDS)
+        taskRepository.minimizeTask(DEFAULT_DISPLAY, task.taskId)
+        val requestedBounds = Rect(DEFAULT_LANDSCAPE_BOUNDS).apply { inset(10, 20, 30, 40) }
+
+        val targetDeskId = 2
+        taskRepository.addDesk(displayId = SECOND_DISPLAY, deskId = targetDeskId)
+        taskRepository.setActiveDesk(displayId = SECOND_DISPLAY, deskId = targetDeskId)
+        whenever(rootTaskDisplayAreaOrganizer.displayIds)
+            .thenReturn(intArrayOf(DEFAULT_DISPLAY, SECOND_DISPLAY))
+        desktopState.enterDesktopByDefaultOnFreeformDisplay = true
+        rootTaskDisplayAreaOrganizer.setDesktopFirst(SECOND_DISPLAY)
+
+        val wct =
+            controller.handleRequest(
+                Binder(),
+                createTaskMoveTransition(task, SECOND_DISPLAY, requestedBounds),
+            )
+
+        assertNotNull(wct, "should handle request")
+        assertThat(findBoundsChange(wct, task)).isEqualTo(requestedBounds)
+        verify(desksOrganizer).moveTaskToDesk(wct, targetDeskId, task, minimized = false)
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
+    fun handleRequest_freeformTaskMove_fromInactiveDesk_sameDisplay_noZOrderChange() {
+        val stableBounds =
+            Rect(0, 0, DISPLAY_DIMENSION_LONG, DISPLAY_DIMENSION_SHORT - TASKBAR_FRAME_HEIGHT)
+        whenever(displayLayout.getStableBounds(any())).thenAnswer { i ->
+            (i.arguments.first() as Rect).set(stableBounds)
+        }
+
+        val activeDeskId = 4
+        taskRepository.addDesk(displayId = DEFAULT_DISPLAY, deskId = activeDeskId)
+        taskRepository.setActiveDesk(displayId = DEFAULT_DISPLAY, deskId = activeDeskId)
+        val inactiveDeskId = 5
+        taskRepository.addDesk(displayId = DEFAULT_DISPLAY, deskId = inactiveDeskId)
+
+        val task = setUpFreeformTask(bounds = DEFAULT_LANDSCAPE_BOUNDS, deskId = inactiveDeskId)
+        val requestedBounds = Rect(DEFAULT_LANDSCAPE_BOUNDS).apply { inset(10, 20, 30, 40) }
+
+        val wct =
+            controller.handleRequest(
+                Binder(),
+                createTaskMoveTransition(task, task.displayId, requestedBounds),
+            )
+
+        assertNotNull(wct, "should handle request")
+        assertThat(findBoundsChange(wct, task)).isEqualTo(requestedBounds)
+        verify(desksOrganizer, never()).moveTaskToDesk(eq(wct), any(), any(), any())
+        verify(desksOrganizer, never()).unminimizeTask(eq(wct), any(), any())
+        verify(desksOrganizer, never()).reorderTaskToFront(eq(wct), any(), any())
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
+    fun handleRequest_freeformTaskMove_fromInactiveDesk_crossDisplay_movesToActiveDesk() {
+        val stableBounds =
+            Rect(0, 0, DISPLAY_DIMENSION_LONG, DISPLAY_DIMENSION_SHORT - TASKBAR_FRAME_HEIGHT)
+        whenever(displayLayout.getStableBounds(any())).thenAnswer { i ->
+            (i.arguments.first() as Rect).set(stableBounds)
+        }
+
+        val activeDeskId = 4
+        taskRepository.addDesk(displayId = DEFAULT_DISPLAY, deskId = activeDeskId)
+        taskRepository.setActiveDesk(displayId = DEFAULT_DISPLAY, deskId = activeDeskId)
+        val inactiveDeskId = 5
+        taskRepository.addDesk(displayId = DEFAULT_DISPLAY, deskId = inactiveDeskId)
+
+        val targetDeskId = 2
+        taskRepository.addDesk(displayId = SECOND_DISPLAY, deskId = targetDeskId)
+        taskRepository.setActiveDesk(displayId = SECOND_DISPLAY, deskId = targetDeskId)
+        whenever(rootTaskDisplayAreaOrganizer.displayIds)
+            .thenReturn(intArrayOf(DEFAULT_DISPLAY, SECOND_DISPLAY))
+        desktopState.enterDesktopByDefaultOnFreeformDisplay = true
+        rootTaskDisplayAreaOrganizer.setDesktopFirst(SECOND_DISPLAY)
+
+        val task = setUpFreeformTask(bounds = DEFAULT_LANDSCAPE_BOUNDS, deskId = inactiveDeskId)
+        val requestedBounds = Rect(DEFAULT_LANDSCAPE_BOUNDS).apply { inset(10, 20, 30, 40) }
+
+        val wct =
+            controller.handleRequest(
+                Binder(),
+                createTaskMoveTransition(task, SECOND_DISPLAY, requestedBounds),
+            )
+
+        assertNotNull(wct, "should handle request")
+        assertThat(findBoundsChange(wct, task)).isEqualTo(requestedBounds)
+        verify(desksOrganizer).moveTaskToDesk(wct, targetDeskId, task, minimized = false)
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND)
     fun handleRequest_userSwitch() {
         val previousUser = DEFAULT_USER_ID
         val newUser = SECONDARY_USER_ID
@@ -11701,8 +11885,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
 
     @Test
     @EnableFlags(
-        FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
-        Flags.FLAG_REMOVE_DESK_ON_LAST_TASK_REMOVAL,
+        Flags.FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
         com.android.launcher3.Flags.FLAG_ENABLE_ALT_TAB_KQS_FLATENNING,
     )
     @DisableFlags(Flags.FLAG_ENABLE_BUBBLE_ROOT_TASK)
@@ -11724,7 +11907,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     @Test
     @EnableFlags(
         FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
-        Flags.FLAG_REMOVE_DESK_ON_LAST_TASK_REMOVAL,
         Flags.FLAG_ENABLE_BUBBLE_ROOT_TASK,
         com.android.launcher3.Flags.FLAG_ENABLE_ALT_TAB_KQS_FLATENNING,
     )
@@ -11745,7 +11927,6 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     @Test
     @EnableFlags(
         FLAG_ENABLE_MULTIPLE_DESKTOPS_BACKEND,
-        Flags.FLAG_REMOVE_DESK_ON_LAST_TASK_REMOVAL,
         Flags.FLAG_ENABLE_BUBBLE_ROOT_TASK,
     )
     fun addMoveToBubbleFromDesktopChange_multiTasks_notExitDesktop() {
@@ -11762,6 +11943,34 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
 
         wct.assertHop(ReorderPredicate(token = task.token, toTop = true))
         verify(desksOrganizer, never()).removeDesk(wct, deskId = 0, task.userId)
+    }
+
+    @Test
+    fun testToggleDesktopTaskSize_callsTransitionHandlerWithUserResize() {
+        val task = setUpFreeformTask()
+        controller.toggleDesktopTaskSize(
+            task,
+            ToggleTaskSizeInteraction(
+                ToggleTaskSizeInteraction.Direction.MAXIMIZE,
+                ToggleTaskSizeInteraction.Source.HEADER_BUTTON_TO_MAXIMIZE,
+                InputMethod.TOUCH,
+            ),
+        )
+
+        verify(toggleResizeDesktopTaskTransitionHandler)
+            .startTransition(
+                any(),
+                anyOrNull(),
+                anyOrNull(),
+                eq(true), // isUserResize
+            )
+    }
+
+    @Test
+    fun testOnDragResizeTransitionStarted_callsObserver() {
+        val transition = mock(IBinder::class.java)
+        controller.onDragResizeTransitionStarted(transition)
+        verify(desktopTasksTransitionObserver).addPendingUserBoundsChangeTransition(transition)
     }
 
     private class RunOnStartTransitionCallback : ((IBinder) -> Unit) {
@@ -11961,7 +12170,18 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
             }
         val activityInfo = ActivityInfo()
         activityInfo.screenOrientation = screenOrientation
-        activityInfo.windowLayout = ActivityInfo.WindowLayout(0, 0F, 0, 0F, gravity, 0, 0)
+        activityInfo.windowLayout =
+            ActivityInfo.WindowLayout(
+                -1 /* complexWidth */,
+                -1f /* widthFraction */,
+                -1 /* complexHeight */,
+                -1f /* heightFraction */,
+                gravity,
+                -1 /* complexMinWidth */,
+                -1 /* complexMinHeight */,
+                null, /* windowLayoutAffinity */
+                null, /* displayMetrics */
+            )
         activityInfo.applicationInfo = ApplicationInfo()
         with(task) {
             topActivityInfo = activityInfo
@@ -12075,7 +12295,7 @@ class DesktopTasksControllerTest(flags: FlagsParameterization) : ShellTestCase()
     ): WindowContainerTransaction {
         val arg = argumentCaptor<WindowContainerTransaction>()
         verify(toggleResizeDesktopTaskTransitionHandler, atLeastOnce())
-            .startTransition(arg.capture(), eq(currentBounds), isNull())
+            .startTransition(arg.capture(), eq(currentBounds), isNull(), any())
         return arg.lastValue
     }
 
@@ -12460,6 +12680,7 @@ private fun createRecentTaskInfo(taskId: Int, displayId: Int = DEFAULT_DISPLAY):
         this.displayId = displayId
         token = WindowContainerToken(mock(IWindowContainerToken::class.java))
         positionInParent = Point()
+        userId = ActivityManager.getCurrentUser()
     }
 
 private fun RootTaskDisplayAreaOrganizer.setTouchFirst(displayId: Int) {

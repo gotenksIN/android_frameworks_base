@@ -118,6 +118,7 @@ import android.content.pm.ApplicationInfo;
 import android.content.pm.IPackageManager;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManagerInternal;
+import android.content.pm.ProcessInfo;
 import android.content.res.Resources;
 import android.graphics.Point;
 import android.net.LocalSocket;
@@ -271,6 +272,11 @@ public final class ProcessList extends ProcessListInternal
     // Must keep sync with com_android_internal_os_Zygote.cpp.
     private static final String UNSOL_ZYGOTE_MSG_SOCKET_PATH = "/data/system/unsolzygotesocket";
 
+    // The suffix of the key of mAppZygotes for Native Zygote processes
+    private static final String NATIVE_ZYGOTE_SUFFIX = "_zygote_native";
+    // The suffix of the key of mAppZygotes for Managed Zygote processes
+    private static final String MANAGED_ZYGOTE_SUFFIX = "_zygote";
+
     // Low Memory Killer Daemon command codes.
     // These must be kept in sync with lmk_cmd definitions in lmkd.h
     //
@@ -402,6 +408,33 @@ public final class ProcessList extends ProcessListInternal
 
     @CompositeRWLock({"mService", "mProcLock"})
     ActiveUids mActiveUids;
+
+    private UidTransitionPolicy mUidTransitionPolicy;
+    // Only attempt to initialize the policy once. If init fails,
+    // behavior will fallback to the existing per-app range behavior.
+    private boolean mAttemptedUidPolicyInit = false;
+
+    @GuardedBy("mService")
+    public UidTransitionPolicy getUidTransitionPolicy() {
+        if (!Flags.useSafesetidUidPolicy2()) {
+            return null;
+        }
+
+        if (!mAttemptedUidPolicyInit && mUidTransitionPolicy == null) {
+            mAttemptedUidPolicyInit = true;
+            mUidTransitionPolicy = new UidTransitionPolicy();
+
+            try {
+                mUidTransitionPolicy.clear();
+            } catch (UidTransitionPolicy.UidTransitionPolicyUpdateException e) {
+                Slog.wtf(TAG, "Failed to clear UID policy.");
+                mUidTransitionPolicy = null;
+                return null;
+            }
+        }
+
+        return mUidTransitionPolicy;
+    }
 
     /**
      * The currently running isolated processes.
@@ -686,12 +719,23 @@ public final class ProcessList extends ProcessListInternal
 
     /**
      * An allocator for isolated UID ranges for apps that use an application zygote.
+     *
+     * Only used when safesetid is not used to manage UID transitions.
+     * TODO(b/414893665) Remove this range once safesetid is the default behavior.
      */
     @VisibleForTesting
     @GuardedBy("mService")
     IsolatedUidRangeAllocator mAppIsolatedUidRangeAllocator =
             new IsolatedUidRangeAllocator(Process.FIRST_APP_ZYGOTE_ISOLATED_UID,
                     Process.LAST_APP_ZYGOTE_ISOLATED_UID, Process.NUM_UIDS_PER_APP_ZYGOTE);
+
+    /**
+     * The available isolated UIDs for processes that are spawned from an
+     * application zygote when managed by SafeSetID.
+     */
+    @VisibleForTesting
+    @GuardedBy("mService")
+    IsolatedUidRange mGlobalAppIsolatedUids;
 
     /**
      * Processes that are being forcibly torn down.
@@ -814,6 +858,11 @@ public final class ProcessList extends ProcessListInternal
                 ANDROID_VOLD_APP_DATA_ISOLATION_ENABLED_PROPERTY, false);
         mAppDataIsolationAllowlistedApps = new ArrayList<>(
                 SystemConfig.getInstance().getAppDataIsolationWhitelistedApps());
+
+        if (Flags.useSafesetidUidPolicy2()) {
+            mGlobalAppIsolatedUids = new IsolatedUidRange(Process.FIRST_APP_ZYGOTE_ISOLATED_UID,
+                    Process.LAST_APP_ZYGOTE_ISOLATED_UID);
+        }
 
         if (sKillHandler == null) {
             sKillThread = new ServiceThread(TAG + ":kill",
@@ -1718,6 +1767,17 @@ public final class ProcessList extends ProcessListInternal
         return sLmkdConnection.exchange(buf, repl);
     }
 
+    /**
+     * An Application can have both Managed and Native App Zygote by declaring service entries for
+     * both variants, so construct different strings for each of them, which will be used as the key
+     * of mAppZygotes in ProcessList.
+     */
+    private static String makeAppZygoteName(ProcessRecord app) {
+        final boolean isNativeService = app.getHostingRecord().usesNativeAppZygote();
+        final String suffix = isNativeService ? NATIVE_ZYGOTE_SUFFIX : MANAGED_ZYGOTE_SUFFIX;
+        return (app.info.processName + suffix).intern();
+    }
+
     static void killProcessGroup(int uid, int pid, String reason) {
         /* static; one-time init here */
         if (sKillHandler != null) {
@@ -2158,8 +2218,8 @@ public final class ProcessList extends ProcessListInternal
         app.setPendingStart(true);
         app.setRemoved(false);
         synchronized (mProcLock) {
-            app.setKilledByAm(false);
-            app.setKilled(false);
+            mService.mProcessStateController.setKilledByAm(app, false);
+            mService.mProcessStateController.setKilled(app, false);
         }
         if (app.getStartSeq() != 0) {
             Slog.wtf(TAG, "startProcessLocked processName:" + app.processName
@@ -2318,7 +2378,7 @@ public final class ProcessList extends ProcessListInternal
         ArrayList<ProcessRecord> zygoteProcesses = mAppZygoteProcesses.get(appZygote);
         if (zygoteProcesses != null && (force || zygoteProcesses.size() == 0)) {
             // Only remove if no longer in use now, or forced kill
-            mAppZygotes.remove(appInfo.processName, appInfo.uid);
+            mAppZygotes.remove(appZygote.getProcessName(), appInfo.uid);
             mAppZygoteProcesses.remove(appZygote);
             mAppIsolatedUidRangeAllocator.freeUidRangeLocked(appInfo);
             appZygote.stopZygote();
@@ -2328,6 +2388,27 @@ public final class ProcessList extends ProcessListInternal
     @GuardedBy("mService")
     private void removeProcessFromAppZygoteLocked(final ProcessRecord app) {
         // Free the isolated uid for this process
+        if (Flags.useSafesetidUidPolicy2()
+                && UidTransitionPolicy.isEnabled()
+                && getUidTransitionPolicy() != null) {
+            // TODO(b/467504571) Create tests for this interaction between
+            // ProcessList and UidTransitionPolicy
+            mGlobalAppIsolatedUids.freeIsolatedUidLocked(app.uid);
+
+            // In the case that the isolated process failed to fully start,
+            // we might not have cleaned up the transition rule for this UID.
+            // If the rule for this UID was removed earlier (after successful start),
+            // this call will have no effect.
+            //
+            // In the case of this call failing to apply the policy, allow the exception to go
+            // uncaught.
+            // If the rule is not removed from the policy, it could result in a potential
+            // vulnerability.
+            //
+            // TODO(b/468898907) Monitor system server crashes due to failures at this call site.
+            getUidTransitionPolicy().purgeFromPolicy(app.uid);
+        }
+
         final IsolatedUidRange appUidRange =
                 mAppIsolatedUidRangeAllocator.getIsolatedUidRangeLocked(app.info.processName,
                         app.getHostingRecord().getDefiningUid());
@@ -2335,7 +2416,8 @@ public final class ProcessList extends ProcessListInternal
             appUidRange.freeIsolatedUidLocked(app.uid);
         }
 
-        final AppZygote appZygote = mAppZygotes.get(app.info.processName,
+        final String appZygoteName = makeAppZygoteName(app);
+        final AppZygote appZygote = mAppZygotes.get(appZygoteName,
                 app.getHostingRecord().getDefiningUid());
         if (appZygote != null) {
             ArrayList<ProcessRecord> zygoteProcesses = mAppZygoteProcesses.get(appZygote);
@@ -2355,25 +2437,55 @@ public final class ProcessList extends ProcessListInternal
         }
     }
 
-    private AppZygote createAppZygoteForProcessIfNeeded(final ProcessRecord app) {
+    @VisibleForTesting
+    AppZygote createAppZygoteForProcessIfNeeded(final ProcessRecord app) {
         synchronized (mService) {
             // The UID for the app zygote should be the UID of the application hosting
             // the service.
             final int uid = app.getHostingRecord().getDefiningUid();
-            AppZygote appZygote = mAppZygotes.get(app.info.processName, uid);
+            final String appZygoteName = makeAppZygoteName(app);
+            AppZygote appZygote = mAppZygotes.get(appZygoteName, uid);
             final ArrayList<ProcessRecord> zygoteProcessList;
             if (appZygote == null) {
                 if (DEBUG_PROCESSES) {
                     Slog.d(TAG_PROCESSES, "Creating new app zygote.");
                 }
-                final IsolatedUidRange uidRange =
+
+                final int firstUid;
+                final int lastUid;
+
+                final int userId = UserHandle.getUserId(uid);
+
+                if (Flags.useSafesetidUidPolicy2()
+                        && UidTransitionPolicy.isEnabled()
+                        && getUidTransitionPolicy() != null) {
+                    // TODO(b/467504571) Create tests for this interaction between
+                    // ProcessList and UidTransitionPolicy
+
+                    // When safesetid is active, the allowed UID range for an app zygote is the
+                    // entire isolated app UID space (instead of an app specific range allocated
+                    // from the global range).
+                    // Select the first and last value of the global range.
+                    firstUid = UserHandle.getUid(userId, mGlobalAppIsolatedUids.mFirstUid);
+                    lastUid = UserHandle.getUid(userId, mGlobalAppIsolatedUids.mLastUid);
+
+                    // Since the safesetid policy allows all UID transitions by default, explicitly
+                    // block all UID transitions from the app zygote UID since the app zygote will
+                    // soon be executing untrusted code.
+                    //
+                    // TODO(b/468898907) Monitor system server crashes due to failures at this call
+                    // site.
+                    getUidTransitionPolicy().disallowAllUidTransitionsFrom(uid);
+                } else {
+                    final IsolatedUidRange uidRange =
                         mAppIsolatedUidRangeAllocator.getIsolatedUidRangeLocked(
                                 app.info.processName, app.getHostingRecord().getDefiningUid());
-                final int userId = UserHandle.getUserId(uid);
-                // Create the app-zygote and provide it with the UID-range it's allowed
-                // to setresuid/setresgid to.
-                final int firstUid = UserHandle.getUid(userId, uidRange.mFirstUid);
-                final int lastUid = UserHandle.getUid(userId, uidRange.mLastUid);
+                    // Create the app-zygote and provide it with the UID-range it's allowed
+                    // to setresuid/setresgid to.
+                    firstUid = UserHandle.getUid(userId, uidRange.mFirstUid);
+                    lastUid = UserHandle.getUid(userId, uidRange.mLastUid);
+                }
+
                 ApplicationInfo appInfo = new ApplicationInfo(app.info);
                 // If this was an external service, the package name and uid in the passed in
                 // ApplicationInfo have been changed to match those of the calling package;
@@ -2383,9 +2495,10 @@ public final class ProcessList extends ProcessListInternal
                 // not the calling one.
                 appInfo.packageName = app.getHostingRecord().getDefiningPackageName();
                 appInfo.uid = uid;
-                appZygote = new AppZygote(appInfo, app.processInfo, uid, firstUid, lastUid,
-                                          app.getHostingRecord().usesNativeAppZygote());
-                mAppZygotes.put(app.info.processName, uid, appZygote);
+                appZygote = newAppZygote(appInfo, app.processInfo, uid, firstUid, lastUid,
+                                          app.getHostingRecord().usesNativeAppZygote(),
+                                          appZygoteName);
+                mAppZygotes.put(appZygoteName, uid, appZygote);
                 zygoteProcessList = new ArrayList<ProcessRecord>();
                 mAppZygoteProcesses.put(appZygote, zygoteProcessList);
             } else {
@@ -2405,10 +2518,20 @@ public final class ProcessList extends ProcessListInternal
         }
     }
 
+    @VisibleForTesting
+    AppZygote newAppZygote(ApplicationInfo appInfo, ProcessInfo processInfo, int uid,
+            int uidGidMin, int uidGidMax, boolean isNativeService, String processName) {
+        return new AppZygote(appInfo, processInfo, uid, uidGidMin, uidGidMax, isNativeService,
+                processName);
+    }
+
     private Map<String, Pair<String, Long>> getPackageAppDataInfoMap(PackageManagerInternal pmInt,
             String[] packages, int uid, boolean areAllowlistedPackages) {
         Map<String, Pair<String, Long>> result = new ArrayMap<>(packages.length);
         int userId = UserHandle.getUserId(uid);
+        final boolean isPcc = enablePccFrameworkSupport()
+                && Process.isPrivateComputeCoreUid(uid)
+                && !areAllowlistedPackages;
         for (String packageName : packages) {
             final PackageStateInternal packageState = pmInt.getPackageStateInternal(packageName);
             if (packageState == null) {
@@ -2416,28 +2539,20 @@ public final class ProcessList extends ProcessListInternal
                 continue;
             }
             String volumeUuid = packageState.getVolumeUuid();
-            long inode = packageState.getUserStateOrDefault(userId).getCeDataInode();
+            final long inode;
+            final String keyName;
+            if (isPcc) {
+                inode = packageState.getUserStateOrDefault(userId).getPccCeDataInode();
+                keyName = packageName + Environment.PCC_DATA_DIRECTORY_SUFFIX;
+            } else {
+                inode = packageState.getUserStateOrDefault(userId).getCeDataInode();
+                keyName = packageName;
+            }
             if (inode <= 0) {
-                Slog.w(TAG, packageName + " inode == 0 or app uninstalled with keep-data");
+                Slog.w(TAG, keyName + " inode == 0 or app uninstalled with keep-data");
                 return null;
             }
-
-            final long finalInode;
-            final String finalPackageName;
-            // Currently, we do not anticipate PCC apps needing to start before device unlock so
-            // it's safe to pass 0 as the inode value.
-            // Also, the allowlisted apps themselves don't have PCC components so we should not add
-            // the PCC suffix to them.
-            if (enablePccFrameworkSupport()
-                    && Process.isPrivateComputeCoreUid(uid)
-                    && !areAllowlistedPackages) {
-                finalInode = 0L;
-                finalPackageName = packageName + Environment.PCC_DATA_DIRECTORY_SUFFIX;
-            } else {
-                finalInode = inode;
-                finalPackageName = packageName;
-            }
-            result.put(finalPackageName, Pair.create(volumeUuid, finalInode));
+            result.put(keyName, Pair.create(volumeUuid, inode));
         }
 
         return result;
@@ -2585,22 +2700,34 @@ public final class ProcessList extends ProcessListInternal
             app.mProcessGroupCreated = false;
             app.mSkipProcessGroupCreation = false;
             long forkTimeNs = SystemClock.uptimeNanos();
+            final boolean useDeliQueue = mPlatformCompat.getUseDeliQueue(app.info);
             if (hostingRecord.usesWebviewZygote()) {
                 startResult = startWebView(entryPoint,
                         app.processName, uid, uid, gids, runtimeFlags, mountExternal,
                         app.info.targetSdkVersion, seInfo, requiredAbi, instructionSet,
                         app.info.dataDir, null, app.info.packageName,
-                        app.getDisabledCompatChanges(), app.getStartSeq(),
+                        app.getDisabledCompatChanges(), useDeliQueue, app.getStartSeq(),
                         new String[]{PROC_START_SEQ_IDENT + app.getStartSeq()});
             } else if (hostingRecord.usesAppZygote()) {
                 final AppZygote appZygote = createAppZygoteForProcessIfNeeded(app);
+
+                if (Flags.useSafesetidUidPolicy2()
+                        && UidTransitionPolicy.isEnabled()
+                        && getUidTransitionPolicy() != null) {
+                    // TODO(b/467504571) Create tests for this interaction between
+                    // ProcessList and UidTransitionPolicy
+                    //
+                    // TODO(b/468898907) Monitor system server crashes due to failures at this call
+                    // site.
+                    getUidTransitionPolicy().allowUidTransition(appZygote.getZygoteUid(), uid);
+                }
 
                 // We can't isolate app data and storage data as parent zygote already did that.
                 startResult = appZygote.startProcess(entryPoint,
                         app.processName, uid, gids, runtimeFlags, mountExternal,
                         app.info.targetSdkVersion, seInfo, requiredAbi, instructionSet,
                         app.info.dataDir, app.info.packageName, isTopApp,
-                        app.getDisabledCompatChanges(), pkgDataInfoMap,
+                        app.getDisabledCompatChanges(), useDeliQueue, pkgDataInfoMap,
                         allowlistedAppDataInfoMap, app.getStartSeq(),
                         new String[]{PROC_START_SEQ_IDENT + app.getStartSeq()});
             } else {
@@ -2609,10 +2736,9 @@ public final class ProcessList extends ProcessListInternal
                         app.processName, uid, uid, gids, runtimeFlags, mountExternal,
                         app.info.targetSdkVersion, seInfo, requiredAbi, instructionSet,
                         app.info.dataDir, invokeWith, app.info.packageName, zygotePolicyFlags,
-                        isTopApp, app.getDisabledCompatChanges(), pkgDataInfoMap,
+                        isTopApp, app.getDisabledCompatChanges(), useDeliQueue, pkgDataInfoMap,
                         allowlistedAppDataInfoMap, bindMountAppsData, bindMountAppStorageDirs,
-                        bindOverrideSysprops,
-                        app.getStartSeq(),
+                        bindOverrideSysprops, app.getStartSeq(),
                         new String[]{PROC_START_SEQ_IDENT + app.getStartSeq()});
                 // By now the process group should have been created by zygote.
                 app.mProcessGroupCreated = true;
@@ -3345,8 +3471,8 @@ public final class ProcessList extends ProcessListInternal
                 if (Arrays.binarySearch(mService.mDeviceIdleTempAllowlist,
                             UserHandle.getAppId(proc.uid)) >= 0
                         || mService.mPendingTempAllowlist.indexOfKey(proc.uid) >= 0) {
-                    uidRec.setCurAllowListed(true);
-                    uidRec.setSetAllowListed(true);
+                    mService.mProcessStateController.setUidCurAllowListed(uidRec, true);
+                    mService.mProcessStateController.setUidSetAllowListed(uidRec, true);
                 }
                 uidRec.updateHasInternetPermission();
                 mActiveUids.put(proc.uid, uidRec);
@@ -3381,6 +3507,8 @@ public final class ProcessList extends ProcessListInternal
         if (hostingRecord == null || !hostingRecord.usesAppZygote()) {
             // Allocate an isolated UID from the global range
             return mGlobalIsolatedUids;
+        } else if (Flags.useSafesetidUidPolicy2() && UidTransitionPolicy.isEnabled()) {
+            return mGlobalAppIsolatedUids;
         } else {
             return mAppIsolatedUidRangeAllocator.getOrCreateIsolatedUidRangeLocked(
                     info.processName, hostingRecord.getDefiningUid());
@@ -3637,8 +3765,8 @@ public final class ProcessList extends ProcessListInternal
             final IApplicationThread thread = processRecord.getThread();
             try {
                 // It's possible for userSettings to be null here if a process has already started
-                // for a new user after CoreSettingsObserverMultiUser retrieves the list of running
-                // users. In that situation, CoreSettingsObserverMultiUser will receive another
+                // for a new user after CoreSettingsObserver retrieves the list of running
+                // users. In that situation, CoreSettingsObserver will receive another
                 // onUserStarted() call for that user and call onCoreSettingsChange() again, so we
                 // can skip setCoreSettings() if userSettings is null.
                 if (thread != null && userSettings != null) {

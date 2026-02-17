@@ -17,7 +17,6 @@
 package com.android.wm.shell.desktopmode
 
 import android.os.IBinder
-import android.platform.test.annotations.EnableFlags
 import android.testing.AndroidTestingRunner
 import android.view.SurfaceControl
 import android.view.WindowManager.TRANSIT_CHANGE
@@ -25,7 +24,6 @@ import android.view.WindowManager.TRANSIT_CLOSE
 import androidx.test.filters.SmallTest
 import com.android.testing.wm.util.StubTransaction
 import com.android.testing.wm.util.TransitionInfoBuilder
-import com.android.window.flags.Flags
 import com.android.wm.shell.ShellTestCase
 import com.android.wm.shell.desktopmode.multidesks.DesksTransitionObserver
 import com.android.wm.shell.transition.FocusTransitionObserver
@@ -68,9 +66,6 @@ class DesktopInOrderTransitionObserverTest : ShellTestCase() {
     }
 
     @Test
-    @EnableFlags(
-        Flags.FLAG_ENABLE_FULLY_IMMERSIVE_IN_DESKTOP
-    )
     fun onTransitionReady_forwardsToDesktopImmersiveController() {
         val transition = Mockito.mock(IBinder::class.java)
         val info = TransitionInfoBuilder(TRANSIT_CHANGE, 0).build()
@@ -83,9 +78,6 @@ class DesktopInOrderTransitionObserverTest : ShellTestCase() {
     }
 
     @Test
-    @EnableFlags(
-        Flags.FLAG_ENABLE_FULLY_IMMERSIVE_IN_DESKTOP
-    )
     fun onTransitionMerged_forwardsToDesktopImmersiveController() {
         val merged = Mockito.mock(IBinder::class.java)
         val playing = Mockito.mock(IBinder::class.java)
@@ -96,9 +88,6 @@ class DesktopInOrderTransitionObserverTest : ShellTestCase() {
     }
 
     @Test
-    @EnableFlags(
-        Flags.FLAG_ENABLE_FULLY_IMMERSIVE_IN_DESKTOP
-    )
     fun onTransitionStarting_forwardsToDesktopImmersiveController() {
         val transition = Mockito.mock(IBinder::class.java)
 
@@ -108,9 +97,6 @@ class DesktopInOrderTransitionObserverTest : ShellTestCase() {
     }
 
     @Test
-    @EnableFlags(
-        Flags.FLAG_ENABLE_FULLY_IMMERSIVE_IN_DESKTOP
-    )
     fun onTransitionFinished_forwardsToDesktopImmersiveController() {
         val transition = Mockito.mock(IBinder::class.java)
 

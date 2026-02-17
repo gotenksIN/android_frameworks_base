@@ -66,6 +66,7 @@ import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.LayoutCoordinates
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.findRootCoordinates
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.onSizeChanged
@@ -85,12 +86,15 @@ import androidx.compose.ui.util.lerp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.android.compose.animation.scene.ContentKey
 import com.android.compose.animation.scene.ContentScope
+import com.android.compose.animation.scene.ElementContentPicker
 import com.android.compose.animation.scene.ElementKey
-import com.android.compose.animation.scene.LowestZIndexContentPicker
+import com.android.compose.animation.scene.HeadsUpContentPicker
 import com.android.compose.animation.scene.SceneTransitionLayoutState
+import com.android.compose.animation.scene.content.state.TransitionState
 import com.android.compose.gesture.effect.OffsetOverscrollEffect
 import com.android.compose.gesture.effect.rememberOffsetOverscrollEffect
 import com.android.compose.modifiers.onUnplaced
+import com.android.compose.modifiers.padding
 import com.android.compose.modifiers.thenIf
 import com.android.compose.nestedscroll.OnStopScope
 import com.android.compose.nestedscroll.PriorityNestedScrollConnection
@@ -143,7 +147,14 @@ object Notifications {
          * [HeadsUpPlaceholderContentPicker].
          */
         val HeadsUpNotificationPlaceholder =
-            ElementKey("HeadsUpNotificationPlaceholder", contentPicker = LowestZIndexContentPicker)
+            ElementKey(
+                "HeadsUpNotificationPlaceholder",
+                contentPicker =
+                    HeadsUpContentPicker(
+                        sceneWithShadeCollapsed = Scenes.Lockscreen,
+                        sceneWithShadeExpanded = Scenes.Shade,
+                    ),
+            )
     }
 }
 
@@ -167,6 +178,7 @@ fun ContentScope.ConstrainedNotificationStack(
                 .onUnplaced {
                     debugLog(viewModel) { "Constrained.container onUnplaced" }
                     viewModel.resetStackBounds()
+                    viewModel.onLockScreenStackBottomChanged(-1f)
                 }
     ) {
         StackPlaceholder(
@@ -201,7 +213,7 @@ fun ContentScope.ScrollingNotificationPanel(
     shouldPunchHoleBehindScrim: Boolean,
     isTransparencyEnabled: Boolean,
     stackTopPadding: Dp,
-    stackBottomPadding: Dp,
+    stackBottomPadding: () -> Dp,
     modifier: Modifier = Modifier,
     shouldFillMaxHeight: Boolean = false,
     shouldIncludeHeadsUpSpace: Boolean = true,
@@ -283,7 +295,7 @@ fun ContentScope.NestedScrollingNotificationPanel(
     shouldPunchHoleBehindScrim: Boolean,
     isTransparencyEnabled: Boolean,
     stackTopPadding: Dp,
-    stackBottomPadding: Dp,
+    stackBottomPadding: () -> Dp,
     contentScrollState: ScrollState,
     scrollingContentOverscrollEffect: OffsetOverscrollEffect,
     shortContentOverscrollEffect: OffsetOverscrollEffect,
@@ -399,8 +411,9 @@ fun ContentScope.NestedScrollingNotificationPanel(
     val screenHeight = with(density) { LocalConfiguration.current.screenHeightDp.dp.toPx() }
 
     /** Total horizontal stack padding in pixels. */
-    val stackHorizontalPaddingPx =
-        with(LocalDensity.current) { (stackTopPadding + stackBottomPadding).toPx() }.roundToInt()
+    val stackHorizontalPaddingPx = {
+        with(density) { (stackTopPadding + stackBottomPadding()).toPx() }.roundToInt()
+    }
 
     val scrimRounding =
         viewModel.shadeScrimRounding.collectAsStateWithLifecycle(ShadeScrimRounding())
@@ -413,7 +426,11 @@ fun ContentScope.NestedScrollingNotificationPanel(
         ) {
             PriorityNestedScrollConnection(
                 orientation = Orientation.Vertical,
-                canStartPreScroll = { _, _, _ -> false },
+                // Enable preScroll for nested connection while expanding notification
+                // so that the scrim does not consume the scroll event.
+                canStartPreScroll = { offsetAvailable, _, _ ->
+                    offsetAvailable < 0 && viewModel.isCurrentGestureExpandingNotification
+                },
                 canStartPostScroll = { _, _, _ -> viewModel.isCurrentGestureExpandingNotification },
                 onStart = { _ ->
                     object : ScrollController {
@@ -453,10 +470,13 @@ fun ContentScope.NestedScrollingNotificationPanel(
         modifier =
             modifier
                 .element(Notifications.Elements.NotificationScrim)
-                // Apply overscroll visuals (visuals only, no event handling):
-                .overscroll(verticalOverscrollEffect) // SceneContainer transitions
-                .overscroll(scrollingContentOverscrollEffect) // Content scrolling
-                .overscroll(shortContentOverscrollEffect) // Short/Empty content swipes
+                // Only apply visual effects when the background is drawn.
+                .thenIf(shouldDrawScrimBackground) {
+                    // Apply overscroll visuals (visuals only, no event handling):
+                    Modifier.overscroll(verticalOverscrollEffect) // SceneContainer transitions
+                        .overscroll(scrollingContentOverscrollEffect) // Content scrolling
+                        .overscroll(shortContentOverscrollEffect) // Short/Empty content swipes
+                }
                 .onGloballyPositioned { coordinates ->
                     val boundsInWindow = coordinates.boundsInWindow()
                     debugLog(viewModel) {
@@ -537,7 +557,10 @@ fun ContentScope.NestedScrollingNotificationPanel(
                                         if (shouldContentFillMaxSize) Modifier.fillMaxSize()
                                         else Modifier.fillMaxWidth()
                                     )
-                                    .padding(top = stackTopPadding, bottom = stackBottomPadding)
+                                    .padding(
+                                        top = { stackTopPadding.roundToPx() },
+                                        bottom = { stackBottomPadding().roundToPx() },
+                                    )
                                     .onPlaced {
                                         val rawBounds = it.rawBoundsInWindow()
                                         debugLog(viewModel) {
@@ -590,7 +613,7 @@ fun ContentScope.NestedScrollingNotificationPanel(
                                     Modifier.notificationStackHeight(view = stackScrollView)
                                         .onSizeChanged { size ->
                                             onStackHeightChanged(
-                                                size.height + stackHorizontalPaddingPx
+                                                size.height + stackHorizontalPaddingPx()
                                             )
                                         },
                             )
@@ -632,9 +655,15 @@ fun ContentScope.NestedScrollingNotificationPanel(
             val contentMeasurable = measurables[1][0]
 
             if (shouldScrimBackgroundFillMaxHeight) {
-                // Let the content match its constraints, but force the background to match the
-                // screen height to ensure it covers the full display area.
-                val content = contentMeasurable.measure(constraints)
+                // Fill the entire available space with the content, and force the background to
+                // match the screen height to ensure it covers the full display area.
+                val content =
+                    contentMeasurable.measure(
+                        Constraints.fixed(
+                            width = constraints.maxWidth,
+                            height = constraints.maxHeight,
+                        )
+                    )
                 val background =
                     backgroundMeasurable.measure(
                         Constraints.fixed(
@@ -752,7 +781,7 @@ private val DEBUG_BOX_COLOR = Color(0f, 1f, 0f, 0.2f)
  * This is different from [boundsInWindow], which clips the bounds to the window. Unclipped bounds
  * are needed when a layout is positioned off-screen, for example during a scene transition.
  */
-private fun LayoutCoordinates.rawBoundsInWindow(): YSpace {
+internal fun LayoutCoordinates.rawBoundsInWindow(): YSpace {
     val root = findRootCoordinates()
 
     // Explicitly set clipBounds=false to ensure we get the raw, unclipped bounds, as the default

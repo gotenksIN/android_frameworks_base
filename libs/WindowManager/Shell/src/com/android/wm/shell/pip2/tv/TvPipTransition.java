@@ -18,13 +18,18 @@ package com.android.wm.shell.pip2.tv;
 
 import static android.view.WindowManager.TRANSIT_PIP;
 
+import static com.android.wm.shell.common.pip.PipMenuController.ALPHA_NO_CHANGE;
 import static com.android.wm.shell.pip2.phone.transition.PipTransitionUtils.getPipChange;
 import static com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_PICTURE_IN_PICTURE;
+import static com.android.wm.shell.transition.Transitions.TRANSIT_PIP_BOUNDS_CHANGE;
 
+import android.animation.ValueAnimator;
 import android.annotation.NonNull;
 import android.app.ActivityManager;
 import android.app.PictureInPictureParams;
+import android.app.TaskInfo;
 import android.content.Context;
+import android.graphics.Insets;
 import android.graphics.PointF;
 import android.graphics.Rect;
 import android.os.Bundle;
@@ -34,11 +39,14 @@ import android.view.Surface;
 import android.view.SurfaceControl;
 import android.window.TransitionInfo;
 import android.window.TransitionRequestInfo;
+import android.window.WindowContainerToken;
 import android.window.WindowContainerTransaction;
 
 import androidx.annotation.Nullable;
 
 import com.android.internal.protolog.ProtoLog;
+import com.android.internal.util.Preconditions;
+import com.android.wm.shell.R;
 import com.android.wm.shell.ShellTaskOrganizer;
 import com.android.wm.shell.common.pip.PipUtils;
 import com.android.wm.shell.pip.PipTransitionController;
@@ -47,23 +55,31 @@ import com.android.wm.shell.pip.tv.TvPipBoundsState;
 import com.android.wm.shell.pip.tv.TvPipMenuController;
 import com.android.wm.shell.pip2.PipSurfaceTransactionHelper;
 import com.android.wm.shell.pip2.animation.PipEnterAnimator;
+import com.android.wm.shell.pip2.animation.PipResizeAnimator;
 import com.android.wm.shell.pip2.phone.PipTransitionState;
 import com.android.wm.shell.pip2.phone.transition.PipTransitionUtils;
+import com.android.wm.shell.protolog.ShellProtoLogGroup;
 import com.android.wm.shell.shared.pip.PipFlags;
 import com.android.wm.shell.sysui.ShellInit;
 import com.android.wm.shell.transition.Transitions;
 
 /**
- * A skeleton placeholder for the TV PiP2 Transition handler.
- * It does not handle any incoming requests.
+ * TV PiP2 Transition handler.
  */
-public class TvPipTransition extends PipTransitionController {
+public class TvPipTransition extends PipTransitionController implements
+        PipTransitionState.PipTransitionStateChangedListener {
     private static final String TAG = "TvPip2Transition";
 
     // Used when for ENTERING_PIP state update.
     private static final String PIP_TASK_LEASH = "pip_task_leash";
     private static final String PIP_TASK_INFO = "pip_task_info";
 
+    // Used for PiP CHANGING_BOUNDS state update.
+    static final String PIP_START_TX = "pip_start_tx";
+    static final String PIP_FINISH_TX = "pip_finish_tx";
+    static final String PIP_DESTINATION_BOUNDS = "pip_dest_bounds";
+    static final String ANIMATING_BOUNDS_CHANGE_DURATION =
+            "animating_bounds_change_duration";
     //
     // Dependencies
     //
@@ -79,12 +95,16 @@ public class TvPipTransition extends PipTransitionController {
 
     @Nullable
     private IBinder mEnterPipTransition;
+    @Nullable
+    private IBinder mBoundsChangeTransition;
+    private int mBoundsChangeDuration;
 
     //
     // Internal state and relevant cached info
     //
 
     private Transitions.TransitionFinishCallback mFinishCallback;
+    private ValueAnimator mCurrentAnimator;
 
     public TvPipTransition(
             Context context,
@@ -102,6 +122,7 @@ public class TvPipTransition extends PipTransitionController {
         mPipSurfaceTransactionHelper = pipSurfaceTransactionHelper;
         mTvPipMenuController = tvPipMenuController;
         mPipTransitionState = pipTransitionState;
+        mPipTransitionState.addPipTransitionStateChangedListener(this);
     }
 
     @Override
@@ -110,6 +131,28 @@ public class TvPipTransition extends PipTransitionController {
             ProtoLog.d(WM_SHELL_PICTURE_IN_PICTURE,
                     "%s: V2 Flag is ON, registering TvPip2Transition handler.", TAG);
             mTransitions.addHandler(this);
+        }
+    }
+
+    @Override
+    public void startPipBoundsChangeTransition(WindowContainerTransaction wct, int duration) {
+        if (wct == null) {
+            return;
+        }
+        mBoundsChangeTransition = mTransitions.startTransition(TRANSIT_PIP_BOUNDS_CHANGE, wct,
+                this);
+        mBoundsChangeDuration = duration;
+    }
+
+    @Override
+    public void mergeAnimation(@NonNull IBinder transition, @NonNull TransitionInfo info,
+            @NonNull SurfaceControl.Transaction startT,
+            @NonNull SurfaceControl.Transaction finishT,
+            @NonNull IBinder mergeTarget,
+            @NonNull Transitions.TransitionFinishCallback finishCallback) {
+        ProtoLog.v(ShellProtoLogGroup.WM_SHELL_PICTURE_IN_PICTURE, "%s: merge animation", TAG);
+        if (mCurrentAnimator != null && mCurrentAnimator.isRunning()) {
+            mCurrentAnimator.end();
         }
     }
 
@@ -133,18 +176,36 @@ public class TvPipTransition extends PipTransitionController {
             @NonNull TransitionRequestInfo.PipChange pipChange) {
         final ActivityManager.RunningTaskInfo pipTask = pipChange.getTaskInfo();
 
+        final TvPipBoundsState tvPipBoundsState = (TvPipBoundsState) mPipBoundsState;
         PictureInPictureParams pipParams = pipTask.pictureInPictureParams;
-        mPipBoundsState.setBoundsStateForEntry(pipTask.topActivity, pipTask.topActivityInfo,
+        tvPipBoundsState.setBoundsStateForEntry(pipTask.topActivity, pipTask.topActivityInfo,
                 pipParams, mPipBoundsAlgorithm);
+
+        // Temporarily add insets for menu border and edu text height during bounds calculation
+        // since the task leash is not yet available and menu cannot be attached here.
+        int pipMenuBorderWidth = mContext.getResources()
+                .getDimensionPixelSize(R.dimen.pip_menu_border_width);
+        tvPipBoundsState.setPipMenuPermanentDecorInsets(Insets.of(-pipMenuBorderWidth,
+                -pipMenuBorderWidth, -pipMenuBorderWidth, -pipMenuBorderWidth));
+        final int pipEduTextHeight = mContext.getResources()
+                .getDimensionPixelSize(R.dimen.pip_menu_edu_text_view_height);
+        tvPipBoundsState.setPipMenuTemporaryDecorInsets(Insets.of(0, 0, 0,
+                -pipEduTextHeight));
 
         // Calculate the final PiP bounds.
         final Rect entryBounds =
                 mPipBoundsAlgorithm.getEntryDestinationBoundsIgnoringKeepClearAreas();
+        tvPipBoundsState.setBounds(entryBounds);
+
+        // Undo the insets.
+        tvPipBoundsState.setPipMenuPermanentDecorInsets(Insets.NONE);
+        tvPipBoundsState.setPipMenuTemporaryDecorInsets(Insets.NONE);
 
         // Create the transaction that tells the core to pin task and move to final bounds.
+        WindowContainerToken token = pipChange.getTaskFragmentToken();
         WindowContainerTransaction wct = new WindowContainerTransaction();
-        wct.movePipActivityToPinnedRootTask(pipTask.token, entryBounds);
-        wct.deferConfigToTransitionEnd(pipTask.token);
+        wct.movePipActivityToPinnedRootTask(token, entryBounds);
+        wct.deferConfigToTransitionEnd(token);
         return wct;
     }
 
@@ -187,6 +248,40 @@ public class TvPipTransition extends PipTransitionController {
             finishTransition();
         });
 
+        mCurrentAnimator = animator;
+        animator.start();
+        return true;
+    }
+
+    private boolean startBoundsChangeAnimation(@NonNull TransitionInfo info,
+            @NonNull SurfaceControl.Transaction startTransaction,
+            @NonNull SurfaceControl.Transaction finishTransaction,
+            @NonNull Transitions.TransitionFinishCallback finishCallback) {
+        TransitionInfo.Change pipChange = getPipChange(info);
+        if (pipChange == null) {
+            return false;
+        }
+        mFinishCallback = finishCallback;
+        final SurfaceControl leash = pipChange.getLeash();
+        final Rect startBounds = pipChange.getStartAbsBounds();
+        final Rect destinationBounds = pipChange.getEndAbsBounds();
+
+        final PipResizeAnimator animator = new PipResizeAnimator(mContext,
+                mPipSurfaceTransactionHelper, leash, startTransaction, finishTransaction,
+                destinationBounds, startBounds, destinationBounds, mBoundsChangeDuration,
+                /* delta= */ 0);
+
+        // Set the sync listener used to move the menu.
+        animator.setSyncMenuListener((tx, animatedRect) -> {
+            mTvPipMenuController.movePipMenu(tx, animatedRect, ALPHA_NO_CHANGE);
+        });
+
+        animator.setAnimationEndCallback(() -> {
+            mPipBoundsState.setBounds(destinationBounds);
+            finishTransition();
+        });
+
+        mCurrentAnimator = animator;
         animator.start();
         return true;
     }
@@ -209,6 +304,21 @@ public class TvPipTransition extends PipTransitionController {
             extra.putParcelable(PIP_TASK_INFO, pipChange.getTaskInfo());
             mPipTransitionState.setState(PipTransitionState.ENTERING_PIP, extra);
             return startEnterAnimation(info, startTransaction, finishTransaction, finishCallback);
+        } else if (transition == mBoundsChangeTransition) {
+            ProtoLog.d(WM_SHELL_PICTURE_IN_PICTURE,
+                    "%s: starting PiP bounds change animation", TAG);
+            mBoundsChangeTransition = null;
+            TransitionInfo.Change pipChange = getPipChange(info);
+
+            Bundle extra = new Bundle();
+            extra.putParcelable(PIP_START_TX, startTransaction);
+            extra.putParcelable(PIP_FINISH_TX, finishTransaction);
+            extra.putParcelable(PIP_DESTINATION_BOUNDS, pipChange.getEndAbsBounds());
+            extra.putInt(ANIMATING_BOUNDS_CHANGE_DURATION, mBoundsChangeDuration);
+
+            mPipTransitionState.setState(PipTransitionState.CHANGING_PIP_BOUNDS, extra);
+            return startBoundsChangeAnimation(info, startTransaction, finishTransaction,
+                    finishCallback);
         }
         return false;
     }
@@ -232,6 +342,14 @@ public class TvPipTransition extends PipTransitionController {
                 initActivityScale.y);
         finishTx.setPosition(pipActivityChange.getLeash(), initActivityPos.x,
                 initActivityPos.y);
+    }
+
+    @Override
+    public void end() {
+        if (mCurrentAnimator != null) {
+            mCurrentAnimator.end();
+            mCurrentAnimator = null;
+        }
     }
 
     @Override
@@ -264,6 +382,36 @@ public class TvPipTransition extends PipTransitionController {
             final Transitions.TransitionFinishCallback finishCallback = mFinishCallback;
             mFinishCallback = null;
             finishCallback.onTransitionFinished(null /* finishWct */);
+        }
+    }
+
+    @Override
+    public void onPipTransitionStateChanged(@PipTransitionState.TransitionState int oldState,
+            @PipTransitionState.TransitionState int newState, @Nullable Bundle extra) {
+        switch (newState) {
+            case PipTransitionState.ENTERING_PIP:
+                Preconditions.checkState(extra != null,
+                        "No extra bundle for " + mPipTransitionState);
+
+                mPipTransitionState.setPinnedTaskLeash(extra.getParcelable(
+                        PIP_TASK_LEASH, SurfaceControl.class));
+                mPipTransitionState.setPipTaskInfo(extra.getParcelable(
+                        PIP_TASK_INFO, TaskInfo.class));
+
+                boolean hasValidTokenAndLeash = mPipTransitionState.getPipTaskToken() != null
+                        && mPipTransitionState.getPinnedTaskLeash() != null;
+                Preconditions.checkState(hasValidTokenAndLeash,
+                        "Unexpected state for " + mPipTransitionState);
+                break;
+            case PipTransitionState.EXITED_PIP:
+                mPipTransitionState.setPinnedTaskLeash(null);
+                mPipTransitionState.setPipTaskInfo(null);
+                mPipTransitionState.setPipCandidateTaskInfo(null);
+                break;
+            case PipTransitionState.CHANGING_PIP_BOUNDS:
+                Preconditions.checkState(mPipTransitionState.getPinnedTaskLeash() != null,
+                        "Unexpected state for " + mPipTransitionState);
+                break;
         }
     }
 }

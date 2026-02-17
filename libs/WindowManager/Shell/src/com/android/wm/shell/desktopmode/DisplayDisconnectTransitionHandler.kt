@@ -26,6 +26,9 @@ import android.window.TransitionRequestInfo
 import android.window.WindowContainerTransaction
 import com.android.internal.protolog.ProtoLog
 import com.android.window.flags.Flags.enableDisplayDisconnectSplitscreen
+import com.android.wm.shell.fullscreen.FullscreenDisconnectHandler
+import com.android.wm.shell.pinnedlayer.phone.PinnedLayerController
+import com.android.wm.shell.pip2.phone.PipDisplayDisconnectHandler
 import com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_DESKTOP_MODE
 import com.android.wm.shell.splitscreen.SplitScreenController
 import com.android.wm.shell.sysui.ShellInit
@@ -43,6 +46,9 @@ class DisplayDisconnectTransitionHandler(
     shellInit: ShellInit,
     private val splitScreenController: Optional<SplitScreenController>,
     private val desktopTasksController: Optional<DesktopTasksController>,
+    private val fullscreenDisconnectHandler: Optional<FullscreenDisconnectHandler>,
+    private val pinnedLayerController: Optional<PinnedLayerController>,
+    private val pipDisplayDisconnectHandler: Optional<PipDisplayDisconnectHandler>,
 ) : Transitions.TransitionHandler {
 
     private val pendingTransitions = mutableSetOf<IBinder>()
@@ -121,8 +127,39 @@ class DisplayDisconnectTransitionHandler(
                 desktopTasksController
                     .get()
                     .onDisplayDisconnect(displayChange.displayId, reparentDisplay, transition)
-            wct.merge(desktopWct, true)
-            handled = true
+            if (!desktopWct.isEmpty) {
+                wct.merge(desktopWct, true)
+                handled = true
+            }
+        }
+        if (fullscreenDisconnectHandler.isPresent) {
+            val fullscreenWct =
+                fullscreenDisconnectHandler
+                    .get()
+                    .onDisplayDisconnect(displayChange.displayId, reparentDisplay)
+            if (!fullscreenWct.isEmpty) {
+                wct.merge(fullscreenWct, true)
+                handled = true
+            }
+        }
+        if (pinnedLayerController.isPresent) {
+            pinnedLayerController
+                .get()
+                .getDisplayDisconnectChanges(transition, displayChange.displayId, reparentDisplay)
+                ?.let { pinnedWct ->
+                    wct.merge(pinnedWct, true)
+                    handled = true
+                }
+        }
+        if (pipDisplayDisconnectHandler.isPresent) {
+            val pipWct =
+                pipDisplayDisconnectHandler
+                    .get()
+                    .onDisplayDisconnect(displayChange.displayId, reparentDisplay)
+            if (!pipWct.isEmpty) {
+                wct.merge(pipWct, true)
+                handled = true
+            }
         }
 
         if (handled) {
@@ -134,6 +171,6 @@ class DisplayDisconnectTransitionHandler(
     }
 
     companion object {
-        private const val TAG = "DisplayDisconnectTransitionHandler"
+        private const val TAG = "DisconnectHandler"
     }
 }

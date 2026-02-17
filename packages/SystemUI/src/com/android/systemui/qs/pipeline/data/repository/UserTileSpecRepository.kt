@@ -11,10 +11,11 @@ import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.qs.panels.data.repository.QSPreferencesRepository
 import com.android.systemui.qs.pipeline.data.model.RestoreData
-import com.android.systemui.qs.pipeline.shared.InternetTileMigration.migrateInternetTile
+import com.android.systemui.qs.pipeline.shared.InternetTileMigration
 import com.android.systemui.qs.pipeline.shared.TileSpec
 import com.android.systemui.qs.pipeline.shared.TilesUpgradePath
 import com.android.systemui.qs.pipeline.shared.logging.QSPipelineLogger
+import com.android.systemui.user.data.repository.UserRepository
 import com.android.systemui.user.domain.interactor.HeadlessSystemUserMode
 import com.android.systemui.util.settings.SecureSettings
 import dagger.assisted.Assisted
@@ -53,6 +54,8 @@ constructor(
     private val hsum: HeadlessSystemUserMode,
     private val logger: QSPipelineLogger,
     private val qsPreferencesRepository: QSPreferencesRepository,
+    private val internetTileMigration: InternetTileMigration,
+    private val userRepository: UserRepository,
     @Application private val applicationScope: CoroutineScope,
     @Background private val backgroundDispatcher: CoroutineDispatcher,
 ) {
@@ -77,9 +80,11 @@ constructor(
             }
             _tiles =
                 changeEvents
-                    .scan(loadTilesFromSettingsAndParse(userId)) { current, change ->
+                    .scan(loadTilesFromSettingsAndParse(userId).migrationSteps()) { current, change
+                        ->
                         change
                             .apply(current)
+                            .run { migrationSteps() }
                             .also { afterRestore ->
                                 if (current != afterRestore) {
                                     if (change is RestoreTiles) {
@@ -103,7 +108,6 @@ constructor(
                             // all tiles should be different
                             .distinct()
                     }
-                    .newTilesMigration()
                     .flowOn(backgroundDispatcher)
                     .stateIn(applicationScope)
                     .also { startFlowCollections(it) }
@@ -283,8 +287,8 @@ constructor(
      * could be used for existing tiles that require complex migration, based on the state of the
      * device beyond the current list of tiles.
      *
-     * Each step should be a `Flow<List<TileSpec>>.() -> Flow<List<TileSpec>>`, mapping the list of
-     * tiles pre-migration to the tiles post-migration. Be mindful (not completely banned) of side
+     * Each step should be a `List<TileSpec>.() -> List<TileSpec>`, mapping the list of tiles
+     * pre-migration to the tiles post-migration. Be mindful (not completely banned) of side
      * effects. An example of a valid side effect is updating another related data source (e.g. the
      * set of large tiles).
      *
@@ -297,7 +301,7 @@ constructor(
      * applications of the step should early return with no changes to the list and no side effects
      * run.
      */
-    private fun Flow<List<TileSpec>>.newTilesMigration(): Flow<List<TileSpec>> {
+    private fun List<TileSpec>.migrationSteps(): List<TileSpec> {
         return migrateInternetTileSpecs()
     }
 
@@ -312,18 +316,17 @@ constructor(
      *
      * @see migrateInternetTile for the exact migration when the flag is enabled or disabled
      */
-    private fun Flow<List<TileSpec>>.migrateInternetTileSpecs(): Flow<List<TileSpec>> {
-        return map { tiles ->
-            val largeTiles = qsPreferencesRepository.getLargeTilesForUser(userId)
-            val (newTiles, newLargeTiles) =
-                migrateInternetTile(tiles, largeTiles) { scenario ->
-                    logger.logInternetTileMigrated(userId, scenario)
-                }
-            if (newLargeTiles != largeTiles) {
-                qsPreferencesRepository.setLargeTilesForUser(userId, newLargeTiles)
+    private fun List<TileSpec>.migrateInternetTileSpecs(): List<TileSpec> {
+        val largeTiles = qsPreferencesRepository.getLargeTilesForUser(userId)
+        val isMainUser = userRepository.mainUserId == userId
+        val (newTiles, newLargeTiles) =
+            internetTileMigration.migrateInternetTile(this, largeTiles, isMainUser) { scenario ->
+                logger.logInternetTileMigrated(userId, scenario)
             }
-            newTiles.distinct()
+        if (newLargeTiles != largeTiles) {
+            qsPreferencesRepository.setLargeTilesForUser(userId, newLargeTiles)
         }
+        return newTiles.distinct()
     }
 
     companion object {

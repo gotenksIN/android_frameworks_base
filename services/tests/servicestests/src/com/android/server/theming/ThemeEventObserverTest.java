@@ -114,6 +114,8 @@ public class ThemeEventObserverTest {
 
         when(mActivityManagerInternal.getCurrentUserId()).thenReturn(USER_ID);
         when(mThemeUserLifecycle.loadUserStateAndNotifyStateManager(anyInt())).thenReturn(true);
+        when(mThemeUserLifecycle.loadUserStateAndNotifyStateManager(USER_ID)).thenReturn(true);
+        when(mThemeStateManager.parentOf(USER_ID)).thenReturn(null);
 
         org.mockito.Mockito.doAnswer(invocation -> {
             mWallpaperListener = invocation.getArgument(0);
@@ -321,7 +323,7 @@ public class ThemeEventObserverTest {
         mThemeEventObserver.mThemeSettingsObserver.onChange(false, null, 0, USER_ID);
 
         verify(mThemeStateManager).onStyleChange(USER_ID, ThemeStyle.EXPRESSIVE);
-        verify(mThemeStateManager, never()).onSeedColorChange(anyInt(), anyInt(), anyBoolean());
+        verify(mThemeStateManager).onSeedColorChange(USER_ID, Color.BLUE, true);
     }
 
     @Test

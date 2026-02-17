@@ -16,16 +16,31 @@
 
 package com.android.systemui.usb
 
+import android.app.PendingIntent
+import android.content.Intent
+import android.hardware.usb.UsbManager
+import android.hardware.usb.flags.Flags.FLAG_ENABLE_PERSISTENT_USB_DEVICE_PERMISSIONS
+import android.platform.test.annotations.DisableFlags
+import android.platform.test.annotations.EnableFlags
 import android.testing.TestableLooper
+import android.view.View
 import android.widget.CheckBox
+import android.widget.FrameLayout
+import android.widget.TextView
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.internal.app.AlertController
 import com.android.systemui.res.R
 import com.google.common.truth.Truth.assertThat
 import javax.inject.Inject
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.mockito.kotlin.any
+import org.mockito.kotlin.eq
+import org.mockito.kotlin.verify
+import org.mockito.kotlin.verifyNoMoreInteractions
 
 /** UsbPermissionActivityTest */
 @RunWith(AndroidJUnit4::class)
@@ -33,6 +48,10 @@ import org.junit.runner.RunWith
 @TestableLooper.RunWithLooper
 class UsbPermissionActivityTest :
     UsbDialogActivityTest<UsbPermissionActivityTest.UsbPermissionActivityTestable>() {
+    companion object {
+        private const val REQUEST_CODE: Int = 334
+        private const val INTENT_ACTION: String = "NO_ACTION"
+    }
 
     class UsbPermissionActivityTestable
     @Inject
@@ -51,9 +70,29 @@ class UsbPermissionActivityTest :
         return UsbPermissionActivityTestable::class.java
     }
 
+    override fun createIntent(canBeDefault: Boolean): Intent {
+        return super.createIntent(canBeDefault)
+            .putExtra(UsbManager.EXTRA_PACKAGE, EXTRA_PACKAGE)
+            .putExtra(Intent.EXTRA_UID, EXTRA_UID)
+            .putExtra(
+                Intent.EXTRA_INTENT,
+                PendingIntent.getBroadcast(
+                    mContext,
+                    REQUEST_CODE,
+                    Intent(INTENT_ACTION).apply { setPackage(PACKAGE) },
+                    PendingIntent.FLAG_MUTABLE,
+                ),
+            )
+    }
+
+    // Tests for old Usb Dialog UI
+
     @Test
-    fun testUsbAccessoryDialogTitleAndMessage() {
+    @DisableFlags(FLAG_ENABLE_PERSISTENT_USB_DEVICE_PERMISSIONS)
+    fun testUsbAccessoryDialogTitle() {
         deviceConfiguration(isUsbDevice = false)
+
+        checkNewUiIsNotInitialized()
 
         val expectedTitle: String =
             context.getString(
@@ -63,21 +102,19 @@ class UsbPermissionActivityTest :
             )
         assertThat(mAlertParams.mTitle).isEqualTo(expectedTitle)
 
-        val expectedMessage: String =
-            context.getString(
-                R.string.usb_accessory_permission_prompt,
-                mAppName,
-                USB_ACCESSORY_DESCRIPTION,
-            )
-        assertThat(mAlertParams.mMessage).isEqualTo(expectedMessage)
+        // Usb Accessory shouldn't have a message.
+        assertThat(mAlertParams.mMessage).isNull()
 
         // Dialog shouldn't have a checkbox, if it can't be default.
         assertThat(mAlertParams.mView).isNull()
     }
 
     @Test
+    @DisableFlags(FLAG_ENABLE_PERSISTENT_USB_DEVICE_PERMISSIONS)
     fun testUsbAccessoryDialog() {
         deviceConfiguration(isUsbDevice = false, canBeDefault = true)
+
+        checkNewUiIsNotInitialized()
 
         val expectedTitle: String =
             context.getString(
@@ -87,13 +124,8 @@ class UsbPermissionActivityTest :
             )
         assertThat(mAlertParams.mTitle).isEqualTo(expectedTitle)
 
-        val expectedMessage: String =
-            context.getString(
-                R.string.usb_accessory_permission_prompt,
-                mAppName,
-                USB_ACCESSORY_DESCRIPTION,
-            )
-        assertThat(mAlertParams.mMessage).isEqualTo(expectedMessage)
+        // Usb Accessory shouldn't have a message.
+        assertThat(mAlertParams.mMessage).isNull()
 
         val alwaysUseView: CheckBox? =
             mAlertParams.mView.findViewById(com.android.internal.R.id.alwaysUse)
@@ -108,8 +140,11 @@ class UsbPermissionActivityTest :
     }
 
     @Test
+    @DisableFlags(FLAG_ENABLE_PERSISTENT_USB_DEVICE_PERMISSIONS)
     fun testUsbDeviceDialogTitle() {
         deviceConfiguration(isUsbDevice = true)
+
+        checkNewUiIsNotInitialized()
 
         val expectedTitle: String =
             context.getString(
@@ -126,8 +161,11 @@ class UsbPermissionActivityTest :
     }
 
     @Test
+    @DisableFlags(FLAG_ENABLE_PERSISTENT_USB_DEVICE_PERMISSIONS)
     fun testUsbDeviceDialogTitleAndMessage() {
         deviceConfiguration(isUsbDevice = true, hasAudioPlayback = true)
+
+        checkNewUiIsNotInitialized()
 
         val expectedTitle: String =
             context.getString(
@@ -146,6 +184,7 @@ class UsbPermissionActivityTest :
     }
 
     @Test
+    @DisableFlags(FLAG_ENABLE_PERSISTENT_USB_DEVICE_PERMISSIONS)
     fun testUsbDeviceDialog() {
         deviceConfiguration(
             canBeDefault = true,
@@ -153,6 +192,8 @@ class UsbPermissionActivityTest :
             hasAudioCapture = true,
             audioRecordingPermissionStatus = android.content.pm.PackageManager.PERMISSION_GRANTED,
         )
+
+        checkNewUiIsNotInitialized()
 
         val expectedTitle: String =
             context.getString(
@@ -172,5 +213,265 @@ class UsbPermissionActivityTest :
             .isEqualTo(
                 context.getString(R.string.always_use_device, mAppName, USB_DEVICE_PRODUCT_NAME)
             )
+    }
+
+    // Tests for new Usb Dialog UI
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_PERSISTENT_USB_DEVICE_PERMISSIONS)
+    fun testUsbAccessoryNewDialogTitle() {
+        deviceConfiguration(isUsbDevice = false)
+
+        checkOldUiIsNotInitialized()
+
+        val dialogView: View = mAlertParams.mView
+
+        val expectedTitle: String =
+            context.getString(
+                R.string.usb_audio_device_permission_prompt_title,
+                mAppName,
+                USB_ACCESSORY_DESCRIPTION,
+            )
+        assertThat(dialogView.findViewById<TextView>(R.id.usb_device_dialog_title).text)
+            .isEqualTo(expectedTitle)
+
+        // Usb Accessory shouldn't have a message.
+        assertThat(dialogView.findViewById<TextView>(R.id.usb_device_dialog_message).visibility)
+            .isEqualTo(View.GONE)
+
+        // Dialog shouldn't have a checkbox, if it can't be default.
+        assertThat(
+                dialogView
+                    .findViewById<FrameLayout>(R.id.usb_device_dialog_always_use_content)
+                    .visibility
+            )
+            .isEqualTo(View.GONE)
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_PERSISTENT_USB_DEVICE_PERMISSIONS)
+    fun testUsbAccessoryNewDialog() {
+        deviceConfiguration(isUsbDevice = false, canBeDefault = true)
+
+        checkOldUiIsNotInitialized()
+
+        val dialogView: View = mAlertParams.mView
+
+        val expectedTitle: String =
+            context.getString(
+                R.string.usb_audio_device_permission_prompt_title,
+                mAppName,
+                USB_ACCESSORY_DESCRIPTION,
+            )
+        assertThat(dialogView.findViewById<TextView>(R.id.usb_device_dialog_title).text)
+            .isEqualTo(expectedTitle)
+
+        // Usb Accessory shouldn't have a message.
+        assertThat(dialogView.findViewById<TextView>(R.id.usb_device_dialog_message).visibility)
+            .isEqualTo(View.GONE)
+
+        assertThat(
+                dialogView
+                    .findViewById<FrameLayout>(R.id.usb_device_dialog_always_use_content)
+                    .findViewById<CheckBox>(com.android.internal.R.id.alwaysUse)
+                    .text
+            )
+            .isEqualTo(
+                context.getString(
+                    R.string.always_use_accessory,
+                    mAppName,
+                    USB_ACCESSORY_DESCRIPTION,
+                )
+            )
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_PERSISTENT_USB_DEVICE_PERMISSIONS)
+    fun testUsbAccessoryNewDialogCancel() {
+        prepareNewDialogCancel(isUsbDevice = false)
+
+        verifyNoMoreInteractions(mUsbService)
+
+        assertFalse(activityRule.activity.mPermissionGranted)
+        assertFalse(activityRule.activity.isAlwaysUseChecked)
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_PERSISTENT_USB_DEVICE_PERMISSIONS)
+    fun testUsbAccessoryNewDialogAllowOnlyThisTime() {
+        prepareNewDialogAllowOnlyThisTime(isUsbDevice = false)
+
+        verify(mUsbService)
+            .grantAccessoryPermission(eq(mUsbAccessory), eq(EXTRA_PACKAGE), eq(EXTRA_UID))
+        verifyNoMoreInteractions(mUsbService)
+
+        assertTrue(activityRule.activity.mPermissionGranted)
+        assertFalse(activityRule.activity.isAlwaysUseChecked)
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_PERSISTENT_USB_DEVICE_PERMISSIONS)
+    fun testUsbAccessoryNewDialogAllowOnlyThisTimeWithAlwaysUse() {
+        prepareNewDialogAllowOnlyThisTimeWithAlwaysUse(isUsbDevice = false)
+
+        verify(mUsbService)
+            .grantAccessoryPermission(eq(mUsbAccessory), eq(EXTRA_PACKAGE), eq(EXTRA_UID))
+        verify(mUsbService).setAccessoryPackage(eq(mUsbAccessory), eq(EXTRA_PACKAGE), any())
+        verifyNoMoreInteractions(mUsbService)
+
+        assertTrue(activityRule.activity.mPermissionGranted)
+        assertTrue(activityRule.activity.isAlwaysUseChecked)
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_PERSISTENT_USB_DEVICE_PERMISSIONS)
+    fun testUsbDeviceNewDialogTitle() {
+        deviceConfiguration(isUsbDevice = true)
+
+        checkOldUiIsNotInitialized()
+
+        val dialogView: View = mAlertParams.mView
+
+        val expectedTitle: String =
+            context.getString(
+                R.string.usb_audio_device_permission_prompt_title,
+                mAppName,
+                USB_DEVICE_PRODUCT_NAME,
+            )
+        assertThat(dialogView.findViewById<TextView>(R.id.usb_device_dialog_title).text)
+            .isEqualTo(expectedTitle)
+
+        // Dialog shouldn't have a message, if it is not an audio device.
+        assertThat(dialogView.findViewById<TextView>(R.id.usb_device_dialog_message).visibility)
+            .isEqualTo(View.GONE)
+        // Dialog shouldn't have a checkbox, if it is not an audio device.
+        assertThat(
+                dialogView
+                    .findViewById<FrameLayout>(R.id.usb_device_dialog_always_use_content)
+                    .visibility
+            )
+            .isEqualTo(View.GONE)
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_PERSISTENT_USB_DEVICE_PERMISSIONS)
+    fun testUsbDeviceNewDialogTitleAndMessage() {
+        deviceConfiguration(isUsbDevice = true, hasAudioPlayback = true)
+
+        checkOldUiIsNotInitialized()
+
+        val dialogView: View = mAlertParams.mView
+
+        val expectedTitle: String =
+            context.getString(
+                R.string.usb_audio_device_permission_prompt_title,
+                mAppName,
+                USB_DEVICE_PRODUCT_NAME,
+            )
+        assertThat(dialogView.findViewById<TextView>(R.id.usb_device_dialog_title).text)
+            .isEqualTo(expectedTitle)
+
+        val expectedMessage: String =
+            context.getString(R.string.usb_audio_device_prompt, mAppName, USB_DEVICE_PRODUCT_NAME)
+        assertThat(dialogView.findViewById<TextView>(R.id.usb_device_dialog_message).text)
+            .isEqualTo(expectedMessage)
+
+        // Dialog shouldn't have a checkbox, if it can't be default.
+        assertThat(
+                dialogView
+                    .findViewById<FrameLayout>(R.id.usb_device_dialog_always_use_content)
+                    .visibility
+            )
+            .isEqualTo(View.GONE)
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_PERSISTENT_USB_DEVICE_PERMISSIONS)
+    fun testUsbDeviceNewDialog() {
+        deviceConfiguration(
+            canBeDefault = true,
+            isUsbDevice = true,
+            hasAudioCapture = true,
+            audioRecordingPermissionStatus = android.content.pm.PackageManager.PERMISSION_GRANTED,
+        )
+
+        checkOldUiIsNotInitialized()
+
+        val dialogView: View = mAlertParams.mView
+
+        val expectedTitle: String =
+            context.getString(
+                R.string.usb_audio_device_permission_prompt_title,
+                mAppName,
+                USB_DEVICE_PRODUCT_NAME,
+            )
+        assertThat(dialogView.findViewById<TextView>(R.id.usb_device_dialog_title).text)
+            .isEqualTo(expectedTitle)
+
+        val expectedMessage: String =
+            context.getString(R.string.usb_audio_device_prompt, mAppName, USB_DEVICE_PRODUCT_NAME)
+        assertThat(dialogView.findViewById<TextView>(R.id.usb_device_dialog_message).text)
+            .isEqualTo(expectedMessage)
+
+        assertThat(
+                dialogView
+                    .findViewById<FrameLayout>(R.id.usb_device_dialog_always_use_content)
+                    .findViewById<CheckBox>(com.android.internal.R.id.alwaysUse)
+                    .text
+            )
+            .isEqualTo(
+                context.getString(R.string.always_use_device, mAppName, USB_DEVICE_PRODUCT_NAME)
+            )
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_PERSISTENT_USB_DEVICE_PERMISSIONS)
+    fun testUsbDeviceNewDialogCancel() {
+        prepareNewDialogCancel(isUsbDevice = true)
+
+        verifyNoMoreInteractions(mUsbService)
+
+        assertFalse(activityRule.activity.mPermissionGranted)
+        assertFalse(activityRule.activity.isAlwaysUseChecked)
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_PERSISTENT_USB_DEVICE_PERMISSIONS)
+    fun testUsbDeviceNewDialogAllowOnlyThisTime() {
+        prepareNewDialogAllowOnlyThisTime(isUsbDevice = true)
+
+        verify(mUsbService)
+            .grantDevicePermission(eq(mUsbDevice), eq(EXTRA_PACKAGE), eq(EXTRA_UID), eq(false))
+        verifyNoMoreInteractions(mUsbService)
+
+        assertTrue(activityRule.activity.mPermissionGranted)
+        assertFalse(activityRule.activity.isAlwaysUseChecked)
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_PERSISTENT_USB_DEVICE_PERMISSIONS)
+    fun testUsbDeviceNewDialogAllowOnlyThisTimeWithAlwaysUse() {
+        prepareNewDialogAllowOnlyThisTimeWithAlwaysUse(isUsbDevice = true)
+
+        verify(mUsbService)
+            .grantDevicePermission(eq(mUsbDevice), eq(EXTRA_PACKAGE), eq(EXTRA_UID), eq(false))
+        verify(mUsbService).setDevicePackage(eq(mUsbDevice), eq(EXTRA_PACKAGE), any())
+        verifyNoMoreInteractions(mUsbService)
+
+        assertTrue(activityRule.activity.mPermissionGranted)
+        assertTrue(activityRule.activity.isAlwaysUseChecked)
+    }
+
+    @Test
+    @EnableFlags(FLAG_ENABLE_PERSISTENT_USB_DEVICE_PERMISSIONS)
+    fun testUsbDeviceNewDialogAlwaysAllow() {
+        prepareNewDialogAlwaysAllow()
+
+        verify(mUsbService)
+            .grantDevicePermission(eq(mUsbDevice), eq(EXTRA_PACKAGE), eq(EXTRA_UID), eq(true))
+        verifyNoMoreInteractions(mUsbService)
+
+        assertTrue(activityRule.activity.mPermissionGranted)
+        assertFalse(activityRule.activity.isAlwaysUseChecked)
     }
 }

@@ -1123,6 +1123,7 @@
     <string name="lockscreen_access_pattern_cell_added_verbose" msgid="2931364927622563465">"Đã thêm ô <xliff:g id="CELL_INDEX">%1$s</xliff:g>"</string>
     <string name="lockscreen_access_pattern_detected" msgid="3931150554035194012">"Đã vẽ xong hình"</string>
     <string name="lockscreen_access_pattern_area" msgid="1288780416685002841">"Khu vực mẫu."</string>
+    <string name="lockscreen_access_pattern_cell_verbose" msgid="6670905066468035137">"Ô <xliff:g id="CELL_INDEX">%1$s</xliff:g>"</string>
     <string name="keyguard_accessibility_widget_changed" msgid="7298011259508200234">"%1$s. Tiện ích %2$d trong số %3$d."</string>
     <string name="keyguard_accessibility_add_widget" msgid="8245795023551343672">"Thêm tiện ích."</string>
     <string name="keyguard_accessibility_widget_empty_slot" msgid="544239307077644480">"Trống"</string>
@@ -2006,6 +2007,7 @@
     <string name="managed_profile_label_badge_3" msgid="6882151970556391957">"Công việc thứ 2 <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="clone_profile_label_badge" msgid="1871997694718793964">"Sao chép <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="private_profile_label_badge" msgid="1712086003787839183">"<xliff:g id="LABEL">%1$s</xliff:g> riêng tư"</string>
+    <string name="hsu_label_badge" msgid="1357272000281944932">"Hệ thống <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="lock_to_app_unlock_pin" msgid="3890940811866290782">"Hỏi mã PIN trước khi bỏ ghim"</string>
     <string name="lock_to_app_unlock_pattern" msgid="2694204070499712503">"Hỏi hình mở khóa trước khi bỏ ghim"</string>
     <string name="lock_to_app_unlock_password" msgid="9126722403506560473">"Hỏi mật khẩu trước khi bỏ ghim"</string>
@@ -2111,7 +2113,32 @@
     <string name="app_suspended_default_message" msgid="6451215678552004172">"<xliff:g id="APP_NAME_0">%1$s</xliff:g> hiện không sử dụng được. Chính sách này do <xliff:g id="APP_NAME_1">%2$s</xliff:g> quản lý."</string>
     <string name="app_suspended_more_details" msgid="211260942831587014">"Tìm hiểu thêm"</string>
     <string name="app_suspended_unsuspend_message" msgid="1665438589450555459">"Mở lại ứng dụng"</string>
+    <string name="app_lock_add_screen_lock_button_text" msgid="9209013414563206600">"Thêm phương thức khoá màn hình"</string>
+    <string name="app_lock_add_screen_lock_message" msgid="6107009360675769892">"Phương thức khoá màn hình có thể là mã PIN, hình mở khoá hoặc mật khẩu. Bạn sẽ dùng phương thức này để mở khoá thiết bị và truy cập vào các ứng dụng đã khoá."</string>
+    <string name="app_lock_add_screen_lock_title" msgid="6905612843620128689">"Trước tiên, hãy thêm một phương thức khoá màn hình"</string>
+    <string name="enable_app_lock_success_toast_message" msgid="3339622779190529987">"Đã khoá <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
+    <string name="enable_app_lock_failure_toast_message" msgid="1055838896510445566">"Không thể khoá <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
+    <string name="disable_app_lock_success_toast_message" msgid="70733620589071266">"Đã xoá Khoá ứng dụng khỏi <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="locked_app_biometric_prompt_description" msgid="6853122652400451464">"Đã khoá <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
+    <string name="locked_app_external_display_message" msgid="5483884799685545338">"Để truy cập vào ứng dụng trên màn hình này, trước tiên, hãy xác minh danh tính của bạn trên thiết bị kia"</string>
+    <string name="app_lock_edu_dialog_enable_app_lock_title" msgid="283314042336592322">"Thêm khoá ứng dụng vào <xliff:g id="APP_NAME">%1$s</xliff:g>?"</string>
+    <string name="app_lock_edu_dialog_description" msgid="8176807243219769518">"Để đảm bảo an toàn cho bạn, chỉ bạn mới có thể truy cập vào ứng dụng này bằng tính năng Mở khoá bằng vân tay và Mở khoá bằng khuôn mặt hoặc mã PIN"</string>
+    <string name="app_lock_edu_dialog_description_template" msgid="8563718120753342530">"Để đảm bảo an toàn cho bạn, chỉ bạn mới có thể truy cập vào ứng dụng này bằng %1$s hoặc %2$s"</string>
+    <string name="app_lock_edu_dialog_description_template_no_biometrics" msgid="7122017109150633691">"Để đảm bảo an toàn cho bạn, chỉ bạn mới có thể truy cập vào ứng dụng này bằng %1$s"</string>
+    <string name="app_lock_edu_dialog_info_header" msgid="5876120209204270990">"Có khoá ứng dụng"</string>
+    <string name="app_lock_edu_dialog_info_notifications" msgid="1124438392204873305">"Nội dung thông báo sẽ bị ẩn"</string>
+    <string name="app_lock_edu_dialog_info_widgets" msgid="8809009414650740872">"Tiện ích và lối tắt sẽ bị xoá"</string>
+    <string name="app_lock_edu_dialog_button_lock" msgid="3914687128135704801">"Thêm khoá ứng dụng"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_face" msgid="1348151645996748654">"Mở khoá bằng khuôn mặt"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_fingerprint" msgid="5206107469561561455">"Mở khoá bằng vân tay"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_fingerprint_and_face" msgid="7895807411323811641">"Mở khoá bằng vân tay hoặc khuôn mặt"</string>
+    <string name="app_lock_edu_dialog_lockscreen_password_name" msgid="8487096457702445059">"Mật khẩu"</string>
+    <string name="app_lock_edu_dialog_lockscreen_pattern_name" msgid="991436996281983547">"Hình mở khoá"</string>
+    <string name="app_lock_edu_dialog_lockscreen_pin_name" msgid="6458607126966304795">"Mã PIN"</string>
+    <string name="app_lock_permission_review_dialog_title" msgid="5030286398974840579">"Ảnh của bạn vẫn có thể xuất hiện trong các ứng dụng khác"</string>
+    <string name="app_lock_permission_review_dialog_sub_title" msgid="310758587817184145">"Ứng dụng có quyền truy cập ảnh của bạn"</string>
+    <string name="app_lock_permission_review_expand_app_list_button" msgid="3214809707125223273">"Xem tất cả"</string>
+    <string name="app_lock_permission_review_continue_button" msgid="4045066724173414043">"Tiếp tục"</string>
     <string name="work_mode_off_title" msgid="6367463960165135829">"Tiếp tục dùng ứng dụng công việc?"</string>
     <string name="work_mode_turn_on" msgid="5316648862401307800">"Tiếp tục dùng"</string>
     <string name="work_mode_emergency_call_button" msgid="6818855962881612322">"Khẩn cấp"</string>
@@ -2337,7 +2364,7 @@
     <string name="accessibility_autoclick_scroll_left" msgid="7469540382570551732">"Di chuyển sang trái"</string>
     <string name="accessibility_autoclick_scroll_right" msgid="8395851755038161912">"Di chuyển sang phải"</string>
     <string name="accessibility_autoclick_scroll_exit" msgid="8766731873098339511">"Thoát khỏi chế độ di chuyển"</string>
-    <string name="accessibility_autoclick_scroll_panel_title" msgid="7120598166296447036">"Cuộn bảng điều khiển"</string>
+    <string name="accessibility_autoclick_scroll_panel_title" msgid="7120598166296447036">"Bảng điều khiển cuộn"</string>
     <string name="as_app_forced_to_restricted_bucket" msgid="8233871289353898964">"Đã đưa <xliff:g id="PACKAGE_NAME">%1$s</xliff:g> vào bộ chứa BỊ HẠN CHẾ"</string>
     <string name="conversation_single_line_name_display" msgid="8958948312915255999">"<xliff:g id="SENDER_NAME">%1$s</xliff:g>:"</string>
     <string name="conversation_single_line_image_placeholder" msgid="6983271082911936900">"đã gửi hình ảnh"</string>
@@ -2592,6 +2619,8 @@
     <string name="satellite_messaging_unsupported_default_sms_app_notification_summary" msgid="17084124893763593">"Để nhắn tin qua vệ tinh, hãy đặt Google Tin nhắn làm ứng dụng nhắn tin mặc định của bạn"</string>
     <string name="satellite_messaging_location_disabled_notification_title" msgid="7270641894250928494">"Tính năng nhắn tin qua vệ tinh chưa hoạt động"</string>
     <string name="satellite_messaging_location_disabled_notification_summary" msgid="1450824950686221810">"Để kiểm tra xem tính năng nhắn tin qua vệ tinh có hoạt động ở quốc gia hoặc khu vực này không, hãy bật chế độ cài đặt vị trí"</string>
+    <!-- no translation found for satellite_indicator (6846063647532086110) -->
+    <skip />
     <string name="fingerprint_dangling_notification_title" msgid="7362075195588639989">"Thiết lập lại tính năng Mở khoá bằng vân tay"</string>
     <string name="fingerprint_dangling_notification_msg_1" msgid="5851784577768803510">"Không nhận dạng được <xliff:g id="FINGERPRINT">%s</xliff:g> nữa."</string>
     <string name="fingerprint_dangling_notification_msg_2" msgid="7925203589860744456">"Không nhận dạng được <xliff:g id="FINGERPRINT_0">%1$s</xliff:g> và <xliff:g id="FINGERPRINT_1">%2$s</xliff:g> nữa."</string>
@@ -2619,10 +2648,10 @@
     <string name="usb_apm_usb_plugged_in_when_locked_notification_app_title" msgid="285421860627714333">"Tính bảo mật và quyền riêng tư"</string>
     <string name="usb_apm_usb_plugged_in_when_locked_replug_notification_title" msgid="3711633462195368964">"Mở khoá màn hình và kết nối lại USB"</string>
     <string name="usb_apm_usb_plugged_in_when_locked_notification_title" msgid="2426356396215833585">"Mở khoá màn hình để kết nối USB"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_replug_notification_text" msgid="3936428118409384816">"Chế độ Bảo vệ nâng cao yêu cầu bạn phải mở khoá màn hình để bắt đầu kết nối USB"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_data_notification_text" msgid="8392199274984083972">"Chế độ Bảo vệ nâng cao yêu cầu bạn phải mở khoá màn hình để bắt đầu kết nối USB"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_charge_notification_text" msgid="6563939109526112446">"Chế độ Bảo vệ nâng cao yêu cầu bạn phải mở khoá màn hình để sạc nhanh hơn"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_charge_data_notification_text" msgid="411509882563364946">"Để sạc nhanh hơn hoặc bắt đầu kết nối USB, chế độ Bảo vệ nâng cao yêu cầu bạn phải mở khoá màn hình"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_replug_notification_text" msgid="3936428118409384816">"Chế độ Bảo vệ nâng cao yêu cầu phải mở khoá màn hình để bắt đầu kết nối USB"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_data_notification_text" msgid="8392199274984083972">"Chế độ Bảo vệ nâng cao yêu cầu phải mở khoá màn hình để bắt đầu kết nối USB"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_charge_notification_text" msgid="6563939109526112446">"Chế độ Bảo vệ nâng cao yêu cầu phải mở khoá màn hình để sạc nhanh hơn"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_charge_data_notification_text" msgid="411509882563364946">"Để sạc nhanh hơn hoặc bắt đầu kết nối USB, chế độ Bảo vệ nâng cao yêu cầu phải mở khoá màn hình"</string>
     <string name="usb_apm_usb_plugged_in_when_locked_notification_silence_action_text" msgid="5495539757631669634">"Tắt tiếng"</string>
     <string name="usb_apm_usb_notification_silenced_title" msgid="5114203793430169863">"Đã tắt tiếng thông báo"</string>
     <string name="usb_apm_usb_notification_silenced_text" msgid="8394777105856033342">"Chỉ khi khởi động lại thiết bị, bạn mới nhận được thông báo của chế độ Bảo vệ nâng cao đối với USB"</string>

@@ -23,8 +23,9 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.os.IBinder;
 import android.os.RemoteException;
-import android.service.personalcontext.embedded.IEmbeddedInsightSurfaceVisualizer;
-import android.service.personalcontext.embedded.IEmbeddedInsightSurfaceVisualizerCallback;
+import android.service.personalcontext.RenderToken;
+import android.service.personalcontext.embedded.IInsightSurfaceVisualizer;
+import android.service.personalcontext.embedded.IVisualizationResult;
 import android.service.personalcontext.embedded.InsightSurfaceClientInfo;
 import android.service.personalcontext.embedded.InsightSurfaceVisualizerService;
 import android.service.personalcontext.insight.ContextInsight;
@@ -35,7 +36,10 @@ import android.util.Slog;
 import com.android.internal.annotations.VisibleForTesting;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.Executor;
 import java.util.function.Consumer;
 
@@ -51,9 +55,11 @@ public class VisualizerConnection {
 
     private final Injector mInjector;
     private final ComponentName mComponentName;
-    private IEmbeddedInsightSurfaceVisualizer mVisualizer;
+    private IInsightSurfaceVisualizer mVisualizer;
     // A queue of actions that have been deferred until a visualizer has connected.
     private final List<Runnable> mDeferredActions = new ArrayList<>();
+    // A set of the currently connected client ids.
+    private final Set<UUID> mConnectedClientIds = new HashSet<>();
     private boolean mStarted = false;
     private boolean mBound = false;
 
@@ -61,7 +67,7 @@ public class VisualizerConnection {
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
             mInjector.executeAction(() -> {
-                mVisualizer = IEmbeddedInsightSurfaceVisualizer.Stub.asInterface(service);
+                mVisualizer = IInsightSurfaceVisualizer.Stub.asInterface(service);
 
                 // Perform all the deferred actions now that a visualizer exists.
                 mDeferredActions.forEach(Runnable::run);
@@ -119,7 +125,10 @@ public class VisualizerConnection {
 
         @Override
         public boolean connectToService(Intent intent, ServiceConnection serviceConnection) {
-            return mContext.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
+            return mContext.bindService(
+                    intent,
+                    serviceConnection,
+                    Context.BIND_AUTO_CREATE | Context.BIND_ALLOW_ACTIVITY_STARTS);
         }
 
         @Override
@@ -155,8 +164,9 @@ public class VisualizerConnection {
 
     /** Create a visualization for the given client using the given insights. */
     public void createVisualizationForClient(
-            List<ContextInsight> insights,
+            ContextInsight insight,
             InsightSurfaceClientInfo client,
+            RenderToken renderToken,
             Consumer<Boolean> callback) {
         executeOrDeferAction(() -> {
             if (mVisualizer == null) {
@@ -167,13 +177,20 @@ public class VisualizerConnection {
             }
             try {
                 mVisualizer.createVisualizationForClient(
-                        ContextInsightWrapper.wrapList(insights),
+                        new ContextInsightWrapper(insight),
                         client,
-                        new IEmbeddedInsightSurfaceVisualizerCallback.Stub() {
+                        renderToken,
+                        new IVisualizationResult.Stub() {
                             @RequiresNoPermission
                             @Override
                             public void onResult(boolean success) {
                                 callback.accept(success);
+                                if (success) {
+                                    mConnectedClientIds.add(client.getId());
+                                } else {
+                                    maybeTeardownVisualizer(
+                                            mComponentName, "no visualization for client");
+                                }
                             }
                         });
             } catch (RemoteException e) {
@@ -190,6 +207,10 @@ public class VisualizerConnection {
                 if (mVisualizer != null) {
                     mVisualizer.onClientDisconnected(client);
                 }
+
+                // Tear the visualizer down if there are no more connected clients.
+                mConnectedClientIds.remove(client.getId());
+                maybeTeardownVisualizer(mComponentName, "last client disconnected");
             } catch (RemoteException e) {
                 throw e.rethrowFromSystemServer();
             }
@@ -198,23 +219,6 @@ public class VisualizerConnection {
 
     /** Called when this connection has been registered with the {@link VisualizerRegistry}. */
     public void onRegistered() {
-        mInjector.executeAction(() -> {
-            if (mStarted) return;
-            mStarted = true;
-            mBound = false;
-            mVisualizer = null;
-
-            if (Log.isLoggable(TAG, Log.DEBUG)) {
-                Slog.d(TAG, this + " service is starting");
-            }
-
-            final Intent intent = new Intent(InsightSurfaceVisualizerService.SERVICE_INTERFACE);
-            intent.setComponent(mComponentName);
-            mBound = mInjector.connectToService(intent, mServiceConnection);
-            if (!mBound) {
-                teardownVisualizer(mComponentName, "failed to connect to visualizer");
-            }
-        });
     }
 
     /** Called when this connection has been unregistered with the {@link VisualizerRegistry} */
@@ -243,8 +247,40 @@ public class VisualizerConnection {
                             .clear();
                 }
                 mDeferredActions.add(action);
+                connectToVisualizer();
             }
         });
+    }
+
+    private void connectToVisualizer() {
+        mInjector.executeAction(() -> {
+            if (mStarted) return;
+            mStarted = true;
+            mBound = false;
+            mVisualizer = null;
+
+            if (Log.isLoggable(TAG, Log.DEBUG)) {
+                Slog.d(TAG, this + " service is starting");
+            }
+
+            final Intent intent = new Intent(InsightSurfaceVisualizerService.SERVICE_INTERFACE);
+            intent.setComponent(mComponentName);
+            mBound = mInjector.connectToService(intent, mServiceConnection);
+            if (!mBound) {
+                teardownVisualizer(mComponentName, "failed to connect to visualizer");
+            }
+
+            // Queued actions will be executed once the visualizer connection is established.
+        });
+    }
+
+    /**
+     * Tear down the connection to the visualizer if there no clients connected to it.
+     */
+    private void maybeTeardownVisualizer(ComponentName name, String reason) {
+        if (mConnectedClientIds.isEmpty()) {
+            teardownVisualizer(name, reason);
+        }
     }
 
     /**

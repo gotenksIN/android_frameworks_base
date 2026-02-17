@@ -19,15 +19,12 @@ package com.android.wm.shell.bubbles
 import android.app.ActivityManager
 import android.app.WindowConfiguration.ACTIVITY_TYPE_STANDARD
 import com.android.internal.protolog.ProtoLog
+import com.android.wm.shell.bubbles.util.BubbleUtils.isBubbleMovedToAnotherRootTask
 import com.android.wm.shell.bubbles.util.BubbleUtils.isBubbleToFullscreen
-import com.android.wm.shell.bubbles.util.BubbleUtils.isBubbleToSplit
 import com.android.wm.shell.bubbles.util.DefaultBubblePolicyHelper
 import com.android.wm.shell.common.TaskStackListenerCallback
 import com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_BUBBLES_NOISY
 import com.android.wm.shell.shared.bubbles.logging.BubbleLog
-import com.android.wm.shell.splitscreen.SplitScreenController
-import dagger.Lazy
-import java.util.Optional
 
 /**
  * Listens for task stack changes to manage associated bubble interactions.
@@ -43,7 +40,6 @@ import java.util.Optional
 class BubbleTaskStackListener(
     private val bubbleHelper: BubbleHelper,
     private val bubbleData: BubbleData,
-    private val splitScreenController: Lazy<Optional<SplitScreenController>>,
 ) : TaskStackListenerCallback {
 
     override fun onActivityRestartAttempt(
@@ -68,7 +64,8 @@ class BubbleTaskStackListener(
                     )
                     if (bubbleData.isExpanded) bubbleData.isExpanded = false
                 }
-                task.isBubbleToSplit(splitScreenController) -> return // skip split task restarts
+                // skip task restarts to other multi-tasking mode
+                task.isBubbleMovedToAnotherRootTask(bubbleHelper) -> return
                 !task.isAppBubbleMovingToFront() -> selectAndExpandInStackBubble(bubble, task)
             }
         }
@@ -77,6 +74,15 @@ class BubbleTaskStackListener(
     override fun onTaskMovedToFront(task: ActivityManager.RunningTaskInfo) {
         val taskId = task.taskId
         bubbleData.getBubbleInStackWithTaskId(taskId)?.let { bubble ->
+            if (bubble.currentTransition != null) {
+                BubbleLog.d(
+                    "BubbleTaskStackListener.onTaskMovedToFront(): taskId=%d bubble=%s" +
+                        " has an active transition, skip handling",
+                    taskId,
+                    bubble.key,
+                )
+                return
+            }
             BubbleLog.d(
                 "BubbleTaskStackListener.onTaskMovedToFront(): taskId=%d bubble=%s",
                 taskId,

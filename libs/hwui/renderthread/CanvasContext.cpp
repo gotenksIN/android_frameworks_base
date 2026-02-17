@@ -150,7 +150,8 @@ CanvasContext::CanvasContext(RenderThread& thread, bool translucent, RenderNode*
         , mProfiler(mJankTracker.frames(), thread.timeLord().frameIntervalNanos())
         , mContentDrawBounds(0, 0, 0, 0)
         , mRenderPipeline(std::move(renderPipeline))
-        , mHintSessionWrapper(std::make_shared<HintSessionWrapper>(uiThreadId, renderThreadId)) {
+        , mHintSessionWrapper(std::make_shared<HintSessionWrapper>(uiThreadId, renderThreadId))
+        , mExpectedFrameCallbackDuration(-1) {
     mRenderThread.cacheManager().registerCanvasContext(this);
     mRenderThread.renderState().registerContextCallback(this);
     rootRenderNode->makeRoot();
@@ -187,6 +188,7 @@ void CanvasContext::destroy() {
     setSurface(nullptr);
 #ifdef __ANDROID__
     setSurfaceControl(nullptr);
+    setBLASTBufferQueue(nullptr);
 #endif
     freePrefetchedLayers();
     destroyHardwareResources();
@@ -277,6 +279,41 @@ void CanvasContext::setSurfaceControl(sp<SurfaceControl> surfaceControl) {
 
     mRenderPipeline->setSurfaceControl(mSurfaceControl);
 #endif
+}
+
+void CanvasContext::setBLASTBufferQueue(const sp<BLASTBufferQueue>& bbq) {
+#ifdef __ANDROID__
+    mRenderPipeline->setBLASTBufferQueue(bbq);
+#endif
+}
+
+#ifdef __ANDROID__
+bool CanvasContext::syncNextTransaction(std::function<void(SurfaceComposerClient::Transaction*)> t,
+                                        bool acquireSingleBuffer) {
+    return mRenderPipeline->syncNextTransaction(t, acquireSingleBuffer);
+}
+
+void CanvasContext::mergeWithNextTransaction(SurfaceComposerClient::Transaction* t,
+                                             uint64_t frameNumber) {
+    mRenderPipeline->mergeWithNextTransaction(t, frameNumber);
+}
+
+void CanvasContext::applyPendingTransactions(uint64_t frameNumber) {
+    mRenderPipeline->applyPendingTransactions(frameNumber);
+}
+
+void CanvasContext::clearSyncTransaction() {
+    mRenderPipeline->clearSyncTransaction();
+}
+
+SurfaceComposerClient::Transaction* CanvasContext::gatherPendingTransactions(
+        uint64_t frameNumber) {
+    return mRenderPipeline->gatherPendingTransactions(frameNumber);
+}
+#endif
+
+void CanvasContext::updateRenderTargetSize(uint64_t width, uint64_t height) {
+    mRenderPipeline->updateRenderTargetSize(width, height);
 }
 
 void CanvasContext::setupPipelineSurface() {
@@ -741,7 +778,9 @@ void CanvasContext::draw(bool solelyTextureViewUpdates) {
     if (requireSwap) {
         didDraw = true;
         // Handle any swapchain errors
-        error = mNativeSurface->getAndClearError();
+        if (mNativeSurface) {
+            error = mNativeSurface->getAndClearError();
+        }
         if (error == TIMED_OUT) {
             // Try again
             mRenderThread.postFrameCallback(this);
@@ -764,7 +803,8 @@ void CanvasContext::draw(bool solelyTextureViewUpdates) {
         }
         swap.swapCompletedTime = systemTime(SYSTEM_TIME_MONOTONIC);
         swap.vsyncTime = mRenderThread.timeLord().latestVsync();
-        if (didDraw) {
+
+        if (didDraw && mNativeSurface) {
             nsecs_t dequeueStart =
                     ANativeWindow_getLastDequeueStartTime(mNativeSurface->getNativeWindow());
             if (dequeueStart < mCurrentFrameInfo->get(FrameInfoIndex::SyncStart)) {
@@ -937,6 +977,15 @@ FrameInfo* CanvasContext::getFrameInfoFromLastFew(uint64_t frameNumber, uint32_t
     return nullptr;
 }
 
+static int64_t calculateExpectedDuration(const int64_t current, const int64_t previous) {
+    if (previous == -1) {
+        return current;
+    }
+
+    static const float kAlpha = 0.8f;
+    return (1 - kAlpha) * previous + kAlpha * current;
+}
+
 void CanvasContext::onSurfaceStatsAvailable(void* context, int32_t surfaceControlId,
                                             const SurfaceStats& stats) {
 #ifdef __ANDROID__
@@ -967,6 +1016,11 @@ void CanvasContext::onSurfaceStatsAvailable(void* context, int32_t surfaceContro
                 frameInfo->get(FrameInfoIndex::SwapBuffersCompleted));
         frameInfo->set(FrameInfoIndex::GpuCompleted) = std::max(
                 gpuCompleteTime, frameInfo->get(FrameInfoIndex::CommandSubmissionCompleted));
+
+        const auto currentDuration = frameInfo->get(FrameInfoIndex::FrameCompleted) -
+                                     frameInfo->get(FrameInfoIndex::SyncStart);
+        instance->mExpectedFrameCallbackDuration = calculateExpectedDuration(
+                currentDuration, instance->mExpectedFrameCallbackDuration);
         instance->mJankTracker.finishFrame(*frameInfo, instance->mFrameMetricsReporter, frameNumber,
                                            surfaceControlId);
     }
@@ -979,6 +1033,17 @@ void CanvasContext::doFrame() {
     mIdleDuration =
             systemTime(SYSTEM_TIME_MONOTONIC) - mRenderThread.timeLord().computeFrameTimeNanos();
     prepareAndDraw(nullptr);
+}
+
+std::chrono::nanoseconds CanvasContext::getExpectedDuration() {
+    std::scoped_lock lock(mFrameInfoMutex);
+    if (mExpectedFrameCallbackDuration == -1) {
+        const TimeLord& timeLord = mRenderThread.timeLord();
+        return std::chrono::nanoseconds((timeLord.lastFrameDeadline() - timeLord.latestVsync()) /
+                                        2);
+    }
+
+    return std::chrono::nanoseconds(mExpectedFrameCallbackDuration);
 }
 
 SkISize CanvasContext::getNextFrameSize() const {
@@ -1121,8 +1186,8 @@ void CanvasContext::enqueueFrameWork(std::function<void()>&& func) {
 
 uint64_t CanvasContext::getFrameNumber() {
     // mFrameNumber is reset to 0 when the surface changes or we swap buffers
-    if (mFrameNumber == 0 && mNativeSurface.get()) {
-        mFrameNumber = ANativeWindow_getNextFrameId(mNativeSurface->getNativeWindow());
+    if (mFrameNumber == 0) {
+        return mRenderPipeline->getFrameNumber();
     }
     return mFrameNumber;
 }
@@ -1237,7 +1302,20 @@ void CanvasContext::setSyncDelayDuration(nsecs_t duration) {
 }
 
 void CanvasContext::startHintSession() {
-    mHintSessionWrapper->init();
+    if (mIsHintSessionEnabled) {
+        mHintSessionWrapper->init();
+    }
+}
+
+void CanvasContext::setHintSessionEnabled(bool enabled) {
+    mIsHintSessionEnabled = enabled;
+    if (mIsHintSessionEnabled) {
+        if (!mHintSessionWrapper->alive() && hasOutputTarget()) {
+            startHintSession();
+        }
+    } else {
+        mHintSessionWrapper->destroy();
+    }
 }
 
 bool CanvasContext::shouldDither() {

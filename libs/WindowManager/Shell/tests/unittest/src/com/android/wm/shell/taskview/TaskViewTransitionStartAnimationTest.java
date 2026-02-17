@@ -24,7 +24,6 @@ import static android.view.WindowManager.TRANSIT_TO_BACK;
 import static android.view.WindowManager.TRANSIT_TO_FRONT;
 
 import static com.android.window.flags.Flags.FLAG_ENABLE_BUBBLE_ROOT_TASK;
-import static com.android.window.flags.Flags.FLAG_ENABLE_SEE_THROUGH_TASK_FRAGMENTS;
 import static com.android.window.flags.Flags.enableHandlersDebuggingMode;
 import static com.android.wm.shell.Flags.FLAG_ENABLE_CREATE_ANY_BUBBLE;
 import static com.android.wm.shell.Flags.FLAG_TASK_VIEW_TRANSITIONS_REFACTOR;
@@ -66,7 +65,6 @@ import com.android.wm.shell.ShellTaskOrganizer;
 import com.android.wm.shell.ShellTestCase;
 import com.android.wm.shell.bubbles.BubbleHelper;
 import com.android.wm.shell.common.ShellExecutor;
-import com.android.wm.shell.common.SyncTransactionQueue;
 import com.android.wm.shell.shared.bubbles.BubbleAnythingFlagHelper;
 import com.android.wm.shell.transition.TransitionDispatchState;
 import com.android.wm.shell.transition.Transitions;
@@ -108,7 +106,6 @@ public class TaskViewTransitionStartAnimationTest extends ShellTestCase {
         return FlagsParameterization.progressionOf(
                 FLAG_TASK_VIEW_TRANSITIONS_REFACTOR,
                 FLAG_ENABLE_CREATE_ANY_BUBBLE,
-                FLAG_ENABLE_SEE_THROUGH_TASK_FRAGMENTS,
                 FLAG_ENABLE_BUBBLE_ROOT_TASK);
     }
 
@@ -171,8 +168,8 @@ public class TaskViewTransitionStartAnimationTest extends ShellTestCase {
         mTaskInfo.taskDescription = mock(ActivityManager.TaskDescription.class);
 
         mTaskViewTransitions = new TaskViewTransitions(mTransitions, mTaskViewRepository,
-                mock(ShellTaskOrganizer.class), mock(SyncTransactionQueue.class),
-                Optional.of(mBubbleHelper));
+                mock(ShellTaskOrganizer.class), Optional.of(mBubbleHelper),
+                /* taskViewRootTask= */ Optional.empty());
         mTaskViewTransitions.registerTaskView(mTaskViewTaskController);
         when(mTaskViewTaskController.getTaskInfo()).thenReturn(mTaskInfo);
         when(mTaskViewTaskController.getPendingInfo()).thenReturn(mTaskInfo);

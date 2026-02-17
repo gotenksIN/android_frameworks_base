@@ -46,6 +46,10 @@
     <string name="usb_accessory_confirm_prompt" msgid="5728408382798643421">"Да се използва ли <xliff:g id="APPLICATION">%1$s</xliff:g> за работата с/ъс <xliff:g id="USB_ACCESSORY">%2$s</xliff:g>?"</string>
     <string name="usb_accessory_uri_prompt" msgid="6756649383432542382">"Инстал. приложения не работят с този аксесоар за USB. Научете повече на адрес <xliff:g id="URL">%1$s</xliff:g>"</string>
     <string name="title_usb_accessory" msgid="1236358027511638648">"Аксесоар за USB"</string>
+    <!-- no translation found for usb_device_dialog_always_allow_button (7426535342650638393) -->
+    <skip />
+    <string name="usb_device_dialog_allow_only_this_time_button" msgid="3653881633944232491">"Само този път"</string>
+    <string name="usb_device_dialog_cancel_button" msgid="9050554648474787233">"Отказ"</string>
     <string name="label_view" msgid="6815442985276363364">"Преглед"</string>
     <string name="always_use_device" msgid="210535878779644679">"<xliff:g id="APPLICATION">%1$s</xliff:g> да се отваря винаги при връзка с(ъс) <xliff:g id="USB_DEVICE">%2$s</xliff:g>"</string>
     <string name="always_use_accessory" msgid="1977225429341838444">"<xliff:g id="APPLICATION">%1$s</xliff:g> да се отваря винаги при връзка с(ъс) <xliff:g id="USB_ACCESSORY">%2$s</xliff:g>"</string>
@@ -91,7 +95,8 @@
     <string name="screenshot_failed_to_save_text" msgid="7232739948999195960">"Екранната снимка не може да се запази"</string>
     <string name="screenshot_failed_to_capture_text" msgid="7818288545874407451">"Правенето на екранни снимки не е разрешено от приложението или организацията ви"</string>
     <string name="screenshot_blocked_by_admin" msgid="5486757604822795797">"Правенето на екранни снимки е блокирано от системния ви администратор"</string>
-    <string name="screenshot_copy_description" msgid="2857172429942249976">"Копиране на екранната снимка в буферната памет"</string>
+    <string name="screenshot_copy_label" msgid="3551237076438128722">"Копиране"</string>
+    <string name="screenshot_copy_description" msgid="2890150686381938858">"Бутон за копиране на екранната снимка в буферната памет"</string>
     <string name="screenshot_edit_label" msgid="8754981973544133050">"Редактиране"</string>
     <string name="screenshot_edit_description" msgid="7802378587672433507">"Бутон за редактиране на екранната снимка"</string>
     <string name="screenshot_share_label" msgid="1653061117238861559">"Споделяне"</string>
@@ -134,6 +139,8 @@
     <string name="screenrecord_ongoing_screen_and_audio" msgid="5351133763125180920">"Екранът и аудиото се записват"</string>
     <string name="screenrecord_taps_label" msgid="1595690528298857649">"Показване на докосванията на екрана"</string>
     <string name="screenrecord_stop_label" msgid="72699670052087989">"Спиране"</string>
+    <string name="screenrecord_stop_description" msgid="4656717003438764637">"Спиране на записа"</string>
+    <string name="screenrecord_start_description" msgid="8173864933793754995">"Стартиране на записа"</string>
     <string name="screenrecord_share_label" msgid="5025590804030086930">"Споделяне"</string>
     <string name="screenrecord_save_title" msgid="1886652605520893850">"Записът е запазен"</string>
     <string name="screenrecord_save_text" msgid="3008973099800840163">"Докоснете за преглед"</string>
@@ -149,13 +156,16 @@
     <string name="screen_record_single_app_no_recents" msgid="1023249803854209330">"Едно приложение (отворете приложение, за да изберете)"</string>
     <string name="screen_record_record_device_audio_label" msgid="5363057443124085198">"Записване на звука от устройството"</string>
     <string name="screen_record_record_microphone_label" msgid="4685753707185662381">"Записване от микрофона"</string>
+    <string name="screen_record_record_audio_during_recording_warning" msgid="1240590393919102946">"Настройките за звука не могат да се променят по време на запис"</string>
     <string name="screen_record_should_show_camera_label" msgid="159628971484931357">"Показване на камерата за селфи"</string>
     <string name="screen_record_should_show_touches_label" msgid="2203962566795833783">"Показване на докосванията"</string>
     <string name="screen_record_capture_target_choose_app" msgid="3524481083640900931">"Избор на приложение за записване"</string>
+    <string name="screen_record_settings" msgid="2377267679200139285">"Настройки за функцията за запис на екрана"</string>
+    <string name="screen_record_markup" msgid="5583986085046693669">"Маркиране"</string>
     <string name="screen_record_video_saved" msgid="1345283626390232282">"Видеокл. бе запазен"</string>
     <string name="screen_record_video_deleted" msgid="30786214839944540">"Видеоклипът е изтрит"</string>
     <string name="screen_record_undo" msgid="7942716736019800870">"Отмяна"</string>
-    <string name="screen_record_take_another" msgid="8071412867905614800">"Направете друг"</string>
+    <string name="screen_record_take_another" msgid="5877933424208100617">"Ново"</string>
     <string name="screen_record_edit" msgid="8733014191240769309">"Редактиране"</string>
     <string name="screen_record_delete" msgid="1023421937978254537">"Изтриване"</string>
     <string name="screen_record_delete_dialog_title" msgid="5868561491974057044">"Да се изтрие ли този запис?"</string>
@@ -164,6 +174,7 @@
     <string name="screen_record_pause" msgid="1715012292444967776">"Пауза"</string>
     <string name="screen_record_mute" msgid="8111682249858638168">"Спиране на звука"</string>
     <string name="screen_record_unmute" msgid="2207912659365156472">"Включване на звука"</string>
+    <string name="screen_record_video_preview_elapsed_time_a11y_template" formatted="false" msgid="969599623785875798">"<xliff:g id="ELAPSED_TIME">%1$s</xliff:g> от <xliff:g id="DURATION">%2$s</xliff:g>"</string>
     <string name="screen_capture_blocked_by_admin" msgid="1751756953683506644">"Заснемането на екрана е блокирано от системния ви администратор"</string>
     <string name="screen_capture_fullscreen_screenshot_button" msgid="3173749413928507877">"Създаване на екранна снимка на целия екран"</string>
     <string name="screen_capture_fullscreen_record_button" msgid="5697594296042198690">"Записване на целия екран"</string>
@@ -171,14 +182,53 @@
     <string name="screen_capture_record_region_selection_button" msgid="3699353194755563053">"Записване на избраната област"</string>
     <string name="screen_capture_toolbar_screenshot_button" msgid="5676585348709494125">"Екранна снимка"</string>
     <string name="screen_capture_toolbar_record_button" msgid="7533814143351870339">"Записване"</string>
+    <string name="screen_capture_region_box_top_left_handle_description" msgid="3619310281612042126">"Горен ляв манипулатор – използвайте клавишите със стрелки, за да преоразмерите"</string>
+    <string name="screen_capture_region_box_top_right_handle_description" msgid="7732373569053287436">"Горен десен манипулатор – използвайте клавишите със стрелки, за да преоразмерите"</string>
+    <string name="screen_capture_region_box_bottom_right_handle_description" msgid="5444943380877006881">"Долен десен манипулатор – използвайте клавишите със стрелки, за да преоразмерите"</string>
+    <string name="screen_capture_region_box_bottom_left_handle_description" msgid="6095764656409143184">"Долен ляв манипулатор – използвайте клавишите със стрелки, за да преоразмерите"</string>
     <string name="screen_share_toolbar_share_button" msgid="9182050596136815833">"Споделяне"</string>
     <string name="screen_share_no_select_app_thumbnail" msgid="1630012401570567430">"Изберете приложение, което да споделите"</string>
     <string name="screen_share_audio_sharing_text" msgid="7829391478284315787">"Споделяне на звука"</string>
     <string name="screen_share_app_window_sharing_title" msgid="2063554880747318383">"Споделяне на прозореца на прилож."</string>
     <string name="screen_share_tab_sharing_title" msgid="1178046793832072728">"Споделяне на раздела"</string>
     <string name="screen_share_entire_screen_sharing_title" msgid="9093580141248337998">"Споделяне на целия екран"</string>
-    <string name="screen_share_disclaimer_app_sharing" msgid="4191319837838590771">"Когато споделяте дадено приложение, всичко, което се показва или възпроизвежда в него, е видимо за [APP NAME]. Затова внимавайте с неща като пароли, подробности за начини на плащане, съобщения, снимки, аудио и видео."</string>
-    <string name="screen_share_disclaimer_full_screen_sharing" msgid="6445373139864031364">"Когато споделяте целия екран, всичко, което се показва на него, е видимо за [APP NAME]. Затова внимавайте с неща като пароли, подробности за начини на плащане, съобщения, снимки, аудио и видео."</string>
+    <string name="screen_share_disclaimer_app_sharing" msgid="1839029004749224549">"Когато споделяте прил., всичко, което се показва или възпр. в него, е видимо за <xliff:g id="APP_NAME">%1$s</xliff:g>. Внимавайте с поверителната информация."</string>
+    <string name="screen_share_disclaimer_tab_sharing" msgid="3811486274577713101">"Когато споделяте раздел, всичко в него е видимо за <xliff:g id="APP_NAME">%1$s</xliff:g>. Внимавайте с поверителната информация."</string>
+    <string name="screen_share_disclaimer_full_screen_sharing" msgid="5173795016606926338">"Когато споделяте целия си екран, всичко, което се показва на него, е видимо за <xliff:g id="APP_NAME">%1$s</xliff:g>. Внимавайте с поверителната информация."</string>
+    <string name="screen_share_a11y_announcement" msgid="8938007210094494367">"Изберете какво да споделите. Изберете раздел, приложение или целия екран. След това натиснете „Споделяне“."</string>
+    <string name="screen_share_cancel_announcement" msgid="5940879227647436383">"Инициирането на споделянето на екрана приключи. Екранът не се споделя с никого."</string>
+    <string name="screen_share_a11y_sharing_app" msgid="3445421300603336524">"Приложението, което се споделя в момента: <xliff:g id="APP_NAME">%1$s</xliff:g>. Използвайте индикатора за поверителност, за да спрете споделянето."</string>
+    <string name="screen_share_a11y_sharing_tab" msgid="2963542572740628746">"Разделът, който се споделя в момента: <xliff:g id="TAB_TITLE">%1$s</xliff:g>. Използвайте индикатора за поверителност, за да спрете споделянето."</string>
+    <string name="screen_share_a11y_sharing_display" msgid="5919924998949424031">"Екранът, който се споделя в момента: <xliff:g id="DISPLAY_NAME">%1$s</xliff:g>. Използвайте индикатора за поверителност, за да спрете споделянето."</string>
+    <string name="screen_share_a11y_stopped_sharing_app" msgid="6928492106881188404">"Споделянето на приложението <xliff:g id="APP_NAME">%1$s</xliff:g> е спряно. Екранът не се споделя с никого."</string>
+    <string name="screen_share_a11y_stopped_sharing_tab" msgid="5929089339684027985">"Споделянето на раздела <xliff:g id="TAB_TITLE">%1$s</xliff:g> е спряно. Екранът не се споделя с никого."</string>
+    <string name="screen_share_a11y_stopped_sharing_display" msgid="121502117308433983">"Споделянето на екрана <xliff:g id="DISPLAY_NAME">%1$s</xliff:g> е спряно. Екранът не се споделя с никого."</string>
+    <!-- no translation found for screen_share_a11y_close_button (8017115316741874857) -->
+    <skip />
+    <!-- no translation found for screen_share_a11y_tab_button_unselected (5363622532939787310) -->
+    <skip />
+    <!-- no translation found for screen_share_a11y_tab_button_selected (4304681826101817704) -->
+    <skip />
+    <!-- no translation found for screen_share_a11y_app_button_unselected (4539549394242556282) -->
+    <skip />
+    <!-- no translation found for screen_share_a11y_app_button_selected (6049272377472922732) -->
+    <skip />
+    <!-- no translation found for screen_share_a11y_fullscreen_button_unselected (2492516552817892989) -->
+    <skip />
+    <!-- no translation found for screen_share_a11y_fullscreen_button_selected (6706822615908429473) -->
+    <skip />
+    <!-- no translation found for screen_share_a11y_share_button_off (2004866083045967602) -->
+    <skip />
+    <!-- no translation found for screen_share_a11y_share_button_on (1311279200212158833) -->
+    <skip />
+    <!-- no translation found for screen_share_a11y_item_unselected (7479321583507874795) -->
+    <skip />
+    <!-- no translation found for screen_share_a11y_item_selected (2538971376128528640) -->
+    <skip />
+    <!-- no translation found for screen_share_a11y_tab_audio_on (7240792268381508075) -->
+    <skip />
+    <!-- no translation found for screen_share_a11y_tab_audio_off (8545238601433952854) -->
+    <skip />
     <string name="screen_capture_toolbar_app_window_button_screenshot_a11y" msgid="1357560392667941303">"Създаване на екранна снимка на прозореца"</string>
     <string name="screen_capture_toolbar_app_window_button_record_a11y" msgid="8984966592912823394">"Прозорец за записване"</string>
     <string name="screen_capture_toolbar_region_button_screenshot_a11y" msgid="2102262602357521192">"Създаване на екранна снимка на избраната област"</string>
@@ -196,6 +246,7 @@
     <string name="screen_capture_front_camera" msgid="1214647538302639358">"Предна камера"</string>
     <string name="screen_capture_region_dimensions" msgid="2317064050253056256">"<xliff:g id="WIDTH">%1$d</xliff:g> x <xliff:g id="HEIGHT">%2$d</xliff:g>"</string>
     <string name="screen_share_privacy_indicator_stop_sharing" msgid="2297045039651417274">"Спиране на споделянето"</string>
+    <string name="share_screen_privacy_indicator_accessibility_label" msgid="8748931450480306816">"Споделянето на екрана е включено. Използвайте индикатора за поверителност, за да спрете споделянето."</string>
     <string name="share_to_app_chip_accessibility_label" msgid="4210256229976947065">"Екранът се споделя"</string>
     <string name="share_to_app_chip_accessibility_label_generic" msgid="5517431657924536133">"Съдържанието се споделя"</string>
     <string name="share_to_app_stop_dialog_title" msgid="9212915050910250438">"Да се спре ли споделянето на екрана?"</string>
@@ -380,7 +431,9 @@
     <string name="accessibility_clear_all" msgid="970525598287244592">"Изчистване на всички известия."</string>
     <string name="accessibility_notification_bell" msgid="7149451526721220526">"Известия"</string>
     <string name="accessibility_status_bar_assistant_icon" msgid="1174898709836451013">"Асистент"</string>
-    <string name="accessibility_status_bar_input_method_indicator" msgid="4316411266975554038">"Метод на въвеждане"</string>
+    <string name="accessibility_status_bar_input_method_indicator" msgid="4911669064186093506">"Клавиатура"</string>
+    <!-- no translation found for input_method_switcher_title_large_screen (8490419050265486980) -->
+    <skip />
     <string name="notification_group_overflow_indicator" msgid="7605120293801012648">"+ <xliff:g id="NUMBER">%s</xliff:g>"</string>
     <string name="notification_group_overflow_description" msgid="7176322877233433278">"{count,plural, =1{Съдържа още # известие.}other{Съдържа още # известия.}}"</string>
     <string name="accessibility_rotation_lock_on_landscape" msgid="936972553861524360">"Екранът е заключен в хоризонтална ориентация."</string>
@@ -930,14 +983,14 @@
     <string name="notification_guts_recs_summary" msgid="8391881843238947007">"Бюлетини, препоръчани медии и др."</string>
     <string name="notification_onboarding_summaries_turn_on" msgid="3831339570984683297">"Включване от настройките"</string>
     <string name="notification_onboarding_summaries_message" msgid="6061524903176459064">"По-дългите ви разговори вече могат да бъдат обобщени, за да получите кратка обзорна информация"</string>
+    <string name="notification_onboarding_summaries_message_with_apps" msgid="5320980333818238465">"Устройството и приложенията ви вече могат да обобщават по-дългите разговори, за да ви предоставят кратка обзорна информация"</string>
     <string name="notification_onboarding_bundles_message" msgid="4612908213178622912">"Инструментът за организиране на известията групира и заглушава известията с по-нисък приоритет. Добавете още категории в настройките."</string>
     <string name="notification_bundle_header_counter" msgid="5515532701569242265">"{count,plural, =1{# известие}other{# известия}}"</string>
     <string name="notification_bundle_header_joined_description" msgid="4517556837418088139">"<xliff:g id="NAME">%1$s</xliff:g>, <xliff:g id="NUM_NOTIFICATIONS">%2$s</xliff:g>"</string>
     <string name="inline_done_button" msgid="6043094985588909584">"Готово"</string>
     <string name="inline_ok_button" msgid="603075490581280343">"Прилагане"</string>
     <string name="inline_turn_off_notifications" msgid="2653064779176881329">"Изключване"</string>
-    <!-- no translation found for bridged_device_type_unknown (8435318668271946936) -->
-    <skip />
+    <string name="bridged_device_type_unknown" msgid="8435318668271946936">"устройство"</string>
     <string name="bridged_device_type_phone" msgid="7971199513068521770">"телефона"</string>
     <string name="bridged_device_type_tablet" msgid="7403330807933649592">"таблета"</string>
     <string name="bridged_device_type_laptop" msgid="8027976360936787349">"лаптопа"</string>
@@ -1780,8 +1833,58 @@
     <string name="accessibility_close_overlay_action" msgid="3581095146209387670">"връщане назад"</string>
     <string name="ambient_cue_autofill_action" msgid="9213025887835308128">"автоматично попълване"</string>
     <string name="ambient_cue_expand_action" msgid="6803711089932959312">"разгъване"</string>
-    <string name="location_button_text_share_precise_location" msgid="5341882050169860712">"Споделяне на точното местоположение"</string>
-    <string name="location_button_text_use_precise_location" msgid="3499475231656390476">"Използване на точното местоположение"</string>
-    <string name="location_button_text_near_precise_location" msgid="3607275724182981412">"Близо до точното местоположение"</string>
     <string name="location_button_text_precise_location" msgid="4441259889842542799">"Точно местоположение"</string>
+    <string name="location_button_text_use_precise_location" msgid="3499475231656390476">"Използване на точното местоположение"</string>
+    <string name="location_button_text_share_precise_location" msgid="5341882050169860712">"Споделяне на точното местоположение"</string>
+    <string name="location_button_text_near_my_precise_location" msgid="7590342799002942963">"Близо до точното ми местоположение"</string>
+    <string name="location_button_text_near_your_precise_location" msgid="3792598666253599055">"Близо до точното ви местоположение"</string>
+    <string name="privacy_chip_use_string" msgid="979159484631969073">"<xliff:g id="SENSOR">%1$s</xliff:g> се използва"</string>
+    <string name="privacy_chip_use_string_with_app" msgid="6807216002072346877">"<xliff:g id="SENSOR">%1$s</xliff:g> се използва от <xliff:g id="APP">%2$s</xliff:g>"</string>
+    <string name="privacy_chip_camera_and_mic_text" msgid="6254449489859255607">"Камера и микрофон"</string>
+    <string name="av_panel_title" msgid="455230832870768515">"Поверителност"</string>
+    <string name="sensor_activity_header" msgid="2145727448786698035">"Вижте приложенията, които активно или наскоро са използвали тези разрешения."</string>
+    <string name="sensor_activity_see_all_access_button" msgid="8005330122289549048">"Преглед на пълния достъп"</string>
+    <string name="sensor_activity_camera_label" msgid="4260675418606211259">"Камерата"</string>
+    <string name="sensor_activity_microphone_label" msgid="4012136402420177411">"Микрофонът"</string>
+    <string name="sensor_activity_manage_access_button" msgid="1275701280501357102">"Управление на достъпа"</string>
+    <string name="sensor_activity_close_app_button" msgid="6907314738150753330">"Затваряне на приложението"</string>
+    <string name="sensor_activity_back_button_cd" msgid="6894532284650291222">"Назад"</string>
+    <string name="privacy_chip_apps_using_sensor_suffix" msgid="527247786536767096">"+ още <xliff:g id="COUNT">%1$d</xliff:g>"</string>
+    <string name="privacy_chip_camera_in_use" msgid="5163494654848590528">"Камерата се използва"</string>
+    <string name="privacy_chip_mic_in_use" msgid="1586091297556363367">"Микрофонът се използва"</string>
+    <string name="privacy_chip_camera_mic_in_use" msgid="5179267787210197484">"Камерата и микрофонът се използват"</string>
+    <string name="av_camera_portrait_touch_up" msgid="5191856296212427203">"Ретуширане на лицето"</string>
+    <string name="av_mic_label" msgid="5427348054144789879">"Микрофонът"</string>
+    <string name="av_camera_label" msgid="7719772172590702343">"Камерата"</string>
+    <string name="av_camera_blur_drill_in_title" msgid="2250600375798981511">"Замъгляване на фона"</string>
+    <string name="av_camera_blur_off" msgid="3170334995799202022">"Изкл."</string>
+    <string name="av_camera_blur_light" msgid="5666055368940059418">"Леко"</string>
+    <string name="av_camera_blur_full" msgid="3276351992811619332">"Пълно"</string>
+    <string name="av_camera_improve_lighting" msgid="1540549414296669133">"Подобряване на осветлението"</string>
+    <string name="av_camera_face_retouch" msgid="45890971969486224">"Ретуширане на лицето"</string>
+    <string name="av_camera_framing" msgid="5108462267843042492">"Кадриране"</string>
+    <string name="av_studio_mic" msgid="2614843492629357766">"Студиен микрофон"</string>
+    <string name="av_studio_look" msgid="621893522645557619">"Студиен образ"</string>
+    <string name="av_studio_look_effects" msgid="4105109585851068415">"%d ефекта"</string>
+    <string name="av_blur" msgid="405131343487260171">"Замъгляване"</string>
+    <string name="av_live_captions" msgid="7819416886586903077">"Надписи на живо"</string>
+    <string name="accessibility_hearing_device_battery_level" msgid="1032601787487328432">"Батерия: %s"</string>
+    <string name="accessibility_hearing_device_left_right_battery_level" msgid="5327672450604052979">"Батерия на лявата слушалка: %1$s    Батерия на дясната слушалка: %2$s"</string>
+    <string name="accessibility_hearing_device_left_battery_level" msgid="327961080394238636">"Батерия на лявата слушалка: %1$s"</string>
+    <string name="accessibility_hearing_device_right_battery_level" msgid="7598843215226414563">"Батерия на дясната слушалка: %1$s"</string>
+    <string name="accessibility_hearing_device_notification_channel_name" msgid="7365020777623709400">"Състояние на слуховия апарат"</string>
+    <!-- no translation found for more_options_edit (6337988646114341329) -->
+    <skip />
+    <!-- no translation found for more_options_move (2226159413422979066) -->
+    <skip />
+    <!-- no translation found for more_options_remove_all (194855000797536179) -->
+    <skip />
+    <!-- no translation found for floating_menu_more_options_label (7859269790323628599) -->
+    <skip />
+    <!-- no translation found for dream_setup_title (7996530071414508238) -->
+    <skip />
+    <!-- no translation found for dream_setup_button_not_now (8028385323668620805) -->
+    <skip />
+    <!-- no translation found for dream_setup_button_setup (4755361016017554826) -->
+    <skip />
 </resources>

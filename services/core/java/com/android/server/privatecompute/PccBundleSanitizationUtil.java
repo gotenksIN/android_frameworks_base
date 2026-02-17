@@ -18,6 +18,7 @@ package com.android.server.privatecompute;
 
 import android.graphics.Bitmap;
 import android.os.BadParcelableException;
+import android.os.BaseBundle;
 import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
 import android.os.Parcelable;
@@ -40,28 +41,26 @@ class PccBundleSanitizationUtil {
      * <p> Safe data types strictly enforce a one-way data flow, and cannot be used to establish a
      * two-way communication with the PCC service.
      *
-     * @param bundle the {@link android.os.Bundle} to be sanitized.
-     * @throws IllegalArgumentException if the bundle contains data types not in the allowlist.
+     * @param baseBundle the {@link android.os.BaseBundle} to be sanitized.
+     * @throws IllegalArgumentException if the bundle contains data types not in the allowlist
+     * or exceeds a recursive depth of 100.
      */
-    public static void sanitizeBundle(Bundle bundle) throws IllegalArgumentException {
-        if (bundle == null) {
+     public static void sanitizeBundle(BaseBundle baseBundle) throws IllegalArgumentException {
+        if (baseBundle == null) {
             return;
         }
 
-        if (bundle.hasBinders() != Bundle.STATUS_BINDERS_NOT_PRESENT) {
-            throw new IllegalArgumentException("Binders not permitted in the bundle.");
+        if (baseBundle instanceof Bundle) {
+            Bundle bundle = (Bundle) baseBundle;
+            if (bundle.hasBinders() != Bundle.STATUS_BINDERS_NOT_PRESENT) {
+                throw new IllegalArgumentException("Binders not permitted in the bundle.");
+            }
         }
 
-        if (!bundle.hasFileDescriptors()) {
-            // Safe to exit, as there are no active objects if bundle doesn't contain any binders
-            // or file descriptors.
-            return;
-        }
-
-        sanitizeBundleInternal(bundle, 0);
+        sanitizeBundleInternal(baseBundle, 0);
     }
 
-    private static void sanitizeBundleInternal(Bundle bundle, int depth) {
+    private static void sanitizeBundleInternal(BaseBundle bundle, int depth) {
         if (depth > MAX_BUNDLE_DEPTH) {
             throw new IllegalArgumentException("Bundle depth exceeds limit of " + MAX_BUNDLE_DEPTH);
         }
@@ -86,7 +85,11 @@ class PccBundleSanitizationUtil {
             switch (value) {
                 case Bundle subBundle -> sanitizeBundleInternal(subBundle, depth + 1);
                 case ParcelFileDescriptor pfd -> validatePfdIsReadOnly(pfd);
-                case SharedMemory sm -> sm.setProtect(OsConstants.PROT_READ);
+                case SharedMemory sm -> {
+                    if (!sm.isRegionReadOnly()) {
+                        throw new IllegalArgumentException("SharedMemory must be read-only.");
+                    }
+                }
                 // Bitmaps are considered safe to send across IPC. When a Bitmap is parceled, it
                 // is either copied into a new blob or, if immutable and backed by shared memory,
                 // its file descriptor is transferred. In either case, the receiving process gets
@@ -132,7 +135,11 @@ class PccBundleSanitizationUtil {
             switch (p) {
                 case ParcelFileDescriptor parcelFileDescriptor -> validatePfdIsReadOnly(
                         parcelFileDescriptor);
-                case SharedMemory sharedMemory -> sharedMemory.setProtect(OsConstants.PROT_READ);
+                case SharedMemory sharedMemory -> {
+                    if (!sharedMemory.isRegionReadOnly()) {
+                        throw new IllegalArgumentException("SharedMemory must be read-only.");
+                    }
+                }
                 case Bitmap ignored -> {
                 }
                 case null -> {

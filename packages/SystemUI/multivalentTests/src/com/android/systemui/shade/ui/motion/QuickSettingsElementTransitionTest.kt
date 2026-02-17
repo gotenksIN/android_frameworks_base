@@ -60,22 +60,18 @@ import com.android.systemui.testKosmos
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
-import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import platform.test.motion.compose.ComposeFeatureCaptures.positionInRoot
 import platform.test.motion.compose.ComposeRecordingSpec
 import platform.test.motion.compose.MotionControl
 import platform.test.motion.compose.asDataPoint
-import platform.test.motion.compose.feature
 import platform.test.motion.compose.recordMotion
 import platform.test.motion.compose.runTest
 import platform.test.motion.golden.DataPoint
 import platform.test.screenshot.DeviceEmulationSpec
 import platform.test.screenshot.Displays.Phone
 
-@Ignore("b/467228678")
 @RunWith(AndroidJUnit4::class)
 @MotionTest
 @LargeTest
@@ -115,9 +111,9 @@ class QuickSettingsElementTransitionTest : SysuiTestCase() {
     @DisableFlags(Flags.FLAG_STATUS_BAR_MOBILE_ICON_KAIROS)
     fun swipeLeftInQSTilePanel_QSTileTransitsToNextPage() {
         motionTestRule.runTest(60.seconds) {
+            kosmos.enableSingleShade()
             kosmos.usingMediaInComposeFragment = true
             kosmos.populateQuickSettings(tileCount = 20)
-            kosmos.enableSingleShade()
             val motion =
                 recordMotion(
                     content = {
@@ -128,7 +124,7 @@ class QuickSettingsElementTransitionTest : SysuiTestCase() {
                             MotionControl(
                                 delayRecording = {
                                     awaitCondition {
-                                        kosmos.sceneInteractor.transitionState.value.isIdle()
+                                        kosmos.sceneInteractor.transitionStateFlow.value.isIdle()
                                     }
                                 }
                             ) {
@@ -140,7 +136,7 @@ class QuickSettingsElementTransitionTest : SysuiTestCase() {
                                     )
                                 }
                                 awaitCondition {
-                                    kosmos.sceneInteractor.transitionState.value.isIdle()
+                                    kosmos.sceneInteractor.transitionStateFlow.value.isIdle()
                                 }
                             }
                         ) {

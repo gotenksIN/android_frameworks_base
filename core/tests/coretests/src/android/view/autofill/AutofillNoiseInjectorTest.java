@@ -25,6 +25,9 @@ import static org.mockito.Mockito.when;
 
 import android.app.assist.AssistStructure;
 import android.content.ComponentName;
+import android.text.InputType;
+import android.view.View;
+import android.widget.EditText;
 
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 
@@ -44,9 +47,6 @@ public class AutofillNoiseInjectorTest {
     private static final String MASTER_SEED2 = "anotherMasterSeed456";
     private static final ComponentName TEST_COMPONENT =
             new ComponentName("com.example", "com.example.TestActivity");
-    private static final int FIXED_LENGTH_BYTES = 32;
-
-    private static final int BITS_TO_RETAIN = 2;
 
     @Mock private AssistStructure.ViewNode mMockViewNode;
     private AutofillId mTestAutofillId;
@@ -80,7 +80,8 @@ public class AutofillNoiseInjectorTest {
         AutofillNoiseInjector injector = new AutofillNoiseInjector(MASTER_SEED1, TEST_COMPONENT);
         AutofillNoiseInjectedData result = injector.injectNoise(mMockViewNode);
         assertNotNull(result);
-        assertEquals(FIXED_LENGTH_BYTES, result.getNoiseInjectedPayload().length);
+        assertEquals(
+                AutofillNoiseInjector.FIXED_LENGTH_BYTES, result.getNoiseInjectedPayload().length);
     }
 
     @Test
@@ -88,12 +89,15 @@ public class AutofillNoiseInjectorTest {
         String longString = "ThisIsAVeryLongStringThatExceedsTheThirtyTwoByteLimit";
         when(mMockViewNode.getText()).thenReturn(longString);
         // UTF-16BE bytes
-        assertTrue(longString.getBytes(StandardCharsets.UTF_16BE).length > FIXED_LENGTH_BYTES);
+        assertTrue(
+                longString.getBytes(StandardCharsets.UTF_16BE).length
+                        > AutofillNoiseInjector.FIXED_LENGTH_BYTES);
 
         AutofillNoiseInjector injector = new AutofillNoiseInjector(MASTER_SEED1, TEST_COMPONENT);
         AutofillNoiseInjectedData result = injector.injectNoise(mMockViewNode);
         assertNotNull(result);
-        assertEquals(FIXED_LENGTH_BYTES, result.getNoiseInjectedPayload().length);
+        assertEquals(
+                AutofillNoiseInjector.FIXED_LENGTH_BYTES, result.getNoiseInjectedPayload().length);
     }
 
     @Test
@@ -139,9 +143,13 @@ public class AutofillNoiseInjectorTest {
         AutofillNoiseInjector injector = new AutofillNoiseInjector(MASTER_SEED1, TEST_COMPONENT);
         AutofillNoiseInjectedData result = injector.injectNoise(mMockViewNode);
         byte[] payload = result.getNoiseInjectedPayload();
-        int retainedBitMask = result.getRetainedBitMask();
+        byte retainedBitMask = result.getRetainedBitMask();
 
-        assertEquals(BITS_TO_RETAIN, Integer.bitCount(retainedBitMask));
+        // Verify that the retained bit mask is either all odd or all even bits.
+        assertTrue(
+                (retainedBitMask & 0xFF) == AutofillNoiseInjector.ODD_BITS_MASK
+                        || (retainedBitMask & 0xFF) == AutofillNoiseInjector.EVEN_BITS_MASK);
+
         for (byte b : payload) {
             for (int i = 0; i < 8; i++) {
                 if ((retainedBitMask & (1 << i)) == 0) {
@@ -168,5 +176,32 @@ public class AutofillNoiseInjectorTest {
         assertFalse(
                 Arrays.equals(
                         result1.getNoiseInjectedPayload(), result2.getNoiseInjectedPayload()));
+    }
+
+    @Test
+    public void testInjectNoise_autofillTypeNotNone() {
+        when(mMockViewNode.getText()).thenReturn("Test");
+        when(mMockViewNode.getAutofillType()).thenReturn(View.AUTOFILL_TYPE_TEXT);
+        AutofillNoiseInjector injector = new AutofillNoiseInjector(MASTER_SEED1, TEST_COMPONENT);
+        AutofillNoiseInjectedData result = injector.injectNoise(mMockViewNode);
+        assertNull(result);
+    }
+
+    @Test
+    public void testInjectNoise_editTextClass() {
+        when(mMockViewNode.getText()).thenReturn("Test");
+        when(mMockViewNode.getClassName()).thenReturn(EditText.class.getName());
+        AutofillNoiseInjector injector = new AutofillNoiseInjector(MASTER_SEED1, TEST_COMPONENT);
+        AutofillNoiseInjectedData result = injector.injectNoise(mMockViewNode);
+        assertNull(result);
+    }
+
+    @Test
+    public void testInjectNoise_inputTypeNotNone() {
+        when(mMockViewNode.getText()).thenReturn("Test");
+        when(mMockViewNode.getInputType()).thenReturn(InputType.TYPE_CLASS_TEXT);
+        AutofillNoiseInjector injector = new AutofillNoiseInjector(MASTER_SEED1, TEST_COMPONENT);
+        AutofillNoiseInjectedData result = injector.injectNoise(mMockViewNode);
+        assertNull(result);
     }
 }

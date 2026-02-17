@@ -225,7 +225,6 @@ public class UserManager {
      * actions; it does not represent the user to which restriction or management is applied.
      * @hide
      */
-    @FlaggedApi(android.multiuser.Flags.FLAG_ALLOW_SUPERVISING_PROFILE)
     @SystemApi
     public static final String USER_TYPE_PROFILE_SUPERVISING =
             "android.os.usertype.profile.SUPERVISING";
@@ -1060,6 +1059,24 @@ public class UserManager {
      * @see #getUserRestrictions()
      */
     public static final String DISALLOW_FACTORY_RESET = "no_factory_reset";
+
+    /**
+     * Specifies if a user is disallowed from adding new guests. The default value is
+     * <code>false</code>.
+     *
+     * <p>Holders of the permission
+     * {@link android.Manifest.permission#MANAGE_DEVICE_POLICY_MODIFY_USERS}
+     * can set this restriction using the DevicePolicyManager APIs mentioned below.
+     *
+     * <p>Key for user restrictions.
+     * <p>Type: Boolean
+     * @see DevicePolicyManager#addUserRestriction(ComponentName, String)
+     * @see DevicePolicyManager#clearUserRestriction(ComponentName, String)
+     * @see #getUserRestrictions()
+     * @hide
+     */
+    @FlaggedApi(android.os.Flags.FLAG_DISALLOW_ADD_GUEST)
+    public static final String DISALLOW_ADD_GUEST = "no_add_guest";
 
     /**
      * Specifies if a user is disallowed from adding new users. This can only be set by device
@@ -2134,6 +2151,7 @@ public class UserManager {
     @StringDef(value = {
             ALLOW_PARENT_PROFILE_APP_LINKING,
             DISALLOW_ADD_CLONE_PROFILE,
+            DISALLOW_ADD_GUEST,
             DISALLOW_ADD_MANAGED_PROFILE,
             DISALLOW_ADD_PRIVATE_PROFILE,
             DISALLOW_ADD_USER,
@@ -3392,7 +3410,6 @@ public class UserManager {
      *
      * @hide
      */
-    @FlaggedApi(android.multiuser.Flags.FLAG_ALLOW_SUPERVISING_PROFILE)
     @android.ravenwood.annotation.RavenwoodKeep
     public static boolean isUserTypeSupervisingProfile(@Nullable String userType) {
         return USER_TYPE_PROFILE_SUPERVISING.equals(userType);
@@ -3499,26 +3516,18 @@ public class UserManager {
      * @deprecated evaluate canAddMoreProfilesToUser(USER_TYPE_PROFILE_PRIVATE, userId) > 0 instead
      * @hide
      */
+    // TODO(b/394178333): Switch to canAddMoreProfilesToUser(USER_TYPE_PROFILE_PRIVATE, userId) > 0
     @Deprecated
     @TestApi
-    @FlaggedApi(android.multiuser.Flags.FLAG_CONSISTENT_MAX_USERS)
     @RequiresPermission(anyOf = {
             Manifest.permission.MANAGE_USERS,
             Manifest.permission.CREATE_USERS,
             Manifest.permission.QUERY_USERS})
     @UserHandleAware
     public boolean canAddPrivateProfile() {
-        if (!android.multiuser.Flags.enablePrivateSpaceFeatures()) return false;
         if (android.multiuser.Flags.blockPrivateSpaceCreation()) {
-            if (android.multiuser.Flags.consistentMaxUsers()) {
-                return canAddMoreProfilesToUser(USER_TYPE_PROFILE_PRIVATE, mUserId)
-                        && !hasUserRestriction(UserManager.DISALLOW_ADD_PRIVATE_PROFILE);
-            }
-            try {
-                return mService.canAddPrivateProfile(mUserId);
-            } catch (RemoteException re) {
-                throw re.rethrowFromSystemServer();
-            }
+            return canAddMoreProfilesToUser(USER_TYPE_PROFILE_PRIVATE, mUserId)
+                    && !hasUserRestriction(UserManager.DISALLOW_ADD_PRIVATE_PROFILE);
         }
         return true;
     }
@@ -5403,9 +5412,6 @@ public class UserManager {
             android.Manifest.permission.CREATE_USERS
     })
     public boolean canAddMoreUsers(@NonNull String userType) {
-        if (!android.multiuser.Flags.consistentMaxUsers()) {
-            return canAddMoreUsersLegacy(userType);
-        }
         try {
             // Differs from getRemainingCreatableUserCount only because of isCreationOverrideEnabled
             return mService.canAddMoreUsersOfType(userType);
@@ -5537,9 +5543,6 @@ public class UserManager {
             android.Manifest.permission.CREATE_USERS
     })
     public int getCurrentAllowedNumberOfUsers(@NonNull String userType) {
-        if (!android.multiuser.Flags.consistentMaxUsers()) {
-            throw new UnsupportedOperationException("This method requires flag consistentMaxUsers");
-        }
         try {
             return mService.getCurrentAllowedNumberOfUsers(userType);
         } catch (RemoteException re) {
@@ -6058,8 +6061,11 @@ public class UserManager {
      * @hide
      */
     public boolean hasBadge(@UserIdInt int userId) {
-        if (!isProfile(userId)) {
-            // Since currently only profiles actually have badges, we can do this optimization.
+        final boolean isHsu = android.multiuser.Flags.hsuAppManagement()
+                && isHeadlessSystemUserMode() && userId == UserHandle.USER_SYSTEM;
+        if (!isProfile(userId) && !isHsu) {
+            // Since only certain types of users can currently have badges, we can sometimes
+            // optimize and avoid a binder call.
             return false;
         }
         try {
@@ -7063,60 +7069,6 @@ public class UserManager {
     public void setBootUser(@NonNull UserHandle bootUser) {
         try {
             mService.setBootUser(bootUser.getIdentifier());
-        } catch (RemoteException re) {
-            throw re.rethrowFromSystemServer();
-        }
-    }
-
-    /**
-     * Checks whether it's possible to add more users. Legacy version of parameterless
-     * {@link #canAddMoreUsers(String)}. Do not use.
-     *
-     * @return true if more users can be added, false if limit has been reached.
-     *
-     * @deprecated use {@link #canAddMoreUsers(String)} instead.
-     *
-     * @hide
-     */
-    @Deprecated
-    @RequiresPermission(anyOf = {
-            android.Manifest.permission.MANAGE_USERS,
-            android.Manifest.permission.CREATE_USERS
-    })
-    public boolean canAddMoreUsersLegacy() {
-        if (android.multiuser.Flags.consistentMaxUsers()
-                && android.multiuser.Flags.maxUsersInCarIsForSecondary()) {
-            // TODO(b/394178333): When the flags are permanent, delete this method entirely.
-            throw new UnsupportedOperationException("This method is no longer supported");
-        }
-
-        // TODO(b/142482943): UMS has different logic, excluding Demo and Profile from counting.
-        //                    Why not here? The logic is inconsistent. See
-        //                    UMS.canAddMoreManagedProfiles
-        final List<UserInfo> users = getAliveUsers();
-        final int totalUserCount = users.size();
-        int aliveUserCount = 0;
-        for (int i = 0; i < totalUserCount; i++) {
-            UserInfo user = users.get(i);
-            if (!user.isGuest()) {
-                aliveUserCount++;
-            }
-        }
-        return aliveUserCount < getMaxSwitchableUsers();
-    }
-
-    /** Legacy version of {@link #canAddMoreUsers(String)}. Do not use. */
-    private boolean canAddMoreUsersLegacy(@NonNull String userType) {
-        if (android.multiuser.Flags.consistentMaxUsers()) {
-            // TODO(b/394178333): When the flag is permanent, delete this method entirely.
-            throw new UnsupportedOperationException("This method is no longer supported");
-        }
-        try {
-            if (userType.equals(USER_TYPE_FULL_GUEST)) {
-                return mService.canAddMoreUsersOfType(userType);
-            } else {
-                return canAddMoreUsersLegacy() && mService.canAddMoreUsersOfType(userType);
-            }
         } catch (RemoteException re) {
             throw re.rethrowFromSystemServer();
         }

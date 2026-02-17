@@ -29,6 +29,7 @@ import com.android.internal.widget.LockPatternUtils
 import com.android.internal.widget.LockPatternUtils.StrongAuthTracker.PRIMARY_AUTH_REQUIRED_FOR_SECURE_LOCK_DEVICE
 import com.android.internal.widget.LockPatternUtils.StrongAuthTracker.STRONG_BIOMETRIC_AUTH_REQUIRED_FOR_SECURE_LOCK_DEVICE
 import com.android.systemui.SysuiTestCase
+import com.android.systemui.accessibility.data.repository.fakeAccessibilityRepository
 import com.android.systemui.authentication.data.repository.FakeAuthenticationRepository
 import com.android.systemui.authentication.data.repository.FakeAuthenticationRepository.Companion.WRONG_PASSWORD
 import com.android.systemui.authentication.data.repository.FakeAuthenticationRepository.Companion.WRONG_PATTERN
@@ -47,6 +48,7 @@ import com.android.systemui.biometrics.data.repository.fakeFingerprintPropertyRe
 import com.android.systemui.biometrics.shared.model.FaceSensorInfo
 import com.android.systemui.biometrics.shared.model.SensorStrength
 import com.android.systemui.bouncer.domain.interactor.bouncerInteractor
+import com.android.systemui.bouncer.ui.viewmodel.BouncerMessageViewModel.Companion.DEFAULT_MESSAGE_DURATION
 import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.deviceentry.domain.interactor.DeviceUnlockedInteractor
 import com.android.systemui.deviceentry.shared.model.ErrorFaceAuthenticationStatus
@@ -236,6 +238,9 @@ class BouncerMessageViewModelTest : SysuiTestCase() {
         // Set auth method to test the initial message value
         kosmos.fakeAuthenticationRepository.setAuthenticationMethod(Pin)
 
+        // Set default a11y timeout to ensure that there is a timeout.
+        kosmos.fakeAccessibilityRepository.setRecommendedTimeout(DEFAULT_MESSAGE_DURATION)
+
         kosmos.fakeUserRepository.setUserInfos(listOf(PRIMARY_USER))
         overrideResource(
             R.array.config_face_acquire_device_entry_ignorelist,
@@ -336,7 +341,8 @@ class BouncerMessageViewModelTest : SysuiTestCase() {
             bouncerInteractor.authenticate(wrongCred)
             runCurrent()
 
-            assertThat(message?.text).isEqualTo(duplicateCredString)
+            assertThat(message?.text).isEqualTo(enterCredString)
+            assertThat(message?.secondaryText).isEqualTo(duplicateCredString)
         }
 
     @Test

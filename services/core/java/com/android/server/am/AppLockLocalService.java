@@ -19,11 +19,11 @@ package com.android.server.am;
 import static android.app.ActivityManager.PROCESS_STATE_TOP;
 
 import android.annotation.NonNull;
+import android.annotation.Nullable;
 import android.app.AppLockInternal;
 import android.app.KeyguardManager;
 import android.content.Context;
 import android.content.pm.ActivityInfo;
-import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManagerInternal;
 import android.content.pm.UserInfo;
@@ -119,13 +119,18 @@ public final class AppLockLocalService implements AppLockInternal,
      * Called by the {@link ActivityManagerService} once the system services are ready.
      */
     public void systemServicesReady() {
-        initAppLockLockedStates();
-        mPackageMonitor.register(mAmService.mContext, UserHandle.ALL,
-                BackgroundThread.getHandler());
-        Context context = mAmService.mContext;
-        final KeyguardManager keyguardManager = context.getSystemService(KeyguardManager.class);
-        keyguardManager.addDeviceLockedStateListener(BackgroundThread.getExecutor(), /* listener= */
-                this);
+        Trace.beginSection(TAG + ".systemServicesReady");
+        try {
+            initAppLockLockedStates();
+            mPackageMonitor.register(mAmService.mContext, UserHandle.ALL,
+                    BackgroundThread.getHandler());
+            Context context = mAmService.mContext;
+            final KeyguardManager keyguardManager = context.getSystemService(KeyguardManager.class);
+            keyguardManager.addDeviceLockedStateListener(BackgroundThread.getExecutor(),
+                    /* listener= */ this);
+        } finally {
+            Trace.endSection();
+        }
     }
 
     /**
@@ -149,25 +154,18 @@ public final class AppLockLocalService implements AppLockInternal,
                 }
 
                 final int userId = userInfo.id;
-                final List<ApplicationInfo> appInfos =
-                        getPackageManagerInternal().getInstalledApplications(
-                                PackageManager.GET_APP_LOCK_INFO, userId, Process.myUid());
-                if (appInfos == null) {
-                    Slog.w(TAG, "Unable to retrieve appInfos for user " + userId);
-                    continue;
-                }
+                final List<String> appLockEnabledPackages =
+                        getPackageManagerInternal().getAppLockEnabledPackagesForUser(userId);
                 synchronized (mLock) {
                     ArrayMap<String, AppLockLockedState> map = mAppLockLockedStatesForUser.get(
                             userId);
 
-                    for (ApplicationInfo appInfo : appInfos) {
-                        if (appInfo != null && appInfo.isAppLockEnabled) {
-                            if (map == null) {
-                                map = new ArrayMap<>();
-                                mAppLockLockedStatesForUser.put(userId, map);
-                            }
-                            map.put(appInfo.packageName, new AppLockLockedState());
+                    for (int i = appLockEnabledPackages.size() - 1; i >= 0; i--) {
+                        if (map == null) {
+                            map = new ArrayMap<>();
+                            mAppLockLockedStatesForUser.put(userId, map);
                         }
+                        map.put(appLockEnabledPackages.get(i), new AppLockLockedState());
                     }
                 }
             }
@@ -224,28 +222,61 @@ public final class AppLockLocalService implements AppLockInternal,
         Objects.requireNonNull(packageName);
 
         synchronized (mLock) {
-            return mAppLockLockedStatesForUser.contains(userId) && mAppLockLockedStatesForUser.get(
-                    userId).containsKey(packageName);
+            return isPackageAppLockEnabledLocked(packageName, userId);
         }
+    }
+
+    @GuardedBy("mLock")
+    private boolean isPackageAppLockEnabledLocked(@NonNull String packageName, int userId) {
+        Objects.requireNonNull(packageName);
+
+        return mAppLockLockedStatesForUser.contains(userId) && mAppLockLockedStatesForUser.get(
+                userId).containsKey(packageName);
     }
 
     // NOTE: This method will hold the ActivityManagerService lock. Callers should be mindful of not
     // causing a deadlock.
     @Override
     public boolean isPackageLocked(@NonNull String packageName, int userId) {
+        return isPackageLocked(packageName, userId, /* respectGracePeriod= */ true);
+    }
+
+    private boolean isPackageLocked(@NonNull String packageName, int userId,
+            boolean respectGracePeriod) {
         Trace.beginSection(TAG + ".isPackageLocked");
+        if (DEBUG) {
+            Slog.d(TAG, "isPackageLocked for " + packageName + " and user: " + userId
+                    + ", respectGracePeriod: " + respectGracePeriod);
+        }
         try {
             Objects.requireNonNull(packageName);
 
             // 1. Check if App Lock is enabled.
             if (!isPackageAppLockEnabled(packageName, userId)) {
+                if (DEBUG) {
+                    Slog.d(TAG, "isPackageLocked: App Lock is disabled, returning false");
+                }
                 return false;
             }
 
             // 2. Check if the last successful authentication is within the grace period. Note that
             //    the grace period associated with the package's last visibility in the foreground
             //    is checked below with pending locked jobs.
-            if (isLastAuthWithinGracePeriod(packageName, userId)) {
+            if (respectGracePeriod && isLastAuthWithinGracePeriod(packageName, userId)) {
+                if (DEBUG) {
+                    Slog.d(TAG, "isPackageLocked: last successful auth is within grace period,"
+                            + " returning false");
+                }
+                return false;
+            }
+
+            // 3. Check pending jobs. If there is a pending job to lock the package, the package
+            //    is currently in a grace period and is thus technically unlocked.
+            if (respectGracePeriod && packageHasQueuedAppLockedJob(userId, packageName)) {
+                if (DEBUG) {
+                    Slog.d(TAG, "isPackageLocked: there is a pending job to lock the package,"
+                            + " returning false");
+                }
                 return false;
             }
 
@@ -255,21 +286,17 @@ public final class AppLockLocalService implements AppLockInternal,
             }
 
             synchronized (mAmService) {
-                // 3. Check pending jobs. If there is a pending job to lock the package, the package
-                //    must be unlocked.
-                if (packageHasQueuedAppLockedJob(userId, packageName)) {
-                    return false;
-                }
-
                 // 4. Check if the package has any visible tasks.
+                // TODO(b/462423789): Move the visible tasks logic in isPackageLocked into
+                //  WindowManager's AppLockController.
                 final List<ActivityAssistInfo> visibleAaInfoList =
                         getVisibleActivityAssistInfosForPackageLocked(packageName, userId);
                 if (!visibleAaInfoList.isEmpty()) {
                     // If there are visible tasks and any of them have showWhenLocked=false, the
-                    // package  is unlocked. showWhenLocked indicates that the activity should be
-                    // shown  even if the device is locked, so those activities should still be
+                    // package is unlocked. showWhenLocked indicates that the activity should be
+                    // shown even if the device is locked, so those activities should still be
                     // shown if the app is locked.
-                    final int callingUid = Binder.getCallingUid();
+                    final int callingUid = mInjector.getCallingUid();
                     for (ActivityAssistInfo aaInfo : visibleAaInfoList) {
                         final ActivityInfo info = getPackageManagerInternal().getActivityInfo(
                                 aaInfo.getComponentName(), PackageManager.MATCH_DIRECT_BOOT_AWARE
@@ -277,8 +304,16 @@ public final class AppLockLocalService implements AppLockInternal,
                                 userId);
                         if (info != null
                                 && (info.flags & ActivityInfo.FLAG_SHOW_WHEN_LOCKED) == 0) {
+                            if (DEBUG) {
+                                Slog.d(TAG, "isPackageLocked: there are visible tasks with"
+                                        + " showWhenLocked=false, returning false");
+                            }
                             return false;
                         }
+                    }
+                    if (DEBUG) {
+                        Slog.d(TAG, "isPackageLocked: there are no visible tasks with"
+                                + " showWhenLocked=false, returning true");
                     }
                     // If all visible tasks have showWhenLocked=true, the package is locked.
                     return true;
@@ -287,7 +322,13 @@ public final class AppLockLocalService implements AppLockInternal,
                 // 5. Check if the package is in the foreground: at least one process belonging to
                 //    the package should have a PROCESS_STATE_TOP state (includes the notification
                 //    shade being pulled down while the app is in the foreground).
-                return !anyProcessInPackageIsInForegroundLocked(packageName, userId);
+                final boolean isPackageInBackground =
+                        !anyProcessInPackageIsInForegroundLocked(packageName, userId);
+                if (DEBUG) {
+                    Slog.d(TAG, "isPackageLocked: returning isPackageInBackground="
+                            + isPackageInBackground);
+                }
+                return isPackageInBackground;
             }
         } finally {
             Trace.endSection();
@@ -298,7 +339,8 @@ public final class AppLockLocalService implements AppLockInternal,
         final long lastSuccessfulAuth = getLastSuccessfulAuthTimeForLockedPackage(packageName,
                 userId);
         return lastSuccessfulAuth + DEFAULT_APP_LOCK_GRACE_PERIOD_MS.toMillis()
-                > System.currentTimeMillis();
+                > System.currentTimeMillis()
+                && lastSuccessfulAuth != AppLockLockedState.INVALID_AUTH_TIME_MS;
     }
 
     @GuardedBy("mAmService")
@@ -315,9 +357,8 @@ public final class AppLockLocalService implements AppLockInternal,
     private ArrayList<ActivityAssistInfo> getVisibleActivityAssistInfosForPackageLocked(
             String packageName, int userId) {
         final List<ActivityAssistInfo> aaInfoList = mAtmInternal.getTopVisibleActivities();
-        // TODO(b/456178049): Filter out paused activities
         final ArrayList<ActivityAssistInfo> visibleAaInfoList = new ArrayList<>();
-        for (int i = aaInfoList.size() - 1; i >= 0; i--) {
+        for (int i = 0; i < aaInfoList.size(); i++) {
             final ActivityAssistInfo aaInfo = aaInfoList.get(i);
             if (aaInfo.getUserId() == userId && aaInfo.getComponentName().getPackageName().equals(
                     packageName)) {
@@ -353,10 +394,13 @@ public final class AppLockLocalService implements AppLockInternal,
      * @param procState      the process state the uid is moving to
      */
     @GuardedBy("mAmService")
-    public void handleUidChangeLocked(UidRecord uidRec, int uid, int enqueuedChange,
+    public void handleUidChangeLocked(@Nullable UidRecord uidRec, int uid, int enqueuedChange,
             int procState) {
         Trace.beginSection(TAG + ".handleUidChangeLocked");
         try {
+            if (uidRec == null) {
+                return;
+            }
             if ((enqueuedChange & UidRecord.CHANGE_PROCSTATE) == 0) {
                 // Only handles process state changes, e.g. TOP <-> NOT_TOP
                 return;
@@ -383,23 +427,33 @@ public final class AppLockLocalService implements AppLockInternal,
             // 3. Iterate over App Lock enabled packages and schedule listener updates.
             for (int i = 0; i < packageSet.size(); i++) {
                 final String packageName = packageSet.valueAt(i);
+                if (DEBUG) {
+                    Slog.d(TAG, "handleUidChangeLocked: packageName: " + packageName);
+                }
                 // isPackageLocked should be called outside of this synchronized block because it
                 // acquires the outer lock (mAmService).
+                //
+                // Note: respectGracePeriod is set to false here. If the user recently authenticated
+                // and then immediately left the app, isPackageLocked would normally return false
+                // (unlocked) due to the authentication grace period. By ignoring it, we ensure
+                // that moving to the background correctly triggers handleLockedStateLocked to
+                // schedule the grace period lock.
                 final boolean isCurrentlyLocked = procState != PROCESS_STATE_TOP && isPackageLocked(
-                        packageName, userId);
+                        packageName, userId, /* respectGracePeriod= */ false);
                 synchronized (mLock) {
                     final Boolean lastSentLockedState = getOrCreateAppLockLockedStateLocked(
                             packageName,
                             userId).mLastSentLockedState;
 
                     if (lastSentLockedState != null && lastSentLockedState == isCurrentlyLocked) {
+                        if (DEBUG) {
+                            Slog.d(TAG, "handleUidChangeLocked: lastSentLockedState is the same");
+                        }
                         // No change since last listener update.
                         if (!isCurrentlyLocked) {
                             // If the update that the package is locked hasn't been sent yet, but
-                            // the
-                            // package was moved off of the top (and now back to the top), cancel
-                            // the
-                            // queued lock update
+                            // the package was moved off of the top (and now back to the top),
+                            // cancel the queued lock update
                             cancelPackageAppLockedJobLocked(packageName, userId);
                         }
                         continue;
@@ -425,6 +479,10 @@ public final class AppLockLocalService implements AppLockInternal,
             Slog.d(TAG, "handleUnlockedState for " + packageName + " in user: " + userId);
         }
         mInjector.getHandler().post(() -> {
+            if (DEBUG) {
+                Slog.d(TAG, "handleUnlockedState's runnable for " + packageName + " and user: "
+                        + userId);
+            }
             synchronized (AppLockLocalService.this.mLock) {
                 for (int i = 0; i < mPackageLockedStateListeners.size(); i++) {
                     mPackageLockedStateListeners.get(i).onPackageLockedStateChanged(packageName,
@@ -454,6 +512,10 @@ public final class AppLockLocalService implements AppLockInternal,
 
         if (isPackageLocked(packageName, userId)) {
             mInjector.getHandler().post(() -> {
+                if (DEBUG) {
+                    Slog.d(TAG, "handleAppLockEnabled's runnable for " + packageName + " and user: "
+                            + userId);
+                }
                 synchronized (AppLockLocalService.this.mLock) {
                     for (int j = 0; j < mPackageLockedStateListeners.size(); j++) {
                         mPackageLockedStateListeners.get(j).onPackageLockedStateChanged(packageName,
@@ -471,33 +533,24 @@ public final class AppLockLocalService implements AppLockInternal,
     @GuardedBy("mLock")
     void handleLockedStateLocked(String packageName, int userId, boolean lockImmediately) {
         if (DEBUG) {
-            Slog.d(TAG, "handleLockedState for " + packageName + " and user: " + userId);
+            Slog.d(TAG, "handleLockedState for " + packageName + " and user: " + userId
+                    + ", lockImmediately: " + lockImmediately);
         }
 
         if (!lockImmediately && getOrCreateAppLockLockedStateLocked(packageName,
                 userId).mLockedUpdateRunnable != null) {
+            if (DEBUG) {
+                Slog.d(TAG, "handleLockedState: there is already a job to lock the package,"
+                        + " returning early");
+            }
             // This shouldn't happen, but if there's already a job to lock the package, don't
             // schedule a new one and let the existing one run. If we're locking immediately, do
             // that instead.
             return;
         }
 
-        final Runnable setPackageLocked = () -> {
-            if (!isPackageAppLockEnabled(packageName, userId)) {
-                // ensure the package still has App Lock enabled
-                return;
-            }
-            synchronized (AppLockLocalService.this.mLock) {
-                for (int i = 0; i < mPackageLockedStateListeners.size(); i++) {
-                    mPackageLockedStateListeners.get(i).onPackageLockedStateChanged(packageName,
-                            userId, true);
-                }
-                final AppLockLockedState state = getOrCreateAppLockLockedStateLocked(packageName,
-                        userId);
-                state.mLastSentLockedState = true;
-                state.mLockedUpdateRunnable = null;
-            }
-        };
+        final Runnable setPackageLocked = new SetPackageLockedRunnable(this, packageName, userId,
+                lockImmediately);
 
         if (lockImmediately) {
             cancelPackageAppLockedJobLocked(packageName, userId);
@@ -513,53 +566,110 @@ public final class AppLockLocalService implements AppLockInternal,
 
     @Override
     public void onDeviceLockedStateChanged(boolean isDeviceLocked) {
-        if (!isDeviceLocked) {
-            return;
-        }
-        synchronized (mLock) {
-            for (int i = 0; i < mAppLockLockedStatesForUser.size(); i++) {
-                final int userId = mAppLockLockedStatesForUser.keyAt(i);
-                final ArrayMap<String, AppLockLockedState> userPackages =
-                        mAppLockLockedStatesForUser.valueAt(i);
+        Trace.beginSection(TAG + ".onDeviceLockedStateChanged");
+        try {
+            if (!isDeviceLocked) {
+                return;
+            }
+            synchronized (mLock) {
+                for (int i = 0; i < mAppLockLockedStatesForUser.size(); i++) {
+                    final int userId = mAppLockLockedStatesForUser.keyAt(i);
+                    final ArrayMap<String, AppLockLockedState> userPackages =
+                            mAppLockLockedStatesForUser.valueAt(i);
 
-                if (userPackages == null) {
-                    continue;
-                }
-                for (Map.Entry<String, AppLockLockedState> entry : userPackages.entrySet()) {
-                    AppLockLockedState state = entry.getValue();
-                    // Send an update for all unlocked packages that they are now immediately locked
-                    if (state != null && state.mLastSentLockedState != null
-                            && !state.mLastSentLockedState) {
-                        if (DEBUG) {
-                            Slog.d(TAG, entry.getKey()
-                                    + " has become locked due to the device locking");
+                    if (userPackages == null) {
+                        continue;
+                    }
+                    for (Map.Entry<String, AppLockLockedState> entry : userPackages.entrySet()) {
+                        AppLockLockedState state = entry.getValue();
+                        // Send an update for all unlocked packages that they are now immediately
+                        // locked.
+                        if (state != null && state.mLastSentLockedState != null
+                                && !state.mLastSentLockedState) {
+                            if (DEBUG) {
+                                Slog.d(TAG, entry.getKey()
+                                        + " has become locked due to the device locking");
+                            }
+                            state.mLastAuthTimeSinceDeviceUnlock =
+                                    AppLockLockedState.INVALID_AUTH_TIME_MS;
+                            handleLockedStateLocked(entry.getKey(), userId, /* lockImmediately= */
+                                    true);
                         }
-                        handleLockedStateLocked(entry.getKey(), userId, /* lockImmediately= */
-                                true);
                     }
                 }
             }
+        } finally {
+            Trace.endSection();
         }
     }
 
     @Override
     public void setAppLockEnabledPackageSuccessfullyAuthenticated(@NonNull String packageName,
             int userId) {
-        Objects.requireNonNull(packageName);
+        Trace.beginSection(TAG + ".setAppLockEnabledPackageSuccessfullyAuthenticated");
+        try {
+            Objects.requireNonNull(packageName);
+            if (!UserHandle.isSameApp(mInjector.getCallingUid(), Process.SYSTEM_UID)
+                    && !UserHandle.isSameApp(mInjector.getCallingUid(), Process.ROOT_UID)) {
+                throw new SecurityException(
+                        "setAppLockEnabledPackageSuccessfullyAuthenticated can only be called by "
+                                + "the system");
+            }
 
-        synchronized (mLock) {
-            final AppLockLockedState state = getOrCreateAppLockLockedStateLocked(packageName,
-                    userId);
-            state.mLastSuccessfulAuthTimeSinceBoot = System.currentTimeMillis();
-            handleUnlockedStateLocked(packageName, userId);
+            if (DEBUG) {
+                Slog.d(TAG, "setAppLockEnabledPackageSuccessfullyAuthenticated for " + packageName
+                        + " and user: " + userId);
+            }
+
+            final ArraySet<String> packagesToAuthenticate = new ArraySet<>();
+            packagesToAuthenticate.add(packageName);
+            // In a multi-window scenario, e.g. split screen and freeform windows, multiple packages
+            // can be visible with an App Lock overlay simultaneously. To improve user experience,
+            // retrieve all such packages for the current user and authenticate them along with the
+            // primary package.
+            final Set<String> packagesWithVisibleAppLockOverlay = mAtmInternal
+                    .getPackagesWithVisibleAppLockOverlay(userId);
+            if (packagesWithVisibleAppLockOverlay != null
+                    && !packagesWithVisibleAppLockOverlay.isEmpty()) {
+                packagesToAuthenticate.addAll(packagesWithVisibleAppLockOverlay);
+            }
+
+            synchronized (mLock) {
+                // All packages receive the same 'authTime' to accurately reflect a single user
+                // authentication event. Even if processing multiple packages takes longer than a
+                // very short grace period, the functional impact is practically negligible due to
+                // the microsecond scale of loop operations vs. the millisecond or second scale of
+                // typical grace periods.
+                final long authTime = System.currentTimeMillis();
+
+                for (int i = 0; i < packagesToAuthenticate.size(); i++) {
+                    final String packageToAuthenticate = packagesToAuthenticate.valueAt(i);
+                    if (packageToAuthenticate == null
+                            || !isPackageAppLockEnabledLocked(packageToAuthenticate, userId)) {
+                        // Ensure the package still has App Lock enabled.
+                        continue;
+                    }
+                    if (DEBUG) {
+                        Slog.d(TAG, "setAppLockEnabledPackageSuccessfullyAuthenticated:"
+                                + " authenticating package " + packageToAuthenticate);
+                    }
+                    final AppLockLockedState state = getOrCreateAppLockLockedStateLocked(
+                            packageToAuthenticate, userId);
+                    state.mLastAuthTimeSinceDeviceUnlock = authTime;
+                    handleUnlockedStateLocked(packageToAuthenticate, userId);
+                }
+            }
+        } finally {
+            Trace.endSection();
         }
     }
 
-    private long getLastSuccessfulAuthTimeForLockedPackage(String packageName, int userId) {
+    @VisibleForTesting
+    long getLastSuccessfulAuthTimeForLockedPackage(String packageName, int userId) {
         synchronized (mLock) {
             final AppLockLockedState state = getOrCreateAppLockLockedStateLocked(packageName,
                     userId);
-            return state.mLastSuccessfulAuthTimeSinceBoot;
+            return state.mLastAuthTimeSinceDeviceUnlock;
         }
     }
 
@@ -576,8 +686,15 @@ public final class AppLockLocalService implements AppLockInternal,
 
     @GuardedBy("mLock")
     private void cancelPackageAppLockedJobLocked(String packageName, int userId) {
+        if (DEBUG) {
+            Slog.d(TAG, "cancelPackageAppLockedJobLocked for " + packageName + " and user: "
+                    + userId);
+        }
         final AppLockLockedState state = getOrCreateAppLockLockedStateLocked(packageName, userId);
         if (state.mLockedUpdateRunnable == null) {
+            if (DEBUG) {
+                Slog.d(TAG, "cancelPackageAppLockedJobLocked: no job to cancel");
+            }
             return;
         }
         mInjector.getHandler().removeCallbacks(state.mLockedUpdateRunnable);
@@ -594,6 +711,8 @@ public final class AppLockLocalService implements AppLockInternal,
     @VisibleForTesting
     interface Injector {
         Handler getHandler();
+
+        int getCallingUid();
     }
 
     /**
@@ -605,10 +724,11 @@ public final class AppLockLocalService implements AppLockInternal,
      * state change notifications.
      */
     static final class AppLockLockedState {
-        private static final long DEFAULT_LAST_AUTH_TIME_SINCE_BOOT_MS = 0L;
+        private static final long INVALID_AUTH_TIME_MS = -1L;
         // Last successful authentication timestamp, which is required to calculate grace period
-        // expiration.
-        private long mLastSuccessfulAuthTimeSinceBoot;
+        // expiration. This gets reset to {@link #INVALID_AUTH_TIME_MS} when the device becomes
+        // locked.
+        private long mLastAuthTimeSinceDeviceUnlock;
         // A runnable to inform listeners that the package has become locked after the grace period
         // has expired. If the package moves back to PROCESS_STATE_TOP, the runnable should be
         // canceled. If this runnable exists for this package and user combination, the package
@@ -618,9 +738,104 @@ public final class AppLockLocalService implements AppLockInternal,
         private Boolean mLastSentLockedState;
 
         AppLockLockedState() {
-            mLastSuccessfulAuthTimeSinceBoot = DEFAULT_LAST_AUTH_TIME_SINCE_BOOT_MS;
+            mLastAuthTimeSinceDeviceUnlock = INVALID_AUTH_TIME_MS;
             mLockedUpdateRunnable = null;
             mLastSentLockedState = null;
+        }
+    }
+
+    private static final class SetPackageLockedRunnable implements Runnable {
+        private final AppLockLocalService mService;
+        private final String mPackageName;
+        private final int mUserId;
+        private final boolean mLockImmediately;
+
+        SetPackageLockedRunnable(AppLockLocalService service, String packageName, int userId,
+                boolean lockImmediately) {
+            mService = service;
+            this.mPackageName = packageName;
+            this.mUserId = userId;
+            this.mLockImmediately = lockImmediately;
+        }
+
+        @Override
+        public void run() {
+            if (DEBUG) {
+                Slog.d(TAG, "SetPackageLockedRunnable for " + mPackageName + " and user: "
+                        + mUserId + ", lockImmediately: " + mLockImmediately);
+            }
+            synchronized (mService.mLock) {
+                if (!mService.isPackageAppLockEnabledLocked(mPackageName, mUserId)) {
+                    // Ensure the package still has App Lock enabled.
+                    if (DEBUG) {
+                        Slog.d(TAG, "SetPackageLockedRunnable: package has App Lock disabled,"
+                                + " returning");
+                    }
+                    return;
+                }
+                final AppLockLockedState state = mService.getOrCreateAppLockLockedStateLocked(
+                        mPackageName, mUserId);
+                if (Boolean.TRUE.equals(state.mLastSentLockedState)) {
+                    // Already sent an update that the package is locked.
+                    if (DEBUG) {
+                        Slog.d(TAG, "SetPackageLockedRunnable: already sent a locked update,"
+                                + " updating state and returning");
+                    }
+                    state.mLockedUpdateRunnable = null;
+                    return;
+                }
+                if (!mLockImmediately && state.mLockedUpdateRunnable != this) {
+                    // Job has been canceled or replaced. Note that there's no need to check
+                    // mLockedUpdateRunnable for an immediate lock because in that case the job
+                    // won't be cached in mLockedUpdateRunnable.
+                    Slog.w(TAG, "SetPackageLockedRunnable: job was canceled or replaced,"
+                            + " returning");
+                    return;
+                }
+            }
+
+            // Check if the package is still locked before sending the update.
+            // isPackageLocked acquires the AMS lock, so it must be called without holding mLock to
+            // avoid deadlocks.
+            //
+            // Note: We should ignore the grace period here. Otherwise, isPackageLocked would see
+            // this current execution as a "pending lock job" and return false (unlocked), causing
+            // this runnable to incorrectly abort.
+            final boolean isPackageLocked = mService.isPackageLocked(mPackageName, mUserId,
+                    /* respectGracePeriod= */ false);
+
+            synchronized (mService.mLock) {
+                final AppLockLockedState state = mService.getOrCreateAppLockLockedStateLocked(
+                        mPackageName, mUserId);
+                if (!mLockImmediately && !isPackageLocked) {
+                    // Note that there's no need to check mLockedUpdateRunnable for an immediate
+                    // lock because in that case the job won't be cached in mLockedUpdateRunnable.
+                    if (DEBUG) {
+                        Slog.d(TAG, "SetPackageLockedRunnable: package is no longer locked,"
+                                + " updating state and returning");
+                    }
+                    state.mLockedUpdateRunnable = null;
+                    return;
+                }
+                // Check again in case state changed while we weren't holding the lock.
+                if (state.mLastSentLockedState != null && state.mLastSentLockedState) {
+                    if (DEBUG) {
+                        Slog.d(TAG, "SetPackageLockedRunnable: package was just locked, updating"
+                                + " state and returning");
+                    }
+                    state.mLockedUpdateRunnable = null;
+                    return;
+                }
+                for (int i = 0; i < mService.mPackageLockedStateListeners.size(); i++) {
+                    mService.mPackageLockedStateListeners.get(i).onPackageLockedStateChanged(
+                            mPackageName, mUserId, true);
+                }
+                state.mLastSentLockedState = true;
+                state.mLockedUpdateRunnable = null;
+            }
+            if (DEBUG) {
+                Slog.d(TAG, "SetPackageLockedRunnable: completed");
+            }
         }
     }
 
@@ -633,39 +848,58 @@ public final class AppLockLocalService implements AppLockInternal,
 
         @Override
         public void onPackageAppLockEnabled(String packageName) {
-            super.onPackageAppLockEnabled(packageName);
-            if (DEBUG) {
-                Slog.d(TAG, "onPackageAppLockEnabled for " + packageName);
-            }
-            final int userId = getChangingUserId();
+            Trace.beginSection(TAG + ".onPackageAppLockEnabled");
+            try {
+                super.onPackageAppLockEnabled(packageName);
+                if (DEBUG) {
+                    Slog.d(TAG, "onPackageAppLockEnabled for " + packageName);
+                }
+                final int userId = getChangingUserId();
 
-            mService.handleAppLockEnabled(packageName, userId);
+                mService.handleAppLockEnabled(packageName, userId);
+            } finally {
+                Trace.endSection();
+            }
         }
 
         @Override
         public void onPackageAppLockDisabled(String packageName) {
-            super.onPackageAppLockDisabled(packageName);
-            if (DEBUG) {
-                Slog.d(TAG, "onPackageAppLockDisabled for " + packageName);
-            }
+            Trace.beginSection(TAG + ".onPackageAppLockDisabled");
+            try {
+                super.onPackageAppLockDisabled(packageName);
+                if (DEBUG) {
+                    Slog.d(TAG, "onPackageAppLockDisabled for " + packageName);
+                }
 
-            updateMapAndListenersPackageNoLongerAppLockEnabled(packageName);
+                updateMapAndListenersPackageNoLongerAppLockEnabled(packageName);
+            } finally {
+                Trace.endSection();
+            }
         }
 
         @Override
         public void onPackageRemoved(String packageName, int uid) {
-            super.onPackageRemoved(packageName, uid);
-            if (DEBUG) {
-                Slog.d(TAG, "onPackageRemoved for " + packageName);
-            }
+            Trace.beginSection(TAG + ".onPackageRemoved");
+            try {
+                super.onPackageRemoved(packageName, uid);
+                if (DEBUG) {
+                    Slog.d(TAG, "onPackageRemoved for " + packageName);
+                }
 
-            updateMapAndListenersPackageNoLongerAppLockEnabled(packageName);
+                updateMapAndListenersPackageNoLongerAppLockEnabled(packageName);
+            } finally {
+                Trace.endSection();
+            }
         }
 
         private void updateMapAndListenersPackageNoLongerAppLockEnabled(String packageName) {
             final int userId = getChangingUserId();
 
             mService.mInjector.getHandler().post(() -> {
+                if (DEBUG) {
+                    Slog.d(TAG, "updateMapAndListenersPackageNoLongerAppLockEnabled's runnable for "
+                            + packageName);
+                }
                 synchronized (mService.mLock) {
                     final ArrayMap<String, AppLockLockedState> map =
                             mService.mAppLockLockedStatesForUser.get(userId);
@@ -699,6 +933,11 @@ public final class AppLockLocalService implements AppLockInternal,
         @Override
         public Handler getHandler() {
             return BackgroundThread.getHandler();
+        }
+
+        @Override
+        public int getCallingUid() {
+            return Binder.getCallingUid();
         }
     }
 }

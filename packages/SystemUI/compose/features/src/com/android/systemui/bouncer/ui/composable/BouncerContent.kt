@@ -223,12 +223,10 @@ fun ContentScope.BouncerContent(
         appearAnimationDelay =
             BOUNCER_CONTENTS_PASSIVE_AUTH_DELAY.takeIf { viewModel.shouldDelayBouncerContent() }
                 ?: 0
-
-        // Evaluate once when BouncerContent first shows; we don't animate if the bouncer showing
-        // was initiated from a drag/fling.
         appearAnimationDuration =
-            if (!isDraggingToBouncer()) BOUNCER_CONTENTS_ALPHA_IN_ANIMATION_DURATION else 0
-
+            BOUNCER_CONTENTS_ALPHA_IN_ANIMATION_DURATION.takeIf {
+                viewModel.shouldDelayBouncerContent()
+            } ?: 0
         startAppearAnimation = true
     }
 
@@ -1000,7 +998,10 @@ private fun UserSwitcher(viewModel: BouncerOverlayContentViewModel, modifier: Mo
                 modifier = Modifier.size(userSwitcherIconSize).sysuiResTag("user_icon"),
             )
         }
-        if (Flags.disableUserSwitcherDropdownOnBouncer() && dropdownItems.size <= 1) {
+        if (
+            (Flags.disableUserSwitcherDropdownOnBouncer() ||
+                Flags.disableUserSwitcherDropdownOnBouncer2()) && dropdownItems.size <= 1
+        ) {
             Spacer(modifier = Modifier.height(24.dp))
             UserNamePill(viewModel = viewModel, maxWidth = maxUserSwitcherWidth)
         } else {

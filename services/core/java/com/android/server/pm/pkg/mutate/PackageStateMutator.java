@@ -469,6 +469,26 @@ public class PackageStateMutator {
                 }
                 return this;
             }
+
+            @NonNull
+            @Override
+            public PackageUserStateWrite setVirtualGamepadUserOption(
+                    @PackageManager.VirtualGamepadUserOption int userOption) {
+                if (mUserState != null) {
+                    mUserState.setVirtualGamepadUserOption(userOption);
+                }
+                return this;
+            }
+
+            @NonNull
+            @Override
+            public PackageUserStateWrite setPersonalContextMode(
+                    @PackageManager.PersonalContextMode int userOption) {
+                if (mUserState != null) {
+                    mUserState.setPersonalContextMode(userOption);
+                }
+                return this;
+            }
         }
     }
 }

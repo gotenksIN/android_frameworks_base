@@ -17,7 +17,6 @@
 package com.android.wm.shell.pinnedlayer.phone
 
 import android.app.ActivityManager.RunningTaskInfo
-import android.app.TaskInfo
 import android.app.WindowConfiguration
 import android.graphics.Rect
 import android.os.IBinder
@@ -34,15 +33,17 @@ import android.window.WindowContainerToken
 import android.window.WindowContainerTransaction
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
-import com.android.window.flags.Flags
 import com.android.testing.wm.util.MockToken
+import com.android.window.flags.Flags
 import com.android.wm.shell.R
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer
+import com.android.wm.shell.ShellTaskOrganizer
 import com.android.wm.shell.ShellTestCase
 import com.android.wm.shell.common.DisplayController
 import com.android.wm.shell.common.DisplayLayout
 import com.android.wm.shell.common.MultiDisplayDragMoveIndicatorController
 import com.android.wm.shell.desktopmode.DesktopTestHelpers
+import com.android.wm.shell.desktopmode.FakeShellDesktopState
 import com.android.wm.shell.desktopmode.WindowDragTransitionHandler
 import com.android.wm.shell.shared.TransactionPool
 import com.android.wm.shell.shared.desktopmode.FakeDesktopState
@@ -51,6 +52,7 @@ import com.android.wm.shell.transition.Transitions
 import kotlin.math.roundToInt
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -59,8 +61,10 @@ import org.mockito.Mock
 import org.mockito.kotlin.any
 import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.argumentCaptor
+import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
+import org.mockito.kotlin.stub
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.verifyNoInteractions
 import org.mockito.kotlin.whenever
@@ -86,12 +90,14 @@ class PinnedLayerControllerTest : ShellTestCase() {
     @Mock private lateinit var leash: SurfaceControl
     @Mock private lateinit var displayController: DisplayController
     @Mock private lateinit var rootTaskDisplayAreaOrganizer: RootTaskDisplayAreaOrganizer
+    @Mock private lateinit var shellTaskOrganizer: ShellTaskOrganizer
     @Mock
     private lateinit var multiDisplayDragMoveIndicatorController:
         MultiDisplayDragMoveIndicatorController
 
     private lateinit var defaultDisplayToken: WindowContainerToken
     private lateinit var desktopState: FakeDesktopState
+    private lateinit var shellDesktopState: FakeShellDesktopState
     private lateinit var presentationController: PinnedLayerPresentationController
     private lateinit var pinnedWindowRepositionAnimationHandler:
         PinnedWindowRepositionAnimationHandler
@@ -101,6 +107,7 @@ class PinnedLayerControllerTest : ShellTestCase() {
     fun setup() {
         defaultDisplayToken = MockToken.token()
         desktopState = FakeDesktopState()
+        shellDesktopState = FakeShellDesktopState(desktopState)
 
         whenever(transactionPool.acquire()).thenReturn(poolTransaction)
 
@@ -114,8 +121,9 @@ class PinnedLayerControllerTest : ShellTestCase() {
             PinnedLayerController(
                 shellInit,
                 transitions,
-                desktopState,
+                shellDesktopState,
                 rootTaskDisplayAreaOrganizer,
+                shellTaskOrganizer,
                 presentationController,
                 windowDragTransitionHandler,
                 pinnedWindowRepositionAnimationHandler,
@@ -268,8 +276,9 @@ class PinnedLayerControllerTest : ShellTestCase() {
     fun moveToDisplay_policiesAreValid_startTransition() {
         val task = setupTask()
         pinTask(task)
+        setupDisplay(DISPLAY_1, isDesktopModeSupported = true)
 
-        val result = pinnedLayerController.moveToDisplay(task, DEFAULT_DISPLAY, DEFAULT_TASK_BOUNDS)
+        val result = pinnedLayerController.moveToDisplay(task, DISPLAY_1, DEFAULT_TASK_BOUNDS)
         assertTrue(result)
     }
 
@@ -336,6 +345,30 @@ class PinnedLayerControllerTest : ShellTestCase() {
         assertEquals(DEFAULT_TASK_BOUNDS.top, topCaptor.firstValue.roundToInt())
     }
 
+    @Test
+    fun onDisplayDisconnect_taskOnRemovedDisplay_returnsWct() {
+        setupDisplay(displayId = DISPLAY_1, isDesktopModeSupported = true)
+        val task = setupTask(displayId = DISPLAY_1)
+
+        pinTask(task)
+
+        val wct =
+            pinnedLayerController.getDisplayDisconnectChanges(mock(), DISPLAY_1, DEFAULT_DISPLAY)
+        assertNotNull(wct, "wct should not be null if task is on disconnected display")
+    }
+
+    @Test
+    fun onDisplayDisconnect_taskOnDifferentDisplay_returnsNull() {
+        setupDisplay(displayId = DISPLAY_1, isDesktopModeSupported = true)
+        val task = setupTask(displayId = DEFAULT_DISPLAY)
+
+        pinTask(task)
+
+        val wct =
+            pinnedLayerController.getDisplayDisconnectChanges(mock(), DISPLAY_1, DEFAULT_DISPLAY)
+        assertTrue(wct == null, "wct should be null if task is on different display")
+    }
+
     private fun setupTask(
         displayId: Int = DEFAULT_DISPLAY,
         bounds: Rect = DEFAULT_TASK_BOUNDS,
@@ -356,6 +389,7 @@ class PinnedLayerControllerTest : ShellTestCase() {
         isDesktopModeSupported: Boolean = true,
     ) {
         desktopState.overrideDesktopModeSupportPerDisplay[displayId] = isDesktopModeSupported
+        shellDesktopState.overrideWindowDropTargetEligibility[displayId] = isDesktopModeSupported
 
         whenever(rootTaskDisplayAreaOrganizer.getDisplayAreaInfo(displayId))
             .thenReturn(DisplayAreaInfo(token, displayId, DisplayAreaOrganizer.FEATURE_UNDEFINED))
@@ -381,10 +415,11 @@ class PinnedLayerControllerTest : ShellTestCase() {
         }
     }
 
-    private fun pinTask(task: TaskInfo) {
+    private fun pinTask(task: RunningTaskInfo) {
         val transition = mock<IBinder>()
         val transitionInfo = TransitionInfo(TRANSIT_CHANGE, FLAG_NONE)
 
+        shellTaskOrganizer.stub { on { getRunningTaskInfo(task.taskId) } doReturn task }
         pinnedLayerController.pinTask(transition, task, null)
         pinnedLayerController.onTransitionReady(
             transition,

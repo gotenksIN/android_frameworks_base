@@ -24,6 +24,8 @@ import static android.os.UserManager.isHeadlessSystemUserMode;
 import android.Manifest;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.RequiresPermission;
+import android.app.AppCompatTaskInfo;
 import android.app.TaskInfo;
 import android.app.WindowConfiguration;
 import android.content.ComponentName;
@@ -33,6 +35,7 @@ import android.content.pm.ActivityInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
+import android.provider.Settings;
 
 import com.android.internal.R;
 import com.android.window.flags.Flags;
@@ -127,7 +130,6 @@ public class DesktopModeCompatPolicy {
         if (topActivityType == ACTIVITY_TYPE_DREAM) {
             return true;
         }
-        // TODO: b/434943016 - Replace with permission.
         // If activity belongs to package exempt via device config, force out of desktop.
         if (isPackageExemptViaConfig(packageName) && !isActivityStackTransparent) {
             return true;
@@ -143,9 +145,12 @@ public class DesktopModeCompatPolicy {
         // If all activities in task stack are transparent AND package has the relevant
         // fullscreen transparent permission OR is signed with platform key, safe to force out
         // of desktop.
+        // TODO: b/458693972 - Replace with permission and manifest check.
         return isTransparentTask(isActivityStackTransparent, numActivities)
-                && (hasFullscreenTransparentPermission(packageName, userId)
-                || hasPlatformSignature(info));
+                && (hasFullscreenTransparentPermission(packageName, userId, info)
+                    || hasPlatformSignature(info)
+                    || (Flags.enablePrivilegedAppTransparentWindowingExemptions()
+                        && isPrivilegedApp(info)));
     }
 
     /** @see #shouldDisableDesktopEntryPoints(String, int, boolean, boolean, int, int) */
@@ -194,7 +199,6 @@ public class DesktopModeCompatPolicy {
         if (isPartOfDefaultHomePackageOrNoHomeAvailable(packageName, userId)) {
             return true;
         }
-        // TODO: b/434943016 - Replace with permission.
         // If activity belongs to package exempt via device config, hide desktop entry point.
         if (isPackageExemptViaConfig(packageName)) {
             return true;
@@ -207,12 +211,16 @@ public class DesktopModeCompatPolicy {
 
     /** @see DesktopModeCompatUtils#shouldExcludeCaptionFromAppBounds */
     public boolean shouldExcludeCaptionFromAppBounds(@NonNull TaskInfo taskInfo) {
+        final AppCompatTaskInfo appCompatInfo = taskInfo.appCompatTaskInfo;
+        if (Flags.refactorCaptionSandboxingToCore()) {
+            return appCompatInfo != null && appCompatInfo.hasIsExcludeCaptionInsets();
+        }
         if (taskInfo.topActivityInfo != null) {
             return DesktopModeCompatUtils.shouldExcludeCaptionFromAppBounds(
                     taskInfo.topActivityInfo,
                     taskInfo.isResizeable,
-                    taskInfo.appCompatTaskInfo != null
-                            && taskInfo.appCompatTaskInfo.hasOptOutEdgeToEdge()
+                    appCompatInfo != null && appCompatInfo.hasOptOutEdgeToEdge(),
+                    appCompatInfo != null && appCompatInfo.hasIsExcludeCaptionInsets()
             );
         }
         return false;
@@ -239,12 +247,19 @@ public class DesktopModeCompatPolicy {
     }
 
     // Checks if the app for the given package has the SYSTEM_ALERT_WINDOW permission.
-    private boolean hasFullscreenTransparentPermission(@NonNull String packageName, int userId) {
+    private boolean hasFullscreenTransparentPermission(
+            @NonNull String packageName, int userId, ActivityInfo info) {
+        if (info != null && info.applicationInfo != null) {
+            int uid = info.applicationInfo.uid;
+            Boolean appOpState = Settings.isCallingPackageAllowedToDrawOverlays(
+                    mContext, uid, packageName, false);
+            if (appOpState) return true;
+        }
+
         final String cacheKey = userId + "@" + packageName;
         if (mPackageInfoCache.containsKey(cacheKey)) {
             return mPackageInfoCache.get(cacheKey);
         }
-
         boolean hasPermission = false;
         try {
             PackageInfo packageInfo = getPackageManager().getPackageInfoAsUser(
@@ -253,9 +268,14 @@ public class DesktopModeCompatPolicy {
                     userId
             );
             if (packageInfo != null && packageInfo.requestedPermissions != null) {
-                for (String permission : packageInfo.requestedPermissions) {
-                    if (Objects.equals(permission, Manifest.permission.SYSTEM_ALERT_WINDOW)) {
-                        hasPermission = true;
+                for (int i = 0; i < packageInfo.requestedPermissions.length; i++) {
+                    if (Objects.equals(
+                            packageInfo.requestedPermissions[i],
+                            Manifest.permission.SYSTEM_ALERT_WINDOW)) {
+                        if ((packageInfo.requestedPermissionsFlags[i]
+                                & PackageInfo.REQUESTED_PERMISSION_GRANTED) != 0) {
+                            hasPermission = true;
+                        }
                         break;
                     }
                 }
@@ -265,7 +285,6 @@ public class DesktopModeCompatPolicy {
         }
         mPackageInfoCache.put(cacheKey, hasPermission);
         return hasPermission;
-
     }
 
     // Checks if the app is signed with the platform signature.
@@ -273,6 +292,14 @@ public class DesktopModeCompatPolicy {
         return info != null
                 && info.applicationInfo != null
                 && info.applicationInfo.isSignedWithPlatformKey();
+    }
+
+    // Checks if the app is a privileged application.
+    @RequiresPermission(Manifest.permission.INSTALL_PACKAGES)
+    private boolean isPrivilegedApp(@Nullable ActivityInfo info) {
+        return info != null
+                && info.applicationInfo != null
+                && info.applicationInfo.isPrivilegedApp();
     }
 
     /**

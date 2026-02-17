@@ -16,13 +16,15 @@
 
 package android.service.personalcontext;
 
-import android.content.ComponentName;
+import android.os.Bundle;
 import android.os.ParcelUuid;
 import android.service.personalcontext.RenderToken;
 import android.service.personalcontext.Token;
 import android.service.personalcontext.embedded.InsightSurfaceClientInfo;
+import android.service.personalcontext.hint.ContextHintWithSignatureWrapper;
 import android.service.personalcontext.hint.ContextHintWrapper;
 import android.service.personalcontext.insight.ContextInsightWrapper;
+import android.service.personalcontext.insight.interaction.InsightEvent;
 
 /**
  * {@link IPersonalContextManager} is the internal interface for accessing the
@@ -31,9 +33,16 @@ import android.service.personalcontext.insight.ContextInsightWrapper;
  */
 interface IPersonalContextManager {
     oneway void publishTriggeringHint(
-            in List<ContextHintWrapper> hints, in RenderToken renderToken, int userId);
+            in List<ContextHintWrapper> hints,
+            in List<RenderToken> renderTokens,
+            in List<ContextHintWrapper> attributionHints,
+            int userId);
 
     oneway void publishInsight(in List<ContextInsightWrapper> insights, int userId);
+
+    ContextHintWithSignatureWrapper signHint(
+            in ContextHintWrapper hint,
+            in List<ContextHintWrapper> attributionHints);
 
     oneway void registerInsightSurfaceClient(
             in List<ContextHintWrapper> clientHints,
@@ -46,4 +55,17 @@ interface IPersonalContextManager {
 
     oneway void publishInsightSurfaceHints(
         in List<ContextHintWrapper> hints, in InsightSurfaceClientInfo clientInfo, int userId);
+
+    oneway void showAttribution(in ContextInsightWrapper insight);
+
+    oneway void reportEvent(in InsightEvent event, int userId);
+
+    oneway void reportFeedback(
+        in ContextInsightWrapper insight, in Bundle partialFeedback, int userId);
+
+    boolean isPersonalContextModeEnabled(in String packageName, int userId);
+
+    // Avoiding oneway so that get and set have a consistent ordering.
+    @EnforcePermission("CHANGE_PERSONAL_CONTEXT_MODE")
+    void setPersonalContextModeEnabled(in String packageName, int userId, boolean enabled);
 }

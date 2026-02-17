@@ -1036,6 +1036,10 @@ public class AccessibilityWindowManager {
                     return AccessibilityWindowInfo.TYPE_MAGNIFICATION_OVERLAY;
                 }
 
+                case WindowManager.LayoutParams.TYPE_APPLICATION_CAPTION_BAR: {
+                    return AccessibilityWindowInfo.TYPE_WINDOW_CONTROL;
+                }
+
                 default: {
                     return -1;
                 }

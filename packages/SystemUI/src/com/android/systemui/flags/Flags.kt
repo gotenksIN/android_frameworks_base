@@ -41,26 +41,11 @@ object Flags {
     @JvmField val NULL_FLAG = unreleasedFlag("null_flag")
 
     // 100 - notification
-    // TODO(b/254512751): Tracking Bug
-    val NOTIFICATION_PIPELINE_DEVELOPER_LOGGING =
-        unreleasedFlag("notification_pipeline_developer_logging")
-
-    // TODO(b/254512732): Tracking Bug
-    @JvmField val NSSL_DEBUG_LINES = unreleasedFlag("nssl_debug_lines")
-
-    // TODO(b/254512505): Tracking Bug
-    @JvmField val NSSL_DEBUG_REMOVE_ANIMATION = unreleasedFlag("nssl_debug_remove_animation")
 
     // TODO(b/254512624): Tracking Bug
     @JvmField
     val NOTIFICATION_DRAG_TO_CONTENTS =
         resourceBooleanFlag(R.bool.config_notificationToContents, "notification_drag_to_contents")
-
-    // TODO(b/280783617): Tracking Bug
-    @Keep
-    @JvmField
-    val BUILDER_EXTRAS_OVERRIDE =
-        sysPropBooleanFlag("persist.sysui.notification.builder_extras_override", default = true)
 
     // 200 - keyguard/lockscreen
     // ** Flag retired **

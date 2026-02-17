@@ -94,6 +94,8 @@ interface MediaRepository {
 
     val visualStabilityListenerFlow: Flow<Unit>
 
+    val isReorderingAllowed: Boolean
+
     /** Seek to [to], in milliseconds on the media session with the given [sessionKey]. */
     fun seek(sessionKey: InstanceId, to: Long)
 
@@ -171,6 +173,9 @@ constructor(
         visualStabilityProvider.addPersistentReorderingAllowedListener(listener)
         awaitClose { visualStabilityProvider.removeReorderingAllowedListener(listener) }
     }
+
+    override val isReorderingAllowed: Boolean
+        get() = visualStabilityProvider.isReorderingAllowed
 
     override fun addCurrentUserMediaEntry(data: MediaData): UpdateArtInfoModel? {
         return super.addCurrentUserMediaEntry(data).also { updateModel ->
@@ -292,7 +297,7 @@ constructor(
                     } else {
                         withContext(backgroundDispatcher) {
                             // Clear controller state if changed for the same media session.
-                            currentModel?.instanceId?.let { clearControllerState(it) }
+                            currentModel?.instanceId?.let { clearControllerStateLocked(it) }
                             token?.let { mediaControllerFactory.create(applicationContext, it) }
                         }
                     }
@@ -335,7 +340,7 @@ constructor(
             TreeMap<MediaSortKeyModel, MediaDataModel>(comparator).apply {
                 putAll(sortedMedia.filter { (_, model) -> model.instanceId != data.instanceId })
             }
-        clearControllerState(data.instanceId)
+        clearControllerStateLocked(data.instanceId)
     }
 
     private suspend fun MediaData.toDataModel(
@@ -509,7 +514,9 @@ constructor(
             object : MediaController.Callback() {
                 override fun onPlaybackStateChanged(state: PlaybackState?) {
                     if (state == null || PlaybackState.STATE_NONE.equals(state)) {
-                        clearControllerState(dataModel.instanceId)
+                        applicationScope.launch {
+                            mediaMutex.withLock { clearControllerStateLocked(dataModel.instanceId) }
+                        }
                     } else {
                         updatePollingState(dataModel.instanceId, state)
                     }
@@ -538,7 +545,9 @@ constructor(
                 }
 
                 override fun onSessionDestroyed() {
-                    clearControllerState(dataModel.instanceId)
+                    applicationScope.launch {
+                        mediaMutex.withLock { clearControllerStateLocked(dataModel.instanceId) }
+                    }
                 }
             }
         controller.registerCallback(callback)
@@ -618,7 +627,8 @@ constructor(
         }
     }
 
-    private fun clearControllerState(instanceId: InstanceId) {
+    @GuardedBy("mediaMutex")
+    private fun clearControllerStateLocked(instanceId: InstanceId) {
         positionPollers[instanceId]?.cancel()
         positionPollers.remove(instanceId)
         mediaCallbacks[instanceId]?.let { activeControllers[instanceId]?.unregisterCallback(it) }
@@ -640,7 +650,10 @@ constructor(
         updateBlock: (MediaDataModel) -> MediaDataModel,
     ) {
         val newModel = updateBlock(oldModel)
-        if (oldModel != newModel) {
+        val index = currentMedia.indexOf(oldModel)
+        if (index == -1) {
+            Log.w(TAG, "Could not find model to update ${oldModel.appName}")
+        } else if (oldModel != newModel) {
             sortedMedia.keys
                 .find { it.instanceId == newModel.instanceId }
                 ?.let {
@@ -651,8 +664,7 @@ constructor(
                     sortedMap[it] = newModel
                     sortedMedia = sortedMap
                 }
-
-            currentMedia[currentMedia.indexOf(oldModel)] = newModel
+            currentMedia[index] = newModel
         }
     }
 

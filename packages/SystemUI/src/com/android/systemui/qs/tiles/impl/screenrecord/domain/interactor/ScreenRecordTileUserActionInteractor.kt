@@ -22,6 +22,7 @@ import com.android.internal.jank.InteractionJankMonitor
 import com.android.systemui.animation.DialogCuj
 import com.android.systemui.animation.DialogTransitionAnimator
 import com.android.systemui.animation.Expandable
+import com.android.systemui.animation.TransitionAnimator
 import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
@@ -32,6 +33,7 @@ import com.android.systemui.qs.tiles.base.domain.interactor.QSTileUserActionInte
 import com.android.systemui.qs.tiles.base.domain.model.QSTileInput
 import com.android.systemui.qs.tiles.base.shared.model.QSTileUserAction
 import com.android.systemui.screencapture.common.shared.model.ScreenCaptureUiParameters
+import com.android.systemui.screencapture.common.shared.model.ScreenCaptureUiSource
 import com.android.systemui.screencapture.domain.interactor.ScreenCaptureUiInteractor
 import com.android.systemui.screencapture.record.domain.interactor.ScreenCaptureRecordFeaturesInteractor
 import com.android.systemui.screenrecord.ScreenRecordUxController
@@ -74,7 +76,8 @@ constructor(
                                 activityStarter.executeRunnableDismissingKeyguard(
                                     {
                                         screenCaptureUiInteractor.show(
-                                            ScreenCaptureUiParameters.Record()
+                                            ScreenCaptureUiParameters.Record(),
+                                            ScreenCaptureUiSource.QUICK_SETTINGS_TILE,
                                         )
                                     },
                                     /* cancelAction= */ null,
@@ -143,11 +146,20 @@ constructor(
                             )
                         )
                     controller?.let {
-                        dialogTransitionAnimator.show(
-                            dialog,
-                            controller,
-                            animateBackgroundBoundsChange = true,
-                        )
+                        if (TransitionAnimator.dynamicTargetResolutionEnabled()) {
+                            dialogTransitionAnimator.show(
+                                dialog,
+                                expandable::dialogTransitionController,
+                                it.cuj,
+                                animateBackgroundBoundsChange = true,
+                            )
+                        } else {
+                            dialogTransitionAnimator.show(
+                                dialog,
+                                it,
+                                animateBackgroundBoundsChange = true,
+                            )
+                        }
                     } ?: dialog.show()
                 } else {
                     dialog.show()

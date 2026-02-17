@@ -57,7 +57,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalViewConfiguration
-import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
@@ -66,7 +65,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import com.android.compose.modifiers.thenIf
 import com.android.compose.theme.PlatformTheme
 import com.android.compose.theme.colorAttr
-import com.android.keyguard.AlphaOptimizedLinearLayout
 import com.android.systemui.Flags
 import com.android.systemui.clock.ClockModernization
 import com.android.systemui.clock.ui.composable.Clock
@@ -79,21 +77,13 @@ import com.android.systemui.lifecycle.WindowLifecycleState
 import com.android.systemui.lifecycle.rememberViewModel
 import com.android.systemui.lifecycle.repeatWhenAttached
 import com.android.systemui.lifecycle.viewModel
-import com.android.systemui.media.controls.ui.controller.MediaHierarchyManager
-import com.android.systemui.media.controls.ui.view.MediaHost
-import com.android.systemui.media.controls.ui.view.MediaHostState
-import com.android.systemui.media.dagger.MediaModule
-import com.android.systemui.media.remedia.ui.viewmodel.MediaViewModel
 import com.android.systemui.plugins.DarkIconDispatcher
 import com.android.systemui.res.R
-import com.android.systemui.scene.shared.flag.SceneContainerFlag
 import com.android.systemui.scene.ui.view.WindowRootView
 import com.android.systemui.shade.ui.composable.VariableDayDate
 import com.android.systemui.statusbar.StatusBarAlwaysUseRegionSampling
 import com.android.systemui.statusbar.chips.ui.compose.OngoingActivityChips
 import com.android.systemui.statusbar.core.NewStatusBarIcons
-import com.android.systemui.statusbar.core.RudimentaryBattery
-import com.android.systemui.statusbar.core.StatusBarConnectedDisplays
 import com.android.systemui.statusbar.core.StatusBarEventForwardingModernization
 import com.android.systemui.statusbar.core.StatusBarForDesktop
 import com.android.systemui.statusbar.events.domain.interactor.SystemStatusEventAnimationInteractor
@@ -109,8 +99,6 @@ import com.android.systemui.statusbar.phone.domain.interactor.IsAreaDark
 import com.android.systemui.statusbar.phone.ui.DarkIconManager
 import com.android.systemui.statusbar.phone.ui.StatusBarIconController
 import com.android.systemui.statusbar.phone.ui.TintedIconManager
-import com.android.systemui.statusbar.pipeline.battery.ui.composable.BatteryWithChargeStatus
-import com.android.systemui.statusbar.pipeline.battery.ui.composable.ShowPercentMode
 import com.android.systemui.statusbar.pipeline.battery.ui.composable.UnifiedBattery
 import com.android.systemui.statusbar.pipeline.battery.ui.viewmodel.BatteryViewModel
 import com.android.systemui.statusbar.pipeline.shared.ui.binder.HomeStatusBarIconBlockListBinder
@@ -120,16 +108,12 @@ import com.android.systemui.statusbar.pipeline.shared.ui.view.SystemStatusIconsL
 import com.android.systemui.statusbar.pipeline.shared.ui.viewmodel.HomeStatusBarViewModel
 import com.android.systemui.statusbar.pipeline.shared.ui.viewmodel.HomeStatusBarViewModel.HomeStatusBarViewModelFactory
 import com.android.systemui.statusbar.policy.Clock
-import com.android.systemui.statusbar.quickactions.av.ui.viewmodel.AvControlsPopupViewModel
-import com.android.systemui.statusbar.quickactions.popups.StatusBarPopupChips
-import com.android.systemui.statusbar.quickactions.ui.compose.QuickActionChipsContainer
 import com.android.systemui.statusbar.systemstatusicons.SystemStatusIconsInCompose
 import com.android.systemui.statusbar.systemstatusicons.ui.compose.SystemStatusIcons
 import com.android.systemui.statusbar.systemstatusicons.ui.viewmodel.SystemStatusIconsViewModel
 import com.android.systemui.statusbar.ui.viewmodel.StatusBarRegionSamplingViewModel
 import com.android.systemui.util.boundsOnScreen
 import javax.inject.Inject
-import javax.inject.Named
 import kotlin.math.abs
 import kotlinx.coroutines.DisposableHandle
 import kotlinx.coroutines.awaitCancellation
@@ -146,10 +130,6 @@ constructor(
     private val tintedIconManagerFactory: TintedIconManager.Factory,
     private val iconController: StatusBarIconController,
     @DisplayAware private val eventAnimationInteractor: SystemStatusEventAnimationInteractor,
-    private val mediaHierarchyManager: MediaHierarchyManager,
-    private val avControlsPopupViewModelFactory: AvControlsPopupViewModel.Factory,
-    @Named(MediaModule.POPUP) private val mediaHost: MediaHost,
-    private val mediaViewModelFactory: MediaViewModel.Factory,
     @DisplayAware private val darkIconDispatcher: DarkIconDispatcher,
     @DisplayAware private val homeStatusBarViewBinder: HomeStatusBarViewBinder,
     @DisplayAware private val homeStatusBarViewModelFactory: HomeStatusBarViewModelFactory,
@@ -174,13 +154,9 @@ constructor(
                         iconController = iconController,
                         darkIconDispatcher = darkIconDispatcher,
                         eventAnimationInteractor = eventAnimationInteractor,
-                        mediaHierarchyManager = mediaHierarchyManager,
-                        mediaHost = mediaHost,
-                        mediaViewModelFactory = mediaViewModelFactory,
                         statusBarRegionSamplingViewModelFactory =
                             statusBarRegionSamplingViewModelFactory,
                         onViewCreated = andThen,
-                        avControlsPopupViewModelFactory = avControlsPopupViewModelFactory,
                         modifier = Modifier.sysUiResTagContainer(),
                     )
                 }
@@ -215,11 +191,7 @@ fun StatusBarRoot(
     iconController: StatusBarIconController,
     darkIconDispatcher: DarkIconDispatcher,
     eventAnimationInteractor: SystemStatusEventAnimationInteractor,
-    mediaHierarchyManager: MediaHierarchyManager,
-    mediaHost: MediaHost,
-    mediaViewModelFactory: MediaViewModel.Factory,
     statusBarRegionSamplingViewModelFactory: StatusBarRegionSamplingViewModel.Factory,
-    avControlsPopupViewModelFactory: AvControlsPopupViewModel.Factory,
     onViewCreated: (ViewGroup) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -227,29 +199,14 @@ fun StatusBarRoot(
     val statusBarViewModel =
         rememberViewModel("HomeStatusBar") { statusBarViewModelFactory.create() }
     val iconViewStore: NotificationIconContainerViewBinder.IconViewStore? =
-        if (StatusBarConnectedDisplays.isEnabled) {
-            rememberViewModel("HomeStatusBar.IconViewStore[$displayId]") {
-                iconViewStoreFactory.create(displayId)
-            }
-        } else {
-            null
+        rememberViewModel("HomeStatusBar.IconViewStore[$displayId]") {
+            iconViewStoreFactory.create(displayId)
         }
     val appHandlesViewModel =
         rememberViewModel("AppHandleBounds") {
             statusBarViewModel.appHandlesViewModelFactory.create(displayId)
         }
     var touchableExclusionRegionDisposableHandle: DisposableHandle? = null
-
-    if (StatusBarPopupChips.isEnabled) {
-        with(mediaHost) {
-            expansion = MediaHostState.EXPANDED
-            expandedMatchesParentHeight = true
-            showsOnlyActiveMedia = true
-            falsingProtectionNeeded = false
-            disableScrolling = true
-            init(MediaHierarchyManager.LOCATION_STATUS_BAR_POPUP)
-        }
-    }
 
     val touchSlop = LocalViewConfiguration.current.touchSlop
 
@@ -260,10 +217,6 @@ fun StatusBarRoot(
             clockViewModelFactory = clockViewModelFactory,
             statusBarIconController = iconController,
             iconManagerFactory = tintedIconManagerFactory,
-            mediaHierarchyManager = mediaHierarchyManager,
-            mediaViewModelFactory = mediaViewModelFactory,
-            mediaHost = mediaHost,
-            avControlsPopupViewModelFactory = avControlsPopupViewModelFactory,
             iconViewStore = iconViewStore,
             modifier =
                 modifier.forwardDragAndSwipeToShadeRootView(shadeWindowRootView, touchSlop) {
@@ -314,46 +267,6 @@ fun StatusBarRoot(
                         R.id.notificationIcons
                     )
 
-                // Add a composable container for `StatusBarPopupChip`s
-                if (StatusBarPopupChips.isEnabled) {
-                    val endSideContent =
-                        phoneStatusBarView.requireViewById<AlphaOptimizedLinearLayout>(
-                            R.id.status_bar_end_side_content
-                        )
-
-                    val composeView =
-                        ComposeView(context).apply {
-                            layoutParams =
-                                LinearLayout.LayoutParams(
-                                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                                )
-
-                            setViewCompositionStrategy(
-                                if (SceneContainerFlag.isEnabled) {
-                                    ViewCompositionStrategy.Default
-                                } else {
-                                    ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed
-                                }
-                            )
-
-                            setContent {
-                                QuickActionChipsContainer(
-                                    chips = statusBarViewModel.popupChips,
-                                    mediaViewModelFactory = mediaViewModelFactory,
-                                    mediaHost = mediaHost,
-                                    onMediaControlPopupVisibilityChanged = { popupShowing ->
-                                        mediaHierarchyManager.isMediaControlPopupShowing =
-                                            popupShowing
-                                    },
-                                    avControlsPopupViewModelFactory =
-                                        avControlsPopupViewModelFactory,
-                                )
-                            }
-                        }
-                    endSideContent.addView(composeView, 0)
-                }
-
                 // If the flag is enabled, create and add a compose section to the end
                 // of the system_icons container
                 if (SystemStatusIconsInCompose.isEnabled) {
@@ -369,12 +282,12 @@ fun StatusBarRoot(
                             StatusBarLocation.HOME,
                             darkIconDispatcher,
                         )
-                    iconController.addIconGroup(darkIconManager)
 
                     HomeStatusBarIconBlockListBinder.bind(
                         statusIconContainer,
                         darkIconManager,
                         statusBarViewModel.iconBlockList,
+                        iconController,
                     )
 
                     if (NewStatusBarIcons.isEnabled) {
@@ -617,29 +530,19 @@ private fun addBatteryComposable(
     val batteryComposeView =
         ComposeView(phoneStatusBarView.context).apply {
             setContent {
-                if (RudimentaryBattery.isEnabled) {
-                    BatteryWithChargeStatus(
-                        viewModelFactory = statusBarViewModel.batteryNextToPercentViewModel,
-                        isDarkProvider = { statusBarViewModel.areaDark },
-                        showPercentMode = ShowPercentMode.FollowSetting,
-                        modifier = Modifier.sysUiResTagContainer().wrapContentSize(),
-                    )
-                } else {
-                    val height =
-                        with(LocalDensity.current) {
-                            BatteryViewModel.getStatusBarBatteryHeight(LocalContext.current).toDp()
-                        }
-                    val viewModel =
-                        rememberViewModel(traceName = "UnifiedBattery") {
-                            statusBarViewModel.unifiedBatteryViewModel.create()
-                        }
-                    UnifiedBattery(
-                        modifier =
-                            Modifier.sysUiResTagContainer().height(height).wrapContentWidth(),
-                        viewModel = viewModel,
-                        isDarkProvider = { statusBarViewModel.areaDark },
-                    )
-                }
+                val height =
+                    with(LocalDensity.current) {
+                        BatteryViewModel.getStatusBarBatteryHeight(LocalContext.current).toDp()
+                    }
+                val viewModel =
+                    rememberViewModel(traceName = "UnifiedBattery") {
+                        statusBarViewModel.unifiedBatteryViewModel.create()
+                    }
+                UnifiedBattery(
+                    modifier = Modifier.sysUiResTagContainer().height(height).wrapContentWidth(),
+                    viewModel = viewModel,
+                    isDarkProvider = { statusBarViewModel.areaDark },
+                )
             }
         }
     phoneStatusBarView.findViewById<ViewGroup>(R.id.system_icons).apply {
@@ -674,30 +577,19 @@ private fun addEndSideComposable(
                         modifier = Modifier.weight(1f, fill = false),
                     )
 
-                    if (RudimentaryBattery.isEnabled) {
-                        BatteryWithChargeStatus(
-                            viewModelFactory = statusBarViewModel.batteryNextToPercentViewModel,
-                            isDarkProvider = { statusBarViewModel.areaDark },
-                            showPercentMode = ShowPercentMode.FollowSetting,
-                            modifier = Modifier.sysUiResTagContainer().wrapContentSize(),
-                        )
-                    } else {
-                        val height =
-                            with(LocalDensity.current) {
-                                BatteryViewModel.getStatusBarBatteryHeight(LocalContext.current)
-                                    .toDp()
-                            }
-                        val viewModel =
-                            rememberViewModel(traceName = "UnifiedBattery") {
-                                statusBarViewModel.unifiedBatteryViewModel.create()
-                            }
-                        UnifiedBattery(
-                            viewModel = viewModel,
-                            isDarkProvider = { statusBarViewModel.areaDark },
-                            modifier =
-                                Modifier.sysUiResTagContainer().height(height).wrapContentWidth(),
-                        )
-                    }
+                    val height =
+                        with(LocalDensity.current) {
+                            BatteryViewModel.getStatusBarBatteryHeight(LocalContext.current).toDp()
+                        }
+                    val viewModel =
+                        rememberViewModel(traceName = "UnifiedBattery") {
+                            statusBarViewModel.unifiedBatteryViewModel.create()
+                        }
+                    UnifiedBattery(
+                        viewModel = viewModel,
+                        isDarkProvider = { statusBarViewModel.areaDark },
+                        modifier = Modifier.sysUiResTagContainer().height(height).wrapContentWidth(),
+                    )
                 }
             }
         }

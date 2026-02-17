@@ -18,20 +18,24 @@ package android.service.personalcontext.insight;
 
 import android.annotation.FlaggedApi;
 import android.annotation.NonNull;
+import android.annotation.Nullable;
+import android.annotation.SystemApi;
 import android.os.Bundle;
+import android.service.personalcontext.ComponentIdProvider;
 import android.service.personalcontext.Flags;
 import android.service.personalcontext.Token;
-import android.service.personalcontext.hint.ContextHint;
 import android.service.personalcontext.hint.ContextHintWithSignature;
+import android.service.personalcontext.insight.interaction.AttributionDetails;
+import android.service.personalcontext.insight.interaction.FeedbackRequest;
 
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import java.util.HashSet;
 
 /**
  * An insight that is a collection of other {@link ContextInsight}s. This may be used to group
@@ -149,10 +153,16 @@ public final class InsightCollection extends ContextInsight implements Iterable<
         return Collections.unmodifiableList(mInsights);
     }
 
-    /** Builder for {@link InsightCollection}. */
+    /**
+     * Builder for {@link InsightCollection}.
+     */
     @FlaggedApi(Flags.FLAG_ENABLE_PERSONAL_CONTEXT_SERVICE)
     public static final class Builder {
         private final List<ContextInsight> mInsights = new ArrayList<>();
+        private final ConstructorParams.Builder mBaseBuilder = new ConstructorParams.Builder();
+
+        /** Creates a new builder for an insight collection. */
+        public Builder() {}
 
         /**
          * Creates a new builder for an insight collection.
@@ -167,9 +177,6 @@ public final class InsightCollection extends ContextInsight implements Iterable<
             }
         }
 
-        /** Creates a new builder for an insight collection. */
-        public Builder() {}
-
         /**
          * Adds an insight to the collection.
          *
@@ -178,6 +185,48 @@ public final class InsightCollection extends ContextInsight implements Iterable<
         @NonNull
         public Builder addInsight(@NonNull ContextInsight insight) {
             mInsights.add(Objects.requireNonNull(insight, "insight cannot be null"));
+            return this;
+        }
+
+        /**
+         * Sets the originating component in the resulting {@link ContextInsight}, allowing events
+         * to be routed back to the understander that created this {@link ContextInsight}.
+         *
+         * @param originatingComponent the component that is creating this insight
+         *
+         * @hide
+         */
+        @SystemApi
+        @NonNull
+        public Builder setOriginatingComponentId(
+                @Nullable ComponentIdProvider originatingComponent) {
+            mBaseBuilder.setOriginatingComponentId(originatingComponent);
+            return this;
+        }
+
+        /**
+         * Sets the user feedback request in the resulting {@link ContextInsight}. If feedback
+         * is requested, the originating component id must be set via
+         * {@link #setOriginatingComponentId}, or else an exception will be thrown when calling
+         * {@link #build}.
+         *
+         * @param feedbackRequest the feedback that is being requested
+         */
+        @NonNull
+        public Builder setUserFeedbackRequest(@Nullable FeedbackRequest feedbackRequest) {
+            mBaseBuilder.setUserFeedbackRequest(feedbackRequest);
+            return this;
+        }
+
+        /**
+         * Sets the attribution details that can be shown to the user.
+         *
+         * @param attributionDetails Details to show user when they ask for how this insight was
+         *                           generated.
+         */
+        @NonNull
+        Builder setAttributionDetails(@Nullable AttributionDetails attributionDetails) {
+            mBaseBuilder.setAttributionDetails(attributionDetails);
             return this;
         }
 
@@ -193,7 +242,7 @@ public final class InsightCollection extends ContextInsight implements Iterable<
                 throw new IllegalStateException("InsightCollection cannot be empty");
             }
 
-            return new InsightCollection(new ConstructorParams.Builder().build(), mInsights);
+            return new InsightCollection(mBaseBuilder.build(), mInsights);
         }
     }
 }

@@ -18,7 +18,7 @@ package com.android.systemui.motioncues
 
 import android.annotation.MainThread;
 import android.annotation.SuppressLint
-import android.app.motioncues.MotionCuesData
+import android.app.motioncues.MotionCuesVisualStyle
 import android.app.motioncues.MotionCuesSettings
 import android.content.Context
 import android.content.pm.PackageManager
@@ -144,9 +144,9 @@ class MotionCuesUi(
 
     /** Updates the data used to control the appearance of the motion cues. */
     @MainThread
-    fun updateMotionCuesData(data: MotionCuesData) {
+    fun updateMotionCuesVisualStyle(data: MotionCuesVisualStyle) {
         if (!isStarted) {
-            Log.w(TAG, "Ignoring updateMotionCuesData call before UI is started.")
+            Log.w(TAG, "Ignoring updateMotionCuesVisualStyle call before UI is started.")
             return
         }
         Log.i(TAG, "Updating motion cues data")
@@ -242,13 +242,13 @@ class MotionCuesUi(
                         MotionCue(
                             (col * bubbleSpacingX + rowOffset - xOffset).toFloat(),
                             (row * bubbleSpacingY).toFloat(),
-                            motionCuesSettings.radius.toFloat()
+                            motionCuesSettings.radiusDp.toFloat()
                         )
                     )
                 }
             }
 
-            val maxMarginSize = motionCuesSettings.marginSize / 100f
+            val maxMarginSize = motionCuesSettings.marginSizeDp / 100f
             marginLeft = (screenDimensions.x * maxMarginSize).toInt()
             marginRight = screenDimensions.x - marginLeft
         }
@@ -313,7 +313,7 @@ class MotionCuesUi(
                 val distanceFromEdge = min(distanceFromEdgeX, distanceFromEdgeY)
 
                 // Adjust radius based on distance from edge
-                var adjustedRadius = motionCuesSettings.radius.toFloat()
+                var adjustedRadius = motionCuesSettings.radiusDp.toFloat()
                 if (distanceFromEdge < EDGE_SHRINK_THRESHOLD) {
                     val shrinkFactor = distanceFromEdge / EDGE_SHRINK_THRESHOLD
                     adjustedRadius *= shrinkFactor
@@ -355,8 +355,8 @@ class MotionCuesUi(
         state.bubbleShapeResId = this@MotionCuesUi.bubbleShapeResId
         state.horizontalSpacingDp = motionCuesSettings.horizontalSpacingDp
         state.verticalSpacingDp = motionCuesSettings.verticalSpacingDp
-        state.marginSize = motionCuesSettings.marginSize
-        state.radius = motionCuesSettings.radius
+        state.marginSizeDp = motionCuesSettings.marginSizeDp
+        state.radiusDp = motionCuesSettings.radiusDp
         state.motionBubbles = motionBubbleProtos
         state.clientPackageName = this@MotionCuesUi.clientPackageName?: ""
         return state
@@ -403,8 +403,8 @@ class MotionCuesUi(
             MotionCuesSettings.Builder()
                 .setHorizontalSpacingDp(60)
                 .setVerticalSpacingDp(140)
-                .setMarginSize(20)
-                .setRadius(15)
+                .setMarginSizeDp(20)
+                .setRadiusDp(15)
                 .build()
     }
 }

@@ -18,6 +18,7 @@ package android.app;
 
 import static android.app.ActivityManager.PROCESS_STATE_UNKNOWN;
 import static android.app.ConfigurationController.createNewConfigAndUpdateIfNotNull;
+import static android.app.Flags.customBackupagentInstantiation;
 import static android.app.Flags.skipBgMemTrimOnFgApp;
 import static android.app.WindowConfiguration.WINDOWING_MODE_PINNED;
 import static android.app.WindowConfiguration.WINDOWING_MODE_UNDEFINED;
@@ -50,6 +51,7 @@ import android.app.RemoteServiceException.BadForegroundServiceNotificationExcept
 import android.app.RemoteServiceException.BadUserInitiatedJobNotificationException;
 import android.app.RemoteServiceException.CannotPostForegroundServiceNotificationException;
 import android.app.RemoteServiceException.CrashedByAdbException;
+import android.app.RemoteServiceException.ExcessiveEnqueuedBroadcastsException;
 import android.app.RemoteServiceException.ForegroundServiceDidNotStartInTimeException;
 import android.app.RemoteServiceException.ForegroundServiceDidNotStopInTimeException;
 import android.app.RemoteServiceException.MissingRequestPasswordComplexityPermissionException;
@@ -338,7 +340,7 @@ public final class ActivityThread extends ClientTransactionHandler
     // It will be replaced by a sharding config in the future.
     private static final Set<String> PERFETTO_TRACING_ALLOWLIST = new ArraySet<>(Arrays.asList(
             "com.google.android.youtube",
-            "com.whatsapp"
+            "com.google.android.googlequicksearchbox"
     ));
 
     static final boolean localLOGV = false;
@@ -447,6 +449,24 @@ public final class ActivityThread extends ClientTransactionHandler
     /** Maps from activity token to the pending override configuration. */
     @GuardedBy("mPendingOverrideConfigs")
     private final ArrayMap<IBinder, Configuration> mPendingOverrideConfigs = new ArrayMap<>();
+    /** Maps from activity token to the pending configuration changes. */
+    @GuardedBy("mPendingConfigChanges")
+    private final ArrayMap<IBinder, ConfigChange> mPendingConfigChanges = new ArrayMap<>();
+
+    private static class ConfigChange {
+        @NonNull
+        private final Configuration mConfiguration;
+        @NonNull
+        private final ActivityWindowInfo mActivityWindowInfo;
+        private final int mDisplayId;
+
+        private ConfigChange(Configuration configuration, ActivityWindowInfo activityWindowInfo,
+                int displayId) {
+            mConfiguration = configuration;
+            mActivityWindowInfo = activityWindowInfo;
+            mDisplayId = displayId;
+        }
+    }
 
     /**
      * A queue of pending ApplicationInfo updates. In case when we get a concurrent update
@@ -699,8 +719,7 @@ public final class ActivityThread extends ClientTransactionHandler
         boolean startsNotResumed;
         public final boolean isForward;
         int pendingConfigChanges;
-        // Whether we are in the process of performing on user leaving.
-        boolean mIsUserLeaving;
+        int mDisplayId;
 
         Window mPendingRemoveWindow;
         WindowManager mPendingRemoveWindowManager;
@@ -739,7 +758,7 @@ public final class ActivityThread extends ClientTransactionHandler
                 boolean isForward, ProfilerInfo profilerInfo, ClientTransactionHandler client,
                 IBinder assistToken, IBinder shareableActivityToken, boolean launchedFromBubble,
                 IBinder taskFragmentToken, IBinder initialCallerInfoAccessToken,
-                ActivityWindowInfo activityWindowInfo) {
+                ActivityWindowInfo activityWindowInfo, int displayId) {
             this.token = token;
             this.assistToken = assistToken;
             this.shareableActivityToken = shareableActivityToken;
@@ -761,6 +780,7 @@ public final class ActivityThread extends ClientTransactionHandler
             mLaunchedFromBubble = launchedFromBubble;
             mTaskFragmentToken = taskFragmentToken;
             mActivityWindowInfo.set(activityWindowInfo);
+            mDisplayId = displayId;
             init();
         }
 
@@ -2542,9 +2562,12 @@ public final class ActivityThread extends ClientTransactionHandler
             case CrashedByAdbException.TYPE_ID:
                 throw new CrashedByAdbException(message);
 
+            case ExcessiveEnqueuedBroadcastsException.TYPE_ID:
+                throw new ExcessiveEnqueuedBroadcastsException(message);
+
             default:
                 throw new RemoteServiceException(message
-                        + " (with unwknown typeId:" + typeId + ")");
+                        + " (with unknown typeId:" + typeId + ")");
         }
     }
 
@@ -4611,7 +4634,8 @@ public final class ActivityThread extends ClientTransactionHandler
     }
 
     private ContextImpl createBaseContextForActivity(ActivityClientRecord r) {
-        final int displayId = ActivityClient.getInstance().getDisplayId(r.token);
+        final int displayId = com.android.window.flags.Flags.useKnownDisplayIdForBaseContext()
+                ? r.mDisplayId : ActivityClient.getInstance().getDisplayId(r.token);
         ContextImpl appContext = ContextImpl.createActivityContext(
                 this, r.packageInfo, r.activityInfo, r.token, displayId, r.overrideConfig);
 
@@ -4657,7 +4681,8 @@ public final class ActivityThread extends ClientTransactionHandler
             return null;
         }
 
-        final int displayId = ActivityClient.getInstance().getDisplayId(r.token);
+        final int displayId = com.android.window.flags.Flags.useKnownDisplayIdForBaseContext()
+                ? r.mDisplayId : ActivityClient.getInstance().getDisplayId(r.token);
         final LoadedApk sdkApk = getPackageInfo(
                 contextInfo.getSdkApplicationInfo(),
                 r.packageInfo.getCompatibilityInfo(),
@@ -4703,11 +4728,14 @@ public final class ActivityThread extends ClientTransactionHandler
             final int tid = HardwareRenderer.preload();
             // Adjust the RenderThread priority as soon as it's created.
             if (tid > 0) {
-                try {
-                    ActivityManager.getService().setRenderThread(tid);
-                } catch (Throwable t) {
-                    Log.w(TAG, "Failed to set scheduler for RenderThread", t);
-                }
+                AsyncTask.THREAD_POOL_EXECUTOR.execute(() -> {
+                    HardwareRenderer.waitForRenderThreadPriorityInitialized();
+                    try {
+                        ActivityManager.getService().setRenderThread(tid);
+                    } catch (Throwable t) {
+                        Log.w(TAG, "Failed to set scheduler for RenderThread", t);
+                    }
+                });
             }
         }
 
@@ -5404,8 +5432,11 @@ public final class ActivityThread extends ClientTransactionHandler
         try {
             PackageInfo requestedPackage = getPackageManager().getPackageInfo(
                     data.appInfo.packageName, 0, UserHandle.myUserId());
-            if (requestedPackage.applicationInfo.uid != Process.myUid()) {
-                Slog.w(TAG, "Asked to instantiate non-matching package "
+            int backupAgentUid = enablePccFrameworkSupport()
+                    ? requestedPackage.applicationInfo.getBackupAgentUid()
+                    : requestedPackage.applicationInfo.uid;
+            if (backupAgentUid != Process.myUid()) {
+                Slog.w(TAG, "Asked to instantiate non-matching package or UID "
                         + data.appInfo.packageName);
                 return;
             }
@@ -5441,7 +5472,11 @@ public final class ActivityThread extends ClientTransactionHandler
                     if (DEBUG_BACKUP) Slog.v(TAG, "Initializing agent class " + classname);
 
                     java.lang.ClassLoader cl = packageInfo.getClassLoader();
-                    agent = (BackupAgent) cl.loadClass(classname).newInstance();
+                    if (customBackupagentInstantiation()) {
+                        agent = packageInfo.getAppFactory().instantiateBackupAgent(cl, classname);
+                    } else {
+                        agent = (BackupAgent) cl.loadClass(classname).newInstance();
+                    }
 
                     // set up the agent's context
                     ContextImpl context = ContextImpl.createAppContext(this, packageInfo);
@@ -6673,7 +6708,7 @@ public final class ActivityThread extends ClientTransactionHandler
             @Nullable List<ResultInfo> pendingResults,
             @Nullable List<ReferrerIntent> pendingNewIntents, int configChanges,
             @NonNull MergedConfiguration config, boolean preserveWindow,
-            @NonNull ActivityWindowInfo activityWindowInfo) {
+            @NonNull ActivityWindowInfo activityWindowInfo, int displayId) {
         ActivityClientRecord target = null;
         boolean scheduleRelaunch = false;
 
@@ -6715,6 +6750,7 @@ public final class ActivityThread extends ClientTransactionHandler
             target.overrideConfig = config.getOverrideConfiguration();
             target.pendingConfigChanges |= configChanges;
             target.mActivityWindowInfo.set(activityWindowInfo);
+            target.mDisplayId = displayId;
         }
 
         return scheduleRelaunch ? target : null;
@@ -6803,7 +6839,7 @@ public final class ActivityThread extends ClientTransactionHandler
 
         handleRelaunchActivityInner(r, tmp.pendingResults, tmp.pendingIntents,
                 pendingActions, tmp.startsNotResumed, tmp.overrideConfig, tmp.mActivityWindowInfo,
-                "handleRelaunchActivity");
+                tmp.mDisplayId, "handleRelaunchActivity");
     }
 
     void scheduleRelaunchActivity(IBinder token) {
@@ -6875,7 +6911,7 @@ public final class ActivityThread extends ClientTransactionHandler
             @Nullable List<ReferrerIntent> pendingIntents,
             @NonNull PendingTransactionActions pendingActions, boolean startsNotResumed,
             @NonNull Configuration overrideConfig, @NonNull ActivityWindowInfo activityWindowInfo,
-            @NonNull String reason) {
+            int displayId, @NonNull String reason) {
         // Preserve last used intent, it may be set from Activity#setIntent().
         final Intent customIntent = r.activity.mIntent;
         // Need to ensure state is saved.
@@ -6909,6 +6945,7 @@ public final class ActivityThread extends ClientTransactionHandler
         r.startsNotResumed = startsNotResumed;
         r.overrideConfig = overrideConfig;
         r.mActivityWindowInfo.set(activityWindowInfo);
+        r.mDisplayId = displayId;
 
         handleLaunchActivity(r, pendingActions, mLastReportedDeviceId, customIntent);
     }
@@ -7387,6 +7424,9 @@ public final class ActivityThread extends ClientTransactionHandler
     @Override
     public void updatePendingActivityConfiguration(@NonNull IBinder token,
             @NonNull Configuration overrideConfig) {
+        if (com.android.window.flags.Flags.improveFluidResizingPerformance()) {
+            throw new UnsupportedOperationException();
+        }
         synchronized (mPendingOverrideConfigs) {
             final Configuration pendingOverrideConfig = mPendingOverrideConfigs.get(token);
             if (pendingOverrideConfig != null
@@ -7402,11 +7442,59 @@ public final class ActivityThread extends ClientTransactionHandler
         }
     }
 
+    /**
+     * Sets the supplied {@code overrideConfig} as pending for the {@code token}. Calling
+     * this method prevents any calls to
+     * {@link #handleActivityConfigurationChanged(ActivityClientRecord, Configuration, int,
+     * ActivityWindowInfo)} from processing any configurations older than {@code overrideConfig}.
+     */
+    @Override
+    public void updatePendingActivityConfiguration(@NonNull IBinder token,
+            @NonNull Configuration overrideConfig, @NonNull ActivityWindowInfo info,
+            int displayId) {
+        synchronized (mPendingConfigChanges) {
+            final ConfigChange pendingChange = mPendingConfigChanges.get(token);
+            if (pendingChange != null
+                    && !pendingChange.mConfiguration.isOtherSeqNewer(overrideConfig)) {
+                if (DEBUG_CONFIGURATION) {
+                    Slog.v(TAG,
+                            "Activity has newer configuration pending so this transaction will"
+                                    + " be dropped. overrideConfig=" + overrideConfig
+                                    + " pendingOverrideConfig=" + pendingChange.mConfiguration);
+                }
+                return;
+            }
+            mPendingConfigChanges.put(token, new ConfigChange(overrideConfig, info, displayId));
+        }
+    }
+
     @Override
     public void handleActivityConfigurationChanged(@NonNull ActivityClientRecord r,
             @NonNull Configuration overrideConfig, int displayId,
             @NonNull ActivityWindowInfo activityWindowInfo) {
+        if (com.android.window.flags.Flags.improveFluidResizingPerformance()) {
+            throw new UnsupportedOperationException();
+        }
         handleActivityConfigurationChanged(r, overrideConfig, displayId, activityWindowInfo,
+                // This is the only place that uses alwaysReportChange=true. The entry point should
+                // be from ActivityConfigurationChangeItem or MoveToDisplayItem, so the server side
+                // has confirmed the activity should handle the configuration instead of relaunch.
+                // If Activity#onConfigurationChanged is called unexpectedly, then we can know it is
+                // something wrong from server side.
+                true /* alwaysReportChange */);
+    }
+
+    @Override
+    public void handleActivityConfigurationChanged(@NonNull ActivityClientRecord r) {
+        final ConfigChange change;
+        synchronized (mPendingConfigChanges) {
+            change = mPendingConfigChanges.remove(r.token);
+        }
+        if (change == null) {
+            return;
+        }
+        handleActivityConfigurationChanged(
+                r, change.mConfiguration, change.mDisplayId, change.mActivityWindowInfo,
                 // This is the only place that uses alwaysReportChange=true. The entry point should
                 // be from ActivityConfigurationChangeItem or MoveToDisplayItem, so the server side
                 // has confirmed the activity should handle the configuration instead of relaunch.
@@ -7444,17 +7532,19 @@ public final class ActivityThread extends ClientTransactionHandler
     private void handleActivityConfigurationChangedInner(@NonNull ActivityClientRecord r,
             @NonNull Configuration overrideConfig, int displayId,
             @NonNull ActivityWindowInfo activityWindowInfo, boolean alwaysReportChange) {
-        synchronized (mPendingOverrideConfigs) {
-            final Configuration pendingOverrideConfig = mPendingOverrideConfigs.get(r.token);
-            if (overrideConfig.isOtherSeqNewer(pendingOverrideConfig)) {
-                if (DEBUG_CONFIGURATION) {
-                    Slog.v(TAG, "Activity has newer configuration pending so drop this"
-                            + " transaction. overrideConfig=" + overrideConfig
-                            + " pendingOverrideConfig=" + pendingOverrideConfig);
+        if (!com.android.window.flags.Flags.improveFluidResizingPerformance()) {
+            synchronized (mPendingOverrideConfigs) {
+                final Configuration pendingOverrideConfig = mPendingOverrideConfigs.get(r.token);
+                if (overrideConfig.isOtherSeqNewer(pendingOverrideConfig)) {
+                    if (DEBUG_CONFIGURATION) {
+                        Slog.v(TAG, "Activity has newer configuration pending so drop this"
+                                + " transaction. overrideConfig=" + overrideConfig
+                                + " pendingOverrideConfig=" + pendingOverrideConfig);
+                    }
+                    return;
                 }
-                return;
+                mPendingOverrideConfigs.remove(r.token);
             }
-            mPendingOverrideConfigs.remove(r.token);
         }
 
         if (displayId == INVALID_DISPLAY) {
@@ -7477,6 +7567,7 @@ public final class ActivityThread extends ClientTransactionHandler
         // Perform updates.
         r.overrideConfig = overrideConfig;
         r.mActivityWindowInfo.set(activityWindowInfo);
+        r.mDisplayId = displayId;
 
         final ViewRootImpl viewRoot = r.activity.mDecor != null
             ? r.activity.mDecor.getViewRootImpl() : null;
@@ -9374,16 +9465,13 @@ public final class ActivityThread extends ClientTransactionHandler
     }
 
     private Bundle getCoreSettingsForDeviceLocked(int deviceId) {
-        if (android.companion.virtualdevice.flags.Flags.deviceAwareSettingsOverride()) {
-            Bundle bundle = mCoreSettings.getBundle(String.valueOf(deviceId));
-            if (deviceId != Context.DEVICE_ID_DEFAULT && bundle == null) {
-                // There hasn't been any overridden settings for the virtual device, so just return
-                // the settings for the default device.
-                bundle = mCoreSettings.getBundle(String.valueOf(Context.DEVICE_ID_DEFAULT));
-            }
-            return bundle;
+        Bundle bundle = mCoreSettings.getBundle(String.valueOf(deviceId));
+        if (deviceId != Context.DEVICE_ID_DEFAULT && bundle == null) {
+            // There hasn't been any overridden settings for the virtual device, so just return
+            // the settings for the default device.
+            bundle = mCoreSettings.getBundle(String.valueOf(Context.DEVICE_ID_DEFAULT));
         }
-        return mCoreSettings;
+        return bundle;
     }
 
     @RavenwoodThrow(comment = "See ActivityThread_ravenwood for initialization on Ravenwood")
@@ -9407,21 +9495,30 @@ public final class ActivityThread extends ClientTransactionHandler
         // Call per-process mainline module initialization.
         initializeMainlineModules();
 
-        Looper.prepareMainLooper();
-
         Process.setArgV0("<pre-initialized>");
 
-        // Find the value for {@link #PROC_START_SEQ_IDENT} if provided on the command line.
-        // It will be in the format "seq=114"
         long startSeq = 0;
         if (args != null) {
             for (int i = args.length - 1; i >= 0; --i) {
-                if (args[i] != null && args[i].startsWith(PROC_START_SEQ_IDENT)) {
-                    startSeq = Long.parseLong(
-                            args[i].substring(PROC_START_SEQ_IDENT.length()));
+                if (args[i] != null) {
+                    // Find the value for {@link #PROC_START_SEQ_IDENT} if provided on the command
+                    // line. It will be in the format "seq=114"
+                    if (args[i].startsWith(PROC_START_SEQ_IDENT)) {
+                        startSeq = Long.parseLong(
+                                args[i].substring(PROC_START_SEQ_IDENT.length()));
+                    } else if (args[i].startsWith("--use-deliqueue=")) {
+                        boolean useDeliQueue =
+                                Boolean.parseBoolean(args[i].substring(args[i].indexOf('=') + 1));
+                        // This must be called before Looper.prepareMainLooper(), which will
+                        // instantiate a MessageQueue.
+                        MessageQueue.setUseDeliQueue(useDeliQueue);
+                    }
                 }
             }
         }
+
+        Looper.prepareMainLooper();
+
         ActivityThread thread = new ActivityThread();
         thread.attach(false, startSeq);
 

@@ -286,7 +286,7 @@
     <string name="global_action_logout" msgid="6093581310002476511">"结束会话"</string>
     <string name="global_action_screenshot" msgid="2610053466156478564">"屏幕截图"</string>
     <string name="global_action_standby" msgid="6786920589970257642">"待机"</string>
-    <string name="bugreport_title" msgid="8549990811777373050">"Bug 报告"</string>
+    <string name="bugreport_title" msgid="8549990811777373050">"错误报告"</string>
     <string name="bugreport_message" msgid="5212529146119624326">"这会收集有关当前设备状态的信息，并以电子邮件的形式进行发送。从开始生成错误报告到准备好发送需要一点时间，请耐心等待。"</string>
     <string name="bugreport_option_interactive_title" msgid="7968287837902871289">"互动式报告"</string>
     <string name="bugreport_option_interactive_summary" msgid="8493795476325339542">"在大多数情况下，建议您使用此选项，以便追踪报告的生成进度，输入与相应问题相关的更多详细信息，以及截取屏幕截图。系统可能会省略掉一些不常用的区段，从而缩短生成报告的时间。"</string>
@@ -728,9 +728,9 @@
     <string name="fingerprint_acquired_immobile" msgid="1621891895241888048">"每次放手指时，请略微变换手指的位置"</string>
   <string-array name="fingerprint_acquired_vendor">
   </string-array>
-    <string name="fingerprint_error_not_match" msgid="4599441812893438961">"未能识别指纹"</string>
-    <string name="fingerprint_udfps_error_not_match" msgid="8236930793223158856">"未能识别指纹"</string>
-    <string name="fingerprint_dialog_use_fingerprint_instead" msgid="5590293588784953188">"无法识别面孔。请改用指纹。"</string>
+    <string name="fingerprint_error_not_match" msgid="4599441812893438961">"无法识别指纹"</string>
+    <string name="fingerprint_udfps_error_not_match" msgid="8236930793223158856">"无法识别指纹"</string>
+    <string name="fingerprint_dialog_use_fingerprint_instead" msgid="5590293588784953188">"无法识别面孔，请改用指纹。"</string>
     <string name="fingerprint_authenticated" msgid="2024862866860283100">"已验证指纹"</string>
     <string name="face_authenticated_no_confirmation_required" msgid="8867889115112348167">"面孔已验证"</string>
     <string name="face_authenticated_confirmation_required" msgid="6872632732508013755">"面孔已验证，请按确认按钮"</string>
@@ -777,10 +777,10 @@
     <string name="face_acquired_too_right" msgid="6245286514593540859">"请将手机向左移动"</string>
     <string name="face_acquired_too_left" msgid="9201762240918405486">"请将手机向右移动"</string>
     <string name="face_acquired_poor_gaze" msgid="6746437451436776485">"请尽量直视摄像头"</string>
-    <string name="face_acquired_not_detected" msgid="1057966913397548150">"看不到您的脸，请将手机举到与眼睛齐平的位置。"</string>
+    <string name="face_acquired_not_detected" msgid="1057966913397548150">"看不到您的脸，请将手机举到与眼睛齐平的位置"</string>
     <string name="face_acquired_too_much_motion" msgid="8199691445085189528">"摄像头过于晃动。请将手机拿稳。"</string>
     <string name="face_acquired_recalibrate" msgid="8724013080976469746">"请重新注册您的面孔。"</string>
-    <string name="face_acquired_too_different" msgid="4505278456634706967">"无法识别面孔。请重试。"</string>
+    <string name="face_acquired_too_different" msgid="4505278456634706967">"无法识别面孔，请重试。"</string>
     <string name="face_acquired_too_similar" msgid="8882920552674125694">"请略微调整头部的位置"</string>
     <string name="face_acquired_pan_too_extreme" msgid="5417928604710621088">"请尽量直视手机"</string>
     <string name="face_acquired_tilt_too_extreme" msgid="5715715666540716620">"请尽量直视手机"</string>
@@ -1123,6 +1123,7 @@
     <string name="lockscreen_access_pattern_cell_added_verbose" msgid="2931364927622563465">"已添加圆点 <xliff:g id="CELL_INDEX">%1$s</xliff:g>"</string>
     <string name="lockscreen_access_pattern_detected" msgid="3931150554035194012">"图案绘制完成"</string>
     <string name="lockscreen_access_pattern_area" msgid="1288780416685002841">"图案区域。"</string>
+    <string name="lockscreen_access_pattern_cell_verbose" msgid="6670905066468035137">"单元格 <xliff:g id="CELL_INDEX">%1$s</xliff:g>"</string>
     <string name="keyguard_accessibility_widget_changed" msgid="7298011259508200234">"%1$s。%3$d的微件%2$d。"</string>
     <string name="keyguard_accessibility_add_widget" msgid="8245795023551343672">"添加微件。"</string>
     <string name="keyguard_accessibility_widget_empty_slot" msgid="544239307077644480">"空白"</string>
@@ -1695,13 +1696,13 @@
     <string name="storage_usb_drive_label" msgid="6631740655876540521">"<xliff:g id="MANUFACTURER">%s</xliff:g> U 盘"</string>
     <string name="storage_usb" msgid="2391213347883616886">"USB存储器"</string>
     <string name="extract_edit_menu_button" msgid="63954536535863040">"修改"</string>
-    <string name="data_usage_warning_title" msgid="9034893717078325845">"数据流量警告"</string>
+    <string name="data_usage_warning_title" msgid="9034893717078325845">"流量用量警告"</string>
     <string name="data_usage_warning_body" msgid="1669325367188029454">"您已使用 <xliff:g id="APP">%s</xliff:g> 的数据流量"</string>
-    <string name="data_usage_mobile_limit_title" msgid="3911447354393775241">"已达到移动流量使用上限"</string>
-    <string name="data_usage_wifi_limit_title" msgid="2069698056520812232">"已达到 WLAN 流量上限"</string>
+    <string name="data_usage_mobile_limit_title" msgid="3911447354393775241">"已达到移动流量用量上限"</string>
+    <string name="data_usage_wifi_limit_title" msgid="2069698056520812232">"已达到 WLAN 流量用量上限"</string>
     <string name="data_usage_limit_body" msgid="3567699582000085710">"已暂停使用数据网络连接，直到这个周期结束为止"</string>
-    <string name="data_usage_mobile_limit_snoozed_title" msgid="101888478915677895">"已超出移动数据流量上限"</string>
-    <string name="data_usage_wifi_limit_snoozed_title" msgid="1622359254521960508">"已超出 WLAN 数据流量上限"</string>
+    <string name="data_usage_mobile_limit_snoozed_title" msgid="101888478915677895">"已超出移动流量用量上限"</string>
+    <string name="data_usage_wifi_limit_snoozed_title" msgid="1622359254521960508">"已超出 WLAN 流量用量上限"</string>
     <string name="data_usage_limit_snoozed_body" msgid="545146591766765678">"您已使用 <xliff:g id="SIZE">%s</xliff:g>，超出所设上限"</string>
     <string name="data_usage_restricted_title" msgid="126711424380051268">"后台流量受限制"</string>
     <string name="data_usage_restricted_body" msgid="5338694433686077733">"点按即可取消限制。"</string>
@@ -2006,6 +2007,7 @@
     <string name="managed_profile_label_badge_3" msgid="6882151970556391957">"第三个工作<xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="clone_profile_label_badge" msgid="1871997694718793964">"<xliff:g id="LABEL">%1$s</xliff:g>克隆"</string>
     <string name="private_profile_label_badge" msgid="1712086003787839183">"私人“<xliff:g id="LABEL">%1$s</xliff:g>”"</string>
+    <string name="hsu_label_badge" msgid="1357272000281944932">"系统<xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="lock_to_app_unlock_pin" msgid="3890940811866290782">"取消时要求输入PIN码"</string>
     <string name="lock_to_app_unlock_pattern" msgid="2694204070499712503">"取消固定前要求绘制解锁图案"</string>
     <string name="lock_to_app_unlock_password" msgid="9126722403506560473">"取消时要求输入密码"</string>
@@ -2111,14 +2113,39 @@
     <string name="app_suspended_default_message" msgid="6451215678552004172">"<xliff:g id="APP_NAME_0">%1$s</xliff:g>目前无法使用。该应用是由<xliff:g id="APP_NAME_1">%2$s</xliff:g>所管理。"</string>
     <string name="app_suspended_more_details" msgid="211260942831587014">"了解详情"</string>
     <string name="app_suspended_unsuspend_message" msgid="1665438589450555459">"取消暂停应用"</string>
+    <string name="app_lock_add_screen_lock_button_text" msgid="9209013414563206600">"添加屏幕锁定方式"</string>
+    <string name="app_lock_add_screen_lock_message" msgid="6107009360675769892">"您可以设定 PIN 码、图案或密码来锁定屏幕，此后就可以使用相应方式来解锁设备和访问已锁定的应用。"</string>
+    <string name="app_lock_add_screen_lock_title" msgid="6905612843620128689">"请先添加屏幕锁定方式"</string>
+    <string name="enable_app_lock_success_toast_message" msgid="3339622779190529987">"“<xliff:g id="APP_NAME">%1$s</xliff:g>”已锁定"</string>
+    <string name="enable_app_lock_failure_toast_message" msgid="1055838896510445566">"无法锁定“<xliff:g id="APP_NAME">%1$s</xliff:g>”"</string>
+    <string name="disable_app_lock_success_toast_message" msgid="70733620589071266">"已停止锁定“<xliff:g id="APP_NAME">%1$s</xliff:g>”"</string>
     <string name="locked_app_biometric_prompt_description" msgid="6853122652400451464">"“<xliff:g id="APP_NAME">%1$s</xliff:g>”已锁定"</string>
+    <string name="locked_app_external_display_message" msgid="5483884799685545338">"如需在此显示屏上访问该应用，请先在其他设备上验证您的身份"</string>
+    <string name="app_lock_edu_dialog_enable_app_lock_title" msgid="283314042336592322">"要为“<xliff:g id="APP_NAME">%1$s</xliff:g>”添加应用锁吗？"</string>
+    <string name="app_lock_edu_dialog_description" msgid="8176807243219769518">"为保障您的安全，只有您可以使用指纹解锁、人脸解锁或 PIN 码来访问此应用"</string>
+    <string name="app_lock_edu_dialog_description_template" msgid="8563718120753342530">"出于安全考虑，只有您可以使用%1$s或%2$s访问此应用"</string>
+    <string name="app_lock_edu_dialog_description_template_no_biometrics" msgid="7122017109150633691">"出于安全考虑，只有您可以使用%1$s访问此应用"</string>
+    <string name="app_lock_edu_dialog_info_header" msgid="5876120209204270990">"应用锁定之后"</string>
+    <string name="app_lock_edu_dialog_info_notifications" msgid="1124438392204873305">"通知内容将被隐藏"</string>
+    <string name="app_lock_edu_dialog_info_widgets" msgid="8809009414650740872">"微件和快捷方式将被移除"</string>
+    <string name="app_lock_edu_dialog_button_lock" msgid="3914687128135704801">"添加应用锁"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_face" msgid="1348151645996748654">"人脸解锁"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_fingerprint" msgid="5206107469561561455">"指纹解锁"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_fingerprint_and_face" msgid="7895807411323811641">"指纹解锁或人脸解锁"</string>
+    <string name="app_lock_edu_dialog_lockscreen_password_name" msgid="8487096457702445059">"密码"</string>
+    <string name="app_lock_edu_dialog_lockscreen_pattern_name" msgid="991436996281983547">"解锁图案"</string>
+    <string name="app_lock_edu_dialog_lockscreen_pin_name" msgid="6458607126966304795">"PIN 码"</string>
+    <string name="app_lock_permission_review_dialog_title" msgid="5030286398974840579">"您的照片可能仍会在其他应用中显示"</string>
+    <string name="app_lock_permission_review_dialog_sub_title" msgid="310758587817184145">"有权访问您照片的应用"</string>
+    <string name="app_lock_permission_review_expand_app_list_button" msgid="3214809707125223273">"查看全部"</string>
+    <string name="app_lock_permission_review_continue_button" msgid="4045066724173414043">"继续"</string>
     <string name="work_mode_off_title" msgid="6367463960165135829">"是否为工作应用解除暂停状态？"</string>
     <string name="work_mode_turn_on" msgid="5316648862401307800">"解除暂停"</string>
     <string name="work_mode_emergency_call_button" msgid="6818855962881612322">"紧急呼叫"</string>
     <string name="set_up_screen_lock_title" msgid="8346083801616474030">"设置屏锁"</string>
     <string name="set_up_screen_lock_action_label" msgid="2687634803649209367">"设置屏锁"</string>
     <string name="private_space_set_up_screen_lock_message" msgid="1109956797005149814">"若要使用私密空间，请在此设备上设置屏锁"</string>
-    <string name="private_space_set_up_screen_lock_for_reset" msgid="7817091386408432097">"若要删除私密空间，请在此设备上设置屏幕锁定"</string>
+    <string name="private_space_set_up_screen_lock_for_reset" msgid="7817091386408432097">"若要删除私密空间，请在此设备上设置屏锁"</string>
     <string name="app_blocked_title" msgid="7353262160455028160">"应用无法使用"</string>
     <string name="app_blocked_message" msgid="542972921087873023">"<xliff:g id="APP_NAME">%1$s</xliff:g>目前无法使用。"</string>
     <string name="app_streaming_blocked_title" msgid="6090945835898766139">"<xliff:g id="ACTIVITY">%1$s</xliff:g>不可用"</string>
@@ -2592,6 +2619,8 @@
     <string name="satellite_messaging_unsupported_default_sms_app_notification_summary" msgid="17084124893763593">"如需通过卫星发送消息，请将 Google 信息设为默认即时通讯应用"</string>
     <string name="satellite_messaging_location_disabled_notification_title" msgid="7270641894250928494">"不支持卫星消息功能"</string>
     <string name="satellite_messaging_location_disabled_notification_summary" msgid="1450824950686221810">"若要查看此国家/地区是否支持卫星消息功能，请开启位置信息设置"</string>
+    <!-- no translation found for satellite_indicator (6846063647532086110) -->
+    <skip />
     <string name="fingerprint_dangling_notification_title" msgid="7362075195588639989">"重新设置指纹解锁功能"</string>
     <string name="fingerprint_dangling_notification_msg_1" msgid="5851784577768803510">"系统无法再识别<xliff:g id="FINGERPRINT">%s</xliff:g>。"</string>
     <string name="fingerprint_dangling_notification_msg_2" msgid="7925203589860744456">"系统无法再识别<xliff:g id="FINGERPRINT_0">%1$s</xliff:g>和<xliff:g id="FINGERPRINT_1">%2$s</xliff:g>。"</string>
@@ -2619,10 +2648,10 @@
     <string name="usb_apm_usb_plugged_in_when_locked_notification_app_title" msgid="285421860627714333">"安全和隐私"</string>
     <string name="usb_apm_usb_plugged_in_when_locked_replug_notification_title" msgid="3711633462195368964">"请解锁屏幕以重新连接 USB"</string>
     <string name="usb_apm_usb_plugged_in_when_locked_notification_title" msgid="2426356396215833585">"请解锁屏幕以连接 USB"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_replug_notification_text" msgid="3936428118409384816">"高级保护功能要求您先解锁屏幕，才能启用 USB 连接"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_data_notification_text" msgid="8392199274984083972">"高级保护功能要求您先解锁屏幕，才能启用 USB 连接"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_replug_notification_text" msgid="3936428118409384816">"高级保护功能要求您先解锁屏幕，才能启动 USB 连接"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_data_notification_text" msgid="8392199274984083972">"高级保护功能要求您先解锁屏幕，才能启动 USB 连接"</string>
     <string name="usb_apm_usb_plugged_in_when_locked_charge_notification_text" msgid="6563939109526112446">"高级保护功能要求您先解锁屏幕，才能快速充电"</string>
-    <string name="usb_apm_usb_plugged_in_when_locked_charge_data_notification_text" msgid="411509882563364946">"高级保护功能要求您先解锁屏幕，才能快速充电或启用 USB 连接"</string>
+    <string name="usb_apm_usb_plugged_in_when_locked_charge_data_notification_text" msgid="411509882563364946">"高级保护功能要求您先解锁屏幕，才能快速充电或启动 USB 连接"</string>
     <string name="usb_apm_usb_plugged_in_when_locked_notification_silence_action_text" msgid="5495539757631669634">"忽略"</string>
     <string name="usb_apm_usb_notification_silenced_title" msgid="5114203793430169863">"已忽略通知"</string>
     <string name="usb_apm_usb_notification_silenced_text" msgid="8394777105856033342">"在重启设备之前，您不会收到 USB 高级保护通知"</string>

@@ -27,6 +27,7 @@ import android.os.Process
 import android.util.Log
 import android.widget.Toast
 import androidx.annotation.StringRes
+import com.android.systemui.Flags
 import com.android.systemui.mediaprojection.MediaProjectionCaptureTarget
 import com.android.systemui.res.R
 import com.android.systemui.screencapture.data.repository.StaticScreenCaptureDeviceStateRepository
@@ -128,19 +129,26 @@ open class ScreenRecordingService : ComponentService() {
     }
 
     private fun RecordingContext.startRecording() {
-        screenRecordingPreferenceRepository.updateShowTaps(shouldShowTaps)
+        screenRecordingPreferenceRepository.updateSettings(shouldShowTaps)
         try {
             Log.d(tag, "Starting screen recording user=$userId $this")
-            recorder.start()
-            notificationInteractor.notifyRecording(
-                notificationId = notificationId,
-                audioSource = audioSource,
-            )
+            val notification = notificationInteractor.createRecordingNotification(audioSource)
+            if (Flags.screenRecordingServiceFix()) {
+                startForeground(notificationId, notification)
+                recorder.start()
+            } else {
+                recorder.start()
+                val notificationManager = getSystemService(NotificationManager::class.java)
+                notificationManager?.notify(tag, notificationId, notification)
+            }
         } catch (e: Exception) {
-            screenRecordingPreferenceRepository.maybeRestoreShowTapsSetting()
+            screenRecordingPreferenceRepository.maybeRestoreSetting()
             Log.e(tag, "Error starting screen recording", e)
             notificationInteractor.notifyErrorStarting(notificationId)
             showToast(R.string.screenrecord_start_error)
+            if (Flags.screenRecordingServiceFix()) {
+                stopForeground(STOP_FOREGROUND_DETACH)
+            }
             stopSelf()
         }
     }
@@ -165,6 +173,9 @@ open class ScreenRecordingService : ComponentService() {
             showToast(R.string.screenrecord_save_error)
         } finally {
             recorder.release()
+            if (Flags.screenRecordingServiceFix()) {
+                stopForeground(STOP_FOREGROUND_DETACH)
+            }
             stopSelf()
         }
     }
@@ -173,7 +184,7 @@ open class ScreenRecordingService : ComponentService() {
         try {
             Log.d(tag, "Stopping screen recording reason=$reason")
             recordingContext = null
-            screenRecordingPreferenceRepository.maybeRestoreShowTapsSetting()
+            screenRecordingPreferenceRepository.maybeRestoreSetting()
             recorder.end(reason)
             coroutineScope.launch { saveRecording() }
         } catch (e: Exception) {
@@ -181,6 +192,9 @@ open class ScreenRecordingService : ComponentService() {
             Log.e(tag, "Error stopping screen recording", e)
             showToast(R.string.screenrecord_save_error)
             recorder.release()
+            if (Flags.screenRecordingServiceFix()) {
+                stopForeground(STOP_FOREGROUND_DETACH)
+            }
             stopSelf() // only stop if there is an error. Otherwise leave it to saveRecording
         }
     }
@@ -200,9 +214,9 @@ open class ScreenRecordingService : ComponentService() {
         }
 
         override fun updateParameters(parameters: ScreenRecordingParameters) {
-            screenRecordingPreferenceRepository.updateShowTaps(
+            screenRecordingPreferenceRepository.updateSettings(
                 showTaps = parameters.shouldShowTaps,
-                rememberOriginal = false,
+                rememberOriginalShowTaps = false,
             )
         }
 

@@ -71,18 +71,13 @@ import com.android.systemui.shade.ShadeViewProviderModule.Companion.SHADE_HEADER
 import com.android.systemui.shade.carrier.ShadeCarrierGroup
 import com.android.systemui.shade.carrier.ShadeCarrierGroupController
 import com.android.systemui.shade.data.repository.ShadeDisplaysRepository
-import com.android.systemui.shade.shared.flag.ShadeWindowGoesAround
-import com.android.systemui.statusbar.core.RudimentaryBattery
 import com.android.systemui.statusbar.phone.StatusBarLocation
 import com.android.systemui.statusbar.phone.StatusIconContainer
 import com.android.systemui.statusbar.phone.StatusOverlayHoverListenerFactory
 import com.android.systemui.statusbar.phone.domain.interactor.IsAreaDark
 import com.android.systemui.statusbar.phone.ui.StatusBarIconController
 import com.android.systemui.statusbar.phone.ui.TintedIconManager
-import com.android.systemui.statusbar.pipeline.battery.ui.composable.BatteryWithChargeStatus
 import com.android.systemui.statusbar.pipeline.battery.ui.composable.BatteryWithEstimate
-import com.android.systemui.statusbar.pipeline.battery.ui.composable.ShowPercentMode
-import com.android.systemui.statusbar.pipeline.battery.ui.viewmodel.BatteryNextToPercentViewModel
 import com.android.systemui.statusbar.pipeline.battery.ui.viewmodel.BatteryViewModel
 import com.android.systemui.statusbar.pipeline.shared.ui.view.SystemStatusIconsLayoutHelper
 import com.android.systemui.statusbar.policy.Clock
@@ -120,7 +115,6 @@ constructor(
     private val shadeDisplaysRepositoryLazy: Lazy<ShadeDisplaysRepository>,
     private val variableDateViewControllerFactory: VariableDateViewController.Factory,
     private val unifiedBatteryViewModelFactory: BatteryViewModel.AlwaysShowPercent.Factory,
-    private val tandemBatteryViewModelFactory: BatteryNextToPercentViewModel.Factory,
     private val dumpManager: DumpManager,
     private val shadeCarrierGroupControllerBuilder: ShadeCarrierGroupController.Builder,
     private val combinedShadeHeadersConstraintManager: CombinedShadeHeadersConstraintManager,
@@ -133,14 +127,7 @@ constructor(
 
     private val statusBarContentInsetsProvider
         get() =
-            perDisplaySubcomponentRepo[
-                    if (ShadeWindowGoesAround.isEnabled) {
-                        // ShadeDisplaysRepository is the source of truth for display id when
-                        // ShadeWindowGoesAround.isEnabled
-                        shadeDisplaysRepositoryLazy.get().pendingDisplayId.value
-                    } else {
-                        context.displayId
-                    }]
+            perDisplaySubcomponentRepo[shadeDisplaysRepositoryLazy.get().pendingDisplayId.value]
                 ?.statusBarContentInsetsProvider
 
     companion object {
@@ -342,10 +329,7 @@ constructor(
                 lastInsets?.let { updateConstraintsForInsets(header, it) }
                 updateResources()
                 updateCarrierGroupPadding()
-                if (!ShadeWindowGoesAround.isEnabled) {
-                    // the clock handles the config change itself.
-                    clock.onDensityOrFontScaleChanged()
-                }
+
                 if (Flags.fixShadeHeaderWrongDndIconSize()) {
                     statusBarIconController.reloadIconGroupLayoutParams(iconManager)
                 }
@@ -410,42 +394,22 @@ constructor(
         }
 
     private fun createBatteryComposeView(): ComposeView {
-        return if (RudimentaryBattery.isEnabled) {
-            ComposeView(mView.context).apply {
-                setContent {
-                    PlatformTheme {
-                        id = R.id.battery_meter_composable_view
-                        val showBatteryEstimate by showBatteryEstimate.collectAsStateWithLifecycle()
-                        val dark = isSystemInDarkTheme()
-                        BatteryWithChargeStatus(
-                            modifier = Modifier.wrapContentSize(),
-                            viewModelFactory = tandemBatteryViewModelFactory,
-                            isDarkProvider = { IsAreaDark { dark } },
-                            showPercentMode =
-                                if (showBatteryEstimate) ShowPercentMode.PreferEstimate
-                                else ShowPercentMode.Always,
-                        )
-                    }
-                }
-            }
-        } else {
-            ComposeView(mView.context).apply {
-                setContent {
-                    PlatformTheme {
-                        id = R.id.battery_meter_composable_view
-                        val showBatteryEstimate by showBatteryEstimate.collectAsStateWithLifecycle()
-                        val dark = isSystemInDarkTheme()
-                        BatteryWithEstimate(
-                            modifier = Modifier.wrapContentSize(),
-                            viewModelFactory = unifiedBatteryViewModelFactory,
-                            isDarkProvider = { IsAreaDark { dark } },
-                            textColor =
-                                if (notificationShadeBlur())
-                                    Color(context.getColor(R.color.shade_header_text_color))
-                                else Color.White,
-                            showEstimate = showBatteryEstimate,
-                        )
-                    }
+        return ComposeView(mView.context).apply {
+            setContent {
+                PlatformTheme {
+                    id = R.id.battery_meter_composable_view
+                    val showBatteryEstimate by showBatteryEstimate.collectAsStateWithLifecycle()
+                    val dark = isSystemInDarkTheme()
+                    BatteryWithEstimate(
+                        modifier = Modifier.wrapContentSize(),
+                        viewModelFactory = unifiedBatteryViewModelFactory,
+                        isDarkProvider = { IsAreaDark { dark } },
+                        textColor =
+                            if (notificationShadeBlur())
+                                Color(context.getColor(R.color.shade_header_text_color))
+                            else Color.White,
+                        showEstimate = showBatteryEstimate,
+                    )
                 }
             }
         }

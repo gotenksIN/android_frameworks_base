@@ -346,6 +346,11 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
         try {
             synchronized (mGlobalLock) {
                 Transition transition = Transition.fromBinder(transitionToken);
+                if (transition == null && transitionToken != null) {
+                    Slog.wtf(TAG, "Requested transition was lost (controller isn't tracking it): "
+                            + transitionToken + " " + t);
+                    return null;
+                }
                 if (mTransitionController.isFlushing() && transition == null) {
                     Slog.w(TAG, "Using shell transitions API for legacy transitions.");
                     if (t == null) {
@@ -648,6 +653,42 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
     }
 
     /**
+     * {@link WindowContainerToken}s are used to stably identify containers across processes, but
+     * that doesn't mean they should all be manipulable by other processes. This will filter out
+     * (and warn about) any containers that are not organized.
+     */
+    private void sanitizeTransaction(@NonNull WindowContainerTransaction t) {
+        final Iterator<Map.Entry<IBinder, WindowContainerTransaction.Change>> entries =
+                t.getChanges().entrySet().iterator();
+        while (entries.hasNext()) {
+            final Map.Entry<IBinder, WindowContainerTransaction.Change> entry = entries.next();
+            final WindowContainer wc = WindowContainer.fromBinder(entry.getKey());
+            if (wc == null || wc.isOrganized()) continue;
+            Slog.wtf(TAG, "Attempting to externally manipulate a non-organized container: " + wc
+                    + " isAttached=" + wc.isAttached()
+                    + " playercount=" + mTransitionController.getTransitionPlayerCount()
+                    + " taskorg=" + mTaskOrganizerController.getTaskOrganizer());
+            entries.remove();
+        }
+        List<WindowContainerTransaction.HierarchyOp> hops = t.getHierarchyOps();
+        for (int h = hops.size() - 1; h >= 0; --h) {
+            final WindowContainerTransaction.HierarchyOp hop = hops.get(h);
+            if (hop.getType() == HIERARCHY_OP_TYPE_ADD_TASK_FRAGMENT_OPERATION
+                    || hop.getType() == HIERARCHY_OP_TYPE_FINISH_ACTIVITY) {
+                // TaskFragmentOrganizer ops don't use RemoteTokens and validate their inputs later
+                // via validateTaskFragmentOperation, so skip checking these here.
+                continue;
+            }
+            final IBinder binder = hop.getContainer();
+            if (binder == null) continue;
+            final WindowContainer wc = WindowContainer.fromBinder(binder);
+            if (wc == null || wc.isOrganized()) continue;
+            Slog.wtf(TAG, "Trying to externally manipulate a non-organized container: " + wc);
+            hops.remove(h);
+        }
+    }
+
+    /**
      * @param syncId If non-null, this will be a sync-transaction.
      * @param chain A lifecycle-chain to acculumate changes into.
      * @param caller Info about the calling process.
@@ -657,6 +698,7 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
             @NonNull ActionChain chain, @NonNull CallerInfo caller) {
         int effects = TRANSACT_EFFECTS_NONE;
         ProtoLog.v(WM_DEBUG_WINDOW_ORGANIZER, "Apply window transaction, syncId=%d", syncId);
+        sanitizeTransaction(t);
         mService.deferWindowLayout();
         mService.mTaskSupervisor.beginDeferResume();
         boolean deferResume = true;
@@ -784,10 +826,16 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
             if (transition != null && transition.applyDisplayContentClearIfNeeded()) {
                 effects |= TRANSACT_EFFECTS_LIFECYCLE;
             }
-            if ((effects & TRANSACT_EFFECTS_LIFECYCLE) != 0) {
-                mService.mTaskSupervisor.setDeferRootVisibilityUpdate(false /* deferUpdate */);
+            if (Flags.deferResumeEndBeforeEnsureActivityConfigurationBugfix()) {
                 mService.mTaskSupervisor.endDeferResume();
                 deferResume = false;
+            }
+            if ((effects & TRANSACT_EFFECTS_LIFECYCLE) != 0) {
+                mService.mTaskSupervisor.setDeferRootVisibilityUpdate(false /* deferUpdate */);
+                if (!Flags.deferResumeEndBeforeEnsureActivityConfigurationBugfix()) {
+                    mService.mTaskSupervisor.endDeferResume();
+                    deferResume = false;
+                }
                 // Already calls ensureActivityConfig
                 mService.mRootWindowContainer.ensureActivitiesVisible();
                 mService.mRootWindowContainer.resumeFocusedTasksTopActivities();
@@ -830,6 +878,7 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
         final int windowMask = change.getWindowSetMask() & CONTROLLABLE_WINDOW_CONFIGS;
         int effects = TRANSACT_EFFECTS_NONE;
         final int windowingMode = change.getWindowingMode();
+        int pendingBoundsChangeDiff = BOUNDS_CHANGE_NONE;
         if (configMask != 0) {
             // Save a copy before the configuration is updated.
             final Rect prevRequestedBounds = new Rect(container.getRequestedOverrideConfiguration()
@@ -840,6 +889,8 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
                 // need it called right now. Additionally, some logic requires everything in the
                 // configuration to change at the same time (ie. surface-freezer requires bounds
                 // and mode to change at the same time).
+                pendingBoundsChangeDiff = container.diffRequestedOverrideBounds(
+                        change.getConfiguration().windowConfiguration.getBounds());
                 final Configuration c = container.getRequestedOverrideConfiguration();
                 c.setTo(change.getConfiguration(), configMask, windowMask);
             } else {
@@ -914,16 +965,14 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
                     // changes.
                     effects |= TRANSACT_EFFECTS_LIFECYCLE;
                 }
-                if (Flags.makeFillingBoundsChangeEffectLifecycle()) {
-                    final boolean hasBoundsConfigChange =
-                            (windowMask & WindowConfiguration.WINDOW_CONFIG_BOUNDS) != 0;
-                    final boolean wasFillingParent = prevRequestedBounds.isEmpty();
-                    final boolean isFillingParent = change.getConfiguration()
-                            .windowConfiguration.getBounds().isEmpty();
-                    if (hasBoundsConfigChange && (wasFillingParent || isFillingParent)) {
-                        // Changing bounds to fill or from filling may result in lifecycle changes.
-                        effects |= TRANSACT_EFFECTS_LIFECYCLE;
-                    }
+                final boolean hasBoundsConfigChange =
+                        (windowMask & WindowConfiguration.WINDOW_CONFIG_BOUNDS) != 0;
+                final boolean wasFillingParent = prevRequestedBounds.isEmpty();
+                final boolean isFillingParent = change.getConfiguration()
+                        .windowConfiguration.getBounds().isEmpty();
+                if (hasBoundsConfigChange && (wasFillingParent || isFillingParent)) {
+                    // Changing bounds to fill or from filling may result in lifecycle changes.
+                    effects |= TRANSACT_EFFECTS_LIFECYCLE;
                 }
             }
         }
@@ -964,6 +1013,12 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
                 container.asTask().setRootTaskWindowingMode(windowingMode);
             } else {
                 container.setWindowingMode(windowingMode);
+            }
+            if (pendingBoundsChangeDiff != BOUNDS_CHANGE_NONE) {
+                // TODO: b/474212387 - Remove this workaround.
+                // Because we directly apply the bounds above, we here manually calls bounds change
+                // callbacks which are usually triggered by onRequestedOverrideConfigurationChanged.
+                container.dispatchBoundsChangeCallbacksIfNeeded(pendingBoundsChangeDiff);
             }
             if (prevMode != container.getWindowingMode()) {
                 // The activity in the container may become focusable or non-focusable due to
@@ -1198,6 +1253,7 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
             case HIERARCHY_OP_TYPE_REMOVE_TASK: {
                 final WindowContainer wc = WindowContainer.fromBinder(hop.getContainer());
                 final boolean removeFromRecents = hop.getRemoveFromRecents();
+                final boolean killProcess = hop.getKillProcess();
                 if (wc == null || wc.asTask() == null || !wc.isAttached()) {
                     Slog.e(TAG, "Attempt to remove invalid task: " + wc);
                     break;
@@ -1208,7 +1264,8 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
                 }
                 if (task.isLeafTask()) {
                     mService.mTaskSupervisor
-                            .removeTask(task, true, /* removeFromRecents= */ removeFromRecents,
+                            .removeTask(task, killProcess,
+                                    /* removeFromRecents= */ removeFromRecents,
                                     "remove-task-through-hierarchyOp");
                 } else {
                     mService.mTaskSupervisor.removeRootTask(task);
@@ -1498,8 +1555,8 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
                     // schedulePauseActivity() call uses this flag when entering PiP after Recents
                     // swipe-up TO_FRONT transition. In this case the state of the activity is
                     // RESUMED until ActivityRecord#makeActiveIfNeeded() makes it PAUSING followed
-                    // by the scheduling for PAUSE. See moveActivityToPinnedRootTask()'s call into
-                    // resumeFocusedTasksTopActivities().
+                    // by the scheduling for PAUSE.
+                    // This flag would be reset in ActivityRecord#makeActiveIfNeeded().
                     pipActivity.mAutoEnteringPip =
                             pipActivity.pictureInPictureArgs.isAutoEnterEnabled();
                 }
@@ -1518,8 +1575,6 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
                             pipActivity, false /* userLeaving */,
                             false /* pauseImmediately */, true /* autoEnteringPip */, "auto-pip");
                 }
-                // Reset auto-entering PiP info since any internal state updates are finished.
-                pipActivity.mAutoEnteringPip = false;
 
                 effects |= TRANSACT_EFFECTS_LIFECYCLE;
                 break;
@@ -2887,7 +2942,8 @@ class WindowOrganizerController extends IWindowOrganizerController.Stub
             return;
         }
         if (!ownerActivity.isResizeable()
-                && !ownerActivity.info.isChangeEnabled(ActivityInfo.FORCE_RESIZE_APP)) {
+                && !ownerActivity.mAppCompatController.getResizeOverrides()
+                .shouldOverrideForceResizeApp()) {
             final IllegalArgumentException exception = new IllegalArgumentException("Not allowed"
                     + " to operate with non-resizable owner Activity");
             sendTaskFragmentOperationFailure(organizer, errorCallbackToken, null /* taskFragment */,

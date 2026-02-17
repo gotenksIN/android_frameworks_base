@@ -23,6 +23,8 @@ import android.graphics.drawable.Icon;
 import android.os.Parcel;
 import android.os.Parcelable;
 
+import com.android.users.UserType;
+
 import java.util.Objects;
 
 /**
@@ -51,12 +53,13 @@ public class BubbleInfo implements Parcelable {
     @Nullable
     private final ParcelableFlyoutMessage mParcelableFlyoutMessage;
     private final boolean mIsApp;
+    private final boolean mIsChat;
     private final UserType mUserType;
 
     public BubbleInfo(String key, int flags, @Nullable String shortcutId, @Nullable Icon icon,
             int userId, String packageName, @Nullable String title, @Nullable String appName,
             boolean isImportantConversation, @Nullable ParcelableFlyoutMessage flyoutMessage,
-            boolean isApp, UserType userType) {
+            boolean isApp, boolean isChat, UserType userType) {
         mKey = key;
         mFlags = flags;
         mShortcutId = shortcutId;
@@ -68,6 +71,7 @@ public class BubbleInfo implements Parcelable {
         mIsImportantConversation = isImportantConversation;
         mParcelableFlyoutMessage = flyoutMessage;
         mIsApp = isApp;
+        mIsChat = isChat;
         mUserType = userType;
     }
 
@@ -84,6 +88,7 @@ public class BubbleInfo implements Parcelable {
         mParcelableFlyoutMessage = source.readParcelable(
                 ParcelableFlyoutMessage.class.getClassLoader(), ParcelableFlyoutMessage.class);
         mIsApp = source.readBoolean();
+        mIsChat = source.readBoolean();
         mUserType = source.readParcelable(UserType.class.getClassLoader(), UserType.class);
     }
 
@@ -134,6 +139,10 @@ public class BubbleInfo implements Parcelable {
 
     public boolean isApp() {
         return mIsApp;
+    }
+
+    public boolean isChat() {
+        return mIsChat;
     }
 
     public UserType getUserType() {
@@ -199,6 +208,7 @@ public class BubbleInfo implements Parcelable {
         parcel.writeBoolean(mIsImportantConversation);
         parcel.writeParcelable(mParcelableFlyoutMessage, flags);
         parcel.writeBoolean(mIsApp);
+        parcel.writeBoolean(mIsChat);
         parcel.writeParcelable(mUserType, flags);
     }
 

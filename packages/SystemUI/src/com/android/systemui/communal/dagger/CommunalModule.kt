@@ -16,6 +16,7 @@
 
 package com.android.systemui.communal.dagger
 
+import android.content.ComponentName
 import android.content.Context
 import android.content.res.Resources
 import com.android.systemui.CoreStartable
@@ -28,10 +29,12 @@ import com.android.systemui.communal.data.repository.CommunalSettingsRepositoryM
 import com.android.systemui.communal.data.repository.CommunalSmartspaceRepositoryModule
 import com.android.systemui.communal.data.repository.CommunalTutorialRepositoryModule
 import com.android.systemui.communal.data.repository.CommunalWidgetRepositoryModule
+import com.android.systemui.communal.domain.definition.SetupTarget
 import com.android.systemui.communal.domain.interactor.CommunalSceneTransitionInteractor
 import com.android.systemui.communal.domain.suppression.dagger.CommunalSuppressionModule
 import com.android.systemui.communal.shared.log.CommunalMetricsLogger
 import com.android.systemui.communal.shared.log.CommunalStatsLogProxyImpl
+import com.android.systemui.communal.shared.model.CommunalSceneDataSourceDelegator
 import com.android.systemui.communal.shared.model.CommunalScenes
 import com.android.systemui.communal.shared.model.GlanceableHubMultiUserHelper
 import com.android.systemui.communal.shared.model.GlanceableHubMultiUserHelperImpl
@@ -46,8 +49,6 @@ import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.res.R
 import com.android.systemui.scene.shared.model.SceneContainerConfig
-import com.android.systemui.scene.shared.model.SceneDataSource
-import com.android.systemui.scene.shared.model.SceneDataSourceDelegator
 import com.android.systemui.scene.ui.composable.ConstantSceneContainerTransitionsBuilder
 import dagger.Binds
 import dagger.Module
@@ -80,10 +81,6 @@ interface CommunalModule {
         starter: EditWidgetsActivityStarterImpl
     ): EditWidgetsActivityStarter
 
-    @Binds
-    @Communal
-    fun bindCommunalSceneDataSource(@Communal delegator: SceneDataSourceDelegator): SceneDataSource
-
     @Binds fun bindCommunalColors(impl: CommunalColorsImpl): CommunalColors
 
     @Binds
@@ -113,11 +110,10 @@ interface CommunalModule {
         const val TOUCH_NOTIFIFCATION_RATE_LIMIT_MS = 100
 
         @Provides
-        @Communal
         @SysUISingleton
         fun providesCommunalSceneDataSourceDelegator(
             @Application applicationScope: CoroutineScope
-        ): SceneDataSourceDelegator {
+        ): CommunalSceneDataSourceDelegator {
             val config =
                 SceneContainerConfig(
                     sceneKeys = listOf(CommunalScenes.Blank, CommunalScenes.Communal),
@@ -126,7 +122,7 @@ interface CommunalModule {
                         mapOf(CommunalScenes.Blank to 0, CommunalScenes.Communal to 1),
                     transitionsBuilder = ConstantSceneContainerTransitionsBuilder(sceneTransitions),
                 )
-            return SceneDataSourceDelegator(applicationScope, config)
+            return CommunalSceneDataSourceDelegator(applicationScope, config)
         }
 
         @Provides
@@ -167,6 +163,12 @@ interface CommunalModule {
         @Named(TOUCH_NOTIFICATION_RATE_LIMIT)
         fun providesRateLimit(): Int {
             return TOUCH_NOTIFIFCATION_RATE_LIMIT_MS
+        }
+
+        @Provides
+        fun provideUprightChargingSetupTarget(): SetupTarget {
+            // TODO(b/475513342): Target should be read from RROs to allow OEM customization
+            return SetupTarget.Activity(ComponentName("", ""))
         }
     }
 }

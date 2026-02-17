@@ -353,36 +353,27 @@ public class SettingsProvider extends ContentProvider {
     private static final Set<String> sReadableSecureSettings = new ArraySet<>();
     private static final ArrayMap<String, Integer> sReadableSecureSettingsWithMaxTargetSdk =
             new ArrayMap<>();
-    private static final ArrayMap<String, String> sReadableSecureSettingsWithRedactedValue =
-            new ArrayMap<>();
     static {
         Settings.Secure.getPublicSettings(sAllSecureSettings, sReadableSecureSettings,
-                sReadableSecureSettingsWithMaxTargetSdk,
-                sReadableSecureSettingsWithRedactedValue);
+                sReadableSecureSettingsWithMaxTargetSdk);
     }
 
     private static final Set<String> sAllSystemSettings = new ArraySet<>();
     private static final Set<String> sReadableSystemSettings = new ArraySet<>();
     private static final ArrayMap<String, Integer> sReadableSystemSettingsWithMaxTargetSdk =
             new ArrayMap<>();
-    private static final ArrayMap<String, String> sReadableSystemSettingsWithRedactedValue =
-            new ArrayMap<>();
     static {
         Settings.System.getPublicSettings(sAllSystemSettings, sReadableSystemSettings,
-                sReadableSystemSettingsWithMaxTargetSdk,
-                sReadableSystemSettingsWithRedactedValue);
+                sReadableSystemSettingsWithMaxTargetSdk);
     }
 
     private static final Set<String> sAllGlobalSettings = new ArraySet<>();
     private static final Set<String> sReadableGlobalSettings = new ArraySet<>();
     private static final ArrayMap<String, Integer> sReadableGlobalSettingsWithMaxTargetSdk =
             new ArrayMap<>();
-    private static final ArrayMap<String, String> sReadableGlobalSettingsWithRedactedValue =
-            new ArrayMap<>();
     static {
         Settings.Global.getPublicSettings(sAllGlobalSettings, sReadableGlobalSettings,
-                sReadableGlobalSettingsWithMaxTargetSdk,
-                sReadableGlobalSettingsWithRedactedValue);
+                sReadableGlobalSettingsWithMaxTargetSdk);
     }
 
     private final Object mLock = new Object();
@@ -1557,10 +1548,7 @@ public class SettingsProvider extends ContentProvider {
                     continue;
                 }
                 Setting setting = settingsState.getSettingLocked(name);
-                // Check if there is a redacted value setting
-                var finalSetting = getRedactedValueSettingIfPresent(name, setting,
-                        sReadableGlobalSettingsWithRedactedValue);
-                appendSettingToCursor(result, finalSetting);
+                appendSettingToCursor(result, setting);
             }
 
             return result;
@@ -1579,12 +1567,8 @@ public class SettingsProvider extends ContentProvider {
         synchronized (mLock) {
             // Global settings are applicable only for the default device, hence pass
             // Context.DEVICE_ID_DEFAULT as the deviceId.
-            var setting = mSettingsRegistry.getSettingLocked(SETTINGS_TYPE_GLOBAL,
+            return mSettingsRegistry.getSettingLocked(SETTINGS_TYPE_GLOBAL,
                     UserHandle.USER_SYSTEM, Context.DEVICE_ID_DEFAULT, name);
-
-            // Check if there is a redacted value for this setting
-            return getRedactedValueSettingIfPresent(name, setting,
-                    sReadableGlobalSettingsWithRedactedValue);
         }
     }
 
@@ -1760,11 +1744,7 @@ public class SettingsProvider extends ContentProvider {
                     setting = mSettingsRegistry.getSettingLocked(SETTINGS_TYPE_SECURE, owningUserId,
                             deviceId, name);
                 }
-
-                // Check if there is a redacted value setting
-                var finalSetting = getRedactedValueSettingIfPresent(name, setting,
-                        sReadableSecureSettingsWithRedactedValue);
-                appendSettingToCursor(result, finalSetting);
+                appendSettingToCursor(result, setting);
             }
 
             return result;
@@ -1805,12 +1785,8 @@ public class SettingsProvider extends ContentProvider {
 
         // Not the SSAID; do a straight lookup
         synchronized (mLock) {
-            var setting = mSettingsRegistry.getSettingLocked(SETTINGS_TYPE_SECURE,
+            return mSettingsRegistry.getSettingLocked(SETTINGS_TYPE_SECURE,
                     owningUserId, deviceId, name);
-
-            // Check if there is a redacted value for this setting
-            return getRedactedValueSettingIfPresent(name, setting,
-                    sReadableSecureSettingsWithRedactedValue);
         }
     }
 
@@ -2038,10 +2014,7 @@ public class SettingsProvider extends ContentProvider {
 
                 Setting setting = mSettingsRegistry.getSettingLocked(
                         SETTINGS_TYPE_SYSTEM, owningUserId, deviceId, name);
-                // Check if there is a redacted value setting
-                var finalSetting = getRedactedValueSettingIfPresent(name, setting,
-                        sReadableSystemSettingsWithRedactedValue);
-                appendSettingToCursor(result, finalSetting);
+                appendSettingToCursor(result, setting);
             }
 
             return result;
@@ -2065,12 +2038,8 @@ public class SettingsProvider extends ContentProvider {
 
         // Get the value.
         synchronized (mLock) {
-            var setting = mSettingsRegistry.getSettingLocked(SETTINGS_TYPE_SYSTEM, owningUserId,
+            return mSettingsRegistry.getSettingLocked(SETTINGS_TYPE_SYSTEM, owningUserId,
                     deviceId, name);
-
-            // Check if there is a redacted value for this setting
-            return getRedactedValueSettingIfPresent(name, setting,
-                    sReadableSystemSettingsWithRedactedValue);
         }
     }
 
@@ -2449,19 +2418,6 @@ public class SettingsProvider extends ContentProvider {
         // Don't enforce the instant app allowlist for now -- its too prone to unintended breakage
         // in the current form.
         return mSettingsRegistry.getSettingsNamesLocked(settingsType, userId, deviceId);
-    }
-
-    private Setting getRedactedValueSettingIfPresent(String name, Setting fetchedSetting,
-            ArrayMap<String, String> redactedSettingsMap) {
-        if (android.provider.Flags.enableRedactedValueForReadable()
-                && redactedSettingsMap.containsKey(name)) {
-            String redactedValue = redactedSettingsMap.get(name);
-            if (redactedValue != null && !redactedValue.isEmpty()) {
-                return fetchedSetting.withValue(redactedValue);
-            }
-        }
-
-        return fetchedSetting;
     }
 
     private void enforceSettingReadable(String settingName, int settingsType, int userId) {
@@ -3308,8 +3264,7 @@ public class SettingsProvider extends ContentProvider {
     }
 
     private int getDeviceId() {
-        int deviceId = android.companion.virtualdevice.flags.Flags.deviceAwareSettingsOverride()
-                && canAccessDeviceAwareSettings(Binder.getCallingUid(),
+        int deviceId = canAccessDeviceAwareSettings(Binder.getCallingUid(),
                 getCallingPackageUnchecked()) ? getCallingDeviceId() : Context.DEVICE_ID_DEFAULT;
         if (deviceId != Context.DEVICE_ID_DEFAULT) {
             // We have received a call for a non-default device id, so now would be a good time
@@ -3357,18 +3312,14 @@ public class SettingsProvider extends ContentProvider {
     private List<Integer> getDeviceIds() {
         final List<Integer> deviceIds = new ArrayList<>(1);
         deviceIds.add(Context.DEVICE_ID_DEFAULT);
-        VirtualDeviceManager virtualDeviceManager = getVirtualDeviceManager();
+        final VirtualDeviceManager virtualDeviceManager =
+                getContext().getSystemService(VirtualDeviceManager.class);
         if (virtualDeviceManager != null) {
             for (VirtualDevice virtualDevice : virtualDeviceManager.getVirtualDevices()) {
                 deviceIds.add(virtualDevice.getDeviceId());
             }
         }
         return deviceIds;
-    }
-
-    private VirtualDeviceManager getVirtualDeviceManager() {
-        return android.companion.virtualdevice.flags.Flags.deviceAwareSettingsOverride()
-                ? getContext().getSystemService(VirtualDeviceManager.class) : null;
     }
 
     private static boolean canAccessDeviceAwareSettings(int uid, String packageName) {
@@ -4362,7 +4313,7 @@ public class SettingsProvider extends ContentProvider {
 
         @VisibleForTesting
         final class UpgradeController {
-            private static final int SETTINGS_VERSION = 234;
+            private static final int SETTINGS_VERSION = 236;
 
             private final int mUserId;
             private final int mDeviceId;
@@ -6950,32 +6901,29 @@ public class SettingsProvider extends ContentProvider {
 
                 // Version 231: Update the curve for the HDR brightness boost level
                 if (currentVersion == 231) {
-                    if (com.android.server.display.feature.flags.Flags.hdrBrightnessSetting()) {
-                        Setting hdrBrightnessBoostLevelSetting = secureSettings.getSettingLocked(
-                                Secure.HDR_BRIGHTNESS_BOOST_LEVEL);
-                        if (!hdrBrightnessBoostLevelSetting.isNull()) {
-                            try {
-                                float hdrBrightnessBoostLevel = Float.parseFloat(
-                                        hdrBrightnessBoostLevelSetting.getValue());
-                                if (hdrBrightnessBoostLevel > 0 && hdrBrightnessBoostLevel < 1) {
-                                    float ratioScaleFactor = BrightnessUtils.convertGammaToLinear(
-                                            hdrBrightnessBoostLevel);
-                                    float newHdrBrightnessBoostLevel = MathUtils.sqrt(
-                                            ratioScaleFactor);
-                                    secureSettings.insertSettingLocked(
-                                            Secure.HDR_BRIGHTNESS_BOOST_LEVEL,
-                                            String.valueOf(newHdrBrightnessBoostLevel),
-                                            /* tag= */ null,
-                                            /* makeDefault= */ false,
-                                            SettingsState.SYSTEM_PACKAGE_NAME);
-                                }
-                            } catch (NumberFormatException e) {
-                                secureSettings.deleteSettingLocked(
-                                        Secure.HDR_BRIGHTNESS_BOOST_LEVEL);
+                    Setting hdrBrightnessBoostLevelSetting = secureSettings.getSettingLocked(
+                            Secure.HDR_BRIGHTNESS_BOOST_LEVEL);
+                    if (!hdrBrightnessBoostLevelSetting.isNull()) {
+                        try {
+                            float hdrBrightnessBoostLevel = Float.parseFloat(
+                                    hdrBrightnessBoostLevelSetting.getValue());
+                            if (hdrBrightnessBoostLevel > 0 && hdrBrightnessBoostLevel < 1) {
+                                float ratioScaleFactor = BrightnessUtils.convertGammaToLinear(
+                                        hdrBrightnessBoostLevel);
+                                float newHdrBrightnessBoostLevel = MathUtils.sqrt(
+                                        ratioScaleFactor);
+                                secureSettings.insertSettingLocked(
+                                        Secure.HDR_BRIGHTNESS_BOOST_LEVEL,
+                                        String.valueOf(newHdrBrightnessBoostLevel),
+                                        /* tag= */ null,
+                                        /* makeDefault= */ false,
+                                        SettingsState.SYSTEM_PACKAGE_NAME);
                             }
+                        } catch (NumberFormatException e) {
+                            secureSettings.deleteSettingLocked(
+                                    Secure.HDR_BRIGHTNESS_BOOST_LEVEL);
                         }
                     }
-
                     currentVersion = 232;
                 }
 
@@ -7016,6 +6964,37 @@ public class SettingsProvider extends ContentProvider {
                                 Settings.Secure.ADAPTIVE_CONNECTIVITY_ENABLED);
                     }
                     currentVersion = 234;
+                }
+
+                if (currentVersion == 234) {
+                    // Version 234: Add AMBIENT_OFFWRIST_TIMEOUT for Wear charging experience
+                    // AMBIENT_OFFWRIST_TIMEOUT_MIN
+                    initGlobalSettingsDefaultValLocked(
+                            globalSettings,
+                            Settings.Global.Wearable.AMBIENT_OFFWRIST_TIMEOUT_MIN,
+                            SystemProperties.getInt("ro.ambient.offwrist_timeout_min", -1));
+
+                    currentVersion = 235;
+                }
+
+                // Version 235: Migrate the value of TEXT_SHOW_PASSWORD to TEXT_SHOW_PASSWORD_TOUCH.
+                if (currentVersion == 235) {
+                    final Setting showPasswordSetting =
+                            systemSettings.getSettingLocked(Settings.System.TEXT_SHOW_PASSWORD);
+
+                    if (!showPasswordSetting.isNull()) {
+                        String value = showPasswordSetting.getValue();
+                        secureSettings.insertSettingOverrideableByRestoreLocked(
+                                Settings.Secure.TEXT_SHOW_PASSWORD_TOUCH,
+                                value,
+                                null,
+                                true,
+                                SettingsState.SYSTEM_PACKAGE_NAME);
+                        // We don't migrate the value for the PHYSICAL setting as this can be
+                        // considered new. Also some vendors may chose to not expose the physical
+                        // setting at all and we don't want the user to be stuck on these devices.
+                    }
+                    currentVersion = 236;
                 }
 
                 // vXXX: Add new settings above this point.

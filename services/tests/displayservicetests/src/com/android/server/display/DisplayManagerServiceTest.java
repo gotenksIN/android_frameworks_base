@@ -46,6 +46,7 @@ import static android.view.Display.HdrCapabilities.HDR_TYPE_INVALID;
 
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.doAnswer;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.when;
+import static com.android.graphics.surfaceflinger.flags.Flags.FLAG_FORCE_SDR_INVALID_HDR_TYPE;
 import static com.android.server.display.ExternalDisplayPolicy.ENABLE_ON_CONNECT;
 import static com.android.server.display.TestUtilsKt.createInMemoryPersistentDataStore;
 import static com.android.server.display.TestUtilsKt.createSensor;
@@ -145,6 +146,7 @@ import android.os.TestLooperManager;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.os.test.FakePermissionEnforcer;
+import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.annotations.RequiresFlagsEnabled;
 import android.platform.test.flag.junit.CheckFlagsRule;
@@ -487,6 +489,7 @@ public class DisplayManagerServiceTest {
                     .setStrictness(Strictness.LENIENT)
                     .spyStatic(SystemProperties.class)
                     .spyStatic(BatteryStatsService.class)
+                    .spyStatic(SmallAreaDetectionController.class)
                     .build();
 
     private int mUniqueIdCount = 0;
@@ -497,8 +500,7 @@ public class DisplayManagerServiceTest {
     public void setUp() throws Exception {
         MockitoAnnotations.initMocks(this);
 
-        mIsDisplayListenerSnapshotFlagEnabled = Flags.displayListenerSnapshot()
-                || Flags.displayIdsCache();
+        mIsDisplayListenerSnapshotFlagEnabled = Flags.displayIdsCache();
 
         mLocalServiceKeeperRule.overrideLocalService(
                 InputManagerInternal.class, mMockInputManagerInternal);
@@ -551,6 +553,8 @@ public class DisplayManagerServiceTest {
         doReturn(mPermissionEnforcer).when(mContext).getSystemService(
                 eq(Context.PERMISSION_ENFORCER_SERVICE));
         doReturn(mock(JobScheduler.class)).when(mContext).getSystemService(JobScheduler.class);
+        doAnswer(invocationOnMock -> mock(SmallAreaDetectionController.class)).when(
+                () -> SmallAreaDetectionController.create(any(Context.class)));
 
         VirtualDeviceManager vdm = new VirtualDeviceManager(mIVirtualDeviceManager, mContext);
         when(mContext.getSystemService(VirtualDeviceManager.class)).thenReturn(vdm);
@@ -1032,10 +1036,7 @@ public class DisplayManagerServiceTest {
     }
 
     @Test
-    @EnableFlags({
-        Flags.FLAG_CHANGE_DEFAULT_DISPLAY_LID_CLOSED,
-        Flags.FLAG_FIX_SET_DISPLAY_STATE_AFTER_DEVICE_CHANGE
-    })
+    @EnableFlags(Flags.FLAG_CHANGE_DEFAULT_DISPLAY_LID_CLOSED)
     public void testDockedDeviceState_displayStateUpdated() {
         mDisplayManager = new DisplayManagerService(mContext,
                 mShortMockedInjector);
@@ -1048,8 +1049,11 @@ public class DisplayManagerServiceTest {
         DisplayManagerService.BinderService displayManagerBinderService =
                 mDisplayManager.new BinderService();
 
-        DisplayDevice internalDisplayDevice = logicalDisplayMapper.getDisplayLocked(
-                Display.DEFAULT_DISPLAY).getPrimaryDisplayDeviceLocked();
+        DisplayDevice internalDisplayDevice;
+        synchronized (mDisplayManager.getSyncRoot()) {
+            internalDisplayDevice = logicalDisplayMapper.getDisplayLocked(
+                    Display.DEFAULT_DISPLAY).getPrimaryDisplayDeviceLocked();
+        }
         // Create external display
         FakeDisplayDevice externalDisplayDevice =
                 createFakeDisplayDevice(mDisplayManager, new float[]{60f}, Display.TYPE_EXTERNAL);
@@ -1057,10 +1061,13 @@ public class DisplayManagerServiceTest {
                 displayManagerBinderService, externalDisplayDevice);
         initDisplayPowerController(localService);
         mDisplayManager.enableConnectedDisplay(externalDisplayId, /* enabled= */ true);
-        int internalGroupId = logicalDisplayMapper.getDisplayGroupIdFromDisplayIdLocked(
-                Display.DEFAULT_DISPLAY);
-        int externalGroupId = logicalDisplayMapper.getDisplayGroupIdFromDisplayIdLocked(
-                externalDisplayId);
+        int internalGroupId, externalGroupId;
+        synchronized (mDisplayManager.getSyncRoot()) {
+            internalGroupId = logicalDisplayMapper.getDisplayGroupIdFromDisplayIdLocked(
+                    Display.DEFAULT_DISPLAY);
+            externalGroupId = logicalDisplayMapper.getDisplayGroupIdFromDisplayIdLocked(
+                    externalDisplayId);
+        }
         DisplayManagerInternal.DisplayPowerRequest dpr =
                 new DisplayManagerInternal.DisplayPowerRequest();
         // Initialize DPCs
@@ -1079,12 +1086,16 @@ public class DisplayManagerServiceTest {
         localService.requestPowerState(externalGroupId, dpr, /* waitForNegativeProximity= */ false);
         flushHandlers();
 
-        assertEquals(Display.STATE_OFF, mDisplayManager.getLogicalDisplayMapper().getDisplayLocked(
-                internalDisplayDevice).getPrimaryDisplayDeviceLocked().getDisplayDeviceInfoLocked()
-                .committedState);
-        assertEquals(Display.STATE_ON, mDisplayManager.getLogicalDisplayMapper().getDisplayLocked(
-                externalDisplayDevice).getPrimaryDisplayDeviceLocked().getDisplayDeviceInfoLocked()
-                .committedState);
+        synchronized (mDisplayManager.getSyncRoot()) {
+            assertEquals(Display.STATE_OFF,
+                    mDisplayManager.getLogicalDisplayMapper().getDisplayLocked(
+                            internalDisplayDevice).getPrimaryDisplayDeviceLocked()
+                            .getDisplayDeviceInfoLocked().committedState);
+            assertEquals(Display.STATE_ON,
+                    mDisplayManager.getLogicalDisplayMapper().getDisplayLocked(
+                            externalDisplayDevice).getPrimaryDisplayDeviceLocked()
+                            .getDisplayDeviceInfoLocked().committedState);
+        }
 
         listener.onDeviceStateChanged(
                 new DeviceState(new DeviceState.Configuration.Builder(/* identifier= */ 456,
@@ -1099,12 +1110,16 @@ public class DisplayManagerServiceTest {
         localService.requestPowerState(externalGroupId, dpr, /* waitForNegativeProximity= */ false);
         flushHandlers();
 
-        assertEquals(Display.STATE_ON, mDisplayManager.getLogicalDisplayMapper().getDisplayLocked(
-                internalDisplayDevice).getPrimaryDisplayDeviceLocked().getDisplayDeviceInfoLocked()
-                .committedState);
-        assertEquals(Display.STATE_ON, mDisplayManager.getLogicalDisplayMapper().getDisplayLocked(
-                externalDisplayDevice).getPrimaryDisplayDeviceLocked().getDisplayDeviceInfoLocked()
-                .committedState);
+        synchronized (mDisplayManager.getSyncRoot()) {
+            assertEquals(Display.STATE_ON,
+                    mDisplayManager.getLogicalDisplayMapper().getDisplayLocked(
+                            internalDisplayDevice).getPrimaryDisplayDeviceLocked()
+                            .getDisplayDeviceInfoLocked().committedState);
+            assertEquals(Display.STATE_ON,
+                    mDisplayManager.getLogicalDisplayMapper().getDisplayLocked(
+                            externalDisplayDevice).getPrimaryDisplayDeviceLocked()
+                            .getDisplayDeviceInfoLocked().committedState);
+        }
     }
 
     /**
@@ -2360,6 +2375,228 @@ public class DisplayManagerServiceTest {
     }
 
     @Test
+    @EnableFlags(Flags.FLAG_VIRTUAL_SECONDARY_DISPLAYS)
+    public void testCreateVirtualDisplay_allowsContentModeSwitch() throws Exception {
+        mDisplayManager = new DisplayManagerService(mContext, mBasicInjector);
+        registerDefaultDisplays(mDisplayManager);
+
+        DisplayManagerService.BinderService bs = mDisplayManager.new BinderService();
+
+        String uniqueId = "uniqueId --- Content Mode Switch Test";
+        int width = 600;
+        int height = 800;
+        int dpi = 320;
+        int flags = DisplayManager.VIRTUAL_DISPLAY_FLAG_ALLOWS_CONTENT_MODE_SWITCH
+                | DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC
+                | DisplayManager.VIRTUAL_DISPLAY_FLAG_TRUSTED;
+
+        when(mContext.checkCallingPermission(ADD_TRUSTED_DISPLAY)).thenReturn(
+                PackageManager.PERMISSION_GRANTED);
+        when(mMockAppToken.asBinder()).thenReturn(mMockAppToken);
+        final VirtualDisplayConfig.Builder builder = new VirtualDisplayConfig.Builder(
+                VIRTUAL_DISPLAY_NAME, width, height, dpi);
+        builder.setFlags(flags);
+        builder.setUniqueId(uniqueId);
+        int displayId = bs.createVirtualDisplay(builder.build(), /* callback= */ mMockAppToken,
+                /* projection= */ null, PACKAGE_NAME);
+
+        performTraversalInternal(mDisplayManager);
+
+        flushHandlers();
+
+        DisplayDeviceInfo ddi = mDisplayManager.getDisplayDeviceInfoInternal(displayId);
+        assertNotNull(ddi);
+        assertNotEquals(0, ddi.flags & DisplayDeviceInfo.FLAG_ALLOWS_CONTENT_MODE_SWITCH);
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_VIRTUAL_SECONDARY_DISPLAYS)
+    public void testCreateVirtualDisplay_allowsContentModeSwitch_ignoredWhenUntrusted()
+            throws Exception {
+        mDisplayManager = new DisplayManagerService(mContext, mBasicInjector);
+        registerDefaultDisplays(mDisplayManager);
+
+        DisplayManagerService.BinderService bs = mDisplayManager.new BinderService();
+
+        String uniqueId = "uniqueId --- Content Mode Switch Test";
+        int width = 600;
+        int height = 800;
+        int dpi = 320;
+        // Missing VIRTUAL_DISPLAY_FLAG_TRUSTED
+        int flags = DisplayManager.VIRTUAL_DISPLAY_FLAG_ALLOWS_CONTENT_MODE_SWITCH
+                | DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC;
+
+        when(mContext.checkCallingPermission(CAPTURE_VIDEO_OUTPUT)).thenReturn(
+                PackageManager.PERMISSION_GRANTED);
+        when(mMockAppToken.asBinder()).thenReturn(mMockAppToken);
+        final VirtualDisplayConfig.Builder builder = new VirtualDisplayConfig.Builder(
+                VIRTUAL_DISPLAY_NAME, width, height, dpi);
+        builder.setFlags(flags);
+        builder.setUniqueId(uniqueId);
+        int displayId = bs.createVirtualDisplay(builder.build(), /* callback= */ mMockAppToken,
+                /* projection= */ null, PACKAGE_NAME);
+
+        performTraversalInternal(mDisplayManager);
+
+        flushHandlers();
+
+        DisplayDeviceInfo ddi = mDisplayManager.getDisplayDeviceInfoInternal(displayId);
+        assertNotNull(ddi);
+        assertEquals(0, ddi.flags & DisplayDeviceInfo.FLAG_ALLOWS_CONTENT_MODE_SWITCH);
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_VIRTUAL_SECONDARY_DISPLAYS)
+    public void testCreateVirtualDisplay_allowsContentModeSwitch_ignoredWhenPrivate()
+            throws Exception {
+        mDisplayManager = new DisplayManagerService(mContext, mBasicInjector);
+        registerDefaultDisplays(mDisplayManager);
+
+        DisplayManagerService.BinderService bs = mDisplayManager.new BinderService();
+
+        String uniqueId = "uniqueId --- Content Mode Switch Test";
+        int width = 600;
+        int height = 800;
+        int dpi = 320;
+        // Missing VIRTUAL_DISPLAY_FLAG_PUBLIC
+        int flags = DisplayManager.VIRTUAL_DISPLAY_FLAG_ALLOWS_CONTENT_MODE_SWITCH
+                | DisplayManager.VIRTUAL_DISPLAY_FLAG_TRUSTED;
+
+        when(mContext.checkCallingPermission(ADD_TRUSTED_DISPLAY)).thenReturn(
+                PackageManager.PERMISSION_GRANTED);
+        when(mMockAppToken.asBinder()).thenReturn(mMockAppToken);
+        final VirtualDisplayConfig.Builder builder = new VirtualDisplayConfig.Builder(
+                VIRTUAL_DISPLAY_NAME, width, height, dpi);
+        builder.setFlags(flags);
+        builder.setUniqueId(uniqueId);
+        int displayId = bs.createVirtualDisplay(builder.build(), /* callback= */ mMockAppToken,
+                /* projection= */ null, PACKAGE_NAME);
+
+        performTraversalInternal(mDisplayManager);
+
+        flushHandlers();
+
+        DisplayDeviceInfo ddi = mDisplayManager.getDisplayDeviceInfoInternal(displayId);
+        assertNotNull(ddi);
+        assertEquals(0, ddi.flags & DisplayDeviceInfo.FLAG_ALLOWS_CONTENT_MODE_SWITCH);
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_VIRTUAL_SECONDARY_DISPLAYS)
+    public void testCreateVirtualDisplay_allowsContentModeSwitch_ignoredWhenAutoMirror()
+            throws Exception {
+        mDisplayManager = new DisplayManagerService(mContext, mBasicInjector);
+        registerDefaultDisplays(mDisplayManager);
+
+        DisplayManagerService.BinderService bs = mDisplayManager.new BinderService();
+
+        String uniqueId = "uniqueId --- Content Mode Switch Test";
+        int width = 600;
+        int height = 800;
+        int dpi = 320;
+        int flags = DisplayManager.VIRTUAL_DISPLAY_FLAG_ALLOWS_CONTENT_MODE_SWITCH
+                | DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC
+                | DisplayManager.VIRTUAL_DISPLAY_FLAG_TRUSTED
+                | DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR;
+
+        when(mContext.checkCallingPermission(ADD_TRUSTED_DISPLAY)).thenReturn(
+                PackageManager.PERMISSION_GRANTED);
+        when(mContext.checkCallingPermission(CAPTURE_VIDEO_OUTPUT)).thenReturn(
+                PackageManager.PERMISSION_GRANTED);
+        when(mMockAppToken.asBinder()).thenReturn(mMockAppToken);
+        final VirtualDisplayConfig.Builder builder = new VirtualDisplayConfig.Builder(
+                VIRTUAL_DISPLAY_NAME, width, height, dpi);
+        builder.setFlags(flags);
+        builder.setUniqueId(uniqueId);
+        int displayId = bs.createVirtualDisplay(builder.build(), /* callback= */ mMockAppToken,
+                /* projection= */ null, PACKAGE_NAME);
+
+        performTraversalInternal(mDisplayManager);
+
+        flushHandlers();
+
+        DisplayDeviceInfo ddi = mDisplayManager.getDisplayDeviceInfoInternal(displayId);
+        assertNotNull(ddi);
+        assertEquals(0, ddi.flags & DisplayDeviceInfo.FLAG_ALLOWS_CONTENT_MODE_SWITCH);
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_VIRTUAL_SECONDARY_DISPLAYS)
+    public void testCreateVirtualDisplay_allowsContentModeSwitch_ignoredWhenOwnContentOnly()
+            throws Exception {
+        mDisplayManager = new DisplayManagerService(mContext, mBasicInjector);
+        registerDefaultDisplays(mDisplayManager);
+
+        DisplayManagerService.BinderService bs = mDisplayManager.new BinderService();
+
+        String uniqueId = "uniqueId --- Content Mode Switch Test";
+        int width = 600;
+        int height = 800;
+        int dpi = 320;
+        int flags = DisplayManager.VIRTUAL_DISPLAY_FLAG_ALLOWS_CONTENT_MODE_SWITCH
+                | DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC
+                | DisplayManager.VIRTUAL_DISPLAY_FLAG_TRUSTED
+                | VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY;
+
+        when(mContext.checkCallingPermission(ADD_TRUSTED_DISPLAY)).thenReturn(
+                PackageManager.PERMISSION_GRANTED);
+        when(mMockAppToken.asBinder()).thenReturn(mMockAppToken);
+        final VirtualDisplayConfig.Builder builder = new VirtualDisplayConfig.Builder(
+                VIRTUAL_DISPLAY_NAME, width, height, dpi);
+        builder.setFlags(flags);
+        builder.setUniqueId(uniqueId);
+        int displayId = bs.createVirtualDisplay(builder.build(), /* callback= */ mMockAppToken,
+                /* projection= */ null, PACKAGE_NAME);
+
+        performTraversalInternal(mDisplayManager);
+
+        flushHandlers();
+
+        DisplayDeviceInfo ddi = mDisplayManager.getDisplayDeviceInfoInternal(displayId);
+        assertNotNull(ddi);
+        assertEquals(0, ddi.flags & DisplayDeviceInfo.FLAG_ALLOWS_CONTENT_MODE_SWITCH);
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_VIRTUAL_SECONDARY_DISPLAYS)
+    public void testCreateVirtualDisplay_allowsContentModeSwitch_ignoredWhenShouldShowSystemDecors()
+            throws Exception {
+        mDisplayManager = new DisplayManagerService(mContext, mBasicInjector);
+        registerDefaultDisplays(mDisplayManager);
+
+        DisplayManagerService.BinderService bs = mDisplayManager.new BinderService();
+
+        String uniqueId = "uniqueId --- Content Mode Switch Test";
+        int width = 600;
+        int height = 800;
+        int dpi = 320;
+        int flags = DisplayManager.VIRTUAL_DISPLAY_FLAG_ALLOWS_CONTENT_MODE_SWITCH
+                | DisplayManager.VIRTUAL_DISPLAY_FLAG_PUBLIC
+                | DisplayManager.VIRTUAL_DISPLAY_FLAG_TRUSTED
+                | DisplayManager.VIRTUAL_DISPLAY_FLAG_SHOULD_SHOW_SYSTEM_DECORATIONS;
+
+        when(mContext.checkCallingPermission(ADD_TRUSTED_DISPLAY)).thenReturn(
+                PackageManager.PERMISSION_GRANTED);
+        when(mContext.checkCallingPermission(CAPTURE_VIDEO_OUTPUT))
+                .thenReturn(PackageManager.PERMISSION_GRANTED);
+        when(mMockAppToken.asBinder()).thenReturn(mMockAppToken);
+        final VirtualDisplayConfig.Builder builder = new VirtualDisplayConfig.Builder(
+                VIRTUAL_DISPLAY_NAME, width, height, dpi);
+        builder.setFlags(flags);
+        builder.setUniqueId(uniqueId);
+        int displayId = bs.createVirtualDisplay(builder.build(), /* callback= */ mMockAppToken,
+                /* projection= */ null, PACKAGE_NAME);
+
+        performTraversalInternal(mDisplayManager);
+
+        flushHandlers();
+
+        DisplayDeviceInfo ddi = mDisplayManager.getDisplayDeviceInfoInternal(displayId);
+        assertNotNull(ddi);
+        assertEquals(0, ddi.flags & DisplayDeviceInfo.FLAG_ALLOWS_CONTENT_MODE_SWITCH);
+    }
+
+    @Test
     public void test_displayChangedNotified_displayInfoFramerateOverridden() {
         when(mMockFlags.isFramerateOverrideTriggersRrCallbacksEnabled()).thenReturn(false);
 
@@ -2901,6 +3138,31 @@ public class DisplayManagerServiceTest {
         assertEquals(mode, mDisplayManager.getHdrConversionModeSettingInternal());
         assertEquals(mode.getConversionMode(), mHdrConversionMode);
         assertEquals(mode.getPreferredHdrOutputType(), mPreferredHdrOutputType);
+    }
+
+    @DisableFlags({FLAG_FORCE_SDR_INVALID_HDR_TYPE})
+    @Test
+    public void testHdrConversionMode_withForceSdr_sendsPassthrough() {
+        mDisplayManager = new DisplayManagerService(mContext, mBasicInjector);
+        final HdrConversionMode mode = new HdrConversionMode(
+                HdrConversionMode.HDR_CONVERSION_FORCE,
+                Display.HdrCapabilities.HDR_TYPE_INVALID);
+        mDisplayManager.setHdrConversionModeInternal(mode);
+
+        assertEquals(mHdrConversionMode, HdrConversionMode.HDR_CONVERSION_PASSTHROUGH);
+    }
+
+    @EnableFlags({FLAG_FORCE_SDR_INVALID_HDR_TYPE})
+    @Test
+    public void testHdrConversionMode_withForceSdr_sendsHdrTypeInvalid() {
+        mDisplayManager = new DisplayManagerService(mContext, mBasicInjector);
+        final HdrConversionMode mode = new HdrConversionMode(
+                HdrConversionMode.HDR_CONVERSION_FORCE,
+                Display.HdrCapabilities.HDR_TYPE_INVALID);
+        mDisplayManager.setHdrConversionModeInternal(mode);
+
+        assertEquals(mHdrConversionMode, HdrConversionMode.HDR_CONVERSION_FORCE);
+        assertEquals(mPreferredHdrOutputType, Display.HdrCapabilities.HDR_TYPE_INVALID);
     }
 
     @Test
@@ -3782,7 +4044,6 @@ public class DisplayManagerServiceTest {
     @Test
     public void testResolutionChangeDoesNotGetBackedUp() throws Exception {
         mPermissionEnforcer.grant(MODIFY_USER_PREFERRED_DISPLAY_MODE);
-        when(mMockFlags.isModeSwitchWithoutSavingEnabled()).thenReturn(true);
         mDisplayManager = new DisplayManagerService(mContext, mBasicInjector);
 
         Display.Mode[] modes = new Display.Mode[2];
@@ -3813,7 +4074,6 @@ public class DisplayManagerServiceTest {
     @Test
     public void testResolutionRestFromSettings() throws Exception {
         mPermissionEnforcer.grant(MODIFY_USER_PREFERRED_DISPLAY_MODE);
-        when(mMockFlags.isModeSwitchWithoutSavingEnabled()).thenReturn(true);
         mDisplayManager = new DisplayManagerService(mContext, mBasicInjector);
 
         Display.Mode[] modes = new Display.Mode[2];
@@ -3839,6 +4099,40 @@ public class DisplayManagerServiceTest {
         // reset, preferredMode restored from persistence
         bs.resetUserPreferredDisplayMode(Display.DEFAULT_DISPLAY);
         assertEquals(modes[0], displayDevice.mPreferredMode);
+    }
+
+    @Test
+    public void testSetGlobalUserPreferredDisplayMode() throws Exception {
+        mPermissionEnforcer.grant(MODIFY_USER_PREFERRED_DISPLAY_MODE);
+        mDisplayManager = new DisplayManagerService(mContext, mBasicInjector);
+
+        Display.Mode[] modes = new Display.Mode[2];
+        modes[0] = new Display.Mode(/*id=*/1, /*width=*/100, /*height=*/200, /*rr=*/60);
+        modes[1] = new Display.Mode(/*id=*/2, /*width=*/200, /*height=*/400, /*rr=*/30);
+
+        // Set up two fake displays
+        FakeDisplayDevice displayDevice1 = createFakeDisplayDevice(
+                mDisplayManager, modes, Display.TYPE_EXTERNAL, "testDevice1");
+        FakeDisplayDevice displayDevice2 = createFakeDisplayDevice(
+                mDisplayManager, modes, Display.TYPE_EXTERNAL, "testDevice2");
+        flushHandlers();
+
+        mDisplayManager.onBootPhase(SystemService.PHASE_BOOT_COMPLETED);
+
+        DisplayManagerService.BinderService bs = mDisplayManager.new BinderService();
+
+        // Set the global user preferred display mode by using INVALID_DISPLAY
+        bs.setUserPreferredDisplayMode(Display.INVALID_DISPLAY, modes[1], true);
+
+        // Verify that the user preferred mode was set on both displays
+        assertEquals("Failed to set testDevice1 user preferred display mode", modes[1],
+                displayDevice1.getUserPreferredDisplayModeLocked());
+        assertEquals("Failed to set testDevice2 user preferred display mode", modes[1],
+                displayDevice2.getUserPreferredDisplayModeLocked());
+
+        // Verify that getting the global user preferred mode returns the mode we just set
+        Display.Mode globalMode = bs.getUserPreferredDisplayMode(Display.INVALID_DISPLAY);
+        assertEquals(modes[1], globalMode);
     }
 
     @Test
@@ -4042,7 +4336,6 @@ public class DisplayManagerServiceTest {
         Settings.Global.putInt(mContext.getContentResolver(),
                 DEVELOPMENT_FORCE_DESKTOP_MODE_ON_EXTERNAL_DISPLAYS, 1);
         manageDisplaysPermission(/* granted= */ true);
-        when(mMockFlags.isDisplayTopologyEnabled()).thenReturn(true);
         mDisplayManager = new DisplayManagerService(mContext, mBasicInjector);
         DisplayManagerInternal localService = mDisplayManager.new LocalService();
         DisplayManagerService.BinderService displayManagerBinderService =
@@ -4058,24 +4351,8 @@ public class DisplayManagerServiceTest {
     }
 
     @Test
-    public void testGetDisplayTopology_NullIfFlagDisabled() {
-        manageDisplaysPermission(/* granted= */ true);
-        when(mMockFlags.isDisplayTopologyEnabled()).thenReturn(false);
-        mDisplayManager = new DisplayManagerService(mContext, mBasicInjector);
-        DisplayManagerInternal localService = mDisplayManager.new LocalService();
-        DisplayManagerService.BinderService displayManagerBinderService =
-                mDisplayManager.new BinderService();
-        registerDefaultDisplays(mDisplayManager);
-        initDisplayPowerController(localService);
-
-        DisplayTopology topology = displayManagerBinderService.getDisplayTopology();
-        assertNull(topology);
-    }
-
-    @Test
     public void testSetDisplayTopology() {
         manageDisplaysPermission(/* granted= */ true);
-        when(mMockFlags.isDisplayTopologyEnabled()).thenReturn(true);
         when(mMockFlags.isDisplayContentModeManagementEnabled()).thenReturn(true);
         mDisplayManager = new DisplayManagerService(mContext, mBasicInjector);
         DisplayManagerInternal localService = mDisplayManager.new LocalService();
@@ -4097,7 +4374,6 @@ public class DisplayManagerServiceTest {
 
     @Test
     public void testSetDisplayTopology_withoutPermission_shouldThrowException() {
-        when(mMockFlags.isDisplayTopologyEnabled()).thenReturn(true);
         mDisplayManager = new DisplayManagerService(mContext, mBasicInjector);
         DisplayManagerInternal localService = mDisplayManager.new LocalService();
         DisplayManagerService.BinderService displayManagerBinderService =
@@ -4112,7 +4388,6 @@ public class DisplayManagerServiceTest {
     @Test
     public void testShouldNotifyTopologyChanged() {
         manageDisplaysPermission(/* granted= */ true);
-        when(mMockFlags.isDisplayTopologyEnabled()).thenReturn(true);
         when(mMockFlags.isDisplayContentModeManagementEnabled()).thenReturn(true);
         mDisplayManager = new DisplayManagerService(mContext, mBasicInjector);
         DisplayManagerService.BinderService displayManagerBinderService =
@@ -4138,7 +4413,6 @@ public class DisplayManagerServiceTest {
     @Test
     public void testShouldNotNotifyTopologyChanged_WhenClientIsNotSubscribed() {
         manageDisplaysPermission(/* granted= */ true);
-        when(mMockFlags.isDisplayTopologyEnabled()).thenReturn(true);
         when(mMockFlags.isDisplayContentModeManagementEnabled()).thenReturn(true);
         mDisplayManager = new DisplayManagerService(mContext, mBasicInjector);
         DisplayManagerService.BinderService displayManagerBinderService =
@@ -4665,13 +4939,14 @@ public class DisplayManagerServiceTest {
         setFieldValue(mDisplayManager, "mDisplayTopologyCoordinator",
                 mMockDisplayTopologyCoordinator);
         mDisplayManager.systemReady(/* safeMode= */ false);
-        assertThat(mDisplayManager.shouldIncludeDefaultDisplayInTopology()).isFalse();
+        assertThat(mDisplayManager.shouldIncludeDefaultDisplayInTopology()).isTrue();
+        verify(mMockDisplayTopologyCoordinator, never()).onDisplayRemoved(anyInt());
 
         Settings.Secure.putInt(mContext.getContentResolver(), INCLUDE_DEFAULT_DISPLAY_IN_TOPOLOGY,
                 1);
         final ContentObserver observer = mDisplayManager.getSettingsObserver();
         observer.onChange(false, Settings.Secure.getUriFor(INCLUDE_DEFAULT_DISPLAY_IN_TOPOLOGY));
-        assertThat(mDisplayManager.shouldIncludeDefaultDisplayInTopology()).isFalse();
+        assertThat(mDisplayManager.shouldIncludeDefaultDisplayInTopology()).isTrue();
         verify(mMockDisplayTopologyCoordinator, never()).onDisplayAdded(any());
     }
 
@@ -4690,6 +4965,7 @@ public class DisplayManagerServiceTest {
 
         mDisplayManager.systemReady(/* safeMode= */ false);
         assertThat(mDisplayManager.shouldIncludeDefaultDisplayInTopology()).isTrue();
+        verify(mMockDisplayTopologyCoordinator, never()).onDisplayRemoved(anyInt());
 
         Settings.Secure.putInt(mContext.getContentResolver(), INCLUDE_DEFAULT_DISPLAY_IN_TOPOLOGY,
                 1);
@@ -4705,7 +4981,9 @@ public class DisplayManagerServiceTest {
         Settings.Secure.putInt(mContext.getContentResolver(), MIRROR_BUILT_IN_DISPLAY, 0);
         Settings.Secure.putInt(mContext.getContentResolver(), INCLUDE_DEFAULT_DISPLAY_IN_TOPOLOGY,
                 0);
-
+        DisplayTopology mockTopology = mock(DisplayTopology.class);
+        doReturn(true).when(mockTopology).hasMultipleDisplays();
+        doReturn(mockTopology).when(mMockDisplayTopologyCoordinator).getTopology();
         mDisplayManager = new DisplayManagerService(mContext, mBasicInjector);
         setFieldValue(mDisplayManager, "mDisplayTopologyCoordinator",
                 mMockDisplayTopologyCoordinator);
@@ -4746,6 +5024,28 @@ public class DisplayManagerServiceTest {
                 0);
         final ContentObserver observer = mDisplayManager.getSettingsObserver();
         observer.onChange(false, Settings.Secure.getUriFor(INCLUDE_DEFAULT_DISPLAY_IN_TOPOLOGY));
+        assertThat(mDisplayManager.shouldIncludeDefaultDisplayInTopology()).isFalse();
+        verify(mMockDisplayTopologyCoordinator).onDisplayRemoved(Display.DEFAULT_DISPLAY);
+    }
+
+    @Test
+    public void testIncludeDefaultDisplayInTopologySwitch_systemReadyUpdatesTopology() {
+        when(mMockFlags.isDefaultDisplayInTopologySwitchEnabled()).thenReturn(true);
+        Settings.Secure.putInt(mContext.getContentResolver(), MIRROR_BUILT_IN_DISPLAY, 0);
+        Settings.Secure.putInt(mContext.getContentResolver(), INCLUDE_DEFAULT_DISPLAY_IN_TOPOLOGY,
+                0);
+        DisplayTopology mockTopology = mock(DisplayTopology.class);
+        doReturn(true).when(mockTopology).hasMultipleDisplays();
+        doReturn(mockTopology).when(mMockDisplayTopologyCoordinator).getTopology();
+        mDisplayManager = new DisplayManagerService(mContext, mBasicInjector);
+        setFieldValue(mDisplayManager, "mDisplayTopologyCoordinator",
+                mMockDisplayTopologyCoordinator);
+
+        // True by default, will be updated when systemReady() is called
+        assertThat(mDisplayManager.shouldIncludeDefaultDisplayInTopology()).isTrue();
+
+        mDisplayManager.systemReady(/* safeMode= */ false);
+
         assertThat(mDisplayManager.shouldIncludeDefaultDisplayInTopology()).isFalse();
         verify(mMockDisplayTopologyCoordinator).onDisplayRemoved(Display.DEFAULT_DISPLAY);
     }

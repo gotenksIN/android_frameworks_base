@@ -16,19 +16,32 @@
 
 package com.android.systemui.statusbar.quickactions.ime.domain.interactor
 
+import android.provider.Settings
+import android.view.inputmethod.InputMethodManager
 import com.android.systemui.Flags
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Background
+import com.android.systemui.deviceentry.domain.interactor.DeviceEntryInteractor
 import com.android.systemui.inputmethod.data.repository.InputMethodRepository
+import com.android.systemui.inputmethod.domain.interactor.InputMethodInteractor
+import com.android.systemui.statusbar.policy.domain.interactor.DeviceProvisioningInteractor
+import com.android.systemui.statusbar.policy.domain.interactor.UserSetupInteractor
 import com.android.systemui.statusbar.quickactions.ime.shared.model.ImeIndicatorChipModel
 import com.android.systemui.user.data.repository.UserRepository
+import com.android.systemui.user.domain.interactor.UserLogoutInteractor
+import com.android.systemui.util.settings.SecureSettings
+import com.android.systemui.util.settings.SettingsProxyExt.observerFlow
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -38,26 +51,59 @@ class ImeIndicatorChipInteractor
 @Inject
 constructor(
     @param:Background private val scope: CoroutineScope,
+    private val inputMethodInteractor: InputMethodInteractor,
     private val inputMethodRepository: InputMethodRepository,
     private val userRepository: UserRepository,
+    private val secureSettings: SecureSettings,
+    private val userSetupInteractor: UserSetupInteractor,
+    private val userLogoutInteractor: UserLogoutInteractor,
+    private val deviceProvisioningInteractor: DeviceProvisioningInteractor,
+    private val deviceEntryInteractor: DeviceEntryInteractor,
 ) {
     private val isFeatureEnabled: Boolean
         get() = Flags.statusBarImeChip()
 
+    private val isUserUnlockedAndSetUp: Flow<Boolean> =
+        combine(
+            userSetupInteractor.isUserSetUp,
+            userLogoutInteractor.isLogoutEnabled,
+            deviceProvisioningInteractor.isDeviceProvisioned,
+            deviceEntryInteractor.isDeviceEntered,
+        ) { isUserSetUp, isLoggedIn, isDeviceProvisioned, isDeviceEntered ->
+            isUserSetUp && isLoggedIn && isDeviceProvisioned && isDeviceEntered
+        }
+
     /** The current state of the IME indicator chip. */
     val chipModel: StateFlow<ImeIndicatorChipModel> =
-        if (isFeatureEnabled) {
-                // TODO(b/458558606): Add logic to show / hide chip depending on enabled IME
-                // subtypes.
-                userRepository.selectedUserInfo
-                    .flatMapLatest { userInfo ->
-                        inputMethodRepository.selectedInputMethodSubtype(userInfo.userHandle)
+        isUserUnlockedAndSetUp
+            .map { it && isFeatureEnabled }
+            .flatMapLatest { preconditionsMet ->
+                if (preconditionsMet) {
+                    userRepository.selectedUserInfo.flatMapLatest { userInfo ->
+                        val user = userInfo.userHandle
+                        val hasMultipleEnabledImesOrSubtypes =
+                            secureSettings
+                                .observerFlow(
+                                    user.identifier,
+                                    Settings.Secure.ENABLED_INPUT_METHODS,
+                                )
+                                .onStart { emit(Unit) }
+                                .mapLatest {
+                                    inputMethodInteractor.hasMultipleEnabledImesOrSubtypes(
+                                        user.identifier
+                                    )
+                                }
+
+                        combine(
+                            hasMultipleEnabledImesOrSubtypes,
+                            inputMethodRepository.selectedInputMethodSubtype(user),
+                        ) { isVisible, subtype ->
+                            ImeIndicatorChipModel(isVisible = isVisible, selectedSubtype = subtype)
+                        }
                     }
-                    .map { subtype ->
-                        ImeIndicatorChipModel(isVisible = true, selectedSubtype = subtype)
-                    }
-            } else {
-                flowOf(ImeIndicatorChipModel(isVisible = false, selectedSubtype = null))
+                } else {
+                    flowOf(ImeIndicatorChipModel(isVisible = false, selectedSubtype = null))
+                }
             }
             .stateIn(
                 scope = scope,
@@ -68,8 +114,9 @@ constructor(
     fun showInputMethodPicker(displayId: Int) {
         scope.launch {
             inputMethodRepository.showInputMethodPicker(
-                displayId = displayId,
                 showAuxiliarySubtypes = true,
+                entryPoint = InputMethodManager.IM_PICKER_ENTRY_POINT_STATUS_BAR_CHIP,
+                displayId = displayId,
             )
         }
     }

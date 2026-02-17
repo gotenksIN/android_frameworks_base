@@ -1123,6 +1123,7 @@
     <string name="lockscreen_access_pattern_cell_added_verbose" msgid="2931364927622563465">"<xliff:g id="CELL_INDEX">%1$s</xliff:g> কক্ষ যোগ করা হয়েছে"</string>
     <string name="lockscreen_access_pattern_detected" msgid="3931150554035194012">"প্যাটার্ন সম্পন্ন হয়েছে"</string>
     <string name="lockscreen_access_pattern_area" msgid="1288780416685002841">"প্যাটার্ন এলাকা৷"</string>
+    <string name="lockscreen_access_pattern_cell_verbose" msgid="6670905066468035137">"সেল <xliff:g id="CELL_INDEX">%1$s</xliff:g>"</string>
     <string name="keyguard_accessibility_widget_changed" msgid="7298011259508200234">"%1$s৷ %3$d এর %2$d উইজেট৷"</string>
     <string name="keyguard_accessibility_add_widget" msgid="8245795023551343672">"উইজেট যোগ করুন"</string>
     <string name="keyguard_accessibility_widget_empty_slot" msgid="544239307077644480">"খালি"</string>
@@ -2006,6 +2007,7 @@
     <string name="managed_profile_label_badge_3" msgid="6882151970556391957">"তৃতীয় কার্যক্ষেত্র <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="clone_profile_label_badge" msgid="1871997694718793964">"<xliff:g id="LABEL">%1$s</xliff:g> ক্লোন"</string>
     <string name="private_profile_label_badge" msgid="1712086003787839183">"ব্যক্তিগত <xliff:g id="LABEL">%1$s</xliff:g>"</string>
+    <string name="hsu_label_badge" msgid="1357272000281944932">"সিস্টেম <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="lock_to_app_unlock_pin" msgid="3890940811866290782">"আনপিন করার আগে পিন চান"</string>
     <string name="lock_to_app_unlock_pattern" msgid="2694204070499712503">"আনপিন করার আগে আনলক প্যাটার্ন চান"</string>
     <string name="lock_to_app_unlock_password" msgid="9126722403506560473">"আনপিন করার আগে পাসওয়ার্ড চান"</string>
@@ -2111,7 +2113,32 @@
     <string name="app_suspended_default_message" msgid="6451215678552004172">"<xliff:g id="APP_NAME_0">%1$s</xliff:g> এখন উপলভ্য নয়। এই অ্যাপটিকে <xliff:g id="APP_NAME_1">%2$s</xliff:g> অ্যাপ ম্যানেজ করে।"</string>
     <string name="app_suspended_more_details" msgid="211260942831587014">"আরও জানুন"</string>
     <string name="app_suspended_unsuspend_message" msgid="1665438589450555459">"অ্যাপ আবার চালু করুন"</string>
+    <string name="app_lock_add_screen_lock_button_text" msgid="9209013414563206600">"\'স্ক্রিন লক\' যোগ করুন"</string>
+    <string name="app_lock_add_screen_lock_message" msgid="6107009360675769892">"আপনার স্ক্রিন লক পিন, প্যাটার্ন বা পাসওয়ার্ড হতে পারে। আপনার ডিভাইস আনলক করতে এবং লক করা অ্যাপ অ্যাক্সেস করতে এটি ব্যবহার করবেন।"</string>
+    <string name="app_lock_add_screen_lock_title" msgid="6905612843620128689">"প্রথমে স্ক্রিন লক যোগ করুন"</string>
+    <string name="enable_app_lock_success_toast_message" msgid="3339622779190529987">"<xliff:g id="APP_NAME">%1$s</xliff:g> লক করা হয়েছে"</string>
+    <string name="enable_app_lock_failure_toast_message" msgid="1055838896510445566">"<xliff:g id="APP_NAME">%1$s</xliff:g> লক করা যাচ্ছে না"</string>
+    <string name="disable_app_lock_success_toast_message" msgid="70733620589071266">"<xliff:g id="APP_NAME">%1$s</xliff:g> থেকে অ্যাপ লক সরানো হয়েছে"</string>
     <string name="locked_app_biometric_prompt_description" msgid="6853122652400451464">"<xliff:g id="APP_NAME">%1$s</xliff:g> লক করা হয়েছে"</string>
+    <string name="locked_app_external_display_message" msgid="5483884799685545338">"এই ডিসপ্লেতে অ্যাপ অ্যাক্সেস করতে, প্রথমে আপনার অন্য ডিভাইসে নিজের পরিচয় যাচাই করুন"</string>
+    <string name="app_lock_edu_dialog_enable_app_lock_title" msgid="283314042336592322">"<xliff:g id="APP_NAME">%1$s</xliff:g>-এ অ্যাপ লক যোগ করবেন?"</string>
+    <string name="app_lock_edu_dialog_description" msgid="8176807243219769518">"আপনার নিরাপত্তার জন্য, শুধুমাত্র আপনিই ফিঙ্গারপ্রিন্ট ও ফেস আনলক অথবা আপনার পিন ব্যবহার করে এই অ্যাপ অ্যাক্সেস করতে পারবেন"</string>
+    <string name="app_lock_edu_dialog_description_template" msgid="8563718120753342530">"আপনার সুরক্ষার জন্য, শুধুমাত্র আপনি %1$s বা আপনার %2$s ব্যবহার করে এই অ্যাপ অ্যাক্সেস করতে পারবেন"</string>
+    <string name="app_lock_edu_dialog_description_template_no_biometrics" msgid="7122017109150633691">"নিরাপত্তার জন্য, শুধুমাত্র আপনিই নিজের %1$s ব্যবহার করে এই অ্যাপ অ্যাক্সেস করতে পারবেন"</string>
+    <string name="app_lock_edu_dialog_info_header" msgid="5876120209204270990">"অ্যাপ লকের সাথে"</string>
+    <string name="app_lock_edu_dialog_info_notifications" msgid="1124438392204873305">"বিজ্ঞপ্তির কন্টেন্ট লুকানো থাকবে"</string>
+    <string name="app_lock_edu_dialog_info_widgets" msgid="8809009414650740872">"উইজেট ও শর্টকাট সরানো হবে"</string>
+    <string name="app_lock_edu_dialog_button_lock" msgid="3914687128135704801">"অ্যাপ লক যোগ করুন"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_face" msgid="1348151645996748654">"ফেস আনলক"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_fingerprint" msgid="5206107469561561455">"ফিঙ্গারপ্রিন্ট আনলক"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_fingerprint_and_face" msgid="7895807411323811641">"ফিঙ্গারপ্রিন্ট বা ফেস আনলক"</string>
+    <string name="app_lock_edu_dialog_lockscreen_password_name" msgid="8487096457702445059">"পাসওয়ার্ড"</string>
+    <string name="app_lock_edu_dialog_lockscreen_pattern_name" msgid="991436996281983547">"প্যাটার্ন"</string>
+    <string name="app_lock_edu_dialog_lockscreen_pin_name" msgid="6458607126966304795">"পিন"</string>
+    <string name="app_lock_permission_review_dialog_title" msgid="5030286398974840579">"আপনার ফটো এখনও অন্যান্য অ্যাপে দেখানো হতে পারে"</string>
+    <string name="app_lock_permission_review_dialog_sub_title" msgid="310758587817184145">"আপনার ফটো অ্যাক্সেস করতে পারে এমন অ্যাপ"</string>
+    <string name="app_lock_permission_review_expand_app_list_button" msgid="3214809707125223273">"সবগুলি দেখুন"</string>
+    <string name="app_lock_permission_review_continue_button" msgid="4045066724173414043">"চালিয়ে যান"</string>
     <string name="work_mode_off_title" msgid="6367463960165135829">"অফিসের অ্যাপ আনপজ করতে চান?"</string>
     <string name="work_mode_turn_on" msgid="5316648862401307800">"আনপজ করুন"</string>
     <string name="work_mode_emergency_call_button" msgid="6818855962881612322">"জরুরি"</string>
@@ -2592,6 +2619,8 @@
     <string name="satellite_messaging_unsupported_default_sms_app_notification_summary" msgid="17084124893763593">"স্যাটেলাইটের সাহায্যে মেসেজ পাঠাতে, আপনার ডিফল্ট মেসেজিং অ্যাপ হিসেবে Google Messages সেট করুন"</string>
     <string name="satellite_messaging_location_disabled_notification_title" msgid="7270641894250928494">"\'স্যাটেলাইট মেসেজিং\' ফিচার উপলভ্য নেই"</string>
     <string name="satellite_messaging_location_disabled_notification_summary" msgid="1450824950686221810">"\'স্যাটেলাইট মেসেজিং\' ফিচার এই দেশে বা অঞ্চলে উপলভ্য আছে কিনা দেখতে, লোকেশন সেটিংস চালু করুন"</string>
+    <!-- no translation found for satellite_indicator (6846063647532086110) -->
+    <skip />
     <string name="fingerprint_dangling_notification_title" msgid="7362075195588639989">"\'ফিঙ্গারপ্রিন্ট আনলক\' আবার সেট-আপ করুন"</string>
     <string name="fingerprint_dangling_notification_msg_1" msgid="5851784577768803510">"<xliff:g id="FINGERPRINT">%s</xliff:g> আর শনাক্ত করা যাবে না।"</string>
     <string name="fingerprint_dangling_notification_msg_2" msgid="7925203589860744456">"<xliff:g id="FINGERPRINT_0">%1$s</xliff:g> ও <xliff:g id="FINGERPRINT_1">%2$s</xliff:g> আর শনাক্ত করা যাবে না।"</string>
@@ -2635,7 +2664,7 @@
     <string name="tv_watchdog_notification_channel_name" msgid="4936803270000103737">"সিস্টেম রিসোর্স সংক্রান্ত সতর্কতা"</string>
     <string name="tv_watchdog_notification_title" msgid="195239206215922517">"রিসোর্সের অতিরিক্ত ব্যবহার"</string>
     <string name="tv_watchdog_notification_content" msgid="6444873431710133936">"অ্যাপ \'<xliff:g id="APP_NAME">%1$s</xliff:g> খুব বেশি রিসোর্স ব্যবহার করছে।\""</string>
-    <string name="supervision_blocked_app_title" msgid="5546803865875383588">"আপনার অভিভাবককে দিয়ে আপডেট করান"</string>
+    <string name="supervision_blocked_app_title" msgid="5546803865875383588">"আপনার অভিভাবকের থেকে আসা আপডেট"</string>
     <string name="supervision_blocked_app_content" msgid="4125452996088641559">"<xliff:g id="APP_NAME">%1$s</xliff:g> অ্যাপটি এখনকার মতো সরিয়ে দেওয়া হয়েছে"</string>
     <string name="supervision_unblocked_app_content" msgid="8282985265957852278">"<xliff:g id="APP_NAME">%1$s</xliff:g> এখন উপলভ্য আছে"</string>
 </resources>

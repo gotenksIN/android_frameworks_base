@@ -1123,6 +1123,7 @@
     <string name="lockscreen_access_pattern_cell_added_verbose" msgid="2931364927622563465">"ਸੈਲ <xliff:g id="CELL_INDEX">%1$s</xliff:g> ਜੋੜਿਆ ਗਿਆ"</string>
     <string name="lockscreen_access_pattern_detected" msgid="3931150554035194012">"ਪੈਟਰਨ ਪੂਰਾ ਕੀਤਾ"</string>
     <string name="lockscreen_access_pattern_area" msgid="1288780416685002841">"ਪੈਟਰਨ ਖੇਤਰ।"</string>
+    <string name="lockscreen_access_pattern_cell_verbose" msgid="6670905066468035137">"ਸੈੱਲ <xliff:g id="CELL_INDEX">%1$s</xliff:g>"</string>
     <string name="keyguard_accessibility_widget_changed" msgid="7298011259508200234">"%1$s। %3$d ਦਾ ਵਿਜੇਟ %2$d।"</string>
     <string name="keyguard_accessibility_add_widget" msgid="8245795023551343672">"ਵਿਜੇਟ ਸ਼ਾਮਲ ਕਰੋ।"</string>
     <string name="keyguard_accessibility_widget_empty_slot" msgid="544239307077644480">"ਖਾਲੀ"</string>
@@ -1845,7 +1846,7 @@
     <string name="one_handed_mode_feature_name" msgid="2334330034828094891">"ਇੱਕ ਹੱਥ ਮੋਡ"</string>
     <string name="reduce_bright_colors_feature_name" msgid="3222994553174604132">"ਜ਼ਿਆਦਾ ਘੱਟ ਚਮਕ"</string>
     <string name="hearing_aids_feature_name" msgid="1125892105105852542">"ਸੁਣਨ ਵਾਲੇ ਡੀਵਾਈਸ"</string>
-    <string name="autoclick_feature_name" msgid="4056260617171267864">"ਸਵੈ-ਕਲਿੱਕ (ਉਡੀਕ ਦਾ ਸਮਾਂ)"</string>
+    <string name="autoclick_feature_name" msgid="4056260617171267864">"ਸਵੈ-ਕਲਿੱਕ (ਠਹਿਰਾਅ ਸਮਾਂ)"</string>
     <string name="mouse_keys_feature_name" msgid="3362643216513384542">"ਮਾਊਸ ਕੁੰਜੀਆਂ"</string>
     <string name="hearing_device_status_disconnected" msgid="497547752953543832">"ਡਿਸਕਨੈਕਟ ਹੋ ਗਿਆ"</string>
     <string name="hearing_device_status_connected" msgid="2149385149669918764">"ਕਨੈਕਟ ਹੈ"</string>
@@ -2006,6 +2007,7 @@
     <string name="managed_profile_label_badge_3" msgid="6882151970556391957">"ਤੀਸਰੀ ਕਾਰਜ-ਸਥਾਨ <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="clone_profile_label_badge" msgid="1871997694718793964">"<xliff:g id="LABEL">%1$s</xliff:g> ਦਾ ਕਲੋਨ"</string>
     <string name="private_profile_label_badge" msgid="1712086003787839183">"ਨਿੱਜੀ <xliff:g id="LABEL">%1$s</xliff:g>"</string>
+    <string name="hsu_label_badge" msgid="1357272000281944932">"ਸਿਸਟਮ <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="lock_to_app_unlock_pin" msgid="3890940811866290782">"ਅਨਪਿੰਨ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ ਪਿੰਨ ਮੰਗੋ"</string>
     <string name="lock_to_app_unlock_pattern" msgid="2694204070499712503">"ਅਨਪਿੰਨ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ ਅਣਲਾਕ ਪੈਟਰਨ ਵਾਸਤੇ ਪੁੱਛੋ"</string>
     <string name="lock_to_app_unlock_password" msgid="9126722403506560473">"ਅਣਪਿੰਨ ਕਰਨ ਤੋਂ ਪਹਿਲਾਂ ਪਾਸਵਰਡ ਮੰਗੋ"</string>
@@ -2015,7 +2017,7 @@
     <string name="confirm_battery_saver" msgid="5247976246208245754">"ਠੀਕ ਹੈ"</string>
     <string name="battery_saver_description_with_learn_more" msgid="8969945879044849461">"ਬੈਟਰੀ ਸੇਵਰ ਗੂੜ੍ਹੇ ਥੀਮ ਨੂੰ ਚਾਲੂ ਕਰਦਾ ਹੈ ਅਤੇ ਬੈਕਗ੍ਰਾਊਂਡ ਸਰਗਰਮੀ, ਕੁਝ ਦ੍ਰਿਸ਼ਟੀਗਤ ਪ੍ਰਭਾਵਾਂ, ਕੁਝ ਖਾਸ ਵਿਸ਼ੇਸ਼ਤਾਵਾਂ ਅਤੇ ਕੁਝ ਨੈੱਟਵਰਕ ਕਨੈਕਸ਼ਨਾਂ ਨੂੰ ਸੀਮਤ ਜਾਂ ਬੰਦ ਕਰਦਾ ਹੈ।"</string>
     <string name="battery_saver_description" msgid="2820475140307374570">"ਬੈਟਰੀ ਸੇਵਰ ਗੂੜ੍ਹੇ ਥੀਮ ਨੂੰ ਚਾਲੂ ਕਰਦਾ ਹੈ ਅਤੇ ਬੈਕਗ੍ਰਾਊਂਡ ਸਰਗਰਮੀ, ਕੁਝ ਦ੍ਰਿਸ਼ਟੀਗਤ ਪ੍ਰਭਾਵਾਂ, ਕੁਝ ਖਾਸ ਵਿਸ਼ੇਸ਼ਤਾਵਾਂ ਅਤੇ ਕੁਝ ਨੈੱਟਵਰਕ ਕਨੈਕਸ਼ਨਾਂ ਨੂੰ ਸੀਮਤ ਜਾਂ ਬੰਦ ਕਰਦਾ ਹੈ।"</string>
-    <string name="data_saver_description" msgid="4995164271550590517">"ਡਾਟਾ ਵਰਤੋਂ ਘਟਾਉਣ ਵਿੱਚ ਮਦਦ ਕਰਨ ਲਈ, ਡਾਟਾ ਸੇਵਰ ਵਿਸ਼ੇਸ਼ਤਾ ਕੁਝ ਐਪਾਂ ਨੂੰ ਬੈਕਗ੍ਰਾਊਂਡ ਵਿੱਚ ਡਾਟਾ ਭੇਜਣ ਜਾਂ ਪ੍ਰਾਪਤ ਕਰਨ ਤੋਂ ਰੋਕਦੀ ਹੈ। ਤੁਹਾਡੇ ਵੱਲੋਂ ਮੌਜੂਦਾ ਤੌਰ \'ਤੇ ਵਰਤੀ ਜਾ ਰਹੀ ਐਪ ਡਾਟਾ ਤੱਕ ਪਹੁੰਚ ਕਰ ਸਕਦੀ ਹੈ, ਪਰ ਉਹ ਇੰਝ ਕਦੇ-ਕਦਾਈਂ ਕਰ ਸਕਦੀ ਹੈ। ਉਦਾਹਰਨ ਲਈ, ਇਸ ਦਾ ਮਤਲਬ ਇਹ ਹੋ ਸਕਦਾ ਹੈ ਕਿ ਚਿੱਤਰ ਉਦੋਂ ਤੱਕ ਨਹੀਂ ਦਿਖਾਏ ਜਾਂਦੇ, ਜਦੋਂ ਤੱਕ ਤੁਸੀਂ ਉਨ੍ਹਾਂ \'ਤੇ ਟੈਪ ਨਹੀਂ ਕਰਦੇ।"</string>
+    <string name="data_saver_description" msgid="4995164271550590517">"ਡਾਟਾ ਵਰਤੋਂ ਘਟਾਉਣ ਵਿੱਚ ਮਦਦ ਕਰਨ ਲਈ, ਡਾਟਾ ਸੇਵਰ ਵਿਸ਼ੇਸ਼ਤਾ ਕੁਝ ਐਪਾਂ ਨੂੰ ਬੈਕਗ੍ਰਾਊਂਡ ਵਿੱਚ ਡਾਟਾ ਭੇਜਣ ਜਾਂ ਪ੍ਰਾਪਤ ਕਰਨ ਤੋਂ ਰੋਕਦੀ ਹੈ। ਤੁਹਾਡੇ ਵੱਲੋਂ ਮੌਜੂਦਾ ਤੌਰ \'ਤੇ ਵਰਤੀ ਜਾ ਰਹੀ ਐਪ ਡਾਟੇ ਤੱਕ ਪਹੁੰਚ ਕਰ ਸਕਦੀ ਹੈ, ਪਰ ਉਹ ਇੰਝ ਕਦੇ-ਕਦਾਈਂ ਕਰ ਸਕਦੀ ਹੈ। ਉਦਾਹਰਨ ਲਈ, ਇਸ ਦਾ ਮਤਲਬ ਇਹ ਹੋ ਸਕਦਾ ਹੈ ਕਿ ਚਿੱਤਰ ਉਦੋਂ ਤੱਕ ਨਹੀਂ ਦਿਖਾਏ ਜਾਂਦੇ, ਜਦੋਂ ਤੱਕ ਤੁਸੀਂ ਉਨ੍ਹਾਂ \'ਤੇ ਟੈਪ ਨਹੀਂ ਕਰਦੇ।"</string>
     <string name="data_saver_enable_title" msgid="7080620065745260137">"ਕੀ ਡਾਟਾ ਸੇਵਰ ਚਾਲੂ ਕਰਨਾ ਹੈ?"</string>
     <string name="data_saver_enable_button" msgid="4399405762586419726">"ਚਾਲੂ ਕਰੋ"</string>
     <string name="zen_mode_duration_minutes_summary" msgid="4555514757230849789">"{count,plural, =1{ਇੱਕ ਮਿੰਟ ਲਈ ({formattedTime} ਤੱਕ)}one{# ਮਿੰਟ ਲਈ ({formattedTime} ਤੱਕ)}other{# ਮਿੰਟਾਂ ਲਈ ({formattedTime} ਤੱਕ)}}"</string>
@@ -2111,7 +2113,32 @@
     <string name="app_suspended_default_message" msgid="6451215678552004172">"<xliff:g id="APP_NAME_0">%1$s</xliff:g> ਐਪ ਫਿਲਹਾਲ ਉਪਲਬਧ ਨਹੀਂ ਹੈ। ਇਸਦਾ ਪ੍ਰਬੰਧਨ <xliff:g id="APP_NAME_1">%2$s</xliff:g> ਵੱਲੋਂ ਕੀਤਾ ਜਾਂਦਾ ਹੈ।"</string>
     <string name="app_suspended_more_details" msgid="211260942831587014">"ਹੋਰ ਜਾਣੋ"</string>
     <string name="app_suspended_unsuspend_message" msgid="1665438589450555459">"ਐਪ ਤੋਂ ਰੋਕ ਹਟਾਓ"</string>
+    <string name="app_lock_add_screen_lock_button_text" msgid="9209013414563206600">"ਸਕ੍ਰੀਨ ਲਾਕ ਸ਼ਾਮਲ ਕਰੋ"</string>
+    <string name="app_lock_add_screen_lock_message" msgid="6107009360675769892">"ਤੁਹਾਡਾ ਸਕ੍ਰੀਨ ਲਾਕ ਪਿੰਨ, ਪੈਟਰਨ ਜਾਂ ਪਾਸਵਰਡ ਹੋ ਸਕਦਾ ਹੈ। ਤੁਸੀਂ ਇਸਦੀ ਵਰਤੋਂ ਆਪਣੇ ਡੀਵਾਈਸ ਨੂੰ ਅਣਲਾਕ ਕਰਨ ਅਤੇ ਲਾਕ ਕੀਤੀਆਂ ਐਪਾਂ ਤੱਕ ਪਹੁੰਚ ਕਰਨ ਲਈ ਕਰੋਗੇ।"</string>
+    <string name="app_lock_add_screen_lock_title" msgid="6905612843620128689">"ਪਹਿਲਾਂ, ਸਕ੍ਰੀਨ ਲਾਕ ਸ਼ਾਮਲ ਕਰੋ"</string>
+    <string name="enable_app_lock_success_toast_message" msgid="3339622779190529987">"<xliff:g id="APP_NAME">%1$s</xliff:g> ਲਾਕ ਹੈ"</string>
+    <string name="enable_app_lock_failure_toast_message" msgid="1055838896510445566">"<xliff:g id="APP_NAME">%1$s</xliff:g> ਨੂੰ ਲਾਕ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਦਾ"</string>
+    <string name="disable_app_lock_success_toast_message" msgid="70733620589071266">"ਐਪ ਲਾਕ ਨੂੰ <xliff:g id="APP_NAME">%1$s</xliff:g> ਤੋਂ ਹਟਾ ਦਿੱਤਾ ਗਿਆ ਹੈ"</string>
     <string name="locked_app_biometric_prompt_description" msgid="6853122652400451464">"<xliff:g id="APP_NAME">%1$s</xliff:g> ਲਾਕ ਹੈ"</string>
+    <string name="locked_app_external_display_message" msgid="5483884799685545338">"ਇਸ ਡਿਸਪਲੇ \'ਤੇ ਐਪ ਤੱਕ ਪਹੁੰਚ ਕਰਨ ਲਈ, ਪਹਿਲਾਂ ਆਪਣੇ ਦੂਜੇ ਡੀਵਾਈਸ \'ਤੇ ਆਪਣੀ ਪਛਾਣ ਦੀ ਪੁਸ਼ਟੀ ਕਰੋ"</string>
+    <string name="app_lock_edu_dialog_enable_app_lock_title" msgid="283314042336592322">"ਕੀ <xliff:g id="APP_NAME">%1$s</xliff:g> ਵਿੱਚ ਐਪ ਲਾਕ ਸ਼ਾਮਲ ਕਰਨਾ ਹੈ?"</string>
+    <string name="app_lock_edu_dialog_description" msgid="8176807243219769518">"ਤੁਹਾਡੀ ਸੁਰੱਖਿਆ ਲਈ, ਸਿਰਫ਼ ਤੁਸੀਂ ਹੀ ਫਿੰਗਰਪ੍ਰਿੰਟ ਅਤੇ ਫ਼ੇਸ ਅਣਲਾਕ ਜਾਂ ਆਪਣੇ ਪਿੰਨ ਨਾਲ ਇਸ ਐਪ ਤੱਕ ਪਹੁੰਚ ਕਰ ਸਕਦੇ ਹੋ"</string>
+    <string name="app_lock_edu_dialog_description_template" msgid="8563718120753342530">"ਤੁਹਾਡੀ ਸੁਰੱਖਿਆ ਲਈ, ਸਿਰਫ਼ ਤੁਸੀਂ ਹੀ %1$s ਜਾਂ ਆਪਣੇ %2$s ਨਾਲ ਇਸ ਐਪ ਤੱਕ ਪਹੁੰਚ ਕਰ ਸਕਦੇ ਹੋ"</string>
+    <string name="app_lock_edu_dialog_description_template_no_biometrics" msgid="7122017109150633691">"ਤੁਹਾਡੀ ਸੁਰੱਖਿਆ ਲਈ, ਸਿਰਫ਼ ਤੁਸੀਂ ਹੀ ਆਪਣੇ %1$s ਨਾਲ ਇਸ ਐਪ ਤੱਕ ਪਹੁੰਚ ਕਰ ਸਕਦੇ ਹੋ"</string>
+    <string name="app_lock_edu_dialog_info_header" msgid="5876120209204270990">"ਐਪ ਲਾਕ ਨਾਲ"</string>
+    <string name="app_lock_edu_dialog_info_notifications" msgid="1124438392204873305">"ਸੂਚਨਾ ਸਮੱਗਰੀ ਲੁਕੀ ਹੋਈ ਹੋਵੇਗੀ"</string>
+    <string name="app_lock_edu_dialog_info_widgets" msgid="8809009414650740872">"ਵਿਜੇਟਾਂ ਅਤੇ ਸ਼ਾਰਟਕੱਟਾਂ ਨੂੰ ਹਟਾ ਦਿੱਤਾ ਜਾਵੇਗਾ"</string>
+    <string name="app_lock_edu_dialog_button_lock" msgid="3914687128135704801">"ਐਪ ਲਾਕ ਸ਼ਾਮਲ ਕਰੋ"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_face" msgid="1348151645996748654">"ਫ਼ੇਸ ਅਣਲਾਕ"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_fingerprint" msgid="5206107469561561455">"ਫਿੰਗਰਪ੍ਰਿੰਟ ਅਣਲਾਕ"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_fingerprint_and_face" msgid="7895807411323811641">"ਫਿੰਗਰਪ੍ਰਿੰਟ ਜਾਂ ਫ਼ੇਸ ਅਣਲਾਕ"</string>
+    <string name="app_lock_edu_dialog_lockscreen_password_name" msgid="8487096457702445059">"ਪਾਸਵਰਡ"</string>
+    <string name="app_lock_edu_dialog_lockscreen_pattern_name" msgid="991436996281983547">"ਪੈਟਰਨ"</string>
+    <string name="app_lock_edu_dialog_lockscreen_pin_name" msgid="6458607126966304795">"ਪਿੰਨ"</string>
+    <string name="app_lock_permission_review_dialog_title" msgid="5030286398974840579">"ਤੁਹਾਡੀਆਂ ਫ਼ੋਟੋਆਂ ਹਾਲੇ ਵੀ ਹੋਰ ਐਪਾਂ ਵਿੱਚ ਦਿਖਾਈ ਦੇ ਸਕਦੀਆਂ ਹਨ"</string>
+    <string name="app_lock_permission_review_dialog_sub_title" msgid="310758587817184145">"ਤੁਹਾਡੀਆਂ ਫ਼ੋਟੋਆਂ ਤੱਕ ਪਹੁੰਚ ਵਾਲੀਆਂ ਐਪਾਂ"</string>
+    <string name="app_lock_permission_review_expand_app_list_button" msgid="3214809707125223273">"ਸਭ ਦੇਖੋ"</string>
+    <string name="app_lock_permission_review_continue_button" msgid="4045066724173414043">"ਜਾਰੀ ਰੱਖੋ"</string>
     <string name="work_mode_off_title" msgid="6367463960165135829">"ਕੰਮ ਸੰਬੰਧੀ ਐਪਾਂ ਤੋਂ ਰੋਕ ਹਟਾਈਏ?"</string>
     <string name="work_mode_turn_on" msgid="5316648862401307800">"ਰੋਕ ਹਟਾਓ"</string>
     <string name="work_mode_emergency_call_button" msgid="6818855962881612322">"ਐਮਰਜੈਂਸੀ"</string>
@@ -2592,6 +2619,8 @@
     <string name="satellite_messaging_unsupported_default_sms_app_notification_summary" msgid="17084124893763593">"ਸੈਟੇਲਾਈਟ ਰਾਹੀਂ ਸੁਨੇਹਾ ਭੇਜਣ ਲਈ, Google Messages ਨੂੰ ਆਪਣੀ ਪੂਰਵ-ਨਿਰਧਾਰਿਤ ਸੁਨੇਹਾ ਐਪ ਵਜੋਂ ਸੈੱਟ ਕਰੋ"</string>
     <string name="satellite_messaging_location_disabled_notification_title" msgid="7270641894250928494">"ਸੈਟੇਲਾਈਟ ਸੁਨੇਹੇ ਦੀ ਸੁਵਿਧਾ ਉਪਲਬਧ ਨਹੀਂ ਹੈ"</string>
     <string name="satellite_messaging_location_disabled_notification_summary" msgid="1450824950686221810">"ਇਹ ਜਾਂਚ ਕਰਨ ਲਈ ਕਿ ਇਸ ਦੇਸ਼ ਜਾਂ ਖੇਤਰ ਵਿੱਚ ਸੈਟੇਲਾਈਟ ਸੁਨੇਹੇ ਦੀ ਸੁਵਿਧਾ ਉਪਲਬਧ ਹੈ ਜਾਂ ਨਹੀਂ, ਟਿਕਾਣਾ ਸੈਟਿੰਗਾਂ ਨੂੰ ਚਾਲੂ ਕਰੋ"</string>
+    <!-- no translation found for satellite_indicator (6846063647532086110) -->
+    <skip />
     <string name="fingerprint_dangling_notification_title" msgid="7362075195588639989">"ਫਿੰਗਰਪ੍ਰਿੰਟ ਅਣਲਾਕ ਦਾ ਦੁਬਾਰਾ ਸੈੱਟਅੱਪ ਕਰੋ"</string>
     <string name="fingerprint_dangling_notification_msg_1" msgid="5851784577768803510">"<xliff:g id="FINGERPRINT">%s</xliff:g> ਦੀ ਹੁਣ ਪਛਾਣ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕਦੀ।"</string>
     <string name="fingerprint_dangling_notification_msg_2" msgid="7925203589860744456">"<xliff:g id="FINGERPRINT_0">%1$s</xliff:g> ਅਤੇ <xliff:g id="FINGERPRINT_1">%2$s</xliff:g> ਦੀ ਹੁਣ ਪਛਾਣ ਨਹੀਂ ਕੀਤੀ ਜਾ ਸਕਦੀ।"</string>

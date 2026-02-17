@@ -40,7 +40,7 @@
     <string name="mmiComplete" msgid="6341884570892520140">"MMI voltooi."</string>
     <string name="badPin" msgid="888372071306274355">"Die ou PIN wat jy ingevoer het, is nie korrek nie."</string>
     <string name="badPuk" msgid="4232069163733147376">"Die PUK wat jy ingevoer het, is nie korrek nie."</string>
-    <string name="mismatchPin" msgid="2929611853228707473">"Die PIN\'e wat jy ingevoer het, pas nie by mekaar nie."</string>
+    <string name="mismatchPin" msgid="2929611853228707473">"Die PIN’e wat jy ingevoer het, stem nie ooreen nie."</string>
     <string name="invalidPin" msgid="7542498253319440408">"Sleutel \'n PIN wat 4 to 8 nommers lank is, in."</string>
     <string name="invalidPuk" msgid="8831151490931907083">"Voer \'n PUK van 8 syfers of langer in."</string>
     <string name="needPuk" msgid="3503414069503752211">"Jou SIM is PUK-gesluit. Voer die PUK-kode in om dit te ontsluit."</string>
@@ -977,7 +977,7 @@
   </string-array>
     <string name="phoneTypeCustom" msgid="5120365721260686814">"Gepasmaak"</string>
     <string name="phoneTypeHome" msgid="3880132427643623588">"Tuis"</string>
-    <string name="phoneTypeMobile" msgid="1178852541462086735">"Mobiel"</string>
+    <string name="phoneTypeMobile" msgid="1178852541462086735">"Selfoon"</string>
     <string name="phoneTypeWork" msgid="6604967163358864607">"Werk"</string>
     <string name="phoneTypeFaxWork" msgid="6757519896109439123">"Werkfaks"</string>
     <string name="phoneTypeFaxHome" msgid="6678559953115904345">"Tuisfaks"</string>
@@ -1123,6 +1123,7 @@
     <string name="lockscreen_access_pattern_cell_added_verbose" msgid="2931364927622563465">"Sel <xliff:g id="CELL_INDEX">%1$s</xliff:g> is bygevoeg"</string>
     <string name="lockscreen_access_pattern_detected" msgid="3931150554035194012">"Patroon klaar"</string>
     <string name="lockscreen_access_pattern_area" msgid="1288780416685002841">"Patroonarea."</string>
+    <string name="lockscreen_access_pattern_cell_verbose" msgid="6670905066468035137">"Sel <xliff:g id="CELL_INDEX">%1$s</xliff:g>"</string>
     <string name="keyguard_accessibility_widget_changed" msgid="7298011259508200234">"%1$s. Legstuk %2$d van %3$d."</string>
     <string name="keyguard_accessibility_add_widget" msgid="8245795023551343672">"Voeg legstuk by."</string>
     <string name="keyguard_accessibility_widget_empty_slot" msgid="544239307077644480">"Leeg"</string>
@@ -1985,7 +1986,7 @@
     <string name="restr_pin_enter_new_pin" msgid="3267614461844565431">"Nuwe PIN"</string>
     <string name="restr_pin_confirm_pin" msgid="7143161971614944989">"Bevestig nuwe PIN"</string>
     <string name="restr_pin_create_pin" msgid="917067613896366033">"Skep \'n PIN vir wysigingbeperkings"</string>
-    <string name="restr_pin_error_doesnt_match" msgid="7063392698489280556">"PIN\'e kom nie ooreen nie. Probeer weer."</string>
+    <string name="restr_pin_error_doesnt_match" msgid="7063392698489280556">"PIN’e stem nie ooreen nie. Probeer weer."</string>
     <string name="restr_pin_error_too_short" msgid="1547007808237941065">"PIN is te kort. Moet ten minste 4 syfers wees."</string>
     <string name="restr_pin_try_later" msgid="5897719962541636727">"Probeer later weer"</string>
     <string name="immersive_cling_title" msgid="2307034298721541791">"Bekyk tans volskerm"</string>
@@ -2006,6 +2007,7 @@
     <string name="managed_profile_label_badge_3" msgid="6882151970556391957">"3e werk-<xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="clone_profile_label_badge" msgid="1871997694718793964">"Kloon <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="private_profile_label_badge" msgid="1712086003787839183">"Privaat <xliff:g id="LABEL">%1$s</xliff:g>"</string>
+    <string name="hsu_label_badge" msgid="1357272000281944932">"Stelsel <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="lock_to_app_unlock_pin" msgid="3890940811866290782">"Vra PIN voordat jy ontspeld"</string>
     <string name="lock_to_app_unlock_pattern" msgid="2694204070499712503">"Vra ontsluitpatroon voordat jy ontspeld"</string>
     <string name="lock_to_app_unlock_password" msgid="9126722403506560473">"Vra wagwoord voordat jy ontspeld"</string>
@@ -2015,7 +2017,7 @@
     <string name="confirm_battery_saver" msgid="5247976246208245754">"OK"</string>
     <string name="battery_saver_description_with_learn_more" msgid="8969945879044849461">"Batterybespaarder skakel donkertema aan en beperk of skakel agtergrondaktiwiteit, sommige visuele effekte, sekere kenmerke en sommige netwerkverbindings af."</string>
     <string name="battery_saver_description" msgid="2820475140307374570">"Batterybespaarder skakel donkertema aan en beperk of skakel agtergrondaktiwiteit, sommige visuele effekte, sekere kenmerke en sommige netwerkverbindings af."</string>
-    <string name="data_saver_description" msgid="4995164271550590517">"Databespaarder verhoed sommige apps om data op die agtergrond te stuur of te ontvang om datagebruik te help verminder. ’n App wat jy tans gebruik kan by data ingaan, maar sal dit dalk minder gereeld doen. Dit kan byvoorbeeld beteken dat prente nie wys voordat jy op hulle tik nie."</string>
+    <string name="data_saver_description" msgid="4995164271550590517">"Databespaarder verhoed sommige apps om data op die agtergrond te stuur of te ontvang om datagebruik te help verminder. ’n App wat jy tans gebruik kan data gebruik, maar sal dit dalk minder gereeld doen. Dit kan byvoorbeeld beteken dat prente nie wys voordat jy op hulle tik nie."</string>
     <string name="data_saver_enable_title" msgid="7080620065745260137">"Skakel Databespaarder aan?"</string>
     <string name="data_saver_enable_button" msgid="4399405762586419726">"Skakel aan"</string>
     <string name="zen_mode_duration_minutes_summary" msgid="4555514757230849789">"{count,plural, =1{Een minuut lank (tot {formattedTime})}other{# minute lank (tot {formattedTime})}}"</string>
@@ -2111,7 +2113,32 @@
     <string name="app_suspended_default_message" msgid="6451215678552004172">"<xliff:g id="APP_NAME_0">%1$s</xliff:g> is nie nou onmiddellik beskikbaar nie. Dit word bestuur deur <xliff:g id="APP_NAME_1">%2$s</xliff:g>."</string>
     <string name="app_suspended_more_details" msgid="211260942831587014">"Kom meer te wete"</string>
     <string name="app_suspended_unsuspend_message" msgid="1665438589450555459">"Hervat app"</string>
+    <string name="app_lock_add_screen_lock_button_text" msgid="9209013414563206600">"Voeg skermslot by"</string>
+    <string name="app_lock_add_screen_lock_message" msgid="6107009360675769892">"Jou skermslot kan ’n PIN, patroon of wagwoord wees. Jy sal dit gebruik om jou toestel te ontsluit en toegang tot geslote apps te kry."</string>
+    <string name="app_lock_add_screen_lock_title" msgid="6905612843620128689">"Voeg eers ’n skermslot by"</string>
+    <string name="enable_app_lock_success_toast_message" msgid="3339622779190529987">"<xliff:g id="APP_NAME">%1$s</xliff:g> is gesluit"</string>
+    <string name="enable_app_lock_failure_toast_message" msgid="1055838896510445566">"Kan nie <xliff:g id="APP_NAME">%1$s</xliff:g> sluit nie"</string>
+    <string name="disable_app_lock_success_toast_message" msgid="70733620589071266">"Appslot is van <xliff:g id="APP_NAME">%1$s</xliff:g> verwyder"</string>
     <string name="locked_app_biometric_prompt_description" msgid="6853122652400451464">"<xliff:g id="APP_NAME">%1$s</xliff:g> is gesluit"</string>
+    <string name="locked_app_external_display_message" msgid="5483884799685545338">"Om toegang tot die app op hierdie skerm te kry, moet jy eers op jou ander toestel verifieer dat dit jy is"</string>
+    <string name="app_lock_edu_dialog_enable_app_lock_title" msgid="283314042336592322">"Voeg appslot by <xliff:g id="APP_NAME">%1$s</xliff:g>?"</string>
+    <string name="app_lock_edu_dialog_description" msgid="8176807243219769518">"Vir jou sekuriteit kan net jy met Vingerafdruk- en Gesigslot of jou PIN toegang tot hierdie app kry"</string>
+    <string name="app_lock_edu_dialog_description_template" msgid="8563718120753342530">"Vir jou sekuriteit kan net jy met %1$s of jou %2$s toegang tot hierdie app kry"</string>
+    <string name="app_lock_edu_dialog_description_template_no_biometrics" msgid="7122017109150633691">"Vir jou sekuriteit kan net jy met jou %1$s toegang tot hierdie app kry"</string>
+    <string name="app_lock_edu_dialog_info_header" msgid="5876120209204270990">"Met appslot"</string>
+    <string name="app_lock_edu_dialog_info_notifications" msgid="1124438392204873305">"Kennisgewinginhoud sal versteek word"</string>
+    <string name="app_lock_edu_dialog_info_widgets" msgid="8809009414650740872">"Legstukke en kortpaaie sal verwyder word"</string>
+    <string name="app_lock_edu_dialog_button_lock" msgid="3914687128135704801">"Voeg appslot by"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_face" msgid="1348151645996748654">"Gesigslot"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_fingerprint" msgid="5206107469561561455">"Vingerafdrukslot"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_fingerprint_and_face" msgid="7895807411323811641">"Vingerafdruk- of Gesigslot"</string>
+    <string name="app_lock_edu_dialog_lockscreen_password_name" msgid="8487096457702445059">"Wagwoord"</string>
+    <string name="app_lock_edu_dialog_lockscreen_pattern_name" msgid="991436996281983547">"Patroon"</string>
+    <string name="app_lock_edu_dialog_lockscreen_pin_name" msgid="6458607126966304795">"PIN"</string>
+    <string name="app_lock_permission_review_dialog_title" msgid="5030286398974840579">"Jou foto’s kan steeds in ander apps wys"</string>
+    <string name="app_lock_permission_review_dialog_sub_title" msgid="310758587817184145">"Apps met toegang tot jou foto’s"</string>
+    <string name="app_lock_permission_review_expand_app_list_button" msgid="3214809707125223273">"Bekyk alles"</string>
+    <string name="app_lock_permission_review_continue_button" msgid="4045066724173414043">"Gaan voort"</string>
     <string name="work_mode_off_title" msgid="6367463960165135829">"Hervat werkapps?"</string>
     <string name="work_mode_turn_on" msgid="5316648862401307800">"Hervat"</string>
     <string name="work_mode_emergency_call_button" msgid="6818855962881612322">"Noodgeval"</string>
@@ -2592,6 +2619,8 @@
     <string name="satellite_messaging_unsupported_default_sms_app_notification_summary" msgid="17084124893763593">"Stel Google Boodskappe as jou verstekboodskapapp op om boodskappe per satelliet te stuur"</string>
     <string name="satellite_messaging_location_disabled_notification_title" msgid="7270641894250928494">"Satellietboodskappe is nie beskikbaar nie"</string>
     <string name="satellite_messaging_location_disabled_notification_summary" msgid="1450824950686221810">"Skakel ligginginstellings aan om te kyk of satellietboodskappe in hierdie land of streek beskikbaar is"</string>
+    <!-- no translation found for satellite_indicator (6846063647532086110) -->
+    <skip />
     <string name="fingerprint_dangling_notification_title" msgid="7362075195588639989">"Stel Vingerafdrukslot weer op"</string>
     <string name="fingerprint_dangling_notification_msg_1" msgid="5851784577768803510">"<xliff:g id="FINGERPRINT">%s</xliff:g> kan nie meer herken word nie."</string>
     <string name="fingerprint_dangling_notification_msg_2" msgid="7925203589860744456">"<xliff:g id="FINGERPRINT_0">%1$s</xliff:g> en <xliff:g id="FINGERPRINT_1">%2$s</xliff:g> kan nie meer herken word nie."</string>

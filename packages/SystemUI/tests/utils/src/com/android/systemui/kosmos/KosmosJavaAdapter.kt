@@ -22,6 +22,9 @@ import android.app.NotificationChannel
 import android.content.Context
 import android.content.applicationContext
 import android.os.fakeExecutorHandler
+import com.android.internal.logging.uiEventLoggerFake
+import com.android.internal.widget.lockPatternUtils
+import com.android.keyguard.keyguardUpdateMonitor
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.activity.data.repository.activityIntentRepository
 import com.android.systemui.activity.data.repository.fake
@@ -30,6 +33,7 @@ import com.android.systemui.bouncer.data.repository.bouncerRepository
 import com.android.systemui.bouncer.data.repository.fakeKeyguardBouncerRepository
 import com.android.systemui.bouncer.domain.interactor.alternateBouncerInteractor
 import com.android.systemui.classifier.falsingCollector
+import com.android.systemui.colorextraction.fakeSysuiColorExtractor
 import com.android.systemui.common.ui.data.repository.fakeConfigurationRepository
 import com.android.systemui.common.ui.domain.interactor.configurationInteractor
 import com.android.systemui.communal.data.repository.fakeCommunalSceneRepository
@@ -38,17 +42,18 @@ import com.android.systemui.communal.domain.interactor.communalSceneInteractor
 import com.android.systemui.communal.domain.interactor.communalSettingsInteractor
 import com.android.systemui.communal.ui.viewmodel.communalTransitionViewModel
 import com.android.systemui.concurrency.fakeExecutor
+import com.android.systemui.data.repository.brightnessMirrorShowingRepository
 import com.android.systemui.deviceentry.domain.interactor.deviceEntryFingerprintAuthInteractor
 import com.android.systemui.deviceentry.domain.interactor.deviceEntryInteractor
 import com.android.systemui.deviceentry.domain.interactor.deviceEntryUdfpsInteractor
 import com.android.systemui.deviceentry.domain.interactor.deviceUnlockedInteractor
 import com.android.systemui.display.data.repository.displayRepository
 import com.android.systemui.display.data.repository.displaySubcomponentPerDisplayRepository
+import com.android.systemui.globalactions.actionsDialogLiteDelegateFactory
 import com.android.systemui.globalactions.data.repository.globalActionsRepository
 import com.android.systemui.globalactions.domain.interactor.globalActionsInteractor
 import com.android.systemui.haptics.msdl.bouncerHapticPlayer
 import com.android.systemui.haptics.msdl.fakeMSDLPlayer
-import com.android.systemui.haptics.qs.qsLongPressEffect
 import com.android.systemui.jank.interactionJankMonitor
 import com.android.systemui.keyguard.data.repository.deviceEntryFingerprintAuthRepository
 import com.android.systemui.keyguard.data.repository.fakeKeyguardRepository
@@ -75,23 +80,25 @@ import com.android.systemui.scene.domain.interactor.sceneInteractor
 import com.android.systemui.scene.ui.view.mockWindowRootViewProvider
 import com.android.systemui.securelockdevice.data.repository.fakeSecureLockDeviceRepository
 import com.android.systemui.securelockdevice.domain.interactor.secureLockDeviceInteractor
-import com.android.systemui.settings.brightness.data.repository.brightnessMirrorShowingRepository
 import com.android.systemui.settings.displayTracker
 import com.android.systemui.shade.data.repository.fakeFocusedDisplayRepository
 import com.android.systemui.shade.data.repository.fakeShadeDisplaysRepository
 import com.android.systemui.shade.data.repository.shadeConfigRepository
 import com.android.systemui.shade.data.repository.shadeDialogContextInteractor
 import com.android.systemui.shade.data.repository.shadeRepository
+import com.android.systemui.shade.domain.interactor.fakeShadeModeInteractor
 import com.android.systemui.shade.domain.interactor.shadeDisplaysInteractor
 import com.android.systemui.shade.domain.interactor.shadeInteractor
 import com.android.systemui.shade.domain.interactor.shadeLayoutParams
 import com.android.systemui.shade.domain.interactor.shadeModeInteractor
 import com.android.systemui.shade.domain.interactor.shadeStatusBarComponentsInteractor
+import com.android.systemui.shade.fakeShadeController
 import com.android.systemui.shade.shadeController
 import com.android.systemui.shade.ui.viewmodel.notificationShadeWindowModel
 import com.android.systemui.statusbar.data.repository.fakeStatusBarModePerDisplayRepository
 import com.android.systemui.statusbar.disableflags.data.repository.fakeDisableFlagsRepository
 import com.android.systemui.statusbar.disableflags.domain.interactor.disableFlagsInteractor
+import com.android.systemui.statusbar.multiDisplayStatusBarLogger
 import com.android.systemui.statusbar.notification.collection.BundleSpec
 import com.android.systemui.statusbar.notification.collection.NotificationEntry
 import com.android.systemui.statusbar.notification.collection.NotificationEntryBuilder
@@ -129,7 +136,11 @@ import com.android.systemui.statusbar.policy.data.repository.fakeDeviceProvision
 import com.android.systemui.statusbar.policy.domain.interactor.deviceProvisioningInteractor
 import com.android.systemui.statusbar.policy.keyguardStateController
 import com.android.systemui.topui.topUiController
+import com.android.systemui.user.data.repository.fakeUserRepository
+import com.android.systemui.user.data.repository.userRepository
+import com.android.systemui.user.domain.interactor.fakeSelectedUserInteractor
 import com.android.systemui.util.kotlin.javaAdapter
+import com.android.systemui.util.settings.fakeGlobalSettings
 import com.android.systemui.util.time.systemClock
 import com.android.systemui.volume.dialog.captions.domain.volumeDialogCaptionsButtonInteractor
 import com.android.systemui.volume.domain.interactor.volumeDialogInteractor
@@ -173,6 +184,7 @@ class KosmosJavaAdapter() {
     val keyguardTransitionRepository by lazy { kosmos.fakeKeyguardTransitionRepository }
     val keyguardTransitionInteractor by lazy { kosmos.keyguardTransitionInteractor }
     val keyguardStateController by lazy { kosmos.keyguardStateController }
+    val keyguardUpdateMonitor by lazy { kosmos.keyguardUpdateMonitor }
     val powerRepository by lazy { kosmos.fakePowerRepository }
     val clock by lazy { kosmos.systemClock }
     val mobileConnectionsRepository by lazy { kosmos.mobileConnectionsRepository }
@@ -208,8 +220,8 @@ class KosmosJavaAdapter() {
     val globalActionsInteractor by lazy { kosmos.globalActionsInteractor }
     val keyguardClockInteractor by lazy { kosmos.keyguardClockInteractor }
     val brightnessMirrorShowingRepository by lazy { kosmos.brightnessMirrorShowingRepository }
-    val qsLongPressEffect by lazy { kosmos.qsLongPressEffect }
     val shadeController by lazy { kosmos.shadeController }
+    val fakeShadeController by lazy { kosmos.fakeShadeController }
     val shadeDisplaysInteractor by lazy { kosmos.shadeDisplaysInteractor }
     val shadeRepository by lazy { kosmos.shadeRepository }
     val shadeConfigRepository by lazy { kosmos.shadeConfigRepository }
@@ -227,6 +239,7 @@ class KosmosJavaAdapter() {
     val msdlPlayer by lazy { kosmos.fakeMSDLPlayer }
 
     val shadeModeInteractor by lazy { kosmos.shadeModeInteractor }
+    val fakeShadeModeInteractor by lazy { kosmos.fakeShadeModeInteractor }
 
     val bouncerHapticHelper by lazy { kosmos.bouncerHapticPlayer }
 
@@ -268,6 +281,15 @@ class KosmosJavaAdapter() {
     val displayRepository by lazy { kosmos.displayRepository }
     val shadeStatusBarComponentsInteractor by lazy { kosmos.shadeStatusBarComponentsInteractor }
     val keyguardSurfaceBehindInteractor by lazy { kosmos.keyguardSurfaceBehindInteractor }
+    val fakeUserRepository by lazy { kosmos.fakeUserRepository }
+    val userRepository by lazy { kosmos.userRepository }
+    val multiDisplayStatusBarLogger by lazy { kosmos.multiDisplayStatusBarLogger }
+    val fakeSelectedUserInteractor by lazy { kosmos.fakeSelectedUserInteractor }
+    val fakeSysuiColorExtractor by lazy { kosmos.fakeSysuiColorExtractor }
+    val lockPatternUtils by lazy { kosmos.lockPatternUtils }
+    val uiEventLoggerFake by lazy { kosmos.uiEventLoggerFake }
+    val actionsDialogLiteDelegateFactory by lazy { kosmos.actionsDialogLiteDelegateFactory }
+    val fakeGlobalSettings by lazy { kosmos.fakeGlobalSettings }
 
     /** Use if you need a unique or mutate-able row */
     fun createRow(): ExpandableNotificationRow {

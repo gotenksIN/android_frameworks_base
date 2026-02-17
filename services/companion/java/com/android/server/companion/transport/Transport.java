@@ -32,11 +32,13 @@ import static android.companion.CompanionDeviceManager.MESSAGE_REQUEST_TRUSTED_D
 import android.annotation.IntDef;
 import android.annotation.NonNull;
 import android.companion.AssociationRequest;
+import android.companion.CompanionDeviceManager.MessageType;
 import android.companion.IOnMessageReceivedListener;
 import android.companion.IOnTransportEventListener;
 import android.content.Context;
 import android.os.Build;
 import android.os.ParcelFileDescriptor;
+import android.os.RemoteCallbackList;
 import android.os.RemoteException;
 import android.util.Slog;
 import android.util.SparseArray;
@@ -50,6 +52,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
+import java.nio.ByteBuffer;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
@@ -79,10 +82,13 @@ public abstract class Transport {
     protected final OutputStream mRemoteOut;
     protected final Context mContext;
 
+    protected final MessageQueue mMessageQueue;
+
     /** @hide */
     @IntDef(value = {
             SUCCESSFUL_CONNECTION,
             ERROR_UPDATE_REQUIRED,
+            ERROR_TOO_MANY_REQUESTS,
             ERROR_UNKNOWN,
     })
     @Retention(RetentionPolicy.SOURCE)
@@ -97,6 +103,11 @@ public abstract class Transport {
      * Reserved for AVF patch level difference error.
      */
     public static final int ERROR_UPDATE_REQUIRED = 427;
+
+    /**
+     * Indicates that the message queue is full.
+     */
+    public static final int ERROR_TOO_MANY_REQUESTS = 429;
 
     /**
      * Fallback error code.
@@ -114,19 +125,20 @@ public abstract class Transport {
     private final SparseArray<Set<IOnMessageReceivedListener>> mListeners = new SparseArray<>();
 
     @GuardedBy("mEventListeners")
-    private final Set<IOnTransportEventListener> mEventListeners = new HashSet<>();
+    private final RemoteCallbackList<IOnTransportEventListener> mEventListeners =
+            new RemoteCallbackList<>();
 
     private OnTransportClosedListener mOnTransportClosed;
 
-    private static boolean isRequest(int message) {
+    private static boolean isRequest(@MessageType int message) {
         return (message & 0xFF000000) == 0x63000000;
     }
 
-    private static boolean isResponse(int message) {
+    private static boolean isResponse(@MessageType int message) {
         return (message & 0xFF000000) == 0x33000000;
     }
 
-    private static boolean isOneway(int message) {
+    private static boolean isOneway(@MessageType int message) {
         return (message & 0xFF000000) == 0x43000000;
     }
 
@@ -141,6 +153,7 @@ public abstract class Transport {
         mRemoteIn = new ParcelFileDescriptor.AutoCloseInputStream(fd);
         mRemoteOut = new ParcelFileDescriptor.AutoCloseOutputStream(fd);
         mContext = context;
+        mMessageQueue = new MessageQueue();
     }
 
     /**
@@ -148,7 +161,7 @@ public abstract class Transport {
      * @param message Message type
      * @param listener Execute when a message with the type is received
      */
-    public void addListener(int message, IOnMessageReceivedListener listener) {
+    public void addListener(@MessageType int message, IOnMessageReceivedListener listener) {
         synchronized (mListeners) {
             if (!mListeners.contains(message)) {
                 mListeners.put(message, new HashSet<IOnMessageReceivedListener>());
@@ -163,7 +176,7 @@ public abstract class Transport {
      */
     void addListener(IOnTransportEventListener listener) {
         synchronized (mEventListeners) {
-            mEventListeners.add(listener);
+            mEventListeners.register(listener);
         }
     }
 
@@ -172,9 +185,23 @@ public abstract class Transport {
      */
     void removeListener(IOnTransportEventListener listener) {
         synchronized (mEventListeners) {
-            mEventListeners.remove(listener);
+            mEventListeners.unregister(listener);
         }
     }
+
+    /**
+     * Returns the session key for the transport of the given association id.
+     *
+     * @return the session key. Null if transport does not have a session.
+     */
+    public abstract byte[] getSessionKey();
+
+    /**
+     * Returns the session role for the transport of the given association id.
+     *
+     * @return the session role. Null if transport does not have a session.
+     */
+    public abstract String getSessionRole();
 
     public int getAssociationId() {
         return mAssociationId;
@@ -185,7 +212,7 @@ public abstract class Transport {
     }
 
     /**
-     * Start listening to messages.
+     * Start sending and listening to messages.
      */
     abstract void start();
 
@@ -204,8 +231,32 @@ public abstract class Transport {
         }
     }
 
-    protected abstract void sendMessage(int message, int sequence, @NonNull byte[] data)
-            throws IOException;
+    protected void enqueueMessage(int message, int sequence, @NonNull byte[] data)
+            throws IOException {
+        if (DEBUG) {
+            Slog.d(TAG, "Queueing message 0x" + Integer.toHexString(message)
+                    + " sequence " + sequence + " length " + data.length
+                    + " to association " + mAssociationId);
+        }
+
+        // Queue up a message to send
+        try {
+            byte[] request = ByteBuffer.allocate(HEADER_LENGTH + data.length)
+                    .putInt(message)
+                    .putInt(sequence)
+                    .putInt(data.length)
+                    .put(data)
+                    .array();
+            mMessageQueue.add(message, request);
+        } catch (IllegalStateException e) {
+            // Request buffer can only be full if too many requests are being added or
+            // the request processing thread is dead. Assume latter and detach the transport.
+            Slog.w(TAG, "Failed to queue message 0x" + Integer.toHexString(message)
+                    + " . Request buffer is full; detaching transport.", e);
+            eventCallback(ERROR_TOO_MANY_REQUESTS);
+            close();
+        }
+    }
 
     /**
      * Send a message using this transport. If the message was a request, then the returned Future
@@ -217,7 +268,7 @@ public abstract class Transport {
      * @param data the message payload
      * @return CompletableFuture object containing the result of the sent message.
      */
-    public CompletableFuture<byte[]> sendMessage(int message, byte[] data) {
+    public CompletableFuture<byte[]> sendMessage(@MessageType int message, byte[] data) {
         final CompletableFuture<byte[]> pending = new CompletableFuture<>();
         if (data == null) {
             pending.completeExceptionally(new IllegalArgumentException(
@@ -247,7 +298,7 @@ public abstract class Transport {
      * @see #sendMessage(int, byte[])
      */
     @Deprecated
-    public CompletableFuture<byte[]> requestForResponse(int message, byte[] data) {
+    public CompletableFuture<byte[]> requestForResponse(@MessageType int message, byte[] data) {
         if (DEBUG) Slog.d(TAG, "Requesting for response");
         final int sequence = mNextSequence.incrementAndGet();
         final CompletableFuture<byte[]> pending = new CompletableFuture<>();
@@ -256,7 +307,7 @@ public abstract class Transport {
         }
 
         try {
-            sendMessage(message, sequence, data);
+            enqueueMessage(message, sequence, data);
         } catch (IOException e) {
             synchronized (mPendingRequests) {
                 mPendingRequests.remove(sequence);
@@ -267,12 +318,12 @@ public abstract class Transport {
         return pending;
     }
 
-    private CompletableFuture<byte[]> sendAndForget(int message, byte[]data) {
+    private CompletableFuture<byte[]> sendAndForget(@MessageType int message, byte[]data) {
         if (DEBUG) Slog.d(TAG, "Sending a one-way message");
         final CompletableFuture<byte[]> pending = new CompletableFuture<>();
 
         try {
-            sendMessage(message, -1, data);
+            enqueueMessage(message, -1, data);
             pending.complete(null);
         } catch (IOException e) {
             pending.completeExceptionally(e);
@@ -281,7 +332,7 @@ public abstract class Transport {
         return pending;
     }
 
-    protected final void handleMessage(int message, int sequence, @NonNull byte[] data)
+    protected final void handleMessage(@MessageType int message, int sequence, @NonNull byte[] data)
             throws IOException {
         if (DEBUG) {
             Slog.d(TAG, "Received message 0x" + Integer.toHexString(message)
@@ -306,13 +357,18 @@ public abstract class Transport {
 
     protected final void eventCallback(@TransportEvent int event) {
         synchronized (mEventListeners) {
-            for (IOnTransportEventListener listener : mEventListeners) {
+            mEventListeners.broadcast(listener -> {
                 try {
                     listener.onTransportEvent(event);
                 } catch (RemoteException ignored) {
                 }
-            }
+            });
         }
+    }
+
+    @TransportEvent
+    protected int translateError(Throwable error) {
+        return ERROR_UNKNOWN;
     }
 
     private void processOneway(int message, byte[] data) {
@@ -337,16 +393,16 @@ public abstract class Transport {
             throws IOException {
         switch (message) {
             case MESSAGE_REQUEST_PING: {
-                sendMessage(MESSAGE_RESPONSE_SUCCESS, sequence, data);
+                enqueueMessage(MESSAGE_RESPONSE_SUCCESS, sequence, data);
                 break;
             }
             case MESSAGE_REQUEST_PERMISSION_RESTORE: {
                 try {
                     callback(message, data);
-                    sendMessage(MESSAGE_RESPONSE_SUCCESS, sequence, EmptyArray.BYTE);
+                    enqueueMessage(MESSAGE_RESPONSE_SUCCESS, sequence, EmptyArray.BYTE);
                 } catch (Exception e) {
                     Slog.w(TAG, "Failed to restore permissions");
-                    sendMessage(MESSAGE_RESPONSE_FAILURE, sequence, EmptyArray.BYTE);
+                    enqueueMessage(MESSAGE_RESPONSE_FAILURE, sequence, EmptyArray.BYTE);
                 }
                 break;
             }
@@ -356,23 +412,23 @@ public abstract class Transport {
             case MESSAGE_REQUEST_METADATA_UPDATE: {
                 try {
                     callback(message, data);
-                    sendMessage(MESSAGE_RESPONSE_SUCCESS, sequence, EmptyArray.BYTE);
+                    enqueueMessage(MESSAGE_RESPONSE_SUCCESS, sequence, EmptyArray.BYTE);
                 } catch (Exception e) {
                     Slog.w(TAG, "Failed to execute callback for request 0x"
                             + Integer.toHexString(message));
-                    sendMessage(MESSAGE_RESPONSE_FAILURE, sequence, EmptyArray.BYTE);
+                    enqueueMessage(MESSAGE_RESPONSE_FAILURE, sequence, EmptyArray.BYTE);
                 }
                 break;
             }
             default: {
                 Slog.w(TAG, "Unknown request 0x" + Integer.toHexString(message));
-                sendMessage(MESSAGE_RESPONSE_FAILURE, sequence, EmptyArray.BYTE);
+                enqueueMessage(MESSAGE_RESPONSE_FAILURE, sequence, EmptyArray.BYTE);
                 break;
             }
         }
     }
 
-    private void callback(int message, byte[] data) {
+    private void callback(@MessageType int message, byte[] data) {
         Set<IOnMessageReceivedListener> listenersToCall;
         synchronized (mListeners) {
             if (!mListeners.contains(message)) {

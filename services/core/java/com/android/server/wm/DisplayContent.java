@@ -302,6 +302,9 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
 
     static final float INVALID_DPI = 0.0f;
 
+    /** Override frame rate to use for the display when client rendering limitations are enabled. */
+    private static final float CLIENT_RENDERING_LIMITATION_FRAME_RATE_OVERRIDE = 10;
+
     private final boolean mVisibleBackgroundUserEnabled =
             UserManager.isVisibleBackgroundUsersEnabled();
 
@@ -851,6 +854,18 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
      */
     private final List<DisplayMirrorImpl> mDisplayMirrors = new ArrayList<>();
 
+    /**
+     * Whether to request HardwareRenderer output to be disabled for all window clients on this
+     * display.
+     */
+    private boolean mIsHardwareRendererOutputDisabled = false;
+
+    /** Whether SystemPerformanceHinter is disabled for the display. */
+    private boolean mIsSystemPerformanceHinterDisabled = false;
+
+    /** Whether client rendering limitations are enabled for this display. **/
+    private boolean mAreClientRenderingLimitationsEnabled = false;
+
     private final Consumer<WindowState> mUpdateWindowsForAnimator = w -> {
         WindowStateAnimator winAnimator = w.mWinAnimator;
         final ActivityRecord activity = w.mActivityRecord;
@@ -1230,8 +1245,6 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         }
     };
 
-    private boolean mIsTaskMoveAllowedOnDisplay = false;
-
     /**
      * Create new {@link DisplayContent} instance, add itself to the root window container and
      * initialize direct children.
@@ -1254,7 +1267,6 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         mDisplayId = display.getDisplayId();
         mCurrentUniqueDisplayId = display.getUniqueId();
         mWallpaperController = new WallpaperController(mWmService, this);
-        mWallpaperController.resetLargestDisplay(display);
         display.getDisplayInfo(mDisplayInfo);
         display.getMetrics(mDisplayMetrics);
         mDisplayUpdater = new DeferredDisplayUpdater(this);
@@ -1488,12 +1500,79 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         }
     }
 
+    void requestHardwareRendererOutputDisabled(boolean disabled) {
+        if (disabled && mIsHardwareRendererOutputDisabled) {
+            return;
+        }
+        mIsHardwareRendererOutputDisabled = disabled;
+        forAllWindows(w -> {
+            try {
+                w.mClient.requestHardwareRendererOutputDisabled(disabled);
+            } catch (RemoteException e) {
+            }
+        }, true /* traverseTopToBottom */);
+    }
+
+    boolean isHardwareRendererOutputDisabled() {
+        return mIsHardwareRendererOutputDisabled;
+    }
+
+    void disableSystemPerformanceHinter() {
+        mIsSystemPerformanceHinterDisabled = true;
+    }
+
+    boolean isSystemPerformanceHinterDisabled() {
+        return mIsSystemPerformanceHinterDisabled;
+    }
+
     void setAnimationsDisabledLocked(boolean disabled) {
         if (mAnimationsDisabled != disabled) {
             mAnimationsDisabled = disabled;
             mWmService.mDisplayNotificationController
                     .dispatchDisplayAnimationsDisabledChanged(mDisplayId, mAnimationsDisabled);
         }
+    }
+
+    void enableClientRenderingLimitations(boolean enable) {
+        if (mAreClientRenderingLimitationsEnabled == enable) {
+            return;
+        }
+
+        mAreClientRenderingLimitationsEnabled = enable;
+
+        forAllWindows(w -> {
+            try {
+                w.mClient.requestViewAnimationsDisabled(enable);
+            } catch (RemoteException e) {
+            }
+        }, true /* traverseTopToBottom */);
+
+        final var transaction = mWmService.mTransactionFactory.get();
+        if (enable) {
+            enableClientRenderingLimitations(transaction);
+        } else if (mSurfaceControl != null) {
+            // Remove the frame rate override.
+            transaction
+                    .clearFrameRate(mSurfaceControl)
+                    .setFrameRateSelectionStrategy(mSurfaceControl,
+                            SurfaceControl.FRAME_RATE_SELECTION_STRATEGY_PROPAGATE);
+        }
+        transaction.apply();
+    }
+
+    boolean areClientRenderingLimitationsEnabled() {
+        return mAreClientRenderingLimitationsEnabled;
+    }
+
+    private void enableClientRenderingLimitations(Transaction transaction) {
+        if (mSurfaceControl == null) {
+            return;
+        }
+        transaction
+                .setFrameRate(mSurfaceControl, CLIENT_RENDERING_LIMITATION_FRAME_RATE_OVERRIDE,
+                        Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
+                .setFrameRateSelectionStrategy(mSurfaceControl,
+                        SurfaceControl.FRAME_RATE_SELECTION_STRATEGY_OVERRIDE_CHILDREN);
     }
 
     /**
@@ -1530,12 +1609,7 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                 .setContainerLayer()
                 .setCallsite("DisplayContent");
         mSurfaceControl = b.setName(getName()).build();
-        for (int i = getChildCount() - 1; i >= 0; i--)  {
-            final SurfaceControl sc = getChildAt(i).mSurfaceControl;
-            if (sc != null) {
-                transaction.reparent(sc, mSurfaceControl);
-            }
-        }
+        migrateChildrenToNewSurfaceControl(transaction);
 
         if (mOverlayLayer == null) {
             mOverlayLayer = b.setName("Display Overlays").setParent(mSurfaceControl).build();
@@ -1565,6 +1639,10 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
 
         for (int i = 0; i < mDisplayMirrors.size(); i++) {
             mDisplayMirrors.get(i).recreateMirror(mSurfaceControl, transaction);
+        }
+
+        if (mAreClientRenderingLimitationsEnabled) {
+            enableClientRenderingLimitations(transaction);
         }
 
         transaction
@@ -1657,15 +1735,6 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         }
         if (token.asActivityRecord() == null) {
             // Setting the mDisplayContent to the token is not needed: it is done by da.addChild
-            // below, that also calls onDisplayChanged once moved.
-            if (!Flags.reparentWindowTokenApi()) {
-                // Set displayContent for non-app token to prevent same token will add twice after
-                // onDisplayChanged.
-                // TODO: Check if it's fine that super.onDisplayChanged of WindowToken
-                //  (WindowsContainer#onDisplayChanged) may skipped when token.mDisplayContent
-                //  assigned.
-                token.mDisplayContent = this;
-            }
             // Add non-app token to container hierarchy on the display. App tokens are added through
             // the parent container managing them (e.g. Tasks).
             final DisplayArea.Tokens da = findAreaForToken(token).asTokens();
@@ -2018,12 +2087,6 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         final ActivityRecord r =
                 orientationSource != null ? orientationSource.asActivityRecord() : null;
         if (r != null) {
-            final Task task = r.getTask();
-            if (task != null && orientation != task.mLastReportedRequestedOrientation) {
-                task.mLastReportedRequestedOrientation = orientation;
-                mAtmService.getTaskChangeNotificationController()
-                        .notifyTaskRequestedOrientationChanged(task.mTaskId, orientation);
-            }
             // The orientation source may not be the top if it uses SCREEN_ORIENTATION_BEHIND,
             // or it is a translucent SCREEN_ORIENTATION_UNSPECIFIED activity.
             ActivityRecord topCandidate = r;
@@ -3025,8 +3088,20 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
             return true;
         }
         final int userId = UserHandle.getUserId(uid);
-        return userId == UserHandle.USER_SYSTEM
-                || mWmService.mUmInternal.isUserVisible(userId, mDisplayId);
+
+        // - The system user has access to all displays.
+        // - The current user has access to its assigned displays.
+        //   If the allow_current_user_access_unassigned_displays flag is true,
+        //   the current user has access to all unassigned displays.
+        // - A non-current non-system user has access to its assigned displays.
+        if (userId == UserHandle.USER_SYSTEM) {
+          return true;
+        }
+        if (Flags.currentUserAccessUnassignedDisplays()) {
+          // Note that getUserAssignedToDisplay returns the current user for unassigned displays.
+          return userId == mWmService.mUmInternal.getUserAssignedToDisplay(mDisplayId);
+        }
+        return mWmService.mUmInternal.isUserVisible(userId, mDisplayId);
     }
 
     boolean isPrivate() {
@@ -3718,7 +3793,6 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
             mWmService.mAccessibilityController.onDisplayRemoved(mDisplayId);
             mRootWindowContainer.mTaskSupervisor
                     .getKeyguardController().onDisplayRemoved(this);
-            mWallpaperController.resetLargestDisplay(mDisplay);
             mWmService.mDisplayWindowSettings.onDisplayRemoved(this);
             getDisplayUiContext().unregisterComponentCallbacks(mSysUiContextConfigCallback);
             removeAllDisplayMirrors(getPendingTransaction());
@@ -4021,6 +4095,14 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
         pw.println();
         pw.print(prefix + "mLastWakeLockObscuringWindow=");
         pw.println(mLastWakeLockObscuringWindow);
+
+        pw.println();
+        pw.print(prefix);
+        pw.print("mIsHardwareRendererOutputDisabled=");
+        pw.println(mIsHardwareRendererOutputDisabled);
+        pw.print(prefix);
+        pw.print("mAreClientRenderingLimitationsEnabled=");
+        pw.println(mAreClientRenderingLimitationsEnabled);
 
         pw.println();
         mWallpaperController.dump(pw, "  ");
@@ -6374,8 +6456,6 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                 updateRecording();
             }
         }
-        // Notify wallpaper controller of any size changes.
-        mWallpaperController.resetLargestDisplay(mDisplay);
         // Dispatch pending Configuration to WindowContext if the associated display changes to
         // un-suspended state from suspended.
         if (isSuspendedState(lastDisplayState)
@@ -6636,15 +6716,26 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
     }
 
     /**
+     * To be used when determining if DisplayContent should be removed or has a pending
+     * removal due to the Display object no longer being valid.
      * @see #mRemoved
      */
-    boolean isRemoved() {
+    boolean isRemovedOrInvalid() {
         // After DisplayManager removes the LogicalDisplay object but before WindowManager begins
         // removing the corresponding DisplayContent, we should check Display.isValid(), which
         // returns false in this specific scenario.
         if (mDisplayId != DEFAULT_DISPLAY && !mDisplay.isValid()) {
             return true;
         }
+        return mRemoved;
+    }
+
+    /**
+     * To be used when determining if DisplayContent should be removed; the validity
+     * of the display is irrelevant.
+     * @see #mRemoved
+     */
+    boolean isRemoved() {
         return mRemoved;
     }
 
@@ -7531,33 +7622,12 @@ class DisplayContent extends RootDisplayArea implements WindowManagerPolicy.Disp
                 .apply();
     }
 
+    // LINT.IfChange(isTaskMoveAllowedOnDisplay)
     boolean isTaskMoveAllowedOnDisplay() {
-        // Since the listener work changes the model so that isTaskMoveAllowedOnDisplay uses cached
-        // values instead of calculating the value directly upon each call, let's have a killswitch
-        // that will let us go back to the original behavior if anything breaks (e.g. we haven't
-        // covered all events that may change this value).
-        if (!DesktopExperienceFlags.ENABLE_TASK_MOVE_ALLOWED_LISTENER_API.isTrue()) {
-            updateIsTaskMoveAllowedOnDisplay();
-        }
-        return mIsTaskMoveAllowedOnDisplay;
-    }
-
-    void onDescendantsTaskMoveAllowedChanged() {
-        boolean lastValueOfIsTaskMoveAllowedOnDisplay = isTaskMoveAllowedOnDisplay();
-        updateIsTaskMoveAllowedOnDisplay();
-        if (lastValueOfIsTaskMoveAllowedOnDisplay == isTaskMoveAllowedOnDisplay()) {
-            return;
-        }
-        mAtmService.onTaskMoveAllowedChanged();
-    }
-
-    // LINT.IfChange(updateIsTaskMoveAllowedOnDisplay)
-    private void updateIsTaskMoveAllowedOnDisplay() {
         // Keep the WindowContainer's subtypes we are traversing here in sync with
         // WindowContainer#canHoldSelfMovableTasks.
-        mIsTaskMoveAllowedOnDisplay =
-                forAllTaskDisplayAreas(TaskDisplayArea::getIsTaskMoveAllowed)
-                        || forAllRootTasks(Task::getIsTaskMoveAllowed);
+        return forAllTaskDisplayAreas(TaskDisplayArea::getIsTaskMoveAllowed)
+                || forAllRootTasks(Task::getIsTaskMoveAllowed);
     }
     // LINT.ThenChange(WindowContainer.java:canHoldSelfMovableTasks)
 

@@ -19,10 +19,10 @@ package com.android.server.personalcontext.notifications;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.Notification;
-import android.content.Context;
 import android.os.Bundle;
 import android.service.notification.Adjustment;
 import android.service.notification.StatusBarNotification;
+import android.service.personalcontext.RenderToken;
 import android.service.personalcontext.hint.ContextHint;
 import android.service.personalcontext.hint.ContextHintWithSignature;
 import android.service.personalcontext.hint.NotificationEvent.NotificationEnqueuedEvent;
@@ -30,7 +30,6 @@ import android.service.personalcontext.hint.NotificationHint;
 import android.service.personalcontext.insight.ActionableInsight;
 import android.service.personalcontext.insight.ContextInsight;
 import android.service.personalcontext.insight.DisplayInsight;
-import android.service.personalcontext.insight.InsightDisplayDetails;
 import android.service.personalcontext.insight.InsightTraverser;
 import android.service.personalcontext.insight.InsightVisitor;
 import android.util.Log;
@@ -79,6 +78,11 @@ public class NotificationActionRenderer implements Renderer {
         mNotificationActionFactory = notificationActionFactory;
     }
 
+    @Override
+    public int getProperties() {
+        return Renderer.PROPERTY_CAN_RECEIVE_NOTIFICATION_INSIGHTS;
+    }
+
     @Nullable
     private static StatusBarNotification getSbnFromInsight(ContextInsight insight) {
         for (ContextHint hint : ContextHintWithSignature.unwrapList(insight.getOriginHints())) {
@@ -92,7 +96,7 @@ public class NotificationActionRenderer implements Renderer {
     }
 
     @Override
-    public void render(@NonNull ContextInsight insight) {
+    public void render(@NonNull ContextInsight insight, RenderToken renderToken) {
         if (mNotificationManagerInternal == null) {
             Slog.e(TAG, "NotificationManagerInternal not found.");
             return;

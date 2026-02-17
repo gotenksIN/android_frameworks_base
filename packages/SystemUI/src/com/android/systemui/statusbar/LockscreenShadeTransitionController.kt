@@ -23,6 +23,7 @@ import com.android.systemui.deviceentry.domain.interactor.DeviceEntryInteractor
 import com.android.systemui.dump.DumpManager
 import com.android.systemui.keyguard.WakefulnessLifecycle
 import com.android.systemui.keyguard.domain.interactor.NaturalScrollingSettingObserver
+import com.android.systemui.media.controls.ui.controller.KeyguardMediaController
 import com.android.systemui.media.controls.ui.controller.MediaHierarchyManager
 import com.android.systemui.plugins.ActivityStarter
 import com.android.systemui.plugins.ActivityStarter.OnDismissAction
@@ -35,10 +36,10 @@ import com.android.systemui.shade.ShadeDisplayAware
 import com.android.systemui.shade.data.repository.ShadeRepository
 import com.android.systemui.shade.domain.interactor.ShadeInteractor
 import com.android.systemui.shade.domain.interactor.ShadeLockscreenInteractor
+import com.android.systemui.shade.domain.interactor.ShadeModeInteractor
 import com.android.systemui.statusbar.notification.collection.NotificationEntry
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow
 import com.android.systemui.statusbar.notification.row.ExpandableView
-import com.android.systemui.statusbar.notification.shared.NotificationBundleUi
 import com.android.systemui.statusbar.notification.stack.AmbientState
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayoutController
 import com.android.systemui.statusbar.phone.CentralSurfaces
@@ -67,6 +68,7 @@ constructor(
     private val falsingCollector: FalsingCollector,
     private val ambientState: AmbientState,
     private val mediaHierarchyManager: MediaHierarchyManager,
+    private val keyguardMediaController: KeyguardMediaController,
     private val scrimTransitionController: LockscreenShadeScrimTransitionController,
     private val keyguardTransitionControllerFactory:
         LockscreenShadeKeyguardTransitionController.Factory,
@@ -83,6 +85,7 @@ constructor(
     private val shadeRepository: ShadeRepository,
     private val shadeInteractor: ShadeInteractor,
     private val splitShadeStateController: SplitShadeStateController,
+    private val shadeModeInteractor: ShadeModeInteractor,
     private val shadeLockscreenInteractorLazy: Lazy<ShadeLockscreenInteractor>,
     private val deviceEntryInteractor: DeviceEntryInteractor,
     naturalScrollingSettingObserver: NaturalScrollingSettingObserver,
@@ -93,7 +96,12 @@ constructor(
     var fractionToShade: Float = 0f
         private set
 
-    private var useSplitShade: Boolean = false
+    private var useSplitShadeLegacy: Boolean = false
+    private val useSplitShade: Boolean
+        get() =
+            if (SceneContainerFlag.isEnabled) shadeModeInteractor.isSplitShade
+            else useSplitShadeLegacy
+
     private lateinit var nsslController: NotificationStackScrollLayoutController
     lateinit var centralSurfaces: CentralSurfaces
 
@@ -279,7 +287,10 @@ constructor(
                 R.dimen.lockscreen_shade_status_bar_transition_distance
             )
 
-        useSplitShade = splitShadeStateController.shouldUseSplitNotificationShade(context.resources)
+        if (!SceneContainerFlag.isEnabled) {
+            useSplitShadeLegacy =
+                splitShadeStateController.shouldUseSplitNotificationShade(context.resources)
+        }
     }
 
     fun setStackScroller(nsslController: NotificationStackScrollLayoutController) {
@@ -305,9 +316,7 @@ constructor(
             if (startingChild != null && isLockdownShade()) {
                 if (startingChild is ExpandableNotificationRow) {
                     // Only drag down on sensitive views, otherwise the ExpandHelper will take this
-                    return if (NotificationBundleUi.isEnabled)
-                        startingChild.entryAdapter?.isSensitive?.value == true
-                    else startingChild.entryLegacy.isSensitive.value
+                    return startingChild.entryAdapter?.isSensitive?.value == true
                 }
             }
             return false
@@ -418,9 +427,7 @@ constructor(
             }
             if (view is ExpandableNotificationRow) {
                 // Only drag down on sensitive views, otherwise the ExpandHelper will take this
-                return if (NotificationBundleUi.isEnabled)
-                    view.entryAdapter?.isSensitive?.value == true
-                else view.entryLegacy.isSensitive.value
+                return view.entryAdapter?.isSensitive?.value == true
             }
         }
         return false
@@ -458,6 +465,7 @@ constructor(
                         )
                     }
 
+                    keyguardMediaController.setTransitionToFullShadeAmount(field)
                     mediaHierarchyManager.setTransitionToFullShadeAmount(field)
                     scrimTransitionController.dragDownAmount = value
                     transitionToShadeAmountCommon(field)
@@ -596,11 +604,7 @@ constructor(
             // Indicate that the group expansion is changing at this time -- this way the group
             // and children backgrounds / divider animations will look correct.
             expandView.isGroupExpansionChanging = true
-            if (NotificationBundleUi.isEnabled) {
-                expandView.entryAdapter.sbn?.userId?.let { userId = it }
-            } else {
-                userId = expandView.entryLegacy.sbn.userId
-            }
+            expandView.entryAdapter.sbn?.userId?.let { userId = it }
         }
         var fullShadeNeedsBouncer =
             (!lockScreenUserManager.shouldShowLockscreenNotifications() ||
@@ -869,7 +873,8 @@ class DragDownHelper(
                     return intercepted
                 } else {
                     if (SceneContainerFlag.isEnabled) {
-                        // Check if we're dragging upwards and if we're not in the locked, open shade
+                        // Check if we're dragging upwards and if we're not in the locked, open
+                        // shade
                         val dragUpH = -1 * h
                         if (
                             dragUpH > touchSlop &&

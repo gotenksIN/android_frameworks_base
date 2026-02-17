@@ -75,7 +75,6 @@ import com.android.systemui.statusbar.notification.row.shared.NewRemoteViews
 import com.android.systemui.statusbar.notification.row.shared.NotificationContentModel
 import com.android.systemui.statusbar.notification.row.ui.viewbinder.SingleLineViewBinder
 import com.android.systemui.statusbar.notification.row.wrapper.NotificationViewWrapper
-import com.android.systemui.statusbar.notification.shared.NotificationBundleUi
 import com.android.systemui.statusbar.notification.stack.NotificationChildrenContainer
 import com.android.systemui.statusbar.policy.InflatedSmartReplyState
 import com.android.systemui.statusbar.policy.InflatedSmartReplyViewHolder
@@ -104,6 +103,7 @@ constructor(
     private val logger: NotificationRowContentBinderLogger,
 ) : NotificationRowContentBinder {
     private var inflateSynchronously = false
+    private var userProfileBadgeProvider: Notification.UserProfileBadgeProvider? = null
 
     override fun bindContent(
         entry: NotificationEntry,
@@ -135,6 +135,7 @@ constructor(
             AsyncInflationTask(
                 inflationExecutor,
                 inflateSynchronously,
+                userProfileBadgeProvider,
                 /* reInflateFlags = */ contentToBind,
                 remoteViewCache,
                 entry,
@@ -197,23 +198,21 @@ constructor(
         result.inflatedSingleLineView =
             result.contentModel.singleLineViewModel?.let { viewModel ->
                 SingleLineViewInflater.inflatePrivateSingleLineView(
-                    viewModel.isConversation(),
-                    viewModel.isMetric(),
-                    reInflateFlags,
-                    entry,
-                    systemUIContext,
-                    logger,
+                    payload = viewModel.payload,
+                    reinflateFlags = reInflateFlags,
+                    entry = entry,
+                    context = systemUIContext,
+                    logger = logger,
                 )
             }
         result.inflatedPublicSingleLineView =
             result.contentModel.publicSingleLineViewModel?.let { viewModel ->
                 SingleLineViewInflater.inflatePublicSingleLineView(
-                    viewModel.isConversation(),
-                    viewModel.isMetric(),
-                    reInflateFlags,
-                    entry,
-                    systemUIContext,
-                    logger,
+                    payload = viewModel.payload,
+                    reinflateFlags = reInflateFlags,
+                    entry = entry,
+                    context = systemUIContext,
+                    logger = logger,
                 )
             }
         apply(
@@ -344,9 +343,21 @@ constructor(
         this.inflateSynchronously = inflateSynchronously
     }
 
+    /**
+     * Sets the user profile badge provider. This method should only be used in tests, not in
+     * production.
+     */
+    @VisibleForTesting
+    override fun setUserProfileBadgeProvider(
+        userProfileBadgeProvider: Notification.UserProfileBadgeProvider?
+    ): Unit {
+        this.userProfileBadgeProvider = userProfileBadgeProvider
+    }
+
     class AsyncInflationTask(
         private val inflationExecutor: Executor,
         private val inflateSynchronously: Boolean,
+        private val userProfileBadgeProvider: Notification.UserProfileBadgeProvider?,
         @get:InflationFlag @get:VisibleForTesting @InflationFlag val reInflateFlags: Int,
         private val remoteViewCache: NotifRemoteViewCache,
         private val entry: NotificationEntry,
@@ -410,6 +421,10 @@ constructor(
             // Ensure the ApplicationInfo is updated before a builder is recovered.
             updateApplicationInfo(sbn)
             val recoveredBuilder = Notification.Builder.recoverBuilder(context, sbn.notification)
+            // In some tests, we want to replace the static badge logic with a fake.
+            if (userProfileBadgeProvider != null) {
+                recoveredBuilder.setUserProfileBadgeProvider(userProfileBadgeProvider)
+            }
             var packageContext: Context = sbn.getPackageContext(context)
             if (recoveredBuilder.usesTemplate()) {
                 // For all of our templates, we want it to be RTL
@@ -450,12 +465,11 @@ constructor(
             inflationProgress.inflatedSingleLineView =
                 inflationProgress.contentModel.singleLineViewModel?.let {
                     SingleLineViewInflater.inflatePrivateSingleLineView(
-                        it.isConversation(),
-                        it.isMetric(),
-                        reInflateFlags,
-                        entry,
-                        context,
-                        logger,
+                        payload = it.payload,
+                        reinflateFlags = reInflateFlags,
+                        entry = entry,
+                        context = context,
+                        logger = logger,
                     )
                 }
 
@@ -463,22 +477,21 @@ constructor(
             inflationProgress.inflatedPublicSingleLineView =
                 inflationProgress.contentModel.publicSingleLineViewModel?.let { viewModel ->
                     SingleLineViewInflater.inflatePublicSingleLineView(
-                        viewModel.isConversation(),
-                        viewModel.isMetric(),
-                        reInflateFlags,
-                        entry,
-                        context,
-                        logger,
+                        payload = viewModel.payload,
+                        reinflateFlags = reInflateFlags,
+                        entry = entry,
+                        context = context,
+                        logger = logger,
                     )
                 }
 
             logger.logAsyncTaskProgress(entry.logKey, "loading RON images")
             inflationProgress.rowImageInflater.loadImagesSynchronously(packageContext)
-
             logger.logAsyncTaskProgress(
                 entry.logKey,
-                "getting row image resolver (on wrong thread!)",
+                "loaded RON images: ${inflationProgress.rowImageInflater.toDebugString()}",
             )
+
             val imageResolver = row.imageResolver
             // wait for image resolver to finish preloading
             logger.logAsyncTaskProgress(entry.logKey, "waiting for preloaded images")
@@ -519,7 +532,7 @@ constructor(
             val ident: String = (sbn.packageName + "/0x" + Integer.toHexString(sbn.id))
             Log.e(TAG, "couldn't inflate view for notification $ident", e)
             callback?.handleInflationException(
-                if (NotificationBundleUi.isEnabled) entry else row.entryLegacy,
+                entry,
                 when (e) {
                     is InflationException -> e
                     else -> InflationException("Couldn't inflate contentViews: $e")

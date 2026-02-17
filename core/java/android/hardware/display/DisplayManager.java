@@ -210,6 +210,7 @@ public final class DisplayManager {
             VIRTUAL_DISPLAY_FLAG_TOUCH_FEEDBACK_DISABLED,
             VIRTUAL_DISPLAY_FLAG_OWN_FOCUS,
             VIRTUAL_DISPLAY_FLAG_STEAL_TOP_FOCUS_DISABLED,
+            VIRTUAL_DISPLAY_FLAG_ALLOWS_CONTENT_MODE_SWITCH,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface VirtualDisplayFlag {}
@@ -488,7 +489,7 @@ public final class DisplayManager {
     /**
      * Virtual display flags: Indicates that the display maintains its own focus and touch mode.
      *
-     * This flag is similar to {@link com.android.internal.R.bool.config_perDisplayFocusEnabled} in
+     * This flag is similar to {@link com.android.internal.R.bool#config_perDisplayFocusEnabled} in
      * behavior, but only applies to the specific display instead of system-wide to all displays.
      *
      * Note: The display must be trusted in order to have its own focus.
@@ -521,6 +522,23 @@ public final class DisplayManager {
      */
     @SystemApi
     public static final int VIRTUAL_DISPLAY_FLAG_STEAL_TOP_FOCUS_DISABLED = 1 << 16;
+
+    /**
+     * Virtual display flags: Indicates that the display is allowed to switch the content mode
+     * between projected/extended and mirroring. This allows the display to dynamically add or
+     * remove the home and system decorations.
+     *
+     * Note that this flag requires {@link #VIRTUAL_DISPLAY_FLAG_PUBLIC} and
+     * {@link #VIRTUAL_DISPLAY_FLAG_TRUSTED}, and should not be enabled with either
+     * {@link #VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR}, {@link #VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY},
+     * or {@link #VIRTUAL_DISPLAY_FLAG_SHOULD_SHOW_SYSTEM_DECORATIONS} at the same time; otherwise
+     * it will be ignored.
+     *
+     * @see #createVirtualDisplay
+     * @hide
+     */
+    @FlaggedApi(com.android.server.display.feature.flags.Flags.FLAG_VIRTUAL_SECONDARY_DISPLAYS)
+    public static final int VIRTUAL_DISPLAY_FLAG_ALLOWS_CONTENT_MODE_SWITCH = 1 << 17;
 
     /** @hide */
     @IntDef(prefix = {"MATCH_CONTENT_FRAMERATE_"}, value = {
@@ -679,8 +697,7 @@ public final class DisplayManager {
             EVENT_TYPE_DISPLAY_REMOVED,
             EVENT_TYPE_DISPLAY_REFRESH_RATE,
             EVENT_TYPE_DISPLAY_STATE,
-            EVENT_TYPE_DISPLAY_BRIGHTNESS,
-            EVENT_TYPE_DISPLAY_SNAPSHOT
+            EVENT_TYPE_DISPLAY_BRIGHTNESS
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface EventType {}
@@ -759,17 +776,7 @@ public final class DisplayManager {
      *
      * @see #registerDisplayListener(Executor, long, DisplayListener)
      */
-    @FlaggedApi(Flags.FLAG_SET_BRIGHTNESS_BY_UNIT)
     public static final long EVENT_TYPE_DISPLAY_BRIGHTNESS = 1L << 5;
-
-    /**
-     * Event type to register for an initial enabled displays snapshot. This snapshot is sent
-     * through the {@link DisplayListener#onDisplayAddedSnapshot} callback method.
-     *
-     * @see #registerDisplayListener(Executor, long, DisplayListener)
-     */
-    @FlaggedApi(Flags.FLAG_DISPLAY_LISTENER_SNAPSHOT)
-    public static final long EVENT_TYPE_DISPLAY_SNAPSHOT = 1L << 6;
 
     /**
      * Event type to register for a display's hdr/sdr ratio changes. This notification is sent
@@ -810,7 +817,6 @@ public final class DisplayManager {
      * environment). When this type of used, 0 and 100 map to the current brightness minimum and
      * maximum respectively.
      */
-    @FlaggedApi(Flags.FLAG_SET_BRIGHTNESS_BY_UNIT)
     public static final int BRIGHTNESS_UNIT_PERCENTAGE = 1;
 
     /**
@@ -1704,7 +1710,6 @@ public final class DisplayManager {
      * @param value The brightness value to set
      * @param unit The unit of the brightness value
      */
-    @FlaggedApi(Flags.FLAG_SET_BRIGHTNESS_BY_UNIT)
     @RequiresPermission(Manifest.permission.WRITE_SETTINGS)
     public void setBrightness(int displayId, float value, @BrightnessUnit int unit) {
         mGlobal.setBrightness(displayId, value, unit);
@@ -1733,7 +1738,6 @@ public final class DisplayManager {
      * @param displayId The display of which brightness value to get from.
      * @param unit The unit of the brightness value
      */
-    @FlaggedApi(Flags.FLAG_SET_BRIGHTNESS_BY_UNIT)
     public float getBrightness(int displayId, @BrightnessUnit int unit) {
         return mGlobal.getBrightness(displayId, unit);
     }
@@ -2012,7 +2016,7 @@ public final class DisplayManager {
 
     /**
      * Sets the refresh rate switching type.
-     * This matches {@link android.provider.Settings.Secure.MATCH_CONTENT_FRAME_RATE}
+     * This matches {@link android.provider.Settings.Secure#MATCH_CONTENT_FRAME_RATE}
      *
      * @hide
      */
@@ -2188,7 +2192,7 @@ public final class DisplayManager {
 
     /**
      * @return The current display topology that represents the relative positions of extended
-     * displays.
+     * displays. It only includes the displays that can be reached with the mouse cursor.
      */
     @Nullable
     @FlaggedApi(Flags.FLAG_DISPLAY_TOPOLOGY_API)
@@ -2276,26 +2280,6 @@ public final class DisplayManager {
         @TestApi
         @SuppressLint("UnflaggedApi") // @TestApi without associated feature.
         default void onDisplayDisconnected(int displayId) { }
-
-        /**
-         * Called when a display connected snapshot is received. Invoked once, upon display listener
-         * registration.
-         *
-         * @param connected The ids of the logical displays that are connected.
-         * @hide
-         */
-        @TestApi
-        @FlaggedApi(Flags.FLAG_DISPLAY_LISTENER_SNAPSHOT)
-        default void onDisplayConnectedSnapshot(@NonNull int[] connected) { }
-
-        /**
-         * Called when a display added snapshot is received. Invoked once, upon display listener
-         * registration.
-         *
-         * @param added The ids of the logical displays that are added.
-         */
-        @FlaggedApi(Flags.FLAG_DISPLAY_LISTENER_SNAPSHOT)
-        default void onDisplayAddedSnapshot(@NonNull int[] added) { }
     }
 
     /**

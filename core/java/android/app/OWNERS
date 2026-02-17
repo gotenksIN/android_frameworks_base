@@ -55,6 +55,9 @@ per-file ActivityThread.java = file:RESOURCES_OWNERS
 # Alarm
 per-file *Alarm* = file:/apex/jobscheduler/ALARM_OWNERS
 
+# Ambient Context
+per-file ambient_context.aconfig = file:ambientcontext/OWNERS
+
 # AndroidForwardingOs
 per-file AndroidForwardingOs.java = file:/ACTIVITY_MANAGER_OWNERS
 per-file AndroidForwardingOS.java = file:RESOURCES_OWNERS
@@ -99,6 +102,7 @@ per-file *Notification* = file:/packages/SystemUI/OWNERS
 per-file *Zen* = file:/packages/SystemUI/OWNERS
 per-file *StatusBar* = file:/packages/SystemUI/OWNERS
 per-file *UiModeManager* = file:/packages/SystemUI/OWNERS
+per-file ui_mode_manager.aconfig = file:/packages/SystemUI/OWNERS
 per-file notification.aconfig = file:/packages/SystemUI/OWNERS
 per-file statusbar.aconfig = file:/packages/SystemUI/OWNERS
 

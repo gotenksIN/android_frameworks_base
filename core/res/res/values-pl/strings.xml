@@ -1125,6 +1125,7 @@
     <string name="lockscreen_access_pattern_cell_added_verbose" msgid="2931364927622563465">"Dodano komórkę <xliff:g id="CELL_INDEX">%1$s</xliff:g>"</string>
     <string name="lockscreen_access_pattern_detected" msgid="3931150554035194012">"Wzór ukończony"</string>
     <string name="lockscreen_access_pattern_area" msgid="1288780416685002841">"Obszar wzoru."</string>
+    <string name="lockscreen_access_pattern_cell_verbose" msgid="6670905066468035137">"Komórka <xliff:g id="CELL_INDEX">%1$s</xliff:g>"</string>
     <string name="keyguard_accessibility_widget_changed" msgid="7298011259508200234">"%1$s. Widżet %2$d z %3$d."</string>
     <string name="keyguard_accessibility_add_widget" msgid="8245795023551343672">"Dodaj widżet."</string>
     <string name="keyguard_accessibility_widget_empty_slot" msgid="544239307077644480">"Puste"</string>
@@ -2008,6 +2009,7 @@
     <string name="managed_profile_label_badge_3" msgid="6882151970556391957">"<xliff:g id="LABEL">%1$s</xliff:g> – praca 3"</string>
     <string name="clone_profile_label_badge" msgid="1871997694718793964">"Klon aplikacji <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="private_profile_label_badge" msgid="1712086003787839183">"Prywatna aplikacja <xliff:g id="LABEL">%1$s</xliff:g>"</string>
+    <string name="hsu_label_badge" msgid="1357272000281944932">"System – <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="lock_to_app_unlock_pin" msgid="3890940811866290782">"Podaj PIN, aby odpiąć"</string>
     <string name="lock_to_app_unlock_pattern" msgid="2694204070499712503">"Aby odpiąć, poproś o wzór odblokowania"</string>
     <string name="lock_to_app_unlock_password" msgid="9126722403506560473">"Aby odpiąć, poproś o hasło"</string>
@@ -2113,7 +2115,32 @@
     <string name="app_suspended_default_message" msgid="6451215678552004172">"Aplikacja <xliff:g id="APP_NAME_0">%1$s</xliff:g> nie jest teraz dostępna. Zarządza tym aplikacja <xliff:g id="APP_NAME_1">%2$s</xliff:g>."</string>
     <string name="app_suspended_more_details" msgid="211260942831587014">"Więcej informacji"</string>
     <string name="app_suspended_unsuspend_message" msgid="1665438589450555459">"Wznów działanie aplikacji"</string>
+    <string name="app_lock_add_screen_lock_button_text" msgid="9209013414563206600">"Dodaj blokadę ekranu"</string>
+    <string name="app_lock_add_screen_lock_message" msgid="6107009360675769892">"Blokada ekranu może być kodem PIN, wzorem lub hasłem. Będziesz jej używać do odblokowywania urządzenia i dostępu do zablokowanych aplikacji."</string>
+    <string name="app_lock_add_screen_lock_title" msgid="6905612843620128689">"Najpierw dodaj blokadę ekranu"</string>
+    <string name="enable_app_lock_success_toast_message" msgid="3339622779190529987">"Aplikacja <xliff:g id="APP_NAME">%1$s</xliff:g> jest zablokowana"</string>
+    <string name="enable_app_lock_failure_toast_message" msgid="1055838896510445566">"Nie można zablokować aplikacji <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
+    <string name="disable_app_lock_success_toast_message" msgid="70733620589071266">"Wyłączono blokadę aplikacji <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="locked_app_biometric_prompt_description" msgid="6853122652400451464">"Pojazd <xliff:g id="APP_NAME">%1$s</xliff:g> jest zablokowany"</string>
+    <string name="locked_app_external_display_message" msgid="5483884799685545338">"Aby uzyskać dostęp do aplikacji na tym wyświetlaczu, najpierw potwierdź swoją tożsamość na innym urządzeniu"</string>
+    <string name="app_lock_edu_dialog_enable_app_lock_title" msgid="283314042336592322">"Włączyć blokadę aplikacji <xliff:g id="APP_NAME">%1$s</xliff:g>?"</string>
+    <string name="app_lock_edu_dialog_description" msgid="8176807243219769518">"Ze względów bezpieczeństwa tylko Ty możesz uzyskać dostęp do tej aplikacji za pomocą odcisku palca, rozpoznawania twarzy lub kodu PIN"</string>
+    <string name="app_lock_edu_dialog_description_template" msgid="8563718120753342530">"Ze względów bezpieczeństwa tylko Ty możesz uzyskać dostęp do tej aplikacji za pomocą %1$s lub %2$s"</string>
+    <string name="app_lock_edu_dialog_description_template_no_biometrics" msgid="7122017109150633691">"Ze względów bezpieczeństwa tylko Ty możesz uzyskać dostęp do tej aplikacji za pomocą %1$s"</string>
+    <string name="app_lock_edu_dialog_info_header" msgid="5876120209204270990">"Gdy blokada aplikacji jest włączona"</string>
+    <string name="app_lock_edu_dialog_info_notifications" msgid="1124438392204873305">"Treść powiadomień zostanie ukryta"</string>
+    <string name="app_lock_edu_dialog_info_widgets" msgid="8809009414650740872">"Widżety i skróty zostaną usunięte"</string>
+    <string name="app_lock_edu_dialog_button_lock" msgid="3914687128135704801">"Dodaj blokadę"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_face" msgid="1348151645996748654">"Rozpoznawanie twarzy"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_fingerprint" msgid="5206107469561561455">"Odblokowywanie odciskiem palca"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_fingerprint_and_face" msgid="7895807411323811641">"Odcisk palca lub rozpoznawanie twarzy"</string>
+    <string name="app_lock_edu_dialog_lockscreen_password_name" msgid="8487096457702445059">"Hasło"</string>
+    <string name="app_lock_edu_dialog_lockscreen_pattern_name" msgid="991436996281983547">"Wzór"</string>
+    <string name="app_lock_edu_dialog_lockscreen_pin_name" msgid="6458607126966304795">"Kod PIN"</string>
+    <string name="app_lock_permission_review_dialog_title" msgid="5030286398974840579">"Zdjęcia mogą być nadal widoczne w innych aplikacjach"</string>
+    <string name="app_lock_permission_review_dialog_sub_title" msgid="310758587817184145">"Aplikacje, które mają dostęp do zdjęć"</string>
+    <string name="app_lock_permission_review_expand_app_list_button" msgid="3214809707125223273">"Wyświetl wszystkie"</string>
+    <string name="app_lock_permission_review_continue_button" msgid="4045066724173414043">"Dalej"</string>
     <string name="work_mode_off_title" msgid="6367463960165135829">"Cofnąć wstrzymanie aplikacji służbowych?"</string>
     <string name="work_mode_turn_on" msgid="5316648862401307800">"Cofnij wstrzymanie"</string>
     <string name="work_mode_emergency_call_button" msgid="6818855962881612322">"Połączenie alarmowe"</string>
@@ -2594,6 +2621,8 @@
     <string name="satellite_messaging_unsupported_default_sms_app_notification_summary" msgid="17084124893763593">"Aby wysyłać wiadomości przez satelitę, ustaw Wiadomości Google jako domyślną aplikację do obsługi SMS-ów"</string>
     <string name="satellite_messaging_location_disabled_notification_title" msgid="7270641894250928494">"Przesyłanie wiadomości przez satelitę jest niedostępne"</string>
     <string name="satellite_messaging_location_disabled_notification_summary" msgid="1450824950686221810">"Aby sprawdzić, czy przesyłanie wiadomości przez satelitę jest dostępne w tym kraju lub regionie, włącz ustawienia lokalizacji"</string>
+    <!-- no translation found for satellite_indicator (6846063647532086110) -->
+    <skip />
     <string name="fingerprint_dangling_notification_title" msgid="7362075195588639989">"Skonfiguruj ponownie odblokowywanie odciskiem palca"</string>
     <string name="fingerprint_dangling_notification_msg_1" msgid="5851784577768803510">"Ten odcisk palca (<xliff:g id="FINGERPRINT">%s</xliff:g>) nie jest już rozpoznawany."</string>
     <string name="fingerprint_dangling_notification_msg_2" msgid="7925203589860744456">"Te odciski palców (<xliff:g id="FINGERPRINT_0">%1$s</xliff:g> i <xliff:g id="FINGERPRINT_1">%2$s</xliff:g>) nie są już rozpoznawane."</string>

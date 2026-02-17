@@ -33,6 +33,7 @@ import static android.content.pm.PackageManager.MATCH_FACTORY_ONLY;
 import static android.content.pm.PackageManager.MATCH_SYSTEM_ONLY;
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
 import static android.content.pm.PackageManager.USER_MIN_ASPECT_RATIO_UNSET;
+import static android.content.pm.PackageManager.VIRTUAL_GAMEPAD_USER_OPTION_UNSET;
 import static android.crashrecovery.flags.Flags.refactorCrashrecovery;
 import static android.os.PerfettoTrace.BIG_LOCKS_V3;
 import static android.os.Process.INVALID_UID;
@@ -887,6 +888,9 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
     @GuardedBy("mKeepUninstalledPackages")
     @NonNull
     private final ArraySet<String> mKeepUninstalledPackages = new ArraySet<>();
+
+    @NonNull
+    private final ArraySet<String> mRequiredSystemPackages = new ArraySet<>();
 
     // Cached reference to IDevicePolicyManager.
     private IDevicePolicyManager mDevicePolicyManager = null;
@@ -2244,7 +2248,9 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                 }
             }
 
-            SELinuxMMAC.readInstallPolicy();
+            if (!SELinuxMMAC.readInstallPolicy()) {
+                throw new RuntimeException("Unable to load SELinux MMAC policy");
+            }
 
             t.traceBegin("loadFallbacks");
             FallbackCategoryProvider.loadFallbacks();
@@ -2525,6 +2531,9 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
 
             // Resolve the sdk sandbox package
             mRequiredSdkSandboxPackage = getRequiredSdkSandboxPackageName(computer);
+            if (Flags.protectSystemRequiredPackages()) {
+                buildRequiredSystemPackages();
+            }
             // Check that the developer verification service provider package specified in the
             // config can indeed be a verifier.
             mDeveloperVerificationServiceProvider =
@@ -4025,6 +4034,31 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         }
     }
 
+    private void buildRequiredSystemPackages() {
+        mRequiredSystemPackages.addAll(mInjector.getSystemConfig().getPreventUserDisablePackages());
+        mRequiredSystemPackages.add(mRequiredInstallerPackage);
+        mRequiredSystemPackages.add(mRequiredUninstallerPackage);
+        mRequiredSystemPackages.add(mRequiredPermissionControllerPackage);
+        mRequiredSystemPackages.add(mRequiredSdkSandboxPackage);
+    }
+
+    private boolean isRequiredSystemPackage(Computer snapshot, String pkgName) {
+        return mRequiredSystemPackages.contains(pkgName)
+                && snapshot.getPackageStateInternal(pkgName).isSystem();
+    }
+
+    private boolean canControlSystemRequiredPackages(Computer snapshot, int callingUid) {
+        return snapshot.checkUidPermission(
+                android.Manifest.permission.ALLOW_CONTROL_SYSTEM_REQUIRED_PACKAGES,
+                callingUid) == PERMISSION_GRANTED;
+    }
+
+    boolean isRequiredSystemPackageThatCallerCannotControl(
+            Computer snapshot, String pkgName, int callingUid) {
+        return isRequiredSystemPackage(snapshot, pkgName)
+                && !canControlSystemRequiredPackages(snapshot, callingUid);
+    }
+
     private void setEnabledSettings(List<ComponentEnabledSetting> settings, int userId,
             @NonNull String callingPackage) {
         final int callingUid = Binder.getCallingUid();
@@ -4140,6 +4174,20 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                         throw new SecurityException(
                                 "Shell cannot change component state for "
                                         + setting.getComponentName() + " to " + newState);
+                    }
+                }
+                if (Flags.protectSystemRequiredPackages()) {
+                    final int newState = setting.getEnabledState();
+                    if (isRequiredSystemPackageThatCallerCannotControl(
+                            preLockSnapshot, packageName, callingUid)
+                            && (newState == COMPONENT_ENABLED_STATE_DISABLED
+                                || newState == COMPONENT_ENABLED_STATE_DISABLED_USER
+                                || newState == COMPONENT_ENABLED_STATE_DISABLED_UNTIL_USED)
+                            && !setting.isComponent()) {
+                        Log.w(TAG, "Cannot disable system required package " + packageName
+                                + ", callingPackage: " + callingPackage);
+                        throw new SecurityException("Cannot disable required package "
+                                + packageName);
                     }
                 }
                 pkgSettings.put(packageName, pkgSetting);
@@ -5222,26 +5270,25 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             mHandler.post(() -> {
                 final int id = verificationId >= 0 ? verificationId : -verificationId;
                 final PackageVerificationState state = mPendingVerification.get(id);
-                if (state == null || !state.extendTimeout(callingUid)) {
-                    // Invalid uid or already extended.
+                if (state == null || !state.extendTimeout(callingUid, millisecondsToDelay)) {
+                    // Invalid uid or (when flag not enabled) already extended.
                     return;
                 }
 
                 final PackageVerificationResponse response = new PackageVerificationResponse(
                         verificationCodeAtTimeout, callingUid);
 
-                long delay = millisecondsToDelay;
-                if (delay > PackageManager.MAXIMUM_VERIFICATION_TIMEOUT) {
-                    delay = PackageManager.MAXIMUM_VERIFICATION_TIMEOUT;
-                }
-                if (delay < 0) {
-                    delay = 0;
+                if (Flags.extendVerificationTimeoutMultipleTimes()) {
+                    // Remove previous messages in the queue. Since queue is small this won't be an
+                    // expensive operation so that previously scheduled response won't take effect
+                    // before the newly extended timeout.
+                    mHandler.removeEqualMessages(PackageManagerService.PACKAGE_VERIFIED, response);
                 }
 
                 final Message msg = mHandler.obtainMessage(PackageManagerService.PACKAGE_VERIFIED);
                 msg.arg1 = id;
                 msg.obj = response;
-                mHandler.sendMessageDelayed(msg, delay);
+                mHandler.sendMessageDelayed(msg, state.getTotalDelay(callingUid));
             });
         }
 
@@ -5569,6 +5616,28 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         }
 
         @Override
+        @PackageManager.VirtualGamepadUserOption
+        public int getVirtualGamepadUserOption(@NonNull String packageName, int userId) {
+            final Computer snapshot = snapshotComputer();
+            final int callingUid = Binder.getCallingUid();
+            snapshot.enforceCrossUserPermission(
+                    callingUid, userId, false /* requireFullPermission */,
+                    false /* checkShell */, "getSplashScreenTheme");
+
+            // The user option can be read by the app itself or system apps holding the
+            // INJECT_EVENTS signature permission (system gamepad and Settings).
+            if (mPermissionManager.checkUidPermission(callingUid, Manifest.permission.INJECT_EVENTS,
+                    Context.DEVICE_ID_DEFAULT) != PERMISSION_GRANTED) {
+                enforceOwnerRights(snapshot, packageName, callingUid);
+            }
+
+            final PackageStateInternal packageState = snapshot
+                    .getPackageStateForInstalledAndFiltered(packageName, callingUid, userId);
+            return packageState == null ? VIRTUAL_GAMEPAD_USER_OPTION_UNSET
+                    : packageState.getUserStateOrDefault(userId).getVirtualGamepadUserOption();
+        }
+
+        @Override
         public Bundle getSuspendedPackageAppExtras(String packageName, int userId) {
             final int callingUid = Binder.getCallingUid();
             final Computer snapshot = snapshot();
@@ -5618,7 +5687,7 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             }
             return mAppLockPackageHelper.setPackageAppLockEnabled(
                     PackageManagerService.this::snapshotComputer, pkgName, userId, enabled,
-                    Binder.getCallingUid());
+                    Binder.getCallingUid(), Binder.getCallingPid());
         }
 
         @Override
@@ -6135,11 +6204,18 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                 return false;
             }
 
-            // Don't allow hiding "android" or SysUI as it makes device unusable.
-            if ("android".equals(packageName)
-                    || LocalServices.getService(PackageManagerInternal.class)
-                            .getSystemUiServiceComponent().getPackageName().equals(packageName)) {
-                Slog.w(TAG, "Cannot hide package: " + packageName);
+            // Don't allow hiding "android" package.
+            if ("android".equals(packageName)) {
+                Slog.w(TAG, "Cannot hide package: android");
+                return false;
+            }
+
+            // Don't allow hiding of required system packages as these are required at boot time.
+            if (Flags.protectSystemRequiredPackages()
+                    && isRequiredSystemPackageThatCallerCannotControl(
+                            snapshot, packageName, callingUid)) {
+                Slog.w(TAG, "Cannot hide package: " + packageName + " as it is required by the "
+                        + "system");
                 return false;
             }
 
@@ -6661,6 +6737,32 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
                     state.userState(userId).setMinAspectRatio(aspectRatio));
         }
 
+        @android.annotation.EnforcePermission(Manifest.permission.INJECT_EVENTS)
+        @Override
+        public void setVirtualGamepadUserOption(@NonNull String packageName, int userId,
+                @PackageManager.VirtualGamepadUserOption int userOption) {
+            setVirtualGamepadUserOption_enforcePermission();
+            final int callingUid = Binder.getCallingUid();
+            final Computer snapshot = snapshotComputer();
+            snapshot.enforceCrossUserPermission(callingUid, userId,
+                    false /* requireFullPermission */, false /* checkShell */,
+                    "setVirtualGamepadUserOption");
+
+            final PackageStateInternal packageState = snapshot
+                    .getPackageStateForInstalledAndFiltered(packageName, callingUid, userId);
+            if (packageState == null) {
+                return;
+            }
+
+            if (packageState.getUserStateOrDefault(userId).getVirtualGamepadUserOption()
+                    == userOption) {
+                return;
+            }
+
+            commitPackageStateMutation(null, packageName, state ->
+                    state.userState(userId).setVirtualGamepadUserOption(userOption));
+        }
+
         @Override
         @SuppressWarnings("GuardedBy")
         public void setRuntimePermissionsVersion(int version, @UserIdInt int userId) {
@@ -6944,7 +7046,8 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
         }
     }
 
-    private class PackageManagerInternalImpl extends PackageManagerInternalBase {
+    @VisibleForTesting
+    class PackageManagerInternalImpl extends PackageManagerInternalBase {
 
         public PackageManagerInternalImpl() {
             super(PackageManagerService.this);
@@ -7530,6 +7633,15 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             return mAppLockPackageHelper.isPackageAppLockEnabled(snapshot, packageName, userId);
         }
 
+        @Override
+        public @NonNull List<String> getAppLockEnabledPackagesForUser(int userId) {
+            if (!android.security.Flags.appLockApis()) {
+                return Collections.emptyList();
+            }
+            final Computer snapshot = snapshotComputer();
+            return mAppLockPackageHelper.getAppLockEnabledPackages(snapshot, userId);
+        }
+
         @Nullable
         @Override
         public AllowComponentAccessPolicyInfo getAllowComponentAccessPolicyInfo(
@@ -7549,6 +7661,42 @@ public class PackageManagerService implements PackageSender, TestUtilityService 
             }
 
             return PackageInfoUtils.generateAllowComponentAccessPolicyInfo(parsedPolicy);
+        }
+
+        @Override
+        public void setPersonalContextMode(@NonNull String packageName, int callingUid, int userId,
+                @PackageManager.PersonalContextMode int mode) {
+            final Computer snapshot = snapshotComputer();
+            snapshot.enforceCrossUserPermission(callingUid, userId,
+                    false /* requireFullPermission */, false /* checkShell */,
+                    "setPersonalContextMode");
+
+            final PackageStateInternal packageState = snapshot
+                    .getPackageStateForInstalledAndFiltered(packageName, callingUid, userId);
+            if (packageState == null) {
+                throw new ParcelableException(
+                        new PackageManager.NameNotFoundException(packageName));
+            }
+
+            if (packageState.getUserStateOrDefault(userId).getPersonalContextMode() == mode) {
+                return;
+            }
+
+            commitPackageStateMutation(null, packageName, state ->
+                    state.userState(userId).setPersonalContextMode(mode));
+        }
+
+        @Override
+        @PackageManager.PersonalContextMode
+        public int getPersonalContextMode(String packageName, int callingUid, int userId) {
+            final Computer snapshot = snapshotComputer();
+            final PackageStateInternal packageState = snapshot
+                    .getPackageStateForInstalledAndFiltered(packageName, callingUid, userId);
+            if (packageState == null) {
+                throw new ParcelableException(
+                        new PackageManager.NameNotFoundException(packageName));
+            }
+            return packageState.getUserStateOrDefault(userId).getPersonalContextMode();
         }
     }
 

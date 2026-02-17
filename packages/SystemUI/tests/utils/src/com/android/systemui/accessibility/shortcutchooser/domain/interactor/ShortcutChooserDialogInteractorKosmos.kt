@@ -16,9 +16,11 @@
 
 package com.android.systemui.accessibility.shortcutchooser.domain.interactor
 
+import android.content.applicationContext
 import com.android.systemui.accessibility.data.repository.accessibilityShortcutsRepository
 import com.android.systemui.broadcast.broadcastDispatcher
 import com.android.systemui.broadcast.mockBroadcastSender
+import com.android.systemui.display.data.repository.displayRepository
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.Kosmos.Fixture
 import com.android.systemui.user.data.repository.userRepository
@@ -26,10 +28,12 @@ import com.android.systemui.user.domain.interactor.fakeHeadlessSystemUserMode
 
 val Kosmos.shortcutChooserDialogInteractor by Fixture {
     ShortcutChooserDialogInteractor(
-        repository = accessibilityShortcutsRepository,
-        broadcastDispatcher = broadcastDispatcher,
-        broadcastSender = mockBroadcastSender,
-        userRepository = userRepository,
-        hsum = fakeHeadlessSystemUserMode,
+        applicationContext,
+        accessibilityShortcutsRepository,
+        displayRepository,
+        userRepository,
+        fakeHeadlessSystemUserMode,
+        broadcastDispatcher,
+        mockBroadcastSender,
     )
 }

@@ -23,29 +23,31 @@ import static android.app.appfunctions.AppFunctionException.ERROR_SYSTEM_ERROR;
 import static android.app.appfunctions.AppFunctionManagerHelper.buildCancellationSignal;
 import static android.app.appfunctions.AppFunctionManagerHelper.executionExceptionToErrorCode;
 import static android.app.appfunctions.flags.Flags.FLAG_ENABLE_APP_FUNCTION_MANAGER;
+import static android.app.appfunctions.flags.Flags.FLAG_ENABLE_APP_FUNCTION_PERMISSION_V2;
 import static android.app.appfunctions.flags.Flags.FLAG_ENABLE_DYNAMIC_APP_FUNCTIONS;
 import static android.permission.flags.Flags.FLAG_APP_FUNCTION_ACCESS_UI_ENABLED;
-import static android.permission.flags.Flags.allowlistServiceEnabled;
 
 import android.Manifest;
 import android.annotation.CallbackExecutor;
 import android.annotation.FlaggedApi;
 import android.annotation.IntDef;
 import android.annotation.NonNull;
+import android.annotation.Nullable;
 import android.annotation.RequiresPermission;
 import android.annotation.SdkConstant;
 import android.annotation.SystemApi;
 import android.annotation.SystemService;
 import android.annotation.TestApi;
 import android.annotation.UserHandleAware;
+import android.app.Activity;
 import android.app.appfunctions.AppFunctionManagerHelper.AppFunctionNotFoundException;
 import android.app.appsearch.AppSearchManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.SignedPackage;
-import android.content.pm.SignedPackageParcel;
 import android.os.Binder;
 import android.os.CancellationSignal;
+import android.os.IBinder;
 import android.os.ICancellationSignal;
 import android.os.OutcomeReceiver;
 import android.os.ParcelableException;
@@ -55,14 +57,15 @@ import android.permission.flags.Flags;
 import android.util.ArrayMap;
 import android.util.ArraySet;
 import android.util.Log;
+import java.util.Set;
 
-import com.android.internal.R;
 import com.android.internal.annotations.GuardedBy;
 
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.Executor;
@@ -82,15 +85,37 @@ import java.util.concurrent.Executor;
  * these data classes into {@link ExecuteAppFunctionRequest#getParameters()} and {@link
  * ExecuteAppFunctionResponse#getResultDocument()}.
  *
+ * <h3>Declaring App Functions</h3>
+ *
+ * <p>App functions can be declared in two ways in your {@code AndroidManifest.xml}:
+ *
+ * <ul>
+ *   <li><b>Application-level (for dynamic registration):</b> Declare these functions using a {@code
+ *       <property>} tag within the {@code <application>} element. These functions
+ *       <strong>must</strong> be registered at runtime using {@link
+ *       AppFunctionManager#registerAppFunction} API to become executable.
+ *   <li><b>Service-level (for service binding):</b> Declare these functions within a {@code
+ *       <service>} definition that extends {@link AppFunctionService}. The system automatically
+ *       handles these functions by binding to the service for execution.
+ * </ul>
+ *
  * <h3>Discovering App Functions</h3>
  *
- * <p>When there is a package change or the device starts up, the metadata of available functions is
- * indexed on-device by {@link AppSearchManager}. AppSearch stores the indexed information as an
- * {@code AppFunctionStaticMetadata} document. This document contains the {@code functionIdentifier}
- * and the schema information that the app function implements. This allows other apps and the app
- * itself to discover these functions using the AppSearch search APIs. Visibility to this metadata
- * document is based on the packages that have visibility to the app providing the app functions.
- * AppFunction SDK provides a convenient way to achieve this and is the preferred method.
+ * <p>Apps can discover available functions by querying {@link AppFunctionMetadata} using the {@link
+ * #searchAppFunctions} API.
+ *
+ * <p>{@link AppFunctionMetadata} contains info about the app function, including {@link
+ * AppFunctionName} and {@link AppFunctionSchemaMetadata}, which are required to identify and
+ * execute a function.
+ *
+ * <p>To maintain an up-to-date snapshot of {@link AppFunctionMetadata}, apps can monitor metadata
+ * updates using the {@link #observeAppFunctions} API alongside {@link #searchAppFunctions}. Updates
+ * to function metadata may happen due to a package change, or due to a runtime change; such as an
+ * invocation of {@link #setAppFunctionEnabled}.
+ *
+ * <p>Visibility to the metadata document is based on the packages that have visibility to the app
+ * providing the app functions. AppFunction SDK provides a convenient way to achieve this and is the
+ * preferred method.
  *
  * <h3>Executing App Functions</h3>
  *
@@ -357,7 +382,7 @@ public final class AppFunctionManager {
     @Retention(RetentionPolicy.SOURCE)
     public @interface EnabledState {}
 
-    private AppFunctionRegistry mRegistry = new AppFunctionRegistry();
+    private final AppFunctionRegistry mRegistry;
 
     /**
      * Creates an instance.
@@ -369,6 +394,7 @@ public final class AppFunctionManager {
     public AppFunctionManager(IAppFunctionManager service, Context context) {
         mService = service;
         mContext = context;
+        mRegistry = new AppFunctionRegistry(mContext);
     }
 
     /**
@@ -385,14 +411,21 @@ public final class AppFunctionManager {
      *     <p>If the calling app does not own the app function or does not have {@code
      *     android.permission.EXECUTE_APP_FUNCTIONS}, the execution result will contain {@code
      *     AppFunctionException.ERROR_DENIED}.
-     *     <p>If the caller only has {@code android.permission.EXECUTE_APP_FUNCTIONS}, the execution
-     *     result will contain {@code AppFunctionException.ERROR_DENIED}
+     *     <p>If the caller only has {@link Manifest.permission#EXECUTE_APP_FUNCTIONS} or {@link
+     *     Manifest.permission#EXECUTE_APP_FUNCTIONS_SYSTEM}, the execution result will contain
+     *     {@code AppFunctionException.ERROR_DENIED}
      *     <p>If the function requested for execution is disabled, then the execution result will
      *     contain {@code AppFunctionException.ERROR_DISABLED}
      *     <p>If the cancellation signal is issued, the operation is cancelled and no response is
      *     returned to the caller.
      */
-    @RequiresPermission(value = Manifest.permission.EXECUTE_APP_FUNCTIONS, conditional = true)
+    @FlaggedApi(FLAG_ENABLE_APP_FUNCTION_PERMISSION_V2)
+    @RequiresPermission(
+            anyOf = {
+                Manifest.permission.EXECUTE_APP_FUNCTIONS,
+                Manifest.permission.EXECUTE_APP_FUNCTIONS_SYSTEM
+            },
+            conditional = true)
     @UserHandleAware
     public void executeAppFunction(
             @NonNull ExecuteAppFunctionRequest request,
@@ -449,16 +482,157 @@ public final class AppFunctionManager {
     }
 
     /**
-     * Performs a one-time search for AppFunctionMetadata with the given searchSpec and notifies the
-     * given callback of the result.
+     * Retrieves the runtime state of the specified app functions.
+     *
+     * <p>This method returns the runtime state of the functions, such as whether they are currently
+     * enabled or disabled.
+     *
+     * <p>Functions that do not exist or are not visible to the calling application will be silently
+     * omitted from the result list.
+     *
+     * <p>This differs from {@link #searchAppFunctions}, which returns {@link AppFunctionMetadata}
+     * containing static properties that only change when the app package is updated.
+     *
+     * @param appFunctionNames The names of the app functions to request the state for.
+     * @param executor The executor to run the callback.
+     * @param callback The callback to receive the function state result.
+     * @see android.app.appfunctions.AppFunctionState
+     */
+    @FlaggedApi(FLAG_ENABLE_DYNAMIC_APP_FUNCTIONS)
+    @RequiresPermission(
+            anyOf = {
+                Manifest.permission.EXECUTE_APP_FUNCTIONS,
+                Manifest.permission.DISCOVER_APP_FUNCTIONS,
+                Manifest.permission.EXECUTE_APP_FUNCTIONS_SYSTEM,
+            },
+            conditional = true)
+    @UserHandleAware
+    public void getAppFunctionStates(
+            @NonNull List<AppFunctionName> appFunctionNames,
+            @NonNull @CallbackExecutor Executor executor,
+            @NonNull OutcomeReceiver<List<AppFunctionState>, Exception> callback) {
+        Objects.requireNonNull(appFunctionNames);
+        Objects.requireNonNull(executor);
+        Objects.requireNonNull(callback);
+
+        try {
+            mService.getAppFunctionStates(
+                    appFunctionNames,
+                    mContext.getPackageName(),
+                    mContext.getUserId(),
+                    new IGetAppFunctionStatesCallback.Stub() {
+                        @Override
+                        public void onSuccess(AppFunctionStateList states) {
+                            executor.execute(
+                                    () -> {
+                                        callback.onResult(states.getList());
+                                    });
+                        }
+
+                        @Override
+                        public void onError(ParcelableException exception) {
+                            executor.execute(
+                                    () -> {
+                                        if (exception.getCause() == null) {
+                                            callback.onError(
+                                                    new RuntimeException(
+                                                            "Unknown remote failure."));
+                                        } else {
+                                            callback.onError(
+                                                    new RuntimeException(exception.getCause()));
+                                        }
+                                    });
+                        }
+                    });
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Retrieves the registered app functions for the specified activities.
+     *
+     * <p>This method returns a list of {@link AppFunctionActivityState} where each entry represents
+     * a requested {@link AppFunctionActivityId} and the set of registered function names associated
+     * with it.
+     *
+     * <p>Functions that do not exist or are not visible to the calling application will be silently
+     * omitted from the result.
+     *
+     * <p>A {@link android.service.voice.VoiceInteractionSession} can convert the {@link
+     * android.service.voice.VoiceInteractionSession.ActivityId} to {@link AppFunctionActivityId}
+     * and then use this method to get the registered functions from that activity.
+     *
+     * @param activityIds The set of activity IDs to retrieve function states for.
+     * @param executor The executor to run the callback.
+     * @param callback The callback to receive the list of activity states.
+     *
+     * @see android.service.voice.VoiceInteractionSession#getAppFunctionActivityId
+     */
+    @FlaggedApi(FLAG_ENABLE_DYNAMIC_APP_FUNCTIONS)
+    @RequiresPermission(
+            anyOf = {
+                Manifest.permission.EXECUTE_APP_FUNCTIONS,
+                Manifest.permission.DISCOVER_APP_FUNCTIONS,
+                Manifest.permission.EXECUTE_APP_FUNCTIONS_SYSTEM,
+            },
+            conditional = true)
+    @UserHandleAware
+    public void getAppFunctionActivityStates(
+            @NonNull Set<AppFunctionActivityId> activityIds,
+            @NonNull @CallbackExecutor Executor executor,
+            @NonNull OutcomeReceiver<List<AppFunctionActivityState>, Exception> callback) {
+        Objects.requireNonNull(activityIds);
+        Objects.requireNonNull(executor);
+        Objects.requireNonNull(callback);
+
+        try {
+            mService.getAppFunctionActivityStates(
+                    new ArrayList<>(activityIds),
+                    mContext.getPackageName(),
+                    mContext.getUserId(),
+                    new IGetAppFunctionActivityStatesCallback.Stub() {
+                        @Override
+                        public void onSuccess(AppFunctionActivityStateList states) {
+                            executor.execute(
+                                    () -> {
+                                        callback.onResult(states.getList());
+                                    });
+                        }
+
+                        @Override
+                        public void onError(ParcelableException exception) {
+                            executor.execute(
+                                    () -> {
+                                        if (exception.getCause() == null) {
+                                            callback.onError(
+                                                    new RuntimeException(
+                                                            "Unknown remote failure."));
+                                        } else {
+                                            callback.onError(
+                                                    new RuntimeException(exception.getCause()));
+                                        }
+                                    });
+                        }
+                    });
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Performs a one-time search for {@link AppFunctionMetadata} with the given {@link
+     * AppFunctionSearchSpec} and notifies the given callback of the result.
      *
      * <p>Note that the state is not guaranteed to be the latest, as metadata can change between
      * request and execute times.
      *
      * <p>The calling app can search for:
      * <li>Functions in its own package (no permission required).
-     * <li>When holding the `android.permission.EXECUTE_APP_FUNCTIONS` permission - functions in
-     *     other packages that it is allowed to query via {@link
+     * <li>When holding the {@link Manifest.permission#EXECUTE_APP_FUNCTIONS} or {@link
+     *     Manifest.permission#DISCOVER_APP_FUNCTIONS} or {@link
+     *     Manifest.permission#EXECUTE_APP_FUNCTIONS_SYSTEM} permission - functions in other
+     *     packages that it is allowed to query via {@link
      *     android.content.pm.PackageManager#canPackageQuery}.
      *
      * @param searchSpec The spec of app functions to search for.
@@ -466,7 +640,13 @@ public final class AppFunctionManager {
      * @param callback The callback to receive the search results.
      */
     @FlaggedApi(FLAG_ENABLE_DYNAMIC_APP_FUNCTIONS)
-    @RequiresPermission(value = Manifest.permission.EXECUTE_APP_FUNCTIONS, conditional = true)
+    @RequiresPermission(
+            anyOf = {
+                Manifest.permission.EXECUTE_APP_FUNCTIONS,
+                Manifest.permission.DISCOVER_APP_FUNCTIONS,
+                Manifest.permission.EXECUTE_APP_FUNCTIONS_SYSTEM,
+            },
+            conditional = true)
     @UserHandleAware
     public void searchAppFunctions(
             @NonNull AppFunctionSearchSpec searchSpec,
@@ -510,11 +690,110 @@ public final class AppFunctionManager {
     }
 
     /**
+     * Registers an observer to monitor changes to {@link AppFunctionMetadata} for all packages that
+     * expose app functions and the caller can query.
+     *
+     * <p>When a change occurs, the registered {@link AppFunctionObserver} will be notified with
+     * information about the changed app functions.
+     *
+     * <p>The callback is only triggered by changes after its registration. Existing app functions
+     * are not reported.
+     *
+     * <p>The caller should retain a reference to the returned {@link AppFunctionObservation}, and
+     * call {@link AppFunctionObservation#cancel()} when observation is no longer required.
+     *
+     * <p>Typically, this method is used alongside {@link #searchAppFunctions} to maintain a
+     * complete, up-to-date snapshot of {@link AppFunctionMetadata}.
+     *
+     * <p>An example usage flow is:
+     *
+     * <ol>
+     *   <li>Call this method, {@link #observeAppFunctions}, to start monitoring changes for the
+     *       packages of interest, using the {@link AppFunctionObserver}.
+     *   <li>Call {@link #searchAppFunctions} to get an initial snapshot of {@link
+     *       AppFunctionMetadata}.
+     *   <li>When the observer is triggered, use the change information within it to construct a new
+     *       {@link AppFunctionSearchSpec} targeting the specific changed functions or packages.
+     *   <li>Call {@link #searchAppFunctions} again with the new spec to retrieve the full, updated
+     *       {@link AppFunctionMetadata} for the changed items and update your snapshot.
+     * </ol>
+     *
+     * <strong>Note:</strong> If app functions are reported to have changed but are not returned
+     * from {@link #searchAppFunctions}, it means that they have been removed.
+     *
+     * @param executor the executor to run the {@link AppFunctionObserver} callbacks.
+     * @param appFunctionObserver the observer to receive updates to registered app functions.
+     * @return An {@link AppFunctionObservation} used to cancel this observation.
+     * @throws IllegalStateException if {@code appFunctionObserver} is already registered.
+     */
+    @FlaggedApi(FLAG_ENABLE_DYNAMIC_APP_FUNCTIONS)
+    @RequiresPermission(
+            anyOf = {
+                Manifest.permission.EXECUTE_APP_FUNCTIONS,
+                Manifest.permission.DISCOVER_APP_FUNCTIONS,
+                Manifest.permission.EXECUTE_APP_FUNCTIONS_SYSTEM,
+            },
+            conditional = true)
+    @UserHandleAware
+    @NonNull
+    public AppFunctionObservation observeAppFunctions(
+            @NonNull @CallbackExecutor Executor executor,
+            @NonNull AppFunctionObserver appFunctionObserver) {
+        Objects.requireNonNull(executor);
+        Objects.requireNonNull(appFunctionObserver);
+
+        AppFunctionAidlSearchSpec aidlSearchSpec =
+                new AppFunctionAidlSearchSpec(
+                        mContext.getPackageName(),
+                        new AppFunctionSearchSpec.Builder().build(),
+                        mContext.getUserId());
+
+        IObserveAppFunctionChangesCallback internalCallback =
+                new IObserveAppFunctionChangesCallback.Stub() {
+                    @Override
+                    public void onPackagesChanged(List<String> packageNames) {
+                        executor.execute(
+                                () ->
+                                        appFunctionObserver.onAppFunctionMetadataChanged(
+                                                new ArraySet<>(packageNames)));
+                    }
+
+                    @Override
+                    public void onAppFunctionStatesChanged(
+                            List<AppFunctionName> changedFunctionNames) {
+                        executor.execute(
+                                () ->
+                                        appFunctionObserver.onAppFunctionStatesChanged(
+                                                new ArraySet<>(changedFunctionNames)));
+                    }
+                };
+
+        final AppFunctionObservation observation =
+                () -> {
+                    try {
+                        mService.unregisterAppFunctionObserver(
+                                mContext.getPackageName(), mContext.getUser(), internalCallback);
+                    } catch (RemoteException e) {
+                        throw e.rethrowFromSystemServer();
+                    }
+                };
+
+        try {
+            mService.observeAppFunctions(aidlSearchSpec, internalCallback);
+            return observation;
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
      * Returns a boolean through a callback, indicating whether the app function is enabled.
      *
      * <p>This method can only check app functions owned by the caller, or those where the caller
      * has visibility to the owner package and holds the {@link
-     * Manifest.permission#EXECUTE_APP_FUNCTIONS} permission.
+     * Manifest.permission#EXECUTE_APP_FUNCTIONS} or {@link
+     * Manifest.permission#DISCOVER_APP_FUNCTIONS} or {@link
+     * Manifest.permission#EXECUTE_APP_FUNCTIONS_SYSTEM} permission.
      *
      * <p>If the operation fails, the callback's {@link OutcomeReceiver#onError} is called with
      * errors:
@@ -531,7 +810,14 @@ public final class AppFunctionManager {
      * @param executor the executor to run the request
      * @param callback the callback to receive the function enabled check result
      */
-    @RequiresPermission(value = Manifest.permission.EXECUTE_APP_FUNCTIONS, conditional = true)
+    @FlaggedApi(FLAG_ENABLE_APP_FUNCTION_PERMISSION_V2)
+    @RequiresPermission(
+            anyOf = {
+                Manifest.permission.EXECUTE_APP_FUNCTIONS,
+                Manifest.permission.DISCOVER_APP_FUNCTIONS,
+                Manifest.permission.EXECUTE_APP_FUNCTIONS_SYSTEM,
+            },
+            conditional = true)
     public void isAppFunctionEnabled(
             @NonNull String functionIdentifier,
             @NonNull String targetPackage,
@@ -543,10 +829,46 @@ public final class AppFunctionManager {
     /**
      * Registers an {@link AppFunction}.
      *
-     * <p>Use this method to provide a runtime implementation for an app function. This is intended
-     * for functions that are declared in an XML resource file for system discovery, but that do not
-     * specify a {@code <service>} to handle their execution. This allows for lightweight,
-     * in-process function handling while the app is running.
+     * <p>Use this method to provide a runtime implementation for an app function that is declared
+     * at the application level in your manifest's XML resources. This approach is designed for
+     * lightweight, in-process handling of function calls and requires the app to be running to
+     * execute.
+     *
+     * <p>To register multiple functions at once in a single, batched call, consider using {@link
+     * #registerAppFunctions(List)} as a more efficient alternative.
+     *
+     * <h3>Function Scoping and Context</h3>
+     *
+     * <p>The behavior of this method depends on the {@link AppFunctionMetadata#getScope()} defined
+     * for the function in the app's XML resource:
+     *
+     * <ul>
+     *   <li><b>{@link AppFunctionMetadata#SCOPE_GLOBAL}:</b> Only one implementation can be
+     *       registered for a given {@code functionIdentifier} across the entire application.
+     *       Subsequent registration attempts without unregistering the existing one will throw an
+     *       {@link IllegalStateException}.
+     *   <li><b>{@link AppFunctionMetadata#SCOPE_ACTIVITY}:</b> This method <b>must</b> be called on
+     *       an {@link AppFunctionManager} that was created from an {@link android.app.Activity}
+     *       context. The registration is tied to that specific Activity instance via its {@link
+     *       android.app.appfunctions.AppFunctionActivityId}. This allows multiple instances of the
+     *       same function to be registered simultaneously (e.g., if the same Activity is open in
+     *       split-screen), each associated with its own context.
+     * </ul>
+     *
+     * <h3>Function Execution</h3>
+     *
+     * <p>While the function is registered, a call to {@link AppFunctionManager#executeAppFunction}
+     * with the app's package name and the provided {@code functionId} in the request will be routed
+     * to the {@link AppFunction} implementation provided here. The implementation will be invoked
+     * on the provided {@link Executor}.
+     *
+     * <p><b>Note:</b> For activity-scoped functions, the calling agent must provide the
+     * corresponding {@link android.app.appfunctions.AppFunctionActivityId} in the execution request
+     * to ensure the call is routed to the correct Activity instance, otherwise the execution will
+     * fail with {@link AppFunctionException#ERROR_NOT_FOUND}.
+     *
+     * <p>If an application-level function is called but no implementation is currently registered,
+     * the execution will fail with {@link AppFunctionException#ERROR_DISABLED}.
      *
      * <h3>Lifecycle management</h3>
      *
@@ -561,33 +883,80 @@ public final class AppFunctionManager {
      * typically done within a component's lifecycle, such as in {@link
      * android.app.Activity#onStop()}.
      *
-     * <p>Only one {@link AppFunction} can be registered for a given {@code functionId} per app.
-     * Attempting to register a second implementation for the same ID without first unregistering
-     * the original will throw an {@link IllegalStateException}.
+     * <h3>Error Handling</h3>
      *
-     * <h3>Function Execution</h3>
+     * <p>Only one implementation can be registered for a given {@code functionId} at a time.
+     * Attempting to register a new implementation without unregistering the existing one will throw
+     * an {@link IllegalStateException}.
      *
-     * <p>While the function is registered, a call to {@link AppFunctionManager#executeAppFunction}
-     * with the app's package name and the provided {@code functionId} in the request will be routed
-     * to the {@link AppFunction} implementation provided here. The implementation will be invoked
-     * on the provided {@link Executor}.
+     * <p>The {@code functionId} must correspond to an app function declared in your app's
+     * application-level XML resources. If the ID is not found, this method will throw an {@link
+     * IllegalArgumentException}.
      *
-     * @param functionId The unique identifier for the function, which must match an entry in the
-     *     app's XML resource declarations.
+     * @param functionIdentifier The unique identifier for the function, which must match an entry
+     *     in the app's XML resource declarations.
      * @param executor The {@link Executor} on which the function will be invoked.
      * @param appFunction The {@link AppFunction} implementation to be executed when the function is
      *     triggered.
      * @return A {@link AppFunctionRegistration} object that can be used to unregister the function.
      * @throws IllegalStateException if a function with the same {@code functionId} is already
      *     registered by this app.
+     * @throws IllegalArgumentException if the provided {@code functionId} is not declared in the
+     *     app's application-level XML resources or if an activity-scoped function is registered
+     *     from a non-Activity context.
      */
     @NonNull
     @FlaggedApi(FLAG_ENABLE_DYNAMIC_APP_FUNCTIONS)
     public AppFunctionRegistration registerAppFunction(
-            @NonNull String functionId,
+            @NonNull String functionIdentifier,
             @NonNull Executor executor,
             @NonNull AppFunction appFunction) {
-        return mRegistry.register(functionId, executor, appFunction);
+        return mRegistry.register(
+                List.of(new RegisterAppFunctionRequest(functionIdentifier, executor, appFunction)));
+    }
+
+    /**
+     * Registers several {@link AppFunction} implementations at once, sharing a single lifecycle.
+     *
+     * <p>This is a more efficient alternative to calling {@link #registerAppFunction(String,
+     * Executor, AppFunction)} multiple times.
+     *
+     * <h3>Behavior and Lifecycle</h3>
+     *
+     * <p>Each function registered through this method follows the same execution and lifecycle
+     * rules as those registered individually. For detailed information on function execution,
+     * lifecycle management, and error handling, see the documentation for {@link
+     * #registerAppFunction(String, Executor, AppFunction)}.
+     *
+     * <h3>Batch Operation and Atomicity</h3>
+     *
+     * <p>The registration is atomic: either all functions in the provided list are registered
+     * successfully, or none are. If any function in the list fails validation (e.g., its ID is
+     * already registered or not declared in the manifest), this method will throw an exception, and
+     * no functions from the batch will be registered. Each function in the request follows the
+     * scoping rules declared in the app's XML resources.
+     *
+     * <p>A single {@link AppFunctionRegistration} object is returned, which can be used to
+     * unregister the entire batch of functions with one call.
+     *
+     * @param requests A list of {@link RegisterAppFunctionRequest} objects, each specifying a
+     *     function to be registered.
+     * @return A single {@link AppFunctionRegistration} object that can be used to unregister all
+     *     the functions in the batch with one call.
+     * @throws IllegalStateException if any function in the {@code requests} list has an ID that is
+     *     already registered by this app.
+     * @throws IllegalArgumentException if any function ID in the {@code requests} list is not
+     *     declared in the app's application-level XML resources or the {@code requests} list is
+     *     empty.
+     */
+    @NonNull
+    @FlaggedApi(FLAG_ENABLE_DYNAMIC_APP_FUNCTIONS)
+    public AppFunctionRegistration registerAppFunctions(
+            @NonNull List<RegisterAppFunctionRequest> requests) {
+        if (requests.isEmpty()) {
+            throw new IllegalArgumentException("No functions provided.");
+        }
+        return mRegistry.register(requests);
     }
 
     /**
@@ -668,6 +1037,11 @@ public final class AppFunctionManager {
         Objects.requireNonNull(targetPackage);
         Objects.requireNonNull(executor);
         Objects.requireNonNull(callback);
+        if (android.app.appfunctions.flags.Flags.enableDynamicAppFunctions()) {
+            isAppFunctionEnabledInternal2(functionIdentifier, targetPackage, executor, callback);
+            return;
+        }
+
         AppSearchManager appSearchManager = mContext.getSystemService(AppSearchManager.class);
         if (appSearchManager == null) {
             callback.onError(new IllegalStateException("Failed to get AppSearchManager."));
@@ -700,10 +1074,50 @@ public final class AppFunctionManager {
                 callbackWithExceptionInterceptor);
     }
 
+    private void isAppFunctionEnabledInternal2(
+            @NonNull String functionIdentifier,
+            @NonNull String targetPackage,
+            @NonNull Executor executor,
+            @NonNull OutcomeReceiver<Boolean, Exception> callback) {
+        Objects.requireNonNull(functionIdentifier);
+        Objects.requireNonNull(targetPackage);
+        Objects.requireNonNull(executor);
+        Objects.requireNonNull(callback);
+
+        try {
+            mService.isAppFunctionEnabled(
+                    mContext.getPackageName(),
+                    targetPackage,
+                    functionIdentifier,
+                    mContext.getUser(),
+                    new IIsAppFunctionEnabledCallback.Stub() {
+                        @Override
+                        public void onSuccess(boolean isEnabled) {
+                            callback.onResult(isEnabled);
+                        }
+
+                        @Override
+                        public void onError(ParcelableException exception) {
+                            Throwable cause =
+                                    (exception.getCause() == null)
+                                            ? exception
+                                            : exception.getCause();
+                            if (cause instanceof AppFunctionNotFoundException) {
+                                callback.onError(new IllegalArgumentException(cause));
+                            } else {
+                                callback.onError(new RuntimeException(cause));
+                            }
+                        }
+                    });
+        } catch (RemoteException re) {
+            re.rethrowFromSystemServer();
+        }
+    }
+
     /**
      * Checks whether the given agent has access to app functions of the given target app, or if the
      * access is not {@link #getAccessRequestState(String) valid}. Requires the {@link
-     * Manifest.permission.MANAGE_APP_FUNCTION_ACCESS} permission if the {@code agentPackageName} is
+     * Manifest.permission#MANAGE_APP_FUNCTION_ACCESS} permission if the {@code agentPackageName} is
      * not the calling app.
      *
      * @param agentPackageName The package name of the agent
@@ -733,7 +1147,7 @@ public final class AppFunctionManager {
      * Checks whether the calling app has access to app functions of the given target app, for the
      * given users, or if the access is invalid (not able to be requested). An access is valid if:
      * 1. The agent (calling app) and target apps are both installed, and the agent has visibility
-     * of the target. 2. The agent has the {@link Manifest.permission.EXECUTE_APP_FUNCTIONS}
+     * of the target. 2. The agent has the {@link Manifest.permission#EXECUTE_APP_FUNCTIONS}
      * permission granted. 3. The agent is allowlisted by the system. 4. The target has an
      * AppFunctionService.
      *
@@ -877,24 +1291,6 @@ public final class AppFunctionManager {
     }
 
     /**
-     * Gets the configured list of package names that should be grouped as Device Settings.
-     *
-     * <p>The list here is a configuration, the returned packages are not necessarily installed. The
-     * package names here must refer to system apps.
-     *
-     * @hide
-     */
-    @TestApi
-    @FlaggedApi(Flags.FLAG_APP_FUNCTION_ACCESS_API_ENABLED)
-    @NonNull
-    public Set<String> getDeviceSettingPackages() {
-        final String[] deviceSettingPackages =
-                mContext.getResources()
-                        .getStringArray(R.array.config_appFunctionDeviceSettingsPackages);
-        return new ArraySet<>(deviceSettingPackages);
-    }
-
-    /**
      * Gets the current agent allowlist
      *
      * @hide
@@ -903,22 +1299,7 @@ public final class AppFunctionManager {
     @RequiresPermission(MANAGE_APP_FUNCTION_ACCESS)
     @FlaggedApi(Flags.FLAG_APP_FUNCTION_ACCESS_API_ENABLED)
     public @NonNull List<SignedPackage> getAgentAllowlist() {
-        try {
-            if (allowlistServiceEnabled()) {
-                List<SignedPackage> packages = mService.getAgentAllowlist();
-                return packages;
-            } else {
-                List<SignedPackageParcel> packageParcels = mService.getAgentAllowlistLegacy();
-                int packageParcelsSize = packageParcels.size();
-                List<SignedPackage> packages = new ArrayList<>(packageParcelsSize);
-                for (int i = 0; i < packageParcelsSize; i++) {
-                    packages.add(new SignedPackage(packageParcels.get(i)));
-                }
-                return packages;
-            }
-        } catch (RemoteException e) {
-            throw e.rethrowFromSystemServer();
-        }
+        return new ArrayList<>();
     }
 
     /**
@@ -1027,9 +1408,10 @@ public final class AppFunctionManager {
     private class AppFunctionRegistry {
         private final Object mLock = new Object();
 
+        private final IBinder mActivityToken;
+
         @GuardedBy("mLock")
-        private final ArrayMap<String, AppFunctionRegistrationImpl> mRegistrations =
-                new ArrayMap<>();
+        private final ArrayMap<String, RegistrationRecord> mRegistrations = new ArrayMap<>();
 
         private final IAppFunctionExecutor.Stub mExecutor =
                 new IAppFunctionExecutor.Stub() {
@@ -1039,7 +1421,7 @@ public final class AppFunctionManager {
                             ICancellationCallback cancellationCallback,
                             IExecuteAppFunctionCallback callback)
                             throws RemoteException {
-                        AppFunctionRegistrationImpl registration;
+                        RegistrationRecord registration;
                         synchronized (mLock) {
                             registration = mRegistrations.get(request.getFunctionIdentifier());
                         }
@@ -1059,98 +1441,119 @@ public final class AppFunctionManager {
                     }
                 };
 
-        AppFunctionRegistrationImpl register(
-                String functionId, Executor executor, AppFunction function) {
+        AppFunctionRegistry(Context context) {
+            if (context instanceof Activity) {
+                mActivityToken = context.getActivityToken();
+            } else {
+                mActivityToken = null;
+            }
+        }
+
+        AppFunctionRegistration register(List<RegisterAppFunctionRequest> requests) {
             // This lock is held during the IPC call to the system server. This is a deliberate
             // choice to synchronize registration requests from multiple threads within this
             // process. The server-side implementation is also synchronized, preventing deadlocks
             // and ensuring that registrations are handled atomically across the entire system.
             synchronized (mLock) {
-                if (mRegistrations.containsKey(functionId)) {
-                    throw new IllegalStateException(
-                            "Function id " + functionId + " already registered");
+                ArrayMap<String, RegistrationRecord> batchRegistration =
+                        new ArrayMap<>(requests.size());
+                ArrayList<String> functionIds = new ArrayList<>(requests.size());
+                for (RegisterAppFunctionRequest request : requests) {
+                    if (mRegistrations.containsKey(request.getFunctionIdentifier())) {
+                        throw new IllegalStateException(
+                                "Function id "
+                                        + request.getFunctionIdentifier()
+                                        + " is already registered");
+                    }
+                    if (batchRegistration.containsKey(request.getFunctionIdentifier())) {
+                        throw new IllegalArgumentException(
+                                "Function ids must be unique in the registration requests list.");
+                    }
+                    batchRegistration.put(
+                            request.getFunctionIdentifier(), new RegistrationRecord(request));
+                    functionIds.add(request.getFunctionIdentifier());
                 }
+
                 try {
-                    mService.registerAppFunction(mContext.getPackageName(), functionId, mExecutor);
+                    mService.registerAppFunctions(
+                            mContext.getPackageName(), functionIds, mExecutor, mActivityToken);
                 } catch (RemoteException e) {
                     throw e.rethrowFromSystemServer();
                 }
-                final AppFunctionRegistrationImpl registration =
-                        new AppFunctionRegistrationImpl(functionId, executor, function);
-                mRegistrations.put(functionId, registration);
-                return registration;
+                mRegistrations.putAll(batchRegistration);
+                return () -> unregister(batchRegistration);
             }
         }
 
-        void unregister(
-                @NonNull String functionId, @NonNull AppFunctionRegistrationImpl registration) {
+        void unregister(@NonNull ArrayMap<String, RegistrationRecord> batchRegistrations) {
             synchronized (mLock) {
-                if (mRegistrations.get(functionId) != registration) {
-                    return;
+                List<String> functionIdsToUnregister = new ArrayList<>(batchRegistrations.size());
+                for (Map.Entry<String, RegistrationRecord> entry : batchRegistrations.entrySet()) {
+                    String functionId = entry.getKey();
+                    if (mRegistrations.get(functionId) != entry.getValue()) {
+                        continue;
+                    }
+                    functionIdsToUnregister.add(functionId);
                 }
-
                 try {
-                    mService.unregisterAppFunction(
-                            mContext.getPackageName(), functionId, mExecutor);
+                    mService.unregisterAppFunctions(
+                            mContext.getPackageName(),
+                            functionIdsToUnregister,
+                            mExecutor,
+                            mActivityToken);
                 } catch (RemoteException e) {
                     throw e.rethrowFromSystemServer();
                 }
-                mRegistrations.remove(functionId);
+                mRegistrations.removeAll(functionIdsToUnregister);
+            }
+        }
+
+        private static class RegistrationRecord {
+            private final AppFunction mAppFunction;
+            private final Executor mExecutor;
+
+            RegistrationRecord(RegisterAppFunctionRequest request) {
+                mAppFunction = request.getAppFunction();
+                mExecutor = request.getExecutor();
+            }
+
+            void onExecuteFunction(
+                    ExecuteAppFunctionRequest request,
+                    CancellationSignal cancelSignal,
+                    IExecuteAppFunctionCallback callback) {
+                SafeOneTimeExecuteAppFunctionCallback safeCallback =
+                        new SafeOneTimeExecuteAppFunctionCallback(callback);
+                mExecutor.execute(
+                        () -> {
+                            try {
+                                mAppFunction.onExecuteAppFunction(
+                                        request,
+                                        cancelSignal,
+                                        new OutcomeReceiver<>() {
+                                            @Override
+                                            public void onResult(
+                                                    ExecuteAppFunctionResponse result) {
+                                                safeCallback.onResult(result);
+                                            }
+
+                                            @Override
+                                            public void onError(
+                                                    @NonNull AppFunctionException exception) {
+                                                safeCallback.onError(exception);
+                                            }
+                                        });
+                            } catch (Exception ex) {
+                                safeCallback.onError(
+                                        new AppFunctionException(
+                                                executionExceptionToErrorCode(ex),
+                                                ex.getMessage()));
+                            }
+                        });
             }
         }
     }
 
-    private class AppFunctionRegistrationImpl implements AppFunctionRegistration {
-        private final String mFunctionId;
-        private final AppFunction mFunction;
-        private final Executor mExecutor;
-
-        AppFunctionRegistrationImpl(String functionId, Executor executor, AppFunction function) {
-            this.mFunctionId = functionId;
-            this.mFunction = function;
-            this.mExecutor = executor;
-        }
-
-        @Override
-        public void unregister() {
-            mRegistry.unregister(mFunctionId, this);
-        }
-
-        void onExecuteFunction(
-                ExecuteAppFunctionRequest request,
-                CancellationSignal cancelSignal,
-                IExecuteAppFunctionCallback callback) {
-            SafeOneTimeExecuteAppFunctionCallback safeCallback =
-                    new SafeOneTimeExecuteAppFunctionCallback(callback);
-            mExecutor.execute(
-                    () -> {
-                        try {
-                            mFunction.onExecuteAppFunction(
-                                    request,
-                                    cancelSignal,
-                                    new OutcomeReceiver<
-                                            ExecuteAppFunctionResponse, AppFunctionException>() {
-                                        @Override
-                                        public void onResult(ExecuteAppFunctionResponse result) {
-                                            safeCallback.onResult(result);
-                                        }
-
-                                        @Override
-                                        public void onError(
-                                                @NonNull AppFunctionException exception) {
-                                            safeCallback.onError(exception);
-                                        }
-                                    });
-                        } catch (Exception ex) {
-                            safeCallback.onError(
-                                    new AppFunctionException(
-                                            executionExceptionToErrorCode(ex), ex.getMessage()));
-                        }
-                    });
-        }
-    }
-
-    private static class CallbackWrapper extends IAppFunctionEnabledCallback.Stub {
+    private static class CallbackWrapper extends ISetAppFunctionEnabledCallback.Stub {
 
         private final OutcomeReceiver<Void, Exception> mCallback;
         private final Executor mExecutor;

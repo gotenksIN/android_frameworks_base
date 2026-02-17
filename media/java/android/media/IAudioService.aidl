@@ -19,6 +19,9 @@ package android.media;
 import android.bluetooth.BluetoothDevice;
 import android.content.ComponentName;
 import android.content.AttributionSource;
+import android.media.audio.IAudioModeSession;
+import android.media.audio.IAudioModeSessionCallback;
+import android.media.audio.AudioModeSessionRequest;
 import android.media.AudioAttributes;
 import android.media.AudioDeviceAttributes;
 import android.media.AudioFormat;
@@ -512,7 +515,12 @@ interface IAudioService {
     @EnforcePermission("MODIFY_AUDIO_ROUTING")
     List<AudioDeviceAttributes> getNonDefaultDevicesForStrategy(in int strategy);
 
+    @EnforcePermission(anyOf = {"MODIFY_AUDIO_ROUTING", "QUERY_AUDIO_STATE", "MODIFY_AUDIO_SETTINGS_PRIVILEGED"})
     List<AudioDeviceAttributes> getDevicesForAttributes(in AudioAttributes attributes);
+
+    @EnforcePermission(anyOf = {"MODIFY_AUDIO_ROUTING", "QUERY_AUDIO_STATE", "MODIFY_AUDIO_SETTINGS_PRIVILEGED"})
+    List<AudioDeviceAttributes> getDevicesForAttributesAndUid(in AudioAttributes attributes,
+            in int uid);
 
     List<AudioDeviceAttributes> getDevicesForAttributesUnprotected(in AudioAttributes attributes);
 
@@ -538,7 +546,7 @@ interface IAudioService {
     oneway void unregisterStrategyNonDefaultDevicesDispatcher(
             IStrategyNonDefaultDevicesDispatcher dispatcher);
 
-    oneway void setRttEnabled(in boolean rttEnabled);
+    void setRttEnabled(in boolean rttEnabled);
 
     @EnforcePermission(anyOf = {"MODIFY_AUDIO_ROUTING", "MODIFY_AUDIO_SETTINGS_PRIVILEGED"})
     void setDeviceVolumeBehavior(in AudioDeviceAttributes device,
@@ -816,6 +824,7 @@ interface IAudioService {
             in AudioAttributes aa, int portId, in AudioMixerAttributes mixerAttributes);
     @JavaPassthrough(annotation="@android.annotation.RequiresPermission(android.Manifest.permission.MODIFY_AUDIO_SETTINGS)")
     int clearPreferredMixerAttributes(in AudioAttributes aa, int portId);
+    AudioMixerAttributes getPreferredMixerAttributes(in AudioAttributes attributes, int portId);
     void registerPreferredMixerAttributesDispatcher(
             IPreferredMixerAttributesDispatcher dispatcher);
     oneway void unregisterPreferredMixerAttributesDispatcher(
@@ -866,9 +875,28 @@ interface IAudioService {
 
     @EnforcePermission("MODIFY_AUDIO_SETTINGS_PRIVILEGED")
     @JavaPassthrough(annotation="@android.annotation.RequiresPermission(android.Manifest.permission.MODIFY_AUDIO_SETTINGS_PRIVILEGED)")
-    void setEnableHardening(in boolean shouldEnable);
+    void setHardeningOverride(in int hardeningOverride);
 
     @EnforcePermission("BLUETOOTH_PRIVILEGED")
     @JavaPassthrough(annotation="@android.annotation.RequiresPermission(android.Manifest.permission.BLUETOOTH_PRIVILEGED)")
     boolean isScoManagedByAudio();
+
+    @EnforcePermission(anyOf = {"MODIFY_AUDIO_ROUTING", "MODIFY_AUDIO_SETTINGS_PRIVILEGED"})
+    int setProductStrategiesZoneIdForUser(in UserHandle userHandle, int zoneId);
+
+    @EnforcePermission(anyOf = {"MODIFY_AUDIO_ROUTING", "MODIFY_AUDIO_SETTINGS_PRIVILEGED"})
+    int resetProductStrategiesZoneIdForUser(in UserHandle userHandle);
+
+    @EnforcePermission(anyOf = {"MODIFY_AUDIO_ROUTING", "QUERY_AUDIO_STATE", "MODIFY_AUDIO_SETTINGS_PRIVILEGED"})
+    UserHandle getUserHandleForZoneId(int zoneId);
+
+
+    @EnforcePermission(anyOf = {"MODIFY_AUDIO_ROUTING", "QUERY_AUDIO_STATE", "MODIFY_AUDIO_SETTINGS_PRIVILEGED"})
+    int getZoneIdForAudioVolumeGroupId(int groupId);
+
+    int getDirectPlaybackSupport(in AudioFormat format, in AudioAttributes attributes);
+
+    @EnforcePermission("MODIFY_PHONE_STATE")
+    IAudioModeSession createAudioModeSession(in AudioModeSessionRequest request,
+            in IAudioModeSessionCallback callback);
 }

@@ -75,21 +75,20 @@ constructor(
                 keyguardClockViewModel.clockEventController.smallClockBounds
                     .collectAsStateWithLifecycle()
 
-            // Horizontal Padding is handled internally within the SmartspaceCards element. This
-            // makes the application here to other elements in the hierarchy slightly awkward.
-            val xPadding = dimensionResource(clocksR.dimen.clock_padding_start)
+            val clockXPadding = dimensionResource(clocksR.dimen.small_clock_horizontal_padding)
+            val smartspaceXPadding = dimensionResource(R.dimen.smartspace_padding_horizontal)
+            val clockTopPadding = dimensionResource(R.dimen.keyguard_clock_top_margin)
 
             Column {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier =
-                        Modifier.padding(horizontal = xPadding)
-                            .padding(top = dimensionResource(R.dimen.keyguard_clock_top_margin)),
+                    modifier = Modifier.padding(top = clockTopPadding),
                 ) {
                     with(LocalDensity.current) {
                         LockscreenElement(
                             Clock.Small,
-                            Modifier.widthIn(min = clockBounds.width.toDp())
+                            Modifier.padding(horizontal = clockXPadding)
+                                .widthIn(min = clockBounds.width.toDp())
                                 .heightIn(
                                     min = clockBounds.height.toDp(),
                                     max = dimensionResource(clocksR.dimen.small_clock_height),
@@ -100,10 +99,7 @@ constructor(
                     if (!shouldDateWeatherBeBelowSmallClock) {
                         LockscreenElement(
                             Smartspace.DWA.SmallClock.Column,
-                            Modifier.padding(
-                                horizontal =
-                                    dimensionResource(R.dimen.smartspace_padding_horizontal)
-                            ),
+                            Modifier.padding(horizontal = smartspaceXPadding),
                         )
                     }
                 }
@@ -111,7 +107,7 @@ constructor(
                 if (shouldDateWeatherBeBelowSmallClock) {
                     LockscreenElement(
                         Smartspace.DWA.SmallClock.Row,
-                        Modifier.padding(horizontal = xPadding),
+                        Modifier.padding(horizontal = smartspaceXPadding),
                     )
                 }
 
@@ -134,10 +130,6 @@ constructor(
                 keyguardClockViewModel.clockEventController.largeClockBounds
                     .collectAsStateWithLifecycle()
 
-            // Horizontal Padding is handled internally within the SmartspaceCards element. This
-            // makes the application here to other elements in the hierarchy slightly awkward.
-            val xPadding = dimensionResource(clocksR.dimen.clock_padding_start)
-
             Column(
                 horizontalAlignment = Alignment.Start,
                 verticalArrangement = Arrangement.Top,
@@ -151,10 +143,7 @@ constructor(
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     if (!shouldDateWeatherBeBelowLargeClock) {
-                        LockscreenElement(
-                            Smartspace.DWA.LargeClock.Above,
-                            Modifier.padding(horizontal = xPadding),
-                        )
+                        LockscreenElement(Smartspace.DWA.LargeClock.Above)
                     }
 
                     LockscreenElement(
@@ -175,7 +164,7 @@ constructor(
                             dimensionResource(R.dimen.smartspace_padding_vertical),
                             Alignment.CenterVertically,
                         ),
-                    modifier = Modifier.padding(horizontal = xPadding).fillMaxWidth().weight(1f),
+                    modifier = Modifier.fillMaxWidth().weight(1f),
                 ) {
                     with(LocalDensity.current) {
                         LockscreenElement(

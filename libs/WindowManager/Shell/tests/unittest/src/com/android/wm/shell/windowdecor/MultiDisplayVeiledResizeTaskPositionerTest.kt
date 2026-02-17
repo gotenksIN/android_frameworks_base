@@ -104,6 +104,7 @@ class MultiDisplayVeiledResizeTaskPositionerTest : ShellTestCase() {
     private val mockDesktopTasksController = mock<DesktopTasksController>()
     private val mockDesktopUserRepositories = mock<DesktopUserRepositories>()
     private val mockDesktopRepository = mock<DesktopRepository>()
+    private val mockResizeBinder = mock<IBinder>()
     private lateinit var resources: TestableResources
     private lateinit var spyDisplayLayout0: DisplayLayout
     private lateinit var spyDisplayLayout1: DisplayLayout
@@ -167,6 +168,7 @@ class MultiDisplayVeiledResizeTaskPositionerTest : ShellTestCase() {
         whenever(mockWindowDecoration.display).thenReturn(mockDisplay)
         whenever(mockDisplay.displayId).thenAnswer { DISPLAY_ID_0 }
         whenever(mockDesktopUserRepositories.getProfile(anyInt())).thenReturn(mockDesktopRepository)
+        whenever(mockTransitions.startTransition(any(), any(), any())).thenReturn(mockResizeBinder)
 
         taskPositioner =
             MultiDisplayVeiledResizeTaskPositioner(
@@ -515,9 +517,6 @@ class MultiDisplayVeiledResizeTaskPositionerTest : ShellTestCase() {
         whenever(mockDesktopRepository.getBoundsBeforeSnapOrMaximize(TASK_ID))
             .thenReturn(prevBounds)
 
-        val mockResizeBinder = mock<IBinder>()
-        whenever(mockTransitions.startTransition(any(), any(), any())).thenReturn(mockResizeBinder)
-
         val dragStartX = 150f
         val dragStartY = 150f
         taskPositioner.onDragPositioningStart(
@@ -748,6 +747,34 @@ class MultiDisplayVeiledResizeTaskPositionerTest : ShellTestCase() {
                     }
                 }
             )
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_MOVE_TASK_TO_FRONT_ON_DRAG_RESIZING_BUGFIX)
+    fun testDragResize_resize_movesTaskToFront_whenStartOutside() = runOnUiThread {
+        taskPositioner.onDragPositioningStart(
+            CTRL_TYPE_RIGHT,
+            DISPLAY_ID_0,
+            STARTING_BOUNDS.right.toFloat() + 10,
+            STARTING_BOUNDS.bottom.toFloat() + 10,
+            INPUT_METHOD_TYPE_UNKNOWN,
+        )
+
+        verify(mockDesktopTasksController).moveTaskToFront(mockWindowDecoration.taskInfo)
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_MOVE_TASK_TO_FRONT_ON_DRAG_RESIZING_BUGFIX)
+    fun testDragResize_resize_doesNotMoveTaskToFront_whenStartInside() = runOnUiThread {
+        taskPositioner.onDragPositioningStart(
+            CTRL_TYPE_RIGHT,
+            DISPLAY_ID_0,
+            STARTING_BOUNDS.left.toFloat() + 10,
+            STARTING_BOUNDS.top.toFloat() + 10,
+            INPUT_METHOD_TYPE_UNKNOWN,
+        )
+
+        verify(mockDesktopTasksController, never()).moveTaskToFront(any(), any(), any())
     }
 
     @Test

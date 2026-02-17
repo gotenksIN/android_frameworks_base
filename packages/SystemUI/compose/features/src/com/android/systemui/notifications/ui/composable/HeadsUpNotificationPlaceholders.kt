@@ -26,7 +26,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.offset
-import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.safeContent
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -40,9 +40,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.LayoutCoordinates
-import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onPlaced
-import androidx.compose.ui.layout.positionInWindow
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.dimensionResource
@@ -54,7 +52,6 @@ import com.android.compose.animation.scene.ContentScope
 import com.android.compose.modifiers.onUnplaced
 import com.android.compose.modifiers.thenIf
 import com.android.compose.modifiers.width
-import com.android.systemui.notifications.ui.YSpace
 import com.android.systemui.res.R
 import com.android.systemui.statusbar.notification.stack.ui.view.NotificationScrollView
 import com.android.systemui.statusbar.notification.stack.ui.viewmodel.NotificationsPlaceholderViewModel
@@ -85,17 +82,12 @@ fun ContentScope.HeadsUpNotificationPlaceholder(
                 .notificationHeadsUpHeight(stackScrollView)
                 .debugBackground(viewModel, DEBUG_HUN_COLOR)
                 .onPlaced { coordinates: LayoutCoordinates ->
-                    // Note: boundsInWindow doesn't scroll off the screen, so use positionInWindow
-                    // for top bound, which can scroll off screen while snoozing.
-                    val positionInWindow = coordinates.positionInWindow()
-                    val boundsInWindow = coordinates.boundsInWindow()
-                    viewModel.setHeadsUpBounds(
-                        YSpace(top = positionInWindow.y, bottom = boundsInWindow.bottom)
-                    )
+                    // Note: boundsInWindow doesn't scroll off the screen, so use rawBoundsInWindow,
+                    // which can scroll off screen while snoozing.
+                    val rawBounds = coordinates.rawBoundsInWindow()
+                    viewModel.setHeadsUpBounds(rawBounds)
                     debugLog(viewModel) {
-                        "$tag.HUNS onPlaced:" +
-                            " size=${coordinates.size}" +
-                            " bounds=$boundsInWindow"
+                        "$tag.HUNS onPlaced:" + " size=${coordinates.size}" + " bounds=$rawBounds"
                     }
                 }
                 .onUnplaced {
@@ -208,10 +200,29 @@ fun ContentScope.SnoozableHeadsUpNotificationPlaceholder(
 
 /** Y position of the HUNs at rest, when the shade is closed. */
 @Composable
-private fun headsUpTopInset(): Dp =
-    WindowInsets.safeDrawing.asPaddingValues().calculateTopPadding() +
-        dimensionResource(R.dimen.heads_up_status_bar_padding)
+private fun headsUpTopInset(): Dp {
+    val safeTop = WindowInsets.safeContent.asPaddingValues().calculateTopPadding()
+    // A constant min padding when the device doesn't require safeTop (such as on Desktop)
+    return maxOf(safeTop, dimensionResource(R.dimen.heads_up_status_bar_padding))
+}
 
+/**
+ * Calculates the vertical offset for the heads-up notification based on the user's scroll.
+ *
+ * This function implements a linear interpolation that maps the [scrollOffset] to a physical
+ * Y-position, so that the notification moves faster than the finger swipe to ensure it completely
+ * clears the screen no matter where on the notification the gesture started.
+ * - At rest (scrollOffset = 0): Returns -minScrollOffset. This positions the HUN at its rest
+ *   position: just below the safeTop (top padding from safeContent, or heads_up_status_bar_padding
+ *   if safeContent has 0 topPadding)
+ * - Fully offscreen (scrollOffset = minScrollOffset): Returns -topHeadsUpHeight. This positions the
+ *   HUN completely off-screen above the window.
+ *
+ * @param scrollOffset The current scroll value (negative, ranging from [minScrollOffset] to 0).
+ * @param minScrollOffset The lower bound of the scroll (negative, equivalent to -[headsUpTopInset])
+ * @param topHeadsUpHeight The height of the heads-up notification.
+ * @return The Y-offset for the HeadsUpNotificationPlaceholder.
+ */
 private fun calculateHeadsUpPlaceholderYOffset(
     scrollOffset: Int,
     minScrollOffset: Int,

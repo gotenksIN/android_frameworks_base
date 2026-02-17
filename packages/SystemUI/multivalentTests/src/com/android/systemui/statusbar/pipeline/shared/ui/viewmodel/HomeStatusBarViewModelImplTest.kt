@@ -83,7 +83,7 @@ import com.android.systemui.statusbar.chips.ui.viewmodel.OngoingActivityChipsWit
 import com.android.systemui.statusbar.chips.ui.viewmodel.OngoingActivityChipsWithNotifsViewModelTest.Companion.assertIsScreenRecordChip
 import com.android.systemui.statusbar.core.StatusBarForDesktop
 import com.android.systemui.statusbar.data.model.StatusBarMode
-import com.android.systemui.statusbar.data.repository.fakeStatusBarModeRepository
+import com.android.systemui.statusbar.data.repository.fakeStatusBarModePerDisplayRepository
 import com.android.systemui.statusbar.disableflags.data.repository.fakeDisableFlagsRepository
 import com.android.systemui.statusbar.disableflags.shared.model.DisableFlagsModel
 import com.android.systemui.statusbar.events.data.repository.systemStatusEventAnimationRepository
@@ -451,7 +451,7 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
     @Test
     fun areNotificationsLightsOut_lowProfileWithNotifications_true() =
         kosmos.runTest {
-            fakeStatusBarModeRepository.defaultDisplay.statusBarMode.value =
+            fakeStatusBarModePerDisplayRepository.statusBarMode.value =
                 StatusBarMode.LIGHTS_OUT_TRANSPARENT
             activeNotificationListRepository.activeNotifications.value =
                 activeNotificationsStore(testNotifications)
@@ -464,7 +464,7 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
     @Test
     fun areNotificationsLightsOut_lowProfileWithoutNotifications_false() =
         kosmos.runTest {
-            fakeStatusBarModeRepository.defaultDisplay.statusBarMode.value =
+            fakeStatusBarModePerDisplayRepository.statusBarMode.value =
                 StatusBarMode.LIGHTS_OUT_TRANSPARENT
             activeNotificationListRepository.activeNotifications.value =
                 activeNotificationsStore(emptyList())
@@ -477,8 +477,7 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
     @Test
     fun areNotificationsLightsOut_defaultStatusBarModeWithoutNotifications_false() =
         kosmos.runTest {
-            fakeStatusBarModeRepository.defaultDisplay.statusBarMode.value =
-                StatusBarMode.TRANSPARENT
+            fakeStatusBarModePerDisplayRepository.statusBarMode.value = StatusBarMode.TRANSPARENT
             activeNotificationListRepository.activeNotifications.value =
                 activeNotificationsStore(emptyList())
 
@@ -490,8 +489,7 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
     @Test
     fun areNotificationsLightsOut_defaultStatusBarModeWithNotifications_false() =
         kosmos.runTest {
-            fakeStatusBarModeRepository.defaultDisplay.statusBarMode.value =
-                StatusBarMode.TRANSPARENT
+            fakeStatusBarModePerDisplayRepository.statusBarMode.value = StatusBarMode.TRANSPARENT
             activeNotificationListRepository.activeNotifications.value =
                 activeNotificationsStore(testNotifications)
 
@@ -577,13 +575,13 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
 
             kosmos.sceneContainerRepository.instantlyTransitionTo(Scenes.Gone)
             kosmos.sceneContainerRepository.showOverlay(Overlays.NotificationsShade)
+            kosmos.shadeTestUtil.setShadeExpansion(1f)
             runCurrent()
 
             assertThat(latest).isFalse()
         }
 
     @Test
-    @EnableFlags(Flags.FLAG_SHADE_WINDOW_GOES_AROUND)
     @EnableSceneContainer
     fun isHomeStatusBarAllowed_QsVisibleButInExternalDisplay_defaultStatusBarVisible() =
         kosmos.runTest {
@@ -592,29 +590,13 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
             kosmos.sceneContainerRepository.instantlyTransitionTo(Scenes.Gone)
             kosmos.sceneContainerRepository.showOverlay(Overlays.QuickSettingsShade)
             kosmos.fakeShadeDisplaysRepository.setDisplayId(EXTERNAL_DISPLAY)
+            kosmos.fakeShadeDisplaysRepository.setPendingDisplayId(EXTERNAL_DISPLAY)
             runCurrent()
 
             assertThat(latest).isTrue()
         }
 
     @Test
-    @DisableFlags(Flags.FLAG_SHADE_WINDOW_GOES_AROUND)
-    @EnableSceneContainer
-    fun isHomeStatusBarAllowed_QsVisibleButInExternalDisplay_withFlagOff_defaultStatusBarInvisible() =
-        kosmos.runTest {
-            val latest by collectLastValue(underTest.isHomeStatusBarAllowed)
-
-            kosmos.sceneContainerRepository.instantlyTransitionTo(Scenes.Gone)
-            kosmos.sceneContainerRepository.showOverlay(Overlays.QuickSettingsShade)
-            kosmos.fakeShadeDisplaysRepository.setDisplayId(EXTERNAL_DISPLAY)
-            runCurrent()
-
-            // Shade position is ignored.
-            assertThat(latest).isFalse()
-        }
-
-    @Test
-    @EnableFlags(Flags.FLAG_SHADE_WINDOW_GOES_AROUND)
     @EnableSceneContainer
     fun isHomeStatusBarAllowed_qsVisibleInThisDisplay_thisStatusBarInvisible() =
         kosmos.runTest {
@@ -622,6 +604,7 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
 
             kosmos.sceneContainerRepository.instantlyTransitionTo(Scenes.Gone)
             kosmos.sceneContainerRepository.showOverlay(Overlays.QuickSettingsShade)
+            kosmos.shadeTestUtil.setQsExpansion(1f)
             kosmos.fakeShadeDisplaysRepository.setDisplayId(DEFAULT_DISPLAY)
             runCurrent()
 
@@ -661,7 +644,6 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
 
     @Test
     @EnableSceneContainer
-    @EnableFlags(Flags.FLAG_SHADE_WINDOW_GOES_AROUND)
     fun isHomeStatusBarAllowed_onExternalDisplayWithLocksceren_invisible() =
         kosmos.runTest {
             val underTest = homeStatusBarViewModelFactory(EXTERNAL_DISPLAY)
@@ -674,7 +656,6 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
         }
 
     @Test
-    @EnableFlags(Flags.FLAG_SHADE_WINDOW_GOES_AROUND)
     @EnableSceneContainer
     fun isHomeStatusBarAllowed_onExternalDisplay_whenNotificationShadeIsVisibleOnDefaultDisplay_isTrue() =
         kosmos.runTest {
@@ -689,7 +670,6 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
         }
 
     @Test
-    @EnableFlags(Flags.FLAG_SHADE_WINDOW_GOES_AROUND)
     @EnableSceneContainer
     fun isHomeStatusBarAllowed_onDefaultDisplay_whenShadeIsVisibleOnDefaultDisplay_isFalse() =
         kosmos.runTest {
@@ -697,13 +677,13 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
 
             sceneContainerRepository.instantlyTransitionTo(Scenes.Gone)
             sceneContainerRepository.showOverlay(Overlays.QuickSettingsShade)
+            kosmos.shadeTestUtil.setQsExpansion(1f)
             fakeShadeDisplaysRepository.setDisplayId(DEFAULT_DISPLAY)
 
             assertThat(latest).isFalse()
         }
 
     @Test
-    @EnableFlags(Flags.FLAG_SHADE_WINDOW_GOES_AROUND)
     @EnableSceneContainer
     fun isHomeStatusBarAllowed_onExternalDisplay_whenShadeIsVisibleOnDefaultDisplay_isTrue() =
         kosmos.runTest {
@@ -1886,6 +1866,26 @@ class HomeStatusBarViewModelImplTest(flags: FlagsParameterization) : SysuiTestCa
                 .isEqualTo(logoutToSystemUserCount + 1)
         }
     }
+
+    @Test
+    @EnableSceneContainer
+    fun isHomeStatusBarAllowed_shadeOnExternalDisplay_statusBarOnDefaultDisplay_isVisible() =
+        kosmos.runTest {
+            val latest by collectLastValue(underTest.isHomeStatusBarAllowed)
+
+            // GIVEN shade is moving to external display
+            kosmos.fakeShadeDisplaysRepository.setPendingDisplayId(EXTERNAL_DISPLAY)
+            // AND shade window is still on default display (simulating delay)
+            kosmos.fakeShadeDisplaysRepository.setDisplayId(DEFAULT_DISPLAY)
+
+            // WHEN scene changes to Shade
+            kosmos.shadeTestUtil.setShadeExpansion(1f)
+            kosmos.sceneContainerRepository.instantlyTransitionTo(Scenes.Shade)
+            runCurrent()
+
+            // THEN status bar should be visible on default display
+            assertThat(latest).isTrue()
+        }
 
     private fun activeNotificationsStore(notifications: List<ActiveNotificationModel>) =
         ActiveNotificationsStore.Builder()

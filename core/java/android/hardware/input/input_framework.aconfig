@@ -79,24 +79,10 @@ flag {
 }
 
 flag {
-    name: "enable_talkback_and_magnifier_key_gestures"
-    namespace: "input"
-    description: "Adds key gestures for Magnification. TalkBack key gesture has been flagged separately under enable_talkback_key_gestures."
-    bug: "375277034"
-}
-
-flag {
     name: "enable_talkback_key_gestures"
     namespace: "accessibility"
     description: "Adds key gesture for TalkBack"
     bug: "441787329"
-}
-
-flag {
-    name: "enable_voice_access_key_gestures"
-    namespace: "input"
-    description: "Adds key gestures for voice access"
-    bug: "383734125"
 }
 
 flag {
@@ -219,6 +205,7 @@ flag {
     namespace: "input"
     description: "Enables desktop entrypoints for contextual search"
     bug: "442915863"
+    is_exported: true
 }
 
 flag {
@@ -260,3 +247,23 @@ flag {
     is_exported: true
 }
 
+flag {
+    name: "enable_contextual_input_trigger"
+    namespace: "input"
+    description: "Enables keyboard triggers (shortcut and dedicated key) for assistive input"
+    bug: "469890315"
+}
+
+flag {
+    name: "hid_api"
+    namespace: "input"
+    description: "Enables HID APIs"
+    bug: "390701065"
+}
+
+flag {
+    name: "enable_poem_input_customization"
+    namespace: "input"
+    description: "Adds an API for peripheral OEMs to build customization apps"
+    bug: "433405394"
+}

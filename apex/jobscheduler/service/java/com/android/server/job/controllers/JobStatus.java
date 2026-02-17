@@ -32,6 +32,7 @@ import android.annotation.LongDef;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.AppGlobals;
+import android.app.compat.CompatChanges;
 import android.app.job.JobInfo;
 import android.app.job.JobParameters;
 import android.app.job.JobScheduler;
@@ -39,6 +40,7 @@ import android.app.job.JobWorkItem;
 import android.app.job.PendingJobReasonsInfo;
 import android.app.job.UserVisibleJobSummary;
 import android.app.usage.UsageStatsManager;
+import android.compat.annotation.ChangeId;
 import android.content.ClipData;
 import android.content.ComponentName;
 import android.net.Network;
@@ -171,6 +173,22 @@ public final class JobStatus {
 
     public static final long NO_LATEST_RUNTIME = Long.MAX_VALUE;
     public static final long NO_EARLIEST_RUNTIME = 0L;
+
+    /**
+     * Introduces more specific pending and stop reasons for jobs.
+     * JobScheduler will now return
+     * {@link JobScheduler#PENDING_JOB_REASON_DEVICE_STATE_BATTERY_SAVER}
+     * if the job is pending because of battery saver or
+     * {@link JobScheduler#PENDING_JOB_REASON_DEVICE_STATE_THERMAL} if the job is pending because of
+     * thermal instead of {@link JobScheduler#PENDING_JOB_REASON_DEVICE_STATE}.
+     * JobScheduler will also now return
+     * {@link JobParameters#STOP_REASON_DEVICE_STATE_BATTERY_SAVER}
+     * if the job is stopped because of battery saver or
+     * {@link JobParameters#STOP_REASON_DEVICE_STATE_THERMAL} if the job is stopped because of
+     * thermal instead of {@link JobParameters#STOP_REASON_DEVICE_STATE}.
+     */
+    @ChangeId
+    public static final long INTRODUCE_NEW_PENDING_AND_STOP_DEVICE_STATE_REASONS = 430347691L;
 
     public static final int CONSTRAINT_CHARGING = JobInfo.CONSTRAINT_FLAG_CHARGING; // 1 < 0
     public static final int CONSTRAINT_IDLE = JobInfo.CONSTRAINT_FLAG_DEVICE_IDLE;  // 1 << 2
@@ -682,12 +700,12 @@ public final class JobStatus {
      * Constraints (converted to the pending job reasons they represent) mapped to
      * when they became unsatisfied.
      */
-    private final SparseLongArray mLastTimesConstraintsUnsatisfied = new SparseLongArray();
+    private SparseLongArray mLastTimesConstraintsUnsatisfied = new SparseLongArray();
     /**
      * Pending job reasons mapped to how long (aggregated) the job has been pending execution
      * due to those reasons.
      */
-    private final SparseLongArray mPendingJobReasonsStats = new SparseLongArray();
+    private SparseLongArray mPendingJobReasonsStats = new SparseLongArray();
 
     /**
      * For use only by ContentObserverController: state it is maintaining about content URIs
@@ -1005,6 +1023,12 @@ public final class JobStatus {
                 lastSuccessfulRunTime, lastFailedRunTime, cumulativeExecutionTimeMs,
                 rescheduling.getInternalFlags(),
                 rescheduling.mDynamicConstraints);
+
+        // Copy the pending reason stats and related unsatisfied constraints info from
+        // the rescheduled job status
+        this.mLastTimesConstraintsUnsatisfied =
+                rescheduling.mLastTimesConstraintsUnsatisfied.clone();
+        this.mPendingJobReasonsStats = rescheduling.mPendingJobReasonsStats.clone();
     }
 
     /**
@@ -1734,10 +1758,9 @@ public final class JobStatus {
     public String getWakelockTag() {
         if (mWakelockTag == null) {
             mWakelockTag = "*job*";
-            if (android.app.job.Flags.addTypeInfoToWakelockTag()) {
-                mWakelockTag += (isRequestedExpeditedJob()
-                    ? "e" : (getJob().isUserInitiated() ? "u" : "r"));
-            }
+            // Add job type info to wakelock tag.
+            mWakelockTag += isRequestedExpeditedJob() ? "e"
+                                                      : (getJob().isUserInitiated() ? "u" : "r");
             mWakelockTag += "/" + this.batteryName;
         }
         return mWakelockTag;
@@ -2361,6 +2384,14 @@ public final class JobStatus {
                 if (mIsUserBgRestricted) {
                     return JobParameters.STOP_REASON_BACKGROUND_RESTRICTION;
                 }
+                // Uses the new specific stop reason code as
+                // STOP_REASON_DEVICE_STATE_BATTERY_SAVER when flag is enabled,
+                // otherwise fall back to the generic reason stop code STOP_REASON_DEVICE_STATE.
+                if (android.app.job.Flags.enhancedPendingAndStopReasonsApi()
+                        && CompatChanges.isChangeEnabled(
+                                INTRODUCE_NEW_PENDING_AND_STOP_DEVICE_STATE_REASONS)) {
+                    return JobParameters.STOP_REASON_DEVICE_STATE_BATTERY_SAVER;
+                }
                 return JobParameters.STOP_REASON_DEVICE_STATE;
             case CONSTRAINT_DEVICE_NOT_DOZING:
                 return JobParameters.STOP_REASON_DEVICE_STATE;
@@ -2409,6 +2440,15 @@ public final class JobStatus {
             if (mIsUserBgRestricted) {
                 return JobScheduler.PENDING_JOB_REASON_BACKGROUND_RESTRICTION;
             } else {
+                // Uses the new specific pending reason code as
+                // PENDING_JOB_REASON_DEVICE_STATE_BATTERY_SAVER when flag is enabled,
+                // otherwise fall back to the generic pending reason code
+                // PENDING_JOB_REASON_DEVICE_STATE.
+                if (android.app.job.Flags.enhancedPendingAndStopReasonsApi()
+                                && CompatChanges.isChangeEnabled(
+                        INTRODUCE_NEW_PENDING_AND_STOP_DEVICE_STATE_REASONS)) {
+                    return JobScheduler.PENDING_JOB_REASON_DEVICE_STATE_BATTERY_SAVER;
+                }
                 return JobScheduler.PENDING_JOB_REASON_DEVICE_STATE;
             }
         }
@@ -2462,10 +2502,8 @@ public final class JobStatus {
         if (hasConstraintFlag(constraint, CONSTRAINT_WITHIN_QUOTA)) {
             return JobScheduler.PENDING_JOB_REASON_QUOTA;
         }
-        if (android.app.job.Flags.getPendingJobReasonsApi()) {
-            if (hasConstraintFlag(constraint, CONSTRAINT_DEADLINE)) {
-                return JobScheduler.PENDING_JOB_REASON_CONSTRAINT_DEADLINE;
-            }
+        if (hasConstraintFlag(constraint, CONSTRAINT_DEADLINE)) {
+            return JobScheduler.PENDING_JOB_REASON_CONSTRAINT_DEADLINE;
         }
 
         Slog.wtf(TAG, "Unhandled constraint (" + constraint + ") in constraintToPendingJobReason");
@@ -2487,7 +2525,17 @@ public final class JobStatus {
             if (mIsUserBgRestricted) {
                 reasons.addLast(JobScheduler.PENDING_JOB_REASON_BACKGROUND_RESTRICTION);
             } else {
-                reasons.addLast(JobScheduler.PENDING_JOB_REASON_DEVICE_STATE);
+                // Uses the new specific pending reason code as
+                // PENDING_JOB_REASON_DEVICE_STATE_BATTERY_SAVER when flag is enabled,
+                // otherwise fall back to the generic pending reason code
+                // PENDING_JOB_REASON_DEVICE_STATE.
+                if (android.app.job.Flags.enhancedPendingAndStopReasonsApi()
+                        && CompatChanges.isChangeEnabled(
+                                INTRODUCE_NEW_PENDING_AND_STOP_DEVICE_STATE_REASONS)) {
+                    reasons.addLast(JobScheduler.PENDING_JOB_REASON_DEVICE_STATE_BATTERY_SAVER);
+                } else {
+                    reasons.addLast(JobScheduler.PENDING_JOB_REASON_DEVICE_STATE);
+                }
             }
         }
         if (hasConstraintFlag(unsatisfiedConstraints, CONSTRAINT_DEVICE_NOT_DOZING)) {
@@ -2695,6 +2743,7 @@ public final class JobStatus {
     @NonNull
     public Map<String, ParcelDuration> getPendingJobReasonStats() {
         final Map<String, ParcelDuration> returnMap = new HashMap<>();
+        // Add all existing stats (previously satisfied constraints) and create the base return map
         for (int i = mPendingJobReasonsStats.size() - 1; i >= 0; i--) {
             returnMap.put(String.valueOf(mPendingJobReasonsStats.keyAt(i)),
                     new ParcelDuration(mPendingJobReasonsStats.valueAt(i)));
@@ -2703,11 +2752,29 @@ public final class JobStatus {
         final int unsatisfiedConstraints = ~satisfiedConstraints
                 & (requiredConstraints | mDynamicConstraints | IMPLICIT_CONSTRAINTS);
         final ArrayList<Integer> reasons = constraintsToPendingJobReasons(unsatisfiedConstraints);
-        final long waitingTime = JobSchedulerService.sElapsedRealtimeClock.millis() - enqueueTime;
+        final long timeNow = JobSchedulerService.sElapsedRealtimeClock.millis();
+        // Append each constraint that the job is still pending because of
         for (int i = reasons.size() - 1; i >= 0; i--) {
-            // Append each constraint that the job is still pending because of.
-            if (!returnMap.containsKey(String.valueOf((reasons.get(i))))) {
-                returnMap.put(String.valueOf(reasons.get(i)), new ParcelDuration(waitingTime));
+            final int pendingReason = reasons.get(i);
+            // The job has been pending because of this constraint since it was enqueued
+            if (!returnMap.containsKey(String.valueOf(pendingReason))) {
+                returnMap.put(String.valueOf(pendingReason),
+                        new ParcelDuration(timeNow - enqueueTime));
+                continue;
+            }
+
+            final int unsatisfiedConstraintIdx =
+                    mLastTimesConstraintsUnsatisfied.indexOfKey(pendingReason);
+            // The job may be pending again due to a constraint it earlier satisfied, update map
+            if (unsatisfiedConstraintIdx >= 0) {
+                long previousWaitTime = mPendingJobReasonsStats.get(pendingReason);
+                long currentWaitTime = timeNow
+                        - mLastTimesConstraintsUnsatisfied.valueAt(unsatisfiedConstraintIdx);
+                returnMap.put(String.valueOf(pendingReason),
+                        new ParcelDuration(previousWaitTime + currentWaitTime));
+            } else {
+                Slog.w(TAG, "Unsatisfied constraint not being tracked: "
+                        + constraintsToString(pendingReason));
             }
         }
 

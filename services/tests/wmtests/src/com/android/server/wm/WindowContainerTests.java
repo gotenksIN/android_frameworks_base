@@ -921,7 +921,6 @@ public class WindowContainerTests extends WindowTestsBase {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_CAPTION_COMPAT_INSET_FORCE_CONSUMPTION)
     public void testAddLocalInsets_addsFlagsFromProvider() {
         final Task rootTask = createTask(mDisplayContent);
         final Task task = createTaskInRootTask(rootTask, 0 /* userId */);
@@ -1782,33 +1781,6 @@ public class WindowContainerTests extends WindowTestsBase {
         assertEquals(ime(), root.mMergedExcludeInsetsTypes);
         assertEquals(ime(), child1.mMergedExcludeInsetsTypes);
         verify(mockInsetsStateController, never()).notifyInsetsChanged(any());
-    }
-
-    @Test
-    public void testReparentToNewDisplay_expectTmaCallbacks() {
-        final DisplayContent newDisplayContent = createNewDisplay();
-
-        final Task rootTask = createTask(mDisplayContent);
-        rootTask.setIsTaskMoveAllowed(true);
-
-        clearInvocations(mDisplayContent);
-
-        rootTask.reparent(newDisplayContent.getDefaultTaskDisplayArea(), POSITION_TOP);
-
-        verify(mDisplayContent).onDescendantsTaskMoveAllowedChanged();
-        verify(newDisplayContent).onDescendantsTaskMoveAllowedChanged();
-    }
-
-    @Test
-    public void testRemove_expectTmaCallbacks() {
-        final Task rootTask = createTask(mDisplayContent);
-        rootTask.setIsTaskMoveAllowed(true);
-
-        clearInvocations(mDisplayContent);
-
-        rootTask.getDisplayArea().removeRootTask(rootTask);
-
-        verify(mDisplayContent).onDescendantsTaskMoveAllowedChanged();
     }
 
     @Test

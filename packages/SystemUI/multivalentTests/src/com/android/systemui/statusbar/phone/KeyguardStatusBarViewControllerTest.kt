@@ -69,7 +69,6 @@ import com.android.systemui.statusbar.layout.mockStatusBarContentInsetsProvider
 import com.android.systemui.statusbar.phone.ui.StatusBarIconController
 import com.android.systemui.statusbar.phone.ui.TintedIconManager
 import com.android.systemui.statusbar.pipeline.battery.ui.viewmodel.batteryViewModelShowWhenChargingOrSettingFactory
-import com.android.systemui.statusbar.pipeline.battery.ui.viewmodel.batteryWithPercentViewModelFactory
 import com.android.systemui.statusbar.policy.ConfigurationController
 import com.android.systemui.statusbar.policy.KeyguardStateController
 import com.android.systemui.statusbar.policy.UserInfoController
@@ -198,7 +197,6 @@ class KeyguardStatusBarViewControllerTest : SysuiTestCase() {
             userInfoController,
             statusBarIconController,
             iconManagerFactory,
-            kosmos.batteryWithPercentViewModelFactory,
             kosmos.batteryViewModelShowWhenChargingOrSettingFactory,
             shadeViewStateProvider,
             keyguardStateController,
@@ -226,7 +224,6 @@ class KeyguardStatusBarViewControllerTest : SysuiTestCase() {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_UPDATE_USER_SWITCHER_BACKGROUND)
     fun onViewAttached_updateUserSwitcherFlagEnabled_callbacksRegistered() {
         controller.onViewAttached()
 
@@ -239,21 +236,8 @@ class KeyguardStatusBarViewControllerTest : SysuiTestCase() {
         Mockito.verify(userManager).isUserSwitcherEnabled(ArgumentMatchers.anyBoolean())
     }
 
-    @Test
-    @DisableFlags(Flags.FLAG_UPDATE_USER_SWITCHER_BACKGROUND)
-    fun onViewAttached_updateUserSwitcherFlagDisabled_callbacksRegistered() {
-        controller.onViewAttached()
-
-        Mockito.verify(configurationController).addCallback(ArgumentMatchers.any())
-        Mockito.verify(animationScheduler).addCallback(ArgumentMatchers.any())
-        Mockito.verify(userInfoController).addCallback(ArgumentMatchers.any())
-        Mockito.verify(commandQueue).addCallback(ArgumentMatchers.any())
-        Mockito.verify(statusBarIconController).addIconGroup(ArgumentMatchers.any())
-        Mockito.verify(userManager).isUserSwitcherEnabled(ArgumentMatchers.anyBoolean())
-    }
 
     @Test
-    @EnableFlags(Flags.FLAG_UPDATE_USER_SWITCHER_BACKGROUND)
     fun onConfigurationChanged_updateUserSwitcherFlagEnabled_updatesUserSwitcherVisibility() {
         controller.onViewAttached()
         runAllScheduled()
@@ -268,21 +252,8 @@ class KeyguardStatusBarViewControllerTest : SysuiTestCase() {
         Mockito.verify(keyguardStatusBarView).setUserSwitcherEnabled(ArgumentMatchers.anyBoolean())
     }
 
-    @Test
-    @DisableFlags(Flags.FLAG_UPDATE_USER_SWITCHER_BACKGROUND)
-    fun onConfigurationChanged_updateUserSwitcherFlagDisabled_updatesUserSwitcherVisibility() {
-        controller.onViewAttached()
-        Mockito.verify(configurationController).addCallback(configurationListenerCaptor.capture())
-        Mockito.clearInvocations(userManager)
-        Mockito.clearInvocations(keyguardStatusBarView)
-
-        configurationListenerCaptor.value.onConfigChanged(null)
-        Mockito.verify(userManager).isUserSwitcherEnabled(ArgumentMatchers.anyBoolean())
-        Mockito.verify(keyguardStatusBarView).setUserSwitcherEnabled(ArgumentMatchers.anyBoolean())
-    }
 
     @Test
-    @EnableFlags(Flags.FLAG_UPDATE_USER_SWITCHER_BACKGROUND)
     fun onKeyguardVisibilityChanged_userSwitcherFlagEnabled_updatesUserSwitcherVisibility() {
         controller.onViewAttached()
         runAllScheduled()
@@ -293,19 +264,6 @@ class KeyguardStatusBarViewControllerTest : SysuiTestCase() {
         keyguardCallbackCaptor.value.onKeyguardVisibilityChanged(true)
 
         runAllScheduled()
-        Mockito.verify(userManager).isUserSwitcherEnabled(ArgumentMatchers.anyBoolean())
-        Mockito.verify(keyguardStatusBarView).setUserSwitcherEnabled(ArgumentMatchers.anyBoolean())
-    }
-
-    @Test
-    @DisableFlags(Flags.FLAG_UPDATE_USER_SWITCHER_BACKGROUND)
-    fun onKeyguardVisibilityChanged_userSwitcherFlagDisabled_updatesUserSwitcherVisibility() {
-        controller.onViewAttached()
-        Mockito.verify(keyguardUpdateMonitor).registerCallback(keyguardCallbackCaptor.capture())
-        Mockito.clearInvocations(userManager)
-        Mockito.clearInvocations(keyguardStatusBarView)
-
-        keyguardCallbackCaptor.value.onKeyguardVisibilityChanged(true)
         Mockito.verify(userManager).isUserSwitcherEnabled(ArgumentMatchers.anyBoolean())
         Mockito.verify(keyguardStatusBarView).setUserSwitcherEnabled(ArgumentMatchers.anyBoolean())
     }

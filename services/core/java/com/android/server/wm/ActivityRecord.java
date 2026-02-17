@@ -695,7 +695,7 @@ public final class ActivityRecord extends WindowToken {
     private boolean mCurrentLaunchCanTurnScreenOn = true;
 
     /**
-     * The activity is opaque and fills the entire space of this task.
+     * The activity is opaque and fills the entire space of its parent container.
      * @see #occludesParent()
      */
     private boolean mOccludesParent;
@@ -1200,10 +1200,10 @@ public final class ActivityRecord extends WindowToken {
             pw.println(prefix + "mLastReportedMultiWindowMode=" + mLastReportedMultiWindowMode
                     + " mLastReportedPictureInPictureMode=" + mLastReportedPictureInPictureMode);
             if (info.supportsPictureInPicture()) {
-                pw.println(prefix + "supportsPictureInPicture=" + info.supportsPictureInPicture());
-                pw.println(prefix + "supportsEnterPipOnTaskSwitch: "
-                        + supportsEnterPipOnTaskSwitch);
-                pw.println(prefix + "mPauseSchedulePendingForPip=" + mPauseSchedulePendingForPip);
+                pw.println(prefix + "supportsPictureInPicture=" + info.supportsPictureInPicture()
+                        + " supportsEnterPipOnTaskSwitch=" + supportsEnterPipOnTaskSwitch
+                        + " autoEnteringPip=" + mAutoEnteringPip
+                        + " mPauseSchedulePendingForPip=" + mPauseSchedulePendingForPip);
             }
             if (getMaxAspectRatio() != 0) {
                 pw.println(prefix + "maxAspectRatio=" + getMaxAspectRatio());
@@ -2265,7 +2265,7 @@ public final class ActivityRecord extends WindowToken {
      * @return Whether this {@link ActivityRecord} was launched from a system surface (e.g
      * Launcher, Notification,...)
      */
-    private boolean launchedFromSystemSurface() {
+    boolean launchedFromSystemSurface() {
         return mLaunchSourceType == LAUNCH_SOURCE_TYPE_SYSTEM
                 || mLaunchSourceType == LAUNCH_SOURCE_TYPE_HOME
                 || mLaunchSourceType == LAUNCH_SOURCE_TYPE_SYSTEMUI;
@@ -2361,7 +2361,7 @@ public final class ActivityRecord extends WindowToken {
         }
 
         final TaskSnapshot snapshot = mWmService.mTaskSnapshotController.getSnapshot(task.mTaskId,
-                Flags.respectRequestedTaskSnapshotResolution()
+                Flags.onlyCacheLowResTaskSnapshot()
                         ? TaskSnapshotManager.RESOLUTION_ANY
                         : TaskSnapshotManager.RESOLUTION_HIGH);
         final int type = getStartingWindowType(newTask, taskSwitch, processRunning,
@@ -3098,8 +3098,10 @@ public final class ActivityRecord extends WindowToken {
         mNoDisplay = isNoDisplay;
     }
 
-    /** Returns true if this activity is not finishing, is opaque and fills the entire space of
-     * this task. */
+    /**
+     * Returns true if this activity is not finishing, is opaque and fills the entire space of
+     * its parent container.
+     */
     boolean occludesParent() {
         return occludesParent(false /* includingFinishing */);
     }
@@ -3319,9 +3321,18 @@ public final class ActivityRecord extends WindowToken {
         }
 
         final ActivityInfo.WindowLayout windowLayout = info.windowLayout;
-        return windowLayout == null
-                || tda.supportsActivityMinWidthHeightMultiWindow(windowLayout.minWidth,
-                windowLayout.minHeight, info);
+        if (windowLayout == null) {
+            return true;
+        }
+        if (!Flags.runtimeDensityResolutionForWindowLayoutBugfix()) {
+            return tda.supportsActivityMinWidthHeightMultiWindow(windowLayout.minWidth,
+                    windowLayout.minHeight, info);
+        }
+        final DisplayContent displayContent = tda.getDisplayContent();
+        return displayContent == null
+                || tda.supportsActivityMinWidthHeightMultiWindow(
+                        windowLayout.getMinWidth(displayContent.getDisplayMetrics()),
+                        windowLayout.getMinHeight(displayContent.getDisplayMetrics()), info);
     }
 
     /**
@@ -4673,7 +4684,7 @@ public final class ActivityRecord extends WindowToken {
                 if (fromActivity.allDrawn) {
                     allDrawn = true;
                 }
-                if (fromActivity.firstWindowDrawn) {
+                if (!Flags.noTransferFirstWindowDrawn() && fromActivity.firstWindowDrawn) {
                     firstWindowDrawn = true;
                 }
                 if (fromActivity.isVisible()) {
@@ -6209,6 +6220,7 @@ public final class ActivityRecord extends WindowToken {
             final PauseActivityItem item = new PauseActivityItem(token, finishing,
                     false /* userLeaving */, false /* dontReport */, mAutoEnteringPip);
             mAtmService.getLifecycleManager().scheduleTransactionItem(app.getThread(), item);
+            mAutoEnteringPip = false;
         } else if (shouldStartActivity()) {
             if (DEBUG_VISIBILITY) {
                 Slog.v(TAG_VISIBILITY, "Start visible activity, " + this);
@@ -6276,6 +6288,12 @@ public final class ActivityRecord extends WindowToken {
      * and {@link #shouldPauseActivity(ActivityRecord)}.
      */
     private boolean shouldStartActivity() {
+        if (mWmService.mAppLockController != null
+                && mWmService.mAppLockController.isActivityLockedByAppLockLocked(this)) {
+            // The activity is locked by App Lock, so it cannot be moved to STARTED state.
+            ProtoLog.d(WM_DEBUG_STATES, "shouldStartActivity: %s is locked by App Lock", this);
+            return false;
+        }
         return mVisibleRequested && (isState(STOPPED) || isState(STOPPING));
     }
 
@@ -6301,6 +6319,13 @@ public final class ActivityRecord extends WindowToken {
         }
 
         if (this == activeActivity) {
+            return false;
+        }
+
+        if (mWmService.mAppLockController != null
+                && mWmService.mAppLockController.isActivityLockedByAppLockLocked(this)) {
+            // The activity is locked by App Lock, so it cannot be made active.
+            ProtoLog.d(WM_DEBUG_STATES, "shouldMakeActive: %s is locked by App Lock", this);
             return false;
         }
 
@@ -6798,16 +6823,25 @@ public final class ActivityRecord extends WindowToken {
 
     /** Called when the windows associated app window container are visible. */
     void onWindowsVisible() {
-// QTI_BEGIN: 2025-10-14: Performance: Perf: Enable UI perf mode automatically according to pid
-        if (mPerf != null && mPerf.shouldUseUiPerf(mWmService.mContext, packageName)) {
-// QTI_END: 2025-10-14: Performance: Perf: Enable UI perf mode automatically according to pid
+        if (mPerf != null && mPerf.shouldUseUiPerf(mWmService.mContext, packageName)
+                          && mPerf.getLegacyUiPerfHint(mWmService.mContext, packageName) == -1) {
+
 // QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
             int hint = mPerf.getUiPerfHint(mWmService.mContext, info.name);
             if (hint != -1) {
                 int timeout_ms = 5 * 60 * 1000;
                 mPerfScenarioBoostHandler = mPerf.perfHintAcqRel(mPerfScenarioBoostHandler,
                          hint, "android", timeout_ms);
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
+                mPerf.pickDisplayRefreshRate(mWmService.mContext, info.name);
+            } else {
+                mPerf.displayRefreshRateRestore(mWmService.mContext);
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
             }
+// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
+        } else if (mPerf != null && mPerf.getLegacyUiPerfHint(mWmService.mContext, packageName) == -1) {
+            mPerf.displayRefreshRateRestore(mWmService.mContext);
+// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
         }
 
 // QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
@@ -9735,12 +9769,19 @@ public final class ActivityRecord extends WindowToken {
     }
 
     @Nullable
-    Point getMinDimensions() {
+    Point getMinDimensions(@Nullable DisplayContent displayContent) {
         final ActivityInfo.WindowLayout windowLayout = info.windowLayout;
         if (windowLayout == null) {
             return null;
         }
-        return new Point(windowLayout.minWidth, windowLayout.minHeight);
+        if (!Flags.runtimeDensityResolutionForWindowLayoutBugfix()) {
+            return new Point(windowLayout.minWidth, windowLayout.minHeight);
+        }
+        if (displayContent == null) {
+            return null;
+        }
+        return new Point(windowLayout.getMinWidth(displayContent.getDisplayMetrics()),
+                windowLayout.getMinHeight(displayContent.getDisplayMetrics()));
     }
 
     /**

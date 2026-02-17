@@ -128,7 +128,6 @@ import com.android.systemui.statusbar.NotificationEntryHelper;
 import com.android.systemui.statusbar.NotificationLockscreenUserManager;
 import com.android.systemui.statusbar.RankingBuilder;
 import com.android.systemui.statusbar.SysuiStatusBarStateController;
-import com.android.systemui.statusbar.notification.NotifPipelineFlags;
 import com.android.systemui.statusbar.notification.collection.GroupEntry;
 import com.android.systemui.statusbar.notification.collection.GroupEntryBuilder;
 import com.android.systemui.statusbar.notification.collection.NotifPipeline;
@@ -145,7 +144,6 @@ import com.android.systemui.statusbar.notification.interruption.VisualInterrupti
 import com.android.systemui.statusbar.notification.interruption.VisualInterruptionDecisionProvider;
 import com.android.systemui.statusbar.notification.interruption.VisualInterruptionDecisionProviderImpl;
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow;
-import com.android.systemui.statusbar.notification.shared.NotificationBundleUi;
 import com.android.systemui.statusbar.phone.DozeParameters;
 import com.android.systemui.statusbar.phone.KeyguardBypassController;
 import com.android.systemui.statusbar.policy.BatteryController;
@@ -161,6 +159,7 @@ import com.android.systemui.util.FakeEventLog;
 import com.android.systemui.util.settings.FakeGlobalSettings;
 import com.android.systemui.util.settings.SystemSettings;
 import com.android.systemui.util.time.SystemClock;
+import com.android.users.UserType;
 import com.android.wm.shell.Flags;
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer;
 import com.android.wm.shell.ShellTaskOrganizer;
@@ -176,15 +175,16 @@ import com.android.wm.shell.bubbles.BubbleResizabilityChecker;
 import com.android.wm.shell.bubbles.BubbleStackView;
 import com.android.wm.shell.bubbles.BubbleTaskView;
 import com.android.wm.shell.bubbles.BubbleTaskViewFactory;
-import com.android.wm.shell.bubbles.BubbleTransitions;
 import com.android.wm.shell.bubbles.BubbleViewInfoTask;
 import com.android.wm.shell.bubbles.BubbleViewProvider;
 import com.android.wm.shell.bubbles.Bubbles;
 import com.android.wm.shell.bubbles.StackEducationView;
+import com.android.wm.shell.bubbles.appinfo.BubbleAppInfoProvider;
 import com.android.wm.shell.bubbles.appinfo.PackageManagerBubbleAppInfoProvider;
 import com.android.wm.shell.bubbles.bar.BubbleBarLayerView;
 import com.android.wm.shell.bubbles.logging.BubbleLogger;
 import com.android.wm.shell.bubbles.logging.BubbleSessionTracker;
+import com.android.wm.shell.bubbles.transitions.BubbleTransitions;
 import com.android.wm.shell.bubbles.user.data.BubbleUserResolver;
 import com.android.wm.shell.bubbles.user.model.BubbleUserInfo;
 import com.android.wm.shell.common.DisplayController;
@@ -200,7 +200,6 @@ import com.android.wm.shell.onehanded.OneHandedController;
 import com.android.wm.shell.shared.animation.PhysicsAnimatorTestUtils;
 import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
 import com.android.wm.shell.shared.bubbles.BubbleBarUpdate;
-import com.android.wm.shell.shared.bubbles.UserType;
 import com.android.wm.shell.sysui.ShellCommandHandler;
 import com.android.wm.shell.sysui.ShellController;
 import com.android.wm.shell.sysui.ShellInit;
@@ -359,13 +358,9 @@ public class BubblesTest extends SysuiTestCase {
     @Mock
     private UserTracker mUserTracker;
     @Mock
-    private NotifPipelineFlags mNotifPipelineFlags;
-    @Mock
     private Icon mNotesBubbleIcon;
     @Mock
     private Display mDefaultDisplay;
-    @Mock
-    private SyncTransactionQueue mSyncQueue;
     @Mock
     private HomeIntentProvider mHomeIntentProvider;
 
@@ -375,7 +370,7 @@ public class BubblesTest extends SysuiTestCase {
     private ShellTaskOrganizer mShellTaskOrganizer;
     private TaskViewRepository mTaskViewRepository;
     private TaskViewTransitions mTaskViewTransitions;
-    private PackageManagerBubbleAppInfoProvider mAppInfoProvider;
+    private BubbleAppInfoProvider mAppInfoProvider;
     private BubbleUserResolver mBubbleUserResolver;
 
     private TestableBubblePositioner mPositioner;
@@ -450,7 +445,7 @@ public class BubblesTest extends SysuiTestCase {
                 () -> mSelectedUserInteractor,
                 mUserTracker,
                 mNotificationShadeWindowModel,
-                mKosmos::getCommunalInteractor,
+                mKosmos::getCommunalSceneInteractor,
                 mKosmos.getShadeLayoutParams(),
                 mKosmos.getTopUiController(),
                 mKosmos.getKeyguardSurfaceBehindInteractor(),
@@ -476,8 +471,9 @@ public class BubblesTest extends SysuiTestCase {
         mPositioner = new TestableBubblePositioner(mContext,
                 mContext.getSystemService(WindowManager.class));
         mPositioner.setMaxBubbles(5);
+        mAppInfoProvider = new PackageManagerBubbleAppInfoProvider();
         mBubbleData = new BubbleData(mContext, mBubbleLogger, mPositioner, mEducationController,
-                syncExecutor, syncExecutor);
+                mAppInfoProvider, syncExecutor, syncExecutor);
         int currentUserId = ActivityManager.getCurrentUser();
         UserInfo currentUserInfo = createUserInfo(currentUserId);
         when(mUserManager.getProfiles(currentUserId)).thenReturn(
@@ -523,8 +519,7 @@ public class BubblesTest extends SysuiTestCase {
                 syncExecutor);
         mTaskViewRepository = new TaskViewRepository();
         mTaskViewTransitions = new TaskViewTransitions(mTransitions, mTaskViewRepository,
-                mShellTaskOrganizer, mSyncQueue, Optional.of(mBubbleHelper));
-        mAppInfoProvider = new PackageManagerBubbleAppInfoProvider();
+                mShellTaskOrganizer, Optional.of(mBubbleHelper), Optional.empty());
         mBubbleUserResolver = userId -> new BubbleUserInfo(userId, UserType.MAIN);
         BubbleViewInfoTask.Factory bubbleViewInfoTaskFactory = new BubbleViewInfoTask.Factory() {
             @Override
@@ -595,7 +590,6 @@ public class BubblesTest extends SysuiTestCase {
                 mNotifPipeline,
                 mSysUiState,
                 mFeatureFlags,
-                mNotifPipelineFlags,
                 syncExecutor,
                 syncExecutor);
         mBubblesManager.addNotifCallback(mNotifCallback);
@@ -1266,7 +1260,6 @@ public class BubblesTest extends SysuiTestCase {
     }
 
     @Test
-    @EnableFlags(NotificationBundleUi.FLAG_NAME)
     public void testBubbleSummaryDismissal_suppressesSummaryAndBubbleFromShade() throws Exception {
         // GIVEN a group summary with a bubble child
         NotificationEntry summaryEntry = mKosmos.buildNotificationEntry(builder -> {
@@ -1305,49 +1298,6 @@ public class BubblesTest extends SysuiTestCase {
     }
 
     @Test
-    @DisableFlags(NotificationBundleUi.FLAG_NAME)
-    public void testBubbleSummaryDismissal_suppressesSummaryAndBubbleFromShade_rows()
-            throws Exception {
-        // GIVEN a group summary with a bubble child
-        NotificationEntry summaryEntry = mKosmos.buildNotificationEntry(builder -> {
-           builder.modifyNotification(mContext)
-                   .setGroup("group")
-                   .setGroupSummary(true);
-            builder.updateSbn(sbn -> {
-                sbn.setGroup(mContext, "groupId");
-            });
-           return builder.done();
-        });
-        ExpandableNotificationRow groupSummary = mKosmos.createRow(summaryEntry);
-        NotificationEntry entry = mKosmos.createBubbledEntry(builder -> {
-           builder.modifyNotification(mContext).setGroup("groupId");
-           builder.updateSbn(sbn -> {
-               sbn.setGroup(mContext, "groupId");
-           });
-           return builder.done();
-        });
-        ExpandableNotificationRow groupedBubble = mKosmos.createRow(entry);
-        groupSummary.addChildNotification(groupedBubble);
-
-        mEntryListener.onEntryAdded(entry);
-        when(mCommonNotifCollection.getEntry(entry.getKey())).thenReturn(entry);
-        assertTrue(mBubbleData.hasBubbleInStackWithKey(entry.getKey()));
-
-        // WHEN the summary is dismissed
-        mBubblesManager.handleDismissalInterception(summaryEntry);
-
-        // THEN the summary and bubbled child are suppressed from the shade
-        assertTrue(mBubbleController.isBubbleNotificationSuppressedFromShade(
-                summaryEntry.getKey(),
-                summaryEntry.getSbn().getGroupKey()));
-        assertTrue(mBubbleController.getImplCachedState().isBubbleNotificationSuppressedFromShade(
-                entry.getKey(),
-                entry.getSbn().getGroupKey()));
-        assertTrue(mBubbleData.isSummarySuppressed(summaryEntry.getSbn().getGroupKey()));
-    }
-
-    @Test
-    @EnableFlags(NotificationBundleUi.FLAG_NAME)
     public void testAppRemovesSummary_removesAllBubbleChildren() throws Exception {
         // GIVEN a group summary with a bubble child
         NotificationEntry summaryEntry = mKosmos.buildNotificationEntry(builder -> {
@@ -1385,46 +1335,6 @@ public class BubblesTest extends SysuiTestCase {
     }
 
     @Test
-    @DisableFlags(NotificationBundleUi.FLAG_NAME)
-    public void testAppRemovesSummary_removesAllBubbleChildren_rows() throws Exception {
-        // GIVEN a group summary with a bubble child
-        NotificationEntry summaryEntry = mKosmos.buildNotificationEntry(builder -> {
-            builder.modifyNotification(mContext)
-                    .setGroup("group")
-                    .setGroupSummary(true);
-            builder.updateSbn(sbn -> {
-                sbn.setGroup(mContext, "groupId");
-            });
-            return builder.done();
-        });
-        ExpandableNotificationRow groupSummary = mKosmos.createRow(summaryEntry);
-        NotificationEntry entry = mKosmos.createBubbledEntry(builder -> {
-            builder.modifyNotification(mContext).setGroup("groupId");
-            builder.updateSbn(sbn -> {
-                sbn.setGroup(mContext, "groupId");
-            });
-            return builder.done();
-        });
-        ExpandableNotificationRow groupedBubble = mKosmos.createRow(entry);
-
-        mEntryListener.onEntryAdded(entry);
-        when(mCommonNotifCollection.getEntry(entry.getKey())).thenReturn(entry);
-        groupSummary.addChildNotification(groupedBubble);
-        assertTrue(mBubbleData.hasBubbleInStackWithKey(entry.getKey()));
-
-        // GIVEN the summary is dismissed
-        mBubblesManager.handleDismissalInterception(summaryEntry);
-
-        // WHEN the summary is cancelled by the app
-        mEntryListener.onEntryRemoved(summaryEntry, REASON_APP_CANCEL);
-
-        // THEN the summary and its children are removed from bubble data
-        assertFalse(mBubbleData.hasBubbleInStackWithKey(summaryEntry.getKey()));
-        assertFalse(mBubbleData.isSummarySuppressed(summaryEntry.getSbn().getGroupKey()));
-    }
-
-    @Test
-    @EnableFlags(NotificationBundleUi.FLAG_NAME)
     public void testSummaryDismissalMarksBubblesHiddenFromShadeAndDismissesNonBubbledChildren()
             throws Exception {
         // GIVEN a group summary with two (non-bubble) children and one bubble child
@@ -1500,79 +1410,6 @@ public class BubblesTest extends SysuiTestCase {
                 summaryEntry.getKey(),
                 summaryEntry.getSbn().getGroupKey()));
     }
-
-    @Test
-    @DisableFlags(NotificationBundleUi.FLAG_NAME)
-    public void testSummaryDismissalMarksBubblesHiddenFromShadeAndDismissesNonBubbledChildren_row()
-            throws Exception {
-        // GIVEN a group summary with two (non-bubble) children and one bubble child
-        NotificationEntry summaryEntry = mKosmos.buildNotificationEntry(builder -> {
-            builder.modifyNotification(mContext)
-                    .setGroup("group")
-                    .setGroupSummary(true);
-            builder.updateSbn(sbn -> {
-                sbn.setGroup(mContext, "groupId");
-            });
-            return builder.done();
-        });
-        ExpandableNotificationRow groupSummary = mKosmos.createRow(summaryEntry);
-        NotificationEntry entry = mKosmos.createBubbledEntry(builder -> {
-            builder.modifyNotification(mContext).setGroup("groupId");
-            builder.updateSbn(sbn -> {
-                sbn.setGroup(mContext, "groupId");
-            });
-            return builder.done();
-        });
-        ExpandableNotificationRow groupedBubble = mKosmos.createRow(entry);
-        groupSummary.addChildNotification(groupedBubble);
-        // and two non-bubble children
-        NotificationEntry child1 = mKosmos.buildNotificationEntry(builder -> {
-            builder.modifyNotification(mContext).setGroup("groupId");
-            builder.updateSbn(sbn -> {
-                sbn.setGroup(mContext, "groupId");
-            });
-            return builder.done();
-        });
-        groupSummary.addChildNotification(mKosmos.createRow(child1));
-        NotificationEntry child2 = mKosmos.buildNotificationEntry(builder -> {
-            builder.modifyNotification(mContext).setGroup("groupId");
-            builder.updateSbn(sbn -> {
-                sbn.setGroup(mContext, "groupId");
-            });
-            return builder.done();
-        });
-        groupSummary.addChildNotification(mKosmos.createRow(child2));
-
-        mEntryListener.onEntryAdded(entry);
-        when(mCommonNotifCollection.getEntry(entry.getKey())).thenReturn(entry);
-
-        // WHEN the summary is dismissed
-        mBubblesManager.handleDismissalInterception(summaryEntry);
-
-        // THEN only the NON-bubble children are dismissed
-        List<ExpandableNotificationRow> childrenRows = groupSummary.getAttachedChildren();
-        verify(mNotifCallback, times(1)).removeNotification(
-                eq(child1), any(), eq(REASON_GROUP_SUMMARY_CANCELED));
-        verify(mNotifCallback, times(1)).removeNotification(
-                eq(child2), any(), eq(REASON_GROUP_SUMMARY_CANCELED));
-        verify(mNotifCallback, never()).removeNotification(eq(entry), any(), anyInt());
-
-        // THEN the bubble child still exists as a bubble and is suppressed from the shade
-        assertTrue(mBubbleData.hasBubbleInStackWithKey(entry.getKey()));
-        assertTrue(mBubbleController.isBubbleNotificationSuppressedFromShade(
-                entry.getKey(), entry.getSbn().getGroupKey()));
-        assertTrue(mBubbleController.getImplCachedState().isBubbleNotificationSuppressedFromShade(
-                entry.getKey(), entry.getSbn().getGroupKey()));
-
-        // THEN the summary is also suppressed from the shade
-        assertTrue(mBubbleController.isBubbleNotificationSuppressedFromShade(
-                summaryEntry.getKey(),
-                summaryEntry.getSbn().getGroupKey()));
-        assertTrue(mBubbleController.getImplCachedState().isBubbleNotificationSuppressedFromShade(
-                summaryEntry.getKey(),
-                summaryEntry.getSbn().getGroupKey()));
-    }
-
 
     /**
      * Verifies that when the user changes, the bubbles in the overflow list is cleared. Doesn't

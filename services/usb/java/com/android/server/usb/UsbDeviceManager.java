@@ -2712,7 +2712,7 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
      * @param uid Uid of the caller
      */
     public ParcelFileDescriptor openAccessory(UsbAccessory accessory,
-            UsbUserPermissionManager permissions, int pid, int uid) {
+            UsbUserPermissionManager permissions, String packageName, int pid, int uid) {
         UsbAccessory currentAccessory = mHandler.getCurrentAccessory();
         if (currentAccessory == null) {
             throw new IllegalArgumentException("no accessory attached");
@@ -2723,7 +2723,7 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
                     + currentAccessory;
             throw new IllegalArgumentException(error);
         }
-        permissions.checkPermission(accessory, pid, uid);
+        permissions.checkPermission(accessory, packageName, pid, uid);
         return nativeOpenAccessory();
     }
 
@@ -2736,7 +2736,8 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
      * @param uid Uid of the caller
      */
     public ParcelFileDescriptor openAccessoryForInputStream(
-            UsbAccessory accessory, UsbUserPermissionManager permissions, int pid, int uid) {
+            UsbAccessory accessory, UsbUserPermissionManager permissions,
+            String packageName, int pid, int uid) {
         UsbAccessory currentAccessory = mHandler.getCurrentAccessory();
         if (currentAccessory == null) {
             throw new IllegalArgumentException("no accessory attached");
@@ -2746,7 +2747,7 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
                     accessory.toString() + " does not match current accessory " + currentAccessory;
             throw new IllegalArgumentException(error);
         }
-        permissions.checkPermission(accessory, pid, uid);
+        permissions.checkPermission(accessory, packageName, pid, uid);
         return nativeOpenAccessoryForInputStream();
     }
 
@@ -2759,7 +2760,8 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
      * @param uid Uid of the caller
      */
     public ParcelFileDescriptor openAccessoryForOutputStream(
-            UsbAccessory accessory, UsbUserPermissionManager permissions, int pid, int uid) {
+            UsbAccessory accessory, UsbUserPermissionManager permissions,
+            String packageName, int pid, int uid) {
         UsbAccessory currentAccessory = mHandler.getCurrentAccessory();
         if (currentAccessory == null) {
             throw new IllegalArgumentException("no accessory attached");
@@ -2769,7 +2771,7 @@ public class UsbDeviceManager implements ActivityTaskManagerInternal.ScreenObser
                     accessory.toString() + " does not match current accessory " + currentAccessory;
             throw new IllegalArgumentException(error);
         }
-        permissions.checkPermission(accessory, pid, uid);
+        permissions.checkPermission(accessory, packageName, pid, uid);
         return nativeOpenAccessoryForOutputStream();
     }
 

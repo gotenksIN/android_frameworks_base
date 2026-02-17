@@ -46,6 +46,10 @@
     <string name="usb_accessory_confirm_prompt" msgid="5728408382798643421">"Buka <xliff:g id="APPLICATION">%1$s</xliff:g> untuk menangani <xliff:g id="USB_ACCESSORY">%2$s</xliff:g>?"</string>
     <string name="usb_accessory_uri_prompt" msgid="6756649383432542382">"Tidak ada apl terpasang yang bekerja dengan aksesori USB ini. Pelajari lebih lanjut tentang aksesori ini di <xliff:g id="URL">%1$s</xliff:g>"</string>
     <string name="title_usb_accessory" msgid="1236358027511638648">"Aksesori USB"</string>
+    <!-- no translation found for usb_device_dialog_always_allow_button (7426535342650638393) -->
+    <skip />
+    <string name="usb_device_dialog_allow_only_this_time_button" msgid="3653881633944232491">"Hanya kali ini"</string>
+    <string name="usb_device_dialog_cancel_button" msgid="9050554648474787233">"Batal"</string>
     <string name="label_view" msgid="6815442985276363364">"Lihat"</string>
     <string name="always_use_device" msgid="210535878779644679">"Selalu buka <xliff:g id="APPLICATION">%1$s</xliff:g> saat <xliff:g id="USB_DEVICE">%2$s</xliff:g> terhubung"</string>
     <string name="always_use_accessory" msgid="1977225429341838444">"Selalu buka <xliff:g id="APPLICATION">%1$s</xliff:g> saat <xliff:g id="USB_ACCESSORY">%2$s</xliff:g> terhubung"</string>
@@ -91,7 +95,8 @@
     <string name="screenshot_failed_to_save_text" msgid="7232739948999195960">"Tidak dapat menyimpan screenshot"</string>
     <string name="screenshot_failed_to_capture_text" msgid="7818288545874407451">"Mengambil screenshot tidak diizinkan oleh aplikasi atau organisasi"</string>
     <string name="screenshot_blocked_by_admin" msgid="5486757604822795797">"Mengambil screenshot diblokir oleh admin IT Anda"</string>
-    <string name="screenshot_copy_description" msgid="2857172429942249976">"Salin screenshot ke papan klip"</string>
+    <string name="screenshot_copy_label" msgid="3551237076438128722">"Salin"</string>
+    <string name="screenshot_copy_description" msgid="2890150686381938858">"Tombol salin screenshot ke papan klip"</string>
     <string name="screenshot_edit_label" msgid="8754981973544133050">"Edit"</string>
     <string name="screenshot_edit_description" msgid="7802378587672433507">"Tombol edit screenshot"</string>
     <string name="screenshot_share_label" msgid="1653061117238861559">"Bagikan"</string>
@@ -116,7 +121,7 @@
     <string name="screenrecord_title" msgid="4257171601439507792">"Perekam Layar"</string>
     <string name="screenrecord_background_processing_label" msgid="7244617554884238898">"Memproses perekaman layar"</string>
     <string name="screenrecord_channel_description" msgid="4147077128486138351">"Notifikasi yang sedang berjalan untuk sesi rekaman layar"</string>
-    <string name="screenrecord_permission_dialog_title" msgid="7415261783188749730">"Rekam layar Anda?"</string>
+    <string name="screenrecord_permission_dialog_title" msgid="7415261783188749730">"Rekam layar?"</string>
     <string name="screenrecord_permission_dialog_option_text_single_app" msgid="1996450687814647583">"Rekam satu aplikasi"</string>
     <string name="screenrecord_permission_dialog_option_text_entire_screen" msgid="4882406311415082016">"Rekam layar ini"</string>
     <string name="screenrecord_permission_dialog_option_text_entire_screen_for_display" msgid="4169494703993148253">"Rekam %s"</string>
@@ -134,6 +139,8 @@
     <string name="screenrecord_ongoing_screen_and_audio" msgid="5351133763125180920">"Merekam layar dan audio"</string>
     <string name="screenrecord_taps_label" msgid="1595690528298857649">"Tampilkan lokasi sentuhan pada layar"</string>
     <string name="screenrecord_stop_label" msgid="72699670052087989">"Berhenti"</string>
+    <string name="screenrecord_stop_description" msgid="4656717003438764637">"Berhenti merekam"</string>
+    <string name="screenrecord_start_description" msgid="8173864933793754995">"Mulai merekam"</string>
     <string name="screenrecord_share_label" msgid="5025590804030086930">"Bagikan"</string>
     <string name="screenrecord_save_title" msgid="1886652605520893850">"Rekaman layar disimpan"</string>
     <string name="screenrecord_save_text" msgid="3008973099800840163">"Ketuk untuk melihat"</string>
@@ -149,13 +156,16 @@
     <string name="screen_record_single_app_no_recents" msgid="1023249803854209330">"Satu aplikasi (Buka aplikasi untuk memilih)"</string>
     <string name="screen_record_record_device_audio_label" msgid="5363057443124085198">"Rekam audio perangkat"</string>
     <string name="screen_record_record_microphone_label" msgid="4685753707185662381">"Rekam mikrofon"</string>
+    <string name="screen_record_record_audio_during_recording_warning" msgid="1240590393919102946">"Audio tak dapat diubah saat merekam"</string>
     <string name="screen_record_should_show_camera_label" msgid="159628971484931357">"Tampilkan kamera selfie"</string>
     <string name="screen_record_should_show_touches_label" msgid="2203962566795833783">"Tampilkan sentuhan"</string>
     <string name="screen_record_capture_target_choose_app" msgid="3524481083640900931">"Pilih aplikasi yang akan direkam"</string>
+    <string name="screen_record_settings" msgid="2377267679200139285">"Setelan perekaman layar"</string>
+    <string name="screen_record_markup" msgid="5583986085046693669">"Markup"</string>
     <string name="screen_record_video_saved" msgid="1345283626390232282">"Video disimpan"</string>
     <string name="screen_record_video_deleted" msgid="30786214839944540">"Video dihapus"</string>
     <string name="screen_record_undo" msgid="7942716736019800870">"Urungkan"</string>
-    <string name="screen_record_take_another" msgid="8071412867905614800">"Rekan lagi"</string>
+    <string name="screen_record_take_another" msgid="5877933424208100617">"Baru"</string>
     <string name="screen_record_edit" msgid="8733014191240769309">"Edit"</string>
     <string name="screen_record_delete" msgid="1023421937978254537">"Hapus"</string>
     <string name="screen_record_delete_dialog_title" msgid="5868561491974057044">"Hapus rekaman ini?"</string>
@@ -164,6 +174,7 @@
     <string name="screen_record_pause" msgid="1715012292444967776">"Jeda"</string>
     <string name="screen_record_mute" msgid="8111682249858638168">"Bisukan"</string>
     <string name="screen_record_unmute" msgid="2207912659365156472">"Bunyikan"</string>
+    <string name="screen_record_video_preview_elapsed_time_a11y_template" formatted="false" msgid="969599623785875798">"<xliff:g id="ELAPSED_TIME">%1$s</xliff:g> dari <xliff:g id="DURATION">%2$s</xliff:g>"</string>
     <string name="screen_capture_blocked_by_admin" msgid="1751756953683506644">"Screenshot diblokir oleh admin IT Anda"</string>
     <string name="screen_capture_fullscreen_screenshot_button" msgid="3173749413928507877">"Ambil screenshot seluruh layar"</string>
     <string name="screen_capture_fullscreen_record_button" msgid="5697594296042198690">"Rekam seluruh layar"</string>
@@ -171,14 +182,53 @@
     <string name="screen_capture_record_region_selection_button" msgid="3699353194755563053">"Rekam area yang dipilih"</string>
     <string name="screen_capture_toolbar_screenshot_button" msgid="5676585348709494125">"Screenshot"</string>
     <string name="screen_capture_toolbar_record_button" msgid="7533814143351870339">"Rekam"</string>
+    <string name="screen_capture_region_box_top_left_handle_description" msgid="3619310281612042126">"Tuas kiri atas - Gunakan tombol panah untuk mengubah ukuran"</string>
+    <string name="screen_capture_region_box_top_right_handle_description" msgid="7732373569053287436">"Tuas kanan atas - Gunakan tombol panah untuk mengubah ukuran"</string>
+    <string name="screen_capture_region_box_bottom_right_handle_description" msgid="5444943380877006881">"Tuas kanan bawah - Gunakan tombol panah untuk mengubah ukuran"</string>
+    <string name="screen_capture_region_box_bottom_left_handle_description" msgid="6095764656409143184">"Tuas kiri bawah - Gunakan tombol panah untuk mengubah ukuran"</string>
     <string name="screen_share_toolbar_share_button" msgid="9182050596136815833">"Bagikan"</string>
     <string name="screen_share_no_select_app_thumbnail" msgid="1630012401570567430">"Pilih aplikasi yang ingin dibagikan"</string>
     <string name="screen_share_audio_sharing_text" msgid="7829391478284315787">"Bagikan audio"</string>
     <string name="screen_share_app_window_sharing_title" msgid="2063554880747318383">"Bagikan jendela aplikasi"</string>
     <string name="screen_share_tab_sharing_title" msgid="1178046793832072728">"Bagikan tab"</string>
     <string name="screen_share_entire_screen_sharing_title" msgid="9093580141248337998">"Bagikan seluruh layar"</string>
-    <string name="screen_share_disclaimer_app_sharing" msgid="4191319837838590771">"Saat Anda membagikan aplikasi, semua hal yang ditampilkan atau diputar di aplikasi tersebut akan terlihat oleh [APP NAME]. Jadi, berhati-hatilah saat memasukkan sandi, detail pembayaran, pesan, foto, audio &amp; video."</string>
-    <string name="screen_share_disclaimer_full_screen_sharing" msgid="6445373139864031364">"Jika Anda membagikan seluruh layar, semua hal yang ada di layar Anda akan terlihat oleh [APP NAME]. Jadi, berhati-hatilah saat memasukkan sandi, detail pembayaran, pesan, foto, audio &amp; video."</string>
+    <string name="screen_share_disclaimer_app_sharing" msgid="1839029004749224549">"Jika Anda membagikan aplikasi, apa pun yang ditampilkan atau diputar di aplikasi tersebut akan terlihat oleh <xliff:g id="APP_NAME">%1$s</xliff:g>. Berhati-hatilah dengan informasi sensitif."</string>
+    <string name="screen_share_disclaimer_tab_sharing" msgid="3811486274577713101">"Jika Anda membagikan tab, apa pun yang ada di dalam tab tersebut akan terlihat oleh <xliff:g id="APP_NAME">%1$s</xliff:g>. Berhati-hatilah dengan informasi sensitif."</string>
+    <string name="screen_share_disclaimer_full_screen_sharing" msgid="5173795016606926338">"JIka Anda membagikan seluruh layar, apa pun yang ada di layar Anda akan terlihat oleh <xliff:g id="APP_NAME">%1$s</xliff:g>. Berhati-hatilah dengan informasi sensitif."</string>
+    <string name="screen_share_a11y_announcement" msgid="8938007210094494367">"Tentukan hal yang dibagikan. Pilih tab, aplikasi, atau seluruh layar. Lalu tekan bagikan."</string>
+    <string name="screen_share_cancel_announcement" msgid="5940879227647436383">"Inisiasi berbagi layar berakhir. Layar tidak dibagikan kepada siapa pun."</string>
+    <string name="screen_share_a11y_sharing_app" msgid="3445421300603336524">"Berbagi aplikasi sekarang: <xliff:g id="APP_NAME">%1$s</xliff:g>. Gunakan indikator privasi untuk mengakhiri berbagi."</string>
+    <string name="screen_share_a11y_sharing_tab" msgid="2963542572740628746">"Berbagi tab sekarang: <xliff:g id="TAB_TITLE">%1$s</xliff:g>. Gunakan indikator privasi untuk mengakhiri berbagi."</string>
+    <string name="screen_share_a11y_sharing_display" msgid="5919924998949424031">"Berbagi layar sekarang: <xliff:g id="DISPLAY_NAME">%1$s</xliff:g>. Gunakan indikator privasi untuk mengakhiri berbagi."</string>
+    <string name="screen_share_a11y_stopped_sharing_app" msgid="6928492106881188404">"Berhenti berbagi aplikasi: <xliff:g id="APP_NAME">%1$s</xliff:g>. Layar tidak dibagikan kepada siapa pun."</string>
+    <string name="screen_share_a11y_stopped_sharing_tab" msgid="5929089339684027985">"Berhenti berbagi tab: <xliff:g id="TAB_TITLE">%1$s</xliff:g>. Layar tidak dibagikan kepada siapa pun."</string>
+    <string name="screen_share_a11y_stopped_sharing_display" msgid="121502117308433983">"Berhenti berbagi layar: <xliff:g id="DISPLAY_NAME">%1$s</xliff:g>. Layar tidak dibagikan kepada siapa pun."</string>
+    <!-- no translation found for screen_share_a11y_close_button (8017115316741874857) -->
+    <skip />
+    <!-- no translation found for screen_share_a11y_tab_button_unselected (5363622532939787310) -->
+    <skip />
+    <!-- no translation found for screen_share_a11y_tab_button_selected (4304681826101817704) -->
+    <skip />
+    <!-- no translation found for screen_share_a11y_app_button_unselected (4539549394242556282) -->
+    <skip />
+    <!-- no translation found for screen_share_a11y_app_button_selected (6049272377472922732) -->
+    <skip />
+    <!-- no translation found for screen_share_a11y_fullscreen_button_unselected (2492516552817892989) -->
+    <skip />
+    <!-- no translation found for screen_share_a11y_fullscreen_button_selected (6706822615908429473) -->
+    <skip />
+    <!-- no translation found for screen_share_a11y_share_button_off (2004866083045967602) -->
+    <skip />
+    <!-- no translation found for screen_share_a11y_share_button_on (1311279200212158833) -->
+    <skip />
+    <!-- no translation found for screen_share_a11y_item_unselected (7479321583507874795) -->
+    <skip />
+    <!-- no translation found for screen_share_a11y_item_selected (2538971376128528640) -->
+    <skip />
+    <!-- no translation found for screen_share_a11y_tab_audio_on (7240792268381508075) -->
+    <skip />
+    <!-- no translation found for screen_share_a11y_tab_audio_off (8545238601433952854) -->
+    <skip />
     <string name="screen_capture_toolbar_app_window_button_screenshot_a11y" msgid="1357560392667941303">"Ambil screenshot jendela"</string>
     <string name="screen_capture_toolbar_app_window_button_record_a11y" msgid="8984966592912823394">"Rekam jendela"</string>
     <string name="screen_capture_toolbar_region_button_screenshot_a11y" msgid="2102262602357521192">"Ambil screenshot area yang dipilih"</string>
@@ -196,6 +246,7 @@
     <string name="screen_capture_front_camera" msgid="1214647538302639358">"Kamera depan"</string>
     <string name="screen_capture_region_dimensions" msgid="2317064050253056256">"<xliff:g id="WIDTH">%1$d</xliff:g> x <xliff:g id="HEIGHT">%2$d</xliff:g>"</string>
     <string name="screen_share_privacy_indicator_stop_sharing" msgid="2297045039651417274">"Berhenti berbagi"</string>
+    <string name="share_screen_privacy_indicator_accessibility_label" msgid="8748931450480306816">"Berbagi layar aktif. Gunakan indikator privasi untuk mengakhiri berbagi."</string>
     <string name="share_to_app_chip_accessibility_label" msgid="4210256229976947065">"Membagikan layar"</string>
     <string name="share_to_app_chip_accessibility_label_generic" msgid="5517431657924536133">"Membagikan konten"</string>
     <string name="share_to_app_stop_dialog_title" msgid="9212915050910250438">"Hentikan berbagi layar?"</string>
@@ -380,7 +431,9 @@
     <string name="accessibility_clear_all" msgid="970525598287244592">"Menghapus semua pemberitahuan."</string>
     <string name="accessibility_notification_bell" msgid="7149451526721220526">"Notifikasi"</string>
     <string name="accessibility_status_bar_assistant_icon" msgid="1174898709836451013">"Asisten"</string>
-    <string name="accessibility_status_bar_input_method_indicator" msgid="4316411266975554038">"Metode masukan"</string>
+    <string name="accessibility_status_bar_input_method_indicator" msgid="4911669064186093506">"Keyboard"</string>
+    <!-- no translation found for input_method_switcher_title_large_screen (8490419050265486980) -->
+    <skip />
     <string name="notification_group_overflow_indicator" msgid="7605120293801012648">"+ <xliff:g id="NUMBER">%s</xliff:g>"</string>
     <string name="notification_group_overflow_description" msgid="7176322877233433278">"{count,plural, =1{# notifikasi lainnya di dalam.}other{# notifikasi lainnya di dalam.}}"</string>
     <string name="accessibility_rotation_lock_on_landscape" msgid="936972553861524360">"Layar dikunci dalam orientasi lanskap."</string>
@@ -461,7 +514,7 @@
     <string name="quick_settings_hotspot_secondary_label_transient" msgid="7585604088079160564">"Mengaktifkan…"</string>
     <string name="quick_settings_hotspot_secondary_label_data_saver_enabled" msgid="1280433136266439372">"Penghemat Data aktif"</string>
     <string name="quick_settings_hotspot_secondary_label_num_devices" msgid="7536823087501239457">"{count,plural, =1{# perangkat}other{# perangkat}}"</string>
-    <string name="quick_settings_flashlight_label" msgid="4904634272006284185">"Lampu Senter"</string>
+    <string name="quick_settings_flashlight_label" msgid="4904634272006284185">"Senter"</string>
     <string name="quick_settings_flashlight_camera_in_use" msgid="4820591564526512571">"Kamera sedang digunakan"</string>
     <string name="flashlight_dialog_title" msgid="4232742718579701241">"Intensitas Cahaya Senter"</string>
     <string name="quick_settings_flashlight_tile_level_percentage" msgid="2071942013174794819">"<xliff:g id="PERCENTAGE">%1$d</xliff:g>%%"</string>
@@ -503,7 +556,7 @@
     <string name="qs_record_issue_dropdown_screenrecord" msgid="6396141928484257626">"Perekaman layar"</string>
     <string name="performance" msgid="6552785217174378320">"Performa"</string>
     <string name="user_interface" msgid="3712869377953950887">"Antarmuka Pengguna"</string>
-    <string name="thermal" msgid="6758074791325414831">"Panas"</string>
+    <string name="thermal" msgid="6758074791325414831">"Suhu"</string>
     <string name="custom" msgid="3337456985275158299">"Kustom"</string>
     <string name="custom_trace_settings_dialog_title" msgid="2608570500144830554">"Setelan Rekaman Aktivitas Kustom"</string>
     <string name="restore_default" msgid="5259420807486239755">"Pulihkan Default"</string>
@@ -655,7 +708,7 @@
     <string name="accessibility_action_label_umo_show_next" msgid="8033581654789193281">"Tampilkan berikutnya"</string>
     <string name="accessibility_action_label_umo_show_previous" msgid="5935831384525173810">"Tampilkan sebelumnya"</string>
     <string name="communal_widgets_disclaimer_title" msgid="1150954395585308868">"Widget layar kunci"</string>
-    <string name="communal_widgets_disclaimer_text" msgid="7363411191173297965">"Untuk membuka aplikasi menggunakan widget, Anda perlu memverifikasi diri Anda. Selain itu, harap ingat bahwa siapa saja dapat melihatnya, bahkan saat perangkat Anda terkunci. Beberapa widget mungkin tidak dirancang untuk layar kunci Anda dan mungkin tidak aman untuk ditambahkan di sini."</string>
+    <string name="communal_widgets_disclaimer_text" msgid="7363411191173297965">"Untuk membuka aplikasi menggunakan widget, Anda perlu memverifikasi diri. Selain itu, ingat bahwa siapa saja dapat melihat widget, bahkan saat perangkat terkunci. Sebagian widget mungkin tidak dirancang untuk layar kunci dan mungkin tidak aman untuk ditambahkan di sini."</string>
     <string name="communal_widgets_disclaimer_button" msgid="4423059765740780753">"Oke"</string>
     <string name="accessibility_glanceable_hub_to_dream_button" msgid="7552776300297055307">"Tampilkan tombol screensaver"</string>
     <string name="hub_onboarding_bottom_sheet_title" msgid="162092881395529947">"Jelajahi mode hub"</string>
@@ -930,14 +983,14 @@
     <string name="notification_guts_recs_summary" msgid="8391881843238947007">"Newsletter, media yang direkomendasikan, dan lainnya"</string>
     <string name="notification_onboarding_summaries_turn_on" msgid="3831339570984683297">"Aktifkan di Setelan"</string>
     <string name="notification_onboarding_summaries_message" msgid="6061524903176459064">"Percakapan yang panjang kini dapat diringkas untuk memberikan rangkuman cepat"</string>
+    <string name="notification_onboarding_summaries_message_with_apps" msgid="5320980333818238465">"Perangkat dan aplikasi Anda kini dapat meringkas percakapan yang panjang untuk memberikan rangkuman singkat"</string>
     <string name="notification_onboarding_bundles_message" msgid="4612908213178622912">"Pengatur notifikasi menggabungkan dan menyenyapkan notifikasi yang memiliki prioritas lebih rendah. Tambahkan kategori lainnya di Setelan."</string>
     <string name="notification_bundle_header_counter" msgid="5515532701569242265">"{count,plural, =1{# notifikasi}other{# notifikasi}}"</string>
     <string name="notification_bundle_header_joined_description" msgid="4517556837418088139">"<xliff:g id="NAME">%1$s</xliff:g>, <xliff:g id="NUM_NOTIFICATIONS">%2$s</xliff:g>"</string>
     <string name="inline_done_button" msgid="6043094985588909584">"Selesai"</string>
     <string name="inline_ok_button" msgid="603075490581280343">"Terapkan"</string>
     <string name="inline_turn_off_notifications" msgid="2653064779176881329">"Nonaktifkan"</string>
-    <!-- no translation found for bridged_device_type_unknown (8435318668271946936) -->
-    <skip />
+    <string name="bridged_device_type_unknown" msgid="8435318668271946936">"perangkat"</string>
     <string name="bridged_device_type_phone" msgid="7971199513068521770">"ponsel"</string>
     <string name="bridged_device_type_tablet" msgid="7403330807933649592">"tablet"</string>
     <string name="bridged_device_type_laptop" msgid="8027976360936787349">"laptop"</string>
@@ -1201,7 +1254,7 @@
     <string name="accessibility_key_gesture_voice_access_dialog_content" msgid="8539054865187379687">"Menekan "<annotation id="action_key_icon">"ikon"</annotation>" <xliff:g id="ID_1">^1</xliff:g> + <xliff:g id="ID_2">^2</xliff:g> + <xliff:g id="ID_3">^3</xliff:g> akan mengaktifkan fitur aksesibilitas <xliff:g id="ID_4">^4</xliff:g>. Tindakan ini memungkinkan Anda mengontrol perangkat secara handsfree."</string>
     <string name="accessibility_shortcutchooser_toprow_tutorial_dialog_title" msgid="4659318395231105188">"Tombol aksesibilitas"</string>
     <string name="accessibility_shortcutchooser_toprow_tutorial_dialog_content" msgid="7058726404278534674">"Anda dapat menekan tombol aksesibilitas untuk mulai menggunakan fitur aksesibilitas."</string>
-    <string name="accessibility_shortcutchooser_toprow_tutorial_dialog_positive_button_text" msgid="7095579813773247709">"Menambahkan fitur"</string>
+    <string name="accessibility_shortcutchooser_toprow_tutorial_dialog_positive_button_text" msgid="7095579813773247709">"Tambahkan fitur"</string>
     <string name="accessibility_shortcutchooser_editor_dialog_title" msgid="7881631878787325869">"Siapkan <xliff:g id="ID_1">%1$s</xliff:g>"</string>
     <string name="accessibility_shortcutchooser_done_button" msgid="5288975589451082156">"Selesai"</string>
     <string name="accessibility_shortcutchooser_picker_dialog_title" msgid="6067291073174568750">"Pilih fitur"</string>
@@ -1780,8 +1833,58 @@
     <string name="accessibility_close_overlay_action" msgid="3581095146209387670">"kembali"</string>
     <string name="ambient_cue_autofill_action" msgid="9213025887835308128">"isi otomatis"</string>
     <string name="ambient_cue_expand_action" msgid="6803711089932959312">"luaskan"</string>
-    <string name="location_button_text_share_precise_location" msgid="5341882050169860712">"Bagikan lokasi presisi"</string>
-    <string name="location_button_text_use_precise_location" msgid="3499475231656390476">"Gunakan lokasi presisi"</string>
-    <string name="location_button_text_near_precise_location" msgid="3607275724182981412">"Dekat lokasi presisi"</string>
     <string name="location_button_text_precise_location" msgid="4441259889842542799">"Lokasi presisi"</string>
+    <string name="location_button_text_use_precise_location" msgid="3499475231656390476">"Gunakan lokasi presisi"</string>
+    <string name="location_button_text_share_precise_location" msgid="5341882050169860712">"Bagikan lokasi presisi"</string>
+    <string name="location_button_text_near_my_precise_location" msgid="7590342799002942963">"Dekat lokasi presisi saya"</string>
+    <string name="location_button_text_near_your_precise_location" msgid="3792598666253599055">"Dekat lokasi presisi Anda"</string>
+    <string name="privacy_chip_use_string" msgid="979159484631969073">"<xliff:g id="SENSOR">%1$s</xliff:g> sedang digunakan"</string>
+    <string name="privacy_chip_use_string_with_app" msgid="6807216002072346877">"<xliff:g id="SENSOR">%1$s</xliff:g> sedang digunakan oleh <xliff:g id="APP">%2$s</xliff:g>"</string>
+    <string name="privacy_chip_camera_and_mic_text" msgid="6254449489859255607">"Kamera dan mikrofon"</string>
+    <string name="av_panel_title" msgid="455230832870768515">"Privasi"</string>
+    <string name="sensor_activity_header" msgid="2145727448786698035">"Lihat aplikasi yang secara aktif atau baru-baru ini menggunakan izin ini."</string>
+    <string name="sensor_activity_see_all_access_button" msgid="8005330122289549048">"Lihat semua akses"</string>
+    <string name="sensor_activity_camera_label" msgid="4260675418606211259">"Kamera"</string>
+    <string name="sensor_activity_microphone_label" msgid="4012136402420177411">"Mikrofon"</string>
+    <string name="sensor_activity_manage_access_button" msgid="1275701280501357102">"Kelola akses"</string>
+    <string name="sensor_activity_close_app_button" msgid="6907314738150753330">"Tutup aplikasi"</string>
+    <string name="sensor_activity_back_button_cd" msgid="6894532284650291222">"Kembali"</string>
+    <string name="privacy_chip_apps_using_sensor_suffix" msgid="527247786536767096">"+<xliff:g id="COUNT">%1$d</xliff:g> lainnya"</string>
+    <string name="privacy_chip_camera_in_use" msgid="5163494654848590528">"Kamera sedang digunakan"</string>
+    <string name="privacy_chip_mic_in_use" msgid="1586091297556363367">"Mikrofon sedang digunakan"</string>
+    <string name="privacy_chip_camera_mic_in_use" msgid="5179267787210197484">"Kamera dan mikrofon sedang digunakan"</string>
+    <string name="av_camera_portrait_touch_up" msgid="5191856296212427203">"Sempurnakan penampilan"</string>
+    <string name="av_mic_label" msgid="5427348054144789879">"Mikrofon"</string>
+    <string name="av_camera_label" msgid="7719772172590702343">"Kamera"</string>
+    <string name="av_camera_blur_drill_in_title" msgid="2250600375798981511">"Blur Latar Belakang"</string>
+    <string name="av_camera_blur_off" msgid="3170334995799202022">"Nonaktif"</string>
+    <string name="av_camera_blur_light" msgid="5666055368940059418">"Terang"</string>
+    <string name="av_camera_blur_full" msgid="3276351992811619332">"Penuh"</string>
+    <string name="av_camera_improve_lighting" msgid="1540549414296669133">"Koreksi pencahayaan"</string>
+    <string name="av_camera_face_retouch" msgid="45890971969486224">"Sempurnakan penampilan"</string>
+    <string name="av_camera_framing" msgid="5108462267843042492">"Framing Kamera"</string>
+    <string name="av_studio_mic" msgid="2614843492629357766">"Mikrofon Studio"</string>
+    <string name="av_studio_look" msgid="621893522645557619">"Tampilan Studio"</string>
+    <string name="av_studio_look_effects" msgid="4105109585851068415">"%d efek"</string>
+    <string name="av_blur" msgid="405131343487260171">"Blur"</string>
+    <string name="av_live_captions" msgid="7819416886586903077">"Teks Otomatis"</string>
+    <string name="accessibility_hearing_device_battery_level" msgid="1032601787487328432">"Baterai %s"</string>
+    <string name="accessibility_hearing_device_left_right_battery_level" msgid="5327672450604052979">"Baterai L %1$s    Baterai R %2$s"</string>
+    <string name="accessibility_hearing_device_left_battery_level" msgid="327961080394238636">"Baterai L %1$s"</string>
+    <string name="accessibility_hearing_device_right_battery_level" msgid="7598843215226414563">"Baterai R %1$s"</string>
+    <string name="accessibility_hearing_device_notification_channel_name" msgid="7365020777623709400">"Status Alat Bantu Dengar"</string>
+    <!-- no translation found for more_options_edit (6337988646114341329) -->
+    <skip />
+    <!-- no translation found for more_options_move (2226159413422979066) -->
+    <skip />
+    <!-- no translation found for more_options_remove_all (194855000797536179) -->
+    <skip />
+    <!-- no translation found for floating_menu_more_options_label (7859269790323628599) -->
+    <skip />
+    <!-- no translation found for dream_setup_title (7996530071414508238) -->
+    <skip />
+    <!-- no translation found for dream_setup_button_not_now (8028385323668620805) -->
+    <skip />
+    <!-- no translation found for dream_setup_button_setup (4755361016017554826) -->
+    <skip />
 </resources>

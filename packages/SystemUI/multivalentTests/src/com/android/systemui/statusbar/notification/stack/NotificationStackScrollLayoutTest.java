@@ -19,6 +19,7 @@ package com.android.systemui.statusbar.notification.stack;
 import static android.view.WindowInsets.Type.ime;
 
 import static com.android.systemui.flags.SceneContainerFlagParameterizationKt.parameterizeSceneContainerFlag;
+import static com.android.systemui.log.LogBufferHelperKt.logcatLogBuffer;
 import static com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayout.ROWS_ALL;
 import static com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayout.ROWS_GENTLE;
 import static com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayout.RUBBER_BAND_FACTOR_NORMAL;
@@ -54,7 +55,6 @@ import android.graphics.Insets;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.os.SystemClock;
-import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.flag.junit.FlagsParameterization;
 import android.testing.TestableLooper;
@@ -88,7 +88,6 @@ import com.android.systemui.statusbar.NotificationShelf;
 import com.android.systemui.statusbar.StatusBarState;
 import com.android.systemui.statusbar.SysuiStatusBarStateController;
 import com.android.systemui.statusbar.notification.collection.EntryAdapter;
-import com.android.systemui.statusbar.notification.collection.NotificationEntry;
 import com.android.systemui.statusbar.notification.collection.render.GroupExpansionManager;
 import com.android.systemui.statusbar.notification.collection.render.GroupMembershipManager;
 import com.android.systemui.statusbar.notification.data.repository.HeadsUpRepository;
@@ -97,7 +96,6 @@ import com.android.systemui.statusbar.notification.footer.ui.view.FooterView;
 import com.android.systemui.statusbar.notification.headsup.AvalancheController;
 import com.android.systemui.statusbar.notification.row.ExpandableNotificationRow;
 import com.android.systemui.statusbar.notification.row.ExpandableView;
-import com.android.systemui.statusbar.notification.shared.NotificationBundleUi;
 import com.android.systemui.statusbar.notification.shared.NotificationThrottleHun;
 import com.android.systemui.statusbar.notification.stack.shared.model.ShadeScrimBounds;
 import com.android.systemui.statusbar.notification.stack.shared.model.ShadeScrimShape;
@@ -139,6 +137,9 @@ public class NotificationStackScrollLayoutTest extends SysuiTestCase {
     }
 
     private final FakeFeatureFlags mFeatureFlags = new FakeFeatureFlags();
+    private final NotificationStackScrollLogger mNotificationStackScrollLogger =
+            new NotificationStackScrollLogger(logcatLogBuffer(), logcatLogBuffer(),
+                    logcatLogBuffer(), logcatLogBuffer());
     private NotificationStackScrollLayout mStackScroller;  // Normally test this
     private NotificationStackScrollLayout mStackScrollerInternal;  // See explanation below
     private AmbientState mAmbientState;
@@ -188,10 +189,6 @@ public class NotificationStackScrollLayoutTest extends SysuiTestCase {
         ));
 
         // Register the debug flags we use
-        assertFalse(Flags.NSSL_DEBUG_LINES.getDefault());
-        assertFalse(Flags.NSSL_DEBUG_REMOVE_ANIMATION.getDefault());
-        mFeatureFlags.set(Flags.NSSL_DEBUG_LINES, false);
-        mFeatureFlags.set(Flags.NSSL_DEBUG_REMOVE_ANIMATION, false);
         mFeatureFlags.set(Flags.LOCKSCREEN_ENABLE_LANDSCAPE, false);
 
         // Inject dependencies before initializing the layout
@@ -224,6 +221,7 @@ public class NotificationStackScrollLayoutTest extends SysuiTestCase {
         mStackScroller.setController(mStackScrollLayoutController);
         mStackScroller.setShelf(mNotificationShelf);
         when(mStackScroller.getExpandHelper()).thenReturn(mExpandHelper);
+        mStackScroller.setLogger(mNotificationStackScrollLogger);
 
         doNothing().when(mGroupExpansionManager).collapseGroups();
         doNothing().when(mExpandHelper).cancelImmediately();
@@ -808,18 +806,11 @@ public class NotificationStackScrollLayoutTest extends SysuiTestCase {
 
         // add notification that's before the speed bump
         ExpandableNotificationRow row = mock(ExpandableNotificationRow.class);
-        if (NotificationBundleUi.isEnabled()) {
-            EntryAdapter entryAdapter = mock(EntryAdapter.class);
-            when(entryAdapter.isAmbient()).thenReturn(false);
-            when(row.getEntryAdapter()).thenReturn(entryAdapter);
-        } else {
-            NotificationEntry entry = mock(NotificationEntry.class);
-            when(row.getEntryLegacy()).thenReturn(entry);
-            when(entry.isAmbient()).thenReturn(false);
-        }
+        EntryAdapter entryAdapter = mock(EntryAdapter.class);
+        when(entryAdapter.isAmbient()).thenReturn(false);
+        when(row.getEntryAdapter()).thenReturn(entryAdapter);
 
         mStackScroller.addContainerView(row);
-
         // speed bump = 1
         assertEquals(1, mStackScroller.getSpeedBumpIndex());
     }
@@ -831,15 +822,10 @@ public class NotificationStackScrollLayoutTest extends SysuiTestCase {
 
         // add notification that's after the speed bump
         ExpandableNotificationRow row = mock(ExpandableNotificationRow.class);
-        if (NotificationBundleUi.isEnabled()) {
-            EntryAdapter entryAdapter = mock(EntryAdapter.class);
-            when(entryAdapter.isAmbient()).thenReturn(true);
-            when(row.getEntryAdapter()).thenReturn(entryAdapter);
-        } else {
-            NotificationEntry entry = mock(NotificationEntry.class);
-            when(row.getEntryLegacy()).thenReturn(entry);
-            when(entry.isAmbient()).thenReturn(true);
-        }
+        EntryAdapter entryAdapter = mock(EntryAdapter.class);
+        when(entryAdapter.isAmbient()).thenReturn(true);
+        when(row.getEntryAdapter()).thenReturn(entryAdapter);
+
         mStackScroller.addContainerView(row);
 
         // speed bump is set to 0
@@ -853,15 +839,9 @@ public class NotificationStackScrollLayoutTest extends SysuiTestCase {
 
         // add 3 notification that are after the speed bump
         ExpandableNotificationRow row = mock(ExpandableNotificationRow.class);
-        if (NotificationBundleUi.isEnabled()) {
-            EntryAdapter entryAdapter = mock(EntryAdapter.class);
-            when(entryAdapter.isAmbient()).thenReturn(false);
-            when(row.getEntryAdapter()).thenReturn(entryAdapter);
-        } else {
-            NotificationEntry entry = mock(NotificationEntry.class);
-            when(row.getEntryLegacy()).thenReturn(entry);
-            when(entry.isAmbient()).thenReturn(false);
-        }
+        EntryAdapter entryAdapter = mock(EntryAdapter.class);
+        when(entryAdapter.isAmbient()).thenReturn(false);
+        when(row.getEntryAdapter()).thenReturn(entryAdapter);
         mStackScroller.addContainerView(row);
 
         // speed bump is 1
@@ -1533,15 +1513,9 @@ public class NotificationStackScrollLayoutTest extends SysuiTestCase {
 
         // Entry was seen in shade
         ExpandableNotificationRow row = mock(ExpandableNotificationRow.class);
-        if (NotificationBundleUi.isEnabled()) {
-            EntryAdapter entryAdapter = mock(EntryAdapter.class);
-            when(entryAdapter.isSeenInShade()).thenReturn(true);
-            when(row.getEntryAdapter()).thenReturn(entryAdapter);
-        } else {
-            NotificationEntry entry = mock(NotificationEntry.class);
-            when(entry.isSeenInShade()).thenReturn(true);
-            when(row.getEntryLegacy()).thenReturn(entry);
-        }
+        EntryAdapter entryAdapter = mock(EntryAdapter.class);
+        when(entryAdapter.isSeenInShade()).thenReturn(true);
+        when(row.getEntryAdapter()).thenReturn(entryAdapter);
 
         // WHEN we generate an add event
         mStackScroller.generateHeadsUpAnimation(
@@ -1631,8 +1605,7 @@ public class NotificationStackScrollLayoutTest extends SysuiTestCase {
     }
 
     @Test
-    @EnableFlags({com.android.systemui.Flags.FLAG_PHYSICAL_NOTIFICATION_MOVEMENT,
-            com.android.systemui.Flags.FLAG_NOTIFICATION_BUNDLE_UI})
+    @EnableFlags({com.android.systemui.Flags.FLAG_PHYSICAL_NOTIFICATION_MOVEMENT})
     public void testOverlapOnTop_groupExpanded() {
         ExpandableNotificationRow parent = createRowGroup();
         mStackScroller.addContainerView(parent);
@@ -1673,8 +1646,7 @@ public class NotificationStackScrollLayoutTest extends SysuiTestCase {
     }
 
     @Test
-    @EnableFlags({com.android.systemui.Flags.FLAG_PHYSICAL_NOTIFICATION_MOVEMENT,
-            com.android.systemui.Flags.FLAG_NOTIFICATION_BUNDLE_UI})
+    @EnableFlags({com.android.systemui.Flags.FLAG_PHYSICAL_NOTIFICATION_MOVEMENT})
     public void testOverlapOnBottom_groupExpanded_Transient() {
         ExpandableNotificationRow parent = createRowGroup();
         mStackScroller.addContainerView(parent);
@@ -2036,8 +2008,7 @@ public class NotificationStackScrollLayoutTest extends SysuiTestCase {
     }
 
     @Test
-    @EnableFlags({com.android.systemui.Flags.FLAG_PHYSICAL_NOTIFICATION_MOVEMENT,
-            com.android.systemui.Flags.FLAG_NOTIFICATION_BUNDLE_UI})
+    @EnableFlags({com.android.systemui.Flags.FLAG_PHYSICAL_NOTIFICATION_MOVEMENT})
     public void testOverlapListCreation_expanded_group() {
         ExpandableNotificationRow parent = createRowGroup();
         mStackScroller.addContainerView(parent);
@@ -2072,8 +2043,7 @@ public class NotificationStackScrollLayoutTest extends SysuiTestCase {
     }
 
     @Test
-    @EnableFlags({com.android.systemui.Flags.FLAG_PHYSICAL_NOTIFICATION_MOVEMENT,
-            com.android.systemui.Flags.FLAG_NOTIFICATION_BUNDLE_UI})
+    @EnableFlags({com.android.systemui.Flags.FLAG_PHYSICAL_NOTIFICATION_MOVEMENT})
     public void testOverlapListCreation_expanded_group_alpha() {
         ExpandableNotificationRow parent = createRowGroup();
         mStackScroller.addContainerView(parent);
@@ -2109,8 +2079,7 @@ public class NotificationStackScrollLayoutTest extends SysuiTestCase {
     }
 
     @Test
-    @EnableFlags({com.android.systemui.Flags.FLAG_PHYSICAL_NOTIFICATION_MOVEMENT,
-            com.android.systemui.Flags.FLAG_NOTIFICATION_BUNDLE_UI})
+    @EnableFlags({com.android.systemui.Flags.FLAG_PHYSICAL_NOTIFICATION_MOVEMENT})
     public void testOverlapListCreation_expanded_group_transient() {
         ExpandableNotificationRow parent = createRowGroup();
         mStackScroller.addContainerView(parent);
@@ -2168,40 +2137,10 @@ public class NotificationStackScrollLayoutTest extends SysuiTestCase {
     }
 
     /**
-     * This test validates the legacy behavior when the NotificationBundleUi flag is OFF.
-     * It confirms that when a partially visible child is removed, the scroll position
-     * incorrectly jumps to an absolute position based on the removed child's location.
-     */
-    @Test
-    @DisableFlags(NotificationBundleUi.FLAG_NAME)
-    @DisableSceneContainer
-    public void updateScrollStateForRemovedChild_partiallyVisible_bundleUiFlagOff_jumpsToTop() {
-        // GIVEN: A scrollable list with two rows, where we can control the height of the first row
-        final int rowHeight = 200;
-        ExpandableNotificationRow row1 = spy(mKosmos.createRow());
-        doReturn(rowHeight).when(row1).getIntrinsicHeight();
-        ExpandableNotificationRow row2 = mKosmos.createRow();
-        mStackScroller.addContainerView(row1);
-        mStackScroller.addContainerView(row2);
-
-        // GIVEN: The NSSL is scrolled down by 100px, making row1 partially visible at the top.
-        mStackScroller.setOwnScrollY(100);
-        assertThat(mStackScroller.getOwnScrollY()).isEqualTo(100);
-
-        // WHEN: The partially visible row1 is removed (simulating auto-grouping).
-        mStackScroller.removeContainerView(row1);
-
-        // THEN: The scroll position should jump to a value LESS THAN its original position.
-        assertThat(mStackScroller.getOwnScrollY()).isLessThan(100);
-    }
-
-    /**
-     * This test validates the new behavior when the NotificationBundleUi flag is ON.
-     * It confirms that when a partially visible child is removed, the scroll position is
+     * This test confirms that when a partially visible child is removed, the scroll position is
      * adjusted relatively to maintain visual stability, preventing any jump
      */
     @Test
-    @EnableFlags(NotificationBundleUi.FLAG_NAME)
     @DisableSceneContainer
     public void updateScrollStateForRemovedChild_partiallyVisible_bundleUiFlagOn_adjustsRelative() {
         // GIVEN: A scrollable list with two rows, where we can control the height of the first.
@@ -2240,7 +2179,7 @@ public class NotificationStackScrollLayoutTest extends SysuiTestCase {
         when(row.getActualHeight()).thenReturn(200);
         when(row.getRemoteInputActionsContainerExpandedOffset()).thenReturn(50f);
         mTestableResources.addOverride(
-                com.android.internal.R.dimen.notification_content_margin, 10);
+                com.android.internal.R.dimen.notification_2025_margin, 10);
 
         // WHEN requestScrollToRemoteInput is called
         mStackScroller.requestScrollToRemoteInput(row);
@@ -2274,7 +2213,7 @@ public class NotificationStackScrollLayoutTest extends SysuiTestCase {
         when(parent.getTranslationY()).thenReturn(50f);
         when(row.getNotificationParent()).thenReturn(parent);
         mTestableResources.addOverride(
-                com.android.internal.R.dimen.notification_content_margin, 10);
+                com.android.internal.R.dimen.notification_2025_margin, 10);
 
         // WHEN requestScrollToRemoteInput is called for the grouped row
         mStackScroller.requestScrollToRemoteInput(row);
@@ -2309,15 +2248,9 @@ public class NotificationStackScrollLayoutTest extends SysuiTestCase {
         ExpandableNotificationRow row = mock(ExpandableNotificationRow.class);
 
         when(row.canViewBeCleared()).thenReturn(true);
-        if (NotificationBundleUi.isEnabled()) {
-            EntryAdapter entryAdapter = mock(EntryAdapter.class);
-            when(entryAdapter.isClearable()).thenReturn(true);
-            when(row.getEntryAdapter()).thenReturn(entryAdapter);
-        } else {
-            NotificationEntry entry = mock(NotificationEntry.class);
-            when(row.getEntryLegacy()).thenReturn(entry);
-            when(entry.isClearable()).thenReturn(true);
-        }
+        EntryAdapter entryAdapter = mock(EntryAdapter.class);
+        when(entryAdapter.isClearable()).thenReturn(true);
+        when(row.getEntryAdapter()).thenReturn(entryAdapter);
 
         return row;
     }

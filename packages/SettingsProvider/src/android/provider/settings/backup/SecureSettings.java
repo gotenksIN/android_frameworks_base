@@ -61,6 +61,7 @@ public class SecureSettings {
         Settings.Secure.ACCESSIBILITY_CAPTIONING_PRESET,
         Settings.Secure.ACCESSIBILITY_CAPTIONING_ENABLED,
         Settings.Secure.ACCESSIBILITY_CAPTIONING_LOCALE,
+        Settings.Secure.ACCESSIBILITY_CAPTIONING_EASY_READER_ENABLED,
         Settings.Secure.ACCESSIBILITY_CAPTIONING_BACKGROUND_COLOR,
         Settings.Secure.ACCESSIBILITY_CAPTIONING_FOREGROUND_COLOR,
         Settings.Secure.ACCESSIBILITY_CAPTIONING_EDGE_TYPE,
@@ -341,5 +342,6 @@ public class SecureSettings {
         Settings.Secure.IDENTITY_CHECK_WATCH_NOTIFICATION_VIEW_DETAILS_CLICKED,
         Settings.Secure.TEXT_SHOW_PASSWORD_TOUCH,
         Settings.Secure.TEXT_SHOW_PASSWORD_PHYSICAL,
+        Settings.Secure.PERSONAL_CONTEXT_ENABLED,
     };
 }

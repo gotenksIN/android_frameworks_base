@@ -16,16 +16,30 @@
 
 package com.android.systemui.screencapture.record.camera.ui.viewmodel
 
+import android.graphics.Region
 import android.media.projection.StopReason
+import android.os.SystemProperties
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.toAndroidRectF
+import androidx.core.graphics.toRect
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.kosmos.runTest
+import com.android.systemui.kosmos.testScope
+import com.android.systemui.lifecycle.activateIn
+import com.android.systemui.screencapture.record.camera.data.repository.fakeScreenRecordCameraRepository
+import com.android.systemui.screencapture.record.camera.domain.interactor.screenCaptureCameraTransformationInteractor
+import com.android.systemui.screenrecord.ScreenRecordingAudioSource
 import com.android.systemui.screenrecord.domain.interactor.screenRecordingServiceInteractor
+import com.android.systemui.screenrecord.shared.model.ScreenRecordingParameters
 import com.android.systemui.screenrecord.shared.model.ScreenRecordingParametersFactory.screenRecordingParameters
 import com.android.systemui.testKosmosNew
 import com.google.common.truth.Truth.assertThat
 import kotlin.time.Duration.Companion.days
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.launch
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -35,15 +49,9 @@ class ScreenCaptureCameraTransformationViewModelTest : SysuiTestCase() {
 
     private val kosmos = testKosmosNew()
 
-    private val underTest by lazy { kosmos.screenCaptureCameraTransformationViewModel }
-
-    @Test
-    fun recordingStarted_transformableByTouchAnywhere_isFalse() =
-        kosmos.runTest {
-            screenRecordingServiceInteractor.startRecording(screenRecordingParameters())
-
-            assertThat(underTest.transformableByTouchAnywhere).isFalse()
-        }
+    private val underTest by lazy {
+        kosmos.screenCaptureCameraTransformationViewModel.apply { activateIn(kosmos.testScope) }
+    }
 
     @Test
     fun recordingStarting_transformableByTouchAnywhere_isFalse() =
@@ -57,11 +65,77 @@ class ScreenCaptureCameraTransformationViewModelTest : SysuiTestCase() {
         }
 
     @Test
-    fun recordingStopped_transformableByTouchAnywhere_isTrue() =
+    fun isTransforming_isPropagated() =
         kosmos.runTest {
-            screenRecordingServiceInteractor.startRecording(screenRecordingParameters())
+            val transform = CompletableDeferred<Unit>()
+
+            testScope.launch { underTest.transform { transform.await() } }
+            assertThat(screenCaptureCameraTransformationInteractor.isTransforming).isTrue()
+
+            transform.complete(Unit)
+            assertThat(screenCaptureCameraTransformationInteractor.isTransforming).isFalse()
+        }
+
+    @Test
+    fun recordingInProgress_useCameraBounds() =
+        kosmos.runTest {
+            val uiBounds = Rect(0f, 0f, 1080f, 1920f)
+            underTest.onUiBoundsChanged(uiBounds)
+            underTest.onSurfaceScreenBoundsUpdated(uiBounds.deflate(10f))
+            screenRecordingServiceInteractor.startRecording(
+                ScreenRecordingParameters(
+                    captureTarget = null,
+                    audioSource = ScreenRecordingAudioSource.NONE,
+                    displayId = 0,
+                    shouldShowTaps = false,
+                )
+            )
+            fakeScreenRecordCameraRepository.setCameraSubjectBounds(Region(20, 20, 100, 100))
+
+            underTest.transform {
+                transformByWithCentroid(
+                    centroid = uiBounds.center,
+                    zoomChange = 0.01f,
+                    panChange = Offset(10f, 10f),
+                    rotationChange = 10f,
+                )
+            }
+
+            assertThat(underTest.transformableByTouchAnywhere).isFalse()
+            val touchableRegion = Region().also(underTest::fillCameraInteractableRegion)
+            assertThat(touchableRegion.bounds).isEqualTo(Region(546, 960, 547, 961).bounds)
+        }
+
+    @Test
+    fun noRecordingInProgress_useGlobalBounds() =
+        kosmos.runTest {
+            val uiBounds = Rect(0f, 0f, 1080f, 1920f)
+            underTest.onUiBoundsChanged(uiBounds)
+            underTest.onSurfaceScreenBoundsUpdated(uiBounds.deflate(10f))
+
             screenRecordingServiceInteractor.stopRecording(StopReason.STOP_HOST_APP)
+            underTest.transform {
+                transformByWithCentroid(
+                    centroid = uiBounds.center,
+                    zoomChange = 10f,
+                    panChange = Offset(10f, 10f),
+                    rotationChange = 10f,
+                )
+            }
 
             assertThat(underTest.transformableByTouchAnywhere).isTrue()
+            val touchableRegion = Region().also(underTest::fillCameraInteractableRegion)
+            assertThat(touchableRegion.bounds).isEqualTo(uiBounds.toAndroidRectF().toRect())
+        }
+
+    @Test
+    fun notDebuggable_debugTouchBounds_isNull() =
+        kosmos.runTest {
+            SystemProperties.set(
+                ScreenCaptureCameraTransformationViewModel.SHOW_SELFIE_TOUCH_BOUNDS_PROPERTY,
+                "false",
+            )
+
+            assertThat(underTest.debugTouchBounds).isNull()
         }
 }

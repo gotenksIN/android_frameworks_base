@@ -16,8 +16,10 @@
 
 package com.android.systemui.screencapture.record.camera.data.repository
 
+import android.graphics.Region
 import android.util.Size
 import android.view.Surface
+import com.android.systemui.screencapture.record.camera.data.model.StreamConfiguration
 import com.android.systemui.screencapture.record.camera.shared.model.CameraState
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
@@ -29,16 +31,16 @@ import kotlinx.coroutines.flow.emptyFlow
 
 class FakeScreenRecordCameraRepository : ScreenRecordCameraRepository {
 
-    override val errors: Flow<Int>
-        get() = emptyFlow()
+    override val errors: Flow<Int> = emptyFlow()
 
     private val _state = MutableStateFlow(CameraState.Unavailable)
-    override val state: StateFlow<CameraState>
-        get() = _state.asStateFlow()
+    override val state: StateFlow<CameraState> = _state.asStateFlow()
 
     private val _isConnected = MutableStateFlow(false)
-    override val isConnected: Flow<Boolean>
-        get() = _isConnected.asStateFlow()
+    override val isConnected: StateFlow<Boolean> = _isConnected.asStateFlow()
+
+    private val _cameraSubjectBounds = MutableStateFlow<Region?>(null)
+    override val cameraSubjectBounds: StateFlow<Region?> = _cameraSubjectBounds.asStateFlow()
 
     private val _taps: Channel<Unit> = Channel()
     val taps: Flow<Unit> = _taps.consumeAsFlow()
@@ -76,7 +78,7 @@ class FakeScreenRecordCameraRepository : ScreenRecordCameraRepository {
     override suspend fun prepareStream(
         displayUniqueId: String?,
         @Surface.Rotation displayRotation: Int,
-    ): Size? = optimalCameraStreamSize
+    ): StreamConfiguration? = optimalCameraStreamSize?.let { StreamConfiguration(it, it) }
 
     override suspend fun setBackgroundColor(color: Int) {
         backgroundColor = color
@@ -84,5 +86,9 @@ class FakeScreenRecordCameraRepository : ScreenRecordCameraRepository {
 
     override suspend fun onTap() {
         _taps.trySend(Unit)
+    }
+
+    fun setCameraSubjectBounds(bounds: Region) {
+        _cameraSubjectBounds.value = bounds
     }
 }

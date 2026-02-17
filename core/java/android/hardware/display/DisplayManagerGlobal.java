@@ -64,7 +64,6 @@ import android.view.Display;
 import android.view.DisplayAdjustments;
 import android.view.DisplayInfo;
 import android.view.Surface;
-import android.window.DesktopExperienceFlags;
 
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.server.LocalServices;
@@ -207,7 +206,7 @@ public final class DisplayManagerGlobal {
     @VisibleForTesting
     public DisplayManagerGlobal(IDisplayManager dm) {
         if (Process.myUid() != Process.SYSTEM_UID // cache display IDs for non-system processes
-                && (Flags.displayListenerSnapshot() || Flags.displayIdsCache())) {
+                && Flags.displayIdsCache()) {
             mDisplayIdsCache = new DisplayIdsCache();
         } else {
             mDisplayIdsCache = null;
@@ -233,9 +232,13 @@ public final class DisplayManagerGlobal {
 
     private PropertyInvalidatedCache<Integer, DisplayInfo> mDisplayCache =
             new PropertyInvalidatedCache<>(
-                new PropertyInvalidatedCache.Args(MODULE_SYSTEM)
-                .maxEntries(8).api(CACHE_KEY_DISPLAY_INFO_API).isolateUids(false),
-                CACHE_KEY_DISPLAY_INFO_API, null) {
+                    new PropertyInvalidatedCache
+                            .Args(MODULE_SYSTEM)
+                            .maxEntries(8)
+                            .api(CACHE_KEY_DISPLAY_INFO_API)
+                            .isolateUids(false)
+                            .cacheNulls(Flags.enableNullDisplayInfoCache()),
+                    CACHE_KEY_DISPLAY_INFO_API, null) {
 
                 @Override
                 public DisplayInfo recompute(Integer id) {
@@ -286,13 +289,7 @@ public final class DisplayManagerGlobal {
             }
             return mDmInternal.getDisplayInfo(displayId);
         }
-        if (Flags.getDisplayInfoOutsideLock()) {
-            return getDisplayInfoInternal(displayId);
-        } else {
-            synchronized (mLock) {
-                return getDisplayInfoInternal(displayId);
-            }
-        }
+        return getDisplayInfoInternal(displayId);
     }
 
     /**
@@ -536,11 +533,6 @@ public final class DisplayManagerGlobal {
                 delegate.setEventsMask(internalEventFlagsMask);
             }
             updateCallbackIfNeededLocked();
-            if (mDisplayIdsCache != null) {
-                delegate.updateSnapshotExpectation();
-                delegate.sendDisplaySnapshot(
-                        mDisplayIdsCache.getConnectedLocked(), mDisplayIdsCache.getAddedLocked());
-            }
         }
         maybeLogAllDisplayListeners();
     }
@@ -726,22 +718,10 @@ public final class DisplayManagerGlobal {
                 // Choreographer only supports a single display, so only dispatch refresh rate
                 // changes for the default display.
                 if (displayId == Display.DEFAULT_DISPLAY) {
-                    if (Flags.nativeRrCallbacksOutsideLock()) {
-                        if (info != null
-                                && mNativeCallbackReportedRefreshRate != info.getRefreshRate()) {
-                            mNativeCallbackReportedRefreshRate = info.getRefreshRate();
-                            shouldNotifyNativeListeners = true;
-                        }
-                    } else {
-                        // We can likely save a binder hop if we attach the refresh rate onto the
-                        // listener.
-                        DisplayInfo display = getDisplayInfoInternal(displayId);
-                        if (display != null
-                                && mNativeCallbackReportedRefreshRate != display.getRefreshRate()) {
-                            mNativeCallbackReportedRefreshRate = display.getRefreshRate();
-                            // Signal native callbacks if we ever set a refresh rate.
-                            nSignalNativeCallbacks(mNativeCallbackReportedRefreshRate);
-                        }
+                    if (info != null
+                            && mNativeCallbackReportedRefreshRate != info.getRefreshRate()) {
+                        mNativeCallbackReportedRefreshRate = info.getRefreshRate();
+                        shouldNotifyNativeListeners = true;
                     }
                 }
             }
@@ -770,11 +750,6 @@ public final class DisplayManagerGlobal {
         }
         synchronized (mLock) {
             mDisplayIdsCache.updateCacheLocked(connected, added);
-            connected = mDisplayIdsCache.getConnectedLocked();
-            added = mDisplayIdsCache.getAddedLocked();
-            for (DisplayListenerDelegate listener : mDisplayListeners) {
-                listener.sendDisplaySnapshot(connected, added);
-            }
         }
     }
 
@@ -1689,9 +1664,6 @@ public final class DisplayManagerGlobal {
      */
     public void registerTopologyListener(@NonNull @CallbackExecutor Executor executor,
             @NonNull Consumer<DisplayTopology> listener, String packageName) {
-        if (!DesktopExperienceFlags.DISPLAY_TOPOLOGY.isTrue()) {
-            return;
-        }
         if (listener == null) {
             throw new IllegalArgumentException("listener must not be null");
         }
@@ -1714,9 +1686,6 @@ public final class DisplayManagerGlobal {
      * @see DisplayManager#unregisterTopologyListener
      */
     public void unregisterTopologyListener(@NonNull Consumer<DisplayTopology> listener) {
-        if (!DesktopExperienceFlags.DISPLAY_TOPOLOGY.isTrue()) {
-            return;
-        }
         if (listener == null) {
             throw new IllegalArgumentException("listener must not be null");
         }
@@ -1766,12 +1735,6 @@ public final class DisplayManagerGlobal {
         }
     }
 
-    enum SnapshotReceived {
-        NEVER,
-        STALE,
-        LATEST
-    }
-
     @VisibleForTesting
     public static final class DisplayListenerDelegate {
         @VisibleForTesting public volatile long internalEventFlagsMask;
@@ -1785,12 +1748,6 @@ public final class DisplayManagerGlobal {
         private final Executor mExecutor;
         private final AtomicLong mGenerationId = new AtomicLong(1);
         private final String mPackageName;
-
-        private volatile boolean mIsConnectedSnapshotExpected;
-        private volatile SnapshotReceived mConnectedSnapshotReceived = SnapshotReceived.NEVER;
-
-        private volatile boolean mIsAddedSnapshotExpected;
-        private volatile SnapshotReceived mAddedSnapshotReceived = SnapshotReceived.NEVER;
 
         DisplayListenerDelegate(DisplayListener listener, @NonNull Executor executor,
                 @InternalEventFlag long internalEventFlag, String packageName,
@@ -1807,17 +1764,7 @@ public final class DisplayManagerGlobal {
             if (extraLogging()) {
                 Slog.i(TAG, "Sending Display Events: " + eventsToString(eventMask));
             }
-            if (Flags.displayListenerSnapshot()
-                    && (internalEventFlagsMask & INTERNAL_EVENT_FLAG_DISPLAY_SNAPSHOT) != 0
-                    && (mIsConnectedSnapshotExpected || mIsAddedSnapshotExpected)
-                    && mAddedSnapshotReceived == SnapshotReceived.NEVER
-                    && mConnectedSnapshotReceived == SnapshotReceived.NEVER) {
-                Slog.i(TAG, "Skipping new events until a snapshot is received"
-                        + " package=" + ActivityThread.currentPackageName()
-                        + " connectedExpected=" + mIsConnectedSnapshotExpected
-                        + " addedExpected=" + mIsAddedSnapshotExpected);
-                return;
-            }
+
             long generationId = this.mGenerationId.get();
             mExecutor.execute(() -> {
                 // If the generation id's don't match we were canceled
@@ -1825,71 +1772,6 @@ public final class DisplayManagerGlobal {
                     handleDisplayEventsInner(displayId, eventMask, info, forceUpdate);
                 }
             });
-        }
-
-        void sendDisplaySnapshot(@Nullable int[] connected, @Nullable int[] added) {
-            if ((internalEventFlagsMask & INTERNAL_EVENT_FLAG_DISPLAY_SNAPSHOT) == 0) {
-                if (DEBUG) {
-                    Slog.d(TAG, "Snapshot is not requested by the client"
-                            + " package=" + ActivityThread.currentPackageName());
-                }
-                return;
-            }
-            if ((connected == null || connected.length == 0) && mIsConnectedSnapshotExpected
-                    && mConnectedSnapshotReceived != SnapshotReceived.LATEST) {
-                if (DEBUG) {
-                    Slog.d(TAG, "Not satisfactory. Expected connected"
-                            + ", but no connected are provided."
-                            + " package=" + ActivityThread.currentPackageName());
-                }
-                return;
-            }
-            if ((added == null || added.length == 0) && mIsAddedSnapshotExpected
-                    && mAddedSnapshotReceived != SnapshotReceived.LATEST) {
-                if (DEBUG) {
-                    Slog.d(TAG, "Not satisfactory. Expected added, but no added are provided."
-                            + " package=" + ActivityThread.currentPackageName());
-                }
-                return;
-            }
-            if (mConnectedSnapshotReceived == SnapshotReceived.LATEST) {
-                if (DEBUG) {
-                    Slog.d(TAG, "latest connected already received"
-                            + ", no need to receive connected again."
-                            + " package=" + ActivityThread.currentPackageName());
-                }
-                connected = null;
-            }
-            if (mAddedSnapshotReceived == SnapshotReceived.LATEST) {
-                if (DEBUG) {
-                    Slog.d(TAG, "latest added already received, no need to receive added again."
-                            + " package=" + ActivityThread.currentPackageName());
-                }
-                added = null;
-            }
-            if ((connected == null || connected.length == 0)
-                    && (added == null || added.length == 0)) {
-                if (DEBUG) {
-                    Slog.d(TAG, "connected and added are not satisfactory, or not needed."
-                            + " package=" + ActivityThread.currentPackageName());
-                }
-                return;
-            }
-            int[] connectedFinal = connected;
-            int[] addedFinal = added;
-            long generationId = this.mGenerationId.get();
-            mExecutor.execute(() -> {
-                // If the generation id's don't match we were canceled
-                if (generationId == this.mGenerationId.get()) {
-                    handleDisplaySnapshotInner(connectedFinal, addedFinal);
-                }
-            });
-            if (connected != null && connected.length > 0) {
-                mConnectedSnapshotReceived = SnapshotReceived.LATEST;
-            }
-            if (added != null && added.length > 0) {
-                mAddedSnapshotReceived = SnapshotReceived.LATEST;
-            }
         }
 
         @VisibleForTesting
@@ -1903,26 +1785,6 @@ public final class DisplayManagerGlobal {
 
         void setEventsMask(@InternalEventFlag long newInternalEventFlagsMask) {
             internalEventFlagsMask = newInternalEventFlagsMask;
-        }
-
-        void updateSnapshotExpectation() {
-            // The listener for this Delegate may be expecting connected and added snapshot
-            mIsConnectedSnapshotExpected =
-                    (internalEventFlagsMask & INTERNAL_EVENT_FLAG_DISPLAY_CONNECTION_CHANGED) != 0;
-            mIsAddedSnapshotExpected =
-                    (internalEventFlagsMask & INTERNAL_EVENT_FLAG_DISPLAY_ADDED) != 0
-                        && (internalEventFlagsMask & INTERNAL_EVENT_FLAG_DISPLAY_REMOVED) != 0;
-            // In case connected snapshot is no longer expected, but was previously received,
-            // mark the snapshot as STALE.
-            if (!mIsConnectedSnapshotExpected
-                    && mConnectedSnapshotReceived == SnapshotReceived.LATEST) {
-                mConnectedSnapshotReceived = SnapshotReceived.STALE;
-            }
-            // In case added snapshot is no longer expected, but was previously received,
-            // mark the snapshot as STALE.
-            if (!mIsAddedSnapshotExpected && mAddedSnapshotReceived == SnapshotReceived.LATEST) {
-                mAddedSnapshotReceived = SnapshotReceived.STALE;
-            }
         }
 
         private void implicitlyRegisterForRRChanges() {
@@ -2032,33 +1894,6 @@ public final class DisplayManagerGlobal {
                         mListener.onDisplayChanged(displayId);
                     }
                     break;
-            }
-            if (DEBUG) {
-                Trace.endSection();
-            }
-        }
-
-        private void handleDisplaySnapshotInner(@Nullable int[] connected, @Nullable int[] added) {
-            if (extraLogging()) {
-                Slog.i(TAG, "DLD(SNAPSHOT"
-                        + ", connected=" + Arrays.toString(connected)
-                        + ", added=" + Arrays.toString(added)
-                        + ", mPackageName=" + mPackageName
-                        + ", listener=" + mListener.getClass() + ")");
-            }
-            if (DEBUG) {
-                Trace.beginSection(
-                        TextUtils.trimToSize(
-                                "DLD(SNAPSHOT"
-                                        + ", connected=" + Arrays.toString(connected)
-                                        + ", added=" + Arrays.toString(added)
-                                        + ", listener=" + mListener.getClass() + ")", 127));
-            }
-            if (connected != null && connected.length > 0) {
-                mListener.onDisplayConnectedSnapshot(connected);
-            }
-            if (added != null && added.length > 0) {
-                mListener.onDisplayAddedSnapshot(added);
             }
             if (DEBUG) {
                 Trace.endSection();
@@ -2327,12 +2162,6 @@ public final class DisplayManagerGlobal {
             baseEventMask |= INTERNAL_EVENT_FLAG_DISPLAY_BRIGHTNESS_CHANGED;
         }
 
-        if (Flags.displayListenerSnapshot()) {
-            if ((eventFlags & DisplayManager.EVENT_TYPE_DISPLAY_SNAPSHOT) != 0) {
-                baseEventMask |= INTERNAL_EVENT_FLAG_DISPLAY_SNAPSHOT;
-            }
-        }
-
         return baseEventMask;
     }
 
@@ -2577,8 +2406,10 @@ public final class DisplayManagerGlobal {
                         // event, since this is the first time the system is acknowledging it.
                         endLocalControl(index);
                     } else if (value == LOCALLY_REMOVED_MASK || (value & FLAG_ADDED) != 0) {
-                        // If it is either already removed display, or it is a duplicated event.
-                        // We should not send these events to the client.
+                        /// The value is found, but it is not locally injected
+                        // (value != LOCALLY_ADDED_MASK), then it is either already removed display,
+                        // or it is a duplicated event. In either case we should not send these
+                        // events to the client.
                         outEventMask &= ~(EVENT_DISPLAY_CONNECTED | EVENT_DISPLAY_ADDED);
                         endLocalControl(index);
                     } else {
@@ -2598,11 +2429,13 @@ public final class DisplayManagerGlobal {
                     if (value == LOCALLY_ADDED_MASK) {
                         // The display is locally injected.
                         // The event must be sent to the listener, because it was not sent before.
-                        endLocalControl(index);
+                        // Don't end local control yet, because display is "ADDED" so we still need
+                        // to wait for the ADDED event to be sent from the system server.
                     } else if (value == LOCALLY_REMOVED_MASK || (value & FLAG_CONNECTED) != 0) {
-                        // If value is found, but it is not "locally injected" display, then it is
-                        // either already removed display, or it is a duplicated event. In either
-                        // case we should not send these events to the client.
+                        // The value is found, but it is not locally injected
+                        // (value != LOCALLY_ADDED_MASK), then it is either already removed display,
+                        // or it is a duplicated event. In either case we should not send these
+                        // events to the client.
                         outEventMask &= ~EVENT_DISPLAY_CONNECTED;
                         endLocalControl(index);
                     } else {

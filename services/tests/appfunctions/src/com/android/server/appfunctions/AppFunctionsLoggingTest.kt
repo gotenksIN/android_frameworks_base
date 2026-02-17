@@ -43,6 +43,7 @@ import com.android.modules.utils.testing.ExtendedMockitoRule
 import com.android.server.LocalServices
 import com.android.server.appinteraction.AppInteractionService
 import com.android.server.uri.UriGrantsManagerInternal
+import com.android.server.wm.ActivityTaskManagerInternal
 import com.google.common.util.concurrent.MoreExecutors
 import org.junit.Before
 import org.junit.Rule
@@ -89,11 +90,10 @@ class AppFunctionsLoggingTest {
                 whenever(this.newUriPermissionOwner(any())).thenReturn(mock<IBinder>())
             },
             mAppFunctionsLoggerWrapper,
-            mock<AppFunctionAgentAllowlistStorage>(),
             mock<MultiUserDynamicAppFunctionRegistry>(),
             mock<AppInteractionService>(),
-            MoreExecutors.directExecutor(),
-            mMetadataReader
+            mMetadataReader,
+            mock<ActivityTaskManagerInternal>(),
         )
 
     @Before
@@ -372,7 +372,13 @@ class AppFunctionsLoggingTest {
                 TEST_INITIAL_REQUEST_TIME_MILLIS,
                 System.currentTimeMillis(),
             )
-        whenever(mMetadataReader.isDynamicFunction(eq(TEST_TARGET_PACKAGE), eq(TEST_FUNCTION_ID), any()))
+        whenever(
+                mMetadataReader.isDynamicFunction(
+                    eq(TEST_TARGET_PACKAGE),
+                    eq(TEST_FUNCTION_ID),
+                    any(),
+                )
+            )
             .thenReturn(false)
         val safeCallback =
             mServiceImpl.initializeSafeExecuteAppFunctionCallback(
@@ -414,7 +420,13 @@ class AppFunctionsLoggingTest {
                 TEST_INITIAL_REQUEST_TIME_MILLIS,
                 System.currentTimeMillis(),
             )
-        whenever(mMetadataReader.isDynamicFunction(eq(TEST_TARGET_PACKAGE), eq(TEST_FUNCTION_ID), any()))
+        whenever(
+                mMetadataReader.isDynamicFunction(
+                    eq(TEST_TARGET_PACKAGE),
+                    eq(TEST_FUNCTION_ID),
+                    any(),
+                )
+            )
             .thenReturn(true)
         val safeCallback =
             mServiceImpl.initializeSafeExecuteAppFunctionCallback(

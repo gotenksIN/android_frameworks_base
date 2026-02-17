@@ -44,11 +44,12 @@ import com.android.systemui.dreams.suppression.dagger.NoOpActivityRecognitionMod
 import com.android.systemui.education.dagger.ContextualEducationModule;
 import com.android.systemui.emergency.EmergencyGestureModule;
 import com.android.systemui.inputdevice.tutorial.KeyboardTouchpadTutorialModule;
+import com.android.systemui.inputmethod.ImeSwitcherMenuModule;
 import com.android.systemui.keyboard.shortcut.ShortcutHelperModule;
 import com.android.systemui.keyguard.dagger.KeyguardModule;
 import com.android.systemui.keyguard.ui.view.layout.blueprints.KeyguardBlueprintModule;
 import com.android.systemui.keyguard.ui.view.layout.sections.KeyguardSectionsModule;
-import com.android.systemui.lowlight.dagger.NoopAmbientLightModeMonitorModule;
+import com.android.systemui.lowlight.dagger.ScreenAwareLightModeMonitorModule;
 import com.android.systemui.media.dagger.MediaModule;
 import com.android.systemui.media.muteawait.MediaMuteAwaitConnectionCli;
 import com.android.systemui.media.nearby.NearbyMediaDevicesManager;
@@ -139,6 +140,7 @@ import javax.inject.Provider;
         CentralSurfacesModule.class,
         ClipboardOverlayOverrideModule.class,
         ConnectingDisplayViewModel.StartableModule.class,
+        ImeSwitcherMenuModule.class,
         DisplayPhoneModule.class,
         EmergencyGestureModule.class,
         GestureModule.class,
@@ -160,7 +162,6 @@ import javax.inject.Provider;
         RecentsModule.class,
         ReferenceNotificationsModule.class,
         PosturingModule.class,
-        NoopAmbientLightModeMonitorModule.class,
         ReferenceScreenshotModule.class,
         RotationLockModule.class,
         RotationLockNewModule.class,
@@ -171,6 +172,7 @@ import javax.inject.Provider;
         ShadeModule.class,
         StartCentralSurfacesModule.class,
         SceneContainerFrameworkModule.class,
+        ScreenAwareLightModeMonitorModule.class,
         SysUICoroutinesModule.class,
         SysUIUnfoldStartableModule.class,
         UnfoldTransitionModule.Startables.class,

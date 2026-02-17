@@ -53,7 +53,6 @@ import android.content.IntentSender;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.ResolveInfoFlags;
 import android.content.pm.ResolveInfo;
-import android.graphics.PixelFormat;
 import android.hardware.display.DisplayManager;
 import android.hardware.display.DisplayManagerGlobal;
 import android.hardware.display.VirtualDisplay;
@@ -64,11 +63,11 @@ import android.hardware.input.VirtualKeyEvent;
 import android.hardware.input.VirtualTouchEvent;
 import android.hardware.input.VirtualTouchscreen;
 import android.hardware.input.VirtualTouchscreenConfig;
-import android.media.ImageReader;
 import android.os.Binder;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.os.RemoteException;
+import android.os.Trace;
 import android.os.UserHandle;
 import android.util.ArraySet;
 import android.util.Slog;
@@ -93,6 +92,8 @@ import com.android.server.pm.UserManagerInternal;
 import com.android.server.wm.ActivityTaskManagerInternal;
 import com.android.server.wm.WindowManagerInternal;
 
+import java.io.FileDescriptor;
+import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -110,14 +111,23 @@ import java.util.function.Supplier;
 /**
  * A computer control session that encapsulates a {@link android.companion.virtual.IVirtualDevice}.
  * The device is created and managed by the system, but it is still owned by the caller.
+ *
+ * NOTE: Lock ordering precedence: The hierarchy of locks defined in this file is determined by the
+ * order in which the locks are declared. If two locks need to be acquired at once, the lock
+ * declared earlier in the file needs to be acquired first.
  */
 final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         implements IBinder.DeathRecipient, AppOpsManager.OnOpChangedListener {
 
     private static final String TAG = "ComputerControlSession";
+    private static final int TRACE_COOKIE_SESSION = 0;
+    private static final int TRACE_COOKIE_WINDOW_DRAW = 1;
 
     private static final long DEFAULT_GLOBAL_SESSION_TIMEOUT_DURATION_MS =
             TimeUnit.MILLISECONDS.convert(360, TimeUnit.MINUTES);
+
+    // Timeout for waiting for all windows on the display to be drawn before taking a screenshot.
+    private static final int WINDOW_DRAW_TIMEOUT_MS = 1000;
 
     // Input device names are limited to 80 bytes, so keep the prefix shorter than that.
     private static final int MAX_INPUT_DEVICE_NAME_PREFIX_BYTES = 70;
@@ -153,6 +163,9 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     @VisibleForTesting
     static final int PRODUCT_ID_TOUCHSCREEN = 0xCC03;
 
+    private final String mTraceTrack = "ComputerControlSessionImpl#"
+            + System.identityHashCode(this);
+
     private final IBinder mAppToken;
     private final ComputerControlSessionParams mParams;
     private final IApplicationThread mAppThread;
@@ -173,6 +186,25 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     private final VirtualDpad mVirtualDpad;
     private final ComputerControlAudioCapture mAudioCapture;
     private final ComputerControlAudioInjector mAudioInjector;
+
+    @Override
+    protected void dump(@androidx.annotation.NonNull FileDescriptor fd,
+            @androidx.annotation.NonNull PrintWriter fout,
+            @androidx.annotation.Nullable String[] args) {
+        String indent = "        ";
+        fout.print(indent);
+
+        fout.print("ComupterControlSession {");
+        fout.print(" mDeviceId=" + mVirtualDeviceId);
+        fout.print(" mName=" + mParams.getName());
+        fout.print(" mTargetExtensionVersion=" + mParams.getTargetExtensionVersion());
+        fout.print(" mOwnerPackageName=" + mOwnerPackageName);
+        fout.print(" mTargetPackageNames=" + mParams.getTargetPackageNames());
+        fout.print(" mAppInteractionAttribution=" + mParams.getAppInteractionAttribution());
+        fout.print("}");
+        fout.print("\n");
+    }
+
     private final ScheduledExecutorService mScheduler =
             Executors.newSingleThreadScheduledExecutor();
     /** Executor for the shared FgThread. */
@@ -189,7 +221,6 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     private final ViewConfiguration mViewConfiguration;
     private final long mGlobalSessionTimeoutDurationMs;
     private final Supplier<SurfaceControl.Transaction> mTransactionSupplier;
-    private final ImageReader mBlockedStateImageReader;
     private final ComputerControlAllowlistController mAllowlistController;
     private final ComputerControlStatsController mStatsController;
     @Nullable private final AppInteractionService mAppInteractionService;
@@ -203,18 +234,13 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             new ComputerControlSession.LifecycleCallback() {
                 @Override
                 public void onActive() {
-                    mVirtualDisplay.setSurface(mClientSurface);
                     mStatsController.onSessionActive();
                 }
 
                 @Override
                 public void onBlocked(@ComputerControlSession.SessionBlockReason int reason,
                         @Nullable String blockingPackage) {
-                    cancelOngoingKeyGestures();
-                    cancelOngoingTouchGestures();
-                    // Prevent the client from being able to see the display by disconnecting
-                    // the client surface from the display.
-                    mVirtualDisplay.setSurface(mBlockedStateImageReader.getSurface());
+                    cancelOngoingInteractions();
                     mStatsController.onSessionBlocked(reason);
                 }
 
@@ -222,6 +248,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
                 public void onClosed(@ComputerControlSession.SessionCloseReason int reason) {
                     releaseResources();
                     mStatsController.onSessionClosed(reason);
+                    Trace.asyncTraceForTrackEnd(mTraceTrack, TRACE_COOKIE_SESSION);
                 }
             };
 
@@ -238,6 +265,8 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     private PendingIntent mPreviewIntent = null;
 
     @GuardedBy("mInteractiveMirrors")
+    // A list of active interactive mirrors. The presence of mirrors indicates foreground
+    // automation, which enables touch visualization.
     private final List<InteractiveMirrorImpl> mInteractiveMirrors = new ArrayList<>();
 
     @Nullable
@@ -253,6 +282,11 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
 
     // Whether this is a session only intended for testing ComputerControl functionality.
     private final boolean mIsTestSession;
+
+    private final Object mWindowDrawLock = new Object();
+    // Whether a window draw as a result of a screenshot request is in progress.
+    @GuardedBy("mWindowDrawLock")
+    private boolean mIsWaitingForWindowDraw = false;
 
     ComputerControlSessionImpl(Context context,
             ComputerControlAllowlistController allowlistController, IBinder appToken,
@@ -275,6 +309,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             AttributionSource attributionSource,
             ComputerControlSessionProcessor.VirtualDeviceFactory virtualDeviceFactory,
             Consumer<ComputerControlSessionImpl> onClosedListener, Executor fgThreadExecutor) {
+        Trace.asyncTraceForTrackBegin(mTraceTrack, "Session", TRACE_COOKIE_SESSION);
         mFgThreadExecutor = fgThreadExecutor;
         mViewConfiguration = viewConfiguration;
         mGlobalSessionTimeoutDurationMs = globalSessionTimeoutDurationMs;
@@ -337,9 +372,6 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         final int displayWidth = virtualDisplayConfig.getWidth();
         final int displayHeight = virtualDisplayConfig.getHeight();
 
-        mBlockedStateImageReader = ImageReader.newInstance(displayWidth, displayHeight,
-                PixelFormat.RGBA_8888, /* maxImages= */ 1);
-
         try {
             mVirtualDevice = virtualDeviceFactory.createVirtualDevice(mAppToken, attributionSource,
                     virtualDeviceParams);
@@ -353,9 +385,9 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             mWindowManagerInternal.setAnimationsDisabledForDisplay(
                     mVirtualDisplay.getDisplay().getDisplayId(), true);
             mVirtualDisplayId = mVirtualDisplay.getDisplay().getDisplayId();
-
-            mInputManagerInternal.setForceShowTouchesOnDisplay(mVirtualDisplayId,
-                    true /* enabled */);
+            mWindowManagerInternal.disableSystemPerformanceHinter(mVirtualDisplayId);
+            mWindowManagerInternal.enableClientRenderingLimitationsOnDisplay(
+                    mVirtualDisplayId, /* enable = */true);
 
             mVirtualDevice.setDisplayImePolicy(
                     mVirtualDisplayId, WindowManager.DISPLAY_IME_POLICY_HIDE);
@@ -471,6 +503,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             throw new IllegalStateException("Client surface is already initialized");
         }
         mClientSurface = clientSurface;
+        mVirtualDisplay.setSurface(mClientSurface);
 
         mLifecycle.initializeWithRemoteCallback(callback);
     }
@@ -495,6 +528,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
             Slog.e(TAG, "Cannot launch application: Agent interaction is not available");
             return;
         }
+        cancelOngoingInteractions();
         synchronized (mAllowlistedPackages) {
             mAllowlistedPackages.add(packageName);
         }
@@ -521,7 +555,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         if (shouldDisallowInteractions("tap")) {
             return;
         }
-        cancelOngoingTouchGestures();
+        cancelOngoingInteractions();
         mVirtualTouchscreen.sendTouchEvent(createTouchEvent(x, y, VirtualTouchEvent.ACTION_DOWN));
         mVirtualTouchscreen.sendTouchEvent(createTouchEvent(x, y, VirtualTouchEvent.ACTION_UP));
         mStatsController.onTap();
@@ -534,7 +568,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         if (shouldDisallowInteractions("swipe")) {
             return;
         }
-        cancelOngoingTouchGestures();
+        cancelOngoingInteractions();
         mVirtualTouchscreen.sendTouchEvent(
                 createTouchEvent(fromX, fromY, VirtualTouchEvent.ACTION_DOWN));
         performSwipeStep(fromX, fromY, toX, toY, /* step= */ 0, SWIPE_STEPS);
@@ -547,7 +581,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         if (shouldDisallowInteractions("longPress")) {
             return;
         }
-        cancelOngoingTouchGestures();
+        cancelOngoingInteractions();
         mVirtualTouchscreen.sendTouchEvent(
                 createTouchEvent(x, y, VirtualTouchEvent.ACTION_DOWN));
         int longPressStepCount =
@@ -564,6 +598,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         if (shouldDisallowInteractions("performAction")) {
             return;
         }
+        cancelOngoingInteractions();
         if (actionCode == ComputerControlSession.ACTION_GO_BACK) {
             mVirtualDpad.sendKeyEvent(
                     createKeyEvent(KeyEvent.KEYCODE_BACK, VirtualKeyEvent.ACTION_DOWN));
@@ -583,11 +618,27 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         if (mirror == null) {
             return null;
         }
+        final boolean foregroundMirroringStarted;
         synchronized (mInteractiveMirrors) {
+            foregroundMirroringStarted = mInteractiveMirrors.isEmpty();
+            if (foregroundMirroringStarted) {
+                // Automation is no longer running in the background. Show touches.
+                mInputManagerInternal.setForceShowTouchesOnDisplay(mVirtualDisplayId,
+                        true /* enabled */);
+                // Automation is happening in the foreground, so enable rendering.
+                mWindowManagerInternal.enableClientRenderingLimitationsOnDisplay(
+                        mVirtualDisplayId, /* enable = */false);
+                mWindowManagerInternal.requestHardwareRendererOutputEnabled(mVirtualDisplayId,
+                        0 /* timeoutMs */, (success) -> {
+                        }, mScheduler);
+            }
             mInteractiveMirrors.add(mirror);
         }
         outMirrorSurface.copyFrom(mirror.getMirrorLeash(),
                 "ComputerControlSessionImpl#createInteractiveMirrorDisplay");
+        if (foregroundMirroringStarted) {
+            mStatsController.onMirroringStarted();
+        }
         mStatsController.onMirrorViewCreated();
         return mirror;
     }
@@ -631,18 +682,38 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     }
 
     private void removeInteractiveMirror(InteractiveMirrorImpl interactiveMirror) {
+        final boolean foregroundMirroringStopped;
         synchronized (mInteractiveMirrors) {
             if (!mInteractiveMirrors.remove(interactiveMirror)) {
                 return;
+            }
+            foregroundMirroringStopped = mInteractiveMirrors.isEmpty();
+            if (foregroundMirroringStopped) {
+                // Automation is fully running in the background. No need to show touches.
+                mInputManagerInternal.setForceShowTouchesOnDisplay(mVirtualDisplayId,
+                        false /* enabled */);
+                // Disable rendering during background automation, where windows will only draw
+                // when the client requests a screenshot.
+                mWindowManagerInternal.enableClientRenderingLimitationsOnDisplay(
+                        mVirtualDisplayId, /* enable = */true);
+                synchronized (mWindowDrawLock) {
+                    if (!mIsWaitingForWindowDraw) {
+                        mWindowManagerInternal.requestHardwareRendererOutputDisabled(
+                                mVirtualDisplayId);
+                    }
+                }
             }
         }
         try (var transaction = mTransactionSupplier.get()) {
             interactiveMirror.closeWithTransaction(transaction);
             transaction.apply();
         }
+        if (foregroundMirroringStopped) {
+            mStatsController.onMirroringStopped();
+        }
     }
 
-    private void removeAllInteractiveMirrors() {
+    private void removeAllInteractiveMirrorsOnSessionClose() {
         synchronized (mInteractiveMirrors) {
             if (mInteractiveMirrors.isEmpty()) {
                 return;
@@ -654,6 +725,10 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
                 transaction.apply();
             }
             mInteractiveMirrors.clear();
+
+            // Automation is fully running in the background. No need to show touches.
+            mInputManagerInternal.setForceShowTouchesOnDisplay(mVirtualDisplayId,
+                    false /* enabled */);
         }
     }
 
@@ -663,7 +738,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         if (shouldDisallowInteractions("insertText")) {
             return;
         }
-        cancelOngoingKeyGestures();
+        cancelOngoingInteractions();
 
         InputMethodManagerInternal.ComputerControlInputConnectionData data = getInputConnectionData(
                 mVirtualDisplayId);
@@ -739,6 +814,44 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     }
 
     @Override
+    public boolean requestScreenshot() {
+        if (mLifecycle.getCurrentState() instanceof LifecycleState.Closed) {
+            Slog.e(TAG, "Cannot request screenshot: Session is closed");
+            return false;
+        }
+        synchronized (mWindowDrawLock) {
+            if (mIsWaitingForWindowDraw) {
+                Slog.w(TAG, "Cannot request screenshot: Window draw is already in progress");
+                return false;
+            }
+            mIsWaitingForWindowDraw = mWindowManagerInternal.requestHardwareRendererOutputEnabled(
+                    mVirtualDisplayId, WINDOW_DRAW_TIMEOUT_MS, this::onWindowsDrawnCallback,
+                    mScheduler);
+            if (mIsWaitingForWindowDraw) {
+                Trace.asyncTraceForTrackBegin(mTraceTrack, "isWaitingForWindowDraw",
+                        TRACE_COOKIE_WINDOW_DRAW);
+            }
+            return mIsWaitingForWindowDraw;
+        }
+    }
+
+    private void onWindowsDrawnCallback(boolean success) {
+        if (!success) {
+            Slog.w(TAG, "Timed out waiting for windows to be drawn!");
+        }
+        synchronized (mInteractiveMirrors) {
+            if (mInteractiveMirrors.isEmpty()) {
+                mWindowManagerInternal.requestHardwareRendererOutputDisabled(
+                        mVirtualDisplayId);
+            }
+            synchronized (mWindowDrawLock) {
+                mIsWaitingForWindowDraw = false;
+                Trace.asyncTraceForTrackEnd(mTraceTrack, TRACE_COOKIE_WINDOW_DRAW);
+            }
+        }
+    }
+
+    @Override
     public void close() throws RemoteException {
         close(CLOSE_REASON_CALLER_INITIATED);
     }
@@ -762,14 +875,13 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
     }
 
     private void releaseResources() {
-        cancelOngoingKeyGestures();
-        cancelOngoingTouchGestures();
+        cancelOngoingInteractions();
         cancelPendingCloseSession();
         mAudioInjector.stopAudioInjection();
         mAudioCapture.stopAudioCapture();
         mVirtualDevice.close(); // closes also the VirtualAudioDevice
         mAppToken.unlinkToDeath(this, 0);
-        removeAllInteractiveMirrors();
+        removeAllInteractiveMirrorsOnSessionClose();
         mOnClosedListener.accept(this);
         mAppOpsManager.stopWatchingMode(this);
     }
@@ -816,14 +928,11 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
         return false;
     }
 
-    private void cancelOngoingKeyGestures() {
+    private void cancelOngoingInteractions() {
         if (mInsertTextFuture != null) {
             mInsertTextFuture.cancel(false);
             mInsertTextFuture = null;
         }
-    }
-
-    private void cancelOngoingTouchGestures() {
         if (mSwipeFuture != null && mSwipeFuture.cancel(false)) {
             mVirtualTouchscreen.sendTouchEvent(
                     createTouchEvent(0, 0, VirtualTouchEvent.ACTION_CANCEL));
@@ -1019,7 +1128,7 @@ final class ComputerControlSessionImpl extends IComputerControlSession.Stub
                             mAppInteractionService.noteAppInteraction(
                                     mOwnerPackageName,
                                     componentName.getPackageName(),
-                                    null, // TODO(b/454891648): get attribution from agent
+                                    mParams.getAppInteractionAttribution(),
                                     now,
                                     userId);
                         });

@@ -1,5 +1,4 @@
-/*
- * Copyright (C) 2022 The Android Open Source Project
+/* Copyright (C) 2022 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -1073,7 +1072,6 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_FULLY_IMMERSIVE_IN_DESKTOP)
     fun testImmersiveRestoreButtonClick_exitsImmersiveMode() {
         val onClickListenerCaptor = argumentCaptor<View.OnClickListener>()
         val decor =
@@ -1097,7 +1095,6 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_FULLY_IMMERSIVE_IN_DESKTOP)
     fun testMaximizeButtonClick_notRequestingImmersive_togglesDesktopTaskSize() {
         val onClickListenerCaptor = argumentCaptor<View.OnClickListener>()
         val decor =
@@ -1122,7 +1119,6 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_FULLY_IMMERSIVE_IN_DESKTOP)
     fun testImmersiveMenuOptionClick_entersImmersiveMode() {
         val windowDecorationActions = createDefaultWindowActions()
         val decor =
@@ -1140,7 +1136,6 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_FULLY_IMMERSIVE_IN_DESKTOP)
     fun testImmersiveMenuOptionClick_exitsTiling() {
         val windowDecorationActions = createDefaultWindowActions()
         val decor =
@@ -1159,7 +1154,6 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_DISPLAY_FOCUS_IN_SHELL_TRANSITIONS)
     fun testOnTaskInfoChanged_enableShellTransitionsFlag() {
         val task = createTask(windowingMode = WINDOWING_MODE_FREEFORM)
         val taskSurface = SurfaceControl()
@@ -1173,25 +1167,6 @@ class DesktopModeWindowDecorViewModelTests : DesktopModeWindowDecorViewModelTest
         verify(decoration).relayout(eq(task), eq(true), anyOrNull())
 
         whenever(decoration.hasGlobalFocus).thenReturn(false)
-        desktopModeWindowDecorViewModel.onTaskInfoChanged(task)
-        verify(decoration).relayout(eq(task), eq(false), anyOrNull())
-    }
-
-    @Test
-    @DisableFlags(Flags.FLAG_ENABLE_DISPLAY_FOCUS_IN_SHELL_TRANSITIONS)
-    fun testOnTaskInfoChanged_disableShellTransitionsFlag() {
-        val task = createTask(windowingMode = WINDOWING_MODE_FREEFORM)
-        val taskSurface = SurfaceControl()
-        val decoration = setUpMockDecorationForTask(task)
-
-        onTaskOpening(task, taskSurface)
-        assertTrue(windowDecorByTaskIdSpy.contains(task.taskId))
-
-        task.isFocused = true
-        desktopModeWindowDecorViewModel.onTaskInfoChanged(task)
-        verify(decoration).relayout(eq(task), eq(true), anyOrNull())
-
-        task.isFocused = false
         desktopModeWindowDecorViewModel.onTaskInfoChanged(task)
         verify(decoration).relayout(eq(task), eq(false), anyOrNull())
     }

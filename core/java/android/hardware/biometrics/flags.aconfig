@@ -90,13 +90,6 @@ flag {
 }
 
 flag {
-  name: "identity_check_all_surfaces"
-  namespace: "biometrics_framework"
-  description: "This flag applies Identity Check to all biometric prompt requests"
-  bug: "402534668"
-}
-
-flag {
   name: "identity_check_watch"
   namespace: "biometrics_framework"
   description: "This flag is for the integration of Identity Check with Watch"
@@ -116,4 +109,19 @@ flag {
   namespace: "biometrics_framework"
   description: "Feature flag for adding double auth in biometric prompt for Identity Check"
   bug: "442571994"
+}
+
+flag {
+  name: "get_biometric_sensor_strengths"
+  is_exported: true
+  namespace: "biometrics_framework"
+  description: "Feature flag for adding the getBiometricSensorStrengths API to BiometricManager."
+  bug: "454275027"
+}
+
+flag {
+    name: "agent_auth_api"
+    namespace: "biometrics_framework"
+    description: "Feature flag for internal xdevice agent auth API"
+    bug: "474639153"
 }

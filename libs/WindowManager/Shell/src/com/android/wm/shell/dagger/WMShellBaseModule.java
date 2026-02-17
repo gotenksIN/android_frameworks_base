@@ -76,6 +76,7 @@ import com.android.wm.shell.common.pip.PhoneSizeSpecSource;
 import com.android.wm.shell.common.pip.PipAppOpsListener;
 import com.android.wm.shell.common.pip.PipBoundsAlgorithm;
 import com.android.wm.shell.common.pip.PipBoundsState;
+import com.android.wm.shell.common.pip.PipDesktopState;
 import com.android.wm.shell.common.pip.PipDisplayLayoutState;
 import com.android.wm.shell.common.pip.PipMediaController;
 import com.android.wm.shell.common.pip.PipPerfHintController;
@@ -95,6 +96,7 @@ import com.android.wm.shell.compatui.api.CompatUIRepository;
 import com.android.wm.shell.compatui.api.CompatUISharedRepositoryCleanUp;
 import com.android.wm.shell.compatui.api.CompatUISharedStateHandler;
 import com.android.wm.shell.compatui.api.CompatUISharedStateRepository;
+import com.android.wm.shell.compatui.api.events.CompatUIEventService;
 import com.android.wm.shell.compatui.components.RestartButtonSpecKt;
 import com.android.wm.shell.compatui.impl.CompositeCompatUIHandler;
 import com.android.wm.shell.compatui.impl.DefaultCompatUIComponentFactory;
@@ -399,6 +401,17 @@ public abstract class WMShellBaseModule {
 
     @WMSingleton
     @Provides
+    static Optional<CompatUIEventService> provideCompatUIEventService(
+            @NonNull @ShellMainThread ShellExecutor mainExecutor,
+            @NonNull @ShellBackgroundThread ShellExecutor backgroundExecutor) {
+        if (Flags.appCompatUiFramework()) {
+            return Optional.of(new CompatUIEventService(mainExecutor, backgroundExecutor));
+        }
+        return Optional.empty();
+    }
+
+    @WMSingleton
+    @Provides
     static Optional<CompatUISharedRepositoryCleanUp> provideCompatUISharedStateManager(
             @NonNull ShellInit shellInit,
             @NonNull ShellTaskOrganizer shellTaskOrganizer,
@@ -609,9 +622,10 @@ public abstract class WMShellBaseModule {
     static PipBoundsAlgorithm providesPipBoundsAlgorithm(Context context,
             PipBoundsState pipBoundsState, PipSnapAlgorithm pipSnapAlgorithm,
             PhonePipKeepClearAlgorithm pipKeepClearAlgorithm,
-            PipDisplayLayoutState pipDisplayLayoutState, SizeSpecSource sizeSpecSource) {
+            PipDisplayLayoutState pipDisplayLayoutState,
+            PipDesktopState pipDesktopState, SizeSpecSource sizeSpecSource) {
         return new PipBoundsAlgorithm(context, pipBoundsState, pipSnapAlgorithm,
-                pipKeepClearAlgorithm, pipDisplayLayoutState, sizeSpecSource);
+                pipKeepClearAlgorithm, pipDisplayLayoutState, pipDesktopState, sizeSpecSource);
     }
 
     @WMSingleton
@@ -874,8 +888,9 @@ public abstract class WMShellBaseModule {
     @Provides
     static TaskViewTransitions provideTaskViewTransitions(Transitions transitions,
             TaskViewRepository repository, ShellTaskOrganizer organizer,
-            SyncTransactionQueue syncQueue, Optional<BubbleHelper> bubbleHelper) {
-        return new TaskViewTransitions(transitions, repository, organizer, syncQueue, bubbleHelper);
+            Optional<BubbleHelper> bubbleHelper) {
+        return new TaskViewTransitions(transitions, repository, organizer, bubbleHelper,
+                /* taskViewRootTask= */ Optional.empty());
     }
 
     @WMSingleton

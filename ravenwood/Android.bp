@@ -20,6 +20,14 @@ filegroup {
 }
 
 filegroup {
+    name: "ravenwood-aidl-policies",
+    srcs: [
+        "texts/ravenwood-aidl-policies.txt",
+    ],
+    visibility: [":__subpackages__"],
+}
+
+filegroup {
     name: "ravenwood-services-policies",
     srcs: [
         "texts/ravenwood-services-policies.txt",
@@ -249,6 +257,9 @@ cc_library_host_shared {
     name: "libravenwood_runtime",
     defaults: ["ravenwood_jni_defaults"],
     header_libs: ["libicuuc_headers"],
+    cflags: [
+        "-DNATIVE_HELPER_EMULATE_ART_UTF_CHARS=1",
+    ],
     srcs: [
         "runtime-jni/ravenwood_os_constants.cpp",
         "runtime-jni/ravenwood_runtime.cpp",
@@ -257,6 +268,7 @@ cc_library_host_shared {
         "libbase",
         "libcutils",
         "libutils",
+        "libandroid_runtime_ravenwood",
     ],
 }
 
@@ -574,7 +586,12 @@ filegroup {
 
 android_ravenwood_libgroup {
     name: "ravenwood-runtime.ravenwood-core",
-    data: [":ravenwood-core-data"],
+    data: [
+        {
+            path: "ravenwood-data",
+            srcs: [":ravenwood-core-data"],
+        },
+    ],
     libs: [
         "hoststubgen-helper-runtime",
         "ravenwood-framework",
@@ -584,7 +601,6 @@ android_ravenwood_libgroup {
         // Libraries has to be loaded in the following order
         "libravenwood_initializer",
         "libravenwood_runtime",
-        "libandroid_runtime_ravenwood",
     ],
     // Install it along with "ravenwood-runtime".
     install_name: "ravenwood-runtime",
@@ -619,8 +635,20 @@ android_ravenwood_libgroup {
 
 android_ravenwood_libgroup {
     name: "ravenwood-runtime",
-    data: [":ravenwood-data"],
-    fonts: [":ravenwood-fonts"],
+    data: [
+        {
+            path: "ravenwood-data",
+            srcs: [":ravenwood-data"],
+        },
+        {
+            path: "fonts",
+            srcs: [":ravenwood-fonts"],
+        },
+        {
+            path: "hyph-data",
+            srcs: [":hyph-data"],
+        },
+    ],
     subruntimes: [
         "ravenwood-runtime.ravenwood-core",
         "ravenwood-runtime.framework-minus-apex",

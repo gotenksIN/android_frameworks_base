@@ -26,6 +26,7 @@ import android.util.Log;
 import android.util.Slog;
 
 import com.android.server.personalcontext.component.Refiner;
+import com.android.server.personalcontext.component.Renderer;
 import com.android.server.personalcontext.util.FragileReference;
 
 import java.security.GeneralSecurityException;
@@ -57,13 +58,13 @@ public final class RefinerWorkflow {
     public static RefinerWorkflow start(
             ComponentProvider provider,
             Set<ContextHintWithSignature> initialHints,
-            RenderToken renderToken,
+            Set<RenderToken> renderTokens,
             SecretKeySpec secretKey,
             EventListener eventListener,
             ScheduledExecutorService executor) {
         // Build a new workflow instance.
         final RefinerWorkflow workflow = new RefinerWorkflow(
-                provider, renderToken, secretKey, eventListener, executor);
+                provider, renderTokens, secretKey, eventListener, executor);
 
         // Seed it with the first round of hints.
         workflow.seedHints(initialHints);
@@ -76,7 +77,7 @@ public final class RefinerWorkflow {
     private final Map<Refiner, Set<UUID>> mSeenHintIds = new HashMap<>();
     private final Set<RefinerCallback> mPendingRefinerCallbacks = new HashSet<>();
     private final ComponentProvider mProvider;
-    private final RenderToken mRenderToken;
+    private final Set<RenderToken> mRenderTokens;
     private final SecretKeySpec mSecretKey;
     private final EventListener mEventListener;
     private final ScheduledExecutorService mExecutor;
@@ -84,12 +85,12 @@ public final class RefinerWorkflow {
 
     private RefinerWorkflow(
             ComponentProvider provider,
-            RenderToken renderToken,
+            Set<RenderToken> renderTokens,
             SecretKeySpec secretKey,
             EventListener eventListener,
             ScheduledExecutorService executor) {
         mProvider = provider;
-        mRenderToken = renderToken;
+        mRenderTokens = renderTokens;
         mSecretKey = secretKey;
         mEventListener = eventListener != null ? eventListener : new EventListener() {};
         mExecutor = executor;
@@ -219,10 +220,10 @@ public final class RefinerWorkflow {
             for (ContextHint hint : newHints) {
                 final ComponentName componentName = source.getComponentName();
                 final String packageName =
-                        componentName == null ? null : componentName.getPackageName();
+                        componentName != null ? componentName.getPackageName() : null;
                 result.add(new ContextHintWithSignature.Builder(hint, mSecretKey)
                         .setOriginatingPackage(packageName)
-                        .setRenderToken(mRenderToken)
+                        .addRenderTokens(mRenderTokens)
                         .addAttributionHints(attributionHints)
                         .build());
             }
@@ -327,6 +328,9 @@ public final class RefinerWorkflow {
     public interface ComponentProvider {
         /** Gets currently-configured refiners. */
         Collection<Refiner> getRefiners();
+
+        /** Gets renderers that contain the specified properties. */
+        Collection<Renderer> getRenderersWithProperties(int properties);
     }
 
     /**

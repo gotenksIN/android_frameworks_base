@@ -409,17 +409,11 @@ public class LocationManagerService extends ILocationManager.Stub implements
 
     @VisibleForTesting
     protected void setProxyPopulationDensityProvider(ProxyPopulationDensityProvider provider) {
-        if (Flags.populationDensityProvider()) {
-            mPopulationDensityProvider = provider;
-        }
+        mPopulationDensityProvider = provider;
     }
 
     @VisibleForTesting
     protected void setLocationFudgerCache(LocationFudgerCache cache) {
-        if (!Flags.densityBasedCoarseLocations()) {
-            return;
-        }
-
         mLocationFudgerCache = cache;
         for (LocationProviderManager manager : mProviderManagers) {
             manager.setLocationFudgerCache(cache);
@@ -553,19 +547,17 @@ public class LocationManagerService extends ILocationManager.Stub implements
         }
 
 // QTI_END: 2018-04-10: Core: NLP Combo feature
-        if (Flags.populationDensityProvider()) {
-            long startTime = System.currentTimeMillis();
-            setProxyPopulationDensityProvider(
-                    ProxyPopulationDensityProvider.createAndRegister(mContext));
-            int duration = (int) (System.currentTimeMillis() - startTime);
-            if (mPopulationDensityProvider == null) {
-                Log.e(TAG, "no population density provider found");
-            }
-            FrameworkStatsLog.write(FrameworkStatsLog.POPULATION_DENSITY_PROVIDER_LOADING_REPORTED,
-                /* provider_null= */ (mPopulationDensityProvider == null),
-                /* provider_start_time_millis= */ duration);
+        long startTime = System.currentTimeMillis();
+        setProxyPopulationDensityProvider(
+                ProxyPopulationDensityProvider.createAndRegister(mContext));
+        int duration = (int) (System.currentTimeMillis() - startTime);
+        if (mPopulationDensityProvider == null) {
+            Log.e(TAG, "no population density provider found");
         }
-        if (mPopulationDensityProvider != null && Flags.densityBasedCoarseLocations()) {
+        FrameworkStatsLog.write(FrameworkStatsLog.POPULATION_DENSITY_PROVIDER_LOADING_REPORTED,
+            /* provider_null= */ (mPopulationDensityProvider == null),
+            /* provider_start_time_millis= */ duration);
+        if (mPopulationDensityProvider != null) {
             setLocationFudgerCache(new LocationFudgerCache(mPopulationDensityProvider));
         }
 

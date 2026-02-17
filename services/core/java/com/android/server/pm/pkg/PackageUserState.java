@@ -93,6 +93,20 @@ public interface PackageUserState {
     long getDeDataInode();
 
     /**
+     * Credential encrypted /data partition PCC directory inode.
+     *
+     * @hide
+     */
+    long getPccCeDataInode();
+
+    /**
+     * Device encrypted /data partition PCC directory inode.
+     *
+     * @hide
+     */
+    long getPccDeDataInode();
+
+    /**
      * Fully qualified class names of components explicitly disabled.
      *
      * @hide
@@ -246,6 +260,20 @@ public interface PackageUserState {
      */
     @PackageManager.UserMinAspectRatio
     int getMinAspectRatio();
+
+    /**
+     * @return the user option for the virtual gamepad feature.
+     * @hide
+     */
+    @PackageManager.VirtualGamepadUserOption
+    int getVirtualGamepadUserOption();
+
+    /**
+     * @return the user option for personal context data collection.
+     * @hide
+     */
+    @PackageManager.PersonalContextMode
+    int getPersonalContextMode();
 
     /**
      * Information about the archived state of an app. Set only if an app is archived.

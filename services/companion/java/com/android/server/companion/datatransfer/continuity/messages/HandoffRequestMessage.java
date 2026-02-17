@@ -17,62 +17,41 @@
 package com.android.server.companion.datatransfer.continuity.messages;
 
 import android.annotation.NonNull;
-import android.annotation.Nullable;
 import android.util.proto.ProtoInputStream;
 import android.util.proto.ProtoOutputStream;
-import com.android.internal.util.FrameworkStatsLog;
 import java.io.IOException;
 import java.util.Objects;
 
 /** Deserialized version of the HandoffRequestMessage proto. */
-public record HandoffRequestMessage(int taskId) implements TaskContinuityMessage {
+public record HandoffRequestMessage(int taskId) implements Proto {
 
-    public static final ProtoCreator<HandoffRequestMessage> CREATOR =
-            new ProtoCreator<HandoffRequestMessage>() {
-                @Override
-                public HandoffRequestMessage read(@NonNull ProtoInputStream pis)
-                        throws IOException {
-                    Objects.requireNonNull(pis);
+    public static class Builder extends Proto.Builder<HandoffRequestMessage> {
+        private int taskId = 0;
 
-                    int taskId = 0;
-                    while (pis.nextField() != ProtoInputStream.NO_MORE_FIELDS) {
-                        switch (pis.getFieldNumber()) {
-                            case (int) android.companion.HandoffRequestMessage.TASK_ID:
-                                taskId =
-                                        pis.readInt(
-                                                android.companion.HandoffRequestMessage.TASK_ID);
-                                break;
-                        }
-                    }
+        @NonNull
+        public Builder setTaskId(int taskId) {
+            this.taskId = taskId;
+            return this;
+        }
 
-                    return new HandoffRequestMessage(taskId);
-                }
+        @Override
+        protected void processField(@NonNull ProtoInputStream pis, int fieldNumber)
+                throws IOException {
+            switch (fieldNumber) {
+                case (int) android.companion.HandoffRequestMessage.TASK_ID ->
+                        setTaskId(pis.readInt(android.companion.HandoffRequestMessage.TASK_ID));
+            }
+        }
 
-                @Override
-                public void write(
-                        @NonNull ProtoOutputStream pos, @Nullable HandoffRequestMessage value)
-                        throws IOException {
-                    if (value == null) {
-                        return;
-                    }
-
-                    Objects.requireNonNull(pos)
-                            .write(android.companion.HandoffRequestMessage.TASK_ID, value.taskId());
-                }
-            };
-
-    @Override
-    public long getFieldNumber() {
-        return android.companion.TaskContinuityMessage.HANDOFF_REQUEST;
+        @Override
+        public HandoffRequestMessage build() {
+            return new HandoffRequestMessage(taskId);
+        }
     }
 
     @Override
-    public void writeToProto(@NonNull ProtoOutputStream pos) throws IOException {
-        HandoffRequestMessage.CREATOR.write(Objects.requireNonNull(pos), this);
-    }
-
-    @Override
-    public int getTypeForMetrics() {
-        return FrameworkStatsLog.TASK_CONTINUITY_MESSAGE_SENT__MESSAGE_TYPE__HANDOFF_REQUEST;
+    public void write(@NonNull ProtoOutputStream pos) throws IOException {
+        Objects.requireNonNull(pos)
+                .write(android.companion.HandoffRequestMessage.TASK_ID, taskId());
     }
 }

@@ -115,7 +115,6 @@ filegroup {
         "tests/src/**/systemui/graphics/ImageLoaderContentProviderTest.kt",
         "tests/src/**/systemui/flags/FakeFeatureFlagsTest.kt",
         "tests/src/**/systemui/communal/data/backup/CommunalBackupUtilsTest.kt",
-        "tests/src/**/AAAPlusPlusVerifySysuiRequiredTestPropertiesTest.java",
         "tests/src/**/systemui/accessibility/AccessibilityGestureTargetsObserverTest.java",
         "tests/src/**/systemui/accessibility/floatingmenu/AccessibilityFloatingMenuControllerTest.java",
         "tests/src/**/systemui/screenshot/appclips/AppClipsActivityTest.java",
@@ -429,6 +428,7 @@ android_library {
         "androidx.leanback_leanback",
         "androidx.slice_slice-core",
         "androidx.slice_slice-view",
+        "dynamiccolors",
     ],
     manifest: "AndroidManifest-res.xml",
     flags_packages: [
@@ -440,12 +440,6 @@ android_library {
 // Defaults for both SystemUI-core and SystemUI-application, used while we migrate code to pods.
 java_defaults {
     name: "SystemUI-srcs-defaults",
-    product_variables: {
-        debuggable: {
-            srcs: [":DebugJavaFiles"],
-            exclude_srcs: [":ReleaseJavaFiles"],
-        },
-    },
     use_resource_processor: true,
     resource_dirs: [],
     libs: [
@@ -468,54 +462,59 @@ java_defaults {
     },
 }
 
+java_defaults {
+    name: "SystemUI_compile_dagger",
+
+    plugins: ["dagger2-compiler"],
+
+    annotation_processor_flags: [
+        "dagger.fastInit=ENABLED",
+        "dagger.explicitBindingConflictsWithInject=ERROR",
+        "dagger.useBindingGraphFix=ENABLED",
+    ],
+
+    defaults_visibility: ["//visibility:public"],
+}
+
 // The set of sources that instantiate the AOSP System UI Application (including Dagger graph)
 filegroup {
     name: "SystemUI-application-srcs",
     srcs: [
-        "src/com/android/systemui/SystemUIService.java",
-        "src/com/android/systemui/SystemUIInitializer.java",
-        "src/com/android/systemui/SystemUIInitializerImpl.kt",
-        "src/com/android/systemui/SystemUIAppComponentFactoryBase.kt",
-        "src/com/android/systemui/PhoneSystemUIAppComponentFactory.kt",
-        "src/com/android/systemui/application/ApplicationContextInitializer.kt",
-        "src/com/android/systemui/application/ApplicationContextAvailableCallback.kt",
-        "src/com/android/systemui/application/impl/SystemUIApplicationImpl.java",
-        "src/com/android/systemui/dagger/DefaultComponentBinder.java",
-        "src/com/android/systemui/dagger/DefaultServiceBinder.java",
-        "src/com/android/systemui/dagger/SystemUIModule.java",
-        "src/com/android/systemui/dagger/SysUIComponent.java",
-        "src/com/android/systemui/dagger/ReferenceSysUIComponent.java",
-        "src/com/android/systemui/dagger/ReferenceGlobalRootComponent.java",
-        "src/com/android/systemui/dagger/GlobalRootComponent.java",
-        "src/com/android/systemui/dagger/GlobalModule.java",
-        "src/com/android/systemui/screenshot/policy/ScreenshotPolicyModule.kt",
-        "src/com/android/systemui/screenshot/dagger/ScreenshotModule.java",
+        "application/src/com/android/systemui/SystemUIService.java",
+        "application/src/com/android/systemui/SystemUIInitializer.java",
+        "application/src/com/android/systemui/SystemUIInitializerImpl.kt",
+        "application/src/com/android/systemui/SystemUIAppComponentFactoryBase.kt",
+        "application/src/com/android/systemui/PhoneSystemUIAppComponentFactory.kt",
+        "application/src/com/android/systemui/application/ApplicationContextInitializer.kt",
+        "application/src/com/android/systemui/application/ApplicationContextAvailableCallback.kt",
+        "application/src/com/android/systemui/application/impl/SystemUIApplicationImpl.java",
+        "application/src/com/android/systemui/dagger/DefaultComponentBinder.java",
+        "application/src/com/android/systemui/dagger/DefaultServiceBinder.java",
+        "application/src/com/android/systemui/dagger/SystemUIModule.java",
+        "application/src/com/android/systemui/dagger/SysUIComponent.java",
+        "application/src/com/android/systemui/dagger/ReferenceSysUIComponent.java",
+        "application/src/com/android/systemui/dagger/ReferenceGlobalRootComponent.java",
+        "application/src/com/android/systemui/dagger/GlobalRootComponent.java",
+        "application/src/com/android/systemui/dagger/GlobalModule.java",
+        "application/src/com/android/systemui/screenshot/policy/ScreenshotPolicyModule.kt",
+        "application/src/com/android/systemui/screenshot/dagger/ScreenshotModule.java",
     ],
-    path: "src",
-    visibility: ["//visibility:private"],
-}
-
-filegroup {
-    name: "SystemUI-core-srcs",
-    srcs: [
-        "src/**/*.kt",
-        "src/**/*.java",
-        "src/**/I*.aidl",
-    ],
-    // See SystemUI-application for why these are excluded
-    exclude_srcs: [":SystemUI-application-srcs"],
-    path: "src",
+    path: "application/src",
     visibility: ["//visibility:private"],
 }
 
 android_library {
     name: "SystemUI-core",
     srcs: [
-        ":SystemUI-core-srcs",
-        ":ReleaseJavaFiles",
+        "src/**/*.kt",
+        "src/**/*.java",
+        "src/**/I*.aidl",
         "compose/features/src/**/*.kt",
         "compose/facade/enabled/src/**/*.kt",
-    ],
+    ] + select(product_variable("debuggable"), {
+        true: [":DebugJavaFiles"],
+        false: [":ReleaseJavaFiles"],
+    }),
     defaults: ["SystemUI-srcs-defaults"],
     static_libs: [
         "//frameworks/libs/systemui:compilelib",
@@ -541,8 +540,10 @@ android_library {
         "androidx.recyclerview_recyclerview",
         "androidx.preference_preference",
         "androidx.appcompat_appcompat",
+        "androidx.autofill_autofill",
         "androidx.concurrent_concurrent-futures",
         "androidx.concurrent_concurrent-futures-ktx",
+        "androidx.constraintlayout_constraintlayout-core",
         "androidx.mediarouter_mediarouter",
         "androidx.palette_palette",
         "androidx.legacy_legacy-preference-v14",
@@ -581,7 +582,6 @@ android_library {
         "SerialPortAccessDialog",
         "TraceurCommon",
         "Traceur-res",
-        "//frameworks/libs/systemui:motion_tool_lib",
         "//frameworks/libs/systemui:contextualeducationlib",
         "//frameworks/libs/systemui/mechanics/compose:mechanics-compose",
         "notification_flags_lib",
@@ -596,6 +596,7 @@ android_library {
         "kairos",
         "displaylib",
         "aconfig_settings_flags_lib",
+        "SurfaceEffectsComposeLib",
     ],
     enable_ksp: true,
     annotation_processor_flags: [
@@ -622,6 +623,8 @@ android_library {
         "SystemUI-core",
         "com.android.systemui.pods-api-aosp-handheld",
         "com.android.systemui.pods-impl-aosp-handheld",
+        "com.android.systemui.bundle.phone_dagger",
+        "dagger2",
     ],
     enable_ksp: true,
     annotation_processor_flags: [
@@ -633,52 +636,13 @@ android_library {
     manifest: "AndroidManifest.xml",
 }
 
-filegroup {
-    name: "AAA-src",
-    srcs: ["tests/src/com/android/AAAPlusPlusVerifySysuiRequiredTestPropertiesTest.java"],
-    path: "tests/src",
-}
-
-filegroup {
-    name: "kosmos-src",
-    srcs: ["tests/utils/kosmos/src/**/*.kt"],
-    path: "tests/utils/kosmos",
-}
-
 java_library {
     name: "kosmos",
     host_supported: true,
-    srcs: [":kosmos-src"],
+    srcs: ["tests/utils/kosmos/src/**/*.kt"],
     static_libs: [
         "kotlin-reflect",
         "kotlin-stdlib",
-    ],
-}
-
-filegroup {
-    name: "SystemUI-tests-utils-pods",
-    srcs: [
-        "pods/testFixtures/src/**/*.kt",
-        "pods/testFixtures/src/**/*.java",
-    ],
-    path: "pods/testFixtures/src",
-}
-
-filegroup {
-    name: "SystemUI-tests-utils-monolith",
-    srcs: [
-        "tests/utils/src/**/*.java",
-        "tests/utils/src/**/*.kt",
-    ],
-    path: "tests/utils",
-}
-
-filegroup {
-    name: "SystemUI-tests-utils",
-    srcs: [
-        ":SystemUI-tests-utils-monolith",
-        ":SystemUI-tests-utils-pods",
-        ":kosmos-src",
     ],
 }
 
@@ -737,7 +701,7 @@ java_library {
 android_library {
     name: "SystemUI-tests-base",
     use_resource_processor: true,
-    manifest: "tests/AndroidManifest-base.xml",
+    package_name: "com.android.systemui.tests",
     resource_dirs: [
         "tests/res",
     ],
@@ -810,7 +774,6 @@ android_library {
         "jsr330",
         "WindowManager-Shell",
         "LowLightDreamLib",
-        "//frameworks/libs/systemui:motion_tool_lib",
         "//frameworks/libs/systemui:contextualeducationlib",
         "//frameworks/libs/systemui/mechanics/compose:mechanics-compose",
         "androidx.core_core-animation-testing",
@@ -835,6 +798,7 @@ android_library {
         "kairos",
         "displaylib",
         "device_policy_aconfig_flags_lib",
+        "dynamiccolors",
         "SurfaceEffectsComposeLib",
     ],
 }
@@ -842,27 +806,24 @@ android_library {
 android_library {
     name: "SystemUI-tests",
     use_resource_processor: true,
-    manifest: "tests/AndroidManifest-base.xml",
-    resource_dirs: [],
+    manifest: "tests/AndroidManifest.xml",
+    resource_dirs: ["tests/res/"],
 
-    additional_manifests: ["tests/AndroidManifest.xml"],
     srcs: [
         "tests/src/**/*.kt",
         "tests/src/**/*.java",
-        ":SystemUI-application-srcs",
-        ":SystemUI-core-srcs",
         ":ReleaseJavaFiles",
         ":SystemUI-tests-multivalent-monolith",
         ":SystemUI-tests-multivalent-pods",
-        ":SystemUI-tests-utils",
-        "compose/features/src/**/*.kt",
-        "compose/facade/enabled/src/**/*.kt",
     ],
     static_libs: [
         "//frameworks/libs/systemui:compilelib",
         "com.android.systemui.pods-api-aosp-handheld",
         "com.android.systemui.pods-impl-aosp-handheld",
+        "com.android.systemui.bundle.phone_dagger",
+        "SystemUI_test_fixtures",
         "SystemUI-tests-base",
+        "SystemUI_pod_tests",
         "androidx.compose.ui_ui-test-junit4",
         "androidx.test.uiautomator_uiautomator",
         "androidx.core_core-animation-testing",
@@ -874,6 +835,8 @@ android_library {
         "kotlin-test",
         "platform-screenshot-diff-core",
         "PlatformMotionTesting",
+        "SystemUI-application",
+        "SystemUI-core",
         "SystemUICustomizationTestUtils",
         "androidx.compose.runtime_runtime",
         "kairos",
@@ -893,6 +856,9 @@ android_library {
         "extphonelib",
 // QTI_END: 2021-02-09: Telephony: Change to move IExtTelephony to IExtPhone
     ],
+    associates: [
+        "SystemUI-core",
+    ],
     kotlincflags: [
         "-Xjvm-default=all",
         // TODO(b/352363800): Why do we need this?
@@ -909,7 +875,6 @@ android_library {
     ],
     plugins: [
         "androidx.room_room-compiler-plugin",
-        "dagger2-compiler",
     ],
     lint: {
         test: true,
@@ -924,14 +889,13 @@ android_app {
         "platform_app_defaults",
         "SystemUI_optimized_defaults",
     ],
-    manifest: "tests/AndroidManifest-base.xml",
+    manifest: "AndroidManifest-robo.xml",
 
     static_libs: [
         "//frameworks/libs/systemui:compilelib",
         "SystemUI-tests-base",
         "androidx.compose.runtime_runtime",
         "SystemUI-application",
-        "SystemUI-core",
     ],
     libs: [
         "keepanno-annotations",
@@ -990,7 +954,6 @@ android_robolectric_test {
     srcs: [
         "tests/robolectric/src/**/*.kt",
         "tests/robolectric/src/**/*.java",
-        ":SystemUI-tests-utils",
         ":SystemUI-tests-multivalent-monolith",
         ":SystemUI-tests-multivalent-pods",
     ],
@@ -999,6 +962,8 @@ android_robolectric_test {
         "RoboTestLibraries",
         "androidx.compose.runtime_runtime",
         "androidx.compose.ui_ui-test-junit4",
+        "SystemUI_pod_tests",
+        "SystemUI_test_fixtures",
     ],
     libs: [
         "android.test.runner.impl",
@@ -1023,7 +988,6 @@ android_robolectric_test {
     srcs: [
         "tests/robolectric/src/**/*.kt",
         "tests/robolectric/src/**/*.java",
-        ":SystemUI-tests-utils",
         ":SystemUI-tests-multivalent-monolith",
         ":SystemUI-tests-multivalent-pods",
         ":SystemUI-tests-robofiles",
@@ -1037,6 +1001,8 @@ android_robolectric_test {
         "RoboTestLibraries",
         "androidx.compose.runtime_runtime",
         "platform-compat-test-rules",
+        "SystemUI_pod_tests",
+        "SystemUI_test_fixtures",
     ],
     libs: [
         "android.test.runner.impl",
@@ -1056,11 +1022,10 @@ android_robolectric_test {
 
 android_ravenwood_test {
     name: "SystemUiRavenTests",
-    manifest: "tests/AndroidManifest-base.xml",
+    package_name: "com.android.systemui.tests.raven",
     build_resources: true,
     data: ["ravenwood.prop"],
     srcs: [
-        ":SystemUI-tests-utils",
         ":SystemUI-tests-multivalent-monolith",
         ":SystemUI-tests-multivalent-pods",
     ],
@@ -1068,6 +1033,8 @@ android_ravenwood_test {
         "SystemUI-application",
         "SystemUI-core",
         "SystemUI-tests-base",
+        "SystemUI_pod_tests",
+        "SystemUI_test_fixtures",
         "androidx.test.uiautomator_uiautomator",
         "androidx.core_core-animation-testing",
         "androidx.test.ext.junit",

@@ -1,6 +1,9 @@
 package com.android.systemui.keyguard
 
 import android.app.WallpaperManager
+import android.app.WindowConfiguration
+import android.graphics.Point
+import android.graphics.Rect
 import android.graphics.RectF
 import android.os.PowerManager
 import android.platform.test.annotations.DisableFlags
@@ -10,6 +13,7 @@ import android.view.SyncRtSurfaceTransactionApplier
 import android.view.View
 import android.view.ViewRootImpl
 import android.view.WindowManager
+import android.view.WindowManager.LayoutParams.INVALID_WINDOW_TYPE
 import android.window.WindowAnimationState
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
@@ -58,6 +62,8 @@ class KeyguardUnlockAnimationControllerTest : SysuiTestCase() {
     @Mock private lateinit var keyguardViewMediator: KeyguardViewMediator
     @Mock private lateinit var keyguardStateController: KeyguardStateController
     @Mock private lateinit var keyguardViewController: KeyguardViewController
+    @Mock private lateinit var viewRootImpl: ViewRootImpl
+    @Mock private lateinit var rootView: View
     @Mock private lateinit var featureFlags: FeatureFlags
     @Mock private lateinit var biometricUnlockController: BiometricUnlockController
     @Mock private lateinit var surfaceTransactionApplier: SyncRtSurfaceTransactionApplier
@@ -112,7 +118,8 @@ class KeyguardUnlockAnimationControllerTest : SysuiTestCase() {
             launcherUnlockAnimationController,
         )
 
-        whenever(keyguardViewController.viewRootImpl).thenReturn(mock(ViewRootImpl::class.java))
+        whenever(keyguardViewController.viewRootImpl).thenReturn(viewRootImpl)
+        whenever(viewRootImpl.view).thenReturn(rootView)
         whenever(powerManager.isInteractive).thenReturn(true)
 
         // All of these fields are final, so we can't mock them, but are needed so that the surface
@@ -339,6 +346,10 @@ class KeyguardUnlockAnimationControllerTest : SysuiTestCase() {
      */
     @Test
     fun manualUnlock_multipleWallpapers() {
+        whenever(rootView.visibility).thenReturn(View.VISIBLE)
+        whenever(surfaceControlWp.isValid).thenReturn(true)
+        whenever(surfaceControlLockWp.isValid).thenReturn(true)
+
         var lastFadeInAlpha = -1f
         var lastFadeOutAlpha = -1f
 
@@ -386,6 +397,9 @@ class KeyguardUnlockAnimationControllerTest : SysuiTestCase() {
     @Test
     @DisableFlags(Flags.FLAG_KEYGUARD_WM_STATE_REFACTOR)
     fun surfaceAnimation_multipleTargets() {
+        whenever(rootView.visibility).thenReturn(View.VISIBLE)
+        whenever(surfaceControlWp.isValid).thenReturn(true)
+
         keyguardUnlockAnimationController.notifyStartSurfaceBehindRemoteAnimation(
             arrayOf(animatedSurface1, animatedSurface2),
             wallpaperTargets,
@@ -437,6 +451,8 @@ class KeyguardUnlockAnimationControllerTest : SysuiTestCase() {
     @DisableFlags(Flags.FLAG_KEYGUARD_WM_STATE_REFACTOR)
     fun surfaceBehindAlphaOverriddenTo0_ifNotInteractive() {
         whenever(powerManager.isInteractive).thenReturn(false)
+        whenever(rootView.visibility).thenReturn(View.VISIBLE)
+        whenever(surfaceControlWp.isValid).thenReturn(true)
 
         keyguardUnlockAnimationController.notifyStartSurfaceBehindRemoteAnimation(
             animatedSurfaces,
@@ -476,6 +492,8 @@ class KeyguardUnlockAnimationControllerTest : SysuiTestCase() {
     @DisableFlags(Flags.FLAG_KEYGUARD_WM_STATE_REFACTOR)
     fun surfaceBehindAlphaNotOverriddenTo0_ifInteractive() {
         whenever(powerManager.isInteractive).thenReturn(true)
+        whenever(rootView.visibility).thenReturn(View.VISIBLE)
+        whenever(surfaceControlWp.isValid).thenReturn(true)
 
         keyguardUnlockAnimationController.notifyStartSurfaceBehindRemoteAnimation(
             animatedSurfaces,
@@ -512,6 +530,16 @@ class KeyguardUnlockAnimationControllerTest : SysuiTestCase() {
         )
 
         verifyNoMoreInteractions(surfaceTransactionApplier)
+    }
+
+    @Test
+    fun wallpaperChangesSkipped_ifSurfacesAlreadyReleased() {
+        whenever(surfaceControlWp.isValid).thenReturn(false)
+        whenever(surfaceControlLockWp.isValid).thenReturn(false)
+
+        keyguardUnlockAnimationController.setWallpaperAppearAmount(0.5f, wallpaperTargets)
+        keyguardUnlockAnimationController.setWallpaperAppearAmount(0.5f, lockWallpaperTargets)
+        verify(surfaceTransactionApplier, never()).scheduleApply(any())
     }
 
     @Test
@@ -638,6 +666,19 @@ class KeyguardUnlockAnimationControllerTest : SysuiTestCase() {
                 false /* isTranslucent */,
                 null /* taskInfo */,
                 AnimatedSurface.Mode.OTHER,
+                Rect() /* screenSpaceBounds */,
+                Rect() /* localBounds */,
+                Point() /* position */,
+                0 /* rotationChange */,
+                WindowConfiguration() /* windowConfiguration */,
+                -1 /* taskId */,
+                INVALID_WINDOW_TYPE /* windowType */,
+                null /* startLeash */,
+                Rect() /* startBounds */,
+                Rect() /* contentInsets */,
+                false /* willShowImeOnTarget */,
+                true /* isNotInRecents */,
+                false, /* allowEnterPip */
             )
         }
     }

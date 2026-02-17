@@ -36,6 +36,7 @@ import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraMetadata;
 import android.hardware.camera2.MultiResolutionImageReader;
+import android.hardware.camera2.extension.IOnActiveOutputSurfaceCallback;
 import android.hardware.camera2.utils.HashCodeHelpers;
 import android.hardware.camera2.utils.ListUtils;
 import android.hardware.camera2.utils.SurfaceUtils;
@@ -1697,6 +1698,7 @@ public final class OutputConfiguration implements Parcelable {
         this.mReadoutTimestampEnabled = other.mReadoutTimestampEnabled;
         this.mUsage = other.mUsage;
         this.mMultiResolutionReader = other.mMultiResolutionReader;
+        this.mOnActiveOutputSurfaceCallback = other.mOnActiveOutputSurfaceCallback;
     }
 
     /**
@@ -1862,16 +1864,19 @@ public final class OutputConfiguration implements Parcelable {
     /**
      * Get the usage flag associated with this {@link OutputConfiguration}.
      *
-     * <p>Return the application specified usage flag if the OutputConfiguration is created
-     * with an Image format.</p>
+     * <p>If the OutputConfiguration is created using an output surface, or using a Surface
+     * source class, this function returns the consumer usage flag of the output surface or
+     * the Surface source class.</p>
      *
-     * <p>If the OutputConfiguration is created using an output surface, or using a class,
-     * this function returns 0.</p>
+     * <p>If the OutputConfiguration is created using an Image format, this function returns
+     * the application specified usage flag. If the application doesn't specify the usage flag,
+     * the return value is 0 for {@link ImageFormat#PRIVATE} and
+     * {@link HardwareBuffer#USAGE_CPU_READ_OFTEN} for all other cases.</p>
      *
-     * @return {@link HardwareBuffer#Usage} associated with this {@link OutputConfiguration}.
-     *
-     * @hide
+     * @return The usage flag associated with this {@link OutputConfiguration}, as defined in
+     *         {@link HardwareBuffer}.
      */
+    @FlaggedApi(Flags.FLAG_OUTPUT_CONFIGURATION_GET_USAGE)
     public @Usage long getUsage() {
         return mUsage;
     }
@@ -1918,9 +1923,8 @@ public final class OutputConfiguration implements Parcelable {
      * multi-camera, this function returns {@code null}.</p>
      *
      * @return The physical camera Id associated with this {@link OutputConfiguration}.
-     *
-     * @hide
      */
+    @FlaggedApi(Flags.FLAG_OUTPUT_CONFIGURATION_GET_PHYSICAL_CAMERA_ID)
     public @Nullable String getPhysicalCameraId() {
         return mPhysicalCameraId;
     }
@@ -1934,6 +1938,44 @@ public final class OutputConfiguration implements Parcelable {
      */
     public @Nullable MultiResolutionImageReader getMultiResolutionReader() {
         return mMultiResolutionReader;
+    }
+
+    /**
+     * Get the remote {@link IOnActiveOutputSurfaceCallback} associated with this
+     * OutputConfiguration.
+     *
+     * @return The remote {@link IOnActiveOutputSurfaceCallback} or {@code null} if not set.
+     * @hide
+     */
+    public @Nullable IOnActiveOutputSurfaceCallback getOnActiveOutputSurfaceCallback() {
+        if (!Flags.multiResolutionConcurrentReaders()) {
+            return null;
+        }
+
+        return mOnActiveOutputSurfaceCallback;
+    }
+
+    /**
+     * Set the remote {@link IOnActiveOutputSurfaceCallback} to be notified when the output
+     * surface becomes active.
+     *
+     * @param onActiveOutputSurfaceCallback The callback to set.
+     * @hide
+     */
+    public void setOnActiveOutputSurfaceCallback(
+            @Nullable IOnActiveOutputSurfaceCallback onActiveOutputSurfaceCallback) {
+        if (!Flags.multiResolutionConcurrentReaders()) {
+            return;
+        }
+
+        if (mMultiResolutionReader != null) {
+            throw new IllegalStateException("MultiResolutionImageReader already set");
+        }
+        mOnActiveOutputSurfaceCallback = onActiveOutputSurfaceCallback;
+
+        if (mOnActiveOutputSurfaceCallback != null) {
+            mMultiResMode = MULTI_RES_ON_CONCURRENT;
+        }
     }
 
     public static final @android.annotation.NonNull Parcelable.Creator<OutputConfiguration> CREATOR =
@@ -2057,6 +2099,11 @@ public final class OutputConfiguration implements Parcelable {
                 if (!Objects.equals(mMultiResolutionReader, other.mMultiResolutionReader)) {
                     return false;
                 }
+
+                if (!Objects.equals(mOnActiveOutputSurfaceCallback,
+                        other.mOnActiveOutputSurfaceCallback)) {
+                    return false;
+                }
             }
 
             return true;
@@ -2092,7 +2139,8 @@ public final class OutputConfiguration implements Parcelable {
                     mTimestampBase, mMirrorMode,
                     HashCodeHelpers.hashCode(mMirrorModeForSurfaces.toArray()),
                     mReadoutTimestampEnabled ? 1 : 0, Long.hashCode(mUsage),
-                    Objects.hashCode(mMultiResolutionReader));
+                    Objects.hashCode(mMultiResolutionReader),
+                    Objects.hashCode(mOnActiveOutputSurfaceCallback));
         }
 
         return HashCodeHelpers.hashCode(
@@ -2104,7 +2152,8 @@ public final class OutputConfiguration implements Parcelable {
                 mDynamicRangeProfile, mColorSpace, mStreamUseCase, mTimestampBase,
                 mMirrorMode, HashCodeHelpers.hashCode(mMirrorModeForSurfaces.toArray()),
                 mReadoutTimestampEnabled ? 1 : 0,
-                Long.hashCode(mUsage), Objects.hashCode(mMultiResolutionReader));
+                Long.hashCode(mUsage), Objects.hashCode(mMultiResolutionReader),
+                Objects.hashCode(mOnActiveOutputSurfaceCallback));
     }
 
     private static final String TAG = "OutputConfiguration";
@@ -2160,4 +2209,6 @@ public final class OutputConfiguration implements Parcelable {
     // The parent multiResolutionImageReader if this OutputConfiguration is generated from it.
     private MultiResolutionImageReader mMultiResolutionReader;
 
+    // Remote multiResolutionImageReader callback to be notified instead of the local instance.
+    private IOnActiveOutputSurfaceCallback mOnActiveOutputSurfaceCallback;
 }

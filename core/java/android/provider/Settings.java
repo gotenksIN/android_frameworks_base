@@ -817,17 +817,21 @@ public final class Settings {
             "android.settings.VPN_SETTINGS";
 
     /**
-     * Activity Action: Shows a settings screen to configure application exclusions for
-     * a platform VPN.
+     * Activity Action: Show a settings screen to configure application exclusions for the
+     * calling package's {@link android.net.VpnManager} VPN.
      * <p>
-     * When this action is used to start an Activity, the system displays a user
-     * interface allowing the user to select applications that are excluded from the VPN
-     * provisioned through {@link android.net.VpnManager} by the calling package.
+     * Invoking this Intent with {@link Activity#startActivity} displays a screen allowing
+     * the user to select applications that will be excluded from the calling package's
+     * {@link android.net.VpnManager} VPN. Exclusion changes will take effect immediately if the
+     * VPN is already running, or the next time the VPN is started.
+     * <p>
+     * The presence of this activity is not guaranteed on all devices; accordingly callers
+     * should verify {@link Intent#resolveActivity} prior to {@link Activity#startActivity}
+     * or catch {@link android.content.ActivityNotFoundException}.
      * <p>
      * Input: Nothing.
      * <p>
      * Output: Nothing.
-     * @hide
      */
     @FlaggedApi(Flags.FLAG_EXPOSE_VPN_APP_EXCLUSION_SETTINGS)
     @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
@@ -3114,6 +3118,23 @@ public final class Settings {
     public static final String ACTION_SUPERVISION_SETTINGS =
             "android.settings.SUPERVISION_SETTINGS";
 
+    /**
+     * Activity Action: Show settings to allow configuration of personal context.
+     * <p>
+     * In some cases, a matching Activity may not exist, so ensure you
+     * safeguard against this.
+     * <p>
+     * Input: Nothing.
+     * <p>
+     * Output: Nothing.
+     *
+     * @hide
+     */
+    @FlaggedApi("android.service.personalcontext.enable_personal_context_service")
+    @SdkConstant(SdkConstantType.ACTIVITY_INTENT_ACTION)
+    public static final String ACTION_PERSONAL_CONTEXT_SETTINGS =
+            "android.settings.PERSONAL_CONTEXT_SETTINGS";
+
     // End of Intent actions for Settings
 
     /**
@@ -3662,7 +3683,6 @@ public final class Settings {
         private final ArraySet<String> mReadableFields;
         private final ArraySet<String> mAllFields;
         private final ArrayMap<String, Integer> mReadableFieldsWithMaxTargetSdk;
-        private final ArrayMap<String, String> mReadableFieldsWithRedactedValue;
 
         // Mapping of key to generation trackers for queried settings.
         // Key is composed by the setting's name and deviceId, value is the generation tracker.
@@ -3703,9 +3723,8 @@ public final class Settings {
             mReadableFields = new ArraySet<>();
             mAllFields = new ArraySet<>();
             mReadableFieldsWithMaxTargetSdk = new ArrayMap<>();
-            mReadableFieldsWithRedactedValue = new ArrayMap<>();
             getPublicSettingsForClass(callerClass, mAllFields, mReadableFields,
-                    mReadableFieldsWithMaxTargetSdk, mReadableFieldsWithRedactedValue);
+                    mReadableFieldsWithMaxTargetSdk);
         }
 
         public boolean putStringForUser(ContentResolver cr, String name, String value,
@@ -3786,24 +3805,12 @@ public final class Settings {
                 final @CanBeCURRENT @UserIdInt int userId) {
             final boolean isSelf = (userId == UserHandle.myUserId());
             final AttributionSource attributionSource = cr.getAttributionSource();
-            final int deviceId =
-                    android.companion.virtualdevice.flags.Flags.deviceAwareSettingsOverride()
-                            && android.permission.flags.Flags.deviceAwarePermissionApisEnabled()
-                            && attributionSource != null
-                            ? attributionSource.getDeviceId() : Context.DEVICE_ID_DEFAULT;
+            final int deviceId = android.permission.flags.Flags.deviceAwarePermissionApisEnabled()
+                    && attributionSource != null
+                    ? attributionSource.getDeviceId() : Context.DEVICE_ID_DEFAULT;
             final GenerationTracker.Key key = new GenerationTracker.Key(name, deviceId);
             final boolean useCache = isSelf && !isInSystemServer();
             boolean needsGenerationTracker = false;
-
-            // Check if there is a redacted value for this setting
-            if (Flags.enableRedactedValueForReadable()
-                    && mReadableFieldsWithRedactedValue.containsKey(name)) {
-                String redactedValue = mReadableFieldsWithRedactedValue.get(name);
-                if (redactedValue != null && !redactedValue.isEmpty()) {
-                    return redactedValue;
-                }
-            }
-
             if (useCache) {
                 synchronized (NameValueCache.this) {
                     final GenerationTracker generationTracker = mGenerationTrackers.get(key);
@@ -4254,13 +4261,11 @@ public final class Settings {
     @Retention(RetentionPolicy.RUNTIME)
     private @interface Readable {
         int maxTargetSdk() default 0;
-        String redactedValue() default "";
     }
 
     private static <T extends NameValueTable> void getPublicSettingsForClass(
             Class<T> callerClass, Set<String> allKeys, Set<String> readableKeys,
-            ArrayMap<String, Integer> keysWithMaxTargetSdk,
-            ArrayMap<String, String> keysWithRedactedValue) {
+            ArrayMap<String, Integer> keysWithMaxTargetSdk) {
         final Field[] allFields = callerClass.getDeclaredFields();
         try {
             for (int i = 0; i < allFields.length; i++) {
@@ -4278,13 +4283,9 @@ public final class Settings {
                 if (annotation != null) {
                     final String key = (String) value;
                     final int maxTargetSdk = annotation.maxTargetSdk();
-                    final String redactedValue = annotation.redactedValue();
                     readableKeys.add(key);
                     if (maxTargetSdk != 0) {
                         keysWithMaxTargetSdk.put(key, maxTargetSdk);
-                    }
-                    if (redactedValue != null && !redactedValue.isEmpty()) {
-                        keysWithRedactedValue.put(key, redactedValue);
                     }
                 }
             }
@@ -4509,10 +4510,9 @@ public final class Settings {
 
         /** @hide */
         public static void getPublicSettings(Set<String> allKeys, Set<String> readableKeys,
-                ArrayMap<String, Integer> readableKeysWithMaxTargetSdk,
-                ArrayMap<String, String> readableKeysWithRedactedValue) {
+                ArrayMap<String, Integer> readableKeysWithMaxTargetSdk) {
             getPublicSettingsForClass(System.class, allKeys, readableKeys,
-                    readableKeysWithMaxTargetSdk, readableKeysWithRedactedValue);
+                    readableKeysWithMaxTargetSdk);
         }
 
         /**
@@ -7483,10 +7483,9 @@ public final class Settings {
 
         /** @hide */
         public static void getPublicSettings(Set<String> allKeys, Set<String> readableKeys,
-                ArrayMap<String, Integer> readableKeysWithMaxTargetSdk,
-                ArrayMap<String, String> readableKeysWithRedactedValue) {
+                ArrayMap<String, Integer> readableKeysWithMaxTargetSdk) {
             getPublicSettingsForClass(Secure.class, allKeys, readableKeys,
-                    readableKeysWithMaxTargetSdk, readableKeysWithRedactedValue);
+                    readableKeysWithMaxTargetSdk);
         }
 
         /**
@@ -9557,6 +9556,7 @@ public final class Settings {
          * the following settings:
          * <ul>
          * <li>{@link #ACCESSIBILITY_CAPTIONING_LOCALE}
+         * <li>{@link #ACCESSIBILITY_CAPTIONING_EASY_READER_ENABLED}
          * <li>{@link #ACCESSIBILITY_CAPTIONING_BACKGROUND_COLOR}
          * <li>{@link #ACCESSIBILITY_CAPTIONING_FOREGROUND_COLOR}
          * <li>{@link #ACCESSIBILITY_CAPTIONING_EDGE_COLOR}
@@ -9583,6 +9583,16 @@ public final class Settings {
                 "accessibility_captioning_locale";
 
         /**
+         * Setting that specifies whether simplified language captions should be shown if possible,
+         * i.e. Easy Reader is enabled.
+         *
+         * @hide
+         */
+        @Readable
+        public static final String ACCESSIBILITY_CAPTIONING_EASY_READER_ENABLED =
+                "accessibility_captioning_easy_reader_enabled";
+
+        /**
          * Integer property that specifies the preset style for captions, one
          * of:
          * <ul>
@@ -9590,7 +9600,6 @@ public final class Settings {
          * <li>a valid index of {@link android.view.accessibility.CaptioningManager.CaptionStyle#PRESETS}
          * </ul>
          *
-         * @see java.util.Locale#toString
          * @hide
          */
         @Readable
@@ -11763,7 +11772,9 @@ public final class Settings {
          * @hide
          */
         @UnsupportedAppUsage
+        @TestApi
         @Readable
+        @SuppressLint({"UnflaggedApi", "NoSettingsProvider"}) // @TestApi without associated feature
         public static final String ASSISTANT = "assistant";
 
         /**
@@ -13057,6 +13068,33 @@ public final class Settings {
         public static final String NEARBY_SHARING_COMPONENT = "nearby_sharing_component";
 
         /**
+         * Current provider of the component that manages the gesture lifecycle while the share
+         * sheet is active.
+         * Default value in @string/config_defaultTapEventServiceComponent.
+         * No VALIDATOR as this setting will not be backed up.
+         * @hide
+         */
+        @FlaggedApi(android.service.chooser.Flags.FLAG_TAP_TO_SHARE)
+        @TestApi
+        @Readable
+        @SuppressLint("NoSettingsProvider")
+        public static final String TAP_EVENT_SERVICE_COMPONENT = "tap_event_service_component";
+
+        /**
+         * Current provider of the component that receives the finalized intent after a successful
+         * tap is detected.
+         * Default value in @string/config_defaultTapShareFulfillmentActivityComponent.
+         * No VALIDATOR as this setting will not be backed up.
+         * @hide
+         */
+        @FlaggedApi(android.service.chooser.Flags.FLAG_TAP_TO_SHARE)
+        @TestApi
+        @Readable
+        @SuppressLint("NoSettingsProvider")
+        public static final String TAP_SHARE_FULFILLMENT_ACTIVITY_COMPONENT =
+                "tap_share_fulfillment_activity_component";
+
+        /**
          * Nearby Sharing Slice URI for the SliceProvider to
          * read Nearby Sharing scan results and then draw the UI.
          * @hide
@@ -14082,16 +14120,34 @@ public final class Settings {
          * 1 = On, 0 = Off
          * @hide
          */
+        @Readable
         @FlaggedApi(com.android.text.flags.Flags.FLAG_SPLIT_SHOW_PASSWORDS_TO_TOUCH_AND_PHYSICAL)
-        public static final String TEXT_SHOW_PASSWORD_TOUCH = "show_passwords_touch";
+        public static final String TEXT_SHOW_PASSWORD_TOUCH = "show_password_touch";
 
         /**
          * Setting to showing password characters from physical inputs in text editors.
          * 1 = On, 0 = Off
          * @hide
          */
+        @Readable
         @FlaggedApi(com.android.text.flags.Flags.FLAG_SPLIT_SHOW_PASSWORDS_TO_TOUCH_AND_PHYSICAL)
-        public static final String TEXT_SHOW_PASSWORD_PHYSICAL = "show_passwords_physical";
+        public static final String TEXT_SHOW_PASSWORD_PHYSICAL = "show_password_physical";
+
+        /**
+         * Whether personal context is enabled.
+         * 1 = On, 0 = Off
+         * @hide
+         */
+        @Readable
+        @FlaggedApi(android.service.personalcontext.Flags.FLAG_ENABLE_PERSONAL_CONTEXT_SERVICE)
+        public static final String PERSONAL_CONTEXT_ENABLED = "personal_context_enabled";
+
+       /**
+         * Setting to determine if the wallet service is available.
+         * 1 = available, 0 = unavailable
+         * @hide
+         */
+        public static final String IS_WALLET_SERVICE_AVAILABLE = "is_wallet_service_available";
     }
 
     /**
@@ -14561,10 +14617,9 @@ public final class Settings {
         public static final String CUSTOM_BUGREPORT_HANDLER_USER = "custom_bugreport_handler_user";
 
         /**
-         * Whether ADB over USB is enabled (0 = false, 1 = true).
-         * This will always return 0 for all third-party apps.
+         * Whether ADB over USB is enabled.
          */
-        @Readable(redactedValue = "0")
+        @Readable
         public static final String ADB_ENABLED = "adb_enabled";
 
         /**
@@ -14847,10 +14902,9 @@ public final class Settings {
                 "wm_display_settings_path";
 
         /**
-        * Whether user has enabled development settings (0 = false, 1 = true).
-        * This will always return 0 for all third-party apps.
+        * Whether user has enabled development settings.
         */
-        @Readable(redactedValue = "0")
+        @Readable
         public static final String DEVELOPMENT_SETTINGS_ENABLED = "development_settings_enabled";
 
         /**
@@ -14873,6 +14927,13 @@ public final class Settings {
         @Readable
         @SuppressLint("NoSettingsProvider")
         public static final String SECURE_FRP_MODE = "secure_frp_mode";
+
+        /**
+         * Whether to enable the WebApp minter in webapp mainline module.
+         * @hide
+         */
+        @Readable
+        public static final String ENABLE_WEBAPP_MINTER = "enable_webapp_minter";
 
         /**
          * Whether bypassing the device policy management role holder qualification is allowed,
@@ -19452,15 +19513,14 @@ public final class Settings {
 
         /** @hide */
         public static void getPublicSettings(Set<String> allKeys, Set<String> readableKeys,
-                ArrayMap<String, Integer> readableKeysWithMaxTargetSdk,
-                ArrayMap<String, String> readableKeysWithRedactedValue) {
+                ArrayMap<String, Integer> readableKeysWithMaxTargetSdk) {
             getPublicSettingsForClass(Global.class, allKeys, readableKeys,
-                    readableKeysWithMaxTargetSdk, readableKeysWithRedactedValue);
+                    readableKeysWithMaxTargetSdk);
             // Add Global.Wearable keys on watches.
             if (ActivityThread.currentApplication().getApplicationContext().getPackageManager()
                     .hasSystemFeature(PackageManager.FEATURE_WATCH)) {
                 getPublicSettingsForClass(Global.Wearable.class, allKeys, readableKeys,
-                        readableKeysWithMaxTargetSdk, readableKeysWithRedactedValue);
+                        readableKeysWithMaxTargetSdk);
             }
         }
 
@@ -20962,11 +21022,25 @@ public final class Settings {
             public static final String AMBIENT_LOW_BIT_ENABLED = "ambient_low_bit_enabled";
 
             /**
-             * The timeout duration in minutes of ambient mode when plugged in.
+             * The timeout duration in minutes of ambient mode when plugged in with Wear Charging
+             * Experience enabled. This remaining time in this timeout will be reset only when the
+             * device is unplugged. If the remaining time is less than AMBIENT_PLUGGED_TIMEOUT_MIN
+             * when entering ambient mode, AMBIENT_OFFWRIST_TIMEOUT_MIN will be used instead.
              * @hide
              */
             @Readable
             public static final String AMBIENT_PLUGGED_TIMEOUT_MIN = "ambient_plugged_timeout_min";
+
+            /**
+             * The timeout duration in minutes of ambient mode when offwrist. It fallbacks to
+             * AMBIENT_PLUGGED_TIMEOUT_MIN if undefined or negative. This timeout will also be used
+             * when the plugged device enters ambient mode with Wear Charging Experience disabled,
+             * or plugged remaining time is less than this timeout.
+             * @hide
+             */
+            @Readable
+            public static final String AMBIENT_OFFWRIST_TIMEOUT_MIN =
+                    "ambient_offwrist_timeout_min";
 
             /**
              * What OS does paired device has.
@@ -21625,6 +21699,14 @@ public final class Settings {
                     "gesture_primary_action_user_preference";
 
             /**
+             * Whether the "always on media" gesture is enabled.
+             *
+             * @hide
+             */
+            public static final String GESTURE_ALWAYS_ON_MEDIA_ENABLED =
+                    "gesture_always_on_media_enabled";
+
+            /**
              * Setting indicating whether the dismiss gesture input action has been enabled by the
              * user.
              *
@@ -21642,6 +21724,93 @@ public final class Settings {
              * @hide
              */
             public static final String GESTURE_HINT_PERIOD_DAYS = "gesture_hint_period_days";
+
+            /**
+             * Gesture primary action customization for media controls.
+             *
+             * @hide
+             */
+            public static final String GESTURE_CUSTOMIZE_MEDIA_CONTROLS_PRIMARY_ACTION =
+                    "gesture_customize_media_controls_primary_action";
+
+            /**
+             * Indicates that the primary gesture for media controls should be the play or pause
+             * action.
+             *
+             * @hide
+             */
+            public static final int GESTURE_CUSTOMIZE_MEDIA_CONTROLS_PRIMARY_ACTION_PLAY_PAUSE = 0;
+
+            /**
+             * Indicates that the primary gesture for media controls should be the skip action.
+             *
+             * @hide
+             */
+            public static final int GESTURE_CUSTOMIZE_MEDIA_CONTROLS_PRIMARY_ACTION_SKIP = 1;
+
+            /**
+             * Gesture primary action customization for workout controls.
+             *
+             * @hide
+             */
+            public static final String GESTURE_CUSTOMIZE_WORKOUT_CONTROLS_PRIMARY_ACTION =
+                    "gesture_customize_workout_controls_primary_action";
+
+            /**
+             * Indicates that the primary gesture for workout controls should be a workout specific
+             * action.
+             *
+             * @hide
+             */
+            public static final int
+                    GESTURE_CUSTOMIZE_WORKOUT_CONTROLS_PRIMARY_ACTION_WORKOUT_SPECIFIC = 0;
+
+            /**
+             * Indicates that the primary gesture for workout controls should be the play or pause
+             * all workouts action.
+             *
+             * @hide
+             */
+            public static final int
+                    GESTURE_CUSTOMIZE_WORKOUT_CONTROLS_PRIMARY_ACTION_PLAY_PAUSE_ALL_WORKOUTS = 1;
+
+            /**
+             * Gesture primary action customization for alarm.
+             *
+             * @hide
+             */
+            public static final String GESTURE_CUSTOMIZE_ALARM_PRIMARY_ACTION =
+                    "gesture_customize_alarm_primary_action";
+
+            /**
+             * Indicates that the primary gesture for alarm should snooze the alarm.
+             *
+             * @hide
+             */
+            public static final int GESTURE_CUSTOMIZE_ALARM_PRIMARY_ACTION_SNOOZE = 0;
+
+            /**
+             * Indicates that the primary gesture for alarm should dismiss the alarm.
+             *
+             * @hide
+             */
+            public static final int GESTURE_CUSTOMIZE_ALARM_PRIMARY_ACTION_DISMISS = 1;
+
+            /**
+             * A boolean that tracks whether remote gestures are enabled.
+             *
+             * @hide
+             */
+            public static final String REMOTE_GESTURES_ENABLED = "remote_gestures_enabled";
+
+            /**
+             * A boolean that tracks whether all gestures are routed to remote clients when remote
+             * clients are connected.
+             *
+             * @hide
+             */
+            public static final String ALWAYS_ROUTE_GESTURES_TO_REMOTE_CLIENTS =
+                    "always_route_gestures_to_remote_clients";
 
             /** Whether Wear Power Anomaly Service is enabled.
              *

@@ -25,7 +25,6 @@ import android.content.res.mainResources
 import android.graphics.Insets
 import android.graphics.Region
 import android.hardware.display.DisplayManagerGlobal
-import android.platform.test.annotations.DisableFlags
 import android.platform.test.annotations.EnableFlags
 import android.platform.test.flag.junit.FlagsParameterization
 import android.testing.TestableLooper
@@ -65,10 +64,8 @@ import com.android.systemui.shade.domain.interactor.PanelExpansionInteractor
 import com.android.systemui.shade.domain.interactor.enableDualShade
 import com.android.systemui.shade.domain.interactor.enableSingleShade
 import com.android.systemui.shade.domain.interactor.shadeModeInteractor
-import com.android.systemui.shade.shared.flag.ShadeWindowGoesAround
 import com.android.systemui.shade.shared.model.ShadeMode
 import com.android.systemui.statusbar.CommandQueue
-import com.android.systemui.statusbar.core.StatusBarConnectedDisplays
 import com.android.systemui.statusbar.layout.mockStatusBarContentInsetsProvider
 import com.android.systemui.statusbar.policy.Clock
 import com.android.systemui.statusbar.policy.mockStatusBarConfigurationController
@@ -195,8 +192,7 @@ class PhoneStatusBarViewControllerTest(flags: FlagsParameterization) : SysuiTest
     }
 
     @Test
-    @DisableFlags(StatusBarConnectedDisplays.FLAG_NAME)
-    fun onViewAttachedAndDrawn_connectedDisplaysFlagOff_doesNotSetInteractionGate() {
+    fun onViewAttachedAndDrawn_defaultDisplay_doesNotSetInteractionGate() {
         attachToWindow(view)
 
         controller = createAndInitController(view)
@@ -205,18 +201,7 @@ class PhoneStatusBarViewControllerTest(flags: FlagsParameterization) : SysuiTest
     }
 
     @Test
-    @EnableFlags(StatusBarConnectedDisplays.FLAG_NAME)
-    fun onViewAttachedAndDrawn_connectedDisplaysFlagOn_defaultDisplay_doesNotSetInteractionGate() {
-        attachToWindow(view)
-
-        controller = createAndInitController(view)
-
-        verify(view, never()).setIsStatusBarInteractiveSupplier(any())
-    }
-
-    @Test
-    @EnableFlags(StatusBarConnectedDisplays.FLAG_NAME)
-    fun onViewAttachedAndDrawn_connectedDisplaysFlagOn_secondaryDisplay_setsInteractionGate() {
+    fun onViewAttachedAndDrawn_secondaryDisplay_setsInteractionGate() {
         attachToWindow(viewForSecondaryDisplay)
 
         controller = createAndInitController(viewForSecondaryDisplay)
@@ -330,7 +315,6 @@ class PhoneStatusBarViewControllerTest(flags: FlagsParameterization) : SysuiTest
     }
 
     @Test
-    @EnableFlags(StatusBarConnectedDisplays.FLAG_NAME, ShadeWindowGoesAround.FLAG_NAME)
     fun handleTouchEventFromStatusBar_touchOnSecondaryDisplay_interactionsAllowed_shadeReceivesEvent() {
         attachToWindow(viewForSecondaryDisplay)
         controller = createAndInitController(viewForSecondaryDisplay)
@@ -353,7 +337,6 @@ class PhoneStatusBarViewControllerTest(flags: FlagsParameterization) : SysuiTest
     }
 
     @Test
-    @EnableFlags(StatusBarConnectedDisplays.FLAG_NAME, ShadeWindowGoesAround.FLAG_NAME)
     fun handleTouchEventFromStatusBar_touchOnSecondaryDisplay_interactionsNotAllowed_shadeDoesNotReceiveEvent() {
         attachToWindow(viewForSecondaryDisplay)
         controller = createAndInitController(viewForSecondaryDisplay)
@@ -518,7 +501,6 @@ class PhoneStatusBarViewControllerTest(flags: FlagsParameterization) : SysuiTest
     }
 
     @Test
-    @EnableFlags(ShadeWindowGoesAround.FLAG_NAME)
     fun onInterceptTouchEvent_actionDown_propagatesToDisplayPolicy() {
         val event = MotionEvent.obtain(0L, 0L, MotionEvent.ACTION_DOWN, 0f, 0f, 0)
 
@@ -535,7 +517,6 @@ class PhoneStatusBarViewControllerTest(flags: FlagsParameterization) : SysuiTest
     }
 
     @Test
-    @EnableFlags(ShadeWindowGoesAround.FLAG_NAME)
     fun onInterceptTouchEvent_actionUp_notPropagatesToDisplayPolicy() {
         val event = MotionEvent.obtain(0L, 0L, MotionEvent.ACTION_UP, 0f, 0f, 0)
 
@@ -546,18 +527,6 @@ class PhoneStatusBarViewControllerTest(flags: FlagsParameterization) : SysuiTest
     }
 
     @Test
-    @DisableFlags(ShadeWindowGoesAround.FLAG_NAME)
-    fun onInterceptTouchEvent_shadeWindowGoesAroundDisabled_notPropagatesToDisplayPolicy() {
-        val event = MotionEvent.obtain(0L, 0L, MotionEvent.ACTION_DOWN, 0f, 0f, 0)
-
-        view.onInterceptTouchEvent(event)
-
-        verify(shadeExpansionTargetDisplayInteractor, never())
-            .setExpansionIntentFromStatusBarEvent(any(), any(), any(), any(), any())
-    }
-
-    @Test
-    @EnableFlags(ShadeWindowGoesAround.FLAG_NAME)
     fun onTouch_withMouseOnEndSideIcons_flagOn_propagatedToShadeDisplayPolicy() {
         attachToWindow(view)
         controller = createAndInitController(view)
@@ -577,7 +546,6 @@ class PhoneStatusBarViewControllerTest(flags: FlagsParameterization) : SysuiTest
     }
 
     @Test
-    @EnableFlags(ShadeWindowGoesAround.FLAG_NAME)
     fun onTouch_withMouseOnStartSideIcons_flagOn_propagatedToShadeDisplayPolicy() {
         attachToWindow(view)
         controller = createAndInitController(view)
@@ -597,33 +565,6 @@ class PhoneStatusBarViewControllerTest(flags: FlagsParameterization) : SysuiTest
     }
 
     @Test
-    @DisableFlags(ShadeWindowGoesAround.FLAG_NAME)
-    fun onTouch_withMouseOnSystemIcons_flagOff_notPropagatedToShadeDisplayPolicy() {
-        attachToWindow(view)
-        controller = createAndInitController(view)
-        val event = getActionUpEventFromSource(InputDevice.SOURCE_MOUSE)
-
-        val statusContainer = view.requireViewById<View>(R.id.system_icons)
-        statusContainer.dispatchTouchEvent(event)
-
-        verify(shadeExpansionTargetDisplayInteractor, never())
-            .setExpansionIntentFromStatusBarEvent(any(), any(), any(), any(), any())
-    }
-
-    @Test
-    @EnableFlags(StatusBarConnectedDisplays.FLAG_NAME)
-    @DisableFlags(ShadeWindowGoesAround.FLAG_NAME)
-    fun shouldAllowInteractions_shadeGoesAroundFlagOff_returnsFalse() {
-        attachToWindow(viewForSecondaryDisplay)
-        controller = createAndInitController(viewForSecondaryDisplay)
-        val argumentCaptor = argumentCaptor<BooleanSupplier>()
-        verify(viewForSecondaryDisplay).setIsStatusBarInteractiveSupplier(argumentCaptor.capture())
-
-        assertThat(argumentCaptor.lastValue.asBoolean).isFalse()
-    }
-
-    @Test
-    @EnableFlags(StatusBarConnectedDisplays.FLAG_NAME, ShadeWindowGoesAround.FLAG_NAME)
     fun shouldAllowInteractions_defaultShadeDisplayPolicy_returnsFalse() {
         attachToWindow(viewForSecondaryDisplay)
         controller = createAndInitController(viewForSecondaryDisplay)
@@ -635,7 +576,6 @@ class PhoneStatusBarViewControllerTest(flags: FlagsParameterization) : SysuiTest
     }
 
     @Test
-    @EnableFlags(StatusBarConnectedDisplays.FLAG_NAME, ShadeWindowGoesAround.FLAG_NAME)
     fun shouldAllowInteractions_statusBarTouchShadeDisplayPolicy_returnsTrue() {
         attachToWindow(viewForSecondaryDisplay)
         controller = createAndInitController(viewForSecondaryDisplay)
@@ -647,7 +587,6 @@ class PhoneStatusBarViewControllerTest(flags: FlagsParameterization) : SysuiTest
     }
 
     @Test
-    @EnableFlags(StatusBarConnectedDisplays.FLAG_NAME, ShadeWindowGoesAround.FLAG_NAME)
     fun shouldAllowInteractions_shadePolicyChanges_updatesReturnValue() {
         attachToWindow(viewForSecondaryDisplay)
         controller = createAndInitController(viewForSecondaryDisplay)
@@ -844,26 +783,6 @@ class PhoneStatusBarViewControllerTest(flags: FlagsParameterization) : SysuiTest
         controller = createAndInitController(view)
         view.performClick()
         verify(shadeControllerImpl, never()).animateExpandShade()
-    }
-
-    @Test
-    @DisableFlags(StatusBarConnectedDisplays.FLAG_NAME)
-    fun connectedDisplayFlagOff_windowControllerIsSetInView() {
-        attachToWindow(view)
-
-        controller = createAndInitController(view)
-
-        verify(view).setStatusBarWindowControllerStore(statusBarWindowControllerStore)
-    }
-
-    @Test
-    @EnableFlags(StatusBarConnectedDisplays.FLAG_NAME)
-    fun connectedDisplayFlagOn_windowControllerIsNotSetInView() {
-        attachToWindow(view)
-
-        controller = createAndInitController(view)
-
-        verify(view, never()).setStatusBarWindowControllerStore(statusBarWindowControllerStore)
     }
 
     private fun getCommandQueueCallback(): CommandQueue.Callbacks {

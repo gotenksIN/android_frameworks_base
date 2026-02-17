@@ -22,6 +22,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.snapping.SnapPosition
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -32,17 +33,20 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,6 +55,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.focused
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.android.compose.PlatformIconButton
 import com.android.systemui.lifecycle.rememberViewModel
@@ -58,6 +67,7 @@ import com.android.systemui.res.R
 import com.android.systemui.screencapture.common.domain.model.ScreenCaptureRecentTask
 import com.android.systemui.screencapture.common.ui.viewmodel.RecentTaskViewModel
 import com.android.systemui.screencapture.record.smallscreen.ui.viewmodel.RecordDetailsAppSelectorViewModel
+import kotlinx.coroutines.launch
 
 @Composable
 fun RecordDetailsAppSelector(
@@ -88,28 +98,51 @@ fun RecordDetailsAppSelector(
                 text = stringResource(R.string.screen_record_capture_target_choose_app),
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurface,
+                maxLines = 1,
+                modifier = Modifier.basicMarquee(),
             )
         }
-        val tasks = viewModel.recentTasks
-        val pagerState = rememberPagerState { tasks?.size ?: 1 }
+        val coroutineScope = rememberCoroutineScope()
+        val tasks = viewModel.recentTasks.takeUnless { it.isNullOrEmpty() } ?: return@Column
+        val pagerState: PagerState = rememberPagerState { tasks.size }
         HorizontalPager(
             state = pagerState,
             pageSpacing = 22.dp,
             snapPosition = SnapPosition.Center,
             contentPadding = PaddingValues(horizontal = 68.dp),
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().semantics { role = Role.Carousel },
         ) { index ->
-            val task = tasks?.getOrNull(index)
+            val task = tasks[index]
             val taskViewModel =
-                task?.let {
-                    rememberViewModel("RecordDetailsAppSelector#taskViewModel_$index") {
-                        viewModel.createTaskViewModel(task)
-                    }
+                rememberViewModel("RecordDetailsAppSelector#taskViewModel_$index") {
+                    viewModel.createTaskViewModel(task)
                 }
+            val currentIndex = pagerState.settledPage
             AppPreview(
                 viewModel = taskViewModel,
-                onClick = { if (task != null) onTaskSelected(task) },
-                modifier = Modifier.fillMaxWidth(),
+                onClick = {
+                    if (index == currentIndex) {
+                        onTaskSelected(task)
+                    } else {
+                        coroutineScope.launch { pagerState.animateScrollToPage(index) }
+                    }
+                },
+                modifier =
+                    Modifier.fillMaxWidth().semantics {
+                        role = Role.Button
+                        if (index == currentIndex) {
+                            focused = true
+                            contentDescription = taskViewModel.label?.getOrNull()?.toString() ?: ""
+                        } else {
+                            focused = false
+                            contentDescription =
+                                if (index > currentIndex) {
+                                    "Next"
+                                } else {
+                                    "Previous"
+                                }
+                        }
+                    },
             )
         }
     }
@@ -117,7 +150,7 @@ fun RecordDetailsAppSelector(
 
 @Composable
 private fun AppPreview(
-    viewModel: RecentTaskViewModel?,
+    viewModel: RecentTaskViewModel,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -126,7 +159,7 @@ private fun AppPreview(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier,
     ) {
-        val icon = viewModel?.icon?.getOrNull()
+        val icon = viewModel.icon?.getOrNull()
         if (icon == null) {
             Spacer(Modifier.size(18.dp))
         } else {
@@ -154,7 +187,7 @@ private fun AppPreview(
                 ),
         ) {
             AnimatedContent(
-                targetState = viewModel?.thumbnail?.getOrNull(),
+                targetState = viewModel.thumbnail?.getOrNull(),
                 transitionSpec = { fadeIn() togetherWith fadeOut() },
                 contentAlignment = Alignment.Center,
                 modifier =
@@ -168,10 +201,15 @@ private fun AppPreview(
                         .clickable(onClick = onClick)
                         .background(MaterialTheme.colorScheme.surfaceContainer),
             ) { thumbnail ->
+                val sizeModifier = Modifier.fillMaxSize()
                 if (thumbnail == null) {
-                    Spacer(modifier = Modifier)
+                    Spacer(modifier = sizeModifier)
                 } else {
-                    Image(bitmap = thumbnail.asImageBitmap(), contentDescription = null)
+                    Image(
+                        bitmap = thumbnail.asImageBitmap(),
+                        contentDescription = null,
+                        modifier = sizeModifier,
+                    )
                 }
             }
         }

@@ -42,6 +42,9 @@ import java.util.Objects;
 public class DeviceFilter {
     private static final String TAG = DeviceFilter.class.getSimpleName();
 
+    // Name of tag used for serialization and deserialization.
+    public static final String XML_ROOT_NAME = "usb-device";
+
     // USB Vendor ID (or -1 for unspecified)
     public final int mVendorId;
     // USB Product ID (or -1 for unspecified)
@@ -157,7 +160,7 @@ public class DeviceFilter {
     }
 
     public void write(XmlSerializer serializer) throws IOException {
-        serializer.startTag(null, "usb-device");
+        serializer.startTag(null, XML_ROOT_NAME);
         if (mVendorId != -1) {
             serializer.attribute(null, "vendor-id", Integer.toString(mVendorId));
         }
@@ -185,7 +188,7 @@ public class DeviceFilter {
         if (mInterfaceName != null) {
             serializer.attribute(null, "interface-name", mInterfaceName);
         }
-        serializer.endTag(null, "usb-device");
+        serializer.endTag(null, XML_ROOT_NAME);
     }
 
     private boolean matches(int usbClass, int subclass, int protocol) {
@@ -216,11 +219,17 @@ public class DeviceFilter {
         if (mSerialNumber != null && device.getSerialNumber() != null &&
                 !mSerialNumber.equals(device.getSerialNumber())) return false;
 
-        // check device class/subclass/protocol
-        if (matches(device.getDeviceClass(), device.getDeviceSubclass(),
-                device.getDeviceProtocol())) return true;
+        // If the filter specifies an interface name, it is strictly an Interface-scoped filter.
+        // We must skip the Device-level check to ensure we verify the interface name later.
+        boolean isInterfaceScoped =
+                (mInterfaceName != null) && Flags.enableDeviceAndInterfaceFilterSeparation();
 
-        // if device doesn't match, check the interfaces
+        if (!isInterfaceScoped && matches(device.getDeviceClass(), device.getDeviceSubclass(),
+                device.getDeviceProtocol())) {
+            return true;
+        }
+
+        // Check interfaces.
         int count = device.getInterfaceCount();
         for (int i = 0; i < count; i++) {
             UsbInterface intf = device.getInterface(i);

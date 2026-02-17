@@ -12,7 +12,6 @@ import android.graphics.PointF
 import android.graphics.Rect
 import android.os.IBinder
 import android.os.SystemProperties
-import android.platform.test.annotations.DisableFlags
 import android.platform.test.annotations.EnableFlags
 import android.testing.AndroidTestingRunner
 import android.testing.TestableLooper.RunWithLooper
@@ -27,12 +26,12 @@ import com.android.dx.mockito.inline.extended.ExtendedMockito
 import com.android.internal.jank.Cuj.CUJ_DESKTOP_MODE_ENTER_APP_HANDLE_DRAG_HOLD
 import com.android.internal.jank.Cuj.CUJ_DESKTOP_MODE_ENTER_APP_HANDLE_DRAG_RELEASE
 import com.android.internal.jank.InteractionJankMonitor
-import com.android.window.flags.Flags
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer
 import com.android.wm.shell.ShellTestCase
 import com.android.wm.shell.TestRunningTaskInfoBuilder
 import com.android.wm.shell.bubbles.BubbleController
-import com.android.wm.shell.bubbles.BubbleTransitions
+import com.android.wm.shell.bubbles.transitions.BubbleTransitions
+import com.android.wm.shell.common.DisplayController
 import com.android.wm.shell.desktopmode.DesktopModeTransitionTypes.TRANSIT_DESKTOP_MODE_CANCEL_DRAG_TO_DESKTOP
 import com.android.wm.shell.desktopmode.DesktopModeTransitionTypes.TRANSIT_DESKTOP_MODE_END_DRAG_TO_DESKTOP
 import com.android.wm.shell.desktopmode.DesktopModeTransitionTypes.TRANSIT_DESKTOP_MODE_START_DRAG_TO_DESKTOP
@@ -46,6 +45,7 @@ import com.android.wm.shell.shared.split.SplitScreenConstants.SPLIT_POSITION_TOP
 import com.android.wm.shell.splitscreen.SplitScreenController
 import com.android.wm.shell.transition.Transitions
 import com.android.wm.shell.windowdecor.MoveToDesktopAnimator
+import com.android.wm.shell.windowdecor.OnTaskResizeAnimationListener
 import com.google.common.truth.Truth.assertThat
 import java.util.Optional
 import java.util.function.Supplier
@@ -56,15 +56,16 @@ import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchers.anyFloat
 import org.mockito.ArgumentMatchers.anyInt
 import org.mockito.ArgumentMatchers.anyLong
 import org.mockito.ArgumentMatchers.eq
 import org.mockito.Mock
+import org.mockito.kotlin.any
 import org.mockito.kotlin.anyOrNull
 import org.mockito.kotlin.argThat
 import org.mockito.kotlin.argumentCaptor
+import org.mockito.kotlin.doReturn
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.never
 import org.mockito.kotlin.times
@@ -94,6 +95,8 @@ class DragToDesktopTransitionHandlerTest : ShellTestCase() {
     @Mock private lateinit var visualIndicator: DesktopModeVisualIndicator
     @Mock private lateinit var dragCancelCallback: Runnable
     @Mock private lateinit var desktopConfig: DesktopConfig
+    @Mock private lateinit var displayController: DisplayController
+    @Mock private lateinit var onResizeAnimationListener: OnTaskResizeAnimationListener
     @Mock
     private lateinit var dragToDesktopStateListener:
         DragToDesktopTransitionHandler.DragToDesktopStateListener
@@ -125,11 +128,13 @@ class DragToDesktopTransitionHandlerTest : ShellTestCase() {
                     transactionSupplier,
                     desktopState,
                     desktopConfig,
+                    displayController,
                 )
                 .apply {
                     setSplitScreenController(splitScreenController)
                     dragToDesktopStateListener =
                         this@DragToDesktopTransitionHandlerTest.dragToDesktopStateListener
+                    onTaskResizeAnimationListener = onResizeAnimationListener
                 }
         whenever(
                 transitions.startTransition(
@@ -386,40 +391,6 @@ class DragToDesktopTransitionHandlerTest : ShellTestCase() {
     }
 
     @Test
-    fun cancelSplitDragToDesktop_startWasReady_cancel_merged_and_starts_splitscreen_transition() {
-        val draggedTask = createTask(windowingMode = WINDOWING_MODE_MULTI_WINDOW)
-        val otherTask = createTask(windowingMode = WINDOWING_MODE_MULTI_WINDOW)
-        whenever(splitScreenController.getTaskInfo(anyInt())).thenReturn(otherTask)
-        val startToken = startDrag(springHandler, task = draggedTask)
-
-        // Then user cancelled after it had already started.
-        val cancelToken =
-            cancelDragToDesktopTransition(
-                springHandler,
-                DragToDesktopTransitionHandler.CancelState.STANDARD_CANCEL,
-            )
-        springHandler.mergeAnimation(
-            cancelToken,
-            TransitionInfo(TRANSIT_DESKTOP_MODE_CANCEL_DRAG_TO_DESKTOP, 0),
-            mock<SurfaceControl.Transaction>(),
-            mock<SurfaceControl.Transaction>(),
-            startToken,
-            mock<Transitions.TransitionFinishCallback>(),
-        )
-
-        // Cancel animation should run since it had already started.
-        verify(dragAnimator).cancelAnimator()
-        assertFalse("Drag should not be in progress after cancelling", springHandler.inProgress)
-
-        // Splitscreen should expand to fullscreen after the regular cancel transition finishes.
-        verify(splitScreenController)
-            .moveTaskToFullscreen(
-                draggedTask.taskId,
-                SplitScreenController.EXIT_REASON_DRAG_TO_FULLSCREEN,
-            )
-    }
-
-    @Test
     fun cancelDragToDesktop_startWasReady_cancel_aborted() {
         val startToken = startDrag(springHandler)
 
@@ -454,6 +425,27 @@ class DragToDesktopTransitionHandlerTest : ShellTestCase() {
                 /* startRecents = */ eq(false), // Home already running, so recents isn't needed.
                 /* withRecentsWct = */ anyOrNull(),
             )
+    }
+
+    @Test
+    fun mergeAnimation_cancelSplitToFullscreen_onAnimationEndCalled() {
+        val task = createSplitTask()
+        val startToken = startDrag(springHandler, task)
+
+        // Then user cancelled after it had already started.
+        val cancelToken =
+            cancelDragToDesktopTransition(springHandler, CancelState.CANCEL_SPLIT_TO_FULLSCREEN)
+        springHandler.mergeAnimation(
+            cancelToken,
+            TransitionInfo(TRANSIT_DESKTOP_MODE_CANCEL_DRAG_TO_DESKTOP, /* flags= */ 0),
+            mock<SurfaceControl.Transaction>(),
+            mock<SurfaceControl.Transaction>(),
+            startToken,
+            mock<Transitions.TransitionFinishCallback>(),
+        )
+
+        // onAnimationEnd called for cancelled drag to desktop
+        verify(onResizeAnimationListener).onAnimationEnd(task.taskId)
     }
 
     @Test
@@ -906,7 +898,9 @@ class DragToDesktopTransitionHandlerTest : ShellTestCase() {
             springHandler.finishDragToDesktopTransition(WindowContainerTransaction())
         val startTransaction = mock<SurfaceControl.Transaction>()
         val endDragFinishCallback = mock<Transitions.TransitionFinishCallback>()
-        springHandler.onTaskResizeAnimationListener = mock()
+        springHandler.onTaskResizeAnimationListener = mock {
+            on { onAnimationStart(any(), any(), any()) } doReturn true
+        }
         mergeInterruptingTransition(mergeTarget = startTransition)
 
         val didAnimate =
@@ -1239,6 +1233,16 @@ class DragToDesktopTransitionHandlerTest : ShellTestCase() {
 
         // Don't even animate the "drag" since it was already cancelled.
         verify(dragAnimator, never()).startAnimation()
+    }
+
+    private fun createSplitTask(): RunningTaskInfo {
+        val task1 = createTask(WINDOWING_MODE_MULTI_WINDOW)
+        val task2 = createTask(WINDOWING_MODE_MULTI_WINDOW)
+        whenever(splitScreenController.getSplitPosition(task1.taskId))
+            .thenReturn(SPLIT_POSITION_TOP_OR_LEFT)
+        whenever(splitScreenController.getTaskInfo(SPLIT_POSITION_BOTTOM_OR_RIGHT))
+            .thenReturn(task2)
+        return task1
     }
 
     private fun createTask(

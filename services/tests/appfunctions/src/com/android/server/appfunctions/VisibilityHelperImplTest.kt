@@ -24,6 +24,7 @@ import android.app.appfunctions.flags.Flags
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.content.pm.PackageManagerInternal
+import android.platform.test.annotations.EnableFlags
 import android.platform.test.annotations.RequiresFlagsEnabled
 import android.platform.test.flag.junit.CheckFlagsRule
 import android.platform.test.flag.junit.DeviceFlagsValueProvider
@@ -82,7 +83,7 @@ class VisibilityHelperImplTest {
             AppFunctionAidlSearchSpec(
                 CALLING_PKG,
                 AppFunctionSearchSpec.Builder()
-                    .setFunctionNames(listOf(FUNC_A_1, FUNC_B_2, FUNC_HIDDEN_1))
+                    .setFunctionNames(setOf(FUNC_A_1, FUNC_B_2, FUNC_HIDDEN_1))
                     .build(),
                 TARGET_USER_ID,
             )
@@ -97,7 +98,7 @@ class VisibilityHelperImplTest {
     fun testApplyFilterWithoutFunctionNames_hasQueryAllPackages_returnsOriginalSpec() {
         setTestPermission(Manifest.permission.EXECUTE_APP_FUNCTIONS, true)
         setTestPermission(Manifest.permission.QUERY_ALL_PACKAGES, true)
-        val requested = listOf(PKG_A, PKG_B, PKG_HIDDEN)
+        val requested = setOf(PKG_A, PKG_B, PKG_HIDDEN)
         val spec =
             AppFunctionAidlSearchSpec(
                 CALLING_PKG,
@@ -115,13 +116,13 @@ class VisibilityHelperImplTest {
     fun testApplyFilterWithFunctionNames_hasQueryAllPackages_returnsOriginalSpec() {
         setTestPermission(Manifest.permission.EXECUTE_APP_FUNCTIONS, true)
         setTestPermission(Manifest.permission.QUERY_ALL_PACKAGES, true)
-        val requested = listOf(PKG_A, PKG_B, PKG_HIDDEN)
+        val requested = setOf(PKG_A, PKG_B, PKG_HIDDEN)
         val spec =
             AppFunctionAidlSearchSpec(
                 CALLING_PKG,
                 AppFunctionSearchSpec.Builder()
                     .setPackageNames(requested)
-                    .setFunctionNames(listOf(FUNC_A_1, FUNC_A_2, FUNC_B_1, FUNC_HIDDEN_1))
+                    .setFunctionNames(setOf(FUNC_A_1, FUNC_A_2, FUNC_B_1, FUNC_HIDDEN_1))
                     .build(),
                 TARGET_USER_ID,
             )
@@ -141,7 +142,7 @@ class VisibilityHelperImplTest {
         val spec =
             AppFunctionAidlSearchSpec(
                 CALLING_PKG,
-                AppFunctionSearchSpec.Builder().setPackageNames(listOf(PKG_A, PKG_HIDDEN)).build(),
+                AppFunctionSearchSpec.Builder().setPackageNames(setOf(PKG_A, PKG_HIDDEN)).build(),
                 TARGET_USER_ID,
             )
 
@@ -160,8 +161,8 @@ class VisibilityHelperImplTest {
             AppFunctionAidlSearchSpec(
                 CALLING_PKG,
                 AppFunctionSearchSpec.Builder()
-                    .setPackageNames(listOf(PKG_A, PKG_HIDDEN))
-                    .setFunctionNames(listOf(FUNC_A_1, FUNC_A_2, FUNC_HIDDEN_1, FUNC_HIDDEN_2))
+                    .setPackageNames(setOf(PKG_A, PKG_HIDDEN))
+                    .setFunctionNames(setOf(FUNC_A_1, FUNC_A_2, FUNC_HIDDEN_1, FUNC_HIDDEN_2))
                     .build(),
                 TARGET_USER_ID,
             )
@@ -181,8 +182,8 @@ class VisibilityHelperImplTest {
             AppFunctionAidlSearchSpec(
                 CALLING_PKG,
                 AppFunctionSearchSpec.Builder()
-                    .setPackageNames(listOf(PKG_A, PKG_HIDDEN))
-                    .setFunctionNames(listOf(FUNC_HIDDEN_1, FUNC_HIDDEN_2))
+                    .setPackageNames(setOf(PKG_A, PKG_HIDDEN))
+                    .setFunctionNames(setOf(FUNC_HIDDEN_1, FUNC_HIDDEN_2))
                     .build(),
                 TARGET_USER_ID,
             )
@@ -190,6 +191,57 @@ class VisibilityHelperImplTest {
         val result = visibilityHelper.applyVisiblePackageFilter(spec, TEST_UID, TEST_PID)
 
         assertThat(result).isNull()
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_APP_FUNCTION_PERMISSION_V2)
+    fun testApplyFilter_withSystemPermission_filtersInvisiblePackages() {
+        // With EXECUTE_APP_FUNCTIONS_SYSTEM, the caller can query for other packages.
+        setTestPermission(Manifest.permission.EXECUTE_APP_FUNCTIONS_SYSTEM, true)
+        // Ensure other permissions that grant visibility are denied to isolate the test.
+        setTestPermission(Manifest.permission.EXECUTE_APP_FUNCTIONS, false)
+        setTestPermission(Manifest.permission.DISCOVER_APP_FUNCTIONS, false)
+        setTestPermission(Manifest.permission.QUERY_ALL_PACKAGES, false)
+        mockVisiblePackages(PKG_A, PKG_B)
+        val spec =
+            AppFunctionAidlSearchSpec(
+                CALLING_PKG,
+                AppFunctionSearchSpec.Builder().setPackageNames(setOf(PKG_A, PKG_HIDDEN)).build(),
+                TARGET_USER_ID,
+            )
+
+        val result = visibilityHelper.applyVisiblePackageFilter(spec, TEST_UID, TEST_PID)
+
+        // The result should be filtered to only packages visible to the caller.
+        assertThat(result!!.packageNames).containsExactly(PKG_A)
+        assertThat(result.functionNames).isNull()
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_ENABLE_APP_FUNCTION_PERMISSION_V2)
+    fun testApplyFilterWithFunctionNames_withSystemPermission_filtersInvisiblePackages() {
+        // With EXECUTE_APP_FUNCTIONS_SYSTEM, the caller can query for other packages.
+        setTestPermission(Manifest.permission.EXECUTE_APP_FUNCTIONS_SYSTEM, true)
+        // Ensure other permissions that grant visibility are denied to isolate the test.
+        setTestPermission(Manifest.permission.EXECUTE_APP_FUNCTIONS, false)
+        setTestPermission(Manifest.permission.DISCOVER_APP_FUNCTIONS, false)
+        setTestPermission(Manifest.permission.QUERY_ALL_PACKAGES, false)
+        mockVisiblePackages(PKG_A, PKG_B)
+        val spec =
+            AppFunctionAidlSearchSpec(
+                CALLING_PKG,
+                AppFunctionSearchSpec.Builder()
+                    .setPackageNames(setOf(PKG_A, PKG_HIDDEN))
+                    .setFunctionNames(setOf(FUNC_A_1, FUNC_A_2, FUNC_HIDDEN_1, FUNC_HIDDEN_2))
+                    .build(),
+                TARGET_USER_ID,
+            )
+
+        val result = visibilityHelper.applyVisiblePackageFilter(spec, TEST_UID, TEST_PID)
+
+        // The result should be filtered to only packages and functions visible to the caller.
+        assertThat(result!!.packageNames).containsExactly(PKG_A)
+        assertThat(result.functionNames).containsExactly(FUNC_A_1, FUNC_A_2)
     }
 
     private fun setTestPermission(perm: String, granted: Boolean) {

@@ -152,6 +152,7 @@ import android.app.ActivityManagerInternal;
 import android.app.ActivityManagerInternal.OomAdjReason;
 import android.app.ActivityManagerInternal.ServiceNotificationPolicy;
 import android.app.ActivityThread;
+import android.app.AnrTypes;
 import android.app.AppGlobals;
 import android.app.AppOpsManager;
 import android.app.BackgroundStartPrivileges;
@@ -262,6 +263,7 @@ import com.android.server.LocalServices;
 import com.android.server.SystemService;
 import com.android.server.am.ActivityManagerService.ItemMatcher;
 import com.android.server.am.LowMemDetector.MemFactor;
+import com.android.server.am.ServiceRecord.NeededReason;
 import com.android.server.am.ServiceRecord.ShortFgsInfo;
 import com.android.server.am.ServiceRecord.TimeLimitedFgsInfo;
 import com.android.server.am.psc.SyncBatchSession;
@@ -852,27 +854,45 @@ public final class ActiveServices {
                 ? maxBg : ActivityManager.isLowRamDeviceStatic() ? 1 : 8;
 
         final IBinder b = ServiceManager.getService(Context.PLATFORM_COMPAT_SERVICE);
-
 // QTI_BEGIN: 2019-04-15: Performance: perf: Use get API for perf Properties.
         if(mPerf != null)
             SERVICE_RESCHEDULE = Boolean.parseBoolean(mPerf.perfGetProp("ro.vendor.qti.am.reschedule_service", "false"));
 // QTI_END: 2019-04-15: Performance: perf: Use get API for perf Properties.
 
-        this.mFGSLogger = new ForegroundServiceTypeLoggerModule();
-        this.mActiveServiceAnrTimer = new ProcessAnrTimer(service,
-                ActivityManagerService.SERVICE_TIMEOUT_MSG,
-                "SERVICE_TIMEOUT",
-                new AnrTimer.Args().longMethodTracing(Flags.enableLongMethodTracingOnAnrTimer()));
-        this.mShortFGSAnrTimer = new ServiceAnrTimer(service,
-                ActivityManagerService.SERVICE_SHORT_FGS_ANR_TIMEOUT_MSG,
-                "SHORT_FGS_TIMEOUT",
-                new AnrTimer.Args().longMethodTracing(Flags.enableLongMethodTracingOnAnrTimer()));
-        this.mServiceFGAnrTimer = new ServiceAnrTimer(service,
-                ActivityManagerService.SERVICE_FOREGROUND_TIMEOUT_MSG,
-                "SERVICE_FOREGROUND_TIMEOUT",
-                new AnrTimer.Args()
-                            .extend(true)
-                            .longMethodTracing(Flags.enableLongMethodTracingOnAnrTimer()));
+        mFGSLogger = new ForegroundServiceTypeLoggerModule();
+        mActiveServiceAnrTimer =
+                new ProcessAnrTimer(
+                        service,
+                        ActivityManagerService.SERVICE_TIMEOUT_MSG,
+                        "SERVICE_TIMEOUT",
+                        new AnrTimer.Args()
+                                .longMethodTracing(Flags.enableLongMethodTracingOnAnrTimer())
+                                .anrWarning(android.app.Flags.enableAnrWarningCallback())
+                                .anrWarningMessageId(
+                                        ActivityManagerService.SERVICE_TIMEOUT_WARNING_MSG));
+        mShortFGSAnrTimer =
+                new ServiceAnrTimer(
+                        service,
+                        ActivityManagerService.SERVICE_SHORT_FGS_ANR_TIMEOUT_MSG,
+                        "SHORT_FGS_TIMEOUT",
+                        new AnrTimer.Args()
+                                .longMethodTracing(Flags.enableLongMethodTracingOnAnrTimer())
+                                .anrWarning(android.app.Flags.enableAnrWarningCallback())
+                                .anrWarningMessageId(
+                                        ActivityManagerService
+                                                .SERVICE_SHORT_FGS_ANR_TIMEOUT_WARNING_MSG));
+        mServiceFGAnrTimer =
+                new ServiceAnrTimer(
+                        service,
+                        ActivityManagerService.SERVICE_FOREGROUND_TIMEOUT_MSG,
+                        "SERVICE_FOREGROUND_TIMEOUT",
+                        new AnrTimer.Args()
+                                .extend(true)
+                                .longMethodTracing(Flags.enableLongMethodTracingOnAnrTimer())
+                                .anrWarning(android.app.Flags.enableAnrWarningCallback())
+                                .anrWarningMessageId(
+                                        ActivityManagerService
+                                                .SERVICE_FOREGROUND_TIMEOUT_ANR_WARNING_MSG));
 // QTI_BEGIN: 2023-10-16: Frameworks: Add check if vendor is supporting AIDL or HIDL
         try {
             if (ServiceManager.isDeclared(AIDL_SERVICE)){
@@ -3012,7 +3032,7 @@ public final class ActiveServices {
                 }
                 // foregroundServiceType is used in logFGSStateChangeLocked(), so we can't clear it
                 // earlier.
-                r.setForegroundServiceType(0);
+                mAm.mProcessStateController.setForegroundServiceType(r, 0);
                 r.mFgsNotificationWasDeferred = false;
                 r.systemRequestedFgToBg = systemRequestedTransition;
                 signalForegroundServiceObserversLocked(r);
@@ -4449,7 +4469,8 @@ public final class ActiveServices {
                     "BIND_ALLOW_FOREGROUND_SERVICE_STARTS_FROM_BACKGROUND");
         }
 
-        if ((flags & Context.BIND_ALLOW_FREEZE) != 0 && !isCallerSystem) {
+        if ((flags & Context.BIND_ALLOW_FREEZE) != 0 && !isCallerSystem
+                && !callerApp.hasActiveInstrumentation()) {
             throw new SecurityException("Non-system caller (pid=" + callingPid
                     + ") set BIND_ALLOW_FREEZE when binding service " + service);
         }
@@ -4758,6 +4779,12 @@ public final class ActiveServices {
                         res.aliasComponent != null ? res.aliasComponent : s.name;
                 final IBinderSession session =
                         mAm.mProcessStateController.getBoundServiceSessionFor(c);
+
+                final boolean isPccFrameworkSupportEnabled = enablePccFrameworkSupport();
+                if (isPccFrameworkSupportEnabled) {
+                    Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER,
+                            "bindServiceLocked#createPccProxyIfNeededAndNotifyClient");
+                }
                 try {
                     IBinder serviceBinder = createPccProxyIfNeeded(c, b.intent.binder);
 
@@ -4766,6 +4793,10 @@ public final class ActiveServices {
                     Slog.w(TAG, "Failure sending service " + s.shortInstanceName
                             + " to connection " + c.conn.asBinder()
                             + " (in " + c.binding.client.processName + ")", e);
+                } finally {
+                    if (isPccFrameworkSupportEnabled) {
+                        Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
+                    }
                 }
 
                 // If this is the first app connected back to this binding,
@@ -4849,6 +4880,12 @@ public final class ActiveServices {
                                     c.aliasComponent != null ? c.aliasComponent : r.name;
                             final IBinderSession session =
                                     mAm.mProcessStateController.getBoundServiceSessionFor(c);
+
+                            if (enablePccFrameworkSupport()) {
+                                Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER,
+                                        "publishServiceLocked"
+                                                + "#createPccProxyIfNeededAndNotifyClient");
+                            }
                             try {
                                 IBinder serviceBinder = createPccProxyIfNeeded(c, service);
 
@@ -4858,6 +4895,10 @@ public final class ActiveServices {
                                 Slog.w(TAG, "Failure sending service " + r.shortInstanceName
                                       + " to connection " + c.conn.asBinder()
                                       + " (in " + c.binding.client.processName + ")", e);
+                            } finally {
+                                if (enablePccFrameworkSupport()) {
+                                    Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
+                                }
                             }
                         }
                     }
@@ -5018,7 +5059,7 @@ public final class ActiveServices {
             if (updatedFlags != (updatedFlags & Context.BIND_UPDATEABLE_FLAGS)) {
                 throw new IllegalArgumentException("Attempting to update non-updatedable flags");
             }
-            if (r.updateFlags(flags)) {
+            if (mAm.mProcessStateController.updateConnectionFlags(r, flags)) {
                 final ProcessRecord app = r.binding.service.getHostProcess();
                 if (app != null) {
                     mAm.updateLruProcessLocked(app, true, null);
@@ -5793,7 +5834,8 @@ public final class ActiveServices {
         final boolean skipOomAdj = (serviceBindingOomAdjPolicy
                 & SERVICE_BIND_OOMADJ_POLICY_SKIP_OOM_UPDATE_ON_BIND) != 0;
         if ((!b.requested || rebind) && b.apps.size() > 0) {
-            try {
+            try (SyncBatchSession batch = mAm.mProcessStateController.startServiceBatchSession(
+                    OOM_ADJ_REASON_BIND_SERVICE)) {
                 final boolean skipTimeout = skipOomAdj;
                 bumpServiceExecutingLocked(r, execInFg, "bind",
                         skipOomAdj ? OOM_ADJ_REASON_NONE : OOM_ADJ_REASON_BIND_SERVICE,
@@ -5801,6 +5843,11 @@ public final class ActiveServices {
                 if (Trace.isTagEnabled(Trace.TRACE_TAG_ACTIVITY_MANAGER)) {
                     Trace.instant(Trace.TRACE_TAG_ACTIVITY_MANAGER, "requestServiceBinding="
                             + b.intent.getIntent() + ". bindSeq=" + mBindServiceSeqCounter);
+                }
+                if (batch != null && !skipOomAdj) {
+                    // Must trigger the update before the scheduleBindService IPC is sent out, so
+                    // that the process is in correct state before it tries to do anything.
+                    batch.triggerUpdate(OOM_ADJ_REASON_BIND_SERVICE);
                 }
                 r.getHostProcess().getThread().scheduleBindService(r, b, b.intent.getIntent(),
                         rebind, r.getHostProcess().getReportedProcState(),
@@ -6221,13 +6268,22 @@ public final class ActiveServices {
         if (!mRestartingServices.contains(r)) {
             return;
         }
-        if (!isServiceNeededLocked(r, false, false)) {
+        final @NeededReason int needed = r.getNeededReasonsLocked(false, false);
+        if (needed == ServiceRecord.NEEDED_NONE) {
             // Paranoia: is this service actually needed?  In theory a service that is not
             // needed should never remain on the restart list.  In practice...  well, there
             // have been bugs where this happens, and bad things happen because the process
             // ends up just being cached, so quickly killed, then restarted again and again.
             // Let's not let that happen.
             Slog.wtf(TAG, "Restarting service that is not needed: " + r);
+            return;
+        }
+        // Don't restart yet if all auto-create clients are frozen and no
+        // explicit start request exists.
+        if (Flags.deferServiceRestartWhenFrozen()
+                && needed == ServiceRecord.NEEDED_BY_AUTO_CREATE
+                && !r.hasNonFrozenAutoCreateConnections()) {
+            Slog.d(TAG_SERVICE, "Delaying restart of " + r + " because all clients are frozen");
             return;
         }
         try (var unused = mAm.mProcessStateController.startServiceBatchSession(
@@ -6290,6 +6346,25 @@ public final class ActiveServices {
             } else {
                 /* Will be a no-op if nothing pending */
                 mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_START_SERVICE);
+            }
+        }
+    }
+
+    /**
+     * Called when a process is unfrozen. Triggers restarts of any services it binds to
+     * that were deferred due to the client being frozen.
+     */
+    void onProcessUnfrozenLocked(@NonNull ProcessServiceRecord psr) {
+        if (!Flags.deferServiceRestartWhenFrozen()) {
+            return;
+        }
+        for (int i = 0; i < psr.numberOfConnections(); i++) {
+            final ConnectionRecord cr = psr.getConnectionAt(i);
+            if (cr.hasFlag(Context.BIND_AUTO_CREATE)) {
+                final ServiceRecord sr = cr.getService();
+                if (mRestartingServices.contains(sr)) {
+                    performServiceRestartLocked(sr);
+                }
             }
         }
     }
@@ -6654,13 +6729,6 @@ public final class ActiveServices {
         if (clientApp != null && hostApp != null) {
             if (clientApp == hostApp) {
                 policy = DEFAULT_SERVICE_NO_BUMP_BIND_POLICY_FLAG;
-            } else if (clientApp.isCached()) {
-                if (!Flags.cpuTimeCapabilityBasedFreezePolicy()) {
-                    policy = DEFAULT_SERVICE_NO_BUMP_BIND_POLICY_FLAG;
-                    if (clientApp.isFreezable()) {
-                        policy |= SERVICE_BIND_OOMADJ_POLICY_FREEZE_CALLER;
-                    }
-                }
             }
             if ((policy & SERVICE_BIND_OOMADJ_POLICY_SKIP_OOM_UPDATE_ON_CONNECT) == 0) {
                 // Binding between two different processes.
@@ -6671,11 +6739,9 @@ public final class ActiveServices {
                     policy = DEFAULT_SERVICE_NO_BUMP_BIND_POLICY_FLAG;
                 }
             }
-            if (Flags.cpuTimeCapabilityBasedFreezePolicy()) {
-                // Non cached processes can possibly be frozen, always check their freezability.
-                if (clientApp.isFreezable()) {
-                    policy |= SERVICE_BIND_OOMADJ_POLICY_FREEZE_CALLER;
-                }
+            // Non cached processes can possibly be frozen, always check their freezability.
+            if (clientApp.isFreezable()) {
+                policy |= SERVICE_BIND_OOMADJ_POLICY_FREEZE_CALLER;
             }
         }
         return policy;
@@ -6776,7 +6842,12 @@ public final class ActiveServices {
                         serviceName);
                 mAm.mBatteryStatsService.noteServiceStartLaunch(uid, packageName, serviceName);
                 mAm.notifyPackageUse(r.serviceInfo.packageName,
-                                     PackageManager.NOTIFY_PACKAGE_USE_SERVICE);
+                        PackageManager.NOTIFY_PACKAGE_USE_SERVICE);
+                if (batch != null) {
+                    // Must trigger the update before the scheduleCreateService IPC is sent out, so
+                    // that the process is in correct state before it tries to do anything.
+                    batch.triggerUpdate(OOM_ADJ_REASON_BIND_SERVICE);
+                }
                 thread.scheduleCreateService(r, r.serviceInfo,
                         null /* compatInfo (unused but need to keep method signature) */,
                         app.getReportedProcState());
@@ -6881,7 +6952,7 @@ public final class ActiveServices {
         if (N == 0) {
             return;
         }
-        try (var unused = mAm.mProcessStateController.startServiceBatchSession(
+        try (SyncBatchSession batch = mAm.mProcessStateController.startServiceBatchSession(
                 OOM_ADJ_REASON_START_SERVICE)) {
             ArrayList<ServiceStartArgs> args = new ArrayList<>();
 
@@ -6945,6 +7016,12 @@ public final class ActiveServices {
                     mAm.updateOomAdjPendingTargetsLocked(OOM_ADJ_REASON_START_SERVICE);
                 }
             }
+            if (batch != null) {
+                // Must trigger the update before the scheduleServiceArgs IPC is sent out, so
+                // that the process is in correct state before it tries to do anything.
+                batch.triggerUpdate(OOM_ADJ_REASON_START_SERVICE);
+            }
+
             ParceledListSlice<ServiceStartArgs> slice = new ParceledListSlice<>(args);
             slice.setInlineCountLimit(4);
             Exception caughtException = null;
@@ -6988,24 +7065,6 @@ public final class ActiveServices {
         }
     }
 
-    final boolean isServiceNeededLocked(ServiceRecord r, boolean knowConn,
-            boolean hasConn) {
-        // Are we still explicitly being asked to run?
-        if (r.isStartRequested()) {
-            return true;
-        }
-
-        // Is someone still bound to us keeping us running?
-        if (!knowConn) {
-            hasConn = r.hasAutoCreateConnections();
-        }
-        if (hasConn) {
-            return true;
-        }
-
-        return false;
-    }
-
     private void bringDownServiceIfNeededLocked(ServiceRecord r, boolean knowConn,
             boolean hasConn, boolean enqueueOomAdj,
             @ServiceBindingOomAdjPolicy int serviceBindingOomAdjPolicy, String debugReason) {
@@ -7013,7 +7072,7 @@ public final class ActiveServices {
             Slog.i(TAG, "Bring down service for " + debugReason + " :" + r.toString());
         }
 
-        if (isServiceNeededLocked(r, knowConn, hasConn)) {
+        if (r.isNeededLocked(knowConn, hasConn)) {
             return;
         }
 
@@ -7609,14 +7668,24 @@ public final class ActiveServices {
     }
 
     private void removePccProxyIfNeeded(ConnectionRecord cr) {
-        if (cr.binding.service.serviceInfo.shouldRunInPccSandbox()) {
-            mPccSandboxManagerInternal.removePccProxyIfNeeded(
-                    cr.binding.service.name,
-                    cr.binding.client.userId,
-                    cr.binding.intent.intent.getIntent(),
-                    cr.binding.intent.binder,
-                    cr.binding.client.uid
-            );
+        final boolean isPccFrameworkSupportEnabled = enablePccFrameworkSupport();
+        if (isPccFrameworkSupportEnabled) {
+            Trace.traceBegin(Trace.TRACE_TAG_ACTIVITY_MANAGER, "removePccProxyIfNeeded");
+        }
+        try {
+            if (cr.binding.service.serviceInfo.shouldRunInPccSandbox()) {
+                mPccSandboxManagerInternal.removePccProxyIfNeeded(
+                        cr.binding.service.name,
+                        cr.binding.client.userId,
+                        cr.binding.intent.intent.getIntent(),
+                        cr.binding.intent.binder,
+                        cr.binding.client.uid
+                );
+            }
+        } finally {
+            if (isPccFrameworkSupportEnabled) {
+                Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
+            }
         }
     }
 
@@ -7766,7 +7835,7 @@ public final class ActiveServices {
                         Trace.traceEnd(Trace.TRACE_TAG_ACTIVITY_MANAGER);
                     }
                     didSomething = true;
-                    if (!isServiceNeededLocked(sr, false, false)) {
+                    if (!sr.isNeededLocked(false, false)) {
                         // We were waiting for this service to start, but it is actually no
                         // longer needed.  This could happen because bringDownServiceIfNeeded
                         // won't bring down a service that is pending...  so now the pending
@@ -8488,6 +8557,106 @@ public final class ActiveServices {
         }
 
         return res;
+    }
+
+    /**
+     * Notifies the app about a potential ANR due to a short foreground service timeout.
+     *
+     * @param serviceRecord The service record that is timing out.
+     * @param anrId An identifier for this ANR.
+     * @param elapsedTimeMs The time in milliseconds that has elapsed since the timeout started.
+     */
+    void onShortFgsAnrTimeoutWarning(ServiceRecord serviceRecord, int anrId, long elapsedTimeMs) {
+        final String description = "Short Foreground Service: " + serviceRecord.getComponentName();
+        final long timeoutMs;
+
+        synchronized (mAm) {
+            if (serviceRecord.getShortFgsInfo() == null) {
+                return;
+            }
+            timeoutMs =
+                    serviceRecord.getShortFgsInfo().getAnrTime()
+                            - serviceRecord.getShortFgsInfo().getStartTime();
+        }
+
+        mAm.notifyAnrWarning(
+                serviceRecord.appInfo.uid,
+                anrId,
+                AnrTypes.ANR_TYPE_FOREGROUND_SHORT_SERVICE_TIMEOUT,
+                elapsedTimeMs,
+                timeoutMs,
+                description);
+    }
+
+    /**
+     * Notifies the app about a potential ANR due to a foreground service took too long to start.
+     *
+     * @param serviceRecord The service record that is timing out.
+     * @param anrId An identifier for this ANR.
+     * @param elapsedTimeMs The time in milliseconds that has elapsed since the timeout started.
+     */
+    void serviceForegroundAnrWarning(ServiceRecord serviceRecord, int anrId, long elapsedTimeMs) {
+        String description = "Foreground Service: " + serviceRecord.getComponentName();
+        mAm.notifyAnrWarning(
+                serviceRecord.appInfo.uid,
+                anrId,
+                AnrTypes.ANR_TYPE_START_FOREGROUND_SERVICE,
+                elapsedTimeMs,
+                mAm.mConstants.mServiceStartForegroundTimeoutMs,
+                description);
+    }
+
+    /**
+     * Notifies the app about a potential ANR due to service took too long to finish.
+     *
+     * @param proc The process record of the process hosting the service.
+     * @param anrId A unique integer ID for this ANR.
+     * @param elapsedTimeMs The elapsed time in milliseconds since the service execution started.
+     */
+    void serviceTimeoutAnrWarning(ProcessRecord proc, int anrId, long elapsedTimeMs) {
+        final long timeoutMs;
+        String description;
+        synchronized (mAm) {
+            final ProcessServiceRecord psr = proc.mServices;
+            if (psr.numberOfExecutingServices() == 0
+                    || proc.getThread() == null
+                    || proc.isKilled()) {
+                return;
+            }
+
+            timeoutMs =
+                    psr.isExecServicesFg()
+                            ? mAm.mConstants.SERVICE_TIMEOUT
+                            : mAm.mConstants.SERVICE_BACKGROUND_TIMEOUT;
+
+            ServiceRecord serviceRecord = null;
+            final long now = SystemClock.uptimeMillis();
+            final long maxTime = now - elapsedTimeMs;
+
+            // Find the service with the oldest start time among those that have timed out.
+            for (int i = psr.numberOfExecutingServices() - 1; i >= 0; i--) {
+                ServiceRecord temp = psr.getExecutingServiceAt(i);
+                if (temp.executingStart < maxTime) {
+                    if (serviceRecord == null
+                            || (temp.executingStart < serviceRecord.executingStart)) {
+                        serviceRecord = temp;
+                    }
+                }
+            }
+            if (serviceRecord != null && mAm.mProcessList.isInLruListLOSP(proc)) {
+                description = "Executing Service: " + serviceRecord.shortInstanceName;
+            } else {
+                return;
+            }
+        }
+
+        mAm.notifyAnrWarning(
+                proc.uid,
+                anrId,
+                AnrTypes.ANR_TYPE_EXECUTE_SERVICE,
+                elapsedTimeMs,
+                timeoutMs,
+                description);
     }
 
     void serviceTimeout(ProcessRecord proc) {

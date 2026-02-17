@@ -18,7 +18,6 @@ import android.content.Context
 import com.android.settingslib.SignalIcon
 import com.android.settingslib.mobile.MobileMappings
 import com.android.systemui.KairosActivatable
-import com.android.systemui.KairosBuilder
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.kairos.KairosNetwork
@@ -28,7 +27,6 @@ import com.android.systemui.kairos.map
 import com.android.systemui.kairos.mapValues
 import com.android.systemui.kairos.toColdConflatedFlow
 import com.android.systemui.kairos.util.nameTag
-import com.android.systemui.kairosBuilder
 import com.android.systemui.log.table.TableLogBuffer
 import com.android.systemui.log.table.TableLogBufferFactory
 import com.android.systemui.statusbar.pipeline.mobile.StatusBarMobileIconKairos
@@ -46,6 +44,8 @@ import com.android.systemui.statusbar.pipeline.mobile.domain.model.SignalIconMod
 import com.android.systemui.statusbar.pipeline.mobile.util.MobileMappingsProxy
 import com.android.systemui.statusbar.pipeline.shared.data.model.DataActivityModel
 import com.android.systemui.statusbar.policy.data.repository.UserSetupRepository
+import com.android.systemui.util.lifecycle.kairos.KairosBuilder
+import com.android.systemui.util.lifecycle.kairos.kairosBuilder
 import com.android.systemui.utils.coroutines.flow.flatMapLatestConflated
 import dagger.Provides
 import dagger.multibindings.ElementsIntoSet
@@ -83,7 +83,8 @@ constructor(
                 name = nameTag("MobileIconsInteractorKairosAdapter.interactorsBySubIdK")
             )
     }
-    private val interactorsBySubId =
+
+    private val interactorsBySubId: StateFlow<Map<Int, MobileIconInteractor>> =
         interactorsBySubIdK
             .toColdConflatedFlow(
                 kairosNetwork,

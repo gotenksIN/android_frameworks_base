@@ -26,9 +26,6 @@ import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.dagger.qualifiers.Default
 import com.android.systemui.display.dagger.SystemUIDisplaySubcomponent
-import com.android.systemui.kairos.KairosNetwork
-import com.android.systemui.kairos.toColdConflatedFlow
-import com.android.systemui.kairos.util.nameTag
 import com.android.systemui.log.LogBuffer
 import com.android.systemui.log.LogBufferFactory
 import com.android.systemui.log.table.TableLogBuffer
@@ -39,6 +36,8 @@ import com.android.systemui.statusbar.events.data.repository.SystemStatusEventAn
 import com.android.systemui.statusbar.events.domain.interactor.SystemStatusEventAnimationInteractor
 import com.android.systemui.statusbar.pipeline.airplane.ui.viewmodel.AirplaneModeViewModel
 import com.android.systemui.statusbar.pipeline.airplane.ui.viewmodel.AirplaneModeViewModelImpl
+import com.android.systemui.statusbar.pipeline.audio.data.repository.WiredAudioDeviceRepository
+import com.android.systemui.statusbar.pipeline.audio.data.repository.WiredAudioDeviceRepositoryImpl
 import com.android.systemui.statusbar.pipeline.battery.data.repository.BatteryRepository
 import com.android.systemui.statusbar.pipeline.battery.data.repository.BatteryRepositoryImpl
 import com.android.systemui.statusbar.pipeline.icons.shared.BindableIconsRegistry
@@ -62,8 +61,13 @@ import com.android.systemui.statusbar.pipeline.mobile.domain.interactor.MobileIc
 import com.android.systemui.statusbar.pipeline.mobile.domain.interactor.MobileIconsInteractorKairosImpl
 import com.android.systemui.statusbar.pipeline.mobile.ui.MobileUiAdapter
 import com.android.systemui.statusbar.pipeline.mobile.ui.MobileUiAdapterKairos
-import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.MobileIconsViewModel
+import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.MobileIconsState
+import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.MobileIconsStateImpl
+import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.MobileIconsStateKairos
 import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.MobileIconsViewModelKairos
+import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.StackedMobileIconViewModel
+import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.StackedMobileIconViewModelImpl
+import com.android.systemui.statusbar.pipeline.mobile.ui.viewmodel.StackedMobileIconViewModelKairos
 import com.android.systemui.statusbar.pipeline.mobile.util.MobileMappingsProxy
 import com.android.systemui.statusbar.pipeline.mobile.util.MobileMappingsProxyImpl
 import com.android.systemui.statusbar.pipeline.mobile.util.SubscriptionManagerProxy
@@ -94,11 +98,8 @@ import dagger.Module
 import dagger.Provides
 import dagger.multibindings.ClassKey
 import dagger.multibindings.IntoMap
-import java.util.function.Supplier
-import javax.inject.Named
 import javax.inject.Provider
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.Flow
 
 @Module(
     includes =
@@ -126,6 +127,11 @@ abstract class StatusBarPipelineModule {
     abstract fun connectivityRepository(impl: ConnectivityRepositoryImpl): ConnectivityRepository
 
     @Binds abstract fun batteryRepository(impl: BatteryRepositoryImpl): BatteryRepository
+
+    @Binds
+    abstract fun wiredAudioDeviceRepository(
+        impl: WiredAudioDeviceRepositoryImpl
+    ): WiredAudioDeviceRepository
 
     @Binds
     abstract fun realDeviceBasedSatelliteRepository(
@@ -217,32 +223,6 @@ abstract class StatusBarPipelineModule {
                 disabledWifiRepository
             } else {
                 wifiRepositoryImplFactory.create(wifiManager)
-            }
-        }
-
-        @Provides
-        @SysUISingleton
-        @Named(FIRST_MOBILE_SUB_SHOWING_NETWORK_TYPE_ICON)
-        fun provideFirstMobileSubShowingNetworkTypeIconProvider(
-            mobileIconsViewModel: Provider<MobileIconsViewModel>,
-            kairosViewModel: Provider<MobileIconsViewModelKairos>,
-            kairosNetwork: KairosNetwork,
-        ): Supplier<Flow<Boolean>> {
-            return if (StatusBarMobileIconKairos.isEnabled) {
-                Supplier {
-                    kairosViewModel
-                        .get()
-                        .firstMobileSubShowingNetworkTypeIcon
-                        .toColdConflatedFlow(
-                            kairosNetwork,
-                            name =
-                                nameTag(
-                                    "StatusBarPipelineModule.provideFirstMobileSubShowingNetworkTypeIconProvider"
-                                ),
-                        )
-                }
-            } else {
-                Supplier { mobileIconsViewModel.get().firstMobileSubShowingNetworkTypeIcon }
             }
         }
 
@@ -362,7 +342,18 @@ abstract class StatusBarPipelineModule {
             return factory.create(repo, configurationInteractor, scope)
         }
 
-        const val FIRST_MOBILE_SUB_SHOWING_NETWORK_TYPE_ICON =
-            "FirstMobileSubShowingNetworkTypeIcon"
+        @Provides
+        fun mobileIconsStateFactory(
+            kairosFactory: MobileIconsStateKairos.Factory,
+            legacyFactory: MobileIconsStateImpl.Factory,
+        ): MobileIconsState.Factory =
+            if (StatusBarMobileIconKairos.isEnabled) kairosFactory else legacyFactory
+
+        @Provides
+        fun stackedMobileIconViewModelFactory(
+            kairosFactory: StackedMobileIconViewModelKairos.Factory,
+            legacyFactory: StackedMobileIconViewModelImpl.Factory,
+        ): StackedMobileIconViewModel.Factory =
+            if (StatusBarMobileIconKairos.isEnabled) kairosFactory else legacyFactory
     }
 }

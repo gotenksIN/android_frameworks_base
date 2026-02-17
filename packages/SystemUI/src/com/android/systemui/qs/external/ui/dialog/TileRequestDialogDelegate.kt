@@ -36,6 +36,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.style.TextAlign
@@ -68,7 +69,12 @@ constructor(
 ) : SystemUIDialog.Delegate {
 
     override fun createDialog(): SystemUIDialog {
-        return sysuiDialogFactory.create { TileRequestDialogContent(it) }
+        return sysuiDialogFactory
+            .create { TileRequestDialogContent(it) }
+            .apply {
+                window?.attributes?.accessibilityTitle =
+                    context.getString(R.string.qs_tile_request_dialog_title)
+            }
     }
 
     @Composable
@@ -217,6 +223,10 @@ constructor(
                     // essentially one button and shouldn't be able to be focused on separately
                     contentDescription = formatContentDescription + ", " + viewModel.uiState.label
                     this.selected = selected
+                    this.onClick {
+                        onClick()
+                        true
+                    }
                     role = Role.RadioButton
                 },
         ) {

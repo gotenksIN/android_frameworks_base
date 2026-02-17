@@ -18,6 +18,7 @@ package com.android.systemui.screencapture.record.camera.domain.interactor
 
 import android.content.res.Resources
 import android.graphics.Color
+import android.graphics.Region
 import android.util.Log
 import android.util.Size
 import android.view.Surface
@@ -30,6 +31,8 @@ import com.android.systemui.res.R
 import com.android.systemui.screencapture.common.ScreenCapture
 import com.android.systemui.screencapture.common.ScreenCaptureScope
 import com.android.systemui.screencapture.common.ScreenCaptureStartable
+import com.android.systemui.screencapture.record.camera.data.model.StreamConfiguration
+import com.android.systemui.screencapture.record.camera.data.model.isValid
 import com.android.systemui.screencapture.record.camera.data.repository.ScreenRecordCameraRepository
 import com.android.systemui.screencapture.record.camera.shared.model.CameraState
 import javax.inject.Inject
@@ -63,8 +66,9 @@ constructor(
             array.map { index -> getColor(index, Color.TRANSPARENT) }
         }
     val errors: Flow<Int> = repository.errors
-    val state: Flow<CameraState> = repository.state
+    val state: StateFlow<CameraState> = repository.state
     val isConnected: Flow<Boolean> = repository.isConnected
+    val cameraSubjectBounds: StateFlow<Region?> = repository.cameraSubjectBounds
 
     private val _cameraBackground = MutableStateFlow(cameraBackgroundColors.first())
     val cameraBackground: StateFlow<Int> = _cameraBackground
@@ -74,7 +78,7 @@ constructor(
 
     val isCameraSupported: Flow<Boolean> =
         repository.isConnected
-            .map { repository.isCameraSupported() }
+            .map { it && repository.isCameraSupported() }
             .stateInTraced(
                 "ScreenRecordCameraInteractor#isCameraSupported",
                 coroutineScope,
@@ -83,8 +87,8 @@ constructor(
             )
             .filterNotNull()
     val isOnTapSupported: Flow<Boolean> =
-        repository.isConnected
-            .map { repository.isOnTapSupported() }
+        isCameraSupported
+            .map { it && repository.isOnTapSupported() }
             .stateInTraced(
                 "ScreenRecordCameraInteractor#isOnTapSupported",
                 coroutineScope,
@@ -93,8 +97,8 @@ constructor(
             )
             .filterNotNull()
     val isBackgroundColorSupported: Flow<Boolean> =
-        repository.isConnected
-            .map { repository.isBackgroundColorSupported() }
+        isCameraSupported
+            .map { it && repository.isBackgroundColorSupported() }
             .stateInTraced(
                 "ScreenRecordCameraInteractor#isBackgroundColorSupported",
                 coroutineScope,
@@ -102,20 +106,23 @@ constructor(
                 null,
             )
             .filterNotNull()
-    val optimalCameraStreamSize: StateFlow<Size?> =
+    val streamConfiguration: StateFlow<StreamConfiguration?> =
         combine(repository.isConnected.filter { it }, displayParameters.filterNotNull()) {
-                isConnected,
+                _,
                 displayParameters ->
                 repository
                     .prepareStream(
                         displayUniqueId = displayParameters.uniqueId,
                         displayRotation = displayParameters.rotation,
                     )
-                    .also { size ->
-                        Log.d(TAG, "Prepared the stream: dp=$displayParameters size=$size")
+                    .also { config ->
+                        Log.d(TAG, "Prepared the stream: dp=$displayParameters config=$config")
                     }
             }
-            .filter { it == null || !it.isEmpty() }
+            .filter {
+                // null is a valid value here indicating that something went wrong
+                it == null || it.isValid()
+            }
             .stateInTraced(
                 "ScreenRecordCameraInteractor#optimalCameraStreamSize",
                 coroutineScope,
@@ -131,15 +138,21 @@ constructor(
             .onEach { color -> repository.setBackgroundColor(color) }
             .launchIn(coroutineScope)
 
-        combine(surfaceParameters.filterNotNull(), optimalCameraStreamSize.filterNotNull()) {
+        combine(surfaceParameters.filterNotNull(), streamConfiguration.filterNotNull()) {
                 params,
                 optimalCameraStreamSize ->
-                if (params.surface == null || params.size != optimalCameraStreamSize) {
+                if (
+                    params.surface == null ||
+                        params.size != optimalCameraStreamSize.cameraStreamSize
+                ) {
                     Log.d(TAG, "Waiting for a properly sized surface")
                     return@combine
                 }
                 Log.d(TAG, "Starting the stream: ${params.size}")
-                repository.startStream(surface = params.surface, size = optimalCameraStreamSize)
+                repository.startStream(
+                    surface = params.surface,
+                    size = optimalCameraStreamSize.cameraStreamSize,
+                )
             }
             .launchIn(coroutineScope)
     }
@@ -179,5 +192,3 @@ private data class CameraDisplayParameters(
 )
 
 private data class CameraSurfaceParameters(val surface: Surface?, val size: Size?)
-
-private fun Size.isEmpty(): Boolean = width == 0 || height == 0

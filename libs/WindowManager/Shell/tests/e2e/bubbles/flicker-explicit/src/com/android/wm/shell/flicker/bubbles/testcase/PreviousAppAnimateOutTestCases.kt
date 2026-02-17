@@ -18,7 +18,6 @@ package com.android.wm.shell.flicker.bubbles.testcase
 
 import android.tools.traces.component.ComponentNameMatcher.Companion.LAUNCHER
 import android.tools.traces.component.IComponentNameMatcher
-import androidx.test.filters.FlakyTest
 import com.android.wm.shell.flicker.bubbles.utils.BubbleFlickerSubjects
 import com.android.wm.shell.flicker.bubbles.utils.FlickerAssertionHelper.assertLayerAlphaChangeConsistently
 import com.android.wm.shell.flicker.bubbles.utils.FlickerAssertionHelper.assertLayerMoveInSingleDirection
@@ -88,7 +87,6 @@ interface PreviousAppAnimateOutTestCases : BubbleFlickerSubjects {
      * Verifies the [previousApp] layer's alpha value only decreases (optional if the spec wants to
      * keep alpha unchanged).
      */
-    @FlakyTest(bugId = 456051408)
     @Test
     fun previousAppLayerFadeOut() {
         assertLayerAlphaChangeConsistently(
@@ -98,19 +96,19 @@ interface PreviousAppAnimateOutTestCases : BubbleFlickerSubjects {
         )
     }
 
-    /**
-     * Verifies the [previousApp] layer's bounds don't jump around (optional if the spec wants to
-     * keep bounds unchanged).
-     */
-    @FlakyTest(bugId = 456051408)
+    /** Verifies that [previousApp] resizes consistently. */
     @Test
-    fun previousAppLayerAnimateOut() {
-        assertLayerMoveInSingleDirection(
+    fun previousAppLayerResizeConsistently() {
+        assertLayerResizeConsistently(
             layersTraceSubject = layersTraceSubject,
             layerMatcher = previousApp,
         )
+    }
 
-        assertLayerResizeConsistently(
+    /** Verifies that [previousApp] only moves in one direction (no jumping around) when visible. */
+    @Test
+    fun previousAppLayerMoveInSingleDirection() {
+        assertLayerMoveInSingleDirection(
             layersTraceSubject = layersTraceSubject,
             layerMatcher = previousApp,
         )

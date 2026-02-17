@@ -19,6 +19,7 @@ package com.android.server.supervision;
 import static android.Manifest.permission.BYPASS_ROLE_QUALIFICATION;
 import static android.Manifest.permission.INTERACT_ACROSS_USERS;
 import static android.Manifest.permission.MANAGE_ROLE_HOLDERS;
+import static android.Manifest.permission.MANAGE_SUPERVISION;
 import static android.Manifest.permission.MANAGE_USERS;
 import static android.Manifest.permission.QUERY_USERS;
 import static android.app.role.RoleManager.ROLE_SUPERVISION;
@@ -33,6 +34,7 @@ import static com.android.internal.util.Preconditions.checkCallAuthorization;
 import android.annotation.CallbackExecutor;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.RequiresPermission;
 import android.annotation.SuppressLint;
 import android.annotation.UserIdInt;
 import android.app.KeyguardManager;
@@ -151,6 +153,8 @@ public class SupervisionService extends ISupervisionManager.Stub {
 
     @GuardedBy("getLockObject()")
     final SupervisionSettings mSupervisionSettings = SupervisionSettings.getInstance();
+
+    private boolean mAllowBypassingSupervisionRoleQualification = false;
 
     public SupervisionService(Context context) {
         this(new Injector(context.createAttributionContext(SupervisionLog.TAG)));
@@ -286,15 +290,7 @@ public class SupervisionService extends ISupervisionManager.Stub {
     /** Set the Supervision Recovery Info. */
     @Override
     public void setSupervisionRecoveryInfo(SupervisionRecoveryInfo recoveryInfo) {
-        if (Flags.supervisionRecoveryImprovements()) {
-            checkCallAuthorization(isCallerSystem());
-        }
-
-        if (!Flags.persistentSupervisionSettings()) {
-            SupervisionRecoveryInfoStorage.getInstance(mInjector.context)
-                    .saveRecoveryInfo(recoveryInfo);
-            return;
-        }
+        checkCallAuthorization(isCallerSystem());
 
         synchronized (getLockObject()) {
             mSupervisionSettings.saveRecoveryInfo(recoveryInfo);
@@ -306,41 +302,51 @@ public class SupervisionService extends ISupervisionManager.Stub {
     /** Returns the Supervision Recovery Info or null if recovery is not set. */
     @Override
     public SupervisionRecoveryInfo getSupervisionRecoveryInfo() {
-        if (Flags.supervisionRecoveryImprovements()) {
-            checkCallAuthorization(isCallerSystem());
+        checkCallAuthorization(isCallerSystem());
 
-            synchronized (getLockObject()) {
-                return mSupervisionSettings.getRecoveryInfo();
-            }
-        } else if (Flags.persistentSupervisionSettings()) {
+        synchronized (getLockObject()) {
             return mSupervisionSettings.getRecoveryInfo();
         }
-        return SupervisionRecoveryInfoStorage.getInstance(mInjector.context).loadRecoveryInfo();
     }
 
     @Override
+    @RequiresPermission(MANAGE_ROLE_HOLDERS)
     public boolean shouldAllowBypassingSupervisionRoleQualification() {
         enforcePermission(MANAGE_ROLE_HOLDERS);
+        if (!Flags.enableSupervisionManagerPolicyApis()) {
+            return shouldAllowBypassingSupervisionRoleQualificationBasedOnState();
+        }
 
         if (hasNonTestDefaultUsers()) {
             return false;
         }
 
         synchronized (getLockObject()) {
-            if (Flags.persistentSupervisionSettings()) {
-                if (mSupervisionSettings.anySupervisedUser()) {
-                    return false;
-                }
-            } else {
-                for (int i = 0; i < mUserData.size(); i++) {
-                    if (mUserData.valueAt(i).supervisionEnabled) {
-                        return false;
-                    }
-                }
+            return mAllowBypassingSupervisionRoleQualification;
+        }
+    }
+
+    private boolean shouldAllowBypassingSupervisionRoleQualificationBasedOnState() {
+        if (hasNonTestDefaultUsers()) {
+            return false;
+        }
+
+        synchronized (getLockObject()) {
+            if (mSupervisionSettings.anySupervisedUser()) {
+                return false;
             }
         }
 
         return true;
+    }
+
+    @Override
+    @RequiresPermission(BYPASS_ROLE_QUALIFICATION)
+    public void setShouldAllowBypassingSupervisionRoleQualification(boolean allowBypassing) {
+        enforcePermission(BYPASS_ROLE_QUALIFICATION);
+        synchronized (getLockObject()) {
+            mAllowBypassingSupervisionRoleQualification = allowBypassing;
+        }
     }
 
     private boolean hasAnySupervisionApprovalMethods(@UserIdInt int userId) {
@@ -721,6 +727,10 @@ public class SupervisionService extends ISupervisionManager.Stub {
             pw.println("SupervisionService state:");
             pw.increaseIndent();
 
+            pw.println("bypassingRoleQualification: "
+                    + mAllowBypassingSupervisionRoleQualification);
+            pw.println();
+
             List<UserInfo> users = mInjector.getUserManagerInternal().getUsers(false);
             synchronized (getLockObject()) {
                 if (Flags.enableSupervisionManagerPolicyApis()) {
@@ -750,10 +760,7 @@ public class SupervisionService extends ISupervisionManager.Stub {
 
         final Context context = mInjector.context;
         return new SupervisionPolicyMigrator(
-                        context,
-                        mInjector.getUserManagerInternal(),
-                        mInjector,
-                        context.getSystemService(DevicePolicyManager.class))
+                        context, mInjector.getUserManagerInternal(), mInjector.getDpmInternal())
                 .upgrade(fromVersion, toVersion);
     }
 
@@ -798,17 +805,7 @@ public class SupervisionService extends ISupervisionManager.Stub {
     @NonNull
     @GuardedBy("getLockObject()")
     SupervisionUserData getUserDataLocked(@UserIdInt int userId) {
-        if (Flags.persistentSupervisionSettings()) {
-            return mSupervisionSettings.getUserData(userId);
-        } else {
-            SupervisionUserData data = mUserData.get(userId);
-            if (data == null) {
-                // TODO(b/362790738): Do not create user data for nonexistent users.
-                data = new SupervisionUserData(userId);
-                mUserData.append(userId, data);
-            }
-            return data;
-        }
+        return mSupervisionSettings.getUserData(userId);
     }
 
     /**
@@ -821,9 +818,7 @@ public class SupervisionService extends ISupervisionManager.Stub {
             SupervisionUserData data = getUserDataLocked(userId);
             data.supervisionEnabled = enabled;
             data.supervisionAppPackage = enabled ? supervisionAppPackage : null;
-            if (Flags.persistentSupervisionSettings()) {
-                mSupervisionSettings.saveUserData();
-            }
+            mSupervisionSettings.saveUserData();
         }
         if (enabled) {
             onSupervisionEnabled(userId);
@@ -1150,33 +1145,11 @@ public class SupervisionService extends ISupervisionManager.Stub {
     }
 
     private void enforceCallerCanSetPolicy() {
-        checkCallAuthorization(isCallerSystem() || doesCallerHoldAnySupervisionRole());
+        checkCallAuthorization(isCallerSystem() || hasCallingPermission(MANAGE_SUPERVISION));
     }
 
     private void enforceCallerCanGetPolicies() {
-        checkCallAuthorization(isCallerSystem() || doesCallerHoldAnySupervisionRole());
-    }
-
-    private boolean doesCallerHoldAnySupervisionRole() {
-        UserHandle userHandle = Binder.getCallingUserHandle();
-        int callingUid = Binder.getCallingUid();
-
-        List<String> roleHolders = new ArrayList<String>();
-        synchronized (getLockObject()) {
-            roleHolders.addAll(
-                    getUserDataLocked(UserHandle.getUserId(callingUid)).supervisionRoleHolders);
-        }
-
-        String[] packages = mInjector.getPackageManager().getPackagesForUid(callingUid);
-        if (packages != null) {
-            for (var packageName : packages) {
-                if (roleHolders.contains(packageName)) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
+        checkCallAuthorization(isCallerSystem() || hasCallingPermission(MANAGE_SUPERVISION));
     }
 
     /**
@@ -1187,21 +1160,26 @@ public class SupervisionService extends ISupervisionManager.Stub {
      * @return A list of the supervision role holders that were removed.
      */
     private List<String> updateSupervisionRoleHolders(@UserIdInt int userId) {
-        List<String> newRoleHolders =
+        List<String> allSupervisionRoleHolders =
+                new ArrayList<String>(
+                        mInjector.getRoleHoldersAsUser(
+                                ROLE_SYSTEM_SUPERVISION, UserHandle.of(userId)));
+
+        List<String> supervisionRoleHolders =
                 new ArrayList<String>(
                         mInjector.getRoleHoldersAsUser(ROLE_SUPERVISION, UserHandle.of(userId)));
-        newRoleHolders.addAll(
-                mInjector.getRoleHoldersAsUser(ROLE_SYSTEM_SUPERVISION, UserHandle.of(userId)));
+        allSupervisionRoleHolders.addAll(supervisionRoleHolders);
 
         synchronized (getLockObject()) {
             SupervisionUserData data = getUserDataLocked(userId);
             List<String> removedRoleHolders = new ArrayList<>(data.supervisionRoleHolders);
-            removedRoleHolders.removeAll(newRoleHolders);
+            removedRoleHolders.removeAll(allSupervisionRoleHolders);
             data.supervisionRoleHolders.clear();
-            data.supervisionRoleHolders.addAll(newRoleHolders);
-            if (Flags.persistentSupervisionSettings()) {
-                mSupervisionSettings.saveUserData();
+            data.supervisionRoleHolders.addAll(allSupervisionRoleHolders);
+            if (Flags.verifySupervisionRoleHoldersBeforeDestroyingEscrowToken()) {
+                data.escrowTokenRequired = !supervisionRoleHolders.isEmpty();
             }
+            mSupervisionSettings.saveUserData();
             return removedRoleHolders;
         }
     }
@@ -1529,9 +1507,17 @@ public class SupervisionService extends ISupervisionManager.Stub {
                 SupervisionUserData data = getUserDataLocked(userId);
                 data.supervisionLockScreenEnabled = enabled;
                 data.supervisionLockScreenOptions = options;
-                if (Flags.persistentSupervisionSettings()) {
-                    mSupervisionSettings.saveUserData();
-                }
+                mSupervisionSettings.saveUserData();
+            }
+        }
+
+        @Override
+        public boolean isEscrowTokenRequired(@UserIdInt int userId) {
+            if (!Flags.verifySupervisionRoleHoldersBeforeDestroyingEscrowToken()) {
+                return false;
+            }
+            synchronized (getLockObject()) {
+                return getUserDataLocked(userId).escrowTokenRequired;
             }
         }
     }
@@ -1563,11 +1549,7 @@ public class SupervisionService extends ISupervisionManager.Stub {
         @Override
         public void onUserRemoved(UserInfo user) {
             synchronized (getLockObject()) {
-                if (Flags.persistentSupervisionSettings()) {
-                    mSupervisionSettings.removeUserData(user.id);
-                } else {
-                    mUserData.remove(user.id);
-                }
+                mSupervisionSettings.removeUserData(user.id);
             }
         }
     }

@@ -14,6 +14,7 @@ android_library {
         "SettingsLintDefaults",
     ],
     static_libs: [
+        "androidx.concurrent_concurrent-futures",
         "androidx.localbroadcastmanager_localbroadcastmanager",
         "androidx.room_room-runtime",
         "androidx.sqlite_sqlite",
@@ -24,6 +25,8 @@ android_library {
         "//frameworks/libs/systemui:iconloader",
         "WifiTrackerLibRes",
         "setupdesign",
+
+        "dynamiccolors",
 
         "SettingsLibActionBarShadow",
         "SettingsLibActionButtonsPreference",

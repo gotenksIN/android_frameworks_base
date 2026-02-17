@@ -28,7 +28,7 @@ import com.android.internal.protolog.ProtoLog
 import com.android.window.flags.Flags
 import com.android.wm.shell.common.DisplayController
 import com.android.wm.shell.desktopmode.DesktopUserRepositories
-import com.android.wm.shell.desktopmode.data.DesktopRepositoryInitializer.DeskRecreationFactory
+import com.android.wm.shell.desktopmode.data.DesktopRepositoryInitializer.DeskRootHelper
 import com.android.wm.shell.desktopmode.data.persistence.Desktop
 import com.android.wm.shell.desktopmode.data.persistence.DesktopPersistentRepository
 import com.android.wm.shell.desktopmode.data.persistence.DesktopRepositoryState
@@ -60,7 +60,7 @@ class DesktopRepositoryInitializerImpl(
     private val displayController: DisplayController,
 ) : DesktopRepositoryInitializer {
 
-    override var deskRecreationFactory: DeskRecreationFactory = DefaultDeskRecreationFactory()
+    override var deskRootHelper: DeskRootHelper = SingleDeskRootHelper()
 
     private val _isInitialized = MutableStateFlow(false)
     override val isInitialized: StateFlow<Boolean> = _isInitialized
@@ -78,6 +78,7 @@ class DesktopRepositoryInitializerImpl(
                 val uniqueIdToDisplayIdMap = displayController.getAllDisplaysByUniqueId()
                 val desktopUserPersistentRepositoryMap =
                     persistentRepository.getUserDesktopRepositoryMap() ?: return@launch
+                val deskRootRemovalRequests = mutableListOf<DeskRootHelper.DeskRootRemovalRequest>()
                 for (userId in desktopUserPersistentRepositoryMap.keys) {
                     val repository = userRepositories.getProfile(userId)
                     val desktopRepositoryState =
@@ -99,6 +100,7 @@ class DesktopRepositoryInitializerImpl(
                             userId,
                             repository,
                             wasPreservedDisplay = false,
+                            deskRootRemovalRequests,
                         )
                     }
                     for (preservedDesktop in preservedDesksToRestore) {
@@ -110,11 +112,15 @@ class DesktopRepositoryInitializerImpl(
                             userId,
                             repository,
                             wasPreservedDisplay = true,
+                            deskRootRemovalRequests,
                         )
                     }
                     if (Flags.enableRememberedBounds()) {
                         restoreRememberedBoundsRatio(desktopRepositoryState, repository)
                     }
+                }
+                if (deskRootRemovalRequests.isNotEmpty()) {
+                    deskRootHelper.removeDeskRoots(deskRootRemovalRequests)
                 }
             } finally {
                 _isInitialized.value = true
@@ -147,6 +153,7 @@ class DesktopRepositoryInitializerImpl(
         userId: Int,
         repository: DesktopRepository,
         wasPreservedDisplay: Boolean,
+        deskRootRemovalRequests: MutableList<DeskRootHelper.DeskRootRemovalRequest>,
     ) {
         val maxTasks = getTaskLimit(persistentDesktop)
         var uniqueDisplayId = persistentDesktop.uniqueDisplayId
@@ -155,6 +162,7 @@ class DesktopRepositoryInitializerImpl(
         //  rely on an IPC if the display is not yet available.
         val displayIdIfNotFound = displayController.getDisplayIdByUniqueIdBlocking(uniqueDisplayId)
         var newDisplayId = uniqueIdToDisplayIdMap?.get(uniqueDisplayId) ?: displayIdIfNotFound
+
         val deskId = persistentDesktop.desktopId
         var transientDesk = false
         var preserveDesk = false
@@ -180,14 +188,14 @@ class DesktopRepositoryInitializerImpl(
         }
 
         val newDeskId =
-            deskRecreationFactory.recreateDesk(
+            deskRootHelper.recreateDeskRoot(
                 userId = userId,
                 destinationDisplayId = newDisplayId,
                 deskId = deskId,
             )
         if (newDeskId != null) {
             logV(
-                "Re-created desk=%d in uniqueDisplayId=%d using new" +
+                "Re-created desk=%d in uniqueDisplayId=%s using new" +
                     " deskId=%d and displayId=%d",
                 deskId,
                 uniqueDisplayId,
@@ -201,7 +209,7 @@ class DesktopRepositoryInitializerImpl(
         }
         if (newDeskId == null) {
             logW(
-                "Could not re-create desk=%d from uniqueDisplayId=%d " + "in displayId=%d",
+                "Could not re-create desk=%d from uniqueDisplayId=%s in displayId=%d",
                 deskId,
                 uniqueDisplayId,
                 newDisplayId,
@@ -295,6 +303,16 @@ class DesktopRepositoryInitializerImpl(
                 preserveAsActive = shouldActivate,
             )
         }
+        if (transientDesk) {
+            // The transient desk is preserved and has served its purpose, it can be removed now.
+            repository.removeDesk(newDeskId)
+            deskRootRemovalRequests.add(
+                DesktopRepositoryInitializer.DeskRootHelper.DeskRootRemovalRequest(
+                    newDeskId,
+                    userId,
+                )
+            )
+        }
     }
 
     private suspend fun getDesksToRestore(
@@ -377,10 +395,14 @@ class DesktopRepositoryInitializerImpl(
     private fun getTaskLimit(persistedDesk: Desktop): Int =
         desktopConfig.maxTaskLimit.takeIf { it > 0 } ?: persistedDesk.zOrderedTasksCount
 
+    // TODO(b/478792808): Remove suppression
+    @SuppressWarnings("ProtoLogNonConstantFormat")
     private fun logV(msg: String, vararg arguments: Any?) {
         ProtoLog.v(WM_SHELL_DESKTOP_MODE, "%s: $msg", TAG, *arguments)
     }
 
+    // TODO(b/478792808): Remove suppression
+    @SuppressWarnings("ProtoLogNonConstantFormat")
     private fun logW(msg: String, vararg arguments: Any?) {
         ProtoLog.w(WM_SHELL_DESKTOP_MODE, "%s: $msg", TAG, *arguments)
     }
@@ -401,13 +423,23 @@ class DesktopRepositoryInitializerImpl(
         val transientDesk: Boolean,
     )
 
-    /** A default implementation of [DeskRecreationFactory] that reuses the desk id. */
-    private class DefaultDeskRecreationFactory : DeskRecreationFactory {
-        override suspend fun recreateDesk(
+    /**
+     * A default implementation of [DeskRootHelper] that reuses the desk id.
+     *
+     * TODO: b/467431918 - clean up with multi-desks flag cleanup.
+     */
+    private class SingleDeskRootHelper : DeskRootHelper {
+        override suspend fun recreateDeskRoot(
             userId: Int,
             destinationDisplayId: Int,
             deskId: Int,
         ): Int = deskId
+
+        override suspend fun removeDeskRoots(
+            requests: List<DeskRootHelper.DeskRootRemovalRequest>
+        ) {
+            // No-op. Unsupported in single desk mode.
+        }
     }
 
     companion object {

@@ -23,11 +23,13 @@ import android.content.IntentFilter
 import android.content.pm.FeatureInfo
 import android.content.pm.PackageManager
 import android.content.pm.UserInfo
+import android.os.Binder
 import android.os.Process
 import android.os.UserHandle
 import android.util.ArrayMap
 import android.util.ArraySet
 import androidx.test.platform.app.InstrumentationRegistry
+import com.android.compatibility.common.util.SystemUtil.runWithShellPermissionIdentity
 import com.android.internal.pm.parsing.pkg.AndroidPackageInternal
 import com.android.internal.pm.pkg.component.ParsedActivity
 import com.android.internal.pm.pkg.component.ParsedActivityImpl
@@ -71,9 +73,13 @@ class AppLockPackageHelperTest : PackageHelperTestBase() {
     private val activities =
         listOf<ParsedActivity>(createActivity(TEST_PACKAGE_NAME, testLauncherIntentFilters))
     private val mockSnapshot: Computer = mock()
-    private val mockPackageStateInternal: PackageStateInternal = mock()
-    private val mockPackageUserStateInternal: PackageUserStateInternal = mock()
+    private val mockPackageStateInternal1: PackageStateInternal = mock()
+    private val mockPackageStateInternal2: PackageStateInternal = mock()
+    private val packageStates = ArrayMap<String, PackageStateInternal>()
+    private val mockPackageUserStateInternal1: PackageUserStateInternal = mock()
+    private val mockPackageUserStateInternal2: PackageUserStateInternal = mock()
     private val mockAndroidPackage: AndroidPackageInternal = mock()
+    private val mockAndroidPackage2: AndroidPackageInternal = mock()
     private var availableFeatures = ArrayMap<String, FeatureInfo>(1)
 
     val userInfo: UserInfo = mock()
@@ -91,13 +97,21 @@ class AppLockPackageHelperTest : PackageHelperTestBase() {
         appLockPackageHelper =
             AppLockPackageHelper(instrumentation.context, pms, broadcastHelper, testInjector)
         whenever(mockSnapshot.getPackageStateInternal(eq(EXEMPT_PACKAGE_NAME)))
-            .thenReturn(mockPackageStateInternal)
+            .thenReturn(mockPackageStateInternal1)
         whenever(mockSnapshot.getPackageStateInternal(eq(TEST_PACKAGE_NAME)))
-            .thenReturn(mockPackageStateInternal)
-        whenever(mockPackageStateInternal.getUserStateOrDefault(
-            eq(TEST_USER_ID_1))).thenReturn(mockPackageUserStateInternal)
+            .thenReturn(mockPackageStateInternal1)
+        packageStates.put(TEST_PACKAGE_NAME, mockPackageStateInternal1)
+        packageStates.put(TEST_PACKAGE_NAME_2, mockPackageStateInternal2)
+        whenever(mockSnapshot.packageStates).thenReturn(packageStates)
+        whenever(mockPackageStateInternal1.getUserStateOrDefault(
+            eq(TEST_USER_ID_1))).thenReturn(mockPackageUserStateInternal1)
+        whenever(mockPackageStateInternal2.getUserStateOrDefault(
+            eq(TEST_USER_ID_1))).thenReturn(mockPackageUserStateInternal2)
 
-        whenever(mockPackageStateInternal.pkg).thenReturn(mockAndroidPackage)
+        whenever(mockPackageStateInternal1.pkg).thenReturn(mockAndroidPackage)
+        whenever(mockPackageStateInternal2.pkg).thenReturn(mockAndroidPackage2)
+        whenever(mockAndroidPackage.packageName).thenReturn(TEST_PACKAGE_NAME)
+        whenever(mockAndroidPackage2.packageName).thenReturn(TEST_PACKAGE_NAME_2)
         whenever(mockAndroidPackage.activities).thenReturn(activities)
         whenever(rule.mocks().systemConfig.appLockExemptPackages).thenReturn(
             ArraySet<String>().apply { add(EXEMPT_PACKAGE_NAME) })
@@ -118,6 +132,19 @@ class AppLockPackageHelperTest : PackageHelperTestBase() {
     }
 
     @Test
+    fun getAppLockEnabledPackages_returnsAppLockEnabledPackages() {
+        whenever(mockPackageUserStateInternal1.isAppLockEnabled).thenReturn(true)
+        whenever(mockPackageUserStateInternal2.isAppLockEnabled).thenReturn(false)
+
+        assertThat(
+            appLockPackageHelper.getAppLockEnabledPackages(
+                mockSnapshot,
+                TEST_USER_ID_1
+            )
+        ).containsExactly(TEST_PACKAGE_NAME)
+    }
+
+    @Test
     @Throws(Exception::class)
     fun setPackageAppLockEnabled_systemConfigExemptApp(
         @TestParameter currentEnabledState: Boolean,
@@ -134,7 +161,8 @@ class AppLockPackageHelperTest : PackageHelperTestBase() {
                 EXEMPT_PACKAGE_NAME,
                 TEST_USER_ID_1,
                 newEnabledState,
-                Process.SYSTEM_UID
+                Process.SYSTEM_UID,
+                Binder.getCallingPid(),
             )
         ).isEqualTo(!newEnabledState)
         // Disk write occurs only if the current state was true, as exempt apps cannot have App Lock
@@ -166,7 +194,8 @@ class AppLockPackageHelperTest : PackageHelperTestBase() {
                 TEST_PACKAGE_NAME,
                 TEST_USER_ID_1,
                 newEnabledState,
-                Process.SYSTEM_UID
+                Process.SYSTEM_UID,
+                        Binder.getCallingPid(),
             )
         ).isEqualTo(!newEnabledState)
         // Disk write occurs only if the current state was true, as headless apps cannot have App
@@ -197,7 +226,8 @@ class AppLockPackageHelperTest : PackageHelperTestBase() {
                 TEST_PACKAGE_NAME,
                 TEST_USER_ID_1,
                 newEnabledState,
-                Process.SYSTEM_UID
+                Process.SYSTEM_UID,
+                Binder.getCallingPid(),
             )
         ).isEqualTo(!newEnabledState)
         // Disk write occurs only if the current state was true, as profile users cannot have App
@@ -227,7 +257,8 @@ class AppLockPackageHelperTest : PackageHelperTestBase() {
                 TEST_PACKAGE_NAME,
                 TEST_USER_ID_1,
                 newEnabledState,
-                Process.SYSTEM_UID
+                Process.SYSTEM_UID,
+                Binder.getCallingPid(),
             )
         ).isEqualTo(!newEnabledState)
         // Disk write occurs only if the current state was true, as profile users cannot have App
@@ -258,7 +289,8 @@ class AppLockPackageHelperTest : PackageHelperTestBase() {
                 TEST_PACKAGE_NAME,
                 TEST_USER_ID_1,
                 newEnabledState,
-                Process.SYSTEM_UID
+                Process.SYSTEM_UID,
+                Binder.getCallingPid(),
             )
         ).isEqualTo(!newEnabledState)
         // Disk write occurs only if the current state was true, as supervised users cannot have App
@@ -287,7 +319,8 @@ class AppLockPackageHelperTest : PackageHelperTestBase() {
                 TEST_PACKAGE_NAME,
                 TEST_USER_ID_1,
                 newEnabledState,
-                Process.SYSTEM_UID
+                Process.SYSTEM_UID,
+                Binder.getCallingPid(),
             )
         ).isEqualTo(!newEnabledState)
         // Disk write occurs only if the current state was true, as App Lock is not supported on
@@ -301,7 +334,7 @@ class AppLockPackageHelperTest : PackageHelperTestBase() {
 
     @Test
     @Throws(Exception::class)
-    fun setPackageAppLockEnabled_unauthorizedUid_throwsSecurityException_noDiskWrite(
+    fun setPackageAppLockEnabled_unauthorizedUidNoPermission_throwsSecurityException_noDiskWrite(
         @TestParameter currentEnabledState: Boolean,
         @TestParameter newEnabledState: Boolean,
         @TestParameter(valuesProvider = UnauthorizedUidProvider::class) callingUid: Int,
@@ -317,10 +350,34 @@ class AppLockPackageHelperTest : PackageHelperTestBase() {
                 TEST_PACKAGE_NAME,
                 TEST_USER_ID_1,
                 newEnabledState,
-                callingUid
+                callingUid,
+                Binder.getCallingPid(),
             )
         }
         verifyNoWriteOrPackageUpdate()
+    }
+
+    @Test
+    @Throws(Exception::class)
+    fun setPackageAppLockEnabled_unauthorizedUidWithTestPermission_noSecurityException_success() {
+        val currentEnabledState = false
+        val newEnabledState = true
+        setupTestForSetPackageAppLockEnabled(
+            deviceSecure = true,
+            currentEnabledState
+        )
+
+        runWithShellPermissionIdentity {
+            appLockPackageHelper.setPackageAppLockEnabled(
+                this::mockSnapshot,
+                TEST_PACKAGE_NAME,
+                TEST_USER_ID_1,
+                newEnabledState,
+                Process.SHELL_UID,
+                Binder.getCallingPid(),
+            )
+        }
+        verifyDiskWriteAndPackageUpdate(newEnabledState)
     }
 
     @Test
@@ -333,7 +390,7 @@ class AppLockPackageHelperTest : PackageHelperTestBase() {
         val targetState = appLockSupportedForSecureDevice && newEnabledState
         val expectDiskWrite = currentEnabledState != targetState
         // The value gets successfully set to the desired state if the desired state is false, or if
-        // if the desired state is true for a supported, secure device
+        // the desired state is true for a supported, secure device
         val successfullySet = !newEnabledState || appLockSupportedForSecureDevice
         setupTestForSetPackageAppLockEnabled(
             deviceSecure = true,
@@ -354,6 +411,7 @@ class AppLockPackageHelperTest : PackageHelperTestBase() {
                 TEST_USER_ID_1,
                 newEnabledState,
                 callingUid,
+                Binder.getCallingPid(),
             )
         ).isEqualTo(successfullySet)
         if (expectDiskWrite) {
@@ -366,7 +424,7 @@ class AppLockPackageHelperTest : PackageHelperTestBase() {
     @Test
     @Throws(Exception::class)
     fun isPackageAppLockEnabled_appLockIsEnabled_true() {
-        whenever(mockPackageUserStateInternal.isAppLockEnabled).thenReturn(true)
+        whenever(mockPackageUserStateInternal1.isAppLockEnabled).thenReturn(true)
 
         assertThat(
             appLockPackageHelper.isPackageAppLockEnabled(
@@ -378,7 +436,7 @@ class AppLockPackageHelperTest : PackageHelperTestBase() {
     @Test
     @Throws(Exception::class)
     fun isPackageAppLockEnabled_appLockIsDisabled_false() {
-        whenever(mockPackageUserStateInternal.isAppLockEnabled).thenReturn(false)
+        whenever(mockPackageUserStateInternal1.isAppLockEnabled).thenReturn(false)
 
         assertThat(
             appLockPackageHelper.isPackageAppLockEnabled(
@@ -404,7 +462,7 @@ class AppLockPackageHelperTest : PackageHelperTestBase() {
     @Test
     @Throws(Exception::class)
     fun getEnableAppLockIntentForPackage_appLockAlreadySetToTargetState_nullIntent() {
-        whenever(mockPackageUserStateInternal.isAppLockEnabled).thenReturn(false)
+        whenever(mockPackageUserStateInternal1.isAppLockEnabled).thenReturn(false)
 
         assertThat(
             appLockPackageHelper.getEnableAppLockIntentForPackage(
@@ -416,7 +474,7 @@ class AppLockPackageHelperTest : PackageHelperTestBase() {
     @Test
     @Throws(Exception::class)
     fun getEnableAppLockIntentForPackage_pendingIntent(@TestParameter newEnabledState: Boolean) {
-        whenever(mockPackageUserStateInternal.isAppLockEnabled).thenReturn(!newEnabledState)
+        whenever(mockPackageUserStateInternal1.isAppLockEnabled).thenReturn(!newEnabledState)
         testInjector.setDeviceSecure(true)
 
         val intent = assertNotNull(
@@ -550,7 +608,7 @@ class AppLockPackageHelperTest : PackageHelperTestBase() {
         currentEnabledState: Boolean,
     ) {
         testInjector.setDeviceSecure(deviceSecure)
-        whenever(mockPackageUserStateInternal.isAppLockEnabled).thenReturn(currentEnabledState)
+        whenever(mockPackageUserStateInternal1.isAppLockEnabled).thenReturn(currentEnabledState)
     }
 
     private class TestInjector : AppLockPackageHelper.Injector {
@@ -584,6 +642,7 @@ class AppLockPackageHelperTest : PackageHelperTestBase() {
 
     companion object {
         private const val TEST_PACKAGE_NAME = "testpackagename"
+        private const val TEST_PACKAGE_NAME_2 = "testpackagename2"
         private const val EXEMPT_PACKAGE_NAME = "exempt.package.name"
         private const val TEST_USER_ID_1 = 1
         private const val APP_UID = 12345

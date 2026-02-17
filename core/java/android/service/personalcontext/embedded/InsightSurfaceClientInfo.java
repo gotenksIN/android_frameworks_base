@@ -21,6 +21,7 @@ import static android.annotation.SystemApi.Client.PRIVILEGED_APPS;
 import android.annotation.FlaggedApi;
 import android.annotation.SystemApi;
 import android.content.res.Configuration;
+import android.graphics.Color;
 import android.os.Parcel;
 import android.os.Parcelable;
 import android.os.RemoteException;
@@ -29,20 +30,18 @@ import android.service.personalcontext.insight.ContextInsight;
 import android.service.personalcontext.insight.ContextInsightWrapper;
 import android.util.Log;
 import android.view.SurfaceControlViewHost;
-import android.window.InputTransferToken;
 
 import androidx.annotation.IntRange;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 
-import com.android.internal.annotations.VisibleForTesting;
-
-import java.util.Objects;
 import java.util.UUID;
 
 /**
- * Contains information about an {@link InsightSurfaceClient}, which is an object to be instantiated
- * by apps that want to receive embedded surfaces from the personal context engine.
+ * Contains the properties of an {@link InsightSurfaceClient} that will be passed through the
+ * personal context engine to the visualizer that will be providing a surface to embed in the
+ * client. This class will be instantiated by {@link InsightSurfaceClient}.
  * @hide
  */
 @SystemApi(client = PRIVILEGED_APPS)
@@ -51,52 +50,76 @@ public final class InsightSurfaceClientInfo implements Parcelable {
     private static final String TAG = "InsightSrfcClientInfo";
 
     private final UUID mId;
-    private final InputTransferToken mInputTransferToken;
     private final int mDisplayId;
-    private final int mWidthMeasureSpec;
-    private final int mHeightMeasureSpec;
+    private final int mMeasureSpecWidth;
+    private final int mMeasureSpecHeight;
+    private final Color mBackgroundColor;
+    private final int mNestedScrollAxes;
+    private final boolean mNestedScrollAxisLocked;
+    private final boolean mShouldBlur;
+    private final String mThemeResourceName;
+    private final String mPackageName;
     private final Configuration mConfiguration;
-    private final IEmbeddedInsightSurfaceCallback mCallback;
+    private final IInsightSurfaceClient mClient;
 
     /**
      * Create a new insight surface client info object.
      *
-     * @param inputTransferToken an {@link InputTransferToken} for the client surface
-     * @param displayId The client app's {@link android.view.Display#getDisplayId}
-     * @param widthMeasureSpec the width MeasureSpec of the client surface
-     * @param heightMeasureSpec the height MeasureSpec of the client surface
+     * @param displayId the client app's {@link android.view.Display#getDisplayId}
+     * @param measureSpecWidth the width MeasureSpec of the client surface
+     * @param measureSpecHeight the height MeasureSpec of the client surface
+     * @param backgroundColor the background color of the client surface
+     * @param nestedScrollAxes the nested scroll axes supported by the client surface
+     * @param nestedScrollAxisLocked whether scrolling is locked to the nested scroll axes
+     * @param shouldBlur whether the client surface should be blurred
+     * @param themeResourceName the name of a theme resource specifying client styling
+     * @param packageName the package name of the client application
      * @param configuration resource configuration from the client's local context
-     * @param callback callback used to pass surfaces and insights back to the client
+     * @param client interface used to pass sessions and insights back to the client
      *
      * @hide
      */
     @VisibleForTesting
     public InsightSurfaceClientInfo(
-            @Nullable InputTransferToken inputTransferToken,
             int displayId,
-            int widthMeasureSpec,
-            int heightMeasureSpec,
+            int measureSpecWidth,
+            int measureSpecHeight,
+            @NonNull Color backgroundColor,
+            int nestedScrollAxes,
+            boolean nestedScrollAxisLocked,
+            boolean shouldBlur,
+            @Nullable String themeResourceName,
+            @NonNull String packageName,
             @NonNull Configuration configuration,
-            @NonNull IEmbeddedInsightSurfaceCallback callback) {
+            @NonNull IInsightSurfaceClient client) {
         mId = UUID.randomUUID();
-        mInputTransferToken = inputTransferToken;
         mDisplayId = displayId;
-        mWidthMeasureSpec = widthMeasureSpec;
-        mHeightMeasureSpec = heightMeasureSpec;
+        mMeasureSpecWidth = measureSpecWidth;
+        mMeasureSpecHeight = measureSpecHeight;
+        mBackgroundColor = backgroundColor;
+        mNestedScrollAxes = nestedScrollAxes;
+        mNestedScrollAxisLocked = nestedScrollAxisLocked;
+        mShouldBlur = shouldBlur;
+        mPackageName = packageName;
+        mThemeResourceName = themeResourceName;
         mConfiguration = configuration;
-        mCallback = callback;
+        mClient = client;
     }
 
     private InsightSurfaceClientInfo(Parcel in) {
-        mId = UUID.fromString(in.readString());
-        mInputTransferToken = in.readParcelable(
-                InputTransferToken.class.getClassLoader(), InputTransferToken.class);
+        mId = UUID.fromString(in.readString8());
         mDisplayId = in.readInt();
-        mWidthMeasureSpec = in.readInt();
-        mHeightMeasureSpec = in.readInt();
+        mMeasureSpecWidth = in.readInt();
+        mMeasureSpecHeight = in.readInt();
+        mBackgroundColor = Color.valueOf(in.readInt());
+        mNestedScrollAxes = in.readInt();
+        mNestedScrollAxisLocked = in.readBoolean();
+        mShouldBlur = in.readBoolean();
+        mThemeResourceName = in.readString8();
+        mPackageName = in.readString8();
         mConfiguration =
                 in.readParcelable(Configuration.class.getClassLoader(), Configuration.class);
-        mCallback = IEmbeddedInsightSurfaceCallback.Stub.asInterface(in.readStrongBinder());
+        mClient = IInsightSurfaceClient.Stub.asInterface(in.readStrongBinder());
     }
 
     /**
@@ -107,16 +130,6 @@ public final class InsightSurfaceClientInfo implements Parcelable {
     @NonNull
     public UUID getId() {
         return mId;
-    }
-
-    /**
-     * Get the client's {@link InputTransferToken}.
-     *
-     * @return the client's {@link InputTransferToken}
-     */
-    @NonNull
-    public InputTransferToken getInputTransferToken() {
-        return mInputTransferToken;
     }
 
     /**
@@ -134,8 +147,8 @@ public final class InsightSurfaceClientInfo implements Parcelable {
      *
      * @return the client's width {@link android.view.View.MeasureSpec}
      */
-    public int getWidthMeasureSpec() {
-        return mWidthMeasureSpec;
+    public int getMeasureSpecWidth() {
+        return mMeasureSpecWidth;
     }
 
     /**
@@ -143,8 +156,94 @@ public final class InsightSurfaceClientInfo implements Parcelable {
      *
      * @return the client's height {@link android.view.View.MeasureSpec}
      */
-    public int getHeightMeasureSpec() {
-        return mHeightMeasureSpec;
+    public int getMeasureSpecHeight() {
+        return mMeasureSpecHeight;
+    }
+
+    /**
+     * Get the background color of the client over which the embedded surface will be rendered.
+     *
+     * @return the client's background color
+     */
+    @NonNull
+    public Color getBackgroundColor() {
+        return mBackgroundColor;
+    }
+
+    /**
+     * Get the bitfield indicating the nested scroll axes supported by the client. This ensures that
+     * an embedded surface will only send these nested scroll events back to the client. Possible
+     * values are {@link android.view.View#SCROLL_AXIS_HORIZONTAL},
+     * {@link android.view.View#SCROLL_AXIS_VERTICAL},
+     * or {@link android.view.View#SCROLL_AXIS_NONE}.
+     */
+    public int getNestedScrollAxes() {
+        return mNestedScrollAxes;
+    }
+
+    /**
+     * Return whether an embedded surface should report a specific axis when a nested scroll gesture
+     * is detected, and whether that axis should be locked such that subsequent nested scroll events
+     * are only reported for that axis. A value of {@code true} is typical for Android UIs where
+     * scroll axes are locked during a gesture, while a value of {@code false} can be used to give
+     * the illusion of a 2D canvas. Only applicable when nested scroll axes is set to
+     * {@link android.view.View#SCROLL_AXIS_HORIZONTAL} or
+     * {@link android.view.View#SCROLL_AXIS_VERTICAL}.
+     */
+    public boolean getNestedScrollAxisLocked() {
+        return mNestedScrollAxisLocked;
+    }
+
+    /**
+     * Return whether the embedded surface should apply a blur to match the client's blur.
+     */
+    public boolean shouldBlur() {
+        return mShouldBlur;
+    }
+
+    /**
+     * Get the name of a theme resource to be passed to the connected visualizer. A visualizer
+     * can use this name to look up the theme, which can then be used when creating an embedded
+     * surface for the client. If this method returns a {@code null} name, or the resource can't
+     * be found, then the caller should fall back to default attribute values. Note that the
+     * caller needs to be able to query the package related to this theme resource in order
+     * to retrieve any values.
+     * <p/>
+     * Visualizers can obtain the style attributes with this name as follows:
+     * <pre>
+     * String themeResourceName = clientInfo.getThemeResourceName();
+     * if (themeResourceName != null) {
+     *     TypedArray styleAttrs;
+     *     try {
+     *         String packageName = clientInfo.getPackageName();
+     *         Context context = getPackageManager().getResourcesForApplication(packageName);
+     *         Resources res = context.getResources();
+     *         int styleResId =
+     *             res.getIdentifier(clientInfo.getThemeResourceName(), "style", packageName);
+     *         styleAttrs = res.obtainStyledAttributes(styleResId, attrs);
+     *     } catch (PackageManager.NameNotFoundException e) {
+     *         // Custom client theme not found, apply default attributes...
+     *     } finally {
+     *         // Recycle the TypedArray when finished with it.
+     *         styleAttrs.recycle();
+     *     }
+     *     // Apply custom attributes from client's resources...
+     * } else {
+     *     // Apply default attributes...
+     * }
+     * </pre>
+     */
+    @Nullable
+    public String getThemeResourceName() {
+        return mThemeResourceName;
+    }
+
+    /**
+     * Return the package name of the client application.
+     */
+    @NonNull
+    public String getPackageName() {
+        return mPackageName;
     }
 
     /**
@@ -158,25 +257,30 @@ public final class InsightSurfaceClientInfo implements Parcelable {
     }
 
     /**
-     * Get the client's {@link IEmbeddedInsightSurfaceCallback}.
+     * Get the {@link IInsightSurfaceClient} interface for the client.
      *
-     * @return the client's {@link IEmbeddedInsightSurfaceCallback}
+     * @return the client's {@link IInsightSurfaceClient}
      *
      * @hide
      */
     @NonNull
-    public IEmbeddedInsightSurfaceCallback getCallback() {
-        return mCallback;
+    public IInsightSurfaceClient getClient() {
+        return mClient;
     }
 
     /**
      * The given {@link SurfaceControlViewHost.SurfacePackage} has been created.
      *
      * @param surfacePackage the created {@link SurfaceControlViewHost.SurfacePackage}
+     * @param session the {@link IInsightSurfaceSession} for the surface
+     *
+     * @hide
      */
-    public void onSurfaceCreated(@NonNull SurfaceControlViewHost.SurfacePackage surfacePackage) {
+    public void onSurfaceCreated(
+            @NonNull SurfaceControlViewHost.SurfacePackage surfacePackage,
+            @NonNull IInsightSurfaceSession session) {
         try {
-            mCallback.onSurfaceCreated(surfacePackage);
+            mClient.onSurfaceCreated(surfacePackage, session);
         } catch (RemoteException e) {
             Log.e(TAG, "Error creating SurfacePackage", e);
             throw e.rethrowFromSystemServer();
@@ -187,10 +291,12 @@ public final class InsightSurfaceClientInfo implements Parcelable {
      * The given {@link SurfaceControlViewHost.SurfacePackage} has been released.
      *
      * @param surfacePackage the released {@link SurfaceControlViewHost.SurfacePackage}
+     *
+     * @hide
      */
     public void onSurfaceReleased(@NonNull SurfaceControlViewHost.SurfacePackage surfacePackage) {
         try {
-            mCallback.onSurfaceReleased(surfacePackage);
+            mClient.onSurfaceReleased(surfacePackage);
         } catch (RemoteException e) {
             Log.e(TAG, "Error releasing SurfacePackage", e);
             throw e.rethrowFromSystemServer();
@@ -207,7 +313,23 @@ public final class InsightSurfaceClientInfo implements Parcelable {
      */
     public void onReceiveInsight(@NonNull ContextInsight insight) {
         try {
-            mCallback.onReceiveInsight(new ContextInsightWrapper(insight));
+            mClient.onReceiveInsight(new ContextInsightWrapper(insight));
+        } catch (RemoteException e) {
+            Log.e(TAG, "Error sending insight to client", e);
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Called by a visualizer in order to inform the client that the embedded surface size has
+     * changed.
+     *
+     * @param width the new width of the surface in pixels
+     * @param height the new height of the surface in pixels
+     */
+    public void onSizeChanged(int width, int height) {
+        try {
+            mClient.onSizeChanged(width, height);
         } catch (RemoteException e) {
             Log.e(TAG, "Error sending insight to client", e);
             throw e.rethrowFromSystemServer();
@@ -221,13 +343,45 @@ public final class InsightSurfaceClientInfo implements Parcelable {
 
     @Override
     public void writeToParcel(@NonNull Parcel dest, int flags) {
-        dest.writeString(mId.toString());
-        dest.writeParcelable(mInputTransferToken, flags);
+        dest.writeString8(mId.toString());
         dest.writeInt(mDisplayId);
-        dest.writeInt(mWidthMeasureSpec);
-        dest.writeInt(mHeightMeasureSpec);
+        dest.writeInt(mMeasureSpecWidth);
+        dest.writeInt(mMeasureSpecHeight);
+        dest.writeInt(mBackgroundColor.toArgb());
+        dest.writeInt(mNestedScrollAxes);
+        dest.writeBoolean(mNestedScrollAxisLocked);
+        dest.writeBoolean(mShouldBlur);
+        dest.writeString8(mThemeResourceName);
+        dest.writeString8(mPackageName);
         dest.writeParcelable(mConfiguration, flags);
-        dest.writeStrongInterface(mCallback);
+        dest.writeStrongInterface(mClient);
+    }
+
+    /**
+     * Returns a new {@link InsightSurfaceClientInfo} from this info and the updated values in the
+     * given {@link InsightSurfaceClientUpdate}.
+     */
+    InsightSurfaceClientInfo createInfoFromUpdate(InsightSurfaceClientUpdate update) {
+        return new InsightSurfaceClientInfo(
+                mDisplayId,
+                update.hasUpdate(InsightSurfaceClientUpdate.KEY_MEASURE_SPEC_WIDTH)
+                        ? update.getMeasureSpecWidth() : mMeasureSpecWidth,
+                update.hasUpdate(InsightSurfaceClientUpdate.KEY_MEASURE_SPEC_HEIGHT)
+                        ? update.getMeasureSpecHeight() : mMeasureSpecHeight,
+                update.hasUpdate(InsightSurfaceClientUpdate.KEY_BACKGROUND_COLOR)
+                        ? update.getBackgroundColor() : mBackgroundColor,
+                update.hasUpdate(InsightSurfaceClientUpdate.KEY_NESTED_SCROLL_AXES)
+                        ? update.getNestedScrollAxes() : mNestedScrollAxes,
+                update.hasUpdate(InsightSurfaceClientUpdate.KEY_NESTED_SCROLL_AXIS_LOCKED)
+                        ? update.isNestedScrollAxisLocked() : mNestedScrollAxisLocked,
+                update.hasUpdate(InsightSurfaceClientUpdate.KEY_SHOULD_BLUR)
+                        ? update.isNestedScrollAxisLocked() : mShouldBlur,
+                update.hasUpdate(InsightSurfaceClientUpdate.KEY_THEME_RESOURCE_NAME)
+                        ? update.getThemeResourceName() : mThemeResourceName,
+                mPackageName,
+                update.hasUpdate(InsightSurfaceClientUpdate.KEY_CONFIGURATION)
+                        ? update.getConfiguration() : mConfiguration,
+                mClient);
     }
 
     @NonNull
@@ -243,55 +397,4 @@ public final class InsightSurfaceClientInfo implements Parcelable {
                     return new InsightSurfaceClientInfo[size];
                 }
             };
-
-    /**
-     * A builder for {@link InsightSurfaceClientInfo} object.
-     *
-     * @hide
-     */
-    public static final class Builder {
-        private final UUID mId = UUID.randomUUID();
-        private InputTransferToken mInputTransferToken;
-        private final int mDisplayId;
-        private final int mWidthMeasureSpec;
-        private final int mHeightMeasureSpec;
-        private final Configuration mConfiguration;
-        private final IEmbeddedInsightSurfaceCallback mCallback;
-
-        /** Constructor a new builder. */
-        public Builder(
-                int displayId,
-                int widthMeasureSpec,
-                int heightMeasureSpec,
-                @NonNull Configuration configuration,
-                @NonNull IEmbeddedInsightSurfaceCallback callback) {
-            Objects.requireNonNull(configuration, "configuration must not be null");
-            Objects.requireNonNull(callback, "callback must not be null");
-
-            mDisplayId = displayId;
-            mWidthMeasureSpec = widthMeasureSpec;
-            mHeightMeasureSpec = heightMeasureSpec;
-            mConfiguration = configuration;
-            mCallback = callback;
-        }
-
-        /** Set the client's {@link InputTransferToken}. */
-        @NonNull
-        public Builder setInputTransferToken(InputTransferToken inputTransferToken) {
-            mInputTransferToken = inputTransferToken;
-            return this;
-        }
-
-        /** Build and return a new {@link InsightSurfaceClientInfo}. */
-        @NonNull
-        public InsightSurfaceClientInfo build() {
-            return new InsightSurfaceClientInfo(
-                    mInputTransferToken,
-                    mDisplayId,
-                    mWidthMeasureSpec,
-                    mHeightMeasureSpec,
-                    mConfiguration,
-                    mCallback);
-        }
-    }
 }

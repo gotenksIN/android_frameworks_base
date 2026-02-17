@@ -243,7 +243,144 @@ class PolicyMetadataCodeGeneratorTest {
                     /* affectedResource= */ 1,
                     /* requiredPermission= */ null,
                     /* requiredCrossUserPermission= */ null,
-                    /* allowedDpcTypes= */ Set.of()
+                    /* allowedDpcTypes= */ Set.of(),
+                    /* minValue= */ Integer.MIN_VALUE,
+                    /* maxValue= */ Integer.MAX_VALUE
+                ));
+                """,
+                )
+            )
+    }
+
+    @Test
+    fun test_integerPolicyWithMinMax_outputMatches() {
+        val integerMetadata =
+            TypeSpecificPolicyMetadata.IntegerPolicyMetadata.newBuilder()
+                .setMinValue(-10)
+                .setMaxValue(10)
+        val policyList =
+            PolicyMetadataList.newBuilder()
+                .addPolicyMetadata(
+                    integerTestPolicy("test.package.PolicyContainer.MY_TEST_INTEGER_POLICY")
+                        .setTypeSpecificMetadata(
+                            TypeSpecificPolicyMetadata.newBuilder()
+                                .setIntegerMetadata(integerMetadata)
+                        )
+                        .addAllAllowedScopes(listOf(PolicyMetadata.PolicyScope.POLICY_SCOPE_DEVICE))
+                        .setAffectedResource(PolicyMetadata.ResourceType.RESOURCE_DEVICE_WIDE)
+                )
+                .build()
+
+        val javaFile = PolicyMetadataCodeGenerator.generate(policyList)
+
+        assertThat(javaFileToString(javaFile))
+            .isEqualTo(
+                fillInFile(
+                    staticImports = listOf("test.package.PolicyContainer.MY_TEST_INTEGER_POLICY"),
+                    code =
+                        """
+                policies.add(new IntegerPolicyMetadata(
+                    /* id= */ MY_TEST_INTEGER_POLICY,
+                    /* allowedScopes= */ Set.of(
+                        2
+                    ),
+                    /* affectedResource= */ 1,
+                    /* requiredPermission= */ null,
+                    /* requiredCrossUserPermission= */ null,
+                    /* allowedDpcTypes= */ Set.of(),
+                    /* minValue= */ -10,
+                    /* maxValue= */ 10
+                ));
+                """,
+                )
+            )
+    }
+
+    private fun longTestPolicy(name: String, minValue: Long? = null, maxValue: Long? = null): PolicyMetadata.Builder {
+        val longMetadata = TypeSpecificPolicyMetadata.LongPolicyMetadata.newBuilder()
+        if (minValue != null) {
+            longMetadata.setMinValue(minValue)
+        }
+        if (maxValue != null) {
+            longMetadata.setMaxValue(maxValue)
+        }
+
+        return PolicyMetadata.newBuilder()
+            .setIdentifier(simpleNameToFieldName(name))
+            .setTypeSpecificMetadata(
+                TypeSpecificPolicyMetadata.newBuilder()
+                    .setLongMetadata(longMetadata)
+            )
+    }
+
+    @Test
+    fun test_longPolicy_outputMatches() {
+        val policyList =
+            PolicyMetadataList.newBuilder()
+                .addPolicyMetadata(
+                    longTestPolicy("test.package.PolicyContainer.MY_TEST_LONG_POLICY")
+                        .addAllAllowedScopes(listOf(PolicyMetadata.PolicyScope.POLICY_SCOPE_DEVICE))
+                        .setAffectedResource(PolicyMetadata.ResourceType.RESOURCE_DEVICE_WIDE)
+                )
+                .build()
+
+        val javaFile = PolicyMetadataCodeGenerator.generate(policyList)
+
+        assertThat(javaFileToString(javaFile))
+            .isEqualTo(
+                fillInFile(
+                    staticImports = listOf("test.package.PolicyContainer.MY_TEST_LONG_POLICY"),
+                    code =
+                        """
+                policies.add(new LongPolicyMetadata(
+                    /* id= */ MY_TEST_LONG_POLICY,
+                    /* allowedScopes= */ Set.of(
+                        2
+                    ),
+                    /* affectedResource= */ 1,
+                    /* requiredPermission= */ null,
+                    /* requiredCrossUserPermission= */ null,
+                    /* allowedDpcTypes= */ Set.of(),
+                    /* minValue= */ Long.MIN_VALUE,
+                    /* maxValue= */ Long.MAX_VALUE
+                ));
+                """,
+                )
+            )
+    }
+
+    @Test
+    fun test_longPolicyWithMinMax_outputMatches() {
+        val policyList =
+            PolicyMetadataList.newBuilder()
+                .addPolicyMetadata(
+                    longTestPolicy("test.package.PolicyContainer.SIMPLE_LONG_POLICY_WITH_RANGE",
+                        minValue = 10,
+                        maxValue = 100)
+                        .addAllAllowedScopes(listOf(PolicyMetadata.PolicyScope.POLICY_SCOPE_DEVICE))
+                        .setAffectedResource(PolicyMetadata.ResourceType.RESOURCE_DEVICE_WIDE)
+                )
+                .build()
+
+        val javaFile = PolicyMetadataCodeGenerator.generate(policyList)
+
+        assertThat(javaFileToString(javaFile))
+            .isEqualTo(
+                fillInFile(
+                    staticImports = listOf("test.package.PolicyContainer.SIMPLE_LONG_POLICY_WITH_RANGE"),
+                    code =
+                        """
+                policies.add(new LongPolicyMetadata(
+                    /* id= */ SIMPLE_LONG_POLICY_WITH_RANGE,
+                    /* allowedScopes= */ Set.of(
+                        2
+                    ),
+                    /* affectedResource= */ 1,
+                    /* requiredPermission= */ null,
+                    /* requiredCrossUserPermission= */ null,
+                    /* allowedDpcTypes= */ Set.of(),
+                    /* minValue= */ 10L,
+                    /* maxValue= */ 100L
                 ));
                 """,
                 )
@@ -474,7 +611,9 @@ class PolicyMetadataCodeGeneratorTest {
                         /* affectedResource= */ 1,
                         /* requiredPermission= */ null,
                         /* requiredCrossUserPermission= */ null,
-                        /* allowedDpcTypes= */ Set.of()
+                        /* allowedDpcTypes= */ Set.of(),
+                        /* minValue= */ Integer.MIN_VALUE,
+                        /* maxValue= */ Integer.MAX_VALUE
                     ),
                     /* emptyListAllowed= */ true
                 ));

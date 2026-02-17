@@ -38,12 +38,12 @@ import static android.service.notification.Adjustment.KEY_USER_SENTIMENT;
 import static android.service.notification.NotificationListenerService.Ranking.USER_SENTIMENT_NEUTRAL;
 import static android.service.notification.NotificationListenerService.Ranking.USER_SENTIMENT_POSITIVE;
 
-import android.annotation.FlaggedApi;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.Flags;
 import android.app.KeyguardManager;
 import android.app.Notification;
+import android.app.Notification.BridgedNotificationMetadata;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.Person;
@@ -246,6 +246,10 @@ public final class NotificationRecord {
     // assigned bundle.
     private int mOriginalChannelVisibility = NotificationManager.VISIBILITY_NO_OVERRIDE;
 
+    // For bridged notifications, this is the UID of the corresponding local app, if it exists.
+    // Used for permission checks against the local app's notification permissions.
+    private int mBridgedAppUid = android.os.Process.INVALID_UID;
+
     public NotificationRecord(Context context, StatusBarNotification sbn,
             NotificationChannel channel) {
         this.sbn = sbn;
@@ -272,6 +276,22 @@ public final class NotificationRecord {
         mStats = new NotificationStats();
         calculateUserSentiment();
         calculateGrantableUris();
+        calculateBridgingInfo();
+    }
+
+    /**
+     * If this is a bridged notification, find the UID of the corresponding local app and store it.
+     */
+    private void calculateBridgingInfo() {
+        if (android.app.Flags.bridgedNotifications()) {
+            BridgedNotificationMetadata bridgedMetadata =
+                    this.sbn.getNotification().getBridgedNotificationMetadata();
+            if (bridgedMetadata != null) {
+                mBridgedAppUid = LocalServices.getService(
+                        PackageManagerInternal.class).getPackageUid(
+                        bridgedMetadata.getPackageName(), 0, getUserId());
+            }
+        }
     }
 
     private boolean isPreChannelsNotification() {
@@ -364,7 +384,7 @@ public final class NotificationRecord {
 
         if (com.android.server.notification.Flags.notificationVibrationInSoundUriForChannel()) {
             final VibrationEffect vibrationEffectFromSoundUri =
-                    helper.createVibrationEffectFromSoundUri(channel.getSound());
+                    helper.createVibrationEffectFromSoundUri(channel.getSound(), insistent);
             if (vibrationEffectFromSoundUri != null) {
                 return vibrationEffectFromSoundUri;
             }
@@ -386,7 +406,7 @@ public final class NotificationRecord {
             if (useDefaultVibrate) {
                 return helper.createDefaultVibration(insistent);
             }
-            return  helper.createWaveformVibration(notification.vibrate, insistent);
+            return helper.createWaveformVibration(notification.vibrate, insistent);
         }
         return getVibrationForChannel(getChannel(), helper, insistent);
     }
@@ -494,13 +514,30 @@ public final class NotificationRecord {
         // Don't copy importance information or mGlobalSortKey, recompute them.
     }
 
-    public Notification getNotification() { return getSbn().getNotification(); }
-    public int getFlags() { return getSbn().getNotification().flags; }
-    public UserHandle getUser() { return getSbn().getUser(); }
-    public String getKey() { return getSbn().getKey(); }
+    public Notification getNotification() {
+        return getSbn().getNotification();
+    }
+
+    public int getFlags() {
+        return getSbn().getNotification().flags;
+    }
+
+    public UserHandle getUser() {
+        return getSbn().getUser();
+    }
+
+    public String getKey() {
+        return getSbn().getKey();
+    }
+
     /** @deprecated Use {@link #getUser()} instead. */
-    public int getUserId() { return getSbn().getUserId(); }
-    public int getUid() { return getSbn().getUid(); }
+    public int getUserId() {
+        return getSbn().getUserId();
+    }
+
+    public int getUid() {
+        return getSbn().getUid();
+    }
 
     void dump(ProtoOutputStream proto, long fieldId, boolean redact, int state) {
         final long token = proto.start(fieldId);
@@ -530,10 +567,11 @@ public final class NotificationRecord {
     String formatRemoteViews(RemoteViews rv) {
         if (rv == null) return "null";
         return String.format("%s/0x%08x (%d bytes): %s",
-            rv.getPackage(), rv.getLayoutId(), rv.estimateMemoryUsage(), rv.toString());
+                rv.getPackage(), rv.getLayoutId(), rv.estimateMemoryUsage(), rv.toString());
     }
 
-    @NeverCompile // Avoid size overhead of debugging code.
+    // Avoid size overhead of debugging code.
+    @NeverCompile
     void dump(PrintWriter pw, String prefix, Context baseContext, boolean redact) {
         final Notification notification = getSbn().getNotification();
         pw.println(prefix + this);
@@ -628,7 +666,7 @@ public final class NotificationRecord {
             final String ticker = notification.tickerText.toString();
             if (redact) {
                 // if the string is long enough, we allow ourselves a few bytes for debugging
-                pw.print(ticker.length() > 16 ? ticker.substring(0,8) : "");
+                pw.print(ticker.length() > 16 ? ticker.substring(0, 8) : "");
                 pw.println("...");
             } else {
                 pw.println(ticker);
@@ -1181,12 +1219,12 @@ public final class NotificationRecord {
 
     /**
      * @param previousRankingTimeMs for updated notifications, {@link #getRankingTimeMs()}
-     *     of the previous notification record, 0 otherwise
+     *                              of the previous notification record, 0 otherwise
      */
     private long calculateRankingTimeMs(long previousRankingTimeMs) {
         Notification n = getNotification();
         // Take developer provided 'when', unless it's in the future.
-        if (n.hasAppProvidedWhen() && n.getWhen() <= getSbn().getPostTime()){
+        if (n.hasAppProvidedWhen() && n.getWhen() <= getSbn().getPostTime()) {
             return n.getWhen();
         }
         // If we've ranked a previous instance with a timestamp, inherit it. This case is
@@ -1521,8 +1559,8 @@ public final class NotificationRecord {
 
     /**
      * @return all {@link Uri} that should have permission granted to whoever
-     *         will be rendering it. This list has already been vetted to only
-     *         include {@link Uri} that the enqueuing app can grant.
+     * will be rendering it. This list has already been vetted to only
+     * include {@link Uri} that the enqueuing app can grant.
      */
     public @Nullable ArraySet<Uri> getGrantableUris() {
         return mGrantableUris;
@@ -1626,7 +1664,7 @@ public final class NotificationRecord {
         // Log Assistant override if present, whether or not importance calculation is complete.
         if (mAssistantImportance != IMPORTANCE_UNSPECIFIED) {
             lm.addTaggedData(MetricsEvent.FIELD_NOTIFICATION_IMPORTANCE_ASST,
-                        mAssistantImportance);
+                    mAssistantImportance);
         }
         // Log the issuer of any adjustments that may have affected this notification. We only log
         // the hash here as NotificationItem events are frequent, and the number of NAS
@@ -1650,7 +1688,7 @@ public final class NotificationRecord {
         Notification notification = getNotification();
         boolean hasDecoratedStyle =
                 notification.isStyle(Notification.DecoratedCustomViewStyle.class)
-                || notification.isStyle(Notification.DecoratedMediaCustomViewStyle.class);
+                        || notification.isStyle(Notification.DecoratedMediaCustomViewStyle.class);
         boolean hasCustomRemoteView = notification.contentView != null
                 || notification.bigContentView != null
                 || notification.headsUpContentView != null;
@@ -1726,7 +1764,7 @@ public final class NotificationRecord {
             // some non-msgStyle notifs can temporarily appear in the conversation space if category
             // is right
             if (mPkgAllowedAsConvo && mTargetSdkVersion < Build.VERSION_CODES.R
-                && Notification.CATEGORY_MESSAGE.equals(getNotification().category)) {
+                    && Notification.CATEGORY_MESSAGE.equals(getNotification().category)) {
                 return true;
             }
             return false;
@@ -1771,6 +1809,47 @@ public final class NotificationRecord {
 
     StatusBarNotification getSbn() {
         return sbn;
+    }
+
+    /**
+     * Returns the UID of the local application corresponding to a bridged notification.
+     * Returns {@link android.os.Process#INVALID_UID} if the notification is not bridged,
+     * or if the bridged package is not installed on the local device.
+     */
+    public int getBridgedAppUid() {
+        return mBridgedAppUid;
+    }
+
+    /**
+     * If the record is for a bridged notification, return the bridged package name,
+     * or {@code null} otherwise.
+     */
+    @Nullable
+    public String getBridgedPackageName() {
+        if (android.app.Flags.bridgedNotifications()) {
+            BridgedNotificationMetadata metadata =
+                    getSbn().getNotification().getBridgedNotificationMetadata();
+            if (metadata != null) {
+                return metadata.getPackageName();
+            }
+        }
+        return null;
+    }
+
+    /**
+     * If the record is for a bridged notification, return the bridged channel ID, or {@code null}
+     * otherwise.
+     */
+    @Nullable
+    public String getBridgedChannelId() {
+        if (android.app.Flags.bridgedNotifications()) {
+            BridgedNotificationMetadata metadata =
+                    getSbn().getNotification().getBridgedNotificationMetadata();
+            if (metadata != null) {
+                return metadata.getChannelId();
+            }
+        }
+        return null;
     }
 
     /**

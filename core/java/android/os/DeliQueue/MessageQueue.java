@@ -692,7 +692,6 @@ public final class MessageQueue {
             removeAllFdRecords();
         }
         removeAllMessages();
-        mStack.drainFreelist();
 
         // We reset the sync barrier tokens to reflect the queue's state reset. This helps ensure
         // that the queue's behavior is deterministic in both individual tests and in a test suite.

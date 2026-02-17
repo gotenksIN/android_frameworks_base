@@ -77,7 +77,6 @@ import android.content.pm.ResolveInfo;
 import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Rect;
-import android.os.PowerManager;
 import android.os.RemoteException;
 import android.os.UserHandle;
 import android.platform.test.annotations.DisableFlags;
@@ -299,16 +298,10 @@ public class RootWindowContainerTests extends WindowTestsBase {
         assertEquals(1, task1.mLayerRank);
         assertEquals(2, task2.mLayerRank);
 
-        // The rank should be updated to invisible when device went to sleep.
+        // The rank should be updated to invisible when all activities in the task become invisible.
         activity1.setVisibleRequested(false);
-        activity2.setVisibleRequested(false);
-        doReturn(true).when(mAtm).isSleepingOrShuttingDownLocked();
-        doReturn(true).when(mRootWindowContainer).putTasksToSleep(anyBoolean());
-        mSupervisor.mGoingToSleepWakeLock = mock(PowerManager.WakeLock.class);
-        doReturn(false).when(mSupervisor.mGoingToSleepWakeLock).isHeld();
-        mAtm.mTaskSupervisor.finishEnteringSleep();
         assertEquals(Task.LAYER_RANK_INVISIBLE, task1.mLayerRank);
-        assertEquals(Task.LAYER_RANK_INVISIBLE, task2.mLayerRank);
+        assertFalse(activity1.app.hasActivityInVisibleTask());
     }
 
     @Test
@@ -1492,7 +1485,7 @@ public class RootWindowContainerTests extends WindowTestsBase {
         final WindowContainerVisibilityHelper visibilityHelper = mAtm.mVisibilityHelper;
         spyOn(visibilityHelper);
         doReturn(true).when(visibilityHelper).isOpaque(
-                any(), any(), anyBoolean(), anyBoolean());
+                any(), any(), anyBoolean(), anyBoolean(), anyBoolean());
 
         final DisplayContent display = mRootWindowContainer.getDefaultDisplay();
         final ActivityRecord bottomR = createActivityRecord(display);
@@ -1500,11 +1493,11 @@ public class RootWindowContainerTests extends WindowTestsBase {
         // The Task behind another should be invisible.
         bottomR.setVisibleRequested(false);
 
-        final List<ActivityAssistInfo> result = mRootWindowContainer.getTopVisibleActivities(
+        final List<ActivityRecord> result = mRootWindowContainer.getTopVisibleActivities(
                 display.mDisplayId);
 
         assertEquals(1, result.size());
-        assertEquals(topR.token, result.get(0).getActivityToken());
+        assertEquals(topR, result.get(0));
     }
 
     @Test
@@ -1513,7 +1506,7 @@ public class RootWindowContainerTests extends WindowTestsBase {
         final WindowContainerVisibilityHelper visibilityHelper = mAtm.mVisibilityHelper;
         spyOn(visibilityHelper);
         doReturn(true).when(visibilityHelper).isOpaque(
-                any(), any(), anyBoolean(), anyBoolean());
+                any(), any(), anyBoolean(), anyBoolean(), anyBoolean());
 
         final DisplayContent display = mRootWindowContainer.getDefaultDisplay();
         final ActivityRecord splitActivity0 = createActivityRecordWithParentTask(display,
@@ -1526,12 +1519,12 @@ public class RootWindowContainerTests extends WindowTestsBase {
         splitTask0.setBounds(0, 0, 500, 500);
         splitTask1.setBounds(500, 0, 1000, 500);
 
-        final List<ActivityAssistInfo> result = mRootWindowContainer.getTopVisibleActivities(
+        final List<ActivityRecord> result = mRootWindowContainer.getTopVisibleActivities(
                 display.mDisplayId);
 
         assertEquals(2, result.size());
-        assertEquals(splitActivity1.token, result.get(0).getActivityToken());
-        assertEquals(splitActivity0.token, result.get(1).getActivityToken());
+        assertEquals(splitActivity1, result.get(0));
+        assertEquals(splitActivity0, result.get(1));
     }
 
     @Test
@@ -1543,13 +1536,13 @@ public class RootWindowContainerTests extends WindowTestsBase {
         final ActivityRecord activity1 = createActivityRecordWithParentTask(deskRoot);
         final ActivityRecord activity2 = createActivityRecordWithParentTask(deskRoot);
 
-        final List<ActivityAssistInfo> result = mRootWindowContainer.getTopVisibleActivities(
+        final List<ActivityRecord> result = mRootWindowContainer.getTopVisibleActivities(
                 display.mDisplayId);
 
         assertEquals(3, result.size());
-        assertEquals(activity2.token, result.get(0).getActivityToken());
-        assertEquals(activity1.token, result.get(1).getActivityToken());
-        assertEquals(activity0.token, result.get(2).getActivityToken());
+        assertEquals(activity2, result.get(0));
+        assertEquals(activity1, result.get(1));
+        assertEquals(activity0, result.get(2));
     }
 
     @Test
@@ -1568,12 +1561,12 @@ public class RootWindowContainerTests extends WindowTestsBase {
         postCreateActivitySetup(activity0, display);
         postCreateActivitySetup(activity1, display);
 
-        final List<ActivityAssistInfo> result = mRootWindowContainer.getTopVisibleActivities(
+        final List<ActivityRecord> result = mRootWindowContainer.getTopVisibleActivities(
                 display.mDisplayId);
 
         assertEquals(2, result.size());
-        assertEquals(activity1.token, result.get(0).getActivityToken());
-        assertEquals(activity0.token, result.get(1).getActivityToken());
+        assertEquals(activity1, result.get(0));
+        assertEquals(activity0, result.get(1));
     }
 
     @Test
@@ -1582,7 +1575,7 @@ public class RootWindowContainerTests extends WindowTestsBase {
         final WindowContainerVisibilityHelper visibilityHelper = mAtm.mVisibilityHelper;
         spyOn(visibilityHelper);
         doReturn(true).when(visibilityHelper).isOpaque(
-                any(), any(), anyBoolean(), anyBoolean());
+                any(), any(), anyBoolean(), anyBoolean(), anyBoolean());
 
         final DisplayContent display = mRootWindowContainer.getDefaultDisplay();
         resizeDisplay(display, 1000, 1000);
@@ -1616,7 +1609,7 @@ public class RootWindowContainerTests extends WindowTestsBase {
         doReturn(focusedRootTask.getRootTask()).when(display).getFocusedRootTask();
 
         // Call the method under test.
-        final List<ActivityAssistInfo> result = mRootWindowContainer.getTopVisibleActivities(
+        final List<ActivityRecord> result = mRootWindowContainer.getTopVisibleActivities(
                 display.mDisplayId);
 
         // Verify the results.
@@ -1624,13 +1617,13 @@ public class RootWindowContainerTests extends WindowTestsBase {
         assertEquals(4, result.size());
 
         // The activities from the focused root task should be first, in top-to-bottom order.
-        assertEquals(focusedActivity2.token, result.get(0).getActivityToken());
-        assertEquals(focusedActivity1.token, result.get(1).getActivityToken());
+        assertEquals(focusedActivity2, result.get(0));
+        assertEquals(focusedActivity1, result.get(1));
 
         // The activities from the non-focused visible root task should be next, in top-to-bottom
         // order.
-        assertEquals(nonFocusedActivity2.token, result.get(2).getActivityToken());
-        assertEquals(nonFocusedActivity1.token, result.get(3).getActivityToken());
+        assertEquals(nonFocusedActivity2, result.get(2));
+        assertEquals(nonFocusedActivity1, result.get(3));
     }
 
     @Test
@@ -1802,28 +1795,35 @@ public class RootWindowContainerTests extends WindowTestsBase {
         final ActivityRecord activity0 = createActivityRecord(task);
         final ActivityRecord activity1 = createActivityRecord(task);
 
-        final List<ActivityAssistInfo> result = mRootWindowContainer.getTopVisibleActivities(
+        final List<ActivityRecord> result = mRootWindowContainer.getTopVisibleActivities(
                 display.mDisplayId);
 
         assertEquals(2, result.size());
-        assertEquals(activity1.token, result.get(0).getActivityToken());
-        assertEquals(activity0.token, result.get(1).getActivityToken());
+        assertEquals(activity1, result.get(0));
+        assertEquals(activity0, result.get(1));
     }
 
     @Test
-    public void testOnDisplayAddedOrRemovedNotifiesTmaChanged() {
-        final DisplayInfo displayInfo = new DisplayInfo();
-        displayInfo.copyFrom(mDisplayInfo);
-        final DisplayContent dc = createNewDisplay(displayInfo);
-        final int displayId = dc.getDisplayId();
+    public void testGetTopVisibleActivityAssistInfos_wrapsGetTopVisibleActivities() {
+        final DisplayContent display = mRootWindowContainer.getDefaultDisplay();
+        final ActivityRecord r1 = createActivityRecord(display);
+        final ActivityRecord r2 = createActivityRecord(display);
+        final List<ActivityRecord> visibleActivities = new ArrayList<>();
+        visibleActivities.add(r1);
+        visibleActivities.add(r2);
 
-        mRootWindowContainer.onDisplayAdded(displayId);
+        spyOn(mRootWindowContainer);
+        doReturn(visibleActivities).when(mRootWindowContainer).getTopVisibleActivities(
+                display.mDisplayId);
 
-        verify(mAtm).onTaskMoveAllowedChanged();
+        final List<ActivityAssistInfo> result = mRootWindowContainer
+                .getTopVisibleActivityAssistInfos(display.mDisplayId);
 
-        mRootWindowContainer.onDisplayRemoved(displayId);
+        assertEquals(2, result.size());
+        assertEquals(r1.token, result.get(0).getActivityToken());
+        assertEquals(r2.token, result.get(1).getActivityToken());
 
-        verify(mAtm, times(2)).onTaskMoveAllowedChanged();
+        verify(mRootWindowContainer).getTopVisibleActivities(display.mDisplayId);
     }
 
     @Test
@@ -1851,7 +1851,7 @@ public class RootWindowContainerTests extends WindowTestsBase {
 
         // Case 2: Test that a "removed" display is skipped.
         doReturn(false).when(secondDisplay).isRemoving(); // ensure previous mock is gone
-        doReturn(true).when(secondDisplay).isRemoved();
+        doReturn(true).when(secondDisplay).isRemovedOrInvalid();
 
         // Update focused window again.
         mRootWindowContainer.updateFocusedWindowLocked(

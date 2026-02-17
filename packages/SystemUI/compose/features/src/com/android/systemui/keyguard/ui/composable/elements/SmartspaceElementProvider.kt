@@ -25,9 +25,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -44,10 +42,10 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.viewinterop.NoOpUpdate
+import androidx.core.view.isEmpty
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.android.compose.animation.scene.MovableElementContentScope
 import com.android.compose.animation.scene.MovableElementKey
-import com.android.systemui.customization.clocks.R as clocksR
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.keyguard.KeyguardUnlockAnimationController
 import com.android.systemui.keyguard.ui.composable.elements.LockscreenUpperRegionElementProvider.Companion.LayoutType
@@ -168,8 +166,8 @@ constructor(
                 smartspaceController
                     .buildAndConnectWeatherView(linearLayout.context, isLargeClock)
                     ?.let { view ->
-                        // Place weather right after the date, before the extras (alarm and dnd)
-                        val index = if (linearLayout.childCount == 0) 0 else 1
+                        // Place weather right after the date, before the extras (alarm and DND).
+                        val index = if (linearLayout.isEmpty()) 0 else 1
                         linearLayout.addView(view, index)
                     }
             }
@@ -191,8 +189,7 @@ constructor(
                 return
             }
 
-            val clockPadding = dimensionResource(clocksR.dimen.clock_padding_start)
-            // In wide-layouts limit the maximum width of the card to be half the screen width
+            // In wide-layouts limit the maximum width of the card to be half the screen width.
             val shadeMode by keyguardSmartspaceViewModel.shadeMode.collectAsStateWithLifecycle()
             val widthMod =
                 when (getLayoutType(shadeMode)) {
@@ -225,7 +222,7 @@ constructor(
                 exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top),
             ) {
                 LookaheadAndroidView(
-                    factory = { ctx ->
+                    factory = { _ ->
                         keyguardUnlockAnimationController.lockscreenSmartspace = view
                         view
                     },
@@ -237,11 +234,8 @@ constructor(
                     modifier =
                         Modifier.then(widthMod)
                             .padding(
-                                // Note: smartspace adds 16dp of start padding internally
-                                start = clockPadding - 16.dp,
-                                end = clockPadding,
                                 bottom =
-                                    dimensionResource(R.dimen.keyguard_status_view_bottom_margin),
+                                    dimensionResource(R.dimen.keyguard_status_view_bottom_margin)
                             )
                             .burnInAware(isClock = false)
                             .nonAuthUI(),

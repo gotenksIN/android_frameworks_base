@@ -60,13 +60,16 @@ public class ComputerControlExtensionsTest {
     private AutoCloseable mMockitoSession;
 
     @Before
-    public void setUp() {
+    public void setUp() throws Exception {
         mMockitoSession = MockitoAnnotations.openMocks(this);
 
         when(mPackageManager.hasSystemFeature(
                 PackageManager.FEATURE_ACTIVITIES_ON_SECONDARY_DISPLAYS))
                 .thenReturn(true);
         mContext.setMockPackageManager(mPackageManager);
+        mContext.addMockSystemService(VirtualDeviceManager.class,
+                new VirtualDeviceManager(mIVirtualDeviceManager, mContext));
+        when(mIVirtualDeviceManager.isComputerControlAvailable(any())).thenReturn(true);
 
         mParams = new ComputerControlSession.Params.Builder(mContext)
                 .setName(SESSION_NAME)
@@ -82,7 +85,7 @@ public class ComputerControlExtensionsTest {
     @Test
     public void testGetVersion() {
         assertThat(ComputerControlExtensions.getVersion())
-                .isEqualTo(ComputerControlExtensions.EXTENSIONS_VERSION);
+                .isEqualTo(VirtualDeviceManager.COMPUTER_CONTROL_VERSION);
     }
 
     @Test
@@ -101,8 +104,26 @@ public class ComputerControlExtensionsTest {
     }
 
     @Test
+    public void getInstance_noAccess_returnsNonNull() throws Exception {
+        when(mIVirtualDeviceManager.isComputerControlAvailable(any())).thenReturn(false);
+        assertThat(ComputerControlExtensions.getInstance(mContext)).isNotNull();
+    }
+
+    @Test
     public void getInstance_returnsNonNull() {
         assertThat(ComputerControlExtensions.getInstance(mContext)).isNotNull();
+    }
+
+    @Test
+    public void isSessionCreationAvailable_noAccess_returnsFalse() throws Exception {
+        when(mIVirtualDeviceManager.isComputerControlAvailable(any())).thenReturn(false);
+        assertThat(ComputerControlExtensions.isSessionCreationAvailable(mContext)).isFalse();
+    }
+
+    @Test
+    public void isSessionCreationAvailable_withAccess_returnsTrue() throws Exception {
+        when(mIVirtualDeviceManager.isComputerControlAvailable(any())).thenReturn(true);
+        assertThat(ComputerControlExtensions.isSessionCreationAvailable(mContext)).isTrue();
     }
 
     @Test
@@ -128,19 +149,7 @@ public class ComputerControlExtensionsTest {
     }
 
     @Test
-    public void requestSession_withoutPermission_throwsException() {
-        ComputerControlExtensions extensions = ComputerControlExtensions.getInstance(mContext);
-
-        // By default, the CTS process is not allowlisted for the required knownSigner permission.
-        assertThrows(SecurityException.class, () ->
-                extensions.requestSession(
-                        mParams, Executors.newSingleThreadExecutor(), mSessionCallback));
-    }
-
-    @Test
     public void requestSession_requestsSession() throws Exception {
-        mContext.addMockSystemService(VirtualDeviceManager.class,
-                new VirtualDeviceManager(mIVirtualDeviceManager, mContext));
         ComputerControlExtensions extensions = ComputerControlExtensions.getInstance(mContext);
         extensions.requestSession(mParams, Executors.newSingleThreadExecutor(), mSessionCallback);
         verify(mIVirtualDeviceManager).requestComputerControlSession(any(), any(), any(), any());

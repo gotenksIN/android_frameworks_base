@@ -31,7 +31,7 @@ import com.android.internal.accessibility.common.ShortcutConstants.UserShortcutT
  * Base class for creating accessibility service target with various fragment types related to
  * legacy type, invisible type and intuitive type.
  */
-class AccessibilityServiceTarget extends AccessibilityTarget {
+public class AccessibilityServiceTarget extends AccessibilityTarget {
 
     private final AccessibilityServiceInfo mAccessibilityServiceInfo;
 
@@ -44,7 +44,7 @@ class AccessibilityServiceTarget extends AccessibilityTarget {
                 isShortcutContained(context, shortcutType,
                         serviceInfo.getComponentName().flattenToString()),
                 serviceInfo.getComponentName().flattenToString(),
-                serviceInfo.getResolveInfo().serviceInfo.applicationInfo.uid,
+                serviceInfo.getResolveInfo().serviceInfo.getUid(),
                 serviceInfo.getResolveInfo().loadLabel(context.getPackageManager()),
                 serviceInfo.getResolveInfo().loadIcon(context.getPackageManager()),
                 convertToKey(shortcutType));

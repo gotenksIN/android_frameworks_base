@@ -25,6 +25,7 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Build
 import android.os.Bundle
+import android.provider.Settings
 import android.util.Log
 import androidx.fragment.app.Fragment
 import androidx.preference.Preference
@@ -64,9 +65,11 @@ import com.android.settingslib.metadata.SensitivityLevel.Companion.UNKNOWN_SENSI
 import com.android.settingslib.metadata.preferencesapi.PreferencesApiScreen
 import com.android.settingslib.metadata.getPreferenceIcon
 import com.android.settingslib.metadata.isPreferenceIndexable
+import com.android.settingslib.metadata.isUiOnlyPreference
 import com.android.settingslib.preference.PreferenceScreenCreator
 import com.android.settingslib.preference.PreferenceScreenFactory
 import com.android.settingslib.preference.PreferenceScreenProvider
+import com.android.settingslib.utils.applications.AppUtils
 import com.google.errorprone.annotations.CanIgnoreReturnValue
 import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
@@ -94,6 +97,7 @@ private constructor(
     private val includeParameters = (request.flags and PreferenceGetterFlags.PARAMETERS) != 0
     private val includeHierarchy = (request.flags and PreferenceGetterFlags.EXCLUDE_HIERARCHY) == 0
     private val shrinkHierarchy = (request.flags and PreferenceGetterFlags.SHRINK_HIERARCHY) != 0
+    private val excludeUiOnlyPreferences = true
 
     private suspend fun init() {
         val factories = PreferenceScreenRegistry.preferenceScreenMetadataFactories
@@ -313,7 +317,7 @@ private constructor(
 
     private fun checkScreenFlag(metadata: PreferenceScreenMetadata): Boolean {
         val isFlagDisabled = when (metadata) {
-            is PreferenceScreenCreator, is PreferencesApiScreen-> {
+            is PreferenceScreenCreator, is PreferencesApiScreen -> {
                 !metadata.isFlagEnabled(context)
             }
             else -> {
@@ -424,14 +428,18 @@ private constructor(
         screenMetadata: PreferenceScreenMetadata,
         isRoot: Boolean,
     ): PreferenceGroupProto = preferenceGroupProto {
-        preference = toProto(screenMetadata, this@toProto.metadata, isRoot)
+        if (!excludeUiOnlyPreferences || !this@toProto.metadata.isUiOnlyPreference(context)) {
+            preference = toProto(screenMetadata, this@toProto.metadata, isRoot)
+        }
         forEachAsync {
             addPreferences(
                 preferenceOrGroupProto {
                     if (it is PreferenceHierarchy) {
                         group = it.toProto(screenMetadata, false)
                     } else {
-                        preference = toProto(screenMetadata, it.metadata, false)
+                        if (!excludeUiOnlyPreferences || !it.metadata.isUiOnlyPreference(context)) {
+                            preference = toProto(screenMetadata, it.metadata, false)
+                        }
                     }
                 }
             )
@@ -590,6 +598,7 @@ fun PreferenceMetadata.toProto(
         screenMetadata.getLaunchIntent(context, launchTarget)?.let { launchIntent = it.toProto() }
         for (tag in metadata.tags(context)) addTags(tag)
     }
+    purpose = metadata.purpose
     persistent = metadata.isPersistent(context)
     if (metadata !is PersistentPreference<*>) return@preferenceProto
     sensitivityLevel = metadata.sensitivityLevel
@@ -614,6 +623,7 @@ fun PreferenceMetadata.toProto(
                 Boolean::class.javaObjectType -> storage.getBoolean(key)?.let { booleanValue = it }
                 Float::class.javaObjectType -> storage.getFloat(key)?.let { floatValue = it }
                 Long::class.javaObjectType -> storage.getLong(key)?.let { longValue = it }
+                String::class.javaObjectType -> storage.getString(key) ?.let {stringValue = it}
                 else -> {}
             }
         }
@@ -632,6 +642,7 @@ fun PreferenceMetadata.toProto(
                 Boolean::class.javaObjectType -> booleanType = true
                 Float::class.javaObjectType -> floatType = true
                 Long::class.javaObjectType -> longType = true
+                String::class.javaObjectType -> stringType = true
             }
         }
     }
@@ -655,17 +666,23 @@ fun <T> PersistentPreference<T>.evalWritePermit(
     callingPid: Int,
     callingUid: Int,
 ): Int? {
-    // Build.IS_DEBUGGABLE is a hidden API and cannot be used here because this module
-    // is built against "system_current". We check Build.TYPE instead to identify
-    // debuggable builds (userdebug/eng).
-    val isDebuggable = Build.TYPE == "eng" || Build.TYPE == "userdebug"
+    val isDebuggable = AppUtils.isDebuggable()
+
+    // Use the global setting as a gate for debug environments
+    val hasUnknownSensitivitySettings = Settings.Global.getInt(
+        context.contentResolver,
+        "com.android.settings.UNKNOWN_SENSITIVITY_IS_AVAILABLE",
+        0
+    ) == 1
 
     return when {
         // High sensitivity is strictly disallowed.
         sensitivityLevel == HIGH_SENSITIVITY -> ReadWritePermit.DISALLOW
 
-        // Unknown sensitivity is disallowed, unless we are on a debuggable build.
-        sensitivityLevel == UNKNOWN_SENSITIVITY && !isDebuggable -> ReadWritePermit.DISALLOW
+        // Unknown sensitivity is disallowed, unless we are on a debuggable build
+        // and the caller holds the WRITE_SECURE_SETTINGS permission.
+        sensitivityLevel == UNKNOWN_SENSITIVITY &&
+                !(isDebuggable && hasUnknownSensitivitySettings) -> ReadWritePermit.DISALLOW
 
         // If the app lacks the required permissions, require them.
         getWritePermissions(context)?.check(context, callingPid, callingUid) == false ->

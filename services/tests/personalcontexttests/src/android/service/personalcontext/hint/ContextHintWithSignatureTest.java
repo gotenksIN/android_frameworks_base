@@ -18,6 +18,8 @@ package android.service.personalcontext.hint;
 
 import static com.google.common.truth.Truth.assertThat;
 
+import static org.mockito.Mockito.mock;
+
 import android.content.ComponentName;
 import android.os.Parcel;
 import android.service.personalcontext.RenderToken;
@@ -44,39 +46,39 @@ public class ContextHintWithSignatureTest {
         final BundleHint hint = new BundleHint.Builder().build();
         final BundleHint attributedHint1 = new BundleHint.Builder().build();
         final BundleHint attributedHint2 = new BundleHint.Builder().build();
-        final RenderToken renderToken = new RenderToken.RenderTokenBuilder()
-                .setRendererComponentId(UUID.randomUUID())
-                .build();
+        final RenderToken renderToken1 = new RenderToken(UUID.randomUUID());
+        final RenderToken renderToken2 = new RenderToken(UUID.randomUUID());
 
         final ContextHintWithSignature signedAttributedHint1 =
                 new ContextHintWithSignature.Builder(attributedHint1, key)
-                        .setRenderToken(renderToken)
+                        .addRenderTokens(List.of(renderToken1, renderToken2))
                         .build();
 
         final ContextHintWithSignature signedAttributedHint2 =
                 new ContextHintWithSignature.Builder(attributedHint2, key)
-                        .setRenderToken(renderToken)
+                        .addRenderTokens(List.of(renderToken1, renderToken2))
                         .build();
 
         final Parcel parcel = Parcel.obtain();
-        parcel.writeParcelable(new ContextHintWithSignature.Builder(hint, key)
-                .setRenderToken(renderToken)
-                .setOriginatingPackage(origin.getPackageName())
-                .addAttributionHint(signedAttributedHint1)
-                .addAttributionHint(signedAttributedHint2)
-                .build(), 0);
+        parcel.writeParcelable(new ContextHintWithSignatureWrapper(
+                new ContextHintWithSignature.Builder(hint, key)
+                        .setOriginatingPackage(origin.getPackageName())
+                        .addRenderTokens(List.of(renderToken1, renderToken2))
+                        .addAttributionHint(signedAttributedHint1)
+                        .addAttributionHint(signedAttributedHint2)
+                        .build()), 0);
 
         parcel.setDataPosition(0);
 
-        final ContextHintWithSignature signedHint = parcel.readParcelable(
-                /* loader= */ null, ContextHintWithSignature.class);
+        final ContextHintWithSignature signedHint =
+                parcel.readParcelable(/* loader= */ null, ContextHintWithSignatureWrapper.class)
+                        .getContextHintWithSignature();
 
         parcel.recycle();
 
         assertThat(signedHint.isSignatureValid(key)).isTrue();
         assertThat(signedHint.getContextHint().getHintId()).isEqualTo(hint.getHintId());
-        assertThat(signedHint.getRenderToken().getRendererComponentId())
-                .isEqualTo(renderToken.getRendererComponentId());
+        assertThat(signedHint.getRenderTokens()).containsExactly(renderToken1, renderToken2);
         assertThat(signedHint.getOriginatingPackage()).isEqualTo(origin.getPackageName());
         assertThat(signedHint.getAttributionHints().size()).isEqualTo(2);
         assertThat(signedHint.getAttributionHints().get(0).getOriginatingPackage()).isNull();
@@ -93,38 +95,37 @@ public class ContextHintWithSignatureTest {
         final BundleHint hint = new BundleHint.Builder().build();
         final BundleHint attributedHint1 = new BundleHint.Builder().build();
         final BundleHint attributedHint2 = new BundleHint.Builder().build();
-        final RenderToken renderToken = new RenderToken.RenderTokenBuilder()
-                .setRendererComponentId(UUID.randomUUID())
-                .build();
+        final RenderToken renderToken = new RenderToken(UUID.randomUUID());
 
         final ContextHintWithSignature signedAttributedHint1 =
                 new ContextHintWithSignature.Builder(attributedHint1, key)
-                        .setRenderToken(renderToken)
+                        .addRenderTokens(List.of(renderToken))
                         .build();
 
         final ContextHintWithSignature signedAttributedHint2 =
                 new ContextHintWithSignature.Builder(attributedHint2, key)
-                        .setRenderToken(renderToken)
+                        .addRenderTokens(List.of(renderToken))
                         .build();
 
         final Parcel parcel = Parcel.obtain();
-        parcel.writeParcelable(new ContextHintWithSignature.Builder(hint, key)
-                .setRenderToken(renderToken)
-                .addAttributionHint(signedAttributedHint1)
-                .addAttributionHint(signedAttributedHint2)
-                .build(), 0);
+        parcel.writeParcelable(
+                new ContextHintWithSignatureWrapper(new ContextHintWithSignature.Builder(hint, key)
+                        .addRenderTokens(List.of(renderToken))
+                        .addAttributionHint(signedAttributedHint1)
+                        .addAttributionHint(signedAttributedHint2)
+                        .build()), 0);
 
         parcel.setDataPosition(0);
 
-        final ContextHintWithSignature signedHint = parcel.readParcelable(
-                /* loader= */ null, ContextHintWithSignature.class);
+        final ContextHintWithSignature signedHint =
+                parcel.readParcelable(/* loader= */ null, ContextHintWithSignatureWrapper.class)
+                        .getContextHintWithSignature();
 
         parcel.recycle();
 
         assertThat(signedHint.isSignatureValid(key)).isTrue();
         assertThat(signedHint.getContextHint().getHintId()).isEqualTo(hint.getHintId());
-        assertThat(signedHint.getRenderToken().getRendererComponentId())
-                .isEqualTo(renderToken.getRendererComponentId());
+        assertThat(signedHint.getRenderTokens()).containsExactly(renderToken);
         assertThat(signedHint.getOriginatingPackage()).isNull();
         assertThat(signedHint.getAttributionHints().size()).isEqualTo(2);
         assertThat(signedHint.getAttributionHints().get(0).getOriginatingPackage()).isNull();
@@ -150,21 +151,23 @@ public class ContextHintWithSignatureTest {
                 new ContextHintWithSignature.Builder(attributedHint2, key).build();
 
         final Parcel parcel = Parcel.obtain();
-        parcel.writeParcelable(new ContextHintWithSignature.Builder(hint, key)
-                .setOriginatingPackage(origin.getPackageName())
-                .addAttributionHints(List.of(signedAttributedHint1, signedAttributedHint2))
-                .build(), 0);
+        parcel.writeParcelable(
+                new ContextHintWithSignatureWrapper(new ContextHintWithSignature.Builder(hint, key)
+                        .setOriginatingPackage(origin.getPackageName())
+                        .addAttributionHints(List.of(signedAttributedHint1, signedAttributedHint2))
+                        .build()), 0);
 
         parcel.setDataPosition(0);
 
-        final ContextHintWithSignature signedHint = parcel.readParcelable(
-                /* loader= */ null, ContextHintWithSignature.class);
+        final ContextHintWithSignature signedHint =
+                parcel.readParcelable(/* loader= */ null, ContextHintWithSignatureWrapper.class)
+                        .getContextHintWithSignature();
 
         parcel.recycle();
 
         assertThat(signedHint.isSignatureValid(key)).isTrue();
         assertThat(signedHint.getContextHint().getHintId()).isEqualTo(hint.getHintId());
-        assertThat(signedHint.getRenderToken()).isNull();
+        assertThat(signedHint.getRenderTokens()).isEmpty();
         assertThat(signedHint.getOriginatingPackage()).isEqualTo(origin.getPackageName());
         assertThat(signedHint.getAttributionHints().size()).isEqualTo(2);
         assertThat(signedHint.getAttributionHints().get(0).getContextHint().getHintId())
@@ -178,27 +181,26 @@ public class ContextHintWithSignatureTest {
         final SecretKeySpec key = ContextHintTestUtils.generateSignedHintKey();
         final ComponentName origin = new ComponentName("com.whatever", "com.whatever.Code");
         final BundleHint hint = new BundleHint.Builder().build();
-        final RenderToken renderToken = new RenderToken.RenderTokenBuilder()
-                .setRendererComponentId(UUID.randomUUID())
-                .build();
+        final RenderToken renderToken = new RenderToken(UUID.randomUUID());
 
         final Parcel parcel = Parcel.obtain();
-        parcel.writeParcelable(new ContextHintWithSignature.Builder(hint, key)
-                .setOriginatingPackage(origin.getPackageName())
-                .setRenderToken(renderToken)
-                .build(), 0);
+        parcel.writeParcelable(
+                new ContextHintWithSignatureWrapper(new ContextHintWithSignature.Builder(hint, key)
+                        .setOriginatingPackage(origin.getPackageName())
+                        .addRenderTokens(List.of(renderToken))
+                        .build()), 0);
 
         parcel.setDataPosition(0);
 
-        final ContextHintWithSignature signedHint = parcel.readParcelable(
-                /* loader= */ null, ContextHintWithSignature.class);
+        final ContextHintWithSignature signedHint =
+                parcel.readParcelable(/* loader= */ null, ContextHintWithSignatureWrapper.class)
+                        .getContextHintWithSignature();
 
         parcel.recycle();
 
         assertThat(signedHint.isSignatureValid(key)).isTrue();
         assertThat(signedHint.getContextHint().getHintId()).isEqualTo(hint.getHintId());
-        assertThat(signedHint.getRenderToken().getRendererComponentId())
-                .isEqualTo(renderToken.getRendererComponentId());
+        assertThat(signedHint.getRenderTokens()).containsExactly(renderToken);
         assertThat(signedHint.getOriginatingPackage()).isEqualTo(origin.getPackageName());
         assertThat(signedHint.getAttributionHints().size()).isEqualTo(0);
     }
@@ -236,11 +238,17 @@ public class ContextHintWithSignatureTest {
         parcel.setDataPosition(0);
 
         // Re-read the parcel with a bad signature.
-        final ContextHintWithSignature signedHint =
-                ContextHintWithSignature.CREATOR.createFromParcel(parcel);
+        final ContextHintWithSignature signedHint = ContextHintWithSignature.fromParcel(parcel);
 
         parcel.recycle();
 
         assertThat(signedHint.isSignatureValid(key)).isFalse();
+    }
+
+    @Test
+    public void testIsMockable() {
+        // Just make sure we can mock it.
+        ContextHintWithSignature hint = mock(ContextHintWithSignature.class);
+        assertThat(hint).isNotNull();
     }
 }

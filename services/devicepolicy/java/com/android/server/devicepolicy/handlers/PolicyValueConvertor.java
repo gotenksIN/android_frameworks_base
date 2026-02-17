@@ -19,10 +19,12 @@ package com.android.server.devicepolicy.handlers;
 import android.annotation.NonNull;
 import android.app.admin.IntegerPolicyValue;
 import android.app.admin.ListOfStringPolicyValue;
+import android.app.admin.LongPolicyValue;
 import android.app.admin.PolicyValue;
 import android.app.admin.StringPolicyValue;
 import android.app.admin.metadata.EnumPolicyMetadata;
 import android.app.admin.metadata.ListPolicyMetadata;
+import android.app.admin.metadata.LongPolicyMetadata;
 import android.app.admin.metadata.PolicyMetadata;
 import android.app.admin.metadata.StringPolicyMetadata;
 
@@ -44,6 +46,14 @@ public abstract class PolicyValueConvertor<T> {
                 }
             };
 
+    private static final PolicyValueConvertor<Long> LONG_POLICY_VALUE_CONVERTOR =
+            new PolicyValueConvertor<>() {
+                @Override
+                public @NonNull PolicyValue<Long> toPolicyValue(@NonNull Long value) {
+                    return new LongPolicyValue(value);
+                }
+            };
+
     private static final PolicyValueConvertor<String> STRING_POLICY_VALUE_CONVERTOR =
             new PolicyValueConvertor<>() {
                 @Override
@@ -56,8 +66,7 @@ public abstract class PolicyValueConvertor<T> {
             new PolicyValueConvertor<>() {
                 @Override
                 public @NonNull PolicyValue<List<String>> toPolicyValue(
-                        @NonNull List<String> value
-                ) {
+                        @NonNull List<String> value) {
                     return new ListOfStringPolicyValue(value);
                 }
             };
@@ -66,44 +75,44 @@ public abstract class PolicyValueConvertor<T> {
      * Gets a convertor that can handle the given policy.
      *
      * @param metadata The metadata for the policy.
-     * @param <T>      The type of the policy.
+     * @param <T> The type of the policy.
      * @return The convertor.
      */
     @NonNull
     @SuppressWarnings({"rawtypes", "unchecked"})
     public static <T> PolicyValueConvertor<T> getInstance(PolicyMetadata<T> metadata) {
-        return (PolicyValueConvertor<T>) switch (metadata) {
-            case EnumPolicyMetadata e -> INTEGER_POLICY_VALUE_CONVERTOR;
-            case StringPolicyMetadata e -> STRING_POLICY_VALUE_CONVERTOR;
-            case ListPolicyMetadata l -> getListInstance(l);
-            default -> throw new UnsupportedOperationException(
-                    "Unsupported policy: " + metadata.getId());
-        };
+        return (PolicyValueConvertor<T>)
+                switch (metadata) {
+                    case EnumPolicyMetadata e -> INTEGER_POLICY_VALUE_CONVERTOR;
+                    case StringPolicyMetadata e -> STRING_POLICY_VALUE_CONVERTOR;
+                    case LongPolicyMetadata e -> LONG_POLICY_VALUE_CONVERTOR;
+                    case ListPolicyMetadata l -> getListInstance(l);
+                    default ->
+                            throw new UnsupportedOperationException(
+                                    "Unsupported policy: " + metadata.getId());
+                };
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
     private static <T> PolicyValueConvertor<List<T>> getListInstance(
-            ListPolicyMetadata<T> listPolicy
-    ) {
+            ListPolicyMetadata<T> listPolicy) {
         // Cast is safe since metadata already checked the type when building.
         // Can't cast to PolicyValidator<List<T>> since List<T> is not a superclass of
         // List<String> (and other list types at the same time), we need to use a raw class
         // instead.
-        return (PolicyValueConvertor) switch (listPolicy.getElementMetadata()) {
-            case StringPolicyMetadata s -> LIST_OF_STRING_POLICY_VALUE_CONVERTOR;
-            default -> throw new UnsupportedOperationException(
-                    "Unsupported list policy: " + listPolicy.getId().getId());
-        };
+        return (PolicyValueConvertor)
+                switch (listPolicy.getElementMetadata()) {
+                    case StringPolicyMetadata s -> LIST_OF_STRING_POLICY_VALUE_CONVERTOR;
+                    default ->
+                            throw new UnsupportedOperationException(
+                                    "Unsupported list policy: " + listPolicy.getId().getId());
+                };
     }
 
-    /**
-     * Converts a value to its corresponding {@link PolicyValue}.
-     */
+    /** Converts a value to its corresponding {@link PolicyValue}. */
     public abstract @NonNull PolicyValue<T> toPolicyValue(@NonNull T value);
 
-    /**
-     * Converts a {@link PolicyValue} to its corresponding value.
-     */
+    /** Converts a {@link PolicyValue} to its corresponding value. */
     public @NonNull T fromPolicyValue(@NonNull PolicyValue<T> value) {
         return value.getValue();
     }

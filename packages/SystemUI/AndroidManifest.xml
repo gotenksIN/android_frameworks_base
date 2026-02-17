@@ -179,6 +179,7 @@
     <!-- Screen Recording -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SYSTEM_EXEMPTED" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.CAPTURE_AUDIO_OUTPUT"/>
     <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
@@ -572,6 +573,7 @@
 
         <service
             android:name=".screenrecord.service.ScreenRecordingService"
+            android:foregroundServiceType="systemExempted|microphone"
             android:exported="false" />
 
         <service android:name=".screenrecord.RecordingService"
@@ -664,6 +666,15 @@
             android:excludeFromRecents="true">
         </activity>
 
+        <!-- started from UsbDeviceSettingsManager -->
+        <activity android:name=".usb.UsbAuthorizationActivity"
+            android:exported="true"
+            android:permission="android.permission.MANAGE_USB"
+            android:theme="@style/Theme.SystemUI.Dialog.Alert"
+            android:finishOnCloseSystemDialogs="true"
+            android:excludeFromRecents="true">
+        </activity>
+
         <!-- started from SensoryPrivacyService -->
         <activity android:name=".sensorprivacy.SensorUseStartedActivity"
                   android:exported="true"
@@ -749,6 +760,7 @@
 
         <activity
             android:name=".screencapture.ui.ShareScreenActivity"
+            android:label="@string/screen_share_a11y_announcement"
             android:showForAllUsers="true"
             android:exported="true"
             android:theme="@style/Theme.SystemUI.MediaProjectionAlertDialog"
@@ -828,6 +840,14 @@
             android:windowDisablePreview="true"
             android:theme="@android:style/Theme.Translucent.NoTitleBar.Fullscreen" />
 
+        <!-- AppFunctions -->
+        <activity android:name=".appfunctions.trampoline.AppFunctionExecutorProxy"
+            android:exported="true"
+            android:permission="android.permission.EXECUTE_APP_FUNCTIONS_SYSTEM"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.NoDisplay">
+        </activity >
+
         <!-- People Space Widget -->
         <receiver
             android:name=".people.widget.PeopleSpaceWidgetProvider"
@@ -872,6 +892,7 @@
 
         <service
             android:name=".keyguard.KeyguardService"
+            android:permission="android.permission.CONTROL_KEYGUARD"
             android:exported="true" />
 
         <service
@@ -929,7 +950,8 @@
             android:finishOnCloseSystemDialogs="true"
             android:launchMode="singleInstance"
             android:excludeFromRecents="true"
-            android:exported="true">
+            android:exported="true"
+            android:showForAllUsers="true">
             <intent-filter>
                 <action android:name="com.android.intent.action.SHOW_BRIGHTNESS_DIALOG" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -1092,6 +1114,18 @@
             android:exported="false">
         </activity>
 
+        <!-- Contextual setup activity for dreams/screensavers. -->
+        <activity
+            android:name=".dreams.ui.activity.DreamSetupActivity"
+            android:theme="@style/Theme.Transparent"
+            android:label=""
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:finishOnTaskLaunch="true"
+            android:showWhenLocked="true"
+            android:showForAllUsers="true"
+            />
+
         <service
             android:name="com.android.systemui.communal.widgets.GlanceableHubWidgetManagerService"
             android:exported="false" />
@@ -1251,6 +1285,16 @@
                 <action
                     android:name="android.service.personalcontext.embedded.InsightSurfaceVisualizerService"
                     />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name="com.android.systemui.personalcontext.AutofillRendererService"
+            android:singleUser="true"
+            android:exported="true"
+            android:permission="android.permission.BIND_INSIGHT_RENDERER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.personalcontext.renderer.InsightRendererService" />
             </intent-filter>
         </service>
 

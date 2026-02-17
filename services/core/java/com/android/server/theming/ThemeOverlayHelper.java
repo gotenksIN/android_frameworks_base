@@ -35,7 +35,6 @@ import com.google.ux.material.libmonet.dynamiccolor.DynamicColor;
 import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CancellationException;
-import java.util.stream.Collectors;
 
 /**
  * A utility class responsible for creating and applying color-based theme overlays.
@@ -48,7 +47,8 @@ import java.util.stream.Collectors;
 public class ThemeOverlayHelper {
     private static final String TAG = "ThemeOverlayHelper";
     private static final String ANDROID_PACKAGE = "android";
-    private static final String SYSUI_PACKAGE = "com.android.systemui";
+
+    private static final String OVERLAY_NAME_DYNAMIC = "dynamic";
 
     private final OverlayManagerInternal mOverlayManager;
 
@@ -59,73 +59,132 @@ public class ThemeOverlayHelper {
     /**
      * Applies color overlays for a given user based on their current theme state.
      *
-     * @param snapshot      The snapshot containing all necessary user, profile, and color info.
-     * @param applyToSystem whenever to apply overlays to the system user as well.
+     * @param snapshot       The snapshot containing all necessary user, profile, and color info.
+     * @param applyToSystem  Whether to apply overlays to the system user as well.
+     * @param shouldRegister Whether to register the overlays (true) or just enable them (false).
      */
     public void applyCurrentStateOverlays(ThemeStatePair.OverlaySnapshot snapshot,
-            boolean applyToSystem) throws CancellationException {
+            boolean applyToSystem, boolean shouldRegister) throws CancellationException {
+        if (shouldRegister) {
+            registerAndEnableOverlays(snapshot, applyToSystem);
+        } else if (applyToSystem) {
+            enableOverlaysOnly(snapshot);
+        }
+    }
 
-        final ColorScheme lightScheme = snapshot.lightScheme();
-        final ColorScheme darkScheme = snapshot.darkScheme();
+    /**
+     * The "Light" path: Only enables existing overlays.
+     * Avoids expensive color calculation and object allocation.
+     */
+    private void enableOverlaysOnly(ThemeStatePair.OverlaySnapshot snapshot) {
         final int userId = snapshot.userId();
-        final Set<UserHandle> managedProfiles = snapshot.profiles()
-                .stream()
-                .map(UserHandle::of)
-                .collect(Collectors.toSet());
 
-        final FabricatedOverlay neutralOverlay = createNeutralOverlay(lightScheme, darkScheme);
-        checkCancellation();
-        final FabricatedOverlay accentOverlay = createAccentOverlay(lightScheme, darkScheme);
-        checkCancellation();
-        final FabricatedOverlay dynamicOverlay = createDynamicOverlay(lightScheme, darkScheme);
-        checkCancellation();
-
-        final List<FabricatedOverlay> overlays = List.of(neutralOverlay, accentOverlay,
-                dynamicOverlay);
+        Slog.d(TAG, "Enabling existing overlays for user " + userId);
+        if (userId != UserHandle.SYSTEM.getIdentifier()) {
+            Slog.d(TAG, "Enabling existing overlays for System User");
+        }
 
         final OverlayManagerTransaction.Builder transaction =
                 new OverlayManagerTransaction.Builder();
 
-        for (FabricatedOverlay overlay : overlays) {
-            transaction.registerFabricatedOverlay(overlay);
-            final OverlayIdentifier identifier = overlay.getIdentifier();
+        final OverlayIdentifier identifier = new OverlayIdentifier(ANDROID_PACKAGE,
+                OVERLAY_NAME_DYNAMIC + "_" + userId);
+        addToTransaction(transaction, identifier, userId, /* applyToSystem */ true,
+                snapshot.profiles());
+        checkCancellation();
 
-            Slog.d(TAG, "Enabling overlay " + identifier.getPackageName() + " for user " + userId);
-            transaction.setEnabled(identifier, true, userId);
+        commitTransaction(transaction);
+    }
 
-            // All generated color overlays must also be applied to the system user for SystemUI.
-            if (applyToSystem && userId != UserHandle.SYSTEM.getIdentifier()) {
-                transaction.setEnabled(identifier, true, UserHandle.SYSTEM.getIdentifier());
+    /**
+     * The "Heavy" path: Creates, Registers, and Enables overlays.
+     */
+    private void registerAndEnableOverlays(ThemeStatePair.OverlaySnapshot snapshot,
+            boolean applyToSystem) {
+        final int userId = snapshot.userId();
+        final FabricatedOverlay overlay = createDynamicOverlay(snapshot.lightScheme(),
+                snapshot.darkScheme(), userId);
+
+        Slog.d(TAG, "Registering and Enabling overlay " + OVERLAY_NAME_DYNAMIC + " for user "
+                + userId);
+
+        final OverlayManagerTransaction.Builder transaction =
+                new OverlayManagerTransaction.Builder();
+
+        transaction.registerFabricatedOverlay(overlay);
+        addToTransaction(transaction, overlay.getIdentifier(), userId, applyToSystem,
+                snapshot.profiles());
+        checkCancellation();
+
+        commitTransaction(transaction);
+    }
+
+    private void addToTransaction(OverlayManagerTransaction.Builder transaction,
+            OverlayIdentifier identifier, int userId, boolean applyToSystem,
+            Set<Integer> profileIds) {
+        transaction.setEnabled(identifier, true, userId);
+
+        // All generated color overlays must also be applied to the system user for SystemUI.
+        if (applyToSystem && userId != UserHandle.SYSTEM.getIdentifier()) {
+            transaction.setEnabled(identifier, true, UserHandle.SYSTEM.getIdentifier());
+        }
+
+        // And to all associated managed profiles.
+        for (int profileId : profileIds) {
+            transaction.setEnabled(identifier, true, profileId);
+        }
+    }
+
+    private boolean commitTransaction(OverlayManagerTransaction.Builder transaction) {
+        try {
+            mOverlayManager.commit(transaction.build());
+            return true;
+        } catch (SecurityException | IllegalStateException e) {
+            Slog.w(TAG, "Could not commit overlays to OverlayManager");
+            return false;
+        }
+    }
+
+    /**
+     * Cleans up legacy overlays from previous controllers.
+     * This ensures we don't have duplicate or orphaned overlays persisting.
+     *
+     * @param legacyOverlays A list of legacy overlay identifiers in the format
+     *                       "packageName:overlayName".
+     */
+    public void cleanupLegacyOverlays(List<String> legacyOverlays) {
+        if (legacyOverlays == null || legacyOverlays.isEmpty()) {
+            return;
+        }
+
+        final OverlayManagerTransaction.Builder transaction =
+                new OverlayManagerTransaction.Builder();
+        boolean hasRemovals = false;
+
+        for (String overlay : legacyOverlays) {
+            String[] split = overlay.split("\\|");
+            if (split.length != 2) {
+                Slog.w(TAG, "Invalid legacy overlay format: " + overlay);
+                continue;
             }
 
-            // And to all associated managed profiles.
-            for (UserHandle userHandle : managedProfiles) {
-                transaction.setEnabled(identifier, true, userHandle.getIdentifier());
+            OverlayIdentifier identifier = new OverlayIdentifier(split[0], split[1]);
+            if (mOverlayManager.getOverlayInfo(identifier, UserHandle.SYSTEM) != null) {
+                Slog.d(TAG, "Cleaning up legacy overlay: " + overlay);
+                transaction.unregisterFabricatedOverlay(identifier);
+                hasRemovals = true;
             }
-            checkCancellation();
+        }
+
+        if (!hasRemovals) {
+            return;
         }
 
         try {
             mOverlayManager.commit(transaction.build());
         } catch (SecurityException | IllegalStateException e) {
-            Slog.e(TAG, "Could not commit overlays to OverlayManager", e);
+            Slog.w(TAG, "Failed to cleanup legacy overlays (this is likely harmless): " + e);
         }
-    }
-
-    private FabricatedOverlay createNeutralOverlay(ColorScheme lightColorScheme,
-            ColorScheme darkColorScheme) {
-        FabricatedOverlay overlay = newFabricatedOverlay("neutral");
-        assignColorsToOverlay(overlay, DynamicColors.getAllNeutralPalette(), false,
-                lightColorScheme, darkColorScheme);
-        return overlay;
-    }
-
-    private FabricatedOverlay createAccentOverlay(ColorScheme lightColorScheme,
-            ColorScheme darkColorScheme) {
-        FabricatedOverlay overlay = newFabricatedOverlay("accent");
-        assignColorsToOverlay(overlay, DynamicColors.getAllAccentPalette(), false,
-                lightColorScheme, darkColorScheme);
-        return overlay;
     }
 
 
@@ -133,29 +192,44 @@ public class ThemeOverlayHelper {
      * Creates a fabricated overlay for dynamic colors.
      *
      * @param lightColorScheme The color scheme for light theme.
-     * @param darkColorScheme The color scheme for dark theme.
+     * @param darkColorScheme  The color scheme for dark theme.
      * @return A fabricated overlay containing dynamic colors.
      */
     @VisibleForTesting(visibility = VisibleForTesting.Visibility.PACKAGE)
     public FabricatedOverlay createDynamicOverlay(ColorScheme lightColorScheme,
-            ColorScheme darkColorScheme) {
-        FabricatedOverlay overlay = newFabricatedOverlay("dynamic");
+            ColorScheme darkColorScheme, int userId) {
+        FabricatedOverlay overlay = new FabricatedOverlay.Builder(ANDROID_PACKAGE,
+                OVERLAY_NAME_DYNAMIC + "_" + userId, ANDROID_PACKAGE).build();
+
+        // Neutral palette
+        assignColorsToOverlay(overlay, DynamicColors.getAllNeutralPalette(),
+                false, lightColorScheme, darkColorScheme);
+
+        // Accent palette
+        assignColorsToOverlay(overlay, DynamicColors.getAllAccentPalette(),
+                false, lightColorScheme, darkColorScheme);
 
         //Themed Colors
         assignColorsToOverlay(overlay, DynamicColors.getAllDynamicColorsMapped(),
                 false, lightColorScheme, darkColorScheme);
-        // Fixed Colors
-        assignColorsToOverlay(overlay, DynamicColors.getFixedColorsMapped(), true, lightColorScheme,
-                darkColorScheme);
+
+        // Fixed colors intentionally use only the lightscheme, hence the "fixed" in name.
+        // However, on Wear, legacy behavior used the dark scheme. We expect the caller to pass
+        // the dark scheme as lightColorScheme if this is desired.
+        ColorScheme fixedScheme = lightColorScheme;
+        assignColorsToOverlay(overlay, DynamicColors.getFixedColorsMapped(), true,
+                fixedScheme, fixedScheme);
+
         //Custom Colors
         assignColorsToOverlay(overlay, DynamicColors.getCustomColorsMapped(), false,
                 lightColorScheme, darkColorScheme);
+
         return overlay;
     }
 
     private void assignColorsToOverlay(FabricatedOverlay overlay,
-            List<Pair<String, DynamicColor>> colors, Boolean isFixed,
-            ColorScheme lightColorScheme, ColorScheme darkColorScheme) {
+            List<Pair<String, DynamicColor>> colors, Boolean isFixed, ColorScheme lightColorScheme,
+            ColorScheme darkColorScheme) {
         for (Pair<String, DynamicColor> p : colors) {
             String prefix = "android:color/system_" + p.first;
             if (isFixed) {
@@ -168,10 +242,6 @@ public class ThemeOverlayHelper {
             overlay.setResourceValue(prefix + "_dark", TYPE_INT_COLOR_ARGB8,
                     p.second.getArgb(darkColorScheme.getMaterialScheme()), null);
         }
-    }
-
-    private FabricatedOverlay newFabricatedOverlay(String name) {
-        return new FabricatedOverlay.Builder(SYSUI_PACKAGE, name, ANDROID_PACKAGE).build();
     }
 
     private void checkCancellation() throws CancellationException {

@@ -24,8 +24,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import com.android.app.tracing.coroutines.launchTraced
 import com.android.internal.accessibility.common.ShortcutConstants.UserShortcutType
-import com.android.internal.accessibility.util.AccessibilityUtils
 import com.android.systemui.accessibility.shortcutchooser.domain.interactor.ShortcutChooserDialogInteractor
+import com.android.systemui.accessibility.shortcutchooser.shared.model.AccessibilityTargetModel
 import com.android.systemui.accessibility.shortcutchooser.shared.model.DialogRequestModel
 import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.keyguard.domain.interactor.KeyguardInteractor
@@ -68,24 +68,41 @@ constructor(
         }
     }
 
+    private val _dialogRequest =
+        MutableStateFlow(DialogRequestModel(UserShortcutType.DEFAULT, INVALID_DISPLAY))
     /**
-     * Latest snapshot of the dialog request that's kept up to date once the view model is
-     * activated.
+     * Latest snapshot of the dialog request.
+     *
+     * Kept up to date only while the view model is activated. Should only be read after activation
+     * and at least one dialog request has been received.
      */
-    val dialogRequest by
-        interactor.dialogRequest.hydratedStateOf(
-            DialogRequestModel(UserShortcutType.DEFAULT, INVALID_DISPLAY)
-        )
+    val dialogRequest = _dialogRequest.asStateFlow()
 
     private val _dialogType = MutableStateFlow(DialogType.NONE)
     /** The type of dialog that should be shown. */
     val dialogType = _dialogType.asStateFlow()
+
+    private val _warningDialogTarget = MutableStateFlow<AccessibilityTargetModel?>(null)
+    /** The target to show the warning dialog for. */
+    val warningDialogTarget = _warningDialogTarget.asStateFlow()
 
     fun getAllAccessibilityTargets(@UserShortcutType shortcutType: Int) =
         interactor.getAllAccessibilityTargets(shortcutType)
 
     fun getAssignedAccessibilityTargets(@UserShortcutType shortcutType: Int) =
         interactor.getAssignedAccessibilityTargets(shortcutType)
+
+    fun getDialogContextByDisplayId(dialogDisplayId: Int) =
+        interactor.getDialogContextByDisplayId(
+            dialogDisplayId = dialogDisplayId,
+            applicationContext = applicationContext,
+        )
+
+    val accessibilityButtonTargetComponent: String? by
+        interactor.accessibilityButtonTargetComponent.hydratedStateOf(null)
+
+    suspend fun setAccessibilityButtonTargetComponent(target: String) =
+        interactor.setAccessibilityButtonTargetComponent(target)
 
     fun enableShortcutForTarget(
         enable: Boolean,
@@ -122,21 +139,18 @@ constructor(
 
     private suspend fun updateEditButtonVisibility() {
         _isEditButtonVisible.value =
-            !isOOBE() &&
-                !interactor.isHeadlessSystemUser() &&
-                !keyguardInteractor.isKeyguardCurrentlyShowing()
+            interactor.isCompletedFullUser() && !keyguardInteractor.isKeyguardCurrentlyShowing()
     }
 
-    // TODO: https://issuetracker.google.com/461597843 - Use SecureSettings in interactor.
-    private fun isOOBE() = !AccessibilityUtils.isUserSetupCompleted(applicationContext)
-
     private suspend fun onDialogRequest(requestModel: DialogRequestModel) {
+        _dialogRequest.value = requestModel
+
         val shortcutType = requestModel.shortcutType
 
         if (shortcutType == UserShortcutType.QUICK_ACCESS) {
             if (Flags.quickAccessShortcutType()) {
                 coroutineScope {
-                    launchTraced { interactor.enableShortcutForAllTargets(shortcutType) }
+                    launchTraced { interactor.enableShortcutForAllAllowedTargets(shortcutType) }
                 }
                 _dialogType.value = DialogType.QUICK_ACCESS
             }
@@ -147,12 +161,12 @@ constructor(
 
         if (assignedTargetsCount == 1) {
             // The target should be directly performed without showing any dialog.
-            Log.d(TAG, "No dialog for shortcut type=${shortcutType} with 1 assigned target")
+            Log.d(TAG, "No dialog for shortcut type=$shortcutType with 1 assigned target")
             return
         }
 
         if (shortcutType == UserShortcutType.TOP_ROW_KEY) {
-            if (interactor.isHeadlessSystemUser() || isOOBE()) {
+            if (!interactor.isCompletedFullUser()) {
                 interactor.launchQuickAccessDialog(requestModel.displayId)
                 return
             }
@@ -162,7 +176,7 @@ constructor(
                 } else {
                     Log.d(
                         TAG,
-                        "No dialog for shortcut type=${shortcutType} with no assigned targets on lock screen",
+                        "No dialog for shortcut type=$shortcutType with no assigned targets on lock screen",
                     )
                 }
                 return
@@ -172,9 +186,37 @@ constructor(
         if (assignedTargetsCount != 0) {
             _dialogType.value = DialogType.TOGGLE_TARGETS
         } else {
-            Log.d(TAG, "No dialog for shortcut type=${shortcutType} with no assigned targets")
+            Log.d(TAG, "No dialog for shortcut type=$shortcutType with no assigned targets")
         }
     }
+
+    /**
+     * Shows the warning dialog if the target requires a warning dialog.
+     *
+     * @return true if the warning dialog was shown, false otherwise.
+     */
+    fun showWarningDialogIfNeeded(target: AccessibilityTargetModel): Boolean {
+        if (interactor.isServiceWarningRequired(target)) {
+            _warningDialogTarget.value = target
+            return true
+        }
+        return false
+    }
+
+    fun dismissWarningDialog() {
+        _warningDialogTarget.value = null
+    }
+
+    fun allowUntrustedService(target: AccessibilityTargetModel) {
+        enableShortcutForTarget(true, target.shortcutType, target.targetName)
+    }
+
+    fun denyUntrustedService(target: AccessibilityTargetModel) {
+        enableShortcutForTarget(false, target.shortcutType, target.targetName)
+    }
+
+    fun getAccessibilityServiceInfo(target: AccessibilityTargetModel) =
+        interactor.getAccessibilityServiceInfo(target)
 
     @AssistedFactory
     interface Factory {

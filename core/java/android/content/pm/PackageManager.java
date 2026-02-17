@@ -97,6 +97,7 @@ import android.ravenwood.annotation.RavenwoodKeepPartialClass;
 import android.ravenwood.annotation.RavenwoodKeepWholeClass;
 import android.ravenwood.annotation.RavenwoodSupported;
 import android.ravenwood.annotation.RavenwoodSupported.SupportType;
+import android.service.personalcontext.PersonalContextManager;
 import android.telephony.TelephonyManager;
 import android.telephony.UiccCardInfo;
 import android.telephony.gba.GbaService;
@@ -1444,7 +1445,7 @@ public abstract class PackageManager {
      * <p>
      * This flag is used only for query and not resolution, the default behaviour would be to
      * restrict querying across clone profile. This flag would be honored only if caller have
-     * permission {@link Manifest.permission.QUERY_CLONED_APPS}.
+     * permission {@link Manifest.permission#QUERY_CLONED_APPS}.
      *
      * @hide
      */
@@ -1456,7 +1457,7 @@ public abstract class PackageManager {
      * {@link ApplicationInfo}, {@link ComponentInfo}, and {@link ResolveInfo} flag: return the
      * {@link ApplicationInfo#isAppLockSupported} and {@link ApplicationInfo#isAppLockEnabled}
      * associated with an application. The caller should have the
-     * {@link Manifest.permission.LOCK_APPS} permission, or a {@link SecurityException} will be
+     * {@link Manifest.permission#LOCK_APPS} permission, or a {@link SecurityException} will be
      * thrown.
      */
     @FlaggedApi(android.security.Flags.FLAG_APP_LOCK_APIS)
@@ -2805,6 +2806,61 @@ public abstract class PackageManager {
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface DeleteFlags {}
+
+    /** @hide Indicate that no user option has been set. System default should be used. */
+    public static final int VIRTUAL_GAMEPAD_USER_OPTION_UNSET = 0;
+    /** @hide Indicate that user has chose to opt out from the virtual gamepad feature. */
+    public static final int VIRTUAL_GAMEPAD_USER_OPTION_OPT_OUT = 1;
+    /**
+     * User option for the virtual gamepad.
+     *
+     * @hide
+     */
+    @IntDef(prefix = { "VIRTUAL_GAMEPAD_USER_OPTION_" }, value = {
+            VIRTUAL_GAMEPAD_USER_OPTION_UNSET,
+            VIRTUAL_GAMEPAD_USER_OPTION_OPT_OUT,
+    })
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface VirtualGamepadUserOption {}
+
+    /**
+     * User options for the personal context data collection setting.
+     *
+     * @see PersonalContextManager#isPersonalContextModeEnabled(String)
+     * @see PersonalContextManager#setPersonalContextModeEnabled(String, boolean)
+     * @hide
+     */
+    @IntDef(
+            prefix = {"PERSONAL_CONTEXT_MODE_"},
+            value = {
+                PERSONAL_CONTEXT_MODE_UNSET,
+                PERSONAL_CONTEXT_MODE_USER_OFF,
+                PERSONAL_CONTEXT_MODE_USER_ON
+            })
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface PersonalContextMode {}
+
+    /**
+     * Value that indicates no user option has been set, meaning personal context data collection is
+     * enabled for this package.
+     *
+     * @hide
+     */
+    public static final int PERSONAL_CONTEXT_MODE_UNSET = 0;
+
+    /**
+     * Value that indicates the user turned off personal context data collection for a package.
+     *
+     * @hide
+     */
+    public static final int PERSONAL_CONTEXT_MODE_USER_OFF = 1;
+
+    /**
+     * Value that indicates the user turned on personal context data collection for a package.
+     *
+     * @hide
+     */
+    public static final int PERSONAL_CONTEXT_MODE_USER_ON = 2;
 
     /**
      * Flag parameter for {@link #deletePackage} to indicate that you don't want to delete the
@@ -4735,6 +4791,7 @@ public abstract class PackageManager {
      * the Android Keystore backed by an isolated execution environment. The version indicates
      * which features are implemented in the isolated execution environment:
      * <ul>
+     * <li>500: Hardware support for ML-DSA signature generation.
      * <li>400: Inclusion of module information (via tag MODULE_HASH) in the attestation record.
      * <li>300: Ability to include a second IMEI in the ID attestation record, see
      * {@link android.app.admin.DevicePolicyManager#ID_TYPE_IMEI}.
@@ -5607,13 +5664,24 @@ public abstract class PackageManager {
     public static final int FLAG_PERMISSION_SELECTED_LOCATION_ACCURACY =  1 << 19;
 
     /**
-     * Permission flag: This location permission is granted by system provided location button.
+     * Permission flag: The user has seen trusted system component once in the application.
      *
      * @hide
      */
     @SystemApi
     @FlaggedApi(android.permission.flags.Flags.FLAG_LOCATION_BUTTON_ENABLED)
-    public static final int FLAG_PERMISSION_GRANTED_BY_LOCATION_BUTTON =  1 << 20;
+    public static final int FLAG_PERMISSION_TRUSTED_UI_SHOWN =  1 << 20;
+
+    /**
+     * Permission flag: The user has consented to using a trusted system component in the
+     * application. When set, the system doesn't show the consent dialog for future
+     * interactions.
+     *
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(android.permission.flags.Flags.FLAG_LOCATION_BUTTON_ENABLED)
+    public static final int FLAG_PERMISSION_TRUSTED_UI_CONSENTED =  1 << 21;
 
     /**
      * Permission flags: Reserved for use by the permission controller. The platform and any
@@ -5670,7 +5738,8 @@ public abstract class PackageManager {
             | FLAG_PERMISSION_ONE_TIME
             | FLAG_PERMISSION_AUTO_REVOKED
             | FLAG_PERMISSION_SELECTED_LOCATION_ACCURACY
-            | FLAG_PERMISSION_GRANTED_BY_LOCATION_BUTTON;
+            | FLAG_PERMISSION_TRUSTED_UI_SHOWN
+            | FLAG_PERMISSION_TRUSTED_UI_CONSENTED;
 
     /**
      * Injected activity in app that forwards user to setting activity of that app.
@@ -7017,7 +7086,8 @@ public abstract class PackageManager {
             FLAG_PERMISSION_ONE_TIME,
             FLAG_PERMISSION_AUTO_REVOKED,
             FLAG_PERMISSION_SELECTED_LOCATION_ACCURACY,
-            FLAG_PERMISSION_GRANTED_BY_LOCATION_BUTTON
+            FLAG_PERMISSION_TRUSTED_UI_SHOWN,
+            FLAG_PERMISSION_TRUSTED_UI_CONSENTED,
     })
     @Retention(RetentionPolicy.SOURCE)
     public @interface PermissionFlags {}
@@ -9341,8 +9411,12 @@ public abstract class PackageManager {
      * {@link PackageManager#VERIFICATION_ALLOW} or
      * {@link PackageManager#VERIFICATION_REJECT}.
      *
-     * This method may only be called once per package id. Additional calls
-     * will have no effect.
+     * This method can be called multiple times, but the total amount of time extension time will
+     * be limited to {@link PackageManager#MAXIMUM_VERIFICATION_TIMEOUT}. If the method is called
+     * multiple times with different {@code verificationCodeAtTimeout}, then previous
+     * {@code verificationCodeAtTimeout} will be ignored and only the latest one will take effect.
+     * If this method is called after calling {@link PackageManager#verifyPendingInstall}, it may
+     * nullify the result set by verifyPendingInstall.
      *
      * @param id pending package identifier as passed via the
      *            {@link PackageManager#EXTRA_VERIFICATION_ID} Intent extra.
@@ -10686,7 +10760,9 @@ public abstract class PackageManager {
      * Set App Lock enablement state (enabled or disabled). This should only be called after a
      * successful authentication with either Device Credential or a Class 3 Biometric.
      *
-     * Only called by the system. This will do UID checks to verify the caller.
+     * Only called by the system or by test apps that hold the
+     * {@link Manifest.permission#TEST_LOCK_APPS} permission. This will do UID checks to verify the
+     * caller.
      *
      * @param packageName the package to enable or disable App Lock.
      * @param enabled true when the user would like to enable App Lock for the given package, false
@@ -10697,6 +10773,9 @@ public abstract class PackageManager {
      *
      * @hide
      */
+    @FlaggedApi(android.security.Flags.FLAG_APP_LOCK_APIS)
+    @RequiresPermission(Manifest.permission.TEST_LOCK_APPS)
+    @TestApi
     public boolean setPackageAppLockEnabled(@NonNull String packageName, boolean enabled) {
         throw new UnsupportedOperationException(
                 "setPackageAppLockEnabled has not been implemented");
@@ -11104,7 +11183,8 @@ public abstract class PackageManager {
             case FLAG_PERMISSION_ONE_TIME: return "ONE_TIME";
             case FLAG_PERMISSION_AUTO_REVOKED: return "AUTO_REVOKED";
             case FLAG_PERMISSION_SELECTED_LOCATION_ACCURACY: return "SELECTED_LOCATION_ACCURACY";
-            case FLAG_PERMISSION_GRANTED_BY_LOCATION_BUTTON: return "GRANTED_BY_LOCATION_BUTTON";
+            case FLAG_PERMISSION_TRUSTED_UI_SHOWN: return "TRUSTED_UI_SHOWN";
+            case FLAG_PERMISSION_TRUSTED_UI_CONSENTED: return "TRUSTED_UI_CONSENTED";
             default: return Integer.toString(flag);
         }
     }

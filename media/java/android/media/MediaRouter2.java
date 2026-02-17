@@ -20,11 +20,9 @@ import static android.media.RoutingChangeInfo.ENTRY_POINT_LOCAL_ROUTER_UNSPECIFI
 import static android.media.RoutingChangeInfo.ENTRY_POINT_PROXY_ROUTER_UNSPECIFIED;
 
 import static com.android.internal.util.function.pooled.PooledLambda.obtainMessage;
-import static com.android.media.flags.Flags.FLAG_ENABLE_BUILT_IN_SPEAKER_ROUTE_SUITABILITY_STATUSES;
 import static com.android.media.flags.Flags.FLAG_ENABLE_GET_TRANSFERABLE_ROUTES;
 import static com.android.media.flags.Flags.FLAG_ENABLE_PRIVILEGED_ROUTING_FOR_MEDIA_ROUTING_CONTROL;
 import static com.android.media.flags.Flags.FLAG_ENABLE_ROUTE_VISIBILITY_CONTROL_API;
-import static com.android.media.flags.Flags.FLAG_ENABLE_SCREEN_OFF_SCANNING;
 import static com.android.media.flags.Flags.FLAG_ENABLE_SUGGESTED_DEVICE_API;
 
 import android.Manifest;
@@ -555,7 +553,6 @@ public final class MediaRouter2 {
      *     Manifest.permission#MEDIA_ROUTING_CONTROL} or {@link
      *     Manifest.permission#MEDIA_CONTENT_CONTROL}.
      */
-    @FlaggedApi(FLAG_ENABLE_SCREEN_OFF_SCANNING)
     @NonNull
     public ScanToken requestScan(@NonNull ScanRequest scanRequest) {
         Objects.requireNonNull(scanRequest, "scanRequest must not be null.");
@@ -596,7 +593,6 @@ public final class MediaRouter2 {
      * @param token {@link ScanToken} of the {@link ScanRequest} to release.
      * @throws IllegalArgumentException if the token does not match any active scan request.
      */
-    @FlaggedApi(FLAG_ENABLE_SCREEN_OFF_SCANNING)
     public void cancelScanRequest(@NonNull ScanToken token) {
         Objects.requireNonNull(token, "token must not be null");
 
@@ -2103,7 +2099,6 @@ public final class MediaRouter2 {
      *
      * <p>See {@link #requestScan(ScanRequest)} for more information.
      */
-    @FlaggedApi(FLAG_ENABLE_SCREEN_OFF_SCANNING)
     public static final class ScanToken {
         private final int mId;
 
@@ -2117,7 +2112,6 @@ public final class MediaRouter2 {
      *
      * <p>See {@link #requestScan(ScanRequest)} for more details.
      */
-    @FlaggedApi(FLAG_ENABLE_SCREEN_OFF_SCANNING)
     public static final class ScanRequest {
         private final boolean mIsScreenOffScan;
 
@@ -2299,7 +2293,6 @@ public final class MediaRouter2 {
          * Returns whether the transfer was initiated by the calling app (as determined by comparing
          * {@link UserHandle} and package name).
          */
-        @FlaggedApi(FLAG_ENABLE_BUILT_IN_SPEAKER_ROUTE_SUITABILITY_STATUSES)
         public boolean wasTransferInitiatedBySelf() {
             return mImpl.wasTransferredBySelf(getRoutingSessionInfo());
         }
@@ -2496,8 +2489,7 @@ public final class MediaRouter2 {
                 // through as a provider driven transfer in order to update the transfer reason and
                 // initiator data.
                 boolean isSystemRouteReselection =
-                        Flags.enableBuiltInSpeakerRouteSuitabilityStatuses()
-                                && mSessionInfo.isSystemSession()
+                        mSessionInfo.isSystemSession()
                                 && route.isSystemRoute()
                                 && mSessionInfo.getSelectedRoutes().contains(route.getId());
                 if (!isSystemRouteReselection
@@ -3063,7 +3055,7 @@ public final class MediaRouter2 {
 
         void setDeviceSuggestions(@Nullable List<SuggestedDeviceInfo> suggestedDeviceInfo);
 
-        @Nullable
+        @NonNull
         Map<String, List<SuggestedDeviceInfo>> getDeviceSuggestions();
 
         void notifyDeviceSuggestionRequested();
@@ -3344,6 +3336,7 @@ public final class MediaRouter2 {
         }
 
         @Override
+        @NonNull
         public Map<String, List<SuggestedDeviceInfo>> getDeviceSuggestions() {
             synchronized (mLock) {
                 try {
@@ -4437,7 +4430,7 @@ public final class MediaRouter2 {
         }
 
         @Override
-        @Nullable
+        @NonNull
         public Map<String, List<SuggestedDeviceInfo>> getDeviceSuggestions() {
             synchronized (mLock) {
                 try {

@@ -572,7 +572,7 @@ public class LauncherAppsService extends SystemService {
         }
 
         private boolean canAccessHiddenProfile(int callingUid, int callingPid) {
-            if (!areHiddenApisChecksEnabled()) {
+            if (!Flags.enablePermissionToAccessHiddenProfiles()) {
                 return true;
             }
 
@@ -617,12 +617,6 @@ public class LauncherAppsService extends SystemService {
                     NAMESPACE_MULTIUSER,
                     FLAG_NON_SYSTEM_ACCESS_TO_HIDDEN_PROFILES,
                     /* defaultValue= */ true);
-        }
-
-        private boolean areHiddenApisChecksEnabled() {
-            return android.os.Flags.allowPrivateProfile()
-                    && Flags.enablePermissionToAccessHiddenProfiles()
-                    && Flags.enablePrivateSpaceFeatures();
         }
 
         @VisibleForTesting // We override it in unit tests
@@ -2295,18 +2289,6 @@ public class LauncherAppsService extends SystemService {
                 Log.e(TAG, "background work was interrupted", e);
             }
         }
-
-        @RequiresPermission(READ_FRAME_BUFFER)
-        @Override
-        public void saveViewCaptureData() {
-            int status = checkCallingOrSelfPermissionForPreflight(mContext, READ_FRAME_BUFFER);
-            if (PERMISSION_GRANTED == status) {
-                forEachViewCaptureWindow(this::dumpViewCaptureDataToWmTrace);
-            } else {
-                Log.w(TAG, "caller lacks permissions to save view capture data");
-            }
-        }
-
 
         @RequiresPermission(READ_FRAME_BUFFER)
         @Override

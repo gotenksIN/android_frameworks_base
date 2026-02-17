@@ -57,14 +57,13 @@ import com.android.systemui.shade.domain.interactor.enableSingleShade
 import com.android.systemui.shade.ui.composable.ShadeScene
 import com.android.systemui.shade.ui.composable.WithStatusIconContext
 import com.android.systemui.shade.ui.viewmodel.shadeSceneContentViewModelFactory
-import com.android.systemui.shade.ui.viewmodel.shadeUserAcionsViewModelFactory
+import com.android.systemui.shade.ui.viewmodel.shadeUserActionsViewModelFactory
 import com.android.systemui.statusbar.notification.stack.ui.view.notificationScrollView
 import com.android.systemui.statusbar.notification.stack.ui.viewmodel.notificationsPlaceholderViewModelFactory
 import com.android.systemui.statusbar.phone.ui.tintedIconManagerFactory
 import com.android.systemui.testKosmos
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.flow.MutableStateFlow
-import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -78,7 +77,6 @@ import platform.test.motion.compose.runTest
 import platform.test.screenshot.DeviceEmulationSpec
 import platform.test.screenshot.Displays.Phone
 
-@Ignore("b/467228678")
 @RunWith(AndroidJUnit4::class)
 @MotionTest
 @LargeTest
@@ -104,7 +102,7 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
         ShadeScene(
             shadeSession = shadeSession,
             notificationStackScrollView = { kosmos.notificationScrollView },
-            actionsViewModelFactory = kosmos.shadeUserAcionsViewModelFactory,
+            actionsViewModelFactory = kosmos.shadeUserActionsViewModelFactory,
             contentViewModelFactory = kosmos.shadeSceneContentViewModelFactory,
             notificationsPlaceholderViewModelFactory =
                 kosmos.notificationsPlaceholderViewModelFactory,
@@ -126,9 +124,9 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
     @DisableFlags(Flags.FLAG_STATUS_BAR_MOBILE_ICON_KAIROS)
     fun swipeDownFromShadeToQSScene_recordingQSPanelPosition() {
         motionTestRule.runTest(60.seconds) {
+            kosmos.enableSingleShade()
             kosmos.usingMediaInComposeFragment = true
             kosmos.populateQuickSettings(tileCount = 10)
-            kosmos.enableSingleShade()
             val motion =
                 recordMotion(
                     content = { ShadeSceneToQSSceneContainer() },
@@ -137,7 +135,7 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
                             MotionControl(
                                 delayRecording = {
                                     awaitCondition {
-                                        kosmos.sceneInteractor.transitionState.value.isIdle()
+                                        kosmos.sceneInteractor.transitionStateFlow.value.isIdle()
                                     }
                                 }
                             ) {
@@ -149,7 +147,7 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
                                     )
                                 }
                                 awaitCondition {
-                                    kosmos.sceneInteractor.transitionState.value.isIdle()
+                                    kosmos.sceneInteractor.transitionStateFlow.value.isIdle()
                                 }
                             }
                         ) {
@@ -169,9 +167,9 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
     @DisableFlags(Flags.FLAG_STATUS_BAR_MOBILE_ICON_KAIROS)
     fun swipeDownFromShadeToQSScene_recordingQSEditModeButtonPosition() {
         motionTestRule.runTest(60.seconds) {
+            kosmos.enableSingleShade()
             kosmos.usingMediaInComposeFragment = true
             kosmos.populateQuickSettings(tileCount = 10)
-            kosmos.enableSingleShade()
             val motion =
                 recordMotion(
                     content = { ShadeSceneToQSSceneContainer() },
@@ -180,7 +178,7 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
                             MotionControl(
                                 delayRecording = {
                                     awaitCondition {
-                                        kosmos.sceneInteractor.transitionState.value.isIdle()
+                                        kosmos.sceneInteractor.transitionStateFlow.value.isIdle()
                                     }
                                 }
                             ) {
@@ -192,7 +190,7 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
                                     )
                                 }
                                 awaitCondition {
-                                    kosmos.sceneInteractor.transitionState.value.isIdle()
+                                    kosmos.sceneInteractor.transitionStateFlow.value.isIdle()
                                 }
                             }
                         ) {
@@ -212,9 +210,9 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
     @DisableFlags(Flags.FLAG_STATUS_BAR_MOBILE_ICON_KAIROS)
     fun swipeDownFromShadeToQSScene_recordingSettingButtonContainerPosition() {
         motionTestRule.runTest(60.seconds) {
+            kosmos.enableSingleShade()
             kosmos.usingMediaInComposeFragment = true
             kosmos.populateQuickSettings(tileCount = 10)
-            kosmos.enableSingleShade()
             val motion =
                 recordMotion(
                     content = { ShadeSceneToQSSceneContainer() },
@@ -223,7 +221,7 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
                             MotionControl(
                                 delayRecording = {
                                     awaitCondition {
-                                        kosmos.sceneInteractor.transitionState.value.isIdle()
+                                        kosmos.sceneInteractor.transitionStateFlow.value.isIdle()
                                     }
                                 }
                             ) {
@@ -235,7 +233,7 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
                                     )
                                 }
                                 awaitCondition {
-                                    kosmos.sceneInteractor.transitionState.value.isIdle()
+                                    kosmos.sceneInteractor.transitionStateFlow.value.isIdle()
                                 }
                             }
                         ) {
@@ -255,9 +253,9 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
     @DisableFlags(Flags.FLAG_STATUS_BAR_MOBILE_ICON_KAIROS)
     fun swipeDownFromShadeToQSScene_recordingExpandedHeaderClockPosition() {
         motionTestRule.runTest(60.seconds) {
+            kosmos.enableSingleShade()
             kosmos.usingMediaInComposeFragment = true
             kosmos.populateQuickSettings(tileCount = 10)
-            kosmos.enableSingleShade()
             val motion =
                 recordMotion(
                     content = { ShadeSceneToQSSceneContainer() },
@@ -266,7 +264,7 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
                             MotionControl(
                                 delayRecording = {
                                     awaitCondition {
-                                        kosmos.sceneInteractor.transitionState.value.isIdle()
+                                        kosmos.sceneInteractor.transitionStateFlow.value.isIdle()
                                     }
                                 }
                             ) {
@@ -278,7 +276,7 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
                                     )
                                 }
                                 awaitCondition {
-                                    kosmos.sceneInteractor.transitionState.value.isIdle()
+                                    kosmos.sceneInteractor.transitionStateFlow.value.isIdle()
                                 }
                             }
                         ) {
@@ -298,9 +296,9 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
     @DisableFlags(Flags.FLAG_STATUS_BAR_MOBILE_ICON_KAIROS)
     fun swipeDownFromShadeToQSScene_recordingDayDatePosition() {
         motionTestRule.runTest(60.seconds) {
+            kosmos.enableSingleShade()
             kosmos.usingMediaInComposeFragment = true
             kosmos.populateQuickSettings(tileCount = 10)
-            kosmos.enableSingleShade()
             val motion =
                 recordMotion(
                     content = { ShadeSceneToQSSceneContainer() },
@@ -309,7 +307,7 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
                             MotionControl(
                                 delayRecording = {
                                     awaitCondition {
-                                        kosmos.sceneInteractor.transitionState.value.isIdle()
+                                        kosmos.sceneInteractor.transitionStateFlow.value.isIdle()
                                     }
                                 }
                             ) {
@@ -321,7 +319,7 @@ class ShadeSceneToQuickSettingsSceneTest : SysuiTestCase() {
                                     )
                                 }
                                 awaitCondition {
-                                    kosmos.sceneInteractor.transitionState.value.isIdle()
+                                    kosmos.sceneInteractor.transitionStateFlow.value.isIdle()
                                 }
                             }
                         ) {

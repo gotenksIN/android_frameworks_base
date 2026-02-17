@@ -456,10 +456,8 @@ class TaskLaunchParamsModifier extends DefaultLaunchParamsModifier {
 
         // Skip inheriting if target root task preserves leaf task and windowing modes differ.
         final Task targetRootTask =
-                targetTask != null ? targetTask.getCreatedByOrganizerTask() : null;
-        if (com.android.window.flags.Flags.enablePreserveLeafTaskIfRelaunch()
-                && targetRootTask != null && targetRootTask.mPreserveLeafTaskIfRelaunch
-                && targetRootTask.getWindowingMode() != sourceWindowingMode) {
+                targetTask != null ? targetTask.getPreservedRootTaskIfEnabled() : null;
+        if (targetRootTask != null && targetRootTask.getWindowingMode() != sourceWindowingMode) {
             return false;
         }
 
@@ -506,7 +504,7 @@ class TaskLaunchParamsModifier extends DefaultLaunchParamsModifier {
 
         if (windowLayout.hasSpecifiedSize()) {
             LaunchParamsUtil.calculateLayoutBounds(stableBounds, windowLayout, inOutBounds,
-                    /* desiredBounds */ null);
+                    /* desiredBounds */ null, displayArea.mDisplayContent.getDisplayMetrics());
         } else if (inOutBounds.isEmpty()) {
             getTaskBounds(root, displayArea, windowLayout, WINDOWING_MODE_FREEFORM,
                     /* hasInitialBounds */ false, inOutBounds);

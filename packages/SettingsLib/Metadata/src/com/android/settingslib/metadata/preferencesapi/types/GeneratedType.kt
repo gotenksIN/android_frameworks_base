@@ -18,7 +18,7 @@ package com.android.settingslib.metadata.preferencesapi.types
 
 import android.content.Context
 import androidx.annotation.StringRes
-
+import com.android.settingslib.metadata.preferencesapi.resolveString
 
 /**
  * The context for a GeneratedType, providing access to the [Context] and any necessary
@@ -35,21 +35,43 @@ class GeneratedTypeContext(val context: Context)
  * which can be used by clients to better understand the value.
  *
  * For example, if the value represents the UUID of an app, then the description should be the
- * the app package name or the app name.
+ * app package name or the app name.
  *
  * @param T The underlying data type of the value.
- * @property description A human-readable description of this specific value.
  * @property value The actual value.
+ * @property description A human-readable description of this specific value.
  */
 data class GeneratedValue<T>(
-    val description: String,
     val value: T,
+    val description: String,
 )
 
-class GeneratedType<T: Any>(
-    @field:StringRes val description: Int,
-    val lambda: GeneratedTypeContext.() -> Collection<GeneratedValue<T>>
-) : ApiType<GeneratedValue<T>>
+class GeneratedType<T : Any> private constructor(
+    @field:StringRes val descriptionRes: Int?,
+    val description: String?,
+    private val lambda: GeneratedTypeContext.() -> Collection<GeneratedValue<T>>
+) : FiniteOptionsType<T> {
+    init {
+        require(descriptionRes != null || description != null)
+    }
 
+    constructor(
+        @StringRes description: Int,
+        lambda: GeneratedTypeContext.() -> Collection<GeneratedValue<T>>
+    ) : this(descriptionRes = description, description = null, lambda = lambda)
+
+    constructor(
+        description: String,
+        lambda: GeneratedTypeContext.() -> Collection<GeneratedValue<T>>
+    ) : this(descriptionRes = null, description = description, lambda = lambda)
+
+    /** Get the description as a string using the provided context. */
+    override fun getDescription(context: Context): String =
+        resolveString(context, descriptionRes, description)
+
+    override fun getOptions(context: Context) = lambda(GeneratedTypeContext(context)).map{
+        it.value to it.description
+    }
+}
 
 typealias GeneratedParameterType = GeneratedType<String>

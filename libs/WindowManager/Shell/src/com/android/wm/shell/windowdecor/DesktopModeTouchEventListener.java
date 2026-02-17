@@ -16,6 +16,7 @@
 
 package com.android.wm.shell.windowdecor;
 
+import static android.os.statsd.desktopmode.DesktopModeEnums.UNKNOWN_INPUT_METHOD;
 import static android.view.InputDevice.SOURCE_TOUCHSCREEN;
 import static android.view.MotionEvent.ACTION_CANCEL;
 import static android.view.MotionEvent.ACTION_HOVER_ENTER;
@@ -23,7 +24,7 @@ import static android.view.MotionEvent.ACTION_HOVER_EXIT;
 import static android.view.MotionEvent.ACTION_MOVE;
 import static android.view.MotionEvent.ACTION_UP;
 
-import static com.android.wm.shell.desktopmode.DesktopModeEventLogger.Companion.MinimizeReason;
+import static com.android.wm.shell.desktopmode.DesktopModeEventLogger.getInputMethodType;
 import static com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_WINDOW_DECORATION;
 import static com.android.wm.shell.windowdecor.DragPositioningCallbackUtility.getInputMethodFromMotionEvent;
 
@@ -43,7 +44,6 @@ import android.view.PointerIcon;
 import android.view.SurfaceControl;
 import android.view.View;
 import android.view.ViewConfiguration;
-import android.window.DesktopExperienceFlags;
 import android.window.DesktopModeFlags;
 import android.window.WindowContainerToken;
 
@@ -124,7 +124,8 @@ public class DesktopModeTouchEventListener
     private boolean mDragInterrupted;
     private boolean mLongClickDisabled;
     private int mDragPointerId = -1;
-    private MotionEvent mMotionEvent;
+    private DesktopModeEventLogger.Companion.InputMethod mInputMethod =
+            getInputMethodType(UNKNOWN_INPUT_METHOD);
     private int mCurrentPointerIconType = PointerIcon.TYPE_ARROW;
 
     public DesktopModeTouchEventListener(
@@ -170,9 +171,7 @@ public class DesktopModeTouchEventListener
         mTaskId = taskInfo.taskId;
         mTaskToken = taskInfo.token;
         final int touchSlop = ViewConfiguration.get(mContext).getScaledTouchSlop();
-        final long appHandleHoldToDragDuration =
-                DesktopModeFlags.ENABLE_HOLD_TO_DRAG_APP_HANDLE.isTrue()
-                        ? APP_HANDLE_HOLD_TO_DRAG_DURATION_MS : 0;
+        final long appHandleHoldToDragDuration = APP_HANDLE_HOLD_TO_DRAG_DURATION_MS;
         mHandleDragDetector = new DragDetector(this, appHandleHoldToDragDuration,
                 touchSlop);
         mHeaderDragDetector = new DragDetector(this, APP_HEADER_HOLD_TO_DRAG_DURATION_MS,
@@ -229,38 +228,25 @@ public class DesktopModeTouchEventListener
             //  {@link AppHeaderViewHolder}. Let it encapsulate the that and have it report
             //  back to the decoration using
             //  {@link DesktopModeWindowDecoration#setOnMaximizeOrRestoreClickListener}, which
-            //  should shared with the maximize menu's maximize/restore actions.
+            //  should shared with the layout menu's maximize/restore actions.
             final DesktopRepository desktopRepository = mDesktopUserRepositories.getProfile(
                     decoration.getTaskInfo().userId);
-            if (DesktopModeFlags.ENABLE_FULLY_IMMERSIVE_IN_DESKTOP.isTrue()
-                    && desktopRepository.isTaskInFullImmersiveState(
-                    decoration.getTaskInfo().taskId)) {
+            if (desktopRepository.isTaskInFullImmersiveState(decoration.getTaskInfo().taskId)) {
                 // Task is in immersive and should exit.
                 mWindowDecorationActions.onImmersiveOrRestore(decoration.getTaskInfo());
             } else {
-                // Full immersive is disabled or task doesn't request/support it, so just
-                // toggle between maximize/restore states.
+                // Just toggle between maximize/restore states.
                 mWindowDecorationActions.onMaximizeOrRestore(decoration.getTaskInfo().taskId,
-                        ToggleTaskSizeInteraction.AmbiguousSource.HEADER_BUTTON,
-                        getInputMethod(mMotionEvent));
+                        ToggleTaskSizeInteraction.AmbiguousSource.HEADER_BUTTON, mInputMethod);
             }
         } else if (id == R.id.minimize_window) {
-            final ActivityManager.RunningTaskInfo taskInfo = decoration.getTaskInfo();
-            final int nextFocusedTaskId =
-                    mDesktopTasksController.getTopTask(
-                            taskInfo.getDisplayId(),
-                            taskInfo.userId,
-                            taskInfo.getTaskId());
-            final WindowDecorationWrapper nextFocusedWindow =
-                    mWindowDecorationFinder.apply(nextFocusedTaskId);
-            if (nextFocusedWindow != null) nextFocusedWindow.a11yAnnounceNewFocusedWindow();
-            mDesktopTasksController.minimizeTask(taskInfo, MinimizeReason.MINIMIZE_BUTTON);
+            mWindowDecorationActions.onMinimize(decoration.getTaskInfo());
         }
     }
 
     @Override
     public boolean onTouch(View v, MotionEvent e) {
-        mMotionEvent = e;
+        mInputMethod = getInputMethod(e);
         final String viewName = getResourceName(v);
         debugLogD("onTouch(%s) action=%s", viewName, MotionEvent.actionToString(e.getAction()));
         final int id = v.getId();
@@ -379,13 +365,13 @@ public class DesktopModeTouchEventListener
         }
         moveTaskToFront(decoration.getTaskInfo());
         if (decoration.getIsDragging()) {
-            logD("onLongClick(%s) but is dragging, skip creating maximize menu", viewName);
+            logD("onLongClick(%s) but is dragging, skip creating layout menu", viewName);
             return true;
         }
-        if (decoration.getMaximizeMenuController() != null
-                && !decoration.getMaximizeMenuController().isMaximizeMenuActive()) {
-            logD("onLongClick(%s) creating maximize menu", viewName);
-            decoration.getMaximizeMenuController().createMaximizeMenu();
+        if (decoration.getLayoutMenuController() != null
+                && !decoration.getLayoutMenuController().isLayoutMenuActive()) {
+            logD("onLongClick(%s) creating layout menu", viewName);
+            decoration.getLayoutMenuController().createLayoutMenu();
         }
         return true;
     }
@@ -396,26 +382,26 @@ public class DesktopModeTouchEventListener
      */
     @Override
     public boolean onGenericMotion(View v, MotionEvent ev) {
-        mMotionEvent = ev;
+        mInputMethod = getInputMethod(ev);
         final WindowDecorationWrapper decoration = mWindowDecorationFinder.apply(mTaskId);
         if (decoration == null) {
             return false;
         }
         final int id = v.getId();
         if (ev.getAction() == ACTION_HOVER_ENTER && id == R.id.maximize_window) {
-            if (decoration.getMaximizeMenuController() == null) return false;
-            decoration.getMaximizeMenuController().setAppHeaderMaximizeButtonHovered(true);
-            if (!decoration.getMaximizeMenuController().isMaximizeMenuActive()) {
-                decoration.getMaximizeMenuController().onMaximizeButtonHoverEnter();
+            if (decoration.getLayoutMenuController() == null) return false;
+            decoration.getLayoutMenuController().setAppHeaderMaximizeButtonHovered(true);
+            if (!decoration.getLayoutMenuController().isLayoutMenuActive()) {
+                decoration.getLayoutMenuController().onLayoutButtonHoverEnter();
             }
             return true;
         }
         if (ev.getAction() == ACTION_HOVER_EXIT && id == R.id.maximize_window) {
-            if (decoration.getMaximizeMenuController() == null) return false;
-            decoration.getMaximizeMenuController().setAppHeaderMaximizeButtonHovered(false);
-            decoration.getMaximizeMenuController().onMaximizeHoverStateChanged();
-            if (!decoration.getMaximizeMenuController().isMaximizeMenuActive()) {
-                decoration.getMaximizeMenuController().onMaximizeButtonHoverExit();
+            if (decoration.getLayoutMenuController() == null) return false;
+            decoration.getLayoutMenuController().setAppHeaderMaximizeButtonHovered(false);
+            decoration.getLayoutMenuController().onLayoutButtonHoverStateChanged();
+            if (!decoration.getLayoutMenuController().isLayoutMenuActive()) {
+                decoration.getLayoutMenuController().onLayoutButtonHoverExit();
             }
             return true;
         }
@@ -774,8 +760,7 @@ public class DesktopModeTouchEventListener
             return false;
         }
         mWindowDecorationActions.onMaximizeOrRestore(mTaskId,
-                ToggleTaskSizeInteraction.AmbiguousSource.DOUBLE_TAP,
-                getInputMethod(mMotionEvent));
+                ToggleTaskSizeInteraction.AmbiguousSource.DOUBLE_TAP, mInputMethod);
         return true;
     }
 

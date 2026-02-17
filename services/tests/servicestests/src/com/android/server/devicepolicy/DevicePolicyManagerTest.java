@@ -140,6 +140,8 @@ import android.os.Process;
 import android.os.UserHandle;
 import android.os.UserManager;
 import android.platform.test.annotations.Presubmit;
+import android.platform.test.annotations.DisableFlags;
+import android.platform.test.annotations.EnableFlags;
 import android.platform.test.annotations.RequiresFlagsDisabled;
 import android.platform.test.annotations.RequiresFlagsEnabled;
 import android.platform.test.flag.junit.CheckFlagsRule;
@@ -2114,9 +2116,9 @@ public class DevicePolicyManagerTest extends DpmTestBase {
     }
 
     private ActiveAdmin getDeviceOwner() {
-        ComponentName component = dpms.mOwners.getDeviceOwnerComponent();
+        ComponentName component = dpms.mDeviceAdmins.getDeviceOwnerComponent();
         DevicePolicyData policy =
-                dpms.getUserData(dpms.mOwners.getDeviceOwnerUserId());
+                dpms.mDeviceAdmins.getUserData(dpms.mDeviceAdmins.getDeviceOwnerUserId());
         for (ActiveAdmin admin : policy.mAdminList) {
             if (component.equals(admin.info.getComponent())) {
                 return admin;
@@ -3536,8 +3538,36 @@ public class DevicePolicyManagerTest extends DpmTestBase {
         verifyScreenTimeoutCall(Long.MAX_VALUE, UserHandle.USER_SYSTEM);
     }
 
+    // TODO(b/37059253): Remove this test as soon as the flag is promoted to Prod.
+    @DisableFlags(Flags.FLAG_INCREASE_WATCH_STRONG_AUTH_TIMEOUT)
     @Test
-    public void testSetRequiredStrongAuthTimeout_DeviceOwner() throws Exception {
+    public void testSetRequiredStrongAuthTimeout_watch_flagOff() throws Exception {
+        when(getServices().packageManager.hasSystemFeature(PackageManager.FEATURE_WATCH))
+                .thenReturn(true);
+        testSetRequiredStrongAuthTimeout_DeviceOwner(
+            DevicePolicyManager.DEFAULT_STRONG_AUTH_TIMEOUT_MS);
+    }
+
+    // TODO(b/37059253): Remove EnableFlags annotation as soon as the flag is promoted to Prod.
+    @EnableFlags(Flags.FLAG_INCREASE_WATCH_STRONG_AUTH_TIMEOUT)
+    @Test
+    public void testSetRequiredStrongAuthTimeout_watch_flagOn() throws Exception {
+        when(getServices().packageManager.hasSystemFeature(PackageManager.FEATURE_WATCH))
+                .thenReturn(true);
+        testSetRequiredStrongAuthTimeout_DeviceOwner(
+            DevicePolicyManager.DEFAULT_STRONG_AUTH_WATCH_TIMEOUT_MS);
+    }
+
+    @Test
+    public void testSetRequiredStrongAuthTimeout_nonWatch() throws Exception {
+        when(getServices().packageManager.hasSystemFeature(PackageManager.FEATURE_WATCH))
+                .thenReturn(false);
+        testSetRequiredStrongAuthTimeout_DeviceOwner(
+            DevicePolicyManager.DEFAULT_STRONG_AUTH_TIMEOUT_MS);
+    }
+
+    public void testSetRequiredStrongAuthTimeout_DeviceOwner(
+        long expectedTimeout) throws Exception {
         mContext.binder.callingUid = DpmMockContext.CALLER_SYSTEM_USER_UID;
         setupDeviceOwner();
         mContext.callerPermissions.add(permission.MANAGE_PROFILE_AND_DEVICE_OWNERS);
@@ -5249,12 +5279,14 @@ public class DevicePolicyManagerTest extends DpmTestBase {
         // Security logging
         when(getServices().settings.securityLogGetLoggingEnabledProperty()).thenReturn(true);
         // System update policy
-        dpms.mOwners.setSystemUpdatePolicy(SystemUpdatePolicy.createAutomaticInstallPolicy());
+        dpms.mDeviceAdmins
+                .getOwners()
+                .setSystemUpdatePolicy(SystemUpdatePolicy.createAutomaticInstallPolicy());
         // Make it look as if FRP agent is present.
         when(dpms.mMockInjector.getPersistentDataBlockManagerInternal().getAllowedUid())
                 .thenReturn(12345 /* some UID in user 0 */);
         // Make personal apps look suspended
-        dpms.getUserData(UserHandle.USER_SYSTEM).mAppsSuspended = true;
+        dpms.mDeviceAdmins.getUserData(UserHandle.USER_SYSTEM).mAppsSuspended = true;
         // Screen capture
         dpm.setScreenCaptureDisabled(admin1, true);
 
@@ -5279,7 +5311,7 @@ public class DevicePolicyManagerTest extends DpmTestBase {
         verify(getServices().settings).settingsGlobalPutInt(
                 Settings.Global.WIFI_DEVICE_OWNER_CONFIGS_LOCKDOWN, 0);
         // System update policy should be removed
-        assertThat(dpms.mOwners.getSystemUpdatePolicy()).isNull();
+        assertThat(dpms.mDeviceAdmins.getOwners().getSystemUpdatePolicy()).isNull();
         // FRP agent should be notified
         verify(mContext.spiedContext, times(0)).sendBroadcastAsUser(
                 MockUtils.checkIntentAction(
@@ -6831,7 +6863,7 @@ public class DevicePolicyManagerTest extends DpmTestBase {
         setDeviceOwner();
         initializeDpms();
         assertThat(getMockTransferMetadataManager().metadataFileExists()).isFalse();
-        assertThat(dpms.isDeviceOwner(admin1, UserHandle.USER_SYSTEM)).isTrue();
+        assertThat(dpms.mDeviceAdmins.isDeviceOwner(admin1, UserHandle.USER_SYSTEM)).isTrue();
         assertThat(dpms.isAdminActive(admin1, UserHandle.USER_SYSTEM)).isTrue();
     }
 
@@ -6875,7 +6907,7 @@ public class DevicePolicyManagerTest extends DpmTestBase {
         setupProfileOwner();
         initializeDpms();
         assertThat(getMockTransferMetadataManager().metadataFileExists()).isFalse();
-        assertThat(dpms.isProfileOwner(admin1, CALLER_USER_HANDLE)).isTrue();
+        assertThat(dpms.mDeviceAdmins.isProfileOwner(admin1, CALLER_USER_HANDLE)).isTrue();
         assertThat(dpms.isAdminActive(admin1, CALLER_USER_HANDLE)).isTrue();
     }
 
@@ -8475,6 +8507,25 @@ public class DevicePolicyManagerTest extends DpmTestBase {
     }
 
     @Test
+    public void testSetGlobalProxy_tooLongStrings() throws Exception {
+        setDeviceOwner();
+        // PolicySizeVerifier uses ModifiedUtf8.countBytes() to check the length of strings
+        // which is max 65535 UTF bytes.
+        final String tooLong = new String(new char[65536]).replace('\0', 'A');
+
+        // Test long proxy spec
+        Proxy proxy = new Proxy(Proxy.Type.HTTP, InetSocketAddress.createUnresolved(tooLong, 8080));
+        assertThrows(IllegalArgumentException.class,
+                () -> dpm.setGlobalProxy(admin1, proxy, Collections.emptyList()));
+
+        // Test long exclusion list
+        Proxy validProxy = new Proxy(Proxy.Type.HTTP,
+                InetSocketAddress.createUnresolved("example.com", 8080));
+        assertThrows(IllegalArgumentException.class,
+                () -> dpm.setGlobalProxy(admin1, validProxy, Collections.singletonList(tooLong)));
+    }
+
+    @Test
     public void testSetAlwaysOnVpnPackage_clearsAdminVpn() throws Exception {
         setDeviceOwner();
 
@@ -9120,6 +9171,28 @@ public class DevicePolicyManagerTest extends DpmTestBase {
         assertThat(permitted).isNull();
     }
 
+    @Test
+    public void testSetPackagesSuspended_afterReload() throws Exception {
+        mockEmptyPolicyExemptApps();
+
+        // Setup DO.
+        setDeviceOwner();
+
+        final String[] pkgs1 = {"pkg1", "pkg2"};
+        final String[] suspended1 = dpm.setPackagesSuspended(admin1, pkgs1, true);
+        assertThat(suspended1).isNotNull();
+        assertThat(suspended1.length).isEqualTo(2);
+
+        // Now simulate a reboot.
+        initializeDpms();
+
+        // Call again. This should not fail.
+        final String[] pkgs2 = {"pkg3", "pkg4"};
+        final String[] suspended2 = dpm.setPackagesSuspended(admin1, pkgs2, true);
+        assertThat(suspended2).isNotNull();
+        assertThat(suspended2.length).isEqualTo(2);
+    }
+
     private void setupVpnAuthorization(String userVpnPackage, int userVpnUid) {
         final AppOpsManager.PackageOps vpnOp = new AppOpsManager.PackageOps(userVpnPackage,
                 userVpnUid, List.of(new AppOpsManager.OpEntry(
@@ -9251,11 +9324,11 @@ public class DevicePolicyManagerTest extends DpmTestBase {
     }
 
     private File getDeviceOwnerFile() {
-        return dpms.mOwners.getDeviceOwnerFile();
+        return dpms.mDeviceAdmins.getOwners().getDeviceOwnerFile();
     }
 
     private File getProfileOwnerFile() {
-        return dpms.mOwners.getProfileOwnerFile(CALLER_USER_HANDLE);
+        return dpms.mDeviceAdmins.getOwners().getProfileOwnerFile(CALLER_USER_HANDLE);
     }
 
     private File getProfileOwnerPoliciesFile() {

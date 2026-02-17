@@ -20,7 +20,6 @@ import android.annotation.ColorInt
 import android.content.res.Resources
 import android.graphics.Rect
 import android.graphics.RectF
-import android.view.Display
 import android.view.View
 import androidx.compose.runtime.getValue
 import com.android.app.tracing.FlowTracing.traceEach
@@ -53,12 +52,10 @@ import com.android.systemui.plugins.DarkIconDispatcher
 import com.android.systemui.res.R
 import com.android.systemui.scene.domain.interactor.SceneInteractor
 import com.android.systemui.scene.shared.flag.SceneContainerFlag
-import com.android.systemui.scene.shared.model.Overlays
 import com.android.systemui.scene.shared.model.Scenes
 import com.android.systemui.shade.display.domain.interactor.ShadeExpansionTargetDisplayInteractor
 import com.android.systemui.shade.domain.interactor.ShadeDisplaysInteractor
 import com.android.systemui.shade.domain.interactor.ShadeInteractor
-import com.android.systemui.shade.shared.flag.ShadeWindowGoesAround
 import com.android.systemui.statusbar.chips.mediaprojection.domain.model.MediaProjectionStopDialogModel
 import com.android.systemui.statusbar.chips.sharetoapp.ui.viewmodel.ShareToAppChipViewModel
 import com.android.systemui.statusbar.chips.ui.model.MultipleOngoingActivityChipsModel
@@ -68,13 +65,12 @@ import com.android.systemui.statusbar.events.domain.interactor.SystemStatusEvent
 import com.android.systemui.statusbar.events.shared.model.SystemEventAnimationState.Idle
 import com.android.systemui.statusbar.layout.ui.viewmodel.AppHandlesViewModel
 import com.android.systemui.statusbar.layout.ui.viewmodel.StatusBarBoundsViewModel
-import com.android.systemui.statusbar.layout.ui.viewmodel.StatusBarContentInsetsViewModelStore
+import com.android.systemui.statusbar.layout.ui.viewmodel.StatusBarContentInsetsViewModel
 import com.android.systemui.statusbar.notification.domain.interactor.ActiveNotificationsInteractor
 import com.android.systemui.statusbar.notification.icon.domain.interactor.StatusBarNotificationIconsInteractor
 import com.android.systemui.statusbar.phone.domain.interactor.DarkIconInteractor
 import com.android.systemui.statusbar.phone.domain.interactor.IsAreaDark
 import com.android.systemui.statusbar.phone.domain.interactor.LightsOutInteractor
-import com.android.systemui.statusbar.pipeline.battery.ui.viewmodel.BatteryNextToPercentViewModel
 import com.android.systemui.statusbar.pipeline.battery.ui.viewmodel.BatteryViewModel
 import com.android.systemui.statusbar.pipeline.shared.StatusBarShowIconsInSecureCamera
 import com.android.systemui.statusbar.pipeline.shared.domain.interactor.HomeStatusBarIconBlockListInteractor
@@ -120,8 +116,6 @@ import kotlinx.coroutines.launch
  * so that it's all in one place and easily testable outside of the fragment.
  */
 interface HomeStatusBarViewModel : Activatable {
-    /** Factory to create the view model for the battery icon with the percentage alongside */
-    val batteryNextToPercentViewModel: BatteryNextToPercentViewModel.Factory
     /** Factory for the unified (percent embedded) battery view model */
     val unifiedBatteryViewModel: BatteryViewModel.BasedOnUserSetting.Factory
 
@@ -264,7 +258,6 @@ class HomeStatusBarViewModelImpl
 @AssistedInject
 constructor(
     @field:DisplayId @DisplayId private val thisDisplayId: Int,
-    override val batteryNextToPercentViewModel: BatteryNextToPercentViewModel.Factory,
     override val unifiedBatteryViewModel: BatteryViewModel.BasedOnUserSetting.Factory,
     override val systemStatusIconsViewModelFactory: SystemStatusIconsViewModel.Factory,
     override val statusBarBoundsViewModelFactory: StatusBarBoundsViewModel.Factory,
@@ -290,7 +283,7 @@ constructor(
     @DisplayAware private val ongoingActivityChipsViewModel: OngoingActivityChipsViewModel,
     statusBarPopupChipsViewModelFactory: StatusBarPopupChipsViewModel.Factory,
     @DisplayAware animations: SystemStatusEventAnimationInteractor,
-    statusBarContentInsetsViewModelStore: StatusBarContentInsetsViewModelStore,
+    @DisplayAware statusBarContentInsetsViewModel: StatusBarContentInsetsViewModel,
     @DisplayAware bgDisplayScope: CoroutineScope,
     @Background bgDispatcher: CoroutineDispatcher,
     shadeDisplaysInteractor: Provider<ShadeDisplaysInteractor>,
@@ -353,21 +346,13 @@ constructor(
      * and lockscreen, among other things).
      */
     private val isShadeWindowOnThisDisplay =
-        if (ShadeWindowGoesAround.isEnabled) {
-            shadeDisplaysInteractor.get().displayId.map { shadeDisplayId ->
-                thisDisplayId == shadeDisplayId
-            }
-        } else {
-            // Shade doesn't move anywhere, it is always on the default display.
-            flowOf(thisDisplayId == Display.DEFAULT_DISPLAY)
+        shadeDisplaysInteractor.get().pendingDisplayId.map { shadeDisplayId ->
+            thisDisplayId == shadeDisplayId
         }
 
     private val isShadeVisibleOnAnyDisplay =
         if (SceneContainerFlag.isEnabled) {
-            sceneInteractor.currentOverlays.map { currentOverlays ->
-                (Overlays.NotificationsShade in currentOverlays ||
-                    Overlays.QuickSettingsShade in currentOverlays)
-            }
+            shadeInteractor.isAnyExpanded
         } else {
             isShadeExpandedEnough
         }
@@ -394,21 +379,24 @@ constructor(
             )
             .flowOn(bgDispatcher)
 
+    private val isSceneGone =
+        sceneInteractor.currentScene.map { it == Scenes.Gone }.distinctUntilChanged()
+
     private val isHomeStatusBarAllowedByScene: Flow<Boolean> =
         combine(
-                sceneInteractor.currentScene,
+                isSceneGone,
                 isShadeVisibleOnAnyDisplay,
                 occlusionInteractor.isKeyguardOccluded,
                 isShadeWindowOnThisDisplay,
-            ) { currentScene, isShadeVisibleOnAnyDisplay, isOccluded, isShadeWindowOnThisDisplay ->
+            ) { isSceneGone, isShadeVisibleOnAnyDisplay, isOccluded, isShadeWindowOnThisDisplay ->
                 if (isOccluded) {
                     true
                 } else if (isShadeWindowOnThisDisplay) {
-                    currentScene == Scenes.Gone && !isShadeVisibleOnAnyDisplay
+                    isSceneGone && !isShadeVisibleOnAnyDisplay
                 } else {
                     // When the shade is visible on another display,
                     // allow the home status bar on the current display.
-                    currentScene == Scenes.Gone || isShadeVisibleOnAnyDisplay
+                    isSceneGone || isShadeVisibleOnAnyDisplay
                 }
             }
             .distinctUntilChanged()
@@ -746,12 +734,12 @@ constructor(
         homeStatusBarIconBlockListInteractor.iconBlockList.flowOn(bgDispatcher)
 
     override val contentArea: Flow<Rect> =
-        statusBarContentInsetsViewModelStore.forDisplay(thisDisplayId)?.contentArea
-            ?: flowOf(Rect(0, 0, 0, 0)).flowOn(bgDispatcher)
+        statusBarContentInsetsViewModel.contentArea.flowOn(bgDispatcher)
 
     override val isSignOutButtonVisible: Boolean by
         if (
-                Flags.signOutButtonOnKeyguardStatusBar() &&
+                (Flags.signOutButtonOnKeyguardStatusBar() ||
+                    Flags.signOutButtonOnKeyguardStatusBar2()) &&
                     keyguardInteractor.isSignOutButtonOnStatusBarEnabled
             ) {
                 combine(

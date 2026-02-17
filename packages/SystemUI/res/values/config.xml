@@ -83,6 +83,20 @@
         internet,bt,dnd,cast,flashlight,airplane,rotation,wallet,alarm,controls,screenrecord,battery
     </string>
 
+    <!-- The default tiles to display in QuickSettings after the internet tile split-->
+    <string name="quick_settings_tiles_default_split" translatable="false">
+        wifi,bt,cell,cast,dnd,wallet,airplane,rotation,flashlight,battery,alarm,controls,screenrecord
+    </string>
+
+    <!-- The default large tiles in Quick Settings after the internet tile split -->
+    <string-array name="quick_settings_large_tiles_default_split" translatable="false">
+        <item>wifi</item>
+        <item>bt</item>
+        <item>cell</item>
+        <item>cast</item>
+        <item>dnd</item>
+        <item>wallet</item>
+    </string-array>
     <!-- The class path of the Safety Quick Settings Tile -->
     <string name="safety_quick_settings_tile_class" translatable="false">
         com.android.permissioncontroller.permission.service.v33.SafetyCenterQsTileService
@@ -833,9 +847,6 @@
     <!-- Component names of allowed communal widgets -->
     <string-array name="config_communalWidgetAllowlist" translatable="false" />
 
-    <!-- Component name of communal source service -->
-    <string name="config_communalSourceComponent" translatable="false">@null</string>
-
     <!-- This value is used when calculating whether the device is in ambient light mode. It is
         light mode when the light sensor sample value exceeds above this value. -->
     <item name="config_ambientLightModeThreshold" translatable="false" format="float" type="dimen">
@@ -905,9 +916,6 @@
 
     <!-- Flag to enable privacy chip animation, it shall be true for normal case -->
     <bool name="config_enablePrivacyChipAnimation">true</bool>
-
-    <!-- Class for the communal source connector to be used -->
-    <string name="config_communalSourceConnector" translatable="false"></string>
 
     <!-- How often in milliseconds to jitter the dream overlay in order to avoid burn-in. -->
     <integer name="config_dreamOverlayBurnInProtectionUpdateIntervalMillis">1000</integer>
@@ -1092,6 +1100,12 @@
     <!-- The dream component used when the device is low light environment. -->
     <string translatable="false" name="config_lowLightDreamComponent"/>
 
+    <!-- The type of the light sensor used by the low light monitor. -->
+    <string name="config_lowLightMonitorLightSensorType" translatable="false"/>
+
+    <!-- The name of the light sensor used by the low light monitor. -->
+    <string name="config_lowLightMonitorLightSensorName" translatable="false"/>
+
     <!-- Determines whether low light should be allowed pre-unlock -->
     <bool translatable="false" name="config_allowLowLightBehaviorWhenLocked">false</bool>
 
@@ -1116,9 +1130,6 @@
 
     <!-- If AOD can show an ambient version of the wallpaper (-1 means ignore) -->
     <integer name="config_dozeSupportsAodWallpaperOverride">-1</integer>
-
-    <!-- Whether to enable large screen UI for screen capture. -->
-    <bool name="config_enableLargeScreenScreencapture">false</bool>
 
     <!-- Whether to show the large screen privacy indicator. -->
     <bool name="config_largeScreenPrivacyIndicator">false</bool>
@@ -1181,6 +1192,6 @@
     -->
     <string name="config_statusBarAssistantPackage" translatable="false" />
 
-    <!-- Whether to enable Bouncer containerization at a lower - large width breakpoint -->
-    <bool name="config_lowerBouncerContainerizationBreakpointToLargeWidth">false</bool>
+    <!-- Enable/disable keyguard connected display presentation -->
+    <bool name="config_enableKeyguardOnConnectedDisplay">true</bool>
 </resources>

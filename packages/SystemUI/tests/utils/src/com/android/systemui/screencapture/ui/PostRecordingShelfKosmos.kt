@@ -20,9 +20,11 @@ import android.content.applicationContext
 import android.graphics.drawable.Icon
 import android.net.Uri
 import android.view.Display
+import android.view.accessibility.accessibilityManager
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.screencapture.record.smallscreen.ui.postRecordSnackbarDialogs
-import com.android.systemui.screenrecord.ui.postRecordingViewModelFactory
+import com.android.systemui.screenrecord.ui.postRecordingActionsViewModelFactory
+import com.android.systemui.screenrecord.ui.postRecordingImmediateVideoViewModelFactory
 import com.android.systemui.statusbar.phone.systemUIDialogFactory
 
 val Kosmos.postRecordingShelfFactory by
@@ -35,8 +37,10 @@ val Kosmos.postRecordingShelfFactory by
                     context = applicationContext,
                     display = display,
                     dialogFactory = systemUIDialogFactory,
-                    viewModelFactory = postRecordingViewModelFactory,
+                    actionsViewModelFactory = postRecordingActionsViewModelFactory,
+                    videoViewModelFactory = postRecordingImmediateVideoViewModelFactory,
                     postRecordSnackbarDialogs = postRecordSnackbarDialogs,
+                    accessibilityManager = accessibilityManager,
                 )
         }
     }

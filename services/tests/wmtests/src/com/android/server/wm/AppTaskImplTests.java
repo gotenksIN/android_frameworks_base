@@ -47,6 +47,7 @@ import static com.android.server.wm.BackgroundActivityStartController.BalVerdict
 import static com.android.window.flags.Flags.FLAG_ENABLE_WINDOW_REPOSITIONING_API;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -56,6 +57,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.testng.AssertJUnit.assertNotNull;
 
+import android.app.ActivityManager;
 import android.app.AppOpsManager;
 import android.app.TaskWindowingLayerRequestHandler;
 import android.graphics.Rect;
@@ -359,6 +361,22 @@ public class AppTaskImplTests extends WindowTestsBase {
         verify(mMockCallback).sendResult(eq(sampleBundle)); // only once, with sampleBundle
     }
 
+    @EnableFlags(FLAG_ENABLE_INTERACTIVE_PICTURE_IN_PICTURE)
+    @Test
+    public void testRequestWindowingLayer_rejectsPinnedRequestForNonFocusedTask()
+            throws Exception {
+        final Task task = getSampleTask();
+        final Task focusedTask = getSampleTaskBuilder().setOnTop(true).build();
+        final AppTaskImpl appTask = getAppTask(task.getRootTaskId());
+        final Bundle sampleBundle = new Bundle();
+
+        appTask.requestWindowingLayer(WINDOWING_LAYER_PINNED, mMockCallback);
+
+        verifyCallbackReceivedWindowingLayerErrorCode(mMockCallback,
+                TaskWindowingLayerRequestHandler.RESULT_FAILED_BAD_STATE);
+        verify(mTransitionController, never()).startCollectOrQueue(any(), any());
+    }
+
     @EnableFlags(FLAG_ENABLE_WINDOW_REPOSITIONING_API)
     @Test
     public void testMoveTaskTo_failsWhenBalBlocks() throws Exception {
@@ -389,6 +407,20 @@ public class AppTaskImplTests extends WindowTestsBase {
                 () -> appTask.moveTaskTo(dc.mDisplayId, bounds, mMockCallback, PACKAGE_NAME));
     }
 
+    @Test
+    public void testGetTaskInfo_returnsNullForNonExistentTask() {
+        // Use a task ID that is guaranteed not to exist.
+        final int nonExistentTaskId = 9999;
+        final AppTaskImpl appTask = getAppTask(nonExistentTaskId);
+
+        // Calling getTaskInfo for a non-existent task should return null.
+        final ActivityManager.RecentTaskInfo taskInfo = appTask.getTaskInfo();
+
+        // Verify that the result is null, as per the updated implementation,
+        // instead of throwing an exception.
+        assertNull(taskInfo);
+    }
+
     private AppTaskImpl getAppTask(int taskId) {
         return new AppTaskImpl(mAtm, taskId, Binder.getCallingUid(), mHandler);
     }
@@ -400,7 +432,11 @@ public class AppTaskImplTests extends WindowTestsBase {
     }
 
     private Task getSampleTask() {
-        return new TaskBuilder(mSupervisor).setCreateActivity(true).build();
+        return getSampleTaskBuilder().build();
+    }
+
+    private TaskBuilder getSampleTaskBuilder() {
+        return new TaskBuilder(mSupervisor).setCreateActivity(true);
     }
 
     private Rect getValidBoundsForDisplay(DisplayContent dc) {

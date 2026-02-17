@@ -32,6 +32,7 @@ import static android.app.ActivityManager.RunningAppProcessInfo.IMPORTANCE_VISIB
 import static android.hardware.display.DisplayManager.BRIGHTNESS_UNIT_NITS;
 import static android.hardware.display.DisplayManager.BRIGHTNESS_UNIT_PERCENTAGE;
 import static android.hardware.display.DisplayManager.DEFAULT_HDR_PREFERENCE;
+import static android.hardware.display.DisplayManager.VIRTUAL_DISPLAY_FLAG_ALLOWS_CONTENT_MODE_SWITCH;
 import static android.hardware.display.DisplayManager.VIRTUAL_DISPLAY_FLAG_ALWAYS_UNLOCKED;
 import static android.hardware.display.DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR;
 import static android.hardware.display.DisplayManager.VIRTUAL_DISPLAY_FLAG_CAN_SHOW_WITH_INSECURE_KEYGUARD;
@@ -576,7 +577,7 @@ public final class DisplayManagerService extends SystemService {
 
     // Whether default display should be included in the display topology. Note that this should
     // only be used for the devices in projected mode.
-    private boolean mIncludeDefaultDisplayInTopology;
+    private boolean mIncludeDefaultDisplayInTopology = true;
     private final boolean mStableEdidsFlag;
 
     private final BroadcastReceiver mIdleModeReceiver = new BroadcastReceiver() {
@@ -636,7 +637,6 @@ public final class DisplayManagerService extends SystemService {
             new CopyOnWriteSparseArray<CachedDisplayInfo>(TAG + ".DisplayInfoCache", DEBUG);
 
     // Manages the relative placement of extended displays
-    @Nullable
     private final DisplayTopologyCoordinator mDisplayTopologyCoordinator;
 
     @NonNull
@@ -694,30 +694,25 @@ public final class DisplayManagerService extends SystemService {
                 ||  com.android.graphics.surfaceflinger.flags.Flags.stableEdidIds();
         mDisplayDeviceRepo = new DisplayDeviceRepository(
                 mSyncRoot, mPersistentDataStore, mStableEdidsFlag);
-        if (mFlags.isDisplayTopologyEnabled()) {
-            final var backupManager = new BackupManager(mContext);
-            Consumer<Pair<DisplayTopology, DisplayTopologyGraph>> topologyChangedCallback =
-                    update -> {
-                        if (mInputManagerInternal != null) {
-                            Slog.d(TAG,
-                                    "Sending topology graph to Input Manager: " + update.second);
-                            mInputManagerInternal.setDisplayTopology(update.second);
-                        } else {
-                            Slog.w(TAG, "Not sending topology, mInputManagerInternal is null");
-                        }
-                        deliverTopologyUpdate(update.first);
-                    };
-            mDisplayTopologyCoordinator = new DisplayTopologyCoordinator(
-                    this::isExtendedDisplayAllowed, this::shouldIncludeDefaultDisplayInTopology,
-                    topologyChangedCallback, new HandlerExecutor(mHandler), mSyncRoot,
-                    backupManager::dataChanged, mFlags,
-                    displayId -> getDisplayInfoInternal(displayId, Process.myUid()));
-        } else {
-            mDisplayTopologyCoordinator = null;
-        }
+        final var backupManager = new BackupManager(mContext);
+        Consumer<Pair<DisplayTopology, DisplayTopologyGraph>> topologyChangedCallback =
+                update -> {
+                    if (mInputManagerInternal != null) {
+                        Slog.d(TAG,
+                                "Sending topology graph to Input Manager: " + update.second);
+                        mInputManagerInternal.setDisplayTopology(update.second);
+                    } else {
+                        Slog.w(TAG, "Not sending topology, mInputManagerInternal is null");
+                    }
+                    deliverTopologyUpdate(update.first);
+                };
+        mDisplayTopologyCoordinator = new DisplayTopologyCoordinator(
+                this::isExtendedDisplayAllowed, this::shouldIncludeDefaultDisplayInTopology,
+                topologyChangedCallback, new HandlerExecutor(mHandler), mSyncRoot,
+                backupManager::dataChanged, mFlags,
+                displayId -> getDisplayInfoInternal(displayId, Process.myUid()));
         Predicate<DisplayInfo> isDisplayAllowedInTopoogy =
-                info -> mDisplayTopologyCoordinator != null
-                        && mDisplayTopologyCoordinator.isDisplayAllowedInTopology(info);
+                mDisplayTopologyCoordinator::isDisplayAllowedInTopology;
         mLogicalDisplayMapper = new LogicalDisplayMapper(mContext, foldSettingProvider,
                 mDisplayDeviceRepo, new LogicalDisplayListener(), mSyncRoot, mHandler, mFlags,
                 isDisplayAllowedInTopoogy, mStableEdidsFlag, mDisplayInfoCache);
@@ -898,11 +893,9 @@ public final class DisplayManagerService extends SystemService {
         synchronized (mSyncRoot) {
             mWindowManagerInternal = LocalServices.getService(WindowManagerInternal.class);
             mInputManagerInternal = LocalServices.getService(InputManagerInternal.class);
-            if (mDisplayTopologyCoordinator != null) {
-                DisplayTopologyGraph graph = mDisplayTopologyCoordinator.getTopology().getGraph();
-                Slog.d(TAG, "Sending topology graph to Input Manager: " + graph);
-                mInputManagerInternal.setDisplayTopology(graph);
-            }
+            DisplayTopologyGraph graph = mDisplayTopologyCoordinator.getTopology().getGraph();
+            Slog.d(TAG, "Sending topology graph to Input Manager: " + graph);
+            mInputManagerInternal.setDisplayTopology(graph);
             mActivityManagerInternal = LocalServices.getService(ActivityManagerInternal.class);
             mActivityTaskManagerInternal = LocalServices.getService(
                     ActivityTaskManagerInternal.class);
@@ -950,11 +943,7 @@ public final class DisplayManagerService extends SystemService {
                 updateMirrorBuiltInDisplaySettingLocked(/*shouldSendDisplayChangeEvent=*/ false);
             }
 
-            if (mFlags.isDefaultDisplayInTopologySwitchEnabled()) {
-                mIncludeDefaultDisplayInTopology =
-                        mInjector.isDesktopModeSupportedOnInternalDisplay(mContext)
-                                || getIncludeDefaultDisplayInTopologySetting();
-            }
+            handleIncludeDefaultDisplayInTopologySettingChangeLocked();
             mUserManagerInternal = LocalServices.getService(UserManagerInternal.class);
             if (mUserManagerInternal != null) {
                 mUserManagerInternal.addUserLifecycleListener(
@@ -1050,12 +1039,10 @@ public final class DisplayManagerService extends SystemService {
     }
 
     private void scheduleTopologiesReload(final int userId, final boolean isUserSwitching) {
-        if (mDisplayTopologyCoordinator != null) {
-            // Need background thread due to xml files read operations not allowed on Display thread
-            BackgroundThread.getHandler().post(() ->
-                    mDisplayTopologyCoordinator.reloadTopologies(
-                            userId, isUserSwitching));
-        }
+        // Need background thread due to xml files read operations not allowed on Display thread
+        BackgroundThread.getHandler().post(() ->
+                mDisplayTopologyCoordinator.reloadTopologies(
+                        userId, isUserSwitching));
     }
 
     private void loadStableDisplayValuesLocked() {
@@ -1179,11 +1166,6 @@ public final class DisplayManagerService extends SystemService {
             }
 
             final BrightnessPair brightnessPair = mDisplayBrightnesses.valueAt(index);
-            if (!Flags.fixSetDisplayStateAfterDeviceChange() && mDisplayStates.valueAt(index)
-                    == state && brightnessPair.brightness == brightnessState
-                    && brightnessPair.sdrBrightness == sdrBrightnessState) {
-                return; // No change.
-            }
 
             if (Trace.isTagEnabled(Trace.TRACE_TAG_POWER)) {
                 traceMessage = Display.stateToString(state)
@@ -1328,12 +1310,8 @@ public final class DisplayManagerService extends SystemService {
             }
             if (Settings.Secure.getUriFor(INCLUDE_DEFAULT_DISPLAY_IN_TOPOLOGY).equals(uri)) {
                 synchronized (mSyncRoot) {
-                    if (mFlags.isDefaultDisplayInTopologySwitchEnabled()
-                            && !mInjector.isDesktopModeSupportedOnInternalDisplay(mContext)) {
-                        handleIncludeDefaultDisplayInTopologySettingChangeLocked();
-                    }
+                    handleIncludeDefaultDisplayInTopologySettingChangeLocked();
                 }
-                return;
             }
         }
     }
@@ -1385,6 +1363,11 @@ public final class DisplayManagerService extends SystemService {
     }
 
     private void handleIncludeDefaultDisplayInTopologySettingChangeLocked() {
+        if (!mFlags.isDefaultDisplayInTopologySwitchEnabled()
+                || mInjector.isDesktopModeSupportedOnInternalDisplay(mContext)) {
+            return;
+        }
+
         final boolean includeDefaultDisplayInTopology = getIncludeDefaultDisplayInTopologySetting();
 
         if (mIncludeDefaultDisplayInTopology == includeDefaultDisplayInTopology) {
@@ -1397,17 +1380,15 @@ public final class DisplayManagerService extends SystemService {
             return;
         }
 
-        if (mDisplayTopologyCoordinator != null) {
-            if (mIncludeDefaultDisplayInTopology) {
-                final DisplayInfo info = mLogicalDisplayMapper.getDisplayLocked(
-                        Display.DEFAULT_DISPLAY).getDisplayInfoLocked();
-                mDisplayTopologyCoordinator.onDisplayAdded(info);
-            } else {
-                // The default display can only be removed when there are multiple displays in the
-                // topology to ensure the topology is not empty.
-                if (mDisplayTopologyCoordinator.getTopology().hasMultipleDisplays()) {
-                    mDisplayTopologyCoordinator.onDisplayRemoved(Display.DEFAULT_DISPLAY);
-                }
+        if (mIncludeDefaultDisplayInTopology) {
+            final DisplayInfo info = mLogicalDisplayMapper.getDisplayLocked(
+                    Display.DEFAULT_DISPLAY).getDisplayInfoLocked();
+            mDisplayTopologyCoordinator.onDisplayAdded(info);
+        } else {
+            // The default display can only be removed when there are multiple displays in the
+            // topology to ensure the topology is not empty.
+            if (mDisplayTopologyCoordinator.getTopology().hasMultipleDisplays()) {
+                mDisplayTopologyCoordinator.onDisplayRemoved(Display.DEFAULT_DISPLAY);
             }
         }
     }
@@ -1620,7 +1601,8 @@ public final class DisplayManagerService extends SystemService {
             CachedDisplayInfo info = mDisplayInfoCache.get(displayId);
             if (info == null) {
                 if (displayId != Display.DEFAULT_DISPLAY) {
-                    Slog.e(TAG, "Display info not found in cache for display " + displayId);
+                    Slog.w(TAG, "Display info not found in cache for display " + displayId
+                            + ", callingUid " + callingUid);
                     return null;
                 }
                 Slog.w(TAG, "Default display not found in cache");
@@ -2020,8 +2002,50 @@ public final class DisplayManagerService extends SystemService {
             throw new IllegalArgumentException("Surface can't be single-buffered");
         }
 
+        if (!Flags.virtualSecondaryDisplays()) {
+            // Support for virtual display content mode switch is not enabled
+            flags &= ~VIRTUAL_DISPLAY_FLAG_ALLOWS_CONTENT_MODE_SWITCH;
+        }
+
+        if ((flags & VIRTUAL_DISPLAY_FLAG_ALLOWS_CONTENT_MODE_SWITCH) != 0) {
+            // TODO(b/474207070): Support VDM displays
+            if (virtualDevice != null) {
+                Slog.d(TAG, "Virtual displays associated with virtual device currently don't "
+                        + "support content mode switch, hence ignoring "
+                        + "VIRTUAL_DISPLAY_FLAG_ALLOWS_CONTENT_MODE_SWITCH");
+                flags &= ~VIRTUAL_DISPLAY_FLAG_ALLOWS_CONTENT_MODE_SWITCH;
+            }
+
+            // Following flag checks should be in sync with DisplayContent.allowContentModeSwitch.
+            // We duplicate the checks here in order to fall back to default content modes on
+            // incompatible flag combinations.
+            if ((flags & VIRTUAL_DISPLAY_FLAG_TRUSTED) == 0) {
+                Slog.d(TAG, "Untrusted displays are not allowed to enter projected/extended mode, "
+                        + "hence ignoring flag VIRTUAL_DISPLAY_FLAG_ALLOWS_CONTENT_MODE_SWITCH.");
+                flags &= ~VIRTUAL_DISPLAY_FLAG_ALLOWS_CONTENT_MODE_SWITCH;
+            }
+            if ((flags & VIRTUAL_DISPLAY_FLAG_PUBLIC) == 0) {
+                Slog.d(TAG, "Private virtual displays are not allowed to perform projection, hence "
+                        + "ignoring VIRTUAL_DISPLAY_FLAG_ALLOWS_CONTENT_MODE_SWITCH");
+                flags &= ~VIRTUAL_DISPLAY_FLAG_ALLOWS_CONTENT_MODE_SWITCH;
+            }
+            if ((flags & (VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR | VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY))
+                    != 0) {
+                Slog.d(TAG, "Either VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR or "
+                        + "VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY already set, hence ignoring "
+                        + "VIRTUAL_DISPLAY_FLAG_ALLOWS_CONTENT_MODE_SWITCH");
+                flags &= ~VIRTUAL_DISPLAY_FLAG_ALLOWS_CONTENT_MODE_SWITCH;
+            }
+            if ((flags & VIRTUAL_DISPLAY_FLAG_SHOULD_SHOW_SYSTEM_DECORATIONS) != 0) {
+                Slog.d(TAG, "The display should unconditionally show system decorations, hence "
+                        + "ignoring VIRTUAL_DISPLAY_FLAG_ALLOWS_CONTENT_MODE_SWITCH");
+                flags &= ~VIRTUAL_DISPLAY_FLAG_ALLOWS_CONTENT_MODE_SWITCH;
+            }
+        }
+
         if ((flags & VIRTUAL_DISPLAY_FLAG_PUBLIC) != 0) {
-            if ((flags & VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY) == 0) {
+            if ((flags & VIRTUAL_DISPLAY_FLAG_OWN_CONTENT_ONLY) == 0
+                    && (flags & VIRTUAL_DISPLAY_FLAG_ALLOWS_CONTENT_MODE_SWITCH) == 0) {
                 Slog.d(TAG, "Public virtual displays are auto mirror by default, hence adding "
                         + "VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR.");
                 flags |= VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR;
@@ -2647,8 +2671,7 @@ public final class DisplayManagerService extends SystemService {
 
         // The default display should always be added to the topology. Other displays will be added
         // upon calling onDisplayBelongToTopologyChanged().
-        if (mDisplayTopologyCoordinator != null
-                && display.getDisplayIdLocked() == Display.DEFAULT_DISPLAY) {
+        if (display.getDisplayIdLocked() == Display.DEFAULT_DISPLAY) {
             mDisplayTopologyCoordinator.onDisplayAdded(display.getDisplayInfoLocked());
         }
     }
@@ -2674,10 +2697,7 @@ public final class DisplayManagerService extends SystemService {
 
     private void handleLogicalDisplayChangedPostProcessLocked(@NonNull LogicalDisplay display) {
         applyDisplayChangedLocked(display);
-
-        if (mDisplayTopologyCoordinator != null) {
-            mDisplayTopologyCoordinator.onDisplayChanged(display.getDisplayInfoLocked());
-        }
+        mDisplayTopologyCoordinator.onDisplayChanged(display.getDisplayInfoLocked());
     }
 
     private void applyDisplayChangedLocked(@NonNull LogicalDisplay display) {
@@ -2747,9 +2767,7 @@ public final class DisplayManagerService extends SystemService {
         if (display.isValidLocked()) {
             applyDisplayChangedLocked(display);
         }
-        if (mDisplayTopologyCoordinator != null) {
-            mDisplayTopologyCoordinator.onDisplayRemoved(display.getDisplayIdLocked());
-        }
+        mDisplayTopologyCoordinator.onDisplayRemoved(display.getDisplayIdLocked());
 
         Slog.i(TAG, "Logical display removed: " + display.getDisplayIdLocked());
     }
@@ -2958,9 +2976,6 @@ public final class DisplayManagerService extends SystemService {
     }
 
     void resetUserPreferredDisplayModeInternal(int displayId) {
-        if (!mFlags.isModeSwitchWithoutSavingEnabled()) {
-            return;
-        }
         synchronized (mSyncRoot) {
             Display.Mode mode;
             if (displayId == Display.INVALID_DISPLAY) {
@@ -2995,11 +3010,9 @@ public final class DisplayManagerService extends SystemService {
                         + "be greater than 0 when setting the global user preferred display mode.");
             }
             DisplayDevice displayDevice = getDeviceForDisplayLocked(displayId);
-            if (displayDevice == null) {
+            // Allow a null displayDevice for INVALID_DISPLAY as it has no logical display mapping
+            if (displayDevice == null && displayId != Display.INVALID_DISPLAY) {
                 return;
-            }
-            if (!mFlags.isModeSwitchWithoutSavingEnabled()) {
-                storeMode = true;
             }
             if (storeMode) {
                 storeModeLocked(displayId, mode);
@@ -3187,11 +3200,14 @@ public final class DisplayManagerService extends SystemService {
                 enabledHdrOutputTypes = null;
             } else {
                 // HDR_CONVERSION_FORCE with HDR_TYPE_INVALID is used to represent forcing SDR type.
-                // But, internally SDR is forced by using passthrough mode and not reporting any
-                // HDR capabilities to apps.
                 if (conversionMode == HdrConversionMode.HDR_CONVERSION_FORCE
                         && preferredHdrType == HDR_TYPE_INVALID) {
-                    conversionMode = HdrConversionMode.HDR_CONVERSION_PASSTHROUGH;
+                    if (!com.android.graphics.surfaceflinger.flags.Flags.forceSdrInvalidHdrType()) {
+                        // But, internally SDR is forced by using passthrough mode and not reporting
+                        // any HDR capabilities to apps.
+                        conversionMode = HdrConversionMode.HDR_CONVERSION_PASSTHROUGH;
+                    }
+                    // Force SDR by not reporting any HDR capabilities to apps.
                     mLogicalDisplayMapper.forEachLocked(
                             logicalDisplay -> {
                                 if (logicalDisplay.setIsForceSdr(true)) {
@@ -4124,10 +4140,8 @@ public final class DisplayManagerService extends SystemService {
         }
 // QTI_END: 2020-10-14: Display: DisplayManager: Fix synchronization issue
 
-        if (mDisplayTopologyCoordinator != null) {
-            pw.println();
-            mDisplayTopologyCoordinator.dump(pw);
-        }
+        pw.println();
+        mDisplayTopologyCoordinator.dump(pw);
         pw.println();
         mPluginManager.dump(ipw);
 
@@ -4496,8 +4510,7 @@ public final class DisplayManagerService extends SystemService {
             }
             if (mPersistentDataStore.setUserPreferredHdrMode(displayDevice, preference)) {
                 mPersistentDataStore.saveIfNeeded();
-                // TODO(b/460304742): Implement HDR mode voting in DisplayModeDirector. displayId
-                //   param will be used in the voting summary
+                mDisplayModeDirector.setUserPreferredHdrMode(displayId, preference);
             }
         }
     }
@@ -4809,7 +4822,7 @@ public final class DisplayManagerService extends SystemService {
         private void sendSnapshotEventIfNeededLocked(
                 @InternalEventFlag long oldFlagsMask,
                 @InternalEventFlag long newFlagsMask) {
-            if (!Flags.displayListenerSnapshot() && !Flags.displayIdsCache()) {
+            if (!Flags.displayIdsCache()) {
                 return;
             }
 
@@ -4947,7 +4960,7 @@ public final class DisplayManagerService extends SystemService {
 
             // Access check, except for removed and disconnected events where the process is not
             // present on the display any more.
-            if ((Flags.displayListenerSnapshot() || Flags.displayIdsCache())
+            if (Flags.displayIdsCache()
                     && (eventMask & DisplayManagerGlobal.EVENT_DISPLAY_REMOVED) == 0
                     && (eventMask & DisplayManagerGlobal.EVENT_DISPLAY_DISCONNECTED) == 0
                     && getDisplayInfoInternal(displayId, mUid) == null) {
@@ -5569,12 +5582,19 @@ public final class DisplayManagerService extends SystemService {
             // Except for configure wifi display permission, which is required to get the wifi
             // display address.
             final int callingUid = Binder.getCallingUid();
-            final boolean hasConfigureWifiDisplayPermission = (callingUid == Process.SYSTEM_UID)
-                    || checkCallingPermission(android.Manifest.permission.CONFIGURE_WIFI_DISPLAY,
-                            "getWifiDisplayStatus()");
+            final boolean isDeviceAddressVisible = (callingUid == Process.SYSTEM_UID)
+                    || (PackageManager.PERMISSION_GRANTED == mContext.checkCallingPermission(
+                            android.Manifest.permission.CONFIGURE_WIFI_DISPLAY))
+                    || (PackageManager.PERMISSION_GRANTED == mContext.checkCallingPermission(
+                            android.Manifest.permission.ACCESS_FINE_LOCATION));
+            if (!isDeviceAddressVisible) {
+                Slog.w(TAG, "getWifiDisplayStatus called without CONFIGURE_WIFI_DISPLAY or"
+                        + " ACCESS_FINE_LOCATION permission, and is not the system UID, uid="
+                        + callingUid + ", device address will be hidden.");
+            }
             final long token = Binder.clearCallingIdentity();
             try {
-                return getWifiDisplayStatusInternal(hasConfigureWifiDisplayPermission);
+                return getWifiDisplayStatusInternal(isDeviceAddressVisible);
             } finally {
                 Binder.restoreCallingIdentity(token);
             }
@@ -5693,9 +5713,6 @@ public final class DisplayManagerService extends SystemService {
         @Override // Binder call
         public void setVirtualDisplayRotation(IVirtualDisplayCallback callback,
                 @Surface.Rotation int rotation) {
-            if (!android.companion.virtualdevice.flags.Flags.virtualDisplayRotationApi()) {
-                return;
-            }
             final long token = Binder.clearCallingIdentity();
             try {
                 setVirtualDisplayRotationInternal(callback.asBinder(), rotation);
@@ -6359,9 +6376,6 @@ public final class DisplayManagerService extends SystemService {
 
         @Override // Binder call
         public DisplayTopology getDisplayTopology() {
-            if (mDisplayTopologyCoordinator == null) {
-                return null;
-            }
             return mDisplayTopologyCoordinator.getTopology();
         }
 
@@ -6369,9 +6383,7 @@ public final class DisplayManagerService extends SystemService {
         @Override // Binder call
         public void setDisplayTopology(DisplayTopology topology) {
             setDisplayTopology_enforcePermission();
-            if (mDisplayTopologyCoordinator != null) {
-                mDisplayTopologyCoordinator.setTopology(topology);
-            }
+            mDisplayTopologyCoordinator.setTopology(topology);
         }
     }
 
@@ -6380,6 +6392,11 @@ public final class DisplayManagerService extends SystemService {
         synchronized (mSyncRoot) {
             mSensorManager = sensorManager;
         }
+    }
+
+    @VisibleForTesting
+    SyncRoot getSyncRoot() {
+        return mSyncRoot;
     }
 
     @VisibleForTesting
@@ -6933,9 +6950,6 @@ public final class DisplayManagerService extends SystemService {
 
         @Override
         public void onDisplayBelongToTopologyChanged(int displayId, boolean inTopology) {
-            if (mDisplayTopologyCoordinator == null) {
-                return;
-            }
             if (inTopology) {
                 var info = getDisplayInfo(displayId);
                 if (info == null) {

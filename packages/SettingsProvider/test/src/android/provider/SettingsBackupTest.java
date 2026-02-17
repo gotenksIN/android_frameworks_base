@@ -562,6 +562,7 @@ public class SettingsBackupTest {
                     Settings.Global.HEARING_DEVICE_LOCAL_AMBIENT_VOLUME, // cache per hearing device
                     Settings.Global.HEARING_DEVICE_LOCAL_NOTIFICATION, // cache per hearing device
                     Settings.Global.REDACT_OTP_NOTIFICATIONS_FROM_UNTRUSTED_LISTENERS,
+                    Settings.Global.ENABLE_WEBAPP_MINTER,
                     Settings.Global.Wearable.COMBINED_LOCATION_ENABLE,
                     Settings.Global.Wearable.HAS_PAY_TOKENS,
                     Settings.Global.Wearable.GMS_CHECKIN_TIMEOUT_MIN,
@@ -599,6 +600,7 @@ public class SettingsBackupTest {
                     Settings.Global.Wearable.AMBIENT_FORCE_WHEN_DOCKED,
                     Settings.Global.Wearable.AMBIENT_LOW_BIT_ENABLED,
                     Settings.Global.Wearable.AMBIENT_PLUGGED_TIMEOUT_MIN,
+                    Settings.Global.Wearable.AMBIENT_OFFWRIST_TIMEOUT_MIN,
                     Settings.Global.Wearable.PAIRED_DEVICE_OS_TYPE,
                     Settings.Global.Wearable.COMPANION_BLE_ROLE,
                     Settings.Global.Wearable.COMPANION_NAME,
@@ -793,6 +795,8 @@ public class SettingsBackupTest {
                  Settings.Secure.FACE_UNLOCK_RE_ENROLL,
                  Settings.Secure.TAP_GESTURE,
                  Settings.Secure.NEARBY_SHARING_COMPONENT, // not user configurable
+                 Settings.Secure.TAP_EVENT_SERVICE_COMPONENT, // not user configurable
+                 Settings.Secure.TAP_SHARE_FULFILLMENT_ACTIVITY_COMPONENT, // not user configurable
                  Settings.Secure.ACCESSIBILITY_SHORTCUT_TARGET_MAGNIFICATION_CONTROLLER,
                  Settings.Secure.SUPPRESS_DOZE,
                  Settings.Secure.REDUCE_BRIGHT_COLORS_ACTIVATED,
@@ -810,7 +814,8 @@ public class SettingsBackupTest {
                  Settings.Secure.OTP_NOTIFICATION_REDACTION_LOCK_TIME,
                  Settings.Secure.APP_FUNCTION_ADDITIONAL_AGENT_ALLOWLIST,
                  Settings.Secure.READ_SCREEN_CONTEXT_REQUEST_DENIED_COUNT,
-                 Settings.Secure.TRUSTED_LOCATIONS_COUNT);
+                 Settings.Secure.TRUSTED_LOCATIONS_COUNT,
+                 Settings.Secure.IS_WALLET_SERVICE_AVAILABLE);
 
     @Test
     public void systemSettingsBackedUpOrDenied() {
@@ -910,8 +915,6 @@ public class SettingsBackupTest {
                         Settings.System.END_BUTTON_BEHAVIOR, // bug?
                         Settings.System
                                 .ACCESSIBILITY_FORCE_INVERT_COLOR_OVERRIDE_PACKAGES_TO_ENABLE,
-                        Settings.System
-                                .ACCESSIBILITY_FORCE_INVERT_COLOR_OVERRIDE_PACKAGES_TO_DISABLE,
                         Settings.System.DEFAULT_DEVICE_FONT_SCALE, // Non configurable
                         Settings.System.HIDE_ROTATION_LOCK_TOGGLE_FOR_ACCESSIBILITY,
                         Settings.System.INPUT_GAIN_INDEX_SETTINGS,

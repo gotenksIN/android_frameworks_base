@@ -17,6 +17,7 @@
 package android.companion.virtual.computercontrol;
 
 import android.accessibilityservice.AccessibilityServiceInfo;
+import android.annotation.AnyThread;
 import android.annotation.CallbackExecutor;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -38,9 +39,16 @@ final class ComputerControlAccessibilityProxy extends AccessibilityDisplayProxy 
 
     private final Handler mHandler;
 
+    /**
+     * Wraps the currently registered {@link ComputerControlSession.StabilityListener}. A null value
+     * indicates no stability listener is set.
+     */
     @Nullable
     @GuardedBy("this")
     private StabilitySignalTracker mStabilitySignalTracker;
+
+    @GuardedBy("this")
+    private boolean mIsFirstFrameReceived = false;
 
     ComputerControlAccessibilityProxy(int displayId, @NonNull Handler handler) {
         super(displayId, handler::post, getAccessibilityServiceInfos());
@@ -55,6 +63,21 @@ final class ComputerControlAccessibilityProxy extends AccessibilityDisplayProxy 
                 return;
             }
             mStabilitySignalTracker.onAccessibilityEvent();
+        }
+    }
+
+    /**
+     * Called when a frame is available for the display.
+     */
+    void onImageAvailable() {
+        synchronized (this) {
+            if (mIsFirstFrameReceived) {
+                return;
+            }
+            mIsFirstFrameReceived = true;
+            if (mStabilitySignalTracker != null) {
+                mStabilitySignalTracker.onFirstFrameReceived();
+            }
         }
     }
 
@@ -80,9 +103,20 @@ final class ComputerControlAccessibilityProxy extends AccessibilityDisplayProxy 
             if (mStabilitySignalTracker != null) {
                 throw new IllegalStateException("A stability listener is already set.");
             }
+            final var callbackRecord = new ComputerControlSession.StabilityListener() {
+                @Override
+                public void onSessionStable() {
+                    synchronized (ComputerControlAccessibilityProxy.this) {
+                        // Ensure the listener does not fire after it was changed or removed.
+                        if (mStabilitySignalTracker.mStabilityListener == this) {
+                            executor.execute(listener::onSessionStable);
+                        }
+                    }
+                }
+            };
             mStabilitySignalTracker =
-                    new StabilitySignalTracker(timeoutMillis, mHandler,
-                            () -> executor.execute(listener::onSessionStable));
+                    new StabilitySignalTracker(timeoutMillis, mHandler, callbackRecord,
+                            mIsFirstFrameReceived);
         }
     }
 
@@ -108,40 +142,76 @@ final class ComputerControlAccessibilityProxy extends AccessibilityDisplayProxy 
         return List.of(info);
     }
 
+    /**
+     * Tracks the stability of a {@link ComputerControlSession}.
+     *
+     * Thread safe.
+     */
     private static final class StabilitySignalTracker implements AutoCloseable,
             EventIdleTracker.Callback {
 
-        private final ComputerControlSession.StabilityListener mStabilityListener;
+        final ComputerControlSession.StabilityListener mStabilityListener;
+
+        private final Handler mHandler;
         private final EventIdleTracker mEventIdleTracker;
+        private boolean mIsFirstFrameReceived;
+        private boolean mIsUnstable;
 
         StabilitySignalTracker(long timeoutMillis, Handler handler,
-                ComputerControlSession.StabilityListener listener) {
+                ComputerControlSession.StabilityListener listener, boolean isFirstFrameReceived) {
+            mHandler = handler;
             mStabilityListener = listener;
             mEventIdleTracker = new EventIdleTracker(handler, timeoutMillis);
+            mIsFirstFrameReceived = isFirstFrameReceived;
+        }
+
+        void onFirstFrameReceived() {
+            mHandler.post(() -> {
+                if (mIsFirstFrameReceived) {
+                    throw new IllegalStateException("First frame was already received!");
+                }
+                mIsFirstFrameReceived = true;
+                checkStability();
+            });
         }
 
         void onAccessibilityEvent() {
-            mEventIdleTracker.onEvent();
+            mHandler.post(mEventIdleTracker::onEvent);
         }
 
         void resetStabilityState() {
-            mEventIdleTracker.reset();
-            mEventIdleTracker.registerOneShotIdleCallback(this);
+            mHandler.post(() -> {
+                mIsUnstable = true;
+                mEventIdleTracker.reset();
+                mEventIdleTracker.registerOneShotIdleCallback(this);
+            });
         }
 
         @Override
         public void close() {
-            mEventIdleTracker.reset();
+            mHandler.post(mEventIdleTracker::reset);
         }
 
         @Override
         public void onEventIdle() {
-            if (mStabilityListener != null) {
-                mStabilityListener.onSessionStable();
+            checkStability();
+        }
+
+        private void checkStability() {
+            if (!mIsUnstable || mEventIdleTracker.hasPendingCallback() || !mIsFirstFrameReceived) {
+                return;
             }
+            mIsUnstable = false;
+            mStabilityListener.onSessionStable();
         }
     }
 
+    /**
+     * Tracks the idle state of an event signal.
+     *
+     * NOTE: This class is NOT thread safe and all interactions must happen on the
+     * {@code mHandler} thread, unless otherwise marked.
+     */
     private static final class EventIdleTracker {
         private final Handler mHandler;
         private final long mEventIdleTimeoutMs;
@@ -160,6 +230,7 @@ final class ComputerControlAccessibilityProxy extends AccessibilityDisplayProxy 
             }
         };
 
+        @AnyThread
         EventIdleTracker(@NonNull Handler handler, long eventIdleTimeoutMs) {
             mHandler = handler;
             mEventIdleTimeoutMs = eventIdleTimeoutMs;
@@ -184,6 +255,10 @@ final class ComputerControlAccessibilityProxy extends AccessibilityDisplayProxy 
             mPendingCallback = callback;
             long now = SystemClock.uptimeMillis();
             mHandler.postAtTime(mCallbackExecutor, now + mEventIdleTimeoutMs);
+        }
+
+        boolean hasPendingCallback() {
+            return mPendingCallback != null;
         }
 
         void reset() {

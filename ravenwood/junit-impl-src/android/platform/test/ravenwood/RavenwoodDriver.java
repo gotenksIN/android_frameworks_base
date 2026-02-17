@@ -39,6 +39,7 @@ import android.os.SystemProperties;
 import android.provider.DeviceConfig_ravenwood;
 import android.system.ErrnoException;
 import android.system.Os;
+import android.text.Hyphenator;
 import android.util.Log;
 import android.util.Log_ravenwood;
 
@@ -50,7 +51,6 @@ import com.android.ravenwood.common.RavenwoodInternalUtils;
 import com.android.ravenwood.common.SneakyThrow;
 import com.android.server.LocalServices;
 
-import org.junit.internal.management.ManagementFactory;
 import org.junit.runner.Description;
 import org.mockito.Mockito;
 import org.mockito.internal.progress.ThreadSafeMockingProgress;
@@ -197,6 +197,9 @@ public class RavenwoodDriver {
         Log.i(TAG, "TempDir=" + RavenwoodEnvironment.getInstance().getTempDir());
         Log.i(TAG, "ArtifactsDir=" + RavenwoodEnvironment.getInstance().getArtifactsDir());
 
+        // Disable the built-in HostRuntime
+        System.setProperty("use_base_native_hostruntime", "false");
+
         // Make sure libravenwood_runtime is loaded.
         System.load(RavenwoodInternalUtils.getJniLibraryPath(RAVENWOOD_NATIVE_RUNTIME_NAME));
 
@@ -235,6 +238,9 @@ public class RavenwoodDriver {
         Typeface.init();
         Typeface.loadPreinstalledSystemFontMap();
         Typeface.loadNativeSystemFonts();
+
+        // Initialize Hyphenator
+        Hyphenator.init();
 
         // Do it after the framework is initialized.
         dumpFrameworkInfo();
@@ -340,13 +346,7 @@ public class RavenwoodDriver {
     private static void dumpCommandLineArgs() {
         Log.i(TAG, "JVM arguments:");
 
-        // Note, we use the wrapper in JUnit4, not the actual class (
-        // java.lang.management.ManagementFactory), because we can't see the later at the build
-        // because this source file is compiled for the device target, where ManagementFactory
-        // doesn't exist.
-        var args = ManagementFactory.getRuntimeMXBean().getInputArguments();
-
-        for (var arg : args) {
+        for (var arg : RavenwoodImplUtils.getJvmArguments()) {
             Log.i(TAG, "  " + arg);
         }
     }

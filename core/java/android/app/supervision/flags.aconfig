@@ -74,11 +74,25 @@ flag {
 }
 
 flag {
-  name: "enable_supervision_auth_controller_updates"
+  name: "enable_supervision_pin_ui_updates_bugfix"
   is_exported: false
   namespace: "supervision"
-  description: "Flag that enables supervision auth controller updates to support two pane settings"
-  bug: "459821424"
+  description: "Flag that enables supervision PIN UI updates to match the latest UI mocks"
+  bug: "470290511"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+  name: "enable_supervision_settings_session_updates"
+  is_exported: false
+  namespace: "supervision"
+  description: "Flag that enables supervision settings session updates"
+  bug: "472342668"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
 }
 
 flag {
@@ -87,14 +101,6 @@ flag {
   namespace: "supervision"
   description: "Enables usage of lock task feature to enable Quick Settings on LockTask mode"
   bug: "401576820"
-}
-
-flag {
-  name: "persistent_supervision_settings"
-  is_exported: false
-  namespace: "supervision"
-  description: "Saves supervision user data and recovery info into a binary xml file"
-  bug: "406449915"
 }
 
 flag {
@@ -137,17 +143,6 @@ flag {
 }
 
 flag {
-  name: "enable_supervision_pin_snackbars_toast_message"
-  is_exported: false
-  namespace: "supervision"
-  description: "Flag that enables snack bar toast message for PIN related flows"
-  bug: "436646514"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
   name: "enable_supervision_pin_metrics"
   is_exported: false
   namespace: "supervision"
@@ -164,22 +159,22 @@ flag {
 }
 
 flag {
-  name: "supervision_recovery_improvements"
-  is_exported: false
-  namespace: "supervision"
-  description: "Fixes some performance issues with supervision recovery"
-  bug: "454885259"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
     name: "enable_supervision_manager_cache"
     is_exported: false
     namespace: "supervision"
     description: "Enables caching in SupervisionManager"
     bug: "446219688"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "verify_supervision_role_holders_before_destroying_escrow_token"
+    is_exported: false
+    namespace: "supervision"
+    description: "Verifies supervision role holders before destroying escrow token"
+    bug: "444713915"
     metadata {
       purpose: PURPOSE_BUGFIX
     }

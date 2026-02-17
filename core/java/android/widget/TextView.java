@@ -92,7 +92,6 @@ import android.graphics.PorterDuff;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Typeface;
-import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.graphics.fonts.FontStyle;
 import android.graphics.fonts.FontVariationAxis;
@@ -172,6 +171,7 @@ import android.util.DisplayMetrics;
 import android.util.IntArray;
 import android.util.Log;
 import android.util.SparseIntArray;
+import android.util.TimeUtils;
 import android.util.TypedValue;
 import android.view.AccessibilityIterators.TextSegmentIterator;
 import android.view.ActionMode;
@@ -5580,12 +5580,11 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
                             Math.clamp(400 + mFontWeightAdjustment,
                                     FontStyle.FONT_WEIGHT_MIN, FontStyle.FONT_WEIGHT_MAX)));
                 }
-                mTextPaint.setFontVariationSettings(
+                effective = mTextPaint.setFontVariationSettings(
                         FontVariationAxis.toFontVariationSettings(axes));
             } else {
-                mTextPaint.setFontVariationSettings(fontVariationSettings);
+                effective = mTextPaint.setFontVariationSettings(fontVariationSettings);
             }
-            effective = true;
         } else {
             effective = mTextPaint.setFontVariationSettings(fontVariationSettings);
         }
@@ -9497,8 +9496,15 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             paddingTop += getVerticalOffset(false);
         }
         r.offset(paddingLeft, paddingTop);
-        int paddingBottom = getExtendedPaddingBottom();
-        r.bottom += paddingBottom;
+
+        int lineStart = mLayout.getLineForOffset(selStart >= 0 ? selStart : selEnd);
+        int lineEnd = mLayout.getLineForOffset(selEnd);
+        if (lineStart == 0) {
+            r.top -= getExtendedPaddingTop();
+        }
+        if (lineEnd == mLayout.getLineCount() - 1) {
+            r.bottom += getExtendedPaddingBottom();
+        }
     }
 
     /**
@@ -12122,15 +12128,8 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             getInterestingRect(mTempRect, line);
             mTempRect.offset(mScrollX, mScrollY);
 
-            boolean requestRectangleOnScreenResult;
-            if (android.view.accessibility.Flags.requestRectangleWithSource()) {
-                requestRectangleOnScreenResult = requestRectangleOnScreen(mTempRect, false,
-                        View.RECTANGLE_ON_SCREEN_REQUEST_SOURCE_TEXT_CURSOR);
-            } else {
-                requestRectangleOnScreenResult = requestRectangleOnScreen(mTempRect);
-            }
-
-            if (requestRectangleOnScreenResult) {
+            if (requestRectangleOnScreen(mTempRect, false,
+                    View.RECTANGLE_ON_SCREEN_REQUEST_SOURCE_TEXT_CURSOR)) {
                 changed = true;
             }
         }
@@ -15348,77 +15347,67 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             max = Math.max(0, Math.max(selStart, selEnd));
         }
 
-        switch (id) {
-            case ID_SELECT_ALL:
-                final boolean hadSelection = hasSelection();
-                selectAllText();
-                if (mEditor != null && hadSelection) {
-                    mEditor.invalidateActionModeAsync();
-                }
-                return true;
-
-            case ID_UNDO:
-                if (mEditor != null) {
-                    mEditor.undo();
-                }
-                return true;  // Returns true even if nothing was undone.
-
-            case ID_REDO:
-                if (mEditor != null) {
-                    mEditor.redo();
-                }
-                return true;  // Returns true even if nothing was undone.
-
-            case ID_PASTE:
-                paste(true /* withFormatting */);
-                return true;
-
-            case ID_PASTE_AS_PLAIN_TEXT:
-                paste(false /* withFormatting */);
-                return true;
-
-            case ID_CUT:
-                final ClipData cutData = ClipData.newPlainText(null, getTransformedText(min, max));
-                if (setPrimaryClip(cutData)) {
-                    deleteText_internal(min, max);
-                } else {
-                    Toast.makeText(getContext(),
-                            com.android.internal.R.string.failed_to_copy_to_clipboard,
-                            Toast.LENGTH_SHORT).show();
-                }
-                return true;
-
-            case ID_COPY:
-                // For link action mode in a non-selectable/non-focusable TextView,
-                // make sure that we set the appropriate min/max.
-                final int selStart = getSelectionStart();
-                final int selEnd = getSelectionEnd();
-                min = Math.max(0, Math.min(selStart, selEnd));
-                max = Math.max(0, Math.max(selStart, selEnd));
-                final ClipData copyData = ClipData.newPlainText(null, getTransformedText(min, max));
-                if (setPrimaryClip(copyData)) {
-                    stopTextActionMode();
-                } else {
-                    Toast.makeText(getContext(),
-                            com.android.internal.R.string.failed_to_copy_to_clipboard,
-                            Toast.LENGTH_SHORT).show();
-                }
-                return true;
-
-            case ID_REPLACE:
-                if (mEditor != null) {
-                    mEditor.replace();
-                }
-                return true;
-
-            case ID_SHARE:
-                shareSelectedText();
-                return true;
-
-            case ID_AUTOFILL:
-                requestAutofill();
+        if (id == ID_SELECT_ALL) {
+            final boolean hadSelection = hasSelection();
+            selectAllText();
+            if (mEditor != null && hadSelection) {
+                mEditor.invalidateActionModeAsync();
+            }
+            return true;
+        } else if (id == ID_UNDO) {
+            if (mEditor != null) {
+                mEditor.undo();
+            }
+            return true;  // Returns true even if nothing was undone.
+        } else if (id == ID_REDO) {
+            if (mEditor != null) {
+                mEditor.redo();
+            }
+            return true;  // Returns true even if nothing was undone.
+        } else if (id == ID_PASTE) {
+            paste(true /* withFormatting */);
+            return true;
+        } else if (id == ID_PASTE_AS_PLAIN_TEXT) {
+            paste(false /* withFormatting */);
+            return true;
+        } else if (id == ID_CUT) {
+            final ClipData cutData = ClipData.newPlainText(null, getTransformedText(min, max));
+            if (setPrimaryClip(cutData)) {
+                deleteText_internal(min, max);
+            } else {
+                Toast.makeText(getContext(),
+                        com.android.internal.R.string.failed_to_copy_to_clipboard,
+                        Toast.LENGTH_SHORT).show();
+            }
+            return true;
+        } else if (id == ID_COPY) {
+            // For link action mode in a non-selectable/non-focusable TextView,
+            // make sure that we set the appropriate min/max.
+            final int selStart = getSelectionStart();
+            final int selEnd = getSelectionEnd();
+            min = Math.max(0, Math.min(selStart, selEnd));
+            max = Math.max(0, Math.max(selStart, selEnd));
+            final ClipData copyData = ClipData.newPlainText(null, getTransformedText(min, max));
+            if (setPrimaryClip(copyData)) {
                 stopTextActionMode();
-                return true;
+            } else {
+                Toast.makeText(getContext(),
+                        com.android.internal.R.string.failed_to_copy_to_clipboard,
+                        Toast.LENGTH_SHORT).show();
+            }
+            return true;
+        } else if (id == ID_REPLACE) {
+            if (mEditor != null) {
+                mEditor.replace();
+            }
+            return true;
+        } else if (id == ID_SHARE) {
+            shareSelectedText();
+            return true;
+        } else if (id == ID_AUTOFILL) {
+            requestAutofill();
+            stopTextActionMode();
+            return true;
         }
         return false;
     }
@@ -16587,7 +16576,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
         private Choreographer.FrameCallback mTickCallback = new Choreographer.FrameCallback() {
             @Override
             public void doFrame(long frameTimeNanos) {
-                tick();
+                tick(frameTimeNanos);
             }
         };
 
@@ -16595,8 +16584,8 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             @Override
             public void doFrame(long frameTimeNanos) {
                 mStatus = MARQUEE_RUNNING;
-                mLastAnimationMs = mChoreographer.getFrameTime();
-                tick();
+                mLastAnimationMs = frameTimeNanos / TimeUtils.NANOS_PER_MS;
+                tick(frameTimeNanos);
             }
         };
 
@@ -16612,7 +16601,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             }
         };
 
-        void tick() {
+        void tick(long frameTimeNanos) {
             if (mStatus != MARQUEE_RUNNING) {
                 return;
             }
@@ -16622,7 +16611,7 @@ public class TextView extends View implements ViewTreeObserver.OnPreDrawListener
             final TextView textView = mView.get();
             if (textView != null && textView.isAggregatedVisible()
                     && (textView.isFocused() || textView.isSelected())) {
-                long currentMs = mChoreographer.getFrameTime();
+                long currentMs = frameTimeNanos / TimeUtils.NANOS_PER_MS;
                 long deltaMs = currentMs - mLastAnimationMs;
                 mLastAnimationMs = currentMs;
                 float deltaPx = deltaMs * mPixelsPerMs;

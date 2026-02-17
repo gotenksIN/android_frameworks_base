@@ -155,6 +155,7 @@ import com.android.internal.util.IndentingPrintWriter;
 import com.android.internal.util.Preconditions;
 import com.android.modules.utils.TypedXmlPullParser;
 import com.android.modules.utils.TypedXmlSerializer;
+import com.android.server.flags.Flags;
 import com.android.server.memory.ZramMaintenance;
 import com.android.server.pm.Installer;
 import com.android.server.pm.UserManagerInternal;
@@ -380,6 +381,9 @@ class StorageManagerService extends IStorageManager.Stub
     private static final int DEFAULT_MIN_GC_SLEEPTIME = 10000;
     // Target dirty segment ratio to aim to
     private static final int DEFAULT_TARGET_DIRTY_RATIO = 80;
+
+    // Default max lock elapsed time, the unit is millisecond
+    private static final int DEFAULT_MAX_LOCK_ELAPSED_TIME = 500;
 
     private volatile int mLifetimePercentThreshold;
     private volatile int mMinSegmentsThreshold;
@@ -976,6 +980,14 @@ class StorageManagerService extends IStorageManager.Stub
         }
 
         configureTranscoding();
+
+        // Guard the new feature call with the aflag
+        if (Flags.enableFilesystemConfiguration()) {
+            Slog.i(TAG, "Filesystem configuration feature is enabled");
+            configureFilesystem();
+        } else {
+            Slog.i(TAG, "Filesystem configuration feature is disabled");
+        }
     }
 
     /**
@@ -1036,12 +1048,33 @@ class StorageManagerService extends IStorageManager.Stub
             transcodeEnabled = DeviceConfig.getBoolean(DeviceConfig.NAMESPACE_STORAGE_NATIVE_BOOT,
                     "transcode_enabled", defaultValue);
         }
-        SystemProperties.set("sys.fuse.transcode_enabled", String.valueOf(transcodeEnabled));
 
         if (transcodeEnabled) {
             LocalServices.getService(ActivityManagerInternal.class)
                 .registerAnrController(new ExternalStorageServiceAnrController());
         }
+    }
+
+    /**
+     * Update below filesystem configs w/ last value in DeviceConfig
+     * - f2fs sysfs node: max_lock_elapsed_time
+     */
+    private void configureFilesystem() {
+        int maxTime = DeviceConfig.getInt(DeviceConfig.NAMESPACE_STORAGE_NATIVE_BOOT,
+                "max_lock_elapsed_time", DEFAULT_MAX_LOCK_ELAPSED_TIME);
+        Slog.i(TAG, "DeviceConfig max_lock_elapsed_time: " + maxTime);
+
+        if (mVold == null) {
+            Slog.i(TAG, "configureFilesystem: mVold is null");
+            return;
+        }
+
+        try {
+            mVold.setMaxLockElapsedTime(maxTime);
+        } catch (Exception e) {
+            Slog.wtf(TAG, e);
+        }
+        Slog.i(TAG, "configureFilesystem: done");
     }
 
     private class ExternalStorageServiceAnrController implements AnrController {
@@ -2155,18 +2188,18 @@ class StorageManagerService extends IStorageManager.Stub
 
         ProviderInfo provider = getProviderInfo(MediaStore.AUTHORITY);
         if (provider != null) {
-            mMediaStoreAuthorityAppId = UserHandle.getAppId(provider.applicationInfo.uid);
+            mMediaStoreAuthorityAppId = UserHandle.getAppId(provider.getUid());
             sMediaStoreAuthorityProcessName = provider.applicationInfo.processName;
         }
 
         provider = getProviderInfo(Downloads.Impl.AUTHORITY);
         if (provider != null) {
-            mDownloadsAuthorityAppId = UserHandle.getAppId(provider.applicationInfo.uid);
+            mDownloadsAuthorityAppId = UserHandle.getAppId(provider.getUid());
         }
 
         provider = getProviderInfo(DocumentsContract.EXTERNAL_STORAGE_PROVIDER_AUTHORITY);
         if (provider != null) {
-            mExternalStorageAuthorityAppId = UserHandle.getAppId(provider.applicationInfo.uid);
+            mExternalStorageAuthorityAppId = UserHandle.getAppId(provider.getUid());
         }
     }
 

@@ -31,6 +31,7 @@ import com.android.internal.widget.remotecompose.core.documentation.Documentatio
 import com.android.internal.widget.remotecompose.core.operations.layout.measure.Measurable;
 import com.android.internal.widget.remotecompose.core.operations.layout.measure.MeasurePass;
 import com.android.internal.widget.remotecompose.core.operations.layout.modifiers.ComponentModifiers;
+import com.android.internal.widget.remotecompose.core.operations.layout.utils.DebugLog;
 import com.android.internal.widget.remotecompose.core.operations.utilities.StringSerializer;
 import com.android.internal.widget.remotecompose.core.serialize.MapSerializer;
 import com.android.internal.widget.remotecompose.core.serialize.SerializeTags;
@@ -64,7 +65,7 @@ public class RootLayoutComponent extends Component {
     }
 
     public RootLayoutComponent(int componentId) {
-        super(null, componentId, 0, -1, 0, 0, 0);
+        super(null, componentId, -1, 0, 0, 0, 0);
     }
 
     @NonNull
@@ -142,6 +143,9 @@ public class RootLayoutComponent extends Component {
         if (!mNeedsMeasure) {
             return;
         }
+        if (context.isLayoutDebug()) {
+            DebugLog.clear();
+        }
         mNeedsMeasure = false;
         context.mLastComponent = this;
         setWidth(context.mWidth);
@@ -155,6 +159,9 @@ public class RootLayoutComponent extends Component {
                 m.measure(context.getPaintContext(), 0f, mWidth, 0f, mHeight, measurePass);
                 m.layout(context, measurePass);
             }
+        }
+        if (context.isLayoutDebug()) {
+            DebugLog.display();
         }
     }
 
@@ -288,11 +295,11 @@ public class RootLayoutComponent extends Component {
      */
     public static void documentation(@NonNull DocumentationBuilder doc) {
         doc.operation("Layout Operations", id(), name())
-                .field(INT, "COMPONENT_ID", "unique id for this component")
+                .field(INT, "componentId", "Unique ID for this component")
                 .description(
                         "Root element for a document. Other components / layout managers are"
                                 + " children in the component tree starting from"
-                                + "this Root component.");
+                                + " this Root component.");
     }
 
     @Override

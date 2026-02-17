@@ -37,6 +37,8 @@ import com.android.wm.shell.apptoweb.data.AppToWebDatastoreRepository
 import com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_DESKTOP_MODE
 import com.android.wm.shell.shared.annotations.ShellBackgroundThread
 import com.android.wm.shell.shared.annotations.ShellMainThread
+import com.android.wm.shell.sysui.ShellCommandHandler
+import com.android.wm.shell.sysui.ShellController
 import com.android.wm.shell.sysui.ShellInit
 import java.io.PrintWriter
 import kotlin.coroutines.suspendCoroutine
@@ -68,7 +70,11 @@ class AppToWebRepositoryImpl(
     private val shellTaskOrganizer: ShellTaskOrganizer,
     private val launcherApps: LauncherApps,
     shellInit: ShellInit,
+    shellController: ShellController,
+    shellCommandHandler: ShellCommandHandler,
 ) : TaskVanishedListener, AppToWebRepository {
+    private val appToWebShellCommandHandler = AppToWebShellCommandHandler(this, shellController)
+
     private var appToWebDataByTask = SparseArray<TaskAppToWebData>()
     private val firstRunPromptShownByTaskId = mutableSetOf<Int>()
     private var firstRunPromptAckedPackagesByUserId: MutableMap<Int, MutableSet<String>> =
@@ -118,12 +124,13 @@ class AppToWebRepositoryImpl(
 
     init {
         shellInit.addInitCallback(::onInit, this)
+        shellCommandHandler.addCommandCallback("apptoweb", appToWebShellCommandHandler, this)
     }
 
     private fun onInit() {
         shellTaskOrganizer.addTaskVanishedListener(this)
 
-        if (Flags.enableEnhancedAppToWebTransition()) {
+        if (Flags.enableEnhancedAppToWebTransition() && isFirstRunPromptSupportedOnDevice()) {
             launcherApps.registerCallback(launcherAppsCallback)
             mainCoroutineScope.launch {
                 val appToWebProto = appToWebDatastoreRepository.getAppToWebProto() ?: return@launch
@@ -229,6 +236,9 @@ class AppToWebRepositoryImpl(
         if (!Flags.enableEnhancedAppToWebTransition()) {
             return false
         }
+        if (!isFirstRunPromptSupportedOnDevice()) {
+            return false
+        }
         val packageName = taskInfo.topActivity?.packageName ?: return false
         if (taskInfo.capturedLink == null) {
             // No captured link, so no prompt.
@@ -250,10 +260,6 @@ class AppToWebRepositoryImpl(
         if (ALWAYS_SHOW_APP_TO_WEB_FIRST_RUN_PROMPT_FOR_TESTING) {
             return true
         }
-        if (!context.resources.getBoolean(R.bool.config_appToWebActivePrompting)) {
-            // Active prompting is disabled.
-            return false
-        }
         val everAcked =
             firstRunPromptAckedPackagesByUserId[taskInfo.userId]?.contains(packageName) ?: false
         if (everAcked) {
@@ -262,6 +268,10 @@ class AppToWebRepositoryImpl(
         }
         return true
     }
+
+    private fun isFirstRunPromptSupportedOnDevice(): Boolean =
+        context.resources.getBoolean(R.bool.config_appToWebActivePrompting) ||
+            ALWAYS_SHOW_APP_TO_WEB_FIRST_RUN_PROMPT_FOR_TESTING
 
     override fun isFirstRunPromptShown(taskInfo: RunningTaskInfo): Boolean {
         if (!Flags.enableEnhancedAppToWebTransition()) {
@@ -287,6 +297,22 @@ class AppToWebRepositoryImpl(
                 "firstRunPromptAckedPackagesByUserId must be non-null for userId ${taskInfo.userId}"
             }
             .add(packageName)
+        persistFirstRunPromptAckedPackages()
+    }
+
+    override fun clearFirstRunPromptAckedPackages(userId: Int, packageName: String) {
+        if (!Flags.enableEnhancedAppToWebTransition()) {
+            return
+        }
+        firstRunPromptAckedPackagesByUserId[userId]?.remove(packageName)
+        persistFirstRunPromptAckedPackages()
+    }
+
+    override fun clearAllFirstRunPromptAckedPackages(userId: Int) {
+        if (!Flags.enableEnhancedAppToWebTransition()) {
+            return
+        }
+        firstRunPromptAckedPackagesByUserId[userId]?.clear()
         persistFirstRunPromptAckedPackages()
     }
 
@@ -364,10 +390,14 @@ class AppToWebRepositoryImpl(
         var educationRequestTimestamp: Long = 0L,
     )
 
+    // TODO(b/478792808): Remove suppression
+    @SuppressWarnings("ProtoLogNonConstantFormat")
     private fun logD(msg: String, vararg arguments: Any?) {
         ProtoLog.d(WM_SHELL_DESKTOP_MODE, "%s: $msg", TAG, *arguments)
     }
 
+    // TODO(b/478792808): Remove suppression
+    @SuppressWarnings("ProtoLogNonConstantFormat")
     private fun logE(msg: String, vararg arguments: Any?) {
         ProtoLog.d(WM_SHELL_DESKTOP_MODE, "%s: $msg", TAG, *arguments)
     }

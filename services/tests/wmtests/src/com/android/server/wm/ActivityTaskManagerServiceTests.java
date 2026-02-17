@@ -39,9 +39,8 @@ import static com.android.server.wm.ActivityRecord.State.PAUSED;
 import static com.android.server.wm.ActivityRecord.State.PAUSING;
 import static com.android.server.wm.ActivityRecord.State.RESUMED;
 import static com.android.server.wm.ActivityRecord.State.STOPPING;
+import static com.android.window.flags.Flags.FLAG_ENABLE_IS_TASK_MOVE_ALLOWED_ON_DISPLAY_API;
 import static com.android.window.flags.Flags.FLAG_ENABLE_SYS_DECORS_CALLBACKS_VIA_WM;
-import static com.android.window.flags.Flags.FLAG_ENABLE_TASK_MOVE_ALLOWED_LISTENER_API;
-import static com.android.window.flags.Flags.FLAG_ENABLE_WINDOW_REPOSITIONING_API;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -60,7 +59,6 @@ import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doCallRealMethod;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.times;
 
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -74,8 +72,8 @@ import android.app.HandoffActivityParams;
 import android.app.HandoffFailureCode;
 import android.app.IApplicationThread;
 import android.app.IHandoffTaskDataReceiver;
-import android.app.ITaskMoveAllowedListener;
 import android.app.PictureInPictureParams;
+import android.app.PictureInPictureUiState;
 import android.app.servertransaction.ClientTransactionItem;
 import android.app.servertransaction.EnterPipRequestedItem;
 import android.content.ComponentName;
@@ -84,17 +82,17 @@ import android.content.pm.ActivityInfo;
 import android.content.pm.ApplicationInfo;
 import android.content.res.Configuration;
 import android.graphics.Rect;
+import android.net.Uri;
 import android.os.Binder;
 import android.os.IBinder;
 import android.os.LocaleList;
 import android.os.PowerManagerInternal;
 import android.os.RemoteException;
 import android.os.UserHandle;
-import android.permission.PermissionManager;
 import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.annotations.Presubmit;
-import android.util.ArrayMap;
+import android.util.TypedValue;
 import android.view.Display;
 import android.view.DisplayInfo;
 import android.view.IDisplayWindowListener;
@@ -113,7 +111,6 @@ import org.mockito.MockitoSession;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.function.Consumer;
 
 /**
@@ -544,6 +541,48 @@ public class ActivityTaskManagerServiceTests extends WindowTestsBase {
 
         // Request Handoff
         requestHandoffTaskData(task.getRootTaskId(), receiver);
+
+        // Verify that the result code is success.
+        receiver.verifySucceeded(task.getRootTaskId(), handoffActivityData);
+    }
+
+    @EnableFlags(android.companion.Flags.FLAG_TASK_CONTINUITY)
+    @Test
+    public void testRequestHandoffTaskData_succeedsWhenPassingURL()
+        throws Exception{
+        // Create a test task.
+        final Task task = new TaskBuilder(mSupervisor)
+                              .setComponent(new ComponentName("pkg", "cls"))
+                              .setCreateActivity(true).build();
+        final ActivityRecord activity = task.getTopNonFinishingActivity();
+        doReturn(true).when(activity).attachedToProcess();
+        doReturn(true).when(activity).isState(RESUMED);
+        WindowProcessController mockWindowProcessController = mock(WindowProcessController.class);
+        activity.app = mockWindowProcessController;
+        IApplicationThread mockThread = mock(IApplicationThread.class);
+        doReturn(mockThread).when(mockWindowProcessController).getThread();
+        doReturn(true).when(activity).isProcessRunning();
+        doReturn(true).when(activity).isHandoffEnabled();
+
+        // Setup a fake receiver to receive the result.
+        TestHandoffTaskDataReceiver receiver = new TestHandoffTaskDataReceiver();
+
+        // Request Handoff
+        requestHandoffTaskData(task.getRootTaskId(), receiver);
+
+        ArgumentCaptor<IBinder> requestTokenCaptor = ArgumentCaptor.forClass(IBinder.class);
+        ArgumentCaptor<List<IBinder>> activityTokenCaptor = ArgumentCaptor.forClass(List.class);
+        verify(mockThread).requestHandoffActivityData(
+            requestTokenCaptor.capture(),
+            activityTokenCaptor.capture());
+
+        // Finish the request
+        HandoffActivityData handoffActivityData
+            = HandoffActivityData.createWebHandoff(Uri.parse("https://www.google.com"));
+
+        mAtm.reportHandoffActivityData(
+            requestTokenCaptor.getValue(),
+            List.of(handoffActivityData));
 
         // Verify that the result code is success.
         receiver.verifySucceeded(task.getRootTaskId(), handoffActivityData);
@@ -1154,15 +1193,12 @@ public class ActivityTaskManagerServiceTests extends WindowTestsBase {
 
     @Test
     public void testSupportsMultiWindow_activityMinWidthHeight_largerThanSupport() {
-        final float density = mContext.getResources().getDisplayMetrics().density;
         final ActivityInfo.WindowLayout windowLayout =
-                new ActivityInfo.WindowLayout(0, 0, 0, 0, 0,
-                        // This is larger than the min dimensions device support in multi window,
-                        // the activity will not be supported in multi window if the device respects
-                        /* minWidth= */
-                        (int) (WindowManager.LARGE_SCREEN_SMALLEST_SCREEN_WIDTH_DP * density),
-                        /* minHeight= */
-                        (int) (WindowManager.LARGE_SCREEN_SMALLEST_SCREEN_WIDTH_DP * density));
+                createWindowLayoutWithMinSize(
+                        WindowManager.LARGE_SCREEN_SMALLEST_SCREEN_WIDTH_DP,
+                        WindowManager.LARGE_SCREEN_SMALLEST_SCREEN_WIDTH_DP,
+                        mContext.getResources().getDisplayMetrics(),
+                        TypedValue.COMPLEX_UNIT_DIP);
         final ActivityRecord activity = new ActivityBuilder(mAtm)
                 .setCreateTask(true)
                 .setWindowLayout(windowLayout)
@@ -1210,13 +1246,13 @@ public class ActivityTaskManagerServiceTests extends WindowTestsBase {
     public void testSupportsMultiWindow_landscape_checkActivityMinWidth() {
         // This is smaller than the min dimensions device support in multi window,
         // the activity will be supported in multi window
-        final float density = mContext.getResources().getDisplayMetrics().density;
-        final int supportedWidth = (int) (WindowManager.LARGE_SCREEN_SMALLEST_SCREEN_WIDTH_DP
-                * mAtm.mMinPercentageMultiWindowSupportWidth * density);
         final ActivityInfo.WindowLayout windowLayout =
-                new ActivityInfo.WindowLayout(0, 0, 0, 0, 0,
-                        /* minWidth= */ supportedWidth,
-                        /* minHeight= */ 0);
+                createWindowLayoutWithMinSize(
+                        (int) (WindowManager.LARGE_SCREEN_SMALLEST_SCREEN_WIDTH_DP
+                                * mAtm.mMinPercentageMultiWindowSupportWidth),
+                        0,
+                        mContext.getResources().getDisplayMetrics(),
+                        TypedValue.COMPLEX_UNIT_DIP);
         final ActivityRecord activity = new ActivityBuilder(mAtm)
                 .setCreateTask(true)
                 .setWindowLayout(windowLayout)
@@ -1245,13 +1281,13 @@ public class ActivityTaskManagerServiceTests extends WindowTestsBase {
     public void testSupportsMultiWindow_portrait_checkActivityMinHeight() {
         // This is smaller than the min dimensions device support in multi window,
         // the activity will be supported in multi window
-        final float density = mContext.getResources().getDisplayMetrics().density;
-        final int supportedHeight = (int) (WindowManager.LARGE_SCREEN_SMALLEST_SCREEN_WIDTH_DP
-                * mAtm.mMinPercentageMultiWindowSupportHeight * density);
         final ActivityInfo.WindowLayout windowLayout =
-                new ActivityInfo.WindowLayout(0, 0, 0, 0, 0,
-                        /* minWidth= */ 0,
-                        /* minHeight= */ supportedHeight);
+                createWindowLayoutWithMinSize(
+                        0,
+                        (int) (WindowManager.LARGE_SCREEN_SMALLEST_SCREEN_WIDTH_DP
+                                * mAtm.mMinPercentageMultiWindowSupportHeight),
+                        mContext.getResources().getDisplayMetrics(),
+                        TypedValue.COMPLEX_UNIT_DIP);
         final ActivityRecord activity = new ActivityBuilder(mAtm)
                 .setCreateTask(true)
                 .setWindowLayout(windowLayout)
@@ -1908,7 +1944,7 @@ public class ActivityTaskManagerServiceTests extends WindowTestsBase {
         assertFalse(record.inPinnedWindowingMode());
     }
 
-    @EnableFlags(FLAG_ENABLE_WINDOW_REPOSITIONING_API)
+    @EnableFlags(FLAG_ENABLE_IS_TASK_MOVE_ALLOWED_ON_DISPLAY_API)
     @Test
     public void testIsTaskMoveAllowedOnDisplay_permissionGranted() {
         final int displayId = Display.DEFAULT_DISPLAY;
@@ -1932,7 +1968,7 @@ public class ActivityTaskManagerServiceTests extends WindowTestsBase {
         }
     }
 
-    @EnableFlags(FLAG_ENABLE_WINDOW_REPOSITIONING_API)
+    @EnableFlags(FLAG_ENABLE_IS_TASK_MOVE_ALLOWED_ON_DISPLAY_API)
     @Test
     public void testIsTaskMoveAllowedOnDisplay_permissionDenied() {
         final int displayId = Display.DEFAULT_DISPLAY;
@@ -1956,275 +1992,6 @@ public class ActivityTaskManagerServiceTests extends WindowTestsBase {
         }
     }
 
-    @EnableFlags({FLAG_ENABLE_WINDOW_REPOSITIONING_API, FLAG_ENABLE_TASK_MOVE_ALLOWED_LISTENER_API})
-    @Test
-    public void testTaskMoveAllowedListener_permissionGranted_notifies() throws RemoteException {
-        final DisplayInfo displayInfo = new DisplayInfo();
-        displayInfo.copyFrom(mDisplayInfo);
-        final DisplayContent dc = createNewDisplay(displayInfo);
-
-        MockitoSession session =
-                mockitoSession().spyStatic(ActivityTaskManagerService.class).startMocking();
-        try {
-            doReturn(PERMISSION_GRANTED)
-                    .when(
-                            () -> {
-                                return ActivityTaskManagerService.checkPermission(
-                                        eq(REPOSITION_SELF_WINDOWS), anyInt(), anyInt());
-                            });
-            doReturn(false).when(dc).isTaskMoveAllowedOnDisplay();
-
-            final PermissionManager pm = mock(PermissionManager.class);
-            doReturn(pm).when(mContext).getSystemService(PermissionManager.class);
-
-            final ITaskMoveAllowedListener listener = mock(ITaskMoveAllowedListener.class);
-            final IBinder binder = mock(IBinder.class);
-            doReturn(binder).when(listener).asBinder();
-
-            // Verify that the listener got called upon registration.
-            mAtm.registerTaskMoveAllowedListener(listener);
-            verify(listener).onTaskMoveAllowedChanged(any(int[].class), any(boolean[].class));
-
-            // Verify that the listener got called again.
-            doReturn(true).when(dc).isTaskMoveAllowedOnDisplay();
-            mAtm.onTaskMoveAllowedChanged();
-            verify(listener, times(2))
-                    .onTaskMoveAllowedChanged(any(int[].class), any(boolean[].class));
-
-            mAtm.unregisterTaskMoveAllowedListener(listener);
-            mAtm.onTaskMoveAllowedChanged();
-
-            // Verify that the listener hasn't got any further updates.
-            verify(listener, times(2))
-                    .onTaskMoveAllowedChanged(any(int[].class), any(boolean[].class));
-        } finally {
-            session.finishMocking();
-        }
-    }
-
-    @EnableFlags({FLAG_ENABLE_WINDOW_REPOSITIONING_API, FLAG_ENABLE_TASK_MOVE_ALLOWED_LISTENER_API})
-    @Test
-    public void testTaskMoveAllowedListener_permissionDenied_isQuiet() throws RemoteException {
-        DisplayInfo displayInfo = new DisplayInfo();
-        displayInfo.copyFrom(mDisplayInfo);
-        DisplayContent dc = createNewDisplay(displayInfo);
-
-        MockitoSession session =
-                mockitoSession().spyStatic(ActivityTaskManagerService.class).startMocking();
-        try {
-            doReturn(PERMISSION_DENIED)
-                    .when(
-                            () -> {
-                                return ActivityTaskManagerService.checkPermission(
-                                        eq(REPOSITION_SELF_WINDOWS), anyInt(), anyInt());
-                            });
-            doReturn(false).when(dc).isTaskMoveAllowedOnDisplay();
-
-            final PermissionManager pm = mock(PermissionManager.class);
-            doReturn(pm).when(mContext).getSystemService(PermissionManager.class);
-
-            final ITaskMoveAllowedListener listener = mock(ITaskMoveAllowedListener.class);
-            final IBinder binder = mock(IBinder.class);
-            doReturn(binder).when(listener).asBinder();
-
-            // Verify that the listener got called upon registration.
-            mAtm.registerTaskMoveAllowedListener(listener);
-            verify(listener).onTaskMoveAllowedChanged(any(int[].class), any(boolean[].class));
-
-            // Verify that the listener hasn't got any further updates.
-            doReturn(true).when(dc).isTaskMoveAllowedOnDisplay();
-            mAtm.onTaskMoveAllowedChanged();
-            verify(listener).onTaskMoveAllowedChanged(any(int[].class), any(boolean[].class));
-
-            mAtm.unregisterTaskMoveAllowedListener(listener);
-            mAtm.onTaskMoveAllowedChanged();
-
-            // Verify that the listener hasn't got any further updates.
-            verify(listener).onTaskMoveAllowedChanged(any(int[].class), any(boolean[].class));
-        } finally {
-            session.finishMocking();
-        }
-    }
-
-    @EnableFlags({FLAG_ENABLE_WINDOW_REPOSITIONING_API, FLAG_ENABLE_TASK_MOVE_ALLOWED_LISTENER_API})
-    @Test
-    public void testTaskMoveAllowedListener_permissionChanges_tmaFalse_expectNothing()
-            throws RemoteException {
-        DisplayInfo displayInfo = new DisplayInfo();
-        displayInfo.copyFrom(mDisplayInfo);
-        DisplayContent dc = createNewDisplay(displayInfo);
-        doReturn(false).when(dc).isTaskMoveAllowedOnDisplay();
-
-        final PermissionManager pm = mock(PermissionManager.class);
-        doReturn(pm).when(mContext).getSystemService(PermissionManager.class);
-
-        final ITaskMoveAllowedListener listener = mock(ITaskMoveAllowedListener.class);
-        final IBinder binder = mock(IBinder.class);
-        doReturn(binder).when(listener).asBinder();
-        // Verify that the listener got called upon registration
-        mAtm.registerTaskMoveAllowedListener(listener);
-        verify(listener).onTaskMoveAllowedChanged(any(int[].class), any(boolean[].class));
-
-        // Verify that the listener hasn't got any further updates.
-        mAtm.sendTmaValuesToListeners(Binder.getCallingUid());
-        verify(listener).onTaskMoveAllowedChanged(any(int[].class), any(boolean[].class));
-    }
-
-    @EnableFlags({FLAG_ENABLE_WINDOW_REPOSITIONING_API, FLAG_ENABLE_TASK_MOVE_ALLOWED_LISTENER_API})
-    @Test
-    public void testTaskMoveAllowedListener_permissionChangesToGranted_tmaTrue_expectCallback()
-            throws RemoteException {
-        DisplayInfo displayInfo = new DisplayInfo();
-        displayInfo.copyFrom(mDisplayInfo);
-        DisplayContent dc = createNewDisplay(displayInfo);
-
-        MockitoSession session =
-                mockitoSession().spyStatic(ActivityTaskManagerService.class).startMocking();
-        try {
-            doReturn(true).when(dc).isTaskMoveAllowedOnDisplay();
-
-            final PermissionManager pm = mock(PermissionManager.class);
-            doReturn(pm).when(mContext).getSystemService(PermissionManager.class);
-
-            final ITaskMoveAllowedListener listener = mock(ITaskMoveAllowedListener.class);
-            final IBinder binder = mock(IBinder.class);
-            doReturn(binder).when(listener).asBinder();
-
-            doReturn(PERMISSION_DENIED)
-                    .when(
-                            () -> {
-                                return ActivityTaskManagerService.checkPermission(
-                                        eq(REPOSITION_SELF_WINDOWS), anyInt(), anyInt());
-                            });
-
-            // Verify that the listener got called upon registration.
-            mAtm.registerTaskMoveAllowedListener(listener);
-            verify(listener).onTaskMoveAllowedChanged(any(int[].class), any(boolean[].class));
-
-            doReturn(PERMISSION_GRANTED)
-                    .when(
-                            () -> {
-                                return ActivityTaskManagerService.checkPermission(
-                                        eq(REPOSITION_SELF_WINDOWS), anyInt(), anyInt());
-                            });
-
-            // Verify that the listener got called again.
-            mAtm.sendTmaValuesToListeners(Binder.getCallingUid());
-            verify(listener, times(2))
-                    .onTaskMoveAllowedChanged(any(int[].class), any(boolean[].class));
-        } finally {
-            session.finishMocking();
-        }
-    }
-
-    @EnableFlags({FLAG_ENABLE_WINDOW_REPOSITIONING_API, FLAG_ENABLE_TASK_MOVE_ALLOWED_LISTENER_API})
-    @Test
-    public void testTaskMoveAllowedListener_permissionChangesToDenied_tmaTrue_expectCallback()
-            throws RemoteException {
-        DisplayInfo displayInfo = new DisplayInfo();
-        displayInfo.copyFrom(mDisplayInfo);
-        DisplayContent dc = createNewDisplay(displayInfo);
-
-        MockitoSession session =
-                mockitoSession().spyStatic(ActivityTaskManagerService.class).startMocking();
-        try {
-            doReturn(true).when(dc).isTaskMoveAllowedOnDisplay();
-
-            final PermissionManager pm = mock(PermissionManager.class);
-            doReturn(pm).when(mContext).getSystemService(PermissionManager.class);
-
-            final ITaskMoveAllowedListener listener = mock(ITaskMoveAllowedListener.class);
-            final IBinder binder = mock(IBinder.class);
-            doReturn(binder).when(listener).asBinder();
-
-            doReturn(PERMISSION_GRANTED)
-                    .when(
-                            () -> {
-                                return ActivityTaskManagerService.checkPermission(
-                                        eq(REPOSITION_SELF_WINDOWS), anyInt(), anyInt());
-                            });
-
-            // Verify that the listener got called upon registration.
-            mAtm.registerTaskMoveAllowedListener(listener);
-            verify(listener).onTaskMoveAllowedChanged(any(int[].class), any(boolean[].class));
-
-            doReturn(PERMISSION_DENIED)
-                    .when(
-                            () -> {
-                                return ActivityTaskManagerService.checkPermission(
-                                        eq(REPOSITION_SELF_WINDOWS), anyInt(), anyInt());
-                            });
-
-            // Verify that the listener got called again.
-            mAtm.sendTmaValuesToListeners(Binder.getCallingUid());
-            verify(listener, times(2))
-                    .onTaskMoveAllowedChanged(any(int[].class), any(boolean[].class));
-        } finally {
-            session.finishMocking();
-        }
-    }
-
-    @EnableFlags({FLAG_ENABLE_WINDOW_REPOSITIONING_API, FLAG_ENABLE_TASK_MOVE_ALLOWED_LISTENER_API})
-    @Test
-    public void testTaskMoveAllowedListener_verifyDataGoingToClientSide() throws RemoteException {
-        DisplayInfo displayInfo1 = new DisplayInfo();
-        displayInfo1.copyFrom(mDisplayInfo);
-        DisplayContent dc1 = createNewDisplay(displayInfo1);
-
-        DisplayInfo displayInfo2 = new DisplayInfo();
-        displayInfo2.copyFrom(mDisplayInfo);
-        DisplayContent dc2 = createNewDisplay(displayInfo2);
-
-        MockitoSession session =
-                mockitoSession().spyStatic(ActivityTaskManagerService.class).startMocking();
-        try {
-            doReturn(false).when(mDisplayContent).isTaskMoveAllowedOnDisplay();
-            doReturn(true).when(dc1).isTaskMoveAllowedOnDisplay();
-            doReturn(false).when(dc2).isTaskMoveAllowedOnDisplay();
-
-            final PermissionManager pm = mock(PermissionManager.class);
-            doReturn(pm).when(mContext).getSystemService(PermissionManager.class);
-
-            final ITaskMoveAllowedListener listener = mock(ITaskMoveAllowedListener.class);
-            final IBinder binder = mock(IBinder.class);
-            doReturn(binder).when(listener).asBinder();
-
-            doReturn(PERMISSION_GRANTED)
-                    .when(
-                            () -> {
-                                return ActivityTaskManagerService.checkPermission(
-                                        eq(REPOSITION_SELF_WINDOWS), anyInt(), anyInt());
-                            });
-
-            mAtm.registerTaskMoveAllowedListener(listener);
-
-            doReturn(true).when(mDisplayContent).isTaskMoveAllowedOnDisplay();
-            mAtm.onTaskMoveAllowedChanged();
-
-            final ArgumentCaptor<int[]> intArrayCaptor = ArgumentCaptor.forClass(int[].class);
-            final ArgumentCaptor<boolean[]> booleanArrayCaptor =
-                    ArgumentCaptor.forClass(boolean[].class);
-            verify(listener, times(2))
-                    .onTaskMoveAllowedChanged(
-                            intArrayCaptor.capture(), booleanArrayCaptor.capture());
-
-            final int[] intArrayCaptorValue = intArrayCaptor.getValue();
-            final boolean[] booleanArrayCaptorValue = booleanArrayCaptor.getValue();
-
-            final Map<Integer, Boolean> resultMap = new ArrayMap<>();
-            for (int i = 0; i < intArrayCaptorValue.length; i++) {
-                resultMap.put(intArrayCaptorValue[i], booleanArrayCaptorValue[i]);
-            }
-
-            assertEquals(3, resultMap.size());
-            assertEquals(true, resultMap.get(mDisplayContent.mDisplayId));
-            assertEquals(true, resultMap.get(dc1.mDisplayId));
-            assertEquals(false, resultMap.get(dc2.mDisplayId));
-        } finally {
-            session.finishMocking();
-        }
-    }
-
     @Test
     public void testStartActivitiesAsPackage_passesCallingActivityToken() {
         final IBinder callingActivityToken = new Binder();
@@ -2239,5 +2006,119 @@ public class ActivityTaskManagerServiceTests extends WindowTestsBase {
                 anyInt(), eq(DEFAULT_COMPONENT_PACKAGE_NAME), any(), any(), any(),
                 eq(callingActivityToken), any(), eq(DEFAULT_USER_ID), anyBoolean(), any(),
                 anyBoolean());
+    }
+
+    @Test
+    public void onPictureInPictureUiStateChanged_defaultDisplay_sendsToPinnedTask() {
+        // Spy on the client controller to verify the call.
+        spyOn(mAtm.mActivityClientController);
+
+        // Create a pinned task with an activity on the default display.
+        final Task pinnedTask = new TaskBuilder(mSupervisor)
+                .setWindowingMode(WINDOWING_MODE_PINNED)
+                .setCreateActivity(true)
+                .build();
+        final ActivityRecord pinnedActivity = pinnedTask.getTopMostActivity();
+        final PictureInPictureUiState pipState = new PictureInPictureUiState.Builder().build();
+
+        // Call the method under test for the default display.
+        mAtm.onPictureInPictureUiStateChanged(pipState, Display.DEFAULT_DISPLAY);
+
+        // Verify the state is dispatched to the correct activity.
+        verify(mAtm.mActivityClientController).onPictureInPictureUiStateChanged(
+                eq(pinnedActivity), eq(pipState));
+    }
+
+    @Test
+    public void onPictureInPictureUiStateChanged_defaultDisplay_sendsToStandardTaskIfNoPinned() {
+        // Spy on the client controller to verify the call.
+        spyOn(mAtm.mActivityClientController);
+
+        // Create a standard task with an activity on the default display.
+        final Task standardTask = new TaskBuilder(mSupervisor)
+                .setCreateActivity(true)
+                .build();
+        final ActivityRecord standardActivity = standardTask.getTopMostActivity();
+        final PictureInPictureUiState pipState = new PictureInPictureUiState.Builder().build();
+
+        // Ensure no pinned task exists on the default display.
+        assertNull(mDefaultDisplay.getDefaultTaskDisplayArea().getRootPinnedTask());
+
+        // Call the method under test for the default display.
+        mAtm.onPictureInPictureUiStateChanged(pipState, Display.DEFAULT_DISPLAY);
+
+        // Verify the state is dispatched to the correct activity.
+        verify(mAtm.mActivityClientController).onPictureInPictureUiStateChanged(
+                eq(standardActivity), eq(pipState));
+    }
+
+    @Test
+    public void onPictureInPictureUiStateChanged_secondaryDisplay_sendsToPinnedTask() {
+        // Spy on the client controller to verify the call.
+        spyOn(mAtm.mActivityClientController);
+
+        // Create a secondary display.
+        final DisplayContent secondaryDisplay = new TestDisplayContent.Builder(mAtm, 1000, 1500)
+                .build();
+
+        // Create a pinned task with an activity on the secondary display.
+        final Task pinnedTask = new TaskBuilder(mSupervisor)
+                .setWindowingMode(WINDOWING_MODE_PINNED)
+                .setCreateActivity(true)
+                .setDisplay(secondaryDisplay)
+                .build();
+        final ActivityRecord pinnedActivity = pinnedTask.getTopMostActivity();
+        final PictureInPictureUiState pipState = new PictureInPictureUiState.Builder().build();
+
+        // Call the method under test for the secondary display.
+        mAtm.onPictureInPictureUiStateChanged(pipState, secondaryDisplay.getDisplayId());
+
+        // Verify the state is dispatched to the correct activity.
+        verify(mAtm.mActivityClientController).onPictureInPictureUiStateChanged(
+                eq(pinnedActivity), eq(pipState));
+    }
+
+    @Test
+    public void onPictureInPictureUiStateChanged_secondaryDisplay_sendsToStandardTaskIfNoPinned() {
+        // Spy on the client controller to verify the call.
+        spyOn(mAtm.mActivityClientController);
+
+        // Create a secondary display.
+        final DisplayContent secondaryDisplay = new TestDisplayContent.Builder(mAtm, 1000, 1500)
+                .build();
+
+        // Create a standard task with an activity on the secondary display.
+        final Task standardTask = new TaskBuilder(mSupervisor)
+                .setCreateActivity(true)
+                .setDisplay(secondaryDisplay)
+                .build();
+        final ActivityRecord standardActivity = standardTask.getTopMostActivity();
+        final PictureInPictureUiState pipState = new PictureInPictureUiState.Builder().build();
+
+        // Ensure no pinned task exists on the secondary display.
+        assertNull(secondaryDisplay.getDefaultTaskDisplayArea().getRootPinnedTask());
+
+        // Call the method under test for the secondary display.
+        mAtm.onPictureInPictureUiStateChanged(pipState, secondaryDisplay.getDisplayId());
+
+        // Verify the state is dispatched to the correct activity.
+        verify(mAtm.mActivityClientController).onPictureInPictureUiStateChanged(
+                eq(standardActivity), eq(pipState));
+    }
+
+    @Test
+    public void onPictureInPictureUiStateChanged_invalidDisplay_doesNothing() {
+        // Spy on the client controller to verify no calls are made.
+        spyOn(mAtm.mActivityClientController);
+
+        final int invalidDisplayId = 999;
+        final PictureInPictureUiState pipState = new PictureInPictureUiState.Builder().build();
+
+        // Call the method under test with an invalid display ID.
+        mAtm.onPictureInPictureUiStateChanged(pipState, invalidDisplayId);
+
+        // Verify the controller is never called.
+        verify(mAtm.mActivityClientController, never()).onPictureInPictureUiStateChanged(any(),
+                any());
     }
 }

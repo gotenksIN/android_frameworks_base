@@ -50,7 +50,6 @@ import android.util.SparseIntArray;
 import android.util.SparseLongArray;
 import android.util.TypedValue;
 import android.view.Display;
-import android.view.View;
 import android.view.ViewConfiguration;
 import android.view.accessibility.MagnificationAnimationCallback;
 
@@ -106,7 +105,6 @@ public class MagnificationController implements MagnificationConnectionManager.C
     private final SparseArray<DisableMagnificationCallback>
             mMagnificationEndRunnableSparseArray = new SparseArray();
 
-    private final AlwaysOnMagnificationFeatureFlag mAlwaysOnMagnificationFeatureFlag;
     private final MagnificationScaleProvider mScaleProvider;
     private FullScreenMagnificationController mFullScreenMagnificationController;
     private MagnificationConnectionManager mMagnificationConnectionManager;
@@ -120,7 +118,7 @@ public class MagnificationController implements MagnificationConnectionManager.C
 
     private final Handler mHandler;
     // Prefer this to SystemClock, because it allows for tests to influence behavior.
-    private SystemClock mSystemClock;
+    private MagnificationSystemClock mSystemClock;
     private boolean[] mActivePanDirections = {false, false, false, false};
     private int mActivePanDisplay = Display.INVALID_DISPLAY;
     // The time that panning by keyboard last took place. Since users can pan
@@ -196,26 +194,6 @@ public class MagnificationController implements MagnificationConnectionManager.C
          */
         void onResult(int displayId, boolean success);
     }
-
-    /**
-     * Functional interface for providing time. Tests may extend this interface to "control time".
-     */
-    @VisibleForTesting
-    interface SystemClock {
-        /**
-         * Returns current time in milliseconds since boot, not counting time spent in deep sleep.
-         */
-        long uptimeMillis();
-    }
-
-    /** The real system clock for use in production. */
-    private static class SystemClockImpl implements SystemClock {
-        @Override
-        public long uptimeMillis() {
-            return android.os.SystemClock.uptimeMillis();
-        }
-    }
-
 
     /**
      * An interface to configure how much the magnification scale should be affected when moving in
@@ -341,17 +319,13 @@ public class MagnificationController implements MagnificationConnectionManager.C
         mScaleProvider = scaleProvider;
         mBackgroundExecutor = backgroundExecutor;
         mHandler = new Handler(looper);
-        mSystemClock = new SystemClockImpl();
+        mSystemClock = new MagnificationSystemClock();
         LocalServices.getService(WindowManagerInternal.class)
                 .getAccessibilityController().setUiChangesForAccessibilityCallbacks(this);
         mSupportWindowMagnification = context.getPackageManager().hasSystemFeature(
                 FEATURE_WINDOW_MAGNIFICATION);
         mScaleStepProvider = new DefaultMagnificationScaleStepProvider();
         mPanStepProvider = new DefaultMagnificationPanStepProvider(mContext);
-
-        mAlwaysOnMagnificationFeatureFlag = new AlwaysOnMagnificationFeatureFlag(context);
-        mAlwaysOnMagnificationFeatureFlag.addOnChangedListener(
-                mBackgroundExecutor, mAms::updateAlwaysOnMagnification);
     }
 
     @VisibleForTesting
@@ -359,7 +333,7 @@ public class MagnificationController implements MagnificationConnectionManager.C
             Context context, FullScreenMagnificationController fullScreenMagnificationController,
             MagnificationConnectionManager magnificationConnectionManager,
             MagnificationScaleProvider scaleProvider, Executor backgroundExecutor, Looper looper,
-            SystemClock systemClock) {
+            MagnificationSystemClock systemClock) {
         this(ams, lock, context, scaleProvider, backgroundExecutor, looper);
         mFullScreenMagnificationController = fullScreenMagnificationController;
         mMagnificationConnectionManager = magnificationConnectionManager;
@@ -824,13 +798,7 @@ public class MagnificationController implements MagnificationConnectionManager.C
             delegate = mAccessibilityCallbacksDelegateArray.get(displayId);
         }
         if (delegate != null) {
-            if (android.view.accessibility.Flags.requestRectangleWithSource()) {
-                delegate.onRectangleOnScreenRequested(displayId, left, top, right, bottom, source);
-            } else {
-                delegate.onRectangleOnScreenRequested(displayId, left, top, right, bottom,
-                        View.RECTANGLE_ON_SCREEN_REQUEST_SOURCE_UNDEFINED);
-            }
-
+            delegate.onRectangleOnScreenRequested(displayId, left, top, right, bottom, source);
         }
     }
 
@@ -1133,8 +1101,9 @@ public class MagnificationController implements MagnificationConnectionManager.C
         getFullScreenMagnificationController().setAlwaysOnMagnificationEnabled(enabled);
     }
 
-    public boolean isAlwaysOnMagnificationFeatureFlagEnabled() {
-        return mAlwaysOnMagnificationFeatureFlag.isFeatureFlagEnabled();
+    public boolean isAlwaysOnMagnificationConfigSupported() {
+        return mContext.getResources().getBoolean(
+                com.android.internal.R.bool.config_magnification_always_on_enabled);
     }
 
     private DisableMagnificationCallback getDisableMagnificationEndRunnableLocked(

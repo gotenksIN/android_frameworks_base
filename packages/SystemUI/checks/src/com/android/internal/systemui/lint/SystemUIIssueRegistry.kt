@@ -30,7 +30,7 @@ class SystemUIIssueRegistry : IssueRegistry() {
         get() =
             listOf(
                 BindServiceOnMainThreadDetector.ISSUE,
-                // TODO(b/469073407): Add BinderCallOnMainThreadDetector.ISSUE here when ready.
+                BinderCallOnMainThreadDetector.ISSUE,
                 BroadcastSentViaContextDetector.ISSUE,
                 CleanArchitectureDependencyViolationDetector.ISSUE,
                 CollectAsStateDetector.ISSUE,
@@ -46,6 +46,7 @@ class SystemUIIssueRegistry : IssueRegistry() {
                 MissingApacheLicenseDetector.ISSUE,
                 NonInjectedMainThreadDetector.ISSUE,
                 NonInjectedServiceDetector.ISSUE,
+                NonSysUISingletonApplicationScopeDetector.ISSUE,
                 NoKotlinTestInScenarioTestDetector.ISSUE,
                 NoMetricInParameterizedDetector.ISSUE_BEFORE,
                 NoMetricInParameterizedDetector.ISSUE_AFTER,
@@ -63,6 +64,7 @@ class SystemUIIssueRegistry : IssueRegistry() {
                 TestFunctionNameViolationDetector.ISSUE,
                 UseNoMetricInFunctionalDetector.ISSUE_BEFORE,
                 UseNoMetricInFunctionalDetector.ISSUE_AFTER,
+                ViewModelCoroutineScopeBanDetector.ISSUE,
             )
 
     override val api: Int

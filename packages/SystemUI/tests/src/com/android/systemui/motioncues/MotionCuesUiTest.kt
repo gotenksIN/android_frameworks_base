@@ -16,7 +16,7 @@
 
 package com.android.systemui.motioncues
 
-import android.app.motioncues.MotionCuesData
+import android.app.motioncues.MotionCuesVisualStyle
 import android.app.motioncues.MotionCuesSettings
 import android.content.Context
 import android.content.pm.PackageManager
@@ -54,8 +54,8 @@ class MotionCuesUiTest : SysuiTestCase() {
         MotionCuesSettings.Builder()
             .setHorizontalSpacingDp(50)
             .setVerticalSpacingDp(100)
-            .setMarginSize(10)
-            .setRadius(20)
+            .setMarginSizeDp(10)
+            .setRadiusDp(20)
             .build()
 
     @Mock private lateinit var mockContext: Context
@@ -129,7 +129,7 @@ class MotionCuesUiTest : SysuiTestCase() {
     }
 
     @Test
-    fun updateMotionCuesData_updatesColorAndShape() {
+    fun updateMotionCuesVisualStyle_updatesColorAndShape() {
         whenever(mockContext.createPackageContextAsUser(anyString(), anyInt(), any(UserHandle::class.java)))
             .thenReturn(clientPackageContext)
         whenever(clientPackageContext.getDrawable(anyInt())).thenReturn(drawable)
@@ -139,8 +139,8 @@ class MotionCuesUiTest : SysuiTestCase() {
 
         val newColor = Color.RED
         val newShapeRes = 12345
-        val data = MotionCuesData(newColor, newShapeRes)
-        underTest.updateMotionCuesData(data)
+        val data = MotionCuesVisualStyle(newColor, newShapeRes)
+        underTest.updateMotionCuesVisualStyle(data)
 
         val state: MotionCueState = underTest.getState()
         assertThat(state.paintColor).isEqualTo(String.format("#%08X", newColor))
@@ -148,7 +148,7 @@ class MotionCuesUiTest : SysuiTestCase() {
     }
 
     @Test
-    fun updateMotionCuesData_withInvalidPackage_usesDefault() {
+    fun updateMotionCuesVisualStyle_withInvalidPackage_usesDefault() {
         whenever(mockContext.createPackageContextAsUser(anyString(), anyInt(), any(UserHandle::class.java)))
             .thenThrow(PackageManager.NameNotFoundException())
         underTest = MotionCuesUi(mockContext, windowManager)
@@ -156,8 +156,8 @@ class MotionCuesUiTest : SysuiTestCase() {
 
         val newColor = Color.RED
         val newShapeRes = 12345
-        val data = MotionCuesData(newColor, newShapeRes)
-        underTest.updateMotionCuesData(data)
+        val data = MotionCuesVisualStyle(newColor, newShapeRes)
+        underTest.updateMotionCuesVisualStyle(data)
 
         val state: MotionCueState = underTest.getState()
         assertThat(state.paintColor).isEqualTo(String.format("#%08X", newColor))
@@ -170,8 +170,8 @@ class MotionCuesUiTest : SysuiTestCase() {
             MotionCuesSettings.Builder()
                 .setHorizontalSpacingDp(50)
                 .setVerticalSpacingDp(100)
-                .setMarginSize(10)
-                .setRadius(20)
+                .setMarginSizeDp(10)
+                .setRadiusDp(20)
                 .build()
         val userId = 1
         val clientPackageName = "com.test.app"
@@ -183,8 +183,8 @@ class MotionCuesUiTest : SysuiTestCase() {
         assertThat(state.clientPackageName).isEqualTo(clientPackageName)
         assertThat(state.horizontalSpacingDp).isEqualTo(settings.horizontalSpacingDp)
         assertThat(state.verticalSpacingDp).isEqualTo(settings.verticalSpacingDp)
-        assertThat(state.marginSize).isEqualTo(settings.marginSize)
-        assertThat(state.radius).isEqualTo(settings.radius)
+        assertThat(state.marginSizeDp).isEqualTo(settings.marginSizeDp)
+        assertThat(state.radiusDp).isEqualTo(settings.radiusDp)
         assertThat(state.motionBubbles).isNotEmpty()
     }
 }

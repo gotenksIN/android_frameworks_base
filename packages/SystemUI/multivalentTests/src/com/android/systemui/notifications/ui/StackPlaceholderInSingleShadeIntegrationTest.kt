@@ -36,6 +36,10 @@ import com.android.systemui.flags.EnableSceneContainer
 import com.android.systemui.jank.interactionJankMonitor
 import com.android.systemui.kosmos.testScope
 import com.android.systemui.lifecycle.rememberViewModel
+import com.android.systemui.media.controls.shared.model.MediaData
+import com.android.systemui.media.remedia.data.repository.fakeMediaData
+import com.android.systemui.media.remedia.data.repository.fakeMediaRepository
+import com.android.systemui.media.remedia.data.repository.mediaPipelineRepository
 import com.android.systemui.motion.createSysUiComposeMotionTestRule
 import com.android.systemui.notifications.ui.composable.Notifications.Elements.NotificationScrim
 import com.android.systemui.qs.composefragment.dagger.usingMediaInComposeFragment
@@ -60,7 +64,7 @@ import com.android.systemui.shade.domain.interactor.shadeModeInteractor
 import com.android.systemui.shade.ui.composable.ShadeScene
 import com.android.systemui.shade.ui.composable.WithStatusIconContext
 import com.android.systemui.shade.ui.viewmodel.shadeSceneContentViewModelFactory
-import com.android.systemui.shade.ui.viewmodel.shadeUserAcionsViewModelFactory
+import com.android.systemui.shade.ui.viewmodel.shadeUserActionsViewModelFactory
 import com.android.systemui.statusbar.notification.stack.ui.view.notificationScrollView
 import com.android.systemui.statusbar.notification.stack.ui.viewmodel.notificationScrollViewModel
 import com.android.systemui.statusbar.notification.stack.ui.viewmodel.notificationsPlaceholderViewModelFactory
@@ -73,7 +77,6 @@ import kotlinx.coroutines.DisposableHandle
 import kotlinx.coroutines.cancelChildren
 import org.junit.After
 import org.junit.Before
-import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -95,7 +98,6 @@ import platform.test.screenshot.Displays.Phone
  * 1. The actual on-screen position and bounds of the [NotificationScrim] UI element.
  * 2. The stack placeholder's position reported to its view models.
  */
-@Ignore("b/462706428") // Re-enable this test, once the test config issues are resolved.
 @RunWith(AndroidJUnit4::class)
 @MotionTest
 @LargeTest
@@ -120,6 +122,12 @@ class StackPlaceholderInSingleShadeIntegrationTest : SysuiTestCase() {
         }
     }
 
+    fun setupMediaForShade() {
+        kosmos.fakeMediaRepository.currentMedia = kosmos.fakeMediaData
+        val userMedia = MediaData(active = true)
+        kosmos.mediaPipelineRepository.addCurrentUserMediaEntry(userMedia)
+    }
+
     @After
     fun tearDown() {
         kosmos.testScope.coroutineContext.cancelChildren()
@@ -128,31 +136,49 @@ class StackPlaceholderInSingleShadeIntegrationTest : SysuiTestCase() {
 
     @Test
     fun swipeDownToOpenSingleShade_recordPlaceholderPosition() {
-        assertShadeMotion {
-            // Swipe down across the whole screen with an ease-in, ease-out curve,
-            // that decelerates to zero velocity, resulting in a very little overscroll.
-            swipe(
-                curve = {
-                    val progress = it / 200f
-                    val easedProgress = (1 - cos(progress * PI).toFloat()) / 2f
-                    Offset(centerX, lerp(top, bottom, easedProgress))
-                },
-                durationMillis = 200,
-            )
-        }
+        assertShadeMotion { performSwipe() }
+    }
+
+    @Test
+    fun swipeDownToOpenSingleShadeWithMedia_recordPlaceholderPosition() {
+        setupMediaForShade()
+        assertShadeMotion { performSwipe() }
+    }
+
+    /**
+     * Swipe down across the whole screen with an ease-in, ease-out curve, that decelerates to zero
+     * velocity, resulting in a very little overscroll.
+     */
+    private fun TouchInjectionScope.performSwipe() {
+        swipe(
+            curve = {
+                val progress = it / 200f
+                val easedProgress = (1 - cos(progress * PI).toFloat()) / 2f
+                Offset(centerX, lerp(top, bottom, easedProgress))
+            },
+            durationMillis = 200,
+        )
     }
 
     @Test
     fun flingDownToOpenSingleShade_recordPlaceholderPosition() {
-        assertShadeMotion {
-            // Fling down half-screen with high exit velocity to trigger an overscroll.
-            swipeWithVelocity(
-                start = topCenter,
-                end = center,
-                durationMillis = 100,
-                endVelocity = 6000.dp.toPx(),
-            )
-        }
+        assertShadeMotion { performSwipeWithVelocity() }
+    }
+
+    @Test
+    fun flingDownToOpenSingleShadeWithMedia_recordPlaceholderPosition() {
+        setupMediaForShade()
+        assertShadeMotion { performSwipeWithVelocity() }
+    }
+
+    /** Fling down half-screen with high exit velocity to trigger an overscroll. */
+    private fun TouchInjectionScope.performSwipeWithVelocity() {
+        swipeWithVelocity(
+            start = topCenter,
+            end = center,
+            durationMillis = 100,
+            endVelocity = 6000.dp.toPx(),
+        )
     }
 
     private fun assertShadeMotion(performGesture: TouchInjectionScope.() -> Unit) =
@@ -181,13 +207,13 @@ class StackPlaceholderInSingleShadeIntegrationTest : SysuiTestCase() {
                             MotionControl(
                                 delayRecording = {
                                     awaitCondition {
-                                        kosmos.sceneInteractor.transitionState.value.isIdle()
+                                        kosmos.sceneInteractor.transitionStateFlow.value.isIdle()
                                     }
                                 }
                             ) {
                                 performTouchInputAsync(onRoot()) { performGesture() }
                                 awaitCondition {
-                                    kosmos.sceneInteractor.transitionState.value.isIdle()
+                                    kosmos.sceneInteractor.transitionStateFlow.value.isIdle()
                                 }
                             },
                             recordBefore = false,
@@ -272,7 +298,7 @@ class StackPlaceholderInSingleShadeIntegrationTest : SysuiTestCase() {
         return ShadeScene(
             shadeSession = shadeSession,
             notificationStackScrollView = { kosmos.notificationScrollView },
-            actionsViewModelFactory = kosmos.shadeUserAcionsViewModelFactory,
+            actionsViewModelFactory = kosmos.shadeUserActionsViewModelFactory,
             contentViewModelFactory = kosmos.shadeSceneContentViewModelFactory,
             notificationsPlaceholderViewModelFactory =
                 kosmos.notificationsPlaceholderViewModelFactory,

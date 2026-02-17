@@ -16,13 +16,19 @@
 
 package android.app.appfunctions;
 
+import android.app.appfunctions.AppFunctionActivityId;
 import android.app.appfunctions.AppFunctionAidlSearchSpec;
 import android.app.appfunctions.ExecuteAppFunctionAidlRequest;
-import android.app.appfunctions.IAppFunctionEnabledCallback;
+import android.app.appfunctions.IGetAppFunctionActivityStatesCallback;
+import android.app.appfunctions.IIsAppFunctionEnabledCallback;
+import android.app.appfunctions.ISetAppFunctionEnabledCallback;
 import android.app.appfunctions.IExecuteAppFunctionCallback;
 import android.app.appfunctions.IOnAppFunctionAccessChangeListener;
 import android.app.appfunctions.IAppFunctionExecutor;
+import android.app.appfunctions.IObserveAppFunctionChangesCallback;
 import android.app.appfunctions.ISearchAppFunctionsCallback;
+import android.app.appfunctions.IGetAppFunctionStatesCallback;
+import android.app.appfunctions.AppFunctionName;
 import android.os.ICancellationSignal;
 import android.os.UserHandle;
 import android.content.Intent;
@@ -60,6 +66,28 @@ interface IAppFunctionManager {
         in ISearchAppFunctionsCallback callback
     );
 
+    @JavaPassthrough(annotation="@android.annotation.RequiresPermission(value = android.Manifest.permission.EXECUTE_APP_FUNCTIONS, conditional = true)")
+    void observeAppFunctions(
+        in AppFunctionAidlSearchSpec aidlSearchSpec,
+        in IObserveAppFunctionChangesCallback callback
+    );
+
+    @JavaPassthrough(annotation="@android.annotation.RequiresPermission(value = android.Manifest.permission.EXECUTE_APP_FUNCTIONS, conditional = true)")
+    void unregisterAppFunctionObserver(
+        in String callingPackage,
+        in UserHandle userHandle,
+        in IObserveAppFunctionChangesCallback callback
+    );
+
+    @JavaPassthrough(annotation="@android.annotation.RequiresPermission(value = android.Manifest.permission.EXECUTE_APP_FUNCTIONS, conditional = true)")
+    void isAppFunctionEnabled(
+        in String callingPackage,
+        in String targetPackage,
+        in String functionIdentifier,
+        in UserHandle userHandle,
+        in IIsAppFunctionEnabledCallback callback
+    );
+
     /**
     * Sets an AppFunction's enabled state provided by {@link AppFunctionService} through the system.
     */
@@ -68,7 +96,7 @@ interface IAppFunctionManager {
         in String functionIdentifier,
         in UserHandle userHandle,
         int enabledState,
-        in IAppFunctionEnabledCallback callback
+        in ISetAppFunctionEnabledCallback callback
     );
 
     int getAccessRequestState(
@@ -94,9 +122,9 @@ interface IAppFunctionManager {
         int flags
     );
 
-    void registerAppFunction(in String packageName, in String functionId, in IAppFunctionExecutor executor);
+    void registerAppFunctions(in String packageName, in List<String> functionIds, in IAppFunctionExecutor executor, in IBinder activityToken);
 
-    void unregisterAppFunction(in String packageName, in String functionId, in IAppFunctionExecutor executor);
+    void unregisterAppFunctions(in String packageName, in List<String> functionIds, in IAppFunctionExecutor executor, in IBinder activityToken);
 
     void revokeSelfAccess(in String targetPackageName);
 
@@ -108,18 +136,21 @@ interface IAppFunctionManager {
         int targetUserId
     );
 
-    @EnforcePermission("MANAGE_APP_FUNCTION_ACCESS")
-    List<SignedPackage> getAgentAllowlist();
-
-    @EnforcePermission("MANAGE_APP_FUNCTION_ACCESS")
-    List<SignedPackageParcel> getAgentAllowlistLegacy();
-
-    @EnforcePermission("MANAGE_APP_FUNCTION_ACCESS")
-    void clearAccessHistory(int userId);
-
     Intent createRequestAccessIntent(in String targetPackageName);
 
     void addOnAccessChangedListener(IOnAppFunctionAccessChangeListener listener, int userId);
 
     void removeOnAccessChangedListener(IOnAppFunctionAccessChangeListener listener, int userId);
+
+    void getAppFunctionStates(
+        in List<AppFunctionName> appFunctionNames,
+        in String callingPackageName,
+        int targetUserId,
+        in IGetAppFunctionStatesCallback callback);
+
+    void getAppFunctionActivityStates(
+        in List<AppFunctionActivityId> activityIds,
+        in String callingPackageName,
+        int targetUserId,
+        in IGetAppFunctionActivityStatesCallback callback);
 }

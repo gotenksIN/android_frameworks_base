@@ -145,7 +145,7 @@ class MockSystem(withSession: (StaticMockitoSessionBuilder) -> Unit = {}) {
                 .mockStatic(SaferIntentUtils::class.java)
                 .mockStatic(SystemProperties::class.java)
                 .mockStatic(SystemConfig::class.java)
-                .mockStatic(SELinuxMMAC::class.java, Mockito.CALLS_REAL_METHODS)
+                .mockStatic(SELinuxMMAC::class.java)
                 .mockStatic(FallbackCategoryProvider::class.java)
                 .mockStatic(PackageManagerServiceUtils::class.java)
                 .mockStatic(Environment::class.java)
@@ -325,6 +325,7 @@ class MockSystem(withSession: (StaticMockitoSessionBuilder) -> Unit = {}) {
         whenever(mocks.systemConfig.hiddenApiWhitelistedApps).thenReturn(ArraySet())
         whenever(mocks.systemConfig.appMetadataFilePaths).thenReturn(ArrayMap())
         whenever(mocks.systemConfig.oemDefinedUids).thenReturn(ArrayMap())
+        whenever(mocks.systemConfig.preventUserDisablePackages).thenReturn(ArraySet())
         wheneverStatic { SystemProperties.set(anyString(), anyString()) }.thenDoNothing()
         wheneverStatic { SystemProperties.getBoolean("fw.free_cache_v2", true) }.thenReturn(true)
         wheneverStatic { Environment.getApexDirectory() }.thenReturn(apexDirectory)
@@ -333,6 +334,7 @@ class MockSystem(withSession: (StaticMockitoSessionBuilder) -> Unit = {}) {
         wheneverStatic { Environment.getRootDirectory() }.thenReturn(rootDirectory)
         wheneverStatic { SystemServerInitThreadPool.submit(any(Runnable::class.java), anyString()) }
                 .thenAnswer { FutureTask<Any?>(it.getArgument(0), null) }
+        wheneverStatic { SELinuxMMAC.readInstallPolicy() }.thenReturn(true)
 
         wheneverStatic { Environment.getDataDirectory() }.thenReturn(dataAppDirectory.parentFile)
         wheneverStatic { Environment.getDataSystemDirectory() }

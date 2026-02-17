@@ -11,37 +11,6 @@ package: "android.companion.virtualdevice.flags"
 container: "system"
 
 flag {
-     namespace: "virtual_devices"
-     name: "activity_control_api"
-     description: "Enable APIs for fine grained activity policy, fallback and callbacks"
-     bug: "333443509"
-     is_exported: true
-}
-
-flag {
-    name: "virtual_rotary"
-    is_exported: true
-    namespace: "virtual_devices"
-    description: "Enable virtual rotary input"
-    bug: "320328752"
-}
-
-flag {
-    namespace: "virtual_devices"
-    name: "virtual_display_rotation_api"
-    description: "API for on-demand rotation of virtual displays"
-    bug: "291748430"
-    is_exported: true
-}
-
-flag {
-    namespace: "virtual_devices"
-    name: "high_resolution_scroll"
-    description: "Enable high resolution scroll"
-    bug: "335160780"
-}
-
-flag {
     name: "camera_multiple_input_streams"
     is_exported: true
     namespace: "virtual_devices"
@@ -96,16 +65,6 @@ flag {
 }
 
 flag {
-    name: "itemized_vdm_permissions"
-    namespace: "virtual_devices"
-    description: "Itemized permissions in CDM dialog for VDM roles"
-    bug: "419169396"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     namespace: "virtual_devices"
     name: "notifications_for_device_streaming"
     description: "Add notifications permissions to device streaming role"
@@ -122,31 +81,6 @@ flag {
 }
 
 flag {
-    name: "correct_virtual_display_power_state"
-    namespace: "virtual_devices"
-    description: "Fix the virtual display power state"
-    bug: "371125136"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
-    name: "migrate_viewconfiguration_constants_to_resources"
-    namespace: "virtual_devices"
-    description: "Use resources instead of constants in ViewConfiguration"
-    is_fixed_read_only: true
-    bug: "370928384"
-}
-
-flag {
-    name: "device_aware_settings_override"
-    namespace: "virtual_devices"
-    description: "Settings override for virtual devices"
-    bug: "371801645"
-}
-
-flag {
     namespace: "virtual_devices"
     name: "viewconfiguration_apis"
     description: "APIs for setting ViewConfiguration attributes on virtual devices"
@@ -160,13 +94,6 @@ flag {
     description: "API for injecting SensorAdditionalInfo for VirtualSensor"
     bug: "393517834"
     is_exported: true
-}
-
-flag {
-    name: "external_virtual_cameras"
-    namespace: "virtual_devices"
-    description: "Allow external virtual cameras visible only in the Context of the virtual device"
-    bug: "375609768"
 }
 
 flag {
@@ -210,24 +137,6 @@ flag {
 }
 
 flag {
-    name: "virtual_camera_metadata"
-    namespace: "virtual_devices"
-    description: "API for enabling metadata support for virtual cameras"
-    bug: "371167033"
-    is_exported: true
-}
-
-flag {
-    name: "handle_invalid_device_id"
-    namespace: "virtual_devices"
-    description: "Handle invalid device ids in various system services"
-    bug: "394613051"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "external_camera_default_policy"
     namespace: "virtual_devices"
     description: "Allow virtual external cameras to be aded to a virtual device with a default camera policy"
@@ -248,16 +157,6 @@ flag {
 }
 
 flag {
-    name: "gwpc_secure_window_state_tracking"
-    namespace: "virtual_devices"
-    description: "Track secure window states across activity launches in GenericWindowPolicyController"
-    bug: "449765707"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "virtual_camera_support_api"
     namespace: "virtual_devices"
     description: "API for checking if virtual camera is supported on the device"
@@ -269,6 +168,52 @@ flag {
     name: "device_aware_touch_mode"
     namespace: "virtual_devices"
     description: "API for setting the touch mode for a virtual display"
-    bug: "434903682"
+    bug: "461824207"
     is_exported: true
+}
+
+flag {
+    name: "virtual_input_view_behavior"
+    namespace: "virtual_devices"
+    description: "API for setting the view behavior for virtual input devices"
+    bug: "434658418"
+    is_exported: true
+}
+
+flag {
+    name: "audio_focus_environments"
+    namespace: "virtual_devices"
+    description: "Create separate audio focus environments per virtual device with custom audio policy"
+    bug: "433996961"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "remove_start_mode_from_blocked_intents"
+    namespace: "virtual_devices"
+    description: "Remove the start mode from the blocked intents list"
+    bug: "474610879"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "associated_display_id_input_api"
+    namespace: "virtual_devices"
+    description: "API for getting the associated display id for an input device"
+    bug: "441661489"
+    is_exported: true
+}
+
+flag {
+    name: "computer_control_managed_profiles"
+    namespace: "virtual_devices"
+    description: "Improve computer control support for managed profiles."
+    bug: "440352486"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
 }

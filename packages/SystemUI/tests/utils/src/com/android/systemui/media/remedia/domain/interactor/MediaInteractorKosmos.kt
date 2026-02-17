@@ -19,11 +19,12 @@ package com.android.systemui.media.remedia.domain.interactor
 import android.content.applicationContext
 import com.android.systemui.activityIntentHelper
 import com.android.systemui.deviceentry.domain.interactor.deviceEntryInteractor
+import com.android.systemui.keyguard.domain.interactor.keyguardTransitionInteractor
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.applicationCoroutineScope
 import com.android.systemui.media.controls.domain.pipeline.mediaDataProcessor
 import com.android.systemui.media.mediaOutputDialogManager
-import com.android.systemui.media.remedia.data.repository.mediaRepository
+import com.android.systemui.media.remedia.data.repository.fakeMediaRepository
 import com.android.systemui.plugins.activityStarter
 import com.android.systemui.statusbar.notificationLockscreenUserManager
 import com.android.systemui.statusbar.policy.keyguardStateController
@@ -33,7 +34,7 @@ val Kosmos.mediaInteractor by
         MediaInteractorImpl(
             applicationContext = applicationContext,
             applicationScope = applicationCoroutineScope,
-            repository = mediaRepository,
+            repository = fakeMediaRepository,
             mediaDataProcessor = mediaDataProcessor,
             keyguardStateController = keyguardStateController,
             activityStarter = activityStarter,
@@ -41,5 +42,6 @@ val Kosmos.mediaInteractor by
             activityIntentHelper = activityIntentHelper,
             mediaOutputDialogManager = mediaOutputDialogManager,
             deviceEntryInteractor = deviceEntryInteractor,
+            keyguardTransitionInteractor = keyguardTransitionInteractor,
         )
     }

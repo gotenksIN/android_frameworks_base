@@ -39,6 +39,7 @@ import com.android.systemui.animation.ActivityTransitionAnimator;
 import com.android.systemui.bouncer.domain.interactor.AlternateBouncerInteractor;
 import com.android.systemui.bouncer.domain.interactor.PrimaryBouncerInteractor;
 import com.android.systemui.bouncer.ui.binder.BouncerViewBinder;
+import com.android.systemui.brightness.domain.interactor.BrightnessMirrorShowingInteractor;
 import com.android.systemui.classifier.FalsingCollector;
 import com.android.systemui.dagger.SysUISingleton;
 import com.android.systemui.dagger.qualifiers.Main;
@@ -56,11 +57,9 @@ import com.android.systemui.keyguard.shared.model.TransitionStep;
 import com.android.systemui.res.R;
 import com.android.systemui.scene.shared.flag.SceneContainerFlag;
 import com.android.systemui.scene.ui.view.WindowRootViewKeyEventHandler;
-import com.android.systemui.settings.brightness.domain.interactor.BrightnessMirrorShowingInteractor;
 import com.android.systemui.shade.domain.interactor.PanelExpansionInteractor;
 import com.android.systemui.shade.domain.interactor.ShadeAnimationInteractor;
 import com.android.systemui.shade.domain.interactor.ShadeStatusBarComponentsInteractor;
-import com.android.systemui.shade.shared.flag.ShadeWindowGoesAround;
 import com.android.systemui.shared.animation.DisableSubpixelTextTransitionListener;
 import com.android.systemui.statusbar.DragDownHelper;
 import com.android.systemui.statusbar.LockscreenShadeTransitionController;
@@ -68,7 +67,6 @@ import com.android.systemui.statusbar.NotificationInsetsController;
 import com.android.systemui.statusbar.NotificationShadeDepthController;
 import com.android.systemui.statusbar.NotificationShadeWindowController;
 import com.android.systemui.statusbar.SysuiStatusBarStateController;
-import com.android.systemui.statusbar.core.StatusBarConnectedDisplays;
 import com.android.systemui.statusbar.notification.domain.interactor.NotificationLaunchAnimationInteractor;
 import com.android.systemui.statusbar.notification.stack.AmbientState;
 import com.android.systemui.statusbar.notification.stack.NotificationStackScrollLayout;
@@ -292,9 +290,7 @@ public class NotificationShadeWindowViewController implements Dumpable {
                             mDisableSubpixelTextTransitionListener));
         }
 
-        if (ShadeWindowGoesAround.isEnabled()) {
-            mView.setConfigurationForwarder(configurationForwarder.get());
-        }
+        mView.setConfigurationForwarder(configurationForwarder.get());
         bindWindowRootView(windowRootViewModelFactory, blurChoreographer);
         mAodInterceptingTouches = javaAdapter.stateInApp(
                 dozeTouchInteractor.getShouldInterceptTouches(),
@@ -503,7 +499,7 @@ public class NotificationShadeWindowViewController implements Dumpable {
                     } else {
                         mShadeLogger.d("NSWVC: touch not within view");
                     }
-                } else if (mIsTrackingBarGesture) {
+                } else if (!SceneContainerFlag.isEnabled() && mIsTrackingBarGesture) {
                     boolean sendToStatusBar = phoneStatusBarViewController.sendTouchToView(ev);
                     if (isUp || isCancel) {
                         mIsTrackingBarGesture = false;
@@ -760,17 +756,8 @@ public class NotificationShadeWindowViewController implements Dumpable {
         }
     }
 
-    public void setStatusBarViewController(PhoneStatusBarViewController statusBarViewController) {
-        StatusBarConnectedDisplays.assertInLegacyMode();
-        mStatusBarViewController = statusBarViewController;
-    }
-
     private PhoneStatusBarViewController statusBarViewController() {
-        if (StatusBarConnectedDisplays.isEnabled()) {
-            return mShadeStatusBarComponentsInteractor.getPhoneStatusBarViewController().getValue();
-        } else {
-            return mStatusBarViewController;
-        }
+        return mShadeStatusBarComponentsInteractor.getPhoneStatusBarViewController().getValue();
     }
 
     @VisibleForTesting

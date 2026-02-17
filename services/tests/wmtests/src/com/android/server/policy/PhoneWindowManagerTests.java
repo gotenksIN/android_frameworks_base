@@ -41,6 +41,7 @@ import static com.android.dx.mockito.inline.extended.ExtendedMockito.verify;
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.when;
 import static com.android.internal.policy.IKeyguardService.SCREEN_TURNING_ON_REASON_DISPLAY_SWITCH;
 import static com.android.internal.policy.IKeyguardService.SCREEN_TURNING_ON_REASON_UNKNOWN;
+import static com.android.server.flags.Flags.FLAG_RESET_KEYGUARD_FIRST_STATE_DISPATCH_ON_SERVICE_CONNECTED;
 import static com.android.server.policy.PhoneWindowManager.EXTRA_TRIGGER_HUB;
 import static com.android.server.policy.PhoneWindowManager.MULTI_PRESS_POWER_BRIGHTNESS_BOOST;
 import static com.android.server.policy.PhoneWindowManager.SHORT_PRESS_POWER_DREAM_OR_AWAKE_OR_SLEEP;
@@ -59,21 +60,28 @@ import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.times;
 
+import android.annotation.NonNull;
 import android.app.ActivityManager;
+import android.app.ActivityManagerInternal;
+import android.app.ActivityTaskManager;
 import android.app.AppOpsManager;
 import android.bluetooth.BluetoothProfile;
 import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
+import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.hardware.display.DisplayManagerInternal;
 import android.hardware.input.InputManager;
 import android.hardware.input.KeyGestureEvent;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.IBinder;
 import android.os.PowerManager;
 import android.os.PowerManagerInternal;
 import android.os.SystemProperties;
+import android.os.UserHandle;
 import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.annotations.Presubmit;
@@ -91,9 +99,11 @@ import android.view.KeyEvent;
 import androidx.test.filters.SmallTest;
 
 import com.android.dx.mockito.inline.extended.StaticMockitoSession;
+import com.android.internal.policy.IKeyguardService;
 import com.android.internal.util.test.LocalServiceKeeperRule;
 import com.android.internal.widget.LockPatternUtils;
 import com.android.server.SystemServiceManager;
+import com.android.server.UiThread;
 import com.android.server.input.InputManagerInternal;
 import com.android.server.pm.UserManagerInternal;
 import com.android.server.policy.WindowManagerPolicy.ScreenOnListener;
@@ -142,9 +152,10 @@ public class PhoneWindowManagerTests {
     @Mock private IBinder mInputToken;
     private OffsettableClock mOffsettableClock;
 
-    PhoneWindowManager mNonSpyPhoneWindowManager;
     PhoneWindowManager mPhoneWindowManager;
 
+    @Mock
+    private android.app.IActivityTaskManager mIActivityTaskManager;
     @Mock
     private ActivityTaskManagerInternal mAtmInternal;
     @Mock
@@ -176,6 +187,8 @@ public class PhoneWindowManagerTests {
     @Mock
     private SystemServiceManager mSystemServiceManager;
     @Mock
+    private ActivityManagerInternal mActivityManagerInternal;
+    @Mock
     private PackageManager mPackageManager;
 
     private static final int INTERCEPT_SYSTEM_KEY_NOT_CONSUMED_DELAY = 0;
@@ -188,14 +201,17 @@ public class PhoneWindowManagerTests {
         when(mContext.getSystemService(Context.POWER_SERVICE)).thenReturn(mPowerManager);
         mMockitoSession = mockitoSession()
                 .mockStatic(SystemProperties.class)
+                .mockStatic(ActivityTaskManager.class)
                 .strictness(Strictness.LENIENT)
                 .startMocking();
+        when(ActivityTaskManager.getService()).thenReturn(mIActivityTaskManager);
 
         mOffsettableClock = new OffsettableClock.Stopped();
 
-        mNonSpyPhoneWindowManager = new PhoneWindowManager();
-        mPhoneWindowManager = spy(mNonSpyPhoneWindowManager);
         spyOn(ActivityManager.getService());
+
+        mPhoneWindowManager = new PhoneWindowManager();
+        spyOn(mPhoneWindowManager);
 
         mLocalServiceKeeperRule.overrideLocalService(ActivityTaskManagerInternal.class,
                 mAtmInternal);
@@ -216,6 +232,9 @@ public class PhoneWindowManagerTests {
         mLocalServiceKeeperRule.overrideLocalService(SystemServiceManager.class,
                 mSystemServiceManager);
         when(mSystemServiceManager.isBootCompleted()).thenReturn(true);
+        mLocalServiceKeeperRule.overrideLocalService(ActivityManagerInternal.class,
+                mActivityManagerInternal);
+        when(mActivityManagerInternal.getCurrentUserId()).thenReturn(0);
 
         mPhoneWindowManager.mKeyguardDelegate = mKeyguardServiceDelegate;
         doNothing().when(mInputManager).registerKeyGestureEventHandler(anyList(), any());
@@ -224,6 +243,7 @@ public class PhoneWindowManagerTests {
 
     @After
     public void tearDown() {
+        UiThread.dispose();
         reset(ActivityManager.getService());
         reset(mContext);
         mMockitoSession.finishMocking();
@@ -253,7 +273,8 @@ public class PhoneWindowManagerTests {
 
     @Test
     public void testScreenTurnedOff() {
-        doNothing().when(mPhoneWindowManager).updateSettings(any());
+        doNothing().when(mPhoneWindowManager).postUpdateSettings();
+        doNothing().when(mPhoneWindowManager).updateSettings();
         doNothing().when(mPhoneWindowManager).initializeHdmiState();
         final boolean[] isScreenTurnedOff = {false};
         doAnswer(invocation -> isScreenTurnedOff[0] = true).when(mDisplayPolicy).screenTurnedOff(
@@ -286,7 +307,8 @@ public class PhoneWindowManagerTests {
     @Test
     @RequiresFlagsEnabled(com.android.server.display.feature.flags.Flags.FLAG_SEPARATE_TIMEOUTS)
     public void testScreenTurnedOff_forNonAdjacentDisplayGroup() {
-        doNothing().when(mPhoneWindowManager).updateSettings(any());
+        doNothing().when(mPhoneWindowManager).postUpdateSettings();
+        doNothing().when(mPhoneWindowManager).updateSettings();
         doNothing().when(mPhoneWindowManager).initializeHdmiState();
         initPhoneWindowManager();
 
@@ -302,7 +324,8 @@ public class PhoneWindowManagerTests {
     @Test
     @RequiresFlagsEnabled(com.android.server.display.feature.flags.Flags.FLAG_SEPARATE_TIMEOUTS)
     public void testScreenTurnedOff_forAdjacentDisplayGroup() {
-        doNothing().when(mPhoneWindowManager).updateSettings(any());
+        doNothing().when(mPhoneWindowManager).postUpdateSettings();
+        doNothing().when(mPhoneWindowManager).updateSettings();
         doNothing().when(mPhoneWindowManager).initializeHdmiState();
         initPhoneWindowManager();
 
@@ -321,7 +344,8 @@ public class PhoneWindowManagerTests {
     @Test
     @RequiresFlagsEnabled(com.android.server.display.feature.flags.Flags.FLAG_SEPARATE_TIMEOUTS)
     public void testScreenTurnedOn_forNonAdjacentDisplayGroup() {
-        doNothing().when(mPhoneWindowManager).updateSettings(any());
+        doNothing().when(mPhoneWindowManager).postUpdateSettings();
+        doNothing().when(mPhoneWindowManager).updateSettings();
         doNothing().when(mPhoneWindowManager).initializeHdmiState();
         initPhoneWindowManager();
 
@@ -337,7 +361,8 @@ public class PhoneWindowManagerTests {
     @Test
     @RequiresFlagsEnabled(com.android.server.display.feature.flags.Flags.FLAG_SEPARATE_TIMEOUTS)
     public void testScreenTurnedOn_forAdjacentDisplayGroup() {
-        doNothing().when(mPhoneWindowManager).updateSettings(any());
+        doNothing().when(mPhoneWindowManager).postUpdateSettings();
+        doNothing().when(mPhoneWindowManager).updateSettings();
         doNothing().when(mPhoneWindowManager).initializeHdmiState();
         initPhoneWindowManager();
 
@@ -404,7 +429,7 @@ public class PhoneWindowManagerTests {
         // Set power button behavior.
         Settings.Global.putInt(mContext.getContentResolver(),
                 Settings.Global.POWER_BUTTON_SHORT_PRESS, SHORT_PRESS_POWER_HUB_OR_DREAM_OR_SLEEP);
-        mPhoneWindowManager.updateSettings(null);
+        mPhoneWindowManager.updateSettings();
 
         // Device is dreaming.
         when(mDreamManagerInternal.isDreaming()).thenReturn(true);
@@ -429,7 +454,7 @@ public class PhoneWindowManagerTests {
         // Set power button behavior.
         Settings.Global.putInt(mContext.getContentResolver(),
                 Settings.Global.POWER_BUTTON_SHORT_PRESS, SHORT_PRESS_POWER_HUB_OR_DREAM_OR_SLEEP);
-        mPhoneWindowManager.updateSettings(null);
+        mPhoneWindowManager.updateSettings();
 
         // Power button pressed. Make sure no crash occurs
         int eventTime = 0;
@@ -447,7 +472,7 @@ public class PhoneWindowManagerTests {
         // Set power button behavior.
         Settings.Global.putInt(mContext.getContentResolver(),
                 Settings.Global.POWER_BUTTON_SHORT_PRESS, SHORT_PRESS_POWER_HUB_OR_DREAM_OR_SLEEP);
-        mPhoneWindowManager.updateSettings(null);
+        mPhoneWindowManager.updateSettings();
 
         // Set up hub prerequisites.
         Settings.Secure.putInt(mContext.getContentResolver(),
@@ -474,7 +499,7 @@ public class PhoneWindowManagerTests {
         // Set power button behavior.
         Settings.Global.putInt(mContext.getContentResolver(),
                 Settings.Global.POWER_BUTTON_SHORT_PRESS, SHORT_PRESS_POWER_HUB_OR_DREAM_OR_SLEEP);
-        mPhoneWindowManager.updateSettings(null);
+        mPhoneWindowManager.updateSettings();
 
         // Hub is not available.
         Settings.Secure.putInt(mContext.getContentResolver(),
@@ -498,7 +523,7 @@ public class PhoneWindowManagerTests {
         Settings.Global.putInt(mContext.getContentResolver(),
                 Settings.Global.POWER_BUTTON_SHORT_PRESS,
                 SHORT_PRESS_POWER_DREAM_OR_AWAKE_OR_SLEEP);
-        mPhoneWindowManager.updateSettings(null);
+        mPhoneWindowManager.updateSettings();
 
         // Can not dream when device is dreaming.
         when(mDreamManagerInternal.canStartDreaming(any(Boolean.class))).thenReturn(false);
@@ -523,7 +548,7 @@ public class PhoneWindowManagerTests {
         Settings.Global.putInt(mContext.getContentResolver(),
                 Settings.Global.POWER_BUTTON_SHORT_PRESS,
                 SHORT_PRESS_POWER_DREAM_OR_AWAKE_OR_SLEEP);
-        mPhoneWindowManager.updateSettings(null);
+        mPhoneWindowManager.updateSettings();
 
         // Can not dream for other reasons.
         when(mDreamManagerInternal.canStartDreaming(any(Boolean.class))).thenReturn(false);
@@ -547,7 +572,7 @@ public class PhoneWindowManagerTests {
         Settings.Global.putInt(mContext.getContentResolver(),
                 Settings.Global.POWER_BUTTON_SHORT_PRESS,
                 SHORT_PRESS_POWER_DREAM_OR_AWAKE_OR_SLEEP);
-        mPhoneWindowManager.updateSettings(null);
+        mPhoneWindowManager.updateSettings();
 
         // Can dream when active.
         when(mDreamManagerInternal.canStartDreaming(any(Boolean.class))).thenReturn(true);
@@ -631,7 +656,7 @@ public class PhoneWindowManagerTests {
         Settings.Global.putInt(mContext.getContentResolver(),
                 Settings.Global.POWER_BUTTON_TRIPLE_PRESS, MULTI_PRESS_POWER_BRIGHTNESS_BOOST);
         initPhoneWindowManager();
-        mPhoneWindowManager.updateSettings(null);
+        mPhoneWindowManager.updateSettings();
 
         final long time = 3L;
         final int displayId = 5;
@@ -663,7 +688,6 @@ public class PhoneWindowManagerTests {
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_ENABLE_KEY_GESTURE_HANDLER_FOR_SYSUI)
     public void testKeyGestureEvents_sysuiKeyGesturesEventsEnabled_notRegistered() {
         initPhoneWindowManager();
 
@@ -676,26 +700,13 @@ public class PhoneWindowManagerTests {
     }
 
     @Test
-    @DisableFlags(Flags.FLAG_ENABLE_KEY_GESTURE_HANDLER_FOR_SYSUI)
-    public void testKeyGestureEvents_sysuiKeyGesturesEventsDisabled_registered() {
-        initPhoneWindowManager();
-
-        ArgumentCaptor<List<Integer>> registeredKeyGestureEvents = ArgumentCaptor.forClass(
-                List.class);
-        verify(mInputManager).registerKeyGestureEventHandler(registeredKeyGestureEvents.capture(),
-                any());
-        assertThat(registeredKeyGestureEvents.getValue()).contains(
-                KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_NOTIFICATION_PANEL);
-    }
-
-    @Test
     public void testBluetoothHidConnectionBroadcastCanWakeup() {
         when(mContext.getPackageManager()).thenReturn(mPackageManager);
         when(mPackageManager.hasSystemFeature(PackageManager.FEATURE_PC)).thenReturn(true);
         doReturn(true).when(() -> SystemProperties.getBoolean(
                                 eq("bluetooth.power.suspend.hid_wake_up.enabled"), eq(false)));
 
-        initNonSpyPhoneWindowManager();
+        initPhoneWindowManager();
 
         final Intent intent = new Intent(ACTION_CONNECTION_STATE_CHANGED);
         intent.putExtra(BluetoothProfile.EXTRA_PREVIOUS_STATE, BluetoothProfile.STATE_DISCONNECTED);
@@ -726,7 +737,7 @@ public class PhoneWindowManagerTests {
         initPhoneWindowManager();
         when(mPowerManagerInternal.getLastWakeup()).thenReturn(wakeData);
         when(mDisplayPolicy.isAwake()).thenReturn(true);
-        mPhoneWindowManager.updateSettings(null);
+        mPhoneWindowManager.updateSettings();
 
         mOffsettableClock.fastForward(powerButtonPressEventTimeMillis);
         mPhoneWindowManager.powerPress(powerButtonPressEventTimeMillis, 1, DEFAULT_DISPLAY);
@@ -753,7 +764,7 @@ public class PhoneWindowManagerTests {
         initPhoneWindowManager();
         when(mPowerManagerInternal.getLastWakeup()).thenReturn(wakeData);
         when(mDisplayPolicy.isAwake()).thenReturn(true);
-        mPhoneWindowManager.updateSettings(null);
+        mPhoneWindowManager.updateSettings();
 
         mOffsettableClock.fastForward(powerButtonPressEventTimeMillis);
         mPhoneWindowManager.powerPress(powerButtonPressEventTimeMillis, 1, DEFAULT_DISPLAY);
@@ -771,8 +782,7 @@ public class PhoneWindowManagerTests {
         mPhoneWindowManager.screenTurningOn(DEFAULT_DISPLAY, mock(ScreenOnListener.class));
 
         verify(mKeyguardServiceDelegate).onScreenTurningOn(
-                /* reason= */ eq(SCREEN_TURNING_ON_REASON_DISPLAY_SWITCH),
-                /* drawnListener= */ any());
+                /* reason= */ eq(SCREEN_TURNING_ON_REASON_DISPLAY_SWITCH));
     }
 
     @Test
@@ -784,8 +794,7 @@ public class PhoneWindowManagerTests {
         mPhoneWindowManager.screenTurningOn(DEFAULT_DISPLAY, mock(ScreenOnListener.class));
 
         verify(mKeyguardServiceDelegate).onScreenTurningOn(
-                /* reason= */ eq(SCREEN_TURNING_ON_REASON_UNKNOWN),
-                /* drawnListener= */ any());
+                /* reason= */ eq(SCREEN_TURNING_ON_REASON_UNKNOWN));
     }
 
     @Test
@@ -820,11 +829,62 @@ public class PhoneWindowManagerTests {
                 eq(true), /* fromHomeKey= */ eq(true));
     }
 
-    private void initNonSpyPhoneWindowManager() {
-        mNonSpyPhoneWindowManager.mDefaultDisplayPolicy = mDisplayPolicy;
-        mNonSpyPhoneWindowManager.mDefaultDisplayRotation = mock(DisplayRotation.class);
-        mContext.getMainThreadHandler().runWithScissors(() -> mNonSpyPhoneWindowManager.init(
-                new TestInjector(mContext, mock(WindowManagerPolicy.WindowManagerFuncs.class))), 0);
+    @Test
+    @EnableFlags(FLAG_RESET_KEYGUARD_FIRST_STATE_DISPATCH_ON_SERVICE_CONNECTED)
+    public void testKeyguardServiceDelegate_onKeyguardServiceConnected() throws Exception {
+        // Set up the KeyguardServiceDelegate so that it can attempt to bind a KeyguardService
+        KeyguardServiceDelegate.StateCallback mockCallback =
+                mock(KeyguardServiceDelegate.StateCallback.class);
+        KeyguardServiceDelegate delegate = new KeyguardServiceDelegate(mContext, mockCallback);
+
+        ArgumentCaptor<ServiceConnection> serviceConnectionCaptor =
+                ArgumentCaptor.forClass(ServiceConnection.class);
+
+        ComponentName keyguardServiceComponentName =
+                new ComponentName("testPackage", "testService");
+
+        // Return a mock KeyguardService when binder is queried for IKeyguardService
+        IBinder mockBinder = mock(IBinder.class);
+        IKeyguardService mockKeyguardService = mock(IKeyguardService.class);
+        when(mockBinder.queryLocalInterface(anyString())).thenReturn(mockKeyguardService);
+
+        doReturn(true)
+                .when(mContext)
+                .bindServiceAsUser(
+                        any(Intent.class),
+                        any(ServiceConnection.class),
+                        anyInt(),
+                        any(Handler.class),
+                        any(UserHandle.class));
+        Handler mockHandler = mock(Handler.class);
+        delegate.bindService(mContext, mockHandler);
+
+        verify(mContext)
+                .bindServiceAsUser(
+                        any(Intent.class),
+                        serviceConnectionCaptor.capture(),
+                        anyInt(),
+                        any(Handler.class),
+                        any(UserHandle.class));
+        ServiceConnection connection = serviceConnectionCaptor.getValue();
+
+        // Fake out a successful connection
+        connection.onServiceConnected(keyguardServiceComponentName, mockBinder);
+
+        // Verify that the onKeyguardServiceConnected callback is called
+        verify(mockCallback).onKeyguardServiceConnected();
+
+        // Simulate disconnect
+        connection.onServiceDisconnected(keyguardServiceComponentName);
+
+        // Verify that the onKeyguardServiceConnected callback is not called on disconnect
+        verify(mockCallback, times(1)).onKeyguardServiceConnected();
+
+        // Simulate a reconnect
+        connection.onServiceConnected(keyguardServiceComponentName, mockBinder);
+
+        // Verify that the onKeyguardServiceConnected callback is called a second time on reconnect
+        verify(mockCallback, times(2)).onKeyguardServiceConnected();
     }
 
     private void initPhoneWindowManager() {
@@ -850,7 +910,10 @@ public class PhoneWindowManagerTests {
             super(context, funcs);
         }
 
-        KeyguardServiceDelegate getKeyguardServiceDelegate() {
+        @NonNull
+        @Override
+        KeyguardServiceDelegate getKeyguardServiceDelegate(
+                @NonNull KeyguardServiceDelegate.StateCallback callbacks) {
             return mKeyguardServiceDelegate;
         }
 

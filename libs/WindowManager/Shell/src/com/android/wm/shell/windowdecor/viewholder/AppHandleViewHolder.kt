@@ -112,7 +112,6 @@ class AppHandleViewHolder(
             onCaptionButtonClickListener.onClick(v)
         }
         captionHandle.setOnTouchListener(onCaptionTouchListener)
-        captionHandle.setOnClickListener(onCaptionButtonClickListener)
         if (!shouldAddStatusBarInputLayer) {
             ViewCompat.replaceAccessibilityAction(
                 captionHandle,
@@ -392,6 +391,8 @@ class AppHandleViewHolder(
         animator.cancel()
     }
 
+    // TODO(b/478792808): Remove suppression
+    @SuppressWarnings("ProtoLogNonConstantFormat")
     private fun logD(msg: String, vararg arguments: Any?) {
         ProtoLog.d(WM_SHELL_WINDOW_DECORATION, "%s: $msg", TAG, *arguments)
     }

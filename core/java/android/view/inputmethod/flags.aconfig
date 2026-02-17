@@ -191,6 +191,7 @@ flag {
   namespace: "input_method"
   description: "Deprecate unsupported show/hide flags."
   bug: "322992891"
+  is_exported: true
 }
 
 flag {
@@ -270,6 +271,23 @@ flag {
   namespace: "input_method"
   description: "Migration of the IME Switcher Menu to SystemUi"
   bug: "460776726"
+  metadata {
+    purpose: PURPOSE_BUGFIX
+  }
+}
+
+flag {
+  name: "ime_switcher_menu_large_screen"
+  namespace: "input_method"
+  description: "IME Switcher Menu large screen UI adjustments"
+  bug: "443854916"
+}
+
+flag {
+  name: "limit_subtype_count"
+  namespace: "input_method"
+  description: "Limits the number of subtypes per ime"
+  bug: "456008595"
   metadata {
     purpose: PURPOSE_BUGFIX
   }

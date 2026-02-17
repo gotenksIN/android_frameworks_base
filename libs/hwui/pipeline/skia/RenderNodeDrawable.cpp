@@ -33,6 +33,7 @@
 #include "SkiaDisplayList.h"
 #include "StretchMask.h"
 #include "TransformCanvas.h"
+#include "hwui/OutOfProcessRendering.h"
 
 namespace android {
 namespace uirenderer {

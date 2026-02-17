@@ -96,7 +96,6 @@ import android.util.Pair;
 import android.util.SparseArray;
 import android.view.Display;
 import android.view.WindowManagerGlobal;
-import android.window.DesktopExperienceFlags;
 
 import com.android.internal.R;
 import com.android.internal.annotations.Keep;
@@ -894,13 +893,8 @@ public class WallpaperManager {
                     return null;
                 }
                 try (InputStream is = new ParcelFileDescriptor.AutoCloseInputStream(pfd)) {
-                    ImageDecoder.Source src;
-                    if (DesktopExperienceFlags.ENABLE_CONNECTED_DISPLAYS_WALLPAPER.isTrue()) {
-                        src = ImageDecoder.createSource(context.getResources(), is,
-                                /* density= */ 0);
-                    } else {
-                        src = ImageDecoder.createSource(context.getResources(), is);
-                    }
+                    ImageDecoder.Source src = ImageDecoder.createSource(context.getResources(), is,
+                        /* density= */ 0);
                     return ImageDecoder.decodeBitmap(src, ((decoder, info, source) -> {
                         // Mutable and hardware config can't be set at the same time.
                         decoder.setMutableRequired(!hardware);
@@ -2379,8 +2373,6 @@ public class WallpaperManager {
         try {
             Resources resources = mContext.getResources();
             WallpaperDescription description = new WallpaperDescription.Builder().build();
-            // This code no longer executes because multiCrop() is always true. This is just so
-            // that this compiles.
             ParcelFileDescriptor fd = sGlobals.mService.setWallpaper(
                     "res:" + resources.getResourceName(resid), mContext.getOpPackageName(),
                     description, false, result, which, completion, mContext.getUserId());

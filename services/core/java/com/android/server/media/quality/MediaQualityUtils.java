@@ -27,6 +27,8 @@ import android.hardware.tv.mediaquality.DolbyAudioProcessing;
 import android.hardware.tv.mediaquality.DownmixMode;
 import android.hardware.tv.mediaquality.DtsVirtualX;
 import android.hardware.tv.mediaquality.Gamma;
+import android.hardware.tv.mediaquality.MemcEffect;
+import android.hardware.tv.mediaquality.PanelTechnologyType;
 import android.hardware.tv.mediaquality.ParameterDefaultValue;
 import android.hardware.tv.mediaquality.ParameterName;
 import android.hardware.tv.mediaquality.ParameterRange;
@@ -36,7 +38,11 @@ import android.hardware.tv.mediaquality.QualityLevel;
 import android.hardware.tv.mediaquality.SoundParameter;
 import android.hardware.tv.mediaquality.SoundStyle;
 import android.hardware.tv.mediaquality.StreamStatus;
+import android.hardware.tv.mediaquality.ThreeDMode;
 import android.hardware.tv.mediaquality.VendorParamCapability;
+import android.media.quality.EqualizerBand;
+import android.media.quality.EqualizerCapabilities;
+import android.media.quality.EqualizerSettings;
 import android.media.quality.MediaQualityContract;
 import android.media.quality.MediaQualityContract.BaseParameters;
 import android.media.quality.MediaQualityContract.PictureQuality;
@@ -77,10 +83,7 @@ public final class MediaQualityUtils {
     private static final String TAG = "MediaQualityUtils";
     public static final String SETTINGS = "settings";
 
-    public static final SoundProfileHandle SOUND_PROFILE_HANDLE_NONE = new SoundProfileHandle();
-    static {
-        SOUND_PROFILE_HANDLE_NONE.id = -10000;
-    }
+    public static final SoundProfileHandle SOUND_PROFILE_HANDLE_NONE = SoundProfileHandle.NONE;
 
     private static final Set<String> PREDEFINED_NAMES = new HashSet<>(Arrays.asList(
             PictureQuality.PARAMETER_BRIGHTNESS,
@@ -163,11 +166,17 @@ public final class MediaQualityUtils {
             PictureQuality.PARAMETER_COLOR_TUNER_LUMINANCE_MAGENTA,
             PictureQuality.PARAMETER_COLOR_TUNER_LUMINANCE_YELLOW,
             PictureQuality.PARAMETER_COLOR_TUNER_LUMINANCE_FLESH,
+            PictureQuality.PARAMETER_MEMC_EFFECT,
+            PictureQuality.PARAMETER_MEMC_DEBLUR,
+            PictureQuality.PARAMETER_MEMC_DEJUDDER,
+            PictureQuality.PARAMETER_ORIGINAL_FRAMERATE,
+            PictureQuality.PARAMETER_3D_MODE,
+            PictureQuality.PARAMETER_3D_TO_2D,
             SoundQuality.PARAMETER_BALANCE,
             SoundQuality.PARAMETER_BASS,
             SoundQuality.PARAMETER_TREBLE,
             SoundQuality.PARAMETER_SURROUND_SOUND,
-            SoundQuality.PARAMETER_EQUALIZER_DETAIL,
+            SoundQuality.PARAMETER_EQUALIZER_SETTINGS,
             SoundQuality.PARAMETER_SPEAKERS,
             SoundQuality.PARAMETER_SPEAKERS_DELAY_MILLIS,
             SoundQuality.PARAMETER_EARC,
@@ -179,7 +188,16 @@ public final class MediaQualityUtils {
             SoundQuality.PARAMETER_DTS_VIRTUAL_X,
             SoundQuality.PARAMETER_DIGITAL_OUTPUT_DELAY_MILLIS,
             SoundQuality.PARAMETER_DIGITAL_OUTPUT_MODE,
-            SoundQuality.PARAMETER_SOUND_STYLE
+            SoundQuality.PARAMETER_SOUND_STYLE,
+            SoundQuality.PARAMETER_BALANCE_SPEAKER,
+            SoundQuality.PARAMETER_BALANCE_BLUETOOTH,
+            SoundQuality.PARAMETER_BALANCE_HEADPHONES,
+            SoundQuality.PARAMETER_HI_RES_AUDIO,
+            SoundQuality.PARAMETER_BT_LATENCY_US,
+            SoundQuality.PARAMETER_AD_SPEAKER_ENABLE,
+            SoundQuality.PARAMETER_AD_HEADPHONE_ENABLE,
+            SoundQuality.PARAMETER_AD_VOLUME,
+            SoundQuality.PARAMETER_PAN_FADE_ENABLE
     ));
 
     private static final Set<String> VALID_STREAM_STATUS = new HashSet<>(Arrays.asList(
@@ -699,6 +717,39 @@ public final class MediaQualityUtils {
                     if (pp.getStreamStatus() > -1) {
                         bundle.putInt(PictureQuality.PARAMETER_STREAM_STATUS,
                                 pp.getStreamStatus());
+                    }
+                    break;
+                case PictureParameter.memcEffect:
+                    if (pp.getMemcEffect() > -1) {
+                        bundle.putString(PictureQuality.PARAMETER_MEMC_EFFECT,
+                                mapMemcEffectToString(pp.getMemcEffect()));
+                    }
+                    break;
+                case PictureParameter.memcDeblur:
+                    if (pp.getMemcDeblur() > -1) {
+                        bundle.putInt(PictureQuality.PARAMETER_MEMC_DEBLUR,
+                                pp.getMemcDeblur());
+                    }
+                    break;
+                case PictureParameter.memcDejudder:
+                    if (pp.getMemcDejudder() > -1) {
+                        bundle.putInt(PictureQuality.PARAMETER_MEMC_DEJUDDER,
+                                pp.getMemcDejudder());
+                    }
+                    break;
+                case PictureParameter.realCinema:
+                    bundle.putBoolean(PictureQuality.PARAMETER_ORIGINAL_FRAMERATE, pp.getRealCinema());
+                    break;
+                case PictureParameter.threeDMode:
+                    if (pp.getThreeDMode() > -1) {
+                        bundle.putString(PictureQuality.PARAMETER_3D_MODE,
+                                map3dModeToString(pp.getThreeDMode()));
+                    }
+                    break;
+                case PictureParameter.threeDToTwoD:
+                    if (pp.getThreeDToTwoD() > -1) {
+                        bundle.putString(PictureQuality.PARAMETER_3D_TO_2D,
+                                map3dModeToString(pp.getThreeDToTwoD()));
                     }
                     break;
                 default:
@@ -1261,6 +1312,21 @@ public final class MediaQualityUtils {
                     PictureQuality.PARAMETER_COLOR_TUNER_LUMINANCE_FLESH)));
             params.remove(PictureQuality.PARAMETER_COLOR_TUNER_LUMINANCE_FLESH);
         }
+        if (params.containsKey(PictureQuality.PARAMETER_MEMC_DEBLUR)) {
+            pictureParams.add(PictureParameter.memcDeblur(params.getInt(
+                    PictureQuality.PARAMETER_MEMC_DEBLUR)));
+            params.remove(PictureQuality.PARAMETER_MEMC_DEBLUR);
+        }
+        if (params.containsKey(PictureQuality.PARAMETER_MEMC_DEJUDDER)) {
+            pictureParams.add(PictureParameter.memcDejudder(params.getInt(
+                    PictureQuality.PARAMETER_MEMC_DEJUDDER)));
+            params.remove(PictureQuality.PARAMETER_MEMC_DEJUDDER);
+        }
+        if (params.containsKey(PictureQuality.PARAMETER_ORIGINAL_FRAMERATE)) {
+            pictureParams.add(PictureParameter.realCinema(params.getBoolean(
+                    PictureQuality.PARAMETER_ORIGINAL_FRAMERATE)));
+            params.remove(PictureQuality.PARAMETER_ORIGINAL_FRAMERATE);
+        }
         if (params.containsKey(PictureQuality.PARAMETER_PICTURE_QUALITY_EVENT_TYPE)) {
             String pictureQualityEventTypeString = params.getString(
                     PictureQuality.PARAMETER_PICTURE_QUALITY_EVENT_TYPE);
@@ -1367,6 +1433,30 @@ public final class MediaQualityUtils {
                 pictureParams.add(PictureParameter.streamStatus(streamStatusByte));
             }
             params.remove(PictureQuality.PARAMETER_STREAM_STATUS);
+        }
+        if (params.containsKey(PictureQuality.PARAMETER_MEMC_EFFECT)) {
+            String memcEffectString = params.getString(PictureQuality.PARAMETER_MEMC_EFFECT);
+            if (memcEffectString != null) {
+                byte memcEffectByte = mapLevelStringToHalByte(memcEffectString);
+                pictureParams.add(PictureParameter.memcEffect(memcEffectByte));
+            }
+            params.remove(PictureQuality.PARAMETER_MEMC_EFFECT);
+        }
+        if (params.containsKey(PictureQuality.PARAMETER_3D_MODE)) {
+            String threeDModeString = params.getString(PictureQuality.PARAMETER_3D_MODE);
+            if (threeDModeString != null) {
+                byte threeDModeByte = map3dModeToHalByte(threeDModeString);
+                pictureParams.add(PictureParameter.threeDMode(threeDModeByte));
+            }
+            params.remove(PictureQuality.PARAMETER_3D_MODE);
+        }
+        if (params.containsKey(PictureQuality.PARAMETER_3D_TO_2D)) {
+            String threeDToTwoDString = params.getString(PictureQuality.PARAMETER_3D_TO_2D);
+            if (threeDToTwoDString != null) {
+                byte threeDToTwoDByte = map3dModeToHalByte(threeDToTwoDString);
+                pictureParams.add(PictureParameter.threeDToTwoD(threeDToTwoDByte));
+            }
+            params.remove(PictureQuality.PARAMETER_3D_TO_2D);
         }
         return pictureParams.toArray(new PictureParameter[0]);
     }
@@ -1521,6 +1611,42 @@ public final class MediaQualityUtils {
                         bundle.putBoolean(SoundQuality.PARAMETER_DOLBY_AUDIO_PROCESSING_DOLBY_ATMOS,
                                 false);
                     }
+                    break;
+                case SoundParameter.balanceSpeaker:
+                    bundle.putInt(SoundQuality.PARAMETER_BALANCE_SPEAKER, sp.getBalanceSpeaker());
+                    break;
+                case SoundParameter.balanceBluetooth:
+                    bundle.putInt(SoundQuality.PARAMETER_BALANCE_BLUETOOTH,
+                            sp.getBalanceBluetooth());
+                    break;
+                case SoundParameter.balanceHeadphone:
+                    bundle.putInt(SoundQuality.PARAMETER_BALANCE_HEADPHONES,
+                            sp.getBalanceHeadphone());
+                    break;
+                case SoundParameter.hiResAudio:
+                    if (sp.getHiResAudio()) {
+                        bundle.putBoolean(SoundQuality.PARAMETER_HI_RES_AUDIO, true);
+                    } else {
+                        bundle.putBoolean(SoundQuality.PARAMETER_HI_RES_AUDIO, false);
+                    }
+                    break;
+                case SoundParameter.btLatencyUs:
+                    bundle.putInt(SoundQuality.PARAMETER_BT_LATENCY_US, sp.getBtLatencyUs());
+                    break;
+                case SoundParameter.adSpeakerEnable:
+                    bundle.putBoolean(SoundQuality.PARAMETER_AD_SPEAKER_ENABLE,
+                            sp.getAdSpeakerEnable());
+                    break;
+                case SoundParameter.adHeadphoneEnable:
+                    bundle.putBoolean(SoundQuality.PARAMETER_AD_HEADPHONE_ENABLE,
+                            sp.getAdHeadphoneEnable());
+                    break;
+                case SoundParameter.adVolume:
+                    bundle.putInt(SoundQuality.PARAMETER_AD_VOLUME, sp.getAdVolume());
+                    break;
+                case SoundParameter.panFadeEnable:
+                    bundle.putBoolean(SoundQuality.PARAMETER_PAN_FADE_ENABLE,
+                            sp.getPanFadeEnable());
                     break;
                 default:
                     Log.e(TAG, "Invalid sound parameter tag: " + tag);
@@ -1688,6 +1814,31 @@ public final class MediaQualityUtils {
             }
             params.remove(SoundQuality.PARAMETER_DIALOGUE_ENHANCER);
         }
+        if (params.containsKey(SoundQuality.PARAMETER_BALANCE_SPEAKER)) {
+            soundParams.add(SoundParameter.balanceSpeaker(params.getInt(
+                    SoundQuality.PARAMETER_BALANCE_SPEAKER)));
+            params.remove(SoundQuality.PARAMETER_BALANCE_SPEAKER);
+        }
+        if (params.containsKey(SoundQuality.PARAMETER_BALANCE_BLUETOOTH)) {
+            soundParams.add(SoundParameter.balanceBluetooth(params.getInt(
+                    SoundQuality.PARAMETER_BALANCE_BLUETOOTH)));
+            params.remove(SoundQuality.PARAMETER_BALANCE_BLUETOOTH);
+        }
+        if (params.containsKey(SoundQuality.PARAMETER_BALANCE_HEADPHONES)) {
+            soundParams.add(SoundParameter.balanceHeadphone(params.getInt(
+                    SoundQuality.PARAMETER_BALANCE_HEADPHONES)));
+            params.remove(SoundQuality.PARAMETER_BALANCE_HEADPHONES);
+        }
+        if (params.containsKey(SoundQuality.PARAMETER_HI_RES_AUDIO)) {
+            soundParams.add(SoundParameter.hiResAudio(params.getBoolean(
+                    SoundQuality.PARAMETER_HI_RES_AUDIO)));
+            params.remove(SoundQuality.PARAMETER_HI_RES_AUDIO);
+        }
+        if (params.containsKey(SoundQuality.PARAMETER_BT_LATENCY_US)) {
+            soundParams.add(SoundParameter.btLatencyUs(params.getInt(
+                    SoundQuality.PARAMETER_BT_LATENCY_US)));
+            params.remove(SoundQuality.PARAMETER_BT_LATENCY_US);
+        }
         if (params.getBoolean(SoundQuality.PARAMETER_DOLBY_AUDIO_PROCESSING)) {
             DolbyAudioProcessing dab = new DolbyAudioProcessing();
             if (params.containsKey(SoundQuality.PARAMETER_DOLBY_AUDIO_PROCESSING_SOUND_MODE)) {
@@ -1781,6 +1932,26 @@ public final class MediaQualityUtils {
             }
             soundParams.add(SoundParameter.dtsVirtualX(dts));
         }
+        if (params.containsKey(SoundQuality.PARAMETER_AD_SPEAKER_ENABLE)) {
+            soundParams.add(SoundParameter.adSpeakerEnable(params.getBoolean(
+                    SoundQuality.PARAMETER_AD_SPEAKER_ENABLE)));
+            params.remove(SoundQuality.PARAMETER_AD_SPEAKER_ENABLE);
+        }
+        if (params.containsKey(SoundQuality.PARAMETER_AD_HEADPHONE_ENABLE)) {
+            soundParams.add(SoundParameter.adHeadphoneEnable(params.getBoolean(
+                    SoundQuality.PARAMETER_AD_HEADPHONE_ENABLE)));
+            params.remove(SoundQuality.PARAMETER_AD_HEADPHONE_ENABLE);
+        }
+        if (params.containsKey(SoundQuality.PARAMETER_AD_VOLUME)) {
+            soundParams.add(SoundParameter.adVolume(params.getInt(
+                    SoundQuality.PARAMETER_AD_VOLUME)));
+            params.remove(SoundQuality.PARAMETER_AD_VOLUME);
+        }
+        if (params.containsKey(SoundQuality.PARAMETER_PAN_FADE_ENABLE)) {
+            soundParams.add(SoundParameter.panFadeEnable(params.getBoolean(
+                    SoundQuality.PARAMETER_PAN_FADE_ENABLE)));
+            params.remove(SoundQuality.PARAMETER_PAN_FADE_ENABLE);
+        }
         return soundParams.toArray(new SoundParameter[0]);
     }
 
@@ -1859,6 +2030,24 @@ public final class MediaQualityUtils {
             }
         }
         return bundle;
+    }
+
+    /**
+     * Converts the framework panel technology int to the HAL PanelTechnology enum.
+     *
+     * @param frameworkPanelTechnology The framework panel technology, as defined in
+     *         {@link MediaQualityContract.PanelTechnology}.
+     * @return The corresponding HAL {@link PanelTechnologyType} enum.
+     * @throws IllegalArgumentException if the frameworkPanelTechnology is not a valid, known value.
+     */
+    public static int mapPanelTechnologyToHal(
+            @MediaQualityContract.PanelTechnology int frameworkPanelTechnology) {
+        return switch (frameworkPanelTechnology) {
+            case MediaQualityContract.PANEL_TECHNOLOGY_OLED -> PanelTechnologyType.OLED;
+            default ->
+                    throw new IllegalArgumentException(
+                            "Unknown panel technology: " + frameworkPanelTechnology);
+        };
     }
 
     /**
@@ -2214,6 +2403,21 @@ public final class MediaQualityUtils {
         if (nameMap.contains(PictureQuality.PARAMETER_COLOR_TUNER_LUMINANCE_FLESH)) {
             bytes.add(ParameterName.COLOR_TUNER_LUMINANCE_FLESH);
         }
+        if (nameMap.contains(PictureQuality.PARAMETER_MEMC_EFFECT)) {
+            bytes.add(ParameterName.MEMC_EFFECT);
+        }
+        if (nameMap.contains(PictureQuality.PARAMETER_MEMC_DEBLUR)) {
+            bytes.add(ParameterName.MEMC_DEBLUR);
+        }
+        if (nameMap.contains(PictureQuality.PARAMETER_ORIGINAL_FRAMERATE)) {
+            bytes.add(ParameterName.REAL_CINEMA);
+        }
+        if (nameMap.contains(PictureQuality.PARAMETER_3D_MODE)) {
+            bytes.add(ParameterName.THREE_D_MODE);
+        }
+        if (nameMap.contains(PictureQuality.PARAMETER_3D_TO_2D)) {
+            bytes.add(ParameterName.THREE_D_TO_2D);
+        }
 
         // Sound Quality parameters
         if (nameMap.contains(SoundQuality.PARAMETER_BALANCE)) {
@@ -2228,7 +2432,7 @@ public final class MediaQualityUtils {
         if (nameMap.contains(SoundQuality.PARAMETER_SURROUND_SOUND)) {
             bytes.add(ParameterName.SURROUND_SOUND_ENABLED);
         }
-        if (nameMap.contains(SoundQuality.PARAMETER_EQUALIZER_DETAIL)) {
+        if (nameMap.contains(SoundQuality.PARAMETER_EQUALIZER_SETTINGS)) {
             bytes.add(ParameterName.EQUALIZER_DETAIL);
         }
         if (nameMap.contains(SoundQuality.PARAMETER_SPEAKERS)) {
@@ -2266,6 +2470,33 @@ public final class MediaQualityUtils {
         }
         if (nameMap.contains(SoundQuality.PARAMETER_SOUND_STYLE)) {
             bytes.add(ParameterName.SOUND_STYLE);
+        }
+        if (nameMap.contains(SoundQuality.PARAMETER_BALANCE_SPEAKER)) {
+            bytes.add(ParameterName.BALANCE_SPEAKER);
+        }
+        if (nameMap.contains(SoundQuality.PARAMETER_BALANCE_BLUETOOTH)) {
+            bytes.add(ParameterName.BALANCE_BLUETOOTH);
+        }
+        if (nameMap.contains(SoundQuality.PARAMETER_BALANCE_HEADPHONES)) {
+            bytes.add(ParameterName.BALANCE_HEADPHONE);
+        }
+        if (nameMap.contains(SoundQuality.PARAMETER_HI_RES_AUDIO)) {
+            bytes.add(ParameterName.HI_RES_AUDIO);
+        }
+        if (nameMap.contains(SoundQuality.PARAMETER_BT_LATENCY_US)) {
+            bytes.add(ParameterName.BT_LATENCY_US);
+        }
+        if (nameMap.contains(SoundQuality.PARAMETER_AD_HEADPHONE_ENABLE)) {
+            bytes.add(ParameterName.AD_HEADPHONE_ENABLE);
+        }
+        if (nameMap.contains(SoundQuality.PARAMETER_AD_SPEAKER_ENABLE)) {
+            bytes.add(ParameterName.AD_SPEAKER_ENABLE);
+        }
+        if (nameMap.contains(SoundQuality.PARAMETER_AD_VOLUME)) {
+            bytes.add(ParameterName.AD_VOLUME);
+        }
+        if (nameMap.contains(SoundQuality.PARAMETER_PAN_FADE_ENABLE)) {
+            bytes.add(ParameterName.PAN_FADE_ENABLE);
         }
 
         byte[] byteArray = new byte[bytes.size()];
@@ -2433,13 +2664,23 @@ public final class MediaQualityUtils {
                 PictureQuality.PARAMETER_COLOR_TUNER_LUMINANCE_YELLOW);
         parameterNameMap.put(ParameterName.COLOR_TUNER_LUMINANCE_FLESH,
                 PictureQuality.PARAMETER_COLOR_TUNER_LUMINANCE_FLESH);
+        parameterNameMap.put(ParameterName.MEMC_EFFECT,
+                PictureQuality.PARAMETER_MEMC_EFFECT);
+        parameterNameMap.put(ParameterName.MEMC_DEBLUR,
+                PictureQuality.PARAMETER_MEMC_DEBLUR);
+        parameterNameMap.put(ParameterName.REAL_CINEMA,
+                PictureQuality.PARAMETER_ORIGINAL_FRAMERATE);
+        parameterNameMap.put(ParameterName.THREE_D_MODE,
+                PictureQuality.PARAMETER_3D_MODE);
+        parameterNameMap.put(ParameterName.THREE_D_TO_2D,
+                PictureQuality.PARAMETER_3D_TO_2D);
         parameterNameMap.put(ParameterName.BALANCE, SoundQuality.PARAMETER_BALANCE);
         parameterNameMap.put(ParameterName.BASS, SoundQuality.PARAMETER_BASS);
         parameterNameMap.put(ParameterName.TREBLE, SoundQuality.PARAMETER_TREBLE);
         parameterNameMap.put(ParameterName.SURROUND_SOUND_ENABLED,
                 SoundQuality.PARAMETER_SURROUND_SOUND);
         parameterNameMap.put(ParameterName.EQUALIZER_DETAIL,
-                SoundQuality.PARAMETER_EQUALIZER_DETAIL);
+                SoundQuality.PARAMETER_EQUALIZER_SETTINGS);
         parameterNameMap.put(ParameterName.SPEAKERS_ENABLED, SoundQuality.PARAMETER_SPEAKERS);
         parameterNameMap.put(ParameterName.SPEAKERS_DELAY_MS,
                 SoundQuality.PARAMETER_SPEAKERS_DELAY_MILLIS);
@@ -2460,6 +2701,22 @@ public final class MediaQualityUtils {
         parameterNameMap.put(ParameterName.DIGITAL_OUTPUT_DELAY_MS,
                 SoundQuality.PARAMETER_DIGITAL_OUTPUT_DELAY_MILLIS);
         parameterNameMap.put(ParameterName.SOUND_STYLE, SoundQuality.PARAMETER_SOUND_STYLE);
+        parameterNameMap.put(ParameterName.AD_HEADPHONE_ENABLE,
+                SoundQuality.PARAMETER_AD_HEADPHONE_ENABLE);
+        parameterNameMap.put(ParameterName.AD_SPEAKER_ENABLE,
+                SoundQuality.PARAMETER_AD_SPEAKER_ENABLE);
+        parameterNameMap.put(ParameterName.AD_VOLUME, SoundQuality.PARAMETER_AD_VOLUME);
+        parameterNameMap.put(ParameterName.PAN_FADE_ENABLE, SoundQuality.PARAMETER_PAN_FADE_ENABLE);
+        parameterNameMap.put(ParameterName.BALANCE_SPEAKER,
+                SoundQuality.PARAMETER_BALANCE_SPEAKER);
+        parameterNameMap.put(ParameterName.BALANCE_BLUETOOTH,
+                SoundQuality.PARAMETER_BALANCE_BLUETOOTH);
+        parameterNameMap.put(ParameterName.BALANCE_HEADPHONE,
+                SoundQuality.PARAMETER_BALANCE_HEADPHONES);
+        parameterNameMap.put(ParameterName.HI_RES_AUDIO,
+                SoundQuality.PARAMETER_HI_RES_AUDIO);
+        parameterNameMap.put(ParameterName.BT_LATENCY_US,
+                SoundQuality.PARAMETER_BT_LATENCY_US);
 
         return parameterNameMap.get(pn);
     }
@@ -2477,6 +2734,93 @@ public final class MediaQualityUtils {
         String name = vendorParamNameParcel.readString();
         vendorParamNameParcel.recycle();
         return name;
+    }
+
+    /**
+     * Converts HAL EqualizerCapabilities to framework EqualizerCapabilities.
+     */
+    public static EqualizerCapabilities convertToFrameworkEqualizerCapabilities(
+            android.hardware.tv.mediaquality.EqualizerCapabilities halCaps) {
+        if (halCaps == null) {
+            return null;
+        }
+        // convert int array to list
+        List<Integer> freqList = new ArrayList<>();
+        if (halCaps.supportedFrequenciesHz != null) {
+            for (int freq : halCaps.supportedFrequenciesHz) {
+                freqList.add(freq);
+            }
+        }
+        return new EqualizerCapabilities(
+                halCaps.minLevelDb,
+                halCaps.maxLevelDb,
+                freqList,
+                halCaps.hasAdjustableQ);
+    }
+
+    /**
+     * Converts HAL EqualizerDetail to framework EqualizerSettings.
+     */
+    public static EqualizerSettings convertToFrameworkEqualizerSettings(
+            android.hardware.tv.mediaquality.EqualizerDetail halDetail) {
+        if (halDetail == null) {
+            return null;
+        }
+
+        List<EqualizerBand> frameworkBands = new ArrayList<>();
+        if (halDetail.bands != null) {
+            for (android.hardware.tv.mediaquality.EqualizerBand halBand : halDetail.bands) {
+                if (halBand != null) {
+                    frameworkBands.add(new EqualizerBand(
+                            halBand.frequencyHz,
+                            halBand.gainDb,
+                            halBand.qFactor
+                    ));
+                }
+            }
+        }
+
+        //TODO: add the pre-defined band
+        return new EqualizerSettings.Builder()
+                .addBands(frameworkBands)
+                .build();
+    }
+
+    /**
+     * Converts framework EqualizerSettings to HAL EqualizerDetail.
+     */
+    public static android.hardware.tv.mediaquality.EqualizerDetail convertToHalEqualizerDetail(
+            EqualizerSettings frameworkSettings) {
+        if (frameworkSettings == null) {
+            return null;
+        }
+
+        android.hardware.tv.mediaquality.EqualizerDetail halDetail =
+                new android.hardware.tv.mediaquality.EqualizerDetail();
+
+        //TODO: map pre-defined bands
+        List<EqualizerBand> frameworkBands = frameworkSettings.getBands();
+        if (!frameworkBands.isEmpty()) {
+            int size = frameworkBands.size();
+            halDetail.bands = new android.hardware.tv.mediaquality.EqualizerBand[size];
+
+            for (int i = 0; i < size; i++) {
+                EqualizerBand fBand = frameworkBands.get(i);
+                android.hardware.tv.mediaquality.EqualizerBand hBand =
+                        new android.hardware.tv.mediaquality.EqualizerBand();
+
+                if (fBand != null) {
+                    hBand.frequencyHz = fBand.getFrequencyHz();
+                    hBand.gainDb = fBand.getGainDb();
+                    hBand.qFactor = fBand.getQFactor();
+                }
+                halDetail.bands[i] = hBand;
+            }
+        } else {
+            halDetail.bands = new android.hardware.tv.mediaquality.EqualizerBand[0];
+        }
+
+        return halDetail;
     }
 
     /**
@@ -2598,6 +2942,50 @@ public final class MediaQualityUtils {
                 Log.e("PictureParams", "Invalid quality level: " + qualityLevel);
                 yield MediaQualityContract.LEVEL_OFF;
             }
+        };
+    }
+
+    private static String mapMemcEffectToString(byte memcEffect) {
+        return switch (memcEffect) {
+            case MemcEffect.LOW -> MediaQualityContract.LEVEL_LOW;
+            case MemcEffect.MIDDLE -> MediaQualityContract.LEVEL_MEDIUM;
+            case MemcEffect.HIGH -> MediaQualityContract.LEVEL_HIGH;
+            case MemcEffect.USER -> MediaQualityContract.LEVEL_USER;
+            default -> MediaQualityContract.LEVEL_OFF;
+        };
+    }
+
+    private static String map3dModeToString(byte mode) {
+        return switch (mode) {
+            case ThreeDMode.SIDE_BY_SIDE -> MediaQualityContract.THREE_D_MODE_SIDE_BY_SIDE;
+            case ThreeDMode.TOP_AND_BOTTOM -> MediaQualityContract.THREE_D_MODE_TOP_AND_BOTTOM;
+            case ThreeDMode.FRAME_PACKING -> MediaQualityContract.THREE_D_MODE_FRAME_PACKING;
+            default -> MediaQualityContract.THREE_D_MODE_OFF;
+        };
+    }
+
+    private static byte mapLevelStringToHalByte(String level) {
+        if (level == null) {
+            return MemcEffect.OFF;
+        }
+        return switch (level) {
+            case MediaQualityContract.LEVEL_LOW -> MemcEffect.LOW;
+            case MediaQualityContract.LEVEL_MEDIUM -> MemcEffect.MIDDLE;
+            case MediaQualityContract.LEVEL_HIGH -> MemcEffect.HIGH;
+            case MediaQualityContract.LEVEL_USER -> MemcEffect.USER;
+            default -> MemcEffect.OFF;
+        };
+    }
+
+    private static byte map3dModeToHalByte(String mode) {
+        if (mode == null) {
+            return ThreeDMode.OFF;
+        }
+        return switch (mode) {
+            case MediaQualityContract.THREE_D_MODE_SIDE_BY_SIDE -> ThreeDMode.SIDE_BY_SIDE;
+            case MediaQualityContract.THREE_D_MODE_TOP_AND_BOTTOM -> ThreeDMode.TOP_AND_BOTTOM;
+            case MediaQualityContract.THREE_D_MODE_FRAME_PACKING -> ThreeDMode.FRAME_PACKING;
+            default -> ThreeDMode.OFF;
         };
     }
 

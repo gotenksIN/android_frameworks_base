@@ -433,36 +433,6 @@ flag {
 }
 
 flag {
-  name: "dont_write_is_system_authority"
-  namespace: "enterprise"
-  description: "Stop writing redundant is-system attribute in EnforcingAdmin XML representation ."
-  bug: "336315393"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
-  name: "tighten_admin_instantiation"
-  namespace: "enterprise"
-  description: "Don't allow arbitrary EnforcingAdmin authority to be read from disk."
-  bug: "336315393"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
-  name: "package_as_admin_id"
-  namespace: "enterprise"
-  description: "Use only package name for DPC and role admins' identity"
-  bug: "336315393"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
   name: "cross_profile_widget_provider_bulk_apis"
   namespace: "enterprise"
   description: "Add bulk APIs for cross profile widget providers"
@@ -567,6 +537,7 @@ flag {
   namespace: "enterprise"
   description: "Making sure that the existing `adb shell cmd role set-bypassing-role-qualification` command is protected against abuse on MUM devices."
   bug: "451571955"
+  is_exported: true
 }
 
 flag {
@@ -574,6 +545,7 @@ flag {
   namespace: "enterprise"
   description: "Add a generic provisioning error for forward compatibility."
   bug: "458352522"
+  is_exported: true
 }
 
 flag {
@@ -608,4 +580,45 @@ flag {
   description: "Enable passing a null admin component to DPM.enableSystemApp and DPM.setPermissionPolicy."
   bug: "346490174"
   is_exported: true
+}
+
+flag {
+  name: "increase_watch_strong_auth_timeout"
+  namespace: "cross_device_access_service"
+  description: "Increase the watch strong auth timeout to 14 days."
+  bug: "461907039"
+}
+
+flag {
+  name: "policy_streamlining_auto_time"
+  namespace: "enterprise"
+  description: "Redirect set/getAutoTimeEnabled to the generic set/getPolicy APIs."
+  bug: "434919316"
+  is_exported: true
+}
+
+flag {
+  name: "keychain_suppress_certificate_selections"
+  namespace: "enterprise"
+  description: "Feature flag to enable keychain to suppress certificate selection"
+  bug: "424869636"
+  is_exported: true
+}
+
+
+flag {
+    name: "user_control_disabled_packages_settings_fix"
+    namespace: "enterprise"
+    description: "Controls a fix for the user_control_disabled_packages policy. When this policy is active, this flag ensures that users are prevented from clearing app storage or cache in the Settings app."
+    bug: "407764721"
+    metadata {
+      purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+  name: "policy_streamlining_maximum_time_to_lock"
+  namespace: "enterprise"
+  description: "Redirect set/getMaximumTimeToLock to the generic set/getPolicy APIs."
+  bug: "444381053"
 }

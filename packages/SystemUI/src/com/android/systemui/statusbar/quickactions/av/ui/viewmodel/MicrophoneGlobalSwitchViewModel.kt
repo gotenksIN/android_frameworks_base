@@ -16,7 +16,7 @@
 
 package com.android.systemui.statusbar.quickactions.av.ui.viewmodel
 
-import androidx.compose.runtime.getValue
+import com.android.systemui.display.dagger.SystemUIDisplaySubcomponent.DisplayAware
 import com.android.systemui.lifecycle.HydratedActivatable
 import com.android.systemui.statusbar.quickactions.av.domain.interactor.AvControlsChipInteractor
 import dagger.assisted.AssistedFactory
@@ -25,7 +25,7 @@ import kotlinx.coroutines.flow.map
 
 class MicrophoneGlobalSwitchViewModel
 @AssistedInject
-constructor(private val avControlsChipInteractor: AvControlsChipInteractor) :
+constructor(@DisplayAware private val avControlsChipInteractor: AvControlsChipInteractor) :
     ButtonViewModel, HydratedActivatable() {
 
     override val state by
@@ -33,8 +33,7 @@ constructor(private val avControlsChipInteractor: AvControlsChipInteractor) :
             .map {
                 ButtonUiState(
                     isEnabled = !it,
-                    // TODO(b/436222258): Replace hardcoded strings with resource resolution
-                    subText = "Microphone",
+                    subText = com.android.systemui.res.R.string.av_mic_label,
                     image =
                         if (it) com.android.systemui.res.R.drawable.gs_mic_off
                         else com.android.systemui.res.R.drawable.gs_mic,
@@ -43,7 +42,7 @@ constructor(private val avControlsChipInteractor: AvControlsChipInteractor) :
             .hydratedStateOf(initialValue = ButtonUiState())
 
     override suspend fun onClick() {
-        avControlsChipInteractor.setCameraBlocked(!state.isEnabled)
+        avControlsChipInteractor.setMicrophoneBlocked(state.isEnabled)
     }
 
     /** A factory to be used to create view model instances. */

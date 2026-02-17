@@ -19,6 +19,7 @@ package com.android.systemui.statusbar.quickactions.ime.ui.viewmodel
 import android.platform.test.annotations.DisableFlags
 import android.platform.test.annotations.EnableFlags
 import android.view.Display
+import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.systemui.Flags
 import com.android.systemui.SysuiTestCase
@@ -31,28 +32,44 @@ import com.android.systemui.kosmos.runTest
 import com.android.systemui.kosmos.testScope
 import com.android.systemui.lifecycle.activateIn
 import com.android.systemui.res.R
+import com.android.systemui.scene.SceneHelper.setDeviceEntered
+import com.android.systemui.statusbar.policy.data.repository.fakeDeviceProvisioningRepository
+import com.android.systemui.statusbar.policy.data.repository.fakeUserSetupRepository
+import com.android.systemui.statusbar.quickactions.ui.viewmodel.ChipContent
 import com.android.systemui.statusbar.quickactions.ui.viewmodel.QuickActionChipUiState
 import com.android.systemui.testKosmosNew
+import com.android.systemui.user.data.repository.fakeUserRepository
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.runCurrent
+import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
-import org.junit.runners.JUnit4
 
 @OptIn(ExperimentalCoroutinesApi::class)
 @SmallTest
-@RunWith(JUnit4::class)
+@RunWith(AndroidJUnit4::class)
 class ImeIndicatorChipViewModelTest : SysuiTestCase() {
 
     private val kosmos = testKosmosNew()
     private val fakeInputMethodRepository = kosmos.fakeInputMethodRepository
+    private val fakeUserSetupRepository = kosmos.fakeUserSetupRepository
+    private val fakeDeviceProvisioningRepository = kosmos.fakeDeviceProvisioningRepository
+    private val fakeUserRepository = kosmos.fakeUserRepository
     private val Kosmos.underTest by
         Kosmos.Fixture {
             imeIndicatorChipViewModelFactory.create(Display.DEFAULT_DISPLAY).apply {
                 activateIn(testScope)
             }
         }
+
+    @Before
+    fun setUp() {
+        fakeUserSetupRepository.setUserSetUp(true)
+        fakeDeviceProvisioningRepository.setDeviceProvisioned(true)
+        fakeUserRepository.setUserManagerLogoutEnabled(true)
+        kosmos.setDeviceEntered()
+    }
 
     @Test
     @DisableFlags(Flags.FLAG_STATUS_BAR_IME_CHIP)
@@ -63,8 +80,14 @@ class ImeIndicatorChipViewModelTest : SysuiTestCase() {
 
     @Test
     @EnableFlags(Flags.FLAG_STATUS_BAR_IME_CHIP)
-    fun chip_flagEnabled_isShown() =
+    fun chip_multipleImesEnabled_isShown() =
         kosmos.runTest {
+            fakeInputMethodRepository.selectedInputMethodSubtypes =
+                listOf(
+                    InputMethodModel.Subtype(subtypeId = 1, isAuxiliary = false),
+                    InputMethodModel.Subtype(subtypeId = 2, isAuxiliary = false),
+                )
+
             assertThat(underTest.chip).isInstanceOf(QuickActionChipUiState.PopupChip::class.java)
         }
 
@@ -84,7 +107,8 @@ class ImeIndicatorChipViewModelTest : SysuiTestCase() {
                     icon = subtypeIcon,
                     shortLabel = "EN",
                 )
-            fakeInputMethodRepository.selectedInputMethodSubtypes = listOf(subtype)
+            fakeInputMethodRepository.selectedInputMethodSubtypes =
+                listOf(subtype, InputMethodModel.Subtype(subtypeId = 1, isAuxiliary = false))
             fakeInputMethodRepository.setSelectedInputMethodSubtypeId(subtype.subtypeId)
 
             val chip = underTest.chip as QuickActionChipUiState.PopupChip
@@ -94,7 +118,13 @@ class ImeIndicatorChipViewModelTest : SysuiTestCase() {
             val loadedIcon = chip.icons[0].icon as Icon.Loaded
             assertThat(loadedIcon.resId).isEqualTo(subtypeIcon.resId)
             assertThat(loadedIcon.packageName).isEqualTo(subtypeIcon.packageName)
-            assertThat(chip.chipText).isNull()
+            assertThat(chip.chipContent).isNull()
+            assertThat(chip.contentDescription)
+                .isEqualTo(
+                    ContentDescription.Resource(
+                        R.string.accessibility_status_bar_input_method_indicator
+                    )
+                )
         }
 
     @Test
@@ -108,13 +138,14 @@ class ImeIndicatorChipViewModelTest : SysuiTestCase() {
                     icon = null,
                     shortLabel = "EN",
                 )
-            fakeInputMethodRepository.selectedInputMethodSubtypes = listOf(subtype)
+            fakeInputMethodRepository.selectedInputMethodSubtypes =
+                listOf(subtype, InputMethodModel.Subtype(subtypeId = 1, isAuxiliary = false))
             fakeInputMethodRepository.setSelectedInputMethodSubtypeId(subtype.subtypeId)
 
             val chip = underTest.chip as QuickActionChipUiState.PopupChip
 
             assertThat(chip.icons).isEmpty()
-            assertThat(chip.chipText).isEqualTo("EN")
+            assertThat((chip.chipContent as ChipContent.Text).text).isEqualTo("EN")
         }
 
     @Test
@@ -128,7 +159,8 @@ class ImeIndicatorChipViewModelTest : SysuiTestCase() {
                     icon = null,
                     shortLabel = null,
                 )
-            fakeInputMethodRepository.selectedInputMethodSubtypes = listOf(subtype)
+            fakeInputMethodRepository.selectedInputMethodSubtypes =
+                listOf(subtype, InputMethodModel.Subtype(subtypeId = 1, isAuxiliary = false))
             fakeInputMethodRepository.setSelectedInputMethodSubtypeId(subtype.subtypeId)
 
             val chip = underTest.chip as QuickActionChipUiState.PopupChip
@@ -149,7 +181,11 @@ class ImeIndicatorChipViewModelTest : SysuiTestCase() {
     @EnableFlags(Flags.FLAG_STATUS_BAR_IME_CHIP)
     fun chip_noSubtypeSelected_showsDefaultKeyboardIcon() =
         kosmos.runTest {
-            fakeInputMethodRepository.selectedInputMethodSubtypes = listOf()
+            fakeInputMethodRepository.selectedInputMethodSubtypes =
+                listOf(
+                    InputMethodModel.Subtype(subtypeId = 1, isAuxiliary = false),
+                    InputMethodModel.Subtype(subtypeId = 2, isAuxiliary = false),
+                )
 
             val chip = underTest.chip as QuickActionChipUiState.PopupChip
 
@@ -169,6 +205,11 @@ class ImeIndicatorChipViewModelTest : SysuiTestCase() {
     @EnableFlags(Flags.FLAG_STATUS_BAR_IME_CHIP)
     fun chip_showPopup_callsShowInputMethodPicker() =
         kosmos.runTest {
+            fakeInputMethodRepository.selectedInputMethodSubtypes =
+                listOf(
+                    InputMethodModel.Subtype(subtypeId = 1, isAuxiliary = false),
+                    InputMethodModel.Subtype(subtypeId = 2, isAuxiliary = false),
+                )
             val chip = underTest.chip
             assertThat(chip).isInstanceOf(QuickActionChipUiState.PopupChip::class.java)
             val shownChip = chip as QuickActionChipUiState.PopupChip

@@ -17,6 +17,7 @@
 package com.android.wm.shell.bubbles
 
 import android.app.ActivityManager
+import android.app.ActivityTaskManager
 import android.app.WindowConfiguration.WINDOWING_MODE_FULLSCREEN
 import android.content.ComponentName
 import android.content.Context
@@ -31,12 +32,10 @@ import com.android.wm.shell.Flags
 import com.android.wm.shell.Flags.FLAG_BUG_DONT_REMOVE_TASK_BUBBLE
 import com.android.wm.shell.Flags.FLAG_ENABLE_CREATE_ANY_BUBBLE
 import com.android.wm.shell.shared.bubbles.BubbleAnythingFlagHelper
-import com.android.wm.shell.splitscreen.SplitScreenController
 import com.android.wm.shell.taskview.TaskView
 import com.android.wm.shell.taskview.TaskViewTaskController
 import com.google.common.truth.Truth.assertThat
 import com.google.common.util.concurrent.MoreExecutors.directExecutor
-import java.util.Optional
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -58,7 +57,6 @@ class BubbleTaskViewTest(flags: FlagsParameterization) {
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private val componentName = ComponentName(context, "TestClass")
     private val runningTaskInfo = ActivityManager.RunningTaskInfo()
-    private val splitScreenController = mock<SplitScreenController>()
     private val bubbleHelper = mock<BubbleHelper>()
     private val bubbleController =
         mock<BubbleController> { on { bubbleHelper } doReturn bubbleHelper }
@@ -69,12 +67,7 @@ class BubbleTaskViewTest(flags: FlagsParameterization) {
             on { controller } doReturn taskViewTaskController
         }
     private val bubbleTaskView =
-        BubbleTaskView(
-            taskView,
-            executor = directExecutor(),
-            bubbleController,
-            splitScreenController = { Optional.of(splitScreenController) },
-        )
+        BubbleTaskView(taskView, executor = directExecutor(), bubbleController)
 
     @Test
     fun onTaskCreated_updatesState() {
@@ -157,7 +150,6 @@ class BubbleTaskViewTest(flags: FlagsParameterization) {
     @Test
     fun cleanup_taskTransitioningToSplitScreen_unregistersTask() {
         val sideStageRootTask = 5
-        splitScreenController.stub { on { isTaskRootOrStageRoot(sideStageRootTask) } doReturn true }
         runningTaskInfo.apply {
             parentTaskId = sideStageRootTask // Task is running in split-screen mode.
         }
@@ -173,6 +165,7 @@ class BubbleTaskViewTest(flags: FlagsParameterization) {
     fun cleanup_taskTransitioningToFullscreen_removesOrUnregistersTask() {
         runningTaskInfo.apply {
             configuration.windowConfiguration.windowingMode = WINDOWING_MODE_FULLSCREEN
+            parentTaskId = ActivityTaskManager.INVALID_TASK_ID
         }
         bubbleTaskView.listener.onTaskCreated(123 /* taskId */, componentName)
 

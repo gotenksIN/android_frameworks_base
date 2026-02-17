@@ -16,15 +16,11 @@
 
 package com.android.systemui.statusbar.phone;
 
-import static android.app.StatusBarManager.DISABLE_HOME;
 import static android.app.StatusBarManager.SESSION_KEYGUARD;
-import static android.app.StatusBarManager.WINDOW_STATE_HIDDEN;
 import static android.app.StatusBarManager.WINDOW_STATE_SHOWING;
 import static android.app.StatusBarManager.WindowVisibleState;
-import static android.app.StatusBarManager.windowStateToString;
 import static android.service.quickaccesswallet.Flags.launchWalletOptionOnPowerDoubleTap;
 import static android.service.quickaccesswallet.Flags.launchWalletViaSysuiCallbacks;
-import static android.view.View.IMPORTANT_FOR_ACCESSIBILITY_AUTO;
 import static android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO;
 import static android.view.View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS;
 
@@ -53,7 +49,6 @@ import android.graphics.Point;
 import android.hardware.devicestate.DeviceStateManager;
 import android.metrics.LogMaker;
 import android.net.Uri;
-import android.os.Binder;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.PowerManager;
@@ -77,7 +72,6 @@ import android.view.MotionEvent;
 import android.view.SurfaceControl;
 import android.view.ThreadedRenderer;
 import android.view.View;
-import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.view.WindowManagerGlobal;
 import android.view.accessibility.AccessibilityManager;
@@ -88,16 +82,13 @@ import androidx.annotation.NonNull;
 import androidx.lifecycle.Lifecycle;
 import androidx.lifecycle.LifecycleRegistry;
 
-import com.android.app.displaylib.PerDisplayRepository;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.colorextraction.ColorExtractor;
 import com.android.internal.logging.MetricsLogger;
-import com.android.internal.logging.UiEvent;
 import com.android.internal.logging.UiEventLogger;
 import com.android.internal.logging.UiEventLoggerImpl;
 import com.android.internal.logging.nano.MetricsProto.MetricsEvent;
 import com.android.internal.statusbar.IStatusBarService;
-import com.android.internal.statusbar.RegisterStatusBarResult;
 import com.android.keyguard.AuthKeyguardMessageArea;
 import com.android.keyguard.KeyguardUpdateMonitor;
 import com.android.keyguard.KeyguardUpdateMonitorCallback;
@@ -108,13 +99,12 @@ import com.android.systemui.CoreStartable;
 import com.android.systemui.DejankUtils;
 import com.android.systemui.EventLogTags;
 import com.android.systemui.Flags;
-import com.android.systemui.InitController;
 import com.android.systemui.Prefs;
 import com.android.systemui.accessibility.floatingmenu.AccessibilityFloatingMenuController;
 import com.android.systemui.animation.ActivityTransitionAnimator;
 import com.android.systemui.assist.AssistManager;
-import com.android.systemui.back.domain.interactor.BackActionInteractor;
 import com.android.systemui.bouncer.domain.interactor.AlternateBouncerInteractor;
+import com.android.systemui.brightness.data.repository.BrightnessMirrorShowingRepository;
 import com.android.systemui.broadcast.BroadcastDispatcher;
 import com.android.systemui.broadcast.BroadcastDispatcherCustomExecutor;
 import com.android.systemui.camera.CameraIntents;
@@ -128,13 +118,12 @@ import com.android.systemui.dagger.qualifiers.Main;
 import com.android.systemui.dagger.qualifiers.UiBackground;
 import com.android.systemui.demomode.DemoMode;
 import com.android.systemui.demomode.DemoModeController;
-import com.android.systemui.display.dagger.SystemUIDisplaySubcomponent;
 import com.android.systemui.emergency.EmergencyGesture;
 import com.android.systemui.emergency.EmergencyGestureModule.EmergencyGestureIntentFactory;
-import com.android.systemui.flags.FeatureFlags;
 import com.android.systemui.fragments.ExtensionFragmentListener;
 import com.android.systemui.fragments.FragmentHostManager;
 import com.android.systemui.fragments.FragmentService;
+import com.android.systemui.keyguard.KeyguardUiEvent;
 import com.android.systemui.keyguard.KeyguardUnlockAnimationController;
 import com.android.systemui.keyguard.KeyguardViewMediator;
 import com.android.systemui.keyguard.ScreenLifecycle;
@@ -146,10 +135,8 @@ import com.android.systemui.navigationbar.views.NavigationBarView;
 import com.android.systemui.notetask.NoteTaskController;
 import com.android.systemui.plugins.ActivityStarter;
 import com.android.systemui.plugins.ActivityStarter.OnDismissAction;
-import com.android.systemui.plugins.DarkIconDispatcher;
 import com.android.systemui.plugins.FalsingManager;
 import com.android.systemui.plugins.OverlayPlugin;
-import com.android.systemui.plugins.PluginDependencyProvider;
 import com.android.systemui.plugins.PluginListener;
 import com.android.systemui.plugins.PluginManager;
 import com.android.systemui.plugins.qs.QS;
@@ -161,7 +148,6 @@ import com.android.systemui.scene.domain.interactor.WindowRootViewVisibilityInte
 import com.android.systemui.scene.shared.flag.SceneContainerFlag;
 import com.android.systemui.scrim.ScrimView;
 import com.android.systemui.settings.UserTracker;
-import com.android.systemui.settings.brightness.data.repository.BrightnessMirrorShowingRepository;
 import com.android.systemui.shade.CameraLauncher;
 import com.android.systemui.shade.GlanceableHubContainerController;
 import com.android.systemui.shade.NotificationShadeWindowView;
@@ -174,9 +160,6 @@ import com.android.systemui.shade.ShadeExpansionStateManager;
 import com.android.systemui.shade.ShadeLogger;
 import com.android.systemui.shade.ShadeSurface;
 import com.android.systemui.shade.ShadeViewController;
-import com.android.systemui.shade.shared.flag.ShadeWindowGoesAround;
-import com.android.systemui.shared.statusbar.phone.BarTransitions;
-import com.android.systemui.statusbar.AutoHideUiElement;
 import com.android.systemui.statusbar.CommandQueue;
 import com.android.systemui.statusbar.GestureRecorder;
 import com.android.systemui.statusbar.KeyguardIndicationController;
@@ -191,10 +174,6 @@ import com.android.systemui.statusbar.PowerButtonReveal;
 import com.android.systemui.statusbar.PulseExpansionHandler;
 import com.android.systemui.statusbar.StatusBarState;
 import com.android.systemui.statusbar.SysuiStatusBarStateController;
-import com.android.systemui.statusbar.core.StatusBarConnectedDisplays;
-import com.android.systemui.statusbar.core.StatusBarInitializer;
-import com.android.systemui.statusbar.data.model.StatusBarMode;
-import com.android.systemui.statusbar.data.repository.StatusBarModeRepositoryStore;
 import com.android.systemui.statusbar.notification.NotificationActivityStarter;
 import com.android.systemui.statusbar.notification.NotificationLaunchAnimatorControllerProvider;
 import com.android.systemui.statusbar.notification.NotificationWakeUpCoordinator;
@@ -214,8 +193,6 @@ import com.android.systemui.statusbar.policy.DeviceProvisionedController.DeviceP
 import com.android.systemui.statusbar.policy.ExtensionController;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
 import com.android.systemui.statusbar.policy.UserInfoControllerImpl;
-import com.android.systemui.statusbar.window.StatusBarWindowControllerStore;
-import com.android.systemui.statusbar.window.StatusBarWindowStateController;
 import com.android.systemui.surfaceeffects.core.ripple.RippleShader.RippleShape;
 import com.android.systemui.topui.TopUiController;
 import com.android.systemui.util.DumpUtilsKt;
@@ -287,12 +264,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
                     }
                 }
             };
-
-    void onStatusBarWindowStateChanged(@WindowVisibleState int state) {
-        StatusBarConnectedDisplays.assertInLegacyMode();
-        mStatusBarWindowState = state;
-        updateBubblesVisibility();
-    }
 
     @Override
     public void acquireGestureWakeLock(long time) {
@@ -366,14 +337,9 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
 
     private final Point mCurrentDisplaySize = new Point();
 
-    private PhoneStatusBarViewController mPhoneStatusBarViewController;
-    private PhoneStatusBarTransitions mStatusBarTransitions;
     @WindowVisibleState private int mStatusBarWindowState = WINDOW_STATE_SHOWING;
     private final NotificationShadeWindowController mNotificationShadeWindowController;
     private final TopUiController mTopUiController;
-    private final StatusBarInitializer mStatusBarInitializer;
-    private final StatusBarWindowControllerStore mStatusBarWindowControllerStore;
-    private final StatusBarModeRepositoryStore mStatusBarModeRepository;
     private final KeyguardUpdateMonitor mKeyguardUpdateMonitor;
     @VisibleForTesting
     DozeServiceHost mDozeServiceHost;
@@ -406,16 +372,13 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     private final PluginManager mPluginManager;
     private final ShadeController mShadeController;
     private final WindowRootViewVisibilityInteractor mWindowRootViewVisibilityInteractor;
-    private final InitController mInitController;
     private final Lazy<CameraLauncher> mCameraLauncherLazy;
     private final AlternateBouncerInteractor mAlternateBouncerInteractor;
 
-    private final PluginDependencyProvider mPluginDependencyProvider;
     private final ExtensionController mExtensionController;
     private final UserInfoControllerImpl mUserInfoControllerImpl;
     private final DemoModeController mDemoModeController;
     private final NotificationsController mNotificationsController;
-    private final StatusBarSignalPolicy mStatusBarSignalPolicy;
     private final StatusBarHideIconsForBouncerManager mStatusBarHideIconsForBouncerManager;
 
     /** Controller for the Shade. */
@@ -432,7 +395,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     private final NotificationGutsManager mGutsManager;
     private final ShadeExpansionStateManager mShadeExpansionStateManager;
     private final KeyguardViewMediator mKeyguardViewMediator;
-    private final FeatureFlags mFeatureFlags;
     private final FragmentService mFragmentService;
     private final ScreenOffAnimationController mScreenOffAnimationController;
     private final WallpaperController mWallpaperController;
@@ -455,44 +417,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     @VisibleForTesting
     protected boolean mUserSetup = false;
 
-    @VisibleForTesting
-    public enum StatusBarUiEvent implements UiEventLogger.UiEventEnum {
-        @UiEvent(doc = "Secured lockscreen is opened.")
-        LOCKSCREEN_OPEN_SECURE(405),
-
-        @UiEvent(doc = "Lockscreen without security is opened.")
-        LOCKSCREEN_OPEN_INSECURE(406),
-
-        @UiEvent(doc = "Secured lockscreen is closed.")
-        LOCKSCREEN_CLOSE_SECURE(407),
-
-        @UiEvent(doc = "Lockscreen without security is closed.")
-        LOCKSCREEN_CLOSE_INSECURE(408),
-
-        @UiEvent(doc = "Secured bouncer is opened.")
-        BOUNCER_OPEN_SECURE(409),
-
-        @UiEvent(doc = "Bouncer without security is opened.")
-        BOUNCER_OPEN_INSECURE(410),
-
-        @UiEvent(doc = "Secured bouncer is closed.")
-        BOUNCER_CLOSE_SECURE(411),
-
-        @UiEvent(doc = "Bouncer without security is closed.")
-        BOUNCER_CLOSE_INSECURE(412);
-
-        private final int mId;
-
-        StatusBarUiEvent(int id) {
-            mId = id;
-        }
-
-        @Override
-        public int getId() {
-            return mId;
-        }
-    }
-
     private final DelayableExecutor mMainExecutor;
 
     private int mInteractingWindows;
@@ -500,7 +424,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     private final ViewMediatorCallback mKeyguardViewMediatorCallback;
     private final ScrimController mScrimController;
     protected DozeScrimController mDozeScrimController;
-    private final BackActionInteractor mBackActionInteractor;
     private final JavaAdapter mJavaAdapter;
     private final Executor mUiBgExecutor;
 
@@ -557,7 +480,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         updateScrimController();
     };
 
-    private boolean mNoAnimationOnNextBarModeChange;
     private final SysuiStatusBarStateController mStatusBarStateController;
 
     private final ActivityTransitionAnimator mActivityTransitionAnimator;
@@ -598,12 +520,7 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
             FragmentService fragmentService,
             LightBarController lightBarController,
             AutoHideController autoHideController,
-            StatusBarInitializer statusBarInitializer,
-            StatusBarWindowControllerStore statusBarWindowControllerStore,
-            PerDisplayRepository<SystemUIDisplaySubcomponent> perDisplaySubcomponentRepository,
-            StatusBarModeRepositoryStore statusBarModeRepository,
             KeyguardUpdateMonitor keyguardUpdateMonitor,
-            StatusBarSignalPolicy statusBarSignalPolicy,
             PulseExpansionHandler pulseExpansionHandler,
             NotificationWakeUpCoordinator notificationWakeUpCoordinator,
             KeyguardBypassController keyguardBypassController,
@@ -653,7 +570,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
             Lazy<ScrimController> scrimController,
             Lazy<BiometricUnlockController> biometricUnlockControllerLazy,
             DozeServiceHost dozeServiceHost,
-            BackActionInteractor backActionInteractor,
             PowerManager powerManager,
             DozeScrimController dozeScrimController,
             VolumeComponent volumeComponent,
@@ -664,9 +580,7 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
             WindowRootViewVisibilityInteractor windowRootViewVisibilityInteractor,
             StatusBarKeyguardViewManager statusBarKeyguardViewManager,
             ViewMediatorCallback viewMediatorCallback,
-            InitController initController,
             @Named(TIME_TICK_HANDLER_NAME) Handler timeTickHandler,
-            PluginDependencyProvider pluginDependencyProvider,
             ExtensionController extensionController,
             UserInfoControllerImpl userInfoControllerImpl,
             PhoneStatusBarPolicy phoneStatusBarPolicy,
@@ -678,7 +592,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
             WallpaperController wallpaperController,
             StatusBarHideIconsForBouncerManager statusBarHideIconsForBouncerManager,
             LockscreenShadeTransitionController lockscreenShadeTransitionController,
-            FeatureFlags featureFlags,
             KeyguardUnlockAnimationController keyguardUnlockAnimationController,
             @Main DelayableExecutor delayableExecutor,
             @Main MessageRouter messageRouter,
@@ -706,16 +619,12 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         mFragmentService = fragmentService;
         mLightBarController = lightBarController;
         mAutoHideController = autoHideController;
-        mStatusBarInitializer = statusBarInitializer;
-        mStatusBarWindowControllerStore = statusBarWindowControllerStore;
-        mStatusBarModeRepository = statusBarModeRepository;
         mKeyguardUpdateMonitor = keyguardUpdateMonitor;
         mPulseExpansionHandler = pulseExpansionHandler;
         mWakeUpCoordinator = notificationWakeUpCoordinator;
         mKeyguardBypassController = keyguardBypassController;
         mKeyguardStateController = keyguardStateController;
         mHeadsUpManager = headsUpManager;
-        mBackActionInteractor = backActionInteractor;
         mKeyguardIndicationController = keyguardIndicationController;
         mShadeTouchableRegionManager = shadeTouchableRegionManager;
         mFalsingCollector = falsingCollector;
@@ -772,16 +681,12 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         mWindowRootViewVisibilityInteractor = windowRootViewVisibilityInteractor;
         mStatusBarKeyguardViewManager = statusBarKeyguardViewManager;
         mKeyguardViewMediatorCallback = viewMediatorCallback;
-        mInitController = initController;
-        mPluginDependencyProvider = pluginDependencyProvider;
         mExtensionController = extensionController;
         mUserInfoControllerImpl = userInfoControllerImpl;
         mIconPolicy = phoneStatusBarPolicy;
         mDemoModeController = demoModeController;
         mWallpaperController = wallpaperController;
-        mStatusBarSignalPolicy = statusBarSignalPolicy;
         mStatusBarHideIconsForBouncerManager = statusBarHideIconsForBouncerManager;
-        mFeatureFlags = featureFlags;
         mKeyguardUnlockAnimationController = keyguardUnlockAnimationController;
         mMainExecutor = delayableExecutor;
         mMessageRouter = messageRouter;
@@ -803,13 +708,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         mStartingSurfaceOptional = startingSurfaceOptional;
         mDreamManager = dreamManager;
         lockscreenShadeTransitionController.setCentralSurfaces(this);
-        if (!StatusBarConnectedDisplays.isEnabled()) {
-            SystemUIDisplaySubcomponent displaySubcomponent = perDisplaySubcomponentRepository.get(
-                    Display.DEFAULT_DISPLAY);
-            StatusBarWindowStateController statusBarWindowStateController =
-                    displaySubcomponent.getStatusBarWindowStateController();
-            statusBarWindowStateController.addListener(this::onStatusBarWindowStateChanged);
-        }
         mScreenOffAnimationController = screenOffAnimationController;
 
         ShadeExpansionListener shadeExpansionListener = this::onPanelExpansionChanged;
@@ -879,60 +777,10 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         mKeyguardManager = (KeyguardManager) mContext.getSystemService(Context.KEYGUARD_SERVICE);
         mWallpaperSupported = mWallpaperManager.isWallpaperSupported();
 
-        RegisterStatusBarResult result = null;
-        if (!StatusBarConnectedDisplays.isEnabled()) {
-            try {
-                result = mBarService.registerStatusBar(mCommandQueue);
-            } catch (RemoteException ex) {
-                ex.rethrowFromSystemServer();
-            }
-        }
-
-        createAndAddWindows(result);
+        createAndAddWindows();
 
         // Set up the initial notification state. This needs to happen before CommandQueue.disable()
         setUpPresenter();
-
-        // When the StatusBarConnectedDisplays flag is enabled, this logic will be done in
-        // StatusBarOrchestrator
-        if (!StatusBarConnectedDisplays.isEnabled()) {
-            if ((result.mTransientBarTypes & WindowInsets.Type.statusBars()) != 0) {
-                mStatusBarModeRepository.getDefaultDisplay().showTransient();
-            }
-            mCommandQueueCallbacks.onSystemBarAttributesChanged(
-                    mDisplayId,
-                    result.mAppearance,
-                    result.mAppearanceRegions,
-                    result.mNavbarColorManagedByIme,
-                    result.mBehavior,
-                    result.mRequestedVisibleTypes,
-                    result.mPackageName,
-                    result.mLetterboxDetails);
-
-            // StatusBarManagerService has a back up of IME token and it's restored here.
-            mCommandQueueCallbacks.setImeWindowStatus(
-                    mDisplayId,
-                    result.mImeWindowVis,
-                    result.mImeBackDisposition,
-                    result.mShowImeSwitcherButton);
-
-            // Set up the initial icon state
-            int numIcons = result.mIcons.size();
-            for (int i = 0; i < numIcons; i++) {
-                mCommandQueue.setIcon(result.mIcons.keyAt(i), result.mIcons.valueAt(i));
-            }
-
-            if (DEBUG) {
-                Log.d(
-                        TAG,
-                        String.format(
-                                "init: icons=%d disabled=0x%08x lights=0x%08x imeButton=0x%08x",
-                                numIcons,
-                                result.mDisabledFlags1,
-                                result.mAppearance,
-                                result.mImeWindowVis));
-            }
-        }
 
         if (mWallpaperSupported) {
             IWallpaperManager wallpaperManager = IWallpaperManager.Stub.asInterface(
@@ -970,31 +818,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         mLifecycle.setCurrentState(RESUMED);
 
         mAccessibilityFloatingMenuController.init();
-
-        // When the StatusBarConnectedDisplays flag is enabled, this logic will be done in
-        // StatusBarOrchestrator
-        if (!StatusBarConnectedDisplays.isEnabled()) {
-            // set the initial view visibility
-            int disabledFlags1 = result.mDisabledFlags1;
-            int disabledFlags2 = result.mDisabledFlags2;
-            mInitController.addPostInitTask(
-                    () -> {
-                        setUpDisableFlags(disabledFlags1, disabledFlags2);
-                        try {
-                            // NOTE(b/262059863): Force-update the disable flags after applying the
-                            // flags returned from registerStatusBar(). The result's disabled flags
-                            // may be stale if StatusBarManager's disabled flags are updated between
-                            // registering the bar and this handling this post-init task. We force
-                            // an update in this case, and use a new token to not conflict with any
-                            // other disabled flags already requested by SysUI
-                            Binder token = new Binder();
-                            mBarService.disable(DISABLE_HOME, token, mContext.getPackageName());
-                            mBarService.disable(0, token, mContext.getPackageName());
-                        } catch (RemoteException ex) {
-                            ex.rethrowFromSystemServer();
-                        }
-                    });
-        }
 
         registerCallbacks();
 
@@ -1128,7 +951,7 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     // ================================================================================
     // Constructing the view
     // ================================================================================
-    protected void makeStatusBarView(@Nullable RegisterStatusBarResult result) {
+    protected void makeStatusBarView() {
         updateDisplaySize(); // populates mDisplayMetrics
         updateResources();
         updateTheme();
@@ -1138,16 +961,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         mWallpaperController.setRootView(getNotificationShadeWindowView());
 
         mDemoModeController.addCallback(mDemoModeCallback);
-        // When the StatusBarConnectedDisplays flag is enabled, this logic will be done in
-        // StatusBarOrchestrator.
-        if (!StatusBarConnectedDisplays.isEnabled()) {
-            mJavaAdapter.alwaysCollectFlow(
-                    mStatusBarModeRepository.getDefaultDisplay().isTransientShown(),
-                    this::onTransientShownChanged);
-            mJavaAdapter.alwaysCollectFlow(
-                    mStatusBarModeRepository.getDefaultDisplay().getStatusBarMode(),
-                    this::updateBarMode);
-        }
         mCommandQueueCallbacks = mCommandQueueCallbacksLazy.get();
         mCommandQueue.addCallback(mCommandQueueCallbacks);
 
@@ -1157,66 +970,10 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
                 mShadeExpansionStateManager.addExpansionListener(mWakeUpCoordinator);
         mWakeUpCoordinator.onPanelExpansionChanged(currentState);
 
-        // When the StatusBarConnectedDisplays flag is enabled, all this logic will be done in
-        // StatusBarOrchestrator.
-        if (!StatusBarConnectedDisplays.isEnabled()) {
-            // Allow plugins to reference DarkIconDispatcher and StatusBarStateController
-            mPluginDependencyProvider.allowPluginDependency(DarkIconDispatcher.class);
-            mPluginDependencyProvider.allowPluginDependency(StatusBarStateController.class);
-
-            // Set up CollapsedStatusBarFragment and PhoneStatusBarView
-            mStatusBarInitializer.setStatusBarViewUpdatedListener(
-                    (statusBarViewController, statusBarTransitions) -> {
-
-                        mPhoneStatusBarViewController = statusBarViewController;
-                        mStatusBarTransitions = statusBarTransitions;
-                        getNotificationShadeWindowViewController()
-                                .setStatusBarViewController(mPhoneStatusBarViewController);
-                        // Ensure we re-propagate panel expansion values to the panel controller and
-                        // any listeners it may have, such as PanelBar. This will also ensure we
-                        // re-display the notification panel if necessary (for example, if
-                        // a heads-up notification was being displayed and should continue being
-                        // displayed).
-                        mShadeSurface.updateExpansionAndVisibility();
-                        setBouncerShowingForStatusBarComponents(mBouncerShowing);
-                        checkBarModes();
-                    });
-        }
-
         mShadeTouchableRegionManager.setup(getNotificationShadeWindowView());
-
-        if (!StatusBarConnectedDisplays.isEnabled()) {
-            createNavigationBar(result);
-        }
 
         mAmbientIndicationContainer = getNotificationShadeWindowView().findViewById(
                 R.id.ambient_indication_container);
-
-        // When the StatusBarConnectedDisplays flag is enabled, all this logic will be done in
-        // StatusBarOrchestrator.
-        if (!StatusBarConnectedDisplays.isEnabled()) {
-            mAutoHideController.setStatusBar(
-                    new AutoHideUiElement() {
-                        @Override
-                        public void synchronizeState() {
-                            checkBarModes();
-                        }
-
-                        @Override
-                        public boolean shouldHideOnTouch() {
-                            return !mRemoteInputManager.isRemoteInputActive();
-                        }
-
-                        @Override
-                        public boolean isVisible() {
-                            return isTransientShown();
-                        }
-
-                        @Override
-                        public void hide() {
-                        }
-                    });
-        }
 
         ScrimView scrimBehind = getNotificationShadeWindowView().findViewById(R.id.scrim_behind);
         ScrimView notificationsScrim = getNotificationShadeWindowView()
@@ -1434,23 +1191,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     }
 
     /**
-     * Post-init task of {@link #start()}
-     * @param state1 disable1 flags
-     * @param state2 disable2 flags
-     */
-    protected void setUpDisableFlags(int state1, int state2) {
-        StatusBarConnectedDisplays.assertInLegacyMode();
-        mCommandQueue.disable(mDisplayId, state1, state2, false /* animate */);
-    }
-
-    // TODO(b/117478341): This was left such that CarStatusBar can override this method.
-    // Try to remove this.
-    protected void createNavigationBar(@Nullable RegisterStatusBarResult result) {
-        StatusBarConnectedDisplays.assertInLegacyMode();
-        mNavigationBarController.createNavigationBars(true /* includeDefaultDisplay */, result);
-    }
-
-    /**
      * Returns the {@link android.view.View.OnTouchListener} that will be invoked when the
      * background window of the status bar is clicked.
      */
@@ -1622,18 +1362,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         return mCommandQueue.panelsEnabled();
     }
 
-    private void onTransientShownChanged(boolean transientShown) {
-        if (transientShown) {
-            mNoAnimationOnNextBarModeChange = true;
-        }
-    }
-
-    private void updateBarMode(StatusBarMode barMode) {
-        checkBarModes();
-        mAutoHideController.touchAutoHide();
-        updateBubblesVisibility();
-    }
-
     @Override
     public void showWirelessChargingAnimation(int batteryLevel) {
         showChargingAnimation(batteryLevel, UNKNOWN_BATTERY_LEVEL, 0);
@@ -1660,44 +1388,10 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
     @Override
     public void checkBarModes() {
         if (mDemoModeController.isInDemoMode()) return;
-        // When the StatusBarConnectedDisplays flag is enabled, this logic will be done in
-        // StatusBarOrchestrator.
-        if (!StatusBarConnectedDisplays.isEnabled() && mStatusBarTransitions != null) {
-            checkBarMode(
-                    mStatusBarModeRepository.getDefaultDisplay().getStatusBarMode().getValue(),
-                    mStatusBarWindowState,
-                    mStatusBarTransitions);
-            mNoAnimationOnNextBarModeChange = false;
-        }
         mNavigationBarController.checkNavBarModes(mDisplayId);
     }
 
-    /** Temporarily hides Bubbles if the status bar is hidden. */
-    @Override
-    public void updateBubblesVisibility() {
-        StatusBarMode mode =
-                mStatusBarModeRepository.getDefaultDisplay().getStatusBarMode().getValue();
-        mBubblesOptional.ifPresent(bubbles -> bubbles.onStatusBarVisibilityChanged(
-                mode != StatusBarMode.LIGHTS_OUT
-                        && mode != StatusBarMode.LIGHTS_OUT_TRANSPARENT
-                        && mStatusBarWindowState != WINDOW_STATE_HIDDEN));
-    }
-
-    void checkBarMode(
-            StatusBarMode mode,
-            @WindowVisibleState int windowState,
-            BarTransitions transitions) {
-        final boolean anim = !mNoAnimationOnNextBarModeChange && mDeviceInteractive
-                && windowState != WINDOW_STATE_HIDDEN;
-        transitions.transitionTo(mode.toTransitionModeInt(), anim);
-    }
-
     private void finishBarAnimations() {
-        // When the StatusBarConnectedDisplays flag is enabled, this logic will be done in
-        // StatusBarOrchestrator.
-        if (!StatusBarConnectedDisplays.isEnabled() && mStatusBarTransitions != null) {
-            mStatusBarTransitions.finishAnimations();
-        }
         mNavigationBarController.finishBarAnimations(mDisplayId);
     }
 
@@ -1737,17 +1431,9 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
         }
 
         pw.print("  mInteractingWindows="); pw.println(mInteractingWindows);
-        if (!StatusBarConnectedDisplays.isEnabled()) {
-            pw.print("  mStatusBarWindowState=");
-            pw.println(windowStateToString(mStatusBarWindowState));
-        }
         pw.print("  mDozing="); pw.println(mDozing);
         pw.print("  mWallpaperSupported= "); pw.println(mWallpaperSupported);
 
-        if (!StatusBarConnectedDisplays.isEnabled()) {
-            CentralSurfaces.dumpBarTransitions(
-                    pw, "PhoneStatusBarTransitions", mStatusBarTransitions);
-        }
         pw.println("  mMediaManager: ");
         if (mMediaManager != null) {
             mMediaManager.dump(pw, args);
@@ -1810,14 +1496,9 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
                 + CameraIntents.getOverrideCameraPackage(mContext, mUserTracker.getUserId()));
     }
 
-    private void createAndAddWindows(@Nullable RegisterStatusBarResult result) {
-        makeStatusBarView(result);
+    private void createAndAddWindows() {
+        makeStatusBarView();
         mNotificationShadeWindowController.attach();
-        // When the StatusBarConnectedDisplays flag is enabled, this logic will be done in
-        // StatusBarOrchestrator
-        if (!StatusBarConnectedDisplays.isEnabled()) {
-            mStatusBarWindowControllerStore.getDefaultDisplay().attach();
-        }
     }
 
     // called by makeStatusbar and also by PhoneStatusBarView
@@ -1900,13 +1581,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
      * meantime, just update the things that we know change.
      */
     void updateResources() {
-        if (!ShadeWindowGoesAround.isEnabled()) {
-            // Each class now subscribes to configuration changes by themselves.
-
-            if (mShadeSurface != null) {
-                mShadeSurface.updateResources();
-            }
-        }
         if (mStatusBarKeyguardViewManager != null) {
             mStatusBarKeyguardViewManager.updateResources();
         }
@@ -1944,16 +1618,18 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
                     unlocked ? 1 : 0);
             mLastLoggedStateFingerprint = stateFingerprint;
 
-            StringBuilder uiEventValueBuilder = new StringBuilder();
-            uiEventValueBuilder.append(isBouncerShowing ? "BOUNCER" : "LOCKSCREEN");
-            uiEventValueBuilder.append(isShowing ? "_OPEN" : "_CLOSE");
-            uiEventValueBuilder.append(isSecure ? "_SECURE" : "_INSECURE");
-            sUiEventLogger.logWithInstanceId(
-                    StatusBarUiEvent.valueOf(uiEventValueBuilder.toString()),
-                    0,
-                    null,
-                    mSessionTracker.getSessionId(SESSION_KEYGUARD)
-            );
+            if (!SceneContainerFlag.isEnabled()) {
+                StringBuilder uiEventValueBuilder = new StringBuilder();
+                uiEventValueBuilder.append(isBouncerShowing ? "BOUNCER" : "LOCKSCREEN");
+                uiEventValueBuilder.append(isShowing ? "_OPEN" : "_CLOSE");
+                uiEventValueBuilder.append(isSecure ? "_SECURE" : "_INSECURE");
+                sUiEventLogger.logWithInstanceId(
+                        KeyguardUiEvent.valueOf(uiEventValueBuilder.toString()),
+                        0,
+                        null,
+                        mSessionTracker.getSessionId(SESSION_KEYGUARD)
+                );
+            }
         }
     }
 
@@ -2142,8 +1818,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
      */
     @Override
     public boolean hideKeyguardImpl(boolean forceStateChange) {
-        if (SceneContainerFlag.isEnabled()) return false;
-
         Trace.beginSection("CentralSurfaces#hideKeyguard");
         boolean staying = mStatusBarStateController.leaveOpenOnKeyguardHide();
         int previousState = mStatusBarStateController.getState();
@@ -2157,6 +1831,12 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
                 mStackScrollerController.updateSensitivenessWithoutAnimation();
             }
         }
+
+        if (SceneContainerFlag.isEnabled()) {
+            Trace.endSection();
+            return false;
+        }
+
         if (mStatusBarStateController.leaveOpenOnKeyguardHide()) {
             long delay = mKeyguardStateController.calculateGoingToFullShadeDelay();
             mLockscreenShadeTransitionController.onHideKeyguard(delay, previousState);
@@ -2385,12 +2065,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
      * should update only the status bar components.
      */
     private void setBouncerShowingForStatusBarComponents(boolean bouncerShowing) {
-        if (!StatusBarConnectedDisplays.isEnabled() && mPhoneStatusBarViewController != null) {
-            int importance = bouncerShowing
-                    ? IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
-                    : IMPORTANT_FOR_ACCESSIBILITY_AUTO;
-            mPhoneStatusBarViewController.setImportantForAccessibility(importance);
-        }
         int importance = bouncerShowing
                 ? IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
                 : IMPORTANT_FOR_ACCESSIBILITY_NO;
@@ -2840,10 +2514,6 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
 
     // End Extra BaseStatusBarMethods.
 
-    boolean isTransientShown() {
-        return mStatusBarModeRepository.getDefaultDisplay().isTransientShown().getValue();
-    }
-
     private final KeyguardUpdateMonitorCallback mUpdateCallback =
             new KeyguardUpdateMonitorCallback() {
                 @Override
@@ -3067,7 +2737,7 @@ public class CentralSurfacesImpl implements CoreStartable, CentralSurfaces {
                         @Nullable SurfaceControl.Transaction transaction) {
                     if (Flags.notificationShadeBlur()) {
                         mNotificationShadeDepthControllerLazy.get()
-                                .onTransitionAnimationEnd();
+                                .onTransitionAnimationEnd(transaction);
                     } else {
                         mKeyguardViewMediator.setBlursDisabledForAppLaunch(false);
                     }

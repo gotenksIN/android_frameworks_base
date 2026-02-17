@@ -19,13 +19,15 @@ package com.android.systemui.screencapture.record.smallscreen.ui.compose
 import android.content.res.Resources
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -41,8 +43,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.unit.dp
 import com.android.systemui.common.shared.model.Icon as IconModel
+import com.android.systemui.common.ui.compose.load
 import com.android.systemui.res.R
 import com.android.systemui.screencapture.common.ui.compose.LoadingIcon
 import com.android.systemui.screencapture.common.ui.compose.loadIcon
@@ -75,7 +86,7 @@ fun RecordDetailsSettings(
                     items = targetViewModel.items,
                     selectedItemIndex = targetViewModel.selectedIndex,
                     onItemSelected = { targetViewModel.select(it) },
-                    itemToString = { stringResource(it.labelRes) },
+                    itemToString = { it.label.load()!! },
                     isItemEnabled = { it.isSelectable },
                     viewModel = drawableLoaderViewModel,
                     modifier = Modifier.padding(vertical = 12.dp),
@@ -126,8 +137,8 @@ fun RecordDetailsSettings(
                             contentDescription = null,
                         ),
                     label = stringResource(R.string.screen_record_should_show_camera_label),
-                    checked = parametersViewModel.shouldShowFrontCamera == true,
-                    onCheckedChange = { parametersViewModel.setShouldShowFrontCamera(it) },
+                    checked = parametersViewModel.shouldShowFrontCamera,
+                    onCheckedChange = { parametersViewModel.shouldShowFrontCamera = it },
                     modifier = Modifier,
                 )
             }
@@ -140,10 +151,19 @@ fun RecordDetailsSettings(
                             contentDescription = null,
                         ),
                     label = stringResource(R.string.screen_record_should_show_touches_label),
-                    checked = parametersViewModel.shouldShowTaps == true,
-                    onCheckedChange = { parametersViewModel.setShouldShowTaps(it) },
+                    checked = parametersViewModel.shouldShowTaps,
+                    onCheckedChange = { parametersViewModel.shouldShowTaps = it },
                     modifier = Modifier,
                 )
+            }
+            SettingsRow(modifier = Modifier.padding(top = 4.dp)) {
+                Crossfade(targetViewModel.warningMessageRes) { warningMessageRes ->
+                    Text(
+                        text = stringResource(warningMessageRes),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
             }
         }
     }
@@ -160,27 +180,45 @@ private fun RichSwitch(
     disabledMessageRes: Int = Resources.ID_NULL,
 ) {
     val context = LocalContext.current
+    require(enabled || disabledMessageRes != Resources.ID_NULL) {
+        "Provide disabled message for a disabled switch"
+    }
+    val disabledMessage: String? = if (enabled) null else stringResource(disabledMessageRes)
     SettingsRow(
-        modifier.clickable(
-            onClick = {
+        modifier
+            .clearAndSetSemantics {
+                role = Role.Switch
+                toggleableState = if (checked) ToggleableState.On else ToggleableState.Off
                 if (enabled) {
-                    onCheckedChange(!checked)
+                    contentDescription = label
                 } else {
-                    if (disabledMessageRes != Resources.ID_NULL) {
-                        Toast.makeText(context, disabledMessageRes, Toast.LENGTH_SHORT).show()
-                    }
+                    contentDescription = "$label. ${disabledMessage!!}"
+                    disabled()
                 }
             }
-        )
+            .clickable(
+                onClick = {
+                    if (enabled) {
+                        onCheckedChange(!checked)
+                    } else {
+                        Toast.makeText(context, disabledMessage, Toast.LENGTH_SHORT).show()
+                    }
+                }
+            )
     ) {
         LoadingIcon(icon = icon.value, modifier = Modifier.size(40.dp).padding(8.dp))
         Text(
             text = label,
             style = MaterialTheme.typography.titleSmall,
-            maxLines = 2,
+            maxLines = 1,
             modifier = Modifier.padding(horizontal = 8.dp).weight(1f).basicMarquee(),
         )
-        Switch(checked = checked, enabled = enabled, onCheckedChange = onCheckedChange)
+        Switch(
+            checked = checked,
+            enabled = enabled,
+            onCheckedChange = onCheckedChange,
+            modifier = Modifier,
+        )
     }
 }
 
@@ -191,7 +229,7 @@ private fun AppSelectorButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    SettingsRow(modifier.clickable(onClick = onClick)) {
+    SettingsRow(modifier.semantics { role = Role.Button }.clickable(onClick = onClick)) {
         LoadingIcon(
             icon =
                 loadIcon(
@@ -202,21 +240,21 @@ private fun AppSelectorButton(
                     .value,
             modifier = Modifier.size(40.dp).padding(8.dp),
         )
-        Column(modifier = Modifier.padding(horizontal = 8.dp).weight(1f)) {
+        Column(modifier = Modifier.padding(horizontal = 8.dp).weight(weight = 1f).basicMarquee()) {
             Text(
                 text = stringResource(R.string.screen_record_single_app_hint),
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurface,
-                maxLines = 2,
-                modifier = Modifier.basicMarquee(),
+                maxLines = 1,
+                modifier = Modifier,
             )
             AnimatedVisibility(visible = !appLabel.isNullOrEmpty()) {
                 Text(
                     text = appLabel ?: "",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    modifier = Modifier.basicMarquee(),
+                    maxLines = 1,
+                    modifier = Modifier,
                 )
             }
         }
@@ -239,7 +277,11 @@ private fun SettingsRow(modifier: Modifier = Modifier, content: @Composable RowS
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier =
-            modifier.height(64.dp).padding(horizontal = 20.dp, vertical = 12.dp).fillMaxWidth(),
+            modifier
+                .heightIn(min = 64.dp)
+                .padding(horizontal = 20.dp)
+                .fillMaxWidth()
+                .animateContentSize(),
         content = content,
     )
 }

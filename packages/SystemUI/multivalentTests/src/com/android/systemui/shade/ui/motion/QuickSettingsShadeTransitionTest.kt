@@ -26,6 +26,7 @@ import androidx.compose.ui.test.SemanticsNodeInteractionsProvider
 import androidx.compose.ui.test.hasTestTag
 import androidx.compose.ui.test.onRoot
 import androidx.compose.ui.test.swipe
+import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.LargeTest
 import com.android.compose.snapshot.ObserveReadsRoot
 import com.android.compose.theme.PlatformTheme
@@ -66,7 +67,6 @@ import com.android.systemui.testKosmos
 import com.android.systemui.window.data.repository.fakeWindowRootViewBlurRepository
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CoroutineScope
-import org.junit.Ignore
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -82,26 +82,20 @@ import platform.test.motion.compose.values.MotionTestValueKey
 import platform.test.motion.golden.FeatureCapture
 import platform.test.motion.golden.TimeSeriesCaptureScope
 import platform.test.motion.golden.asDataPoint
-import platform.test.runner.parameterized.ParameterizedAndroidJunit4
-import platform.test.runner.parameterized.Parameters
 import platform.test.screenshot.DeviceEmulationSpec
 import platform.test.screenshot.Displays.Phone
-import platform.test.screenshot.PathConfig
-import platform.test.screenshot.PathElementNoContext
 
-@Ignore("b/467228678")
-@RunWith(ParameterizedAndroidJunit4::class)
+@RunWith(AndroidJUnit4::class)
 @MotionTest
 @LargeTest
 @RunWithLooper
 @EnableSceneContainer
 @EnableFlags(Flags.FLAG_DUAL_SHADE)
-class QuickSettingsShadeTransitionTest(val deviceSpec: DeviceEmulationSpec) : SysuiTestCase() {
+class QuickSettingsShadeTransitionTest() : SysuiTestCase() {
     private val kosmos = testKosmos()
-    private val deviceType = deviceSpec.display.name
+    private val deviceSpec = DeviceEmulationSpec(Phone)
 
-    private val pathConfig = PathConfig(PathElementNoContext("deviceSpec", false) { deviceType })
-    @get:Rule val motionTestRule = createSysUiComposeMotionTestRule(kosmos, deviceSpec, pathConfig)
+    @get:Rule val motionTestRule = createSysUiComposeMotionTestRule(kosmos, deviceSpec)
 
     private val quickSettingsShadeOverlayActionsViewModelFactory =
         object : QuickSettingsShadeOverlayActionsViewModel.Factory {
@@ -164,6 +158,7 @@ class QuickSettingsShadeTransitionTest(val deviceSpec: DeviceEmulationSpec) : Sy
                                         )
                                     }
 
+                                    // TODO replace with awaitIdle(b/480861333)
                                     awaitFrames(1)
                                 }
                             ) {
@@ -223,7 +218,7 @@ class QuickSettingsShadeTransitionTest(val deviceSpec: DeviceEmulationSpec) : Sy
                             )
                         },
                 )
-            assertThat(motion).timeSeriesMatchesGolden("goneSceneToQuickSettingsShadeOverlayTest")
+            assertThat(motion).timeSeriesMatchesGolden()
         }
     }
 
@@ -262,8 +257,7 @@ class QuickSettingsShadeTransitionTest(val deviceSpec: DeviceEmulationSpec) : Sy
                             featureFloat(OverlayShadeMotionTestKeys.scrimAlpha)
                         },
                 )
-            assertThat(motion)
-                .timeSeriesMatchesGolden("recordScrimAlpha_duringSwipeDownToQSShadeOverlay")
+            assertThat(motion).timeSeriesMatchesGolden()
         }
     }
 
@@ -304,8 +298,7 @@ class QuickSettingsShadeTransitionTest(val deviceSpec: DeviceEmulationSpec) : Sy
                             )
                         },
                 )
-            assertThat(motion)
-                .timeSeriesMatchesGolden("recordEditIconButtonPosition_duringSwipeDownToOpenQS")
+            assertThat(motion).timeSeriesMatchesGolden()
         }
     }
 
@@ -349,7 +342,5 @@ class QuickSettingsShadeTransitionTest(val deviceSpec: DeviceEmulationSpec) : Sy
                 name = motionTestValueKey.semanticsPropertyKey.name,
             )
         }
-
-        @get:Parameters @JvmStatic val parameterValues = listOf(DeviceEmulationSpec(Phone))
     }
 }

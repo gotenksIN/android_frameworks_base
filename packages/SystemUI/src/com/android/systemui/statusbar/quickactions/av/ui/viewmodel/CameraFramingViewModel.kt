@@ -32,17 +32,15 @@ constructor(private val desktopEffectInteractor: DesktopEffectInteractor) :
         desktopEffectInteractor.model
             .map {
                 ButtonUiState(
-                    // TODO(b/436222258): Attach to backend when available
-                    isEnabled = false,
-                    // TODO(b/436222258): Replace hardcoded strings with resource resolution
-                    subText = "Camera Framing",
+                    isEnabled = it.cameraFraming,
+                    subText = com.android.systemui.res.R.string.av_camera_framing,
                     image = R.drawable.frame_person,
                 )
             }
             .hydratedStateOf(initialValue = ButtonUiState())
 
     override suspend fun onClick() {
-        desktopEffectInteractor.setStudioMic(newValue = state.isEnabled)
+        desktopEffectInteractor.setCameraFraming(newValue = state.isEnabled)
     }
 
     /** A factory to be used to create view model instances. */

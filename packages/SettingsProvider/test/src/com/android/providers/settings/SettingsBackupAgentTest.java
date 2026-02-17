@@ -16,6 +16,7 @@
 
 package com.android.providers.settings;
 
+import static com.android.providers.settings.SettingsBackupRestoreKeys.KEY_PLATFORM_MANAGED_SIM_PINS;
 import static com.android.providers.settings.SettingsBackupRestoreKeys.KEY_SIM_SPECIFIC_SETTINGS_2;
 import static com.android.providers.settings.SettingsBackupRestoreKeys.KEY_SOFTAP_CONFIG;
 import static com.android.providers.settings.SettingsBackupRestoreKeys.KEY_WIFI_NEW_CONFIG;
@@ -54,12 +55,12 @@ import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.UserHandle;
-import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.flag.junit.SetFlagsRule;
 import android.provider.Settings;
 import android.provider.settings.validators.SettingsValidators;
 import android.provider.settings.validators.Validator;
+import android.security.Flags;
 import android.telephony.SubscriptionManager;
 import android.test.mock.MockContentProvider;
 import android.test.mock.MockContentResolver;
@@ -332,22 +333,6 @@ public class SettingsBackupAgentTest extends BaseSettingsProviderTest {
     }
 
     @Test
-    @DisableFlags(android.view.accessibility.Flags.FLAG_TEXT_CURSOR_BLINK_INTERVAL)
-    public void testFindEqualOrNextLargestTextCursorBlinkInterval_flagOff() {
-        final Function<String, String> testedMethod =
-                getFindEqualOrNextLargestTextCursorBlinkInterval();
-
-        // Always return default if flag is off.
-        assertEquals("500", testedMethod.apply("0"));
-        assertEquals("500", testedMethod.apply("333"));
-        assertEquals("500", testedMethod.apply("385"));
-        assertEquals("500", testedMethod.apply("500"));
-        assertEquals("500", testedMethod.apply("625"));
-        assertEquals("500", testedMethod.apply("1000"));
-    }
-
-    @Test
-    @EnableFlags(android.view.accessibility.Flags.FLAG_TEXT_CURSOR_BLINK_INTERVAL)
     public void testFindEqualOrNextLargestTextCursorBlinkInterval() {
         final Function<String, String> testedMethod =
                 getFindEqualOrNextLargestTextCursorBlinkInterval();
@@ -374,7 +359,6 @@ public class SettingsBackupAgentTest extends BaseSettingsProviderTest {
     }
 
     @Test
-    @EnableFlags(android.view.accessibility.Flags.FLAG_TEXT_CURSOR_BLINK_INTERVAL)
     public void testFindEqualOrNextLargestTextCursorBlinkInterval_numberFormatException() {
         final Function<String, String> testedMethod =
                 getFindEqualOrNextLargestTextCursorBlinkInterval();
@@ -837,6 +821,65 @@ public class SettingsBackupAgentTest extends BaseSettingsProviderTest {
 
         DataTypeResult loggingResult =
             getLoggingResultForDatatype(KEY_WIFI_SETTINGS_BACKUP_DATA, mAgentUnderTest);
+        assertNotNull(loggingResult);
+        assertEquals(loggingResult.getFailCount(), 1);
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_AUTO_SIM_PIN_MANAGEMENT)
+    public void getPlatformManagedSimPinsData_numberOfSettingsInKeyAreRecordedIfBackedUp() {
+        mAgentUnderTest.onCreate(
+                UserHandle.SYSTEM, BackupDestination.CLOUD, OperationType.BACKUP);
+        byte[] fromSubManager = new byte[]{0, 1, 2};
+        when(mSubscriptionManager.getAllPlatformManagedPins()).thenReturn(fromSubManager);
+
+        byte[] toBackUp = mAgentUnderTest.getPlatformManagedSimPinsData(true);
+
+        assertEquals(mAgentUnderTest.getNumberOfSettingsPerKey(KEY_PLATFORM_MANAGED_SIM_PINS), 1);
+        assertArrayEquals(toBackUp, fromSubManager);
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_AUTO_SIM_PIN_MANAGEMENT)
+    public void getPlatformManagedSimPinsData_doesNotBackupIfNotEncrypted() {
+        mAgentUnderTest.onCreate(
+                UserHandle.SYSTEM, BackupDestination.DEVICE_TRANSFER, OperationType.BACKUP);
+        when(mSubscriptionManager.getAllPlatformManagedPins()).thenReturn(new byte[] {0, 1, 2});
+
+        byte[] toBackUp = mAgentUnderTest.getPlatformManagedSimPinsData(false);
+
+        assertEquals(mAgentUnderTest.getNumberOfSettingsPerKey(KEY_PLATFORM_MANAGED_SIM_PINS), 0);
+        assertEquals(toBackUp.length, 0);
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_AUTO_SIM_PIN_MANAGEMENT)
+    public void restorePlatformManagedSimPins_restoreIsSuccessful_successMetricsAreLogged() {
+        mAgentUnderTest.onCreate(
+                UserHandle.SYSTEM, BackupDestination.CLOUD, OperationType.RESTORE);
+        doNothing().when(mSubscriptionManager).restorePlatformManagedSimPinsFromBackup(any());
+
+        mAgentUnderTest.restorePlatformManagedSimPins(new byte[0]);
+
+        DataTypeResult loggingResult =
+                getLoggingResultForDatatype(KEY_PLATFORM_MANAGED_SIM_PINS, mAgentUnderTest);
+        assertNotNull(loggingResult);
+        assertEquals(loggingResult.getSuccessCount(), 1);
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_AUTO_SIM_PIN_MANAGEMENT)
+    public void restorePlatformManagedSimPins_restoreIsNotSuccessful_failureMetricsAreLogged() {
+        mAgentUnderTest.onCreate(
+                UserHandle.SYSTEM, BackupDestination.CLOUD, OperationType.RESTORE);
+        doThrow(new RuntimeException())
+                .when(mSubscriptionManager)
+                .restorePlatformManagedSimPinsFromBackup(any());
+
+        mAgentUnderTest.restorePlatformManagedSimPins(new byte[0]);
+
+        DataTypeResult loggingResult =
+                getLoggingResultForDatatype(KEY_PLATFORM_MANAGED_SIM_PINS, mAgentUnderTest);
         assertNotNull(loggingResult);
         assertEquals(loggingResult.getFailCount(), 1);
     }

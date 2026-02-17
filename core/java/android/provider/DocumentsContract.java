@@ -257,7 +257,7 @@ public final class DocumentsContract {
             ACTION_DOCUMENT_ROOT_SETTINGS = "android.provider.action.DOCUMENT_ROOT_SETTINGS";
 
     /**
-     * Intent category to filter out activities that can handle document intents.
+     * Intent category to filter for activities that can handle document intents.
      *
      * <p>Indicates that an approved activity can receive intents {@link Intent#ACTION_SEND} and/or
      * {@link Intent#ACTION_SEND_MULTIPLE}. The activity's package must be allowlisted by the system
@@ -766,6 +766,7 @@ public final class DocumentsContract {
          * @see #FLAG_SUPPORTS_CREATE
          * @see #FLAG_SUPPORTS_RECENTS
          * @see #FLAG_SUPPORTS_SEARCH
+         * @see #FLAG_SUPPORTS_QUERY_TRASH
          * @see #FLAG_LIMITED_FUNCTIONALITY_WHEN_OFFLINE
          */
         public static final String COLUMN_FLAGS = "flags";
@@ -1022,7 +1023,7 @@ public final class DocumentsContract {
          * @see Document#COLUMN_MIME_TYPE
          */
         @FlaggedApi(Flags.FLAG_ENABLE_SYNC_STATE)
-        public static final int FLAG_LIMITED_FUNCTIONALITY_WHEN_OFFLINE = 1 << 20;
+        public static final int FLAG_LIMITED_FUNCTIONALITY_WHEN_OFFLINE = 1 << 21;
     }
 
     /**

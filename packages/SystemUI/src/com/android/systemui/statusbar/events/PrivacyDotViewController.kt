@@ -45,10 +45,8 @@ import com.android.systemui.privacy.PrivacyItem
 import com.android.systemui.res.R
 import com.android.systemui.shade.domain.interactor.ShadeDisplaysInteractor
 import com.android.systemui.shade.domain.interactor.ShadeInteractor
-import com.android.systemui.shade.shared.flag.ShadeWindowGoesAround
 import com.android.systemui.statusbar.StatusBarState.SHADE
 import com.android.systemui.statusbar.StatusBarState.SHADE_LOCKED
-import com.android.systemui.statusbar.core.StatusBarConnectedDisplays
 import com.android.systemui.statusbar.events.PrivacyDotCorner.BottomLeft
 import com.android.systemui.statusbar.events.PrivacyDotCorner.BottomRight
 import com.android.systemui.statusbar.events.PrivacyDotCorner.TopLeft
@@ -209,11 +207,7 @@ constructor(
             }
         }
         scope.launch {
-            if (
-                StatusBarConnectedDisplays.isEnabled &&
-                    ShadeWindowGoesAround.isEnabled &&
-                    shadeDisplaysInteractor != null
-            ) {
+            if (shadeDisplaysInteractor != null) {
                 combine(
                     shadeInteractor?.isQsExpanded ?: flowOf(false),
                     shadeDisplaysInteractor.get().displayId,
@@ -232,7 +226,6 @@ constructor(
     }
 
     override fun stop() {
-        StatusBarConnectedDisplays.unsafeAssertInNewMode()
         contentInsetsProvider.removeCallback(insetsChangedListener)
         configurationController.removeCallback(configurationListener)
         stateController.removeCallback(statusBarStateListener)
@@ -542,11 +535,7 @@ constructor(
                 (stateController.isExpanded && stateController.state == SHADE)
             }
         val isShadeExpandedOnThisDisplay =
-            if (
-                StatusBarConnectedDisplays.isEnabled &&
-                    ShadeWindowGoesAround.isEnabled &&
-                    shadeDisplaysInteractor != null
-            ) {
+            if (shadeDisplaysInteractor != null) {
                 isShadeExpanded && shadeDisplaysInteractor.get().displayId.value == displayId
             } else {
                 isShadeExpanded
@@ -800,7 +789,7 @@ object PrivacyDotViewControllerModule {
         configurationController: ConfigurationController,
         perDisplaySubcomponentRepo: PerDisplayRepository<SystemUIDisplaySubcomponent>,
         @Default defaultAnimationSchedulerLazy: Lazy<SystemStatusAnimationScheduler>,
-        defaultAvControlsChipInteractor: AvControlsChipInteractor,
+        @Default defaultAvControlsChipInteractor: AvControlsChipInteractor,
     ): PrivacyDotViewController {
         val displaySubcomponent = perDisplaySubcomponentRepo[Display.DEFAULT_DISPLAY]!!
         val animationScheduler =

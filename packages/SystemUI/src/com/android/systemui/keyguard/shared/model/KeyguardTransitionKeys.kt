@@ -26,4 +26,6 @@ object KeyguardTransitionKeys {
      * etc). In this case, we'll leave the lockscreen UI visible so that animation can play over it.
      */
     val WithAnimationOverLockscreen = TransitionKey("WithNotificationLaunchAnimation")
+
+    val AodToGoneTransition = TransitionKey("AodToGoneTransition")
 }

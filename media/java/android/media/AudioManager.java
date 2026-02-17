@@ -16,9 +16,11 @@
 
 package android.media;
 
+import static android.annotation.SystemApi.Client.MODULE_LIBRARIES;
 import static android.companion.virtual.VirtualDeviceParams.DEVICE_POLICY_CUSTOM;
 import static android.companion.virtual.VirtualDeviceParams.POLICY_TYPE_AUDIO;
 import static android.content.Context.DEVICE_ID_DEFAULT;
+import static android.media.MediaRecorder.AudioSource.AUDIO_SOURCE_INVALID;
 import static android.media.audio.Flags.FLAG_ASSISTANT_VOLUME_CONTROL;
 import static android.media.audio.Flags.FLAG_AUDIO_FOCUS_DESKTOP;
 import static android.media.audio.Flags.FLAG_DEPRECATE_STREAM_BT_SCO;
@@ -27,6 +29,8 @@ import static android.media.audio.Flags.FLAG_FOCUS_EXCLUSIVE_WITH_RECORDING;
 import static android.media.audio.Flags.FLAG_FOCUS_FREEZE_TEST_API;
 import static android.media.audio.Flags.FLAG_REGISTER_VOLUME_CALLBACK_API_HARDENING;
 import static android.media.audio.Flags.FLAG_AMSCO_AVAILABLE_API;
+import static android.media.audio.Flags.FLAG_BT_DEVICE_CATEGORY_API;
+import static android.media.audio.Flags.FLAG_FUSED_TELECOM_ROUTE_API;
 import static android.media.audio.Flags.FLAG_STREAM_ASSISTANT_PUBLIC;
 import static android.media.audio.Flags.FLAG_SUPPORTED_DEVICE_TYPES_API;
 import static android.media.audio.Flags.FLAG_UNIFY_ABSOLUTE_VOLUME_MANAGEMENT;
@@ -35,6 +39,7 @@ import static android.media.audio.Flags.autoPublicVolumeApiHardening;
 import static android.media.audio.Flags.streamAssistantPublic;
 import static android.media.audiopolicy.Flags.FLAG_ENABLE_FADE_MANAGER_CONFIGURATION;
 import static android.media.audiopolicy.Flags.FLAG_MULTI_ZONE_AUDIO;
+import static android.media.audiopolicy.Flags.multiZoneAudio;
 
 import android.Manifest;
 import android.annotation.CallbackExecutor;
@@ -69,6 +74,10 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.media.AudioAttributes.AttributeSystemUsage;
 import android.media.CallbackUtil.ListenerInfo;
+import android.media.audio.AudioModeSessionRequest;
+import android.media.audio.Flags;
+import android.media.audio.IAudioModeSession;
+import android.media.audio.IAudioModeSessionCallback;
 import android.media.audiopolicy.AudioPolicy;
 import android.media.audiopolicy.AudioPolicy.AudioPolicyFocusListener;
 import android.media.audiopolicy.AudioProductStrategy;
@@ -124,6 +133,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /**
  * AudioManager provides access to volume and ringer mode control.
@@ -1882,6 +1892,95 @@ public class AudioManager {
     }
 
     /**
+     * Maps a given zone id to a given user, this will be used for routing and volume management
+     * when audio policy engine with audio zone ids are used.
+     * At initial state, all user ids are implicitly assigned to the zone 0. All other zones
+     * are not reachable in terms of routing and volume management.
+     *
+     * <p>If the user is not mapped to a particular zone then the audio management of the user will
+     * fall under the {@link AudioProductStrategy#DEFAULT_ZONE_ID}
+     *
+     * @param user to consider
+     * @param zoneId the userId shall be assigned to
+     * @return true if the operation was successful, false otherwise
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(FLAG_MULTI_ZONE_AUDIO)
+    @RequiresPermission(anyOf = {
+            android.Manifest.permission.MODIFY_AUDIO_ROUTING,
+            android.Manifest.permission.MODIFY_AUDIO_SETTINGS_PRIVILEGED
+    })
+    public boolean setProductStrategiesZoneIdForUser(@NonNull UserHandle user, int zoneId) {
+        Objects.requireNonNull(user, "user must not be null");
+        IAudioService service = getService();
+        try {
+            int status = service.setProductStrategiesZoneIdForUser(user, zoneId);
+            return status == AudioSystem.SUCCESS;
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Resets the zone id to given user mapping previously set by
+     * {@link #setProductStrategiesZoneIdForUser(UserHandle, int)}
+     *
+     * @param user to consider
+     * @return true if the operation was successful, false otherwise.
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(FLAG_MULTI_ZONE_AUDIO)
+    @RequiresPermission(anyOf = {
+            android.Manifest.permission.MODIFY_AUDIO_ROUTING,
+            android.Manifest.permission.MODIFY_AUDIO_SETTINGS_PRIVILEGED
+    })
+    public boolean resetProductStrategiesZoneIdForUser(@NonNull UserHandle user) {
+        Objects.requireNonNull(user, "user must not be null");
+        IAudioService service = getService();
+        try {
+            int status = service.resetProductStrategiesZoneIdForUser(user);
+            return status == AudioSystem.SUCCESS;
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Returns the current user mapped to a particular audio zone
+     *
+     * <p>If the user is not mapped to a particular zone then the audio management of the user will
+     * fall under the {@link AudioProductStrategy#DEFAULT_ZONE_ID}
+     *
+     * At initialization, all the UserId are attached to the zone 0.
+     * As the secondary zones are non-reachable for neither routing nor volume, it will return
+     * {@code UserHandle.USER_NULL} until explicitly assigned by
+     * {@link #setProductStrategiesZoneIdForUser(UserHandle, int)}.
+     *
+     * @param zoneId to consider
+     * @return the User if the zone is mapped to a User, {@code UserHandle.USER_CURRENT}
+     * otherwise.
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(FLAG_MULTI_ZONE_AUDIO)
+    @RequiresPermission(anyOf = {
+            Manifest.permission.MODIFY_AUDIO_ROUTING,
+            Manifest.permission.QUERY_AUDIO_STATE,
+            Manifest.permission.MODIFY_AUDIO_SETTINGS_PRIVILEGED
+    })
+    @NonNull
+    public UserHandle getUserHandleForZoneId(int zoneId) {
+        IAudioService service = getService();
+        try {
+            return service.getUserHandleForZoneId(zoneId);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+
+    /**
      * Set the system usages to be supported on this device.
      * @param systemUsages array of system usages to support {@link AttributeSystemUsage}
      * @hide
@@ -3077,7 +3176,15 @@ public class AudioManager {
                                                @NonNull AudioAttributes attributes) {
         Objects.requireNonNull(format);
         Objects.requireNonNull(attributes);
-        return AudioSystem.getDirectPlaybackSupport(format, attributes);
+        if (multiZoneAudio()) {
+            final IAudioService service = getService();
+            try {
+                return service.getDirectPlaybackSupport(format, attributes);
+            } catch (RemoteException e) {
+                throw e.rethrowFromSystemServer();
+            }
+        }
+        return AudioSystem.getDirectPlaybackSupport(format, attributes, /* uid= */ 0);
     }
 
     //====================================================================
@@ -3199,7 +3306,10 @@ public class AudioManager {
      *   <li> {@link #SCO_AUDIO_STATE_CONNECTED}, </li>
      * </ul>
      * @see #startBluetoothSco()
+     * @deprecated Use {@link #addOnCommunicationDeviceChangedListener} instead.
      */
+    @FlaggedApi(FLAG_AMSCO_AVAILABLE_API)
+    @Deprecated
     @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
     public static final String ACTION_SCO_AUDIO_STATE_UPDATED =
             "android.media.ACTION_SCO_AUDIO_STATE_UPDATED";
@@ -3207,36 +3317,54 @@ public class AudioManager {
     /**
      * Extra for intent {@link #ACTION_SCO_AUDIO_STATE_CHANGED} or
      * {@link #ACTION_SCO_AUDIO_STATE_UPDATED} containing the new bluetooth SCO connection state.
+     * @deprecated Use {@link #addOnCommunicationDeviceChangedListener} instead.
      */
+    @FlaggedApi(FLAG_AMSCO_AVAILABLE_API)
+    @Deprecated
     public static final String EXTRA_SCO_AUDIO_STATE =
             "android.media.extra.SCO_AUDIO_STATE";
 
     /**
      * Extra for intent {@link #ACTION_SCO_AUDIO_STATE_UPDATED} containing the previous
      * bluetooth SCO connection state.
+     * @deprecated Use {@link #addOnCommunicationDeviceChangedListener} instead.
      */
+    @FlaggedApi(FLAG_AMSCO_AVAILABLE_API)
+    @Deprecated
     public static final String EXTRA_SCO_AUDIO_PREVIOUS_STATE =
             "android.media.extra.SCO_AUDIO_PREVIOUS_STATE";
 
     /**
      * Value for extra EXTRA_SCO_AUDIO_STATE or EXTRA_SCO_AUDIO_PREVIOUS_STATE
      * indicating that the SCO audio channel is not established
+     * @deprecated Use {@link #addOnCommunicationDeviceChangedListener} instead.
      */
+    @FlaggedApi(FLAG_AMSCO_AVAILABLE_API)
+    @Deprecated
     public static final int SCO_AUDIO_STATE_DISCONNECTED = 0;
     /**
      * Value for extra {@link #EXTRA_SCO_AUDIO_STATE} or {@link #EXTRA_SCO_AUDIO_PREVIOUS_STATE}
      * indicating that the SCO audio channel is established
+     * @deprecated Use {@link #addOnCommunicationDeviceChangedListener} instead.
      */
+    @FlaggedApi(FLAG_AMSCO_AVAILABLE_API)
+    @Deprecated
     public static final int SCO_AUDIO_STATE_CONNECTED = 1;
     /**
      * Value for extra EXTRA_SCO_AUDIO_STATE or EXTRA_SCO_AUDIO_PREVIOUS_STATE
      * indicating that the SCO audio channel is being established
+     * @deprecated Use {@link #addOnCommunicationDeviceChangedListener} instead.
      */
+    @FlaggedApi(FLAG_AMSCO_AVAILABLE_API)
+    @Deprecated
     public static final int SCO_AUDIO_STATE_CONNECTING = 2;
     /**
      * Value for extra EXTRA_SCO_AUDIO_STATE indicating that
      * there was an error trying to obtain the state
+     * @deprecated Use {@link #addOnCommunicationDeviceChangedListener} instead.
      */
+    @FlaggedApi(FLAG_AMSCO_AVAILABLE_API)
+    @Deprecated
     public static final int SCO_AUDIO_STATE_ERROR = -1;
 
 
@@ -3248,7 +3376,10 @@ public class AudioManager {
      * @return true if bluetooth SCO can be used for audio when not in call
      *         false otherwise
      * @see #startBluetoothSco()
-    */
+     * @deprecated This method is no longer necessary, the framework always supports SCO off call
+     */
+    @FlaggedApi(FLAG_AMSCO_AVAILABLE_API)
+    @Deprecated
     public boolean isBluetoothScoAvailableOffCall() {
 // QTI_BEGIN: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
         boolean retval;
@@ -3335,7 +3466,10 @@ public class AudioManager {
      * @see #startBluetoothSco()
      * @see #stopBluetoothSco()
      * @see #ACTION_SCO_AUDIO_STATE_UPDATED
+     * @deprecated Use {@link AudioManager#setCommunicationDevice(AudioDeviceInfo)} instead.
      */
+    @FlaggedApi(FLAG_AMSCO_AVAILABLE_API)
+    @Deprecated
     @UnsupportedAppUsage(maxTargetSdk = Build.VERSION_CODES.R, trackingBug = 170729553)
     public void startBluetoothScoVirtualCall() {
 // QTI_BEGIN: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
@@ -3380,9 +3514,15 @@ public class AudioManager {
      * This method should only be used by applications that replace the platform-wide
      * management of audio settings or the main telephony application.
      *
+     * This method has been a no-op for applications for several releases, and should
+     * not be used by any clients.
+     *
      * @param on set <var>true</var> to use bluetooth SCO for communications;
      *               <var>false</var> to not use bluetooth SCO for communications
+     * @deprecated Use {@link AudioManager#setCommunicationDevice()} instead.
      */
+    @FlaggedApi(FLAG_AMSCO_AVAILABLE_API)
+    @Deprecated
     public void setBluetoothScoOn(boolean on){
         final IAudioService service = getService();
 // QTI_BEGIN: 2018-05-15: Bluetooth: HFP: Limiting the mStartcount to 1 for each mScoClient
@@ -3553,7 +3693,10 @@ public class AudioManager {
      *
      * <p>The intent has no extra values, use {@link #isSpeakerphoneOn} to check whether the
      * speakerphone functionality is enabled or not.
+     * @deprecated Use {@link #addOnCommunicationDeviceChangedListener} instead.
      */
+    @FlaggedApi(FLAG_AMSCO_AVAILABLE_API)
+    @Deprecated
     @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
     public static final String ACTION_SPEAKERPHONE_STATE_CHANGED =
             "android.media.action.SPEAKERPHONE_STATE_CHANGED";
@@ -5308,7 +5451,8 @@ public class AudioManager {
             throw new NullPointerException("Illegal null AudioFocusRequest");
         }
         // this can only be checked now, not during the creation of the AudioFocusRequest instance
-        if (afr.locksFocus() && ap == null) {
+        if (afr.locksFocus() && ap == null && !"com.android.server.telecom".equals(
+                mApplicationContext.getOpPackageName())) {
             throw new IllegalArgumentException(
                     "Illegal null audio policy when locking audio focus");
         }
@@ -6797,6 +6941,7 @@ public class AudioManager {
     /**
      * @hide
      * Get the audio devices that would be used for the routing of the given audio attributes.
+     *
      * @param attributes the {@link AudioAttributes} for which the routing is being queried.
      *   For queries about output devices (playback use cases), a valid usage must be specified in
      *   the audio attributes via AudioAttributes.Builder.setUsage(). The capture preset MUST NOT
@@ -6804,14 +6949,16 @@ public class AudioManager {
      *   For queries about input devices (capture use case), a valid capture preset MUST be
      *   specified in the audio attributes via AudioAttributes.Builder.setCapturePreset(). If a
      *   capture preset is present, then this has precedence over any usage or content type also
-     *   present in the audio attrirutes.
+     *   present in the audio attributes.
+     *
      * @return an empty list if there was an issue with the request, a list of audio devices
      *   otherwise (typically one device, except for duplicated paths).
      */
     @SystemApi
     @RequiresPermission(anyOf = {
             Manifest.permission.MODIFY_AUDIO_ROUTING,
-            Manifest.permission.QUERY_AUDIO_STATE
+            Manifest.permission.QUERY_AUDIO_STATE,
+            Manifest.permission.MODIFY_AUDIO_SETTINGS_PRIVILEGED
     })
     public @NonNull List<AudioDeviceAttributes> getDevicesForAttributes(
             @NonNull AudioAttributes attributes) {
@@ -6822,6 +6969,48 @@ public class AudioManager {
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
+    }
+
+    /**
+     * Get the audio devices that would be used for the routing of the given audio attributes.
+     *
+     * @param attributes the {@link AudioAttributes} for which the routing is being queried.
+     *   For queries about output devices (playback use cases), a valid usage must be specified in
+     *   the audio attributes via AudioAttributes.Builder.setUsage(). The capture preset MUST NOT
+     *   be changed from default.
+     *   For queries about input devices (capture use case), a valid capture preset MUST be
+     *   specified in the audio attributes via AudioAttributes.Builder.setCapturePreset(). If a
+     *   capture preset is present, then this has precedence over any usage or content type also
+     *   present in the audio attributes.
+     * @param uid for which the device is being queried.
+     *
+     * @return an empty list if there was an issue with the request, a list of audio devices
+     *   otherwise (typically one device, except for duplicated paths).
+     *
+     * @hide
+     */
+    @FlaggedApi(FLAG_MULTI_ZONE_AUDIO)
+    @SystemApi
+    @RequiresPermission(anyOf = {
+            Manifest.permission.MODIFY_AUDIO_ROUTING,
+            Manifest.permission.QUERY_AUDIO_STATE,
+            Manifest.permission.MODIFY_AUDIO_SETTINGS_PRIVILEGED
+    })
+    public @NonNull List<AudioDeviceInfo> getDevicesForAttributesAndUid(
+            @NonNull AudioAttributes attributes, int uid) {
+        Objects.requireNonNull(attributes);
+        List<AudioDeviceAttributes> deviceAttributes;
+        try {
+            deviceAttributes = getService().getDevicesForAttributesAndUid(attributes, uid);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+        int devicesTypes = attributes.getCapturePreset() == AUDIO_SOURCE_INVALID ?
+                GET_DEVICES_OUTPUTS : GET_DEVICES_INPUTS;
+        List<AudioDeviceInfo> allDevices = List.of(getDevicesStatic(devicesTypes));
+        return deviceAttributes.stream().flatMap(deviceAttr -> allDevices.stream().filter(info ->
+                deviceAttr.getType() == info.getType()
+                        && TextUtils.equals(deviceAttr.getAddress(), info.getAddress()))).toList();
     }
 
     // Each listener corresponds to a unique callback stub because each listener can subscribe to
@@ -7883,6 +8072,8 @@ public class AudioManager {
      */
     @RequiresPermission(Manifest.permission.MODIFY_AUDIO_SETTINGS_PRIVILEGED)
     @AudioDeviceCategory
+    @FlaggedApi(FLAG_BT_DEVICE_CATEGORY_API)
+    @SystemApi(client = SystemApi.Client.MODULE_LIBRARIES)
     public int getBluetoothAudioDeviceCategory(@NonNull String address) {
         try {
             return getService().getBluetoothAudioDeviceCategory(address);
@@ -8183,7 +8374,7 @@ public class AudioManager {
         }
         AudioPortConfig activeConfig = port.activeConfig();
         AudioPortConfig config = new AudioPortConfig(port, activeConfig.samplingRate(),
-                                        activeConfig.channelMask(), activeConfig.format(), gain);
+                                        activeConfig.channelMasks(), activeConfig.format(), gain);
         config.mConfigMask = AudioPortConfig.GAIN;
         return AudioSystem.setAudioPortConfig(config);
     }
@@ -8367,7 +8558,7 @@ public class AudioManager {
                                        gainCfg.rampDurationMs());
         }
         return port.buildConfig(portCfg.samplingRate(),
-                                                 portCfg.channelMask(),
+                                                 portCfg.channelMasks(),
                                                  portCfg.format(),
                                                  gainCfg);
     }
@@ -9125,9 +9316,9 @@ public class AudioManager {
      * and recording of 20kHz~ sounds. If platform supports Ultrasound, then the
      * usage will be
      * To start the Ultrasound playback:
-     *     - Create an AudioTrack with {@link AudioAttributes.CONTENT_TYPE_ULTRASOUND}.
+     *     - Create an AudioTrack with {@link AudioAttributes#CONTENT_TYPE_ULTRASOUND}.
      * To start the Ultrasound capture:
-     *     - Create an AudioRecord with {@link MediaRecorder.AudioSource.ULTRASOUND}.
+     *     - Create an AudioRecord with {@link MediaRecorder.AudioSource#ULTRASOUND}.
      *
      * @return whether the ultrasound feature is supported, true when platform supports both
      * Ultrasound playback and capture, false otherwise.
@@ -9551,6 +9742,92 @@ public class AudioManager {
     }
 
     /**
+     * Creates and initializes a new {@link AudioModeSession}.
+     *
+     * This session allows a client to manage global routing/volume control (as-if via {@link
+     * setMode}) and control routing preference overrides.
+     *
+     * The caller must provide a callback to receive updates on route availability and changes. The
+     * session is active upon successful creation.
+     *
+     * @param request The initial configuration for the session.
+     * @param executor The {@link Executor} on which the callback methods will be invoked.
+     * @param callback The {@link AudioModeSession.Callback} to receive session events.
+     * @return A new {@link AudioModeSession} instance. The caller is responsible for
+     *         calling {@link AudioModeSession#close()} to clean up the audio stack state
+     *         state when their use-case is completed.
+     * @throws IllegalArgumentException if any of the initial values in the request are
+     * malformed.
+     * @throws SecurityException if the caller does not have the required permissions.
+     * @hide
+     */
+    @NonNull
+    @SystemApi(client = MODULE_LIBRARIES)
+    @RequiresPermission(Manifest.permission.MODIFY_PHONE_STATE)
+    @FlaggedApi(FLAG_FUSED_TELECOM_ROUTE_API)
+    public AudioModeSession createAudioModeSession(
+            @NonNull AudioModeSession.Request request,
+            @NonNull @CallbackExecutor Executor executor,
+            @NonNull AudioModeSession.Callback callback) {
+        Objects.requireNonNull(executor);
+        Objects.requireNonNull(callback);
+
+        AudioModeSessionRequest parcelable = request.getParcelable();
+        parcelable.attributionSource = getContext().getAttributionSource().asState();
+
+        IAudioModeSessionCallback cb = new IAudioModeSessionCallback.Stub() {
+            @Override
+            public void onAvailableRoutesChanged(List<IAudioModeSession.Route> availableRoutes) {
+                executor.execute(() -> callback.onAvailableRoutesChanged(
+                    availableRoutes.stream()
+                        .map(AudioModeSession.AudioRoute::new)
+                        .toList()
+                ));
+            }
+
+            @Override
+            public void onExternalRequestedRouteChanged(
+                    IAudioModeSession.Route newRoute, int requestId) {
+                var audioRoute = newRoute == null ? null
+                                               : new AudioModeSession.AudioRoute(newRoute);
+                executor.execute(() ->
+                        callback.onExternalRequestedRouteChanged(audioRoute, requestId));
+            }
+
+            @Override
+            public void onPaused() {
+                executor.execute(() -> callback.onPaused());
+            }
+
+            @Override
+            public void onResumed(int requestId) {
+                executor.execute(() -> callback.onResumed(requestId));
+            }
+
+            @Override
+            public void onClosed() {
+                executor.execute(() -> callback.onClosed());
+            }
+
+            @Override
+            public void onRoutingResult(int requestId, IAudioModeSession.Route route,
+                    int status) {
+                var audioRoute = route == null ? null
+                                               : new AudioModeSession.AudioRoute(route);
+                executor.execute(() -> callback.onRoutingResult(requestId, audioRoute, status));
+            }
+        };
+
+        try {
+            IAudioModeSession session = getService().createAudioModeSession(
+                    parcelable,
+                    cb);
+            return new AudioModeSession(session);
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
+        }
+    }
+    /**
      * Selects the audio device that should be used for communication use cases, for instance voice
      * or video calls. This method can be used by voice or video chat applications to select a
      * different audio device than the one selected by default by the platform.
@@ -9699,9 +9976,42 @@ public class AudioManager {
     public List<AudioProfile> getDirectProfilesForAttributes(@NonNull AudioAttributes attributes) {
         Objects.requireNonNull(attributes);
         ArrayList<AudioProfile> audioProfilesList = new ArrayList<>();
-        int status = AudioSystem.getDirectProfilesForAttributes(attributes, audioProfilesList);
+        int status = AudioSystem.getDirectProfilesForAttributes(attributes, /* uid= */ 0,
+                audioProfilesList);
         if (status != SUCCESS) {
             Log.w(TAG, "getDirectProfilesForAttributes failed.");
+            return new ArrayList<>();
+        }
+        return audioProfilesList;
+    }
+
+    /**
+     * Returns a list of direct {@link AudioProfile} that are supported for the specified
+     * {@link AudioAttributes}. This can be empty in case of an error or if no direct playback
+     * is possible.
+     *
+     * <p>Direct playback means that the audio stream is not resampled or downmixed
+     * by the framework. Checking for direct support can help the app select the representation
+     * of audio content that most closely matches the capabilities of the device and peripherals
+     * (e.g. A/V receiver) connected to it. Note that the provided stream can still be re-encoded
+     * or mixed with other streams, if needed.
+     * <p>When using this information to inform your application which audio format to play,
+     * query again whenever audio output devices change (see {@link AudioDeviceCallback}).
+     *
+     * @param attributes a non-null {@link AudioAttributes} instance.
+     * @param uid Application/Service UID for the query
+     * @return a list of {@link AudioProfile}
+     */
+    @FlaggedApi(FLAG_MULTI_ZONE_AUDIO)
+    @NonNull
+    public List<AudioProfile> getDirectProfilesForAttributes(@NonNull AudioAttributes attributes,
+            int uid) {
+        Objects.requireNonNull(attributes);
+        ArrayList<AudioProfile> audioProfilesList = new ArrayList<>();
+        int status = AudioSystem.getDirectProfilesForAttributes(
+                attributes, uid, audioProfilesList);
+        if (status != SUCCESS) {
+            Log.w(TAG, "getDirectProfilesForAttributes failed: " + status);
             return new ArrayList<>();
         }
         return audioProfilesList;
@@ -10509,14 +10819,10 @@ public class AudioManager {
             @NonNull AudioDeviceInfo device) {
         Objects.requireNonNull(attributes);
         Objects.requireNonNull(device);
-        List<AudioMixerAttributes> mixerAttrList = new ArrayList<>();
-        int ret = AudioSystem.getPreferredMixerAttributes(
-                attributes, device.getId(), mixerAttrList);
-        if (ret == AudioSystem.SUCCESS) {
-            return mixerAttrList.isEmpty() ? null : mixerAttrList.get(0);
-        } else {
-            Log.e(TAG, "Failed calling getPreferredMixerAttributes, ret=" + ret);
-            return null;
+        try {
+            return getService().getPreferredMixerAttributes(attributes, device.getId());
+        } catch (RemoteException e) {
+            throw e.rethrowFromSystemServer();
         }
     }
 
@@ -10884,6 +11190,33 @@ public class AudioManager {
     }
 
     /**
+     * @hide
+     * Default hardening mode: follows flag and other compatibility rules.
+     */
+    public static final int HARDENING_DEFAULT = IAudioPolicyService.HardeningOverride.DEFAULT;
+
+    /**
+     * @hide
+     * Enabled hardening mode: enforces restrictions regardless of compatibility.
+     */
+    public static final int HARDENING_ENABLE = IAudioPolicyService.HardeningOverride.ENABLE;
+
+    /**
+     * @hide
+     * Disabled hardening mode: disables restrictions regardless of compatibility.
+     */
+    public static final int HARDENING_DISABLE = IAudioPolicyService.HardeningOverride.DISABLE;
+
+    /** @hide */
+    @IntDef(prefix = { "HARDENING_" }, value = {
+            HARDENING_DEFAULT,
+            HARDENING_ENABLE,
+            HARDENING_DISABLE
+    })
+    @Retention(RetentionPolicy.SOURCE)
+    public @interface HardeningMode {}
+
+    /**
      * Enable strict audio hardening (background) enforcement, regardless of release or temporary
      * exemptions for debugging purposes.
      * Enforced hardening can be found in the audio dumpsys with the API being restricted and the
@@ -10891,10 +11224,10 @@ public class AudioManager {
      * @hide
      */
     @RequiresPermission(android.Manifest.permission.MODIFY_AUDIO_SETTINGS_PRIVILEGED)
-    public void setEnableHardening(boolean shouldEnable) {
+    public void setHardeningOverride(@HardeningMode int hardeningMode) {
         final IAudioService service = getService();
         try {
-            service.setEnableHardening(shouldEnable);
+            service.setHardeningOverride(hardeningMode);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }

@@ -85,11 +85,12 @@ android_test {
         "services.core",
         "services.credentials",
         "services.devicepolicy",
+        "services.files",
         "services.flags",
         "services.net",
         "services.people",
-        "services.supervision",
         "services.usage",
+        "servicestests-assert-utils",
         "servicestests-utils",
         "testables",
         // TODO: remove once Android migrates to JUnit 4.12,
@@ -99,6 +100,7 @@ android_test {
         "services.signal-collectors",
         "services.signal-collector-manager-internal",
         "service-anomaly-detector.impl",
+        "TestParameterInjector",
     ] + select(soong_config_variable("ANDROID", "release_crashrecovery_module"), {
         "true": ["service-crashrecovery-pre-jarjar"],
         default: [],
@@ -148,7 +150,6 @@ android_test {
     data: [
         ":DisplayManagerTestApp",
         ":MediaButtonReceiverHolderTestHelperApp",
-        ":MemoryLimiterTestApp",
         ":SimpleServiceTestApp1",
         ":SimpleServiceTestApp2",
         ":SimpleServiceTestApp3",
@@ -176,6 +177,7 @@ java_defaults {
         "androidx.annotation_annotation",
         "androidx.test.rules",
         "flag-junit",
+        "servicestests-assert-utils",
         "truth",
     ],
     auto_gen_config: true,
@@ -220,6 +222,22 @@ android_ravenwood_test {
     ],
     srcs: [
         "src/com/android/server/am/psc/**/*.java",
+    ],
+}
+
+android_ravenwood_test {
+    name: "FrameworksServicesTestsRavenwood_ActivityManager",
+    defaults: ["FrameworksServicesTestsRavenwood-defaults"],
+    static_libs: [
+        "androidx.test.ext.junit",
+        "frameworks-base-testutils",
+        "services.core.ravenwood",
+    ],
+    libs: [
+        "mockito-ravenwood-prebuilt",
+    ],
+    srcs: [
+        "src/com/android/server/am/PowerManagerBatchProxyTest.java",
     ],
 }
 
@@ -1097,16 +1115,6 @@ test_module_config {
         "device-tests",
     ],
     include_annotations: ["android.platform.test.annotations.Presubmit"],
-}
-
-test_module_config {
-    name: "FrameworksServicesTests_supervision",
-    base: "FrameworksServicesTests",
-    test_suites: [
-        "automotive-tests",
-        "device-tests",
-    ],
-    include_filters: ["com.android.server.supervision"],
 }
 
 test_module_config {

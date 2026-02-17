@@ -140,6 +140,7 @@ import static android.view.WindowManagerPolicyConstants.TYPE_LAYER_MULTIPLIER;
 import static android.view.WindowManagerPolicyConstants.TYPE_LAYER_OFFSET;
 import static android.window.DesktopExperienceFlags.ENABLE_PRESENTATION_FOR_CONNECTED_DISPLAYS;
 
+import static com.android.internal.policy.TransitionAnimation.MAX_ANIMATION_DURATION;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_ADD_REMOVE;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_ANIM;
 import static com.android.internal.protolog.WmProtoLogGroups.WM_DEBUG_APP_TRANSITIONS;
@@ -173,7 +174,6 @@ import static com.android.server.wm.WindowManagerDebugConfig.DEBUG_VISIBILITY;
 import static com.android.server.wm.WindowManagerDebugConfig.TAG_WITH_CLASS_NAME;
 import static com.android.server.wm.WindowManagerDebugConfig.TAG_WM;
 import static com.android.server.wm.WindowManagerService.H.WINDOW_STATE_BLAST_SYNC_TIMEOUT;
-import static com.android.server.wm.WindowManagerService.MAX_ANIMATION_DURATION;
 import static com.android.server.wm.WindowManagerService.MY_PID;
 import static com.android.server.wm.WindowManagerService.UPDATE_FOCUS_NORMAL;
 import static com.android.server.wm.WindowManagerService.UPDATE_FOCUS_REMOVING_FOCUS;
@@ -1142,6 +1142,8 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         mOverrideScale = mWmService.mAtmService.mCompatModePackages.getCompatScale(
                 mAttrs.packageName, s.mUid);
         updateGlobalScale();
+        updateClientHardwareRendererOutputState(null, mDisplayContent);
+        updateClientRenderingLimitationsState(null, mDisplayContent);
 
         // Make sure we initial all fields before adding to parentWindow, to prevent exception
         // during onDisplayChanged.
@@ -1502,6 +1504,38 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         return !mWindowFrames.mFrame.equals(mWindowFrames.mLastFrame);
     }
 
+    private void updateClientHardwareRendererOutputState(DisplayContent oldDisplay,
+            DisplayContent newDisplay) {
+        final boolean oldState =
+                oldDisplay != null && oldDisplay.isHardwareRendererOutputDisabled();
+        final boolean newState =
+                newDisplay != null && newDisplay.isHardwareRendererOutputDisabled();
+        if (oldState == newState) {
+            return;
+        }
+        try {
+            mClient.requestHardwareRendererOutputDisabled(newState);
+        } catch (RemoteException e) {
+        }
+    }
+
+    private void updateClientRenderingLimitationsState(DisplayContent oldDisplay,
+            DisplayContent newDisplay) {
+        final boolean oldState =
+                oldDisplay != null && oldDisplay.areClientRenderingLimitationsEnabled();
+        final boolean newState =
+                newDisplay != null && newDisplay.areClientRenderingLimitationsEnabled();
+        if (oldState == newState) {
+            return;
+        }
+        var transaction = mWmService.mTransactionFactory.get();
+        try {
+            mClient.requestViewAnimationsDisabled(newState);
+        } catch (RemoteException e) {
+        }
+        transaction.apply();
+    }
+
     @Override
     void onDisplayChanged(DisplayContent dc) {
         if (mDisplayContent != null && dc != mDisplayContent) {
@@ -1518,9 +1552,9 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             }
             if (dc != null) {
                 dc.getInsetsStateController().updateAboveInsetsState(
-                        // This window doesn't have a frame yet. Don't let this window cause the
-                        // insets change.
-                        false /* notifyInsetsChange */);
+                        // This window needs to be notified about the new insets (if there is any)
+                        // of the new display.
+                        true /* notifyInsetsChange */);
 
                 if (mDisplayContent.getImeInputTarget() == this) {
                     dc.updateImeInputAndControlTarget(getImeInputTarget());
@@ -1528,6 +1562,8 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
                 }
             }
         }
+        updateClientHardwareRendererOutputState(mDisplayContent, dc);
+        updateClientRenderingLimitationsState(mDisplayContent, dc);
         super.onDisplayChanged(dc);
         // Window was not laid out for this display yet, so make sure mLayoutSeq does not match.
         if (dc != null && mInputWindowHandle.getDisplayId() != dc.getDisplayId()) {
@@ -2586,17 +2622,16 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
                 || (isVisible() && mActivityRecord != null && mActivityRecord.isVisible());
     }
 
-    void openInputChannel(@NonNull InputChannel outInputChannel) {
+    InputChannel openInputChannel() {
         if (mInputChannelToken != null) {
             throw new IllegalStateException("Window already has an input channel token.");
         }
         String name = getName();
-        InputChannel channel = mWmService.mInputManager.createInputChannel(name);
+        final InputChannel channel = mWmService.mInputManager.createInputChannel(name);
         mInputChannelToken = channel.getToken();
         mInputWindowHandle.setToken(mInputChannelToken);
         mWmService.mInputToWindowMap.put(mInputChannelToken, this);
-        channel.copyTo(outInputChannel);
-        channel.dispose();
+        return channel;
     }
 
     /**
@@ -2760,6 +2795,9 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
             }
             if (!isVisibleByPolicy()) {
                 mWinAnimator.hide(getPendingTransaction(), "checkPolicyVisibilityChange");
+                if (!WindowManager.useClientSurface() && mSurfaceControl != null) {
+                    getPendingTransaction().hide(mSurfaceControl);
+                }
                 if (isFocused()) {
                     ProtoLog.i(WM_DEBUG_FOCUS_LIGHT,
                             "setAnimationLocked: setting mFocusMayChange true");
@@ -3032,6 +3070,9 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         }
         setPolicyVisibilityFlag(LEGACY_POLICY_VISIBILITY);
         mLegacyPolicyVisibilityAfterAnim = true;
+        if (!WindowManager.useClientSurface() && mSurfaceControl != null) {
+            getPendingTransaction().show(mSurfaceControl);
+        }
         if (doAnimation) {
             mWinAnimator.applyAnimationLocked(TRANSIT_ENTER, true);
         }
@@ -3052,6 +3093,16 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         if (doAnimation) {
             if (!mToken.okToAnimate()) {
                 doAnimation = false;
+            }
+            if (mIsForceHiddenNonSystemOverlayWindow || mHiddenWhileSuspended
+                    || !mAppOpVisibility || mPermanentlyHidden) {
+                if (isAnimating()) {
+                    if (mAnimatingExit) {
+                        // Hide immediately if the window is playing an exit animation.
+                        doAnimation = false;
+                    }
+                    cancelAnimation();
+                }
             }
         }
         boolean current =
@@ -3081,6 +3132,9 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
                 ProtoLog.i(WM_DEBUG_FOCUS_LIGHT,
                         "WindowState.hideLw: setting mFocusMayChange true");
                 mWmService.mFocusMayChange = true;
+            }
+            if (!WindowManager.useClientSurface() && mSurfaceControl != null) {
+                getPendingTransaction().hide(mSurfaceControl);
             }
         }
         if (mControllableInsetProvider != null) {
@@ -3295,10 +3349,8 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
         // requested to be visible in a short time (e.g. before activity stopped).
         if (!clientVisible && mActivityRecord != null && mWinAnimator.mDrawState == HAS_DRAWN) {
             mWinAnimator.resetDrawState();
-            if (!WindowManager.useClientSurface()) {
-                // Make sure the app can report drawn if it becomes visible again.
-                forceReportingResized();
-            }
+            // Make sure the app can report drawn if it becomes visible again.
+            forceReportingResized();
         }
     }
 
@@ -3824,7 +3876,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
                     dropBufferFrom(mSyncTransaction);
                 }
                 mSyncSeqId = mBufferSeqId;
-            } else if (!mLastConfigReportedToClient
+            } else if (drawPending
                     || mWindowFrames.isForceReportingResized()
                     || mSyncState == SYNC_STATE_WAITING_FOR_DRAW) {
                 ++mSyncSeqId;
@@ -5048,7 +5100,7 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
      * Clears factors that would cause report-resize.
      */
     void onResizeHandled() {
-        mWindowFrames.onResizeHandled();
+        mWindowFrames.clearForceReportingResized();
     }
 
     @Override
@@ -5827,6 +5879,9 @@ class WindowState extends WindowContainer<WindowState> implements WindowManagerP
     void setViewVisibility(int viewVisibility) {
         mViewVisibility = viewVisibility;
 
+        if (WindowManager.useClientSurface() && viewVisibility != View.VISIBLE) {
+            mWindowFrames.clearForceReportingResized();
+        }
         if (isPublicPresentation()
                 && (viewVisibility == View.INVISIBLE || viewVisibility == View.GONE)) {
             mWmService.mPresentationController.removePresentation(getDisplayId(),

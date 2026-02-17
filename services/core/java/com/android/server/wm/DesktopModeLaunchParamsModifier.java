@@ -81,6 +81,9 @@ class DesktopModeLaunchParamsModifier extends DefaultLaunchParamsModifier {
         initLogBuilder("DesktopModeLaunchParamsModifier", phase, task, activity);
         int result = calculate(task, layout, activity, source, options, request, phase,
                 currentParams, outParams);
+        if (outParams.mWindowingMode == WINDOWING_MODE_FULLSCREEN) {
+            outParams.mIsTaskMoveDisallowed = true;
+        }
         mResult = result;
         outputLog();
         return result;
@@ -419,15 +422,12 @@ class DesktopModeLaunchParamsModifier extends DefaultLaunchParamsModifier {
                     return WINDOWING_MODE_FULLSCREEN;
                 }
 
-                if (mDesktopModeCompatPolicy.isPartOfDefaultHomePackageOrNoHomeAvailable(
-                                source.mActivityComponent.getPackageName(), source.mUserId)) {
+                ActivityRecord rootActivity = task.getRootActivity();
+                if (rootActivity != null
+                        && mDesktopModeCompatPolicy.isPartOfDefaultHomePackageOrNoHomeAvailable(
+                                rootActivity.mActivityComponent.getPackageName(),
+                                rootActivity.mUserId)) {
                     appendLog("desktop-first-but-fullscreen-relaunch-from-home");
-                    return WINDOWING_MODE_FULLSCREEN;
-                }
-
-                if (source.info != null && source.info.applicationInfo != null
-                                && source.info.applicationInfo.isSignedWithPlatformKey()) {
-                    appendLog("desktop-first-but-fullscreen-relaunch-from-signed-activity");
                     return WINDOWING_MODE_FULLSCREEN;
                 }
 
@@ -528,9 +528,17 @@ class DesktopModeLaunchParamsModifier extends DefaultLaunchParamsModifier {
             @NonNull ActivityRecord activityToCheck,
             @NonNull ActivityRecord launchingActivity,
             @NonNull Task launchingTask) {
-        if (!Objects.equals(activityToCheck.packageName, launchingActivity.packageName)) {
-            // Activities are not from the same package so do not inherit.
-            return false;
+        if (Flags.enableTrampolineTaskAffinityBugfix()) {
+            if (!Objects.equals(activityToCheck.getTask().getBasePackageName(),
+                    launchingTask.getBasePackageName())) {
+                // Tasks belong to different packages so do not inherit.
+                return false;
+            }
+        } else {
+            if (!Objects.equals(activityToCheck.packageName, launchingActivity.packageName)) {
+                // Activities are not from the same package so do not inherit.
+                return false;
+            }
         }
         if (activityToCheck.mUserId != launchingTask.mUserId) {
             // Activities belong to different users so do not inherit.

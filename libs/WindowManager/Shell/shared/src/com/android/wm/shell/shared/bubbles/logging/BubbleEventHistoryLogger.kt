@@ -21,7 +21,6 @@ import android.os.Build
 import android.text.TextUtils
 import android.util.Log
 import androidx.annotation.VisibleForTesting
-import com.android.wm.shell.Flags
 import com.android.wm.shell.shared.bubbles.logging.BubbleEventHistoryLogger.Companion.MAX_EVENTS_DEBUG
 import java.io.PrintWriter
 import java.util.Locale
@@ -30,9 +29,8 @@ import java.util.Locale
  * An implementation of [DebugLogger] that stores a history of events, respecting the
  * [MAX_EVENTS_DEBUG] limit. It can add events history as part of a system dump method.
  */
-class BubbleEventHistoryLogger(
-    isUserBuild: Boolean = Build.IS_USER && !Build.IS_DEBUGGABLE
-) : DebugLogger {
+class BubbleEventHistoryLogger(isUserBuild: Boolean = Build.IS_USER && !Build.IS_DEBUGGABLE) :
+    DebugLogger {
 
     private val maxLogEvents =
         if (isUserBuild) {
@@ -41,8 +39,7 @@ class BubbleEventHistoryLogger(
             MAX_EVENTS_DEBUG
         }
 
-    @VisibleForTesting
-    val recentEvents: MutableList<BubbleEvent> = mutableListOf()
+    @VisibleForTesting val recentEvents: MutableList<BubbleEvent> = mutableListOf()
 
     override fun d(message: String, vararg parameters: Any?, eventData: String?) {
         if (!Log.isLoggable(TAG, Log.DEBUG)) return
@@ -89,21 +86,30 @@ class BubbleEventHistoryLogger(
         eventData: String? = null,
         timestamp: Long = System.currentTimeMillis(),
     ) {
-        if (!Flags.enableBubbleEventHistoryLogs()) return
         if (recentEvents.size >= maxLogEvents) {
             recentEvents.removeAt(0)
         }
         // Transform the params to prevent memory leaks.
         // If the object is a primitive wrapper, keep it. Otherwise, call toString() now.
-        val convertedParams = titleParams.map { param ->
-            when (param) {
-                null -> null
-                is Boolean, is Int, is Long, is Float, is Double,
-                is Char, is Byte, is Short, is String -> param
+        val convertedParams =
+            titleParams
+                .map { param ->
+                    when (param) {
+                        null -> null
+                        is Boolean,
+                        is Int,
+                        is Long,
+                        is Float,
+                        is Double,
+                        is Char,
+                        is Byte,
+                        is Short,
+                        is String -> param
 
-                else -> param.toString() // Immediately break the strong reference
-            }
-        }.toTypedArray()
+                        else -> param.toString() // Immediately break the strong reference
+                    }
+                }
+                .toTypedArray()
         @Suppress("UNCHECKED_CAST")
         recentEvents.add(
             BubbleEvent(
@@ -120,7 +126,6 @@ class BubbleEventHistoryLogger(
      * beginning of each line.
      */
     fun dump(pw: PrintWriter, prefix: String = "") {
-        if (!Flags.enableBubbleEventHistoryLogs()) return
         val recentEventsCopy = synchronized(this) { ArrayList(recentEvents) }
         pw.println("${prefix}Bubbles events history:")
         recentEventsCopy.forEach { event ->
@@ -145,7 +150,6 @@ class BubbleEventHistoryLogger(
         const val DATE_FORMAT = "MM-dd HH:mm:ss.SSS"
         const val MAX_EVENTS_RELEASE: Int = 20
         const val MAX_EVENTS_DEBUG: Int = 200
-        @VisibleForTesting
-        val DATE_FORMATTER = SimpleDateFormat(DATE_FORMAT, Locale.US)
+        @VisibleForTesting val DATE_FORMATTER = SimpleDateFormat(DATE_FORMAT, Locale.US)
     }
 }

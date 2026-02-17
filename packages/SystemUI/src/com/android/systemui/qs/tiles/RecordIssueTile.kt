@@ -28,10 +28,10 @@ import android.widget.Switch
 import androidx.annotation.VisibleForTesting
 import com.android.internal.jank.InteractionJankMonitor.CUJ_SHADE_DIALOG_OPEN
 import com.android.internal.logging.MetricsLogger
-import com.android.systemui.Flags.recordIssueQsTile
 import com.android.systemui.animation.DialogCuj
 import com.android.systemui.animation.DialogTransitionAnimator
 import com.android.systemui.animation.Expandable
+import com.android.systemui.animation.TransitionAnimator
 import com.android.systemui.dagger.qualifiers.Background
 import com.android.systemui.dagger.qualifiers.Main
 import com.android.systemui.plugins.ActivityStarter
@@ -133,7 +133,7 @@ constructor(
      * creating a distince SELinux context for com.android.systemui) is complex and will take time
      * to implement.
      */
-    override fun isAvailable(): Boolean = android.os.Build.IS_DEBUGGABLE && recordIssueQsTile()
+    override fun isAvailable(): Boolean = android.os.Build.IS_DEBUGGABLE
 
     override fun newTileState(): QSTile.BooleanState =
         QSTile.BooleanState().apply {
@@ -206,7 +206,17 @@ constructor(
                 if (expandable != null && !keyguardStateController.isShowing) {
                     expandable
                         .dialogTransitionController(DialogCuj(CUJ_SHADE_DIALOG_OPEN, TILE_SPEC))
-                        ?.let { dialogTransitionAnimator.show(dialog, it) } ?: dialog.show()
+                        ?.let {
+                            if (TransitionAnimator.dynamicTargetResolutionEnabled()) {
+                                dialogTransitionAnimator.show(
+                                    dialog,
+                                    expandable::dialogTransitionController,
+                                    it.cuj,
+                                )
+                            } else {
+                                dialogTransitionAnimator.show(dialog, it)
+                            }
+                        } ?: dialog.show()
                 } else {
                     dialog.show()
                 }

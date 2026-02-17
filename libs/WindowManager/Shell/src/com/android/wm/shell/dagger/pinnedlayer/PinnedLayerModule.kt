@@ -19,6 +19,7 @@ package com.android.wm.shell.dagger.pinnedlayer
 import android.content.Context
 import android.view.SurfaceControl
 import com.android.wm.shell.RootTaskDisplayAreaOrganizer
+import com.android.wm.shell.ShellTaskOrganizer
 import com.android.wm.shell.common.DisplayController
 import com.android.wm.shell.common.MultiDisplayDragMoveIndicatorController
 import com.android.wm.shell.common.ShellExecutor
@@ -27,16 +28,17 @@ import com.android.wm.shell.dagger.WMSingleton
 import com.android.wm.shell.desktopmode.DesktopTasksController
 import com.android.wm.shell.desktopmode.DesktopUserRepositories
 import com.android.wm.shell.desktopmode.NormalAppLayerController
+import com.android.wm.shell.desktopmode.ShellDesktopState
 import com.android.wm.shell.desktopmode.WindowDragTransitionHandler
 import com.android.wm.shell.pinnedlayer.phone.PinnedLayerController
 import com.android.wm.shell.pinnedlayer.phone.PinnedLayerFlags
 import com.android.wm.shell.pinnedlayer.phone.PinnedLayerHandler
 import com.android.wm.shell.pinnedlayer.phone.PinnedLayerPermissionObserver
 import com.android.wm.shell.pinnedlayer.phone.PinnedLayerPresentationController
+import com.android.wm.shell.pinnedlayer.phone.PinnedLayerUiState
 import com.android.wm.shell.pinnedlayer.phone.PinnedWindowRepositionAnimationHandler
 import com.android.wm.shell.shared.TransactionPool
 import com.android.wm.shell.shared.annotations.ShellMainThread
-import com.android.wm.shell.shared.desktopmode.DesktopState
 import com.android.wm.shell.sysui.ShellInit
 import com.android.wm.shell.transition.Transitions
 import dagger.Module
@@ -52,6 +54,7 @@ object PinnedLayerModule {
         shellInit: ShellInit,
         transitions: Transitions,
         pinnedLayerController: Optional<PinnedLayerController>,
+        pinnedLayerUiState: Optional<PinnedLayerUiState>,
         // observer is unused here, but required to inject to make sure it is created so it can
         // register itself as a listener.
         pinnedLayerPermissionObserver: Optional<PinnedLayerPermissionObserver>,
@@ -65,6 +68,7 @@ object PinnedLayerModule {
                     shellInit = shellInit,
                     transitions = transitions,
                     pinnedLayerController = pinnedLayerController.get(),
+                    pinnedLayerUiState = pinnedLayerUiState.get(),
                     normalLayerController = normalAppLayerController.get(),
                     desktopUserRepositories = desktopUserRepositories.orElse(null),
                     desktopTasksController = desktopTasksController.orElse(null),
@@ -81,7 +85,8 @@ object PinnedLayerModule {
         shellInit: ShellInit,
         transitions: Transitions,
         displayController: DisplayController,
-        desktopState: DesktopState,
+        shellTaskOrganizer: ShellTaskOrganizer,
+        desktopState: ShellDesktopState,
         windowDragTransitionHandler: WindowDragTransitionHandler,
         windowRepositionAnimationHandler: PinnedWindowRepositionAnimationHandler,
         transactionPool: TransactionPool,
@@ -94,6 +99,7 @@ object PinnedLayerModule {
                     shellInit = shellInit,
                     transitions = transitions,
                     taskDisplayAreaOrganizer = rootTaskDisplayAreaOrganizer,
+                    shellTaskOrganizer = shellTaskOrganizer,
                     presentationController =
                         PinnedLayerPresentationController(context, displayController, desktopState),
                     windowDragTransitionHandler = windowDragTransitionHandler,
@@ -104,6 +110,15 @@ object PinnedLayerModule {
                         multiDisplayDragMoveIndicatorController,
                 )
             )
+        }
+        return Optional.empty()
+    }
+
+    @WMSingleton
+    @Provides
+    fun providePinnedLayerUiState(): Optional<PinnedLayerUiState> {
+        if (PinnedLayerFlags.isPinnedLayerEnabled()) {
+            return Optional.of(PinnedLayerUiState())
         }
         return Optional.empty()
     }

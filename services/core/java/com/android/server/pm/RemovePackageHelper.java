@@ -302,6 +302,8 @@ final class RemovePackageHelper {
             synchronized (mPm.mLock) {
                 ps.setCeDataInode(-1, userId);
                 ps.setDeDataInode(-1, userId);
+                ps.setPccCeDataInode(-1, userId);
+                ps.setPccDeDataInode(-1, userId);
             }
         }
 
@@ -565,7 +567,7 @@ final class RemovePackageHelper {
             for (int userId : userIds) {
                 try {
                     mPm.mInstaller.destroyAppData(volumeUuid, packageName, userId, flags,
-                            0);
+                            /* ceDataInode= */ 0, /* pccCeDataInode= */ 0);
                 } catch (Installer.InstallerException e) {
                     Slog.w(TAG, String.valueOf(e));
                 }

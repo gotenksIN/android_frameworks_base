@@ -19,20 +19,27 @@ package com.android.systemui.screencapture.record.largescreen.ui.viewmodel
 import android.app.ActivityManager
 import android.app.WindowConfiguration
 import android.content.ComponentName
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Point
 import android.graphics.Rect
+import android.hardware.display.displayManager
 import android.net.Uri
+import android.platform.test.annotations.DisableFlags
+import android.platform.test.annotations.EnableFlags
+import android.util.DisplayMetrics
+import android.view.Display
 import android.view.WindowManager
 import android.view.WindowMetrics
-import android.view.windowManager
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.internal.logging.uiEventLoggerFake
 import com.android.internal.util.ScreenshotRequest
 import com.android.internal.util.mockScreenshotHelper
+import com.android.systemui.Flags
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.kosmos.advanceTimeBy
+import com.android.systemui.kosmos.advanceUntilIdle
 import com.android.systemui.kosmos.collectLastValue
 import com.android.systemui.kosmos.runCurrent
 import com.android.systemui.kosmos.runTest
@@ -61,6 +68,7 @@ import org.mockito.Mock
 import org.mockito.MockitoAnnotations
 import org.mockito.kotlin.any
 import org.mockito.kotlin.argumentCaptor
+import org.mockito.kotlin.doAnswer
 import org.mockito.kotlin.eq
 import org.mockito.kotlin.times
 import org.mockito.kotlin.verify
@@ -75,6 +83,9 @@ class PreCaptureViewModelTest : SysuiTestCase() {
     @Mock private lateinit var mockBitmap: Bitmap
     @Mock private lateinit var mockBackgroundBitmap: Bitmap
     @Mock private lateinit var mockWindowMetrics: WindowMetrics
+    @Mock private lateinit var mockDisplay: Display
+    @Mock private lateinit var mockDisplayContext: Context
+    @Mock private lateinit var mockWindowManager: WindowManager
 
     private val screenBounds = Rect(0, 0, 100, 100)
     private val displayId = 1234
@@ -83,8 +94,15 @@ class PreCaptureViewModelTest : SysuiTestCase() {
     @Before
     fun setUp() {
         MockitoAnnotations.openMocks(this)
-        whenever(kosmos.windowManager.currentWindowMetrics).thenReturn(mockWindowMetrics)
-        whenever(mockWindowMetrics.bounds).thenReturn(screenBounds)
+        whenever(kosmos.displayManager.getDisplay(displayId)).thenReturn(mockDisplay)
+        doAnswer {
+                val metrics = it.arguments[0] as DisplayMetrics
+                metrics.widthPixels = screenBounds.width()
+                metrics.heightPixels = screenBounds.height()
+                null
+            }
+            .whenever(mockDisplay)
+            .getRealMetrics(any())
     }
 
     @Test
@@ -126,11 +144,36 @@ class PreCaptureViewModelTest : SysuiTestCase() {
         }
 
     @Test
-    fun captureRegion_defaultsToFullscreen() =
+    fun captureType_initializeBySelectedType() =
+        kosmos.runTest {
+            setupViewModel()
+            assertThat(viewModel.captureType).isEqualTo(ScreenCaptureType.SCREENSHOT)
+            viewModel.updateCaptureType(ScreenCaptureType.RECORDING)
+
+            setupViewModel()
+            assertThat(viewModel.captureType).isEqualTo(ScreenCaptureType.RECORDING)
+        }
+
+    @Test
+    fun captureType_selectedTypeOverriddenByDefaultType() =
+        kosmos.runTest {
+            setupViewModel(
+                LargeScreenCaptureUiParameters(defaultCaptureType = ScreenCaptureType.RECORDING)
+            )
+            assertThat(viewModel.captureType).isEqualTo(ScreenCaptureType.RECORDING)
+
+            setupViewModel()
+            assertThat(largeScreenCaptureParametersInteractor.getSelectedCaptureType())
+                .isEqualTo(ScreenCaptureType.RECORDING)
+            assertThat(viewModel.captureType).isEqualTo(ScreenCaptureType.RECORDING)
+        }
+
+    @Test
+    fun captureRegion_defaultsToPartial() =
         kosmos.runTest {
             setupViewModel()
 
-            assertThat(viewModel.captureRegion).isEqualTo(ScreenCaptureRegion.FULLSCREEN)
+            assertThat(viewModel.captureRegion).isEqualTo(ScreenCaptureRegion.PARTIAL)
         }
 
     @Test
@@ -141,6 +184,79 @@ class PreCaptureViewModelTest : SysuiTestCase() {
             )
 
             assertThat(viewModel.captureRegion).isEqualTo(ScreenCaptureRegion.PARTIAL)
+        }
+
+    @Test
+    fun captureRegion_initializeBySelectedRegion() =
+        kosmos.runTest {
+            setupViewModel()
+
+            // Default selection is Partial + Screenshot
+            assertThat(viewModel.captureRegion).isEqualTo(ScreenCaptureRegion.PARTIAL)
+
+            // Change the capture region and reinit the view model
+            viewModel.updateCaptureRegion(ScreenCaptureRegion.FULLSCREEN)
+            setupViewModel()
+
+            assertThat(largeScreenCaptureParametersInteractor.getSelectedCaptureRegion())
+                .isEqualTo(ScreenCaptureRegion.FULLSCREEN)
+            assertThat(viewModel.captureRegion).isEqualTo(ScreenCaptureRegion.FULLSCREEN)
+        }
+
+    @Test
+    @EnableFlags(Flags.FLAG_LARGE_SCREEN_SCREENSHOT_APP_WINDOW)
+    fun captureRegion_selectedRegionOverriddenByDefaultRegion() =
+        kosmos.runTest {
+            setupViewModel(
+                LargeScreenCaptureUiParameters(
+                    defaultCaptureRegion = ScreenCaptureRegion.APP_WINDOW
+                )
+            )
+            assertThat(viewModel.captureRegion).isEqualTo(ScreenCaptureRegion.APP_WINDOW)
+
+            setupViewModel()
+            assertThat(largeScreenCaptureParametersInteractor.getSelectedCaptureRegion())
+                .isEqualTo(ScreenCaptureRegion.APP_WINDOW)
+            assertThat(viewModel.captureRegion).isEqualTo(ScreenCaptureRegion.APP_WINDOW)
+        }
+
+    @Test
+    @EnableFlags(Flags.FLAG_LARGE_SCREEN_SCREENSHOT_APP_WINDOW)
+    fun initialize_withAppWindowRegion_loadsTasks() =
+        kosmos.runTest {
+            val task = createRunningTaskInfo(taskId = 1, bounds = Rect(0, 0, 50, 50))
+            whenever(appWindowInteractor.getAppWindowTasks(any<Int>())).thenReturn(listOf(task))
+
+            setupViewModel(
+                LargeScreenCaptureUiParameters(
+                    defaultCaptureRegion = ScreenCaptureRegion.APP_WINDOW
+                )
+            )
+            runCurrent()
+
+            // Verify that we can select the task immediately, implying tasks were loaded
+            viewModel.updateTaskSelectionFromHover(Point(25, 25))
+            assertThat(viewModel.topTask).isEqualTo(task)
+        }
+
+    @Test
+    @DisableFlags(Flags.FLAG_LARGE_SCREEN_REGION_RECORDING)
+    fun captureRegion_resetInvalidSelectedRegion() =
+        kosmos.runTest {
+            largeScreenCaptureParametersInteractor.setSelectedCaptureType(
+                ScreenCaptureType.RECORDING
+            )
+            largeScreenCaptureParametersInteractor.setSelectedCaptureRegion(
+                ScreenCaptureRegion.PARTIAL
+            )
+
+            setupViewModel()
+            assertThat(viewModel.captureType).isEqualTo(ScreenCaptureType.RECORDING)
+            assertThat(viewModel.captureRegion).isEqualTo(ScreenCaptureRegion.FULLSCREEN)
+            assertThat(largeScreenCaptureParametersInteractor.getSelectedCaptureType())
+                .isEqualTo(ScreenCaptureType.RECORDING)
+            assertThat(largeScreenCaptureParametersInteractor.getSelectedCaptureRegion())
+                .isEqualTo(ScreenCaptureRegion.FULLSCREEN)
         }
 
     @Test
@@ -162,9 +278,14 @@ class PreCaptureViewModelTest : SysuiTestCase() {
         }
 
     @Test
-    fun updateCaptureType_toRecording_logsFullscreenRecording() =
+    fun updateCaptureType_toRecording_logsSelectedCaptureType() =
         kosmos.runTest {
-            setupViewModel()
+            setupViewModel(
+                LargeScreenCaptureUiParameters(
+                    defaultCaptureType = ScreenCaptureType.SCREENSHOT,
+                    defaultCaptureRegion = ScreenCaptureRegion.FULLSCREEN,
+                )
+            )
 
             viewModel.updateCaptureType(ScreenCaptureType.RECORDING)
 
@@ -176,10 +297,13 @@ class PreCaptureViewModelTest : SysuiTestCase() {
         }
 
     @Test
-    fun updateCaptureType_toScreenshot_logsFullscreenScreenshot() =
+    fun updateCaptureType_toScreenshot_logsSelectedCaptureType() =
         kosmos.runTest {
             setupViewModel(
-                LargeScreenCaptureUiParameters(defaultCaptureType = ScreenCaptureType.RECORDING)
+                LargeScreenCaptureUiParameters(
+                    defaultCaptureType = ScreenCaptureType.RECORDING,
+                    defaultCaptureRegion = ScreenCaptureRegion.FULLSCREEN,
+                )
             )
 
             viewModel.updateCaptureType(ScreenCaptureType.SCREENSHOT)
@@ -418,6 +542,44 @@ class PreCaptureViewModelTest : SysuiTestCase() {
             viewModel.closeUi()
 
             assertUiClosed()
+        }
+
+    @Test
+    fun beginCapture_forFullScreenRecording_logFullscreenRecordingIsTaken() =
+        kosmos.runTest {
+            setupViewModel(
+                LargeScreenCaptureUiParameters(
+                    defaultCaptureType = ScreenCaptureType.RECORDING,
+                    defaultCaptureRegion = ScreenCaptureRegion.FULLSCREEN,
+                )
+            )
+
+            viewModel.beginCapture()
+            advanceUntilIdle()
+
+            val logs = uiEventLoggerFake.logs
+            assertThat(logs).isNotEmpty()
+            assertThat(logs).hasSize(1)
+        }
+
+    @Test
+    fun beginCapture_forAppWindowRecording_logAppWindowRecordingIsTaken() =
+        kosmos.runTest {
+            val topTask = createRunningTaskInfo(taskId = 1, bounds = Rect(0, 0, 50, 50))
+            whenever(appWindowInteractor.getAppWindowTasks(any<Int>())).thenReturn(listOf(topTask))
+            setupViewModel(
+                LargeScreenCaptureUiParameters(
+                    defaultCaptureType = ScreenCaptureType.RECORDING,
+                    defaultCaptureRegion = ScreenCaptureRegion.APP_WINDOW,
+                )
+            )
+
+            viewModel.captureTaskAtPosition(Point(25, 25))
+            runCurrent()
+
+            val logs = uiEventLoggerFake.logs
+            assertThat(logs).isNotEmpty()
+            assertThat(logs).hasSize(1)
         }
 
     @Test

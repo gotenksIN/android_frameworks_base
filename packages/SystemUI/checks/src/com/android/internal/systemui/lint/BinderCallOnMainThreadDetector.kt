@@ -17,6 +17,7 @@
 package com.android.internal.systemui.lint
 
 import com.android.internal.systemui.lint.BindServiceOnMainThreadDetector.Companion.containingMethodOrClassHasWorkerThreadAnnotation
+import com.android.tools.lint.client.api.UElementHandler
 import com.android.tools.lint.detector.api.Category
 import com.android.tools.lint.detector.api.Detector
 import com.android.tools.lint.detector.api.Implementation
@@ -28,6 +29,7 @@ import com.android.tools.lint.detector.api.SourceCodeScanner
 import com.intellij.psi.PsiClass
 import com.intellij.psi.PsiMethod
 import org.jetbrains.uast.UCallExpression
+import org.jetbrains.uast.UElement
 import org.jetbrains.uast.UParenthesizedExpression
 import org.jetbrains.uast.USimpleNameReferenceExpression
 import org.jetbrains.uast.getContainingDeclaration
@@ -40,11 +42,37 @@ import org.jetbrains.uast.getContainingDeclaration
  */
 class BinderCallOnMainThreadDetector : Detector(), SourceCodeScanner {
     // TODO: b/469073407 - Add more binder calls.
+    /**
+     * A list of known binder calls that should be invoked on the background.
+     *
+     * The format is "${fully-qualified-class-name}#${method-name}". The method name will be used as
+     * a regex. Some examples:
+     * - If there's a single method in the class that's a binder call, use the method name directly:
+     *   `getBroadcast` e.g.
+     * - If *all* method calls in a class are binder calls, use `.*` as the method name.
+     * - If any registrations or unregistrations are binder calls, use `(register|unregister).*` as
+     *   the method name.
+     */
     private val binderCalls =
         listOf(
+            // go/keep-sorted start
             "android.app.PendingIntent#getBroadcast",
             "android.app.PendingIntent#queryIntentComponents",
+            "android.content.pm.PackageManager#getApplicationInfo",
             "android.media.projection.MediaProjectionManager#stopActiveProjection",
+            "android.media.session.MediaController#registerCallback",
+            "android.media.session.MediaController#unregisterCallback",
+            "android.telephony.SubscriptionManager#.*",
+            "com.android.internal.statusbar.IStatusBarService#disableForUser",
+            // go/keep-sorted end
+        )
+
+    // A list of constructors that should be considered binder calls.
+    private val constructorBinderCalls =
+        listOf(
+            // go/keep-sorted start
+            "android.media.session.MediaController"
+            // go/keep-sorted end
         )
 
     private data class BinderCall(
@@ -74,25 +102,58 @@ class BinderCallOnMainThreadDetector : Detector(), SourceCodeScanner {
             BinderCall(methodName = methodName, className = className, packageName = packageName)
         }
 
-    override fun getApplicableMethodNames(): List<String> =
-        // Use `toSet` first so that we don't visit the same method multiple times.
-        parsedBinderCalls.map { it.methodName }.toSet().toList()
+    override fun getApplicableConstructorTypes() = constructorBinderCalls
 
-    override fun visitMethodCall(context: JavaContext, node: UCallExpression, method: PsiMethod) {
-        val methodName = method.name
-        val packageName = context.evaluator.getPackage(method)?.qualifiedName
-        val className = (method.parent as? PsiClass)?.name ?: return
+    override fun visitConstructor(
+        context: JavaContext,
+        node: UCallExpression,
+        constructor: PsiMethod,
+    ) {
+        // #visitConstructor should only be invoked if the constructor is in our binder call list,
+        // so we can assume it's a binder call and immediately visit it.
+        visitBinderCall(context, node)
+    }
+
+    override fun getApplicableUastTypes(): List<Class<out UElement>> {
+        return listOf(UCallExpression::class.java)
+    }
+
+    override fun createUastHandler(context: JavaContext): UElementHandler {
+        return object : UElementHandler() {
+            override fun visitCallExpression(node: UCallExpression) {
+                val method = node.resolve() ?: return
+                visitMethodInternal(context, node, method)
+            }
+        }
+    }
+
+    private fun visitMethodInternal(
+        context: JavaContext,
+        node: UCallExpression,
+        method: PsiMethod,
+    ) {
+        val visitedMethodName = method.name
+        val visitedPackageName = context.evaluator.getPackage(method)?.qualifiedName
+        val visitedClassName = (method.parent as? PsiClass)?.name ?: return
 
         val isBinderCall: Boolean =
-            parsedBinderCalls.any {
-                methodName == it.methodName &&
-                    className == it.className &&
-                    packageName == it.packageName
+            parsedBinderCalls.any { binderCall ->
+                visitedPackageName == binderCall.packageName &&
+                    visitedClassName == binderCall.className &&
+                    visitedMethodName.matches(Regex(binderCall.methodName))
             }
         if (!isBinderCall) {
             return
         }
 
+        visitBinderCall(context, node)
+    }
+
+    /**
+     * Visits a call that is definitely in our list of binder calls to check if it's invoked on the
+     * background or not.
+     */
+    private fun visitBinderCall(context: JavaContext, node: UCallExpression) {
         if (node.containingMethodOrClassHasWorkerThreadAnnotation(context)) {
             // This binder call is inside a method or class marked `@WorkerThread`, and that
             // annotation enforces that the method will only be invoked on the background thread.
@@ -102,7 +163,7 @@ class BinderCallOnMainThreadDetector : Detector(), SourceCodeScanner {
         val containingBlock = findContainingBlock(node)
         if (containingBlock != null) {
             if (
-                containingBlock.isLaunchedOnBackgroundScope() ||
+                containingBlock.isLaunchedOnBackground() ||
                     containingBlock.isStartedWithBackgroundParameter()
             ) {
                 // This binder call is correctly inside a block that explicitly runs in the
@@ -158,18 +219,19 @@ class BinderCallOnMainThreadDetector : Detector(), SourceCodeScanner {
     }
 
     /**
-     * Returns true if the call expression is received by the backgroundScope. Matches expressions
-     * like `bgScope.launch {}` or `backgroundScope.launch {}`.
+     * Returns true if the call expression is received by a background worker. Matches expressions
+     * like `bgScope.launch {}`, `backgroundExecutor.execute {}`, and `uiBgExecutor.execute {}`.
      */
-    private fun UCallExpression.isLaunchedOnBackgroundScope(): Boolean {
-        // For extension functions like CoroutineScope.launch, the CoroutineScope is the receiver.
+    private fun UCallExpression.isLaunchedOnBackground(): Boolean {
+        // For both member-defined functions like `Executor.execute` AND extension functions like
+        // `CoroutineScope.launch`, the `Executor`/`CoroutineScope` is the receiver.
         val receiverIdentifier: String? =
             when (val receiver = this.receiver) {
                 is USimpleNameReferenceExpression -> receiver.identifier
                 is UParenthesizedExpression -> receiver.expression.asRenderString()
                 else -> null
             }
-        return receiverIdentifier?.isBackgroundScopeIdentifier() == true
+        return receiverIdentifier?.isBackgroundIdentifier() == true
     }
 
     /**
@@ -195,15 +257,11 @@ class BinderCallOnMainThreadDetector : Detector(), SourceCodeScanner {
             parameter.identifier.isBackgroundIdentifier()
     }
 
-    /** Returns true if this string identifies a background context or background dispatcher. */
+    /** Returns true if this string identifies a background worker of any sort. */
     private fun String.isBackgroundIdentifier(): Boolean {
-        return this.matches(Regex(".*(bg|background|Bg|Background)(Context|Dispatcher)"))
-    }
-
-    /** Returns true if this string identifies a background scope. */
-    private fun String.isBackgroundScopeIdentifier(): Boolean {
-        return endsWith("bgScope", ignoreCase = true) ||
-            endsWith("backgroundScope", ignoreCase = true)
+        return this.matches(
+            Regex(".*(bg|background|Bg|Background)(Context|Dispatcher|Executor|Scope)")
+        )
     }
 
     companion object {

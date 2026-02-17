@@ -167,6 +167,7 @@ public final class MediaRoute2Info implements Parcelable {
                 TYPE_USB_HEADSET,
                 TYPE_HEARING_AID,
                 TYPE_BLE_HEADSET,
+                TYPE_MULTICHANNEL_SPEAKER_GROUP,
                 TYPE_REMOTE_TV,
                 TYPE_REMOTE_SPEAKER,
                 TYPE_REMOTE_AUDIO_VIDEO_RECEIVER,
@@ -632,6 +633,8 @@ public final class MediaRoute2Info implements Parcelable {
     private final boolean mIsSystem;
     private final Uri mIconUri;
     private final CharSequence mDescription;
+    private final String mDeviceManufacturer;
+    private final String mDeviceModel;
     @ConnectionState
     private final int mConnectionState;
     private final String mClientPackageName;
@@ -659,6 +662,8 @@ public final class MediaRoute2Info implements Parcelable {
         mIsSystem = builder.mIsSystem;
         mIconUri = builder.mIconUri;
         mDescription = builder.mDescription;
+        mDeviceManufacturer = builder.mDeviceManufacturer;
+        mDeviceModel = builder.mDeviceModel;
         mConnectionState = builder.mConnectionState;
         mClientPackageName = builder.mClientPackageName;
         mProviderPackageName = builder.mProviderPackageName;
@@ -687,6 +692,8 @@ public final class MediaRoute2Info implements Parcelable {
         mIsSystem = in.readBoolean();
         mIconUri = in.readParcelable(null, android.net.Uri.class);
         mDescription = TextUtils.CHAR_SEQUENCE_CREATOR.createFromParcel(in);
+        mDeviceManufacturer = in.readString8();
+        mDeviceModel = in.readString8();
         mConnectionState = in.readInt();
         mClientPackageName = in.readString();
         mProviderPackageName = in.readString();
@@ -801,6 +808,46 @@ public final class MediaRoute2Info implements Parcelable {
     @Nullable
     public CharSequence getDescription() {
         return mDescription;
+    }
+
+    /**
+     * Gets a string that identifies the manufacturer of the underlying device.
+     *
+     * <p>May be empty if the provider has not populated this information.
+     *
+     * <p>The returned string is intended for machine use, and should remain unlocalized and
+     * unmodified when creating copies of this object. For example, if creating a new {@link
+     * MediaRoute2Info} that points to the same physical device as the base object.
+     *
+     * <p>This value can be used to identify the underlying hardware in order to use special
+     * iconography when the {@link #getType() device type} is not granular enough.
+     *
+     * @see #getDeviceModel()
+     */
+    @FlaggedApi(Flags.FLAG_ENABLE_DEVICE_MANUFACTURER_AND_MODEL_INFO)
+    @NonNull
+    public String getDeviceManufacturer() {
+        return mDeviceManufacturer;
+    }
+
+    /**
+     * Gets a string that identifies the model of the underlying device.
+     *
+     * <p>May be empty if the provider has not populated this information.
+     *
+     * <p>The returned string is intended for machine use, and should remain unlocalized and
+     * unmodified when creating copies of this object. For example, if creating a new {@link
+     * MediaRoute2Info} that points to the same physical device as the base object.
+     *
+     * <p>This value can be used to identify the underlying hardware in order to use special
+     * iconography when the {@link #getType() device type} is not granular enough.
+     *
+     * @see #getDeviceManufacturer()
+     */
+    @FlaggedApi(Flags.FLAG_ENABLE_DEVICE_MANUFACTURER_AND_MODEL_INFO)
+    @NonNull
+    public String getDeviceModel() {
+        return mDeviceModel;
     }
 
     /**
@@ -1073,6 +1120,8 @@ public final class MediaRoute2Info implements Parcelable {
         pw.println(indent + "mIsSystem=" + mIsSystem);
         pw.println(indent + "mIconUri=" + mIconUri);
         pw.println(indent + "mDescription=" + mDescription);
+        pw.println(indent + "mDeviceManufacturer=" + mDeviceManufacturer);
+        pw.println(indent + "mDeviceModel=" + mDeviceModel);
         pw.println(indent + "mConnectionState=" + mConnectionState);
         pw.println(indent + "mClientPackageName=" + mClientPackageName);
         pw.println(indent + "mProviderPackageName=" + mProviderPackageName);
@@ -1113,6 +1162,8 @@ public final class MediaRoute2Info implements Parcelable {
                 && (mIsSystem == other.mIsSystem)
                 && Objects.equals(mIconUri, other.mIconUri)
                 && Objects.equals(mDescription, other.mDescription)
+                && Objects.equals(mDeviceManufacturer, other.mDeviceManufacturer)
+                && Objects.equals(mDeviceModel, other.mDeviceModel)
                 && (mConnectionState == other.mConnectionState)
                 && Objects.equals(mClientPackageName, other.mClientPackageName)
                 && Objects.equals(mProviderPackageName, other.mProviderPackageName)
@@ -1142,6 +1193,8 @@ public final class MediaRoute2Info implements Parcelable {
                 mIsSystem,
                 mIconUri,
                 mDescription,
+                mDeviceManufacturer,
+                mDeviceModel,
                 mConnectionState,
                 mClientPackageName,
                 mProviderPackageName,
@@ -1179,6 +1232,10 @@ public final class MediaRoute2Info implements Parcelable {
                 .append(getIconUri())
                 .append(", description=")
                 .append(getDescription())
+                .append(", deviceManufacturer=")
+                .append(getDeviceManufacturer())
+                .append(", deviceModel=")
+                .append(getDeviceModel())
                 .append(", connectionState=")
                 .append(getConnectionState())
                 .append(", clientPackageName=")
@@ -1198,8 +1255,10 @@ public final class MediaRoute2Info implements Parcelable {
                 .append(", alsoAllowPrivilegedPackages=")
                 .append(mAlsoAllowPrivilegedPackages)
                 .append(", mRequiredPermissions=")
-                .append(mRequiredPermissions.stream().map(set -> String.join(",", set)).collect(
-                                Collectors.joining("),(", "(", ")")))
+                .append(
+                        mRequiredPermissions.stream()
+                                .map(set -> String.join(",", set))
+                                .collect(Collectors.joining("),(", "(", ")")))
                 .append(", suitabilityStatus=")
                 .append(mSuitabilityStatus)
                 .append(" }")
@@ -1221,6 +1280,8 @@ public final class MediaRoute2Info implements Parcelable {
         dest.writeBoolean(mIsSystem);
         dest.writeParcelable(mIconUri, flags);
         TextUtils.writeToParcel(mDescription, dest, flags);
+        dest.writeString8(mDeviceManufacturer);
+        dest.writeString8(mDeviceModel);
         dest.writeInt(mConnectionState);
         dest.writeString(mClientPackageName);
         dest.writeString(mProviderPackageName);
@@ -1303,6 +1364,8 @@ public final class MediaRoute2Info implements Parcelable {
                 return "USB_HEADSET";
             case TYPE_HEARING_AID:
                 return "HEARING_AID";
+            case TYPE_MULTICHANNEL_SPEAKER_GROUP:
+                return "TYPE_MULTICHANNEL_SPEAKER_GROUP";
             case TYPE_REMOTE_TV:
                 return "REMOTE_TV";
             case TYPE_REMOTE_SPEAKER:
@@ -1373,6 +1436,8 @@ public final class MediaRoute2Info implements Parcelable {
         private boolean mIsSystem;
         private Uri mIconUri;
         private CharSequence mDescription;
+        private String mDeviceManufacturer = "";
+        private String mDeviceModel = "";
         @ConnectionState
         private int mConnectionState;
         private String mClientPackageName;
@@ -1455,6 +1520,8 @@ public final class MediaRoute2Info implements Parcelable {
             mIsSystem = routeInfo.mIsSystem;
             mIconUri = routeInfo.mIconUri;
             mDescription = routeInfo.mDescription;
+            mDeviceManufacturer = routeInfo.mDeviceManufacturer;
+            mDeviceModel = routeInfo.mDeviceModel;
             mConnectionState = routeInfo.mConnectionState;
             mClientPackageName = routeInfo.mClientPackageName;
             mProviderPackageName = routeInfo.mProviderPackageName;
@@ -1547,6 +1614,8 @@ public final class MediaRoute2Info implements Parcelable {
          * Sets whether the route is a system route or not.
          * @hide
          */
+        @TestApi
+        @SuppressWarnings("UnflaggedApi") // @TestApi without associated feature.
         @NonNull
         public Builder setSystemRoute(boolean isSystem) {
             mIsSystem = isSystem;
@@ -1579,6 +1648,36 @@ public final class MediaRoute2Info implements Parcelable {
         @NonNull
         public Builder setDescription(@Nullable CharSequence description) {
             mDescription = description;
+            return this;
+        }
+
+        /**
+         * Sets a possibly empty string that identifies the manufacturer of the underlying device.
+         *
+         * <p>The provided string may be empty if the manufacturer is not available, or if the
+         * provider does not intend to share it.
+         *
+         * <p>See {@link #getDeviceManufacturer()}.
+         */
+        @FlaggedApi(Flags.FLAG_ENABLE_DEVICE_MANUFACTURER_AND_MODEL_INFO)
+        @NonNull
+        public Builder setDeviceManufacturer(@NonNull String deviceManufacturer) {
+            mDeviceManufacturer = Objects.requireNonNull(deviceManufacturer);
+            return this;
+        }
+
+        /**
+         * Sets a possibly empty string that identifies the model of the underlying device.
+         *
+         * <p>The provided string may be empty if the model is not available, or if the provider
+         * does not intend to share it.
+         *
+         * <p>See {@link #getDeviceModel()}.
+         */
+        @FlaggedApi(Flags.FLAG_ENABLE_DEVICE_MANUFACTURER_AND_MODEL_INFO)
+        @NonNull
+        public Builder setDeviceModel(@NonNull String deviceModel) {
+            mDeviceModel = Objects.requireNonNull(deviceModel);
             return this;
         }
 

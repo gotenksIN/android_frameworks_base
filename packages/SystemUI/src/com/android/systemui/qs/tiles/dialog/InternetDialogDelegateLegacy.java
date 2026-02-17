@@ -117,6 +117,7 @@ import com.android.systemui.shade.domain.interactor.ShadeDialogContextInteractor
 import com.android.systemui.shade.domain.interactor.ShadeModeInteractor;
 import com.android.systemui.statusbar.phone.SystemUIDialog;
 import com.android.systemui.statusbar.policy.KeyguardStateController;
+import com.android.systemui.user.data.repository.UserRepository;
 import com.android.wifitrackerlib.WifiEntry;
 
 // QTI_BEGIN: 2023-02-13: Telephony: Adjust criteria to show mobile data warning dialog
@@ -144,7 +145,13 @@ import java.util.concurrent.Executor;
 
 /**
  * Dialog for showing mobile network, connected Wi-Fi network and Wi-Fi networks.
+ *
+ * DEPRECATED: This class is deprecated and will be removed in the future.
+ * Do not make any changes to this file unless strictly necessary for legacy support.
+ *
+ * @deprecated Use {@link InternetDetailsContentManager} instead.
  */
+@Deprecated
 public class InternetDialogDelegateLegacy implements
         SystemUIDialog.Delegate,
         InternetDetailsContentController.InternetDialogCallback {
@@ -353,7 +360,8 @@ public class InternetDialogDelegateLegacy implements
             SystemUIDialog.Factory systemUIDialogFactory,
             ShadeDialogContextInteractor shadeDialogContextInteractor,
             ShadeModeInteractor shadeModeInteractor,
-            RetailModeInteractor retailModeInteractor) {
+            RetailModeInteractor retailModeInteractor,
+            UserRepository userRepository) {
         // TODO (b/393628355): remove this after the details view is supported for single shade.
         if (shadeModeInteractor.isDualShade() && !retailModeInteractor.isInRetailMode()) {
             // If `QsDetailedView` is enabled, it should show the details view.
@@ -388,7 +396,8 @@ public class InternetDialogDelegateLegacy implements
         mCoroutineScope = coroutineScope;
         mUiEventLogger = uiEventLogger;
         mDialogTransitionAnimator = dialogTransitionAnimator;
-        mAdapter = new InternetAdapter(mInternetDetailsContentController, coroutineScope);
+        mAdapter = new InternetAdapter(
+                mInternetDetailsContentController, coroutineScope, false, userRepository);
 // QTI_BEGIN: 2024-02-02: Telephony: Update C_IWLAN warning dialog showing criteria
         mPackageName = this.getClass().getPackage().toString();
 // QTI_END: 2024-02-02: Telephony: Update C_IWLAN warning dialog showing criteria

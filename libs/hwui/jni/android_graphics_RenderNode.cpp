@@ -193,7 +193,7 @@ static jboolean android_view_RenderNode_stretch(CRITICAL_JNI_PARAMS_COMMA jlong 
                                                 jfloat vX, jfloat vY, jfloat maxX,
                                                 jfloat maxY) {
     auto* renderNode = reinterpret_cast<RenderNode*>(renderNodePtr);
-    StretchEffect effect = StretchEffect({.fX = vX, .fY = vY}, maxX, maxY);
+    uirenderer::StretchEffect effect = uirenderer::StretchEffect({.fX = vX, .fY = vY}, maxX, maxY);
     renderNode->mutateStagingProperties().mutateLayerProperties().mutableStretchEffect().mergeWith(
             effect);
     renderNode->setPropertyFieldsDirty(RenderNode::GENERIC);
@@ -616,6 +616,7 @@ static void android_view_RenderNode_requestPositionUpdates(JNIEnv* env, jobject,
                         info.damageAccumulator
                                 ->computeClipAndTransform(initialClipBounds.toSkRect(), &transform)
                                 .roundOut();
+                clipBounds.intersect(initialClipBounds.toSkIRect());
             } else {
                 info.damageAccumulator->computeCurrentTransform(&transform);
             }
@@ -718,24 +719,30 @@ static void android_view_RenderNode_requestPositionUpdates(JNIEnv* env, jobject,
             // Search up to find the nearest stretcheffect parent
             const DamageAccumulator::StretchResult result =
                 info.damageAccumulator->findNearestStretchEffect();
-            const StretchEffect* effect = result.stretchEffect;
+            const uirenderer::StretchEffect* effect = result.stretchEffect;
             if (effect) {
                 if (surfaceview_stretch_alignment()) {
                     auto& parentBounds = result.parentBounds;
                     auto parentWidth = parentBounds.width();
                     auto parentHeight = parentBounds.height();
                     float normalized;
-                    normalized = targetBounds.top / parentHeight;
-                    targetBounds.top = effect->computeStretchedPositionY(normalized) * parentHeight;
-                    normalized = targetBounds.bottom / parentHeight;
+                    normalized = (targetBounds.top - parentBounds.top()) / parentHeight;
+                    targetBounds.top =
+                            effect->computeStretchedPositionY(normalized) * parentHeight +
+                            parentBounds.top();
+                    normalized = (targetBounds.bottom - parentBounds.top()) / parentHeight;
                     targetBounds.bottom =
-                            effect->computeStretchedPositionY(normalized) * parentHeight;
+                            effect->computeStretchedPositionY(normalized) * parentHeight +
+                            parentBounds.top();
 
-                    normalized = targetBounds.left / parentWidth;
-                    targetBounds.left = effect->computeStretchedPositionX(normalized) * parentWidth;
-                    normalized = targetBounds.right / parentWidth;
+                    normalized = (targetBounds.left - parentBounds.left()) / parentWidth;
+                    targetBounds.left =
+                            effect->computeStretchedPositionX(normalized) * parentWidth +
+                            parentBounds.left();
+                    normalized = (targetBounds.right - parentBounds.left()) / parentWidth;
                     targetBounds.right =
-                            effect->computeStretchedPositionX(normalized) * parentWidth;
+                            effect->computeStretchedPositionX(normalized) * parentWidth +
+                            parentBounds.left();
                 } else {
                     // Compute the number of pixels that the stretching container
                     // scales by.
@@ -927,5 +934,4 @@ int register_android_view_RenderNode(JNIEnv* env) {
     return RegisterMethodsOrDie(env, kClassPathName, gMethods, NELEM(gMethods));
 }
 
-};
-
+};  // namespace android

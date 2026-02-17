@@ -16,18 +16,18 @@
 
 package com.android.server.notification;
 
+import static android.app.NotificationLoggingConstants.DATA_TYPE_MANAGED_SERVICE_PRIMARY_APPROVED;
+import static android.app.NotificationLoggingConstants.DATA_TYPE_MANAGED_SERVICE_SECONDARY_APPROVED;
 import static android.content.Context.BIND_ALLOW_WHITELIST_MANAGEMENT;
 import static android.content.Context.BIND_AUTO_CREATE;
 import static android.content.Context.BIND_FOREGROUND_SERVICE;
 import static android.content.Context.DEVICE_POLICY_SERVICE;
 import static android.os.UserHandle.USER_ALL;
 import static android.os.UserHandle.USER_SYSTEM;
-import static android.service.notification.Flags.reportNlsStartAndEnd;
 import static android.service.notification.NotificationListenerService.META_DATA_DEFAULT_AUTOBIND;
 
 import static com.android.server.notification.Flags.FLAG_MANAGED_SERVICES_CONCURRENT_MULTIUSER;
 import static com.android.server.notification.Flags.managedServicesConcurrentMultiuser;
-import static com.android.server.notification.NotificationManagerService.privateSpaceFlagsEnabled;
 
 import android.annotation.FlaggedApi;
 import android.annotation.NonNull;
@@ -38,6 +38,7 @@ import android.app.ActivityOptions;
 import android.app.IBinderSession;
 import android.app.PendingIntent;
 import android.app.admin.DevicePolicyManager;
+import android.app.backup.BackupRestoreEventLogger;
 import android.content.ComponentName;
 import android.content.ContentResolver;
 import android.content.Context;
@@ -158,7 +159,8 @@ abstract public class ManagedServices {
     // contains connections to all connected services, including app services
     // and system services
     @GuardedBy("mMutex")
-    private final ArrayList<ManagedServiceInfo> mServices = new ArrayList<>();
+    @VisibleForTesting
+    final ArrayList<ManagedServiceInfo> mServices = new ArrayList<>();
     /**
      * The services that have been bound by us. If the service is also connected, it will also
      * be in {@link #mServices}.
@@ -576,7 +578,8 @@ abstract public class ManagedServices {
         }
     }
 
-    public void writeXml(TypedXmlSerializer out, boolean forBackup, int userId) throws IOException {
+    public void writeXml(TypedXmlSerializer out, boolean forBackup, int userId,
+            @Nullable BackupRestoreEventLogger logger) throws IOException {
         out.startTag(null, getConfig().xmlTag);
 
         out.attributeInt(null, ATT_VERSION, Integer.parseInt(DB_VERSION));
@@ -586,6 +589,9 @@ abstract public class ManagedServices {
         if (forBackup) {
             trimApprovedListsAccordingToInstalledServices(userId);
         }
+
+        int primaryCount = 0;
+        int secondaryCount = 0;
 
         synchronized (mApproved) {
             final int N = mApproved.size();
@@ -629,16 +635,25 @@ abstract public class ManagedServices {
                                             approvedUserId);
                                 }
                             }
-
+                            if (isPrimary) {
+                                primaryCount += approved.size();
+                            } else {
+                                secondaryCount += approved.size();
+                            }
                         }
                     }
                 }
             }
         }
 
-        writeExtraXmlTags(out);
+        writeExtraXmlTags(out, logger);
 
         out.endTag(null, getConfig().xmlTag);
+
+        if (logger != null) {
+            logger.logItemsBackedUp(DATA_TYPE_MANAGED_SERVICE_PRIMARY_APPROVED, primaryCount);
+            logger.logItemsBackedUp(DATA_TYPE_MANAGED_SERVICE_SECONDARY_APPROVED, secondaryCount);
+        }
     }
 
     /**
@@ -656,12 +671,14 @@ abstract public class ManagedServices {
     /**
      * Writes extra xml tags within the parent tag specified in {@link Config#xmlTag}.
      */
-    protected void writeExtraXmlTags(TypedXmlSerializer out) throws IOException {}
+    protected void writeExtraXmlTags(TypedXmlSerializer out,
+            @Nullable BackupRestoreEventLogger logger) throws IOException {}
 
     /**
      * This is called to process tags other than {@link #TAG_MANAGED_SERVICES}.
      */
-    protected void readExtraTag(String tag, TypedXmlPullParser parser)
+    protected void readExtraTag(String tag, TypedXmlPullParser parser,
+            @Nullable BackupRestoreEventLogger logger)
             throws IOException, XmlPullParserException {}
 
     protected final void migrateToXml() {
@@ -707,13 +724,18 @@ abstract public class ManagedServices {
             TypedXmlPullParser parser,
             TriPredicate<String, Integer, String> allowedManagedServicePackages,
             boolean forRestore,
-            int userId)
+            int userId,
+            @Nullable BackupRestoreEventLogger logger)
             throws XmlPullParserException, IOException {
         // read grants
         int type;
         String version = XmlUtils.readStringAttribute(parser, ATT_VERSION);
         boolean needUpgradeUserset = false;
         readDefaults(parser);
+
+        int primaryCount = 0;
+        int secondaryCount = 0;
+
         while ((type = parser.next()) != XmlPullParser.END_DOCUMENT) {
             String tag = parser.getName();
             if (type == XmlPullParser.END_TAG
@@ -783,14 +805,19 @@ abstract public class ManagedServices {
                                 getPackageName(approved), resolvedUserId, getRequiredPermission())
                                 || approved.isEmpty()) {
                             if (mUm.getUserInfo(resolvedUserId) != null) {
-                                addApprovedList(approved, resolvedUserId, isPrimary,
-                                        userSetComponent);
+                                int addedCount = addApprovedList(approved, resolvedUserId,
+                                        isPrimary, userSetComponent);
+                                if (isPrimary) {
+                                    primaryCount += addedCount;
+                                } else {
+                                    secondaryCount += addedCount;
+                                }
                             }
                             mUseXml = true;
                         }
                     }
                 } else {
-                    readExtraTag(tag, parser);
+                    readExtraTag(tag, parser, logger);
                 }
             }
         }
@@ -803,6 +830,11 @@ abstract public class ManagedServices {
         }
         if (needUpgradeUserset) {
             upgradeUserSet();
+        }
+
+        if (logger != null) {
+            logger.logItemsRestored(DATA_TYPE_MANAGED_SERVICE_PRIMARY_APPROVED, primaryCount);
+            logger.logItemsRestored(DATA_TYPE_MANAGED_SERVICE_SECONDARY_APPROVED, secondaryCount);
         }
 
         rebindServices(false, USER_ALL);
@@ -848,11 +880,12 @@ abstract public class ManagedServices {
 
     protected abstract String getRequiredPermission();
 
-    protected void addApprovedList(String approved, int userId, boolean isPrimary) {
-        addApprovedList(approved, userId, isPrimary, approved);
+    protected int addApprovedList(String approved, int userId, boolean isPrimary) {
+        return addApprovedList(approved, userId, isPrimary, approved);
     }
 
-    protected void addApprovedList(String approved, int userId, boolean isPrimary, String userSet) {
+    protected int addApprovedList(String approved, int userId, boolean isPrimary, String userSet) {
+        int added = 0;
         if (TextUtils.isEmpty(approved)) {
             approved = "";
         }
@@ -882,6 +915,7 @@ abstract public class ManagedServices {
                 String approvedItem = getApprovedValue(pkgOrComponent);
                 if (approvedItem != null) {
                     approvedList.add(approvedItem);
+                    added++;
                 }
                 int uid = getUidForPackageOrComponent(pkgOrComponent, userId);
                 if (uid != Process.INVALID_UID) {
@@ -902,6 +936,7 @@ abstract public class ManagedServices {
                 }
             }
         }
+        return added;
     }
 
     protected void denyPregrantedAppUserSet(int userId, boolean isPrimary) {
@@ -1916,22 +1951,19 @@ abstract public class ManagedServices {
                         mServicesRebinding.remove(servicesBindingTag);
                         try {
                             mService = asInterface(binder);
-                            if (reportNlsStartAndEnd()) {
-                                info = new ManagedServiceInfo(mService, name, userid, isSystem,
-                                        this, targetSdkVersion, uid, binderSession);
-                            } else {
-                                info = new ManagedServiceInfo(mService, name, userid, isSystem,
-                                        this, targetSdkVersion, uid);
-                            }
-                            binder.linkToDeath(info, 0);
-
+                            info = new ManagedServiceInfo(mService, name, userid, isSystem,
+                                    this, targetSdkVersion, uid, binderSession);
                             ManagedServiceInfo previousBinding = getService(name, userid);
                             if (previousBinding != null) {
                                 Slog.wtfStack(TAG,
                                         "Duplicate binding! previous=" + previousBinding
                                                 + "; current=" + info);
+                                if (Flags.ignoreDuplicateBindings()) {
+                                    Slog.w(TAG, "Ignoring callback for duplicate binding.");
+                                    return;
+                                }
                             }
-
+                            binder.linkToDeath(info, 0);
                             added = mServices.add(info);
                         } catch (RemoteException e) {
                             Slog.e(TAG, "Failed to linkToDeath, already dead", e);
@@ -2422,10 +2454,7 @@ abstract public class ManagedServices {
                 if (user == null) {
                     return false;
                 }
-                if (privateSpaceFlagsEnabled()) {
-                    return user.isProfile() && hasParent(user, context);
-                }
-                return user.isManagedProfile() || user.isCloneProfile();
+                return user.isProfile() && hasParent(user, context);
             }
         }
 

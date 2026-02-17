@@ -24,8 +24,6 @@ import android.view.SurfaceControl
 import android.view.WindowManager.TRANSIT_CLOSE
 import android.view.WindowManager.TRANSIT_FLAG_KEYGUARD_GOING_AWAY
 import android.view.WindowManager.TRANSIT_OPEN
-import android.view.WindowManager.TRANSIT_TO_BACK
-import android.view.WindowManager.TRANSIT_TO_FRONT
 import android.window.IRemoteTransition
 import android.window.RemoteTransition
 import android.window.TransitionInfo
@@ -35,7 +33,6 @@ import android.window.WindowContainerTransaction
 import androidx.test.filters.SmallTest
 import com.android.dx.mockito.inline.extended.ExtendedMockito.spyOn
 import com.android.testing.wm.util.MockToken
-import com.android.window.flags.Flags.FLAG_ENABLE_BUBBLE_ROOT_TASK
 import com.android.wm.shell.Flags.FLAG_ENABLE_CREATE_ANY_BUBBLE
 import com.android.wm.shell.Flags.FLAG_FIX_OPEN_APP_BUBBLE_FROM_LOCKSCREEN
 import com.android.wm.shell.ShellTestCase
@@ -44,7 +41,7 @@ import com.android.wm.shell.activityembedding.ActivityEmbeddingController
 import com.android.wm.shell.bubbles.BubbleController
 import com.android.wm.shell.bubbles.BubbleHelperImpl
 import com.android.wm.shell.bubbles.BubbleRootTask
-import com.android.wm.shell.bubbles.BubbleTransitions
+import com.android.wm.shell.bubbles.transitions.BubbleTransitions
 import com.android.wm.shell.desktopmode.DesktopTasksController
 import com.android.wm.shell.desktopmode.NormalAppLayerHandler
 import com.android.wm.shell.keyguard.KeyguardTransitionHandler
@@ -71,17 +68,13 @@ import org.mockito.kotlin.spy
 import org.mockito.kotlin.stub
 import org.mockito.kotlin.verify
 
-/**
- * Tests for [DefaultMixedHandler]
- * Build & Run: atest WMShellUnitTests:DefaultMixedHandlerTest
- */
+/** Tests for [DefaultMixedHandler] Build & Run: atest WMShellUnitTests:DefaultMixedHandlerTest */
 @SmallTest
 class DefaultMixedHandlerTest : ShellTestCase() {
 
     private val transitions = mock<Transitions>()
-    private val splitScreenController = mock<SplitScreenController> {
-        on { transitionHandler } doReturn mock<StageCoordinator>()
-    }
+    private val splitScreenController =
+        mock<SplitScreenController> { on { transitionHandler } doReturn mock<StageCoordinator>() }
     private val pipTransitionController = mock<PipTransitionController>()
     private val recentsTransitionHandler = mock<RecentsTransitionHandler>()
     private val keyguardTransitionHandler = mock<KeyguardTransitionHandler>()
@@ -90,41 +83,42 @@ class DefaultMixedHandlerTest : ShellTestCase() {
     private val activityEmbeddingController = mock<ActivityEmbeddingController>()
     private val bubbleController = mock<BubbleController>()
     private val bubbleRootTask = mock<BubbleRootTask>()
-    private val bubbleHelper = spy(BubbleHelperImpl(
-        bubbleRootTask = { bubbleRootTask },
-        splitScreenController = { Optional.of(splitScreenController) }
-    ))
-    private val bubbleTransitions = spy(BubbleTransitions(
-        mContext,
-        transitions,
-        mock(),
-        mock(),
-        mock(),
-        mock(),
-        mock(),
-        bubbleHelper,
-    ))
+    private val bubbleHelper = spy(BubbleHelperImpl(bubbleRootTask = bubbleRootTask))
+    private val bubbleTransitions =
+        spy(
+            BubbleTransitions(
+                mContext,
+                transitions,
+                mock(),
+                mock(),
+                mock(),
+                mock(),
+                mock(),
+                bubbleHelper,
+            )
+        )
     private val pinnedLayerHandler = mock<PinnedLayerHandler>()
     private val normalAppLayerHandler = mock<NormalAppLayerHandler>()
     private val pipScheduler = mock<PipScheduler>()
 
     private val shellInit: ShellInit = ShellInit(TestShellExecutor())
-    private val mixedHandler = DefaultMixedHandler(
-        shellInit,
-        transitions,
-        Optional.of(splitScreenController),
-        pipTransitionController,
-        Optional.of(pipScheduler),
-        normalAppLayerHandler,
-        pinnedLayerHandler,
-        Optional.of(recentsTransitionHandler),
-        keyguardTransitionHandler,
-        Optional.of(desktopTasksController),
-        Optional.of(unfoldTransitionHandler),
-        Optional.of(activityEmbeddingController),
-        bubbleTransitions,
-        bubbleHelper,
-    )
+    private val mixedHandler =
+        DefaultMixedHandler(
+            shellInit,
+            transitions,
+            Optional.of(splitScreenController),
+            pipTransitionController,
+            Optional.of(pipScheduler),
+            normalAppLayerHandler,
+            pinnedLayerHandler,
+            Optional.of(recentsTransitionHandler),
+            keyguardTransitionHandler,
+            Optional.of(desktopTasksController),
+            Optional.of(unfoldTransitionHandler),
+            Optional.of(activityEmbeddingController),
+            bubbleTransitions,
+            bubbleHelper,
+        )
 
     @Before
     fun setUp() {
@@ -146,9 +140,7 @@ class DefaultMixedHandlerTest : ShellTestCase() {
         val runningTask = createRunningTask()
         val request = createTransitionRequestInfo(runningTask)
 
-        bubbleTransitions.stub {
-            on { hasPendingEnterTransition(request) } doReturn false
-        }
+        bubbleTransitions.stub { on { hasPendingEnterTransition(request) } doReturn false }
 
         assertThat(mixedHandler.requestHasBubbleEnter(request)).isFalse()
     }
@@ -159,9 +151,7 @@ class DefaultMixedHandlerTest : ShellTestCase() {
         val runningTask = createRunningTask()
         val request = createTransitionRequestInfo(runningTask)
 
-        bubbleTransitions.stub {
-            on { hasPendingEnterTransition(request) } doReturn true
-        }
+        bubbleTransitions.stub { on { hasPendingEnterTransition(request) } doReturn true }
 
         assertThat(mixedHandler.requestHasBubbleEnter(request)).isTrue()
     }
@@ -172,9 +162,7 @@ class DefaultMixedHandlerTest : ShellTestCase() {
         val runningTask = createRunningTask()
         val request = createTransitionRequestInfo(runningTask)
 
-        bubbleTransitions.stub {
-            on { hasPendingEnterTransition(request) } doReturn true
-        }
+        bubbleTransitions.stub { on { hasPendingEnterTransition(request) } doReturn true }
 
         assertThat(mixedHandler.requestHasBubbleEnter(request)).isTrue()
     }
@@ -186,10 +174,9 @@ class DefaultMixedHandlerTest : ShellTestCase() {
         val remoteTransition = mock<IRemoteTransition>()
         val request = createTransitionRequestInfo(runningTask, RemoteTransition(remoteTransition))
 
-        bubbleTransitions.stub {
-            on { hasPendingEnterTransition(request) } doReturn true
-        }
-        doReturn(mock<Transitions.TransitionHandler>()).`when`(bubbleTransitions)
+        bubbleTransitions.stub { on { hasPendingEnterTransition(request) } doReturn true }
+        doReturn(mock<Transitions.TransitionHandler>())
+            .`when`(bubbleTransitions)
             .storePendingEnterTransition(any(), any())
 
         mixedHandler.handleRequest(Binder(), request)
@@ -202,8 +189,11 @@ class DefaultMixedHandlerTest : ShellTestCase() {
         val noTriggerTaskRequest = createTransitionRequestInfo()
 
         assertThat(
-            mixedHandler.requestHasBubbleEnterFromAppBubbleOrExistingBubble(noTriggerTaskRequest)
-        ).isFalse()
+                mixedHandler.requestHasBubbleEnterFromAppBubbleOrExistingBubble(
+                    noTriggerTaskRequest
+                )
+            )
+            .isFalse()
     }
 
     @Test
@@ -263,11 +253,16 @@ class DefaultMixedHandlerTest : ShellTestCase() {
 
         bubbleHelper.stub { onGeneric { isAppBubbleTask(any()) } doReturn true }
 
-        mixedHandler.startAnimation(Binder(), info, mock<SurfaceControl.Transaction>(),
-            mock<SurfaceControl.Transaction>(), mock<Transitions.TransitionFinishCallback>())
+        mixedHandler.startAnimation(
+            Binder(),
+            info,
+            mock<SurfaceControl.Transaction>(),
+            mock<SurfaceControl.Transaction>(),
+            mock<Transitions.TransitionFinishCallback>(),
+        )
 
-        verify(bubbleTransitions, never()).startExpandAndSelectBubbleForExistingTransition(
-            any(), any(), any())
+        verify(bubbleTransitions, never())
+            .startExpandAndSelectBubbleForExistingTransition(any(), any(), any())
     }
 
     @Test
@@ -281,11 +276,16 @@ class DefaultMixedHandlerTest : ShellTestCase() {
 
         bubbleHelper.stub { onGeneric { isAppBubbleTask(any()) } doReturn true }
 
-        mixedHandler.startAnimation(Binder(), info, mock<SurfaceControl.Transaction>(),
-            mock<SurfaceControl.Transaction>(), mock<Transitions.TransitionFinishCallback>())
+        mixedHandler.startAnimation(
+            Binder(),
+            info,
+            mock<SurfaceControl.Transaction>(),
+            mock<SurfaceControl.Transaction>(),
+            mock<Transitions.TransitionFinishCallback>(),
+        )
 
-        verify(bubbleTransitions).startExpandAndSelectBubbleForExistingTransition(
-            any(), any(), any())
+        verify(bubbleTransitions)
+            .startExpandAndSelectBubbleForExistingTransition(any(), any(), any())
     }
 
     @Test
@@ -305,53 +305,56 @@ class DefaultMixedHandlerTest : ShellTestCase() {
 
         bubbleHelper.stub { onGeneric { isAppBubbleTask(any()) } doReturn true }
 
-        mixedHandler.startAnimation(Binder(), info, mock<SurfaceControl.Transaction>(),
-            mock<SurfaceControl.Transaction>(), mock<Transitions.TransitionFinishCallback>())
+        mixedHandler.startAnimation(
+            Binder(),
+            info,
+            mock<SurfaceControl.Transaction>(),
+            mock<SurfaceControl.Transaction>(),
+            mock<Transitions.TransitionFinishCallback>(),
+        )
 
-        verify(bubbleTransitions).startTaskTrampolineBubbleLaunch(
-            any(), eq(openingChange.taskInfo!!), eq(closingChange.taskInfo!!), any())
-    }
-
-    @Test
-    @EnableFlags(FLAG_ENABLE_CREATE_ANY_BUBBLE, FLAG_ENABLE_BUBBLE_ROOT_TASK)
-    fun test_startAnimation_bubbleSwitch() {
-        val openingChange =
-            TransitionInfo.Change(mock<WindowContainerToken>(), mock<SurfaceControl>())
-        openingChange.mode = TRANSIT_TO_FRONT
-        openingChange.taskInfo = createRunningTask()
-        val closingChange =
-            TransitionInfo.Change(mock<WindowContainerToken>(), mock<SurfaceControl>())
-        closingChange.mode = TRANSIT_TO_BACK
-        closingChange.taskInfo = createRunningTask()
-        val info = TransitionInfo(TRANSIT_TO_FRONT, 0)
-        info.addChange(openingChange)
-        info.addChange(closingChange)
-
-        bubbleHelper.stub { onGeneric { isAppBubbleTask(any()) } doReturn true }
-
-        mixedHandler.startAnimation(Binder(), info, mock<SurfaceControl.Transaction>(),
-            mock<SurfaceControl.Transaction>(), mock<Transitions.TransitionFinishCallback>())
-
-        verify(bubbleTransitions).startBubbleSwitch(
-            any(), eq(openingChange.taskInfo!!), eq(closingChange.taskInfo!!), any())
+        verify(bubbleTransitions)
+            .startTaskTrampolineBubbleLaunch(
+                any(),
+                eq(openingChange.taskInfo!!),
+                eq(closingChange.taskInfo!!),
+                any(),
+            )
     }
 
     @Test
     fun test_startAnimation_prevMixedCanNotAnimateTransition() {
         spyOn(mixedHandler)
         val transition = Binder()
-        val mixedTransition = spy(DefaultMixedTransition(
-            TYPE_LAUNCH_OR_CONVERT_TO_BUBBLE, transition, transitions, mixedHandler,
-            pipTransitionController, splitScreenController.getTransitionHandler(),
-            keyguardTransitionHandler, unfoldTransitionHandler, activityEmbeddingController,
-            desktopTasksController, bubbleTransitions, bubbleHelper, pinnedLayerHandler
-        ))
+        val mixedTransition =
+            spy(
+                DefaultMixedTransition(
+                    TYPE_LAUNCH_OR_CONVERT_TO_BUBBLE,
+                    transition,
+                    transitions,
+                    mixedHandler,
+                    pipTransitionController,
+                    splitScreenController.getTransitionHandler(),
+                    keyguardTransitionHandler,
+                    unfoldTransitionHandler,
+                    activityEmbeddingController,
+                    desktopTasksController,
+                    bubbleTransitions,
+                    bubbleHelper,
+                    pinnedLayerHandler,
+                )
+            )
         mixedHandler.mActiveTransitions.add(mixedTransition)
         val info = TransitionInfo(TRANSIT_OPEN, 0)
         doReturn(false).`when`(mixedTransition).canAnimateTransition(transition, info)
 
-        mixedHandler.startAnimation(transition, info, mock<SurfaceControl.Transaction>(),
-            mock<SurfaceControl.Transaction>(), mock<Transitions.TransitionFinishCallback>())
+        mixedHandler.startAnimation(
+            transition,
+            info,
+            mock<SurfaceControl.Transaction>(),
+            mock<SurfaceControl.Transaction>(),
+            mock<Transitions.TransitionFinishCallback>(),
+        )
 
         verify(mixedTransition).onTransitionConsumed(eq(transition), eq(true), any())
         assertThat(mixedHandler.mActiveTransitions.contains(mixedTransition)).isFalse()
@@ -372,16 +375,24 @@ class DefaultMixedHandlerTest : ShellTestCase() {
             onGeneric { isAppBubbleTask(any()) } doReturn true
             onGeneric { getEnterBubbleTask(any()) } doReturn change
         }
-        bubbleTransitions.stub {
-            on { canAnimateTransition(any(), any()) } doReturn true
-        }
+        bubbleTransitions.stub { on { canAnimateTransition(any(), any()) } doReturn true }
 
-        val mixedTransition = DefaultMixedTransition(
-            TYPE_LAUNCH_OR_CONVERT_TO_BUBBLE, transition, transitions, mixedHandler,
-            pipTransitionController, splitScreenController.getTransitionHandler(),
-            keyguardTransitionHandler, unfoldTransitionHandler, activityEmbeddingController,
-            desktopTasksController, bubbleTransitions, bubbleHelper, pinnedLayerHandler
-        )
+        val mixedTransition =
+            DefaultMixedTransition(
+                TYPE_LAUNCH_OR_CONVERT_TO_BUBBLE,
+                transition,
+                transitions,
+                mixedHandler,
+                pipTransitionController,
+                splitScreenController.getTransitionHandler(),
+                keyguardTransitionHandler,
+                unfoldTransitionHandler,
+                activityEmbeddingController,
+                desktopTasksController,
+                bubbleTransitions,
+                bubbleHelper,
+                pinnedLayerHandler,
+            )
         mixedHandler.mActiveTransitions.add(mixedTransition)
 
         // Make sure keyguard handles it
@@ -396,9 +407,14 @@ class DefaultMixedHandlerTest : ShellTestCase() {
 
         // Verify Keyguard handler started
         val callbackCaptor = argumentCaptor<Transitions.TransitionFinishCallback>()
-        verify(keyguardTransitionHandler).startAnimation(
-            eq(transition), any(), eq(startT), eq(finishT), callbackCaptor.capture()
-        )
+        verify(keyguardTransitionHandler)
+            .startAnimation(
+                eq(transition),
+                any(),
+                eq(startT),
+                eq(finishT),
+                callbackCaptor.capture(),
+            )
 
         // Verify bubble NOT started yet
         verify(bubbleTransitions, never())
@@ -408,9 +424,12 @@ class DefaultMixedHandlerTest : ShellTestCase() {
         val wct = mock<WindowContainerTransaction>()
         callbackCaptor.firstValue.onTransitionFinished(wct)
 
-        verify(bubbleTransitions).startExpandAndSelectBubbleForExistingTransition(
-            eq(transition), eq(change.taskInfo!!), any()
-        )
+        verify(bubbleTransitions)
+            .startExpandAndSelectBubbleForExistingTransition(
+                eq(transition),
+                eq(change.taskInfo!!),
+                any(),
+            )
     }
 
     private fun createTransitionRequestInfo(

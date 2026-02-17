@@ -83,20 +83,6 @@ flag {
 }
 
 flag {
-    name: "population_density_provider"
-    namespace: "location"
-    description: "Flag for enabling the population density provider"
-    bug: "376198890"
-}
-
-flag {
-    name: "density_based_coarse_locations"
-    namespace: "location"
-    description: "Flag for gating the density-based coarse locations"
-    bug: "376198890"
-}
-
-flag {
     name: "gnss_assistance_interface"
     namespace: "location"
     description: "Flag for GNSS assistance interface"
@@ -122,15 +108,7 @@ flag {
     is_fixed_read_only: true
 }
 
-flag {
-    name: "jni_delete_local_reference_gnss_antenna_info_builder"
-    namespace: "location"
-    description: "Flag for deleting local reference for gnssAntennaInfoBuilder"
-    bug: "451136946"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
+
 
 flag {
     name: "service_watcher_unstable_fallback"
@@ -174,6 +152,7 @@ flag {
     namespace: "location"
     description: "Support TOA in GnssSatelliteAlmanac"
     bug: "409934786"
+    is_exported: true
 }
 
 flag {
@@ -206,5 +185,13 @@ flag {
     namespace: "location"
     description: "Support code type and elapsed real time in GnssStatus"
     bug: "361042865"
+    is_exported: true
 }
 
+flag {
+    name: "gnss_capability_restart_engine_after_power_mode_change"
+    namespace: "location"
+    description: "Flag for engine restart after power mode change capability"
+    bug: "475552312"
+    is_exported: true
+}

@@ -83,4 +83,14 @@ public interface PackageUserStateWrite {
     /** @see PackageUserStateImpl#setMinAspectRatio(int) */
     @NonNull
     PackageUserStateWrite setMinAspectRatio(@PackageManager.UserMinAspectRatio int aspectRatio);
+
+    /** @see PackageUserStateImpl#setVirtualGamepadUserOption(int) */
+    @NonNull
+    PackageUserStateWrite setVirtualGamepadUserOption(
+            @PackageManager.VirtualGamepadUserOption int userOption);
+
+    /** @see PackageUserStateImpl#setPersonalContextMode(int) */
+    @NonNull
+    PackageUserStateWrite setPersonalContextMode(
+            @PackageManager.PersonalContextMode int userOption);
 }

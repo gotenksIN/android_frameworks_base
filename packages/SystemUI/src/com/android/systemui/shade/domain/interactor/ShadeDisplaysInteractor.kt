@@ -38,11 +38,9 @@ import com.android.systemui.shade.data.repository.MutableShadeDisplaysRepository
 import com.android.systemui.shade.data.repository.ShadeDisplaysRepository
 import com.android.systemui.shade.display.ShadeExpansionIntent
 import com.android.systemui.shade.domain.interactor.ShadeExpandedStateInteractor.ShadeElement
-import com.android.systemui.shade.shared.flag.ShadeWindowGoesAround
 import com.android.systemui.statusbar.notification.domain.interactor.ActiveNotificationsInteractor
 import com.android.systemui.statusbar.notification.stack.NotificationStackRebindingHider
 import com.android.systemui.statusbar.phone.ConfigurationForwarder
-import com.android.window.flags.Flags
 import dagger.Lazy
 import javax.inject.Inject
 import kotlin.coroutines.CoroutineContext
@@ -95,7 +93,6 @@ constructor(
     override val pendingDisplayId: StateFlow<Int> = shadePositionRepository.pendingDisplayId
 
     override fun start() {
-        ShadeWindowGoesAround.isUnexpectedlyInLegacyMode()
         listenForWindowContextConfigChanges()
         bgScope.launchTraced(TAG) {
             shadePositionRepository.pendingDisplayId.collectLatest { displayId ->
@@ -271,8 +268,7 @@ constructor(
                 TAG,
                 "Shade context display id doesn't match the expected one after the move. " +
                     "actual=${shadeContext.displayId} expected=$destinationId. " +
-                    "This means something wrong happened while trying to move the shade. " +
-                    "Flag reparentWindowTokenApi=${Flags.reparentWindowTokenApi()}",
+                    "This means something wrong happened while trying to move the shade. ",
             )
         }
     }

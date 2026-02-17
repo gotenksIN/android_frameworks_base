@@ -353,6 +353,22 @@ object KeyGestureTestData {
                 0,
                 intArrayOf(KeyGestureEvent.ACTION_GESTURE_COMPLETE),
             ),
+            KeyGestureData(
+                "INSERT -> Contextual Input",
+                intArrayOf(KeyEvent.KEYCODE_INSERT),
+                KeyGestureEvent.KEY_GESTURE_TYPE_CONTEXTUAL_INPUT,
+                intArrayOf(KeyEvent.KEYCODE_INSERT),
+                0,
+                intArrayOf(KeyGestureEvent.ACTION_GESTURE_COMPLETE),
+            ),
+            KeyGestureData(
+                "META + K -> Contextual Input",
+                intArrayOf(KeyEvent.KEYCODE_META_LEFT, KeyEvent.KEYCODE_K),
+                KeyGestureEvent.KEY_GESTURE_TYPE_CONTEXTUAL_INPUT,
+                intArrayOf(KeyEvent.KEYCODE_K),
+                KeyEvent.META_META_ON,
+                intArrayOf(KeyGestureEvent.ACTION_GESTURE_COMPLETE),
+            ),
         )
 
     // All Key gestures that can be captured by the focused window (and should not happen in
@@ -514,7 +530,7 @@ object KeyGestureTestData {
                 AppLaunchData.createLaunchDataForRole(RoleManager.ROLE_BROWSER),
             ),
             KeyGestureData(
-                "META + C -> Launch Default Contacts",
+                "META + P -> Launch Default Contacts",
                 intArrayOf(KeyEvent.KEYCODE_META_LEFT, KeyEvent.KEYCODE_P),
                 KeyGestureEvent.KEY_GESTURE_TYPE_LAUNCH_APPLICATION,
                 intArrayOf(KeyEvent.KEYCODE_P),
@@ -532,7 +548,7 @@ object KeyGestureTestData {
                 AppLaunchData.createLaunchDataForCategory(Intent.CATEGORY_APP_EMAIL),
             ),
             KeyGestureData(
-                "META + K -> Launch Default Calendar",
+                "META + C -> Launch Default Calendar",
                 intArrayOf(KeyEvent.KEYCODE_META_LEFT, KeyEvent.KEYCODE_C),
                 KeyGestureEvent.KEY_GESTURE_TYPE_LAUNCH_APPLICATION,
                 intArrayOf(KeyEvent.KEYCODE_C),
@@ -792,11 +808,22 @@ object KeyGestureTestData {
                 isGestureHandlerRegistered = true,
             ),
             KeyGestureData(
-                "LANGUAGE_SWITCH -> Switch Language Forward",
+                "LANGUAGE_SWITCH -> Switch Language",
                 intArrayOf(KeyEvent.KEYCODE_LANGUAGE_SWITCH),
                 KeyGestureEvent.KEY_GESTURE_TYPE_LANGUAGE_SWITCH,
                 intArrayOf(KeyEvent.KEYCODE_LANGUAGE_SWITCH),
                 0,
+                intArrayOf(KeyGestureEvent.ACTION_GESTURE_COMPLETE),
+            ),
+            KeyGestureData(
+                "SHIFT + LANGUAGE_SWITCH -> Switch Language",
+                intArrayOf(
+                    KeyEvent.KEYCODE_SHIFT_LEFT,
+                    KeyEvent.KEYCODE_LANGUAGE_SWITCH,
+                ),
+                KeyGestureEvent.KEY_GESTURE_TYPE_LANGUAGE_SWITCH,
+                intArrayOf(KeyEvent.KEYCODE_LANGUAGE_SWITCH),
+                KeyEvent.META_SHIFT_ON,
                 intArrayOf(KeyGestureEvent.ACTION_GESTURE_COMPLETE),
             ),
             KeyGestureData(

@@ -21,20 +21,44 @@ import static android.os.Process.INVALID_UID;
 import static android.os.Process.FIRST_APPLICATION_UID;
 import static android.text.TextUtils.formatSimple;
 
+import static com.android.internal.util.Preconditions.checkArgumentInRange;
+import static com.android.internal.util.Preconditions.checkArgumentNonNegative;
+
+import android.annotation.NonNull;
+import android.annotation.Nullable;
 import android.app.ActivityManager;
 import android.app.ActivityManager.ProcessState;
 import android.os.Handler;
 import android.os.Message;
 import android.os.Process;
+import android.os.ProfilingServiceHelper;
+import android.os.ProfilingTrigger;
 import android.os.Trace;
+import android.system.Os;
+import android.system.OsConstants;
 import android.util.Slog;
 
+import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.internal.os.BackgroundThread;
+import com.android.internal.util.FrameworkStatsLog;
 import com.android.internal.util.MemInfoReader;
+import com.android.server.am.memorylimiter.config.MemoryLimiterConfig;
+import com.android.server.am.memorylimiter.config.XmlParser;
 import com.android.tools.r8.keepanno.annotations.UsedByNative;
 
+import org.xmlpull.v1.XmlPullParserException;
+
+import java.io.BufferedInputStream;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.PrintWriter;
+import java.time.Duration;
 import java.util.Objects;
+
+import javax.xml.datatype.DatatypeConfigurationException;
 
 /**
  * This class monitors the amount of memory used by application processes.  Debug data is
@@ -70,22 +94,73 @@ class MemoryLimiter implements AutoCloseable {
     static final int MEMORY_LIMIT_TYPE = 1;
     // LINT.ThenChange(/services/core/jni/com_android_server_am_MemoryLimiter.cpp:limitTypes)
 
+    // A discriminated value to mean "all UIDs".  It does not overlay INVALID_UID or any legal
+    // UID.
+    static final int ALL_UIDS = -2;
+
     /**
      * A convenience function that maps limit types to strings.
      */
     static String limitTypeToString(int type) {
         return switch (type) {
-            case 0 -> "unknown";
-            case 1 -> "memory.high";
+            case UNKNOWN_LIMIT_TYPE -> "unknown";
+            case MEMORY_LIMIT_TYPE -> "memory.high";
             default -> "unexpected";
         };
     }
 
     /**
+     * A convenience function that maps a limit type to a statsd enum.
+     */
+    static int limitTypeToAtom(int type) {
+        return switch (type) {
+            case UNKNOWN_LIMIT_TYPE ->
+                    FrameworkStatsLog.MEMORY_LIMITER_OVER_LIMIT_EVENT__TYPE__UNKNOWN;
+            case MEMORY_LIMIT_TYPE ->
+                    FrameworkStatsLog.MEMORY_LIMITER_OVER_LIMIT_EVENT__TYPE__HIGH;
+            default -> FrameworkStatsLog.MEMORY_LIMITER_OVER_LIMIT_EVENT__TYPE__UNKNOWN;
+        };
+    }
+
+    /**
+     * A configuration object.  The object contains the configuration parameters (memory assigned
+     * to the visible and notVisible proc states as well as a string that identifies the source of
+     * the parameters.
+     * Version zero is reserved for the "no limits" case, when default limits are disabled.
+     */
+    record Configuration(String source, int version, int visible, int notVisible) {
+        Configuration {
+            checkArgumentNonNegative(version, "version must be non-negative");
+            checkArgumentInRange(visible, 1, 100, "visible");
+            checkArgumentInRange(notVisible, 1, 100, "notVisible");
+        }
+
+        @Override
+        public String toString() {
+            return formatSimple("(%s, %d, %d, %d)", source, version, visible, notVisible);
+        }
+    }
+
+    /**
+     * The default configuration limits visible processes to 50% and non-visible processes to 25%
+     * of available memory.
+     */
+    @VisibleForTesting
+    static final Configuration sDefaultConfig =
+            Flags.memoryLimiterDefaultAppLimits()
+            ? new Configuration("default", 1, 50, 25)
+            : new Configuration("disabled", 0, 100, 100);
+
+    /**
+     * The location of the option configuration file.
+     */
+    static final String CONFIG_PATH = "/vendor/etc/memory-limiter-config.xml";
+
+    /**
      * A controller specializes the behavior of an individual MemoryLimiter.
      */
     @UsedByNative
-    interface Controller {
+    interface Controller extends AutoCloseable {
          /**
          * Returns true if this controller is enabled and actively managing memory limits.  This
          * can be overridden in test implementations to force the controller to be enabled or
@@ -104,13 +179,13 @@ class MemoryLimiter implements AutoCloseable {
 
         // The callback when an over-limit event occurs.
         @UsedByNative
-        void onLimitExceeded(int pid, int uid, int limit);
+        void onLimitExceeded(int pid, int uid, int type, long limit);
 
         // Block or unblock the limiter from monitoring/configuring the UID.
         void ignoreUid(int uid, boolean ignore);
 
-        // Close and release any resources.
-        void close();
+        // The controller status, for debug and reports.
+        void dump(PrintWriter pw);
     }
 
     /**
@@ -136,7 +211,7 @@ class MemoryLimiter implements AutoCloseable {
         }
 
         @Override
-        public void onLimitExceeded(int pid, int uid, int limit) {
+        public void onLimitExceeded(int pid, int uid, int type, long limit) {
         }
 
         @Override
@@ -145,6 +220,11 @@ class MemoryLimiter implements AutoCloseable {
 
         @Override
         public void close() {
+        }
+
+        @Override
+        public void dump(PrintWriter pw) {
+            pw.println("disabled");
         }
     }
 
@@ -155,6 +235,14 @@ class MemoryLimiter implements AutoCloseable {
      */
     @UsedByNative
     static class ControllerEnabled implements Controller {
+
+        // A lock for information that is shared between the status() method and the handler.  The
+        // lock is only taken one of those two places.
+        private final Object mLock = new Object();
+
+        // The activity manager service, used to fetch package names based on pids.
+        @Nullable
+        private final ActivityManagerService mAm;
 
         // The message queue that distributes calls into the native layer.
         private final Handler mQueue;
@@ -179,19 +267,23 @@ class MemoryLimiter implements AutoCloseable {
 
         // The ignore list.  The code supports exactly one ignored uid.  The invalid uid never
         // matches a uid, so that value turns off ignoring.
+        @GuardedBy("mLock")
         private int mIgnoredUid = INVALID_UID;
 
         /**
          * In the constructor, create the native peer and the message queue that will handle all
          * requests directed to the native layer.
          */
-        ControllerEnabled() {
+        ControllerEnabled(@Nullable String configFile, @Nullable ActivityManagerService ams) {
+            mAm = ams;
+
             mQueue = new Handler(BackgroundThread.getHandler().getLooper()) {
                     // Toggles to false once the Controller is closed.
                     private boolean mOpen = true;
 
                     // The native handler.
-                    private final long mNative = initLimiter(ControllerEnabled.this);
+                    private final long mNative = initLimiter(ControllerEnabled.this,
+                            enableMonitoring());
 
                     @Override
                     public void handleMessage(Message msg) {
@@ -201,54 +293,85 @@ class MemoryLimiter implements AutoCloseable {
                             // it.
                             return;
                         }
-                        final int pid = msg.arg1;
-                        final int uid = msg.arg2;
-                        final int op = msg.what;
-                        switch (op) {
-                            case MESSAGE_START -> {
-                                if (uid != mIgnoredUid) {
-                                    onProcessStarted(mNative, pid, uid);
+                        int pid = msg.arg1;
+                        int uid = msg.arg2;
+                        int op = msg.what;
+                        synchronized (mLock) {
+                            switch (op) {
+                                case MESSAGE_START -> {
+                                    if (enableMonitoring() && !shouldIgnore(uid)) {
+                                        onProcessStarted(mNative, pid, uid);
+                                    }
                                 }
-                            }
 
-                            case MESSAGE_CONFIG -> {
-                                if (msg.obj != null && uid != mIgnoredUid) {
-                                    long limit = (Long) msg.obj;
-                                    configureLimit(mNative, pid, uid, limit);
+                                case MESSAGE_CONFIG -> {
+                                    if (msg.obj != null && !shouldIgnore(uid)) {
+                                        long limit = (Long) msg.obj;
+                                        configureLimit(mNative, pid, uid, limit);
+                                    }
                                 }
-                            }
 
-                            case MESSAGE_IGNORE -> {
-                                // This message is only issued during testing.
-                                Slog.i(TAG, "ignoring " + uid + " was " + mIgnoredUid);
-                                mIgnoredUid = uid;
-                            }
+                                case MESSAGE_IGNORE -> {
+                                    // This message is only issued during testing.
+                                    String oldValue = ignoredUid();
+                                    Boolean ignored = (Boolean) msg.obj;
+                                    if (!ignored) {
+                                        // Normalize the UID to INVALID if no UID is being ignored.
+                                        uid = INVALID_UID;
+                                    }
+                                    mIgnoredUid = uid;
+                                    Slog.i(TAG, "ignoring " + ignoredUid() + " was " + oldValue);
+                                }
 
-                            case MESSAGE_CLOSE -> {
-                                closeLimiter(mNative);
-                                mOpen = false;
-                            }
+                                case MESSAGE_CLOSE -> {
+                                    closeLimiter(mNative);
+                                    mOpen = false;
+                                }
 
-                            default ->
-                                    Slog.e(TAG, "invalid message: op=" + op);
+                                default ->
+                                        Slog.e(TAG, "invalid message: op=" + op);
+                            }
                         }
                     }
                 };
 
-            if (Flags.memoryLimiterDefaultAppLimits()) {
-                MemInfoReader memInfo = new MemInfoReader();
-                memInfo.readMemInfo();
-                long vmem = memInfo.getTotalSize();
-                // Visible apps get 50% of memory.  Others get 25% of memory.
-                mMemoryVisible = vmem / 2;
-                mMemoryNotVisible = vmem / 4;
-                final long meg = 1024 * 1024;
-                Slog.i(TAG, formatSimple("Limits set to visible=%dMB not-visible=%dMB",
-                                mMemoryVisible / meg, mMemoryNotVisible / meg));
+            MemInfoReader memInfo = new MemInfoReader();
+            memInfo.readMemInfo();
+            long vmem = memInfo.getTotalSize();
+            long pageSize = Os.sysconf(OsConstants._SC_PAGE_SIZE);
+
+            // Note that getConfiguration() accepts a null input.
+            Configuration cfg = getConfiguration(configFile);
+            mMemoryVisible = memLimit(vmem, pageSize, cfg.visible);
+            mMemoryNotVisible = memLimit(vmem, pageSize, cfg.notVisible);
+        }
+
+        /**
+         * The no-argument default tries to pick its configuration from the vendor partition.
+         */
+        ControllerEnabled(@Nullable ActivityManagerService ams) {
+            this(CONFIG_PATH, ams);
+        }
+
+        // Return true if the controller should monitor for over-limit events.  Test instances can
+        // override this.
+        boolean enableMonitoring() {
+            return Flags.memoryLimiterTrigger();
+        }
+
+        // A helper function that returns the correct memory limit given a total memory size and a
+        // percentage.  If the percentage is 100, then MAX_MEMORY is returned.  A non-positive
+        // percentage should not be seen but if it is, the function returns zero.  Return values
+        // are truncated to the kernel page size.
+        private static long memLimit(long total, long pageSize, int percentage) {
+            if (percentage >= 100) {
+                return MAX_MEMORY;
+            } else if (percentage <= 0) {
+                return 0;
             } else {
-                mMemoryVisible = MAX_MEMORY;
-                mMemoryNotVisible = MAX_MEMORY;
-                Slog.i(TAG, "Limits set to visible=max not-visible=max");
+                long limit = (percentage * total) / 100;
+                limit = (limit / pageSize) * pageSize;
+                return limit;
             }
         }
 
@@ -295,21 +418,161 @@ class MemoryLimiter implements AutoCloseable {
             }
         }
 
+        // Allow burst of up to MAX_TOKENS reports in any period.
+        static final int MAX_TOKENS = 4;
+
+        // A period is one hour.
+        static final long TOKEN_PERIOD_MS = Duration.ofHours(1).toMillis();
+
+        // A lock that ensures the token bucket is updated atomically.
+        private final Object mBucketLock = new Object();
+
+        // The last time the token bucket was updated.
+        @GuardedBy("mBucketLock")
+        private long mLastBucketUpdate = 0;
+
+        // The tokens available.
+        @GuardedBy("mBucketLock")
+        private int mAvailableTokens = MAX_TOKENS;
+
+        // The token bucket rate limiter with a supplied current-time, for testing.
+        @VisibleForTesting
+        final boolean shouldLogAtom(long now) {
+            synchronized (mBucketLock) {
+                // 1. Compute the number of available tokens, as of the last period.
+                now = (now / TOKEN_PERIOD_MS) * TOKEN_PERIOD_MS;
+                long accumulated = (now - mLastBucketUpdate) / TOKEN_PERIOD_MS;
+                mLastBucketUpdate = now;
+                // Just in case the clocks glitch, never accept a negative accumulated value.
+                accumulated = Math.max(0, accumulated);
+                mAvailableTokens += accumulated;
+                mAvailableTokens = Math.min(mAvailableTokens, MAX_TOKENS);
+                if (mAvailableTokens > 0) {
+                    mAvailableTokens--;
+                    return true;
+                } else {
+                    return false;
+                }
+            }
+        }
+
+        // The token bucket rate limiter that uses the system clock.
+        final boolean shouldLogAtom() {
+            return shouldLogAtom(System.currentTimeMillis());
+        }
+
         @UsedByNative
         @Override
-        public void onLimitExceeded(int pid, int uid, int limit) {
-            Slog.w(TAG, formatSimple("limits exceeded: pid=%d uid=%d limit=%s", pid, uid,
-                            limitTypeToString(limit)));
+        public void onLimitExceeded(int pid, int uid, int type, long limit) {
+            final String pkg = (mAm != null) ? mAm.mInternal.getPackageNameByPid(pid) : null;
+
+            Slog.i(TAG, formatSimple("onLimitExceeded: pid=%d uid=%d type=%s limit=%d pkg=%s",
+                    pid, uid, limitTypeToString(type), limit, pkg));
+
+            // statsd logging is throttled to at most 28 events per day.
+            if (shouldLogAtom()) {
+                FrameworkStatsLog.write(FrameworkStatsLog.MEMORY_LIMITER_OVER_LIMIT_EVENT,
+                        uid, limitTypeToAtom(type), limit);
+            }
+
+            if (pkg == null) {
+                // A null package cannot be reported.
+                return;
+            }
+
+            if (!android.os.profiling.Flags.systemTriggeredProfilingNew()
+                    || !android.os.profiling.anomaly.flags.Flags.anomalyDetectorCore()) {
+                // Profiling is disabled globally.
+                return;
+            }
+
+            try {
+                ProfilingServiceHelper helper = ProfilingServiceHelper.getInstance();
+                helper.onProfilingTriggerOccurred(uid, pkg, ProfilingTrigger.TRIGGER_TYPE_ANOMALY);
+            } catch (IllegalStateException e) {
+                // Log the exception but otherwise discard it.  A failure to generate a profile is
+                // not fatal.
+                Slog.w(TAG, e.getMessage());
+            }
         }
 
         @Override
         public void ignoreUid(int uid, boolean ignore) {
-            sendCommand(MESSAGE_IGNORE, INVALID_PID, ignore ? uid : INVALID_UID, null);
+            sendCommand(MESSAGE_IGNORE, INVALID_PID, uid, Boolean.valueOf(ignore));
         }
 
         @Override
         public void close() {
             sendCommand(MESSAGE_CLOSE, INVALID_PID, INVALID_UID, null);
+        }
+
+        // A simple function to string-ify the ignored UID.
+        private String ignoredUid() {
+            return switch (mIgnoredUid) {
+                case INVALID_UID -> "none";
+                case ALL_UIDS -> "all";
+                default -> Integer.toString(mIgnoredUid);
+            };
+        }
+
+        // Return true if the input UID is being ignored.
+        private boolean shouldIgnore(int uid) {
+            return switch (mIgnoredUid) {
+                case INVALID_UID -> false;
+                case ALL_UIDS -> true;
+                default -> uid == mIgnoredUid;
+            };
+        }
+
+        @Override
+        public void dump(PrintWriter pw) {
+            final long meg = 1024 * 1024;
+            synchronized (mLock) {
+                pw.format("enabled low=%dMB high=%dMB ignored=%s\n",
+                        mMemoryNotVisible / meg, mMemoryVisible / meg, ignoredUid());
+            }
+        }
+    }
+
+    /**
+     * Fetch the configuration.  If the file is null or the file does not exist, return the
+     * default.  Otherwise try to parse the file.  All errors are converted to an
+     * IllegalArgumentException.
+     */
+    @VisibleForTesting
+    static Configuration getConfiguration(@Nullable String file) {
+        if (file == null) {
+            return sDefaultConfig;
+        }
+        try (InputStream str = new BufferedInputStream(new FileInputStream(file))) {
+            MemoryLimiterConfig cfg = XmlParser.read(str);
+            // The following conditionals test that the required fields are present.  The parser
+            // only verifies that the xml is well-formed, not that it conforms to the xsd.
+            if (cfg == null) {
+                throw new IllegalArgumentException("bad config: no MemoryLimiterConfig");
+            } else if (cfg.getVersion() == null) {
+                throw new IllegalArgumentException("bad config: no version attribute");
+            } else if (cfg.getVisible() == null) {
+                throw new IllegalArgumentException("bad config: no Visible attribute");
+            } else if (cfg.getNotVisible() == null) {
+                throw new IllegalArgumentException("bad config: no NotVisible attribute");
+            }
+            // Most values are checked when the Configuration is constructed.  As a special case,
+            // though, the version must be positive if it comes from a configuration file.
+            if (cfg.getVersion().intValue() <= 0) {
+                throw new IllegalArgumentException("bad config: invalid version");
+            }
+            return new Configuration(file, cfg.getVersion().intValue(),
+                    cfg.getVisible().intValue(), cfg.getNotVisible().intValue());
+        } catch (FileNotFoundException e) {
+            // It is not an error if the file does not exist.  Silently return the default.
+            return sDefaultConfig;
+        } catch (IOException e) {
+            Slog.e(TAG, "I/O error: " + e);
+            throw new IllegalArgumentException("bad config: " + file, e);
+        } catch (XmlPullParserException | DatatypeConfigurationException e) {
+            Slog.e(TAG, "XML error: " + e);
+            throw new IllegalArgumentException("bad config: " + file, e);
         }
     }
 
@@ -320,17 +583,18 @@ class MemoryLimiter implements AutoCloseable {
 
     /**
      * Initialize the native layer and any maps.  This eventually makes a native call and
-     * therefore cannot be invoked before the native libraries are loaded.
+     * therefore cannot be invoked before the native libraries are loaded.  Unit tests call this
+     * directly to supply specialized controllers.
      */
     @VisibleForTesting
-    MemoryLimiter(Controller controller) {
+    MemoryLimiter(@NonNull Controller controller) {
         mController = controller;
     }
 
     /**
      * Construct the default memory limiter.
      */
-    private static Controller getDefaultController() {
+    private static Controller getDefaultController(@Nullable ActivityManagerService ams) {
         if (!Flags.memoryLimiterEnable()) {
             // The feature is disabled.
             return new ControllerDisabled();
@@ -341,15 +605,15 @@ class MemoryLimiter implements AutoCloseable {
             return new ControllerDisabled();
         } else {
             // The feature is enabled and this is system_server.
-            return new ControllerEnabled();
+            return new ControllerEnabled(ams);
         }
     }
 
     /**
-     * Create the default controller, based on the feature flag and the enclosing process.
+     * Create the default MemoryLimiter, based on the feature flag and the enclosing process.
      */
-    MemoryLimiter() {
-        this(getDefaultController());
+    static MemoryLimiter getDefaultMemoryLimiter(@Nullable ActivityManagerService ams) {
+        return new MemoryLimiter(getDefaultController(ams));
     }
 
     // The object that tracks the state of an individual process.  It is not static.  Methods in
@@ -364,29 +628,59 @@ class MemoryLimiter implements AutoCloseable {
         private Long mLimit = null;
 
         /**
+         * Return true if the process should be monitored and limited.
+         */
+        private boolean shouldMonitor() {
+            return (mPid != INVALID_PID && mUid != INVALID_UID && mUid >= FIRST_APPLICATION_UID);
+        }
+
+        /**
+         * Return true if the object is ready to manage a process.  The pid and uid must be valid
+         * and the UID must belong to the application name space.  This method is called whenever
+         * the pid or uid changes.
+         */
+        private void maybeStart() {
+            if (!shouldMonitor()) return;
+            mLimit = null;
+            mController.setPidUid(mPid, mUid);
+        }
+
+        /**
+         * Set the UID.  If this is change from the previous pid/uid combination then start the
+         * process.
+         */
+        void setUid(int uid) {
+            if (!mController.isEnabled()) return;
+            if (uid == mUid) {
+                return;
+            }
+            mUid = uid;
+            maybeStart();
+        }
+
+
+        /**
          * Set the pid and uid of the instance.  The instance is created before the pid is known,
          * so both are set at this time, and the native layer is notified that the process has
-         * started.
+         * started.  The pid and uid are saved for reuse when the process memory limits is
+         * changed.  The package name is passed to the native layer and is not retained by this
+         * class.
          *
          * This method should be called while holding the AMS lock.  The actual work happens on a
          * handler thread.
          */
-        void setPidUid(int pid, int uid) {
+        void setPid(int pid) {
             if (!mController.isEnabled()) return;
 
-            mPid = pid;
-            mUid = uid;
-
-            if (mPid == INVALID_PID || mUid == INVALID_UID || mUid < FIRST_APPLICATION_UID) {
-                // A zero pid/zero uid is not valid for monitoring.  Do not forward any change to
-                // the controller.  The pid may change in the future, so reset the last-known
-                // limit.
-                mPid = INVALID_PID;
-                mUid = INVALID_UID;
-                mLimit = null;
+            if (pid == 0) {
+                // The upper layers tend to use 0 as "invalid".  Convert the pid now.
+                pid = INVALID_PID;
+            }
+            if (pid == mPid) {
                 return;
             }
-            mController.setPidUid(pid, uid);
+            mPid = pid;
+            maybeStart();
         }
 
         /**
@@ -399,8 +693,8 @@ class MemoryLimiter implements AutoCloseable {
         void onProcStateUpdated(@ProcessState int newState) {
             if (!mController.isEnabled()) return;
 
-            // The process is not running, so we cannot assign limits.
-            if (mPid == INVALID_PID) return;
+            // Do not assign limits if the process should not be monitored.
+            if (!shouldMonitor()) return;
 
             final Long newLimit = mController.getStateLimit(newState);
             if (newLimit != null && !Objects.equals(mLimit, newLimit)) {
@@ -411,7 +705,7 @@ class MemoryLimiter implements AutoCloseable {
     }
 
     /**
-     * Return a new Process object bound to this instance.
+     * Return a new Process-helper object bound to this instance.
      */
     Limiter newLimiter() {
         return new Limiter();
@@ -420,8 +714,8 @@ class MemoryLimiter implements AutoCloseable {
     /**
      * Close the instance.  This is idempotent.
      */
-    @VisibleForTesting
-    public void close() {
+    @Override
+    public void close() throws Exception {
         mController.close();
     }
 
@@ -430,6 +724,13 @@ class MemoryLimiter implements AutoCloseable {
      */
     boolean isEnabled() {
         return mController.isEnabled();
+    }
+
+    /**
+     * Display the status of the limiter.
+     */
+    void dump(PrintWriter pw) {
+        mController.dump(pw);
     }
 
     /**
@@ -447,9 +748,14 @@ class MemoryLimiter implements AutoCloseable {
 
     /**
      * Initialize the native layer and return a pointer to the native handler.  The controller
-     * receives any over-limit events.
+     * receives any over-limit events.  The method will throw an exception if initialization
+     * fails.
+     *
+     * @param controller is the Controller that receives over-limit events.
+     * @param monitor is true if limit monitoring is enabled.
+     * @return the native service.
      */
-    private static native long initLimiter(Controller controller);
+    private static native long initLimiter(Controller controller, boolean monitor);
 
     /**
      * Release the native handler.
@@ -458,14 +764,14 @@ class MemoryLimiter implements AutoCloseable {
 
     /**
      * Inform the native layer that a process has started.  No profile is assigned to the process
-     * but monitoring starts.  The function returns true on success.
+     * but the native service prepares to monitor the process, if monitoring was enabled when the
+     * native service was initialized.
      */
-    private static native boolean onProcessStarted(long servicePtr, int pid, int uid);
+    private static native void onProcessStarted(long servicePtr, int pid, int uid);
 
     /**
      * Request that a process's memory.high be configured to limit.  Negative values for the limit
-     * mean "maximum memory".  The function returns true on success.  If the process has not been
-     * started, or the process has exited since the last start, the function returns false.
+     * mean "maximum memory".
      */
-    private static native boolean configureLimit(long servicePtr, int pid, int uid, long limit);
+    private static native void configureLimit(long servicePtr, int pid, int uid, long limit);
 }

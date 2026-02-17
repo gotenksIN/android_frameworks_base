@@ -20,6 +20,7 @@ import android.content.Context
 import android.icu.text.MeasureFormat
 import android.icu.util.Measure
 import android.icu.util.MeasureUnit
+import android.text.format.DateUtils
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -77,12 +78,22 @@ constructor(
         private set
 
     /** The index of the currently visible card across different locations of media carousel */
-    val currentIndex: Int by derivedStateOf { interactor.currentCarouselIndex }
+    val currentIndex: Int by derivedStateOf {
+        // allow update cards index on locations if the number of cards stays the same.
+        if (isVisible() || interactor.sessions.size == latestVersion.size) {
+            latestCurrentIndex = interactor.currentCarouselIndex
+        }
+        latestCurrentIndex
+    }
 
     /** Whether media carousel should scroll to the first card in the list after composition */
     val scrollToFirst: Boolean by derivedStateOf { interactor.shouldScrollToFirst }
 
+    var cardMaxWidth: Int by mutableIntStateOf(0)
+
+    // TODO: b/397989775 these variables are only used when scene_container flag is off
     private var latestVersion = emptyList<MediaCardViewModel>()
+    private var latestCurrentIndex = 0
     private var isVisible: () -> Boolean = { true }
 
     private val isOnLockscreen: Boolean by
@@ -130,9 +141,10 @@ constructor(
                                 seekProgress = progress
                             }
 
-                            val onScrubFinished = { dragDelta: Offset ->
+                            val onScrubFinished = { dragDelta: Offset, isValidVelocity: Boolean ->
                                 if (
-                                    dragDelta.isHorizontal() &&
+                                    isValidVelocity &&
+                                        dragDelta.isHorizontal() &&
                                         !falsingSystem.isFalseTouch(Classifier.MEDIA_SEEKBAR)
                                 ) {
                                     mediaUiEventLogger.logSeek(
@@ -172,6 +184,15 @@ constructor(
                                             formatTimeContentDescription(session.positionMs),
                                             formatTimeContentDescription(session.durationMs),
                                         ),
+                                    progressText =
+                                        if (isCurrentSessionAndScrubbing) {
+                                            formatTimeLabel(
+                                                (seekProgress * session.durationMs).toLong()
+                                            )
+                                        } else {
+                                            formatTimeLabel(session.positionMs)
+                                        },
+                                    durationText = formatTimeLabel(session.durationMs),
                                 )
                             } else {
                                 MediaNavigationViewModel.Hidden(
@@ -417,6 +438,11 @@ constructor(
         interactor.storeCurrentCarouselIndex(selectedCardIndex)
     }
 
+    /** Notifies that the card at [cardIndex] is visible on screen. */
+    fun onCardVisible(cardIndex: Int, areDeviceChipsVisible: Boolean) {
+        interactor.sessions.getOrNull(cardIndex)?.onSessionVisible(areDeviceChipsVisible)
+    }
+
     /** Notifies that the carousel is reordered and first card is now visible on screen. */
     fun onScrollToFirstCard() {
         interactor.resetScrollToFirst()
@@ -516,6 +542,11 @@ constructor(
 
         return MeasureFormat.getInstance(Locale.getDefault(), MeasureFormat.FormatWidth.WIDE)
             .formatMeasures(*measures.toTypedArray())
+    }
+
+    /** Returns a time string suitable for display, e.g. "12:34" */
+    private fun formatTimeLabel(milliseconds: Long): String {
+        return DateUtils.formatElapsedTime(milliseconds / DateUtils.SECOND_IN_MILLIS)
     }
 
     /**

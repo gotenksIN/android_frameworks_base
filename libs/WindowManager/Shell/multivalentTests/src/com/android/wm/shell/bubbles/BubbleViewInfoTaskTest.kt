@@ -43,6 +43,7 @@ import com.android.wm.shell.bubbles.logging.BubbleSessionTracker
 import com.android.wm.shell.bubbles.logging.BubbleSessionTrackerImpl
 import com.android.wm.shell.bubbles.model.BubbleIcon
 import com.android.wm.shell.bubbles.storage.BubblePersistentRepository
+import com.android.wm.shell.bubbles.transitions.BubbleTransitions
 import com.android.wm.shell.bubbles.user.data.FakeBubbleUserResolver
 import com.android.wm.shell.common.DisplayController
 import com.android.wm.shell.common.DisplayImeController
@@ -124,12 +125,14 @@ class BubbleViewInfoTaskTest {
         bubbleLogger = BubbleLogger(UiEventLoggerFake())
         val instanceIdSequence = InstanceIdSequence(/* instanceIdMax= */ 10)
         sessionTracker = BubbleSessionTrackerImpl(instanceIdSequence, bubbleLogger)
+        appInfoProvider = FakeBubbleAppInfoProvider()
         val bubbleData =
             BubbleData(
                 context,
                 bubbleLogger,
                 bubblePositioner,
                 BubbleEducationController(context),
+                appInfoProvider,
                 mainExecutor,
                 bgExecutor,
             )
@@ -144,7 +147,6 @@ class BubbleViewInfoTaskTest {
                 BubblePersistentRepository(context),
             )
 
-        appInfoProvider = FakeBubbleAppInfoProvider()
         bubbleViewInfoTaskFactory =
             FakeBubbleViewInfoTaskFactory(
                 bubblePositioner,

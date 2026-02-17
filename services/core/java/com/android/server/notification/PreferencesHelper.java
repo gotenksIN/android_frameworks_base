@@ -20,6 +20,9 @@ import static android.app.AppOpsManager.OP_SYSTEM_ALERT_WINDOW;
 import static android.app.NotificationChannel.DEFAULT_CHANNEL_ID;
 import static android.app.NotificationChannel.PLACEHOLDER_CONVERSATION_ID;
 import static android.app.NotificationChannel.USER_LOCKED_IMPORTANCE;
+import static android.app.NotificationLoggingConstants.DATA_TYPE_NOTIF_GLOBAL;
+import static android.app.NotificationLoggingConstants.DATA_TYPE_NOTIF_PACKAGES;
+import static android.app.NotificationLoggingConstants.ERROR_XML_PARSING;
 import static android.app.NotificationManager.BUBBLE_PREFERENCE_ALL;
 import static android.app.NotificationManager.BUBBLE_PREFERENCE_NONE;
 import static android.app.NotificationManager.IMPORTANCE_DEFAULT;
@@ -47,7 +50,9 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationChannelGroup;
 import android.app.NotificationManager;
+import android.app.NotificationSoundCanonicalizer;
 import android.app.ZenBypassingApp;
+import android.app.backup.BackupRestoreEventLogger;
 import android.content.AttributionSource;
 import android.content.Context;
 import android.content.pm.ApplicationInfo;
@@ -266,12 +271,17 @@ public class PreferencesHelper implements RankingConfig {
         invalidateNotificationChannelGroupCache();
     }
 
-    public void readXml(TypedXmlPullParser parser, boolean forRestore, int userId)
+    public void readXml(TypedXmlPullParser parser, boolean forRestore, int userId,
+            @Nullable BackupRestoreEventLogger logger)
             throws XmlPullParserException, IOException {
         int type = parser.getEventType();
         if (type != XmlPullParser.START_TAG) return;
         String tag = parser.getName();
         if (!TAG_RANKING.equals(tag)) return;
+
+        int restoredPackageCount = 0;
+        int erroredPackageCount = 0;
+        boolean restoredStatus = false;
 
         final int xmlVersion = parser.getAttributeInt(null, ATT_VERSION, -1);
         boolean upgradeForBubbles = parser.getAttributeInt(null,
@@ -299,20 +309,36 @@ public class PreferencesHelper implements RankingConfig {
                         }
                         mHideSilentStatusBarIcons = parser.getAttributeBoolean(null,
                                 ATT_HIDE_SILENT, DEFAULT_HIDE_SILENT_STATUS_BAR_ICONS);
+                        if (logger != null) {
+                            restoredStatus = true;
+                        }
                     } else if (TAG_PACKAGE.equals(tag)) {
                         String name = parser.getAttributeValue(null, ATT_NAME);
                         if (!TextUtils.isEmpty(name)) {
-                            restorePackageLocked(parser, forRestore, userId, name,
+                            boolean success = restorePackageLocked(parser, forRestore, userId, name,
                                     upgradeForBubbles, migrateToPermission);
+                            if (logger != null) {
+                                if (success) {
+                                    restoredPackageCount++;
+                                } else {
+                                    erroredPackageCount++;
+                                }
+                            }
                         }
                     }
                 }
             }
         }
+        if (logger != null) {
+            logger.logItemsRestored(DATA_TYPE_NOTIF_GLOBAL, restoredStatus ? 1 : 0);
+            logger.logItemsRestored(DATA_TYPE_NOTIF_PACKAGES, restoredPackageCount);
+            logger.logItemsRestoreFailed(
+                    DATA_TYPE_NOTIF_PACKAGES, erroredPackageCount, ERROR_XML_PARSING);
+        }
     }
 
     @GuardedBy("mLock")
-    private void restorePackageLocked(TypedXmlPullParser parser, boolean forRestore,
+    private boolean restorePackageLocked(TypedXmlPullParser parser, boolean forRestore,
             @UserIdInt int userId, String name, boolean upgradeForBubbles,
             boolean migrateToPermission) {
         try {
@@ -433,7 +459,9 @@ public class PreferencesHelper implements RankingConfig {
             }
         } catch (Exception e) {
             Slog.w(TAG, "Failed to restore pkg", e);
+            return false;
         }
+        return true;
     }
 
     @GuardedBy("mLock")
@@ -676,7 +704,8 @@ public class PreferencesHelper implements RankingConfig {
         return channel;
     }
 
-    public void writeXml(TypedXmlSerializer out, boolean forBackup, int userId) throws IOException {
+    public void writeXml(TypedXmlSerializer out, boolean forBackup, int userId,
+            @Nullable BackupRestoreEventLogger logger) throws IOException {
         out.startTag(null, TAG_RANKING);
         out.attributeInt(null, ATT_VERSION, XML_VERSION);
         out.attributeInt(null, ATT_LAST_BUBBLES_VERSION_UPGRADE, Build.VERSION.SDK_INT);
@@ -690,6 +719,7 @@ public class PreferencesHelper implements RankingConfig {
             notifPermissions = mPermissionHelper.getNotificationPermissionValues(userId);
         }
 
+        int count = 0;
         synchronized (mLock) {
             final int N = mPackagePreferences.size();
             for (int i = 0; i < N; i++) {
@@ -698,6 +728,7 @@ public class PreferencesHelper implements RankingConfig {
                     continue;
                 }
                 writePackageXml(r, out, notifPermissions, forBackup);
+                count++;
             }
 
             if (!forBackup) {
@@ -719,6 +750,11 @@ public class PreferencesHelper implements RankingConfig {
             }
         }
         out.endTag(null, TAG_RANKING);
+
+        if (logger != null) {
+            logger.logItemsBackedUp(DATA_TYPE_NOTIF_PACKAGES, count);
+            logger.logItemsBackedUp(DATA_TYPE_NOTIF_GLOBAL, 1);
+        }
     }
 
     @GuardedBy("mLock")
@@ -2913,12 +2949,15 @@ public class PreferencesHelper implements RankingConfig {
                             for (NotificationChannel channel : r.channels.values()) {
                                 if (!channel.isSoundRestored()) {
                                     Uri uri = channel.getSound();
-                                    Uri restoredUri =
-                                            channel.restoreSoundUri(
+                                    Pair<Uri, Boolean> restorationResult =
+                                            NotificationSoundCanonicalizer.restoreSoundUri(
                                                     mContext,
                                                     uri,
                                                     true,
-                                                    channel.getAudioAttributes().getUsage());
+                                                    channel.getAudioAttributes().getUsage(),
+                                                    false);
+                                    Uri restoredUri = restorationResult.first;
+                                    channel.setSoundRestored(restorationResult.second);
                                     if (Settings.System.DEFAULT_NOTIFICATION_URI.equals(
                                             restoredUri)) {
                                         Slog.w(TAG,

@@ -43,6 +43,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredHeightIn
@@ -84,6 +85,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntRect
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.round
 import androidx.compose.ui.util.fastRoundToInt
 import androidx.compose.ui.viewinterop.AndroidView
@@ -150,7 +152,6 @@ import com.android.systemui.qs.ui.composable.QuickSettingsShade.systemGestureExc
 import com.android.systemui.qs.ui.composable.QuickSettingsTheme
 import com.android.systemui.res.R
 import com.android.systemui.shade.ShadeDisplayAware
-import com.android.systemui.shade.shared.flag.ShadeWindowGoesAround
 import com.android.systemui.statusbar.policy.ConfigurationController
 import com.android.systemui.statusbar.policy.ConfigurationController.ConfigurationListener
 import com.android.systemui.util.LifecycleFragment
@@ -633,14 +634,8 @@ constructor(
                 var lastQqsMediaVisible: Boolean? = null
                 this@QSFragmentCompose.view?.setSnapshotBinding {
                     scrollListener.value?.onQsPanelScrollChanged(scrollState.value)
-                    if (ShadeWindowGoesAround.isEnabled) {
-                        if (lastQqsMediaVisible != viewModel.qqsMediaVisible) {
-                            lastQqsMediaVisible = viewModel.qqsMediaVisible
-                            collapsedMediaVisibilityChangedListener.value?.accept(
-                                viewModel.qqsMediaVisible
-                            )
-                        }
-                    } else {
+                    if (lastQqsMediaVisible != viewModel.qqsMediaVisible) {
+                        lastQqsMediaVisible = viewModel.qqsMediaVisible
                         collapsedMediaVisibilityChangedListener.value?.accept(
                             viewModel.qqsMediaVisible
                         )
@@ -759,6 +754,7 @@ constructor(
                                 behavior = viewModel.qqsMediaUiBehavior,
                                 visible = isListening,
                                 location = Media.Location.SHADE,
+                                expansion = { viewModel.expansionState.progress },
                             )
                         }
                     }
@@ -908,6 +904,7 @@ constructor(
                                         behavior = viewModel.qsMediaUiBehavior,
                                         visible = isListening,
                                         location = Media.Location.QS,
+                                        expansion = { viewModel.expansionState.progress },
                                     )
                                 }
                             }
@@ -1379,9 +1376,18 @@ private fun ContentScope.MediaObject(
     behavior: MediaUiBehavior,
     visible: () -> Boolean,
     location: Media.Location,
+    expansion: () -> Float,
 ) {
     if (MediaControlsInComposeFlag.isEnabled) {
-        Element(key = Media.Elements.mediaCarousel, modifier = modifier) {
+        Element(
+            key = Media.Elements.mediaCarousel,
+            modifier =
+                modifier.thenIf(mediaPresentationStyle == MediaPresentationStyle.Compressed) {
+                    Modifier.height {
+                        lerp(Media.COMPRESSED_HEIGHT, Media.DEFAULT_HEIGHT, expansion()).roundToPx()
+                    }
+                },
+        ) {
             Media(
                 viewModelFactory = mediaViewModelFactory,
                 presentationStyle = mediaPresentationStyle,
@@ -1390,6 +1396,7 @@ private fun ContentScope.MediaObject(
                 modifier = Modifier,
                 visible = visible,
                 location = location,
+                expansion = expansion,
             )
         }
     } else {
@@ -1420,7 +1427,7 @@ fun QuickQuickSettingsLayout(
 ) {
     if (mediaInRow) {
         Row(
-            horizontalArrangement = spacedBy(dimensionResource(R.dimen.qs_tile_margin_vertical)),
+            horizontalArrangement = spacedBy(QuickSettingsShade.Dimensions.HorizontalPadding),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(modifier = Modifier.weight(1f)) { tiles() }

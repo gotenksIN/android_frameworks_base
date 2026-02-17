@@ -24,6 +24,7 @@ import static android.appwidget.flags.Flags.remoteViewsProto;
 import static android.appwidget.flags.Flags.removeAppWidgetServiceIoFromCriticalPath;
 import static android.appwidget.flags.Flags.securityPolicyInteractAcrossUsers;
 import static android.appwidget.flags.Flags.supportResumeRestoreAfterReboot;
+import static android.appwidget.flags.Flags.widgetDisplayChanges;
 import static android.content.Context.KEYGUARD_SERVICE;
 import static android.content.Intent.FLAG_ACTIVITY_EXCLUDE_FROM_RECENTS;
 import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
@@ -54,6 +55,7 @@ import android.app.IServiceConnection;
 import android.app.KeyguardManager;
 import android.app.PendingIntent;
 import android.app.StatsManager;
+import android.app.admin.DevicePolicyIdentifiers;
 import android.app.admin.DevicePolicyManagerInternal;
 import android.app.admin.DevicePolicyManagerInternal.OnCrossProfileWidgetProvidersChangeListener;
 import android.app.job.JobScheduler;
@@ -1069,8 +1071,15 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
                 // TODO(b/281839596): don't rely on platform always meaning suspended by admin.
                 if (suspendingPackage != null
                         && PLATFORM_PACKAGE_NAME.equals(suspendingPackage.packageName)) {
-                    onClickIntent = mDevicePolicyManagerInternal.createShowAdminSupportIntent(
-                            appUserId, true);
+                    if (android.app.admin.flags.Flags.policyTransparencyRefactorEnabled()) {
+                        onClickIntent =
+                                mDevicePolicyManagerInternal.createShowAdminSupportIntentForPolicy(
+                                        appUserId,
+                                        DevicePolicyIdentifiers.PACKAGES_SUSPENDED_POLICY);
+                    } else {
+                        onClickIntent = mDevicePolicyManagerInternal.createShowAdminSupportIntent(
+                                appUserId, true);
+                    }
                 } else {
                     final SuspendDialogInfo dialogInfo =
                             mPackageManagerInternal.getSuspendedDialogInfo(
@@ -1104,39 +1113,93 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
             for (int j = 0; j < widgetCount; j++) {
                 Widget widget = provider.widgets.get(j);
                 if (targetWidget != null && targetWidget != widget) continue;
-                // Identify the user in the host process since the intent will be invoked by
-                // the host app.
-                final Host host = widget.host;
-                final UserHandle hostUser;
-                if (host != null && host.id != null) {
-                    hostUser = UserHandle.getUserHandleForUid(host.id.uid);
+
+                boolean useDisabledPreviewWhenMasked = widget.options.getBoolean(
+                        "useDisabledPreviewWhenMasked", false);
+                if (DEBUG) {
+                    Slog.i(TAG, "useDisabledPreviewWhenMasked: " + useDisabledPreviewWhenMasked
+                            + " widget: " + widget);
+                }
+                if (useDisabledPreviewWhenMasked) {
+                    AndroidFuture<RemoteViews> result = getGeneratedPreviewsAsync(provider,
+                            widget.options.getInt(AppWidgetManager.OPTION_APPWIDGET_HOST_CATEGORY));
+                    widget.setMaskPending(true);
+                    Intent clickIntent = onClickIntent;
+                    result.thenAccept(generatedPreview -> {
+                        if (DEBUG) {
+                            Slog.i(TAG,
+                                    "generatedPreview available: " + generatedPreview + " widget: "
+                                            + widget);
+                        }
+                        applyWidgetWithGeneratedPreviewLocked(generatedPreview, views, widget,
+                                provider, clickIntent);
+                    });
                 } else {
-                    // Fallback to the parent profile if the host is null.
-                    Slog.w(TAG, "Host is null when masking widget: " + widget.appWidgetId);
-                    hostUser = mUserManager.getProfileParent(appUserId).getUserHandle();
-                }
-                if (provider.maskedByStoppedPackage) {
-                    Intent intent = createUpdateIntentLocked(provider,
-                            new int[] { widget.appWidgetId });
-                    views.setOnClickPendingIntent(android.R.id.background,
-                            PendingIntent.getBroadcastAsUser(mContext, widget.appWidgetId,
-                                    intent, PendingIntent.FLAG_UPDATE_CURRENT
-                                            | PendingIntent.FLAG_IMMUTABLE, hostUser));
-                } else if (onClickIntent != null) {
-                    views.setOnClickPendingIntent(android.R.id.background,
-                            PendingIntent.getActivityAsUser(mContext, widget.appWidgetId,
-                            onClickIntent, PendingIntent.FLAG_UPDATE_CURRENT
-                                    | PendingIntent.FLAG_IMMUTABLE, null /* options */,
-                            hostUser));
-                }
-                if (widget.replaceWithMaskedViewsLocked(views)) {
-                    scheduleNotifyUpdateAppWidgetLocked(widget, widget.getEffectiveViewsLocked());
+                    applyMaskedViewsLocked(views, provider, onClickIntent, widget);
                 }
             }
         } finally {
             Binder.restoreCallingIdentity(identity);
         }
     }
+
+    private void applyMaskedViewsLocked(RemoteViews views, Provider provider, Intent onClickIntent,
+            Widget widget) {
+        // Identify the user in the host process since the intent will be invoked by
+        // the host app.
+        final Host host = widget.host;
+        final UserHandle hostUser;
+        if (host != null && host.id != null) {
+            hostUser = UserHandle.getUserHandleForUid(host.id.uid);
+        } else {
+            // Fallback to the parent profile if the host is null.
+            Slog.w(TAG, "Host is null when masking widget: " + widget.appWidgetId);
+            hostUser = mUserManager.getProfileParent(provider.getUserId()).getUserHandle();
+        }
+        if (provider.maskedByStoppedPackage) {
+            Intent intent = createUpdateIntentLocked(provider,
+                    new int[]{widget.appWidgetId});
+            views.setOnClickPendingIntent(android.R.id.background,
+                    PendingIntent.getBroadcastAsUser(mContext,
+                            widget.appWidgetId,
+                            intent, PendingIntent.FLAG_UPDATE_CURRENT
+                                    | PendingIntent.FLAG_IMMUTABLE, hostUser));
+        } else if (onClickIntent != null) {
+            views.setOnClickPendingIntent(android.R.id.background,
+                    PendingIntent.getActivityAsUser(mContext,
+                            widget.appWidgetId,
+                            onClickIntent, PendingIntent.FLAG_UPDATE_CURRENT
+                                    | PendingIntent.FLAG_IMMUTABLE, null /* options */,
+                            hostUser));
+        }
+        if (widget.replaceWithMaskedViewsLocked(views)) {
+            scheduleNotifyUpdateAppWidgetLocked(widget, widget.getEffectiveViewsLocked());
+        }
+    }
+
+    private void applyWidgetWithGeneratedPreviewLocked(RemoteViews generatedPreview,
+            RemoteViews workWidgetMaskView, Widget widget, Provider provider, Intent clickIntent) {
+        synchronized (mLock) {
+            if (widget.maskPending) {
+                if (generatedPreview != null) {
+                    RemoteViews wrappedGeneratedpreview = new RemoteViews(
+                            provider.id.componentName.getPackageName(),
+                            R.layout.disabled_widget_mask_view);
+                    wrappedGeneratedpreview.setBoolean(R.id.inner_frameLayout, "setEnabled", false);
+                    RemoteViews copyPreview = new RemoteViews(generatedPreview);
+                    wrappedGeneratedpreview.addView(R.id.inner_frameLayout,
+                            copyPreview);
+                    applyMaskedViewsLocked(wrappedGeneratedpreview, provider,
+                            clickIntent, widget);
+                } else {
+                    // If generated preview is null, then we apply the
+                    // work_widget_mask_view as the final mask view.
+                    applyMaskedViewsLocked(workWidgetMaskView, provider, clickIntent, widget);
+                }
+            }
+        }
+    }
+
 
     /**
      * Unmask widgets of the specified provider. Notify the host to remove the masked views
@@ -3542,9 +3605,7 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
 
         AppWidgetProviderInfo info = createPartialProviderInfo(providerId, ri, existing);
 
-        if (android.os.Flags.allowPrivateProfile()
-                && android.multiuser.Flags.disablePrivateSpaceItemsOnHome()
-                && android.multiuser.Flags.enablePrivateSpaceFeatures()) {
+        if (android.multiuser.Flags.disablePrivateSpaceItemsOnHome()) {
             // Do not add widget providers for profiles with items restricted on home screen.
             if (info != null && mUserManager
                     .getUserProperties(info.getProfile()).areItemsRestrictedOnHomeScreen()) {
@@ -3835,7 +3896,8 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
         out.endTag(null, "h");
     }
 
-    private static void serializeAppWidget(TypedXmlSerializer out, Widget widget,
+    @VisibleForTesting
+    static void serializeAppWidget(TypedXmlSerializer out, Widget widget,
             boolean saveRestoreCompleted) throws IOException {
         out.startTag(null, "g");
         out.attributeIntHex(null, "id", widget.appWidgetId);
@@ -3865,11 +3927,17 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
                         AppWidgetManager.OPTION_APPWIDGET_RESTORE_COMPLETED);
                 out.attributeBoolean(null, "restore_completed", restoreCompleted);
             }
+            if (widgetDisplayChanges()) {
+                int displayId = widget.options.getInt(AppWidgetManager.OPTION_APPWIDGET_DISPLAY_ID,
+                        Display.DEFAULT_DISPLAY);
+                out.attributeIntHex(null, "display_id", displayId);
+            }
         }
         out.endTag(null, "g");
     }
 
-    private static Bundle parseWidgetIdOptions(TypedXmlPullParser parser) {
+    @VisibleForTesting
+    static Bundle parseWidgetIdOptions(TypedXmlPullParser parser) {
         Bundle options = new Bundle();
         boolean restoreCompleted = parser.getAttributeBoolean(null, "restore_completed", false);
         if (restoreCompleted) {
@@ -3900,6 +3968,10 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
                 AppWidgetProviderInfo.WIDGET_CATEGORY_UNKNOWN);
         if (category != AppWidgetProviderInfo.WIDGET_CATEGORY_UNKNOWN) {
             options.putInt(AppWidgetManager.OPTION_APPWIDGET_HOST_CATEGORY, category);
+        }
+        if (widgetDisplayChanges()) {
+            options.putInt(AppWidgetManager.OPTION_APPWIDGET_DISPLAY_ID,
+                    parser.getAttributeIntHex(null, "display_id", Display.DEFAULT_DISPLAY));
         }
         return options;
     }
@@ -6653,6 +6725,7 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
         boolean trackingUpdate = false;
         boolean isFirstConfigActivityPending = false;
         final AppWidgetEvent.Builder eventBuilder = new AppWidgetEvent.Builder();
+        boolean maskPending = false;
 
         @Override
         public String toString() {
@@ -6665,12 +6738,17 @@ class AppWidgetServiceImpl extends IAppWidgetService.Stub implements WidgetBacku
         }
 
         private boolean clearMaskedViewsLocked() {
+            maskPending = false;
             if (maskedViews != null) {
                 maskedViews = null;
                 return true;
             } else {
                 return false;
             }
+        }
+
+        private void setMaskPending(boolean pending) {
+            maskPending = pending;
         }
 
         public RemoteViews getEffectiveViewsLocked() {

@@ -16,17 +16,24 @@
 
 package android.app;
 
+import android.Manifest;
 import android.annotation.FlaggedApi;
 import android.annotation.NonNull;
+import android.annotation.RequiresPermission;
 import android.annotation.SuppressLint;
 import android.annotation.SystemApi;
 import android.app.appfunctions.flags.Flags;
 import android.content.ContentResolver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.UserHandle;
 import android.provider.BaseColumns;
 
+import com.android.internal.R;
+
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -34,10 +41,8 @@ import java.util.Objects;
  * Contains definitions for the supported URIs and columns.
  *
  * @see AppInteractionAttribution
- * @hide
  */
 @FlaggedApi(Flags.FLAG_ENABLE_APP_INTERACTION_API)
-@SystemApi
 public final class AppInteractionContract implements BaseColumns {
     private AppInteractionContract() {}
 
@@ -52,15 +57,19 @@ public final class AppInteractionContract implements BaseColumns {
      * The package name of the agent app.
      *
      * <p>Type: TEXT
+     *
+     * @hide
      */
-    public static final String COLUMN_AGENT_PACKAGE_NAME = "agent_package_name";
+    @SystemApi public static final String COLUMN_AGENT_PACKAGE_NAME = "agent_package_name";
 
     /**
      * The package name of the target app.
      *
      * <p>Type: TEXT
+     *
+     * @hide
      */
-    public static final String COLUMN_TARGET_PACKAGE_NAME = "target_package_name";
+    @SystemApi public static final String COLUMN_TARGET_PACKAGE_NAME = "target_package_name";
 
     /**
      * The type of interaction. See {@link AppInteractionAttribution.InteractionType} for a list of
@@ -70,7 +79,10 @@ public final class AppInteractionContract implements BaseColumns {
      * check if the column value is null for that row.
      *
      * <p>Type: INTEGER (int)
+     *
+     * @hide
      */
+    @SystemApi
     @SuppressLint("IntentName")
     public static final String COLUMN_INTERACTION_TYPE = "interaction_type";
 
@@ -82,7 +94,10 @@ public final class AppInteractionContract implements BaseColumns {
      * check if the column value is null for that row.
      *
      * <p>Type: TEXT
+     *
+     * @hide
      */
+    @SystemApi
     @SuppressLint("IntentName")
     public static final String COLUMN_CUSTOM_INTERACTION_TYPE = "custom_interaction_type";
 
@@ -114,7 +129,9 @@ public final class AppInteractionContract implements BaseColumns {
      * <p>Type: TEXT
      *
      * @see AppInteractionAttribution.Builder#setInteractionUri
+     * @hide
      */
+    @SystemApi
     @SuppressLint("IntentName")
     public static final String COLUMN_INTERACTION_URI = "interaction_uri";
 
@@ -122,8 +139,10 @@ public final class AppInteractionContract implements BaseColumns {
      * The timestamp (in milliseconds) when the interaction was started.
      *
      * <p>Type: INTEGER (long)
+     *
+     * @hide
      */
-    public static final String COLUMN_ACCESS_TIME = "access_time";
+    @SystemApi public static final String COLUMN_ACCESS_TIME = "access_time";
 
     /**
      * Gets the {@code content://} style URI for the App Interaction history table for the user from
@@ -156,5 +175,40 @@ public final class AppInteractionContract implements BaseColumns {
                 .appendPath("user")
                 .appendPath(Integer.toString(user.getIdentifier()))
                 .build();
+    }
+
+    /**
+     * Gets the configured list of package names that should be grouped as Device assistance.
+     *
+     * <p>The return value is only the configured list of package names, so that they might not
+     * refer to actual installed system apps and the caller should perform its own validation
+     * instead of assuming so.
+     */
+    @NonNull
+    @SuppressWarnings("AndroidFrameworkClientSidePermissionCheck")
+    @RequiresPermission(
+            anyOf = {
+                Manifest.permission.EXECUTE_APP_FUNCTIONS,
+                Manifest.permission.EXECUTE_APP_FUNCTIONS_SYSTEM,
+                Manifest.permission.READ_APP_INTERACTION
+            })
+    public static List<String> getDeviceAssistancePackageNames(@NonNull Context context) {
+        if (context.checkSelfPermission(Manifest.permission.EXECUTE_APP_FUNCTIONS)
+                        == PackageManager.PERMISSION_GRANTED
+                || context.checkSelfPermission(Manifest.permission.READ_APP_INTERACTION)
+                        == PackageManager.PERMISSION_GRANTED
+                || (Flags.enableAppFunctionPermissionV2()
+                        && context.checkSelfPermission(
+                                        Manifest.permission.EXECUTE_APP_FUNCTIONS_SYSTEM)
+                                == PackageManager.PERMISSION_GRANTED)) {
+            final String[] deviceSettingPackages =
+                    Objects.requireNonNull(context)
+                            .getResources()
+                            .getStringArray(R.array.config_appInteractionDeviceAssistancePackages);
+            return List.of(deviceSettingPackages);
+        } else {
+            throw new SecurityException(
+                    "Caller does not have permission to get device assistance package names.");
+        }
     }
 }

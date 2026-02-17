@@ -16,21 +16,33 @@
 
 package com.android.systemui.screencapture.common.ui.viewmodel
 
+import android.content.Context
 import android.graphics.Bitmap
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
+import androidx.core.graphics.drawable.toBitmap
+import com.android.app.tracing.coroutines.launchTraced
+import com.android.systemui.dagger.qualifiers.Application
+import com.android.systemui.lifecycle.HydratedActivatable
 import com.android.systemui.screencapture.common.domain.model.ScreenCaptureAppContent
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
-import kotlinx.coroutines.awaitCancellation
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.coroutineScope
 
 /** Data for a UI to display app content. */
 class AppContentViewModel
 @AssistedInject
-constructor(@Assisted override val model: ScreenCaptureAppContent) : TargetViewModel {
+constructor(
+    @Assisted override val model: ScreenCaptureAppContent,
+    @Application private val context: Context,
+) : TargetViewModel, HydratedActivatable() {
 
-    override val icon: Result<Bitmap>? =
-        Result.failure(IllegalArgumentException("App content does not yet support icons"))
+    override var icon by mutableStateOf<Result<Bitmap>?>(null)
+        private set
 
     override val label: Result<CharSequence>? = Result.success(model.label)
 
@@ -44,7 +56,34 @@ constructor(@Assisted override val model: ScreenCaptureAppContent) : TargetViewM
 
     override val backgroundColorOpaque: Color = Color.Black
 
-    override suspend fun activate(): Nothing = awaitCancellation()
+    override suspend fun onActivated() {
+        coroutineScope {
+            launchTraced("AppContentViewModel#icon") {
+                val drawable =
+                    try {
+                        model.icon?.loadDrawable(context)
+                    } catch (e: Exception) {
+                        if (e is CancellationException) throw e
+                        null
+                    }
+                        ?: try {
+                            context.packageManager.getApplicationIcon(model.packageName)
+                        } catch (e: Exception) {
+                            if (e is CancellationException) throw e
+                            null
+                        }
+
+                icon =
+                    if (drawable != null) {
+                        Result.success(drawable.toBitmap())
+                    } else {
+                        Result.failure(
+                            IllegalStateException("No icon available for ${model.packageName}")
+                        )
+                    }
+            }
+        }
+    }
 
     @AssistedFactory
     interface Factory {

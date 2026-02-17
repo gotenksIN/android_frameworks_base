@@ -18,11 +18,15 @@ package com.android.systemui.screencapture.sharescreen.domain.interactor
 
 import android.app.ActivityManager
 import android.app.ActivityOptions
+import android.media.projection.IAppContentProjectionCallback
+import android.media.projection.IAppContentProjectionSession
 import android.media.projection.IMediaProjection
+import android.media.projection.MediaProjectionConfig
 import android.media.projection.ReviewGrantedConsentResult
+import android.media.projection.StopReason
+import android.os.RemoteException
 import android.os.UserHandle
 import android.util.Log
-import com.android.systemui.mediaprojection.MediaProjectionServiceHelper
 import com.android.systemui.screencapture.common.ScreenCaptureUiScope
 import com.android.systemui.screencapture.common.domain.interactor.ScreenCaptureRecentTaskInteractor
 import com.android.systemui.util.AsyncActivityLauncher
@@ -37,6 +41,7 @@ class ShareScreenUiInteractor
 constructor(
     private val recentTaskInteractor: ScreenCaptureRecentTaskInteractor,
     private val asyncActivityLauncher: AsyncActivityLauncher,
+    private val mediaProjectionHelper: MediaProjectionServiceHelperWrapper,
 ) {
 
     sealed class SharingState {
@@ -50,40 +55,82 @@ constructor(
     private val _sharingState = MutableStateFlow<SharingState>(SharingState.NotStarted)
     val sharingState = _sharingState.asStateFlow()
 
+    private lateinit var projection: IMediaProjection
     private var reviewGrantedConsentRequired: Boolean = false
     private lateinit var hostUserHandle: UserHandle
-    private var uid: Int = -1
-    private lateinit var packageName: String
+    var uid: Int = -1
+        private set
+
+    var packageName: String = ""
+        private set
+
     private var initialDisplayId: Int = -1
 
+    var config: MediaProjectionConfig? = null
+        private set
+
     fun initialize(
+        projection: IMediaProjection,
         reviewGrantedConsentRequired: Boolean,
         hostUserHandle: UserHandle,
         uid: Int,
         packageName: String,
         initialDisplayId: Int,
+        config: MediaProjectionConfig?,
     ) {
+        this.projection = projection
         this.reviewGrantedConsentRequired = reviewGrantedConsentRequired
         this.hostUserHandle = hostUserHandle
         this.uid = uid
         this.packageName = packageName
         this.initialDisplayId = initialDisplayId
+        this.config = config
     }
 
-    fun onAppContentSharingApproved(contentId: Int) {
-        // TODO(b/423708479) Finish the flow to support app content sharing.
+    /**
+     * Called when the user approves sharing of a specific piece of app content (e.g. a browser
+     * tab).
+     */
+    fun onAppContentSharingApproved(
+        contentId: Int,
+        callback: IAppContentProjectionCallback,
+        isAudioRequested: Boolean,
+    ) {
+        try {
+            val session =
+                object : IAppContentProjectionSession.Stub() {
+                    // This is an anonymous implementation of IAppContentProjectionSession.Stub.
+                    // It serves as the local Binder object for the projection session, allowing
+                    // the remote app (the app being projected) to notify the SystemUI service
+                    // when the projection session stops.
+                    override fun notifySessionStop() {
+                        Log.d(TAG, "App content projection session stopped by remote app.")
+                        try {
+                            projection.stop(StopReason.STOP_HOST_APP)
+                        } catch (e: RemoteException) {
+                            Log.e(TAG, "Failed to stop projection on session stop", e)
+                        }
+                        _sharingState.value = SharingState.Denied
+                    }
+                }
+
+            callback.onLoopbackProjectionStarted(session, contentId, isAudioRequested)
+
+            mediaProjectionHelper.setReviewedConsentIfNeeded(
+                ReviewGrantedConsentResult.RECORD_CONTENT_TASK,
+                reviewGrantedConsentRequired,
+                projection,
+            )
+            _sharingState.value = SharingState.Approved(projection)
+        } catch (e: Exception) {
+            Log.e(TAG, "Error granting projection permission for app content", e)
+            _sharingState.value = SharingState.Denied
+        }
     }
 
+    /** Called when the user approves sharing of a single application, identified by its task ID. */
     suspend fun onAppSharingApproved(taskId: Int) {
         try {
-            val projection =
-                MediaProjectionServiceHelper.createOrReuseProjection(
-                    uid,
-                    packageName,
-                    reviewGrantedConsentRequired,
-                    initialDisplayId,
-                )
-
             val recentTasks = recentTaskInteractor.recentTasks.first()
             val task = recentTasks.firstOrNull { it.taskId == taskId }
 
@@ -115,7 +162,7 @@ constructor(
                         // cookie.
                         projection.setLaunchCookie(launchCookie)
                         projection.taskId = taskId
-                        MediaProjectionServiceHelper.setReviewedConsentIfNeeded(
+                        mediaProjectionHelper.setReviewedConsentIfNeeded(
                             ReviewGrantedConsentResult.RECORD_CONTENT_TASK,
                             reviewGrantedConsentRequired,
                             projection,
@@ -140,15 +187,32 @@ constructor(
         }
     }
 
+    /** Called when the user approves sharing of an entire display. */
     fun onDisplaySharingApproved(displayId: Int) {
-        val projection =
-            MediaProjectionServiceHelper.createOrReuseProjection(
-                uid,
-                packageName,
+        try {
+            val projectionToUse =
+                if (displayId == initialDisplayId) {
+                    projection
+                } else {
+                    // Create a new projection instance associated with the *correct* displayId.
+                    mediaProjectionHelper.createOrReuseProjection(
+                        uid,
+                        packageName,
+                        reviewGrantedConsentRequired,
+                        displayId,
+                    )
+                }
+
+            mediaProjectionHelper.setReviewedConsentIfNeeded(
+                ReviewGrantedConsentResult.RECORD_CONTENT_DISPLAY,
                 reviewGrantedConsentRequired,
-                displayId,
+                projectionToUse,
             )
-        _sharingState.value = SharingState.Approved(projection)
+            _sharingState.value = SharingState.Approved(projectionToUse)
+        } catch (e: RemoteException) {
+            Log.e(TAG, "Error granting projection permission for display $displayId", e)
+            _sharingState.value = SharingState.Denied
+        }
     }
 
     fun onClose() {

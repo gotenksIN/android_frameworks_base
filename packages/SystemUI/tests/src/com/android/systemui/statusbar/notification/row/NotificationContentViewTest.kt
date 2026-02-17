@@ -42,7 +42,6 @@ import com.android.systemui.statusbar.notification.collection.NotificationEntry
 import com.android.systemui.statusbar.notification.collection.makeEntryOfPeopleType
 import com.android.systemui.statusbar.notification.people.PeopleNotificationIdentifier
 import com.android.systemui.statusbar.notification.people.peopleNotificationIdentifier
-import com.android.systemui.statusbar.notification.shared.NotificationBundleUi
 import com.android.systemui.testKosmos
 import com.google.common.truth.Truth.assertThat
 import junit.framework.Assert.assertEquals
@@ -79,7 +78,6 @@ class NotificationContentViewTest : SysuiTestCase() {
     private val contractedHeight =
         px(com.android.systemui.res.R.dimen.min_notification_layout_height)
     private val expandedHeight = px(com.android.systemui.res.R.dimen.notification_max_height)
-    private val notificationContentMargin = px(R.dimen.notification_content_margin)
 
     @Before
     fun setup() {
@@ -92,16 +90,8 @@ class NotificationContentViewTest : SysuiTestCase() {
 
         row =
             spy(
-                when (NotificationBundleUi.isEnabled) {
-                    true -> {
-                        ExpandableNotificationRow(mContext, /* attrs= */ null, UserHandle.CURRENT)
-                            .apply { this.entryAdapter = entryAdapter }
-                    }
-                    false -> {
-                        ExpandableNotificationRow(mContext, /* attrs= */ null, entry).apply {
-                            entryLegacy = entry
-                        }
-                    }
+                ExpandableNotificationRow(mContext, /* attrs= */ null, UserHandle.CURRENT).apply {
+                    this.entryAdapter = entryAdapter
                 }
             )
         ViewUtils.attachView(fakeParent)
@@ -695,9 +685,6 @@ class NotificationContentViewTest : SysuiTestCase() {
 
     private fun createMockContainingNotification(notificationEntry: NotificationEntry) =
         mock<ExpandableNotificationRow>().apply {
-            if (!NotificationBundleUi.isEnabled) {
-                whenever(this.entryLegacy).thenReturn(notificationEntry)
-            }
             whenever(this.context).thenReturn(mContext)
             whenever(this.bubbleClickListener).thenReturn(View.OnClickListener {})
             whenever(this.entryAdapter).thenReturn(factory.create(notificationEntry))
@@ -779,13 +766,7 @@ class NotificationContentViewTest : SysuiTestCase() {
             .also { contentView ->
                 fakeParent.addView(contentView)
                 contentView.mockRequestLayout()
-                contentView.onNotificationUpdated(
-                    if (NotificationBundleUi.isEnabled) {
-                        null
-                    } else {
-                        row.entryLegacy
-                    }
-                )
+                contentView.onNotificationUpdated()
             }
     }
 

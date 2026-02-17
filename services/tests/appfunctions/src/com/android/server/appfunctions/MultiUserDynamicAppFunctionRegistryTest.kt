@@ -20,14 +20,17 @@ import android.app.appfunctions.ExecuteAppFunctionAidlRequest
 import android.app.appfunctions.ExecuteAppFunctionRequest
 import android.app.appfunctions.IAppFunctionExecutor
 import android.app.appfunctions.SafeOneTimeExecuteAppFunctionCallback
-import android.content.Context
 import android.content.pm.UserInfo
 import android.os.IBinder
 import android.os.ICancellationSignal
 import android.os.UserHandle
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.android.server.SystemService.TargetUser
+import com.android.server.appfunctions.MultiUserDynamicAppFunctionRegistry.RegistrationScopeId
 import com.google.common.truth.Truth.assertThat
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import org.junit.Assert.assertThrows
 import org.junit.Before
 import org.junit.Test
@@ -36,46 +39,42 @@ import org.mockito.kotlin.argumentCaptor
 import org.mockito.kotlin.mock
 import org.mockito.kotlin.verify
 import org.mockito.kotlin.whenever
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
 
 @RunWith(AndroidJUnit4::class)
 class MultiUserDynamicAppFunctionRegistryTest {
-    private val mockContext: Context = mock()
     private lateinit var registry: MultiUserDynamicAppFunctionRegistry
+    private val mockMetadataObserver = mock<AppFunctionMetadataObserver>()
+
+    private val globalScope: List<RegistrationScopeId> = listOf(RegistrationScopeId(null))
 
     @Before
     fun setUp() {
         registry = MultiUserDynamicAppFunctionRegistry()
-        registry.onUserUnlocked(TARGET_USER_10)
-        registry.onUserUnlocked(TARGET_USER_11)
+        registry.onUserUnlocked(mockMetadataObserver, TARGET_USER_10)
+        registry.onUserUnlocked(mockMetadataObserver, TARGET_USER_11)
     }
 
     @Test
     fun register_correctUser_success() {
         val executor = createExecutorMock()
-        registry.registerAppFunction(TEST_PACKAGE, TEST_FUNCTION, executor, USER_10)
+        registry.registerAppFunctions(TEST_PACKAGE, listOf(TEST_FUNCTION), executor, USER_10, globalScope)
 
-        assertThat(
-            registry.isAppFunctionEnabled(TEST_PACKAGE, TEST_FUNCTION, USER_10)
-        ).isTrue()
+        assertThat(registry.isAppFunctionRegistered(TEST_PACKAGE, TEST_FUNCTION, USER_10)).isTrue()
     }
 
     @Test
     fun register_inOneUser_notVisibleInAnother() {
         val executor = createExecutorMock()
-        registry.registerAppFunction(TEST_PACKAGE, TEST_FUNCTION, executor, USER_10)
+        registry.registerAppFunctions(TEST_PACKAGE, listOf(TEST_FUNCTION), executor, USER_10, globalScope)
 
-        assertThat(
-            registry.isAppFunctionEnabled(TEST_PACKAGE, TEST_FUNCTION, USER_11)
-        ).isFalse()
+        assertThat(registry.isAppFunctionRegistered(TEST_PACKAGE, TEST_FUNCTION, USER_11))
+            .isFalse()
     }
 
     @Test
     fun execute_inWrongUser_fails() {
         val executor = createExecutorMock()
-        registry.registerAppFunction(TEST_PACKAGE, TEST_FUNCTION, executor, USER_10)
+        registry.registerAppFunctions(TEST_PACKAGE, listOf(TEST_FUNCTION), executor, USER_10, globalScope)
 
         val request = createAidlRequest(TEST_PACKAGE, TEST_FUNCTION, USER_11)
         val safeCallback = mock<SafeOneTimeExecuteAppFunctionCallback>()
@@ -92,66 +91,57 @@ class MultiUserDynamicAppFunctionRegistryTest {
     @Test
     fun unregister_correctUser_success() {
         val executor = createExecutorMock()
-        registry.registerAppFunction(TEST_PACKAGE, TEST_FUNCTION, executor, USER_10)
-        assertThat(
-            registry.isAppFunctionEnabled(TEST_PACKAGE, TEST_FUNCTION, USER_10)
-        ).isTrue()
+        registry.registerAppFunctions(TEST_PACKAGE, listOf(TEST_FUNCTION), executor, USER_10, globalScope)
+        assertThat(registry.isAppFunctionRegistered(TEST_PACKAGE, TEST_FUNCTION, USER_10)).isTrue()
 
-        registry.unregisterAppFunction(TEST_PACKAGE, TEST_FUNCTION, executor, USER_10)
+        registry.unregisterAppFunctions(TEST_PACKAGE, listOf(TEST_FUNCTION), executor, USER_10, globalScope)
 
-        assertThat(
-            registry.isAppFunctionEnabled(TEST_PACKAGE, TEST_FUNCTION, USER_10)
-        ).isFalse()
+        assertThat(registry.isAppFunctionRegistered(TEST_PACKAGE, TEST_FUNCTION, USER_10))
+            .isFalse()
     }
 
     @Test
     fun unregister_wrongUser_isNoOp() {
         val executor = createExecutorMock()
-        registry.registerAppFunction(TEST_PACKAGE, TEST_FUNCTION, executor, USER_10)
+        registry.registerAppFunctions(TEST_PACKAGE, listOf(TEST_FUNCTION), executor, USER_10, globalScope)
 
-        registry.unregisterAppFunction(TEST_PACKAGE, TEST_FUNCTION, executor, USER_11)
+        registry.unregisterAppFunctions(TEST_PACKAGE, listOf(TEST_FUNCTION), executor, USER_11, globalScope)
 
-        assertThat(
-            registry.isAppFunctionEnabled(TEST_PACKAGE, TEST_FUNCTION, USER_10)
-        ).isTrue()
+        assertThat(registry.isAppFunctionRegistered(TEST_PACKAGE, TEST_FUNCTION, USER_10)).isTrue()
     }
 
     @Test
     fun onUserStopped_removesRegistryAndAffectsOnlyThatUser() {
         val executor10 = createExecutorMock()
         val executor11 = createExecutorMock()
-        registry.registerAppFunction(TEST_PACKAGE, TEST_FUNCTION, executor10, USER_10)
-        registry.registerAppFunction(TEST_PACKAGE, TEST_FUNCTION, executor11, USER_11)
+        registry.registerAppFunctions(TEST_PACKAGE, listOf(TEST_FUNCTION), executor10, USER_10, globalScope)
+        registry.registerAppFunctions(TEST_PACKAGE, listOf(TEST_FUNCTION), executor11, USER_11, globalScope)
 
         registry.onUserStopped(TARGET_USER_10)
 
         assertThrows(IllegalStateException::class.java) {
-            registry.isAppFunctionEnabled(TEST_PACKAGE, TEST_FUNCTION, USER_10)
+            registry.isAppFunctionRegistered(TEST_PACKAGE, TEST_FUNCTION, USER_10)
         }
 
-        assertThat(
-            registry.isAppFunctionEnabled(TEST_PACKAGE, TEST_FUNCTION, USER_11)
-        ).isTrue()
+        assertThat(registry.isAppFunctionRegistered(TEST_PACKAGE, TEST_FUNCTION, USER_11)).isTrue()
     }
 
     @Test
     fun accessBeforeUnlock_throwsException() {
         val user12 = UserHandle.of(12)
         assertThrows(IllegalStateException::class.java) {
-            registry.isAppFunctionEnabled(TEST_PACKAGE, TEST_FUNCTION, user12)
+            registry.isAppFunctionRegistered(TEST_PACKAGE, TEST_FUNCTION, user12)
         }
     }
 
     @Test
     fun onUserUnlocked_calledTwice_isHarmless() {
         val executor = createExecutorMock()
-        registry.registerAppFunction(TEST_PACKAGE, TEST_FUNCTION, executor, USER_10)
+        registry.registerAppFunctions(TEST_PACKAGE, listOf(TEST_FUNCTION), executor, USER_10, globalScope)
 
-        registry.onUserUnlocked(TARGET_USER_10)
+        registry.onUserUnlocked(mockMetadataObserver, TARGET_USER_10)
 
-        assertThat(
-            registry.isAppFunctionEnabled(TEST_PACKAGE, TEST_FUNCTION, USER_10)
-        ).isTrue()
+        assertThat(registry.isAppFunctionRegistered(TEST_PACKAGE, TEST_FUNCTION, USER_10)).isTrue()
     }
 
     @Test
@@ -164,23 +154,26 @@ class MultiUserDynamicAppFunctionRegistryTest {
     @Test
     fun stopAndReunlockUser_providesFreshRegistry() {
         val executor = createExecutorMock()
-        registry.registerAppFunction(TEST_PACKAGE, TEST_FUNCTION, executor, USER_10)
+        registry.registerAppFunctions(TEST_PACKAGE, listOf(TEST_FUNCTION), executor, USER_10, globalScope)
 
         // Stop and re-unlock the user
         registry.onUserStopped(TARGET_USER_10)
-        registry.onUserUnlocked(TARGET_USER_10)
+        registry.onUserUnlocked(mockMetadataObserver, TARGET_USER_10)
 
         // Verify the old registration is gone
-        assertThat(
-            registry.isAppFunctionEnabled(TEST_PACKAGE, TEST_FUNCTION, USER_10)
-        ).isFalse()
+        assertThat(registry.isAppFunctionRegistered(TEST_PACKAGE, TEST_FUNCTION, USER_10))
+            .isFalse()
     }
 
     @Test
     fun register_withInvalidUserAll_throwsException() {
         assertThrows(IllegalStateException::class.java) {
-            registry.registerAppFunction(
-                TEST_PACKAGE, TEST_FUNCTION, createExecutorMock(), UserHandle.ALL
+            registry.registerAppFunctions(
+                TEST_PACKAGE,
+                listOf(TEST_FUNCTION),
+                createExecutorMock(),
+                UserHandle.ALL,
+                globalScope,
             )
         }
     }
@@ -202,8 +195,12 @@ class MultiUserDynamicAppFunctionRegistryTest {
         // Thread 2: Register a function for the same user
         executorService.submit {
             try {
-                registry.registerAppFunction(
-                    TEST_PACKAGE, "raceFunction", createExecutorMock(), USER_10
+                registry.registerAppFunctions(
+                    TEST_PACKAGE,
+                    listOf("raceFunction"),
+                    createExecutorMock(),
+                    USER_10,
+                    globalScope,
                 )
             } catch (e: IllegalStateException) {
                 // This is an expected, safe outcome if stop runs first
@@ -216,7 +213,7 @@ class MultiUserDynamicAppFunctionRegistryTest {
         executorService.shutdown()
 
         assertThrows(IllegalStateException::class.java) {
-            registry.isAppFunctionEnabled(TEST_PACKAGE, "contextFunction", USER_10)
+            registry.isAppFunctionRegistered(TEST_PACKAGE, "contextFunction", USER_10)
         }
     }
 
@@ -229,7 +226,7 @@ class MultiUserDynamicAppFunctionRegistryTest {
     private fun createAidlRequest(
         packageName: String,
         functionId: String,
-        userHandle: UserHandle
+        userHandle: UserHandle,
     ): ExecuteAppFunctionAidlRequest {
         val clientRequest = ExecuteAppFunctionRequest.Builder(packageName, functionId).build()
         return ExecuteAppFunctionAidlRequest(clientRequest, userHandle, "calling.package", 0, 0)

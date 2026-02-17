@@ -405,25 +405,23 @@ class FullMobileConnectionRepository(
             )
 
 // QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the customization signal strength icon
-// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
-// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
     override val radioIconType =
         activeRepo.flatMapLatest { it.radioIconType }
-// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
             .logDiffsForTable(
                 tableLogBuffer,
                 columnPrefix = "",
-// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
                 columnName = "radioIconType",
                 initialValue = activeRepo.value.radioIconType.value,
-// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
             )
             .stateIn(
                 scope,
                 SharingStarted.WhileSubscribed(),
-// QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+// QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
                 activeRepo.value.radioIconType.value
-// QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor NrIconType fields to RadioIconType
+// QTI_BEGIN: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon
             )
 
 // QTI_END: 2023-04-01: Android_UI: SystemUI: Readapt the side car 5G icon

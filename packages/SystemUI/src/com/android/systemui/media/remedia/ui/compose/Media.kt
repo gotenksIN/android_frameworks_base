@@ -19,9 +19,11 @@
 package com.android.systemui.media.remedia.ui.compose
 
 import android.util.Log
+import android.view.ViewConfiguration
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -63,6 +65,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ButtonDefaults
@@ -86,15 +89,14 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.scale
@@ -114,6 +116,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.PointerEventType
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.layout
@@ -121,14 +124,17 @@ import androidx.compose.ui.layout.layoutId
 import androidx.compose.ui.node.Ref
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastCoerceIn
 import androidx.compose.ui.util.fastForEach
@@ -148,6 +154,7 @@ import com.android.compose.animation.scene.rememberMutableSceneTransitionLayoutS
 import com.android.compose.animation.scene.transitions
 import com.android.compose.gesture.effect.rememberOffsetOverscrollEffect
 import com.android.compose.gesture.overscrollToDismiss
+import com.android.compose.modifiers.height
 import com.android.compose.modifiers.thenIf
 import com.android.compose.ui.graphics.painter.rememberDrawablePainter
 import com.android.systemui.animation.Expandable
@@ -196,6 +203,7 @@ fun Media(
     visible: () -> Boolean = { true },
     mediaSquishiness: () -> Float = { 1f },
     location: Media.Location,
+    expansion: () -> Float = { 0F },
 ) {
     val context = LocalContext.current
     val viewModel: MediaViewModel =
@@ -217,6 +225,7 @@ fun Media(
         onDismissed = onDismissed,
         modifier = modifier,
         mediaSquishiness = mediaSquishiness,
+        expansion = expansion,
     )
 }
 
@@ -236,6 +245,7 @@ private fun CardCarousel(
     onDismissed: () -> Unit,
     modifier: Modifier = Modifier,
     mediaSquishiness: () -> Float,
+    expansion: () -> Float,
 ) {
     AnimatedVisibility(
         visible = viewModel.isCarouselVisible,
@@ -249,6 +259,7 @@ private fun CardCarousel(
             behavior = behavior,
             onDismissed = onDismissed,
             mediaSquishiness = mediaSquishiness,
+            expansion = expansion,
         )
     }
 }
@@ -261,8 +272,15 @@ private fun CardCarouselContent(
     onDismissed: () -> Unit,
     modifier: Modifier = Modifier,
     mediaSquishiness: () -> Float,
+    expansion: () -> Float,
 ) {
-    val carouselState = rememberCarouselState { viewModel.cards.size }
+    val carouselState = rememberCarouselState {
+        if (behavior.isCarouselScrollingEnabled) {
+            viewModel.cards.size
+        } else {
+            1
+        }
+    }
     var userTappedIndex by remember { mutableStateOf<Int?>(null) }
     LaunchedEffect(viewModel.currentIndex) {
         if (viewModel.currentIndex != carouselState.currentItem) {
@@ -278,6 +296,12 @@ private fun CardCarouselContent(
             // `animateScrollToItem`, so that scrolling can fully complete.
             if (userTappedIndex == null || carouselState.currentItem == userTappedIndex) {
                 viewModel.onCardSelected(carouselState.currentItem)
+
+                val areDeviceChipsVisible =
+                    presentationStyle !in
+                        listOf(MediaPresentationStyle.Thumbnail, MediaPresentationStyle.Compact)
+                viewModel.onCardVisible(carouselState.currentItem, areDeviceChipsVisible)
+
                 userTappedIndex = null
             }
         }
@@ -319,14 +343,21 @@ private fun CardCarouselContent(
                             )
                         }
                         val presentation =
-                            if (pageIndex == viewModel.currentIndex) {
+                            if (
+                                pageIndex == viewModel.currentIndex ||
+                                    !behavior.isCarouselScrollingEnabled
+                            ) {
                                 presentationStyle
-                            } else MediaPresentationStyle.Thumbnail
+                            } else {
+                                MediaPresentationStyle.Thumbnail
+                            }
                         Card(
-                            viewModel = viewModel.cards[pageIndex],
+                            mediaViewModel = viewModel,
+                            cardIndex = pageIndex,
                             cardStyle = presentation,
                             carouselStyle = presentationStyle,
                             mediaSquishiness = mediaSquishiness,
+                            expansion = expansion,
                             modifier =
                                 Modifier.maskClip(roundedCornerShape)
                                     .fillMaxWidth()
@@ -375,12 +406,15 @@ private fun CardCarouselContent(
 /** Renders the UI of a single media card. */
 @Composable
 private fun Card(
-    viewModel: MediaCardViewModel,
+    mediaViewModel: MediaViewModel,
+    cardIndex: Int,
     cardStyle: MediaPresentationStyle,
     carouselStyle: MediaPresentationStyle,
     modifier: Modifier = Modifier,
     mediaSquishiness: () -> Float,
+    expansion: () -> Float,
 ) {
+    val viewModel = mediaViewModel.cards[cardIndex]
     val stlState =
         rememberMutableSceneTransitionLayoutState(
             initialScene = cardStyle.toScene(),
@@ -417,7 +451,8 @@ private fun Card(
                     scene(Media.Scenes.Default) {
                         CardForeground(
                             expandable = it,
-                            viewModel = viewModel,
+                            mediaViewModel = mediaViewModel,
+                            cardIndex = cardIndex,
                             colorScheme = colorScheme,
                             threeRows = true,
                             fillHeight = false,
@@ -427,7 +462,8 @@ private fun Card(
                     scene(Media.Scenes.Large) {
                         CardForeground(
                             expandable = it,
-                            viewModel = viewModel,
+                            mediaViewModel = mediaViewModel,
+                            cardIndex = cardIndex,
                             colorScheme = colorScheme,
                             threeRows = true,
                             fillHeight = true,
@@ -437,7 +473,8 @@ private fun Card(
                     scene(Media.Scenes.Compressed) {
                         CardForeground(
                             expandable = it,
-                            viewModel = viewModel,
+                            mediaViewModel = mediaViewModel,
+                            cardIndex = cardIndex,
                             colorScheme = colorScheme,
                             threeRows = false,
                             fillHeight = false,
@@ -450,19 +487,25 @@ private fun Card(
 
                     scene(Media.Scenes.Thumbnail) {
                         // Thumbnail is album art only, no foreground elements
-                        val carouselHeight =
-                            when (carouselStyle) {
-                                MediaPresentationStyle.Default -> 176.dp
-                                // Large is only used for communal, which isn't scrollable
-                                MediaPresentationStyle.Large -> Dp.Unspecified
-                                MediaPresentationStyle.Compressed -> 128.dp
-                                MediaPresentationStyle.Compact -> 80.dp
-                                else ->
-                                    throw IllegalArgumentException("Invalid carousel presentation")
-                            }
                         var thumbnailModifier =
-                            Modifier.clickable(onClick = { viewModel.onClick(it) })
-                                .height(carouselHeight)
+                            Modifier.clickable(onClick = { viewModel.onClick(it) }).height {
+                                when (carouselStyle) {
+                                    MediaPresentationStyle.Default -> Media.DEFAULT_HEIGHT
+                                    // Large is only used for communal, which isn't scrollable
+                                    MediaPresentationStyle.Large -> Dp.Unspecified
+                                    MediaPresentationStyle.Compressed ->
+                                        lerp(
+                                            Media.COMPRESSED_HEIGHT,
+                                            Media.DEFAULT_HEIGHT,
+                                            expansion(),
+                                        )
+                                    MediaPresentationStyle.Compact -> Media.COMPACT_HEIGHT
+                                    else ->
+                                        throw IllegalArgumentException(
+                                            "Invalid carousel presentation"
+                                        )
+                                }.roundToPx()
+                            }
                         if (carouselStyle == MediaPresentationStyle.Compact) {
                             thumbnailModifier =
                                 thumbnailModifier.then(
@@ -471,6 +514,22 @@ private fun Card(
                         }
                         Spacer(modifier = modifier.then(thumbnailModifier))
                     }
+                }
+            }
+        }
+
+        LaunchedEffect(cardStyle) {
+            launch {
+                if (
+                    cardStyle != MediaPresentationStyle.Thumbnail &&
+                        carouselStyle == MediaPresentationStyle.Compressed
+                ) {
+                    synchronizeMediaState(
+                        stlState,
+                        expansion,
+                        Media.Scenes.Compressed,
+                        Media.Scenes.Default,
+                    )
                 }
             }
         }
@@ -512,12 +571,14 @@ private fun rememberAnimatedColorScheme(colorScheme: MediaColorScheme?): Animate
 @Composable
 private fun ContentScope.CardForeground(
     expandable: Expandable,
-    viewModel: MediaCardViewModel,
+    mediaViewModel: MediaViewModel,
+    cardIndex: Int,
     colorScheme: AnimatedColorScheme,
     threeRows: Boolean,
     fillHeight: Boolean,
     modifier: Modifier = Modifier,
 ) {
+    val viewModel = mediaViewModel.cards[cardIndex]
     // Can't use a Crossfade composable because of the custom layout logic below. Animate the alpha
     // of the guts (and, indirectly, of the content) from here.
     val gutsAlphaAnimatable = remember { Animatable(0f) }
@@ -531,7 +592,8 @@ private fun ContentScope.CardForeground(
         content = {
             CardForegroundContent(
                 expandable = expandable,
-                viewModel = viewModel,
+                mediaViewModel = mediaViewModel,
+                cardIndex = cardIndex,
                 threeRows = threeRows,
                 fillHeight = fillHeight,
                 colorScheme = colorScheme,
@@ -578,13 +640,14 @@ private fun ContentScope.CardForeground(
 @Composable
 private fun ContentScope.CardForegroundContent(
     expandable: Expandable,
-    viewModel: MediaCardViewModel,
+    mediaViewModel: MediaViewModel,
+    cardIndex: Int,
     threeRows: Boolean,
     fillHeight: Boolean,
     colorScheme: AnimatedColorScheme,
     modifier: Modifier = Modifier,
 ) {
-
+    val viewModel = mediaViewModel.cards[cardIndex]
     Column(
         modifier =
             modifier
@@ -592,7 +655,7 @@ private fun ContentScope.CardForegroundContent(
                     onClick = { viewModel.onClick(expandable) },
                     onLongClick = viewModel.onLongClick,
                 )
-                .clearAndSetSemantics { contentDescription = viewModel.contentDescription }
+                .semantics { contentDescription = viewModel.contentDescription }
     ) {
         // Always add the first/top row, regardless of presentation style.
         Box(modifier = Modifier.fillMaxWidth()) {
@@ -609,30 +672,32 @@ private fun ContentScope.CardForegroundContent(
                 )
             }
 
-            var cardMaxWidth: Int by remember { mutableIntStateOf(0) }
             Element(
                 key = Media.Elements.OutputSwitcherButton,
                 modifier = Modifier.align(Alignment.TopEnd),
             ) {
+                val cardMaxWidth = mediaViewModel.cardMaxWidth
                 Row(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier =
                         Modifier
-                            // Output switcher chip must be limited to at most 40% of the maximum
-                            // width of the card.
+                            // Output switcher chip must be limited to at most 40% of the
+                            // maximum width of the card.
                             //
                             // This saves the maximum possible width of the card so it can be
                             // referred to by child custom layout code below.
                             //
                             // The assumption is that the row can be as wide as the entire card.
                             .layout { measurable, constraints ->
-                                cardMaxWidth = constraints.maxWidth
+                                mediaViewModel.cardMaxWidth =
+                                    cardMaxWidth.coerceAtLeast(constraints.maxWidth)
                                 val placeable = measurable.measure(constraints)
 
                                 layout(placeable.measuredWidth, placeable.measuredHeight) {
                                     placeable.place(0, 0)
                                 }
-                            },
+                            }
+                            .animateContentSize(),
                 ) {
                     AnimatedVisibility(
                         visible = viewModel.deviceSuggestionChip != null,
@@ -667,11 +732,12 @@ private fun ContentScope.CardForegroundContent(
                             ),
                         modifier =
                             Modifier
-                                // The chip must be limited to 40% of the width of the card at most.
+                                // The chip must be limited to 40% of the width of the card at
+                                // most.
                                 //
-                                // The underlying assumption is that there'll never be more than one
-                                // chip with text and one more icon-only chip. Only the one with
-                                // text can ever end up being too wide.
+                                // The underlying assumption is that there'll never be more than
+                                // one chip with text and one more icon-only chip.
+                                // Only the one with text can ever end up being too wide.
                                 .fractionalMaxWidth(
                                     containerMaxWidth = cardMaxWidth,
                                     fraction = 0.4f,
@@ -703,7 +769,7 @@ private fun ContentScope.CardForegroundContent(
                     subtitle = viewModel.subtitle,
                     isExplicit = viewModel.isExplicit,
                     color = Color.White,
-                    modifier = Modifier.weight(1f).padding(end = 8.dp),
+                    modifier = Modifier.weight(1f).padding(end = 8.dp).animateContentSize(),
                 )
 
                 if (viewModel.actionButtonLayout == MediaCardActionButtonLayout.WithPlayPause) {
@@ -759,7 +825,7 @@ private fun ContentScope.CardForegroundContent(
                     subtitle = viewModel.subtitle,
                     isExplicit = viewModel.isExplicit,
                     color = Color.White,
-                    modifier = Modifier.weight(1f).padding(end = 8.dp),
+                    modifier = Modifier.weight(1f).padding(end = 8.dp).animateContentSize(),
                 )
 
                 CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
@@ -824,7 +890,7 @@ private fun ContentScope.CompactCardForeground(
         modifier =
             modifier
                 .clickable(onClick = { viewModel.onClick(expandable) })
-                .clearAndSetSemantics { contentDescription = viewModel.contentDescription }
+                .semantics { contentDescription = viewModel.contentDescription }
                 .background(MaterialTheme.colorScheme.surfaceContainer)
                 .padding(16.dp),
     ) {
@@ -938,7 +1004,11 @@ private fun ContentScope.Navigation(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = modifier,
             ) {
-                if (!isLeftActionVisible || viewModel.left is MediaSecondaryActionViewModel.None) {
+                if (viewModel.isScrubbing) {
+                    TimestampText(viewModel.progressText)
+                } else if (
+                    !isLeftActionVisible || viewModel.left is MediaSecondaryActionViewModel.None
+                ) {
                     Spacer(Modifier.size(width = 16.dp, height = 48.dp))
                 } else {
                     SecondaryAction(
@@ -966,15 +1036,35 @@ private fun ContentScope.Navigation(
                             }
                         }
                         val isEnabled = viewModel.onScrubChange != null
+                        val velocityTracker = remember { VelocityTracker() }
+                        val context = LocalContext.current
+                        val flingVelocity =
+                            remember(context) {
+                                ViewConfiguration.get(context).scaledMinimumFlingVelocity * 10
+                            }
+                        var isDrag by remember { mutableStateOf(false) }
+                        var isDragStartedOnThumb by remember { mutableStateOf(false) }
+                        val currentProgress by rememberUpdatedState(viewModel.progress)
                         Slider(
                             interactionSource = interactionSource,
                             value = viewModel.progress,
                             enabled = isEnabled,
                             onValueChange = { progress ->
-                                viewModel.onScrubChange?.invoke(progress)
+                                if (!isDrag || isDragStartedOnThumb) {
+                                    viewModel.onScrubChange?.invoke(progress)
+                                }
                             },
                             onValueChangeFinished = {
-                                viewModel.onScrubFinished?.invoke(sliderDragDelta.value)
+                                val velocity = velocityTracker.calculateVelocity().x
+                                if (!isDrag || isDragStartedOnThumb) {
+                                    viewModel.onScrubFinished?.invoke(
+                                        sliderDragDelta.value,
+                                        abs(velocity) < abs(flingVelocity),
+                                    )
+                                }
+
+                                isDragStartedOnThumb = false
+                                isDrag = false
                             },
                             colors = colors,
                             thumb = {
@@ -996,26 +1086,31 @@ private fun ContentScope.Navigation(
                             },
                             modifier =
                                 Modifier.fillMaxWidth()
-                                    .clearAndSetSemantics {
-                                        contentDescription = viewModel.contentDescription
-                                    }
+                                    .semantics { stateDescription = viewModel.contentDescription }
                                     .pointerInput(Unit) {
                                         // Track and report the drag delta to the view-model so it
-                                        // can
-                                        // decide whether to accept the next onValueChangeFinished
-                                        // or
-                                        // reject it if the drag was overly vertical.
+                                        // can decide whether to accept the next
+                                        // onValueChangeFinished or reject it if the drag was overly
+                                        // vertical.
                                         awaitPointerEventScope {
                                             var down: PointerInputChange? = null
                                             while (true) {
                                                 val event =
                                                     awaitPointerEvent(PointerEventPass.Initial)
+
+                                                event.changes.forEach { change ->
+                                                    // Feed the velocity tracker to detect flings
+                                                    velocityTracker.addPosition(
+                                                        change.uptimeMillis,
+                                                        change.position,
+                                                    )
+                                                }
                                                 when (event.type) {
                                                     PointerEventType.Press -> {
-                                                        // A new gesture has begun. Record the
-                                                        // initial
-                                                        // down input change.
+                                                        // A new gesture has begun.
+                                                        // Record the initial down input change.
                                                         down = event.changes.last()
+                                                        isDrag = false
                                                     }
 
                                                     PointerEventType.Move -> {
@@ -1023,9 +1118,22 @@ private fun ContentScope.Navigation(
                                                         // pointer as the latest down, calculate and
                                                         // report the drag delta.
                                                         val change = event.changes.last()
+
                                                         if (change.id == down?.id) {
-                                                            sliderDragDelta.value =
-                                                                change.position - down.position
+                                                            if (!isDrag) {
+                                                                val thumbX =
+                                                                    size.width * currentProgress
+                                                                // Add some forgiveness to hit
+                                                                // target by 20dp radius
+                                                                isDragStartedOnThumb =
+                                                                    abs(down.position.x - thumbX) <
+                                                                        20.dp.toPx()
+                                                            }
+                                                            isDrag = true
+                                                            if (isDragStartedOnThumb) {
+                                                                sliderDragDelta.value =
+                                                                    change.position - down.position
+                                                            }
                                                         }
                                                     }
                                                 }
@@ -1036,7 +1144,9 @@ private fun ContentScope.Navigation(
                     }
                 }
 
-                if (
+                if (viewModel.isScrubbing) {
+                    TimestampText(viewModel.durationText)
+                } else if (
                     !isRightActionVisible || viewModel.right is MediaSecondaryActionViewModel.None
                 ) {
                     Spacer(Modifier.size(width = 16.dp, height = 48.dp))
@@ -1277,6 +1387,7 @@ private fun CardGuts(
                 color = Color.White,
                 style = MaterialTheme.typography.labelMedium,
                 fontSize = 14.sp,
+                textAlign = TextAlign.Center,
             )
 
             Row(
@@ -1417,6 +1528,7 @@ private fun DeviceChip(
                             )
                         }
                         .indication(clickInteractionSource, ripple())
+                        .animateContentSize()
                         .padding(horizontal = 8.dp, vertical = 4.dp),
             ) {
                 if (viewModel.isConnecting) {
@@ -1595,6 +1707,19 @@ private fun SecondaryActionContent(
     }
 }
 
+@Composable
+private fun TimestampText(text: String) {
+    Text(
+        text = text,
+        modifier = Modifier.widthIn(min = 48.dp).padding(4.dp),
+        color = Color.White,
+        style = MaterialTheme.typography.labelMedium,
+        fontSize = 12.sp,
+        textAlign = TextAlign.Center,
+        maxLines = 1,
+    )
+}
+
 /**
  * Renders the revealed content on the sides of the horizontal pager.
  *
@@ -1755,6 +1880,15 @@ object Media {
         from(Scenes.Default, to = Scenes.Compact) {}
         from(Scenes.Default, to = Scenes.Large) {}
         from(Scenes.Default, to = Scenes.Compressed) { fade(Elements.SeekBarSlider) }
+        from(Scenes.Compressed, to = Scenes.Default) {
+            fractionRange(start = 0.35f) {
+                fade(Elements.SeekBarSlider)
+                fade(Elements.PrevButton)
+                for (i in 0..5) {
+                    fade(Elements.additionalActionButton(i))
+                }
+            }
+        }
         from(Scenes.Compact, to = Scenes.Compressed) { fade(Elements.SeekBarSlider) }
         from(Scenes.Thumbnail, to = Scenes.Default) { fadeAll() }
         from(Scenes.Thumbnail, to = Scenes.Compact) { fadeAll() }
@@ -1804,6 +1938,9 @@ object Media {
 
     const val TAG = "Media"
     val DEBUG = Log.isLoggable(TAG, Log.DEBUG)
+    val DEFAULT_HEIGHT = 176.dp
+    val COMPRESSED_HEIGHT = 128.dp
+    val COMPACT_HEIGHT = 80.dp
 }
 
 private fun MediaPresentationStyle.toScene(): SceneKey {

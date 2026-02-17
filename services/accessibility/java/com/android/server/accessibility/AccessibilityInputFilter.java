@@ -43,8 +43,6 @@ import android.view.InputEvent;
 import android.view.InputFilter;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
-import android.view.MotionEvent.PointerCoords;
-import android.view.MotionEvent.PointerProperties;
 import android.view.accessibility.AccessibilityEvent;
 
 import com.android.internal.annotations.VisibleForTesting;
@@ -261,39 +259,18 @@ public class AccessibilityInputFilter extends InputFilter implements EventStream
             action = MotionEvent.ACTION_CANCEL;
         }
 
-        final int pointerCount;
+        AccessibilityMotionEventBuilder builder = AccessibilityMotionEventBuilder.fromBaseEvent(
+                        event)
+                .setAction(action);
+
         if (event.getActionMasked() == MotionEvent.ACTION_POINTER_UP) {
-            pointerCount = event.getPointerCount() - 1;
-        } else {
-            pointerCount = event.getPointerCount();
-        }
-        final PointerProperties[] properties = new PointerProperties[pointerCount];
-        final PointerCoords[] coords = new PointerCoords[pointerCount];
-        int newPointerIndex = 0;
-        for (int i = 0; i < event.getPointerCount(); i++) {
-            if (event.getActionMasked() == MotionEvent.ACTION_POINTER_UP) {
-                if (event.getActionIndex() == i) {
-                    // Skip the pointer that's going away
-                    continue;
-                }
-            }
-            final PointerCoords c = new PointerCoords();
-            c.x = event.getX(i);
-            c.y = event.getY(i);
-            coords[newPointerIndex] = c;
-            final PointerProperties p = new PointerProperties();
-            p.id = event.getPointerId(i);
-            p.toolType = event.getToolType(i);
-            properties[newPointerIndex] = p;
-            newPointerIndex++;
+            // When cancelling a POINTER_UP event, the pointer that went up is excluded from the
+            // resulting CANCEL event. This is because the cancellation applies to the gesture
+            // that would have continued with the remaining pointers.
+            builder.excludePointer(event.getActionIndex());
         }
 
-        return MotionEvent.obtain(event.getDownTime(), SystemClock.uptimeMillis(), action,
-                pointerCount, properties, coords,
-                event.getMetaState(), event.getButtonState(),
-                event.getXPrecision(), event.getYPrecision(), event.getDeviceId(),
-                event.getEdgeFlags(), event.getSource(), event.getDisplayId(), event.getFlags(),
-                event.getClassification());
+        return builder.build();
     }
 
     AccessibilityInputFilter(Context context, AccessibilityManagerService service) {
@@ -1164,37 +1141,35 @@ public class AccessibilityInputFilter extends InputFilter implements EventStream
         }
     }
 
-    private void sendTouchCancelEvent(int displayId) {
-        if (!mInstalled) {
-            Slog.w(TAG, "sendTouchCancelEvent: Filter not installed, skipping cancel event.");
+    private void sendTouchCancelEventIfNeeded(int displayId, EventStreamState state) {
+        if (!(state instanceof TouchScreenEventStreamState tsState)
+                || !tsState.mTouchSequenceStarted
+                || !Flags.sendA11yActionCancelOnReset()) {
             return;
         }
-        MotionEvent cancelEvent;
+        if (!mInstalled) {
+            Slog.w(TAG,
+                    "sendTouchCancelEventIfNeeded: Filter not installed, skipping cancel event.");
+            return;
+        }
         if (mLastActiveDeviceMotionEvent != null
                 && mLastActiveDeviceMotionEvent.getDisplayId() == displayId
                 && mLastActiveDeviceMotionEvent.isFromSource(
-                InputDevice.SOURCE_TOUCHSCREEN)) {
-            cancelEvent = cancelMotion(mLastActiveDeviceMotionEvent);
-        } else {
-            long now = SystemClock.uptimeMillis();
-            cancelEvent = MotionEvent.obtain(now, now,
-                    MotionEvent.ACTION_CANCEL, 0.0f, 0.0f, 0);
-            cancelEvent.setSource(InputDevice.SOURCE_TOUCHSCREEN);
-            cancelEvent.setDisplayId(displayId);
+                        InputDevice.SOURCE_TOUCHSCREEN)) {
+            final MotionEvent cancelEvent = cancelMotion(mLastActiveDeviceMotionEvent);
+            super.onInputEvent(cancelEvent, WindowManagerPolicy.FLAG_PASS_TO_USER);
+            cancelEvent.recycle();
+            if (Flags.sendA11yActionCancelOnReset()) {
+                mLastActiveDeviceMotionEvent.recycle();
+                mLastActiveDeviceMotionEvent = null;
+            }
         }
-        super.onInputEvent(cancelEvent, WindowManagerPolicy.FLAG_PASS_TO_USER);
-        cancelEvent.recycle();
     }
-
     void resetStreamStateForDisplay(int displayId) {
         final EventStreamState touchScreenStreamState = mTouchScreenStreamStates.get(displayId);
         if (touchScreenStreamState != null) {
             // Send Cancel if needed to prevent inconsistency
-            if (Flags.sendA11yActionCancelOnReset()
-                    && touchScreenStreamState instanceof TouchScreenEventStreamState tsState
-                    && tsState.mTouchSequenceStarted) {
-                sendTouchCancelEvent(displayId);
-            }
+            sendTouchCancelEventIfNeeded(displayId, touchScreenStreamState);
             touchScreenStreamState.reset();
             mTouchScreenStreamStates.remove(displayId);
         }
@@ -1379,23 +1354,70 @@ public class AccessibilityInputFilter extends InputFilter implements EventStream
         @Override
         final public void reset() {
             super.reset();
+            resetSequenceState();
+        }
+
+        private void resetSequenceState() {
             mTouchSequenceStarted = false;
             mHoverSequenceStarted = false;
         }
 
+        /**
+         * Determines if a motion event should be processed by accessibility transformations.
+         *
+         * <p>This method manages two independent states: one for touch gestures and one for hover
+         * gestures. A touch gesture is processed from ACTION_DOWN until ACTION_UP/ACTION_CANCEL.
+         * A hover gesture is processed from ACTION_HOVER_ENTER until it's superseded by a touch
+         * gesture or another event stream reset.
+         */
         @Override
         final public boolean shouldProcessMotionEvent(MotionEvent event) {
-            // Wait for a down touch event to start processing.
-            if (event.isTouchEvent()) {
-                if (mTouchSequenceStarted) {
-                    return true;
+            if (Flags.sendA11yActionCancelOnReset()) {
+                // Allow the cancel event to pass if it is cancelling a sequence.
+                if (event.getActionMasked() == MotionEvent.ACTION_CANCEL) {
+                    if (mTouchSequenceStarted || mHoverSequenceStarted) {
+                        resetSequenceState();
+                        return true;
+                    }
+                    return false;
                 }
-                mTouchSequenceStarted = event.getActionMasked() == MotionEvent.ACTION_DOWN;
-                return mTouchSequenceStarted;
             }
 
+            if (event.isTouchEvent()) {
+                return shouldProcessTouchEvent(event);
+            }
+
+            if (event.isHoverEvent()) {
+                return shouldProcessHoverEvent(event);
+            }
+
+            return false;
+        }
+
+        private boolean shouldProcessTouchEvent(MotionEvent event) {
+            // Wait for a down touch event to start processing.
+            if (mTouchSequenceStarted) {
+                final int action = event.getActionMasked();
+                if (Flags.sendA11yActionCancelOnReset()
+                        && action == MotionEvent.ACTION_UP) {
+                    resetSequenceState();
+                }
+                return true;
+            }
+
+            mTouchSequenceStarted = event.getActionMasked() == MotionEvent.ACTION_DOWN;
+            return mTouchSequenceStarted;
+        }
+
+        private boolean shouldProcessHoverEvent(MotionEvent event) {
             // Wait for an enter hover event to start processing.
             if (mHoverSequenceStarted) {
+                final int action = event.getActionMasked();
+                // Reset on gesture completion only if the flag is enabled.
+                if (Flags.sendA11yActionCancelOnReset()
+                        && action == MotionEvent.ACTION_HOVER_EXIT) {
+                    resetSequenceState();
+                }
                 return true;
             }
             mHoverSequenceStarted = event.getActionMasked() == MotionEvent.ACTION_HOVER_ENTER;

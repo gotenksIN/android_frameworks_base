@@ -304,6 +304,10 @@ public class SplitScreenController implements SplitDragPolicy.Starter,
         return mImpl;
     }
 
+    public boolean isSplitScreenReady() {
+        return mStageCoordinator != null;
+    }
+
     private ExternalInterfaceBinder createExternalInterface() {
         return new ISplitScreenImpl(this);
     }
@@ -498,6 +502,7 @@ public class SplitScreenController implements SplitDragPolicy.Starter,
         mStageCoordinator.prepareExitSplitScreen(stageToTop, wct, reason);
         mStageCoordinator.setDividerVisibility(false, null);
         mStageCoordinator.clearSplitPairedInRecents(reason);
+        mStageCoordinator.onExitingSplit();
     }
 
     /**

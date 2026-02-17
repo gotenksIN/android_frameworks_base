@@ -802,6 +802,13 @@ static void nativeSetDesiredHdrHeadroom(JNIEnv* env, jclass clazz, jlong transac
     transaction->setDesiredHdrHeadroom(ctrl, desiredRatio);
 }
 
+static void nativeSetDesiredMaxHdrHeadroom(JNIEnv* env, jclass clazz, jlong transactionObj,
+                                           jlong nativeObject, float maxDesiredHdrSdrRatio) {
+    auto transaction = reinterpret_cast<SurfaceComposerClient::Transaction*>(transactionObj);
+    auto ctrl = SpFromRawPtr<SurfaceControl>(nativeObject);
+    transaction->setDesiredMaxHdrHeadroom(ctrl, maxDesiredHdrSdrRatio);
+}
+
 static void nativeSetLuts(JNIEnv* env, jclass clazz, jlong transactionObj, jlong nativeObject,
                           jfloatArray jbufferArray, jintArray joffsetArray,
                           jintArray jdimensionArray, jintArray jsizeArray,
@@ -1246,6 +1253,14 @@ static void nativeSetShadowRadius(JNIEnv* env, jclass clazz, jlong transactionOb
 
     const auto ctrl = SpFromRawPtr<SurfaceControl>(nativeObject);
     transaction->setShadowRadius(ctrl, shadowRadius);
+}
+
+static void nativeToggleRoundedCornerOpt(JNIEnv* env, jclass clazz, jlong transactionObj,
+                                         jlong nativeObject, jboolean enable) {
+    auto transaction = reinterpret_cast<SurfaceComposerClient::Transaction*>(transactionObj);
+
+    const auto ctrl = SpFromRawPtr<SurfaceControl>(nativeObject);
+    transaction->setRoundedCornerOpt(ctrl, enable);
 }
 
 static void nativeSetBoxShadowSettings(JNIEnv* env, jclass clazz, jlong transactionObj,
@@ -2448,7 +2463,7 @@ public:
 
         constexpr int kNoneReportedJankMask = JankType::None | JankType::BufferStuffing |
                 JankType::SurfaceFlingerStuffing | JankType::Dropped | JankType::NonAnimating |
-                JankType::DisplayNotOn;
+                JankType::DisplayNotOn | JankType::DisplayModeChangeInProgress;
 
         constexpr int kAllHandledJankMask =
                 kComposerJankMask | kApplicationJankMask | kNoneReportedJankMask;
@@ -2809,6 +2824,8 @@ static const JNINativeMethod sSurfaceControlMethods[] = {
             (void*) nativeSetEdgeExtensionEffect },
     {"nativeSetShadowRadius", "(JJF)V",
             (void*)nativeSetShadowRadius },
+    {"nativeToggleRoundedCornerOpt", "(JJZ)V",
+            (void*)nativeToggleRoundedCornerOpt},
     {"nativeSetBoxShadowSettings", "(JJLandroid/os/Parcel;)V",
             (void*)nativeSetBoxShadowSettings },
     {"nativeSetBorderSettings", "(JJLandroid/os/Parcel;)V",
@@ -2901,6 +2918,8 @@ static const JNINativeMethod sSurfaceControlMethods[] = {
             (void*)nativeSetExtendedRangeBrightness },
     {"nativeSetDesiredHdrHeadroom", "(JJF)V",
             (void*)nativeSetDesiredHdrHeadroom },
+    {"nativeSetDesiredMaxHdrHeadroom", "(JJF)V",
+            (void*)nativeSetDesiredMaxHdrHeadroom },
     {"nativeSetCachingHint", "(JJI)V",
             (void*)nativeSetCachingHint },
     {"nativeAddTransactionBarrier", "(JLandroid/os/Parcel;)V",

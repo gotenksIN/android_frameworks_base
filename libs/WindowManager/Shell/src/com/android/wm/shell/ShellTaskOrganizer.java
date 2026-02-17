@@ -43,6 +43,7 @@ import android.content.pm.ActivityInfo;
 import android.graphics.Rect;
 import android.os.Debug;
 import android.os.IBinder;
+import android.os.RemoteException;
 import android.util.ArrayMap;
 import android.util.Log;
 import android.util.SparseArray;
@@ -55,7 +56,6 @@ import android.window.TaskCreationParams;
 import android.window.TaskOrganizer;
 import android.window.TransitionInfo;
 import android.window.TransitionRequestInfo;
-import android.window.WindowContainerToken;
 import android.window.WindowContainerTransaction;
 import android.window.WindowContainerTransactionCallback;
 
@@ -71,6 +71,7 @@ import com.android.wm.shell.compatui.api.CompatUITypeUtils;
 import com.android.wm.shell.compatui.impl.CompatUIEvents.SizeCompatRestartButtonAppeared;
 import com.android.wm.shell.compatui.impl.CompatUIEvents.SizeCompatRestartButtonClicked;
 import com.android.wm.shell.recents.RecentTasksController;
+import com.android.wm.shell.shared.IOverviewOverlayLeashInvalidationCallback;
 import com.android.wm.shell.shared.bubbles.BubbleAnythingFlagHelper;
 import com.android.wm.shell.startingsurface.StartingWindowController;
 import com.android.wm.shell.sysui.ShellCommandHandler;
@@ -121,14 +122,14 @@ public class ShellTaskOrganizer extends TaskOrganizer {
          * organized, there will be no callback.
          *
          * @param taskInfo The RunningTaskInfo for the Task which received back event.
-         * @param isFromMoveActivityTaskToBack {@code true} if this is from an app calling
-         *                                     Activity#moveTaskToBack(), {@code false} if this is
-         *                                     from back button press.
+         * @param isFromBackPress {@code true} if this is from back button press,
+         *                                     {@code false} if this is from an app calling
+         *                                     Activity#moveTaskToBack().
          * @param isOptInOnBackInvoked {@code true} if the app opts in enableOnBackInvokedCallback.
          * @param hasOpaqueSibling Whether the task has an opaque sibling
          */
-        default void onBackPressedOnTaskRoot(RunningTaskInfo taskInfo,
-                boolean isFromMoveActivityTaskToBack, boolean isOptInOnBackInvoked,
+        default void onBackOnTaskRoot(RunningTaskInfo taskInfo,
+                boolean isFromBackPress, boolean isOptInOnBackInvoked,
                 boolean hasOpaqueSibling) {}
         /** Whether this task listener supports compat UI. */
         default boolean supportCompatUI() {
@@ -300,6 +301,9 @@ public class ShellTaskOrganizer extends TaskOrganizer {
      */
     private final SparseArray<SurfaceControl> mOverviewOverlayLeashes = new SparseArray<>();
 
+    private final SparseArray<IOverviewOverlayLeashInvalidationCallback>
+            mLeashInvalidationCallbacks = new SparseArray<>();
+
     /**
      * In charge of showing compat UI. Can be {@code null} if the device doesn't support sizef
      * compat or if this isn't the main {@link ShellTaskOrganizer}.
@@ -313,7 +317,7 @@ public class ShellTaskOrganizer extends TaskOrganizer {
     @NonNull
     private final ShellCommandHandler mShellCommandHandler;
 
-    @NonNull
+    @Nullable
     private final RootTaskDisplayAreaOrganizer mRootTaskDisplayAreaOrganizer;
 
     @Nullable
@@ -337,7 +341,7 @@ public class ShellTaskOrganizer extends TaskOrganizer {
 
     public ShellTaskOrganizer(ShellInit shellInit,
             ShellCommandHandler shellCommandHandler,
-            RootTaskDisplayAreaOrganizer rootTaskDisplayAreaOrganizer,
+            @Nullable RootTaskDisplayAreaOrganizer rootTaskDisplayAreaOrganizer,
             @Nullable CompatUIHandler compatUI,
             Optional<UnfoldAnimationController> unfoldAnimationController,
             Optional<RecentTasksController> recentTasks,
@@ -350,7 +354,7 @@ public class ShellTaskOrganizer extends TaskOrganizer {
     @VisibleForTesting
     protected ShellTaskOrganizer(ShellInit shellInit,
             ShellCommandHandler shellCommandHandler,
-            RootTaskDisplayAreaOrganizer rootDisplayAreaOrganizer,
+            @Nullable RootTaskDisplayAreaOrganizer rootDisplayAreaOrganizer,
             ITaskOrganizerController taskOrganizerController,
             @Nullable CompatUIHandler compatUI,
             Optional<UnfoldAnimationController> unfoldAnimationController,
@@ -445,11 +449,11 @@ public class ShellTaskOrganizer extends TaskOrganizer {
      * Creates a persistent task with the given {@link TaskCreationParams}.
      * @param params The creation params
      * @param listener The listener to get the created task callback.
-     * @return the WindowContainerToken of the newly created Task. This can be {@code null} if the
+     * @return the TaskAppearedInfo of the newly created Task. This can be {@code null} if the
      * Task creation fails in the system server (e.g., due to invalid displayId).
      */
     @Nullable
-    public WindowContainerToken createTask(@NonNull TaskCreationParams params,
+    public TaskAppearedInfo createTask(@NonNull TaskCreationParams params,
             TaskListener listener) {
         ProtoLog.v(WM_SHELL_TASK_ORG, "createTask() displayId=%d winMode=%d listener=%s" ,
                 params.getDisplayId(), params.getWindowingMode(), listener.toString());
@@ -710,10 +714,73 @@ public class ShellTaskOrganizer extends TaskOrganizer {
     }
 
     /**
+     * Registers a callback for when the overview overlay leash for the given {@code displayId} is
+     * invalidated.
+     */
+    public void registerOverviewOverlayLeashInvalidationCallback(
+            int displayId, IOverviewOverlayLeashInvalidationCallback callback) {
+        if (!isOverviewOverlayEnabled(displayId)) {
+            ProtoLog.v(WM_SHELL_TASK_ORG,
+                    "registerOverviewOverlayLeashInvalidationCallback: "
+                            + "overview overlay is not enabled on displayId=%d",
+                    displayId);
+            return;
+        }
+        ProtoLog.v(WM_SHELL_TASK_ORG,
+                "Registering overview overlay leash invalidation callback: "
+                        + "displayId=%d, callback=%s",
+                displayId,
+                callback);
+        mLeashInvalidationCallbacks.put(displayId, callback);
+    }
+
+    /**
+     * Requests to unregister the given {@code callback} for the given {@code displayId}.
+     * <p>
+     * No-op if the given {@code callback} is not currently registered for the given
+     * {@code displayId}.
+     */
+    public void unregisterOverviewOverlayLeashInvalidationCallback(
+            int displayId, IOverviewOverlayLeashInvalidationCallback callback) {
+        if (!isOverviewOverlayEnabled(displayId)) {
+            ProtoLog.v(WM_SHELL_TASK_ORG,
+                    "unregisterOverviewOverlayLeashInvalidationCallback: "
+                            + "overview overlay is not enabled on displayId=%d",
+                    displayId);
+            return;
+        }
+        IOverviewOverlayLeashInvalidationCallback registeredCallback =
+                mLeashInvalidationCallbacks.get(displayId);
+        if (registeredCallback == null
+                || callback == null
+                || registeredCallback.asBinder() != callback.asBinder()) {
+            // Handle variable ordering of Launcher restarts and calls into the shell
+            ProtoLog.v(WM_SHELL_TASK_ORG,
+                    "unregisterOverviewOverlayLeashInvalidationCallback: "
+                            + "requested callback cannot be unregistered "
+                            + "(displayId=%d, requested=%s, registered=%s)",
+                    displayId,
+                    callback,
+                    registeredCallback);
+            return;
+        }
+        ProtoLog.v(WM_SHELL_TASK_ORG,
+                "Unregistering overview overlay leash invalidation callback: "
+                        + "displayId=%d, callback=%s",
+                displayId,
+                callback);
+        mLeashInvalidationCallbacks.remove(displayId);
+    }
+
+    /**
      * Returns or creates a surface which can be used to attach overlays to the home root task
      */
+    @Nullable
     private SurfaceControl getOrCreateOverviewOverlayContainer(int displayId) {
         if (!isOverviewOverlayEnabled(displayId)) {
+            return null;
+        }
+        if (mRootTaskDisplayAreaOrganizer == null) {
             return null;
         }
         if (!mOverviewOverlayLeashes.contains(displayId)) {
@@ -813,12 +880,17 @@ public class ShellTaskOrganizer extends TaskOrganizer {
         int displayId = info.getTaskInfo().displayId;
         if (isOverviewOverlayEnabled(displayId)
                 && info.getTaskInfo().getActivityType() == ACTIVITY_TYPE_HOME) {
-            ProtoLog.v(WM_SHELL_TASK_ORG,
-                    "Adding overview overlay to home task on displayId=%d", displayId);
             SurfaceControl overviewOverlay = getOrCreateOverviewOverlayContainer(displayId);
-            final SurfaceControl.Transaction t = new SurfaceControl.Transaction();
-            t.setRelativeLayer(overviewOverlay, info.getLeash(), 1);
-            t.apply();
+            if (overviewOverlay == null) {
+                ProtoLog.v(WM_SHELL_TASK_ORG,
+                        "Couldn't create overview overlay for displayId=%d", displayId);
+            } else {
+                ProtoLog.v(WM_SHELL_TASK_ORG,
+                        "Adding overview overlay to home task on displayId=%d", displayId);
+                final SurfaceControl.Transaction t = new SurfaceControl.Transaction();
+                t.setRelativeLayer(overviewOverlay, info.getLeash(), 1);
+                t.apply();
+            }
         }
 
         if (isHomeTaskOnDefaultDisplay(info.getTaskInfo())) {
@@ -900,17 +972,17 @@ public class ShellTaskOrganizer extends TaskOrganizer {
     }
 
     @Override
-    public void onBackPressedOnTaskRoot(RunningTaskInfo taskInfo,
-            boolean isFromMoveActivityTaskToBack, boolean isOptInOnBackInvoked,
+    public void onBackOnTaskRoot(RunningTaskInfo taskInfo,
+            boolean isFromBackPress, boolean isOptInOnBackInvoked,
             boolean hasOpaqueSibling) {
         synchronized (mLock) {
             ProtoLog.v(WM_SHELL_TASK_ORG, "Task root back pressed taskId=%d "
-                    + "isFromMoveActivityTaskToBack=%b isOptInOnBackInvoked=%b hasOpaqueSibling=%b",
-                    taskInfo.taskId, isFromMoveActivityTaskToBack, isOptInOnBackInvoked,
+                    + "isFromBackPress=%b isOptInOnBackInvoked=%b hasOpaqueSibling=%b",
+                    taskInfo.taskId, isFromBackPress, isOptInOnBackInvoked,
                     hasOpaqueSibling);
             final TaskListener listener = getTaskListener(taskInfo);
             if (listener != null) {
-                listener.onBackPressedOnTaskRoot(taskInfo, isFromMoveActivityTaskToBack,
+                listener.onBackOnTaskRoot(taskInfo, isFromBackPress,
                         isOptInOnBackInvoked, hasOpaqueSibling);
             }
         }
@@ -949,6 +1021,22 @@ public class ShellTaskOrganizer extends TaskOrganizer {
                 SurfaceControl.Transaction t = new SurfaceControl.Transaction();
                 t.remove(surfaceControl);
                 t.apply();
+                IOverviewOverlayLeashInvalidationCallback invalidationCallback =
+                        mLeashInvalidationCallbacks.get(displayId);
+                if (invalidationCallback != null) {
+                    try {
+                        ProtoLog.v(WM_SHELL_TASK_ORG,
+                                "Running overview overlay leash invalidation callback on "
+                                        + "displayId=%d",
+                                displayId);
+                        invalidationCallback.onOverviewOverlayLeashInvalidated();
+                    } catch (RemoteException e) {
+                        ProtoLog.v(WM_SHELL_TASK_ORG,
+                                "Could not run overview overlay leash invalidation callback on "
+                                        + "displayId=%d",
+                                displayId);
+                    }
+                }
             }
 
             if (isHomeTaskOnDefaultDisplay(taskInfo)) {

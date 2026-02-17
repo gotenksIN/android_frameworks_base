@@ -19,6 +19,9 @@ package com.android.server.devicepolicy.handlers;
 import static android.app.admin.DevicePolicyManager.POLICY_SCOPE_DEVICE;
 import static android.app.admin.DevicePolicyManager.POLICY_SCOPE_PARENT_USER;
 import static android.app.admin.DevicePolicyManager.POLICY_SCOPE_USER;
+import static android.app.role.RoleManager.ROLE_SYSTEM_FINANCED_DEVICE_CONTROLLER;
+import static android.app.role.RoleManager.ROLE_SYSTEM_SUPERVISION;
+import static com.android.server.devicepolicy.PolicyDefinition.POLICY_FLAG_GLOBAL_ONLY_POLICY;
 import static android.app.admin.DevicePolicyManager.RESOURCE_DEVICE_WIDE;
 import static android.app.admin.DevicePolicyManager.RESOURCE_PER_USER;
 
@@ -29,18 +32,25 @@ import android.annotation.UserIdInt;
 import android.app.admin.BooleanPolicyValue;
 import android.app.admin.DevicePolicyManager.DpcType;
 import android.app.admin.DevicePolicyManager.PolicyScope;
+import android.app.admin.NoArgsPolicyKey;
 import android.app.admin.PolicyIdentifier;
 import android.app.admin.PolicyValue;
 import android.app.admin.PolicyValueTransport;
 import android.app.admin.metadata.GeneratedPolicyMetadata;
 import android.app.admin.metadata.PolicyMetadata;
 import android.app.admin.metadata.PolicyTransportValueConvertor;
+import android.app.admin.DevicePolicyIdentifiers;
 
 import com.android.server.devicepolicy.CallerIdentity;
 import com.android.server.devicepolicy.DevicePolicyManagerService;
+import com.android.server.devicepolicy.EnforcingAdmin;
 import com.android.server.devicepolicy.IPermissionChecker;
+import com.android.server.devicepolicy.MostRecent;
 import com.android.server.devicepolicy.PolicyDefinition;
+import com.android.server.devicepolicy.PolicyEnforcerCallbacks;
+import com.android.server.devicepolicy.TopPriority;
 
+import com.android.server.utils.Slogf;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -108,7 +118,7 @@ public class PolicyHandler<T> {
 
     static {
         HANDLERS.add(
-                new PolicyHandler<Integer>(PolicyIdentifier.SCREEN_CAPTURE, null) {
+                new PolicyHandler<Integer>(PolicyIdentifier.SCREEN_CAPTURE) {
                     @Override
                     protected void storePolicyValue(
                             CallerIdentity caller, int scope, Integer value) {
@@ -127,7 +137,7 @@ public class PolicyHandler<T> {
 
                     @Override
                     protected Integer getPolicyValue(CallerIdentity caller, int scope) {
-                        Boolean isDisabled =
+                        var isDisabled =
                                 getPolicySetByAdmin(
                                         caller, PolicyDefinition.SCREEN_CAPTURE_DISABLED, scope);
 
@@ -139,10 +149,10 @@ public class PolicyHandler<T> {
 
                     @Override
                     protected Integer getResolvedPerUserPolicyValue(int userId) {
-                        var isDisabled = getDelegate().getResolvedPerUserPolicy(
-                                userId,
-                                PolicyDefinition.SCREEN_CAPTURE_DISABLED
-                        );
+                        var isDisabled =
+                                getDelegate()
+                                        .getResolvedPerUserPolicy(
+                                                userId, PolicyDefinition.SCREEN_CAPTURE_DISABLED);
 
                         return booleanToEnum(
                                 /* trueValue= */ PolicyIdentifier.SCREEN_CAPTURE_DISALLOWED,
@@ -150,6 +160,8 @@ public class PolicyHandler<T> {
                                 isDisabled);
                     }
                 });
+        HANDLERS.add(new PolicyHandler<Integer>(PolicyIdentifier.AUTO_TIME));
+        HANDLERS.add(new PolicyHandler<String>(PolicyIdentifier.LOCKSCREEN_MESSAGE));
     }
 
     static Integer booleanToEnum(int trueValue, int falseValue, Boolean value) {
@@ -164,12 +176,10 @@ public class PolicyHandler<T> {
 
     private final PolicyIdentifier<T> mKey;
     private final PolicyMetadata<T> mPolicyMetadata;
+    private final PolicyDefinition<T> mPolicyDefinition;
     private final PolicyValidator<T> mValidator;
     private final PolicyValueConvertor<T> mValueConvertor;
     private final PolicyTransportValueConvertor<T> mTransportValueConvertor;
-
-    // TODO(444641755): obtain policy definition through PolicyMetadata.
-    private final PolicyDefinition<T> mPolicyDefinition;
 
     /**
      * Helper class that provides access to methods used while processing policies. Must be
@@ -177,7 +187,17 @@ public class PolicyHandler<T> {
      */
     private Delegate mDelegate = null;
 
-    public PolicyHandler(
+    /** Constructor that uses the generated {@link PolicyMetadata} and {@link PolicyDefinition}. */
+    public PolicyHandler(@NonNull PolicyIdentifier<T> key) {
+        this(key, GeneratedPolicyMetadata.getPolicyMetadata(key));
+    }
+
+    /** Constructor that uses the generated {@link PolicyDefinition}. */
+    private PolicyHandler(@NonNull PolicyIdentifier<T> key, @NonNull PolicyMetadata<T> metadata) {
+        this(key, metadata, PolicyDefinitionFactory.build(key, metadata));
+    }
+
+    private PolicyHandler(
             @NonNull PolicyIdentifier<T> key,
             @NonNull PolicyMetadata<T> policyMetadata,
             @Nullable PolicyDefinition<T> policyDefinition) {
@@ -187,12 +207,6 @@ public class PolicyHandler<T> {
         mValidator = PolicyValidator.getInstance(mPolicyMetadata);
         mTransportValueConvertor = PolicyTransportValueConvertor.getInstance(mPolicyMetadata);
         mValueConvertor = PolicyValueConvertor.getInstance(mPolicyMetadata);
-    }
-
-    /** Constructor that uses the generated {@link PolicyMetadata} */
-    public PolicyHandler(
-            @NonNull PolicyIdentifier<T> key, @Nullable PolicyDefinition<T> policyDefinition) {
-        this(key, GeneratedPolicyMetadata.getPolicyMetadata(key), policyDefinition);
     }
 
     /** Convenience constructor used by unittests */
@@ -207,6 +221,10 @@ public class PolicyHandler<T> {
 
     public PolicyIdentifier<T> getKey() {
         return mKey;
+    }
+
+    public final boolean hasPolicyDefinition() {
+        return (mPolicyDefinition != null);
     }
 
     @NonNull
@@ -274,16 +292,12 @@ public class PolicyHandler<T> {
         return convertValue(value);
     }
 
-    /**
-     * Read the resolved per-user policy value.
-     */
+    /** Read the resolved per-user policy value. */
     protected T getResolvedPerUserPolicyValue(int userId) {
         return getDelegate().getResolvedPerUserPolicy(userId, getPolicyDefinition());
     }
 
-    /**
-     * Retrieves the effective value of the per-user policy. Does not check permissions.
-     */
+    /** Retrieves the effective value of the per-user policy. Does not check permissions. */
     public PolicyValueTransport getResolvedPerUserPolicyUnchecked(int userId) {
         if (getPolicyMetadata().getAffectedResource() != RESOURCE_PER_USER) {
             throw new IllegalArgumentException(
@@ -295,16 +309,12 @@ public class PolicyHandler<T> {
         return convertValue(getResolvedPerUserPolicyValue(userId));
     }
 
-    /**
-     * Read the resolved device-wide policy value.
-     */
+    /** Read the resolved device-wide policy value. */
     protected T getResolvedDeviceWidePolicyValue() {
         return getDelegate().getResolvedDeviceWidePolicy(getPolicyDefinition());
     }
 
-    /**
-     * Retrieves the effective value of the device-wide policy. Does not check permissions.
-     */
+    /** Retrieves the effective value of the device-wide policy. Does not check permissions. */
     public PolicyValueTransport getResolvedDeviceWidePolicyUnchecked() {
         if (getPolicyMetadata().getAffectedResource() != RESOURCE_DEVICE_WIDE) {
             throw new IllegalArgumentException(
@@ -315,7 +325,6 @@ public class PolicyHandler<T> {
 
         return convertValue(getResolvedDeviceWidePolicyValue());
     }
-
 
     /**
      * Validates if the {@link PolicyScope} can be used for this policy.
@@ -371,8 +380,7 @@ public class PolicyHandler<T> {
     private void checkPermissionInternal(
             CallerIdentity caller,
             boolean checkRequiredPermission,
-            boolean checkRequiredCrossUserPermission
-    ) {
+            boolean checkRequiredCrossUserPermission) {
         var permissionChecker = getPermissionChecker();
         var requiredPermission = getRequiredPermission();
 
@@ -381,7 +389,6 @@ public class PolicyHandler<T> {
                 permissionChecker.enforce(requiredPermission, caller);
             }
         }
-
 
         if (checkRequiredCrossUserPermission) {
             var requiredCrossUserPermission = getPolicyMetadata().getRequiredCrossUserPermission();
@@ -406,8 +413,7 @@ public class PolicyHandler<T> {
         checkPermissionInternal(
                 caller,
                 /* checkRequiredPermission= */ true,
-                /* checkRequiredCrossUserPermission= */ scope != POLICY_SCOPE_USER
-        );
+                /* checkRequiredCrossUserPermission= */ scope != POLICY_SCOPE_USER);
     }
 
     /**
@@ -429,8 +435,7 @@ public class PolicyHandler<T> {
         checkPermissionInternal(
                 caller,
                 /* checkRequiredPermission= */ !hasQueryAdminPolicy,
-                /* checkRequiredCrossUserPermission= */ caller.getUserId() != userId
-        );
+                /* checkRequiredCrossUserPermission= */ caller.getUserId() != userId);
     }
 
     /**
@@ -450,8 +455,7 @@ public class PolicyHandler<T> {
         checkPermissionInternal(
                 caller,
                 /* checkRequiredPermission= */ !hasQueryAdminPolicy,
-                /* checkRequiredCrossUserPermission= */ true
-        );
+                /* checkRequiredCrossUserPermission= */ true);
     }
 
     /**
@@ -521,12 +525,12 @@ public class PolicyHandler<T> {
      * DevicePolicyEngine.
      */
     @NonNull
-    protected final PolicyDefinition<T> getPolicyDefinition() {
+    public final PolicyDefinition<T> getPolicyDefinition() {
         if (mPolicyDefinition == null) {
             throw new IllegalStateException(
                     "getPolicyDefinition() can not be used for policy "
                             + getKey().getId()
-                            + ", since no policy definition was passed into the constructor");
+                            + ", since PolicyDefinitionFactory returned null");
         }
         return mPolicyDefinition;
     }
@@ -622,9 +626,9 @@ public class PolicyHandler<T> {
                 @PolicyScope int scope);
 
         /**
-         * Helper method to get the effective per-user policy value from the
-         * {@code DevicePolicyEngine}. Invoked from
-         * {@link PolicyHandler.getResolvedPerUserPolicyUnchecked}.
+         * Helper method to get the effective per-user policy value from the {@code
+         * DevicePolicyEngine}. Invoked from {@link
+         * PolicyHandler.getResolvedPerUserPolicyUnchecked}.
          *
          * <p>Will use {@code caller} to decide on the correct storage.
          */
@@ -634,8 +638,8 @@ public class PolicyHandler<T> {
 
         /**
          * Helper method to get the effective device-wide policy value from the {@code
-         * DevicePolicyEngine}. Invoked from
-         * {@link PolicyHandler.getResolvedDeviceWidePolicyUnchecked}.
+         * DevicePolicyEngine}. Invoked from {@link
+         * PolicyHandler.getResolvedDeviceWidePolicyUnchecked}.
          */
         @Nullable
         <T> T getResolvedDeviceWidePolicy(@NonNull PolicyDefinition<T> key);

@@ -49,23 +49,26 @@ import java.lang.annotation.RetentionPolicy;
 public interface LocationButtonSession extends AutoCloseable {
     /** The button displays no text. */
     int TEXT_TYPE_NONE = 0;
-    /** The button displays the text as "Near precise location". */
-    int TEXT_TYPE_NEAR_PRECISE_LOCATION = 1;
     /** The button displays the text as "Precise location". */
-    int TEXT_TYPE_PRECISE_LOCATION = 2;
+    int TEXT_TYPE_PRECISE_LOCATION = 1;
+    /** The button displays the text as "Use precise location". */
+    int TEXT_TYPE_USE_PRECISE_LOCATION = 2;
     /** The button displays the text as "Share precise location". */
     int TEXT_TYPE_SHARE_PRECISE_LOCATION = 3;
-    /** The button displays the text as "Use precise location". */
-    int TEXT_TYPE_USE_PRECISE_LOCATION = 4;
+    /** The button displays the text as "Near my precise location". */
+    int TEXT_TYPE_NEAR_MY_PRECISE_LOCATION = 4;
+    /** The button displays the text as "Near your precise location". */
+    int TEXT_TYPE_NEAR_YOUR_PRECISE_LOCATION = 5;
 
     /** @hide */
     @Retention(RetentionPolicy.SOURCE)
     @IntDef(prefix = "TEXT_TYPE_", value = {
             TEXT_TYPE_NONE,
-            TEXT_TYPE_NEAR_PRECISE_LOCATION,
             TEXT_TYPE_PRECISE_LOCATION,
+            TEXT_TYPE_USE_PRECISE_LOCATION,
             TEXT_TYPE_SHARE_PRECISE_LOCATION,
-            TEXT_TYPE_USE_PRECISE_LOCATION
+            TEXT_TYPE_NEAR_MY_PRECISE_LOCATION,
+            TEXT_TYPE_NEAR_YOUR_PRECISE_LOCATION
     })
     @interface TextType {}
 
@@ -93,6 +96,16 @@ public interface LocationButtonSession extends AutoCloseable {
     void resize(int width, int height);
 
     /**
+     * Sets the padding for the location button within its container.
+     *
+     * @param left   The left padding in pixels.
+     * @param top    The top padding in pixels.
+     * @param right  The right padding in pixels.
+     * @param bottom The bottom padding in pixels.
+     */
+    void setPadding(int left, int top, int right, int bottom);
+
+    /**
      * Notifies the remote service of a configuration change.
      *
      * <p>This should be called when the application's configuration changes, for example, due to a
@@ -113,9 +126,16 @@ public interface LocationButtonSession extends AutoCloseable {
     /**
      * Sets the corner radius for the location button.
      *
-     * @param radius The corner radius in pixels.
+     * @param cornerRadius The corner radius in pixels.
      */
-    void setCornerRadius(float radius);
+    void setCornerRadius(float cornerRadius);
+
+    /**
+     * Sets the corner radius for the location button pressed state.
+     *
+     * @param cornerRadius The corner radius in pixels.
+     */
+    void setPressedCornerRadius(float cornerRadius);
 
     /**
      * Sets the color of location button text.

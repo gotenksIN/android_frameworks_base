@@ -24,6 +24,7 @@
 #include "utils/Thread.h"
 
 #ifdef __ANDROID__
+#include <gui/BLASTBufferQueue.h>
 #include <gui/SurfaceControl.h>
 #endif
 
@@ -130,6 +131,46 @@ void RenderProxy::setSurfaceControl(sp<SurfaceControl> surfaceControl) {
 #endif
 }
 
+/**
+ * Sync methods below execute directly on the calling thread, and so
+ * setBLASTBufferQueue also does.
+ */
+void RenderProxy::setBLASTBufferQueue(const sp<BLASTBufferQueue>& bbq) {
+#ifdef __ANDROID__
+    mContext->setBLASTBufferQueue(std::move(bbq));
+#endif
+}
+
+#ifdef __ANDROID__
+void RenderProxy::mergeWithNextTransaction(SurfaceComposerClient::Transaction* t,
+                                           uint64_t frameNumber) {
+    mContext->mergeWithNextTransaction(t, frameNumber);
+}
+
+bool RenderProxy::syncNextTransaction(std::function<void(SurfaceComposerClient::Transaction*)> t,
+                                      bool acquireSingleBuffer) {
+    return mContext->syncNextTransaction(t, acquireSingleBuffer);
+}
+
+void RenderProxy::applyPendingTransactions(uint64_t frameNumber) {
+    mContext->applyPendingTransactions(frameNumber);
+}
+
+void RenderProxy::clearSyncTransaction() {
+    mContext->clearSyncTransaction();
+}
+
+SurfaceComposerClient::Transaction* RenderProxy::gatherPendingTransactions(uint64_t frameNumber) {
+    return mContext->gatherPendingTransactions(frameNumber);
+}
+#endif
+
+void RenderProxy::updateRenderTargetSize(uint64_t width, uint64_t height) {
+    return mRenderThread.queue().post([this, width, height]() {
+        mContext->updateRenderTargetSize(width, height);
+    });
+}
+
 void RenderProxy::allocateBuffers() {
     mRenderThread.queue().post([this]() { mContext->allocateBuffers(); });
 }
@@ -154,6 +195,10 @@ void RenderProxy::setLightGeometry(const Vector3& lightCenter, float lightRadius
 
 void RenderProxy::setOpaque(bool opaque) {
     mRenderThread.queue().post([=, this]() { mContext->setOpaque(opaque); });
+}
+
+void RenderProxy::setHintSessionEnabled(bool enabled) {
+    mRenderThread.queue().post([=, this]() { mContext->setHintSessionEnabled(enabled); });
 }
 
 float RenderProxy::setColorMode(ColorMode mode) {

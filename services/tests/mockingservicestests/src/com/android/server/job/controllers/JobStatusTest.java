@@ -73,6 +73,7 @@ import android.net.NetworkRequest;
 import android.net.Uri;
 import android.os.ParcelDuration;
 import android.os.SystemClock;
+import android.platform.test.annotations.DisableFlags;
 import android.platform.test.annotations.EnableFlags;
 import android.platform.test.flag.junit.SetFlagsRule;
 import android.provider.MediaStore;
@@ -1435,7 +1436,6 @@ public class JobStatusTest {
     }
 
     @Test
-    @EnableFlags(android.app.job.Flags.FLAG_JOB_DEBUG_INFO_APIS)
     public void testJobName_WithTraceTagWithoutNamespaceWithoutTag() {
         JobInfo jobInfo = new JobInfo.Builder(101, new ComponentName("foo", "bar"))
                         .setTraceTag("TestTraceTag")
@@ -1445,7 +1445,6 @@ public class JobStatusTest {
     }
 
     @Test
-    @EnableFlags(android.app.job.Flags.FLAG_JOB_DEBUG_INFO_APIS)
     public void testJobName_WithTraceTagWithNamespaceWithoutTag() {
         JobInfo jobInfo = new JobInfo.Builder(101, new ComponentName("foo", "bar"))
                         .setTraceTag("TestTraceTag")
@@ -1455,7 +1454,6 @@ public class JobStatusTest {
     }
 
     @Test
-    @EnableFlags(android.app.job.Flags.FLAG_JOB_DEBUG_INFO_APIS)
     public void testJobName_WithTraceTagWithoutNamespaceWithTag() {
         JobInfo jobInfo = new JobInfo.Builder(101, new ComponentName("foo", "bar"))
                         .setTraceTag("TestTraceTag")
@@ -1465,7 +1463,6 @@ public class JobStatusTest {
     }
 
     @Test
-    @EnableFlags(android.app.job.Flags.FLAG_JOB_DEBUG_INFO_APIS)
     public void testJobName_WithTraceTagWithNamespaceWithTag() {
         JobInfo jobInfo =
                 new JobInfo.Builder(101, new ComponentName("foo", "bar"))
@@ -1477,7 +1474,6 @@ public class JobStatusTest {
     }
 
     @Test
-    @EnableFlags(android.app.job.Flags.FLAG_JOB_DEBUG_INFO_APIS)
     public void testJobName_FilteredTraceTagEmail() {
         JobInfo jobInfo = new JobInfo.Builder(101, new ComponentName("foo", "bar"))
                         .setTraceTag("test@email.com")
@@ -1485,8 +1481,8 @@ public class JobStatusTest {
         JobStatus jobStatus = createJobStatus(jobInfo, SOURCE_PACKAGE, 0, null, "TestTag");
         assertEquals("#[EMAIL]#TestTag:foo", jobStatus.getBatteryName());
     }
+
     @Test
-    @EnableFlags(android.app.job.Flags.FLAG_JOB_DEBUG_INFO_APIS)
     public void testJobName_FilteredTraceTagPhone() {
         JobInfo jobInfo = new JobInfo.Builder(101, new ComponentName("foo", "bar"))
                         .setTraceTag("123-456-7890")
@@ -1710,6 +1706,9 @@ public class JobStatusTest {
                 expected, JobStatus.packStatesToBits(jobStatus));
     }
 
+    @EnableFlags({
+            android.app.job.Flags.FLAG_ENHANCED_PENDING_AND_STOP_REASONS_API
+    })
     @Test
     public void testGetPendingJobReasonStats() {
         final TestClock testClock = new TestClock();
@@ -1733,7 +1732,51 @@ public class JobStatusTest {
         // Here 2 explicit constraints are following:
         //  1. JobScheduler.PENDING_JOB_REASON_CONSTRAINT_CHARGING
         //  2. JobScheduler.PENDING_JOB_REASON_CONSTRAINT_BATTERY_NOT_LOW
-        // and the 3 implecite constraint are following:
+        // and the 4 implicit constraint are following:
+        //  1. JobScheduler.PENDING_JOB_REASON_DEVICE_STATE (DOZE mode)
+        //  2. JobScheduler.PENDING_JOB_REASON_DEVICE_STATE_BATTERY_SAVER
+        //  3. JobScheduler.PENDING_JOB_REASON_JOB_SCHEDULER_OPTIMIZATION
+        //  4. JobScheduler.PENDING_JOB_REASON_QUOTA
+        assertEquals(6, stats.size());
+        ParcelDuration chargingDuration = stats.get(
+                String.valueOf(JobScheduler.PENDING_JOB_REASON_CONSTRAINT_CHARGING));
+        assertNotNull(chargingDuration);
+        assertEquals(1000, chargingDuration.getDuration().toMillis());
+
+        ParcelDuration batteryNotLowDuration = stats.get(
+                String.valueOf(JobScheduler.PENDING_JOB_REASON_CONSTRAINT_BATTERY_NOT_LOW));
+        assertNotNull(batteryNotLowDuration);
+        assertEquals(3000, batteryNotLowDuration.getDuration().toMillis());
+    }
+
+
+    @DisableFlags({
+            android.app.job.Flags.FLAG_ENHANCED_PENDING_AND_STOP_REASONS_API
+    })
+    @Test
+    public void testDisabledFlagGetPendingJobReasonStats() {
+        final TestClock testClock = new TestClock();
+        JobSchedulerService.sElapsedRealtimeClock = testClock;
+
+        JobInfo jobInfo = new JobInfo.Builder(1234, TEST_JOB_COMPONENT)
+                .setRequiresCharging(true)
+                .setRequiresBatteryNotLow(true)
+                .build();
+        JobStatus jobStatus = createJobStatus(jobInfo);
+        jobStatus.enqueueTime = testClock.millis();
+
+        // Initially both constraints are unsatisfied.
+        testClock.advanceTime(1000);
+        jobStatus.setChargingConstraintSatisfied(testClock.millis(), true);
+
+        testClock.advanceTime(2000);
+        jobStatus.setBatteryNotLowConstraintSatisfied(testClock.millis(), true);
+
+        Map<String, ParcelDuration> stats = jobStatus.getPendingJobReasonStats();
+        // Here 2 explicit constraints are following:
+        //  1. JobScheduler.PENDING_JOB_REASON_CONSTRAINT_CHARGING
+        //  2. JobScheduler.PENDING_JOB_REASON_CONSTRAINT_BATTERY_NOT_LOW
+        // and the 3 implicit constraint are following:
         //  1. JobScheduler.PENDING_JOB_REASON_DEVICE_STATE
         //  2. JobScheduler.PENDING_JOB_REASON_JOB_SCHEDULER_OPTIMIZATION
         //  3. JobScheduler.PENDING_JOB_REASON_QUOTA
@@ -1749,6 +1792,35 @@ public class JobStatusTest {
         assertEquals(3000, batteryNotLowDuration.getDuration().toMillis());
     }
 
+    @EnableFlags({
+            android.app.job.Flags.FLAG_ENHANCED_PENDING_AND_STOP_REASONS_API
+    })
+    @Test
+    public void testGetPendingJobReasonStats_BatterySaver() {
+        final TestClock testClock = new TestClock();
+        JobSchedulerService.sElapsedRealtimeClock = testClock;
+
+        final JobInfo jobInfo =
+                new JobInfo.Builder(101, new ComponentName("foo", "bar")).build();
+        JobStatus job = createJobStatus(jobInfo);
+        job.enqueueTime = testClock.millis();
+
+        assertFalse(job.canRunInBatterySaver());
+        job.disallowRunInBatterySaverAndDoze();
+
+        // Constraint is unsatisfied.
+        testClock.advanceTime(5000);
+
+        Map<String, ParcelDuration> stats = job.getPendingJobReasonStats();
+        ParcelDuration batterySaverDuration = stats.get(
+                String.valueOf(JobScheduler.PENDING_JOB_REASON_DEVICE_STATE_BATTERY_SAVER));
+        assertNotNull(batterySaverDuration);
+        assertEquals(5000, batterySaverDuration.getDuration().toMillis());
+    }
+
+    @EnableFlags({
+            android.app.job.Flags.FLAG_ENHANCED_PENDING_AND_STOP_REASONS_API
+    })
     @Test
     public void testGetPendingJobReasonStats_StillPending() {
         final TestClock testClock = new TestClock();
@@ -1767,7 +1839,40 @@ public class JobStatusTest {
 
         // Here the only constraint is:
         //  1. JobScheduler.PENDING_JOB_REASON_CONSTRAINT_CHARGING
-        // and the 3 implecite constraint are following:
+        // and the 4 implicit constraint are following:
+        //  1. JobScheduler.PENDING_JOB_REASON_DEVICE_STATE (DOZE mode)
+        //  2. JobScheduler.PENDING_JOB_REASON_DEVICE_STATE_BATTERY_SAVER
+        //  3. JobScheduler.PENDING_JOB_REASON_JOB_SCHEDULER_OPTIMIZATION
+        //  4. JobScheduler.PENDING_JOB_REASON_QUOTA
+        assertEquals(5, stats.size());
+        ParcelDuration chargingDuration = stats.get(
+                String.valueOf(JobScheduler.PENDING_JOB_REASON_CONSTRAINT_CHARGING));
+        assertNotNull(chargingDuration);
+        assertEquals(1000, chargingDuration.getDuration().toMillis());
+    }
+
+    @DisableFlags({
+            android.app.job.Flags.FLAG_ENHANCED_PENDING_AND_STOP_REASONS_API
+    })
+    @Test
+    public void testDisabledFlagGetPendingJobReasonStats_StillPending() {
+        final TestClock testClock = new TestClock();
+        JobSchedulerService.sElapsedRealtimeClock = testClock;
+
+        JobInfo jobInfo = new JobInfo.Builder(1234, TEST_JOB_COMPONENT)
+                .setRequiresCharging(true)
+                .build();
+        JobStatus jobStatus = createJobStatus(jobInfo);
+        jobStatus.enqueueTime = testClock.millis();
+
+        // Constraint is unsatisfied.
+        testClock.advanceTime(1000);
+
+        Map<String, ParcelDuration> stats = jobStatus.getPendingJobReasonStats();
+
+        // Here the only constraint is:
+        //  1. JobScheduler.PENDING_JOB_REASON_CONSTRAINT_CHARGING
+        // and the 3 implicit constraint are following:
         //  1. JobScheduler.PENDING_JOB_REASON_DEVICE_STATE
         //  2. JobScheduler.PENDING_JOB_REASON_JOB_SCHEDULER_OPTIMIZATION
         //  3. JobScheduler.PENDING_JOB_REASON_QUOTA
@@ -1776,6 +1881,99 @@ public class JobStatusTest {
                 String.valueOf(JobScheduler.PENDING_JOB_REASON_CONSTRAINT_CHARGING));
         assertNotNull(chargingDuration);
         assertEquals(1000, chargingDuration.getDuration().toMillis());
+    }
+
+    @EnableFlags({
+            android.app.job.Flags.FLAG_ENHANCED_PENDING_AND_STOP_REASONS_API
+    })
+    @Test
+    public void testGetPendingJobReasonStats_correctlyAccumulates() {
+        final TestClock testClock = new TestClock();
+        JobSchedulerService.sElapsedRealtimeClock = testClock;
+
+        JobInfo jobInfo = new JobInfo.Builder(1234, TEST_JOB_COMPONENT)
+                .setRequiresCharging(true)
+                .build();
+        JobStatus jobStatus = createJobStatus(jobInfo);
+        jobStatus.enqueueTime = testClock.millis();
+
+        testClock.advanceTime(1000);
+        jobStatus.setChargingConstraintSatisfied(testClock.millis(), true);
+
+        Map<String, ParcelDuration> stats = jobStatus.getPendingJobReasonStats();
+        // Here the only constraint is:
+        //  1. JobScheduler.PENDING_JOB_REASON_CONSTRAINT_CHARGING
+        // and the 4 implicit constraint are following:
+        //  1. JobScheduler.PENDING_JOB_REASON_DEVICE_STATE (DOZE mode)
+        //  2. JobScheduler.PENDING_JOB_REASON_DEVICE_STATE_BATTERY_SAVER
+        //  3. JobScheduler.PENDING_JOB_REASON_JOB_SCHEDULER_OPTIMIZATION
+        //  4. JobScheduler.PENDING_JOB_REASON_QUOTA
+        assertEquals(5, stats.size());
+        ParcelDuration chargingDuration = stats.get(
+                String.valueOf(JobScheduler.PENDING_JOB_REASON_CONSTRAINT_CHARGING));
+        assertNotNull(chargingDuration);
+        assertEquals(1000, chargingDuration.getDuration().toMillis());
+
+        // Unsatisfy the same constraint
+        testClock.advanceTime(1000); // now + 2000
+        jobStatus.setChargingConstraintSatisfied(testClock.millis(), false);
+
+        // Satisfy the same constraint again
+        testClock.advanceTime(1000); // now + 3000
+        jobStatus.setChargingConstraintSatisfied(testClock.millis(), true);
+
+        stats = jobStatus.getPendingJobReasonStats();
+        assertEquals(5, stats.size()); // no new constraints added
+        chargingDuration = stats.get(
+                String.valueOf(JobScheduler.PENDING_JOB_REASON_CONSTRAINT_CHARGING));
+        assertNotNull(chargingDuration);
+        assertEquals(2000, chargingDuration.getDuration().toMillis());
+    }
+
+    @DisableFlags({
+            android.app.job.Flags.FLAG_ENHANCED_PENDING_AND_STOP_REASONS_API
+    })
+    @Test
+    public void testDisabledFlagGetPendingJobReasonStats_correctlyAccumulates() {
+        final TestClock testClock = new TestClock();
+        JobSchedulerService.sElapsedRealtimeClock = testClock;
+
+        JobInfo jobInfo = new JobInfo.Builder(1234, TEST_JOB_COMPONENT)
+                .setRequiresCharging(true)
+                .build();
+        JobStatus jobStatus = createJobStatus(jobInfo);
+        jobStatus.enqueueTime = testClock.millis();
+
+        testClock.advanceTime(1000);
+        jobStatus.setChargingConstraintSatisfied(testClock.millis(), true);
+
+        Map<String, ParcelDuration> stats = jobStatus.getPendingJobReasonStats();
+        // Here the only constraint is:
+        //  1. JobScheduler.PENDING_JOB_REASON_CONSTRAINT_CHARGING
+        // and the 3 implicit constraint are following:
+        //  1. JobScheduler.PENDING_JOB_REASON_DEVICE_STATE
+        //  2. JobScheduler.PENDING_JOB_REASON_JOB_SCHEDULER_OPTIMIZATION
+        //  3. JobScheduler.PENDING_JOB_REASON_QUOTA
+        assertEquals(4, stats.size());
+        ParcelDuration chargingDuration = stats.get(
+                String.valueOf(JobScheduler.PENDING_JOB_REASON_CONSTRAINT_CHARGING));
+        assertNotNull(chargingDuration);
+        assertEquals(1000, chargingDuration.getDuration().toMillis());
+
+        // Unsatisfy the same constraint
+        testClock.advanceTime(1000); // now + 2000
+        jobStatus.setChargingConstraintSatisfied(testClock.millis(), false);
+
+        // Satisfy the same constraint again
+        testClock.advanceTime(1000); // now + 3000
+        jobStatus.setChargingConstraintSatisfied(testClock.millis(), true);
+
+        stats = jobStatus.getPendingJobReasonStats();
+        assertEquals(4, stats.size()); // no new constraints added
+        chargingDuration = stats.get(
+                String.valueOf(JobScheduler.PENDING_JOB_REASON_CONSTRAINT_CHARGING));
+        assertNotNull(chargingDuration);
+        assertEquals(2000, chargingDuration.getDuration().toMillis());
     }
 
     private static class TestClock extends Clock {

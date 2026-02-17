@@ -1918,6 +1918,8 @@ public class ActivityManager {
         private String mLabel;
         @Nullable
         private Icon mIcon;
+        @Nullable
+        private Icon mBadge;
         private String mIconFilename;
         private int mColorPrimary;
         private int mColorBackground;
@@ -1948,8 +1950,10 @@ public class ActivityManager {
              */
             @Nullable
             private String mLabel = null;
-            @DrawableRes
-            private int mIconRes = Resources.ID_NULL;
+            @Nullable
+            private Icon mIcon = null;
+            @Nullable
+            private Icon mBadge = null;
             private int mPrimaryColor = 0;
             private int mBackgroundColor = 0;
             private int mStatusBarColor = 0;
@@ -1974,7 +1978,41 @@ public class ActivityManager {
              */
             @NonNull
             public Builder setIcon(@DrawableRes int iconRes) {
-                this.mIconRes = iconRes;
+                if (iconRes == Resources.ID_NULL) {
+                    this.mIcon = null;
+                } else {
+                    this.mIcon =
+                            Icon.createWithResource(ActivityThread.currentPackageName(), iconRes);
+                }
+                return this;
+            }
+
+            /**
+             * Set the icon to use in the TaskDescription.
+             * @param icon An icon that represents the current state of this activity.
+             * @return The same instance of the builder.
+             */
+            @FlaggedApi(Flags.FLAG_ENABLE_DYNAMIC_ICONS_AND_BADGING)
+            @NonNull
+            public Builder setIcon(@Nullable Icon icon) {
+                this.mIcon = icon;
+                return this;
+            }
+
+            /**
+             * Set the icon of the badge to use in the TaskDescription.
+             *
+             * <p>The badge is an optional, small icon that is displayed on bottom corner of the
+             * icon in places like the taskbar and launcher. There is no default badge, and if not
+             * set, no badge will be shown.
+             *
+             * @param badge An Icon of a badge to be attached to the icon.
+             * @return The same instance of the builder.
+             */
+            @FlaggedApi(Flags.FLAG_ENABLE_DYNAMIC_ICONS_AND_BADGING)
+            @NonNull
+            public Builder setBadge(@Nullable Icon badge) {
+                this.mBadge = badge;
                 return this;
             }
 
@@ -2029,9 +2067,7 @@ public class ActivityManager {
              */
             @NonNull
             public TaskDescription build() {
-                final Icon icon = mIconRes == Resources.ID_NULL ? null :
-                        Icon.createWithResource(ActivityThread.currentPackageName(), mIconRes);
-                return new TaskDescription(mLabel, icon, mPrimaryColor, mBackgroundColor,
+                return new TaskDescription(mLabel, mIcon, mBadge, mPrimaryColor, mBackgroundColor,
                         mStatusBarColor, mNavigationBarColor, 0, 0, false, false,
                         RESIZE_MODE_RESIZEABLE, -1, -1, 0);
             }
@@ -2051,7 +2087,8 @@ public class ActivityManager {
         @Deprecated
         public TaskDescription(String label, @DrawableRes int iconRes, int colorPrimary) {
             this(label, Icon.createWithResource(ActivityThread.currentPackageName(), iconRes),
-                    colorPrimary, 0, 0, 0, 0, 0, false, false, RESIZE_MODE_RESIZEABLE, -1, -1, 0);
+                    null, colorPrimary, 0, 0, 0, 0, 0,
+                    false, false, RESIZE_MODE_RESIZEABLE, -1, -1, 0);
             if ((colorPrimary != 0) && (Color.alpha(colorPrimary) != 255)) {
                 throw new RuntimeException("A TaskDescription's primary color should be opaque");
             }
@@ -2069,7 +2106,7 @@ public class ActivityManager {
         @Deprecated
         public TaskDescription(String label, @DrawableRes int iconRes) {
             this(label, Icon.createWithResource(ActivityThread.currentPackageName(), iconRes),
-                    0, 0, 0, 0, 0, 0, false, false, RESIZE_MODE_RESIZEABLE, -1, -1, 0);
+                    null, 0, 0, 0, 0, 0, 0, false, false, RESIZE_MODE_RESIZEABLE, -1, -1, 0);
         }
 
         /**
@@ -2081,7 +2118,8 @@ public class ActivityManager {
          */
         @Deprecated
         public TaskDescription(String label) {
-            this(label, null, 0, 0, 0, 0, 0, 0, false, false, RESIZE_MODE_RESIZEABLE, -1, -1, 0);
+            this(label, null, null, 0, 0, 0, 0, 0, 0, false, false, RESIZE_MODE_RESIZEABLE, -1, -1,
+                    0);
         }
 
         /**
@@ -2091,7 +2129,8 @@ public class ActivityManager {
          */
         @Deprecated
         public TaskDescription() {
-            this(null, null, 0, 0, 0, 0, 0, 0, false, false, RESIZE_MODE_RESIZEABLE, -1, -1, 0);
+            this(null, null, null, 0, 0, 0, 0, 0, 0, false, false, RESIZE_MODE_RESIZEABLE, -1, -1,
+                    0);
         }
 
         /**
@@ -2106,8 +2145,8 @@ public class ActivityManager {
          */
         @Deprecated
         public TaskDescription(String label, Bitmap icon, int colorPrimary) {
-            this(label, icon != null ? Icon.createWithBitmap(icon) : null, colorPrimary, 0, 0, 0,
-                    0, 0, false, false, RESIZE_MODE_RESIZEABLE, -1, -1, 0);
+            this(label, icon != null ? Icon.createWithBitmap(icon) : null, null, colorPrimary, 0, 0,
+                    0, 0, 0, false, false, RESIZE_MODE_RESIZEABLE, -1, -1, 0);
             if ((colorPrimary != 0) && (Color.alpha(colorPrimary) != 255)) {
                 throw new RuntimeException("A TaskDescription's primary color should be opaque");
             }
@@ -2123,13 +2162,13 @@ public class ActivityManager {
          */
         @Deprecated
         public TaskDescription(String label, Bitmap icon) {
-            this(label, icon != null ? Icon.createWithBitmap(icon) : null, 0, 0, 0, 0, 0, 0, false,
-                    false, RESIZE_MODE_RESIZEABLE, -1, -1, 0);
+            this(label, icon != null ? Icon.createWithBitmap(icon) : null, null, 0, 0, 0, 0, 0, 0,
+                    false, false, RESIZE_MODE_RESIZEABLE, -1, -1, 0);
         }
 
         /** @hide */
         public TaskDescription(@Nullable String label, @Nullable Icon icon,
-                int colorPrimary, int colorBackground,
+                @Nullable Icon badge, int colorPrimary, int colorBackground,
                 int statusBarColor, int navigationBarColor,
                 @Appearance int systemBarsAppearance,
                 @Appearance int topOpaqueSystemBarsAppearance,
@@ -2138,6 +2177,7 @@ public class ActivityManager {
                 int minHeight, int colorBackgroundFloating) {
             mLabel = label;
             mIcon = icon;
+            mBadge = badge;
             mColorPrimary = colorPrimary;
             mColorBackground = colorBackground;
             mStatusBarColor = statusBarColor;
@@ -2167,6 +2207,7 @@ public class ActivityManager {
         public void copyFrom(TaskDescription other) {
             mLabel = other.mLabel;
             mIcon = other.mIcon;
+            mBadge = other.mBadge;
             mIconFilename = other.mIconFilename;
             mColorPrimary = other.mColorPrimary;
             mColorBackground = other.mColorBackground;
@@ -2191,6 +2232,7 @@ public class ActivityManager {
         public void copyFromPreserveHiddenFields(TaskDescription other) {
             mLabel = other.mLabel;
             mIcon = other.mIcon;
+            mBadge = other.mBadge;
             mIconFilename = other.mIconFilename;
             mColorPrimary = other.mColorPrimary;
 
@@ -2313,6 +2355,14 @@ public class ActivityManager {
         }
 
         /**
+         * Sets the badge for this task description.
+         * @hide
+         */
+        public void setBadge(Icon badge) {
+            mBadge = badge;
+        }
+
+        /**
          * Sets the resize mode for this task description. Resize mode as in
          * {@link android.content.pm.ActivityInfo}.
          * @hide
@@ -2429,6 +2479,17 @@ public class ActivityManager {
                 }
             }
             return null;
+        }
+
+        /**
+         * @return the icon badge for this task description.
+         * @hide
+         */
+        @TestApi
+        @FlaggedApi(Flags.FLAG_ENABLE_DYNAMIC_ICONS_AND_BADGING)
+        @Nullable
+        public Icon getBadge() {
+            return mBadge;
         }
 
         /**
@@ -2636,6 +2697,7 @@ public class ActivityManager {
                 dest.writeInt(1);
                 mIcon.writeToParcel(dest, 0);
             }
+            dest.writeTypedObject(mBadge, flags);
             dest.writeInt(mColorPrimary);
             dest.writeInt(mColorBackground);
             dest.writeInt(mStatusBarColor);
@@ -2661,6 +2723,7 @@ public class ActivityManager {
             if (source.readInt() > 0) {
                 mIcon = Icon.CREATOR.createFromParcel(source);
             }
+            mBadge = source.readTypedObject(Icon.CREATOR);
             mColorPrimary = source.readInt();
             mColorBackground = source.readInt();
             mStatusBarColor = source.readInt();
@@ -2689,6 +2752,7 @@ public class ActivityManager {
         @Override
         public String toString() {
             return "TaskDescription Label: " + mLabel + " Icon: " + mIcon
+                    + " Badge: " + mBadge
                     + " IconFilename: " + mIconFilename
                     + " colorPrimary: " + mColorPrimary + " colorBackground: " + mColorBackground
                     + " statusBarColor: " + mStatusBarColor
@@ -2711,6 +2775,9 @@ public class ActivityManager {
             }
             if (mIcon != null) {
                 result = result * 31 + mIcon.hashCode();
+            }
+            if (mBadge != null) {
+                result = result * 31 + mBadge.hashCode();
             }
             if (mIconFilename != null) {
                 result = result * 31 + mIconFilename.hashCode();
@@ -2740,6 +2807,7 @@ public class ActivityManager {
             return TextUtils.equals(mLabel, other.mLabel)
                     && TextUtils.equals(mIconFilename, other.mIconFilename)
                     && mIcon == other.mIcon
+                    && mBadge == other.mBadge
                     && mColorPrimary == other.mColorPrimary
                     && mColorBackground == other.mColorBackground
                     && mStatusBarColor == other.mStatusBarColor
@@ -2809,6 +2877,16 @@ public class ActivityManager {
         public int affiliatedTaskId;
 
         public RecentTaskInfo() {
+        }
+
+        /**
+         * @hide
+         */
+        public RecentTaskInfo(@NonNull RecentTaskInfo other) {
+            super(other);
+            id = other.id;
+            persistentId = other.persistentId;
+            // Ignore other fields in RecentTaskInfo as they are deprecated post-Q
         }
 
         private RecentTaskInfo(Parcel source) {
@@ -2996,6 +3074,15 @@ public class ActivityManager {
         public int numRunning;
 
         public RunningTaskInfo() {
+        }
+
+        /**
+         * @hide
+         */
+        public RunningTaskInfo(@NonNull RunningTaskInfo other) {
+            super(other);
+            id = other.id;
+            // Ignore other fields in RunningTaskInfo as they are deprecated post-Q
         }
 
         private RunningTaskInfo(Parcel source) {
@@ -3275,110 +3362,13 @@ public class ActivityManager {
      *
      * @throws IllegalArgumentException if there is no display with given display ID
      */
-    @FlaggedApi(com.android.window.flags.Flags.FLAG_ENABLE_WINDOW_REPOSITIONING_API)
+    @FlaggedApi(com.android.window.flags.Flags.FLAG_ENABLE_IS_TASK_MOVE_ALLOWED_ON_DISPLAY_API)
     @SuppressLint("RequiresPermission")
     public boolean isTaskMoveAllowedOnDisplay(int displayId) {
         try {
             return getTaskService().isTaskMoveAllowedOnDisplay(displayId);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
-        }
-    }
-
-    private final Map<Consumer<List<TaskDisplayPolicyState>>, Executor>
-            mDisplayPolicyStateListeners = new ArrayMap<>();
-
-    private final ITaskMoveAllowedListener mTaskMoveAllowedDispatchListener =
-            new ITaskMoveAllowedListener.Stub() {
-                @Override
-                public void onTaskMoveAllowedChanged(int[] keys, boolean[] values) {
-                    dispatchDisplayPolicyChanges(keys, values);
-                }
-            };
-
-    private void dispatchDisplayPolicyChanges(
-            int[] displayIds, boolean[] taskMoveAllowedPerDisplay) {
-        final List<TaskDisplayPolicyState> displayPolicyStates = new ArrayList<>();
-        for (int i = 0; i < displayIds.length; i++) {
-            final int taskMoveAllowedState =
-                    taskMoveAllowedPerDisplay[i]
-                        ? TaskDisplayPolicyState.TASK_MOVE_ALLOWED
-                        : TaskDisplayPolicyState.TASK_MOVE_DISALLOWED;
-            final TaskDisplayPolicyState displayPolicyState =
-                    new TaskDisplayPolicyState(displayIds[i], taskMoveAllowedState);
-            displayPolicyStates.add(displayPolicyState);
-        }
-
-        synchronized (mDisplayPolicyStateListeners) {
-            mDisplayPolicyStateListeners.forEach(
-                    (listener, executor) -> {
-                        executor.execute(() -> listener.accept(displayPolicyStates));
-                    }
-            );
-        }
-    }
-
-    /**
-     * Registers a listener for changes to task display policy states across all displays.
-     *
-     * <p>The listener receives {@link TaskDisplayPolicyState} objects representing the state of
-     * properties that are controlled by policies, e.g. {@link #isTaskMoveAllowedOnDisplay(int)},
-     * for all displays. It is invoked whenever this state changes, including when a display is
-     * connected (its ID is added as a key) or disconnected (its key is removed).
-     *
-     * <p>The listener is also notified of current states upon registration.
-     *
-     * @param executor The {@link Executor} on which the listener callback will be invoked.
-     * @param listener A {@link Consumer} that receives the updated state.
-     * @see #isTaskMoveAllowedOnDisplay
-     */
-    @FlaggedApi(com.android.window.flags.Flags.FLAG_ENABLE_TASK_MOVE_ALLOWED_LISTENER_API)
-    public void registerTaskDisplayPolicyStateListener(
-            @NonNull final @CallbackExecutor Executor executor,
-            @NonNull final Consumer<List<TaskDisplayPolicyState>> listener) {
-        Objects.requireNonNull(executor);
-        Objects.requireNonNull(listener);
-
-        synchronized (mDisplayPolicyStateListeners) {
-            if (mDisplayPolicyStateListeners.containsKey(listener)) {
-                return;
-            }
-
-            mDisplayPolicyStateListeners.put(listener, executor);
-
-            if (mDisplayPolicyStateListeners.size() > 1) {
-                return;
-            }
-
-            try {
-                getTaskService().registerTaskMoveAllowedListener(mTaskMoveAllowedDispatchListener);
-            } catch (RemoteException e) {
-                throw e.rethrowFromSystemServer();
-            }
-        }
-    }
-
-    /**
-     * Unregisters a task display policy state listener.
-     *
-     * @see #registerTaskDisplayPolicyStateListener(Executor, Consumer)
-     */
-    @FlaggedApi(com.android.window.flags.Flags.FLAG_ENABLE_TASK_MOVE_ALLOWED_LISTENER_API)
-    public void unregisterTaskDisplayPolicyStateListener(
-            @NonNull Consumer<List<TaskDisplayPolicyState>> listener) {
-        synchronized (mDisplayPolicyStateListeners) {
-            mDisplayPolicyStateListeners.remove(listener);
-
-            if (!mDisplayPolicyStateListeners.isEmpty()) {
-                return;
-            }
-
-            try {
-                getTaskService()
-                        .unregisterTaskMoveAllowedListener(mTaskMoveAllowedDispatchListener);
-            } catch (RemoteException e) {
-                throw e.rethrowFromSystemServer();
-            }
         }
     }
 
@@ -4706,7 +4696,7 @@ public class ActivityManager {
      * The callback doesn't wait for {@link Activity#reportFullyDrawn} to occur. Retrieve a copy
      * of {@link ApplicationStartInfo} after {@link Activity#reportFullyDrawn} is called (using this
      * callback or {@link getHistoricalProcessStartReasons}) if you need the
-     * {@link ApplicationStartInfo.START_TIMESTAMP_FULLY_DRAWN} timestamp.
+     * {@link ApplicationStartInfo#START_TIMESTAMP_FULLY_DRAWN} timestamp.
      *
      * If the current start record has already been completed (that is, the process is not currently
      * starting), the callback will be invoked immediately on the specified executor with the
@@ -5078,7 +5068,6 @@ public class ActivityManager {
      * @throws IllegalArgumentException If the listener is already registered.
      * @hide
      */
-    @FlaggedApi(Flags.FLAG_UID_IMPORTANCE_LISTENER_FOR_UIDS)
     @SystemApi
     @SuppressLint("SamShouldBeLast")
     @RequiresPermission(Manifest.permission.PACKAGE_USAGE_STATS)
@@ -5920,7 +5909,7 @@ public class ActivityManager {
      *
      * @param mcc The new MCC.
      * @param mnc The new MNC.
-     * @throws RemoteException; IllegalArgumentException if mcc or mnc is null;
+     * @throws IllegalArgumentException if mcc or mnc is null;
      * @return Returns {@code true} if the configuration was updated successfully;
      *         {@code false} otherwise.
      * @hide
@@ -6474,19 +6463,65 @@ public class ActivityManager {
         /**
          * The windowing layer is not specified. The system will use a
          * {@link #WINDOWING_LAYER_NORMAL_APP} layer.
-         * @hide
          */
+        @FlaggedApi(com.android.window.flags.Flags.FLAG_ENABLE_INTERACTIVE_PICTURE_IN_PICTURE)
         public static final int WINDOWING_LAYER_UNDEFINED = 0;
+
         /**
          * The windowing layer for normal application windows.
-         * @hide
+         *
+         * <p>If an application does not explicitly request a windowing layer for its task, it is
+         * considered to be in this layer.
+         *
+         * <p>Requesting this layer using {@link AppTask#requestWindowingLayer} is typically done
+         * to exit a previously requested layer.
+         *
+         * @see AppTask#requestWindowingLayer
          */
+        @FlaggedApi(com.android.window.flags.Flags.FLAG_ENABLE_INTERACTIVE_PICTURE_IN_PICTURE)
         public static final int WINDOWING_LAYER_NORMAL_APP = 1;
+
         /**
-         * The windowing layer for pinned windows, these windows are typically displayed above
+         * The windowing layer for pinned windows. These windows are typically displayed above
          * normal application windows.
-         * @hide
+         *
+         * <p>To ensure system integrity and a consistent user experience, the system imposes
+         * several restrictions on tasks using this layer. These may include, but are not limited
+         * to:
+         * <ul>
+         *  <li>Forcing the task to be completely opaque and display system decorations.</li>
+         *  <li>Strictly limiting the number of tasks in this layer (e.g., only one at a time).</li>
+         *  <li>Limiting the application's control over the task's size and position.</li>
+         *  <li>Limiting the maximum window size to which the user can resize the task.</li>
+         *  <li>Making the task non-movable programmatically (including restrictions on workarounds
+         *   like resizing).</li>
+         *  <li>Providing users with immediate settings access to disable the feature.</li>
+         *  <li>Providing users with a way to close the window.</li>
+         *  <li>The task may be finished by the system if it can no longer be hosted on this layer
+         *   due to windowing changes.</li>
+         *  <li>The available display modes may be limited for tasks on this layer. These may
+         *   include, but are not limited to: Picture-in-Picture mode, Split-screen mode, and
+         *   fullscreen.</li>
+         * </ul>
+         *
+         * <p>This layer might be shared with Picture-in-Picture (PiP) tasks; therefore, tasks on
+         * this layer might be dismissed when another enters PiP.
+         *
+         * <p>The task's window on this layer has the following requirements:
+         * <ul>
+         *  <li>Must be opaque.</li>
+         *  <li>Must have affordances to close the window and to allow users to disable
+         *   showing and running tasks on this layer, per app.</li>
+         *  <li>Must have a minimum size of 220dp according to <a
+         *   href="https://source.android.com/docs/compatibility/16/android-16-cdd#3814_multi-windows">
+         *   the established Multi-windows CDD</a> requirements.</li>
+         *  <li>The task cannot change to another layer unless requested by the app with a call to
+         *   {@link AppTask#requestWindowingLayer}.</li>
+         * </ul>
+         *
+         * @see AppTask#requestWindowingLayer
          */
+        @FlaggedApi(com.android.window.flags.Flags.FLAG_ENABLE_INTERACTIVE_PICTURE_IN_PICTURE)
         public static final int WINDOWING_LAYER_PINNED = 2;
 
         /**
@@ -6500,6 +6535,33 @@ public class ActivityManager {
         })
         @Retention(RetentionPolicy.SOURCE)
         public @interface WindowingLayer {
+        }
+
+        /**
+         * The request to change the windowing layer was granted.
+         */
+        @FlaggedApi(com.android.window.flags.Flags.FLAG_ENABLE_INTERACTIVE_PICTURE_IN_PICTURE)
+        public static final int WINDOWING_LAYER_REQUEST_GRANTED = 0;
+
+        /**
+         * The request to change the windowing layer was rejected.
+         *
+         * <p>This result implies the system is in a state where the request cannot be fulfilled,
+         * but the request itself was valid.
+         */
+        @FlaggedApi(com.android.window.flags.Flags.FLAG_ENABLE_INTERACTIVE_PICTURE_IN_PICTURE)
+        public static final int WINDOWING_LAYER_REQUEST_REJECTED = 1;
+
+        /**
+         * Defines the result of a windowing layer request.
+         * @hide
+         */
+        @IntDef(prefix = { "WINDOWING_LAYER_REQUEST_" }, value = {
+                WINDOWING_LAYER_REQUEST_GRANTED,
+                WINDOWING_LAYER_REQUEST_REJECTED,
+        })
+        @Retention(RetentionPolicy.SOURCE)
+        public @interface WindowingLayerResult {
         }
 
         private IAppTask mAppTaskImpl;
@@ -6529,6 +6591,7 @@ public class ActivityManager {
          *
          * @return The RecentTaskInfo for this task, or null if the task no longer exists.
          */
+        @Nullable
         public RecentTaskInfo getTaskInfo() {
             try {
                 return mAppTaskImpl.getTaskInfo();
@@ -6655,19 +6718,39 @@ public class ActivityManager {
          * Requests the windowing layer for this task. This can be used to affect the Z-ordering
          * of the activity's window relative to other windows.
          *
-         * <p>
-         * The task will be moved to the requested layer if possible.
+         * <p>The task will be moved to the requested layer if possible. When the request is
+         * approved or rejected, the {@code callback} will be invoked. If rejected, the callback
+         * will receive an exception with a descriptive message accessible via
+         * {@link Exception#getMessage()}.
          *
-         * @param layer the {@link WindowingLayer} to move task to.
-         * @param executor an Executor used to invoke the callback
-         * @param callback a callback to receive the result of the request
-         * @hide
+         * <p>If the request is rejected due to a system state, the callback will receive
+         * {@link AppTask#WINDOWING_LAYER_REQUEST_REJECTED}. If the request is granted, the callback
+         * will receive {@link AppTask#WINDOWING_LAYER_REQUEST_GRANTED}.
+         *
+         * <p>To ensure system integrity and a consistent user experience, the system might impose
+         * restrictions on tasks requesting a specific layer. See
+         * {@link AppTask#WINDOWING_LAYER_PINNED} for implications when requesting the pinned layer.
+         *
+         * <p>If {@link AppTask#WINDOWING_LAYER_PINNED} is requested,
+         * {@link android.app.AppOpsManager#OPSTR_PICTURE_IN_PICTURE} must be allowed and the
+         * {@link android.Manifest.permission#USE_PINNED_WINDOWING_LAYER} permission must be
+         * granted.
+         *
+         * <p>If the request fails due to a developer error (such as missing permissions or
+         * invalid arguments), {@link OutcomeReceiver#onError} will be invoked with a
+         * {@link Exception} describing the error.
+         *
+         * @param layer The {@link WindowingLayer} to move the task to.
+         * @param executor An {@link Executor} used to invoke the callback.
+         * @param callback A callback to receive the result of the request.
          */
-        // TODO(b/442807136): Complete javadoc, add all requirements and detals needed
+        @FlaggedApi(com.android.window.flags.Flags.FLAG_ENABLE_INTERACTIVE_PICTURE_IN_PICTURE)
+        @RequiresPermission(value = Manifest.permission.USE_PINNED_WINDOWING_LAYER,
+                conditional = true)
         public void requestWindowingLayer(
                 @WindowingLayer int layer,
                 @NonNull @CallbackExecutor Executor executor,
-                @NonNull OutcomeReceiver<Void, Exception> callback) {
+                @NonNull OutcomeReceiver<Integer, Exception> callback) {
             Objects.requireNonNull(executor, "executor cannot be null");
             Objects.requireNonNull(callback, "callback cannot be null");
             TaskWindowingLayerRequestHandler.requestWindowingLayer(
@@ -6700,6 +6783,111 @@ public class ActivityManager {
             getService().appNotResponding(reason);
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
+        }
+    }
+
+    // Map of App listener to executor.
+    private final Map<Consumer<AnrWarningResult>, Executor> mAnrWarningAppListeners =
+            new ArrayMap<>();
+
+    // Binder callback for receiving imminent ANR warnings from the system.
+    // This is registered with the Activity Manager Service when the first ANR warning listener is
+    // added to this process.
+    @GuardedBy("mAnrWarningAppListeners")
+    @Nullable
+    private IAnrWarningCallback mAnrWarningCallback = null;
+
+    private void dispatchAnrWarning(AnrWarningResult anrWarningResult) {
+        synchronized (mAnrWarningAppListeners) {
+            mAnrWarningAppListeners.forEach(
+                    (listener, executor) ->
+                            executor.execute(() -> listener.accept(anrWarningResult)));
+        }
+    }
+
+    /**
+     * Registers a listener that is called when the app is close to the ANR timeout.
+     *
+     * <p>This is intended to give the app a chance to collect and store any additional information
+     * they may want to gather at this time, or take any pre-ANR actions. Note that these listeners
+     * are called at best-effort, and may not be successfully called (or be provided time to
+     * execute) before the ANR occurs and the app is killed.
+     *
+     * <p>If the app registers multiple distinct listeners, all registered listeners will be
+     * notified on the potential ANR condition. The order in which listeners are notified is not
+     * guaranteed.
+     *
+     * <p>The app can unregister the listener using {@link #unregisterAnrWarningListener}.
+     *
+     * @param executor The executor on which listener will be invoked. This should not be the
+     *     application's main thread.
+     * @param listener The listener to be triggered on the ANR warning condition.
+     */
+    @FlaggedApi(android.app.Flags.FLAG_ENABLE_ANR_WARNING_CALLBACK)
+    public void registerAnrWarningListener(
+            @NonNull Executor executor, @NonNull Consumer<AnrWarningResult> listener) {
+        Objects.requireNonNull(listener, "listener should not be null");
+        Objects.requireNonNull(executor, "executor should not be null");
+
+        synchronized (mAnrWarningAppListeners) {
+            if (mAnrWarningAppListeners.containsKey(listener)) {
+                return;
+            }
+
+            mAnrWarningAppListeners.put(listener, executor);
+
+            // Only register the first listener with the Activity Manager service to avoid redundant
+            // IPC calls. Subsequent listeners will be notified when the first one receives the
+            // event.
+            if (mAnrWarningAppListeners.size() == 1) {
+                if (mAnrWarningCallback == null) {
+                    mAnrWarningCallback =
+                            new IAnrWarningCallback.Stub() {
+                                @Override
+                                public void onAnrImminent(AnrWarningResult anrWarningResult) {
+                                    dispatchAnrWarning(anrWarningResult);
+                                }
+                            };
+                }
+
+                try {
+                    getService().registerAnrWarningListener(mAnrWarningCallback);
+                } catch (RemoteException e) {
+                    Log.e(TAG, "Unable to register ANR callback with ActivityManagerService", e);
+                    throw e.rethrowFromSystemServer();
+                }
+            }
+        }
+    }
+
+    /**
+     * Unregisters a previously registered ANR warning listener.
+     *
+     * @param listener The listener to unregister. This must be the same object that was previously
+     *     passed to {@link #registerAnrWarningListener}.
+     */
+    @FlaggedApi(android.app.Flags.FLAG_ENABLE_ANR_WARNING_CALLBACK)
+    public void unregisterAnrWarningListener(@NonNull Consumer<AnrWarningResult> listener) {
+        Objects.requireNonNull(listener, "listener should not be null");
+
+        synchronized (mAnrWarningAppListeners) {
+            if (!mAnrWarningAppListeners.containsKey(listener)) {
+                return;
+            }
+            mAnrWarningAppListeners.remove(listener);
+
+            // When app unregisters all the ANR warning listeners, also unregister the binder
+            // callback for ANR warning from the ActivityManagerService.
+            if (mAnrWarningAppListeners.isEmpty()) {
+                try {
+                    getService().unregisterAnrWarningListener(mAnrWarningCallback);
+                } catch (RemoteException e) {
+                    Log.e(TAG, "Unable to unregister ANR callback with ActivityManagerService", e);
+                    throw e.rethrowFromSystemServer();
+                } finally {
+                    mAnrWarningCallback = null;
+                }
+            }
         }
     }
 

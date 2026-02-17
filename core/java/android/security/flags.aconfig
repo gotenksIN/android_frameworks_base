@@ -178,6 +178,7 @@ flag {
     namespace: "cross_device_authentication"
     description: "Enable the Talisman service API."
     bug: "433283951"
+    is_exported: true
 }
 
 flag {
@@ -216,17 +217,6 @@ flag {
 }
 
 flag {
-  name: "thread_safe_key_generation"
-  namespace: "hardware_backed_security"
-  description: "Retry key generation requests when the key generation thread is busy"
-  bug: "445922389"
-  is_fixed_read_only: true
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
     name: "app_lock_apis"
     namespace: "security"
     description: "Flag to enable access to the App Lock APIs in PackageManager"
@@ -258,3 +248,13 @@ flag {
     bug: "458115629"
 }
 
+flag {
+    name: "auto_sim_pin_management"
+    namespace: "security"
+    description: "Enables automatic management of SIM PIN"
+    bug: "381850338"
+    is_exported: true
+    metadata {
+      purpose: PURPOSE_FEATURE
+    }
+}

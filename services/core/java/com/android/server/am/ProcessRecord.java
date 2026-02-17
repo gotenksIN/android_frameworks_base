@@ -18,6 +18,7 @@ package com.android.server.am;
 
 import static android.app.ActivityManagerInternal.OOM_ADJ_REASON_ACTIVITY;
 import static android.app.ProcessMemoryState.HOSTING_COMPONENT_TYPE_FOREGROUND_SERVICE;
+import static android.os.Process.INVALID_UID;
 
 import static com.android.internal.util.Preconditions.checkArgument;
 import static com.android.server.am.ActivityManagerDebugConfig.TAG_AM;
@@ -69,7 +70,6 @@ import com.android.internal.app.procstats.ProcessState;
 import com.android.internal.app.procstats.ProcessStats;
 import com.android.internal.os.Zygote;
 import com.android.server.FgThread;
-import com.android.server.am.ProcessCachedOptimizerRecord.ShouldNotFreezeReason;
 import com.android.server.am.psc.OomAdjuster;
 import com.android.server.am.psc.OomAdjusterImpl.ProcessRecordNode;
 import com.android.server.am.psc.PlatformCompatCache.CachedCompatChangeId;
@@ -676,6 +676,7 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
     @GuardedBy({"mService", "mProcLock"})
     void setUidRecord(UidRecord uidRecord) {
         mUidRecord = uidRecord;
+        mMemoryLimiter.setUid((mUidRecord != null) ? mUidRecord.getUid() : INVALID_UID);
     }
 
     PackageList getPkgList() {
@@ -707,7 +708,7 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
         }
         mPid = pid;
         mWindowProcessController.setPid(pid);
-        mMemoryLimiter.setPidUid(getPid(), (mUidRecord != null) ? mUidRecord.getUid() : 0);
+        mMemoryLimiter.setPid(getPid());
         mShortStringName = null;
         mStringName = null;
         synchronized (mProfile.mProfilerLock) {
@@ -1236,27 +1237,6 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
     }
 
     @Override
-    public boolean shouldNotFreeze() {
-        return mOptRecord.shouldNotFreeze();
-    }
-
-    @Override
-    public boolean setShouldNotFreeze(boolean shouldNotFreeze, boolean dryRun,
-            @ShouldNotFreezeReason int reason, int adjSeq) {
-        return mOptRecord.setShouldNotFreeze(shouldNotFreeze, dryRun, reason, adjSeq);
-    }
-
-    @Override
-    public @ShouldNotFreezeReason int shouldNotFreezeReason() {
-        return mOptRecord.shouldNotFreezeReason();
-    }
-
-    @Override
-    public int shouldNotFreezeAdjSeq() {
-        return mOptRecord.shouldNotFreezeAdjSeq();
-    }
-
-    @Override
     public int getApplicationUid() {
         return info.uid;
     }
@@ -1331,9 +1311,12 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
      * @param message exception message
      * @param exceptionTypeId ID defined in {@link android.app.RemoteServiceException} or one
      *                        of its subclasses.
+     * @param extras optional extras to pass to the exception.
+     * @param subReason the subreason for the crash if it fails to schedule.
      */
     @GuardedBy("mService")
-    void scheduleCrashLocked(String message, int exceptionTypeId, @Nullable Bundle extras) {
+    void scheduleCrashLocked(String message, int exceptionTypeId, @Nullable Bundle extras,
+            @SubReason int subReason) {
         // Checking killedbyAm should keep it from showing the crash dialog if the process
         // was already dead for a good / normal reason.
         if (!isKilledByAm()) {
@@ -1349,7 +1332,7 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
                     // If it's already dead our work is done. If it's wedged just kill it.
                     // We won't get the crash dialog or the error reporting.
                     killLocked("scheduleCrash for '" + message + "' failed",
-                            ApplicationExitInfo.REASON_CRASH, true);
+                            ApplicationExitInfo.REASON_CRASH, subReason, true);
                 } finally {
                     Binder.restoreCallingIdentity(ident);
                 }
@@ -1404,8 +1387,8 @@ class ProcessRecord extends ProcessRecordInternal implements WindowProcessListen
             }
             if (!mPersistent) {
                 synchronized (mProcLock) {
-                    setKilled(true);
-                    setKilledByAm(true);
+                    mService.mProcessStateController.setKilled(this, true);
+                    mService.mProcessStateController.setKilledByAm(this, true);
                     mKillTime = SystemClock.uptimeMillis();
                 }
             }

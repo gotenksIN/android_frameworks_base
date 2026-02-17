@@ -207,6 +207,8 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
     @NonNull
     private final AttributionSource mAttributionSource;
     private final int mDeviceId;
+    @NonNull
+    private final String mDeviceProfile;
     @Nullable
     private final String mPersistentDeviceId;
     @NonNull
@@ -314,34 +316,30 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
                         UserHandle.SYSTEM);
             }
 
-            if (Flags.activityControlApi()) {
-                try {
-                    mActivityListener.onActivityLaunchBlocked(
-                            displayId,
-                            activityInfo.getComponentName(),
-                            UserHandle.getUserHandleForUid(activityInfo.applicationInfo.uid),
-                            intentSender);
-                } catch (RemoteException e) {
-                    Slog.w(TAG, "Unable to call mActivityListener for display: " + displayId, e);
-                }
+            try {
+                mActivityListener.onActivityLaunchBlocked(
+                        displayId,
+                        activityInfo.getComponentName(),
+                        UserHandle.getUserHandleForUid(activityInfo.applicationInfo.uid),
+                        intentSender);
+            } catch (RemoteException e) {
+                Slog.w(TAG, "Unable to call mActivityListener for display: " + displayId, e);
             }
         }
 
         @Override
         public void onSecureWindowShown(int displayId, @NonNull ComponentName componentName,
                 int uid) {
-            if (Flags.activityControlApi()) {
-                try {
-                    mActivityListener.onSecureWindowShown(displayId, componentName,
-                            UserHandle.getUserHandleForUid(uid));
-                } catch (RemoteException e) {
-                    Slog.w(TAG, "Unable to call mActivityListener for display: " + displayId, e);
-                }
+            try {
+                mActivityListener.onSecureWindowShown(displayId, componentName,
+                        UserHandle.getUserHandleForUid(uid));
+            } catch (RemoteException e) {
+                Slog.w(TAG, "Unable to call mActivityListener for display: " + displayId, e);
+            }
 
-                if (CompatChanges.isChangeEnabled(DO_NOT_SHOW_TOAST_WHEN_SECURE_SURFACE_SHOWN,
-                        mOwnerPackageName,  UserHandle.getUserHandleForUid(mOwnerUid))) {
-                    return;
-                }
+            if (CompatChanges.isChangeEnabled(DO_NOT_SHOW_TOAST_WHEN_SECURE_SURFACE_SHOWN,
+                    mOwnerPackageName, UserHandle.getUserHandleForUid(mOwnerUid))) {
+                return;
             }
 
             // If a virtual display isn't secure, the screen can't be captured. Show a warning toast
@@ -366,12 +364,10 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
 
         @Override
         public void onSecureWindowHidden(int displayId) {
-            if (Flags.activityControlApi()) {
-                try {
-                    mActivityListener.onSecureWindowHidden(displayId);
-                } catch (RemoteException e) {
-                    Slog.w(TAG, "Unable to call mActivityListener for display: " + displayId, e);
-                }
+            try {
+                mActivityListener.onSecureWindowHidden(displayId);
+            } catch (RemoteException e) {
+                Slog.w(TAG, "Unable to call mActivityListener for display: " + displayId, e);
             }
         }
 
@@ -472,6 +468,7 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
             @NonNull IBinder token,
             @NonNull AttributionSource attributionSource,
             int deviceId,
+            String deviceProfile,
             @Nullable CameraAccessController cameraAccessController,
             @NonNull PendingTrampolineCallback pendingTrampolineCallback,
             @NonNull IVirtualDeviceActivityListener activityListener,
@@ -485,6 +482,7 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
                 token,
                 attributionSource,
                 deviceId,
+                deviceProfile,
                 /* inputController= */ null,
                 cameraAccessController,
                 pendingTrampolineCallback,
@@ -511,6 +509,7 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
             @NonNull IBinder token,
             @NonNull AttributionSource attributionSource,
             int deviceId,
+            String deviceProfile,
             @Nullable InputController inputController,
             @Nullable CameraAccessController cameraAccessController,
             @NonNull PendingTrampolineCallback pendingTrampolineCallback,
@@ -536,6 +535,7 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
         mSoundEffectListener = soundEffectListener;
         mOwnerUid = attributionSource.getUid();
         mDeviceId = deviceId;
+        mDeviceProfile = deviceProfile;
         mAppToken = token;
         mParams = params;
         mDevicePolicies = params.getDevicePolicies();
@@ -589,7 +589,7 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
             throw e.rethrowFromSystemServer();
         }
         Slog.d(TAG, "Creating virtual device with deviceId: " + deviceId);
-        mVirtualDeviceLog.logCreated(deviceId, mOwnerUid);
+        mVirtualDeviceLog.logCreated(deviceId, mOwnerUid, mDeviceProfile);
 
         mPublicVirtualDeviceObject = new VirtualDevice(
                 this, getDeviceId(), getPersistentDeviceId(), mParams.getName(), getDisplayName());
@@ -821,11 +821,6 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
     public void addActivityPolicyExemption(@NonNull ActivityPolicyExemption exemption) {
         checkCallerIsDeviceOwner();
         final int displayId = exemption.getDisplayId();
-        if (exemption.getComponentName() == null || displayId != Display.INVALID_DISPLAY) {
-            if (!Flags.activityControlApi()) {
-                return;
-            }
-        }
         synchronized (mVirtualDeviceLock) {
             if (displayId != Display.INVALID_DISPLAY) {
                 checkDisplayOwnedByVirtualDeviceLocked(displayId);
@@ -858,11 +853,6 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
     public void removeActivityPolicyExemption(@NonNull ActivityPolicyExemption exemption) {
         checkCallerIsDeviceOwner();
         final int displayId = exemption.getDisplayId();
-        if (exemption.getComponentName() == null || displayId != Display.INVALID_DISPLAY) {
-            if (!Flags.activityControlApi()) {
-                return;
-            }
-        }
         synchronized (mVirtualDeviceLock) {
             if (displayId != Display.INVALID_DISPLAY) {
                 checkDisplayOwnedByVirtualDeviceLocked(displayId);
@@ -915,7 +905,7 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
         }
 
         Slog.d(TAG, "Closing virtual device with deviceId: " + mDeviceId);
-        mVirtualDeviceLog.logClosed(mDeviceId, mOwnerUid);
+        mVirtualDeviceLog.logClosed(mDeviceId, mOwnerUid, mDeviceProfile);
 
         final long ident = Binder.clearCallingIdentity();
         try {
@@ -1056,10 +1046,8 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
                 }
                 break;
             case POLICY_TYPE_BLOCKED_ACTIVITY:
-                if (Flags.activityControlApi()) {
-                    synchronized (mVirtualDeviceLock) {
-                        mDevicePolicies.put(policyType, devicePolicy);
-                    }
+                synchronized (mVirtualDeviceLock) {
+                    mDevicePolicies.put(policyType, devicePolicy);
                 }
                 break;
             default:
@@ -1073,9 +1061,6 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
             @VirtualDeviceParams.DynamicDisplayPolicyType int policyType,
             @VirtualDeviceParams.DevicePolicy int devicePolicy) {
         checkCallerIsDeviceOwner();
-        if (!Flags.activityControlApi()) {
-            return;
-        }
         synchronized (mVirtualDeviceLock) {
             checkDisplayOwnedByVirtualDeviceLocked(displayId);
             switch (policyType) {
@@ -1392,6 +1377,7 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
         fout.println("  VirtualDevice: ");
         fout.println(indent + "mDeviceId: " + mDeviceId);
         fout.println(indent + "mAssociationId: " + getAssociationId());
+        fout.println(indent + "mDeviceProfile: " + mDeviceProfile);
         fout.println(indent + "mOwnerPackageName: " + mOwnerPackageName);
         fout.println(indent + "mParams: ");
         mParams.dump(fout, indent + indent);
@@ -1532,9 +1518,6 @@ final class VirtualDeviceImpl extends IVirtualDevice.Stub implements IBinder.Dea
             // Do not show the dialog if it was blocked for some reason already to avoid
             // infinite blocking loop.
             return false;
-        }
-        if (!Flags.activityControlApi()) {
-            return true;
         }
         // Do not show the dialog if disabled by policy.
         return getDevicePolicy(POLICY_TYPE_BLOCKED_ACTIVITY) == DEVICE_POLICY_DEFAULT;

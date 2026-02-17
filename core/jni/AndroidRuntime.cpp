@@ -690,8 +690,6 @@ int AndroidRuntime::startVm(JavaVM** pJavaVM, JNIEnv** pEnv, bool zygote, bool p
             sizeof("-XMadviseWillNeedVdexFileSize:")-1 + PROPERTY_VALUE_MAX];
     char madviseWillNeedFileSizeOdex[
             sizeof("-XMadviseWillNeedOdexFileSize:")-1 + PROPERTY_VALUE_MAX];
-    char madviseWillNeedFileSizeArt[
-            sizeof("-XMadviseWillNeedArtFileSize:")-1 + PROPERTY_VALUE_MAX];
     char gctypeOptsBuf[sizeof("-Xgc:")-1 + PROPERTY_VALUE_MAX];
     char backgroundgcOptsBuf[sizeof("-XX:BackgroundGC=")-1 + PROPERTY_VALUE_MAX];
     char heaptargetutilizationOptsBuf[sizeof("-XX:HeapTargetUtilization=")-1 + PROPERTY_VALUE_MAX];
@@ -916,14 +914,6 @@ int AndroidRuntime::startVm(JavaVM** pJavaVM, JNIEnv** pEnv, bool zygote, bool p
     parseRuntimeOption("dalvik.vm.madvise.odexfile.size",
                        madviseWillNeedFileSizeOdex,
                        "-XMadviseWillNeedOdexFileSize:");
-
-    // Historically, dalvik.vm.madvise.artfile.size was set to UINT_MAX by default. With the
-    // disable_madvise_art_default flag rollout, we use this default only when the flag is disabled.
-    // TODO(b/382110550): Remove this property/flag entirely after validating and ramping.
-    const char* madvise_artfile_size_default =
-            android::os::disable_madvise_artfile_default() ? "" : "4294967295";
-    parseRuntimeOption("dalvik.vm.madvise.artfile.size", madviseWillNeedFileSizeArt,
-                       "-XMadviseWillNeedArtFileSize:", madvise_artfile_size_default);
 
     /*
      * Profile related options.
@@ -1210,20 +1200,6 @@ char* AndroidRuntime::toSlashClassName(const char* className)
     }
     return result;
 }
-
-/** Create a Java string from an ASCII or Latin-1 string */
-jstring AndroidRuntime::NewStringLatin1(JNIEnv* env, const char* bytes) {
-    if (!bytes) return NULL;
-    int length = strlen(bytes);
-    jchar* buffer = (jchar *)alloca(length * sizeof(jchar));
-    if (!buffer) return NULL;
-    jchar* chp = buffer;
-    for (int i = 0; i < length; i++) {
-        *chp++ = *bytes++;
-    }
-    return env->NewString(buffer, length);
-}
-
 
 /*
  * Start the Android runtime.  This involves starting the virtual machine

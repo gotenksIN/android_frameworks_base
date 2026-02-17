@@ -23,13 +23,10 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SuppressLint;
 import android.annotation.TestApi;
-import android.app.compat.CompatChanges;
 import android.app.ActivityThread;
-import android.app.Instrumentation;
+import android.app.compat.CompatChanges;
 import android.compat.annotation.ChangeId;
-import android.compat.annotation.Disabled;
 import android.compat.annotation.EnabledAfter;
-import android.compat.annotation.Overridable;
 import android.compat.annotation.UnsupportedAppUsage;
 import android.ravenwood.annotation.RavenwoodKeepWholeClass;
 import android.ravenwood.annotation.RavenwoodRedirect;
@@ -164,6 +161,10 @@ public final class MessageQueue {
         setSkipEpollWaitForZeroTimeout(mPtr);
     }
 
+    Thread getLooperThread() {
+        return mLooperThread;
+    }
+
     static boolean getUseConcurrent() {
         if (!sUseConcurrentInitialized) {
             // We may race and compute the underlying value more than once.
@@ -174,6 +175,11 @@ public final class MessageQueue {
             return useConcurrent;
         }
         return sUseConcurrent;
+    }
+
+    /** @hide */
+    public static void setUseDeliQueue(boolean enable) {
+        // No-op for ConcurrentMessageQueue.
     }
 
     /**
@@ -1150,11 +1156,16 @@ public final class MessageQueue {
      */
     public void resetForTest() {
         ActivityThread.throwIfNotInstrumenting();
+        onResetForTestCalled();
         if (sUseConcurrent) {
             resetConcurrent();
         } else {
             resetLegacy();
         }
+    }
+
+    @RavenwoodRedirect
+    private static void onResetForTestCalled() {
     }
 
     private void resetConcurrent() {
@@ -1290,10 +1301,15 @@ public final class MessageQueue {
     @TestApi
     public int postSyncBarrier() {
         if (sUseConcurrent) {
-            return postSyncBarrierConcurrent();
+            return onSyncBarrierPosted(postSyncBarrierConcurrent());
         } else {
-            return postSyncBarrierLegacy();
+            return onSyncBarrierPosted(postSyncBarrierLegacy());
         }
+    }
+
+    @RavenwoodRedirect
+    private int onSyncBarrierPosted(int token) {
+        return token;
     }
 
     private int postSyncBarrier(long when) {
@@ -1432,7 +1448,11 @@ public final class MessageQueue {
         } else {
             removeSyncBarrierLegacy(token);
         }
+        onSyncBarrierRemoved(token);
+    }
 
+    @RavenwoodRedirect
+    private void onSyncBarrierRemoved(int token) {
     }
 
     private boolean enqueueMessageConcurrent(Message msg, long when) {

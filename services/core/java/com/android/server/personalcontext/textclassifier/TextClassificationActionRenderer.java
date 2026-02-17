@@ -16,12 +16,17 @@
 
 package com.android.server.personalcontext.textclassifier;
 
-import android.os.Bundle;
+import static java.util.Objects.requireNonNull;
+
+import android.annotation.Nullable;
+import android.app.RemoteAction;
+import android.service.personalcontext.RenderToken;
 import android.service.personalcontext.hint.ContextHintWithSignature;
 import android.service.personalcontext.hint.TextClassificationHint;
 import android.service.personalcontext.insight.ActionableInsight;
 import android.service.personalcontext.insight.ContextInsight;
-import android.service.textclassifier.TextClassifierService;
+import android.service.personalcontext.insight.InsightTraverser;
+import android.service.personalcontext.insight.InsightVisitor;
 import android.util.Log;
 import android.util.Slog;
 import android.view.textclassifier.TextClassification;
@@ -29,7 +34,11 @@ import android.view.textclassifier.TextClassification;
 import androidx.annotation.NonNull;
 
 import com.android.server.personalcontext.component.Renderer;
+import com.android.server.textclassifier.personalcontext.PersonalContextBridge;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Map.Entry;
 import java.util.UUID;
 
 public class TextClassificationActionRenderer implements Renderer {
@@ -37,9 +46,13 @@ public class TextClassificationActionRenderer implements Renderer {
     private static final boolean DEBUG = Log.isLoggable(TAG, Log.DEBUG);
 
     private final UUID mComponentId = UUID.randomUUID();
+    private final PersonalContextBridge mTcPersonalContextBridge;
 
-    public TextClassificationActionRenderer() {
+    public TextClassificationActionRenderer(
+            @NonNull PersonalContextBridge tcPersonalContextBridge) {
         super();
+        requireNonNull(tcPersonalContextBridge);
+        mTcPersonalContextBridge = tcPersonalContextBridge;
     }
 
     /**
@@ -52,45 +65,30 @@ public class TextClassificationActionRenderer implements Renderer {
     }
 
     @Override
-    public void render(@NonNull ContextInsight insight) {
-        ActionableInsight actionableInsight = getIfActionableInsight(insight);
-        if (actionableInsight == null) {
-            if (DEBUG) {
-                Slog.d(TAG, "Insight is not ActionableInsight");
-            }
-            return;
+    public void render(@NonNull ContextInsight insight, RenderToken renderToken) {
+        Map<String, TextClassification.Builder> textClassificationSessionToBuilders =
+                new LinkedHashMap<>();
+        InsightTraverser.traverse(
+                insight, new InsightCollector(textClassificationSessionToBuilders));
+
+        if (DEBUG) {
+            Slog.w(TAG, textClassificationSessionToBuilders.size() + "valid insights received");
         }
-        TextClassificationHint textClassificationHint =
-                getIfTextClassificationHint(actionableInsight);
-        if (textClassificationHint == null) {
-            if (DEBUG) {
-                Slog.d(TAG, "Hint is not TextClassificationHint");
-            }
-            return;
+
+        for (final Entry<String, TextClassification.Builder> entry :
+                textClassificationSessionToBuilders.entrySet()) {
+            mTcPersonalContextBridge.merge(entry.getKey(), entry.getValue().build());
         }
-        if (actionableInsight.getActionDetails().getRemoteAction() == null) {
-            if (DEBUG) {
-                Slog.d(TAG, "No remote action in insight");
-            }
-            return;
-        }
-        TextClassification textClassification =
-                new TextClassification.Builder()
-                        .addAction(actionableInsight.getActionDetails().getRemoteAction())
-                        .build();
-        Bundle result = new Bundle();
-        TextClassifierService.putResponse(result, textClassification);
-        // TODO(b/461931982): Implement merge back into PersonalContextBridge.
     }
 
-    private ActionableInsight getIfActionableInsight(ContextInsight insight) {
-        if (insight instanceof ActionableInsight actionableInsight) {
-            return actionableInsight;
-        }
-        return null;
+    @Override
+    public UUID getComponentId() {
+        return mComponentId;
     }
 
-    private TextClassificationHint getIfTextClassificationHint(ContextInsight insight) {
+    @Nullable
+    private static TextClassificationHint getFirstTextClassificationHintIfPresent(
+            ContextInsight insight) {
         for (ContextHintWithSignature hint : insight.getOriginHints()) {
             if (hint.getContextHint() instanceof TextClassificationHint textClassificationHint) {
                 return textClassificationHint;
@@ -99,8 +97,42 @@ public class TextClassificationActionRenderer implements Renderer {
         return null;
     }
 
-    @Override
-    public UUID getComponentId() {
-        return mComponentId;
+    private record InsightCollector(
+            Map<String, TextClassification.Builder> mTextClassificationBuilders)
+            implements InsightVisitor {
+        private InsightCollector(
+                @NonNull Map<String, TextClassification.Builder> mTextClassificationBuilders) {
+            this.mTextClassificationBuilders = mTextClassificationBuilders;
+        }
+
+        @Override
+        public void visit(@NonNull ActionableInsight insight) {
+            final TextClassificationHint textClassificationHint =
+                    getFirstTextClassificationHintIfPresent(insight);
+            if (textClassificationHint == null) {
+                if (DEBUG) {
+                    Slog.d(TAG, "TextClassificationHint is not present in insight");
+                }
+                return;
+            }
+
+            RemoteAction remoteAction = insight.getActionDetails().getRemoteAction();
+            if (remoteAction == null) {
+                if (DEBUG) {
+                    Slog.d(TAG, "RemoteAction is not present in insight");
+                }
+                return;
+            }
+
+            final TextClassification.Builder builder =
+                    mTextClassificationBuilders.get(textClassificationHint.getSessionId());
+            if (builder != null) {
+                builder.addAction(remoteAction);
+            } else {
+                mTextClassificationBuilders.put(
+                        textClassificationHint.getSessionId(),
+                        new TextClassification.Builder().addAction(remoteAction));
+            }
+        }
     }
 }

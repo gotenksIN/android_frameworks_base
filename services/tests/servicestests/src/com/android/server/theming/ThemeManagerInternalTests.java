@@ -51,7 +51,9 @@ import com.android.server.om.OverlayManagerInternal;
 import com.android.server.pm.UserManagerInternal;
 import com.android.server.wallpaper.WallpaperManagerInternal;
 
+import com.google.ux.material.libmonet.dynamiccolor.ColorSpec.SpecVersion;
 import com.google.ux.material.libmonet.dynamiccolor.DynamicScheme;
+import com.google.ux.material.libmonet.dynamiccolor.DynamicScheme.Platform;
 
 import org.junit.Before;
 import org.junit.Rule;
@@ -134,9 +136,11 @@ public class ThemeManagerInternalTests {
                 mWallpaperManagerInternal);
         mThemeSettingsManager = new ThemeSettingsManager(themeWallpaperManager);
         mSchedulerExecutor = new FakeScheduledExecutorService();
-        mStateManager = new ThemeStateManager(mContext, mSchedulerExecutor);
+        mStateManager = new ThemeStateManager(mContext, mSchedulerExecutor,
+                Platform.PHONE, SpecVersion.SPEC_2025);
         mUnderTest = new ThemeManagerInternal(mContext, mThemeSettingsManager,
-                mHardwareColorRule.sysPropReader, mStateManager, mOverlayHelper);
+                mHardwareColorRule.sysPropReader, mStateManager, mOverlayHelper,
+                Platform.PHONE, SpecVersion.SPEC_2025);
         mStateManager.onServicesReady();
     }
 
@@ -374,7 +378,8 @@ public class ThemeManagerInternalTests {
         android.content.om.FabricatedOverlay mockFabricatedOverlay =
                 mock(android.content.om.FabricatedOverlay.class);
         when(mockFabricatedOverlay.getInternal()).thenReturn(mockOverlay);
-        doReturn(mockFabricatedOverlay).when(mOverlayHelper).createDynamicOverlay(any(), any());
+        doReturn(mockFabricatedOverlay).when(mOverlayHelper).createDynamicOverlay(any(), any(),
+                anyInt());
 
         FabricatedOverlayInternal overlay = mUnderTest.generateDynamicColorOverlay(mUserId,
                 options);
@@ -392,7 +397,8 @@ public class ThemeManagerInternalTests {
         android.content.om.FabricatedOverlay mockFabricatedOverlay =
                 mock(android.content.om.FabricatedOverlay.class);
         when(mockFabricatedOverlay.getInternal()).thenReturn(mockOverlay);
-        doReturn(mockFabricatedOverlay).when(mOverlayHelper).createDynamicOverlay(any(), any());
+        doReturn(mockFabricatedOverlay).when(mOverlayHelper).createDynamicOverlay(any(), any(),
+                anyInt());
 
         FabricatedOverlayInternal overlay = mUnderTest.generateDynamicColorOverlay(mUserId,
                 options);
@@ -413,7 +419,8 @@ public class ThemeManagerInternalTests {
         android.content.om.FabricatedOverlay mockFabricatedOverlay =
                 mock(android.content.om.FabricatedOverlay.class);
         when(mockFabricatedOverlay.getInternal()).thenReturn(mockOverlay);
-        doReturn(mockFabricatedOverlay).when(mOverlayHelper).createDynamicOverlay(any(), any());
+        doReturn(mockFabricatedOverlay).when(mOverlayHelper).createDynamicOverlay(any(), any(),
+                anyInt());
 
         FabricatedOverlayInternal overlay = mUnderTest.generateDynamicColorOverlay(mUserId,
                 options);

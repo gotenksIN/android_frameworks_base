@@ -25,6 +25,7 @@ import static android.media.codec.Flags.FLAG_REGION_OF_INTEREST;
 import static android.media.codec.Flags.FLAG_APV_SUPPORT;
 import static android.media.codec.Flags.FLAG_VVC_SUPPORT;
 import static android.media.codec.Flags.FLAG_TEMPORAL_LAYER_ENCODING;
+import static android.media.codec.Flags.FLAG_FORMAT_400_444_SUPPORT;
 import static android.media.Utils.intersectSortedDistinctRanges;
 import static android.media.Utils.sortDistinctRanges;
 import static android.media.MediaCodec.GetFlag;
@@ -97,14 +98,22 @@ public final class MediaCodecInfo {
     private int mFlags;
     private String mName;
     private String mCanonicalName;
+    private int mSecurityModel;
     private Map<String, CodecCapabilities> mCaps;
 
     /* package private */ MediaCodecInfo(
             String name, String canonicalName, int flags, CodecCapabilities[] caps) {
+        this(name, canonicalName, flags, caps, SECURITY_MODEL_SANDBOXED);
+    }
+
+    /* package private */ MediaCodecInfo(
+            String name, String canonicalName, int flags, CodecCapabilities[] caps,
+            int securityModel) {
         mName = name;
         mCanonicalName = canonicalName;
         mFlags = flags;
         mCaps = new HashMap<String, CodecCapabilities>();
+        mSecurityModel = securityModel;
 
         for (CodecCapabilities c: caps) {
             mCaps.put(c.getMimeType(), c);
@@ -2473,8 +2482,7 @@ public final class MediaCodecInfo {
     @FlaggedApi(FLAG_IN_PROCESS_SW_AUDIO_CODEC)
     @SecurityModel
     public int getSecurityModel() {
-        // TODO b/297922713 --- detect security model of out-of-sandbox codecs
-        return SECURITY_MODEL_SANDBOXED;
+        return mSecurityModel;
     }
 
     /**
@@ -4262,6 +4270,14 @@ public final class MediaCodecInfo {
                             case CodecProfileLevel.HEVCProfileMain10HDR10:
                             case CodecProfileLevel.HEVCProfileMain10HDR10Plus:
                                 break;
+                            case CodecProfileLevel.HEVCProfileMain400:
+                            case CodecProfileLevel.HEVCProfileMain444:
+                                if (GetFlag(() ->
+                                        android.media.codec.Flags.format400444Support())) {
+                                    break;
+                                }
+                            // fall-through
+
                             default:
                                 Log.w(TAG, "Unrecognized profile "
                                         + profileLevel.profile + " for " + mime);
@@ -5307,7 +5323,7 @@ public final class MediaCodecInfo {
          * Returns the array of layering schemas supported by the encoder.
          * Return empty array if the encoder's layers encoding capability is unknown or not
          * supported.
-         * @see MediaFormat.KEY_TEMPORAL_LAYERING for the meaning of the schema.
+         * @see MediaFormat#KEY_TEMPORAL_LAYERING for the meaning of the schema.
          */
         @FlaggedApi(FLAG_TEMPORAL_LAYER_ENCODING)
         @NonNull
@@ -5562,6 +5578,17 @@ public final class MediaCodecInfo {
         public static final int HEVCProfileMainStill   = 0x04;
         public static final int HEVCProfileMain10HDR10 = 0x1000;
         public static final int HEVCProfileMain10HDR10Plus = 0x2000;
+
+        /** HEVC Monochrome (Main 4:0:0 8-bit) Profile */
+        @SuppressLint("AllUpper")
+        @FlaggedApi(FLAG_FORMAT_400_444_SUPPORT)
+        public static final int HEVCProfileMain400 = 0x08;
+
+        /** HEVC Main 4:4:4 (8-bit) Profile */
+        @SuppressLint("AllUpper")
+        @FlaggedApi(FLAG_FORMAT_400_444_SUPPORT)
+        public static final int HEVCProfileMain444 = 0x10;
+
 
         public static final int HEVCMainTierLevel1  = 0x1;
         public static final int HEVCHighTierLevel1  = 0x2;
@@ -6366,9 +6393,15 @@ public final class MediaCodecInfo {
             return this;
         }
 
-        return new MediaCodecInfo(
-                mName, mCanonicalName, mFlags,
-                caps.toArray(new CodecCapabilities[caps.size()]));
+        if (GetFlag(() -> android.media.codec.Flags.inProcessSwCodecLfi())) {
+            return new MediaCodecInfo(
+                    mName, mCanonicalName, mFlags,
+                    caps.toArray(new CodecCapabilities[caps.size()]), mSecurityModel);
+        } else {
+            return new MediaCodecInfo(
+                    mName, mCanonicalName, mFlags,
+                    caps.toArray(new CodecCapabilities[caps.size()]));
+        }
     }
 
     /* package private */ class GenericHelper {

@@ -31,6 +31,7 @@ import static android.view.Display.STATE_OFF;
 import static android.view.Display.STATE_ON;
 import static android.view.Display.TYPE_EXTERNAL;
 import static android.view.Display.TYPE_INTERNAL;
+import static android.view.Display.TYPE_OVERLAY;
 import static android.view.Display.TYPE_VIRTUAL;
 
 import static com.android.server.display.DeviceStateToLayoutMap.STATE_DEFAULT;
@@ -307,7 +308,7 @@ public class LogicalDisplayMapperTest {
         initLogicalDisplayMapper();
         testDisplayDeviceAddAndRemove_NonInternal(TYPE_EXTERNAL, infoCacheEnabled);
         testDisplayDeviceAddAndRemove_NonInternal(Display.TYPE_WIFI, infoCacheEnabled);
-        testDisplayDeviceAddAndRemove_NonInternal(Display.TYPE_OVERLAY, infoCacheEnabled);
+        testDisplayDeviceAddAndRemove_NonInternal(TYPE_OVERLAY, infoCacheEnabled);
         testDisplayDeviceAddAndRemove_NonInternal(TYPE_VIRTUAL, infoCacheEnabled);
         testDisplayDeviceAddAndRemove_NonInternal(Display.TYPE_UNKNOWN, infoCacheEnabled);
 
@@ -323,7 +324,7 @@ public class LogicalDisplayMapperTest {
         initLogicalDisplayMapper();
         testDisplayDeviceAddAndRemove_NonInternal(TYPE_EXTERNAL, infoCacheEnabled);
         testDisplayDeviceAddAndRemove_NonInternal(Display.TYPE_WIFI, infoCacheEnabled);
-        testDisplayDeviceAddAndRemove_NonInternal(Display.TYPE_OVERLAY, infoCacheEnabled);
+        testDisplayDeviceAddAndRemove_NonInternal(TYPE_OVERLAY, infoCacheEnabled);
         testDisplayDeviceAddAndRemove_NonInternal(TYPE_VIRTUAL, infoCacheEnabled);
         testDisplayDeviceAddAndRemove_NonInternal(Display.TYPE_UNKNOWN, infoCacheEnabled);
 
@@ -726,6 +727,19 @@ public class LogicalDisplayMapperTest {
                 mLogicalDisplayMapper.getDisplayGroupIdFromDisplayIdLocked(id(display2)));
         assertEquals(DEFAULT_DISPLAY_GROUP,
                 mLogicalDisplayMapper.getDisplayGroupIdFromDisplayIdLocked(id(display3)));
+    }
+
+    @Test
+    public void testOverlayDisplayInDefaultGroup() {
+        initLogicalDisplayMapper();
+        LogicalDisplay display1 = add(createDisplayDevice(TYPE_INTERNAL, 600, 800,
+                FLAG_ALLOWED_TO_BE_DEFAULT_DISPLAY));
+        LogicalDisplay display2 = add(createDisplayDevice(TYPE_OVERLAY, 600, 800, 0));
+
+        assertEquals(DEFAULT_DISPLAY_GROUP,
+                mLogicalDisplayMapper.getDisplayGroupIdFromDisplayIdLocked(id(display1)));
+        assertEquals(DEFAULT_DISPLAY_GROUP,
+                mLogicalDisplayMapper.getDisplayGroupIdFromDisplayIdLocked(id(display2)));
     }
 
     @Test
@@ -1339,18 +1353,19 @@ public class LogicalDisplayMapperTest {
         // We can only have one default display
         assertEquals(DEFAULT_DISPLAY, id(display1));
 
-        mLogicalDisplayMapper.onBootCompleted();
-        mLogicalDisplayMapper.setDeviceState(DEVICE_STATE_DOCKED);
-        advanceTime(1000);
+        finishBootAndTransitionBetweenStates(DEVICE_STATE_LID_OPEN, DEVICE_STATE_DOCKED);
 
         assertEquals(DEFAULT_DISPLAY, id(display1));
-        // The device of the default display should not have changed
-        assertEquals(device1, display1.getPrimaryDisplayDeviceLocked());
-        assertTrue(mLogicalDisplayMapper.getDisplayLocked(device1).isEnabledLocked());
+        // Device 2 is now associated with the default display. It cannot host tasks but can
+        // still enter docked mode.
+        assertEquals(device2, display1.getPrimaryDisplayDeviceLocked());
+        assertFalse(mLogicalDisplayMapper.getDisplayLocked(device1).isEnabledLocked());
         assertTrue(mLogicalDisplayMapper.getDisplayLocked(device2).isEnabledLocked());
         assertFalse(mLogicalDisplayMapper.getDisplayLocked(device1).isInTransitionLocked());
         assertFalse(mLogicalDisplayMapper.getDisplayLocked(device2).isInTransitionLocked());
-        verify(mWindowManagerPolicy, never()).onDisplaySwitchStart(DEFAULT_DISPLAY);
+
+        verify(mPowerManagerMock, never()).wakeUp(anyLong(), anyInt(), any());
+        verify(mPowerManagerMock, never()).goToSleep(anyLong(), anyInt(), anyInt());
     }
 
     @Test

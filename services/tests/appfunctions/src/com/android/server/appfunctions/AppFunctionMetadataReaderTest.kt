@@ -20,6 +20,7 @@ import android.app.appfunctions.AppFunctionMetadata
 import android.app.appfunctions.AppFunctionMetadata.PROPERTY_SCHEMA_CATEGORY
 import android.app.appfunctions.AppFunctionMetadata.PROPERTY_SCHEMA_NAME
 import android.app.appfunctions.AppFunctionMetadata.PROPERTY_SCHEMA_VERSION
+import android.app.appfunctions.AppFunctionName
 import android.app.appfunctions.AppFunctionPackageMetadata
 import android.app.appfunctions.AppFunctionRuntimeMetadata.PROPERTY_ENABLED
 import android.app.appfunctions.AppFunctionRuntimeMetadata.PROPERTY_PACKAGE_NAME
@@ -42,6 +43,7 @@ import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.suspendCancellableCoroutine
+import org.junit.Before
 import org.junit.Rule
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -55,15 +57,27 @@ import org.mockito.kotlin.whenever
 class AppFunctionMetadataReaderTest {
     @get:Rule val checkFlagsRule: CheckFlagsRule = DeviceFlagsValueProvider.createCheckFlagsRule()
 
-    val appFunctionMetadataReader =
-        AppFunctionMetadataReader(
-            mock(),
-            object : ServiceConfig {
-                override fun getExecuteAppFunctionCancellationTimeoutMillis(): Long = 0
+    private lateinit var dynamicRegistry: MultiUserDynamicAppFunctionRegistry
 
-                override fun getSearchAppFunctionInternalPageSize(): Int = 100
-            },
-        )
+    private lateinit var metadataCache: AppFunctionsMetadataCache
+
+    private lateinit var appFunctionMetadataReader: AppFunctionMetadataReader
+
+    @Before
+    fun setup() {
+        dynamicRegistry = mock()
+        metadataCache = mock()
+        appFunctionMetadataReader =
+            AppFunctionMetadataReader(
+                dynamicRegistry,
+                metadataCache,
+                object : ServiceConfig {
+                    override fun getExecuteAppFunctionCancellationTimeoutMillis(): Long = 0
+
+                    override fun getSearchAppFunctionInternalPageSize(): Int = 100
+                },
+            )
+    }
 
     @Test
     fun searchAppFunctions_emptyList_succeeds() = doBlocking {
@@ -91,7 +105,7 @@ class AppFunctionMetadataReaderTest {
 
     @Test
     fun searchAppFunctions_multiplePages_succeeds() = doBlocking {
-        val testFutureSearchResults =
+        val testFutureStaticSearchResults =
             object : FutureSearchResults {
                 var pageNumber = 0
 
@@ -109,10 +123,18 @@ class AppFunctionMetadataReaderTest {
 
                 override fun close() {}
             }
-        val futureGlobalSearchSession = mock<FutureGlobalSearchSession>()
+        val testFutureTopLevelSearchResults =
+            object : FutureSearchResults {
+                override fun getNextPage(): AndroidFuture<List<SearchResult?>?> {
+                    return AndroidFuture.completedFuture(listOf(TEST_TOP_LEVEL_SEARCH_RESULT))
+                }
 
+                override fun close() {}
+            }
+        val futureGlobalSearchSession = mock<FutureGlobalSearchSession>()
         whenever(futureGlobalSearchSession.search(any(), any()))
-            .thenReturn(AndroidFuture.completedFuture(testFutureSearchResults))
+            .thenReturn(AndroidFuture.completedFuture(testFutureStaticSearchResults))
+            .thenReturn(AndroidFuture.completedFuture(testFutureTopLevelSearchResults))
 
         val result =
             appFunctionMetadataReader.searchAppFunctions(
@@ -123,25 +145,31 @@ class AppFunctionMetadataReaderTest {
 
         assertThat(result.getNextPage())
             .containsExactly(
-                AppFunctionMetadata.create(
-                    STATIC_METADATA_DOCUMENT,
-                    RUNTIME_METADATA_DOCUMENT,
-                    AppFunctionPackageMetadata.create("testPackage", listOf()),
-                )
+                AppFunctionMetadata.Builder(
+                        STATIC_METADATA_DOCUMENT,
+                        AppFunctionPackageMetadata.create(
+                            "testPackage",
+                            listOf(TEST_TOP_LEVEL_DOCUMENT),
+                        ),
+                    )
+                    .build()
             )
         assertThat(result.getNextPage())
             .containsExactly(
-                AppFunctionMetadata.create(
-                    STATIC_METADATA_DOCUMENT_2,
-                    RUNTIME_METADATA_DOCUMENT,
-                    AppFunctionPackageMetadata.create("testPackage", listOf()),
-                )
+                AppFunctionMetadata.Builder(
+                        STATIC_METADATA_DOCUMENT_2,
+                        AppFunctionPackageMetadata.create(
+                            "testPackage",
+                            listOf(TEST_TOP_LEVEL_DOCUMENT),
+                        ),
+                    )
+                    .build()
             )
     }
 
     @Test
     fun searchAppFunctions_multipleResults_succeedsAndSkipsInvalidResult() = doBlocking {
-        val testFutureSearchResults =
+        val testFutureStaticSearchResults =
             object : FutureSearchResults {
                 var pageNumber = -1
 
@@ -150,7 +178,7 @@ class AppFunctionMetadataReaderTest {
                     when (pageNumber) {
                         0 -> {
                             return AndroidFuture.completedFuture(
-                                listOf(TEST_SEARCH_RESULT_MISSING_RUNTIME_METADATA)
+                                listOf(TEST_SEARCH_RESULT_INVALID_METADATA)
                             )
                         }
                         1 -> {
@@ -164,10 +192,18 @@ class AppFunctionMetadataReaderTest {
 
                 override fun close() {}
             }
-        val futureGlobalSearchSession = mock<FutureGlobalSearchSession>()
+        val testFutureTopLevelSearchResults =
+            object : FutureSearchResults {
+                override fun getNextPage(): AndroidFuture<List<SearchResult?>?> {
+                    return AndroidFuture.completedFuture(listOf(TEST_TOP_LEVEL_SEARCH_RESULT))
+                }
 
+                override fun close() {}
+            }
+        val futureGlobalSearchSession = mock<FutureGlobalSearchSession>()
         whenever(futureGlobalSearchSession.search(any(), any()))
-            .thenReturn(AndroidFuture.completedFuture(testFutureSearchResults))
+            .thenReturn(AndroidFuture.completedFuture(testFutureStaticSearchResults))
+            .thenReturn(AndroidFuture.completedFuture(testFutureTopLevelSearchResults))
 
         val result =
             appFunctionMetadataReader.searchAppFunctions(
@@ -178,80 +214,201 @@ class AppFunctionMetadataReaderTest {
 
         assertThat(result.getNextPage())
             .containsExactly(
-                AppFunctionMetadata.create(
-                    STATIC_METADATA_DOCUMENT,
-                    RUNTIME_METADATA_DOCUMENT,
-                    AppFunctionPackageMetadata.create("testPackage", listOf()),
-                )
+                AppFunctionMetadata.Builder(
+                        STATIC_METADATA_DOCUMENT,
+                        AppFunctionPackageMetadata.create(
+                            "testPackage",
+                            listOf(TEST_TOP_LEVEL_DOCUMENT),
+                        ),
+                    )
+                    .build()
             )
         assertThat(result.getNextPage()).isEmpty()
     }
 
     @Test
-    fun convertSearchResultToAppFunctionMetadata_validInput_returnsMetadata() {
+    fun buildAppFunctionMetadata_dynamicAppFunctionNotRegisteredAndNotEnabled() {
+        whenever(metadataCache.isDynamicFunction(any(), any(), any())).thenReturn(true)
+        whenever(dynamicRegistry.isAppFunctionRegistered(any(), any(), any())).thenReturn(false)
+
+        val packageMetadata = AppFunctionPackageMetadata.create("testPackage", listOf())
         val result =
-            AppFunctionMetadataReader.convertSearchResultToAppFunctionMetadata(
-                TEST_SEARCH_RESULT_VALID
+            appFunctionMetadataReader.buildAppFunctionMetadata(
+                TEST_SEARCH_RESULT_VALID_DISABLED,
+                packageMetadata,
             )
 
         assertThat(result)
             .isEqualTo(
-                AppFunctionMetadata.create(
-                    STATIC_METADATA_DOCUMENT,
-                    RUNTIME_METADATA_DOCUMENT,
-                    AppFunctionPackageMetadata.create("testPackage", listOf()),
-                )
+                AppFunctionMetadata.Builder(STATIC_METADATA_DOCUMENT, packageMetadata).build()
             )
     }
 
     @Test
-    fun convertSearchResultToAppFunctionMetadata_noRuntimeMetadata_returnsNull() {
+    fun buildAppFunctionMetadata_dynamicAppFunctionNotRegisteredButEnabled() {
+        whenever(metadataCache.isDynamicFunction(any(), any(), any())).thenReturn(true)
+        whenever(dynamicRegistry.isAppFunctionRegistered(any(), any(), any())).thenReturn(false)
+
+        val packageMetadata = AppFunctionPackageMetadata.create("testPackage", listOf())
         val result =
-            AppFunctionMetadataReader.convertSearchResultToAppFunctionMetadata(
-                TEST_SEARCH_RESULT_MISSING_RUNTIME_METADATA
+            appFunctionMetadataReader.buildAppFunctionMetadata(
+                TEST_SEARCH_RESULT_VALID,
+                packageMetadata,
             )
 
-        assertThat(result).isNull()
+        assertThat(result)
+            .isEqualTo(
+                AppFunctionMetadata.Builder(STATIC_METADATA_DOCUMENT, packageMetadata).build()
+            )
     }
 
     @Test
-    fun convertSearchResultToAppFunctionMetadata_multipleRuntimeMetadata_returnsNull() {
-        val searchResult =
-            SearchResult.Builder("", "")
-                .setGenericDocument(STATIC_METADATA_DOCUMENT)
-                .addJoinedResult(JOINED_RESULT)
-                .addJoinedResult(JOINED_RESULT)
-                .build()
+    fun buildAppFunctionMetadata_dynamicAppFunctionRegisteredButNotEnabled() {
+        whenever(metadataCache.isDynamicFunction(any(), any(), any())).thenReturn(true)
+        whenever(dynamicRegistry.isAppFunctionRegistered(any(), any(), any())).thenReturn(true)
 
+        val packageMetadata = AppFunctionPackageMetadata.create("testPackage", listOf())
         val result =
-            AppFunctionMetadataReader.convertSearchResultToAppFunctionMetadata(searchResult)
+            appFunctionMetadataReader.buildAppFunctionMetadata(
+                TEST_SEARCH_RESULT_VALID_DISABLED,
+                packageMetadata,
+            )
 
-        assertThat(result).isNull()
+        assertThat(result)
+            .isEqualTo(
+                AppFunctionMetadata.Builder(STATIC_METADATA_DOCUMENT, packageMetadata).build()
+            )
     }
 
     @Test
-    fun convertSearchResultToAppFunctionMetadata_missingPackageName_returnsNull() {
-        val runtimeMetadataDocumentNoPackageName =
-            GenericDocument.Builder<GenericDocument.Builder<*>>("", "", "")
-                .setPropertyLong(
-                    PROPERTY_ENABLED,
-                    AppFunctionManager.APP_FUNCTION_STATE_DEFAULT.toLong(),
-                )
-                .build()
-        val joinedResultNoPackageName =
-            SearchResult.Builder("", "")
-                .setGenericDocument(runtimeMetadataDocumentNoPackageName)
-                .build()
-        val searchResult =
-            SearchResult.Builder("", "")
-                .setGenericDocument(STATIC_METADATA_DOCUMENT)
-                .addJoinedResult(joinedResultNoPackageName)
-                .build()
+    fun buildAppFunctionMetadata_dynamicAppFunctionRegisteredAndEnabled() {
+        whenever(metadataCache.isDynamicFunction(any(), any(), any())).thenReturn(true)
+        whenever(dynamicRegistry.isAppFunctionRegistered(any(), any(), any())).thenReturn(true)
 
+        val packageMetadata = AppFunctionPackageMetadata.create("testPackage", listOf())
         val result =
-            AppFunctionMetadataReader.convertSearchResultToAppFunctionMetadata(searchResult)
+            appFunctionMetadataReader.buildAppFunctionMetadata(
+                TEST_SEARCH_RESULT_VALID,
+                packageMetadata,
+            )
 
-        assertThat(result).isNull()
+        assertThat(result)
+            .isEqualTo(
+                AppFunctionMetadata.Builder(STATIC_METADATA_DOCUMENT, packageMetadata).build()
+            )
+    }
+
+    @Test
+    fun buildAppFunctionMetadata_staticAppFunctionEnabled() {
+        whenever(metadataCache.isDynamicFunction(any(), any(), any())).thenReturn(false)
+
+        val packageMetadata = AppFunctionPackageMetadata.create("testPackage", listOf())
+        val result =
+            appFunctionMetadataReader.buildAppFunctionMetadata(
+                TEST_SEARCH_RESULT_VALID,
+                packageMetadata,
+            )
+
+        assertThat(result)
+            .isEqualTo(
+                AppFunctionMetadata.Builder(STATIC_METADATA_DOCUMENT, packageMetadata).build()
+            )
+    }
+
+    @Test
+    fun buildAppFunctionMetadata_staticAppFunctionDisabled() {
+        whenever(metadataCache.isDynamicFunction(any(), any(), any())).thenReturn(false)
+
+        val packageMetadata = AppFunctionPackageMetadata.create("testPackage", listOf())
+        val result =
+            appFunctionMetadataReader.buildAppFunctionMetadata(
+                TEST_SEARCH_RESULT_VALID_2,
+                packageMetadata,
+            )
+
+        assertThat(result)
+            .isEqualTo(
+                AppFunctionMetadata.Builder(STATIC_METADATA_DOCUMENT_2, packageMetadata).build()
+            )
+    }
+
+    @Test
+    fun getAppFunctionStates_missingRuntimeMetadata_returnsEmptyList() = doBlocking {
+        val resultMissingRuntime =
+            SearchResult.Builder("", "").setGenericDocument(STATIC_METADATA_DOCUMENT).build()
+        val testFutureSearchResults =
+            object : FutureSearchResults {
+                var pageNumber = 0
+
+                override fun getNextPage(): AndroidFuture<List<SearchResult?>?> {
+                    return when (pageNumber++) {
+                        0 -> AndroidFuture.completedFuture(listOf(resultMissingRuntime))
+                        else -> AndroidFuture.completedFuture(listOf())
+                    }
+                }
+
+                override fun close() {}
+            }
+        val futureGlobalSearchSession = mock<FutureGlobalSearchSession>()
+        whenever(futureGlobalSearchSession.search(any(), any()))
+            .thenReturn(AndroidFuture.completedFuture(testFutureSearchResults))
+
+        val functionNames = setOf(AppFunctionName("testPackage", "testFunctionId"))
+        val resultFuture =
+            appFunctionMetadataReader.getAppFunctionStates(
+                futureGlobalSearchSession,
+                functionNames,
+                0,
+            )
+        val resultStates = resultFuture.get()
+
+        assertThat(resultStates).isEmpty()
+    }
+
+    @Test
+    fun getAppFunctionStates_pagination_collectsAllStates() = doBlocking {
+        val testFutureSearchResults =
+            object : FutureSearchResults {
+                var pageNumber = 0
+
+                override fun getNextPage(): AndroidFuture<List<SearchResult?>?> {
+                    return when (pageNumber++) {
+                        0 ->
+                            AndroidFuture.completedFuture(
+                                listOf(GET_APP_FUNCTION_STATE_SEARCH_RESULT_ENABLED)
+                            )
+                        1 ->
+                            AndroidFuture.completedFuture(
+                                listOf(GET_APP_FUNCTION_STATE_SEARCH_RESULT_DISABLED)
+                            )
+                        else -> AndroidFuture.completedFuture(listOf())
+                    }
+                }
+
+                override fun close() {}
+            }
+        val futureGlobalSearchSession = mock<FutureGlobalSearchSession>()
+        whenever(futureGlobalSearchSession.search(any(), any()))
+            .thenReturn(AndroidFuture.completedFuture(testFutureSearchResults))
+
+        val function1 = AppFunctionName("testPackage", "testFunctionId")
+        val function2 = AppFunctionName("testPackage", "testFunctionId2")
+        val functionNames = setOf(function1, function2)
+        val resultFuture =
+            appFunctionMetadataReader.getAppFunctionStates(
+                futureGlobalSearchSession,
+                functionNames,
+                0,
+            )
+        val resultStates = resultFuture.get()
+
+        assertThat(resultStates).hasSize(2)
+        val state1 = resultStates[0]
+        assertThat(state1.functionName).isEqualTo(function1)
+        assertThat(state1.isEnabled).isTrue()
+        val state2 = resultStates[1]
+        assertThat(state2.functionName).isEqualTo(function2)
+        assertThat(state2.isEnabled).isFalse()
     }
 
     private suspend fun IAppFunctionSearchResults.getNextPage(): List<AppFunctionMetadata> {
@@ -273,12 +430,28 @@ class AppFunctionMetadataReaderTest {
     private fun doBlocking(block: suspend CoroutineScope.() -> Unit) = runBlocking(block = block)
 
     companion object {
+        val INVALID_STATIC_METADATA_DOCUMENT =
+            GenericDocument.Builder<GenericDocument.Builder<*>>(
+                    "",
+                    "testPackage", // Malform id format
+                    "",
+                )
+                .setPropertyString(PROPERTY_PACKAGE_NAME, "testPackage")
+                .setPropertyString(PROPERTY_SCHEMA_CATEGORY, "testCategory")
+                .setPropertyString(PROPERTY_SCHEMA_NAME, "testName")
+                .setPropertyLong(PROPERTY_SCHEMA_VERSION, 1L)
+                .setPropertyBoolean(
+                    AppFunctionStaticMetadataHelper.STATIC_PROPERTY_ENABLED_BY_DEFAULT,
+                    true,
+                )
+                .build()
         val STATIC_METADATA_DOCUMENT =
             GenericDocument.Builder<GenericDocument.Builder<*>>(
                     "",
                     "testPackage/testFunctionId",
                     "",
                 )
+                .setPropertyString(PROPERTY_PACKAGE_NAME, "testPackage")
                 .setPropertyString(PROPERTY_SCHEMA_CATEGORY, "testCategory")
                 .setPropertyString(PROPERTY_SCHEMA_NAME, "testName")
                 .setPropertyLong(PROPERTY_SCHEMA_VERSION, 1L)
@@ -293,12 +466,13 @@ class AppFunctionMetadataReaderTest {
                     "testPackage/testFunctionId2",
                     "",
                 )
+                .setPropertyString(PROPERTY_PACKAGE_NAME, "testPackage")
                 .setPropertyString(PROPERTY_SCHEMA_CATEGORY, "testCategory")
                 .setPropertyString(PROPERTY_SCHEMA_NAME, "testName")
                 .setPropertyLong(PROPERTY_SCHEMA_VERSION, 1L)
                 .setPropertyBoolean(
                     AppFunctionStaticMetadataHelper.STATIC_PROPERTY_ENABLED_BY_DEFAULT,
-                    true,
+                    false,
                 )
                 .build()
         val RUNTIME_METADATA_DOCUMENT =
@@ -309,22 +483,55 @@ class AppFunctionMetadataReaderTest {
                     AppFunctionManager.APP_FUNCTION_STATE_DEFAULT.toLong(),
                 )
                 .build()
+        val RUNTIME_METADATA_DOCUMENT_DISABLED =
+            GenericDocument.Builder<GenericDocument.Builder<*>>("", "", "")
+                .setPropertyString(PROPERTY_PACKAGE_NAME, "testPackage")
+                .setPropertyLong(
+                    PROPERTY_ENABLED,
+                    AppFunctionManager.APP_FUNCTION_STATE_DISABLED.toLong(),
+                )
+                .build()
 
-        val JOINED_RESULT =
-            SearchResult.Builder("", "").setGenericDocument(RUNTIME_METADATA_DOCUMENT).build()
-
-        val TEST_SEARCH_RESULT_VALID =
+        val GET_APP_FUNCTION_STATE_SEARCH_RESULT_ENABLED =
             SearchResult.Builder("", "")
                 .setGenericDocument(STATIC_METADATA_DOCUMENT)
-                .addJoinedResult(JOINED_RESULT)
+                .addJoinedResult(
+                    SearchResult.Builder("", "")
+                        .setGenericDocument(RUNTIME_METADATA_DOCUMENT)
+                        .build()
+                )
                 .build()
-        val TEST_SEARCH_RESULT_VALID_2 =
+        val GET_APP_FUNCTION_STATE_SEARCH_RESULT_DISABLED =
             SearchResult.Builder("", "")
                 .setGenericDocument(STATIC_METADATA_DOCUMENT_2)
-                .addJoinedResult(JOINED_RESULT)
+                .addJoinedResult(
+                    SearchResult.Builder("", "")
+                        .setGenericDocument(RUNTIME_METADATA_DOCUMENT_DISABLED)
+                        .build()
+                )
                 .build()
-        val TEST_SEARCH_RESULT_MISSING_RUNTIME_METADATA =
+
+        val TEST_SEARCH_RESULT_VALID =
             SearchResult.Builder("", "").setGenericDocument(STATIC_METADATA_DOCUMENT).build()
+        val TEST_SEARCH_RESULT_VALID_2 =
+            SearchResult.Builder("", "").setGenericDocument(STATIC_METADATA_DOCUMENT_2).build()
+
+        val TEST_TOP_LEVEL_DOCUMENT =
+            GenericDocument.Builder<GenericDocument.Builder<*>>(
+                    "",
+                    "testPackage/testTopLevelDocument",
+                    "",
+                )
+                .setPropertyString("customTopLevelProperty", "value1")
+                .build()
+        val TEST_TOP_LEVEL_SEARCH_RESULT =
+            SearchResult.Builder("", "").setGenericDocument(TEST_TOP_LEVEL_DOCUMENT).build()
+        val TEST_SEARCH_RESULT_VALID_DISABLED =
+            SearchResult.Builder("", "").setGenericDocument(STATIC_METADATA_DOCUMENT).build()
+        val TEST_SEARCH_RESULT_INVALID_METADATA =
+            SearchResult.Builder("", "")
+                .setGenericDocument(INVALID_STATIC_METADATA_DOCUMENT)
+                .build()
 
         val EMPTY_SEARCH_SPEC = AppFunctionSearchSpec.Builder().build()
     }

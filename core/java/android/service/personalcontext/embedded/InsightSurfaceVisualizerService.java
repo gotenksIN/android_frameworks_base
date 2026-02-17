@@ -18,6 +18,7 @@ package android.service.personalcontext.embedded;
 
 import static android.annotation.SystemApi.Client.PRIVILEGED_APPS;
 
+import android.Manifest;
 import android.annotation.FlaggedApi;
 import android.annotation.SdkConstant;
 import android.annotation.SystemApi;
@@ -29,15 +30,17 @@ import android.os.Handler;
 import android.os.HandlerExecutor;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.OutcomeReceiver;
 import android.os.RemoteException;
+import android.os.ResultReceiver;
 import android.service.personalcontext.Flags;
+import android.service.personalcontext.RenderToken;
 import android.service.personalcontext.insight.ContextInsight;
 import android.service.personalcontext.insight.ContextInsightWrapper;
 import android.util.Log;
 import android.view.Display;
 import android.view.SurfaceControlViewHost;
 import android.view.View;
-import android.view.View.MeasureSpec;
 import android.view.WindowManager;
 import android.window.InputTransferToken;
 
@@ -48,7 +51,6 @@ import com.android.internal.annotations.VisibleForTesting;
 
 import java.lang.ref.WeakReference;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.Executor;
@@ -61,7 +63,7 @@ import java.util.function.Consumer;
  * disconnected via the {@link #onClientConnected} and {@link #onClientDisconnected} methods.
  *
  * <p>You must declare the service in the AndroidManifest of the app hosting the service with the
- * {@link android.Manifest.permission#BIND_INSIGHT_SURFACE_VISUALIZER_SERVICE} permission,
+ * {@link Manifest.permission#BIND_INSIGHT_SURFACE_VISUALIZER_SERVICE} permission,
  * and include an intent filter with the necessary action indicating that it is an
  * {@link InsightSurfaceVisualizerService} ({@link #SERVICE_INTERFACE}).
  *
@@ -105,7 +107,7 @@ public abstract class InsightSurfaceVisualizerService extends Service {
         SurfaceControlViewHost createSurfaceControlViewHost(
                 @NonNull Context context,
                 @NonNull Display display,
-                @NonNull InputTransferToken inputTransferToken);
+                @Nullable InputTransferToken inputTransferToken);
     }
 
     /**
@@ -237,18 +239,51 @@ public abstract class InsightSurfaceVisualizerService extends Service {
      * list of {@link ContextInsight}s.
      *
      * @param context a {@link Context} suitable for creating {@link View}s in the current display
-     * @param insights the list of {@link ContextInsight}s that subclasses can use to create the
+     * @param insight the {@link ContextInsight} that subclasses can use to create the
      *                 embedded {@link View}
+     * @param renderToken the {@link RenderToken} associated with the insight
      * @param info the {@link InsightSurfaceClientInfo} containing information about the client
      * @return the {@link View} that will be passed to the client
      */
     @Nullable
     public abstract View onCreateEmbeddedView(
             @NonNull Context context,
-            @NonNull List<ContextInsight> insights,
+            @NonNull ContextInsight insight,
+            @Nullable RenderToken renderToken,
             @NonNull InsightSurfaceClientInfo info);
 
-    private static final class BinderService extends IEmbeddedInsightSurfaceVisualizer.Stub {
+    /**
+     * An insight surface client has been updated. Subclasses that wish to handled updates should
+     * override this method and return whether the update was accepted. The return value will be
+     * sent back to the client via an {@link OutcomeReceiver} callback (see
+     * {@link InsightSurfaceSession#update} for more details).
+     *
+     * @param oldClientInfo the old {@link InsightSurfaceClientInfo} for the client
+     * @param newClientInfo the new {@link InsightSurfaceClientInfo} for the client
+     * @return true if the update was accepted by the visualizer; the client will be informed of
+     * update acceptance through its {@link InsightSurfaceSession}
+     */
+    public boolean onClientUpdated(
+            @NonNull InsightSurfaceClientInfo oldClientInfo,
+            @NonNull InsightSurfaceClientInfo newClientInfo) {
+        return false;
+    }
+
+    private void onClientUpdated(
+            InsightSurfaceClientInfo oldClientInfo,
+            InsightSurfaceClientInfo newClientInfo,
+            ResultReceiver receiver) {
+        final boolean success = onClientUpdated(oldClientInfo, newClientInfo);
+        if (receiver != null) {
+            receiver.send(
+                    success
+                            ? IInsightSurfaceSession.UPDATE_OK
+                            : IInsightSurfaceSession.UPDATE_DECLINED,
+                    null);
+        }
+    }
+
+    private static final class BinderService extends IInsightSurfaceVisualizer.Stub {
         private final WeakReference<InsightSurfaceVisualizerService> mService;
         private final Context mContext;
         private final Display mDisplay;
@@ -272,16 +307,17 @@ public abstract class InsightSurfaceVisualizerService extends Service {
 
         @Override
         public void createVisualizationForClient(
-                List<ContextInsightWrapper> insights,
+                ContextInsightWrapper insight,
                 InsightSurfaceClientInfo clientInfo,
-                IEmbeddedInsightSurfaceVisualizerCallback callback) {
+                RenderToken renderToken,
+                IVisualizationResult result) {
             post(service -> {
 
                 final View view = service.onCreateEmbeddedView(
-                        mContext, ContextInsightWrapper.unwrapList(insights), clientInfo);
+                        mContext, insight.getContextInsight(), renderToken, clientInfo);
                 if (view == null) {
                     Log.e(TAG, "onCreateEmbeddedView returned null for client: " + clientInfo);
-                    sendResult(/*visualizationCreated= */ false, callback);
+                    sendResult(/*visualizationCreated= */ false, result);
                     return;
                 }
 
@@ -292,25 +328,41 @@ public abstract class InsightSurfaceVisualizerService extends Service {
 
                 final SurfaceControlViewHost surfaceControlViewHost =
                         mSurfaceControlViewHostFactory.createSurfaceControlViewHost(
-                                mContext, mDisplay, clientInfo.getInputTransferToken());
+                                mContext, mDisplay, null);
                 mSurfaceControlViewHostsByClient.put(clientInfo.getId(), surfaceControlViewHost);
 
-                surfaceControlViewHost.setView(
-                        view,
-                        MeasureSpec.getSize(clientInfo.getWidthMeasureSpec()),
-                        MeasureSpec.getSize(clientInfo.getHeightMeasureSpec()));
-                clientInfo.onSurfaceCreated(surfaceControlViewHost.getSurfacePackage());
+                // TODO(b/479575802): Just a temporary fix for setting the view dimensions.
+                view.addOnLayoutChangeListener(
+                        (v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
+                            view.measure(
+                                    clientInfo.getMeasureSpecWidth(),
+                                    clientInfo.getMeasureSpecHeight());
+                            final int measuredWidth = view.getMeasuredWidth();
+                            final int measuredHeight = view.getMeasuredHeight();
+                            surfaceControlViewHost.relayout(measuredWidth, measuredHeight);
+                            clientInfo.onSizeChanged(measuredWidth, measuredHeight);
+                        });
+                surfaceControlViewHost.setView(view, 0, 0);
+
+                clientInfo.onSurfaceCreated(
+                        surfaceControlViewHost.getSurfacePackage(),
+                        new IInsightSurfaceSession.Stub() {
+                            @Override
+                            public void onClientUpdated(
+                                    InsightSurfaceClientInfo oldClientInfo,
+                                    InsightSurfaceClientInfo newClientInfo,
+                                    ResultReceiver receiver) {
+                                post(service ->
+                                        service.onClientUpdated(
+                                                oldClientInfo, newClientInfo, receiver));
+                            }
+                        });
 
                 // Tell the visualizer the client is now connected.
                 service.onClientConnected(clientInfo);
 
-                sendResult(/*visualizationCreated= */ true, callback);
+                sendResult(/*visualizationCreated= */ true, result);
             });
-        }
-
-        @Override
-        public void onClientConnected(InsightSurfaceClientInfo client) {
-            post(service -> service.onClientConnected(client));
         }
 
         @Override
@@ -338,9 +390,9 @@ public abstract class InsightSurfaceVisualizerService extends Service {
         }
 
         private void sendResult(
-                boolean visualizationCreated, IEmbeddedInsightSurfaceVisualizerCallback callback) {
+                boolean visualizationCreated, IVisualizationResult result) {
             try {
-                callback.onResult(visualizationCreated);
+                result.onResult(visualizationCreated);
             } catch (RemoteException e) {
                 Log.e(TAG, "Error sending result", e);
             }

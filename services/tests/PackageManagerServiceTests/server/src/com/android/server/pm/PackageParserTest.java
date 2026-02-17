@@ -178,6 +178,14 @@ public class PackageParserTest {
             "PackageParserTestPccAndIsolatedService.apk";
     private static final String TEST_APP_ALLOW_ACCESS_APK =
             "PackageParserTestAllowComponentAccess.apk";
+    private static final String TEST_APP_BACKUP_AGENT_PROCESS_PCC_APK =
+            "PackageParserTestBackupAgentProcessPcc.apk";
+    private static final String TEST_APP_BACKUP_AGENT_PROCESS_PCC_NO_PCC_COMPONENTS_APK =
+            "PackageParserTestBackupAgentProcessPccNoPccComponents.apk";
+    private static final String TEST_APP_BACKUP_AGENT_PROCESS_MAIN_APK =
+            "PackageParserTestBackupAgentProcessMain.apk";
+    private static final String TEST_APP_BACKUP_AGENT_PROCESS_NOT_SPECIFIED_APK =
+            "PackageParserTestBackupAgentProcessNotSpecified.apk";
     private static final String PACKAGE_NAME = "com.android.servicestests.apps.packageparserapp";
 
     @Before
@@ -1242,6 +1250,107 @@ public class PackageParserTest {
         }
     }
 
+    @Test
+    @RequiresFlagsEnabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    public void testParseBackupAgentProcess_Pcc_FlagEnabled() throws Exception {
+        final File testFile = extractFile(TEST_APP_BACKUP_AGENT_PROCESS_PCC_APK);
+        try {
+            final ParsedPackage pkg = new TestPackageParser2().parsePackage(testFile, 0, false);
+            assertThat(pkg.getBackupAgentProcess())
+                    .isEqualTo(ApplicationInfo.BACKUP_AGENT_PROCESS_PCC);
+            assertThat(pkg.hasPccComponents()).isTrue();
+        } finally {
+            testFile.delete();
+        }
+    }
+
+    @Test
+    @RequiresFlagsDisabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    public void testParseBackupAgentProcess_Pcc_FlagDisabled() throws Exception {
+        final File testFile = extractFile(TEST_APP_BACKUP_AGENT_PROCESS_PCC_APK);
+        try {
+            final ParsedPackage pkg = new TestPackageParser2().parsePackage(testFile, 0, false);
+            assertThat(pkg.getBackupAgentProcess())
+                    .isEqualTo(ApplicationInfo.BACKUP_AGENT_PROCESS_MAIN);
+            assertThat(pkg.hasPccComponents()).isFalse();
+        } finally {
+            testFile.delete();
+        }
+    }
+
+    @Test
+    @RequiresFlagsEnabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    public void testParsetestParseBackupAgentProcess_Pcc_NoPccComponents_Fails() throws Exception {
+        final File testFile = extractFile(TEST_APP_BACKUP_AGENT_PROCESS_PCC_NO_PCC_COMPONENTS_APK);
+        try {
+            new TestPackageParser2().parsePackage(testFile, 0, false);
+            fail("Parsing a package setting backup agent process to pcc without pcc components "
+                    + "should fail");
+        } catch (PackageParserException e) {
+            assertThat(e.getMessage()).contains(
+                    "Application has private compute core backup agent without other"
+                            + " private compute core components");
+        } finally {
+            testFile.delete();
+        }
+    }
+
+    @Test
+    @RequiresFlagsEnabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    public void testParseBackupAgentProcess_Default_FlagEnabled() throws Exception {
+        final File testFile = extractFile(TEST_APP_BACKUP_AGENT_PROCESS_MAIN_APK);
+        try {
+            final ParsedPackage pkg = new TestPackageParser2().parsePackage(testFile, 0, false);
+            assertThat(pkg.getBackupAgentProcess())
+                    .isEqualTo(ApplicationInfo.BACKUP_AGENT_PROCESS_MAIN);
+            assertThat(pkg.hasPccComponents()).isFalse();
+        } finally {
+            testFile.delete();
+        }
+    }
+
+    @Test
+    @RequiresFlagsDisabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    public void testParseBackupAgentProcess_Default_FlagDisabled() throws Exception {
+        final File testFile = extractFile(TEST_APP_BACKUP_AGENT_PROCESS_MAIN_APK);
+        try {
+            final ParsedPackage pkg = new TestPackageParser2().parsePackage(testFile, 0, false);
+            assertThat(pkg.getBackupAgentProcess())
+                    .isEqualTo(ApplicationInfo.BACKUP_AGENT_PROCESS_MAIN);
+            assertThat(pkg.hasPccComponents()).isFalse();
+        } finally {
+            testFile.delete();
+        }
+    }
+
+    @Test
+    @RequiresFlagsEnabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    public void testParseBackupAgentProcess_NotSpecified_FlagEnabled() throws Exception {
+        final File testFile = extractFile(TEST_APP_BACKUP_AGENT_PROCESS_NOT_SPECIFIED_APK);
+        try {
+            final ParsedPackage pkg = new TestPackageParser2().parsePackage(testFile, 0, false);
+            assertThat(pkg.getBackupAgentProcess())
+                    .isEqualTo(ApplicationInfo.BACKUP_AGENT_PROCESS_MAIN);
+            assertThat(pkg.hasPccComponents()).isFalse();
+        } finally {
+            testFile.delete();
+        }
+    }
+
+    @Test
+    @RequiresFlagsDisabled(android.app.privatecompute.flags.Flags.FLAG_ENABLE_PCC_FRAMEWORK_SUPPORT)
+    public void testParseBackupAgentProcess_NotSpecified_FlagDisabled() throws Exception {
+        final File testFile = extractFile(TEST_APP_BACKUP_AGENT_PROCESS_NOT_SPECIFIED_APK);
+        try {
+            final ParsedPackage pkg = new TestPackageParser2().parsePackage(testFile, 0, false);
+            assertThat(pkg.getBackupAgentProcess())
+                    .isEqualTo(ApplicationInfo.BACKUP_AGENT_PROCESS_MAIN);
+            assertThat(pkg.hasPccComponents()).isFalse();
+        } finally {
+            testFile.delete();
+        }
+    }
+
     /**
      * A subclass of package parser that adds a "cache_" prefix to the package name for the cached
      * results. This is used by tests to tell if a ParsedPackage is generated from the cache or not.
@@ -1703,7 +1812,7 @@ public class PackageParserTest {
 
     @Test
     @RequiresFlagsEnabled(com.android.internal.pm.pkg.component.flags.Flags
-            .FLAG_ENABLE_ACTIVITY_ALIAS_PERSISTABLE_MODE)
+            .FLAG_ENABLE_ACTIVITY_ALIAS_PERSISTABLE_MODE_BUGFIX)
     public void testParseActivityAlias_inheritPersistableMode() throws Exception {
         final File testFile = extractFile("PackageParserTestActivityAlias.apk");
         try {
@@ -1725,7 +1834,7 @@ public class PackageParserTest {
 
     @Test
     @RequiresFlagsDisabled(com.android.internal.pm.pkg.component.flags.Flags
-            .FLAG_ENABLE_ACTIVITY_ALIAS_PERSISTABLE_MODE)
+            .FLAG_ENABLE_ACTIVITY_ALIAS_PERSISTABLE_MODE_BUGFIX)
     public void testParseActivityAlias_inheritPersistableMode_flagDisabled() throws Exception {
         final File testFile = extractFile("PackageParserTestActivityAlias.apk");
         try {

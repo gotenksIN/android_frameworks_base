@@ -115,7 +115,7 @@ final class AppCompatCameraSimReqOrientationPolicy implements AppCompatCameraSta
                 && (DesktopModeHelper.canEnterDesktopMode(displayContent.mWmService.mContext)
                         || Flags.cameraCompatUnifyCameraPolicies())
                 && displayContent.mWmService.mAppCompatConfiguration
-                        .isCameraCompatSimulateRequestedOrientationTreatmentEnabled();
+                        .isCameraCompatSimReqOrientationTreatmentEnabled();
     }
 
     @Override
@@ -364,7 +364,7 @@ final class AppCompatCameraSimReqOrientationPolicy implements AppCompatCameraSta
         return isCameraRunningAndWindowingModeEligible(activity);
     }
 
-    boolean shouldCameraCompatControlOrientation(@NonNull ActivityRecord activity) {
+    boolean isActivityEligibleForOrientationOverride(@NonNull ActivityRecord activity) {
         return isCameraRunningAndWindowingModeEligible(activity);
     }
 

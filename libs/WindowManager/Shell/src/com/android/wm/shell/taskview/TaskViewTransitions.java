@@ -27,7 +27,6 @@ import static android.view.WindowManager.TRANSIT_TO_FRONT;
 
 import static com.android.window.flags.Flags.enableHandlersDebuggingMode;
 import static com.android.wm.shell.bubbles.util.BubbleUtils.getExitBubbleTransaction;
-import static com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_BUBBLES;
 import static com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_BUBBLES_NOISY;
 import static com.android.wm.shell.transition.TransitionDispatchState.CAPTURED_CHANGE_IN_WRONG_TRANSITION;
 import static com.android.wm.shell.transition.TransitionDispatchState.CAPTURED_UNRELATED_CHANGE;
@@ -61,7 +60,6 @@ import com.android.wm.shell.Flags;
 import com.android.wm.shell.ShellTaskOrganizer;
 import com.android.wm.shell.bubbles.BubbleHelper;
 import com.android.wm.shell.common.ShellExecutor;
-import com.android.wm.shell.common.SyncTransactionQueue;
 import com.android.wm.shell.shared.TransitionUtil;
 import com.android.wm.shell.shared.bubbles.BubbleAnythingFlagHelper;
 import com.android.wm.shell.shared.bubbles.logging.BubbleLog;
@@ -86,8 +84,8 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
     private final boolean[] mRegistered = new boolean[]{false};
     private final ShellTaskOrganizer mTaskOrganizer;
     private final Executor mShellExecutor;
-    private final SyncTransactionQueue mSyncQueue;
     private final Optional<BubbleHelper> mBubbleHelper;
+    private final Optional<TaskViewRootTask> mTaskViewRootTask;
 
     /** A temp transaction used for quick things. */
     private final SurfaceControl.Transaction mTransaction = new SurfaceControl.Transaction();
@@ -98,12 +96,6 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
      * transition once the TaskView is ready.
      */
     private PendingRedirectTransition mPendingRedirectTransition;
-
-    /**
-     * The task info of the Root Task that organized the TaskView's tasks.
-     */
-    @Nullable
-    private ActivityManager.RunningTaskInfo mRootTaskInfo;
 
     /**
      * TaskView makes heavy use of startTransition. Only one shell-initiated transition can be
@@ -145,14 +137,14 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
     }
 
     public TaskViewTransitions(Transitions transitions, TaskViewRepository repository,
-            ShellTaskOrganizer taskOrganizer, SyncTransactionQueue syncQueue,
-            Optional<BubbleHelper> bubbleHelper) {
+            ShellTaskOrganizer taskOrganizer, Optional<BubbleHelper> bubbleHelper,
+            Optional<TaskViewRootTask> taskViewRootTask) {
         mTransitions = transitions;
         mTaskOrganizer = taskOrganizer;
         mShellExecutor = taskOrganizer.getExecutor();
-        mSyncQueue = syncQueue;
         mTaskViewRepo = repository;
         mBubbleHelper = bubbleHelper;
+        mTaskViewRootTask = taskViewRootTask;
         // Defer registration until the first TaskView because we want this to be the "first" in
         // priority when handling requests.
         // TODO(210041388): register here once we have an explicit ordering mechanism.
@@ -698,7 +690,12 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
             return pending != null && taskInfo.containsLaunchCookie(pending.mLaunchCookie);
         }
         if (isTaskViewTask(taskInfo)) {
-            return true;
+            if (!BubbleAnythingFlagHelper.enableRootTaskForBubble() || !taskInfo.hasParentTask()) {
+                return true;
+            }
+            if (mBubbleHelper.isPresent() && mBubbleHelper.get().isAppBubbleTask(taskInfo)) {
+                return true;
+            }
         }
 
         // In some cases, findTaskView returns null but the change is still a task view:
@@ -1131,10 +1128,6 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
             updateBounds(taskView, boundsOnScreen, startTransaction, finishTransaction, taskInfo,
                     leash, wct);
         } else {
-            // Note: This shouldn't happen, but when this happens on Bubble with root Task approach,
-            // it will move the leaf Task to TDA, which leaves the Bubble in a broken state.
-            ProtoLog.e(WM_SHELL_BUBBLES,
-                    "Transitions.prepareOpenAnimation(): open TaskView's surface was not created");
             // The surface has already been destroyed before the task has appeared,
             // so go ahead and hide the task entirely
             wct.setHidden(taskInfo.token, true /* hidden */);
@@ -1239,20 +1232,19 @@ public class TaskViewTransitions implements Transitions.TransitionHandler, TaskV
     public void updateTaskViewTaskBounds(@NonNull WindowContainerTransaction wct,
             @NonNull ActivityManager.RunningTaskInfo taskInfo, @NonNull Rect bounds) {
         final WindowContainerToken token;
-        if (!taskInfo.hasParentTask() || mRootTaskInfo == null
-                || taskInfo.parentTaskId != mRootTaskInfo.taskId) {
+        final ActivityManager.RunningTaskInfo rootTaskInfo = getRootTaskInfo();
+        if (!taskInfo.hasParentTask() || rootTaskInfo == null
+                || taskInfo.parentTaskId != rootTaskInfo.taskId) {
             token = taskInfo.token;
         } else {
-            token = mRootTaskInfo.token;
+            token = rootTaskInfo.token;
         }
         wct.setBounds(token, bounds);
     }
 
-    /**
-     * Sets the root task info that organize the TaskView's task.
-     */
-    public void setTaskViewRootTaskInfo(@NonNull ActivityManager.RunningTaskInfo rootTaskInfo) {
-        mRootTaskInfo = rootTaskInfo;
+    @Nullable
+    private ActivityManager.RunningTaskInfo getRootTaskInfo() {
+        return mTaskViewRootTask.map(TaskViewRootTask::getRootTaskInfo).orElse(null);
     }
 
     private void executePendingRedirectTransition() {

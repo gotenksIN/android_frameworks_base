@@ -60,6 +60,11 @@ final class WindowContainerVisibilityHelperImpl implements WindowContainerVisibi
             return TASK_FRAGMENT_VISIBILITY_INVISIBLE;
         }
 
+        if (Flags.enablePresentationStopsTopTaskBugfix() && current.mWmService
+                .mPresentationController.shouldOccludeActivities(current.getDisplayId())) {
+            return TASK_FRAGMENT_VISIBILITY_INVISIBLE;
+        }
+
         if (isTopActivityLaunchedBehind(current)) {
             return TASK_FRAGMENT_VISIBILITY_VISIBLE;
         }
@@ -94,14 +99,18 @@ final class WindowContainerVisibilityHelperImpl implements WindowContainerVisibi
             }
         }
 
+        final boolean isForceLeafTaskNonOccluding = isForceNonOccludingByRootTask(current);
         AdjacentVisibilityHelper adjacentVisibilityHelper = null;
         final Rect tmpRect = new Rect();
         final List<TaskFragment> adjacentTaskFragments = new ArrayList<>();
         for (int i = parent.getChildCount() - 1; i >= 0; --i) {
-            final WindowContainer other = parent.getChildAt(i);
-            if (other == null) continue;
+            final WindowContainer<?> other = parent.getChildAt(i);
+            if (other.asTask() != null && other.asTask().isVisibilityBarrier()) {
+                // Visibility barrier and siblings below it are all invisible.
+                return TASK_FRAGMENT_VISIBILITY_INVISIBLE;
+            }
 
-            final boolean hasRunningActivities = hasRunningActivity(other);
+            final boolean containsCanBeVisibleActivity = containsCanBeVisibleActivity(other);
             if (other == current) {
                 if (Flags.fixTfAdjacentVisibility()) {
                     if (adjacentVisibilityHelper != null
@@ -137,23 +146,27 @@ final class WindowContainerVisibilityHelperImpl implements WindowContainerVisibi
                 }
                 // Should be visible if there is no other fragment occluding it, unless it doesn't
                 // have any running activities, not starting one and not home stack.
-                shouldBeVisible = hasRunningActivities
+                shouldBeVisible = containsCanBeVisibleActivity
                         || (starting != null && starting.isDescendantOf(current))
                         || (current.isActivityTypeHome() && !current.isEmbedded());
                 break;
             }
 
-            if (!hasRunningActivities) {
+            if (!containsCanBeVisibleActivity) {
+                continue;
+            }
+
+            if (isForceLeafTaskNonOccluding && other.asTask() != null
+                    && !other.asTask().isForceOpaque()) {
+                // Leaf Task is forced to be non-occluding unless it is force opaque.
                 continue;
             }
 
             // Must fill the parent to affect visibility.
             boolean affectsSiblingVisibility = other.fillsParentBounds();
-            if (DesktopExperienceFlags.ENABLE_SEE_THROUGH_TASK_FRAGMENTS.isTrue()) {
-                // It also must have filling content itself, to prevent empty or only partially
-                // occluding containers from affecting visibility.
-                affectsSiblingVisibility &= other.hasFillingContent();
-            }
+            // It also must have filling content itself, to prevent empty or only partially
+            // occluding containers from affecting visibility.
+            affectsSiblingVisibility &= other.hasFillingContent();
             if (affectsSiblingVisibility) {
                 // This task fragment is fully covered by |other|.
                 if (isTranslucent(other, starting)) {
@@ -237,8 +250,7 @@ final class WindowContainerVisibilityHelperImpl implements WindowContainerVisibi
             return false;
         }
 
-        final boolean behindOccludedContainer = !task.shouldBeVisible(null /* starting */)
-                || getOccludingActivityAbove(task, current) != null;
+        final boolean behindOccludedContainer = isActivityBehindOccluded(current);
         return current.updateAndCheckVisibility(behindOccludedContainer, ignoringKeyguard);
     }
 
@@ -252,6 +264,11 @@ final class WindowContainerVisibilityHelperImpl implements WindowContainerVisibi
         AdjacentVisibilityHelper adjacentVisibilityHelper = null;
         for (int i = childCount - 1; i >= 0; --i) {
             final WindowContainer<?> child = current.getChildAt(i);
+            if (child.asTask() != null && child.asTask().isVisibilityBarrier()) {
+                // Siblings behind the visibility barrier cannot be made visible, nor filling
+                // parent.
+                return false;
+            }
             if (child.fillsParentBounds() && child.hasFillingContent()) {
                 // At least one child fills this container and has content filling itself.
                 return true;
@@ -294,16 +311,11 @@ final class WindowContainerVisibilityHelperImpl implements WindowContainerVisibi
     }
 
     @Override
-    public boolean isOpaque(@NonNull WindowContainer<?> current) {
-        return mOpaqueContainerHelper.isOpaque(current);
-    }
-
-    @Override
     public boolean isOpaque(@NonNull WindowContainer<?> current,
             @Nullable ActivityRecord starting, boolean ignoringKeyguard,
-            boolean ignoringInvisibleActivity) {
+            boolean ignoringInvisibleActivity, boolean ignoringFinishing) {
         return mOpaqueContainerHelper.isOpaque(current, starting, ignoringKeyguard,
-                ignoringInvisibleActivity);
+                ignoringInvisibleActivity, ignoringFinishing);
     }
 
     private static boolean isBehindTransparentTaskFragment(@NonNull TaskFragment currentTf,
@@ -312,8 +324,30 @@ final class WindowContainerVisibilityHelperImpl implements WindowContainerVisibi
                 && currentTf.getBounds().intersect(otherTf.getBounds());
     }
 
-    private static boolean hasRunningActivity(@NonNull WindowContainer wc) {
+    /**
+     * Whether this or any of its activities can be made visible without changing their z-order.
+     */
+    private static boolean containsCanBeVisibleActivity(@NonNull WindowContainer wc) {
         if (wc.asTaskFragment() != null) {
+            if (Flags.visibilityManagementInBubbleRoot()) {
+                if (wc.asTaskFragment().isForceHidden()) {
+                    // Activity in hidden container cannot be made visible.
+                    return false;
+                }
+                if (wc.asTask() != null && !wc.asTask().isLeafTask()) {
+                    for (int i = wc.getChildCount() - 1; i >= 0; --i) {
+                        final WindowContainer<?> child = wc.getChildAt(i);
+                        if (child.asTask() != null && child.asTask().isVisibilityBarrier()) {
+                            // Siblings behind the visibility barrier cannot be made visible.
+                            return false;
+                        }
+                        if (containsCanBeVisibleActivity(child)) {
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+            }
             return wc.asTaskFragment().topRunningActivity() != null;
         }
         return wc.asActivityRecord() != null && !wc.asActivityRecord().finishing;
@@ -356,10 +390,41 @@ final class WindowContainerVisibilityHelperImpl implements WindowContainerVisibi
                 !mService.getLockTaskController().isLockTaskModeViolation(leafTask));
     }
 
+    /** Whether the given activity is behind another occluded window. */
+    private boolean isActivityBehindOccluded(@NonNull ActivityRecord current) {
+        if (!Flags.improveOcclusionCalculation()) {
+            final Task task = current.getTask();
+            return task == null || !task.shouldBeVisible(null /* starting */)
+                    || getOccludingActivityAbove(task, current) != null;
+        }
+
+        final TaskFragment tf = current.getTaskFragment();
+        if (tf == null || !tf.shouldBeVisible(null /* starting */)) {
+            // Its parent is behind occluded.
+            return true;
+        }
+        for (int i = tf.getChildCount() - 1; i >= 0; i--) {
+            final WindowContainer<?> child = tf.getChildAt(i);
+            if (child == current) {
+                return false;
+            }
+            if (isOpaque(child, null /* starting */, true /* ignoringKeyguard */,
+                    false /* ignoringInvisibleActivity */, true /* ignoringFinishing */)) {
+                // Check whether there is any opaque siblings above the given activity.
+                // Including invisible activities, but not finishing activities.
+                return true;
+            }
+        }
+        // Shouldn't reach.
+        return true;
+    }
+
     /**
      * Returns the top-most activity that occludes the given {@code activity}, or {@code null} if
      * none.
+     * @deprecated remove after {@link Flags#improveOcclusionCalculation}
      */
+    @Deprecated
     @Nullable
     private static ActivityRecord getOccludingActivityAbove(@NonNull Task current,
             @NonNull ActivityRecord activity) {
@@ -403,6 +468,12 @@ final class WindowContainerVisibilityHelperImpl implements WindowContainerVisibi
         return top != activity ? top : null;
     }
 
+    /** Whether all leaf Tasks in the same root Task are forced to be non-occluding. */
+    private static boolean isForceNonOccludingByRootTask(@NonNull TaskFragment current) {
+        final Task rootTask = current.getRootTask();
+        return current != rootTask && rootTask != null && rootTask.isForceLeafTasksNonOccluding();
+    }
+
     /** The helper to calculate whether a container is opaque. */
     private static class OpaqueContainerHelper implements Predicate<ActivityRecord> {
         private final boolean mEnableMultipleDesktopsBackend =
@@ -411,23 +482,28 @@ final class WindowContainerVisibilityHelperImpl implements WindowContainerVisibi
         private ActivityRecord mStarting;
         private boolean mIgnoringInvisibleActivity;
         private boolean mIgnoringKeyguard;
-
-        /** Whether the container is opaque. */
-        boolean isOpaque(@NonNull WindowContainer<?> container) {
-            return isOpaque(container, null /* starting */, true /* ignoringKeyguard */,
-                    false /* ignoringInvisibleActivity */);
-        }
+        private boolean mIgnoringFinishing;
 
         /**
-         * Whether the container is opaque, but only including visible activities in its
-         * calculation.
+         * @deprecated remove after {@link Flags#improveOcclusionCalculation}
          */
+        @Deprecated
+        private boolean isOpaque(@NonNull WindowContainer<?> container) {
+            return isOpaque(container, null /* starting */, true /* ignoringKeyguard */,
+                    false /* ignoringInvisibleActivity */, false /* ignoringFinishing */);
+        }
+
+        /** Whether the container is opaque. */
         boolean isOpaque(
                 @NonNull WindowContainer<?> container, @Nullable ActivityRecord starting,
-                boolean ignoringKeyguard,  boolean ignoringInvisibleActivity) {
+                boolean ignoringKeyguard,  boolean ignoringInvisibleActivity,
+                boolean ignoringFinishing) {
             mStarting = starting;
             mIgnoringInvisibleActivity = ignoringInvisibleActivity;
             mIgnoringKeyguard = ignoringKeyguard;
+            mIgnoringFinishing = Flags.improveOcclusionCalculation()
+                    ? ignoringFinishing || ignoringInvisibleActivity
+                    : ignoringInvisibleActivity;
 
             final boolean isOpaque;
             if (!mEnableMultipleDesktopsBackend) {
@@ -443,11 +519,16 @@ final class WindowContainerVisibilityHelperImpl implements WindowContainerVisibi
         private boolean isOpaqueInner(@NonNull WindowContainer<?> container) {
             final boolean isActivity = container.asActivityRecord() != null;
             final boolean isLeafTaskFragment = container.asTaskFragment() != null
-                    && ((TaskFragment) container).isLeafTaskFragment();
+                    && container.asTaskFragment().isLeafTaskFragment();
             final boolean isForceOpaque = container.asTask() != null
                     && container.asTask().isForceOpaque();
             if (isForceOpaque) {
                 return true;
+            }
+            if (container.asTask() != null && container.asTask().isLeafTask()
+                    && isForceNonOccludingByRootTask(container.asTask())) {
+                // All leaf Tasks are forced to be non-occluding.
+                return false;
             }
             if (isActivity || isLeafTaskFragment) {
                 // When it is an activity or leaf task fragment, then opacity is calculated based
@@ -462,7 +543,14 @@ final class WindowContainerVisibilityHelperImpl implements WindowContainerVisibi
             AdjacentVisibilityHelper adjacentVisibilityHelper = null;
             for (int i = container.getChildCount() - 1; i >= 0; --i) {
                 final WindowContainer<?> child = container.getChildAt(i);
-                if (child.fillsParent() && isOpaque(child)) {
+                if (child.asTask() != null && child.asTask().isVisibilityBarrier()) {
+                    // Siblings behind the visibility barrier cannot be made visible, nor opaque.
+                    break;
+                }
+
+                if (child.fillsParent() && (Flags.improveOcclusionCalculation()
+                        ? isOpaqueInner(child)
+                        : isOpaque(child))) {
                     return true;
                 }
 
@@ -470,8 +558,10 @@ final class WindowContainerVisibilityHelperImpl implements WindowContainerVisibi
                     final TaskFragment tf = child.asTaskFragment();
                     if (tf != null) {
                         if (tf.hasAdjacentTaskFragment() && adjacentVisibilityHelper == null) {
-                            adjacentVisibilityHelper = new AdjacentVisibilityHelper(
-                                    tf, this::isOpaque);
+                            adjacentVisibilityHelper = new AdjacentVisibilityHelper(tf,
+                                    Flags.improveOcclusionCalculation()
+                                            ? this::isOpaqueInner
+                                            : this::isOpaque);
                         }
                         if (adjacentVisibilityHelper != null) {
                             adjacentVisibilityHelper.process(tf);
@@ -488,9 +578,16 @@ final class WindowContainerVisibilityHelperImpl implements WindowContainerVisibi
                 } else {
                     if (child.asTaskFragment() != null
                             && child.asTaskFragment().hasAdjacentTaskFragment()) {
-                        final boolean isAnyTranslucent = !isOpaque(child)
-                                || child.asTaskFragment().forOtherAdjacentTaskFragments(
-                                        tf -> !isOpaque(tf));
+                        final boolean isAnyTranslucent;
+                        if (Flags.improveOcclusionCalculation()) {
+                            isAnyTranslucent = !isOpaqueInner(child)
+                                    || child.asTaskFragment().forOtherAdjacentTaskFragments(
+                                            tf -> !isOpaqueInner(tf));
+                        } else {
+                            isAnyTranslucent = !isOpaque(child)
+                                    || child.asTaskFragment().forOtherAdjacentTaskFragments(
+                                            tf -> !isOpaque(tf));
+                        }
                         if (!isAnyTranslucent) {
                             // This task fragment and all its adjacent task fragments are opaque,
                             // consider it opaque even if it doesn't fill its parent.
@@ -511,7 +608,7 @@ final class WindowContainerVisibilityHelperImpl implements WindowContainerVisibi
                 // (about to be visible).
                 return false;
             }
-            return r.occludesParent(!mIgnoringInvisibleActivity /* includingFinishing */);
+            return r.occludesParent(!mIgnoringFinishing);
         }
     }
 
@@ -549,18 +646,24 @@ final class WindowContainerVisibilityHelperImpl implements WindowContainerVisibi
         /**
          * Process the given TaskFragment. The TaskFragment should be one of the adjacent
          * TaskFragments or the TaskFragments in between the adjacent TFs.
+         *
+         * Note: the caller must call this on TaskFragments from top to bottom.
          */
         void process(@NonNull TaskFragment taskFragment) {
-            if (mUnprocessedAdjacentTaskFragments.contains(taskFragment)) {
-                mUnprocessedAdjacentTaskFragments.remove(taskFragment);
-            }
-
+            final boolean isAdjacent = mUnprocessedAdjacentTaskFragments.remove(taskFragment);
             if (mOccludingCallback.test(taskFragment)) {
                 // Remove the translucent TaskFragments if it can be fully occluded by this
                 // TaskFragment.
                 mTranslucentTaskFragments.removeIf(
                         t -> taskFragment.getBounds().contains(t.getBounds()));
             } else {
+                if (Flags.improveOcclusionCalculation() && !isAdjacent) {
+                    if (!isBehindTranslucentTaskFragment(taskFragment)) {
+                        // A non-adjacent TaskFragment should not be counted if it is not occluded
+                        // by other translucent adjacent TaskFragment.
+                        return;
+                    }
+                }
                 mTranslucentTaskFragments.add(taskFragment);
             }
         }

@@ -51,6 +51,9 @@ import static android.app.Notification.FLAG_ONGOING_EVENT;
 import static android.app.Notification.FLAG_ONLY_ALERT_ONCE;
 import static android.app.Notification.FLAG_PROMOTED_ONGOING;
 import static android.app.Notification.FLAG_USER_INITIATED_JOB;
+import static android.app.NotificationLoggingConstants.DATA_TYPE_NLS_RESTRICTED;
+import static android.app.NotificationLoggingConstants.DATA_TYPE_ZEN_CONFIG;
+import static android.app.NotificationLoggingConstants.ERROR_XML_PARSING;
 import static android.app.NotificationManager.ACTION_APP_BLOCK_STATE_CHANGED;
 import static android.app.NotificationManager.ACTION_AUTOMATIC_ZEN_RULE_STATUS_CHANGED;
 import static android.app.NotificationManager.ACTION_CONSOLIDATED_NOTIFICATION_POLICY_CHANGED;
@@ -75,6 +78,7 @@ import static android.app.NotificationManager.IMPORTANCE_LOW;
 import static android.app.NotificationManager.IMPORTANCE_MIN;
 import static android.app.NotificationManager.IMPORTANCE_NONE;
 import static android.app.NotificationManager.INTERRUPTION_FILTER_PRIORITY;
+import static android.app.NotificationManager.Policy.ALLOWED_INTERRUPTION_TYPE_UNSET;
 import static android.app.NotificationManager.Policy.SUPPRESSED_EFFECTS_UNSET;
 import static android.app.NotificationManager.Policy.SUPPRESSED_EFFECT_AMBIENT;
 import static android.app.NotificationManager.Policy.SUPPRESSED_EFFECT_BADGE;
@@ -85,11 +89,11 @@ import static android.app.NotificationManager.Policy.SUPPRESSED_EFFECT_PEEK;
 import static android.app.NotificationManager.Policy.SUPPRESSED_EFFECT_SCREEN_OFF;
 import static android.app.NotificationManager.Policy.SUPPRESSED_EFFECT_SCREEN_ON;
 import static android.app.NotificationManager.Policy.SUPPRESSED_EFFECT_STATUS_BAR;
+import static android.app.NotificationManager.ALLOWED_NAS_ADJUSTMENT_KEYS_CHANGED;
+import static android.app.NotificationManager.SUPPORTED_NAS_ADJUSTMENT_KEYS_CHANGED;
 import static android.app.NotificationManager.zenModeFromInterruptionFilter;
 import static android.app.StatusBarManager.ACTION_KEYGUARD_PRIVATE_NOTIFICATIONS_CHANGED;
 import static android.app.StatusBarManager.EXTRA_KM_PRIVATE_NOTIFS_ALLOWED;
-import static android.app.backup.NotificationLoggingConstants.DATA_TYPE_ZEN_CONFIG;
-import static android.app.backup.NotificationLoggingConstants.ERROR_XML_PARSING;
 import static android.content.Context.BIND_ALLOW_FREEZE;
 import static android.content.Context.BIND_ALLOW_WHITELIST_MANAGEMENT;
 import static android.content.Context.BIND_AUTO_CREATE;
@@ -105,7 +109,6 @@ import static android.content.pm.PackageManager.MATCH_ANY_USER;
 import static android.content.pm.PackageManager.MATCH_DIRECT_BOOT_AWARE;
 import static android.content.pm.PackageManager.MATCH_DIRECT_BOOT_UNAWARE;
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
-import static android.os.Flags.allowPrivateProfile;
 import static android.os.IServiceManager.DUMP_FLAG_PRIORITY_CRITICAL;
 import static android.os.IServiceManager.DUMP_FLAG_PRIORITY_NORMAL;
 import static android.os.PowerWhitelistManager.REASON_NOTIFICATION_SERVICE;
@@ -132,7 +135,7 @@ import static android.service.notification.Flags.notificationBitmapOffloading;
 import static android.service.notification.Flags.notificationRegroupOnClassification;
 import static android.service.notification.Flags.redactSensitiveNotificationsBigTextStyle;
 import static android.service.notification.Flags.redactSensitiveNotificationsFromUntrustedListeners;
-import static android.service.notification.Flags.reportNlsStartAndEnd;
+import static android.service.notification.Flags.splitSoundVibrationForNotificationBreakthrough;
 import static android.service.notification.NotificationListenerService.FLAG_FILTER_TYPE_ALERTING;
 import static android.service.notification.NotificationListenerService.FLAG_FILTER_TYPE_CONVERSATIONS;
 import static android.service.notification.NotificationListenerService.FLAG_FILTER_TYPE_ONGOING;
@@ -412,6 +415,7 @@ import com.android.server.notification.toast.CustomToastRecord;
 import com.android.server.notification.toast.TextToastRecord;
 import com.android.server.notification.toast.ToastRecord;
 import com.android.server.personalcontext.PersonalContextManagerInternal;
+import com.android.server.pm.GenericAllowlist;
 import com.android.server.pm.PackageManagerService;
 import com.android.server.pm.UserManagerInternal;
 import com.android.server.policy.PermissionPolicyInternal;
@@ -716,18 +720,21 @@ public class NotificationManagerService extends SystemService {
     private PostNotificationTrackerFactory mPostNotificationTrackerFactory;
 
     private LockPatternUtils mLockUtils;
-    private AppLockInternal mAppLockInternal;
+    // TODO(b/464052878): Make mAppLockInternal @NonNull when App Lock flags are removed.
+    @Nullable private AppLockInternal mAppLockInternal;
     final AppLockInternal.PackageLockedStateListener mPackageLockedStateListener =
             new AppLockInternal.PackageLockedStateListener() {
                 @Override
                 public void onPackageLockedStateChanged(@NonNull String packageName, int userId,
                         boolean locked) {
+                    Trace.beginSection(TAG + ".onPackageLockedStateChanged");
                     synchronized (mNotificationLock) {
                         if (locked == isPackageLockedByAppLockLocked(packageName, userId)) {
                             // Shouldn't happen, but this means it didn't change.
                             Slog.w(TAG,
                                     "onPackageLockedStateChanged called when the lock state "
                                             + "didn't change");
+                            Trace.endSection();
                             return;
                         }
                         // Cache the new value
@@ -737,6 +744,7 @@ public class NotificationManagerService extends SystemService {
                                 findAppNotificationByListLocked(mNotificationList, packageName,
                                         userId));
                     }
+                    Trace.endSection();
                 }
             };
 
@@ -1092,10 +1100,7 @@ public class NotificationManagerService extends SystemService {
     }
 
     boolean isProfileUser(UserInfo userInfo) {
-        if (privateSpaceFlagsEnabled()) {
-            return userInfo.isProfile() && hasParent(userInfo);
-        }
-        return userInfo.isManagedProfile() || userInfo.isCloneProfile();
+        return userInfo.isProfile() && hasParent(userInfo);
     }
 
     boolean hasParent(UserInfo profile) {
@@ -1243,29 +1248,31 @@ public class NotificationManagerService extends SystemService {
                 }
 
             } else if (PreferencesHelper.TAG_RANKING.equals(parser.getName())){
-                mPreferencesHelper.readXml(parser, forRestore, userId);
+                mPreferencesHelper.readXml(parser, forRestore, userId, logger);
             }
             if (mListeners.getConfig().xmlTag.equals(parser.getName())) {
                 if (ineligibleForManagedServices) {
                     continue;
                 }
-                mListeners.readXml(parser, mAllowedManagedServicePackages, forRestore, userId);
+                mListeners.readXml(
+                        parser, mAllowedManagedServicePackages, forRestore, userId, logger);
                 migratedManagedServices = true;
             } else if (mAssistants.getConfig().xmlTag.equals(parser.getName())) {
                 if (ineligibleForManagedServices) {
                     continue;
                 }
-                mAssistants.readXml(parser, mAllowedManagedServicePackages, forRestore, userId);
+                mAssistants.readXml(
+                        parser, mAllowedManagedServicePackages, forRestore, userId, logger);
                 migratedManagedServices = true;
             } else if (mConditionProviders.getConfig().xmlTag.equals(parser.getName())) {
                 if (ineligibleForManagedServices) {
                     continue;
                 }
                 mConditionProviders.readXml(
-                        parser, mAllowedManagedServicePackages, forRestore, userId);
+                        parser, mAllowedManagedServicePackages, forRestore, userId, logger);
                 migratedManagedServices = true;
             } else if (mSnoozeHelper.XML_TAG_NAME.equals(parser.getName())) {
-                mSnoozeHelper.readXml(parser, System.currentTimeMillis());
+                mSnoozeHelper.readXml(parser, System.currentTimeMillis(), logger);
             }
             if (LOCKSCREEN_ALLOW_SECURE_NOTIFICATIONS_TAG.equals(parser.getName())) {
                 if (forRestore && userId != USER_SYSTEM) {
@@ -1347,10 +1354,6 @@ public class NotificationManagerService extends SystemService {
         }
     }
 
-    protected static boolean privateSpaceFlagsEnabled() {
-        return allowPrivateProfile() && android.multiuser.Flags.enablePrivateSpaceFeatures();
-    }
-
     private final class SavePolicyFileRunnable implements Runnable {
         @Override
         public void run() {
@@ -1389,11 +1392,11 @@ public class NotificationManagerService extends SystemService {
         out.startTag(null, TAG_NOTIFICATION_POLICY);
         out.attributeInt(null, ATTR_VERSION, DB_VERSION);
         mZenModeHelper.writeXml(out, forBackup, null, userId, logger);
-        mPreferencesHelper.writeXml(out, forBackup, userId);
-        mListeners.writeXml(out, forBackup, userId);
-        mAssistants.writeXml(out, forBackup, userId);
-        mSnoozeHelper.writeXml(out);
-        mConditionProviders.writeXml(out, forBackup, userId);
+        mPreferencesHelper.writeXml(out, forBackup, userId, logger);
+        mListeners.writeXml(out, forBackup, userId, logger);
+        mAssistants.writeXml(out, forBackup, userId, logger);
+        mSnoozeHelper.writeXml(out, logger);
+        mConditionProviders.writeXml(out, forBackup, userId, logger);
         if (!forBackup || userId == USER_SYSTEM) {
             writeSecureNotificationsPolicy(out);
         }
@@ -2502,8 +2505,7 @@ public class NotificationManagerService extends SystemService {
                     mListeners.onUserStopped(userHandle);
                     mAssistants.onUserStopped(userHandle);
                 }
-            } else if (
-                    isProfileUnavailable(action)) {
+            } else if (action.equals(Intent.ACTION_PROFILE_UNAVAILABLE)) {
                 int userHandle = intent.getIntExtra(Intent.EXTRA_USER_HANDLE, -1);
                 if (userHandle >= 0) {
                     cancelAllNotificationsInt(MY_UID, MY_PID, null, null, 0, 0, userHandle,
@@ -2556,12 +2558,6 @@ public class NotificationManagerService extends SystemService {
                     mListeners.onUserUnlocked(userId);
                 }
             }
-        }
-
-        private boolean isProfileUnavailable(String action) {
-            return privateSpaceFlagsEnabled() ?
-                    action.equals(Intent.ACTION_PROFILE_UNAVAILABLE) :
-                    action.equals(Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE);
         }
     };
 
@@ -3104,9 +3100,7 @@ public class NotificationManagerService extends SystemService {
         filter.addAction(Intent.ACTION_USER_REMOVED);
         filter.addAction(Intent.ACTION_USER_UNLOCKED);
         filter.addAction(Intent.ACTION_MANAGED_PROFILE_UNAVAILABLE);
-        if (privateSpaceFlagsEnabled()){
-            filter.addAction(Intent.ACTION_PROFILE_UNAVAILABLE);
-        }
+        filter.addAction(Intent.ACTION_PROFILE_UNAVAILABLE);
         getContext().registerReceiverAsUser(mIntentReceiver, UserHandle.ALL, filter, null, null);
 
         IntentFilter pkgFilter = new IntentFilter();
@@ -3606,23 +3600,30 @@ public class NotificationManagerService extends SystemService {
             }
         } else if (phase == SystemService.PHASE_ACTIVITY_MANAGER_READY) {
             mSnoozeHelper.scheduleRepostsForPersistedNotifications(System.currentTimeMillis());
-            if (android.security.Flags.appLockCore()) {
+            if (android.security.Flags.appLockApis() && android.security.Flags.appLockCore()) {
+                Trace.beginSection(TAG + ".onBootPhase_AMReady_appLock");
                 // App Lock services gets registered by the ActivityManagerService, and then needs
                 // to initialize the map of App Lock locked states. Wait until it's ready.
                 mAppLockInternal = LocalServices.getService(AppLockInternal.class);
-                synchronized (mNotificationLock) {
-                    final SparseArray<Set<String>> appLockEnabledPackages =
-                            mAppLockInternal.getAppLockEnabledPackages();
-                    mAppLockLockedPackages.clear();
-                    for (int i = 0; i < appLockEnabledPackages.size(); i++) {
-                        final int userId = appLockEnabledPackages.keyAt(i);
-                        final Set<String> packages = appLockEnabledPackages.valueAt(i);
-                        if (packages != null) {
-                            mAppLockLockedPackages.put(userId, new ArraySet<>(packages));
+                if (mAppLockInternal == null) {
+                    Slog.wtf(TAG, "AppLockInternal is null");
+                } else {
+                    synchronized (mNotificationLock) {
+                        final SparseArray<Set<String>> appLockEnabledPackages =
+                                mAppLockInternal.getAppLockEnabledPackages();
+                        mAppLockLockedPackages.clear();
+                        for (int i = 0; i < appLockEnabledPackages.size(); i++) {
+                            final int userId = appLockEnabledPackages.keyAt(i);
+                            final Set<String> packages = appLockEnabledPackages.valueAt(i);
+                            if (packages != null) {
+                                mAppLockLockedPackages.put(userId, new ArraySet<>(packages));
+                            }
                         }
                     }
+                    mAppLockInternal.registerPackageLockedStateListener(
+                            mPackageLockedStateListener);
                 }
-                mAppLockInternal.registerPackageLockedStateListener(mPackageLockedStateListener);
+                Trace.endSection();
             }
         } else if (phase == SystemService.PHASE_DEVICE_SPECIFIC_SERVICES_READY) {
             mPreferencesHelper.updateFixedImportance(mUm.getUsers());
@@ -4726,6 +4727,11 @@ public class NotificationManagerService extends SystemService {
                             NotificationManagerService.this::reclassifyNotificationLocked);
                 }
             }
+            getContext().sendBroadcastAsUser(
+                    new Intent(ALLOWED_NAS_ADJUSTMENT_KEYS_CHANGED)
+                            .putExtra(Intent.EXTRA_USER_ID, userId)
+                            .addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT),
+                    UserHandle.SYSTEM, STATUS_BAR_SERVICE);
             handleSavePolicyFile();
         }
 
@@ -4748,6 +4754,11 @@ public class NotificationManagerService extends SystemService {
                 applyNotificationUpdateForUserProfiles(userId,
                         NotificationManagerService.this::unsummarizeNotificationLocked);
             }
+            getContext().sendBroadcastAsUser(
+                    new Intent(ALLOWED_NAS_ADJUSTMENT_KEYS_CHANGED)
+                            .putExtra(Intent.EXTRA_USER_ID, userId)
+                            .addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT),
+                    UserHandle.SYSTEM, STATUS_BAR_SERVICE);
             handleSavePolicyFile();
         }
 
@@ -4776,14 +4787,13 @@ public class NotificationManagerService extends SystemService {
             } finally {
                 Binder.restoreCallingIdentity(identity);
             }
-            handleSavePolicyFile();
         }
 
         @Override
         public @NonNull List<String> getUnsupportedAdjustmentTypes() {
             checkCallerIsSystemOrSystemUiOrShell();
             synchronized (mNotificationLock) {
-                return new ArrayList(mAssistants.getUnsupportedAdjustments(
+                return new ArrayList<>(mAssistants.getUnsupportedAdjustments(
                         UserHandle.getUserId(Binder.getCallingUid())));
             }
         }
@@ -7099,7 +7109,7 @@ public class NotificationManagerService extends SystemService {
                 }
 
                 int newVisualEffects = calculateSuppressedVisualEffects(
-                            policy, currPolicy, applicationInfo.targetSdkVersion);
+                        policy, currPolicy, applicationInfo.targetSdkVersion);
 
                 // 1. Callers should not modify STATE_CHANNELS_BYPASSING_DND, which is
                 // internally calculated and only indicates whether channels that want to bypass
@@ -7115,9 +7125,49 @@ public class NotificationManagerService extends SystemService {
                             currPolicy.hasPriorityChannels(),
                             policy.allowPriorityChannels());
                 }
-                policy = new Policy(policy.priorityCategories,
-                        policy.priorityCallSenders, policy.priorityMessageSenders,
-                        newVisualEffects, newState, policy.priorityConversationSenders);
+
+                final int priorityCategories = policy.priorityCategories;
+                if (splitSoundVibrationForNotificationBreakthrough()) {
+                    int allowSound;
+                    int allowVibration;
+
+                    if (policy.allowSoundForPriorityCategory == ALLOWED_INTERRUPTION_TYPE_UNSET
+                            || policy.allowVibrationForPriorityCategory
+                            == ALLOWED_INTERRUPTION_TYPE_UNSET) {
+                        // Caller did not specify granular control. So, we preserve the existing
+                        // granular settings if the new setting does not change the corresponding
+                        // priority bit and we discard the granular settings if the corresponding
+                        // priority bit is changed.
+
+                        // if new priority bit is 0, we disable both sound and vibration.
+                        allowSound = currPolicy.allowSoundForPriorityCategory
+                                & priorityCategories;
+                        allowVibration = currPolicy.allowVibrationForPriorityCategory
+                                & priorityCategories;
+
+                        // if new priority bit is switched from 0 -> 1, we enable both sound
+                        // and vibration.
+                        int newlyAllowedCategories =
+                                (priorityCategories ^ currPolicy.priorityCategories)
+                                        & priorityCategories;
+                        allowSound |= newlyAllowedCategories;
+                        allowVibration |= newlyAllowedCategories;
+                    } else {
+                        // Caller specified granular control. So, the passed-in policy's allow mask
+                        // will override the existing setting.
+                        allowSound = policy.allowSoundForPriorityCategory;
+                        allowVibration = policy.allowVibrationForPriorityCategory;
+                    }
+
+                    policy = new Policy(priorityCategories,
+                            policy.priorityCallSenders, policy.priorityMessageSenders,
+                            newVisualEffects, newState, policy.priorityConversationSenders,
+                            allowSound, allowVibration);
+                } else {
+                    policy = new Policy(priorityCategories,
+                            policy.priorityCallSenders, policy.priorityMessageSenders,
+                            newVisualEffects, newState, policy.priorityConversationSenders);
+                }
 
                 if (shouldApplyAsImplicitRule) {
                     mZenModeHelper.applyGlobalPolicyAsImplicitZenRule(zenUser, pkg, callingUid,
@@ -9407,6 +9457,7 @@ public class NotificationManagerService extends SystemService {
         notification.fixSilentGroup();
 
         if (shouldOffloadBitmap(notification)) {
+            Trace.traceBegin(Trace.TRACE_TAG_SYSTEM_SERVER, "offloadNotificationBitmap");
             Icon icon = Notification.BigPictureStyle.getPictureIcon(notification.extras);
 
             Uri uri = mBitmapOffloader.offloadBitmap(BITMAP_SOURCE_NOTIFICATIONS, icon.getBitmap());
@@ -9415,6 +9466,7 @@ public class NotificationManagerService extends SystemService {
                 notification.extras.putParcelable(Notification.EXTRA_PICTURE, null);
                 notification.extras.putParcelable(Notification.EXTRA_PICTURE_ICON, icon);
             }
+            Trace.traceEnd(Trace.TRACE_TAG_SYSTEM_SERVER);
         }
 
         // Ensure only allowed packages can hide status bar notification icon
@@ -9856,6 +9908,16 @@ public class NotificationManagerService extends SystemService {
         synchronized (mNotificationLock) {
             isBlocked |= isRecordBlockedLocked(r);
         }
+
+
+        if (isBridgedNotificationBlocked(r)) {
+            isBlocked = true;
+            if (DBG) {
+                Slog.e(TAG, "Suppressing bridged notification on behalf of package "
+                        + r.getBridgedPackageName());
+            }
+        }
+
         if (isBlocked && !(n.isMediaNotification() || isCallNotification(pkg, uid, n))) {
             if (DBG) {
                 Slog.e(TAG, "Suppressing notification from package " + r.getSbn().getPackageName()
@@ -9967,6 +10029,33 @@ public class NotificationManagerService extends SystemService {
         final int callingUid = r.getSbn().getUid();
         return mPreferencesHelper.isGroupBlocked(pkg, callingUid, r.getChannel().getGroup())
                 || r.getImportance() == IMPORTANCE_NONE;
+    }
+
+    /**
+     * Checks whether a bridged notification is banned at a group or channel level or if the NAS or
+     * system has blocked the notification.
+     */
+    boolean isBridgedNotificationBlocked(NotificationRecord r) {
+        // If this is a bridged notification check if the associated package or channel are
+        // blocked.
+        if (r.getBridgedAppUid() != android.os.Process.INVALID_UID
+                && r.getBridgedPackageName() != null
+                && r.getBridgedChannelId() != null) {
+            if (!areNotificationsEnabledForPackageInt(
+                    r.getBridgedAppUid())) {
+                return true;
+            }
+            NotificationChannel bridgedChannel = mPreferencesHelper.getNotificationChannel(
+                    r.getBridgedPackageName(), r.getBridgedAppUid(),
+                    r.getBridgedChannelId(), /*includeDeleted=*/ false);
+            if (bridgedChannel != null) {
+                return mPreferencesHelper.isGroupBlocked(
+                        r.getBridgedPackageName(), r.getBridgedAppUid(),
+                        bridgedChannel.getGroup())
+                                || bridgedChannel.getImportance() == IMPORTANCE_NONE;
+            }
+        }
+        return false;
     }
 
     protected class SnoozeNotificationRunnable implements Runnable {
@@ -10487,6 +10576,15 @@ public class NotificationManagerService extends SystemService {
                         return false;
                     }
 
+                    if (isBridgedNotificationBlocked(r)) {
+                        mUsageStats.registerBlocked(r);
+                        if (DBG) {
+                            Slog.e(TAG, "Suppressing bridged notification on behalf of package "
+                                    + r.getBridgedPackageName());
+                        }
+                        return false;
+                    }
+
                     // Check if this is an updated for a summary for an aggregated sparse
                     // group and remove it because that summary has been canceled
                     if (mGroupHelper.isUpdateForCanceledSummary(r)) {
@@ -10615,7 +10713,11 @@ public class NotificationManagerService extends SystemService {
                         // Also report to UserManagerService if this notification was shown on HSU
                         // (headless system user)
                         if (shouldLogHsuNotification(r)) {
-                            mUmInternal.logShownHsuNotification(r.getSbn());
+                            // TODO(b/412176703): need to get proper AllowlistStatus from
+                            // mUmInternal itself
+                            mUmInternal.logNotificationShownStatus(r.getSbn(),
+                                    UserHandle.USER_SYSTEM,
+                                    GenericAllowlist.STATUS_ALLOWED_INVALID_MODE);
                         }
                     } else {
                         Slog.e(TAG, "Not posting notification without small icon: " + notification);
@@ -11117,10 +11219,14 @@ public class NotificationManagerService extends SystemService {
                 toastCount++;
             }
         }
-        try {
-            mAm.setProcessImportant(mForegroundToken, pid, toastCount > 0, "toast");
-        } catch (RemoteException e) {
-            // Shouldn't happen.
+        if (com.android.server.am.Flags.simplifyToastImportance()) {
+            mAmi.setIsToastActive(pid, toastCount > 0);
+        } else {
+            try {
+                mAm.setProcessImportant(mForegroundToken, pid, toastCount > 0, "toast");
+            } catch (RemoteException e) {
+                // Shouldn't happen.
+            }
         }
     }
 
@@ -11975,12 +12081,15 @@ public class NotificationManagerService extends SystemService {
             if (!flagChecker.apply(r.getFlags())) {
                 continue;
             }
-            if (pkg != null && !r.getSbn().getPackageName().equals(pkg)) {
+
+            if (pkg != null && !r.getSbn().getPackageName().equals(pkg)
+                    && !TextUtils.equals(r.getBridgedPackageName(), pkg)) {
                 continue;
             }
             if (channelId != null // Compare against possibly bundled channel AND original channel
                     && !channelId.equals(r.getChannel().getId())
-                    && !channelId.equals(r.getNotification().getChannelId())) {
+                    && !channelId.equals(r.getNotification().getChannelId())
+                    && !TextUtils.equals(r.getBridgedChannelId(), channelId)) {
                 continue;
             }
             if (r.getSbn().isGroup() && r.getNotification().isGroupChild()) {
@@ -12900,7 +13009,7 @@ public class NotificationManagerService extends SystemService {
         }
 
         @Override
-        protected void addApprovedList(String approved, int userId, boolean isPrimary,
+        protected int addApprovedList(String approved, int userId, boolean isPrimary,
                 String userSet) {
             if (!TextUtils.isEmpty(approved)) {
                 String[] approvedArray = approved.split(ENABLED_SERVICES_SEPARATOR);
@@ -12909,7 +13018,7 @@ public class NotificationManagerService extends SystemService {
                     approved = approvedArray[0];
                 }
             }
-            super.addApprovedList(approved, userId, isPrimary, userSet);
+            return super.addApprovedList(approved, userId, isPrimary, userSet);
         }
 
         public NotificationAssistants(Context context, Object lock, UserProfiles up,
@@ -13668,6 +13777,10 @@ public class NotificationManagerService extends SystemService {
                 disabledAdjustments.add(key);
             }
             mNasUnsupported.put(userId, disabledAdjustments);
+            mContext.sendBroadcastAsUser(
+                    new Intent(SUPPORTED_NAS_ADJUSTMENT_KEYS_CHANGED)
+                            .addFlags(Intent.FLAG_RECEIVER_REGISTERED_ONLY_BEFORE_BOOT),
+                    UserHandle.SYSTEM, STATUS_BAR_SERVICE);
             handleSavePolicyFile();
         }
 
@@ -13713,7 +13826,8 @@ public class NotificationManagerService extends SystemService {
         }
 
         @Override
-        protected void writeExtraXmlTags(TypedXmlSerializer out) throws IOException {
+        protected void writeExtraXmlTags(TypedXmlSerializer out,
+                @Nullable BackupRestoreEventLogger logger) throws IOException {
             synchronized (mLock) {
                 for (int user : mDeniedAdjustments.keySet()) {
                     out.startTag(null, TAG_DENIED);
@@ -13766,7 +13880,8 @@ public class NotificationManagerService extends SystemService {
         }
 
         @Override
-        protected void readExtraTag(String tag, TypedXmlPullParser parser) throws IOException {
+        protected void readExtraTag(String tag, TypedXmlPullParser parser,
+                @Nullable BackupRestoreEventLogger logger) throws IOException {
             if (TAG_DENIED.equals(tag)) {
                 // default to current context user if this XML pre-dates user-specific settings.
                 final int user = XmlUtils.readIntAttribute(parser, ATT_USER_ID,
@@ -14123,10 +14238,7 @@ public class NotificationManagerService extends SystemService {
 
         @Override
         protected long getBindFlags() {
-            long freezeFlags = 0;
-            if (reportNlsStartAndEnd()) {
-                freezeFlags = BIND_SIMULATE_ALLOW_FREEZE;
-            }
+            long freezeFlags = BIND_SIMULATE_ALLOW_FREEZE;
             if (Flags.allowFreezingIdleNls()) {
                 freezeFlags |= BIND_ALLOW_FREEZE;
             }
@@ -14201,7 +14313,7 @@ public class NotificationManagerService extends SystemService {
             }
             final IDispatchCompletionListener completionListener;
             final long token;
-            if ((info.mBinderSession != null && reportNlsStartAndEnd())) {
+            if (info.mBinderSession != null) {
                 final IBinderSession session = info.mBinderSession;
                 token = reportBinderTransactionStarting(session, BINDER_TAG_ON_LISTENER_CONNECTED);
                 completionListener = new IDispatchCompletionListener.Stub() {
@@ -14323,45 +14435,62 @@ public class NotificationManagerService extends SystemService {
         }
 
         @Override
-        protected void readExtraTag(String tag, TypedXmlPullParser parser)
+        protected void readExtraTag(String tag, TypedXmlPullParser parser,
+                @Nullable BackupRestoreEventLogger logger)
                 throws IOException, XmlPullParserException {
             if (TAG_REQUESTED_LISTENERS.equals(tag)) {
+                int count = 0;
+                int errorCount = 0;
+
                 final int listenersOuterDepth = parser.getDepth();
                 while (XmlUtils.nextElementWithin(parser, listenersOuterDepth)) {
-                    if (!TAG_REQUESTED_LISTENER.equals(parser.getName())) {
-                        continue;
-                    }
-                    final int userId = XmlUtils.readIntAttribute(parser, ATT_USER_ID);
-                    final ComponentName cn = ComponentName.unflattenFromString(
-                            XmlUtils.readStringAttribute(parser, ATT_COMPONENT));
-                    int approved = FLAG_FILTER_TYPE_CONVERSATIONS | FLAG_FILTER_TYPE_ALERTING
-                            | FLAG_FILTER_TYPE_SILENT | FLAG_FILTER_TYPE_ONGOING;
+                    try {
+                        if (!TAG_REQUESTED_LISTENER.equals(parser.getName())) {
+                            continue;
+                        }
+                        final int userId = XmlUtils.readIntAttribute(parser, ATT_USER_ID);
+                        final ComponentName cn = ComponentName.unflattenFromString(
+                                XmlUtils.readStringAttribute(parser, ATT_COMPONENT));
+                        int approved = FLAG_FILTER_TYPE_CONVERSATIONS | FLAG_FILTER_TYPE_ALERTING
+                                | FLAG_FILTER_TYPE_SILENT | FLAG_FILTER_TYPE_ONGOING;
 
-                    ArraySet<VersionedPackage> disallowedPkgs = new ArraySet<>();
-                    final int listenerOuterDepth = parser.getDepth();
-                    while (XmlUtils.nextElementWithin(parser, listenerOuterDepth)) {
-                        if (TAG_APPROVED.equals(parser.getName())) {
-                            approved = XmlUtils.readIntAttribute(parser, ATT_TYPES);
-                        } else if (TAG_DISALLOWED.equals(parser.getName())) {
-                            String pkg = XmlUtils.readStringAttribute(parser, ATT_PKG);
-                            int uid = XmlUtils.readIntAttribute(parser, ATT_UID);
-                            if (!TextUtils.isEmpty(pkg)) {
-                                VersionedPackage ai = new VersionedPackage(pkg, uid);
-                                disallowedPkgs.add(ai);
+                        ArraySet<VersionedPackage> disallowedPkgs = new ArraySet<>();
+                        final int listenerOuterDepth = parser.getDepth();
+                        while (XmlUtils.nextElementWithin(parser, listenerOuterDepth)) {
+                            if (TAG_APPROVED.equals(parser.getName())) {
+                                approved = XmlUtils.readIntAttribute(parser, ATT_TYPES);
+                            } else if (TAG_DISALLOWED.equals(parser.getName())) {
+                                String pkg = XmlUtils.readStringAttribute(parser, ATT_PKG);
+                                int uid = XmlUtils.readIntAttribute(parser, ATT_UID);
+                                if (!TextUtils.isEmpty(pkg)) {
+                                    VersionedPackage ai = new VersionedPackage(pkg, uid);
+                                    disallowedPkgs.add(ai);
+                                }
                             }
                         }
+                        NotificationListenerFilter nlf =
+                                new NotificationListenerFilter(approved, disallowedPkgs);
+                        synchronized (mRequestedNotificationListeners) {
+                            mRequestedNotificationListeners.put(Pair.create(cn, userId), nlf);
+                        }
+                        count++;
+                    } catch (Exception e) {
+                        Slog.e(TAG, "Failed to restore NLS restriction", e);
+                        errorCount++;
                     }
-                    NotificationListenerFilter nlf =
-                            new NotificationListenerFilter(approved, disallowedPkgs);
-                    synchronized (mRequestedNotificationListeners) {
-                        mRequestedNotificationListeners.put(Pair.create(cn, userId), nlf);
-                    }
+                }
+                if (logger != null) {
+                    logger.logItemsRestored(DATA_TYPE_NLS_RESTRICTED, count);
+                    logger.logItemsRestoreFailed(
+                            DATA_TYPE_NLS_RESTRICTED, errorCount, ERROR_XML_PARSING);
                 }
             }
         }
 
         @Override
-        protected void writeExtraXmlTags(TypedXmlSerializer out) throws IOException {
+        protected void writeExtraXmlTags(TypedXmlSerializer out,
+                @Nullable BackupRestoreEventLogger logger) throws IOException {
+            int count = 0;
             out.startTag(null, TAG_REQUESTED_LISTENERS);
             synchronized (mRequestedNotificationListeners) {
                 for (Pair<ComponentName, Integer> listener :
@@ -14386,10 +14515,14 @@ public class NotificationManagerService extends SystemService {
                     }
 
                     out.endTag(null, TAG_REQUESTED_LISTENER);
+                    count++;
                 }
             }
 
             out.endTag(null, TAG_REQUESTED_LISTENERS);
+            if (logger != null) {
+                logger.logItemsBackedUp(DATA_TYPE_NLS_RESTRICTED, count);
+            }
         }
 
         @Nullable protected NotificationListenerFilter getNotificationListenerFilter(
@@ -14504,7 +14637,7 @@ public class NotificationManagerService extends SystemService {
         }
 
         private long getDispatchReportingToken(ManagedServiceInfo info, String input) {
-            if (info.mBinderSession != null && reportNlsStartAndEnd()) {
+            if (info.mBinderSession != null) {
                 return reportBinderTransactionStarting(info.mBinderSession, input);
             } else {
                 return 0; // Will be unused because dispatch completion is disabled.
@@ -14756,19 +14889,24 @@ public class NotificationManagerService extends SystemService {
          * @return A new, redacted {@link StatusBarNotification}.
          */
         StatusBarNotification redactSbnForAppLock(StatusBarNotification sbn) {
-            if (!android.security.Flags.appLockCore()) {
-                Slog.wtf(TAG, "redactSbnForAppLock called while flag is off");
-                return sbn;
+            Trace.beginSection(TAG + ".redactSbnForAppLock");
+            try {
+                if (!android.security.Flags.appLockCore()) {
+                    Slog.wtf(TAG, "redactSbnForAppLock called while flag is off");
+                    return sbn;
+                }
+
+                String redactedText = sbn.getNotification().isStyle(MessagingStyle.class)
+                        ? mContext.getString(R.string.app_locked_notification_message)
+                        : mContext.getString(R.string.app_locked_new_notification);
+                Notification.Builder redactedNotifBuilder = createBaseRedactedNotification(sbn,
+                        redactedText, /* isAppLocked= */ true);
+
+                Notification redacted = redactedNotifBuilder.build();
+                return sbn.cloneShallow(redacted);
+            } finally {
+                Trace.endSection();
             }
-
-            String redactedText = sbn.getNotification().isStyle(MessagingStyle.class)
-                    ? mContext.getString(R.string.app_locked_notification_message)
-                    : mContext.getString(R.string.app_locked_new_notification);
-            Notification.Builder redactedNotifBuilder = createBaseRedactedNotification(sbn,
-                    redactedText, /* isAppLocked= */ true);
-
-            Notification redacted = redactedNotifBuilder.build();
-            return sbn.cloneShallow(redacted);
         }
 
         /**

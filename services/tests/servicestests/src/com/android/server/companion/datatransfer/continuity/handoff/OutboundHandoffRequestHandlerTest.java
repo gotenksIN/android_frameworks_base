@@ -17,57 +17,47 @@
 package com.android.server.companion.datatransfer.continuity.handoff;
 
 import static com.google.common.truth.Truth.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
-import static org.mockito.Mockito.doNothing;
-import static org.mockito.Mockito.doReturn;
-import static org.mockito.ArgumentMatchers.any;
-
-import com.android.server.companion.datatransfer.continuity.connectivity.TaskContinuityMessenger;
-import com.android.server.companion.datatransfer.continuity.messages.HandoffRequestMessage;
-import com.android.server.companion.datatransfer.continuity.messages.HandoffRequestResultMessage;
-import com.android.server.companion.datatransfer.continuity.tasks.TaskSyncController;
 
 import android.app.ActivityManager;
 import android.app.HandoffActivityData;
-import android.content.Context;
-import android.content.ComponentName;
-import android.content.pm.PackageManager;
-import android.content.pm.ActivityInfo;
-import android.content.Intent;
-import android.companion.datatransfer.continuity.IHandoffRequestCallback;
 import android.companion.datatransfer.continuity.TaskContinuityManager;
+import android.content.ComponentName;
+import android.content.Intent;
+import android.content.pm.ActivityInfo;
+import android.content.pm.PackageManager;
 import android.os.PersistableBundle;
-
+import com.android.server.companion.datatransfer.continuity.TaskContinuityTest;
+import com.android.server.companion.datatransfer.continuity.connectivity.TaskContinuityMessenger;
+import com.android.server.companion.datatransfer.continuity.messages.HandoffActivityDataMessage;
+import com.android.server.companion.datatransfer.continuity.messages.HandoffRequestMessage;
+import com.android.server.companion.datatransfer.continuity.messages.HandoffRequestResultMessage;
+import com.android.server.companion.datatransfer.continuity.messages.TaskContinuityMessage;
+import com.android.server.companion.datatransfer.continuity.tasks.RemoteTaskListenerHolder;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.Before;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
 
-import java.util.ArrayList;
-import java.util.List;
+public class OutboundHandoffRequestHandlerTest extends TaskContinuityTest {
 
-public class OutboundHandoffRequestHandlerTest {
-
-    @Mock private Context mMockContext;
-    @Mock private TaskContinuityMessenger mMockTaskContinuityMessenger;
-    @Mock private PackageManager mMockPackageManager;
-    @Mock private TaskSyncController mMockTaskSyncController;
+    @Mock private RemoteTaskListenerHolder mMockRemoteTaskListenerHolder;
 
     private OutboundHandoffRequestHandler mOutboundHandoffRequestHandler;
 
     @Before
     public void setUp() {
-        MockitoAnnotations.initMocks(this);
-        doReturn(mMockPackageManager).when(mMockContext).getPackageManager();
         mOutboundHandoffRequestHandler =
                 new OutboundHandoffRequestHandler(
-                        mMockContext, mMockTaskContinuityMessenger, mMockTaskSyncController);
+                        mMockContext, mMockTaskContinuityMessenger, mMockRemoteTaskListenerHolder);
     }
 
     @Test
@@ -83,9 +73,13 @@ public class OutboundHandoffRequestHandlerTest {
         mOutboundHandoffRequestHandler.requestHandoff(associationId, taskId, callbackHolder);
 
         // Verify HandoffRequestMessage was sent.
-        HandoffRequestMessage expectedHandoffRequestMessage = new HandoffRequestMessage(taskId);
         verify(mMockTaskContinuityMessenger)
-                .sendMessage(eq(associationId), eq(expectedHandoffRequestMessage));
+                .sendMessage(
+                        eq(associationId),
+                        eq(
+                                new TaskContinuityMessage.Builder()
+                                        .setHandoffRequestMessage(new HandoffRequestMessage(taskId))
+                                        .build()));
 
         // Simulate a response message.
         ComponentName expectedComponentName =
@@ -107,7 +101,7 @@ public class OutboundHandoffRequestHandlerTest {
                 new HandoffRequestResultMessage(
                         taskId,
                         TaskContinuityManager.HANDOFF_REQUEST_RESULT_SUCCESS,
-                        List.of(handoffActivityData));
+                        List.of(new HandoffActivityDataMessage(handoffActivityData, List.of())));
         mOutboundHandoffRequestHandler.onHandoffRequestResultMessageReceived(
                 associationId, handoffRequestResultMessage);
 
@@ -127,7 +121,7 @@ public class OutboundHandoffRequestHandlerTest {
                 associationId, taskId, TaskContinuityManager.HANDOFF_REQUEST_RESULT_SUCCESS);
 
         // Verify the task was removed from the store.
-        verify(mMockTaskSyncController).removeTask(associationId, taskId);
+        verify(mMockRemoteTaskListenerHolder).notifyTaskHandedOff(associationId, taskId);
     }
 
     @Test
@@ -162,9 +156,13 @@ public class OutboundHandoffRequestHandlerTest {
         mOutboundHandoffRequestHandler.requestHandoff(associationId, taskId, firstCallback);
         mOutboundHandoffRequestHandler.requestHandoff(associationId, taskId, secondCallback);
 
-        HandoffRequestMessage expectedHandoffRequestMessage = new HandoffRequestMessage(taskId);
         verify(mMockTaskContinuityMessenger, times(1))
-                .sendMessage(eq(associationId), eq(expectedHandoffRequestMessage));
+                .sendMessage(
+                        eq(associationId),
+                        eq(
+                                new TaskContinuityMessage.Builder()
+                                        .setHandoffRequestMessage(new HandoffRequestMessage(taskId))
+                                        .build()));
     }
 
     @Test
@@ -207,6 +205,36 @@ public class OutboundHandoffRequestHandlerTest {
                 associationId,
                 new HandoffRequestResultMessage(
                         taskId, TaskContinuityManager.HANDOFF_REQUEST_RESULT_SUCCESS, List.of()));
+
+        // Verify the callback was invoked.
+        callback.verifyInvoked(
+                associationId,
+                taskId,
+                TaskContinuityManager.HANDOFF_REQUEST_RESULT_FAILURE_OTHER_INTERNAL_ERROR);
+
+        // Verify no intent was launched.
+        verify(mMockContext, never()).startActivitiesAsUser(any(), any(), any());
+    }
+
+    @Test
+    public void testRequestHandoff_messageWithNullActivity_returnsFailure() {
+        // Request a handoff
+        int associationId = 1;
+        int taskId = 1;
+        doReturn(TaskContinuityMessenger.SendMessageResult.SUCCESS)
+                .when(mMockTaskContinuityMessenger)
+                .sendMessage(eq(associationId), any());
+        FakeHandoffRequestCallback callback = new FakeHandoffRequestCallback();
+        mOutboundHandoffRequestHandler.requestHandoff(associationId, taskId, callback);
+
+        // Return no data for this request.
+        List<HandoffActivityDataMessage> activities = new ArrayList<>();
+        activities.add(null);
+
+        mOutboundHandoffRequestHandler.onHandoffRequestResultMessageReceived(
+                associationId,
+                new HandoffRequestResultMessage(
+                        taskId, TaskContinuityManager.HANDOFF_REQUEST_RESULT_SUCCESS, activities));
 
         // Verify the callback was invoked.
         callback.verifyInvoked(

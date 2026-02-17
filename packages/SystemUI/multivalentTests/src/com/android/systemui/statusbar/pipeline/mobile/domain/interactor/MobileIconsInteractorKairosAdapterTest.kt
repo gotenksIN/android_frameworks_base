@@ -21,7 +21,6 @@ import androidx.test.filters.SmallTest
 import com.android.settingslib.SignalIcon
 import com.android.settingslib.mobile.MobileMappings
 import com.android.settingslib.mobile.TelephonyIcons
-import com.android.systemui.KairosBuilder
 import com.android.systemui.flags.featureFlagsClassic
 import com.android.systemui.kairos.BuildScope
 import com.android.systemui.kairos.Events
@@ -34,7 +33,6 @@ import com.android.systemui.kairos.kairos
 import com.android.systemui.kairos.map
 import com.android.systemui.kairos.mapValues
 import com.android.systemui.kairos.stateOf
-import com.android.systemui.kairosBuilder
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.applicationCoroutineScope
 import com.android.systemui.kosmos.runCurrent
@@ -52,6 +50,8 @@ import com.android.systemui.statusbar.pipeline.mobile.data.repository.mobileMapp
 import com.android.systemui.statusbar.pipeline.shared.data.model.DataActivityModel
 import com.android.systemui.statusbar.pipeline.shared.data.repository.connectivityRepository
 import com.android.systemui.statusbar.policy.data.repository.FakeUserSetupRepository
+import com.android.systemui.util.lifecycle.kairos.KairosBuilder
+import com.android.systemui.util.lifecycle.kairos.kairosBuilder
 import org.junit.runner.RunWith
 import org.mockito.kotlin.mock
 
@@ -181,6 +181,8 @@ class MobileIconsInteractorKairosAdapterTest : MobileIconsInteractorTestBase() {
         override val isAllowedDuringAirplaneMode: State<Boolean>,
         override val hasPrioritizedNetworkCapabilities: State<Boolean>,
         override val isInEcmMode: State<Boolean>,
+        override val volteId: State<Int>,
+        override val showSignalStrengthIcon: State<Boolean>,
     ) : MobileConnectionRepositoryKairos {
         override fun setDataEnabled(enabled: Boolean) {
             unwrapped.setDataEnabled(enabled)
@@ -221,6 +223,8 @@ class MobileIconsInteractorKairosAdapterTest : MobileIconsInteractorTestBase() {
                     isAllowedDuringAirplaneMode = isAllowedDuringAirplaneMode.toState(),
                     hasPrioritizedNetworkCapabilities = hasPrioritizedNetworkCapabilities.toState(),
                     isInEcmMode = stateOf(false),
+                    volteId = stateOf(0),
+                    showSignalStrengthIcon = stateOf(true),
                 )
             }
     }

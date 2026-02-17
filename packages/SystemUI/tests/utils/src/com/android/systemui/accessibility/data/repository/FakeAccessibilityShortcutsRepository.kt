@@ -16,10 +16,16 @@
 
 package com.android.systemui.accessibility.data.repository
 
+import android.accessibilityservice.AccessibilityServiceInfo
+import android.content.ComponentName
 import android.content.Context
+import android.content.pm.ApplicationInfo
+import android.content.pm.ResolveInfo
+import android.content.pm.ServiceInfo
 import android.graphics.Color
 import android.graphics.drawable.ColorDrawable
 import android.hardware.input.KeyGestureEvent
+import android.os.Build
 import android.os.Handler
 import com.android.internal.accessibility.common.ShortcutConstants.UserShortcutType
 import com.android.internal.accessibility.util.TtsPrompt
@@ -29,6 +35,7 @@ import com.android.systemui.dagger.qualifiers.Application
 import com.android.systemui.dagger.qualifiers.Main
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import org.mockito.kotlin.mock
@@ -38,11 +45,12 @@ class FakeAccessibilityShortcutsRepository(
     @param:Main private val handler: Handler,
 ) : AccessibilityShortcutsRepository {
     companion object {
-        const val FAKE_COLOR_INVERSION_TARGET_NAME = "com.android.test/.FakeColorInversion"
-        const val FAKE_MAGNIFICATION_TARGET_NAME = "com.android.test/.FakeMagnification"
         const val FAKE_TALKBACK_TARGET_NAME = "com.android.test/.FakeTalkBack"
+        const val FAKE_MAGNIFICATION_TARGET_NAME = "com.android.test/.FakeMagnification"
         const val FAKE_SELECT_TO_SPEAK_TARGET_NAME = "com.android.test/.FakeSelectToSpeak"
         const val FAKE_VOICE_ACCESS_TARGET_NAME = "com.android.test/.FakeVoiceAccess"
+        const val FAKE_UNTRUSTED_SERVICE_TARGET_NAME = "com.android.test/.FakeUntrustedService"
+        const val FAKE_HSU_EXCLUDED_TARGET_NAME = "com.android.test/.FakeHsuExcludedTarget"
     }
 
     private data class TargetInfo(
@@ -57,6 +65,8 @@ class FakeAccessibilityShortcutsRepository(
             TargetInfo(FAKE_MAGNIFICATION_TARGET_NAME, "Magnification", false),
             TargetInfo(FAKE_SELECT_TO_SPEAK_TARGET_NAME, "Select to Speak", false),
             TargetInfo(FAKE_VOICE_ACCESS_TARGET_NAME, "Voice Access", true),
+            TargetInfo(FAKE_UNTRUSTED_SERVICE_TARGET_NAME, "Untrusted Service", true),
+            TargetInfo(FAKE_HSU_EXCLUDED_TARGET_NAME, "HSU Excluded Service", true),
         )
 
     // Target names existing in the set means they are assigned to that shortcut type.
@@ -64,6 +74,8 @@ class FakeAccessibilityShortcutsRepository(
         MutableStateFlow<Map<Int, Set<String>>>(emptyMap())
     // Target names existing in the set means they are turned on.
     private val enabledTargetNames = MutableStateFlow<Set<String>>(emptySet())
+    // Targets names that are not trusted.
+    private val untrustedTargetNames = mutableSetOf(FAKE_UNTRUSTED_SERVICE_TARGET_NAME)
 
     private val featureNameTestMap =
         mapOf(
@@ -73,6 +85,16 @@ class FakeAccessibilityShortcutsRepository(
             KeyGestureEvent.KEY_GESTURE_TYPE_ACTIVATE_SELECT_TO_SPEAK to "Select to Speak",
             KeyGestureEvent.KEY_GESTURE_TYPE_TOGGLE_VOICE_ACCESS to "Voice Access",
         )
+
+    override val hsuExcludedTargets = listOf(FAKE_HSU_EXCLUDED_TARGET_NAME)
+
+    private val _accessibilityButtonTargetComponent = MutableStateFlow<String?>(null)
+    override val accessibilityButtonTargetComponent =
+        _accessibilityButtonTargetComponent.asStateFlow()
+
+    override suspend fun setAccessibilityButtonTargetComponent(target: String) {
+        _accessibilityButtonTargetComponent.value = target
+    }
 
     var ttsPrompt: TtsPrompt? = null
     var ttsText: CharSequence = ""
@@ -182,6 +204,42 @@ class FakeAccessibilityShortcutsRepository(
         combine(assignedTargetNamesByShortcutType, enabledTargetNames) {
             getSelectedAccessibilityTargetsInfo(shortcutType)
         }
+
+    override fun isServiceWarningRequired(target: AccessibilityTargetModel): Boolean =
+        untrustedTargetNames.contains(target.targetName)
+
+    override fun getAccessibilityServiceInfo(
+        target: AccessibilityTargetModel
+    ): AccessibilityServiceInfo? =
+        allTargets
+            .firstOrNull { it.targetName == target.targetName }
+            ?.let {
+                val componentName = ComponentName.unflattenFromString(it.targetName)!!
+                val packageName = componentName.packageName
+                val className = componentName.className
+                val iconResId = 1
+                AccessibilityServiceInfo().apply {
+                    this.componentName = componentName
+                    this.resolveInfo =
+                        ResolveInfo().apply {
+                            this.serviceInfo =
+                                ServiceInfo().apply {
+                                    this.applicationInfo =
+                                        ApplicationInfo().apply {
+                                            this.packageName = packageName
+                                            this.icon = iconResId
+                                            this.targetSdkVersion = Build.VERSION_CODES.BAKLAVA
+                                        }
+                                    this.name = className
+                                    this.packageName = packageName
+                                    this.icon = iconResId
+                                }
+                            this.nonLocalizedLabel = it.featureName
+                            this.icon = iconResId
+                            this.iconResourceId = iconResId
+                        }
+                }
+            }
 
     private fun TargetInfo.toTargetModel(
         @UserShortcutType shortcutType: Int

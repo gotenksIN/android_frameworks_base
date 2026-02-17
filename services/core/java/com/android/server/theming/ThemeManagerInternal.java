@@ -30,13 +30,15 @@ import android.os.FabricatedOverlayInternal;
 import android.os.RemoteCallbackList;
 import android.os.RemoteException;
 import android.os.UserHandle;
+import android.util.Slog;
 import android.util.SparseArray;
 
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.systemui.monet.ColorScheme;
 
-import com.google.ux.material.libmonet.dynamiccolor.DynamicScheme;
+import com.google.ux.material.libmonet.dynamiccolor.ColorSpec.SpecVersion;
+import com.google.ux.material.libmonet.dynamiccolor.DynamicScheme.Platform;
 
 import java.io.PrintWriter;
 import java.util.Optional;
@@ -57,6 +59,8 @@ public class ThemeManagerInternal {
     private final ThemeSettingsManager mThemeSettingsManager;
     private final SystemPropertiesReader mSystemPropertiesReader;
     private final ThemeOverlayHelper mOverlayHelper;
+    private final SpecVersion mSpecVersion;
+    private final Platform mPlatform;
 
     private final Object mLock = new Object();
 
@@ -70,12 +74,14 @@ public class ThemeManagerInternal {
 
     ThemeManagerInternal(Context context, ThemeSettingsManager themeSettingsManager,
             SystemPropertiesReader systemPropertiesReader, ThemeStateManager stateManager,
-            ThemeOverlayHelper overlayHelper) {
+            ThemeOverlayHelper overlayHelper, Platform platform, SpecVersion specVersion) {
         mContext = context;
         mStateManager = stateManager;
         mThemeSettingsManager = themeSettingsManager;
         mSystemPropertiesReader = systemPropertiesReader;
         mOverlayHelper = overlayHelper;
+        mPlatform = platform;
+        mSpecVersion = specVersion;
     }
 
     /**
@@ -117,17 +123,49 @@ public class ThemeManagerInternal {
      * @return The generated {@link FabricatedOverlayInternal}.
      */
     public FabricatedOverlayInternal generateDynamicColorOverlay(int userId, ThemeInfo options) {
-        ThemeState state = mStateManager.getState(userId).getCurrentState();
+        ThemeInfo baseline = getUserThemeInfo(userId);
 
-        int newSeed = Optional.ofNullable(options.seedColor).map(Color::toArgb).orElse(
-                state.seedColor());
-        @ThemeStyle.Type int newStyle = Optional.ofNullable(options.style).orElse(state.style());
-        float newContrast = Optional.ofNullable(options.contrast).orElse(state.contrast());
+        int newSeed = Optional.ofNullable(options.seedColor).orElse(baseline.seedColor).toArgb();
+        @ThemeStyle.Type int newStyle = Optional.ofNullable(options.style).orElse(baseline.style);
+        float newContrast = Optional.ofNullable(options.contrast).orElse(baseline.contrast);
 
-        ColorScheme newDarkScheme = new ColorScheme(newSeed, true, newStyle, newContrast);
-        ColorScheme newLightScheme = new ColorScheme(newSeed, false, newStyle, newContrast);
+        Platform platform;
+        SpecVersion specVersion;
 
-        return mOverlayHelper.createDynamicOverlay(newLightScheme, newDarkScheme).getInternal();
+        try {
+            platform = Platform.valueOf(baseline.platform);
+            if (options.platform != null) {
+                try {
+                    platform = Platform.valueOf(options.platform);
+                } catch (IllegalArgumentException e) {
+                    Slog.w(TAG, "Invalid platform: " + options.platform, e);
+                }
+            }
+
+            specVersion = SpecVersion.valueOf(baseline.specVersion);
+            if (options.specVersion != null) {
+                try {
+                    specVersion = SpecVersion.valueOf(options.specVersion);
+                } catch (IllegalArgumentException e) {
+                    Slog.w(TAG, "Invalid specVersion: " + options.specVersion, e);
+                }
+            }
+        } catch (IllegalArgumentException e) {
+            // this shouldn't happen.
+            throw new IllegalArgumentException("Invalid Baseline Object");
+        }
+
+        ColorScheme newDarkScheme = new ColorScheme(newSeed, true, newStyle, newContrast,
+                specVersion, platform);
+        ColorScheme newLightScheme = new ColorScheme(newSeed, false, newStyle, newContrast,
+                specVersion, platform);
+
+        if (mPlatform == Platform.WATCH) {
+            newLightScheme = newDarkScheme;
+        }
+
+        return mOverlayHelper.createDynamicOverlay(newLightScheme, newDarkScheme,
+                userId).getInternal();
     }
 
     /**
@@ -140,13 +178,13 @@ public class ThemeManagerInternal {
     public ThemeInfo getUserThemeInfo(int userId) {
         ThemeState state = mStateManager.getState(userId).getCurrentState();
         return new ThemeInfo(Color.valueOf(state.seedColor()), state.style(), state.contrast(),
-                DynamicScheme.DEFAULT_SPEC_VERSION.name(), DynamicScheme.DEFAULT_PLATFORM.name());
+                mSpecVersion.name(), mPlatform.name());
     }
 
     /**
      * Notifies all registered listeners that the theme settings have changed for a specific user.
      *
-     * @param userId The ID of a Full User for which the theme settings were changed.
+     * @param userId      The ID of a Full User for which the theme settings were changed.
      * @param oldSettings The previous {@link ThemeSettings} before the change.
      * @param newSettings The new {@link ThemeSettings} after the change.
      */
@@ -335,6 +373,15 @@ public class ThemeManagerInternal {
         }
         return mThemeSettingsManager.createDefaultThemeSettings(mContext.getResources(),
                 mSystemPropertiesReader, userId);
+    }
+
+    /**
+     * Called when the boot animation is being dismissed.
+     * This signals the transition from boot phase to steady state UI.
+     */
+    public void onBootAnimationDismissing() {
+        mStateManager.onBootAnimationDismissing();
+        mThemeSettingsManager.updateMigratedSettings(mContext.getContentResolver());
     }
 
     /**

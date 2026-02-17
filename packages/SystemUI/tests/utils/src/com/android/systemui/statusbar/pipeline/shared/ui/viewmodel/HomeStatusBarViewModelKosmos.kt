@@ -36,14 +36,13 @@ import com.android.systemui.statusbar.chips.ui.viewmodel.ongoingActivityChipsVie
 import com.android.systemui.statusbar.chips.uievents.statusBarChipsUiEventLogger
 import com.android.systemui.statusbar.events.domain.interactor.systemStatusEventAnimationInteractor
 import com.android.systemui.statusbar.layout.ui.viewmodel.appHandlesViewModelFactory
-import com.android.systemui.statusbar.layout.ui.viewmodel.multiDisplayStatusBarContentInsetsViewModelStore
 import com.android.systemui.statusbar.layout.ui.viewmodel.statusBarBoundsViewModelFactory
+import com.android.systemui.statusbar.layout.ui.viewmodel.statusBarContentInsetsViewModel
 import com.android.systemui.statusbar.notification.domain.interactor.activeNotificationsInteractor
 import com.android.systemui.statusbar.notification.icon.domain.interactor.statusBarNotificationIconsInteractor
 import com.android.systemui.statusbar.phone.domain.interactor.darkIconInteractor
 import com.android.systemui.statusbar.phone.domain.interactor.lightsOutInteractor
 import com.android.systemui.statusbar.pipeline.battery.ui.viewmodel.batteryViewModelBasedOnSettingFactory
-import com.android.systemui.statusbar.pipeline.battery.ui.viewmodel.batteryWithPercentViewModelFactory
 import com.android.systemui.statusbar.pipeline.shared.domain.interactor.homeStatusBarIconBlockListInteractor
 import com.android.systemui.statusbar.pipeline.shared.domain.interactor.homeStatusBarInteractor
 import com.android.systemui.statusbar.pipeline.shared.ui.binder.HomeStatusBarViewBinder
@@ -74,7 +73,6 @@ var Kosmos.homeStatusBarViewModelFactory: (Int) -> HomeStatusBarViewModel by
         { displayId ->
             HomeStatusBarViewModelImpl(
                 displayId,
-                batteryWithPercentViewModelFactory,
                 batteryViewModelBasedOnSettingFactory,
                 systemStatusIconsViewModelFactory,
                 statusBarBoundsViewModelFactory,
@@ -100,7 +98,7 @@ var Kosmos.homeStatusBarViewModelFactory: (Int) -> HomeStatusBarViewModel by
                 ongoingActivityChipsViewModel,
                 statusBarPopupChipsViewModelFactory,
                 systemStatusEventAnimationInteractor,
-                multiDisplayStatusBarContentInsetsViewModelStore,
+                statusBarContentInsetsViewModel,
                 backgroundScope,
                 testDispatcher,
                 { shadeDisplaysInteractor },

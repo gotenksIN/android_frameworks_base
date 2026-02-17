@@ -144,6 +144,8 @@ java_library_static {
         ":supplemental_security_patches_xsd",
         ":advanced-protection-config",
         ":device-state-config",
+        ":memory-limiter-config",
+        ":services-sources-telecom",
         "java/com/android/server/EventLogTags.logtags",
         "java/com/android/server/am/EventLogTags.logtags",
         "java/com/android/server/wm/EventLogTags.logtags",
@@ -170,6 +172,7 @@ java_library_static {
         "service-permission.stubs.system_server",
         "service-rkp.stubs.system_server",
         "service-sdksandbox.stubs.system_server",
+        "service-telecom.stubs.system_server",
         "services.net",
     ],
     plugins: ["ImmutabilityAnnotationProcessor"],
@@ -216,8 +219,10 @@ java_library_static {
         "android.hardware.rebootescrow-V1-java",
         "android.hardware.power.stats-V2-java",
         "android.hidl.manager-V1.2-java",
+        "android.media.audiopolicy-aconfig-java",
         "cbor-java",
         "com.android.media.audio-aconfig-java",
+        "statsd_audio_java_gen",
         "icu4j_calendar_astronomer",
         "android.security.aaid_aidl-java",
         "netd-client",
@@ -270,6 +275,8 @@ java_library_static {
         "lights_flags_lib",
         "android.bpfprogs.flags-aconfig-java",
         "services.signal-collector-manager-internal",
+        "android.content.flags-aconfig-java",
+        "trust_token",
     ],
     javac_shard_size: 50,
     javacflags: [
@@ -352,4 +359,23 @@ prebuilt_etc {
 prebuilt_etc {
     name: "core.protolog.pb",
     src: ":gen-core.protolog.pb",
+}
+
+cc_library {
+    name: "libmediametrics_allowlist",
+    srcs: [
+        // java/com/android/server/media/metrics/Allowlist.java is #included
+        // into mediametrics_allowlist.cpp and the dependency is discovered automatically.
+        "mediametrics_allowlist.cpp",
+    ],
+    local_include_dirs: [
+        "include",
+    ],
+    export_include_dirs: [
+        "include",
+    ],
+    cflags: [
+        // The polyglot approach relies on multi-line // comments
+        "-Wno-comment",
+    ],
 }

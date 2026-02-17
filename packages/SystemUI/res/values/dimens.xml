@@ -253,7 +253,7 @@
     <item name="status_bar_icon_scale_factor" format="float" type="dimen">1.0</item>
 
     <dimen name="group_overflow_number_size">@*android:dimen/notification_text_size</dimen>
-    <dimen name="group_overflow_number_padding">@*android:dimen/notification_content_margin_end
+    <dimen name="group_overflow_number_padding">@*android:dimen/notification_2025_margin
     </dimen>
 
     <!-- End margin for the RSSI status icon of a device connected via bluetooth. -->
@@ -398,12 +398,8 @@
     <!-- Extra horizontal space for properly aligning guts buttons with the notification content -->
     <dimen name="notification_guts_button_side_margin">8dp</dimen>
     <dimen name="notification_guts_conversation_icon_size">56dp</dimen>
-    <dimen name="notification_guts_header_top_padding">12dp</dimen>
     <!-- The vertical space between items in the alert selections in the inline settings -->
     <dimen name="notification_guts_option_vertical_padding">16dp</dimen>
-
-    <!-- Extra space for guts bundle feedback button -->
-    <dimen name="notification_guts_bundle_feedback_size">48dp</dimen>
 
     <!-- The height of notification bundle headers -->
     <dimen name="notification_bundle_header_height">48dp</dimen>
@@ -417,11 +413,9 @@
 
     <dimen name="notification_2025_min_tap_target_size">48dp</dimen>
 
-    <dimen name="notification_importance_toggle_size">48dp</dimen>
     <dimen name="notification_importance_button_separation">8dp</dimen>
     <dimen name="notification_importance_drawable_padding">8dp</dimen>
     <dimen name="notification_importance_header_text">12sp</dimen>
-    <dimen name="notification_importance_description_text">14sp</dimen>
     <dimen name="notification_importance_channel_text">16sp</dimen>
     <dimen name="notification_importance_channel_group_text">14sp</dimen>
     <dimen name="notification_importance_button_text">14sp</dimen>
@@ -802,9 +796,6 @@
     <!-- The horizontal margin of the content in the notification shade -->
     <dimen name="notification_shade_content_margin_horizontal">16dp</dimen>
 
-    <!-- The top margin for the notification children container in its non-expanded form. -->
-    <dimen name="notification_children_container_margin_top">48dp</dimen>
-
     <!-- The spacing between the notification children container in its non-expanded form, and the
          header text above it, scaling with text size. This value is chosen so that, taking into
          account the text spacing for both the text in the top line and the text in the container,
@@ -820,9 +811,6 @@
 
     <!-- Size of the face pile shown on one-line (children of a group) conversation notifications -->
     <dimen name="conversation_single_line_face_pile_size">24dp</dimen>
-
-    <!-- Size of the avatars within a face pile shown on one-line (children of a group) conversation notifications -->
-    <dimen name="conversation_single_line_face_pile_avatar_size">17dp</dimen>
 
     <!-- Size of an avatar shown on one-line (children of a group) conversation notifications -->
     <dimen name="conversation_single_line_avatar_size">24dp</dimen>
@@ -1151,16 +1139,9 @@
     <dimen name="smart_reply_button_spacing">8dp</dimen>
     <dimen name="smart_reply_button_padding_vertical">14dp</dimen>
     <dimen name="smart_reply_button_padding_horizontal">16dp</dimen>
-    <dimen name="smart_reply_button_action_padding_left">8dp</dimen>
-    <dimen name="smart_reply_button_min_height">48dp</dimen>
     <dimen name="smart_reply_button_stroke_width">1dp</dimen>
-    <dimen name="smart_reply_button_font_size">14sp</dimen>
-    <dimen name="smart_reply_button_line_spacing_extra">6sp</dimen> <!-- Total line height 20sp. -->
-    <!-- Corner radius = half of min_height to create rounded sides. -->
-    <dimen name="smart_reply_button_corner_radius">8dp</dimen>
     <dimen name="smart_action_button_icon_size">18dp</dimen>
     <dimen name="smart_action_button_icon_padding">8dp</dimen>
-    <dimen name="smart_action_button_outline_stroke_width">2dp</dimen>
     <dimen name="notification_2025_smart_reply_button_corner_radius">24dp</dimen>
     <dimen name="notification_2025_smart_reply_button_min_height">48dp</dimen>
     <!-- The "inner" padding between the chip and the text should be 8dp, but since the chip
@@ -1217,6 +1198,8 @@
 
     <!-- Dimensions for biometric prompt panel padding -->
     <dimen name="biometric_prompt_panel_max_width">640dp</dimen>
+    <dimen name="biometric_prompt_center_vertical_spacing">24dp</dimen>
+    <dimen name="biometric_prompt_center_vertical_padding">60dp</dimen>
     <dimen name="biometric_prompt_land_small_horizontal_guideline_padding">344dp</dimen>
     <dimen name="biometric_prompt_two_pane_udfps_horizontal_guideline_padding">114dp</dimen>
     <dimen name="biometric_prompt_two_pane_udfps_shorter_content_width">216dp</dimen>
@@ -2206,6 +2189,7 @@
     <dimen name="volume_dialog_slider_horizontal_margin_with_captions_toggle">130dp</dimen>
     <dimen name="volume_dialog_half_opened_offset">-128dp</dimen>
     <dimen name="volume_dialog_slider_max_deviation">56dp</dimen>
+    <dimen name="volume_dialog_floating_slider_background_corner_radius">20dp</dimen>
 
     <dimen name="volume_dialog_background_square_corner_radius">12dp</dimen>
 
@@ -2236,8 +2220,12 @@
     <dimen name="bluetooth_details_toggle_row_margin_end">26dp</dimen>
     <dimen name="tile_details_switch_container_width">52dp</dimen>
     <dimen name="tile_details_switch_track_height">24dp</dimen>
+    <!-- tile_details_bottom_padding (14dp)
+     + tile_details_button_vertical_margin_correction (-4dp) -->
+    <dimen name="tile_details_button_margin_vertical_corrected">10dp</dimen>
     <dimen name="tile_details_button_row_height">40dp</dimen>
     <dimen name="tile_details_button_size">20dp</dimen>
+    <dimen name="tile_details_button_tappable_height">48dp</dimen>
     <dimen name="tile_details_bottom_padding">14dp</dimen>
     <dimen name="tile_details_horizontal_padding">14dp</dimen>
     <dimen name="tile_details_vertical_padding">8dp</dimen>
@@ -2261,6 +2249,8 @@
     <dimen name="tile_details_entry_title_size">13sp</dimen>
     <!-- tile_details_entry_title_top_paddings used only when both the title and the subtitle exist -->
     <dimen name="tile_details_entry_title_top_paddings">15dp</dimen>
+    <!-- Spacing between end icons -->
+    <dimen name="tile_details_end_icon_margin">12dp</dimen>
     <!-- Tile Details entry end -->
 
     <!-- Bouncer containerization on large screens -->
@@ -2272,8 +2262,24 @@
     <!-- Bouncer containerization on large screens end -->
 
     <!-- Lockscreen blur values -->
+    <dimen name="keyguard_shortcuts_blur_radius">15dp</dimen>
     <dimen name="fingerprint_icon_blur_radius">15dp</dimen>
     <dimen name="notification_background_blur_radius">25dp</dimen>
     <!-- Lockscreen blur values end -->
+
+    <!-- Usb Device Dialog values -->
+    <dimen name="usb_device_dialog_space_small1">16dp</dimen>
+    <dimen name="usb_device_dialog_space_small4">24dp</dimen>
+    <dimen name="usb_device_dialog_button_margin_vertical">4dp</dimen>
+    <dimen name="usb_device_dialog_button_margin_vertical_large">12dp</dimen>
+    <dimen name="usb_device_dialog_button_padding_vertical">10dp</dimen>
+    <dimen name="usb_device_dialog_always_use_checkbox_corners_radius">20dp</dimen>
+    <dimen name="usb_device_dialog_always_use_checkbox_padding_vertical">12dp</dimen>
+    <dimen name="usb_device_dialog_always_use_checkbox_margin_horizontal">16dp</dimen>
+    <dimen name="usb_device_dialog_icon_size">32dp</dimen>
+    <dimen name="usb_device_dialog_button_height">40dp</dimen>
+
+    <dimen name="usb_device_dialog_button_background_radius_full">360dp</dimen>
+    <!-- Usb Device Dialog values end -->
 
 </resources>

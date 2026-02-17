@@ -62,6 +62,7 @@ import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.onLongClick
@@ -183,7 +184,7 @@ fun PinPad(viewModel: PinBouncerViewModel, verticalSpacing: Dp, modifier: Modifi
 
 @Composable
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
-private fun DigitButton(
+fun DigitButton(
     digit: Int,
     isInputEnabled: Boolean,
     onClicked: (Int) -> Unit,
@@ -214,7 +215,7 @@ private fun DigitButton(
 }
 
 @Composable
-private fun ActionButton(
+fun ActionButton(
     icon: Icon,
     isInputEnabled: Boolean,
     onClicked: () -> Unit,
@@ -341,7 +342,12 @@ private fun PinPadButton(
                     interactionSource = interactionSource,
                     indication = indication,
                 )
-                .semantics(mergeDescendants = true) { role = Role.Button }
+                .semantics(mergeDescendants = true) {
+                    role = Role.Button
+                    if (!isEnabled) {
+                        disabled()
+                    }
+                }
                 .thenIf(elementId != null) { Modifier.sysuiResTag(elementId!!) },
     ) {
         content(contentColor::value)

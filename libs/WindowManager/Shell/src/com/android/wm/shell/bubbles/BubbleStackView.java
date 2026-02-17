@@ -95,6 +95,7 @@ import com.android.wm.shell.bubbles.animation.PhysicsAnimationLayout;
 import com.android.wm.shell.bubbles.animation.StackAnimationController;
 import com.android.wm.shell.bubbles.logging.BubbleSessionTracker;
 import com.android.wm.shell.bubbles.logging.BubbleSessionTracker.SessionEvent;
+import com.android.wm.shell.bubbles.transitions.BubbleTransitions;
 import com.android.wm.shell.common.FloatingContentCoordinator;
 import com.android.wm.shell.common.ShellExecutor;
 import com.android.wm.shell.shared.TypefaceUtils;
@@ -621,13 +622,8 @@ public class BubbleStackView extends FrameLayout
 
             if (isExpanded() && !clickedBubbleIsCurrentlyExpandedBubble) {
                 if (clickedBubble != mBubbleData.getSelectedBubble()) {
-                    // Try expand clicked bubble in transition, which will update BubbleData if
-                    // successful
-                    if (!mManager.applyBubbleExpandTransactionIfNeeded(clickedBubble)) {
-                        // Directly update the BubbleData if failed to expand with transition, which
-                        // can happen if the selected bubble is not an app bubble.
-                        mBubbleData.setSelectedBubble(clickedBubble);
-                    }
+                    // Select the clicked bubble.
+                    mBubbleData.setSelectedBubble(clickedBubble);
                 } else {
                     // If the clicked bubble is the selected bubble (but not the expanded bubble),
                     // that means overflow was previously expanded. Set the selected bubble
@@ -640,7 +636,13 @@ public class BubbleStackView extends FrameLayout
                 // and should expand) or the currently selected bubble (we're expanded
                 // and should collapse).
                 if (!maybeShowStackEdu() && !mShowedUserEducationInTouchListenerActive) {
-                    mBubbleData.setExpanded(!mBubbleData.isExpanded());
+                    if (mBubbleData.isExpanded()) {
+                        mBubbleData.setExpanded(false);
+                    } else if (clickedBubble.isTaskValidToBubbleOnSmallScreen()) {
+                        mBubbleData.setExpanded(true);
+                    } else {
+                        clickedBubble.getTaskView().moveToFullscreen();
+                    }
                 }
                 mShowedUserEducationInTouchListenerActive = false;
             }
@@ -1135,14 +1137,14 @@ public class BubbleStackView extends FrameLayout
             setUpOverflow();
         }
         mScrim = new View(getContext());
-        mScrim.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        mScrim.setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
         mScrim.setBackgroundDrawable(new ColorDrawable(
                 getResources().getColor(android.R.color.system_neutral1_1000)));
         addView(mScrim);
         mScrim.setAlpha(0f);
 
         mManageMenuScrim = new View(getContext());
-        mManageMenuScrim.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        mManageMenuScrim.setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
         mManageMenuScrim.setBackgroundDrawable(new ColorDrawable(
                 getResources().getColor(android.R.color.system_neutral1_1000)));
         addView(mManageMenuScrim, new LayoutParams(MATCH_PARENT, MATCH_PARENT));
@@ -1409,8 +1411,7 @@ public class BubbleStackView extends FrameLayout
             snapshot.release();
             bev.setSurfaceZOrderedOnTop(false);
             bev.setAnimating(false);
-            if (Flags.fixBubblesAddSameBubbleBeingRemoved()
-                    && !bev.getContentVisibility()) {
+            if (!bev.getContentVisibility()) {
                 ProtoLog.w(WM_SHELL_BUBBLES, "BubbleStackView#animateConvert %s "
                                 + "content wasn't visible so setting it visible",
                         bev.getBubbleKey());
@@ -1839,17 +1840,6 @@ public class BubbleStackView extends FrameLayout
                 b.getExpandedView().updateFontSize();
             }
         }
-        if (mShowingOverflow && mBubbleOverflow != null
-                && mBubbleOverflow.getExpandedView() != null) {
-            mBubbleOverflow.getExpandedView().updateFontSize();
-        }
-    }
-
-    void updateLocale() {
-        if (mShowingOverflow && mBubbleOverflow != null
-                && mBubbleOverflow.getExpandedView() != null) {
-            mBubbleOverflow.getExpandedView().updateLocale();
-        }
     }
 
     private void updateOverflow() {
@@ -2099,8 +2089,6 @@ public class BubbleStackView extends FrameLayout
         // R constants are not final so we cannot use switch-case here.
         if (action == AccessibilityNodeInfo.ACTION_DISMISS) {
             mBubbleData.dismissAll(Bubbles.DISMISS_ACCESSIBILITY_ACTION);
-            announceForAccessibility(
-                    getResources().getString(R.string.accessibility_bubble_dismissed));
             return true;
         } else if (action == AccessibilityNodeInfo.ACTION_COLLAPSE) {
             mBubbleData.setExpanded(false);
@@ -2109,19 +2097,31 @@ public class BubbleStackView extends FrameLayout
             mBubbleData.setExpanded(true);
             return true;
         } else if (action == R.id.action_move_top_left) {
-            mStackAnimationController.springStackAfterFling(stackBounds.left, stackBounds.top);
+            moveStackToPosition(stackBounds.left, stackBounds.top);
             return true;
         } else if (action == R.id.action_move_top_right) {
-            mStackAnimationController.springStackAfterFling(stackBounds.right, stackBounds.top);
+            moveStackToPosition(stackBounds.right, stackBounds.top);
             return true;
         } else if (action == R.id.action_move_bottom_left) {
-            mStackAnimationController.springStackAfterFling(stackBounds.left, stackBounds.bottom);
+            moveStackToPosition(stackBounds.left, stackBounds.bottom);
             return true;
         } else if (action == R.id.action_move_bottom_right) {
-            mStackAnimationController.springStackAfterFling(stackBounds.right, stackBounds.bottom);
+            moveStackToPosition(stackBounds.right, stackBounds.bottom);
             return true;
         }
         return false;
+    }
+
+    /**
+     * Moves the bubble stack for accessibility. When expanded, the stack is moved instantly as the
+     * {@link StackAnimationController} is inactive and animation is not needed.
+     */
+    private void moveStackToPosition(float x, float y) {
+        if (isExpanded()) {
+            mStackAnimationController.setStackPosition(new PointF(x, y));
+        } else {
+            mStackAnimationController.springStackAfterFling(x, y);
+        }
     }
 
     /**
@@ -2140,17 +2140,22 @@ public class BubbleStackView extends FrameLayout
             if (titleStr == null) {
                 titleStr = getResources().getString(R.string.notification_bubble_title);
             }
-
             if (bubble.getIconView() != null) {
+                String contentDescription;
                 if (mIsExpanded || i > 0) {
-                    bubble.getIconView().setContentDescription(getResources().getString(
-                            R.string.bubble_content_description_single, titleStr, appName));
+                    if (bubble.isChat()) {
+                        contentDescription = getResources().getString(
+                                R.string.bubble_content_description_single, titleStr, appName);
+                    } else {
+                        contentDescription = appName;
+                    }
                 } else {
                     final int moreCount = getBubbleCount();
-                    bubble.getIconView().setContentDescription(getResources().getString(
+                    contentDescription = getResources().getString(
                             R.string.bubble_content_description_stack,
-                            titleStr, appName, moreCount));
+                            titleStr, appName, moreCount);
                 }
+                bubble.getIconView().setContentDescription(contentDescription);
             }
         }
     }
@@ -2158,7 +2163,7 @@ public class BubbleStackView extends FrameLayout
     /**
      * Update bubbles' icon views accessibility states.
      */
-    public void updateBubblesAcessibillityStates() {
+    public void updateBubblesAccessibilityStates() {
         for (int i = 0; i < mBubbleData.getBubbles().size(); i++) {
             Bubble prevBubble = i > 0 ? mBubbleData.getBubbles().get(i - 1) : null;
             Bubble bubble = mBubbleData.getBubbles().get(i);
@@ -2169,34 +2174,25 @@ public class BubbleStackView extends FrameLayout
             }
 
             if (mIsExpanded) {
-                // when stack is expanded
-                // all bubbles are important for accessibility
-                bubbleIconView
-                        .setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);
-
-                View prevBubbleIconView = prevBubble != null ? prevBubble.getIconView() : null;
-
-                if (prevBubbleIconView != null) {
-                    bubbleIconView.setAccessibilityDelegate(new View.AccessibilityDelegate() {
-                        @Override
-                        public void onInitializeAccessibilityNodeInfo(View v,
-                                AccessibilityNodeInfo info) {
-                            super.onInitializeAccessibilityNodeInfo(v, info);
-                            info.setTraversalAfter(prevBubbleIconView);
-                        }
-                    });
-                }
+                // when stack is expanded all bubbles are important for accessibility
+                bubbleIconView.setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_YES);
+                BadgedImageView prevIcon = prevBubble != null ? prevBubble.getIconView() : null;
+                bubbleIconView.setAccessibilityDelegate(
+                        new BubbleIconAccessibilityDelegate(true /* allowDismiss */, prevIcon));
             } else {
-                // when stack is collapsed, only the top bubble is important for accessibility,
-                bubbleIconView.setImportantForAccessibility(
-                        i == 0 ? View.IMPORTANT_FOR_ACCESSIBILITY_YES :
-                                View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+                if (i == 0) {
+                    // when stack is collapsed, only the first bubble is important for accessibility
+                    bubbleIconView.setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_YES);
+                    bubbleIconView.setAccessibilityDelegate(new BubbleStackAccessibilityDelegate());
+                } else {
+                    bubbleIconView.setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO);
+                    bubbleIconView.setAccessibilityDelegate(null);
+                }
             }
         }
 
         if (mIsExpanded) {
             // make the overflow bubble last in the accessibility traversal order
-
             View bubbleOverflowIconView =
                     mBubbleOverflow != null ? mBubbleOverflow.getIconView() : null;
             if (mShowingOverflow && bubbleOverflowIconView != null
@@ -2206,14 +2202,8 @@ public class BubbleStackView extends FrameLayout
                 View lastBubbleIconView = lastBubble.getIconView();
                 if (lastBubbleIconView != null) {
                     bubbleOverflowIconView.setAccessibilityDelegate(
-                            new View.AccessibilityDelegate() {
-                                @Override
-                                public void onInitializeAccessibilityNodeInfo(View v,
-                                        AccessibilityNodeInfo info) {
-                                    super.onInitializeAccessibilityNodeInfo(v, info);
-                                    info.setTraversalAfter(lastBubbleIconView);
-                                }
-                            });
+                            new BubbleIconAccessibilityDelegate(false /* allowDismiss */,
+                                    lastBubbleIconView));
                 }
             }
         }
@@ -2324,8 +2314,7 @@ public class BubbleStackView extends FrameLayout
 
         // If it is currently being animated out (and newly added again here), remove the view
         // and add it back so that it animates in.
-        if (Flags.fixBubblesAddSameBubbleBeingRemoved()
-                && bubble.getIconView().getParent() != null) {
+        if (bubble.getIconView().getParent() != null) {
             mBubbleContainer.removeViewNoAnimation(bubble.getIconView());
             // If the view was being animated out, need to reset its state
             bubble.getIconView().setAlpha(1f);
@@ -2368,66 +2357,45 @@ public class BubbleStackView extends FrameLayout
 
             showScrim(false, () -> {
                 mRemovingLastBubbleWhileExpanded = false;
-                if (Flags.fixBubblesAddSameBubbleBeingRemoved()) {
-                    boolean removedBubbleBackInStack = mBubbleData.hasBubbleInStackWithKey(
-                            bubble.getKey());
-                    // In the time it takes for the scrim animation, that bubble may have gotten
-                    // a new update and be added back -- only remove the view if it's not in the
-                    // stack.
-                    if (!removedBubbleBackInStack) {
-                        if (iconView != null) {
-                            mBubbleContainer.removeView(iconView);
-                        }
-                        if (bev != null) {
-                            mExpandedViewContainer.removeView(bev);
-                        }
-                    } else if (bev != null) {
-                        // If we were dragging out, reset the expanded view in case the bubble gets
-                        // re-added
-                        bev.setContentAlpha(1f);
-                        bev.setBackgroundAlpha(1f);
-                    }
-
-                    mExpandedViewContainer.setAnimationMatrix(null);
-                    mExpandedViewTemporarilyHidden = false;
-
-                    if (!removedBubbleBackInStack) {
-                        // Not in the stack -- clean up all the views
-                        bubble.cleanupViews();
-                    }
-
-                    // Bubble keys may not have changed if we receive an update to the same bubble.
-                    // Compare bubble object instances to see if the expanded bubble has changed.
-                    if (expandedBubbleBeforeScrim == mExpandedBubble && !removedBubbleBackInStack) {
-                        // Only clear expanded bubble if it has not changed since the scrim
-                        // animation started.
-                        // Scrim animation can take some time run and it is possible for a new
-                        // bubble to be added while the animation is running.
-                        // This causes the expanded bubble to change. Make sure we only clear the
-                        // expanded bubble if it did not change between when the scrim animation
-                        // started and completed.
-                        mExpandedBubble = null;
-                        updateExpandedView();
-                    }
-                } else {
-                    bubble.cleanupExpandedView();
+                boolean removedBubbleBackInStack = mBubbleData.hasBubbleInStackWithKey(
+                        bubble.getKey());
+                // In the time it takes for the scrim animation, that bubble may have gotten
+                // a new update and be added back -- only remove the view if it's not in the
+                // stack.
+                if (!removedBubbleBackInStack) {
                     if (iconView != null) {
                         mBubbleContainer.removeView(iconView);
                     }
-                    bubble.cleanupViews(); // cleans up the icon view
-                    updateExpandedView(); // resets state for no expanded bubble
-                    // Bubble keys may not have changed if we receive an update to the same bubble.
-                    // Compare bubble object instances to see if the expanded bubble has changed.
-                    if (expandedBubbleBeforeScrim == mExpandedBubble) {
-                        // Only clear expanded bubble if it has not changed since the scrim
-                        // animation started.
-                        // Scrim animation can take some time run and it is possible for a new
-                        // bubble to be added while the animation is running.
-                        // This causes the expanded bubble to change. Make sure we only clear the
-                        // expanded bubble if it did not change between when the scrim animation
-                        // started and completed.
-                        mExpandedBubble = null;
+                    if (bev != null) {
+                        mExpandedViewContainer.removeView(bev);
                     }
+                } else if (bev != null) {
+                    // If we were dragging out, reset the expanded view in case the bubble gets
+                    // re-added
+                    bev.setContentAlpha(1f);
+                    bev.setBackgroundAlpha(1f);
+                }
+
+                mExpandedViewContainer.setAnimationMatrix(null);
+                mExpandedViewTemporarilyHidden = false;
+
+                if (!removedBubbleBackInStack) {
+                    // Not in the stack -- clean up all the views
+                    bubble.cleanupViews();
+                }
+
+                // Bubble keys may not have changed if we receive an update to the same bubble.
+                // Compare bubble object instances to see if the expanded bubble has changed.
+                if (expandedBubbleBeforeScrim == mExpandedBubble && !removedBubbleBackInStack) {
+                    // Only clear expanded bubble if it has not changed since the scrim
+                    // animation started.
+                    // Scrim animation can take some time run and it is possible for a new
+                    // bubble to be added while the animation is running.
+                    // This causes the expanded bubble to change. Make sure we only clear the
+                    // expanded bubble if it did not change between when the scrim animation
+                    // started and completed.
+                    mExpandedBubble = null;
+                    updateExpandedView();
                 }
             });
             logBubbleEvent(bubble, FrameworkStatsLog.BUBBLE_UICHANGED__ACTION__DISMISSED);
@@ -2743,7 +2711,6 @@ public class BubbleStackView extends FrameLayout
                         + "expand but we are collapsed");
             }
             notifyExpansionChanged(mExpandedBubble, mIsExpanded);
-            announceExpandForAccessibility(mExpandedBubble, mIsExpanded);
         };
 
         if (mPositioner.isImeVisible()) {
@@ -2774,34 +2741,6 @@ public class BubbleStackView extends FrameLayout
             mBubblesNavBarGestureTracker = new BubblesNavBarGestureTracker(mContext, mPositioner);
             mBubblesNavBarGestureTracker.start(mSwipeUpListener);
             setOnTouchListener(mContainerSwipeListener);
-        }
-    }
-
-    private void announceExpandForAccessibility(BubbleViewProvider bubble, boolean expanded) {
-        if (bubble instanceof Bubble) {
-            String contentDescription = getBubbleContentDescription((Bubble) bubble);
-            String message = getResources().getString(
-                    expanded
-                            ? R.string.bubble_accessibility_announce_expand
-                            : R.string.bubble_accessibility_announce_collapse, contentDescription);
-            announceForAccessibility(message);
-        }
-    }
-
-    @NonNull
-    private String getBubbleContentDescription(Bubble bubble) {
-        final String appName = bubble.getAppName();
-        final String title = bubble.getTitle() != null
-                ? bubble.getTitle()
-                : getResources().getString(R.string.notification_bubble_title);
-
-        if (appName == null || title.equals(appName)) {
-            // App bubble title equals the app name, so return only the title to avoid having
-            // content description like: `<app> from <app>`.
-            return title;
-        } else {
-            return getResources().getString(
-                    R.string.bubble_content_description_single, title, appName);
         }
     }
 
@@ -3133,8 +3072,7 @@ public class BubbleStackView extends FrameLayout
                         BubbleExpandedView expView = getExpandedView();
                         if (expView != null) {
                             expView.setSurfaceZOrderedOnTop(false);
-                            if (Flags.fixBubblesAddSameBubbleBeingRemoved()
-                                    && !expView.getContentVisibility()) {
+                            if (!expView.getContentVisibility()) {
                                 ProtoLog.w(WM_SHELL_BUBBLES, "BubbleStackView#expandBubble %s "
                                         + "content wasn't visible so setting it visible",
                                         expView.getBubbleKey());
@@ -3323,8 +3261,7 @@ public class BubbleStackView extends FrameLayout
             if (expandedView != null) {
                 expandedView.setSurfaceZOrderedOnTop(false);
                 expandedView.setAnimating(false);
-                if (Flags.fixBubblesAddSameBubbleBeingRemoved()
-                        && !expandedView.getContentVisibility()) {
+                if (!expandedView.getContentVisibility()) {
                     ProtoLog.w(WM_SHELL_BUBBLES, "BubbleStackView#animateSwitchBubbles"
                                     + "%s content wasn't visible so setting it visible",
                             expandedView.getBubbleKey());
@@ -4444,6 +4381,78 @@ public class BubbleStackView extends FrameLayout
             return new PointF(
                     mOnLeft ? region.left : region.right,
                     region.top + mVerticalOffsetPercent * region.height());
+        }
+    }
+
+    private class BubbleStackAccessibilityDelegate extends AccessibilityDelegate {
+        @Override
+        public void onInitializeAccessibilityNodeInfo(@NonNull View host,
+                @NonNull AccessibilityNodeInfo info) {
+            super.onInitializeAccessibilityNodeInfo(host, info);
+            setupLocalMenu(info);
+        }
+
+        @Override
+        public boolean performAccessibilityAction(@NonNull View host, int action,
+                @Nullable Bundle args) {
+            if (super.performAccessibilityAction(host, action, args)) {
+                return true;
+            }
+            return BubbleStackView.this.performAccessibilityAction(action, args);
+        }
+    }
+
+    private class BubbleIconAccessibilityDelegate extends AccessibilityDelegate {
+        private final boolean mAllowDismiss;
+        /** The view that precedes the current one in the accessibility traversal order. */
+        private final @Nullable View mPreviousBubbleIcon;
+
+        private BubbleIconAccessibilityDelegate(boolean allowDismiss,
+                @Nullable View lastBubbleIconView) {
+            mAllowDismiss = allowDismiss;
+            mPreviousBubbleIcon = lastBubbleIconView;
+        }
+
+        @Override
+        public void onInitializeAccessibilityNodeInfo(@NonNull View v,
+                @NonNull AccessibilityNodeInfo info) {
+            super.onInitializeAccessibilityNodeInfo(v, info);
+            if (mPreviousBubbleIcon != null) {
+                info.setTraversalAfter(mPreviousBubbleIcon);
+            }
+            if (mAllowDismiss) {
+                info.addAction(AccessibilityAction.ACTION_DISMISS);
+            }
+            if (mExpandedBubble != null && mExpandedBubble.getIconView() == v) {
+                info.addAction(AccessibilityAction.ACTION_COLLAPSE);
+            } else {
+                info.addAction(AccessibilityAction.ACTION_EXPAND);
+            }
+        }
+
+        @Override
+        public boolean performAccessibilityAction(@NonNull View host, int action,
+                @Nullable Bundle args) {
+            if (super.performAccessibilityAction(host, action, args)) {
+                return true;
+            }
+            return switch (action) {
+                case AccessibilityNodeInfo.ACTION_DISMISS -> {
+                    dismissBubbleIfExists(mBubbleData.getBubbleInStackWithView(host));
+                    yield true;
+                }
+                case AccessibilityNodeInfo.ACTION_COLLAPSE -> {
+                    mBubbleData.setExpanded(false);
+                    yield true;
+                }
+                case AccessibilityNodeInfo.ACTION_EXPAND -> {
+                    // Rely on click handler logic on the icon to handle expanding.
+                    // But go through callOnClick to skip reporting an additional a11y events.
+                    host.callOnClick();
+                    yield true;
+                }
+                default -> false;
+            };
         }
     }
 }

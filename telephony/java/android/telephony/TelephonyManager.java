@@ -149,6 +149,7 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -1775,6 +1776,19 @@ public class TelephonyManager {
      */
     public static final String EXTRA_DEFAULT_SUBSCRIPTION_SELECT_TYPE =
             "android.telephony.extra.DEFAULT_SUBSCRIPTION_SELECT_TYPE";
+
+    /**
+     * Broadcast intent sent to indicate 2g has disabled by carrier.
+     *
+     * <p class="note">This is a protected intent that can only be sent by the system.
+     *
+     * @hide
+     */
+    @FlaggedApi(Flags.FLAG_KEY_CARRIER_2G_TOGGLE)
+    @SdkConstant(SdkConstantType.BROADCAST_INTENT_ACTION)
+    @BroadcastBehavior(explicitOnly = true)
+    public static final String ACTION_2G_DISABLED_BY_CARRIER =
+            "android.telephony.action.2G_DISABLED_BY_CARRIER";
 
     /** @hide */
     @IntDef({
@@ -8203,15 +8217,30 @@ public class TelephonyManager {
     }
 
     /**
-     * Generate a radio modem reset. Used for device configuration by some carriers.
+     * Reboot and re-initialize the cellular modem and related subsystems below the OS.
+     *
+     * Used for device provisioning and reconfiguration by some carriers.
+     *
+     * <p>Device-specific and App-specific support information:
+     * <ul>
+     * <li>This method is required to be supported on devices that launch with hardware support for
+     * {@link Build.VERSION_CODES#CINNAMON_BUN} and which declare
+     * {@link PackageManager#FEATURE_TELEPHONY_RADIO_ACCESS}.
+     * <li>On other devices which either do not include hardware support for
+     * {@link Build.VERSION_CODES#CINNAMON_BUN} or do not declare
+     * {@link PackageManager#FEATURE_TELEPHONY_RADIO_ACCESS}, support is likely but not
+     * guaranteed.
+     * <li>For applications targeting {@link Build.VERSION_CODES#BAKLAVA} or lower, if this method
+     * is not supported, it may fail silently.
+     * </ul>
      *
      * <p>Requires Permission:
      * {@link android.Manifest.permission#MODIFY_PHONE_STATE MODIFY_PHONE_STATE} or that the calling
      * app has carrier privileges (see {@link #hasCarrierPrivileges}).
+     *
      * @throws IllegalStateException if the Telephony process is not currently available.
      * @throws RuntimeException
-     * @throws UnsupportedOperationException If the device does not have
-     *          {@link PackageManager#FEATURE_TELEPHONY_RADIO_ACCESS}.
+     * @throws UnsupportedOperationException If the method is unsupported.
      */
     @RequiresPermission(Manifest.permission.MODIFY_PHONE_STATE)
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_RADIO_ACCESS)
@@ -8773,10 +8802,12 @@ public class TelephonyManager {
      *     <li>the calling app has carrier privileges (see {@link #hasCarrierPrivileges}).
      *     <li>the calling app has been granted the
      *     {@link Manifest.permission#USE_ICC_AUTH_WITH_DEVICE_IDENTIFIER} permission.
+     *     <li>the calling app has been granted the {@link Manifest.permission#USE_ICC_AUTH}
+     *     permission.
      * </ul>
      *
-     * The use of {@link Manifest.permission#READ_PRIVILEGED_PHONE_STATE} is deprecated.
-     * Use {@link Manifest.permission#USE_ICC_AUTH_WITH_DEVICE_IDENTIFIER} instead.
+     * The use of {@link Manifest.permission#READ_PRIVILEGED_PHONE_STATE} is no longer supported.
+     * Use {@link Manifest.permission#USE_ICC_AUTH} instead.
      *
      * @param appType the icc application type, like {@link #APPTYPE_USIM}
      * @param authType the authentication type, any one of {@link #AUTHTYPE_EAP_AKA} or
@@ -10373,7 +10404,8 @@ public class TelephonyManager {
      * brand value input. To unset the value, the same function should be
      * called with a null brand value.
      *
-     * <p>Requires that the calling app has carrier privileges (see {@link #hasCarrierPrivileges}).
+     * <p>Requires Permission: {@link android.Manifest.permission#MODIFY_PHONE_STATE} or
+     * that the calling app has carrier privileges (see {@link #hasCarrierPrivileges()}).
      *
      * @param brand The brand name to display/set.
      * @return true if the operation was executed correctly.
@@ -10381,6 +10413,8 @@ public class TelephonyManager {
      * @throws UnsupportedOperationException If the device does not have
      *          {@link PackageManager#FEATURE_TELEPHONY_SUBSCRIPTION}.
      */
+    @RequiresPermission(value = android.Manifest.permission.MODIFY_PHONE_STATE,
+            conditional = true)
     @RequiresFeature(PackageManager.FEATURE_TELEPHONY_SUBSCRIPTION)
     public boolean setOperatorBrandOverride(String brand) {
         return setOperatorBrandOverride(getSubId(), brand);
@@ -14980,6 +15014,45 @@ public class TelephonyManager {
     }
 
     /**
+     * Notify Telephony about entitlement status change.
+     *
+     * Callers (like FCM client app) could invoke this API to inform Telephony whenever
+     * there's a change on Entitlement State, so that Telephony would be able to decide to
+     * fetch latest Entitlement values and operate accordingly.
+     *
+     * For example: In case of Entitlement for Satellite, when user purchases a Satellite Plan,
+     * carriers would push notify devices. The push notifications are handled by FCM client,
+     * which then is supposed to notify Telephony about the same, so that Telephony-Satellite
+     * Framework could enable Satellite functionality based on latest subscription plan information.
+     *
+     * Same applies for all other Entitlement driven feature enablement for all Telephony features,
+     * in addition to Satellite.
+     *
+     * @param subId subscription id
+     * @param appIds list of application IDs for which the entitlement status has changed
+     * @param timestamp time when entitlement status changed
+     * @hide
+     */
+    @FlaggedApi(Flags.FLAG_SATELLITE_26Q2_APIS)
+    @RequiresPermission(android.Manifest.permission.MODIFY_PHONE_STATE)
+    @SystemApi
+    public void notifyEntitlementStatusChanged(int subId,
+            @NonNull @Ts43Constants.AppId List<String> appIds, @NonNull ZonedDateTime timestamp) {
+        try {
+            ITelephony telephony = getITelephony();
+            if (telephony != null) {
+                long timeInMillis = timestamp.toInstant().toEpochMilli();
+                telephony.notifyEntitlementStatusChanged(subId, appIds, timeInMillis);
+            } else {
+                throw new IllegalStateException("telephony service is null.");
+            }
+        } catch (RemoteException ex) {
+            Log.e(TAG, "notifyEntitlementStatusChanged RemoteException", ex);
+            ex.rethrowAsRuntimeException();
+        }
+    }
+
+    /**
      * Indicates Emergency number database version is invalid.
      *
      * @hide
@@ -16126,7 +16199,7 @@ public class TelephonyManager {
      * @param apnSetting The {@link ApnSetting} describing the new APN.
      * @return An integer, corresponding to a primary key in a database, that allows the caller to
      *         modify the APN in the future via {@link #modifyDevicePolicyOverrideApn}, or
-     *         {@link android.provider.Telephony.Carriers.INVALID_APN_ID} if the override operation
+     *         {@link android.provider.Telephony.Carriers#INVALID_APN_ID} if the override operation
      *         failed.
      * @throws SecurityException if the caller is not the system or phone process.
      * @hide
@@ -19671,4 +19744,486 @@ public class TelephonyManager {
      */
     @FlaggedApi(Flags.FLAG_DOMAIN_SELECTION_EMERGENCY_MODE_NOTIFICATION)
     public static final int DOMAIN_SELECTION_EMERGENCY_TYPE_SMS = 2;
+
+    /**
+     * The enrollment status of the SIM in the automatic PIN management feature.
+     * @hide
+     */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef(prefix = {"SIM_PIN_ENROLLMENT_STATUS_"},
+            value = {
+                    SIM_PIN_ENROLLMENT_STATUS_MANUALLY_MANAGED,
+                    SIM_PIN_ENROLLMENT_STATUS_PLATFORM_MANAGED,
+            })
+    public @interface SimPinEnrollmentStatus {
+    }
+
+    /**
+     * The SIM card has a pin that the user inputs manually, or it does not have a PIN at all.
+     *
+     * @hide
+     */
+    @FlaggedApi(android.security.Flags.FLAG_AUTO_SIM_PIN_MANAGEMENT)
+    @SystemApi
+    public static final int SIM_PIN_ENROLLMENT_STATUS_MANUALLY_MANAGED = 0;
+
+    /**
+     * The SIM is enrolled in automatic PIN management.
+     *
+     * @hide
+     */
+    @FlaggedApi(android.security.Flags.FLAG_AUTO_SIM_PIN_MANAGEMENT)
+    @SystemApi
+    public static final int SIM_PIN_ENROLLMENT_STATUS_PLATFORM_MANAGED = 1;
+
+    /**
+     * The result of trying to enroll the SIM into automatic PIN management.
+     *
+     * @hide
+     */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef(prefix = {"SIM_PIN_ENROLLMENT_RESULT_"},
+            value = {
+                    SIM_PIN_ENROLLMENT_RESULT_FAILED_WRONG_PIN,
+                    SIM_PIN_ENROLLMENT_RESULT_FAILED_PUK_REQUIRED,
+                    SIM_PIN_ENROLLMENT_RESULT_FAILED_INVALID_SIM,
+                    SIM_PIN_ENROLLMENT_RESULT_FAILED_SIM_LOCK_ALREADY_ACTIVE,
+                    SIM_PIN_ENROLLMENT_RESULT_FAILED_CHANGING_PIN})
+    public @interface SimPinEnrollmentResult {
+    }
+
+    /**
+     * Enrollment of the SIM card in automatic PIN management has been successful: The platform
+     * has set a random PIN on the SIM.
+     *
+     * This value is only used internally to indicate success and is not a part of the error
+     * code returned to the client.
+     *
+     * @hide
+     */
+    public static final int SIM_PIN_ENROLLMENT_RESULT_SUCCESSFUL = 0;
+
+    /**
+     * It was not possible to enroll the SIM card into automatic PIN management because the
+     * initial PIN provided by the user was wrong.
+     *
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(android.security.Flags.FLAG_AUTO_SIM_PIN_MANAGEMENT)
+    public static final int SIM_PIN_ENROLLMENT_RESULT_FAILED_WRONG_PIN = 1;
+
+    /**
+     * It was not possible to enroll the SIM card into automatic PIN management because the
+     * SIM card is locked and requires a PUK to be unlocked.
+     *
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(android.security.Flags.FLAG_AUTO_SIM_PIN_MANAGEMENT)
+    public static final int SIM_PIN_ENROLLMENT_RESULT_FAILED_PUK_REQUIRED = 2;
+
+    /**
+     * Enrollment of the SIM card into automatic PIN management failed because the subscription
+     * ID provided is wrong - it either does not exist, is not of the current physical SIM
+     * inserted into the device or designates an eSIM.
+     *
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(android.security.Flags.FLAG_AUTO_SIM_PIN_MANAGEMENT)
+    public static final int SIM_PIN_ENROLLMENT_RESULT_FAILED_INVALID_SIM = 3;
+
+    /**
+     * Enrollment of the SIM card into automatic PIN management failed because the SIM already has
+     * PIN protection activated. The PIN has not changed.
+     *
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(android.security.Flags.FLAG_AUTO_SIM_PIN_MANAGEMENT)
+    public static final int SIM_PIN_ENROLLMENT_RESULT_FAILED_SIM_LOCK_ALREADY_ACTIVE = 4;
+
+    /**
+     * Enrollment of the SIM card into automatic PIN management failed because the PIN could not
+     * be changed.
+     * This may be a permanent error in case the SIM does not allow changing of the PIN or a
+     * temporary error in case communication with the SIM temporarily failed.
+     * The PIN for the SIM has not been changed and the SIM has not been enrolled into automatic
+     * PIN management.
+     *
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(android.security.Flags.FLAG_AUTO_SIM_PIN_MANAGEMENT)
+    public static final int SIM_PIN_ENROLLMENT_RESULT_FAILED_CHANGING_PIN = 5;
+
+    /**
+     * Result of trying to get a managed PIN of a SIM.
+     *
+     * @hide
+     */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef(prefix = {"GET_AUTO_MANAGED_PIN_RESULT_"},
+            value = {
+                    GET_AUTO_MANAGED_PIN_RESULT_FAILED_NOT_ENROLLED,
+                    GET_AUTO_MANAGED_PIN_RESULT_USER_AUTH_REQUIRED})
+    public @interface GetAutoManagedPinResult {
+    }
+
+    /**
+     * Successful PIN retrieval.
+     *
+     * This value is only used internally to indicate success and is not part of the error code
+     * returned to the client.
+     *
+     * @hide
+     */
+    public static final int GET_AUTO_MANAGED_PIN_RESULT_SUCCESSFUL = 0;
+
+    /**
+     * Getting the managed PIN for the SIM failed because the SIM is not enrolled in automatic
+     * PIN management.
+     *
+     * @hide
+     */
+    @FlaggedApi(android.security.Flags.FLAG_AUTO_SIM_PIN_MANAGEMENT)
+    @SystemApi
+    public static final int GET_AUTO_MANAGED_PIN_RESULT_FAILED_NOT_ENROLLED = 1;
+
+    /**
+     * Getting the managed PIN for the SIM failed because the user needs to authenticate first.
+     * The user should be authenticated by displaying a biometric prompt using the
+     * {@code BiometricManager} with the {@code DEVICE_CREDENTIAL} and {@code BIOMETRIC_STRONG}
+     * authenticators.
+     *
+     * @hide
+     */
+    @FlaggedApi(android.security.Flags.FLAG_AUTO_SIM_PIN_MANAGEMENT)
+    @SystemApi
+    public static final int GET_AUTO_MANAGED_PIN_RESULT_USER_AUTH_REQUIRED = 2;
+
+    /**
+     * Returns the enrollment status of the SIM card (associated with a given subscription) in the
+     * automatic PIN management feature. Caller must be sure to bind the TelephonyManager instance
+     * to subId by calling {@link #createForSubscriptionId(int)}.
+     *
+     * @return Enrollment status.
+     * @throws IllegalArgumentException when the TelephonyManager instance is not bound to a subId.
+     * @hide
+     */
+    @FlaggedApi(android.security.Flags.FLAG_AUTO_SIM_PIN_MANAGEMENT)
+    @SystemApi
+    public @SimPinEnrollmentStatus int getSimAutoPinManagementEnrollmentStatus() {
+        if (mSubId == SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
+            throw new IllegalArgumentException(
+                    "Must be called on a bound TelephonyManager instance.");
+        }
+
+        ITelephony service = getITelephony();
+        if (service == null) {
+            Rlog.e(TAG, "getSimAutoPinManagementEnrollmentStatus(): ITelephony instance is NULL");
+            throw new IllegalStateException("Telephony service not available.");
+        }
+
+        try {
+            return service.getSimAutoPinManagementEnrollmentStatus(mSubId);
+        } catch (RemoteException ex) {
+            Rlog.e(TAG, "getSimAutoPinManagementEnrollmentStatus() RemoteException : " + ex);
+            ex.rethrowFromSystemServer();
+        }
+
+        // Default - should not reach here in normal circumstances.
+        return SIM_PIN_ENROLLMENT_STATUS_MANUALLY_MANAGED;
+    }
+
+    /**
+     * @hide
+     */
+    @FlaggedApi(android.security.Flags.FLAG_AUTO_SIM_PIN_MANAGEMENT)
+    @SystemApi
+    public static final class SimAutoPinManagementException extends Exception {
+        private final int mErrorCode;
+
+        /**
+         * Create a SimAutoPinManagementException with a given error code.
+         *
+         * @param errorCode The error code. This could be {@link SimPinEnrollmentResult} if the
+         *                  error is for an enrollment request, {@link SimPinUnenrollmentResult} if
+         *                  the error is for an unenrollment request, or
+         *                  {@link GetAutoManagedPinResult} if the error is for a request to
+         *                  retrieve the SIM PIN.
+         * @hide
+         */
+        SimAutoPinManagementException(int errorCode) {
+            mErrorCode = errorCode;
+        }
+
+        /**
+         * Get the error code returned from the call related to automatic SIM PIN management.
+         *
+         * @return The error code, which could be {@link SimPinEnrollmentResult} if the
+         *          error is for an enrollment request, {@link SimPinUnenrollmentResult} if
+         *          the error is for an unenrollment request, or
+         *          {@link GetAutoManagedPinResult} if the error is for a request to
+         *          retrieve the SIM PIN.
+         * @hide
+         */
+        @SystemApi
+        @FlaggedApi(android.security.Flags.FLAG_AUTO_SIM_PIN_MANAGEMENT)
+        public int getErrorCode() {
+            return mErrorCode;
+        }
+    }
+
+    /** @hide */
+    public static final String KEY_MANAGED_SIM_PIN_ENROLLMENT_ATTEMPTS =
+            "managed_sim_pin_enrollment_attempts";
+
+    /** @hide */
+    public static final String KEY_MANAGED_SIM_PIN_ENROLLMENT_GENERATED_PIN =
+            "managed_sim_pin_enrollment_generated_pin";
+
+    /**
+     * Enrolls a physical SIM card into automatic PIN management: As part of the enrollment, the
+     * platform will generate a random PIN, set it as PIN1 of the SIM card, turn on the requirement
+     * to have the PIN entered upon SIM power up, and store the randomly-generated PIN so it can
+     * be automatically provided to the SIM card.
+     * Caller must be sure to bind the TelephonyManager instance to subId by calling
+     * {@link #createForSubscriptionId(int)}. The PIN will be set on the SIM card associated with
+     * this subscription.
+     *
+     * @param currentPin The current PIN set on the SIM. This PIN will be stored alongside the
+     *                   new, random PIN. If the user unenrolls the SIM from automatic PIN
+     *                   management then this PIN will be restored to the card.
+     * @param executor   the executor on which callback will be invoked.
+     * @param callback   a callback to receive enrollment results. On success, the callback's
+     *                   {@code onResult} method will be called with the generated SIM PIN. On
+     *                   failure, the callback's {@code onError} method will be called with
+     *                   the error code.
+     * @throws IllegalArgumentException when the TelephonyManager instance is not bound to a subId.
+     * @hide
+     */
+    @FlaggedApi(android.security.Flags.FLAG_AUTO_SIM_PIN_MANAGEMENT)
+    @SystemApi
+    @RequiresPermission(android.Manifest.permission.CONTROL_SIM_AUTO_PIN_MANAGEMENT)
+    public void enrollSimInAutoPinManagement(
+            @NonNull String currentPin,
+            @NonNull @CallbackExecutor Executor executor,
+            @NonNull OutcomeReceiver<String, SimAutoPinManagementException> callback) {
+        Rlog.i(TAG, "Enroll called for subscription " + mSubId);
+
+        if (mSubId == SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
+            throw new IllegalArgumentException(
+                    "Must be called on a bound TelephonyManager instance.");
+        }
+
+        ResultReceiver receiver = new ResultReceiver(/* handler= */ null) {
+            @Override
+            protected void onReceiveResult(int resultCode, Bundle resultData) {
+                Rlog.i(TAG, "Received result for enrolling SIM: " + resultCode);
+                if (resultCode == SIM_PIN_ENROLLMENT_RESULT_SUCCESSFUL) {
+                    String generatedPin =
+                            resultData.getString(KEY_MANAGED_SIM_PIN_ENROLLMENT_GENERATED_PIN, "");
+                    executor.execute(() -> Binder.withCleanCallingIdentity(() ->
+                            callback.onResult(generatedPin)));
+                } else {
+                    executor.execute(() -> Binder.withCleanCallingIdentity(() ->
+                            callback.onError(
+                                    new SimAutoPinManagementException(resultCode))));
+                }
+            }
+        };
+
+        ITelephony service = getITelephony();
+        if (service == null) {
+            Rlog.e(TAG, "enrollSimInAutoPinManagement(): ITelephony instance is NULL");
+            throw new IllegalStateException("Telephony service not available.");
+        }
+
+        try {
+            service.enrollSimInAutoPinManagement(mSubId, currentPin, receiver);
+        } catch (RemoteException ex) {
+            Rlog.e(TAG, "enrollSimInAutoPinManagement() RemoteException : " + ex);
+            ex.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * The result of trying to unenroll the SIM from automatic PIN management.
+     *
+     * @hide
+     */
+    @Retention(RetentionPolicy.SOURCE)
+    @IntDef(prefix = {"SIM_PIN_UNENROLLMENT_RESULT_"},
+            value = {
+                    SIM_PIN_UNENROLLMENT_RESULT_FAILED_NOT_ENROLLED,
+                    SIM_PIN_UNENROLLMENT_RESULT_FAILED_SIM_NOT_PRESENT,
+                    SIM_PIN_UNENROLLMENT_RESULT_FAILED_PIN_UNAVAILABLE,
+                    SIM_PIN_UNENROLLMENT_RESULT_FAILED_CANNOT_CHANGE_PIN,
+                    SIM_PIN_UNENROLLMENT_RESULT_FAILED_CANNOT_DISABLE_PIN
+            })
+    public @interface SimPinUnenrollmentResult {
+    }
+
+    /**
+     * Unenrollment of the SIM card from automatic PIN management has been successful: The platform
+     * has restored the old PIN and turned off requirement to enter a PIN  for the SIM.
+     *
+     * This value is only used internally to indicate success and is not part of the error code
+      * returned to the client.
+     * @hide
+     */
+    public static final int SIM_PIN_UNENROLLMENT_RESULT_SUCCESSFUL = 0;
+
+    /**
+     * Unenrollment failed: The SIM referred to is not enrolled in automatic PIN management.
+     *
+     * @hide
+     */
+    @FlaggedApi(android.security.Flags.FLAG_AUTO_SIM_PIN_MANAGEMENT)
+    @SystemApi
+    public static final int SIM_PIN_UNENROLLMENT_RESULT_FAILED_NOT_ENROLLED = 1;
+
+    /**
+     * Unenrollment failed: The SIM card referred to is not present in the device.
+     *
+     * @hide
+     */
+    @FlaggedApi(android.security.Flags.FLAG_AUTO_SIM_PIN_MANAGEMENT)
+    @SystemApi
+    public static final int SIM_PIN_UNENROLLMENT_RESULT_FAILED_SIM_NOT_PRESENT = 2;
+
+    /**
+     * Unenrollment failed because the current PIN or the old PIN were unavailable.
+     * This could happen due to a lack of authentication prior to trying to enroll.
+     * The user should be authenticated by displaying a biometric prompt using the
+     * {@code BiometricManager} with the {@code DEVICE_CREDENTIAL} and {@code BIOMETRIC_STRONG}
+     * authenticators.
+     *
+     * @hide
+     */
+    @FlaggedApi(android.security.Flags.FLAG_AUTO_SIM_PIN_MANAGEMENT)
+    @SystemApi
+    public static final int SIM_PIN_UNENROLLMENT_RESULT_FAILED_PIN_UNAVAILABLE = 3;
+
+    /**
+     * Unenrollment failed: Could not change the SIM PIN to the old PIN. This may be because the
+     * stored PIN is somehow incorrect.
+     *
+     * @hide
+     */
+    @FlaggedApi(android.security.Flags.FLAG_AUTO_SIM_PIN_MANAGEMENT)
+    @SystemApi
+    public static final int SIM_PIN_UNENROLLMENT_RESULT_FAILED_CANNOT_CHANGE_PIN = 4;
+
+    /**
+     * Unenrollment failed: After reverting to the old SIM PIN, the attempt to turn off ICC Lock
+     * failed. The old SIM PIN is the active one and will need to be provided manually by the user.
+     *
+     * @hide
+     */
+    @FlaggedApi(android.security.Flags.FLAG_AUTO_SIM_PIN_MANAGEMENT)
+    @SystemApi
+    public static final int SIM_PIN_UNENROLLMENT_RESULT_FAILED_CANNOT_DISABLE_PIN = 5;
+
+    /**
+     * Un-enroll the SIM from automatic PIN management. The randomly-generated PIN which was
+     * previously set will be changed to PIN that was provided during enrollment. The requirement
+     * to enter the PIN for the SIM will be turned off.
+     *
+     * @param executor the executor on which callback will be invoked.
+     * @param callback a callback to receive unenrollment results.
+     * @hide
+     */
+    @FlaggedApi(android.security.Flags.FLAG_AUTO_SIM_PIN_MANAGEMENT)
+    @SystemApi
+    @RequiresPermission(android.Manifest.permission.CONTROL_SIM_AUTO_PIN_MANAGEMENT)
+    public void unenrollSimFromAutoPinManagement(@NonNull @CallbackExecutor Executor executor,
+            @NonNull OutcomeReceiver<Void, SimAutoPinManagementException> callback) {
+
+        ResultReceiver receiver = new ResultReceiver(/* handler= */ null) {
+            @Override
+            protected void onReceiveResult(int resultCode, Bundle resultData) {
+                if (resultCode == SIM_PIN_UNENROLLMENT_RESULT_SUCCESSFUL) {
+                    executor.execute(() -> Binder.withCleanCallingIdentity(() ->
+                            callback.onResult(null)));
+                } else {
+                    executor.execute(() -> Binder.withCleanCallingIdentity(() ->
+                            callback.onError(
+                                    new SimAutoPinManagementException(resultCode))));
+                }
+            }
+        };
+
+        if (mSubId == SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
+            throw new IllegalArgumentException(
+                    "Must be called on a bound TelephonyManager instance.");
+        }
+
+        ITelephony service = getITelephony();
+        if (service == null) {
+            Rlog.e(TAG, "unenrollSimFromAutoPinManagement(): ITelephony instance is NULL");
+            throw new IllegalStateException("Telephony service not available.");
+        }
+
+        try {
+            service.unenrollSimFromAutoPinManagement(mSubId, receiver);
+        } catch (RemoteException ex) {
+            Rlog.e(TAG, "unenrollSimFromAutoPinManagement() RemoteException : " + ex);
+            ex.rethrowFromSystemServer();
+        }
+    }
+
+    /**
+     * Returns the PIN that was auto-generated for the SIM identified by the subscription ID
+     * provided, if enrolled in automatic PIN management.
+     *
+     * Note that the PIN is stored in a database encrypted by authentication-bound Keystore key.
+     * The user needs to have authenticated prior to making this call. If the user has not
+     * authenticated, an error will be returned to indicate an authentication dialog should be
+     * shown to the user first.
+     *
+     * @param executor the executor on which callback will be invoked.
+     * @param callback a callback to receive unenrollment results.
+     * @hide
+     */
+    @FlaggedApi(android.security.Flags.FLAG_AUTO_SIM_PIN_MANAGEMENT)
+    @SystemApi
+    @RequiresPermission(android.Manifest.permission.CONTROL_SIM_AUTO_PIN_MANAGEMENT)
+    public void getAutoManagedPinForSim(@NonNull @CallbackExecutor Executor executor,
+            @NonNull OutcomeReceiver<String, SimAutoPinManagementException> callback) {
+        if (mSubId == SubscriptionManager.INVALID_SUBSCRIPTION_ID) {
+            throw new IllegalArgumentException(
+                    "Must be called on a bound TelephonyManager instance.");
+        }
+
+        ResultReceiver receiver = new ResultReceiver(/* handler= */ null) {
+            @Override
+            protected void onReceiveResult(int resultCode, Bundle resultData) {
+                String pin = resultData.getString(KEY_MANAGED_SIM_PIN_ENROLLMENT_GENERATED_PIN, "");
+                if (resultCode == GET_AUTO_MANAGED_PIN_RESULT_SUCCESSFUL) {
+                    executor.execute(() -> Binder.withCleanCallingIdentity(() ->
+                            callback.onResult(pin)));
+                } else {
+                    executor.execute(() -> Binder.withCleanCallingIdentity(() ->
+                            callback.onError(
+                                    new SimAutoPinManagementException(resultCode))));
+                }
+            }
+        };
+
+        ITelephony service = getITelephony();
+        if (service == null) {
+            Rlog.e(TAG, "getAutoManagedPinForSim(): ITelephony instance is NULL");
+            throw new IllegalStateException("Telephony service not available.");
+        }
+
+        try {
+            service.getAutoManagedPinForSim(mSubId, receiver);
+        } catch (RemoteException ex) {
+            Rlog.e(TAG, "getAutoManagedPinForSim() RemoteException : " + ex);
+            ex.rethrowFromSystemServer();
+        }
+    }
 }

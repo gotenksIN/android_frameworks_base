@@ -19,6 +19,7 @@ package com.android.systemui.authentication.domain.interactor
 import android.os.UserHandle
 import android.security.Flags.lockscreenIndicateDuplicateGuesses
 import com.android.app.tracing.coroutines.launchTraced as launch
+import com.android.internal.util.LatencyTracker
 import com.android.internal.widget.LockPatternUtils
 import com.android.internal.widget.LockPatternView
 import com.android.internal.widget.LockscreenCredential
@@ -42,6 +43,7 @@ import kotlin.math.max
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
@@ -71,6 +73,7 @@ constructor(
     private val clock: SystemClock,
     private val repository: AuthenticationRepository,
     private val selectedUserInteractor: SelectedUserInteractor,
+    private val latencyTracker: LatencyTracker,
 ) {
     /**
      * The currently-configured authentication method. This determines how the authentication
@@ -229,33 +232,46 @@ constructor(
 
         // Attempt to authenticate:
         val credential = authMethod.createCredential(input) ?: return AuthenticationResult.SKIPPED
-        val authenticationResult = repository.checkCredential(credential)
-        credential.zeroize()
+        latencyTracker.onActionStart(LatencyTracker.ACTION_CHECK_CREDENTIAL)
+        latencyTracker.onActionStart(LatencyTracker.ACTION_CHECK_CREDENTIAL_UNLOCKED)
+        try {
+            val authenticationResult =
+                repository.checkCredential(credential) {
+                    latencyTracker.onActionEnd(LatencyTracker.ACTION_CHECK_CREDENTIAL)
+                }
+            credential.zeroize()
 
-        if (authenticationResult.isSuccessful) {
-            repository.reportAuthenticationAttempt(AuthenticationResult.SUCCEEDED)
-            _onAuthenticationResult.emit(true)
+            if (authenticationResult.isSuccessful) {
+                latencyTracker.onActionEnd(LatencyTracker.ACTION_CHECK_CREDENTIAL_UNLOCKED)
+                latencyTracker.onActionStart(LatencyTracker.ACTION_LOCKSCREEN_UNLOCK)
+                repository.reportAuthenticationAttempt(AuthenticationResult.SUCCEEDED)
+                _onAuthenticationResult.emit(true)
 
-            // Force a garbage collection in an attempt to erase any credentials left in memory.
-            // Do it after a 5-sec delay to avoid making the bouncer dismiss animation janky.
-            initiateGarbageCollection(delay = 5.seconds)
+                // Force a garbage collection in an attempt to erase any credentials left in memory.
+                // Do it after a 5-sec delay to avoid making the bouncer dismiss animation janky.
+                initiateGarbageCollection(delay = 5.seconds)
 
-            return AuthenticationResult.SUCCEEDED
+                return AuthenticationResult.SUCCEEDED
+            }
+
+            // Authentication failed.
+            repository.reportAuthenticationAttempt(
+                AuthenticationResult.FAILED,
+                authenticationResult.isDuplicate,
+            )
+
+            if (authenticationResult.lockoutDuration.isPositive()) {
+                // Lockout has been triggered.
+                repository.reportLockoutStarted(authenticationResult.lockoutDuration)
+            }
+
+            _onAuthenticationResult.emit(false)
+            return AuthenticationResult.FAILED
+        } catch (ex: CancellationException) {
+            // The authentication action has been cancelled, likely due to the user leaving the UI.
+            latencyTracker.onActionEnd(LatencyTracker.ACTION_CHECK_CREDENTIAL_UNLOCKED)
+            throw ex
         }
-
-        // Authentication failed.
-        repository.reportAuthenticationAttempt(
-            AuthenticationResult.FAILED,
-            authenticationResult.isDuplicate,
-        )
-
-        if (authenticationResult.lockoutDuration.isPositive()) {
-            // Lockout has been triggered.
-            repository.reportLockoutStarted(authenticationResult.lockoutDuration)
-        }
-
-        _onAuthenticationResult.emit(false)
-        return AuthenticationResult.FAILED
     }
 
     /**
@@ -268,7 +284,11 @@ constructor(
     }
 
     /**
-     * Returns `true` if the power button should instantly lock the device, `false` otherwise.
+     * Returns `true` if the user's settings are such that pressing the power button should
+     * instantly lock the device, vs. waiting for a lock timeout.
+     *
+     * This does not necessarily mean that the device *should* be locked (keyguard may be disabled
+     * or suppressed, etc).
      *
      * WARNING: This causes a blocking IPC to LockPatternUtils (b/446735679).
      */

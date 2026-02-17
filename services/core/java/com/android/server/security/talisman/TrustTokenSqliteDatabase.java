@@ -24,19 +24,23 @@ import android.database.sqlite.SQLiteConstraintException;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteException;
 import android.database.sqlite.SQLiteOpenHelper;
+import android.security.trusttoken.TrustConfiguration;
 import android.util.Pair;
 import android.util.Slog;
 
 import com.android.internal.os.Clock;
 
 import java.io.File;
+import java.io.IOException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.function.Predicate;
 
-class TrustTokenSqliteDatabase extends TrustTokenDatabase {
+class TrustTokenSqliteDatabase extends TrustTokenDatabase implements AutoCloseable {
     private static final String TAG = "TrustTokenDatabase";
     private static final Duration MINIMUM_VALID_DURATION = Duration.ofMinutes(15);
+    private static final int CLEANUP_BATCH_NUM = 8;
 
     private final OpenHelper mOpenHelper;
     private final Clock mClock;
@@ -83,6 +87,77 @@ class TrustTokenSqliteDatabase extends TrustTokenDatabase {
                 });
     }
 
+
+    @Override
+    int countTrustTokenSets(@TrustTokenSet.Type int type) {
+        DatabaseHelper db = getWritableDatabase();
+        return db.countTokens(type);
+    }
+
+    @Override
+    int cleanUpTrustTokenSets(
+            @TrustTokenSet.Type int type, int maxTokenNum, Predicate<TrustTokenSet> verifier) {
+        DatabaseHelper db = getWritableDatabase();
+        int deleted = 0;
+        Instant expiry =
+                Instant.ofEpochMilli(mClock.currentTimeMillis()).plus(MINIMUM_VALID_DURATION);
+        deleted += db.deleteExpiredTokens(type, expiry);
+        deleted +=
+                db.runInTransaction(
+                        () -> {
+                            int count = db.countTokens(type);
+                            if (count <= maxTokenNum) {
+                                return 0;
+                            }
+                            return db.deleteExcessTokens(type, count - maxTokenNum);
+                        });
+        // It's prohibitively expensive to test each and every token in the database, therefore we
+        // delete in batches and only test the first token in a batch.
+        int batchSize = db.countTokens(type) / CLEANUP_BATCH_NUM + 1;
+        Slog.i(TAG, "clean up batch size " + batchSize);
+        while (true) {
+            var deletedThisBatch =
+                    db.runInTransaction(
+                            () -> {
+                                Pair<TrustTokenSetWithKey, Long> tokenAndRowId =
+                                        db.getTrustToken(type, expiry);
+                                if (tokenAndRowId == null
+                                        || verifier.test(tokenAndRowId.first.getTokenSet())) {
+                                    return 0;
+                                }
+                                return db.deleteExcessTokens(type, batchSize);
+                            });
+            if (deletedThisBatch == 0) {
+                break;
+            }
+            Slog.i(TAG, "Deleted " + deletedThisBatch + " invalid tokens in this batch");
+            deleted += deletedThisBatch;
+        }
+        return deleted;
+    }
+
+    @Override
+    @NonNull
+    TrustConfiguration getTrustConfiguration() throws TrustConfigurationUnavailableException {
+        DatabaseHelper db = getWritableDatabase();
+        TrustConfiguration config = db.getTrustConfiguration();
+        if (config == null) {
+            throw new TrustConfigurationUnavailableException();
+        }
+        return config;
+    }
+
+    @Override
+    void updateTrustConfiguration(@NonNull TrustConfiguration configuration) {
+        DatabaseHelper db = getWritableDatabase();
+        db.updateTrustConfiguration(configuration);
+    }
+
+    @Override
+    public void close() {
+        mOpenHelper.close();
+    }
+
     private TrustTokenSqliteDatabase(OpenHelper helper, Clock clock) {
         mOpenHelper = helper;
         mClock = clock;
@@ -102,7 +177,18 @@ class TrustTokenSqliteDatabase extends TrustTokenDatabase {
             private static final String CREATED_AT = "createdAt";
             private static final String EXPIRE_AT = "expireAt";
         }
+
+        private static class Metadata {
+            private static String name() {
+                return "Metadata";
+            }
+
+            private static final String NAME = "name";
+            private static final String VALUE = "value";
+        }
     }
+
+    private static final String TRUST_CONFIGURATION = "trust_configuration";
 
     private DatabaseHelper getWritableDatabase() {
         return new DatabaseHelper(mOpenHelper.getWritableDatabase());
@@ -234,6 +320,21 @@ class TrustTokenSqliteDatabase extends TrustTokenDatabase {
             }
         }
 
+        int countTokens(@TrustTokenSet.Type int type) {
+            Cursor cursor =
+                    mDatabase.rawQuery(
+                            "SELECT COUNT(0) FROM TrustToken WHERE type = ?",
+                            new String[] {String.valueOf(type)});
+            try {
+                if (!cursor.moveToNext()) {
+                    return 0;
+                }
+                return cursor.getInt(0);
+            } finally {
+                cursor.close();
+            }
+        }
+
         void deleteTrustToken(long rowid) {
             long deletedRows =
                     mDatabase.delete(
@@ -245,10 +346,88 @@ class TrustTokenSqliteDatabase extends TrustTokenDatabase {
                         "failed to delete the trust token from the pending table");
             }
         }
+
+        int deleteExpiredTokens(@TrustTokenSet.Type int type, Instant expiry) {
+            return mDatabase.delete(
+                    Schema.TrustToken.name(),
+                    "type = ? and expireAt < ?",
+                    new String[] {String.valueOf(type), String.valueOf(expiry.toEpochMilli())});
+        }
+
+        int deleteExcessTokens(@TrustTokenSet.Type int type, int numToDelete) {
+            if (numToDelete == 0) {
+                return 0;
+            }
+            // Android SQLite doesn't have SQLITE_ENABLE_UPDATE_DELETE_LIMIT enabled, so we have to
+            // determine the rowId range to delete.
+            Cursor cursor =
+                    mDatabase.query(
+                            /* distinct= */ false,
+                            /* table= */ Schema.TrustToken.name(),
+                            /* columns= */ new String[] {Schema.TrustToken.ROWID},
+                            /* selection= */ null,
+                            /* selectionArgs= */ null,
+                            /* groupBy= */ null,
+                            /* having= */ null,
+                            /* orderBy= */ Schema.TrustToken.ROWID + " ASC",
+                            /* limit= */ "1 OFFSET " + String.valueOf(numToDelete - 1));
+            long maxRowId = 0;
+            try {
+                if (!cursor.moveToNext()) {
+                    return 0;
+                }
+                maxRowId = cursor.getLong(0);
+            } finally {
+                cursor.close();
+            }
+            return mDatabase.delete(
+                    Schema.TrustToken.name(),
+                    "type = ? AND rowid <= ?",
+                    new String[] {String.valueOf(type), String.valueOf(maxRowId)});
+        }
+
+        TrustConfiguration getTrustConfiguration() {
+            Cursor cursor =
+                    mDatabase.query(
+                            /* distinct= */ false,
+                            /* table= */ Schema.Metadata.name(),
+                            /* columns= */ new String[] {Schema.Metadata.VALUE},
+                            /* selection= */ Schema.Metadata.NAME + " = ?",
+                            /* selectionArgs= */ new String[] {TRUST_CONFIGURATION},
+                            /* groupBy= */ null,
+                            /* having= */ null,
+                            /* orderBy= */ null,
+                            /* limit= */ "1");
+            try {
+                if (!cursor.moveToNext()) {
+                    return null;
+                }
+                byte[] configBlob =
+                        cursor.getBlob(cursor.getColumnIndexOrThrow(Schema.Metadata.VALUE));
+                try {
+                    return TrustConfiguration.deserialize(configBlob);
+                } catch (IOException e) {
+                    throw new IllegalStateException("failed to deserialize TrustConfiguration", e);
+                }
+            } finally {
+                cursor.close();
+            }
+        }
+
+        void updateTrustConfiguration(TrustConfiguration configuration) {
+            ContentValues values = new ContentValues();
+            values.put(Schema.Metadata.NAME, TRUST_CONFIGURATION);
+            try {
+                values.put(Schema.Metadata.VALUE, configuration.serialize());
+            } catch (IOException e) {
+                throw new IllegalArgumentException("failed to serialize TrustConfiguration", e);
+            }
+            mDatabase.replaceOrThrow(Schema.Metadata.name(), /* nullColumnHack= */ null, values);
+        }
     }
 
     private static class OpenHelper extends SQLiteOpenHelper {
-        private static final int SCHEMA_VERSION = 1;
+        private static final int SCHEMA_VERSION = 2;
 
         OpenHelper(Context context, File databaseFile) {
             super(
@@ -273,14 +452,26 @@ class TrustTokenSqliteDatabase extends TrustTokenDatabase {
             db.execSQL(
                     """
                     CREATE TABLE IF NOT EXISTS TrustToken (
+                          rowid       INTEGER  PRIMARY KEY AUTOINCREMENT,
                           publicKey   BLOB     NOT NULL,
-                          privateKey   BLOB     NOT NULL,
+                          privateKey  BLOB     NOT NULL,
                           type        INTEGER  NOT NULL,
                           tokenSet    BLOB     NOT NULL,
                           createdAt   INTEGER  NOT NULL,
                           expireAt    INTEGER  NOT NULL,
-                          PRIMARY KEY (type, expireAt, publicKey ASC),
                           UNIQUE (publicKey)
+                    );
+                    """);
+            db.execSQL(
+                    """
+                    CREATE INDEX IF NOT EXISTS TrustTokenByTypeAndExpiredAt
+                    ON TrustToken (type, expireAt, rowid ASC);
+                    """);
+            db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS Metadata (
+                          name        STRING   PRIMARY KEY,
+                          value       BLOB     NOT NULL
                     );
                     """);
         }
@@ -300,7 +491,9 @@ class TrustTokenSqliteDatabase extends TrustTokenDatabase {
         }
 
         private void resetDatabase(SQLiteDatabase db) {
-            db.execSQL("DROP TABLE TrustToken");
+            db.execSQL("DROP TABLE IF EXISTS TrustToken");
+            db.execSQL("DROP TABLE IF EXISTS Metadata");
+            db.execSQL("DROP INDEX IF EXISTS TrustTokenByTypeAndExpiredAt");
         }
     }
 }

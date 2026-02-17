@@ -133,6 +133,7 @@ flag {
     namespace: "companion"
     description: "Enables unified association extra permissions"
     bug: "440175468"
+    is_exported: true
 }
 
 flag {
@@ -149,4 +150,12 @@ flag {
     namespace: "companion"
     description: "Enable storage and notification permissions for the APP_STREAMING role."
     bug: "459812815"
+}
+
+flag {
+    name: "support_ai_agent"
+    namespace: "companion"
+    is_exported: true
+    description: "Add a new field in AssociationRequest to indicate if the device supports AI agent automation."
+    bug: "474639153"
 }

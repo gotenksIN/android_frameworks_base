@@ -81,15 +81,13 @@ public class EmbeddedInsightRenderer implements Renderer {
         mExecutor.execute(() -> {
             logDebug("registering insight surface client, id=" + clientInfo.getId());
 
-            final RenderToken clientRenderToken = new RenderToken.RenderTokenBuilder()
-                    .setRendererComponentId(mComponentId)
-                    .build();
+            final RenderToken clientRenderToken = new RenderToken(mComponentId);
 
             mClientRegistry.addClient(clientInfo, clientRenderToken);
 
             // Link the client to death so we can unregister it if it dies.
             try {
-                clientInfo.getCallback().asBinder().linkToDeath(() -> {
+                clientInfo.getClient().asBinder().linkToDeath(() -> {
                     logDebug("client has died: " + clientInfo.getId());
                     unregisterInsightSurfaceClient(clientInfo.getId());
                 }, 0);
@@ -135,7 +133,7 @@ public class EmbeddedInsightRenderer implements Renderer {
     }
 
     @Override
-    public void render(@NonNull ContextInsight insight) {
+    public void render(@NonNull ContextInsight insight, RenderToken renderToken) {
         mExecutor.execute(() -> {
             if (mClientRegistry.isEmpty()) {
                 logDebug("NO embedded surface clients!");
@@ -147,12 +145,12 @@ public class EmbeddedInsightRenderer implements Renderer {
                 return;
             }
 
-            final InsightSurfaceClientInfo client = clientFromInsight(insight);
+            final InsightSurfaceClientInfo client = clientFromRenderToken(renderToken);
             if (client == null) {
                 logDebug("no client found for insight [" + insight + "]");
             }
 
-            mVisualizerRegistry.createVisualizationForClient(List.of(insight), client);
+            mVisualizerRegistry.createVisualizationForClient(insight, client, renderToken);
         });
     }
 
@@ -161,12 +159,12 @@ public class EmbeddedInsightRenderer implements Renderer {
         return mComponentId;
     }
 
-    private InsightSurfaceClientInfo clientFromInsight(ContextInsight insight) {
+    private InsightSurfaceClientInfo clientFromRenderToken(RenderToken renderToken) {
         if (mClientRegistry.isEmpty()) {
             return null;
         }
 
-        return mClientRegistry.getClientForRenderToken(insight.getRenderToken());
+        return mClientRegistry.getClientForRenderToken(renderToken);
     }
 
     private static void logDebug(String msg) {

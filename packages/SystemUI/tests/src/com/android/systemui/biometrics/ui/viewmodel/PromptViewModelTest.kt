@@ -1498,7 +1498,11 @@ internal class PromptViewModelTest(private val testCase: TestCase) : SysuiTestCa
         // TODO(b/251476085): remove Spaghetti, migrate logic, and update this test
         kosmos.promptViewModel.onSwitchToCredential()
 
-        assertThat(size).isEqualTo(PromptSize.LARGE)
+        if (Flags.largeScreenBp()) {
+            assertThat(size).isEqualTo(PromptSize.MEDIUM)
+        } else {
+            assertThat(size).isEqualTo(PromptSize.LARGE)
+        }
     }
 
     @Test
@@ -1620,6 +1624,7 @@ internal class PromptViewModelTest(private val testCase: TestCase) : SysuiTestCa
     } // TODO(b/335278136): Add test for no sensor landscape
 
     @Test
+    @DisableFlags(Flags.FLAG_LARGE_SCREEN_BP)
     fun position_bottom_forceLarge() = runGenericTest {
         kosmos.displayStateRepository.setCurrentRotation(DisplayRotation.ROTATION_270)
         kosmos.promptViewModel.onSwitchToCredential()
@@ -1633,6 +1638,19 @@ internal class PromptViewModelTest(private val testCase: TestCase) : SysuiTestCa
         kosmos.displayStateRepository.setIsLargeScreen(true)
         val position by collectLastValue(kosmos.promptViewModel.position)
         assertThat(position).isEqualTo(PromptPosition.Bottom)
+    }
+
+    @Test
+    @EnableFlags(Flags.FLAG_LARGE_SCREEN_BP)
+    fun position_center_extraLargeScreen() = runGenericTest {
+        kosmos.displayStateRepository.setCurrentRotation(DisplayRotation.ROTATION_0)
+        kosmos.displayStateRepository.setIsExtraLargeScreen(true)
+        val position by collectLastValue(kosmos.promptViewModel.position)
+        if (testCase.modalities.hasUdfps) {
+            assertThat(position).isEqualTo(PromptPosition.Bottom)
+        } else {
+            assertThat(position).isEqualTo(PromptPosition.Center)
+        }
     }
 
     @Test

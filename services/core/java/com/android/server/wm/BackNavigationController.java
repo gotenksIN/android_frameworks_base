@@ -29,6 +29,7 @@ import static android.view.RemoteAnimationTarget.MODE_OPENING;
 import static android.view.WindowManager.LayoutParams.PRIVATE_FLAG_APP_PROGRESS_GENERATION_ALLOWED;
 import static android.view.WindowManager.LayoutParams.TYPE_BASE_APPLICATION;
 import static android.view.WindowManager.TRANSIT_CHANGE;
+import static android.view.WindowManager.TRANSIT_CLOSE_PREPARE_BACK_NAVIGATION;
 import static android.view.WindowManager.TRANSIT_PREPARE_BACK_NAVIGATION;
 import static android.window.SystemOverrideOnBackInvokedCallback.OVERRIDE_FINISH_AND_REMOVE_TASK;
 import static android.window.SystemOverrideOnBackInvokedCallback.OVERRIDE_UNDEFINED;
@@ -179,13 +180,8 @@ class BackNavigationController {
         synchronized (wmService.mGlobalLock) {
             if (isMonitoringFinishTransition()) {
                 Slog.w(TAG, "Previous animation hasn't finish, status: " + mAnimationHandler);
-                if (com.android.window.flags.Flags.predictiveBackQuickDoubleBackSwipes()) {
-                    infoBuilder.setType(BackNavigationInfo.TYPE_IN_TRANSITION);
-                    return infoBuilder.build();
-                } else {
-                    // Don't start any animation for it.
-                    return null;
-                }
+                infoBuilder.setType(BackNavigationInfo.TYPE_IN_TRANSITION);
+                return infoBuilder.build();
             }
 
             // In projected mode, main device remains unchanged when connected to external display.
@@ -268,15 +264,6 @@ class BackNavigationController {
             if (embeddedWindows != null) {
                 for (int i = embeddedWindows.size() - 1; i >= 0; --i) {
                     transferGestureToEmbedded |= embeddedWindows.get(i).mGestureToEmbedded;
-                    if (transferGestureToEmbedded
-                            && !com.android.window.flags.Flags
-                            .enableBackCallbackForFocusedSurfaceControlViewHost()) {
-                        break;
-                    }
-                    if (!com.android.window.flags.Flags
-                            .enableBackCallbackForFocusedSurfaceControlViewHost()) {
-                        continue;
-                    }
                     final OnBackInvokedCallbackInfo tmpCallbackInfo = embeddedWindows.get(i)
                             .getOnBackInvokedCallbackInfo();
                     // The embedded window must not register for system animation.
@@ -380,6 +367,14 @@ class BackNavigationController {
             } else if (!allActivitiesHaveWindow(prevActivities)) {
                 // Skip if one of previous activity doesn't has window. Predictive back animation
                 // cannot resume previous activity, so nothing will be shown.
+                backType = BackNavigationInfo.TYPE_CALLBACK;
+            } else if (hasActivityLockedByAppLockLocked(prevActivities)) {
+                // Skip if one of previous activities is locked by App Lock since it won't be
+                // visible according to AppLockOverlayController. Disabling animation to avoid
+                // animating the App Lock overlay prematurely.
+                ProtoLog.d(WM_DEBUG_BACK_PREVIEW, "One of previous activities is locked by App"
+                        + " Lock, which means it won't be visible. Disabling animation to avoid"
+                        + " animating App Lock overlay prematurely.");
                 backType = BackNavigationInfo.TYPE_CALLBACK;
             } else if (prevActivities.size() > 0
                     && requestOverride == SystemOverrideOnBackInvokedCallback.OVERRIDE_UNDEFINED) {
@@ -686,6 +681,21 @@ class BackNavigationController {
         for (int i = prevActivities.size() - 1; i >= 0; --i) {
             final ActivityRecord test = prevActivities.get(i);
             if (!test.occludesParent() || test.hasWallpaper()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hasActivityLockedByAppLockLocked(
+            @NonNull ArrayList<ActivityRecord> prevActivities) {
+        if (!android.security.Flags.appLockApis() || !android.security.Flags.appLockCore()) {
+            return false;
+        }
+        for (int i = prevActivities.size() - 1; i >= 0; --i) {
+            final ActivityRecord test = prevActivities.get(i);
+            if (mWindowManagerService.isPackageLockedByAppLockLocked(test.packageName,
+                    test.mUserId)) {
                 return true;
             }
         }
@@ -1391,7 +1401,10 @@ class BackNavigationController {
                 mCloseAdaptor = null;
             }
             if (mOpenAnimAdaptor != null) {
-                mOpenAnimAdaptor.cleanUp(mStartingSurfaceTargetMatch);
+                final boolean closePB = mPrepareCloseTransition != null
+                        && mPrepareCloseTransition.mType == TRANSIT_CLOSE_PREPARE_BACK_NAVIGATION;
+                mOpenAnimAdaptor.cleanUp(mStartingSurfaceTargetMatch,
+                        !(cancel || closePB) /* deferForIme */);
                 mOpenAnimAdaptor = null;
             }
         }
@@ -1407,10 +1420,22 @@ class BackNavigationController {
             if (mOpenAnimAdaptor.mRequestedStartingSurfaceId == INVALID_TASK_ID) {
                 return;
             }
+            if (mOpenActivities == null) {
+                return;
+            }
+            boolean allWindowDrawn = true;
+            for (int i = mOpenActivities.length - 1; i >= 0; --i) {
+                final ActivityRecord ar = mOpenActivities[i];
+                allWindowDrawn &= ar.isReportedDrawn();
+            }
+            if (!allWindowDrawn) {
+                return;
+            }
             startTransaction.addTransactionCommittedListener(Runnable::run, () -> {
                 synchronized (mWindowManagerService.mGlobalLock) {
                     if (mOpenAnimAdaptor != null) {
-                        mOpenAnimAdaptor.cleanUpWindowlessSurface(true);
+                        mOpenAnimAdaptor.cleanUpWindowlessSurface(true /* openTransitionMatch */ ,
+                                true /* deferForIme */);
                     }
                 }
             });
@@ -1534,8 +1559,8 @@ class BackNavigationController {
                 return true;
             }
 
-            void cleanUp(boolean startingSurfaceMatch) {
-                cleanUpWindowlessSurface(startingSurfaceMatch);
+            void cleanUp(boolean startingSurfaceMatch, boolean deferForIme) {
+                cleanUpWindowlessSurface(startingSurfaceMatch, deferForIme);
                 for (int i = mAdaptors.length - 1; i >= 0; --i) {
                     mAdaptors[i].mTarget.cancelAnimation();
                 }
@@ -1671,14 +1696,17 @@ class BackNavigationController {
              * Ask shell to clear the starting surface.
              * @param openTransitionMatch if true, shell will play the remove starting window
              *                            animation, otherwise remove it directly.
+             * @param deferForIme if true and the starting surface contains IME, defer removing the
+             *                   starting surface because the IME may not be drawn yet.
              */
-            void cleanUpWindowlessSurface(boolean openTransitionMatch) {
+            void cleanUpWindowlessSurface(boolean openTransitionMatch, boolean deferForIme) {
                 if (mRequestedStartingSurfaceId == INVALID_TASK_ID) {
                     return;
                 }
                 mAdaptors[0].mTarget.mWmService.mAtmService.mTaskOrganizerController
                         .removeWindowlessStartingSurface(mRequestedStartingSurfaceId,
-                                !openTransitionMatch, mHasImeSurface);
+                                !openTransitionMatch,
+                                mHasImeSurface && deferForIme /* deferRemove */);
                 mRequestedStartingSurfaceId = INVALID_TASK_ID;
                 mHasImeSurface = false;
                 if (mStartingSurface != null && mStartingSurface.isValid()) {

@@ -71,6 +71,7 @@ import android.telephony.ims.aidl.IImsRcsFeature;
 import android.telephony.ims.aidl.IImsRegistration;
 import android.telephony.ims.aidl.IImsRegistrationCallback;
 import android.telephony.ims.aidl.IRcsConfigCallback;
+import android.telephony.satellite.EnableRequestAttributes;
 import android.telephony.satellite.INtnSignalStrengthCallback;
 import android.telephony.satellite.ISatelliteCapabilitiesCallback;
 import android.telephony.satellite.ISatelliteCommunicationAccessStateCallback;
@@ -82,6 +83,7 @@ import android.telephony.satellite.ISatelliteTransmissionUpdateCallback;
 import android.telephony.satellite.ISelectedNbIotSatelliteSubscriptionCallback;
 import android.telephony.satellite.NtnSignalStrength;
 import android.telephony.satellite.PlmnSatelliteConfig;
+import android.telephony.satellite.PointingUiAppLaunchIntentAttributes;
 import android.telephony.satellite.SatelliteCapabilities;
 import android.telephony.satellite.SatelliteDatagram;
 import android.telephony.satellite.SatelliteSubscriberInfo;
@@ -89,13 +91,11 @@ import com.android.ims.internal.IImsServiceFeatureCallback;
 import com.android.internal.telephony.CellNetworkScanResult;
 import com.android.internal.telephony.IBooleanConsumer;
 import com.android.internal.telephony.ICallForwardingInfoCallback;
-import com.android.internal.telephony.IccLogicalChannelRequest;
 import com.android.internal.telephony.IImsStateCallback;
 import com.android.internal.telephony.IIntegerConsumer;
 import com.android.internal.telephony.INumberVerificationCallback;
-
+import com.android.internal.telephony.IccLogicalChannelRequest;
 import com.android.internal.telephony.OperatorInfo;
-
 import java.util.List;
 import java.util.Map;
 
@@ -2540,6 +2540,9 @@ interface ITelephony {
      *                    otherwise. When disabling satellite, {@code isEmergency} is always
      *                    considered as {@code false} by Telephony.
      * @param callback The callback to get the result of the request.
+     *
+     * @deprecated Use {@link #requestEnableSatellite(int, int, EnableRequestAttributes, IIntegerConsumer)}
+     *             instead.
      */
     @JavaPassthrough(annotation = "@android.annotation.RequiresPermission("
                     + "android.Manifest.permission.SATELLITE_COMMUNICATION)")
@@ -2552,6 +2555,9 @@ interface ITelephony {
      *
      * @param receiver Result receiver to get the error code of the request and whether the
      *                 satellite modem is enabled.
+     *
+     * @deprecated Use {@link #requestEnableSatelliteStatus(int, int, EnableRequestAttributes,
+     *             ResultReceiver)} instead.
      */
     @JavaPassthrough(annotation = "@android.annotation.RequiresPermission("
                     + "android.Manifest.permission.SATELLITE_COMMUNICATION)")
@@ -2579,6 +2585,33 @@ interface ITelephony {
                     + "android.Manifest.permission.SATELLITE_COMMUNICATION)")
     void
     requestIsEmergencyModeEnabled(in ResultReceiver receiver);
+
+    /**
+     * Request to enable or disable the satellite.
+     *
+     * @param subId The subscription ID of the satellite service.
+     * @param attributes The attributes of the enable request.
+     * @param callback The callback to get the result of the request.
+     */
+    @JavaPassthrough(annotation = "@android.annotation.RequiresPermission("
+                    + "android.Manifest.permission.SATELLITE_COMMUNICATION)")
+    void
+    requestEnableSatellite(int subId, in EnableRequestAttributes attributes,
+            in IIntegerConsumer callback);
+
+    /**
+     * Request to get the satellite enablement status.
+     *
+     * @param subId The subscription ID of the satellite service.
+     * @param connectType The connect type of satellite service to be enabled.
+     *                    See {@link CarrierConfigManager#KEY_CARRIER_ROAMING_NTN_CONNECT_TYPE}.
+     * @param receiver Result receiver to get {@link EnableResponseAttributes} part of the
+     *                 response and {@link SatelliteException} in case of an error.
+     */
+    @JavaPassthrough(annotation = "@android.annotation.RequiresPermission("
+                    + "android.Manifest.permission.SATELLITE_COMMUNICATION)")
+    void
+    requestEnableSatelliteStatus(int subId, int connectType, in ResultReceiver receiver);
 
     /**
      * Request to get whether the satellite service is supported on the device.
@@ -3581,4 +3614,101 @@ interface ITelephony {
      @JavaPassthrough(annotation="@android.annotation.RequiresPermission("
                                + "android.Manifest.permission.SATELLITE_COMMUNICATION)")
      boolean isInCarrierRoamingNtnMode(int subId);
+
+    /**
+     * Returns the enrollment status of a sim identified by {@code subscriptionId} in the automatic
+     * PIN management feature.
+     *
+     * @param subscriptionId Subscription identifier of the SIM card.
+     * @return One of {@link android.telephony.TelephonyManager.SimPinEnrollmentStatus}.
+     */
+    int getSimAutoPinManagementEnrollmentStatus(in int subId);
+
+    /** Enrolls the SIM card identified by the subscription ID into automatic PIN management.
+     * With this feature, the platform will generate and set a PIN1 for the SIM card. The
+     * platform will automatically supply the PIN to the SIM card instead of prompting the user
+     * tho provide it.
+     *
+     * @param subscriptionId Subscription identifier of the SIM card.
+     * @param currentPin The current PIN1 value for the SIM card, needed in order to change the SIM
+     *                   PIN.
+     * @param resultReceiver {@code ResultReceiver} for the resultReceiver.
+     */
+     @JavaPassthrough(annotation="@android.annotation.RequiresPermission("
+                       + "android.Manifest.permission.CONTROL_SIM_AUTO_PIN_MANAGEMENT)")
+    void enrollSimInAutoPinManagement(in int subId, in String currentPin, in ResultReceiver result);
+
+    /**
+     * Unenrolls the SIM card identified by the subscription ID from automatic PIN management.
+     * The PIN provided for {@link #mCurrentlyModifyingSimAutoPinManagementState} will be set as
+     * PIN1 for the SIM card and the requirement to supply a PIN for the SIM card will be turned
+     * off.
+     *
+     * @param subscriptionId  Subscription identifier of the SIM card.
+     * @param resultReceiver Receiver for the
+     * {@link android.telephony.TelephonyManager.SimPinUnenrollmentResult}.
+     */
+     @JavaPassthrough(annotation="@android.annotation.RequiresPermission("
+                       + "android.Manifest.permission.CONTROL_SIM_AUTO_PIN_MANAGEMENT)")
+    void unenrollSimFromAutoPinManagement(in int subId, in ResultReceiver result);
+
+    /**
+     * Returns the platform-generated PIN for a SIM card identified by the subscription ID, if
+     * this SIM is enrolled in automatic PIN management.
+     * The device must be unlocked - the user recently authenticated - for the PIN to be read.
+     *
+     * @param subscriptionId  Subscription identifier of the SIM card.
+     * @param resultReceiver receiver for the PIN.
+     */
+    @JavaPassthrough(annotation="@android.annotation.RequiresPermission("
+                       + "android.Manifest.permission.CONTROL_SIM_AUTO_PIN_MANAGEMENT)")
+    void getAutoManagedPinForSim(in int subId, in ResultReceiver result);
+
+    /**
+     * Notify Telephony about entitlement status change.
+     *
+     * Callers (like FCM client app) could invoke this API to inform Telephony whenever
+     * there's a change on Entitlement State, so that Telephony would be able to decide to
+     * fetch latest Entitlement values and operate accordingly.
+     *
+     * For example: In case of Entitlement for Satellite, when user purchases a Satellite Plan,
+     * carriers would push notify devices. The push notifications are handled by FCM client,
+     * which then is supposed to notify Telephony about the same, so that Telephony-Satellite
+     * Framework could enable Satellite functionality based on latest subscription plan information.
+     *
+     * Same applies for all other Entitlement driven feature enablement for all Telephony features,
+     * in addition to Satellite.
+     *
+     * <p> Requires permission:
+     * {@link android.Manifest.permission#MODIFY_PHONE_STATE MODIFY_PHONE_STATE}
+     *
+     * @param subId subscription id
+     * @param appIds list of application IDs for which the entitlement status has changed
+     * @param timeInMillis time when entitlement status changed
+     * @hide
+     */
+    @JavaPassthrough(annotation="@android.annotation.RequiresPermission("
+                    + "android.Manifest.permission.MODIFY_PHONE_STATE)")
+    void notifyEntitlementStatusChanged(in int subId, in List<String> appIds, in long timeInMillis);
+
+    /**
+     * Get the list of available services for carrier roaming NTN.
+     *
+     * @param subId The subscription ID of the carrier.
+     * @return List of available services for carrier roaming NTN.
+     */
+    @JavaPassthrough(annotation = "@android.annotation.RequiresPermission("
+                    + "android.Manifest.permission.SATELLITE_COMMUNICATION)")
+    int[] getCarrierRoamingNtnAvailableServices(int subId);
+
+    /**
+     * Request to get the PendingIntent to launch the PointingUI app.
+     *
+     * @param launchIntentAttributes The attributes to create the launch intent.
+     * @param receiver The result receiver that returns the {@link PendingIntent} to launch the
+     * PointingUI app if the request is successful or an error code if the request failed.
+     */
+    @JavaPassthrough(annotation = "@android.annotation.RequiresPermission("
+                    + "android.Manifest.permission.SATELLITE_COMMUNICATION)")
+    void requestPointingUiAppLaunchIntent(in PointingUiAppLaunchIntentAttributes launchIntentAttributes, in ResultReceiver receiver);
 }

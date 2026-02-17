@@ -16,6 +16,7 @@
 
 package com.android.wm.shell.scenarios
 
+import android.platform.test.annotations.WithDesktopTest
 import android.tools.PlatformConsts.DEFAULT_DISPLAY
 import com.android.server.wm.flicker.helpers.DesktopModeAppHelper
 import com.android.server.wm.flicker.helpers.MailAppHelper
@@ -33,20 +34,21 @@ abstract class DragAppWindowMultiWindow : DragAppWindowScenarioTestBase() {
     private val mailAppDesktopHelper = DesktopModeAppHelper(mailAppHelper)
 
     private val desktopConfig = DesktopConfig.fromContext(instrumentation.context)
-    private val maxNum = desktopConfig.maxTaskLimit
+    private val hasTaskLimit = desktopConfig.maxTaskLimit > 0
+    private val numWindows = if (hasTaskLimit) desktopConfig.maxTaskLimit - 1 else 15
 
     @Before
     fun setup() {
-        Assume.assumeTrue(maxNum > 0)
         Assume.assumeTrue(
             DesktopState.fromContext(instrumentation.context)
                 .isDesktopModeSupportedOnDisplay(DEFAULT_DISPLAY)
         )
         mailAppDesktopHelper.enterDesktopMode(wmHelper, device)
-        mailAppDesktopHelper.openTasks(wmHelper, numTasks = maxNum - 1)
+        mailAppDesktopHelper.openTasks(wmHelper, numTasks = numWindows)
     }
 
     @Test
+    @WithDesktopTest
     override fun dragAppWindow() {
         val (startX, startY) = getWindowDragStartCoordinate(mailAppHelper)
 

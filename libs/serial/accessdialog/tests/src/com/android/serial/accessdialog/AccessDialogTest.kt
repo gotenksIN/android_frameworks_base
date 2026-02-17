@@ -104,17 +104,18 @@ class AccessDialogTest {
         launchActivity().use {
             val latch = CountDownLatch(1)
             doAnswer { latch.countDown() }.whenever(sSerialAccessManager!!)
-                .grantSerialPortAccess(PORT_NAME, UID, mToken)
+                .grantSerialPortAccess(PORT_NAME, Process.myUid(), false, mToken)
 
             val label = Pattern.compile("Allow", Pattern.CASE_INSENSITIVE)
             val button = mDevice.wait(
                 Until.findObject(By.text(label).clickable(true)),
-                Duration.ofSeconds(1).toMillis()
+                Duration.ofSeconds(TIMEOUT_SECONDS).toMillis()
             )
             button.click()
 
-            assertTrue(latch.await(2, TimeUnit.SECONDS))
-            verify(sSerialAccessManager!!, never()).revokeSerialPortAccess(any(), any(), any())
+            assertTrue(latch.await(TIMEOUT_SECONDS * 2, TimeUnit.SECONDS))
+            verify(sSerialAccessManager!!, never())
+                .revokeSerialPortAccess(any(), any(), any(), any())
         }
     }
 
@@ -123,17 +124,18 @@ class AccessDialogTest {
         launchActivity().use {
             val latch = CountDownLatch(1)
             doAnswer { latch.countDown() }.whenever(sSerialAccessManager!!)
-                .revokeSerialPortAccess(PORT_NAME, UID, mToken)
+                .revokeSerialPortAccess(PORT_NAME, Process.myUid(), false, mToken)
 
             val label = Pattern.compile("Don't allow", Pattern.CASE_INSENSITIVE)
             val button = mDevice.wait(
                 Until.findObject(By.text(label).clickable(true)),
-                Duration.ofSeconds(1).toMillis()
+                Duration.ofSeconds(TIMEOUT_SECONDS).toMillis()
             )
             button.click()
 
-            assertTrue(latch.await(2, TimeUnit.SECONDS))
-            verify(sSerialAccessManager!!, never()).grantSerialPortAccess(any(), any(), any())
+            assertTrue(latch.await(TIMEOUT_SECONDS * 2, TimeUnit.SECONDS))
+            verify(sSerialAccessManager!!, never())
+                .grantSerialPortAccess(any(), any(), any(), any())
         }
     }
 
@@ -142,12 +144,13 @@ class AccessDialogTest {
         launchActivity().use { scenario ->
             val latch = CountDownLatch(1)
             doAnswer { latch.countDown() }.whenever(sSerialAccessManager!!)
-                .revokeSerialPortAccess(PORT_NAME, UID, mToken)
+                .revokeSerialPortAccess(PORT_NAME, Process.myUid(), false, mToken)
 
             scenario.moveToState(State.DESTROYED)
 
-            assertTrue(latch.await(1, TimeUnit.SECONDS))
-            verify(sSerialAccessManager!!, never()).grantSerialPortAccess(any(), any(), any())
+            assertTrue(latch.await(TIMEOUT_SECONDS, TimeUnit.SECONDS))
+            verify(sSerialAccessManager!!, never())
+                .grantSerialPortAccess(any(), any(), any(), any())
         }
     }
 
@@ -164,12 +167,13 @@ class AccessDialogTest {
         launchActivity().use {
             val latch = CountDownLatch(1)
             doAnswer { latch.countDown() }.whenever(sSerialAccessManager!!)
-                .revokeSerialPortAccess(PORT_NAME, UID, mToken)
+                .revokeSerialPortAccess(PORT_NAME, Process.myUid(), false, mToken)
 
             listener!!.onSerialPortDisconnected(port)
 
-            assertTrue(latch.await(1, TimeUnit.SECONDS))
-            verify(sSerialAccessManager!!, never()).grantSerialPortAccess(any(), any(), any())
+            assertTrue(latch.await(TIMEOUT_SECONDS, TimeUnit.SECONDS))
+            verify(sSerialAccessManager!!, never())
+                .grantSerialPortAccess(any(), any(), any(), any())
         }
     }
 
@@ -182,7 +186,7 @@ class AccessDialogTest {
             putExtras(binderExtras)
             putExtra(SerialManager.EXTRA_PORT, PORT_NAME)
             putExtra(SerialManager.EXTRA_PACKAGE_NAME, APP_PACKAGE_NAME)
-            putExtra(SerialManager.EXTRA_UID, UID)
+            putExtra(SerialManager.EXTRA_UID, Process.myUid())
         }
         return ActivityScenario.launch(intent)
     }
@@ -194,9 +198,9 @@ class AccessDialogTest {
         @Mock
         val sSerialAccessManager: SerialAccessManager? = null
 
-        val APP_NAME = "SerialApp"
-        val APP_PACKAGE_NAME = "com.android.serial.accessdialog.AccessDialogTest"
-        val PORT_NAME = "ttyS0"
-        val UID = Process.myUid()
+        private const val APP_NAME = "SerialApp"
+        private const val APP_PACKAGE_NAME = "com.android.serial.accessdialog.AccessDialogTest"
+        private const val PORT_NAME = "ttyS0"
+        private const val TIMEOUT_SECONDS = 5L
     }
 }

@@ -78,7 +78,7 @@ flag {
     is_exported: true
 }
 
-# This flag guards the private space feature, its APIs, and some of the feature implementations. The flag android.multiuser.Flags.enable_private_space_features exclusively guards all the implementations.
+# This flag guards the private space feature, its APIs, and some of the feature implementations.
 flag {
     name: "allow_private_profile"
     is_exported: true
@@ -145,7 +145,7 @@ flag {
 
 flag {
     name: "battery_manufacturer_diagnostics_api"
-    is_exported: false
+    is_exported: true
     namespace: "system_sw_battery"
     description: "Feature flag for adding Health Hal battery manufacturer diagnostics APIs."
     bug: "425196435"
@@ -212,6 +212,7 @@ flag {
     namespace: "crumpet"
     description: "Enable a flag taking screenshots of all displays in bugreport."
     bug: "364767133"
+    is_exported: true
 }
 
 flag {
@@ -219,6 +220,7 @@ flag {
     namespace: "system_performance"
     description: "Guards the new count instances of classes api"
     bug: "337354084"
+    is_exported: true
 }
 
 flag {
@@ -230,10 +232,10 @@ flag {
 }
 
 flag {
-     name: "disable_madvise_artfile_default"
-     namespace: "system_performance"
-     description: "Disables madvise of .art files by default during app start."
-     bug: "382110550"
+    name: "disallow_add_guest"
+    namespace: "security"
+    description: "Introduces the ability to restrict other users from adding a guest."
+    bug: "394218707"
 }
 
 flag {
@@ -358,6 +360,7 @@ flag {
     namespace: "system_performance"
     description: "Enable support for the native-only variant of App Zygote"
     bug: "442732151"
+    is_exported: true
 }
 
 flag {
@@ -365,6 +368,7 @@ flag {
     namespace: "system_performance"
     description: "Enable support for the native framework prototype"
     bug: "406925781"
+    is_exported: true
 }
 
 flag {
@@ -381,13 +385,6 @@ flag {
     namespace: "bluetooth"
     description: "Guards the Context.sendOrderedBroadcastMultiplePermissions API"
     bug: "345802719"
-}
-
-flag {
-    name: "parcel_string_cache_enabled"
-    namespace: "system_performance"
-    description: "Enable JNIStringCache in Parcel"
-    bug: "442140362"
 }
 
 flag {
@@ -440,7 +437,7 @@ flag {
 
 flag {
     name: "supplemental_security_patches"
-    is_exported: false
+    is_exported: true
     namespace: "dynamic_spl"
     description: "access supplemental security files of CVEs patched beyond the SPL"
     bug: "446032302"
@@ -510,13 +507,6 @@ flag {
 
 flag {
      namespace: "system_performance"
-     name: "perfetto_sdk_tracing_v2"
-     description: "Tracing using Perfetto SDK API."
-     bug: "303199244"
-}
-
-flag {
-     namespace: "system_performance"
      name: "perfetto_sdk_tracing_v3"
      description: "Tracing using Perfetto SDK API from the 'dev.perfetto.sdk' package."
      bug: "303199244"
@@ -529,13 +519,6 @@ flag {
      description: "Control framework initialization APIs of telemetry APIs feature."
      is_fixed_read_only: true
      bug: "324241334"
-}
-
-flag {
-    namespace: "wear_services"
-    name: "bugreport_deferred_consent_screenshot_fix"
-    description: "Stops always taking a screenshot when consent is deferred."
-    bug: "385709501"
 }
 
 # keep-sorted end

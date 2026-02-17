@@ -16,6 +16,8 @@
 
 package android.service.personalcontext;
 
+import static java.util.Objects.requireNonNull;
+
 import android.annotation.FlaggedApi;
 import android.os.Parcel;
 import android.os.Parcelable;
@@ -33,7 +35,7 @@ import java.util.UUID;
  * should only be sent to the specific renderer associated with this token.
  */
 @FlaggedApi(Flags.FLAG_ENABLE_PERSONAL_CONTEXT_SERVICE)
-public final class RenderToken implements Parcelable {
+public final class RenderToken implements Parcelable, Comparable<RenderToken> {
     /**
      * Unique identifier for this token.
      */
@@ -47,12 +49,12 @@ public final class RenderToken implements Parcelable {
     /**
      * Creates a new {@link RenderToken} for the renderer with the given ID.
      */
-    private RenderToken(@NonNull UUID rendererComponentId) {
+    public RenderToken(@NonNull UUID rendererComponentId) {
         mId = UUID.randomUUID();
-        mRendererComponentId = rendererComponentId;
+        mRendererComponentId = requireNonNull(rendererComponentId);
     }
 
-    RenderToken(Parcel in) {
+    private RenderToken(Parcel in) {
         mId = UUID.fromString(in.readString());
         mRendererComponentId = UUID.fromString(in.readString());
     }
@@ -73,6 +75,11 @@ public final class RenderToken implements Parcelable {
      */
     public @NonNull UUID getTokenId() {
         return mId;
+    }
+
+    @Override
+    public int compareTo(@NonNull RenderToken o) {
+        return mId.compareTo(o.mId);
     }
 
     /**
@@ -107,26 +114,5 @@ public final class RenderToken implements Parcelable {
     @Override
     public int hashCode() {
         return Objects.hash(mId, mRendererComponentId);
-    }
-
-    /**
-     * Builder used to create a {@link RenderToken}.
-     */
-    @FlaggedApi(Flags.FLAG_ENABLE_PERSONAL_CONTEXT_SERVICE)
-    public static final class RenderTokenBuilder {
-        private UUID mRendererComponentId;
-
-        /** Set identifier of the renderer this token is associated with. */
-        @NonNull
-        public RenderTokenBuilder setRendererComponentId(@NonNull UUID rendererComponentId) {
-            mRendererComponentId = rendererComponentId;
-            return this;
-        }
-
-        /** Returns the built {@link RenderToken}. */
-        @NonNull
-        public RenderToken build() {
-            return new RenderToken(mRendererComponentId);
-        }
     }
 }

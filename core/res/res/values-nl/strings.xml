@@ -1123,6 +1123,7 @@
     <string name="lockscreen_access_pattern_cell_added_verbose" msgid="2931364927622563465">"Cel <xliff:g id="CELL_INDEX">%1$s</xliff:g> toegevoegd"</string>
     <string name="lockscreen_access_pattern_detected" msgid="3931150554035194012">"Patroon voltooid"</string>
     <string name="lockscreen_access_pattern_area" msgid="1288780416685002841">"Tekengebied voor patroon."</string>
+    <string name="lockscreen_access_pattern_cell_verbose" msgid="6670905066468035137">"Cel <xliff:g id="CELL_INDEX">%1$s</xliff:g>"</string>
     <string name="keyguard_accessibility_widget_changed" msgid="7298011259508200234">"%1$s. Widget %2$d van %3$d."</string>
     <string name="keyguard_accessibility_add_widget" msgid="8245795023551343672">"Widget toevoegen."</string>
     <string name="keyguard_accessibility_widget_empty_slot" msgid="544239307077644480">"Leeg"</string>
@@ -2006,6 +2007,7 @@
     <string name="managed_profile_label_badge_3" msgid="6882151970556391957">"3e <xliff:g id="LABEL">%1$s</xliff:g>, werk"</string>
     <string name="clone_profile_label_badge" msgid="1871997694718793964">"Kloon van <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="private_profile_label_badge" msgid="1712086003787839183">"Privé <xliff:g id="LABEL">%1$s</xliff:g>"</string>
+    <string name="hsu_label_badge" msgid="1357272000281944932">"Systeem <xliff:g id="LABEL">%1$s</xliff:g>"</string>
     <string name="lock_to_app_unlock_pin" msgid="3890940811866290782">"Vraag pin voor losmaken"</string>
     <string name="lock_to_app_unlock_pattern" msgid="2694204070499712503">"Ontgrendelingspatroon vragen om app los te maken"</string>
     <string name="lock_to_app_unlock_password" msgid="9126722403506560473">"Vraag wachtwoord voor losmaken"</string>
@@ -2111,7 +2113,32 @@
     <string name="app_suspended_default_message" msgid="6451215678552004172">"<xliff:g id="APP_NAME_0">%1$s</xliff:g> is nu niet beschikbaar. Dit wordt beheerd door <xliff:g id="APP_NAME_1">%2$s</xliff:g>."</string>
     <string name="app_suspended_more_details" msgid="211260942831587014">"Meer info"</string>
     <string name="app_suspended_unsuspend_message" msgid="1665438589450555459">"App niet meer onderbreken"</string>
+    <string name="app_lock_add_screen_lock_button_text" msgid="9209013414563206600">"Schermvergrendeling toevoegen"</string>
+    <string name="app_lock_add_screen_lock_message" msgid="6107009360675769892">"Je schermvergrendeling kan een pincode, patroon of wachtwoord zijn. Je gebruikt deze om je apparaat te ontgrendelen en toegang te krijgen tot vergrendelde apps."</string>
+    <string name="app_lock_add_screen_lock_title" msgid="6905612843620128689">"Voeg eerst een schermvergrendeling toe"</string>
+    <string name="enable_app_lock_success_toast_message" msgid="3339622779190529987">"<xliff:g id="APP_NAME">%1$s</xliff:g> is vergrendeld"</string>
+    <string name="enable_app_lock_failure_toast_message" msgid="1055838896510445566">"Kan <xliff:g id="APP_NAME">%1$s</xliff:g> niet vergrendelen"</string>
+    <string name="disable_app_lock_success_toast_message" msgid="70733620589071266">"App-vergrendeling is verwijderd uit <xliff:g id="APP_NAME">%1$s</xliff:g>"</string>
     <string name="locked_app_biometric_prompt_description" msgid="6853122652400451464">"<xliff:g id="APP_NAME">%1$s</xliff:g> is vergrendeld"</string>
+    <string name="locked_app_external_display_message" msgid="5483884799685545338">"Als je toegang wilt krijgen tot de app op dit scherm, laat je eerst op je andere apparaat verifiëren dat jij het bent"</string>
+    <string name="app_lock_edu_dialog_enable_app_lock_title" msgid="283314042336592322">"App-vergrendeling toevoegen aan <xliff:g id="APP_NAME">%1$s</xliff:g>?"</string>
+    <string name="app_lock_edu_dialog_description" msgid="8176807243219769518">"Voor je veiligheid heb jij als enige toegang tot deze app met Ontgrendelen met vingerafdruk en Ontgrendelen via gezichtsherkenning of je pincode"</string>
+    <string name="app_lock_edu_dialog_description_template" msgid="8563718120753342530">"Voor je veiligheid heb jij als enige toegang tot deze app met %1$s of je %2$s"</string>
+    <string name="app_lock_edu_dialog_description_template_no_biometrics" msgid="7122017109150633691">"Voor je veiligheid heb jij als enige toegang tot deze app met je %1$s"</string>
+    <string name="app_lock_edu_dialog_info_header" msgid="5876120209204270990">"Met app-vergrendeling"</string>
+    <string name="app_lock_edu_dialog_info_notifications" msgid="1124438392204873305">"Content van meldingen wordt verborgen"</string>
+    <string name="app_lock_edu_dialog_info_widgets" msgid="8809009414650740872">"Widgets en snelkoppelingen worden verwijderd"</string>
+    <string name="app_lock_edu_dialog_button_lock" msgid="3914687128135704801">"App-vergrendeling toevoegen"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_face" msgid="1348151645996748654">"Ontgrendelen via gezichtsherkenning"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_fingerprint" msgid="5206107469561561455">"Ontgrendelen met vingerafdruk"</string>
+    <string name="app_lock_edu_dialog_biometric_description_has_fingerprint_and_face" msgid="7895807411323811641">"Ontgrendelen met vingerafdruk of via gezichtsherkenning"</string>
+    <string name="app_lock_edu_dialog_lockscreen_password_name" msgid="8487096457702445059">"Wachtwoord"</string>
+    <string name="app_lock_edu_dialog_lockscreen_pattern_name" msgid="991436996281983547">"Patroon"</string>
+    <string name="app_lock_edu_dialog_lockscreen_pin_name" msgid="6458607126966304795">"Pincode"</string>
+    <string name="app_lock_permission_review_dialog_title" msgid="5030286398974840579">"Je foto\'s kunnen nog steeds worden getoond in andere apps"</string>
+    <string name="app_lock_permission_review_dialog_sub_title" msgid="310758587817184145">"Apps met toegang tot je foto\'s"</string>
+    <string name="app_lock_permission_review_expand_app_list_button" msgid="3214809707125223273">"Alles bekijken"</string>
+    <string name="app_lock_permission_review_continue_button" msgid="4045066724173414043">"Doorgaan"</string>
     <string name="work_mode_off_title" msgid="6367463960165135829">"Werk-apps hervatten?"</string>
     <string name="work_mode_turn_on" msgid="5316648862401307800">"Hervatten"</string>
     <string name="work_mode_emergency_call_button" msgid="6818855962881612322">"Noodgeval"</string>
@@ -2592,6 +2619,8 @@
     <string name="satellite_messaging_unsupported_default_sms_app_notification_summary" msgid="17084124893763593">"Stel Google Berichten in als je standaard berichten-app om via satelliet berichten te sturen"</string>
     <string name="satellite_messaging_location_disabled_notification_title" msgid="7270641894250928494">"Satellietberichten niet beschikbaar"</string>
     <string name="satellite_messaging_location_disabled_notification_summary" msgid="1450824950686221810">"Zet locatie-instellingen aan om te checken of satellietberichten beschikbaar zijn in dit land of deze regio"</string>
+    <!-- no translation found for satellite_indicator (6846063647532086110) -->
+    <skip />
     <string name="fingerprint_dangling_notification_title" msgid="7362075195588639989">"Ontgrendelen met vingerafdruk weer instellen"</string>
     <string name="fingerprint_dangling_notification_msg_1" msgid="5851784577768803510">"<xliff:g id="FINGERPRINT">%s</xliff:g> wordt niet meer herkend."</string>
     <string name="fingerprint_dangling_notification_msg_2" msgid="7925203589860744456">"<xliff:g id="FINGERPRINT_0">%1$s</xliff:g> en <xliff:g id="FINGERPRINT_1">%2$s</xliff:g> worden niet meer herkend."</string>

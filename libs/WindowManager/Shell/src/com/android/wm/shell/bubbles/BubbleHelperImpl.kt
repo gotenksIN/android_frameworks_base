@@ -22,24 +22,24 @@ import android.app.WindowConfiguration.ACTIVITY_TYPE_STANDARD
 import android.view.WindowManager.TRANSIT_CHANGE
 import android.window.TransitionInfo
 import android.window.WindowContainerToken
-import com.android.wm.shell.bubbles.util.BubbleUtils.isBubbleToSplit
 import com.android.wm.shell.shared.TransitionUtil.isClosingMode
 import com.android.wm.shell.shared.TransitionUtil.isOpeningMode
 import com.android.wm.shell.shared.bubbles.BubbleAnythingFlagHelper
-import com.android.wm.shell.splitscreen.SplitScreenController
-import dagger.Lazy
-import java.util.Optional
+import javax.inject.Inject
 
 /** Helper class to query Bubble info from other components. */
-class BubbleHelperImpl(
-    private val bubbleRootTask: Lazy<BubbleRootTask>,
-    private val splitScreenController: Lazy<Optional<SplitScreenController>>,
-) : BubbleHelper {
+class BubbleHelperImpl @Inject constructor(private val bubbleRootTask: BubbleRootTask) :
+    BubbleHelper {
     override fun getAppBubbleRootTaskToken(): WindowContainerToken? =
-        bubbleRootTask.get().windowContainerToken
+        bubbleRootTask.windowContainerToken
+
+    override fun getAppBubbleVisibilityBarrierToken(): WindowContainerToken? =
+        bubbleRootTask.visibilityBarrierToken
+
+    override fun getAppBubbleRootTaskId(): Int = bubbleRootTask.taskId
 
     override fun isAppBubbleRootTask(taskId: Int): Boolean =
-        bubbleRootTask.get().taskId == taskId && taskId != INVALID_TASK_ID
+        bubbleRootTask.taskId == taskId && taskId != INVALID_TASK_ID
 
     override fun isAppBubbleRootTask(taskInfo: ActivityManager.RunningTaskInfo): Boolean =
         isAppBubbleRootTask(taskInfo.taskId)
@@ -49,7 +49,8 @@ class BubbleHelperImpl(
             return isAppBubbleRootTask(taskInfo.parentTaskId)
         }
 
-        // Skip treating the task as an app bubble if it's transitioning from bubble to split.
+        // Skip treating the task as an app bubble if it's transitioning from bubble to split or
+        // desktop.
         // In BubblesTransitionObserver#removeBubbleIfLaunchingToSplit, a WCT is applied to set
         // LaunchNextToBubble=false. Then TaskViewTaskController#notifyTaskRemovalStarted is called,
         // which triggers this check. However, the isAppBubble flag is only updated during the next
@@ -57,7 +58,7 @@ class BubbleHelperImpl(
         // Later, TaskViewTransitions#onExternalDone unblocks the animation. Without this check,
         // DefaultMixedHandler could misinterpret the OPEN change as a bubble-enter transition,
         // incorrectly re-creating the bubble instead of completing the split-screen transition.
-        if (taskInfo.isBubbleToSplit(splitScreenController)) {
+        if (taskInfo.hasParentTask()) {
             return false
         }
 

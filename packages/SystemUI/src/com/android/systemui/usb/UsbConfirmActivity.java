@@ -27,7 +27,7 @@ import javax.inject.Inject;
  */
 public class UsbConfirmActivity extends UsbDialogActivity {
 
-    private UsbAudioWarningDialogMessage mUsbConfirmMessageHandler;
+    private final UsbAudioWarningDialogMessage mUsbConfirmMessageHandler;
 
     @Inject
     public UsbConfirmActivity(UsbAudioWarningDialogMessage usbAudioWarningDialogMessage) {
@@ -43,28 +43,26 @@ public class UsbConfirmActivity extends UsbDialogActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        // Only show the "always use" checkbox if there is no USB/Record warning
-        final boolean useRecordWarning = mDialogHelper.isUsbDevice()
-                && (mDialogHelper.deviceHasAudioCapture()
-                && !mDialogHelper.packageHasAudioRecordingPermission());
 
         final int titleId = mUsbConfirmMessageHandler.getPromptTitleId();
-        final String title = getString(titleId, mDialogHelper.getAppName(),
-                mDialogHelper.getDeviceDescription());
+        final String title =
+                getString(
+                        titleId, mDialogHelper.getAppName(), mDialogHelper.getDeviceDescription());
         final int messageId = mUsbConfirmMessageHandler.getMessageId();
-        String message = (messageId != Resources.ID_NULL)
-                ? getString(messageId, mDialogHelper.getAppName(),
-                mDialogHelper.getDeviceDescription()) : null;
-        setAlertParams(title, message);
-        if (!useRecordWarning) {
-            addAlwaysUseCheckbox();
-        }
-        setupAlert();
+        final String message =
+                (messageId != Resources.ID_NULL)
+                        ? getString(
+                                messageId,
+                                mDialogHelper.getAppName(),
+                                mDialogHelper.getDeviceDescription())
+                        : null;
+
+        showDialog(title, message, /* canBeDefault= */ true);
     }
 
     @Override
-    void onConfirm() {
-        mDialogHelper.grantUidAccessPermission();
+    void onConfirm(boolean isPersistent) {
+        mDialogHelper.grantUidAccessPermission(isPersistent);
         if (isAlwaysUseChecked()) {
             mDialogHelper.setDefaultPackage();
         } else {

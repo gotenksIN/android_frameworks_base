@@ -35,8 +35,8 @@ import com.android.wm.shell.ShellTaskOrganizer
 import com.android.wm.shell.protolog.ShellProtoLogGroup.WM_SHELL_WINDOW_DECORATION
 import com.android.wm.shell.shared.annotations.ShellBackgroundThread
 import com.android.wm.shell.windowdecor.HandleMenuController
+import com.android.wm.shell.windowdecor.LayoutMenuController
 import com.android.wm.shell.windowdecor.ManageWindowsMenuController
-import com.android.wm.shell.windowdecor.MaximizeMenuController
 import com.android.wm.shell.windowdecor.TaskFocusStateConsumer
 import com.android.wm.shell.windowdecor.WindowDecoration2.RelayoutParams
 import com.android.wm.shell.windowdecor.WindowDecorationInsets
@@ -69,6 +69,7 @@ abstract class CaptionController<T>(
     protected lateinit var captionLayoutResult: CaptionRelayoutResult
     private lateinit var decorWindowContext: Context
     private var windowDecorationInsets: WindowDecorationInsets? = null
+    protected lateinit var display: Display
 
     protected var isCaptionVisible = false
     var isRecentsTransitionRunning = false
@@ -76,8 +77,8 @@ abstract class CaptionController<T>(
     var isDragging = false
     var setExcludeLayerJob: Job? = null
 
-    /** Controller for maximize menu or null if caption does not implement a maximize menu. */
-    open val maximizeMenuController: MaximizeMenuController? = null
+    /** Controller for layout menu or null if caption does not implement a layout menu. */
+    open val layoutMenuController: LayoutMenuController? = null
     /** Controller for handle menu or null if caption does not implement a handle menu. */
     open val handleMenuController: HandleMenuController? = null
     /**
@@ -126,6 +127,7 @@ abstract class CaptionController<T>(
             traceTag = Trace.TRACE_TAG_WINDOW_MANAGER,
             name = "CaptionController#relayout",
         ) {
+            this.display = display
             taskInfo = params.runningTaskInfo
             hasGlobalFocus = params.hasGlobalFocus
             this.decorWindowContext = decorWindowContext
@@ -261,7 +263,7 @@ abstract class CaptionController<T>(
                 WindowManager.LayoutParams(
                         captionWidth,
                         captionHeight,
-                        WindowManager.LayoutParams.TYPE_APPLICATION,
+                        WindowManager.LayoutParams.TYPE_APPLICATION_CAPTION_BAR,
                         flags,
                         PixelFormat.TRANSPARENT,
                     )
@@ -327,6 +329,7 @@ abstract class CaptionController<T>(
                 frame = captionInsets,
                 taskFrame = null,
                 boundingRects = emptyList(),
+                insetsBoundingRects = emptyList(),
                 flags = 0,
                 shouldAddCaptionInset = true,
                 excludedFromAppBounds = false,
@@ -359,11 +362,25 @@ abstract class CaptionController<T>(
         // insets than traditional |Insets| to apps about where their content is occluded.
         // These are in coordinates relative to the caption frame.
         val boundingRects =
-            CaptionRegionHelper.calculateBoundingRectsInsets(
-                context = decorWindowContext,
-                captionFrame = localCaptionBounds,
-                elements = elements,
-            )
+            if (!com.android.window.flags.Flags.improveFluidResizingPerformance()) {
+                CaptionRegionHelper.calculateBoundingRectsInsets(
+                    context = decorWindowContext,
+                    captionFrame = localCaptionBounds,
+                    elements = elements,
+                )
+            } else {
+                emptyList()
+            }
+        val insetsBoundingRects =
+            if (com.android.window.flags.Flags.improveFluidResizingPerformance()) {
+                CaptionRegionHelper.calculateInsetsBoundingRectsInsets(
+                    context = decorWindowContext,
+                    captionFrame = localCaptionBounds,
+                    elements = elements,
+                )
+            } else {
+                emptyList()
+            }
 
         val newInsets =
             WindowDecorationInsets(
@@ -372,6 +389,7 @@ abstract class CaptionController<T>(
                 captionInsetsRect,
                 taskBounds,
                 boundingRects,
+                insetsBoundingRects,
                 params.insetSourceFlags,
                 params.isInsetSource,
                 params.shouldSetAppBounds,
@@ -440,6 +458,8 @@ abstract class CaptionController<T>(
             return viewHost
         }
 
+    // TODO(b/478792808): Remove suppression
+    @SuppressWarnings("ProtoLogNonConstantFormat")
     private fun logD(msg: String, vararg arguments: Any?) {
         ProtoLog.d(WM_SHELL_WINDOW_DECORATION, "%s: $msg", TAG, *arguments)
     }

@@ -535,11 +535,10 @@ static jlong NativeOpenXml(JNIEnv* env, jclass /*clazz*/, jlong ptr, jstring fil
 
   // DynamicRefTable is only needed when looking up resource references. Opening an XML file
   // directly from an ApkAssets has no notion of proper resource references.
-  auto xml_tree = util::make_unique<ResXMLTree>(nullptr /*dynamicRefTable*/);
-  status_t err = xml_tree->setTo(buffer.unsafe_ptr(), length, true);
-  if (err != NO_ERROR) {
-    jniThrowException(env, "java/io/FileNotFoundException", "Corrupt XML binary file");
-    return 0;
+  auto xml_tree = ResXMLTree::fromAsset(std::move(asset));
+  if (!xml_tree) {
+      jniThrowException(env, "java/io/FileNotFoundException", "Corrupt XML binary file");
+      return 0;
   }
   return reinterpret_cast<jlong>(xml_tree.release());
 }
@@ -649,7 +648,8 @@ int register_android_content_res_ApkAssets(JNIEnv* env) {
   jclass parcelFd = FindClassOrDie(env, "android/os/ParcelFileDescriptor");
   gParcelFileDescriptorOffsets.detachFd = GetMethodIDOrDie(env, parcelFd, "detachFd", "()I");
 
-  gApkAssetsOffsets.classObject = FindClassOrDie(env, "android/content/res/ApkAssets");
+  jclass apkAssets = FindClassOrDie(env, "android/content/res/ApkAssets");
+  gApkAssetsOffsets.classObject = MakeGlobalRefOrDie(env, apkAssets);
   gApkAssetsOffsets.getFlagValues =
           GetStaticMethodIDOrDie(env, gApkAssetsOffsets.classObject, "getFlagValuesForNative",
                                  "([Ljava/lang/String;)[Z");

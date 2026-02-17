@@ -19,9 +19,11 @@ package com.android.systemui.statusbar.pipeline.shared.ui.composable
 import android.view.ContextThemeWrapper
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -37,6 +39,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -55,9 +58,6 @@ import com.android.systemui.common.ui.compose.Icon
 import com.android.systemui.compose.modifiers.sysUiResTagContainer
 import com.android.systemui.compose.modifiers.sysuiResTag
 import com.android.systemui.lifecycle.rememberViewModel
-import com.android.systemui.media.controls.ui.controller.MediaHierarchyManager
-import com.android.systemui.media.controls.ui.view.MediaHost
-import com.android.systemui.media.remedia.ui.viewmodel.MediaViewModel
 import com.android.systemui.res.R
 import com.android.systemui.shade.ui.composable.ChipHighlightModel
 import com.android.systemui.shade.ui.composable.ShadeHighlightChip
@@ -72,14 +72,12 @@ import com.android.systemui.statusbar.phone.ui.TintedIconManager
 import com.android.systemui.statusbar.pipeline.battery.ui.composable.UnifiedBattery
 import com.android.systemui.statusbar.pipeline.battery.ui.viewmodel.BatteryViewModel
 import com.android.systemui.statusbar.pipeline.shared.ui.viewmodel.HomeStatusBarViewModel
-import com.android.systemui.statusbar.quickactions.av.ui.viewmodel.AvControlsPopupViewModel
 import com.android.systemui.statusbar.quickactions.popups.StatusBarPopupChips
 import com.android.systemui.statusbar.quickactions.ui.compose.QuickActionChipsContainer
 import com.android.systemui.statusbar.systemstatusicons.SystemStatusIconsInCompose
 import com.android.systemui.statusbar.systemstatusicons.ui.compose.SystemStatusIcons
 import com.android.systemui.statusbar.systemstatusicons.ui.compose.SystemStatusIconsLegacy
 import com.android.systemui.statusbar.systemstatusicons.ui.compose.movableSystemStatusIconsLegacyAndroidView
-import com.android.systemui.statusbar.ui.composable.getStatusBarItemSize
 
 object DesktopStatusBar {
     object Dimensions {
@@ -98,10 +96,6 @@ fun DesktopStatusBar(
     clockViewModelFactory: ClockViewModel.Factory,
     statusBarIconController: StatusBarIconController,
     iconManagerFactory: TintedIconManager.Factory,
-    mediaHierarchyManager: MediaHierarchyManager,
-    mediaViewModelFactory: MediaViewModel.Factory,
-    avControlsPopupViewModelFactory: AvControlsPopupViewModel.Factory,
-    mediaHost: MediaHost,
     iconViewStore: NotificationIconContainerViewBinder.IconViewStore?,
     modifier: Modifier = Modifier,
 ) {
@@ -164,15 +158,7 @@ fun DesktopStatusBar(
             }
 
             if (StatusBarPopupChips.isEnabled) {
-                QuickActionChipsContainer(
-                    chips = viewModel.popupChips,
-                    mediaViewModelFactory = mediaViewModelFactory,
-                    mediaHost = mediaHost,
-                    onMediaControlPopupVisibilityChanged = { popupShowing ->
-                        mediaHierarchyManager.isMediaControlPopupShowing = popupShowing
-                    },
-                    avControlsPopupViewModelFactory = avControlsPopupViewModelFactory,
-                )
+                QuickActionChipsContainer(chips = viewModel.popupChips)
             }
 
             NotificationsChip(viewModel = viewModel)
@@ -224,22 +210,42 @@ private fun NotificationsChip(viewModel: HomeStatusBarViewModel, modifier: Modif
                     DesktopStatusBar.Dimensions.ChipInternalSpacing,
                     Alignment.Start,
                 ),
+            includePadding = false,
             isClickable = viewModel.isNotificationsChipClickable,
         ) {
-            Icon(
-                icon =
-                    Icon.Resource(
-                        resId =
-                            if (viewModel.hasStatusBarNotifications) {
-                                R.drawable.ic_notification_bell_unread
-                            } else {
-                                R.drawable.ic_notification_bell
-                            },
-                        contentDescription = null,
-                    ),
-                tint = tint,
-                modifier = Modifier.size(getStatusBarItemSize()).align(Alignment.CenterVertically),
-            )
+            if (viewModel.hasStatusBarNotifications) {
+                Box(modifier = Modifier.align(Alignment.CenterVertically).fillMaxHeight()) {
+                    Icon(
+                        icon =
+                            Icon.Resource(
+                                resId = R.drawable.ic_notification_bell_unread_base,
+                                contentDescription = null,
+                            ),
+                        tint = tint,
+                    )
+                    Icon(
+                        icon =
+                            Icon.Resource(
+                                resId = R.drawable.ic_notification_bell_unread_dot,
+                                contentDescription = null,
+                            ),
+                        tint =
+                            if (chipHighlightModel is ChipHighlightModel.Transparent)
+                                Color.Unspecified
+                            else tint,
+                    )
+                }
+            } else {
+                Icon(
+                    icon =
+                        Icon.Resource(
+                            resId = R.drawable.ic_notification_bell,
+                            contentDescription = null,
+                        ),
+                    tint = tint,
+                    modifier = Modifier.align(Alignment.CenterVertically).fillMaxHeight(),
+                )
+            }
         }
     }
 }

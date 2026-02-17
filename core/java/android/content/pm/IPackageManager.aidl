@@ -334,6 +334,7 @@ interface IPackageManager {
     @EnforcePermission("LOCK_APPS")
     @nullable PendingIntent getEnableAppLockIntentForPackage(String packageName, boolean enabled);
 
+    @PermissionManuallyEnforced
     boolean setPackageAppLockEnabled(String packageName, int userId, boolean enabled);
 
     boolean isPackageAppLockEnabled(String packageName, int userId);
@@ -815,6 +816,11 @@ interface IPackageManager {
 
     @EnforcePermission("INSTALL_PACKAGES")
     void setUserMinAspectRatio(String packageName, int userId, int aspectRatio);
+
+    int getVirtualGamepadUserOption(String packageName, int userId);
+
+    @EnforcePermission("INJECT_EVENTS")
+    void setVirtualGamepadUserOption(String packageName, int userId, int userOption);
 
     List<String> getMimeGroup(String packageName, String group);
 

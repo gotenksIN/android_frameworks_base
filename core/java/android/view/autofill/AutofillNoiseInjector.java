@@ -20,7 +20,12 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.app.assist.AssistStructure.ViewNode;
 import android.content.ComponentName;
+import android.text.InputType;
 import android.text.TextUtils;
+import android.view.View;
+import android.widget.EditText;
+
+import com.android.internal.annotations.VisibleForTesting;
 
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -34,12 +39,16 @@ import java.util.Random;
  * @hide
  */
 public final class AutofillNoiseInjector {
-    private static final int FIXED_LENGTH_BYTES = 32;
-    private static final int BITS_TO_RETAIN = 2;
+    @VisibleForTesting
+    static final int FIXED_LENGTH_BYTES = 32;
+    @VisibleForTesting
+    static final int ODD_BITS_MASK = 0xAA;
+    @VisibleForTesting
+    static final int EVEN_BITS_MASK = 0x55;
 
     private final String mMasterSeed;
     private final ComponentName mActivityComponent;
-    private final int mRetainedBitMask;
+    private final byte mRetainedBitMask;
 
     /**
      * Constructs a new AutofillNoiseInjector.
@@ -64,27 +73,8 @@ public final class AutofillNoiseInjector {
             return;
         }
 
-        // Randomly pick BITS_TO_RETAIN bits out of a byte to retain.
-        int retainedBitMask = 0;
-        for (int i = 0; i < BITS_TO_RETAIN; i++) {
-            // Generate a random index for which *available* bit to set.
-            // There are (8 - i) bits not yet set.
-            int nthAvailableBit = random.nextInt(8 - i);
-
-            int availableBitCount = 0;
-            for (int j = 0; j < 8; j++) {
-                // Check if the j-th bit is NOT already set in retainedBitMask
-                if ((retainedBitMask & (1 << j)) == 0) {
-                    if (availableBitCount == nthAvailableBit) {
-                        // This is the nth available bit we want to set.
-                        retainedBitMask |= (1 << j);
-                        break; // Move to the next iteration of the outer loop
-                    }
-                    availableBitCount++;
-                }
-            }
-        }
-        mRetainedBitMask = retainedBitMask;
+        // Randomly pick either all odd or even bits to retain.
+        mRetainedBitMask = (byte) (random.nextBoolean() ? EVEN_BITS_MASK : ODD_BITS_MASK);
     }
 
     // Helper hash function for a single string
@@ -126,12 +116,18 @@ public final class AutofillNoiseInjector {
      */
     @Nullable
     public AutofillNoiseInjectedData injectNoise(@NonNull ViewNode viewNode) {
+        // If a view is editable(e.g. an input text box), then its content is most likely
+        // to be personal information. Simply skipping collecting them since they'll be dropped
+        // as noise after aggregation anyways.
+        if (isEditable(viewNode)) {
+            return null;
+        }
         CharSequence textChars = viewNode.getText();
         if (TextUtils.isEmpty(textChars)) {
             return null;
         }
         String originalText = textChars.toString();
-        byte[] originalBytes = originalText.getBytes(StandardCharsets.UTF_16BE);
+        byte[] originalBytes = originalText.getBytes(StandardCharsets.UTF_8);
 
         // Adjust the payload to fixed length
         byte[] adjustedBytes = new byte[FIXED_LENGTH_BYTES];
@@ -185,5 +181,18 @@ public final class AutofillNoiseInjector {
         }
 
         return new AutofillNoiseInjectedData(mRetainedBitMask, resultBytes);
+    }
+
+    private boolean isEditable(ViewNode viewNode) {
+        if (viewNode.getAutofillType() != View.AUTOFILL_TYPE_NONE) {
+            return true;
+        }
+        if (EditText.class.getName().equals(viewNode.getClassName())) {
+            return true;
+        }
+        if (viewNode.getInputType() != InputType.TYPE_NULL) {
+            return true;
+        }
+        return false;
     }
 }

@@ -49,6 +49,7 @@ import android.view.WindowlessWindowManager;
 import android.view.inputmethod.ImeTracker;
 
 import com.android.internal.os.IResultReceiver;
+import com.android.internal.view.WindowClientTransactionHandler;
 
 import java.util.HashMap;
 
@@ -338,7 +339,7 @@ public class SystemWindows {
         }
     }
 
-    static class ContainerWindow extends IWindow.Stub {
+    static class ContainerWindow extends WindowClientTransactionHandler {
         ContainerWindow() {}
 
         @Override
@@ -405,5 +406,11 @@ public class SystemWindows {
         public void dumpWindow(ParcelFileDescriptor pfd) {
 
         }
+
+        @Override
+        public void requestHardwareRendererOutputDisabled(boolean disabled) {}
+
+        @Override
+        public void requestViewAnimationsDisabled(boolean disabled) {}
     }
 }

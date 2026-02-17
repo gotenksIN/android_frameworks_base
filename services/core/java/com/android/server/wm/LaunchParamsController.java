@@ -95,19 +95,13 @@ class LaunchParamsController {
             @LaunchParamsModifier.Phase int phase, LaunchParams result) {
         result.reset();
 
-        if (com.android.wm.shell.Flags.limitPersistedLaunchParamsFreeform()) {
-            if (task != null) {
-                if (task.supportsPersistedLaunchState()) {
-                    // If task exists, check if it supports loading persisted state.
-                    mPersister.getLaunchParams(task, activity, result);
-                }
-            } else if (activity != null) {
-                mPersister.getLaunchParams(null, activity, result);
-            }
-        } else {
-            if (task != null || activity != null) {
+        if (task != null) {
+            if (task.supportsPersistedLaunchState()) {
+                // If task exists, check if it supports loading persisted state.
                 mPersister.getLaunchParams(task, activity, result);
             }
+        } else if (activity != null) {
+            mPersister.getLaunchParams(null, activity, result);
         }
 
         // We start at the last registered {@link LaunchParamsModifier} as this represents
@@ -233,6 +227,14 @@ class LaunchParamsController {
         int mWindowingMode;
 
         /**
+         * Indicates whether the {@link Task} is explicitly prevented from being moved via the
+         * {@link AppTask#moveTaskTo} API.
+         * <p>
+         * If {@code false}, the movability is determined from the TDA params.
+         */
+        boolean mIsTaskMoveDisallowed;
+
+        /**
          * Whether the Activity was originally launched from home and needs to reparent the leaf
          * task to TDA.
          */
@@ -257,6 +259,7 @@ class LaunchParamsController {
             mWindowingMode = WINDOWING_MODE_UNDEFINED;
             mIsRelaunchFromHomeToReparent = false;
             mNeedsSafeRegionBounds = null;
+            mIsTaskMoveDisallowed = false;
         }
 
         /** Copies the values set on the passed in {@link LaunchParams}. */
@@ -270,6 +273,7 @@ class LaunchParamsController {
             mWindowingMode = params.mWindowingMode;
             mIsRelaunchFromHomeToReparent = params.mIsRelaunchFromHomeToReparent;
             mNeedsSafeRegionBounds = params.mNeedsSafeRegionBounds;
+            mIsTaskMoveDisallowed = params.mIsTaskMoveDisallowed;
         }
 
         /** Merges the values set on the passed in {@link LaunchParams}. */
@@ -287,6 +291,7 @@ class LaunchParamsController {
             if (params.mNeedsSafeRegionBounds != null) {
                 mNeedsSafeRegionBounds = params.mNeedsSafeRegionBounds;
             }
+            mIsTaskMoveDisallowed = params.mIsTaskMoveDisallowed;
         }
 
         /** Returns {@code true} if no values have been explicitly set. */
@@ -322,6 +327,7 @@ class LaunchParamsController {
             if (!Objects.equals(mNeedsSafeRegionBounds, that.mNeedsSafeRegionBounds)) return false;
             if (mBoundsSetFromOptions != that.mBoundsSetFromOptions) return false;
             if (mBoundsSet != that.mBoundsSet) return false;
+            if (mIsTaskMoveDisallowed != that.mIsTaskMoveDisallowed) return false;
             return !mBounds.isEmpty() ? mBounds.equals(that.mBounds) : that.mBounds.isEmpty();
         }
 
@@ -339,6 +345,7 @@ class LaunchParamsController {
             result = 31 * result + Boolean.hashCode(mIsRelaunchFromHomeToReparent);
             result = 31 * result + (mNeedsSafeRegionBounds != null
                     ? Boolean.hashCode(mNeedsSafeRegionBounds) : 0);
+            result = 31 * result + Boolean.hashCode(mIsTaskMoveDisallowed);
             return result;
         }
     }

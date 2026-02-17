@@ -24,7 +24,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.android.app.tracing.coroutines.launchTraced
 import com.android.systemui.CoreStartable
 import com.android.systemui.Flags as SystemUIFlags
+import com.android.systemui.accessibility.shortcutchooser.shared.model.AccessibilityTargetModel
 import com.android.systemui.accessibility.shortcutchooser.ui.composable.QuickAccessDialogContent
+import com.android.systemui.accessibility.shortcutchooser.ui.composable.ServiceWarningDialogContent
 import com.android.systemui.accessibility.shortcutchooser.ui.composable.ShortcutEditorDialogContent
 import com.android.systemui.accessibility.shortcutchooser.ui.composable.ShortcutPickerDialogContent
 import com.android.systemui.accessibility.shortcutchooser.ui.composable.TopRowKeyTutorialDialogContent
@@ -50,6 +52,7 @@ constructor(
     private val viewModel = viewModelFactory.create()
 
     private var dialogInstance: ComponentSystemUIDialog? = null
+    private var warningDialogInstance: ComponentSystemUIDialog? = null
 
     override fun start() {
         if (
@@ -61,6 +64,7 @@ constructor(
 
         with(applicationScope) {
             launchTraced { observeDialogState() }
+            launchTraced { observeWarningDialogState() }
             launchTraced { viewModel.activate() }
         }
     }
@@ -76,14 +80,28 @@ constructor(
         }
     }
 
+    private suspend fun observeWarningDialogState() {
+        viewModel.warningDialogTarget.collect { target ->
+            if (target == null) {
+                warningDialogInstance?.dismiss()
+                warningDialogInstance = null
+            } else if (warningDialogInstance == null) {
+                showWarningDialog(target)
+            }
+        }
+    }
+
     private fun createDialog() {
+        val dialogRequest = viewModel.dialogRequest.value
+        val dialogContext = viewModel.getDialogContextByDisplayId(dialogRequest.displayId)
+        val displayId = dialogContext.displayId
+
+        // Ensure the dialog is shown on the display where the shortcut was triggered.
         dialogInstance =
             dialogFactory
-                .create { dialog ->
+                .create(context = dialogContext) { dialog ->
                     val dialogType by viewModel.dialogType.collectAsStateWithLifecycle()
-                    val dialogRequest = viewModel.dialogRequest
                     val shortcutType = dialogRequest.shortcutType
-                    val displayId = dialogRequest.displayId
 
                     when (dialogType) {
                         DialogType.TUTORIAL -> {
@@ -124,15 +142,13 @@ constructor(
                                 showEditButton = isEditButtonVisible,
                                 onEditClick = viewModel::showEditDialog,
                                 onDoneClick = viewModel::dismissDialog,
-                                onTargetClick = {
+                                onTargetClick = { target ->
                                     viewModel.performAccessibilityShortcut(
                                         displayId,
                                         shortcutType,
-                                        it.targetName,
+                                        target.targetName,
                                     )
-                                    if (!it.isToggleable) {
-                                        viewModel.dismissDialog()
-                                    }
+                                    viewModel.dismissDialog()
                                 },
                             )
                         }
@@ -144,13 +160,13 @@ constructor(
                                     .collectAsStateWithLifecycle(emptyList())
                             QuickAccessDialogContent(
                                 onDoneClick = { viewModel.dismissDialog() },
-                                onTargetClick = {
-                                    viewModel.performAccessibilityShortcut(
-                                        displayId,
-                                        shortcutType,
-                                        it.targetName,
-                                    )
-                                    if (!it.isToggleable) {
+                                onTargetClick = { target ->
+                                    if (!viewModel.showWarningDialogIfNeeded(target)) {
+                                        viewModel.performAccessibilityShortcut(
+                                            displayId,
+                                            shortcutType,
+                                            target.targetName,
+                                        )
                                         viewModel.dismissDialog()
                                     }
                                 },
@@ -164,5 +180,29 @@ constructor(
                     setOnDismissListener { viewModel.dismissDialog() }
                     show()
                 }
+    }
+
+    private fun showWarningDialog(target: AccessibilityTargetModel) {
+        viewModel.getAccessibilityServiceInfo(target)?.let { info ->
+            warningDialogInstance =
+                dialogFactory
+                    .create {
+                        ServiceWarningDialogContent(
+                            info,
+                            onAllowClick = {
+                                viewModel.allowUntrustedService(target)
+                                viewModel.dismissWarningDialog()
+                            },
+                            onDenyClick = {
+                                viewModel.denyUntrustedService(target)
+                                viewModel.dismissWarningDialog()
+                            },
+                        )
+                    }
+                    .apply {
+                        setOnDismissListener { viewModel.dismissWarningDialog() }
+                        show()
+                    }
+        }
     }
 }

@@ -16,6 +16,7 @@
 
 package android.media;
 
+import static android.media.audio.Flags.FLAG_AMBISONICS_SUPPORT_API;
 import static android.media.audio.Flags.FLAG_ENABLE_MULTICHANNEL_GROUP_DEVICE;
 import static android.media.audio.Flags.FLAG_SPEAKER_LAYOUT_API;
 import static android.media.audio.Flags.FLAG_BLE_HEARING_AID_DEVICE;
@@ -39,7 +40,6 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.util.List;
 import java.util.Objects;
-import java.util.TreeSet;
 
 /**
  * Provides information about an audio device.
@@ -559,32 +559,27 @@ public final class AudioDeviceInfo {
     }
 
     /**
+     * @return An array of Ambisonics channel masks for which this audio device can be configured.
+     *
+     * @see AudioFormat
+     *
+     * Note: an empty array indicates that the device supports arbitrary Ambisonics channel masks.
+     * @hide
+     */
+    @FlaggedApi(FLAG_AMBISONICS_SUPPORT_API)
+    @TestApi
+    public @NonNull int[] getChannelAcnMasks() {
+        return mPort.channelAcnMasks();
+    }
+
+    /**
      * @return An array of channel counts (1, 2, 4, ...) for which this audio device
      * can be configured.
      *
      * Note: an empty array indicates that the device supports arbitrary channel counts.
      */
     public @NonNull int[] getChannelCounts() {
-        TreeSet<Integer> countSet = new TreeSet<Integer>();
-
-        // Channel Masks
-        for (int mask : getChannelMasks()) {
-            countSet.add(isSink() ?
-                    AudioFormat.channelCountFromOutChannelMask(mask)
-                    : AudioFormat.channelCountFromInChannelMask(mask));
-        }
-
-        // Index Masks
-        for (int index_mask : getChannelIndexMasks()) {
-            countSet.add(Integer.bitCount(index_mask));
-        }
-
-        int[] counts = new int[countSet.size()];
-        int index = 0;
-        for (int count : countSet) {
-            counts[index++] = count;
-        }
-        return counts;
+        return mPort.getChannelMasks().getChannelCounts(isSource() /*isInput*/);
     }
 
     /** @hide */

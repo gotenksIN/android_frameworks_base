@@ -1441,6 +1441,26 @@ public class CarrierConfigManager {
             "show_signal_strength_in_sim_status_bool";
 
     /**
+     * Flag specifying whether the Group Identifier Level 1 (GID1) is shown in the SIM
+     * Status screen. The default value is false.
+     * This setting is used by the Settings application and its visibility may be controlled by
+     * a feature flag within Settings.
+     * @hide
+     */
+    public static final String KEY_SHOW_GID1_IN_SIM_STATUS_BOOL =
+            "show_gid1_in_sim_status_bool";
+
+    /**
+     * Flag specifying whether the Carrier ID is shown in the SIM
+     * Status screen. The default value is false.
+     * This setting is used by the Settings application and its visibility may be controlled by
+     * a feature flag within Settings.
+     * @hide
+     */
+    public static final String KEY_SHOW_CARRIER_ID_IN_SIM_STATUS_BOOL =
+            "show_carrier_id_in_sim_status_bool";
+
+    /**
      * Flag specifying if we should interpret all signal strength as one bar higher
      * This is a replacement for the former resource config_inflateSignalStrength
      * The default value is false.
@@ -2042,7 +2062,7 @@ public class CarrierConfigManager {
             "apn_settings_default_apn_types_string_array";
 
     /**
-     * Specifies disallowed substrings for the {@link android.provider.Telephony.Carriers.APN}.
+     * Specifies disallowed substrings for the {@link android.provider.Telephony.Carriers#APN}.
      *
      * Note: If the preset APN contains these strings, then adding or editing is not allowed.
      */
@@ -4155,6 +4175,15 @@ public class CarrierConfigManager {
             "nr_timers_reset_on_plmn_change_bool";
 
     /**
+     * Whether device resets all of NR timers when device transits from ENDC to NR SA.
+     * The default value is false;
+     *
+     * @hide
+     */
+    public static final String KEY_NR_TIMERS_RESET_ON_ENDC_TO_SA_TRANSIT_BOOL =
+            "nr_timers_reset_on_endc_to_sa_transit_bool";
+
+    /**
      * A list of additional NR advanced band would map to
      * {@link TelephonyDisplayInfo#OVERRIDE_NETWORK_TYPE_NR_ADVANCED} when the device is on that
      * band.
@@ -4913,6 +4942,33 @@ public class CarrierConfigManager {
      */
     public static final String KEY_DATA_STALL_RECOVERY_TIMERS_LONG_ARRAY =
             "data_stall_recovery_timers_long_array";
+
+    /**
+     * A long type timer array specifying the max milliseconds to add as a random offset to
+     * each corresponding timer in {@link #KEY_DATA_STALL_RECOVERY_TIMERS_LONG_ARRAY}.
+     *
+     * <p>The array has a fixed size of 4. Each index corresponds to a specific data stall
+     * recovery action stage defined by {@link #KEY_DATA_STALL_RECOVERY_TIMERS_LONG_ARRAY}:
+     *
+     * <ul>
+     *     <li>Index 0: Max random offset for timer between RECOVERY_ACTION GET_DATA_CALL_LIST
+     *     and CLEANUP.</li>
+     *     <li>Index 1: Max random offset for timer between RECOVERY_ACTION CLEANUP and
+     *     RE-REGISTER.</li>
+     *     <li>Index 2: Max random offset for timer between RECOVERY_ACTION RE-REGISTER and
+     *     RADIO_RESTART.</li>
+     *     <li>Index 3: Max random offset for timer between RECOVERY_ACTION RADIO_RESTART
+     *     and RESET_MODEM.</li>
+     * </ul>
+     *
+     * <p>The size of this array MUST match {@link #KEY_DATA_STALL_RECOVERY_TIMERS_LONG_ARRAY}.
+     * If a value is 0, no randomization is added for that step.
+     * @see #KEY_DATA_STALL_RECOVERY_TIMERS_LONG_ARRAY
+     *
+     * @hide
+     */
+    public static final String KEY_DATA_STALL_RECOVERY_TIMERS_RANDOMIZATION_MILLIS_LONG_ARRAY =
+            "data_stall_recovery_timers_randomization_millis_long_array";
 
     /**
      * The data stall recovery action boolean array, we use this array to determine if the
@@ -6213,6 +6269,21 @@ public class CarrierConfigManager {
         public static final String KEY_NR_SA_DISABLE_POLICY_INT =
                 KEY_PREFIX + "sa_disable_policy_int";
 
+        /**
+         * Specifies the policy for disabling NR SA mode for emergency.
+         * Default value is {@link #SA_DISABLE_POLICY_NONE}.
+         * The value set as below:
+         * <ul>
+         * <li>0: {@link #SA_DISABLE_POLICY_NONE }</li>
+         * <li>1: {@link #SA_DISABLE_POLICY_WFC_ESTABLISHED }</li>
+         * <li>2: {@link #SA_DISABLE_POLICY_WFC_ESTABLISHED_WHEN_VONR_DISABLED  }</li>
+         * <li>3: {@link #SA_DISABLE_POLICY_VOWIFI_REGISTERED  }</li>
+         * </ul>
+         * @hide
+         */
+        public static final String KEY_NR_SA_DISABLE_POLICY_FOR_EMERGENCY_INT =
+                KEY_PREFIX + "sa_disable_policy_for_emergency_int";
+
         /** @hide */
         @IntDef({
                 NR_SA_DISABLE_POLICY_NONE,
@@ -6338,6 +6409,7 @@ public class CarrierConfigManager {
             defaults.putInt(KEY_REGISTRATION_RETRY_MAX_TIMER_MILLIS_INT, 1800000);
             defaults.putInt(KEY_REGISTRATION_SUBSCRIBE_EXPIRY_TIMER_SEC_INT, 600000);
             defaults.putInt(KEY_NR_SA_DISABLE_POLICY_INT, NR_SA_DISABLE_POLICY_NONE);
+            defaults.putInt(KEY_NR_SA_DISABLE_POLICY_FOR_EMERGENCY_INT, NR_SA_DISABLE_POLICY_NONE);
 
             defaults.putIntArray(
                     KEY_IPSEC_AUTHENTICATION_ALGORITHMS_INT_ARRAY,
@@ -10052,6 +10124,27 @@ public class CarrierConfigManager {
             "satellite_supported_disaster_plmn_string_array";
 
     /**
+     * Indicates the list of satellite technology types of a satellite provider.
+     * This key is used to configure the satellite technology types of the satellite providers in
+     * the config {@link #KEY_SATELLITE_CONFIGS_PER_PLMN_BUNDLE}.
+     * Possible values are:
+     * <ul>
+     * <li>1 =
+     * {@link android.telephony.satellite.SatelliteManager#NT_RADIO_TECHNOLOGY_NB_IOT_NTN}</li>
+     * <li>2 = {@link android.telephony.satellite.SatelliteManager#NT_RADIO_TECHNOLOGY_NR_NTN}</li>
+     * <li>5 = {@link android.telephony.satellite.SatelliteManager#NT_RADIO_TECHNOLOGY_LTE_DTC}</li>
+     * <li>6 = {@link android.telephony.satellite.SatelliteManager#NT_RADIO_TECHNOLOGY_NR_DTC}</li>
+     * A PLMN supporting DTC technology must be distinct from terrestrial networks;
+     * therefore, it will be classified as an NTN.
+     * </ul>
+     * @hide
+     */
+    @SystemApi
+    @FlaggedApi(Flags.FLAG_SATELLITE_26Q2_APIS)
+    public static final String KEY_SATELLITE_TECHNOLOGY_INT_ARRAY =
+            "satellite_technology_type_int_array";
+
+    /**
      * A PersistableBundle that contains a list of key-value pairs, where keys are satellite
      * provider PLMNs and values are bundles containing satellite configurations for that PLMN.
      * This allows for per-provider settings within a single carrier, which is necessary for
@@ -10067,6 +10160,7 @@ public class CarrierConfigManager {
      * <ul>
      * <li>{@link #KEY_CARRIER_ROAMING_NTN_EMERGENCY_CALL_TO_SATELLITE_HANDOVER_TYPE_INT}</li>
      * <li>{@link #KEY_CARRIER_ROAMING_NTN_CONNECT_TYPE_INT}</li>
+     * <li>{@link #KEY_SATELLITE_TECHNOLOGY_INT_ARRAY}</li>
      * </ul>
      * <p>
      * An example config for a hybrid carrier supporting two PLMNs (lets say "XXXXXX" is the PLMN of
@@ -10080,6 +10174,10 @@ public class CarrierConfigManager {
      *              value="2" />
      *         <!-- CarrierConfigManager#CARRIER_ROAMING_NTN_CONNECT_AUTOMATIC -->
      *         <int name="carrier_roaming_ntn_connect_type_int" value="0" />
+     *         <!-- SatelliteManager#NT_RADIO_TECHNOLOGY_NR_NTN -->
+     *         <int-array name="satellite_technology_type_int_array" num="1">
+     *             <item value="2" />
+     *         </int-array>
      *     </pbundle_as_map>
      *     <!-- Skylo PLMN's satellite configurations -->
      *     <pbundle_as_map name="YYYYYY">
@@ -10088,6 +10186,10 @@ public class CarrierConfigManager {
      *              value="1" />
      *         <!-- CarrierConfigManager#CARRIER_ROAMING_NTN_CONNECT_MANUAL -->
      *         <int name="carrier_roaming_ntn_connect_type_int" value="1" />
+     *         <!-- SatelliteManager#NT_RADIO_TECHNOLOGY_NB_IOT_NTN -->
+     *         <int-array name="satellite_technology_type_int_array" num="1">
+     *             <item value="1" />
+     *         </int-array>
      *     </pbundle_as_map>
      * </pbundle_as_map>
      * }</pre>
@@ -10468,6 +10570,60 @@ public class CarrierConfigManager {
             "emergency_messaging_supported_bool";
 
     /**
+     * A persistable bundle that contains a list of key-value pairs, where the keys are MCC and
+     * the values are integers that indicate supported emergency messaging provider type in
+     * that country.
+     *
+     * <p>The values are:
+     *
+     * <ul>
+     *   <li>0 = {@link
+     *       SatelliteManager#CARRIER_ROAMING_SATELLITE_EMERGENCY_MESSAGING_PROVIDER_UNKNOWN}
+     *   <li>1 = {@link
+     *       SatelliteManager#CARRIER_ROAMING_SATELLITE_EMERGENCY_MESSAGING_PROVIDER_UNSUPPORTED}
+     *   <li>2 = {@link
+     *       SatelliteManager#CARRIER_ROAMING_SATELLITE_EMERGENCY_MESSAGING_PROVIDER_LOCAL_PSAP}
+     *   <li>3 = {@link
+     *       SatelliteManager#CARRIER_ROAMING_SATELLITE_EMERGENCY_MESSAGING_PROVIDER_CONCIERGE}
+     * </ul>
+     *
+     * <p>An example config for two countries "us" and "ca":
+     *
+     * <pre>{@code
+     * <carrier_config>
+     *   <pbundle_as_map
+     *      name="carrier_roaming_satellite_emergency_messaging_provider_per_country_bundle">
+     *     <int name="310" value="2"/>
+     *     <int name="302" value="3"/>
+     *   </pbundle_as_map>
+     * </carrier_config>
+     * }</pre>
+     *
+     * <p>This config is empty by default.
+     * @hide
+     */
+    public static final String
+            KEY_CARRIER_ROAMING_SATELLITE_EMERGENCY_MESSAGING_PROVIDER_PER_COUNTRY_BUNDLE =
+                    "carrier_roaming_satellite_emergency_messaging_provider_per_country_bundle";
+
+    /**
+     * A string containing the concierge number configured by the carrier. This number will be used
+     * for emergency messaging when the device is roaming on a satellite network.
+     *
+     * <p>A user places an emergency call and if the call did not connect within timeout, T911
+     * button will be displayed to the user if the device is connected or was connected within
+     * hysteresis time to satellite network. Upon clicking T911 button, user will be redirected to
+     * text with the concierge number if this key is set otherwise user will be redirected to text
+     * with the dialed emergency number.
+     *
+     * <p>The default value is empty.
+     * @hide
+     */
+    public static final String
+            KEY_CARRIER_ROAMING_SATELLITE_EMERGENCY_MESSAGING_REDIRECTION_DESTINATION_STRING =
+                    "carrier_roaming_satellite_emergency_messaging_redirection_destination_string";
+
+    /**
      * An integer key holds the timeout duration in milliseconds used to determine whether to hand
      * over an emergency call to satellite T911.
      *
@@ -10645,11 +10801,20 @@ public class CarrierConfigManager {
             "satellite_roaming_turn_off_session_for_emergency_call_bool";
 
     /** @hide */
+    @Retention(RetentionPolicy.SOURCE)
     @IntDef({
+            CARRIER_ROAMING_NTN_CONNECT_UNKNOWN,
             CARRIER_ROAMING_NTN_CONNECT_AUTOMATIC,
             CARRIER_ROAMING_NTN_CONNECT_MANUAL,
+            CARRIER_ROAMING_NTN_CONNECT_HYBRID,
     })
     public @interface CARRIER_ROAMING_NTN_CONNECT_TYPE {}
+
+    /**
+     * Carrier roaming ntn connect type is unknown.
+     * @hide
+     */
+    public static final int CARRIER_ROAMING_NTN_CONNECT_UNKNOWN = -1;
 
     /**
      * Device can connect to carrier roaming non-terrestrial network automatically.
@@ -10669,12 +10834,10 @@ public class CarrierConfigManager {
      */
     @FlaggedApi(Flags.FLAG_SATELLITE_26Q2_APIS)
     public static final int CARRIER_ROAMING_NTN_CONNECT_HYBRID = 2;
+
     /**
-     * Indicates carrier roaming non-terrestrial network connect type that the device can use to
-     * perform satellite communication.
-     * If this key is set to CARRIER_ROAMING_NTN_CONNECT_MANUAL then connect button will be
-     * displayed to user when the device is eligible to use carrier roaming
-     * non-terrestrial network.
+     * Indicates carrier roaming non-terrestrial network {@link SatelliteManager.ConnectType} that
+     * the device can use to perform satellite communication.
      */
     @FlaggedApi(Flags.FLAG_SATELLITE_SYSTEM_APIS)
     public static final String KEY_CARRIER_ROAMING_NTN_CONNECT_TYPE_INT =
@@ -11685,6 +11848,18 @@ public class CarrierConfigManager {
     @FlaggedApi(Flags.FLAG_ENABLE_IS_PRIVATE_NETWORK_API)
     public static final String KEY_IS_PRIVATE_NETWORK_BOOL = "is_private_network_bool";
 
+    /**
+     * Controls whether the turbo DSDA icon is shown on the UI.
+     *
+     * <p>If {@code true}, the turbo DSDA icon is shown next to the signal strength on the status
+     * bar
+     *
+     * <p>The default value is false.
+     *
+     * @hide
+     */
+    public static final String KEY_SHOW_TURBO_DSDA_ICON = "show_turbo_dsda_icon";
+
     /** The default value for every variable. */
     private static final PersistableBundle sDefaults;
 
@@ -11838,6 +12013,9 @@ public class CarrierConfigManager {
         sDefaults.putStringArray(KEY_CARRIER_VVM_PACKAGE_NAME_STRING_ARRAY, null);
         sDefaults.putBoolean(KEY_SHOW_ICCID_IN_SIM_STATUS_BOOL, false);
         sDefaults.putBoolean(KEY_SHOW_SIGNAL_STRENGTH_IN_SIM_STATUS_BOOL, true);
+        sDefaults.putBoolean(KEY_SHOW_GID1_IN_SIM_STATUS_BOOL, false);
+        sDefaults.putBoolean(KEY_SHOW_CARRIER_ID_IN_SIM_STATUS_BOOL, false);
+
         sDefaults.putBoolean(KEY_INFLATE_SIGNAL_STRENGTH_BOOL, false);
         sDefaults.putBoolean(KEY_CI_ACTION_ON_SYS_UPDATE_BOOL, false);
         sDefaults.putString(KEY_CI_ACTION_ON_SYS_UPDATE_INTENT_STRING, "");
@@ -12241,6 +12419,7 @@ public class CarrierConfigManager {
         sDefaults.putBoolean(KEY_NR_TIMERS_RESET_IF_NON_ENDC_AND_RRC_IDLE_BOOL, false);
         sDefaults.putBoolean(KEY_NR_TIMERS_RESET_ON_VOICE_QOS_BOOL, false);
         sDefaults.putBoolean(KEY_NR_TIMERS_RESET_ON_PLMN_CHANGE_BOOL, false);
+        sDefaults.putBoolean(KEY_NR_TIMERS_RESET_ON_ENDC_TO_SA_TRANSIT_BOOL, false);
         /* Default value is 1 hour. */
         sDefaults.putLong(KEY_5G_WATCHDOG_TIME_MS_LONG, 3600000);
         sDefaults.putIntArray(KEY_ADDITIONAL_NR_ADVANCED_BANDS_INT_ARRAY, new int[0]);
@@ -12490,6 +12669,12 @@ public class CarrierConfigManager {
                 "com.google.android.apps.messaging"});
         sDefaults.putBoolean(KEY_DISABLE_DUN_APN_WHILE_ROAMING_WITH_PRESET_APN_BOOL, false);
         sDefaults.putBoolean(KEY_EMERGENCY_MESSAGING_SUPPORTED_BOOL, false);
+        sDefaults.putPersistableBundle(
+                KEY_CARRIER_ROAMING_SATELLITE_EMERGENCY_MESSAGING_PROVIDER_PER_COUNTRY_BUNDLE,
+                PersistableBundle.EMPTY);
+        sDefaults.putString(
+                KEY_CARRIER_ROAMING_SATELLITE_EMERGENCY_MESSAGING_REDIRECTION_DESTINATION_STRING,
+            "");
         sDefaults.putInt(KEY_EMERGENCY_CALL_TO_SATELLITE_T911_HANDOVER_TIMEOUT_MILLIS_INT,
                 (int) TimeUnit.SECONDS.toMillis(30));
         sDefaults.putString(KEY_SATELLITE_DISPLAY_NAME_STRING, "");
@@ -12511,10 +12696,8 @@ public class CarrierConfigManager {
         sDefaults.putInt(KEY_CARRIER_ROAMING_NTN_EMERGENCY_CALL_TO_SATELLITE_HANDOVER_TYPE_INT,
                 SatelliteManager.EMERGENCY_CALL_TO_SATELLITE_HANDOVER_TYPE_T911);
         sDefaults.putInt(KEY_CARRIER_SUPPORTED_SATELLITE_NOTIFICATION_HYSTERESIS_SEC_INT, 180);
-        if (Flags.starlinkDataBugfix()) {
-            sDefaults.putLong(KEY_SATELLITE_CONNECTED_NOTIFICATION_THROTTLE_MILLIS_INT,
-                    TimeUnit.DAYS.toMillis(7));
-        }
+        sDefaults.putLong(KEY_SATELLITE_CONNECTED_NOTIFICATION_THROTTLE_MILLIS_INT,
+                TimeUnit.DAYS.toMillis(7));
         sDefaults.putInt(KEY_SATELLITE_ROAMING_SCREEN_OFF_INACTIVITY_TIMEOUT_SEC_INT, 30);
         sDefaults.putInt(KEY_SATELLITE_ROAMING_P2P_SMS_INACTIVITY_TIMEOUT_SEC_INT, 180);
         sDefaults.putInt(KEY_SATELLITE_ROAMING_ESOS_INACTIVITY_TIMEOUT_SEC_INT, 600);
@@ -12636,6 +12819,9 @@ public class CarrierConfigManager {
         // Default data stall recovery configurations.
         sDefaults.putLongArray(KEY_DATA_STALL_RECOVERY_TIMERS_LONG_ARRAY,
                 new long[] {180000, 180000, 180000, 180000});
+        // Default data stall recovery randomization.
+        sDefaults.putLongArray(KEY_DATA_STALL_RECOVERY_TIMERS_RANDOMIZATION_MILLIS_LONG_ARRAY,
+                new long[] {0, 0, 0, 0});
         sDefaults.putBooleanArray(KEY_DATA_STALL_RECOVERY_SHOULD_SKIP_BOOL_ARRAY,
                 new boolean[] {false, false, true, false, false});
         sDefaults.putStringArray(KEY_CARRIER_SERVICE_NAME_STRING_ARRAY, new String[0]);
@@ -12667,6 +12853,7 @@ public class CarrierConfigManager {
         sDefaults.putBoolean(KEY_SUPPORT_PHONE_NUMBER_SOURCE_TS43_BOOL, false);
         sDefaults.putBoolean(KEY_APN_MATCHED_REQUIRED, true);
         sDefaults.putBoolean(KEY_IS_PRIVATE_NETWORK_BOOL, false);
+        sDefaults.putBoolean(KEY_SHOW_TURBO_DSDA_ICON, false);
     }
 
     /**

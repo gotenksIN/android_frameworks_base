@@ -41,7 +41,6 @@ import android.view.KeyCharacterMap;
 import android.view.KeyEvent;
 import android.view.WindowManagerGlobal;
 import android.view.accessibility.AccessibilityManager;
-import android.view.accessibility.Flags;
 
 import com.android.internal.R;
 import com.android.internal.accessibility.util.AccessibilityUtils;
@@ -478,7 +477,7 @@ public class SystemActions implements CoreStartable, ConfigurationController.Con
     }
 
     private RemoteAction createRemoteAction(int labelId, String intent) {
-        // TODO(b/148087487): update the icon used below to a valid one
+        // Using a generic icon because it is not used by accessibility services. See b/148087487.
         return new RemoteAction(
                 Icon.createWithResource(mContext, R.drawable.ic_info),
                 mContext.getString(labelId),
@@ -775,15 +774,11 @@ public class SystemActions implements CoreStartable, ConfigurationController.Con
                     break;
                 }
                 case INTENT_ACTION_MENU: {
-                    if (Flags.globalActionMenu()) {
-                        handleMenu();
-                    }
+                    handleMenu();
                     break;
                 }
                 case INTENT_ACTION_MEDIA_PLAY_PAUSE: {
-                    if (Flags.globalActionMediaPlayPause()) {
-                        handleMediaPlayPause();
-                    }
+                    handleMediaPlayPause();
                     break;
                 }
                 default:

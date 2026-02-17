@@ -123,6 +123,16 @@ final class InputManagerCallback implements InputManagerService.WindowManagerCal
         mService.mAnrController.notifyWindowResponsive(token, pid);
     }
 
+    @Override
+    public void warnNoFocusedWindowAnr(
+            @NonNull InputApplicationHandle inputApplicationHandle,
+            int eventId,
+            long elapsedDurationMs,
+            long timeoutDurationMs) {
+        mService.mAnrController.notifyAppUnresponsiveWarning(
+                inputApplicationHandle, eventId, elapsedDurationMs, timeoutDurationMs);
+    }
+
     /** Notifies that the input device configuration has changed. */
     @Override
     public void notifyConfigurationChanged() {
@@ -300,9 +310,11 @@ final class InputManagerCallback implements InputManagerService.WindowManagerCal
     }
 
     @Override
-    public void notifyDropWindow(IBinder token, float x, float y) {
+    public void notifyDropWindow(IBinder token, float windowX, float windowY, float rawX,
+            float rawY) {
         mService.mH.sendMessage(PooledLambda.obtainMessage(
-                mService.mDragDropController::reportDropWindow, token, x, y));
+                mService.mDragDropController::reportDropWindow, token, windowX, windowY, rawX,
+                rawY));
     }
 
     @Override

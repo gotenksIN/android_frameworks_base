@@ -113,6 +113,8 @@ public class AppCompatTaskInfo implements Parcelable {
     public static final int FLAG_IS_LEAF_TASK = FLAG_BASE << 13;
     /** The main window of the top activity has rounded corners. */
     public static final int FLAG_HAS_MAIN_WINDOW_ROUNDED_CORNERS = FLAG_BASE << 14;
+    /** The top activity has excluded caption insets from app bounds treatment. */
+    public static final int FLAG_IS_EXCLUDE_CAPTION_INSETS = FLAG_BASE << 15;
 
     @Retention(RetentionPolicy.SOURCE)
     @IntDef(flag = true, value = {
@@ -131,7 +133,8 @@ public class AppCompatTaskInfo implements Parcelable {
             FLAG_OPT_OUT_EDGE_TO_EDGE,
             FLAG_SAFE_REGION_LETTERBOXED,
             FLAG_IS_LEAF_TASK,
-            FLAG_HAS_MAIN_WINDOW_ROUNDED_CORNERS
+            FLAG_HAS_MAIN_WINDOW_ROUNDED_CORNERS,
+            FLAG_IS_EXCLUDE_CAPTION_INSETS
     })
     public @interface TopActivityFlag {}
 
@@ -147,7 +150,8 @@ public class AppCompatTaskInfo implements Parcelable {
             | FLAG_ELIGIBLE_FOR_USER_ASPECT_RATIO_BUTTON | FLAG_FULLSCREEN_OVERRIDE_SYSTEM
             | FLAG_FULLSCREEN_OVERRIDE_USER | FLAG_HAS_MIN_ASPECT_RATIO_OVERRIDE
             | FLAG_OPT_OUT_EDGE_TO_EDGE | FLAG_ENABLE_RESTART_MENU_FOR_DISPLAY_MOVE
-            | FLAG_IS_LEAF_TASK | FLAG_HAS_MAIN_WINDOW_ROUNDED_CORNERS;
+            | FLAG_IS_LEAF_TASK | FLAG_HAS_MAIN_WINDOW_ROUNDED_CORNERS
+            | FLAG_IS_EXCLUDE_CAPTION_INSETS;
 
     @TopActivityFlag
     private static final int FLAGS_COMPAT_UI_INTERESTED = FLAGS_ORGANIZER_INTERESTED
@@ -165,6 +169,22 @@ public class AppCompatTaskInfo implements Parcelable {
 
     private AppCompatTaskInfo(Parcel source) {
         readFromParcel(source);
+    }
+
+    /**
+     * @hide
+     */
+    public AppCompatTaskInfo(@NonNull AppCompatTaskInfo other) {
+        mTopActivityFlags = other.mTopActivityFlags;
+        topActivityLetterboxVerticalPosition = other.topActivityLetterboxVerticalPosition;
+        topActivityLetterboxHorizontalPosition = other.topActivityLetterboxHorizontalPosition;
+        topActivityLetterboxWidth = other.topActivityLetterboxWidth;
+        topActivityLetterboxHeight = other.topActivityLetterboxHeight;
+        topActivityAppBounds.set(other.topActivityAppBounds);
+        topActivityLetterboxBounds = other.topActivityLetterboxBounds != null
+                ? new Rect(other.topActivityLetterboxBounds)
+                : null;
+        topNonResizableActivityAspectRatio = other.topNonResizableActivityAspectRatio;
     }
 
     @Override
@@ -418,6 +438,18 @@ public class AppCompatTaskInfo implements Parcelable {
      */
     public boolean hasOptOutEdgeToEdge() {
         return isTopActivityFlagEnabled(FLAG_OPT_OUT_EDGE_TO_EDGE);
+    }
+
+    /** Sets the top activity flag for whether caption insets are excluded from app bounds. */
+    public void setIsExcludeCaptionInsets(boolean enable) {
+        setTopActivityFlag(FLAG_IS_EXCLUDE_CAPTION_INSETS, enable);
+    }
+
+    /**
+     * @return {@code true} if the top activity has caption insets excluded from app bounds.
+     */
+    public boolean hasIsExcludeCaptionInsets() {
+        return isTopActivityFlagEnabled(FLAG_IS_EXCLUDE_CAPTION_INSETS);
     }
 
     /** Clear all top activity flags and set to false. */

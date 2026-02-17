@@ -18,7 +18,7 @@ package com.android.wm.shell.bubbles;
 
 import static com.android.dx.mockito.inline.extended.ExtendedMockito.spyOn;
 import static com.android.wm.shell.Flags.FLAG_ENABLE_OPTIONAL_BUBBLE_OVERFLOW;
-import static com.android.wm.shell.Flags.FLAG_REMOVE_APP_BUBBLE_OVERFLOW_DUPES;
+import static com.android.wm.shell.Flags.FLAG_USE_BUBBLE_ICON_FROM_ACTIVITY_INFO;
 
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assertWithMessage;
@@ -26,8 +26,9 @@ import static com.google.common.truth.Truth.assertWithMessage;
 import static junit.framework.Assert.assertNotNull;
 import static junit.framework.TestCase.assertEquals;
 
-import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
@@ -59,6 +60,7 @@ import androidx.test.filters.SmallTest;
 import com.android.internal.logging.testing.UiEventLoggerFake;
 import com.android.wm.shell.ShellTestCase;
 import com.android.wm.shell.bubbles.BubbleData.TimeSource;
+import com.android.wm.shell.bubbles.appinfo.BubbleAppInfoProvider;
 import com.android.wm.shell.bubbles.logging.BubbleLogger;
 import com.android.wm.shell.common.ShellExecutor;
 import com.android.wm.shell.shared.bubbles.BubbleBarLocation;
@@ -125,6 +127,8 @@ public class BubbleDataTest extends ShellTestCase {
     private PendingIntent mDeleteIntent;
     @Mock
     private BubbleEducationController mEducationController;
+    @Mock
+    private BubbleAppInfoProvider mAppInfoProvider;
     @Mock
     private ShellExecutor mMainExecutor;
     @Mock
@@ -210,7 +214,7 @@ public class BubbleDataTest extends ShellTestCase {
         mPositioner = new TestableBubblePositioner(mContext,
                 mContext.getSystemService(WindowManager.class));
         mBubbleData = new BubbleData(getContext(), new BubbleLogger(mUiEventLogger), mPositioner,
-                mEducationController, mMainExecutor, mBgExecutor);
+                mEducationController, mAppInfoProvider, mMainExecutor, mBgExecutor);
 
         // Used by BubbleData to set lastAccessedTime
         when(mTimeSource.currentTimeMillis()).thenReturn(1000L);
@@ -1597,7 +1601,6 @@ public class BubbleDataTest extends ShellTestCase {
         assertOverflowChangedTo(ImmutableList.of(appBubble));
     }
 
-    @EnableFlags(FLAG_REMOVE_APP_BUBBLE_OVERFLOW_DUPES)
     @Test
     public void testOverflowAppDupes_bothLauncherCategory() {
         mBubbleData.setListener(mListener);
@@ -1639,7 +1642,6 @@ public class BubbleDataTest extends ShellTestCase {
         assertOverflowAdded(appBubble2);
     }
 
-    @EnableFlags(FLAG_REMOVE_APP_BUBBLE_OVERFLOW_DUPES)
     @Test
     public void testOverflowAppDupes_newIsLauncherCategory() {
         mBubbleData.setListener(mListener);
@@ -1672,7 +1674,6 @@ public class BubbleDataTest extends ShellTestCase {
         assertOverflowRemoved(taskBubble);
     }
 
-    @EnableFlags(FLAG_REMOVE_APP_BUBBLE_OVERFLOW_DUPES)
     @Test
     public void testOverflowAppDupes_oldIsLauncherCategory() {
         mBubbleData.setListener(mListener);
@@ -1706,7 +1707,6 @@ public class BubbleDataTest extends ShellTestCase {
         assertOverflowChangedTo(ImmutableList.of(launcherBubble));
     }
 
-    @EnableFlags(FLAG_REMOVE_APP_BUBBLE_OVERFLOW_DUPES)
     @Test
     public void testOverflowAppDupes_neitherIsLauncherCategory() {
         mBubbleData.setListener(mListener);
@@ -1742,6 +1742,22 @@ public class BubbleDataTest extends ShellTestCase {
         // Most recent one gets added to overflow and old one is removed
         assertOverflowAdded(taskBubble2);
         assertOverflowRemoved(taskBubble1);
+    }
+
+    @Test
+    @EnableFlags(FLAG_USE_BUBBLE_ICON_FROM_ACTIVITY_INFO)
+    public void getOrCreateBubble_withFlag_usesActivityIcon() throws Exception {
+        ComponentName componentName = new ComponentName("package.a", "ActivityA");
+        Intent intent = new Intent();
+        intent.setComponent(componentName);
+        intent.setPackage("package.a");
+        UserHandle user = UserHandle.of(1);
+
+        Icon expectedIcon = mock(Icon.class);
+        when(mAppInfoProvider.getActivityInfoIcon(any(), eq(intent))).thenReturn(expectedIcon);
+
+        Bubble b = mBubbleData.getOrCreateBubble(intent, user);
+        assertThat(b.getIcon()).isEqualTo(expectedIcon);
     }
 
     private void verifyUpdateReceived() {

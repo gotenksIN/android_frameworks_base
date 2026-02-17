@@ -69,11 +69,13 @@ import android.widget.TextView;
 
 import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
+import androidx.core.content.ContextCompat;
 
 import com.android.internal.jank.InteractionJankMonitor;
 import com.android.systemui.animation.DialogCuj;
 import com.android.systemui.animation.DialogTransitionAnimator;
 import com.android.systemui.animation.Expandable;
+import com.android.systemui.animation.TransitionAnimator;
 import com.android.systemui.common.shared.model.ContentDescription;
 import com.android.systemui.common.shared.model.Icon;
 import com.android.systemui.dagger.SysUISingleton;
@@ -488,7 +490,12 @@ public class QSSecurityFooterUtils implements DialogInterface.OnClickListener {
                                 InteractionJankMonitor.CUJ_SHADE_DIALOG_OPEN, INTERACTION_JANK_TAG))
                                 : null;
                 if (controller != null) {
-                    mDialogTransitionAnimator.show(mDialog, controller);
+                    if (TransitionAnimator.Companion.dynamicTargetResolutionEnabled()) {
+                        mDialogTransitionAnimator.show(mDialog,
+                                expandable::dialogTransitionController, controller.getCuj());
+                    } else {
+                        mDialogTransitionAnimator.show(mDialog, controller);
+                    }
                 } else {
                     mDialog.show();
                 }
@@ -629,6 +636,10 @@ public class QSSecurityFooterUtils implements DialogInterface.OnClickListener {
 
         if (icon != null) {
             ImageView imageView = (ImageView) dialogView.findViewById(R.id.parental_controls_icon);
+            icon.setTintList(
+                    ContextCompat.getColorStateList(
+                            quickSettingsContext,
+                            com.android.internal.R.color.materialColorPrimary));
             imageView.setImageDrawable(icon);
         }
 

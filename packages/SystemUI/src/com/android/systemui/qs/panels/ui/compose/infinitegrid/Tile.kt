@@ -87,6 +87,7 @@ import com.android.mechanics.compose.modifier.verticalTactileSurfaceReveal
 import com.android.mechanics.effects.VerticalTactileSurfaceRevealEffect
 import com.android.systemui.Flags
 import com.android.systemui.animation.Expandable
+import com.android.systemui.animation.TransitionAnimator.Companion.dynamicTargetResolutionEnabled
 import com.android.systemui.common.shared.model.Icon
 import com.android.systemui.compose.modifiers.sysuiResTag
 import com.android.systemui.haptics.msdl.qs.TileHapticsViewModel
@@ -101,7 +102,6 @@ import com.android.systemui.qs.panels.ui.compose.infinitegrid.CommonTileDefaults
 import com.android.systemui.qs.panels.ui.compose.infinitegrid.CommonTileDefaults.longPressLabelMoreDetails
 import com.android.systemui.qs.panels.ui.compose.infinitegrid.CommonTileDefaults.longPressLabelSettings
 import com.android.systemui.qs.panels.ui.viewmodel.AccessibilityUiState
-import com.android.systemui.qs.panels.ui.viewmodel.BounceableTileViewModel
 import com.android.systemui.qs.panels.ui.viewmodel.DetailsViewModel
 import com.android.systemui.qs.panels.ui.viewmodel.IconProvider
 import com.android.systemui.qs.panels.ui.viewmodel.TileUiState
@@ -152,9 +152,6 @@ private val TileViewModel.traceName
  * @param coroutineScope The [CoroutineScope] to launch coroutines for animations.
  * @param tileHapticsViewModelFactory A factory for creating a [TileHapticsViewModel] instance, used
  *   for haptic feedback.
- * @param interactionSourceFromParent An optional [MutableInteractionSource] to track user
- *   interactions with the tile, used by the parent composable to animate a bounce effect. Tiles may
- *   or may not use this interaction source to control whether they should bounce or not.
  * @param modifier An optional [Modifier] to be applied to the root composable of the tile.
  * @param isVisible Whether the tile is currently visible. Defaults to true.
  * @param requestToggleTextFeedback A lambda function that is invoked when a toggleable icon only
@@ -169,10 +166,9 @@ fun ContentScope.Tile(
     iconOnly: Boolean,
     squishiness: () -> Float,
     coroutineScope: CoroutineScope,
-    bounceableInfo: BounceableInfo?,
+    bounceableInfo: BounceableInfo,
     tileHapticsViewModelFactory: TileHapticsViewModel.Factory,
     modifier: Modifier = Modifier,
-    interactionSourceFromParent: MutableInteractionSource? = null,
     isVisible: () -> Boolean = { true },
     requestToggleTextFeedback: (TileSpec) -> Unit = {},
     detailsViewModel: DetailsViewModel?,
@@ -208,8 +204,7 @@ fun ContentScope.Tile(
         val tileShape by TileDefaults.animateTileShapeAsState(uiState)
         val animatedColor by animateColorAsState(colors.background, label = "QSTileBackgroundColor")
         val isDualTarget = uiState.handlesToggleClick
-        val interactionSource =
-            interactionSourceFromParent ?: remember { MutableInteractionSource() }
+        val interactionSource = remember { MutableInteractionSource() }
 
         val surfaceRevealModifier: Modifier
         val contentRevealModifier: Modifier
@@ -240,7 +235,12 @@ fun ContentScope.Tile(
             contentRevealModifier = Modifier
         }
 
+        val expandable =
+            if (dynamicTargetResolutionEnabled()) tile.expandable
+            else remember { Expandable(mutableSetOf()) }
+
         TileExpandable(
+            expandable = expandable,
             color = { animatedColor },
             shape = tileShape,
             squishiness = squishiness,
@@ -251,16 +251,14 @@ fun ContentScope.Tile(
                     .borderOnFocus(color = MaterialTheme.colorScheme.secondary, tileShape.topEnd)
                     .sysuiResTag("tile_expandable")
                     .fillMaxWidth()
-                    .thenIf(currentBounceableInfo != null) {
-                        Modifier.bounceable(
-                            currentBounceableInfo!!.bounceable,
-                            currentBounceableInfo!!.previousTile,
-                            currentBounceableInfo!!.nextTile,
-                            orientation = Orientation.Horizontal,
-                            bounceEnd = currentBounceableInfo!!.bounceEnd,
-                            interactionSource = interactionSource,
-                        )
-                    },
+                    .bounceable(
+                        currentBounceableInfo.bounceable,
+                        currentBounceableInfo.previousTile,
+                        currentBounceableInfo.nextTile,
+                        orientation = Orientation.Horizontal,
+                        bounceEnd = currentBounceableInfo.bounceEnd,
+                        interactionSource = interactionSource,
+                    ),
         ) { expandable ->
             // Use main click on long press for small, available dual target tiles.
             // Open settings otherwise.
@@ -287,10 +285,6 @@ fun ContentScope.Tile(
             // Bounce the tile's container if it is toggleable and is not a large
             // dual target tile. These don't toggle on main click.
             val bounceContainer = uiState.isToggleable && (iconOnly || !isDualTarget)
-            val contentBounceable =
-                remember(currentBounceableInfo) {
-                    currentBounceableInfo?.bounceable ?: BounceableTileViewModel()
-                }
             TileContainer(
                 interactionSource = interactionSource.takeIf { bounceContainer },
                 onClick = onClick@{
@@ -317,7 +311,7 @@ fun ContentScope.Tile(
                         coroutineScope.launch {
                             // Bounce the content of the tile if we're not animating the container.
                             if (!bounceContainer) {
-                                contentBounceable.animateContentBounce(iconOnly)
+                                currentBounceableInfo.bounceable.animateContentBounce(iconOnly)
                             }
                         }
                         if (uiState.isToggleable && iconOnly) {
@@ -338,7 +332,7 @@ fun ContentScope.Tile(
                         color = colors.icon,
                         modifier =
                             Modifier.align(Alignment.Center).bounceScale {
-                                contentBounceable.iconBounceScale
+                                currentBounceableInfo.bounceable.iconBounceScale
                             },
                     )
                 } else {
@@ -363,7 +357,7 @@ fun ContentScope.Tile(
                         accessibilityUiState = uiState.accessibilityUiState,
                         squishiness = squishiness,
                         isVisible = isVisible,
-                        textScale = { contentBounceable.textBounceScale },
+                        textScale = { currentBounceableInfo.bounceable.textBounceScale },
                         modifier =
                             Modifier.largeTilePadding(isDualTarget = uiState.handlesSettingsClick),
                     )
@@ -375,6 +369,7 @@ fun ContentScope.Tile(
 
 @Composable
 private fun TileExpandable(
+    expandable: Expandable,
     color: () -> Color,
     shape: Shape,
     squishiness: () -> Float,
@@ -383,6 +378,7 @@ private fun TileExpandable(
     content: @Composable (Expandable) -> Unit,
 ) {
     Expandable(
+        expandable = expandable,
         controller = rememberExpandableController(color = color, shape = shape),
         modifier =
             modifier

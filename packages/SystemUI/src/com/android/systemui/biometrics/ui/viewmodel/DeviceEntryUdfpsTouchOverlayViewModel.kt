@@ -56,7 +56,7 @@ constructor(
         if (SceneContainerFlag.isEnabled) {
             sceneInteractor
                 .get()
-                .transitionState
+                .transitionStateFlow
                 .flatMapLatestConflated { state ->
                     when (state) {
                         is ObservableTransitionState.Idle -> {
@@ -79,7 +79,7 @@ constructor(
                                     progress < ALLOW_TOUCH_SHADE_EXPANSION_MAX_THRESHOLD
                                 }
                             } else {
-                                flowOf(true)
+                                flowOf(false)
                             }
                     }
                 }

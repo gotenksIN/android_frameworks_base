@@ -21,7 +21,6 @@ import android.platform.test.annotations.EnableFlags
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.filters.SmallTest
 import com.android.settingslib.AccessibilityContentDescriptions.WIFI_OTHER_DEVICE_CONNECTION
-import com.android.systemui.Flags.FLAG_STATUS_BAR_STATIC_INOUT_INDICATORS
 import com.android.systemui.SysuiTestCase
 import com.android.systemui.common.shared.model.ContentDescription.Companion.loadContentDescription
 import com.android.systemui.coroutines.collectLastValue
@@ -29,12 +28,9 @@ import com.android.systemui.kosmos.testScope
 import com.android.systemui.log.table.logcatTableLogBuffer
 import com.android.systemui.statusbar.connectivity.WifiIcons
 import com.android.systemui.statusbar.phone.StatusBarLocation
-import com.android.systemui.statusbar.pipeline.airplane.data.repository.FakeAirplaneModeRepository
-import com.android.systemui.statusbar.pipeline.airplane.data.repository.airplaneModeRepository
 import com.android.systemui.statusbar.pipeline.airplane.ui.viewmodel.AirplaneModeViewModel
 import com.android.systemui.statusbar.pipeline.airplane.ui.viewmodel.airplaneModeViewModel
 import com.android.systemui.statusbar.pipeline.shared.ConnectivityConstants
-import com.android.systemui.statusbar.pipeline.shared.data.model.ConnectivitySlot
 import com.android.systemui.statusbar.pipeline.shared.data.model.DataActivityModel
 import com.android.systemui.statusbar.pipeline.shared.data.repository.FakeConnectivityRepository
 import com.android.systemui.statusbar.pipeline.shared.data.repository.connectivityRepository
@@ -48,9 +44,10 @@ import com.android.systemui.statusbar.pipeline.wifi.shared.WifiConstants
 import com.android.systemui.statusbar.pipeline.wifi.shared.model.WifiNetworkModel
 import com.android.systemui.statusbar.pipeline.wifi.ui.model.WifiIcon
 import com.android.systemui.statusbar.pipeline.wifi.ui.viewmodel.LocationBasedWifiViewModel.Companion.viewModelForLocation
+import com.android.systemui.statusbar.systemstatusicons.flags.DisableSystemStatusIconsInCompose
+import com.android.systemui.statusbar.systemstatusicons.flags.EnableSystemStatusIconsInCompose
 import com.android.systemui.testKosmos
 import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.test.runTest
 import org.junit.Before
 import org.junit.Test
@@ -69,18 +66,15 @@ class WifiViewModelTest : SysuiTestCase() {
     private val tableLogBuffer = logcatTableLogBuffer(kosmos, "WifiViewModelTest")
     @Mock private lateinit var connectivityConstants: ConnectivityConstants
     @Mock private lateinit var wifiConstants: WifiConstants
-    private lateinit var airplaneModeRepository: FakeAirplaneModeRepository
     private lateinit var connectivityRepository: FakeConnectivityRepository
     private lateinit var wifiRepository: FakeWifiRepository
     private lateinit var interactor: WifiInteractor
     private lateinit var airplaneModeViewModel: AirplaneModeViewModel
-    private val shouldShowSignalSpacerProviderFlow = MutableStateFlow(false)
     private val testScope = kosmos.testScope
 
     @Before
     fun setUp() {
         MockitoAnnotations.initMocks(this)
-        airplaneModeRepository = kosmos.airplaneModeRepository
         connectivityRepository = kosmos.connectivityRepository.fake
         wifiRepository = kosmos.wifiRepository.fake
         wifiRepository.setIsWifiEnabled(true)
@@ -177,8 +171,8 @@ class WifiViewModelTest : SysuiTestCase() {
         }
 
     @Test
-    @DisableFlags(FLAG_STATUS_BAR_STATIC_INOUT_INDICATORS)
-    fun activity_nullSsid_outputsFalse_staticFlagOff() =
+    @DisableSystemStatusIconsInCompose
+    fun activity_nullSsid_outputsFalse_iconsInComposeFlagOff() =
         testScope.runTest {
             whenever(connectivityConstants.shouldShowActivityConfig).thenReturn(true)
             createAndSetViewModel()
@@ -200,8 +194,8 @@ class WifiViewModelTest : SysuiTestCase() {
         }
 
     @Test
-    @EnableFlags(FLAG_STATUS_BAR_STATIC_INOUT_INDICATORS)
-    fun activity_nullSsid_outputsFalse_staticFlagOn() =
+    @EnableSystemStatusIconsInCompose
+    fun activity_nullSsid_outputsFalse_iconsInComposeFlagOn() =
         testScope.runTest {
             whenever(connectivityConstants.shouldShowActivityConfig).thenReturn(true)
             createAndSetViewModel()
@@ -353,8 +347,8 @@ class WifiViewModelTest : SysuiTestCase() {
         }
 
     @Test
-    @DisableFlags(FLAG_STATUS_BAR_STATIC_INOUT_INDICATORS)
-    fun activityContainer_inAndOutFalse_outputsTrue_staticFlagOff() =
+    @DisableSystemStatusIconsInCompose
+    fun activityContainer_inAndOutFalse_outputsTrue_iconsInComposeFlagOff() =
         testScope.runTest {
             whenever(connectivityConstants.shouldShowActivityConfig).thenReturn(true)
             createAndSetViewModel()
@@ -369,8 +363,8 @@ class WifiViewModelTest : SysuiTestCase() {
         }
 
     @Test
-    @EnableFlags(FLAG_STATUS_BAR_STATIC_INOUT_INDICATORS)
-    fun activityContainer_inAndOutFalse_outputsTrue_staticFlagOn() =
+    @EnableSystemStatusIconsInCompose
+    fun activityContainer_inAndOutFalse_outputsTrue_iconsInComposeFlagOn() =
         testScope.runTest {
             whenever(connectivityConstants.shouldShowActivityConfig).thenReturn(true)
             createAndSetViewModel()
@@ -386,65 +380,12 @@ class WifiViewModelTest : SysuiTestCase() {
             assertThat(latest).isTrue()
         }
 
-    @Test
-    fun airplaneSpacer_notAirplaneMode_outputsFalse() =
-        testScope.runTest {
-            val latest by collectLastValue(underTest.isAirplaneSpacerVisible)
-
-            airplaneModeRepository.setIsAirplaneMode(false)
-
-            assertThat(latest).isFalse()
-        }
-
-    @Test
-    fun airplaneSpacer_airplaneForceHidden_outputsFalse() =
-        testScope.runTest {
-            val latest by collectLastValue(underTest.isAirplaneSpacerVisible)
-
-            airplaneModeRepository.setIsAirplaneMode(true)
-            connectivityRepository.setForceHiddenIcons(setOf(ConnectivitySlot.AIRPLANE))
-
-            assertThat(latest).isFalse()
-        }
-
-    @Test
-    fun airplaneSpacer_airplaneIconVisible_outputsTrue() =
-        testScope.runTest {
-            val latest by collectLastValue(underTest.isAirplaneSpacerVisible)
-
-            airplaneModeRepository.setIsAirplaneMode(true)
-
-            assertThat(latest).isTrue()
-        }
-
-    @Test
-    fun signalSpacer_firstSubNotShowingNetworkTypeIcon_outputsFalse() =
-        testScope.runTest {
-            val latest by collectLastValue(underTest.isSignalSpacerVisible)
-
-            shouldShowSignalSpacerProviderFlow.value = false
-
-            assertThat(latest).isFalse()
-        }
-
-    @Test
-    fun signalSpacer_firstSubIsShowingNetworkTypeIcon_outputsTrue() =
-        testScope.runTest {
-            val latest by collectLastValue(underTest.isSignalSpacerVisible)
-
-            shouldShowSignalSpacerProviderFlow.value = true
-
-            assertThat(latest).isTrue()
-        }
-
     private fun createAndSetViewModel() {
         // [WifiViewModel] creates its flows as soon as it's instantiated, and some of those flow
         // creations rely on certain config values that we mock out in individual tests. This method
         // allows tests to create the view model only after those configs are correctly set up.
         underTest =
             WifiViewModel(
-                airplaneModeViewModel,
-                { shouldShowSignalSpacerProviderFlow },
                 connectivityConstants,
                 context,
                 tableLogBuffer,

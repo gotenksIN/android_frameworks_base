@@ -205,7 +205,7 @@ public class BubbleOverflowContainerView extends LinearLayout {
     /**
      * Handle theme changes.
      */
-    void updateTheme() {
+    public void updateTheme() {
         Resources res = getResources();
         final int mode = res.getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK;
         final boolean isNightMode = (mode == Configuration.UI_MODE_NIGHT_YES);
@@ -240,6 +240,7 @@ public class BubbleOverflowContainerView extends LinearLayout {
 
     }
 
+    /** Handle font size changes.*/
     public void updateFontSize() {
         final float fontSize = mContext.getResources()
                 .getDimensionPixelSize(com.android.internal.R.dimen.text_size_body_2_material);
@@ -247,6 +248,7 @@ public class BubbleOverflowContainerView extends LinearLayout {
         mEmptyStateSubtitle.setTextSize(TypedValue.COMPLEX_UNIT_PX, fontSize);
     }
 
+    /** Handle locale changes.*/
     public void updateLocale() {
         mEmptyStateTitle.setText(mContext.getString(R.string.bubble_overflow_empty_title));
         mEmptyStateSubtitle.setText(mContext.getString(R.string.bubble_overflow_empty_subtitle));
@@ -259,9 +261,6 @@ public class BubbleOverflowContainerView extends LinearLayout {
 
             Bubble toRemove = update.removedOverflowBubble;
             if (toRemove != null) {
-                if (!Flags.removeAppBubbleOverflowDupes()) {
-                    toRemove.cleanupViews();
-                }
                 final int indexToRemove = mOverflowBubbles.indexOf(toRemove);
                 mOverflowBubbles.remove(toRemove);
                 mAdapter.notifyItemRemoved(indexToRemove);
@@ -341,7 +340,9 @@ class BubbleOverflowAdapter extends RecyclerView.Adapter<BubbleOverflowAdapter.V
 
         vh.iconView.setRenderedBubble(b);
         vh.iconView.removeDotSuppressionFlag(BadgedImageView.SuppressionFlag.FLYOUT_VISIBLE);
-        vh.iconView.setOnClickListener(view -> {
+        vh.iconView.setClickable(false);
+        vh.iconView.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO);
+        vh.overflowItem.setOnClickListener(view -> {
             mBubbles.remove(b);
             notifyDataSetChanged();
             mPromoteBubbleFromOverflow.accept(b);
@@ -351,10 +352,10 @@ class BubbleOverflowAdapter extends RecyclerView.Adapter<BubbleOverflowAdapter.V
         if (titleStr == null) {
             titleStr = mContext.getResources().getString(R.string.notification_bubble_title);
         }
-        vh.iconView.setContentDescription(mContext.getResources().getString(
+        vh.overflowItem.setContentDescription(mContext.getResources().getString(
                 R.string.bubble_content_description_single, titleStr, b.getAppName()));
 
-        vh.iconView.setAccessibilityDelegate(
+        vh.overflowItem.setAccessibilityDelegate(
                 new View.AccessibilityDelegate() {
                     @Override
                     public void onInitializeAccessibilityNodeInfo(View host,
@@ -382,11 +383,13 @@ class BubbleOverflowAdapter extends RecyclerView.Adapter<BubbleOverflowAdapter.V
     }
 
     public static class ViewHolder extends RecyclerView.ViewHolder {
+        public LinearLayout overflowItem;
         public BadgedImageView iconView;
         public TextView textView;
 
         ViewHolder(LinearLayout v, BubblePositioner positioner) {
             super(v);
+            overflowItem = v;
             iconView = v.findViewById(R.id.bubble_view);
             iconView.initialize(positioner);
             textView = v.findViewById(R.id.bubble_view_name);

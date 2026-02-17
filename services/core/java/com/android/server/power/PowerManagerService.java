@@ -31,7 +31,6 @@ import static android.os.PowerManagerInternal.WAKEFULNESS_DOZING;
 import static android.os.PowerManagerInternal.WAKEFULNESS_DREAMING;
 import static android.os.PowerManagerInternal.WakeUpDelegate;
 import static android.os.PowerManagerInternal.wakefulnessToString;
-
 import static android.service.dreams.Flags.dreamsV2;
 import static android.service.dreams.Flags.napWhenDreamEnabled;
 
@@ -120,6 +119,7 @@ import android.util.LongArray;
 import android.util.PrintWriterPrinter;
 import android.util.Slog;
 import android.util.SparseArray;
+import android.util.SparseBooleanArray;
 import android.util.TimeUtils;
 import android.util.proto.ProtoOutputStream;
 import android.view.Display;
@@ -340,6 +340,8 @@ public final class PowerManagerService extends SystemService
     private final SystemPropertiesWrapper mSystemProperties;
     private final Clock mClock;
     private final Injector mInjector;
+
+    private final WakelockMapper mWakelockMapper;
     private final PermissionCheckerWrapper mPermissionCheckerWrapper;
     private final PowerPropertiesWrapper mPowerPropertiesWrapper;
     private final DeviceConfigParameterProvider mDeviceConfigProvider;
@@ -728,9 +730,13 @@ public final class PowerManagerService extends SystemService
     // Whether to keep dreaming when the device is unplugging.
     private boolean mKeepDreamingWhenUnplugging;
 
-    // Whether to force disable wakelocks.
+    // Whether to globally force disable wakelocks.
     @GuardedBy("mLock")
-    private boolean mForceDisableWakelocks;
+    private boolean mGlobalForceDisableWakelocks;
+
+    // Mapping of power group ids to whether their wakelocks should be force disabled.
+    @GuardedBy("mLock")
+    private SparseBooleanArray mGroupsToForceDisableWakelocks = new SparseBooleanArray();
 
     @GuardedBy("mLock")
     private ScreenTimeoutOverridePolicy mScreenTimeoutOverridePolicy;
@@ -1050,10 +1056,12 @@ public final class PowerManagerService extends SystemService
         Notifier createNotifier(Looper looper, Context context, IBatteryStats batteryStats,
                 SuspendBlocker suspendBlocker, WindowManagerPolicy policy,
                 FaceDownDetector faceDownDetector, ScreenUndimDetector screenUndimDetector,
-                Executor backgroundExecutor, PowerManagerFlags powerManagerFlags) {
+                Executor backgroundExecutor, PowerManagerFlags powerManagerFlags,
+                WakelockMapper wakelockMapper) {
             return new Notifier(
                     looper, context, batteryStats, suspendBlocker, policy, faceDownDetector,
-                    screenUndimDetector, backgroundExecutor, powerManagerFlags, /*injector=*/ null);
+                    screenUndimDetector, backgroundExecutor, powerManagerFlags, /*injector=*/ null,
+                    wakelockMapper);
         }
 
         SuspendBlocker createSuspendBlocker(PowerManagerService service, String name) {
@@ -1164,6 +1172,10 @@ public final class PowerManagerService extends SystemService
         PowerManagerFlags getFlags() {
             return new PowerManagerFlags();
         }
+
+        WakelockMapper getWakelockMapper() {
+            return new WakelockMapper();
+        }
     }
 
     /** Interface for checking an app op permission */
@@ -1232,6 +1244,7 @@ public final class PowerManagerService extends SystemService
         mClock = injector.createClock();
         mFeatureFlags = injector.getFlags();
         mInjector = injector;
+        mWakelockMapper = injector.getWakelockMapper();
 
         mHandlerThread = new ServiceThread(TAG,
                 Process.THREAD_PRIORITY_DISPLAY, /* allowIo= */ false);
@@ -1423,7 +1436,17 @@ public final class PowerManagerService extends SystemService
             mNotifier = mInjector.createNotifier(Looper.getMainLooper(), mContext, mBatteryStats,
                     mInjector.createSuspendBlocker(this, "PowerManagerService.Broadcasts"),
                     mPolicy, mFaceDownDetector, mScreenUndimDetector,
-                    BackgroundThread.getExecutor(), mFeatureFlags);
+                    BackgroundThread.getExecutor(), mFeatureFlags, mWakelockMapper);
+
+            mNotifier.registerWakeLockChangedListener(wakeLock -> {
+                mHandler.postAtTime(() -> {
+                    synchronized (mLock) {
+                        if (setWakeLockDisabledStateLocked(wakeLock)) {
+                            updatePowerStateLocked();
+                        }
+                    }
+                }, mClock.uptimeMillis());
+            });
 
             mPowerGroups.append(Display.DEFAULT_DISPLAY_GROUP,
                     new PowerGroup(WAKEFULNESS_AWAKE, mPowerGroupWakefulnessChangeListener,
@@ -1740,6 +1763,7 @@ public final class PowerManagerService extends SystemService
             addFrozenStateChangeCallbacksLocked(wakeLock);
             mDirty |= DIRTY_WAKE_LOCKS;
             updatePowerStateLocked();
+            mWakelockMapper.addWakeLock(wakeLock);
             if (notifyAcquire) {
                 // This needs to be done last so we are sure we have acquired the
                 // kernel wake lock.  Otherwise we have a race where the system may
@@ -1890,6 +1914,7 @@ public final class PowerManagerService extends SystemService
             wakeLock.unlinkToDeath();
             wakeLock.setDisabled(true);
             removeWakeLockLocked(wakeLock, index);
+            mWakelockMapper.removeWakeLock(wakeLock);
         }
     }
 
@@ -1910,12 +1935,15 @@ public final class PowerManagerService extends SystemService
 
     private void addFrozenStateChangeCallbacksLocked(WakeLock wakelock) {
         if (mFeatureFlags.isDisableFrozenProcessWakelocksEnabled()) {
+            // The callback is never supported for local binders.
+            if (wakelock.mLock instanceof Binder) {
+                return;
+            }
             try {
                 wakelock.mLock.addFrozenStateChangeCallback(wakelock);
             } catch (UnsupportedOperationException e) {
                 // Ignore the exception.  The callback is not supported on this platform or on
-                // this binder.  The callback is never supported for local binders.  There is
-                // no error. A log message is provided for debug.
+                // this binder.  There is no error. A log message is provided for debug.
                 if (DEBUG_SPEW) {
                     Slog.v(TAG, "FrozenStateChangeCallback not supported for this wakelock "
                             + wakelock.mTag + " " + e.getLocalizedMessage());
@@ -1928,6 +1956,10 @@ public final class PowerManagerService extends SystemService
 
     private void removeFrozenStateChangeCallbacksLocked(WakeLock wakelock) {
         if (mFeatureFlags.isDisableFrozenProcessWakelocksEnabled()) {
+            // The callback is never supported for local binders.
+            if (wakelock.mLock instanceof Binder) {
+                return;
+            }
             try {
                 wakelock.mLock.removeFrozenStateChangeCallback(wakelock);
             } catch (UnsupportedOperationException e) {
@@ -2116,10 +2148,15 @@ public final class PowerManagerService extends SystemService
             String packageName, int uid, int pid, WorkSource ws, String historyTag,
             IWakeLockCallback callback) {
         if (mSystemReady && wakeLock.mNotifiedAcquired) {
+            if (!Objects.equals(wakeLock.mWorkSource, ws)) {
+                mWakelockMapper.removeWakeLock(wakeLock);
+                mWakelockMapper.addWakeLock(wakeLock, ws);
+            }
             mNotifier.onWakeLockChanging(wakeLock.mFlags, wakeLock.mTag, wakeLock.mPackageName,
                     wakeLock.mOwnerUid, wakeLock.mOwnerPid, wakeLock.mWorkSource,
                     wakeLock.mHistoryTag, wakeLock.mCallback, flags, tag, packageName, uid, pid, ws,
-                    historyTag, callback);
+                    historyTag, callback, /* isBeingCached */ false, /* isCached */ false,
+                    /* uid */ -1);
             notifyWakeLockLongFinishedLocked(wakeLock);
             // Changing the wake lock will count as releasing the old wake lock(s) and
             // acquiring the new ones...  we do this because otherwise once a wakelock
@@ -4640,12 +4677,36 @@ public final class PowerManagerService extends SystemService
         }
     }
 
-    void setForceDisableWakelocksInternal(boolean force) {
+    /**
+     * Tool to enabled / disable wakelocks. If no power group ids are specified, all wakelocks
+     * will be affected.
+     * @param forceDisable - whether to enable or disable
+     * @param groupsToActUpon - power groups to act upon. Leave empty to act upon all wakelocks
+     */
+    void setForceDisableWakelocksInternal(boolean forceDisable, IntArray groupsToActUpon) {
         synchronized (mLock) {
-            if (mFeatureFlags.isForceDisableWakelocksEnabled()) {
-                mForceDisableWakelocks = force;
-                updateWakeLockDisabledStatesLocked();
+            List<WakeLock> wakeLocksToActUpon = mWakeLocks;
+
+            if (groupsToActUpon.size() > 0) {
+                Slog.i(TAG,
+                        "force-disable-wakelocks for power groups: "
+                                + groupsToActUpon + ", forceDisable: " + forceDisable);
+                for (int i = 0; i < mWakeLocks.size(); i++) {
+                    WakeLock wakelock = mWakeLocks.get(i);
+                    Integer powerGroupId = wakelock.getPowerGroupId();
+                    if (powerGroupId == null || !groupsToActUpon.contains(powerGroupId)) {
+                        // wakelocks we should not act upon
+                        wakeLocksToActUpon.remove(wakelock);
+                    } else {
+                        // wakelocks we should act upon:
+                        mGroupsToForceDisableWakelocks.put(powerGroupId, forceDisable);
+                    }
+                }
+            } else {
+                Slog.i(TAG, "force disable all wakelocks. forceDisable: " + forceDisable);
+                mGlobalForceDisableWakelocks = forceDisable;
             }
+            updateWakeLockDisabledStatesLocked(wakeLocksToActUpon);
         }
     }
 
@@ -4688,6 +4749,10 @@ public final class PowerManagerService extends SystemService
     @GuardedBy("mLock")
     private boolean setWakeLockDisabledStateLocked(WakeLock wakeLock) {
         boolean disabled = false;
+        if (wakeLock.isAttributedUidCached()) {
+            disabled = true;
+            return wakeLock.setDisabled(disabled);
+        }
         if (wakeLock.isFrozenLocked()) {
             if (DEBUG_SPEW) {
                 Slog.d(TAG, "Process frozen. Disabling the wakelock " + wakeLock.mTag);
@@ -4727,8 +4792,11 @@ public final class PowerManagerService extends SystemService
                     }
                 }
             }
-            // Disable all PARTIAL_WAKE_LOCKS if mForceDisableWakelocks is true.
-            if (mForceDisableWakelocks) {
+            // Disable PARTIAL_WAKE_LOCKS
+            // Either globally if mGlobalForceDisableWakelocks is true
+            // or per power group if requested
+            if (mGlobalForceDisableWakelocks || (wakeLock.getPowerGroupId() != null
+                    && mGroupsToForceDisableWakelocks.get(wakeLock.getPowerGroupId()))) {
                 disabled = true;
             }
             return wakeLock.setDisabled(disabled);
@@ -5131,6 +5199,8 @@ public final class PowerManagerService extends SystemService
             pw.println("  mTheaterModeEnabled="
                     + mTheaterModeEnabled);
             pw.println("  mKeepDreamingWhenUnplugging=" + mKeepDreamingWhenUnplugging);
+            pw.println("  mGlobalForceDisableWakelocks=" + mGlobalForceDisableWakelocks);
+            pw.println("  mGroupsToForceDisableWakelocks=" + mGroupsToForceDisableWakelocks);
             pw.println("  mSuspendWhenScreenOffDueToProximityConfig="
                     + mSuspendWhenScreenOffDueToProximityConfig);
             pw.println("  mDreamsSupportedConfig=" + mDreamsSupportedConfig);
@@ -5788,11 +5858,11 @@ public final class PowerManagerService extends SystemService
                     handleProcessFrozenStateChange(msg.obj, msg.arg1);
                     break;
                 case MSG_FORCE_DISABLE_WAKELOCKS:
-                    if (msg.arg1 == 1) {
-                        setForceDisableWakelocksInternal(true);
-                    } else {
-                        setForceDisableWakelocksInternal(false);
+                    IntArray groupIdsToActUpon = new IntArray();
+                    if (msg.obj instanceof IntArray) {
+                        groupIdsToActUpon = (IntArray) msg.obj;
                     }
+                    setForceDisableWakelocksInternal(msg.arg1 == 1, groupIdsToActUpon);
                     break;
             }
 
@@ -5821,6 +5891,8 @@ public final class PowerManagerService extends SystemService
         public boolean mDisabled;
         private boolean mIsFrozen;
         public IWakeLockCallback mCallback;
+
+        private boolean mIsAttributedUidCached;
 
         public WakeLock(IBinder lock, int displayId, int flags, String tag, String packageName,
                 WorkSource workSource, String historyTag, int ownerUid, int ownerPid,
@@ -5860,6 +5932,14 @@ public final class PowerManagerService extends SystemService
 
         public void setFrozenLocked(int state) {
             mIsFrozen = (state == IBinder.FrozenStateChangeCallback.STATE_FROZEN);
+        }
+
+        public void setAttributedUidCached(boolean isCached) {
+            mIsAttributedUidCached = isCached;
+        }
+
+        public boolean isAttributedUidCached() {
+            return mIsAttributedUidCached;
         }
 
         private void linkToDeath() {
@@ -5965,6 +6045,9 @@ public final class PowerManagerService extends SystemService
             sb.append(" isFrozen=");
             sb.append(mIsFrozen);
 
+            sb.append(" isAttributedUidCached=");
+            sb.append(mIsAttributedUidCached);
+
             if (mOwnerPid != 0) {
                 sb.append(" pid=");
                 sb.append(mOwnerPid);
@@ -5972,6 +6055,11 @@ public final class PowerManagerService extends SystemService
             if (mWorkSource != null) {
                 sb.append(" ws=");
                 sb.append(mWorkSource);
+            }
+            final Integer powerGroupId = getPowerGroupId();
+            if (powerGroupId != null) {
+                sb.append(" powerGroupId=");
+                sb.append(powerGroupId);
             }
             sb.append(")");
             return sb.toString();
@@ -8004,9 +8092,32 @@ public final class PowerManagerService extends SystemService
 
         @Override
         public void setForceDisableWakelocks(boolean force) {
-            Slog.i(TAG, (force ? "Starting" : "Stopping") + " to force disable partial wakelocks");
+            Slog.i(TAG, (force ? "Starting" : "Stopping") + " to force disable wakelocks");
             Message msg = mHandler.obtainMessage(MSG_FORCE_DISABLE_WAKELOCKS,
                     force ? 1 : 0,  0 /*unused*/);
+            mHandler.sendMessageAtTime(msg, mClock.uptimeMillis());
+        }
+
+        @Override
+        public void setForceDisableWakelocksByDisplay(boolean forceDisable, IntArray displayIds) {
+            Slog.i(TAG, (forceDisable ? "Starting" : "Stopping")
+                    + " to force disable wakelocks for displayids: " + displayIds);
+            IntArray groupIds = new IntArray();
+            for (int i = 0; i < displayIds.size(); i++) {
+                final int groupId = getDisplayGroupId(displayIds.get(i));
+                if (groupId != Display.INVALID_DISPLAY_GROUP) {
+                    groupIds.add(groupId);
+                }
+            }
+            setForceDisableWakelocksByPowerGroup(forceDisable, groupIds);
+        }
+
+        @Override
+        public void setForceDisableWakelocksByPowerGroup(boolean forceDisable, IntArray groupIds) {
+            Slog.i(TAG, (forceDisable ? "Starting" : "Stopping")
+                    + " to force disable wakelocks for groups: " + groupIds);
+            Message msg = mHandler.obtainMessage(MSG_FORCE_DISABLE_WAKELOCKS,
+                    forceDisable ? 1 : 0, /* unused= */ 0, groupIds);
             mHandler.sendMessageAtTime(msg, mClock.uptimeMillis());
         }
 

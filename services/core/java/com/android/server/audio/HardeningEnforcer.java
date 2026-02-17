@@ -16,9 +16,12 @@
 package com.android.server.audio;
 
 import static android.media.audio.Flags.autoPublicVolumeApiHardening;
+import static com.android.media.audio.Flags.hardeningPartial;
 import static com.android.media.audio.Flags.hardeningPartialVolume;
 import static com.android.media.audio.Flags.hardeningStrict;
-import static com.android.media.audio.Flags.hardeningPartial;
+import static com.android.media.audio.metrics.AudioAtomsLog.AUDIO_HARDENING_REPORTED__API_TYPE__AUDIO_HARDENING_API_TYPE_RINGER;
+import static com.android.media.audio.metrics.AudioAtomsLog.AUDIO_HARDENING_REPORTED__API_TYPE__AUDIO_HARDENING_API_TYPE_VOLUME;
+import static com.android.media.audio.metrics.AudioAtomsLog.AUDIO_HARDENING_REPORTED__API_TYPE__AUDIO_HARDENING_API_TYPE_FOCUS;
 
 import android.Manifest;
 import android.annotation.NonNull;
@@ -29,6 +32,7 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.media.AudioFocusRequest;
 import android.media.AudioManager;
+import android.media.IAudioPolicyService.HardeningOverride;
 import android.os.Binder;
 import android.os.Build;
 import android.os.UserHandle;
@@ -36,11 +40,12 @@ import android.text.TextUtils;
 import android.util.Slog;
 import android.util.SparseArray;
 
+import com.android.media.audio.metrics.AudioAtomsLog;
 import com.android.modules.expresslog.Counter;
 import com.android.server.utils.EventLogger;
 
 import java.io.PrintWriter;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Class to encapsulate all audio API hardening operations
@@ -53,7 +58,7 @@ public class HardeningEnforcer {
 
     final Context mContext;
     final AppOpsManager mAppOps;
-    final AtomicBoolean mShouldEnableAllHardening;
+    final AtomicInteger mHardeningOverride;
     final boolean mIsAutomotive;
 
     final ActivityManager mActivityManager;
@@ -116,11 +121,11 @@ public class HardeningEnforcer {
     private static final int DENIED_IF_FULL = 2;
 
     public HardeningEnforcer(Context ctxt, boolean isAutomotive,
-            AtomicBoolean shouldEnableHardening, AppOpsManager appOps, PackageManager pm,
+            AtomicInteger hardeningOverride, AppOpsManager appOps, PackageManager pm,
             EventLogger logger) {
         mContext = ctxt;
         mIsAutomotive = isAutomotive;
-        mShouldEnableAllHardening = shouldEnableHardening;
+        mHardeningOverride = hardeningOverride;
         mAppOps = appOps;
         mActivityManager = ctxt.getSystemService(ActivityManager.class);
         mPackageManager = pm;
@@ -133,11 +138,11 @@ public class HardeningEnforcer {
      * @return false if the method call is allowed, true if it should be a no-op
      */
     protected boolean blockVolumeMethod(int volumeMethod, String packageName, int uid) {
-        // Regardless of flag state, always permit callers with MODIFY_AUDIO_SETTINGS_PRIVILEGED
+        // Regardless of flag state, always permit callers with privileged audio permissions
         // Prevent them from showing up in metrics as well
-        if (mContext.checkCallingOrSelfPermission(
-                Manifest.permission.MODIFY_AUDIO_SETTINGS_PRIVILEGED)
-                == PackageManager.PERMISSION_GRANTED) {
+        if (holdsPermission(Manifest.permission.MODIFY_AUDIO_SETTINGS_PRIVILEGED) ||
+                holdsPermission(Manifest.permission.MODIFY_AUDIO_ROUTING) ||
+                holdsPermission(Manifest.permission.MODIFY_PHONE_STATE)) {
             return false;
         }
         // for Auto, volume methods require MODIFY_AUDIO_SETTINGS_PRIVILEGED
@@ -159,7 +164,12 @@ public class HardeningEnforcer {
             // This flag is misnamed: it blocks volume changes at the strict level: app usage of
             // volume modifications between partial and strict level should be extremely limited
             // given we don't want to encourage apps modify volume regardless.
-            boolean enforced = mShouldEnableAllHardening.get() || hardeningPartialVolume();
+            var overrideState = mHardeningOverride.get();
+            boolean enforced = switch (overrideState) {
+                case HardeningOverride.ENABLE -> true;
+                case HardeningOverride.DISABLE -> false;
+                default -> hardeningPartialVolume();
+            };
             if (!noteOp(AppOpsManager.OP_CONTROL_AUDIO_PARTIAL, uid, packageName, null)) {
                 // blocked by partial
                 Counter.logIncrementWithUid(
@@ -184,6 +194,16 @@ public class HardeningEnforcer {
                         + getPackNameForUid(uid) + " (" + uid + "), "
                         + "level: " + (allowed == DENIED_IF_PARTIAL ? "partial" : "full");
                 mEventLogger.enqueueAndSlog(msg, EventLogger.Event.ALOGW, TAG);
+                boolean isStrict = allowed == DENIED_IF_FULL;
+                if (volumeMethod == METHOD_AUDIO_MANAGER_SET_RINGER_MODE) {
+                    AudioAtomsLog.write(AudioAtomsLog.AUDIO_HARDENING_REPORTED, uid,
+                            AUDIO_HARDENING_REPORTED__API_TYPE__AUDIO_HARDENING_API_TYPE_RINGER,
+                            isStrict, enforced);
+                } else {
+                    AudioAtomsLog.write(AudioAtomsLog.AUDIO_HARDENING_REPORTED, uid,
+                            AUDIO_HARDENING_REPORTED__API_TYPE__AUDIO_HARDENING_API_TYPE_VOLUME,
+                            isStrict, enforced);
+                }
             }
             return enforced && allowed != ALLOWED;
         }
@@ -212,10 +232,18 @@ public class HardeningEnforcer {
             blockLevel = DENIED_IF_FULL;
         }
 
+        var overrideState = mHardeningOverride.get();
         boolean isPreVic = targetSdk < Build.VERSION_CODES.VANILLA_ICE_CREAM;
-        boolean enforcedPartial =
-                mShouldEnableAllHardening.get() || hardeningPartial() || !isPreVic;
-        boolean enforcedFull = mShouldEnableAllHardening.get() || hardeningStrict();
+        boolean enforcedPartial = switch (overrideState) {
+            case HardeningOverride.ENABLE -> true;
+            case HardeningOverride.DISABLE -> false;
+            default -> hardeningPartial() || !isPreVic;
+        };
+        boolean enforcedFull = switch (overrideState) {
+            case HardeningOverride.ENABLE -> true;
+            case HardeningOverride.DISABLE -> false;
+            default -> hardeningStrict();
+        };
 
         if (blockLevel == DENIED_IF_PARTIAL) {
             String msg = "AudioHardening focus request for req "
@@ -226,6 +254,9 @@ public class HardeningEnforcer {
                     + clientId
                     + ", level: partial";
             mEventLogger.enqueueAndSlog(msg, EventLogger.Event.ALOGW, TAG);
+            AudioAtomsLog.write(AudioAtomsLog.AUDIO_HARDENING_REPORTED, callingUid,
+                    AUDIO_HARDENING_REPORTED__API_TYPE__AUDIO_HARDENING_API_TYPE_FOCUS,
+                    false /*isStrict*/, enforcedPartial);
         } else if (blockLevel == DENIED_IF_FULL) {
             String msg = "AudioHardening focus request for req "
                     + focusReqType
@@ -235,6 +266,9 @@ public class HardeningEnforcer {
                     + clientId
                     + ", level: full";
             mEventLogger.enqueueAndSlog(msg, EventLogger.Event.ALOGW, TAG);
+            AudioAtomsLog.write(AudioAtomsLog.AUDIO_HARDENING_REPORTED, callingUid,
+                    AUDIO_HARDENING_REPORTED__API_TYPE__AUDIO_HARDENING_API_TYPE_FOCUS,
+                    true /*isStrict*/, enforcedFull);
         }
         boolean blocked = (blockLevel == DENIED_IF_PARTIAL) && enforcedPartial ||
                               (blockLevel == DENIED_IF_FULL) && enforcedFull;
@@ -295,5 +329,10 @@ public class HardeningEnforcer {
             return false;
         }
         return true;
+    }
+
+    private boolean holdsPermission(String permission) {
+        return mContext.checkCallingOrSelfPermission(permission)
+            == PackageManager.PERMISSION_GRANTED;
     }
 }

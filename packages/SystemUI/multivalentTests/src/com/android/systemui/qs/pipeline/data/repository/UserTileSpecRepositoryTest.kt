@@ -10,6 +10,7 @@ import com.android.systemui.SysuiTestCase
 import com.android.systemui.coroutines.collectLastValue
 import com.android.systemui.kosmos.Kosmos
 import com.android.systemui.kosmos.collectLastValue
+import com.android.systemui.kosmos.runCurrent
 import com.android.systemui.kosmos.runTest
 import com.android.systemui.kosmos.testDispatcher
 import com.android.systemui.kosmos.testScope
@@ -18,8 +19,13 @@ import com.android.systemui.qs.panels.data.repository.qsPreferencesRepository
 import com.android.systemui.qs.pipeline.data.model.RestoreData
 import com.android.systemui.qs.pipeline.shared.TileSpec
 import com.android.systemui.qs.pipeline.shared.TilesUpgradePath
+import com.android.systemui.qs.pipeline.shared.internetTileMigration
 import com.android.systemui.qs.pipeline.shared.logging.QSPipelineLogger
+import com.android.systemui.statusbar.pipeline.shared.connectivityConstants
+import com.android.systemui.statusbar.pipeline.shared.fake
 import com.android.systemui.testKosmos
+import com.android.systemui.user.data.repository.FakeUserRepository
+import com.android.systemui.user.data.repository.userRepository
 import com.android.systemui.user.domain.interactor.HeadlessSystemUserModeFake
 import com.android.systemui.util.settings.FakeSettings
 import com.google.common.truth.Truth.assertThat
@@ -41,7 +47,8 @@ import platform.test.runner.parameterized.Parameters
 @SmallTest
 @RunWith(ParameterizedAndroidJunit4::class)
 class UserTileSpecRepositoryTest(flags: FlagsParameterization) : SysuiTestCase() {
-    private val kosmos = testKosmos()
+    private val kosmos =
+        testKosmos().apply { connectivityConstants.fake.hasDataCapabilities = true }
     private val secureSettings = FakeSettings()
     private val hsum = HeadlessSystemUserModeFake()
     private val defaultTilesRepository =
@@ -70,6 +77,8 @@ class UserTileSpecRepositoryTest(flags: FlagsParameterization) : SysuiTestCase()
                 hsum,
                 logger,
                 kosmos.qsPreferencesRepository,
+                kosmos.internetTileMigration,
+                kosmos.userRepository,
                 testScope.backgroundScope,
                 testDispatcher,
             )
@@ -97,6 +106,8 @@ class UserTileSpecRepositoryTest(flags: FlagsParameterization) : SysuiTestCase()
                     hsum,
                     logger,
                     kosmos.qsPreferencesRepository,
+                    kosmos.internetTileMigration,
+                    kosmos.userRepository,
                     testScope.backgroundScope,
                     testDispatcher,
                 )
@@ -119,6 +130,8 @@ class UserTileSpecRepositoryTest(flags: FlagsParameterization) : SysuiTestCase()
                     hsum,
                     logger,
                     kosmos.qsPreferencesRepository,
+                    kosmos.internetTileMigration,
+                    kosmos.userRepository,
                     testScope.backgroundScope,
                     testDispatcher,
                 )
@@ -509,6 +522,47 @@ class UserTileSpecRepositoryTest(flags: FlagsParameterization) : SysuiTestCase()
 
     @Test
     @EnableFlags(QsSplitInternetTile.FLAG_NAME)
+    fun flagEnabled_readFromSettings_notMainUser_largeInternetTileBecomesLargeWifi() =
+        kosmos.runTest {
+            val user = FakeUserRepository.MAIN_USER_ID + 1
+            underTest =
+                UserTileSpecRepository(
+                    user,
+                    defaultTilesRepository,
+                    secureSettings,
+                    hsum,
+                    logger,
+                    kosmos.qsPreferencesRepository,
+                    kosmos.internetTileMigration,
+                    kosmos.userRepository,
+                    testScope.backgroundScope,
+                    testDispatcher,
+                )
+
+            val storedInSettings = "a,b,internet,c"
+            storeTiles(storedInSettings, user)
+            qsPreferencesRepository.setLargeTilesForUser(
+                user,
+                setOf(TileSpec.create("internet"), TileSpec.create("a")),
+            )
+
+            val tiles by collectLastValue(underTest.tiles())
+
+            assertThat(tiles!!)
+                .containsExactly(
+                    TileSpec.create("a"),
+                    TileSpec.create("b"),
+                    TileSpec.create("wifi"),
+                    TileSpec.create("c"),
+                )
+                .inOrder()
+
+            assertThat(qsPreferencesRepository.getLargeTilesForUser(user))
+                .isEqualTo(setOf(TileSpec.create("a"), TileSpec.create("wifi")))
+        }
+
+    @Test
+    @EnableFlags(QsSplitInternetTile.FLAG_NAME)
     fun flagEnabled_readFromSettings_smallInternetTileBecomesSmallWifi() =
         kosmos.runTest {
             val storedInSettings = "a,b,internet,c"
@@ -528,6 +582,78 @@ class UserTileSpecRepositoryTest(flags: FlagsParameterization) : SysuiTestCase()
 
             assertThat(qsPreferencesRepository.getLargeTilesForUser(USER))
                 .isEqualTo(setOf(TileSpec.create("a")))
+        }
+
+    @Test
+    @EnableFlags(QsSplitInternetTile.FLAG_NAME)
+    fun flagEnabled_largeInternetTile_changeAfterMigration_correctMigration() =
+        kosmos.runTest {
+            val storedInSettings = "internet,a"
+            storeTiles(storedInSettings)
+            qsPreferencesRepository.setLargeTilesForUser(USER, setOf(TileSpec.create("internet")))
+
+            val tiles by collectLastValue(underTest.tiles())
+            assertThat(tiles!!)
+                .containsExactly(
+                    TileSpec.create("wifi"),
+                    TileSpec.create("cell"),
+                    TileSpec.create("a"),
+                )
+                .inOrder()
+
+            assertThat(qsPreferencesRepository.getLargeTilesForUser(USER)).isEmpty()
+
+            underTest.addTile(TileSpec.create("b"))
+
+            assertThat(tiles!!)
+                .containsExactly(
+                    TileSpec.create("wifi"),
+                    TileSpec.create("cell"),
+                    TileSpec.create("a"),
+                    TileSpec.create("b"),
+                )
+                .inOrder()
+
+            assertThat(qsPreferencesRepository.getLargeTilesForUser(USER)).isEmpty()
+        }
+
+    @Test
+    @EnableFlags(QsSplitInternetTile.FLAG_NAME)
+    fun flagEnabled_restore_largeInternet_smallWifiCell() =
+        kosmos.runTest {
+            val tiles by collectLastValue(underTest.tiles())
+
+            assertThat(tiles).doesNotContain(TileSpec.create("internet"))
+
+            val restoreData =
+                RestoreData(
+                    restoredTiles =
+                        listOf(
+                            TileSpec.create("a"),
+                            TileSpec.create("internet"),
+                            TileSpec.create("b"),
+                        ),
+                    restoredAutoAddedTiles = emptySet(),
+                    USER,
+                )
+            qsPreferencesRepository.setLargeTilesForUser(USER, setOf(TileSpec.create("internet")))
+
+            underTest.reconcileRestore(restoreData, emptySet())
+            runCurrent()
+
+            assertThat(tiles!!)
+                .containsExactly(
+                    TileSpec.create("a"),
+                    TileSpec.create("wifi"),
+                    TileSpec.create("cell"),
+                    TileSpec.create("b"),
+                )
+                .inOrder()
+
+            assertThat(qsPreferencesRepository.getLargeTilesForUser(USER))
+                .doesNotContain(TileSpec.create("wifi"))
+            assertThat(qsPreferencesRepository.getLargeTilesForUser(USER))
+                .doesNotContain(TileSpec.create("cell"))
         }
 
     @Test
@@ -572,13 +698,13 @@ class UserTileSpecRepositoryTest(flags: FlagsParameterization) : SysuiTestCase()
         return defaultTilesRepository.getDefaultTiles(isHeadlessSystemUser)
     }
 
-    private fun TestScope.storeTiles(specs: String) {
-        secureSettings.putStringForUser(SETTING, specs, USER)
+    private fun TestScope.storeTiles(specs: String, user: Int = USER) {
+        secureSettings.putStringForUser(SETTING, specs, user)
         runCurrent()
     }
 
-    private fun Kosmos.storeTiles(specs: String) {
-        testScope.storeTiles(specs)
+    private fun Kosmos.storeTiles(specs: String, user: Int = USER) {
+        testScope.storeTiles(specs, user)
     }
 
     private fun loadTiles(): String? {
@@ -586,7 +712,7 @@ class UserTileSpecRepositoryTest(flags: FlagsParameterization) : SysuiTestCase()
     }
 
     companion object {
-        private const val USER = 10
+        private const val USER = FakeUserRepository.MAIN_USER_ID
         private const val DEFAULT_TILES = "a,b,c"
         private const val DEFAULT_HSU_TILES = "a,c"
         private const val SETTING = Settings.Secure.QS_TILES

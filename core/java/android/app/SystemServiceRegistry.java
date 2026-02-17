@@ -20,6 +20,7 @@ import static android.aiseal.Flags.aisealHostApis;
 import static android.app.appfunctions.flags.Flags.enableAppFunctionManager;
 import static android.app.lskfreset.flags.Flags.enableLskfResetManager;
 import static android.app.privatecompute.flags.Flags.enablePccFrameworkSupport;
+import static android.content.pm.PackageManager.FEATURE_AISEAL;
 import static android.hardware.serial.flags.Flags.enableWiredSerialApi;
 import static android.permission.flags.Flags.assistSettingsPrivacyImprovementsEnabled;
 import static android.provider.flags.Flags.newStoragePublicApi;
@@ -45,6 +46,8 @@ import android.app.appsearch.AppSearchManagerFrameworkInitializer;
 import android.app.blob.BlobStoreManagerFrameworkInitializer;
 import android.app.contentrestriction.ContentRestrictionManager;
 import android.app.contentrestriction.IContentRestrictionManager;
+import android.app.contentsafety.ContentSafetyManager;
+import android.app.contentsafety.IContentSafetyManager;
 import android.app.contentsuggestions.ContentSuggestionsManager;
 import android.app.contentsuggestions.IContentSuggestionsManager;
 import android.app.contextualsearch.ContextualSearchManager;
@@ -239,6 +242,8 @@ import android.os.image.IDynamicSystemService;
 import android.os.incremental.IIncrementalService;
 import android.os.incremental.IncrementalManager;
 import android.os.profiling.anomaly.AnomalyDetectorFrameworkInitializer;
+import android.os.storage.FilesManager;
+import android.os.storage.IFilesService;
 import android.os.storage.StorageManager;
 import android.permission.LegacyPermissionManager;
 import android.permission.PermissionCheckerManager;
@@ -445,6 +450,22 @@ public final class SystemServiceRegistry {
             public AudioDeviceVolumeManager createService(ContextImpl ctx) {
                 return new AudioDeviceVolumeManager(ctx);
             }});
+
+        if (android.app.contentsafety.flags.Flags.enableContentsafety()) {
+            registerService(Context.CONTENT_SAFETY_SERVICE, ContentSafetyManager.class,
+                    new CachedServiceFetcher<ContentSafetyManager>() {
+                        @Override
+                        public ContentSafetyManager createService(ContextImpl ctx)
+                                throws ServiceNotFoundException {
+
+                            IBinder b = ServiceManager.getServiceOrThrow(
+                                    Context.CONTENT_SAFETY_SERVICE);
+                            IContentSafetyManager service = IContentSafetyManager.Stub.asInterface(
+                                    b);
+                            return new ContentSafetyManager(ctx, service);
+                        }
+                    });
+        }
 
         registerService(Context.MEDIA_ROUTER_SERVICE, MediaRouter.class,
                 new CachedServiceFetcher<MediaRouter>() {
@@ -796,6 +817,17 @@ public final class SystemServiceRegistry {
             public StorageManager createService(ContextImpl ctx) throws ServiceNotFoundException {
                 return new StorageManager(ctx, ctx.mMainThread.getHandler().getLooper());
             }});
+
+        if (android.app.privatecompute.flags.Flags.enablePccFrameworkSupport()) {
+            registerService(Context.FILES_SERVICE, FilesManager.class,
+                    new CachedServiceFetcher<FilesManager>() {
+                @Override
+                public FilesManager createService(ContextImpl ctx) throws ServiceNotFoundException {
+                    IBinder b = ServiceManager.getServiceOrThrow(Context.FILES_SERVICE);
+                    IFilesService service = IFilesService.Stub.asInterface(b);
+                    return new FilesManager(ctx, service);
+                }});
+        }
 
         registerService(Context.STORAGE_STATS_SERVICE, StorageStatsManager.class,
                 new CachedServiceFetcher<StorageStatsManager>() {
@@ -2046,6 +2078,9 @@ public final class SystemServiceRegistry {
                         @Override
                         public AiSealManager createService(ContextImpl ctx)
                                 throws ServiceNotFoundException {
+                            if (!ctx.getPackageManager().hasSystemFeature(FEATURE_AISEAL)) {
+                                return null;
+                            }
                             return new AiSealManager(ctx);
                         }
                     });

@@ -445,7 +445,7 @@ class KeyguardRootViewModelTest(flags: FlagsParameterization) : SysuiTestCase() 
 
     @Test
     @EnableSceneContainer
-    fun alpha_transitionToHub_isZero_scene_container() =
+    fun alpha_transitionToHub_isDefault_scene_container() =
         testScope.runTest {
             val alpha by collectLastValue(underTest.alpha(viewState))
 
@@ -465,7 +465,7 @@ class KeyguardRootViewModelTest(flags: FlagsParameterization) : SysuiTestCase() 
                 testScope,
             )
 
-            assertThat(alpha).isEqualTo(0f)
+            assertThat(alpha).isEqualTo(1f)
         }
 
     @Test
@@ -1072,6 +1072,78 @@ class KeyguardRootViewModelTest(flags: FlagsParameterization) : SysuiTestCase() 
 
             // Try pulling down shade and ensure the value doesn't change
             shadeTestUtil.setQsExpansion(0.5f)
+            assertThat(alpha).isEqualTo(0f)
+        }
+
+    @Test
+    @EnableSceneContainer
+    fun alpha_emitsWhenToLockscreenEndStateTransitionFinishes() =
+        testScope.runTest {
+            val alpha by collectLastValue(underTest.alpha(viewState))
+
+            transitionState.value =
+                ObservableTransitionState.Transition(
+                    fromScene = Scenes.Communal,
+                    toScene = Scenes.Lockscreen,
+                    flowOf(Scenes.Lockscreen),
+                    flowOf(0.5f),
+                    false,
+                    emptyFlow(),
+                )
+
+            keyguardTransitionRepository.sendTransitionSteps(
+                from = KeyguardState.UNDEFINED,
+                to = KeyguardState.LOCKSCREEN,
+                testScope,
+            )
+            assertThat(alpha).isEqualTo(1f)
+        }
+
+    @Test
+    @EnableSceneContainer
+    fun alpha_emitsWhenToAodEndStateTransitionFinishes() =
+        testScope.runTest {
+            val alpha by collectLastValue(underTest.alpha(viewState))
+
+            transitionState.value =
+                ObservableTransitionState.Transition(
+                    fromScene = Scenes.Communal,
+                    toScene = Scenes.Lockscreen,
+                    flowOf(Scenes.Lockscreen),
+                    flowOf(0.5f),
+                    false,
+                    emptyFlow(),
+                )
+
+            keyguardTransitionRepository.sendTransitionSteps(
+                from = KeyguardState.UNDEFINED,
+                to = KeyguardState.AOD,
+                testScope,
+            )
+            assertThat(alpha).isEqualTo(1f)
+        }
+
+    @Test
+    @EnableSceneContainer
+    fun alpha_emitsWhenToDozingEndStateTransitionFinishes() =
+        testScope.runTest {
+            val alpha by collectLastValue(underTest.alpha(viewState))
+
+            transitionState.value =
+                ObservableTransitionState.Transition(
+                    fromScene = Scenes.Communal,
+                    toScene = Scenes.Lockscreen,
+                    flowOf(Scenes.Lockscreen),
+                    flowOf(0.5f),
+                    false,
+                    emptyFlow(),
+                )
+
+            keyguardTransitionRepository.sendTransitionSteps(
+                from = KeyguardState.UNDEFINED,
+                to = KeyguardState.DOZING,
+                testScope,
+            )
             assertThat(alpha).isEqualTo(0f)
         }
 }

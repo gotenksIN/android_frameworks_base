@@ -1206,7 +1206,7 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
     }
 
     private void updateBlurRegions(Transaction t, ArrayList<BlurRegion> blurRegions, int offsetX,
-            int offsetY) {
+            int offsetY, float scaleX, float scaleY) {
         if (mSurfaceControl == null || mBlastSurfaceControl == null) {
             return;
         }
@@ -1218,7 +1218,7 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
         float[][] requestedBlurRegions = new float[regionCount][];
         int index = 0;
         for (BlurRegion region : blurRegions) {
-            requestedBlurRegions[index++] = region.toFloatArray(offsetX, offsetY);
+            requestedBlurRegions[index++] = region.toFloatArray(offsetX, offsetY, scaleX, scaleY);
         }
         t.setRelativeLayer(mBlastSurfaceControl, mSurfaceControl, -1);
         t.setBlurRegions(mSurfaceControl, requestedBlurRegions);
@@ -1316,9 +1316,11 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
             updateBackgroundVisibility(surfaceUpdateTransaction);
             updateBackgroundColor(surfaceUpdateTransaction);
             if (blurRegionsChanged || creating || positionChanged) {
-                if (!isHardwareAccelerated()) {
+                if (!isHardwareAccelerated() || !mRtDrivenClipping) {
                     updateBlurRegions(surfaceUpdateTransaction, mBlurRegions, mScreenRect.left,
-                            mScreenRect.top);
+                            mScreenRect.top,
+                            getScaleX(),
+                            getScaleY());
                 } else if (isHardwareAccelerated() && blurRegionsChanged) {
                     replacePositionUpdateListener(mSurfaceWidth, mSurfaceHeight, mBlurRegions);
                 }
@@ -1326,6 +1328,10 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
             if (hdrHeadroomChanged || creating) {
                 surfaceUpdateTransaction.setDesiredHdrHeadroom(
                         mBlastSurfaceControl, mHdrHeadroom);
+                if (android.view.flags.Flags.surfaceViewMaxHdrHeadroom()) {
+                    surfaceUpdateTransaction.setDesiredMaxHdrHeadroom(
+                            mSurfaceControl, mHdrHeadroom);
+                }
             }
             if (pictureProfileHandle != null) {
                 surfaceUpdateTransaction.setPictureProfileHandle(
@@ -1980,8 +1986,6 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
                                     / (float) mRtSurfaceWidth /*postScaleX*/,
                             mRTLastReportedPosition.height()
                                     / (float) mRtSurfaceHeight /*postScaleY*/);
-                    updateBlurRegions(mPositionChangedTransaction, mRtBlurRegions,
-                            mRTLastReportedPosition.left, mRTLastReportedPosition.top);
                     mPositionChangedTransaction.show(mSurfaceControl);
                 }
                 applyOrMergeTransaction(mPositionChangedTransaction, frameNumber);
@@ -2017,8 +2021,14 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
                             mRTLastReportedPosition.left /*positionLeft*/,
                             mRTLastReportedPosition.top /*positionTop*/,
                             postScaleX, postScaleY);
+                    // Scale the blur regions coordinates to the coordinate space of the window
+                    // that contains the view.
                     updateBlurRegions(mPositionChangedTransaction, mRtBlurRegions,
-                            mRTLastReportedPosition.left, mRTLastReportedPosition.top);
+                            mRTLastReportedPosition.left, mRTLastReportedPosition.top,
+                            mRTLastReportedPosition.width()
+                                    / (float) nodeWidth,
+                            mRTLastReportedPosition.height()
+                                    / (float) nodeHeight);
                     // The computed crop is in view-relative dimensions, however we need it to be
                     // in buffer-relative dimensions. So scale the crop by the ratio between
                     // the view's unscaled width/height (nodeWidth/Height), and the surface's
@@ -2391,7 +2401,7 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
     @Override
     public void surfaceDestroyed() {
         setWindowStopped(true);
-        mRemoteAccessibilityController.disassosciateHierarchy();
+        mRemoteAccessibilityController.disassociateHierarchy();
     }
 
     /**
@@ -2603,7 +2613,7 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
     private void initEmbeddedHierarchyForAccessibility(SurfaceControlViewHost.SurfacePackage p) {
         if (!mShouldEmbedAccessibilityHierarchy) {
             if (mRemoteAccessibilityController.connected()) {
-                mRemoteAccessibilityController.disassosciateHierarchy();
+                mRemoteAccessibilityController.disassociateHierarchy();
             }
             return;
         }
@@ -2611,8 +2621,9 @@ public class SurfaceView extends View implements ViewRootImpl.SurfaceChangedCall
         if (mRemoteAccessibilityController.alreadyAssociated(connection)) {
             return;
         }
-        mRemoteAccessibilityController.assosciateHierarchy(connection,
-            getViewRootImpl().mLeashToken, getAccessibilityViewId());
+        mRemoteAccessibilityController.associateHierarchy(connection,
+                getViewRootImpl().mLeashToken, getAccessibilityViewId(),
+                getAccessibilityWindowId());
 
         updateEmbeddedAccessibilityMatrix(true);
     }

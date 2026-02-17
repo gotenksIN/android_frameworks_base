@@ -17,9 +17,12 @@
 package com.android.systemui.statusbar.quickactions.av
 
 import android.view.Display
+import com.android.app.displaylib.PerDisplayRepository
 import com.android.systemui.Flags
 import com.android.systemui.dagger.SysUISingleton
 import com.android.systemui.dagger.qualifiers.Background
+import com.android.systemui.dagger.qualifiers.Default
+import com.android.systemui.display.dagger.SystemUIDisplaySubcomponent
 import com.android.systemui.statusbar.quickactions.av.domain.interactor.AvControlsChipInteractor
 import com.android.systemui.statusbar.quickactions.av.domain.interactor.AvControlsChipInteractorImpl
 import com.android.systemui.statusbar.quickactions.av.domain.interactor.NoOpAvControlsChipInteractor
@@ -33,15 +36,23 @@ import kotlinx.coroutines.CoroutineScope
 class AvControlsChipModule {
 
     /** Provides an [AvControlsChipInteractor] based on whether is is enabled by a flag */
+    @Deprecated("Don't use this dependency directly. Annotate your dependency with @DisplayAware")
     @Provides
+    @Default
     @SysUISingleton
     fun provideAvControlsChipInteractor(
         @Background backgroundScope: CoroutineScope,
         avControlsChipSupportedFactory: Provider<AvControlsChipInteractorImpl.Factory>,
         avControlsChipNotSupported: Provider<NoOpAvControlsChipInteractor>,
+        displaySubcomponentRepo: PerDisplayRepository<SystemUIDisplaySubcomponent>,
     ): AvControlsChipInteractor {
         return if (Flags.expandedPrivacyIndicatorsOnLargeScreen()) {
-            avControlsChipSupportedFactory.get().create(backgroundScope, Display.DEFAULT_DISPLAY)
+            avControlsChipSupportedFactory
+                .get()
+                .create(
+                    backgroundScope,
+                    displaySubcomponentRepo[Display.DEFAULT_DISPLAY]!!.statusBarModeRepo,
+                )
         } else {
             avControlsChipNotSupported.get()
         }

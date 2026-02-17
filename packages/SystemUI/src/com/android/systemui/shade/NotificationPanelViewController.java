@@ -99,6 +99,8 @@ import com.android.systemui.Dumpable;
 import com.android.systemui.Flags;
 import com.android.systemui.Gefingerpoken;
 import com.android.systemui.bouncer.domain.interactor.AlternateBouncerInteractor;
+import com.android.systemui.brightness.data.repository.BrightnessMirrorShowingRepository;
+import com.android.systemui.brightness.domain.interactor.BrightnessMirrorShowingInteractor;
 import com.android.systemui.classifier.Classifier;
 import com.android.systemui.classifier.FalsingCollector;
 import com.android.systemui.common.domain.interactor.SysUIStateDisplaysInteractor;
@@ -141,13 +143,10 @@ import com.android.systemui.power.domain.interactor.PowerInteractor;
 import com.android.systemui.power.shared.model.WakefulnessModel;
 import com.android.systemui.res.R;
 import com.android.systemui.scene.shared.flag.SceneContainerFlag;
-import com.android.systemui.settings.brightness.data.repository.BrightnessMirrorShowingRepository;
-import com.android.systemui.settings.brightness.domain.interactor.BrightnessMirrorShowingInteractor;
 import com.android.systemui.shade.data.repository.FlingInfo;
 import com.android.systemui.shade.data.repository.ShadeDisplaysRepository;
 import com.android.systemui.shade.data.repository.ShadeRepository;
 import com.android.systemui.shade.domain.interactor.ShadeAnimationInteractor;
-import com.android.systemui.shade.shared.flag.ShadeWindowGoesAround;
 import com.android.systemui.shared.system.QuickStepContract;
 import com.android.systemui.statusbar.CommandQueue;
 import com.android.systemui.statusbar.GestureRecorder;
@@ -694,9 +693,7 @@ public final class NotificationPanelViewController implements
 
         mView.addOnLayoutChangeListener(new ShadeLayoutChangeListener());
         mView.setOnTouchListener(getTouchHandler());
-        if (!ShadeWindowGoesAround.isEnabled()) {
-            mView.setOnConfigurationChangedListener(config -> loadDimens());
-        }
+
 
         mResources = mView.getResources();
         mKeyguardStateController = keyguardStateController;
@@ -1584,11 +1581,7 @@ public final class NotificationPanelViewController implements
     }
 
     float getDisplayDensity() {
-        if (ShadeWindowGoesAround.isEnabled()) {
-            return mView.getContext().getResources().getConfiguration().densityDpi;
-        } else {
-            return mCentralSurfaces.getDisplayDensity();
-        }
+        return mView.getContext().getResources().getConfiguration().densityDpi;
     }
 
     /** Return whether a touch is near the gesture handle at the bottom of screen */
@@ -2750,25 +2743,17 @@ public final class NotificationPanelViewController implements
             Log.d(TAG, "Updating panel sysui state flags: fullyExpanded="
                     + isFullyExpanded() + " inQs=" + mQsController.getExpanded());
         }
-        if (ShadeWindowGoesAround.isEnabled()) {
-            setPerDisplaySysUIStateFlags();
-        } else {
-            setDefaultDisplayFlags();
-        }
+        setPerDisplaySysUIStateFlags();
     }
 
     private int getShadeDisplayId() {
-        if (ShadeWindowGoesAround.isEnabled()) {
-            var pendingDisplayId =
-                    mShadeDisplaysRepository.get().getPendingDisplayId().getValue();
-            // Use the pendingDisplayId from the repository, *not* the Shade's context.
-            // This ensures correct UI state updates also if this method is called just *before*
-            // the Shade window moves to another display.
-            // The pendingDisplayId is guaranteed to be updated before this method is called.
-            return pendingDisplayId;
-        } else {
-            return Display.DEFAULT_DISPLAY;
-        }
+        var pendingDisplayId =
+                mShadeDisplaysRepository.get().getPendingDisplayId().getValue();
+        // Use the pendingDisplayId from the repository, *not* the Shade's context.
+        // This ensures correct UI state updates also if this method is called just *before*
+        // the Shade window moves to another display.
+        // The pendingDisplayId is guaranteed to be updated before this method is called.
+        return pendingDisplayId;
     }
 
     private void setPerDisplaySysUIStateFlags() {
@@ -3521,9 +3506,7 @@ public final class NotificationPanelViewController implements
             ConfigurationController.ConfigurationListener {
         @Override
         public void onConfigChanged(Configuration newConfig) {
-            if (ShadeWindowGoesAround.isEnabled()) {
-                updateResources();
-            }
+            updateResources();
         }
 
         @Override
@@ -3535,9 +3518,7 @@ public final class NotificationPanelViewController implements
         @Override
         public void onDensityOrFontScaleChanged() {
             debugLog("onDensityOrFontScaleChanged");
-            if (ShadeWindowGoesAround.isEnabled()) {
-                loadDimens();
-            }
+            loadDimens();
             reInflateViews();
         }
     }
@@ -3808,7 +3789,10 @@ public final class NotificationPanelViewController implements
                 return false;
             }
 
-            mShadeLog.logMotionEvent(event, "NPVC onInterceptTouchEvent");
+            // Logging every motion event is very costly, even when tracing/logcat
+            // endpoints are disabled. Uncomment the following line if full touch
+            // event history is needed.
+            // mShadeLog.logMotionEvent(event, "NPVC onInterceptTouchEvent");
             if (mQsController.disallowTouches()) {
                 mShadeLog.logMotionEvent(event,
                         "NPVC not intercepting touch, panel touches disallowed");

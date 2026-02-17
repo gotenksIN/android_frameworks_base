@@ -119,7 +119,6 @@ import org.mockito.Mock
 import org.mockito.Mockito.atLeastOnce
 import org.mockito.Mockito.clearInvocations
 import org.mockito.Mockito.isNull
-import org.mockito.Mockito.mock
 import org.mockito.Mockito.never
 import org.mockito.Mockito.verify
 import org.mockito.Mockito.verifyNoMoreInteractions
@@ -136,6 +135,7 @@ class DeviceEntryFaceAuthRepositoryTest : SysuiTestCase() {
     private lateinit var underTest: DeviceEntryFaceAuthRepositoryImpl
 
     @Mock private lateinit var uiEventLogger: UiEventLogger
+    @Mock private lateinit var authenticationResult: FaceManager.AuthenticationResult
 
     @Captor
     private lateinit var authenticationCallback: ArgumentCaptor<FaceManager.AuthenticationCallback>
@@ -190,6 +190,7 @@ class DeviceEntryFaceAuthRepositoryTest : SysuiTestCase() {
         kosmos.uiEventLogger = uiEventLogger
 
         fakeUserRepository.setUserInfos(listOf(primaryUser, secondaryUser))
+        whenever(authenticationResult.userId).thenReturn(primaryUserId)
         featureFlags = FakeFeatureFlags()
         bypassStateChangedListener =
             KotlinArgumentCaptor(KeyguardBypassController.OnBypassStateChangedListener::class.java)
@@ -543,51 +544,8 @@ class DeviceEntryFaceAuthRepositoryTest : SysuiTestCase() {
         }
 
     @Test
-    fun cannotRunFaceAuthWhenLockedOut() =
-        testScope.runTest {
-            initCollectors()
-            allPreconditionsToRunFaceAuthAreTrue(SceneContainerFlag.isEnabled)
-
-            underTest.setLockedOut(true)
-            runCurrent()
-
-            // gating check doesn't allow face auth to run.
-            assertThat(underTest.canRunFaceAuth.value).isFalse()
-
-            underTest.requestAuthenticate(FACE_AUTH_TRIGGERED_SWIPE_UP_ON_BOUNCER, false)
-
-            faceAuthenticateIsNotCalled()
-        }
-
-    @Test
-    fun authenticationStopsWhenFaceIsLockedOut() =
-        testScope.runTest {
-            initCollectors()
-            allPreconditionsToRunFaceAuthAreTrue(SceneContainerFlag.isEnabled)
-
-            assertThat(underTest.canRunFaceAuth.value).isTrue()
-
-            underTest.requestAuthenticate(FACE_AUTH_TRIGGERED_SWIPE_UP_ON_BOUNCER, false)
-
-            faceAuthenticateIsCalled()
-            assertThat(authRunning()).isTrue()
-
-            cancellationSignal.value.setOnCancelListener { wasAuthCancelled = true }
-            underTest.setLockedOut(true)
-            runCurrent()
-
-            assertThat(lockedOut())
-            assertThat(wasAuthCancelled).isTrue()
-
-            clearInvocations(faceManager)
-
-            // Try auth again
-            underTest.requestAuthenticate(FACE_AUTH_TRIGGERED_SWIPE_UP_ON_BOUNCER)
-            runCurrent()
-
-            // Auth can't run again
-            faceAuthenticateIsNotCalled()
-        }
+    fun authenticateDoesNotRunWhenFaceIsDisabled() =
+        testScope.runTest { testGatingCheckForFaceAuth { underTest.setLockedOut(true) } }
 
     @Test
     @DisableSceneContainer
@@ -900,9 +858,7 @@ class DeviceEntryFaceAuthRepositoryTest : SysuiTestCase() {
 
             triggerFaceAuth(false)
 
-            authenticationCallback.value.onAuthenticationSucceeded(
-                mock(FaceManager.AuthenticationResult::class.java)
-            )
+            authenticationCallback.value.onAuthenticationSucceeded(authenticationResult)
 
             assertThat(authenticated()).isTrue()
 
@@ -920,9 +876,7 @@ class DeviceEntryFaceAuthRepositoryTest : SysuiTestCase() {
 
             triggerFaceAuth(false)
 
-            authenticationCallback.value.onAuthenticationSucceeded(
-                mock(FaceManager.AuthenticationResult::class.java)
-            )
+            authenticationCallback.value.onAuthenticationSucceeded(authenticationResult)
 
             assertThat(authenticated()).isTrue()
 
@@ -953,9 +907,7 @@ class DeviceEntryFaceAuthRepositoryTest : SysuiTestCase() {
 
             triggerFaceAuth(false)
 
-            authenticationCallback.value.onAuthenticationSucceeded(
-                mock(FaceManager.AuthenticationResult::class.java)
-            )
+            authenticationCallback.value.onAuthenticationSucceeded(authenticationResult)
             assertThat(authenticated()).isTrue()
             kosmos.fakeDeviceEntryRepository.deviceUnlockStatus.value =
                 DeviceUnlockStatus(
@@ -980,9 +932,7 @@ class DeviceEntryFaceAuthRepositoryTest : SysuiTestCase() {
 
             triggerFaceAuth(false)
 
-            authenticationCallback.value.onAuthenticationSucceeded(
-                mock(FaceManager.AuthenticationResult::class.java)
-            )
+            authenticationCallback.value.onAuthenticationSucceeded(authenticationResult)
 
             assertThat(authenticated()).isTrue()
 
@@ -999,9 +949,7 @@ class DeviceEntryFaceAuthRepositoryTest : SysuiTestCase() {
 
             triggerFaceAuth(false)
 
-            authenticationCallback.value.onAuthenticationSucceeded(
-                mock(FaceManager.AuthenticationResult::class.java)
-            )
+            authenticationCallback.value.onAuthenticationSucceeded(authenticationResult)
 
             assertThat(authenticated()).isTrue()
 
@@ -1023,9 +971,7 @@ class DeviceEntryFaceAuthRepositoryTest : SysuiTestCase() {
             triggerFaceAuth(false)
 
             keyguardRepository.setStatusBarState(StatusBarState.KEYGUARD)
-            authenticationCallback.value.onAuthenticationSucceeded(
-                mock(FaceManager.AuthenticationResult::class.java)
-            )
+            authenticationCallback.value.onAuthenticationSucceeded(authenticationResult)
 
             assertThat(authenticated()).isTrue()
 
@@ -1061,9 +1007,7 @@ class DeviceEntryFaceAuthRepositoryTest : SysuiTestCase() {
             triggerFaceAuth(false)
 
             keyguardRepository.setStatusBarState(StatusBarState.KEYGUARD)
-            authenticationCallback.value.onAuthenticationSucceeded(
-                mock(FaceManager.AuthenticationResult::class.java)
-            )
+            authenticationCallback.value.onAuthenticationSucceeded(authenticationResult)
             assertThat(authenticated()).isTrue()
             kosmos.fakeDeviceEntryRepository.deviceUnlockStatus.value =
                 DeviceUnlockStatus(
@@ -1177,12 +1121,12 @@ class DeviceEntryFaceAuthRepositoryTest : SysuiTestCase() {
         testScope.runTest {
             runCurrent()
             initCollectors()
-            assertThat(lockedOut()).isFalse()
+            assertThat(underTest.isLockedOut.value).isFalse()
 
             underTest.setLockedOut(true)
             runCurrent()
 
-            assertThat(lockedOut()).isTrue()
+            assertThat(underTest.isLockedOut.value).isTrue()
         }
 
     @Test
@@ -1523,7 +1467,6 @@ class DeviceEntryFaceAuthRepositoryTest : SysuiTestCase() {
             to = KeyguardState.LOCKSCREEN,
             testScope,
         )
-
         runCurrent()
     }
 
@@ -1534,7 +1477,7 @@ class DeviceEntryFaceAuthRepositoryTest : SysuiTestCase() {
         detectRunning = collectLastValue(underTest.isDetectRunning)
         lockedOut = collectLastValue(underTest.isLockedOut)
         canFaceAuthRun = collectLastValue(underTest.canRunFaceAuth)
-        authenticated = collectLastValue(underTest.isAuthenticated)
+        authenticated = collectLastValue(underTest.isCurrentUserAuthenticated)
         bypassEnabled = collectLastValue(underTest.isBypassEnabled)
         fakeUserRepository.setSelectedUserInfo(primaryUser)
         runCurrent()

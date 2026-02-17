@@ -19,12 +19,17 @@ package android.service.personalcontext.insight;
 import android.annotation.FlaggedApi;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.annotation.SystemApi;
 import android.content.Intent;
 import android.os.Bundle;
+import android.service.personalcontext.ComponentIdProvider;
 import android.service.personalcontext.Flags;
 import android.service.personalcontext.Token;
 import android.service.personalcontext.hint.ContextHint;
 import android.service.personalcontext.hint.ContextHintWithSignature;
+import android.service.personalcontext.insight.interaction.AttributionDetails;
+import android.service.personalcontext.insight.interaction.FeedbackRequest;
+import android.service.personalcontext.insight.interaction.ReturnHintReport;
 
 import com.android.internal.util.Preconditions;
 
@@ -113,17 +118,6 @@ public final class ActionableInsight extends ContextInsight {
         return mActionDetails;
     }
 
-    /**
-     * Returns the intent to be invoked when the actionable insight triggers, or null if the action
-     * details does not contain an intent.
-     * @deprecated get the intent from {@link InsightActionDetails}
-     */
-    @Deprecated
-    @Nullable
-    public Intent createActionIntent() {
-        return mActionDetails.createActionIntent();
-    }
-
     /** @hide */
     @Override
     @InsightType
@@ -135,6 +129,20 @@ public final class ActionableInsight extends ContextInsight {
     @Override
     public void accept(@NonNull InsightVisitor visitor) {
         visitor.visit(this);
+    }
+
+    /**
+     * Creates a new {@link ReturnHintReport}  based on this insight.
+     *
+     * <p>A ReturnHintReport can be handed off to other code. It encapsulates information about
+     * this insight and the information necessary to route an insight based on it back to the same
+     * renderers that received this insight.
+     *
+     * @see ReturnHintReport
+     */
+    @NonNull
+    public ReturnHintReport createReturnHintReport() {
+        return new ReturnHintReport(this);
     }
 
     /** Builder for {@link ActionableInsight}. */
@@ -176,6 +184,48 @@ public final class ActionableInsight extends ContextInsight {
         @NonNull
         public Builder addToken(@NonNull Token token) {
             mBaseBuilder.addToken(token);
+            return this;
+        }
+
+        /**
+         * Sets the attribution details that can be shown to the user.
+         *
+         * @param attributionDetails Details to show user when they ask for how this insight was
+         *                           generated.
+         */
+        @NonNull
+        Builder setAttributionDetails(@Nullable AttributionDetails attributionDetails) {
+            mBaseBuilder.setAttributionDetails(attributionDetails);
+            return this;
+        }
+
+        /**
+         * Sets the originating component in the resulting {@link ContextInsight}, allowing events
+         * to be routed back to the understander that created this {@link ContextInsight}.
+         *
+         * @param originatingComponent the component that is creating this insight
+         *
+         * @hide
+         */
+        @SystemApi
+        @NonNull
+        public Builder setOriginatingComponentId(
+                @Nullable ComponentIdProvider originatingComponent) {
+            mBaseBuilder.setOriginatingComponentId(originatingComponent);
+            return this;
+        }
+
+        /**
+         * Sets the user feedback request in the resulting {@link ContextInsight}. If feedback
+         * is requested, the originating component id must be set via
+         * {@link #setOriginatingComponentId}, or else an exception will be thrown when calling
+         * {@link #build}.
+         *
+         * @param feedbackRequest the feedback that is being requested
+         */
+        @NonNull
+        public Builder setUserFeedbackRequest(@Nullable FeedbackRequest feedbackRequest) {
+            mBaseBuilder.setUserFeedbackRequest(feedbackRequest);
             return this;
         }
 

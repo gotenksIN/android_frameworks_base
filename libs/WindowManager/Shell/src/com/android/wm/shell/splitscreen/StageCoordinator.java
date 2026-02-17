@@ -26,6 +26,7 @@ import static android.app.WindowConfiguration.WINDOWING_MODE_UNDEFINED;
 import static android.content.Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT;
 import static android.content.res.Configuration.SMALLEST_SCREEN_WIDTH_DP_UNDEFINED;
 import static android.view.Display.DEFAULT_DISPLAY;
+import static android.view.Display.INVALID_DISPLAY;
 import static android.view.WindowManager.TRANSIT_CHANGE;
 import static android.view.WindowManager.TRANSIT_CLOSE;
 import static android.view.WindowManager.TRANSIT_KEYGUARD_OCCLUDE;
@@ -41,6 +42,7 @@ import static com.android.wm.shell.common.split.SplitLayout.PARALLAX_ALIGN_CENTE
 import static com.android.wm.shell.common.split.SplitLayout.PARALLAX_FLEX_HYBRID;
 import static com.android.wm.shell.common.split.SplitLayout.RESTING_DIM_LAYER;
 import static com.android.wm.shell.common.split.SplitScreenUtils.getNewParentTokenForStage;
+import static com.android.wm.shell.common.split.SplitScreenUtils.getTargetWindowingModeWhenExitSplit;
 import static com.android.wm.shell.common.split.SplitScreenUtils.reverseSplitPosition;
 import static com.android.wm.shell.common.split.SplitScreenUtils.splitFailureMessage;
 import static com.android.wm.shell.common.split.SplitScreenUtils.updateSplitLayoutConfig;
@@ -128,6 +130,7 @@ import android.widget.Toast;
 import android.window.DesktopExperienceFlags;
 import android.window.DisplayAreaInfo;
 import android.window.RemoteTransition;
+import android.window.TaskAppearedInfo;
 import android.window.TaskCreationParams;
 import android.window.TaskPropertiesRequest;
 import android.window.TransitionInfo;
@@ -154,13 +157,13 @@ import com.android.wm.shell.common.DisplayLayout;
 import com.android.wm.shell.common.LaunchAdjacentController;
 import com.android.wm.shell.common.ShellExecutor;
 import com.android.wm.shell.common.SyncTransactionQueue;
+import com.android.wm.shell.common.TouchInterceptLayer;
 import com.android.wm.shell.common.split.OffscreenTouchZone;
 import com.android.wm.shell.common.split.SplitDecorManager;
 import com.android.wm.shell.common.split.SplitLayout;
 import com.android.wm.shell.common.split.SplitState;
 import com.android.wm.shell.common.split.SplitTransitionUtils;
 import com.android.wm.shell.common.split.SplitWindowManager;
-import com.android.wm.shell.common.split.TouchInterceptLayer;
 import com.android.wm.shell.desktopmode.DesktopTasksController;
 import com.android.wm.shell.desktopmode.DesktopUserRepositories;
 import com.android.wm.shell.desktopmode.data.DesktopRepository;
@@ -189,7 +192,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.Executor;
@@ -468,7 +470,9 @@ public class StageCoordinator extends StageCoordinatorAbstract {
                 .setWindowingMode(WINDOWING_MODE_FULLSCREEN)
                 .setTaskPropertiesRequest(taskProperties)
                 .build();
-        mRootTaskToken = taskOrganizer.createTask(params, this);
+        final TaskAppearedInfo taskAppearedInfo = taskOrganizer.createTask(params, this);
+        mRootTaskToken = taskAppearedInfo != null
+                ? taskAppearedInfo.getTaskInfo().getToken() : null;
 
         ProtoLog.d(WM_SHELL_SPLIT_SCREEN, "Creating main/side root task");
         if (enableFlexibleSplit()) {
@@ -856,6 +860,14 @@ public class StageCoordinator extends StageCoordinatorAbstract {
         final int extraTransitType = isSplitActive()
                 ? TRANSIT_SPLIT_SCREEN_OPEN_TO_SIDE : TRANSIT_SPLIT_SCREEN_PAIR_OPEN;
         final boolean resizeAnim = shouldPlayResizeAnimation(position);
+        if (enableNonDefaultDisplaySplitBugfix()) {
+            final int launchDisplayId = ActivityOptions.fromBundle(options).getLaunchDisplayId();
+            final int displayId = launchDisplayId != INVALID_DISPLAY
+                    ? launchDisplayId
+                    : DEFAULT_DISPLAY;
+            updateSplitLayoutConfig(mRootTDAOrganizer, displayId, mSplitLayout);
+            prepareMovingSplitScreenRoot(wct, displayId, true /* onTop */);
+        }
         prepareEnterSplitScreen(wct, null /* taskInfo */, position,
                 resizeAnim, index);
 
@@ -1605,9 +1617,8 @@ public class StageCoordinator extends StageCoordinatorAbstract {
         }
 
         final TouchInterceptLayer touchInterceptLayer = new TouchInterceptLayer();
-        touchInterceptLayer.inflate(
-                mRootTaskLeash,
-                mSplitRootTaskInfo);
+        touchInterceptLayer.inflate(mRootTaskLeash, mSplitRootTaskInfo.displayId);
+        touchInterceptLayer.show(SplitLayout.RESTING_TOUCH_LAYER);
 
         // Remove touch layers, since offscreen apps coming onscreen will not need their touch
         // layers anymore. populateTouchZones() is called in the end callback to inflate new touch
@@ -2035,15 +2046,8 @@ public class StageCoordinator extends StageCoordinatorAbstract {
                         .filter(stage -> stage.getId() == stageToTop)
                         .findFirst().orElse(null);
             }
-            final DisplayAreaInfo tdaInfo = mRootTDAOrganizer.getDisplayAreaInfo(mDisplayId);
-            Objects.requireNonNull(tdaInfo);
-            final int displayWindowingMode =
-                    tdaInfo.configuration.windowConfiguration.getWindowingMode();
-            // In a freeform-first environment (like desktop), explicitly set the windowing mode to
-            // fullscreen when leaving split-screen. On a standard display, setting it to UNDEFINED
-            // allows the task to inherit the display's default windowing mode (usually fullscreen).
-            final int targetWindowingMode = displayWindowingMode == WINDOWING_MODE_FREEFORM
-                    ? WINDOWING_MODE_FULLSCREEN : WINDOWING_MODE_UNDEFINED;
+            final int targetWindowingMode = getTargetWindowingModeWhenExitSplit(
+                    mRootTDAOrganizer, mDisplayId);
             toTopStage.doForAllChildTaskInfos(taskInfo -> {
                 wct.setWindowingMode(taskInfo.token, targetWindowingMode);
             });
@@ -2053,7 +2057,6 @@ public class StageCoordinator extends StageCoordinatorAbstract {
         // flag is enabled.
         // TODO: b/461541824 - Pass displayId from all split entry points.
         if (DesktopExperienceFlags.ENABLE_NON_DEFAULT_DISPLAY_SPLIT_BUGFIX.isTrue()) {
-            updateSplitLayoutConfig(mRootTDAOrganizer, DEFAULT_DISPLAY, mSplitLayout);
             prepareMovingSplitScreenRoot(wct, DEFAULT_DISPLAY, false /* onTop */);
         }
 
@@ -2545,7 +2548,8 @@ public class StageCoordinator extends StageCoordinatorAbstract {
 
         if (mSplitLayout == null) {
             int parallaxType =
-                    enableFlexibleTwoAppSplit() ? PARALLAX_FLEX_HYBRID : PARALLAX_ALIGN_CENTER;
+                    enableFlexibleTwoAppSplit() && taskInfo.displayId == DEFAULT_DISPLAY
+                            ? PARALLAX_FLEX_HYBRID : PARALLAX_ALIGN_CENTER;
             mSplitLayout = new SplitLayout(TAG + "SplitDivider", mContext,
                     mSplitRootTaskInfo.configuration, this, mParentContainerCallbacks,
                     mDisplayController, mDisplayImeController, mTaskOrganizer, parallaxType,
@@ -3273,8 +3277,11 @@ public class StageCoordinator extends StageCoordinatorAbstract {
             } else {
                 return null;
             }
-        } else if (triggerTask.displayId != mDisplayId) {
-            // Skip handling task on the other display.
+        } else if (triggerTask.displayId != mDisplayId
+                && getStageOfTask(triggerTask.taskId) == STAGE_TYPE_UNDEFINED
+                && !isPendingEnter(transition)) {
+            // Skip handling tasks on other displays unless they are already in a split stage
+            // or are part of a pending split entry.
             return null;
         }
 
@@ -3290,7 +3297,11 @@ public class StageCoordinator extends StageCoordinatorAbstract {
         final boolean isClientRequestedFullscreenRequest =
                 Flags.delegateRequestFullscreenHandlingToShell()
                 && request != null && request.getFullscreenRequestChange() != null;
-        final StageTaskListener stage = getStageOfTask(triggerTask);
+        StageTaskListener stage = getStageOfTask(triggerTask);
+        // Resolve stage using ID to ensure we catch tasks moving to other displays
+        if (stage == null) {
+            stage = getCurrentStageOfTask(triggerTask.taskId);
+        }
 
         if (isClientRequestedFullscreenRequest) {
             // Let the request be handled by the ClientFullscreenRequestController.
@@ -3325,6 +3336,25 @@ public class StageCoordinator extends StageCoordinatorAbstract {
                     primaryStage.getChildCount(), secondaryStage.getChildCount());
             out = new WindowContainerTransaction();
             if (stage != null) {
+                if (triggerTask.displayId != mDisplayId) {
+                    // The task is moving to a different display.
+                    // We must dismiss the split, keep the other stage on this display.
+                    int dismissTop = getStageType(stage) == STAGE_TYPE_MAIN
+                            ? STAGE_TYPE_SIDE : STAGE_TYPE_MAIN;
+
+                    // TODO: introduce a new exit reason for moving one split task to new display.
+                    prepareExitSplitScreen(dismissTop, out, EXIT_REASON_DRAG_DIVIDER);
+                    mSplitTransitions.setDismissTransition(transition, dismissTop,
+                            EXIT_REASON_DRAG_DIVIDER);
+
+                    final int targetWindowingMode = getTargetWindowingModeWhenExitSplit(
+                            mRootTDAOrganizer, triggerTask.displayId);
+
+                    out.setWindowingMode(triggerTask.token, targetWindowingMode);
+                    out.setBounds(triggerTask.token, null);
+                    return out;
+                }
+
                 if (isClosingType(type) && stage.getChildCount() == 1) {
                     // Dismiss split if the last task in one of the stages is going away
                     // The top should be the opposite side that is closing:
@@ -3723,7 +3753,7 @@ public class StageCoordinator extends StageCoordinatorAbstract {
 
                 // Record task moving out of {@code lastStage} unexpectedly.
                 if (lastStage != null && lastStage.containsTask(taskId)
-                        && (lastStage != nextStage || change.getMode() == TRANSIT_CLOSE)) {
+                        && (lastStage != nextStage || isClosingType(change.getMode()))) {
                     Log.w(TAG, "Expected onTaskVanished on " + lastStage + " to have been called"
                             + " with " + taskId + " before startAnimation().");
                     record.addRecord(lastStage, false, taskId);
@@ -4119,7 +4149,13 @@ public class StageCoordinator extends StageCoordinatorAbstract {
         final TransitionInfo.Change finalSideChild = sideChild;
         final StageTaskListener finalFirstAppStage = firstAppStage;
         final StageTaskListener finalSecondAppStage = secondAppStage;
+        // Pause IME inset updates during the split-enter transition. This prevents the transition
+        // from conflicting with the DisplayImeController's attempt to animate the surface to the
+        // IME offset, which can cause the app to be covered by the IME.
+        // The updates will be resumed/applied when the transition finishes.
+        mDisplayImeController.setImeInsetsUpdatesPaused(mDisplayId, true /* paused */);
         enterTransition.setFinishedCallback((callbackWct, callbackT) -> {
+            mDisplayImeController.setImeInsetsUpdatesPaused(mDisplayId, false /* paused */);
             if (!enterTransition.mResizeAnim) {
                 // If resizing, we'll call notify at the end of the resizing animation (below)
                 notifySplitAnimationStatus(false /*animationRunning*/);
@@ -4594,8 +4630,12 @@ public class StageCoordinator extends StageCoordinatorAbstract {
                 true /* reparentLeafTaskIfRelaunch */);
     }
 
-    /** Call this when the animation from split screen to desktop is started. */
-    public void onSplitToDesktop() {
+    /**
+     * Call this when the animation to exit split is started and handled by another
+     * transition handler.
+     */
+    @Override
+    public void onExitingSplit() {
         setSplitsVisible(false);
     }
 

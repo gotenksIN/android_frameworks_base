@@ -139,7 +139,7 @@ public final class UserTypeFactory {
         return new UserTypeDetails.Builder()
                 .setName(USER_TYPE_PROFILE_CLONE)
                 .setBaseType(FLAG_PROFILE)
-                .setMaxAllowed(getDefaultMaxAllowedSwitchableUsers())
+                .setMaxAllowed(getDefaultMaxAllowedForSwitchableTypes())
                 .setMaxAllowedPerParent(1)
                 .setProfileParentRequired(true)
                 .setLabels(R.string.profile_label_clone)
@@ -371,7 +371,7 @@ public final class UserTypeFactory {
                 .setBaseType(FLAG_PROFILE)
                 .setMaxAllowed(1)
                 .setProfileParentRequired(false)
-                .setEnabled(android.multiuser.Flags.allowSupervisingProfile() ? 1 : 0)
+
                 .setLabels(R.string.profile_label_supervising)
                 .setDefaultRestrictions(getDefaultSupervisingProfileRestrictions())
                 .setDefaultSecureSettings(getDefaultNonManagedProfileSecureSettings())
@@ -392,7 +392,7 @@ public final class UserTypeFactory {
         return new UserTypeDetails.Builder()
                 .setName(USER_TYPE_FULL_SECONDARY)
                 .setBaseType(FLAG_FULL)
-                .setMaxAllowed(getDefaultMaxAllowedSwitchableUsers())
+                .setMaxAllowed(getDefaultMaxAllowedForSwitchableTypes())
                 .setDefaultRestrictions(getDefaultSecondaryUserRestrictions());
     }
 
@@ -421,9 +421,7 @@ public final class UserTypeFactory {
                 .setName(USER_TYPE_FULL_DEMO)
                 .setBaseType(FLAG_FULL)
                 .setDefaultUserInfoPropertyFlags(FLAG_DEMO)
-                .setMaxAllowed(android.multiuser.Flags.decoupleMaxUsersFromProfiles()
-                                || android.multiuser.Flags.consistentMaxUsers() ? 3
-                                : UserTypeDetails.getLegacyUnlimitedNumberOfUsersValue())
+                .setMaxAllowed(3)
                 .setDefaultRestrictions(null);
     }
 
@@ -438,7 +436,7 @@ public final class UserTypeFactory {
                 .setName(USER_TYPE_FULL_RESTRICTED)
                 .setBaseType(FLAG_FULL)
                 .setDefaultUserInfoPropertyFlags(FLAG_RESTRICTED)
-                .setMaxAllowed(getDefaultMaxAllowedSwitchableUsers())
+                .setMaxAllowed(getDefaultMaxAllowedForSwitchableTypes())
                 .setProfileParentRequired(false) // they have a "parent", but not a profile parent
                 // NB: UserManagerService.createRestrictedProfile() applies hardcoded restrictions.
                 .setDefaultRestrictions(null);
@@ -461,7 +459,7 @@ public final class UserTypeFactory {
      * configuration.
      */
     private static UserTypeDetails.Builder getDefaultTypeSystemHeadless() {
-        return new UserTypeDetails.Builder()
+        final UserTypeDetails.Builder builder = new UserTypeDetails.Builder()
                 .setName(USER_TYPE_SYSTEM_HEADLESS)
                 .setBaseType(FLAG_SYSTEM)
                 .setDefaultUserInfoPropertyFlags(FLAG_PRIMARY
@@ -471,6 +469,20 @@ public final class UserTypeFactory {
                 .setActivitiesAllowlist(android.multiuser.Flags.hsuAllowlistActivities()
                         ? com.android.internal.R.array.hsu_allowlist_activities
                         : Resources.ID_NULL);
+
+        if (android.multiuser.Flags.hsuAppManagement()) {
+            // We apply a specific badge to the Headless System User so that its apps can be
+            // visually distinguished in Settings.
+            builder.setIconBadge(com.android.internal.R.drawable.ic_hsu_icon_badge)
+                    .setBadgePlain(com.android.internal.R.drawable.ic_hsu_badge)
+                    .setBadgeNoBackground(
+                            com.android.internal.R.drawable.ic_hsu_badge_no_background)
+                    .setBadgeLabels(com.android.internal.R.string.hsu_label_badge)
+                    .setBadgeColors(com.android.internal.R.color.transparent)
+                    .setDarkThemeBadgeColors(com.android.internal.R.color.transparent);
+        }
+
+        return builder;
     }
 
     /** Gets the deprecated config_defaultFirstUserRestrictions as system default restrictions. */
@@ -494,6 +506,7 @@ public final class UserTypeFactory {
 
     private static Bundle getDefaultHeadlessSystemUserRestrictions() {
         final Bundle restrictions = getDefaultSystemUserRestrictions();
+        restrictions.putBoolean(UserManager.DISALLOW_MODIFY_ACCOUNTS, true);
         return restrictions;
     }
 
@@ -577,15 +590,12 @@ public final class UserTypeFactory {
     // NB: Although this should naturally be a static final int, doing so causes tricky mock test
     //  failures (since a static constant may first be evaluated during a test that modifies one of
     //  the underlying values, and will then be wrong for subsequent tests). So we make it a method.
-    //  Once the flags are cleaned up, we can inline it as getMaxSwitchableUsers() - 1 if desired.
-    private static int getDefaultMaxAllowedSwitchableUsers() {
+    private static int getDefaultMaxAllowedForSwitchableTypes() {
         // For convenience, the default is tied to getMaxSwitchableUsers().
         // Switchable users will be capped by the switchable limit anyway (in fact,
         // they'll generally be capped at it minus 1), so this ensures that the
         // switchable limit will serve as the limiting factor unless otherwise dictated.
-        return android.multiuser.Flags.decoupleMaxUsersFromProfiles() ? getMaxSwitchableUsers() - 1
-                : (android.multiuser.Flags.consistentMaxUsers() ?
-                        3 : UserTypeDetails.getLegacyUnlimitedNumberOfUsersValue());
+        return getMaxSwitchableUsers() - 1;
     }
 
     /**
@@ -593,11 +603,7 @@ public final class UserTypeFactory {
      * their config_user_types yet, we use this to dictate default values for various full users.
      */
     private static int getMaxSwitchableUsers() {
-        if (android.multiuser.Flags.decoupleMaxUsersFromProfiles()) {
-            return UserManager.getMaxSwitchableUsers();
-        }
-        // If flag is false, we employ the previous default value of allowing 3 secondary users.
-        return 4;
+        return UserManager.getMaxSwitchableUsers();
     }
 
     /** Returns the number of managed profiles allowed, virtually always 1. */

@@ -18,11 +18,16 @@ package android.service.personalcontext.insight;
 
 import android.annotation.FlaggedApi;
 import android.annotation.NonNull;
+import android.annotation.Nullable;
+import android.annotation.SystemApi;
 import android.os.Bundle;
+import android.service.personalcontext.ComponentIdProvider;
 import android.service.personalcontext.Flags;
 import android.service.personalcontext.Token;
 import android.service.personalcontext.hint.ContextHint;
 import android.service.personalcontext.hint.ContextHintWithSignature;
+import android.service.personalcontext.insight.interaction.AttributionDetails;
+import android.service.personalcontext.insight.interaction.FeedbackRequest;
 
 import java.util.Objects;
 
@@ -102,7 +107,9 @@ public final class DisplayInsight extends ContextInsight {
                 + "}";
     }
 
-    /** Builder for {@link DisplayInsight}. */
+    /**
+     * Builder for {@link DisplayInsight}.
+     */
     @FlaggedApi(Flags.FLAG_ENABLE_PERSONAL_CONTEXT_SERVICE)
     public static final class Builder {
         private final ConstructorParams.Builder mBaseBuilder = new ConstructorParams.Builder();
@@ -114,7 +121,8 @@ public final class DisplayInsight extends ContextInsight {
          *
          * @param displayDetails the display details of the insight.
          */
-        public Builder(@NonNull InsightDisplayDetails displayDetails) {
+        public Builder(
+                @NonNull InsightDisplayDetails displayDetails) {
             mDisplayDetails = Objects.requireNonNull(displayDetails);
         }
 
@@ -137,6 +145,48 @@ public final class DisplayInsight extends ContextInsight {
         @NonNull
         public Builder addToken(@NonNull Token token) {
             mBaseBuilder.addToken(token);
+            return this;
+        }
+
+        /**
+         * Sets the attribution details that can be shown to the user.
+         *
+         * @param attributionDetails Details to show user when they ask for how this insight was
+         *                           generated.
+         */
+        @NonNull
+        Builder setAttributionDetails(@Nullable AttributionDetails attributionDetails) {
+            mBaseBuilder.setAttributionDetails(attributionDetails);
+            return this;
+        }
+
+        /**
+         * Sets the originating component in the resulting {@link ContextInsight}, allowing events
+         * to be routed back to the understander that created this {@link ContextInsight}.
+         *
+         * @param originatingComponent the component that is creating this insight
+         *
+         * @hide
+         */
+        @SystemApi
+        @NonNull
+        public Builder setOriginatingComponentId(
+                @Nullable ComponentIdProvider originatingComponent) {
+            mBaseBuilder.setOriginatingComponentId(originatingComponent);
+            return this;
+        }
+
+        /**
+         * Sets the user feedback request in the resulting {@link ContextInsight}. If feedback
+         * is requested, the originating component id must be set via
+         * {@link #setOriginatingComponentId}, or else an exception will be thrown when calling
+         * {@link #build}.
+         *
+         * @param feedbackRequest the feedback that is being requested
+         */
+        @NonNull
+        public Builder setUserFeedbackRequest(@Nullable FeedbackRequest feedbackRequest) {
+            mBaseBuilder.setUserFeedbackRequest(feedbackRequest);
             return this;
         }
 

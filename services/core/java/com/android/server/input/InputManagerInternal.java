@@ -42,9 +42,9 @@ import android.os.RemoteException;
 import android.util.SparseBooleanArray;
 import android.view.InputChannel;
 import android.view.KeyEvent;
+import android.view.inputmethod.InputMethodInfo;
 import android.view.inputmethod.InputMethodSubtype;
 
-import com.android.internal.inputmethod.InputMethodSubtypeHandle;
 import com.android.internal.policy.IShortcutService;
 
 import org.xmlpull.v1.XmlPullParserException;
@@ -176,14 +176,16 @@ public abstract class InputManagerInternal {
      * Called when the current input method and/or {@link InputMethodSubtype} is updated.
      *
      * @param userId User ID to be notified about.
-     * @param subtypeHandle A {@link InputMethodSubtypeHandle} corresponds to {@code subtype}.
-     * @param subtype A {@link InputMethodSubtype} object, or {@code null} when the current
+     * @param imi An {@link InputMethodInfo} object, or {@code null} when the current
+     *            {@link InputMethodSubtype} is not suitable for the physical keyboard layout
+     *            mapping.
+     * @param subtype An {@link InputMethodSubtype} object, or {@code null} when the current
      *                {@link InputMethodSubtype} is not suitable for the physical keyboard layout
      *                mapping.
      * @see InputMethodSubtype#isSuitableForPhysicalKeyboardLayoutMapping()
      */
     public abstract void onInputMethodSubtypeChangedForKeyboardLayoutMapping(@UserIdInt int userId,
-            @Nullable InputMethodSubtypeHandle subtypeHandle,
+            @Nullable InputMethodInfo imi,
             @Nullable InputMethodSubtype subtype);
 
     /**
@@ -197,21 +199,6 @@ public abstract class InputManagerInternal {
      * @see Light.LIGHT_TYPE_KEYBOARD_BACKLIGHT
      */
     public abstract void decrementKeyboardBacklight(int deviceId);
-
-    /**
-     * Add a runtime association between the input port and device type. Input ports are expected to
-     * be unique.
-     * @param inputPort The port of the input device.
-     * @param type The type of the device. E.g. "touchNavigation".
-     */
-    public abstract void setTypeAssociation(@NonNull String inputPort, @NonNull String type);
-
-    /**
-     * Removes a runtime association between the input device and type.
-     *
-     * @param inputPort The port of the input device.
-     */
-    public abstract void unsetTypeAssociation(@NonNull String inputPort);
 
     /**
      * Add a mapping from the input port and a keyboard layout, by unique id. Input

@@ -234,9 +234,11 @@ public class ScreenMediaRecorder extends MediaProjection.Callback {
         // implicitly decoder supports this size and
         // ensure recordings will be playable on device
         MediaCodec encoder = MediaCodec.createEncoderByType(videoType);
+// QTI_END: 2023-09-06: Video: Use encoder capabilities for determining screen recording size
         MediaCodecInfo.VideoCapabilities vc = encoder.getCodecInfo().getCapabilitiesForType(
                         videoType)
                 .getVideoCapabilities();
+// QTI_BEGIN: 2023-09-06: Video: Use encoder capabilities for determining screen recording size
         encoder.release();
 // QTI_END: 2023-09-06: Video: Use encoder capabilities for determining screen recording size
 

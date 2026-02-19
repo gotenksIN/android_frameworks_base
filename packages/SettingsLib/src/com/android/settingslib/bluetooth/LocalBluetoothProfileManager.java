@@ -838,6 +838,12 @@ public class LocalBluetoothProfileManager {
             removedProfiles.remove(mCsipSetCoordinatorProfile);
         }
 
+        if (mHapClientProfile != null
+                && ArrayUtils.contains(uuids, BluetoothUuid.HAS)) {
+           profiles.add(mHapClientProfile);
+           removedProfiles.remove(mHapClientProfile);
+        }
+
         if (DEBUG) {
             Log.d(TAG,"New Profiles" + profiles.toString());
         }

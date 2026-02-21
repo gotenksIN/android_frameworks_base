@@ -356,9 +356,7 @@ static jobject ImageDecoder_nDecodeBitmap(JNIEnv* env, jobject /*clazz*/, jlong 
 
 // QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
     const bool isHardware = !requireMutable
-// QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
         && (allocator == kDefault_Allocator ||
-// QTI_END: 2025-03-24: Performance: Perf: UI perf mode optimization
             allocator == kHardware_Allocator)
         && colorType != kGray_8_SkColorType
         && !should_use_sw;

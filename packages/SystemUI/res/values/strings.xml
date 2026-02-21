@@ -196,6 +196,8 @@
     <string name="title_usb_accessory">USB accessory</string>
 
     <!-- Prompt for the USB dialog's always allow button [CHAR LIMIT=20] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="usb_device_dialog_always_allow_button">Always allow</string>
 
     <!-- Prompt for the USB dialog's allow only this time button [CHAR LIMIT=20] -->
@@ -254,30 +256,48 @@
     <string name="usb_debugging_secondary_user_message">The user currently signed in to this device can\'t turn on USB debugging. To use this feature, switch to an admin user.</string>
 
     <!-- Title of notification shown when a new USB device needs user authorization. -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="usb_authorization_title">Allow USB device to connect?</string>
 
     <!-- Title of notification shown when a new USB device needs user authorization. -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="usb_authorization_title_multi">Allow USB devices to connect?</string>
 
     <!-- Message of notification shown when a new USB device needs user authorization. -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="usb_authorization_message">The following device was connected to your <xliff:g id="name" example="My Pixel 8 Pro">%1$s</xliff:g>:</string>
 
     <!-- Message of notification shown when a new USB device needs user authorization. -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="usb_authorization_message_multi">The following devices were connected to your <xliff:g id="name" example="My Pixel 8 Pro">%1$s</xliff:g>:</string>
 
     <!-- Message of notification shown when a new USB device needs user authorization before first unlock. -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="usb_authorization_message_untrusted">The following device was connected to your <xliff:g id="name" example="My Pixel 8 Pro">%1$s</xliff:g>. This device will only be trusted after you sign in.</string>
 
     <!-- Message of notification shown when a new USB device needs user authorization before first unlock. -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="usb_authorization_message_multi_untrusted">The following devices were connected to your <xliff:g id="name" example="My Pixel 8 Pro">%1$s</xliff:g>. These devices will only be trusted after you sign in.</string>
 
     <!-- String used for an USB device with an empty product name -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="usb_authorization_unknown_device">Unknown product (<xliff:g id="vendor_id">%1$04X</xliff:g>:<xliff:g id="product_id">%2$04X</xliff:g>)</string>
 
     <!-- Button label for allowing new USB device. [CHAR LIMIT=20] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="usb_authorization_allow">Allow</string>
 
     <!-- Button label for denying new USB device. [CHAR LIMIT=20] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="usb_authorization_deny">Don\'t allow</string>
 
     <!-- Title of confirmation dialog for wireless debugging [CHAR LIMIT=80] -->
@@ -485,8 +505,12 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screenshot_dismiss_work_profile">Dismiss work profile message</string>
     <!-- Label for UI element which allows opening the screenshot in the Files app [CHAR LIMIT=30] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screenshot_open_in_folder_label">View</string>
     <!-- Content description indicating that tapping the element will allow opening the screenshot in the Files app [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screenshot_open_in_folder_description">View screenshot in Files button</string>
     <!-- Content description indicating that the view is a preview of the screenshot that was just taken [CHAR LIMIT=NONE] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -783,6 +807,8 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_record_video_preview_elapsed_time_a11y_template" formatted="false"><xliff:g example="2 seconds" id="elapsed_time">%1$s</xliff:g> of <xliff:g example="4 seconds" id="duration">%2$s</xliff:g></string>
     <!-- A toast explaining how to adjust selfie position [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_record_selfie_hint">Pinch, drag, and tap selfie to adjust</string>
 
     <!-- Notification text displayed when screen capture is blocked by an IT admin. [CHAR LIMIT=100] -->
@@ -814,22 +840,36 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_capture_toolbar_record_button">Record</string>
     <!-- Content description for the top-left handle of the region box. [CHAR_LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_capture_region_box_top_left_handle_description">Top-left handle - Use arrow keys to resize</string>
     <!-- Content description for the top-right handle of the region box. [CHAR_LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_capture_region_box_top_right_handle_description">Top-right handle - Use arrow keys to resize</string>
     <!-- Content description for the bottom-right handle of the region box. [CHAR_LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_capture_region_box_bottom_right_handle_description">Bottom-right handle - Use arrow keys to resize</string>
     <!-- Content description for the bottom-left handle of the region box. [CHAR_LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_capture_region_box_bottom_left_handle_description">Bottom-left handle - Use arrow keys to resize</string>
     <!-- Button text for screen sharing [CHAR LIMIT=35] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_share_toolbar_share_button">Share</string>
     <!-- Text for app screen sharing thumbnail when no app is selected. [CHAR LIMIT=35] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_share_no_select_app_thumbnail">Select app window to share</string>
     <!-- Text for app screen sharing thumbnail when no tab is selected. [CHAR LIMIT=35] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_share_no_select_tab_thumbnail">Select tab to share</string>
     <!-- Text for app screen sharing thumbnail when no display is selected. [CHAR LIMIT=35] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_share_no_select_display_thumbnail">Select display to share</string>
     <!-- Text for share audio. [CHAR LIMIT=35] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -880,36 +920,68 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_share_a11y_sharing_display">Now sharing display: <xliff:g id="display_name">%1$s</xliff:g>. Use privacy indicator to end sharing.</string>
     <!-- Accessibility announcement when stopping sharing an app [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_share_a11y_stopped_sharing_app">Stopped sharing app: <xliff:g id="app_name">%1$s</xliff:g>. Screen not shared with anyone.</string>
     <!-- Accessibility announcement when stopping sharing a tab [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_share_a11y_stopped_sharing_tab">Stopped sharing tab: <xliff:g id="tab_title">%1$s</xliff:g>. Screen not shared with anyone.</string>
     <!-- Accessibility announcement when stopping sharing a display [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_share_a11y_stopped_sharing_display">Stopped sharing display: <xliff:g id="display_name">%1$s</xliff:g>. Screen not shared with anyone.</string>
     <!-- Accessibility string for the close button in the pre-share UI [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_share_a11y_close_button">Close button. Press enter to close pre-share dialog.</string>
     <!-- Accessibility string for the tab sharing button when unselected [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_share_a11y_tab_button_unselected">Tab sharing button. Not selected. Press enter to share tab.</string>
     <!-- Accessibility string for the tab sharing button when selected [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_share_a11y_tab_button_selected">Sharing tab. Navigate to check available tabs.</string>
     <!-- Accessibility string for the app sharing button when unselected [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_share_a11y_app_button_unselected">App sharing button. Not selected. Press enter to share app.</string>
     <!-- Accessibility string for the app sharing button when selected [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_share_a11y_app_button_selected">Sharing app. Navigate to check available apps.</string>
     <!-- Accessibility string for the fullscreen sharing button when unselected [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_share_a11y_fullscreen_button_unselected">Fullscreen button. Not selected. Press enter to share fullscreen.</string>
     <!-- Accessibility string for the fullscreen sharing button when selected [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_share_a11y_fullscreen_button_selected">Sharing fullscreen. Navigate to check available displays.</string>
     <!-- Accessibility string for the share button when disabled [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_share_a11y_share_button_off">Share button. Off. Select app, tab, or display to share.</string>
     <!-- Accessibility string for the share button when enabled [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_share_a11y_share_button_on">Sharing on. <xliff:g id="item">%1$s</xliff:g> selected. Press enter to start sharing.</string>
     <!-- Accessibility string for an item in the sharing list when unselected [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_share_a11y_item_unselected"><xliff:g id="item_name">%1$s</xliff:g>. Not selected. Press enter to select.</string>
     <!-- Accessibility string for an item in the sharing list when selected [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_share_a11y_item_selected"><xliff:g id="item_name">%1$s</xliff:g> selected. Navigate to share button to start sharing.</string>
     <!-- Accessibility string for the tab audio toggle when on [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_share_a11y_tab_audio_on">Tab audio on</string>
     <!-- Accessibility string for the tab audio toggle when off [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_share_a11y_tab_audio_off">Tab audio off</string>
     <!-- Content description for the app window screenshot button in the toolbar, when the capture mode is set to "screenshot". [CHAR LIMIT=NONE] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -952,6 +1024,8 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_capture_post_recording_shelf_delete_button_a11y">Delete screen recording</string>
     <!-- Content description for the thumbnail in the post recording shelf. [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_capture_post_recording_shelf_thumbnail_a11y">Open screen recording in viewing app</string>
 
     <!-- Screen capture setting to show clicks and keys when recording [CHAR LIMIT=35] -->
@@ -982,6 +1056,8 @@
     <string name="screen_share_privacy_indicator_stop_sharing">Stop sharing</string>
 
     <!-- Accessibility label for the share screen privacy indicator on large screens. [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="share_screen_privacy_indicator_accessibility_label">Screen sharing is on. Use privacy indicator to end sharing.</string>
 
     <!-- Content description for the status bar chip shown to the user when they're sharing their screen to another app on the device [CHAR LIMIT=NONE] -->
@@ -1232,6 +1308,8 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="biometric_dialog_tap_confirm">Tap Confirm to complete</string>
     <!-- Message shown when a biometric has authenticated with a user's face and is waiting for the user to confirm authentication [CHAR LIMIT=60]-->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="biometric_dialog_tap_confirm_with_face_alt_2">Face recognized. Press to continue.</string>
     <!-- Message shown when a biometric has authenticated with a user's face and is waiting for the user to confirm authentication [CHAR LIMIT=60]-->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -1725,6 +1803,8 @@
     <string name="accessibility_status_bar_input_method_indicator">Keyboard</string>
 
     <!-- Title of the large-screen version of the pop-up dialog in which the user switches keyboard or input method. [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="input_method_switcher_title_large_screen">Keyboard</string>
 
     <!-- The overflow indicator shown when a group has more notification inside the group than the visible ones. An example is "+ 3" [CHAR LIMIT=5] -->
@@ -2240,6 +2320,8 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="quick_settings_screen_record_label">Screen record</string>
     <!-- QuickSettings: Screen capture tile [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="quick_settings_screen_capture_label">Screen capture</string>
     <!-- QuickSettings: Text to prompt the user to begin a new recording [CHAR LIMIT=20] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -2747,6 +2829,8 @@
     <string name="keyguard_face_successful_unlock_press_alt_3">Face recognized. Press the unlock icon to open.</string>
 
     <!-- Message shown when non-bypass face authentication succeeds. [CHAR LIMIT=60] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="keyguard_face_successful_unlock_alt1">Face recognized</string>
 
     <!-- Message shown when face authentication fails and the pin pad is visible. [CHAR LIMIT=60] -->
@@ -5615,6 +5699,8 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="accessibility_shortcutchooser_toprow_tutorial_dialog_positive_button_text">Add features</string>
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="accessibility_shortcutchooser_toprow_editor_dialog_title">Set up accessibility key</string>
     <!-- Title text for the dialog where the user chooses a set of accessibility features to be activated by this accessibility shortcut type. [CHAR LIMIT=NONE] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -5633,8 +5719,12 @@
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="accessibility_shortcutchooser_edit_button">Edit</string>
     <!-- Title for the dialog that allows the user to select which accessibility feature is triggered by the accessibility button. [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="accessibility_nav_bar_more_options_title">Choose a feature</string>
     <!--Subtitle text explaining the user's selection will become the default action for future clicks on the accessibility button. [CHAR LIMIT=NONE] -->
+<!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
+<!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="accessibility_nav_bar_more_options_subtitle">This feature will open next time you select the accessibility button</string>
 
     <!-- Title text for the accessibility quick access dialog that allows users to quickly toggle on accessibility features. [CHAR LIMIT=NONE] -->

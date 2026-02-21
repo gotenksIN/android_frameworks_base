@@ -2269,7 +2269,9 @@ public class AudioDeviceInventory {
 
     /*package*/ void disconnectLeAudioUnicast() {
         disconnectLeAudio(AudioSystem.DEVICE_OUT_BLE_HEADSET);
+// QTI_BEGIN: 2023-02-28: Audio: base: delay LE Audio device unavailability
         disconnectLeAudio(AudioSystem.DEVICE_IN_BLE_HEADSET);
+// QTI_END: 2023-02-28: Audio: base: delay LE Audio device unavailability
     }
 
     /*package*/ void disconnectLeAudioBroadcast() {

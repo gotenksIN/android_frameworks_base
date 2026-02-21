@@ -1268,6 +1268,8 @@ public final class ViewRootImpl implements ViewParent,
     private int mFrameRateCategoryLowCount = 0;
 
     private CornerRadii mCornerRadii = new CornerRadii();
+    private boolean mCornerRadiiDirty = false;
+    private RectF mLastSetClientDrawnRadiiBounds = new RectF();
 
     /*
      * the variables below are used to determine whther a dVRR feature should be enabled
@@ -1328,12 +1330,14 @@ public final class ViewRootImpl implements ViewParent,
                     }
                     // Post to main thread
                     mHandler.post(() -> {
+                        Trace.instant(TRACE_TAG_VIEW, "mCornerRadiiCallback post to main thread");
                         CornerRadii newCornerRadii = new CornerRadii();
                         newCornerRadii.topLeft = cornerRadii[0];
                         newCornerRadii.topRight = cornerRadii[1];
                         newCornerRadii.bottomLeft = cornerRadii[2];
                         newCornerRadii.bottomRight = cornerRadii[3];
                         mCornerRadii = newCornerRadii;
+                        mCornerRadiiDirty = true;
                         invalidate();
                     });
                 }
@@ -5085,15 +5089,23 @@ public final class ViewRootImpl implements ViewParent,
             return;
         }
         Trace.instant(TRACE_TAG_VIEW, "setClientDrawnCornerRadii: radii" + mCornerRadii);
-        if (!mCornerRadii.isEmpty()) {
-            applyOpacity(false);
-        }
         RectF bounds = threadedRenderer.setCornerRadius(mCornerRadii);
-        applyTransactionOnDraw(mTransaction
-                .setClientDrawnCornerRadius(mSurfaceControl, mCornerRadii.topLeft,
-                                mCornerRadii.topRight, mCornerRadii.bottomLeft,
-                                mCornerRadii.bottomRight,
-                                bounds));
+        if (mCornerRadiiDirty || !mLastSetClientDrawnRadiiBounds.equals(bounds)) {
+            // Reset opacity if we are expecting clipping and surface was opaque before.
+            if (!mCornerRadii.isEmpty() && mIsSurfaceOpaque) {
+                applyOpacity(false);
+            }
+            // We should update the SurfaceControl only if the corner radii or bounds have
+            // changed. Otherwise, SurfaceFlinger will continue using the previous
+            // radii and bounds.
+            applyTransactionOnDraw(mTransaction
+                    .setClientDrawnCornerRadius(mSurfaceControl, mCornerRadii.topLeft,
+                                    mCornerRadii.topRight, mCornerRadii.bottomLeft,
+                                    mCornerRadii.bottomRight,
+                                    bounds));
+            mCornerRadiiDirty = false;
+            mLastSetClientDrawnRadiiBounds.set(bounds);
+        }
     }
 
     private void handleWindowFocusChanged() {

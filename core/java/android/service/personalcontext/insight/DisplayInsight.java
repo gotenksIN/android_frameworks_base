@@ -16,6 +16,8 @@
 
 package android.service.personalcontext.insight;
 
+import static java.util.Objects.requireNonNull;
+
 import android.annotation.FlaggedApi;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -27,7 +29,6 @@ import android.service.personalcontext.Token;
 import android.service.personalcontext.hint.ContextHint;
 import android.service.personalcontext.hint.ContextHintWithSignature;
 import android.service.personalcontext.insight.interaction.AttributionDetails;
-import android.service.personalcontext.insight.interaction.FeedbackRequest;
 
 import java.util.Objects;
 
@@ -44,8 +45,8 @@ public final class DisplayInsight extends ContextInsight {
     private DisplayInsight(
             @NonNull ContextInsight.ConstructorParams baseParams,
             @NonNull InsightDisplayDetails displayDetails) {
-        super(baseParams);
-        mDisplayDetails = Objects.requireNonNull(displayDetails);
+        super(requireNonNull(baseParams));
+        mDisplayDetails = requireNonNull(displayDetails);
     }
 
     /**
@@ -53,8 +54,8 @@ public final class DisplayInsight extends ContextInsight {
      */
     DisplayInsight(@NonNull ContextInsight.ConstructorParams baseParams, @NonNull Bundle bundle) {
         this(
-                baseParams,
-                Objects.requireNonNull(
+                requireNonNull(baseParams),
+                requireNonNull(
                         bundle.getParcelable(KEY_DISPLAY_DETAILS, InsightDisplayDetails.class)));
     }
 
@@ -123,7 +124,7 @@ public final class DisplayInsight extends ContextInsight {
          */
         public Builder(
                 @NonNull InsightDisplayDetails displayDetails) {
-            mDisplayDetails = Objects.requireNonNull(displayDetails);
+            mDisplayDetails = requireNonNull(displayDetails);
         }
 
         /**
@@ -136,7 +137,7 @@ public final class DisplayInsight extends ContextInsight {
          */
         @NonNull
         public Builder addOriginHint(@NonNull ContextHintWithSignature hint) {
-            mBaseBuilder.addOriginHint(hint);
+            mBaseBuilder.addOriginHint(requireNonNull(hint));
             return this;
         }
 
@@ -147,7 +148,7 @@ public final class DisplayInsight extends ContextInsight {
          */
         @NonNull
         public Builder addToken(@NonNull Token token) {
-            mBaseBuilder.addToken(token);
+            mBaseBuilder.addToken(requireNonNull(token));
             return this;
         }
 
@@ -176,20 +177,6 @@ public final class DisplayInsight extends ContextInsight {
         public Builder setOriginatingComponentId(
                 @Nullable ComponentIdProvider originatingComponent) {
             mBaseBuilder.setOriginatingComponentId(originatingComponent);
-            return this;
-        }
-
-        /**
-         * Sets the user feedback request in the resulting {@link ContextInsight}. If feedback
-         * is requested, the originating component id must be set via
-         * {@link #setOriginatingComponentId}, or else an exception will be thrown when calling
-         * {@link #build}.
-         *
-         * @param feedbackRequest the feedback that is being requested
-         */
-        @NonNull
-        public Builder setUserFeedbackRequest(@Nullable FeedbackRequest feedbackRequest) {
-            mBaseBuilder.setUserFeedbackRequest(feedbackRequest);
             return this;
         }
 

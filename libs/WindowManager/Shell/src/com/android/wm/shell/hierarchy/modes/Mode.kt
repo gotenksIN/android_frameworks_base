@@ -18,7 +18,10 @@ package com.android.wm.shell.hierarchy.modes
 import android.view.SurfaceControl
 import android.window.WindowContainerTransaction
 import com.android.wm.shell.hierarchy.containers.Container
+import com.android.wm.shell.hierarchy.properties.DisplayContainerProperties
 import com.android.wm.shell.hierarchy.updates.HierarchySnapshot
+import com.android.wm.shell.transition.DetachResult
+import com.android.wm.shell.transition.ITransitionAnimation
 import java.io.PrintWriter
 
 /**
@@ -27,7 +30,7 @@ import java.io.PrintWriter
 interface Mode {
 
     //
-    // Hierarchy changes (ie. for a mode to respond to changes in the hierarchy)
+    // Updates (ie. for a mode to respond to changes in the hierarchy)
     //
 
     /**
@@ -99,6 +102,28 @@ interface Mode {
         container: Container
     ) {}
 
+    /**
+     * Notification that the display is changing and allows this mode to update the given
+     * {@param wct} to ensure that its associated containers are updated before the display change
+     * completes (ie. sets up tasks in new bounds post-rotation, etc).
+     *
+     * This is called with the directly assigned container for this given mode for containers that
+     * are direct ancestors or descendants of the display, and the change tracker provides
+     * change information.
+     *
+     * The caller is expected to apply the transaction.
+     *
+     * FUTURE: Revisit to see if we need intermediate containers to be updated as well (ie. if there
+     *         are roots who are built within parent containers, updating the display may require
+     *         the parents to be updated before the roots themselves can be properly/easily updated.
+     */
+    fun displayChanging(
+        directlyAssignedContainer: Container,
+        curDisplayProps: DisplayContainerProperties,
+        newDisplayProps: DisplayContainerProperties,
+        wct: WindowContainerTransaction
+    ) {}
+
     //
     // Requests (ie. when someone needs to manipulate containers in the hierarchy and needs to know
     // how to move something into/out of a mode.
@@ -127,6 +152,52 @@ interface Mode {
     }
 
     //
+    // Transitions (ie. post-update transition resolution for containers associated with this mode)
+    //
+
+    /**
+     * Called for the set of descendant containers (of the "source" mode) that are participating in
+     * the current transition, allowing the mode to "detach" the container and report the current
+     * state of the container/surface to whatever animates the container next (ie. the target mode).
+     *
+     * If a mode is handling the "detaching" of the containers from the mode, then it must return
+     * a list of DetachResults with one `WindowAnimationState` for each of the provided containers.
+     * Doing so will also prevent these containers from being notified to other modes for detaching.
+     *
+     * TODO: Clarify about coordinate space for the handoff state
+     */
+    fun prepareForAnimation(
+        containers: List<Container>,
+    ): List<DetachResult>? {
+        return null
+    }
+
+    /**
+     * Called for the set of descendant containers (of the "target" mode) that are participating in
+     * the current transition, allowing this mode to create an animation to be played for the given
+     * containers to their final target state in this mode.
+     *
+     * If the container was previously in the hierarchy, then `prepareForAnimation` will have been
+     * called first prior to this call.
+     *
+     * Returning a non-null animation indicates that this mode will animate ALL provided descendant
+     * containers, and the animation assumes the responsibility for calling the provided finish
+     * callback.
+     *
+     * NOTE: The container provided may not currently exist in the hierarchy (ie. it was removed in
+     * this update).
+     *
+     * FUTURE: Make this work with Shell-only containers as well.
+     */
+    fun createAnimation(
+        animContext: AnimationContext,
+        containers: List<Container>,
+        snapshot: HierarchySnapshot,
+    ): ITransitionAnimation? {
+        return null
+    }
+
+    //
     // Misc
     //
 
@@ -144,6 +215,10 @@ interface Mode {
      */
     fun onShellCommand(displayId: Int, args: MutableList<String>, pw: PrintWriter) {}
 
+    //
+    // Contexts
+    //
+
     /**
      * Additional context for updates, including specific transition information that isn't
      * persisted in the updated hierarchy.
@@ -153,7 +228,6 @@ interface Mode {
         // with the update, if there isn't then these will be null, and the logic doing the update
         // must apply and surface updates itself.
         val preTransitionTx: SurfaceControl.Transaction? = null,
-        val postTransitionTx: SurfaceControl.Transaction? = null,
     )
 
     /**
@@ -165,5 +239,13 @@ interface Mode {
      */
     class EnterRequestContext(
         val displayId: Int
+    )
+
+    /**
+     * Additional context for resolving transitions.
+     */
+    class AnimationContext(
+        // The surface transactions applied before the transition starts playing.
+        val preTransitionTx: SurfaceControl.Transaction,
     )
 }

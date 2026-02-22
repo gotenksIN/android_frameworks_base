@@ -18,7 +18,6 @@ package com.android.wm.shell.hierarchy.containers
 import android.content.Context
 import android.graphics.PixelFormat
 import android.graphics.RectF
-import android.hardware.display.DisplayManager
 import android.os.Binder
 import android.view.SurfaceControl
 import android.view.SurfaceControlViewHost
@@ -58,11 +57,7 @@ class ViewOverlayContainer(
         val parent = this.parent!!
 
         val display = HierarchyUtils.getAncestorDisplay(this)!!
-        val displayMgr = context.getSystemService(DisplayManager::class.java)
-        // FUTURE: Move the context to the display container
-        val displayContext = context.createDisplayContext(
-            displayMgr.getDisplay(display.props<DisplayContainerProperties>().displayId)
-        )
+        val displayContext = display.props<DisplayContainerProperties>().getDisplayContext(context)
         rootView =
             rootViewSupplier(displayContext.createConfigurationContext(parent.props.config), this)
 

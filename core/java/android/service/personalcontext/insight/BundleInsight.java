@@ -29,7 +29,6 @@ import android.service.personalcontext.Token;
 import android.service.personalcontext.hint.ContextHint;
 import android.service.personalcontext.hint.ContextHintWithSignature;
 import android.service.personalcontext.insight.interaction.AttributionDetails;
-import android.service.personalcontext.insight.interaction.FeedbackRequest;
 
 /**
  * An insight that stores arbitrary data in a {@link Bundle}. Should only be used if there is no
@@ -61,8 +60,8 @@ public final class BundleInsight extends ContextInsight {
             @NonNull Bundle data,
             @NonNull String insightTypeName) {
         super(baseParams);
-        mDataBundle = data;
-        mInsightTypeName = insightTypeName;
+        mDataBundle = requireNonNull(data);
+        mInsightTypeName = requireNonNull(insightTypeName);
     }
 
     /** @hide */
@@ -144,7 +143,7 @@ public final class BundleInsight extends ContextInsight {
          */
         @NonNull
         public Builder addOriginHint(@NonNull ContextHintWithSignature hint) {
-            mBaseBuilder.addOriginHint(hint);
+            mBaseBuilder.addOriginHint(requireNonNull(hint));
             return this;
         }
 
@@ -155,7 +154,7 @@ public final class BundleInsight extends ContextInsight {
          */
         @NonNull
         public Builder addToken(@NonNull Token token) {
-            mBaseBuilder.addToken(token);
+            mBaseBuilder.addToken(requireNonNull(token));
             return this;
         }
 
@@ -188,20 +187,6 @@ public final class BundleInsight extends ContextInsight {
         }
 
         /**
-         * Sets the user feedback request in the resulting {@link ContextInsight}. If feedback
-         * is requested, the originating component id must be set via
-         * {@link #setOriginatingComponentId}, or else an exception will be thrown when calling
-         * {@link #build}.
-         *
-         * @param feedbackRequest the feedback that is being requested
-         */
-        @NonNull
-        public Builder setUserFeedbackRequest(@Nullable FeedbackRequest feedbackRequest) {
-            mBaseBuilder.setUserFeedbackRequest(feedbackRequest);
-            return this;
-        }
-
-        /**
          * Sets the data in the given {@link Bundle} to the resulting {@link BundleInsight}'s data
          * bundle.
          *
@@ -209,6 +194,7 @@ public final class BundleInsight extends ContextInsight {
          */
         @NonNull
         public Builder setDataBundle(@NonNull Bundle dataBundle) {
+            requireNonNull(dataBundle);
             mDataBundle.clear();
             mDataBundle.putAll(dataBundle);
             return this;

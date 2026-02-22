@@ -3,6 +3,16 @@ container: "system"
 
 # go/keep-sorted start block=yes newline_separated=yes by_regex=name:\s*"([^"]+)"
 flag {
+    name: "adaptive_low_freq_mode_on_aod"
+    namespace: "systemui"
+    description: "Enables low frequency updates for Chronometers within promoted notifications on Always-on Display after the device has been dozing for 30 seconds, to save power."
+    bug: "460119077"
+    metadata {
+         purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
     name: "ambient_cue_plugin"
     namespace: "ailabs"
     description: "Enable plugin for ambient cue project"
@@ -703,6 +713,16 @@ flag {
     namespace: "note"
     description: "Fix issues related to notes role under the freeform environment."
     bug: "451909067"
+    metadata {
+       purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "fix_nssl_blocking_qs"
+    namespace: "systemui"
+    description: "Fix NSSL blocks the touch event when the QS panel is expanded."
+    bug: "477421025"
     metadata {
        purpose: PURPOSE_BUGFIX
     }

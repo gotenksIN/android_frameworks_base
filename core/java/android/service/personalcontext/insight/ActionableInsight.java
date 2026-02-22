@@ -16,6 +16,8 @@
 
 package android.service.personalcontext.insight;
 
+import static java.util.Objects.requireNonNull;
+
 import android.annotation.FlaggedApi;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
@@ -28,10 +30,7 @@ import android.service.personalcontext.Token;
 import android.service.personalcontext.hint.ContextHint;
 import android.service.personalcontext.hint.ContextHintWithSignature;
 import android.service.personalcontext.insight.interaction.AttributionDetails;
-import android.service.personalcontext.insight.interaction.FeedbackRequest;
 import android.service.personalcontext.insight.interaction.ReturnHintReport;
-
-import com.android.internal.util.Preconditions;
 
 import java.util.Objects;
 
@@ -161,8 +160,8 @@ public final class ActionableInsight extends ContextInsight {
         public Builder(
                 @NonNull InsightActionDetails actionDetails,
                 @NonNull InsightDisplayDetails displayDetails) {
-            mActionDetails = Preconditions.checkNotNull(actionDetails, "actionDetails is null");
-            mDisplayDetails = Preconditions.checkNotNull(displayDetails, "displayDetails is null");
+            mActionDetails = requireNonNull(actionDetails);
+            mDisplayDetails = requireNonNull(displayDetails);
         }
 
         /**
@@ -175,7 +174,7 @@ public final class ActionableInsight extends ContextInsight {
          */
         @NonNull
         public Builder addOriginHint(@NonNull ContextHintWithSignature hint) {
-            mBaseBuilder.addOriginHint(hint);
+            mBaseBuilder.addOriginHint(requireNonNull(hint));
             return this;
         }
 
@@ -186,7 +185,7 @@ public final class ActionableInsight extends ContextInsight {
          */
         @NonNull
         public Builder addToken(@NonNull Token token) {
-            mBaseBuilder.addToken(token);
+            mBaseBuilder.addToken(requireNonNull(token));
             return this;
         }
 
@@ -215,20 +214,6 @@ public final class ActionableInsight extends ContextInsight {
         public Builder setOriginatingComponentId(
                 @Nullable ComponentIdProvider originatingComponent) {
             mBaseBuilder.setOriginatingComponentId(originatingComponent);
-            return this;
-        }
-
-        /**
-         * Sets the user feedback request in the resulting {@link ContextInsight}. If feedback
-         * is requested, the originating component id must be set via
-         * {@link #setOriginatingComponentId}, or else an exception will be thrown when calling
-         * {@link #build}.
-         *
-         * @param feedbackRequest the feedback that is being requested
-         */
-        @NonNull
-        public Builder setUserFeedbackRequest(@Nullable FeedbackRequest feedbackRequest) {
-            mBaseBuilder.setUserFeedbackRequest(feedbackRequest);
             return this;
         }
 

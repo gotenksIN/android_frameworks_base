@@ -73,9 +73,15 @@ class SysuiVisualizerServiceTest : SysuiTestCase() {
             val clientId = UUID.randomUUID()
             val clientInfo = createClient(clientId)
             val insight = BundleInsight.Builder().build()
-            val renderToken = RenderToken(UUID.randomUUID())
+            val renderToken = RenderToken(UUID.randomUUID(), null)
 
-            val view = underTest.onCreateEmbeddedView(context, insight, renderToken, clientInfo)
+            val view =
+                underTest.onCreateEmbeddedView(
+                    context,
+                    insight.fakePublish(),
+                    renderToken,
+                    clientInfo,
+                )
             assertThat(view).isEqualTo(composeView)
         }
     }
@@ -86,9 +92,9 @@ class SysuiVisualizerServiceTest : SysuiTestCase() {
             val clientId = UUID.randomUUID()
             val clientInfo = createClient(clientId)
             val insight = BundleInsight.Builder().build()
-            val renderToken = RenderToken(UUID.randomUUID())
+            val renderToken = RenderToken(UUID.randomUUID(), null)
 
-            underTest.onCreateEmbeddedView(context, insight, renderToken, clientInfo)
+            underTest.onCreateEmbeddedView(context, insight.fakePublish(), renderToken, clientInfo)
             assertThat(underTest.sessions.size).isEqualTo(0)
             underTest.onClientConnected(clientInfo)
             assertThat(underTest.sessions.size).isEqualTo(1)
@@ -102,9 +108,9 @@ class SysuiVisualizerServiceTest : SysuiTestCase() {
             val clientId = UUID.randomUUID()
             val clientInfo = createClient(clientId)
             val insight = BundleInsight.Builder().build()
-            val renderToken = RenderToken(UUID.randomUUID())
+            val renderToken = RenderToken(UUID.randomUUID(), null)
 
-            underTest.onCreateEmbeddedView(context, insight, renderToken, clientInfo)
+            underTest.onCreateEmbeddedView(context, insight.fakePublish(), renderToken, clientInfo)
             underTest.onClientConnected(clientInfo)
             assertThat(underTest.sessions.size).isEqualTo(1)
             underTest.onClientDisconnected(clientInfo)

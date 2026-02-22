@@ -111,6 +111,22 @@ public class SurfaceUtils {
     }
 
     /**
+     * Get the surface object unique id of a surface.
+     *
+     * @param surface The surface to be checked.
+     * @return the native object unique id of the surface, 0 if surface is not backed by a
+     * native object.
+     */
+    public static long getSurfaceUniqueId(Surface surface) {
+        checkNotNull(surface);
+        try {
+            return nativeGetSurfaceUniqueId(surface);
+        } catch (IllegalArgumentException e) {
+            return 0;
+        }
+    }
+
+    /**
      * Get the surface usage bits.
      *
      * @param surface The surface to be queried for usage.
@@ -333,6 +349,8 @@ public class SurfaceUtils {
             /*out*/int[/*2*/] dimens);
 
     private static native long nativeGetSurfaceId(Surface surface);
+
+    private static native long nativeGetSurfaceUniqueId(Surface surface);
 
 // QTI_BEGIN: 2018-06-12: Camera: Skip HFR checks for privileged apps.
     private static boolean isPrivilegedApp() {

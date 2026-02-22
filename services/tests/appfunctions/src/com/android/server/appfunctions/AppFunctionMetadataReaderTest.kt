@@ -77,6 +77,12 @@ class AppFunctionMetadataReaderTest {
                     override fun getSearchAppFunctionInternalPageSize(): Int = 100
 
                     override fun getAppFunctionMetadataChangeDebounceMilliseconds(): Int = 0
+
+                    override fun getAppFunctionAllowlistCacheSize(): Int = 5
+
+                    override fun getAppFunctionEnabledStateChangeDebounceMilliseconds(): Long = 0
+
+                    override fun getAppFunctionEnabledStateChangeMaxDebounceMilliseconds(): Long = 0
                 },
             )
     }
@@ -231,7 +237,7 @@ class AppFunctionMetadataReaderTest {
     @Test
     fun buildAppFunctionMetadata_dynamicAppFunctionNotRegisteredAndNotEnabled() {
         whenever(metadataCache.isDynamicFunction(any(), any(), any())).thenReturn(true)
-        whenever(dynamicRegistry.isAppFunctionRegistered(any(), any(), any())).thenReturn(false)
+        whenever(dynamicRegistry.hasRegistrations(any(), any(), any())).thenReturn(false)
 
         val packageMetadata = AppFunctionPackageMetadata.create("testPackage", listOf())
         val result =
@@ -249,7 +255,7 @@ class AppFunctionMetadataReaderTest {
     @Test
     fun buildAppFunctionMetadata_dynamicAppFunctionNotRegisteredButEnabled() {
         whenever(metadataCache.isDynamicFunction(any(), any(), any())).thenReturn(true)
-        whenever(dynamicRegistry.isAppFunctionRegistered(any(), any(), any())).thenReturn(false)
+        whenever(dynamicRegistry.hasRegistrations(any(), any(), any())).thenReturn(false)
 
         val packageMetadata = AppFunctionPackageMetadata.create("testPackage", listOf())
         val result =
@@ -267,7 +273,7 @@ class AppFunctionMetadataReaderTest {
     @Test
     fun buildAppFunctionMetadata_dynamicAppFunctionRegisteredButNotEnabled() {
         whenever(metadataCache.isDynamicFunction(any(), any(), any())).thenReturn(true)
-        whenever(dynamicRegistry.isAppFunctionRegistered(any(), any(), any())).thenReturn(true)
+        whenever(dynamicRegistry.hasRegistrations(any(), any(), any())).thenReturn(true)
 
         val packageMetadata = AppFunctionPackageMetadata.create("testPackage", listOf())
         val result =
@@ -285,7 +291,7 @@ class AppFunctionMetadataReaderTest {
     @Test
     fun buildAppFunctionMetadata_dynamicAppFunctionRegisteredAndEnabled() {
         whenever(metadataCache.isDynamicFunction(any(), any(), any())).thenReturn(true)
-        whenever(dynamicRegistry.isAppFunctionRegistered(any(), any(), any())).thenReturn(true)
+        whenever(dynamicRegistry.hasRegistrations(any(), any(), any())).thenReturn(true)
 
         val packageMetadata = AppFunctionPackageMetadata.create("testPackage", listOf())
         val result =

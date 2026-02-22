@@ -61,10 +61,12 @@ import android.os.UserManager;
 import android.util.ArraySet;
 import android.util.Slog;
 
+import com.android.internal.R;
 import com.android.internal.annotations.GuardedBy;
 import com.android.internal.annotations.VisibleForTesting;
 import com.android.server.LocalServices;
 import com.android.server.ServiceThread;
+import com.android.server.companion.virtual.VirtualDeviceManagerInternal;
 
 import java.io.FileDescriptor;
 import java.io.PrintWriter;
@@ -84,6 +86,9 @@ public final class ComputerControlSessionProcessor {
     @VisibleForTesting
     static final int MAXIMUM_CONCURRENT_SESSIONS = 1;
 
+    @Nullable
+    private final String mReferenceDisplayAddress;
+
     private final Context mContext;
     private final KeyguardManager mKeyguardManager;
     private final AppOpsManager mAppOpsManager;
@@ -91,6 +96,7 @@ public final class ComputerControlSessionProcessor {
     private final UserManager mUserManager;
     private final DevicePolicyManager mDevicePolicyManager;
     private final DevicePolicyManagerInternal mDevicePolicyManagerInternal;
+    private final VirtualDeviceManagerInternal mVirtualDeviceManagerInternal;
     private final VirtualDeviceFactory mVirtualDeviceFactory;
     private final PendingIntentFactory mPendingIntentFactory;
     private final ComputerControlAllowlistController mAllowlistController;
@@ -106,17 +112,21 @@ public final class ComputerControlSessionProcessor {
     private Handler mHandler;
 
     public ComputerControlSessionProcessor(
-            Context context, VirtualDeviceFactory virtualDeviceFactory) {
-        this(context, virtualDeviceFactory, ComputerControlSessionProcessor::createPendingIntent,
+            Context context, VirtualDeviceManagerInternal virtualDeviceManagerInternal,
+            VirtualDeviceFactory virtualDeviceFactory) {
+        this(context, virtualDeviceManagerInternal, virtualDeviceFactory,
+                ComputerControlSessionProcessor::createPendingIntent,
                 new ComputerControlAllowlistController(context));
     }
 
     @VisibleForTesting
     ComputerControlSessionProcessor(
-            Context context, VirtualDeviceFactory virtualDeviceFactory,
+            Context context, VirtualDeviceManagerInternal virtualDeviceManagerInternal,
+            VirtualDeviceFactory virtualDeviceFactory,
             PendingIntentFactory pendingIntentFactory,
             ComputerControlAllowlistController allowlistController) {
         mContext = context;
+        mVirtualDeviceManagerInternal = virtualDeviceManagerInternal;
         mVirtualDeviceFactory = virtualDeviceFactory;
         mPendingIntentFactory = pendingIntentFactory;
         mKeyguardManager = context.getSystemService(KeyguardManager.class);
@@ -126,6 +136,8 @@ public final class ComputerControlSessionProcessor {
         mDevicePolicyManager = context.getSystemService(DevicePolicyManager.class);
         mDevicePolicyManagerInternal = LocalServices.getService(DevicePolicyManagerInternal.class);
         mAllowlistController = allowlistController;
+        mReferenceDisplayAddress = context.getString(
+                R.string.config_computerControlReferenceDisplayPhysicalAddress);
     }
 
     /** Perform initialization tasks (if any). */
@@ -341,7 +353,7 @@ public final class ComputerControlSessionProcessor {
                     synchronized (mSessions) {
                         mSessions.remove(closedSession);
                     }
-                }));
+                }, mReferenceDisplayAddress));
         synchronized (mSessions) {
             mSessions.add(session);
         }
@@ -382,10 +394,7 @@ public final class ComputerControlSessionProcessor {
             @NonNull AttributionSource attributionSource,
             @NonNull ComputerControlSessionParams params,
             @NonNull IComputerControlSessionCallback callback) {
-        boolean isDeviceLocked = Binder.withCleanCallingIdentity(
-                () -> mKeyguardManager.isDeviceLocked(
-                        UserHandle.getUserId(attributionSource.getUid())));
-        if (isDeviceLocked) {
+        if (isDeviceLocked(attributionSource)) {
             dispatchSessionCreationFailed(callback, attributionSource, params,
                     ComputerControlSession.ERROR_DEVICE_LOCKED);
             return false;
@@ -396,6 +405,28 @@ public final class ComputerControlSessionProcessor {
             return false;
         }
         return true;
+    }
+
+    private boolean isDeviceLocked(@NonNull AttributionSource attributionSource) {
+        // If the caller claims to be running on a virtual device, make sure that this is actually
+        // the case and this is not just an explicitly created device context. If the uid is not
+        // seen on the device they claim to be running on, fallback to default.
+        final int deviceId;
+        if (attributionSource.getDeviceId() != Context.DEVICE_ID_DEFAULT
+                && isDeviceIdAssociationValid(attributionSource)) {
+            deviceId = attributionSource.getDeviceId();
+        } else {
+            deviceId = Context.DEVICE_ID_DEFAULT;
+        }
+        final int userId = UserHandle.getUserId(attributionSource.getUid());
+        return Binder.withCleanCallingIdentity(
+                () -> mKeyguardManager.isDeviceLocked(userId, deviceId));
+    }
+
+    /** Returns true of the source's UID is seen on the device given by the source's deviceId. */
+    private boolean isDeviceIdAssociationValid(@NonNull AttributionSource attributionSource) {
+        return mVirtualDeviceManagerInternal.getDeviceIdsForUid(attributionSource.getUid())
+                .contains(attributionSource.getDeviceId());
     }
 
     /** Notifies the client that session creation failed. */

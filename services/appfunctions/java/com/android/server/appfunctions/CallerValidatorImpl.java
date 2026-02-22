@@ -75,6 +75,9 @@ class CallerValidatorImpl implements CallerValidator {
         final long callingIdentityToken = Binder.clearCallingIdentity();
         try {
             if (Flags.enableAppFunctionPermissionV2()) {
+                if (callingUid == Process.ROOT_UID || callingUid == Process.SHELL_UID) {
+                    return;
+                }
                 enforceNoCrossUserOrSecondaryProfileInteraction(targetUserHandle, callingUid);
             } else {
                 verifyUserInteraction(
@@ -105,7 +108,7 @@ class CallerValidatorImpl implements CallerValidator {
 
         if (android.app.appfunctions.flags.Flags.enableAppFunctionPermissionV2()) {
             return mAllowlistReader
-                    .isAllowlisted(callerPackageName, targetPackageName)
+                    .isAllowlisted(callerPackageName, targetPackageName, targetUser.getIdentifier())
                     .thenCompose(
                             (isAllowlisted) ->
                                     verifyCallerCanExecuteAppFunctionWithAllowlist(

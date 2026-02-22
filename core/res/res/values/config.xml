@@ -3616,16 +3616,6 @@
         <item>350</item>
     </integer-array>
 
-    <!-- A vibration waveform for notifications that specify DEFAULT_VIBRATE.
-         This value is a float array with values grouped as
-         { targetAmplitude (within [0,1]), targetFrequency (in hertz), duration (in milliseconds) }
-         This is only applied on devices with vibration frequency control. If the device doesn't
-         support frequency control, then the vibration specified in
-         config_defaultNotificationVibePattern is used instead.
-     -->
-    <array name="config_defaultNotificationVibeWaveform">
-    </array>
-
     <!-- Vibrator pattern to be used as the default for notifications
          that do not specify vibration but vibrate anyway because the device
          is in vibrate mode.
@@ -3636,16 +3626,6 @@
         <item>150</item>
         <item>100</item>
     </integer-array>
-
-    <!-- A vibration waveform for notifications that do not specify vibration but vibrate anyway,
-         because the device is in vibrate mode. This value is a float array with values grouped as
-         { targetAmplitude (within [0,1]), targetFrequency (in hertz), duration (in milliseconds) }
-         This is only applied on devices with vibration frequency control. If the device doesn't
-         support frequency control, then the vibration specified in
-         config_notificationFallbackVibePattern is used instead.
-     -->
-    <array name="config_notificationFallbackVibeWaveform">
-    </array>
 
     <!-- Flag indicating if the speed up audio on mt call code should be executed -->
     <bool name="config_speed_up_audio_on_mt_calls">false</bool>
@@ -4611,10 +4591,6 @@
     <!-- If the device should still vibrate even in low power mode, for certain priority vibrations
      (e.g. accessibility, alarms). This is mainly for Wear devices that don't have speakers. -->
     <bool name="config_allowPriorityVibrationsInLowPowerMode">false</bool>
-
-    <!-- The duration (in milliseconds) that should be used to convert vibration ramps to a sequence
-         of fixed amplitude steps on devices without PWLE support. -->
-    <integer name="config_vibrationWaveformRampStepDuration">5</integer>
 
     <!-- The duration (in milliseconds) that should be applied to waveform vibrations that ends in
          non-zero amplitudes, to bring the vibrator amplitude down to zero using this timing. -->
@@ -7607,6 +7583,14 @@
     <string-array name="config_computerControlKnownSuperAgents" translatable="false">
     </string-array>
 
+    <!-- Physical address of the display that will be used as reference for display size for running
+         computer control automations.
+         Primarily to be used for devices with multiple displays (like foldables) where you would
+         want to configure the size of the virtual display where the automation will be executed.
+         In absence of this config, we will default to the current active display for the user when
+         the session is created -->
+    <string name="config_computerControlReferenceDisplayPhysicalAddress" translatable="false"></string>
+
     <!-- Certificate digests for trusted apps that will be allowed to obtain the knownSigner
          permission for staging HealthConnect's remote data. The digest should be computed over the
          DER encoding of the trusted certificate using the SHA-256 digest algorithm. -->
@@ -7976,10 +7960,10 @@
     <!-- Whether to force color fade. -->
     <bool name="config_forceColorFade">false</bool>
 
-    <!-- The locale countries that force camera shutter sound-->
-    <string-array name="config_cameraSoundForcedCountry" translatable="false">
-        <item>JP</item>
-        <item>KR</item>
+    <!-- The locale languages that force camera shutter sound-->
+    <string-array name="config_cameraSoundForcedLanguage" translatable="false">
+        <item>ja</item>
+        <item>ko</item>
     </string-array>
 
     <!-- location button service components -->

@@ -28,9 +28,9 @@ import android.os.ParcelUuid;
 import android.os.RemoteException;
 import android.service.personalcontext.Flags;
 import android.service.personalcontext.RenderToken;
-import android.service.personalcontext.insight.ContextInsight;
-import android.service.personalcontext.insight.ContextInsightWrapper;
 import android.service.personalcontext.insight.InsightFilter;
+import android.service.personalcontext.insight.PublishedContextInsight;
+import android.service.personalcontext.insight.PublishedContextInsightWrapper;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -41,11 +41,12 @@ import java.util.UUID;
 
 /**
  * The base insight renderer service, which is a service responsible for rendering
- * {@link ContextInsight}s to the user as suggestions or other actionable items. This is an abstract
- * class intended to be subclassed by concrete renderer services. Subclasses need to implement
- * {@link #onConnected()} (which should return a {@link RendererFilter} indicating what types of
- * hints and insights the renderer will accept), and {@link #onRender} (which the
- * personal context engine will call with a list of {@link ContextInsight}s to be rendered).
+ * {@link PublishedContextInsight}s to the user as suggestions or other actionable items. This is an
+ * abstract class intended to be subclassed by concrete renderer services. Subclasses need to
+ * implement {@link #onConnected()} (which should return a {@link RendererFilter} indicating what
+ * types of hints and insights the renderer will accept), and {@link #onRender} (which the
+ * personal context engine will call with a list of {@link PublishedContextInsight}s to be
+ * rendered).
  *
  * <p>You must declare the service in the AndroidManifest of the app hosting the service with the
  * {@link android.Manifest.permission#BIND_INSIGHT_RENDERER_SERVICE} permission,
@@ -101,7 +102,10 @@ public abstract class InsightRendererService extends Service {
      * @param tag An optional {@link String} value that can be associated with the token for future
      *            identification.
      *
+     * @throws IllegalStateException if called before {@link #onConnected} has been called.
+     *
      * @return a token that uniquely identifies this renderer
+     * @throws IllegalStateException if {@link #onConnected()} has not yet been called
      */
     @NonNull
     public final RenderToken mintRenderToken(@Nullable String tag) {
@@ -117,6 +121,7 @@ public abstract class InsightRendererService extends Service {
      *
      * @see #mintRenderToken(String)
      * @return a token that uniquely identifies this renderer
+     * @throws IllegalStateException if {@link #onConnected()} has not yet been called
      */
     @NonNull
     public final RenderToken mintRenderToken() {
@@ -138,25 +143,31 @@ public abstract class InsightRendererService extends Service {
     }
 
     /**
-     * The renderer should return a {@link RendererFilter} that will be used to filter the insights
+     * The renderer should return an {@link InsightFilter} that will be used to filter the insights
      * that this renderer's {@link #onRender} method will be called with.
      *
      * The result of this method will be cached and re-used between service bindings. If the filter
      * returned by this method changes, the changes will be ignored.
      *
-     * @return a filter that restricts the {@link ContextInsight}s this renderer will receive
+     * @return a filter that restricts the {@link PublishedContextInsight}s this renderer will
+     * receive
      */
     @NonNull
     public abstract InsightFilter onInitializeFilter();
 
     /**
-     * This method will be called when the given {@link ContextInsight} needs to be rendered.
+     * This method will be called when the given
+     * {@link android.service.personalcontext.insight.PublishedContextInsight} needs to be rendered.
+     * Typically the renderer would use the insight provided to prompt the user with information,
+     * or to interact in some way. For example, a notification renderer might use the insight to
+     * modify an existing notification with actions the user might want to take.
      *
-     * @param insight the {@link ContextInsight} to render
+     * @param insight the {@link android.service.personalcontext.insight.PublishedContextInsight}
+     *                to render
      * @param renderToken the {@link RenderToken} that was used to select this renderer
      */
     public abstract void onRender(
-            @NonNull ContextInsight insight, @NonNull RenderToken renderToken);
+            @NonNull PublishedContextInsight insight, @NonNull RenderToken renderToken);
 
     private static final class Binder extends IInsightRenderer.Stub {
         private final WeakReference<InsightRendererService> mService;
@@ -177,9 +188,9 @@ public abstract class InsightRendererService extends Service {
         }
 
         @Override
-        public void render(ContextInsightWrapper insight, RenderToken renderToken)
+        public void render(PublishedContextInsightWrapper insight, RenderToken renderToken)
                 throws RemoteException {
-            getServiceOrThrow().onRender(insight.getContextInsight(), renderToken);
+            getServiceOrThrow().onRender(insight.getPublishedContextInsight(), renderToken);
         }
 
         @Override

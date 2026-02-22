@@ -135,12 +135,11 @@ final class AppFunctionMetadataReader {
     }
 
     /**
-     * Returns whether the function is activity scoped dynamic app function.
-     * Activity scoped dynamic app functions must be registered within the activity context and
-     * support multiregistration (so the same app function can be registered by multiple
-     * activities).
+     * Returns whether the function is activity scoped dynamic app function. Activity scoped dynamic
+     * app functions must be registered within the activity context and support multiregistration
+     * (so the same app function can be registered by multiple activities).
      *
-     * See {@link android.app.appfunctions.AppFunctionActivityId}.
+     * <p>See {@link android.app.appfunctions.AppFunctionActivityId}.
      *
      * @param packageName The package name of the application containing the function.
      * @param functionIdentifier The unique identifier for the function within the package.
@@ -168,7 +167,7 @@ final class AppFunctionMetadataReader {
                         targetAppFunction.getPackageName(),
                         targetAppFunction.getFunctionIdentifier(),
                         UserHandle.of(userId))
-                && !mMultiUserDynamicAppFunctionRegistry.isAppFunctionRegistered(
+                && !mMultiUserDynamicAppFunctionRegistry.hasRegistrations(
                         targetAppFunction.getPackageName(),
                         targetAppFunction.getFunctionIdentifier(),
                         UserHandle.of(userId))) {
@@ -235,7 +234,7 @@ final class AppFunctionMetadataReader {
         // TODO(b/473468720): -hasProperty("functionId") is not a reliable signal
         String query =
                 TextUtils.formatSimple(
-                        "packageName:\"%s\" -hasProperty(\"functionId\")", packageName);
+                        "packageName:\"%s\" -propertyDefined(\"functionId\")", packageName);
         return futureSession
                 .search(query, appFunctionDocumentSearchSpec)
                 .thenCompose(FutureSearchResults::getNextPage)
@@ -456,7 +455,7 @@ final class AppFunctionMetadataReader {
 
         if (mCache.isDynamicFunction(packageName, functionId, UserHandle.of(userId))) {
             return isRuntimeEnabled
-                    && mMultiUserDynamicAppFunctionRegistry.isAppFunctionRegistered(
+                    && mMultiUserDynamicAppFunctionRegistry.hasRegistrations(
                             packageName, functionId, UserHandle.of(userId));
         } else {
             // TODO(b/467317154): Take into account AppFunctionService availability for static

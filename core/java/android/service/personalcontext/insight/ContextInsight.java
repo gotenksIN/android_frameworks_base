@@ -22,18 +22,14 @@ import android.annotation.FlaggedApi;
 import android.annotation.IntDef;
 import android.annotation.SystemApi;
 import android.annotation.TestApi;
-import android.content.Context;
 import android.os.Bundle;
-import android.service.personalcontext.ComponentIdProvider;
 import android.service.personalcontext.Flags;
-import android.service.personalcontext.PersonalContextManager;
 import android.service.personalcontext.RenderToken;
 import android.service.personalcontext.Token;
 import android.service.personalcontext.hint.ContextHint;
 import android.service.personalcontext.hint.ContextHintWithSignature;
 import android.service.personalcontext.hint.ContextHintWithSignatureWrapper;
 import android.service.personalcontext.insight.interaction.AttributionDetails;
-import android.service.personalcontext.insight.interaction.InsightEvent;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -58,7 +54,9 @@ import java.util.UUID;
  * renderers, where they will be rendered as UI to the user.
  *
  * <p>Users of this class can use instanceof to determine the type of the insight.
+ * @hide
  */
+@SystemApi
 @FlaggedApi(Flags.FLAG_ENABLE_PERSONAL_CONTEXT_SERVICE)
 public abstract class ContextInsight {
     private static final String TAG = "ContextInsight";
@@ -69,7 +67,6 @@ public abstract class ContextInsight {
     private static final String KEY_TOKENS = "key_tokens";
     private static final String KEY_INSIGHT_DATA = "key_insight_data";
     private static final String KEY_ATTRIBUTION = "key_attribution";
-    private static final String KEY_ORIGINATING_COMPONENT_ID = "key_originating_component_id";
     private static final String KEY_CREATION_TIME = "key_creation_time";
 
     /**
@@ -118,9 +115,8 @@ public abstract class ContextInsight {
      * @hide
      */
     @NonNull
-    private static final ContextInsight ERROR_INSIGHT = new ContextInsight(
+    protected static final ContextInsight ERROR_INSIGHT = new ContextInsight(
             new ConstructorParams(
-                    /* originatingComponentId= */ UUID.randomUUID(),
                     /* originHints= */ Collections.emptySet(),
                     /* tokens= */ Collections.emptySet(),
                     /* attributionDetails= */ null)) {
@@ -142,7 +138,6 @@ public abstract class ContextInsight {
     };
 
     private final UUID mId;
-    private final UUID mOriginatingComponentId;
     private final Set<ContextHintWithSignature> mOriginHints;
     private final Set<Token> mTokens;
     private final Instant mCreationTime;
@@ -156,7 +151,6 @@ public abstract class ContextInsight {
      */
     ContextInsight(@NonNull ConstructorParams params) {
         mId = params.mId;
-        mOriginatingComponentId = params.mOriginatingComponentId;
         mOriginHints = Collections.unmodifiableSet(new HashSet<>(params.mOriginHints));
         mTokens = Collections.unmodifiableSet(new HashSet<>(params.mTokens));
         mCreationTime = params.mCreationTime;
@@ -188,17 +182,6 @@ public abstract class ContextInsight {
      * @hide
      */
     public abstract void accept(@NonNull InsightVisitor visitor);
-
-    /**
-     * Gets the ID of the component that created this insight.
-     *
-     * @hide
-     */
-    @SystemApi
-    @Nullable
-    public UUID getOriginatingComponentId() {
-        return mOriginatingComponentId;
-    }
 
     /**
      * Returns the children of this insight.
@@ -266,8 +249,6 @@ public abstract class ContextInsight {
         final Bundle b = new Bundle();
         b.putInt(KEY_INSIGHT_TYPE, getInsightType());
         b.putString(KEY_INSIGHT_ID, mId.toString());
-        b.putString(KEY_ORIGINATING_COMPONENT_ID,
-                mOriginatingComponentId == null ? null : mOriginatingComponentId.toString());
         b.putParcelableArrayList(
                 KEY_ORIGIN_HINTS, new ArrayList<>(
                         ContextHintWithSignatureWrapper.wrapList(mOriginHints)));
@@ -296,8 +277,6 @@ public abstract class ContextInsight {
         return "ContextInsight{"
                 + "mId="
                 + mId
-                + ", mOriginatingComponentId="
-                + mOriginatingComponentId
                 + ", mOriginHints="
                 + mOriginHints
                 + '}';
@@ -315,13 +294,10 @@ public abstract class ContextInsight {
             return ERROR_INSIGHT;
         }
 
-        final String originatingComponentId = bundle.getString(KEY_ORIGINATING_COMPONENT_ID);
-
         final int type = bundle.getInt(KEY_INSIGHT_TYPE, INSIGHT_TYPE_ERROR);
         final Bundle data = bundle.getBundle(KEY_INSIGHT_DATA);
         final ConstructorParams constructorParams = new ConstructorParams(
                 UUID.fromString(bundle.getString(KEY_INSIGHT_ID)),
-                originatingComponentId == null ? null : UUID.fromString(originatingComponentId),
                 ContextHintWithSignatureWrapper.unwrapList(
                         bundle.getParcelableArrayList(
                                 KEY_ORIGIN_HINTS, ContextHintWithSignatureWrapper.class)),
@@ -346,7 +322,9 @@ public abstract class ContextInsight {
     }
 
     /**
-     * Indicates whether the insight has attribution details that can be shown.
+     * Indicates whether the insight has attribution details that can be shown. This can be
+     * checked before showing a UI to call {@link PersonalContextManager#showAttribution} to see if
+     * attribution is available.
      *
      * @see AttributionDetails
      */
@@ -360,52 +338,23 @@ public abstract class ContextInsight {
     }
 
     /**
-     * Reports an event that occurred on this insight from a Renderer back to the Understander that
-     * generated it.
-     *
-     * @param context Context
-     * @param eventType Type of event that occurred (see {@code InsightEvent.EVENT_*})
-     * @param renderToken RenderToken supplied to the Renderer
-     * @param extras Bundle of additional data that should be delivered along with the event
-     */
-    public void reportEvent(
-            @NonNull Context context,
-            @InsightEvent.EventType int eventType,
-            @NonNull RenderToken renderToken,
-            @Nullable Bundle extras) {
-        final PersonalContextManager personalContextManager = requireNonNull(
-                context.getSystemService(PersonalContextManager.class),
-                "Personal Context Manager service is not running");
-
-        personalContextManager.reportEvent(new InsightEvent(
-                eventType,
-                this,
-                System.currentTimeMillis(),
-                renderToken,
-                extras));
-    }
-
-    /**
      * Parameters used to create a new {@link ContextInsight}.
      *
      * @hide
      */
     static class ConstructorParams {
         private final UUID mId;
-        private final UUID mOriginatingComponentId;
         private final Collection<ContextHintWithSignature> mOriginHints;
         private final Collection<Token> mTokens;
         private final Instant mCreationTime;
         private final AttributionDetails mAttributionDetails;
 
         private ConstructorParams(
-                UUID originatingComponentId,
                 Collection<ContextHintWithSignature> originHints,
                 Collection<Token> tokens,
                 AttributionDetails attributionDetails) {
             this(
                     UUID.randomUUID(),
-                    originatingComponentId,
                     originHints,
                     tokens,
                     Instant.now(),
@@ -414,13 +363,11 @@ public abstract class ContextInsight {
 
         private ConstructorParams(
                 UUID id,
-                UUID originatingComponentId,
                 Collection<ContextHintWithSignature> originHints,
                 Collection<Token> tokens,
                 Instant creationTime,
                 AttributionDetails attributionDetails) {
             mId = id;
-            mOriginatingComponentId = originatingComponentId;
             mOriginHints = originHints;
             mTokens = tokens;
             mCreationTime = creationTime;
@@ -470,21 +417,8 @@ public abstract class ContextInsight {
                 return this;
             }
 
-            /**
-             * Sets the originating component in the resulting {@link ContextInsight}.
-             *
-             * @param originatingComponent the component that is creating this insight
-             */
-            @NonNull
-            Builder setOriginatingComponentId(@Nullable ComponentIdProvider originatingComponent) {
-                mOriginatingComponentId =
-                        originatingComponent == null ? null : originatingComponent.getComponentId();
-                return this;
-            }
-
             ConstructorParams build() {
                 return new ConstructorParams(
-                        mOriginatingComponentId,
                         mOriginHints,
                         mTokens,
                         mAttributionDetails);

@@ -28,14 +28,11 @@ import android.annotation.SdkConstant;
 import android.annotation.SystemApi;
 import android.annotation.SystemService;
 import android.annotation.UserHandleAware;
-import android.app.assist.AssistStructure;
 import android.content.Context;
-import android.graphics.Rect;
 import android.os.ParcelUuid;
 import android.os.RemoteException;
 import android.provider.Settings;
 import android.service.personalcontext.embedded.InsightSurfaceClientInfo;
-import android.service.personalcontext.hint.AutofillInlineRequestHint;
 import android.service.personalcontext.hint.ContextHint;
 import android.service.personalcontext.hint.ContextHintWithSignature;
 import android.service.personalcontext.hint.ContextHintWrapper;
@@ -48,6 +45,7 @@ import android.util.Log;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * Client facing access to the PersonalContext service.
@@ -101,9 +99,11 @@ import java.util.Set;
  *     should any {@link ContextInsight} generated from the hint.</li>
  *  </ul>
  *
+ * @hide
  */
 @FlaggedApi(Flags.FLAG_ENABLE_PERSONAL_CONTEXT_SERVICE)
 @SystemService(Context.PERSONAL_CONTEXT_SERVICE)
+@SystemApi
 public final class PersonalContextManager {
     /** The name of the Personal Context service. */
     public static final String PERSONAL_CONTEXT_SERVICE = "personal_context";
@@ -133,9 +133,7 @@ public final class PersonalContextManager {
 
     /**
      * Returns whether the Personal Context service is enabled.
-     * @hide
      */
-    @SystemApi
     @UserHandleAware(
             requiresPermissionIfNotCaller = android.Manifest.permission.INTERACT_ACROSS_USERS)
     public boolean isEnabled() {
@@ -150,9 +148,7 @@ public final class PersonalContextManager {
     /**
      * Set whether the Personal Context service is enabled.
      * @param enable whether to enable or disable the service
-     * @hide
      */
-    @SystemApi
     @UserHandleAware(
             requiresPermissionIfNotCaller = android.Manifest.permission.INTERACT_ACROSS_USERS)
     public void setEnabled(boolean enable) {
@@ -190,9 +186,7 @@ public final class PersonalContextManager {
      * @param enabled value for whether data collection is enabled
      * @see #isPersonalContextModeEnabled(String)
      *
-     * @hide
      */
-    @SystemApi
     @RequiresPermission(Manifest.permission.CHANGE_PERSONAL_CONTEXT_MODE)
     public void setPersonalContextModeEnabled(@NonNull String packageName, boolean enabled) {
         try {
@@ -209,9 +203,7 @@ public final class PersonalContextManager {
      * @param renderTokens optional tokens indicating which renderers should be used to render
      *                     results of this flow to the user; if empty, then this flow can be
      *                     rendered by any Personal Context renderer
-     * @hide
      */
-    @SystemApi
     @UserHandleAware(
             requiresPermissionIfNotCaller = android.Manifest.permission.INTERACT_ACROSS_USERS)
     public void publishTriggeringHint(
@@ -233,9 +225,7 @@ public final class PersonalContextManager {
      *     results of this flow to the user; if {@code null} or empty, then this flow can be
      *     rendered by any Personal Context renderer
      * @param attributionHints optional hints to use as attribution for {@code hints}
-     * @hide
      */
-    @SystemApi
     @UserHandleAware(
             requiresPermissionIfNotCaller = android.Manifest.permission.INTERACT_ACROSS_USERS)
     public void publishTriggeringHint(
@@ -291,13 +281,19 @@ public final class PersonalContextManager {
      * will be ignored.
      *
      * @param insights new insights to be injected into the context flow
+     * @param componentId the publisher's unique identifier as issued by the
+     * {@link com.android.server.personalcontext.PersonalContextManagerService}. This value is used
+     *                    to route any resulting events and information stemming from this
+     *                    {@link ContextInsight} back to the publisher.
      * @hide
      */
     @UserHandleAware(
             requiresPermissionIfNotCaller = android.Manifest.permission.INTERACT_ACROSS_USERS)
-    public void publishInsight(@NonNull List<ContextInsight> insights) {
+    public void publishInsight(@NonNull List<ContextInsight> insights, @NonNull UUID componentId) {
         try {
-            mService.publishInsight(ContextInsightWrapper.wrapList(insights), mContext.getUserId());
+            mService.publishInsight(ContextInsightWrapper.wrapList(insights),
+                    new ParcelUuid(componentId),
+                    mContext.getUserId());
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -313,10 +309,7 @@ public final class PersonalContextManager {
      * @param hint raw data to be signed
      * @param attributionHints optional hints to use as attribution for {@code hint}
      * @return signed version of hint annotated with caller's package
-     *
-     * @hide
      */
-    @SystemApi
     @NonNull
     public ContextHintWithSignature signHint(
             @NonNull ContextHint hint, @Nullable List<ContextHint> attributionHints) {
@@ -341,11 +334,9 @@ public final class PersonalContextManager {
     @UserHandleAware(
             requiresPermissionIfNotCaller = android.Manifest.permission.INTERACT_ACROSS_USERS)
     @Nullable
-    public void registerInsightSurfaceClient(
-            @NonNull InsightSurfaceClientInfo clientInfo, @NonNull List<ContextHint> hints) {
+    public void registerInsightSurfaceClient(@NonNull InsightSurfaceClientInfo clientInfo) {
         try {
-            mService.registerInsightSurfaceClient(
-                    ContextHintWrapper.wrapList(hints), clientInfo, mContext.getUserId());
+            mService.registerInsightSurfaceClient(clientInfo, mContext.getUserId());
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
@@ -372,10 +363,7 @@ public final class PersonalContextManager {
     /**
      * Mints a {@link Token} that can be attached to {@link ContextHint}, {@link ContextInsight}, or
      * used in filters to filter for hints and insights.
-     *
-     * @hide
      */
-    @SystemApi
     @NonNull
     public Token mintToken() {
         try {
@@ -405,7 +393,9 @@ public final class PersonalContextManager {
     }
 
     /**
-     * Instructs the understander to show attribution for the provided insight.
+     * Instructs the understander to show attribution for the provided insight. If the insight does
+     * not have attribution, nothing will happen. This can be checked ahead of the call via
+     * {@link ContextInsight#hasAttribution}.
      *
      * @param insight Insight with attribution information that should be shown to the user.
      */
@@ -449,29 +439,5 @@ public final class PersonalContextManager {
         } catch (RemoteException e) {
             throw e.rethrowFromSystemServer();
         }
-    }
-
-    /**
-     * Returns the {@link AssistStructure.ViewNode} for the node focused by autofill in the given
-     * {@link AutofillInlineRequestHint}.
-     *
-     * @hide
-     */
-    @SystemApi
-    @NonNull
-    public AssistStructure.ViewNode getFocusedViewNode(@NonNull AutofillInlineRequestHint hint) {
-        return hint.getAugmentedAutofillProxy().getFocusedViewNode(hint.getFocusedId());
-    }
-
-    /**
-     * Returns the coordinates of the input field view that autofill suggestions are being generated
-     * for in the given {@link AutofillInlineRequestHint}.
-     *
-     * @hide
-     */
-    @SystemApi
-    @NonNull
-    public Rect getViewCoordinates(@NonNull AutofillInlineRequestHint hint) {
-        return hint.getAugmentedAutofillProxy().getViewCoordinates(hint.getFocusedId());
     }
 }

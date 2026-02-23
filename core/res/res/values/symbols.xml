@@ -1447,6 +1447,8 @@
   <java-symbol type="drawable" name="expander_open_holo_dark" />
   <java-symbol type="drawable" name="ic_audio_alarm" />
   <java-symbol type="drawable" name="ic_audio_alarm_mute" />
+  <java-symbol type="drawable" name="ic_volume_voice_chat" />
+  <java-symbol type="drawable" name="ic_volume_voice_chat_mute" />
   <java-symbol type="drawable" name="ic_audio_media" />
   <java-symbol type="drawable" name="ic_audio_media_mute" />
   <java-symbol type="drawable" name="ic_audio_notification" />
@@ -1857,6 +1859,7 @@
   <java-symbol type="id" name="media_route_volume_slider" />
   <java-symbol type="id" name="media_route_extended_settings_button" />
   <java-symbol type="id" name="media_route_progress_bar" />
+  <java-symbol type="id" name="media_route_cast_to_others_button" />
   <java-symbol type="string" name="media_route_chooser_title" />
   <java-symbol type="string" name="media_route_chooser_title_for_remote_display" />
   <java-symbol type="string" name="media_route_controller_disconnect" />
@@ -2145,9 +2148,7 @@
   <java-symbol type="bool" name="config_enablePopulationDensityProviderOverlay" />
   <java-symbol type="array" name="config_testLocationProviders" />
   <java-symbol type="array" name="config_defaultNotificationVibePattern" />
-  <java-symbol type="array" name="config_defaultNotificationVibeWaveform" />
   <java-symbol type="array" name="config_notificationFallbackVibePattern" />
-  <java-symbol type="array" name="config_notificationFallbackVibeWaveform" />
   <java-symbol type="bool" name="config_enableServerNotificationEffectsForAutomotive" />
   <java-symbol type="bool" name="config_useAttentionLight" />
   <java-symbol type="bool" name="config_enableNotificationAccessibilityEvents" />
@@ -2282,7 +2283,6 @@
   <java-symbol type="bool" name="config_ringtoneVibrationSettingsSupported" />
   <java-symbol type="array" name="config_ringtoneVibrationPatternToMetricIdMapping" />
   <java-symbol type="array" name="config_notificationVibrationPatternToMetricIdMapping" />
-  <java-symbol type="integer" name="config_vibrationWaveformRampStepDuration" />
   <java-symbol type="bool" name="config_ignoreVibrationsOnWirelessCharger" />
   <java-symbol type="integer" name="config_vibrationWaveformRampDownDuration" />
   <java-symbol type="integer" name="config_vibrationPipelineMaxDuration" />
@@ -6341,6 +6341,7 @@
   <java-symbol type="bool" name="config_useAutoSuspend" />
 
   <java-symbol type="array" name="config_computerControlKnownSuperAgents" />
+  <java-symbol type="string" name="config_computerControlReferenceDisplayPhysicalAddress" />
 
   <!-- Biometric dangling notification strings -->
   <java-symbol type="string" name="fingerprint_dangling_notification_title" />
@@ -6564,8 +6565,8 @@
   <!-- Whether to force color fade. -->
   <java-symbol type="bool" name="config_forceColorFade" />
 
-  <!-- The locale countries that force camera shutter sound -->
-  <java-symbol type="array" name="config_cameraSoundForcedCountry" />
+  <!-- The locale lauguages that force camera shutter sound -->
+  <java-symbol type="array" name="config_cameraSoundForcedLanguage" />
 
   <!-- The location button render service component name -->
   <java-symbol type="string" name="config_locationButtonRenderService" />

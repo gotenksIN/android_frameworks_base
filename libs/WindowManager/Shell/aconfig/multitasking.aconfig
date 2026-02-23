@@ -196,16 +196,6 @@ flag {
 }
 
 flag {
-    name: "fix_flickers_during_switch_from_dismiss"
-    namespace: "multitasking"
-    description: "Fixes flickers while switching bubbles as a result of dismissing a bubble."
-    bug: "452305969"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "fix_bubble_swipe_up_gesture"
     namespace: "multitasking"
     description: "Fixes the swipe up gesture getting broken due to bubbles."
@@ -347,6 +337,16 @@ flag {
     namespace: "multitasking"
     description: "Fixes a flicker issue that happens when promoting an app bubble from overflow"
     bug: "472080053"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "fix_bubble_notification_showing_in_lock_screen"
+    namespace: "multitasking"
+    description: "Fixes a bug where bubble notification persist on lock screen"
+    bug: "466186520"
     metadata {
         purpose: PURPOSE_BUGFIX
     }

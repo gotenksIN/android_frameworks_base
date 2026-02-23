@@ -21,7 +21,6 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SystemApi;
 import android.os.Bundle;
-import android.service.personalcontext.ComponentIdProvider;
 import android.service.personalcontext.Flags;
 import android.service.personalcontext.Token;
 import android.service.personalcontext.hint.ContextHintWithSignature;
@@ -44,7 +43,9 @@ import java.util.Set;
  * Therefore, child elements should not contain hints with conflicting render tokens. If
  * conflicting render tokens are present, an {@link IllegalStateException} will be thrown when the
  * render token is accessed. This may result in the system dropping the entire collection.
+ * @hide
  */
+@SystemApi
 @FlaggedApi(Flags.FLAG_ENABLE_PERSONAL_CONTEXT_SERVICE)
 public final class InsightCollection extends ContextInsight implements Iterable<ContextInsight> {
     private static final String KEY_INSIGHTS = "key_insights";
@@ -184,22 +185,6 @@ public final class InsightCollection extends ContextInsight implements Iterable<
         @NonNull
         public Builder addInsight(@NonNull ContextInsight insight) {
             mInsights.add(Objects.requireNonNull(insight, "insight cannot be null"));
-            return this;
-        }
-
-        /**
-         * Sets the originating component in the resulting {@link ContextInsight}, allowing events
-         * to be routed back to the understander that created this {@link ContextInsight}.
-         *
-         * @param originatingComponent the component that is creating this insight
-         *
-         * @hide
-         */
-        @SystemApi
-        @NonNull
-        public Builder setOriginatingComponentId(
-                @Nullable ComponentIdProvider originatingComponent) {
-            mBaseBuilder.setOriginatingComponentId(originatingComponent);
             return this;
         }
 

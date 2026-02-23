@@ -23,7 +23,6 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SystemApi;
 import android.os.Bundle;
-import android.service.personalcontext.ComponentIdProvider;
 import android.service.personalcontext.Flags;
 import android.service.personalcontext.Token;
 import android.service.personalcontext.hint.ContextHint;
@@ -34,7 +33,9 @@ import java.util.Objects;
 
 /**
  * An insight that contains information for display purposes with no particular action associated.
+ * @hide
  */
+@SystemApi
 @FlaggedApi(Flags.FLAG_ENABLE_PERSONAL_CONTEXT_SERVICE)
 public final class DisplayInsight extends ContextInsight {
     private static final String KEY_DISPLAY_DETAILS = "key_display_details";
@@ -161,22 +162,6 @@ public final class DisplayInsight extends ContextInsight {
         @NonNull
         Builder setAttributionDetails(@Nullable AttributionDetails attributionDetails) {
             mBaseBuilder.setAttributionDetails(attributionDetails);
-            return this;
-        }
-
-        /**
-         * Sets the originating component in the resulting {@link ContextInsight}, allowing events
-         * to be routed back to the understander that created this {@link ContextInsight}.
-         *
-         * @param originatingComponent the component that is creating this insight
-         *
-         * @hide
-         */
-        @SystemApi
-        @NonNull
-        public Builder setOriginatingComponentId(
-                @Nullable ComponentIdProvider originatingComponent) {
-            mBaseBuilder.setOriginatingComponentId(originatingComponent);
             return this;
         }
 

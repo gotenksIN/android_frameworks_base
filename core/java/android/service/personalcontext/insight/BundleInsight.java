@@ -23,7 +23,6 @@ import android.annotation.NonNull;
 import android.annotation.Nullable;
 import android.annotation.SystemApi;
 import android.os.Bundle;
-import android.service.personalcontext.ComponentIdProvider;
 import android.service.personalcontext.Flags;
 import android.service.personalcontext.Token;
 import android.service.personalcontext.hint.ContextHint;
@@ -33,7 +32,9 @@ import android.service.personalcontext.insight.interaction.AttributionDetails;
 /**
  * An insight that stores arbitrary data in a {@link Bundle}. Should only be used if there is no
  * appropriate insight type already defined.
+ * @hide
  */
+@SystemApi
 @FlaggedApi(Flags.FLAG_ENABLE_PERSONAL_CONTEXT_SERVICE)
 public final class BundleInsight extends ContextInsight {
     private static final String KEY_DATA = "data";
@@ -167,22 +168,6 @@ public final class BundleInsight extends ContextInsight {
         @NonNull
         Builder setAttributionDetails(@Nullable AttributionDetails attributionDetails) {
             mBaseBuilder.setAttributionDetails(attributionDetails);
-            return this;
-        }
-
-        /**
-         * Sets the originating component in the resulting {@link ContextInsight}, allowing events
-         * to be routed back to the understander that created this {@link ContextInsight}.
-         *
-         * @param originatingComponent the component that is creating this insight
-         *
-         * @hide
-         */
-        @SystemApi
-        @NonNull
-        public Builder setOriginatingComponentId(
-                @Nullable ComponentIdProvider originatingComponent) {
-            mBaseBuilder.setOriginatingComponentId(originatingComponent);
             return this;
         }
 

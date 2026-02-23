@@ -106,15 +106,14 @@ public class AutofillInlineRequestHintTest {
         final FillEventHistory fillEventHistory = getFillEventHistory(focusedId, sessionId);
 
         final AutofillInlineRequestHint hint =
-                new AutofillInlineRequestHint.Builder()
-                        .setSessionId(sessionId)
-                        .setTaskId(taskId)
-                        .setRequestTimestamp(requestTimestamp)
-                        .setActivityComponent(activityComponent)
-                        .setFocusedId(focusedId)
-                        .setAutofillValue(autofillValue)
-                        .setInlineSuggestionsRequest(inlineSuggestionsRequest)
-                        .setAugmentedAutofillManagerClient(mFakeBinder)
+                new AutofillInlineRequestHint.Builder(sessionId,
+                        taskId,
+                        requestTimestamp,
+                        activityComponent,
+                        focusedId,
+                        autofillValue,
+                        inlineSuggestionsRequest,
+                        mFakeBinder)
                         .setFillEventHistory(fillEventHistory)
                         .build();
 
@@ -153,15 +152,14 @@ public class AutofillInlineRequestHintTest {
         final FillEventHistory fillEventHistory = getFillEventHistory(focusedId, sessionId);
 
         final AutofillInlineRequestHint hint =
-                new AutofillInlineRequestHint.Builder()
-                        .setSessionId(sessionId)
-                        .setTaskId(taskId)
-                        .setRequestTimestamp(requestTimestamp)
-                        .setActivityComponent(activityComponent)
-                        .setFocusedId(focusedId)
-                        .setAutofillValue(autofillValue)
-                        .setInlineSuggestionsRequest(inlineSuggestionsRequest)
-                        .setAugmentedAutofillManagerClient(mFakeBinder)
+                new AutofillInlineRequestHint.Builder(sessionId,
+                        taskId,
+                        requestTimestamp,
+                        activityComponent,
+                        focusedId,
+                        autofillValue,
+                        inlineSuggestionsRequest,
+                        mFakeBinder)
                         .setFillEventHistory(fillEventHistory)
                         .build();
 
@@ -172,11 +170,11 @@ public class AutofillInlineRequestHintTest {
 
         // Proxy method calls route to the proper calls.
         AssistStructure.ViewNode viewNode =
-                outputAutofillHint.getAugmentedAutofillProxy().getFocusedViewNode(focusedId);
+                outputAutofillHint.getAugmentedAutofillProxy().fetchFocusedViewNode(focusedId);
         assertThat(viewNode).isEqualTo(mViewNode);
         verify(mAugmentedAutofillManagerClient).getViewNodeParcelable(eq(focusedId));
 
-        Rect rect = outputAutofillHint.getAugmentedAutofillProxy().getViewCoordinates(focusedId);
+        Rect rect = outputAutofillHint.getAugmentedAutofillProxy().fetchViewCoordinates(focusedId);
         assertThat(rect).isEqualTo(VIEW_RECT);
         verify(mAugmentedAutofillManagerClient).getViewCoordinates(eq(focusedId));
     }

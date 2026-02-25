@@ -12,4 +12,5 @@
 <!-- QTI_BEGIN: 2025-12-16: Android_UI: SystemUI: Refactor dual sim icon on status bar. -->
     <bool name="config_enable_stacked_icon">false</bool>
 <!-- QTI_END: 2025-12-16: Android_UI: SystemUI: Refactor dual sim icon on status bar. -->
+    <string translatable="false" name="status_bar_turbo_dsda">turbo</string>
 </resources>

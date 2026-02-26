@@ -30,7 +30,6 @@ import static android.view.WindowManagerPolicyConstants.FLAG_INTERACTIVE;
 
 import static com.android.hardware.input.Flags.enableNew26q2Keycodes;
 import static com.android.hardware.input.Flags.keyboardBacklightShortcuts;
-import static com.android.hardware.input.Flags.fixSearchModifierFallbacks;
 import static com.android.hardware.input.Flags.enableContextualInputTrigger;
 import static com.android.internal.config.sysui.SystemUiDeviceConfigFlags.SCREENSHOT_KEYCHORD_DELAY;
 
@@ -631,15 +630,13 @@ final class KeyGestureController {
             return KEY_INTERCEPT_RESULT_CONSUMED;
         }
         if (event.isMetaPressed()) {
-            if (fixSearchModifierFallbacks() ) {
-                // If the key has not been consumed and includes the meta key, do not send the event
-                // to the app and attempt to generate a fallback.
-                final KeyCharacterMap kcm = event.getKeyCharacterMap();
-                final KeyCharacterMap.FallbackAction fallbackAction =
-                        kcm.getFallbackAction(event.getKeyCode(), event.getMetaState());
-                if (fallbackAction != null) {
-                    return KEY_INTERCEPT_RESULT_NOT_CONSUMED_GO_FALLBACK;
-                }
+            // If the key has not been consumed and includes the meta key, do not send the event
+            // to the app and attempt to generate a fallback.
+            final KeyCharacterMap kcm = event.getKeyCharacterMap();
+            final KeyCharacterMap.FallbackAction fallbackAction =
+                    kcm.getFallbackAction(event.getKeyCode(), event.getMetaState());
+            if (fallbackAction != null) {
+                return KEY_INTERCEPT_RESULT_NOT_CONSUMED_GO_FALLBACK;
             }
             return KEY_INTERCEPT_RESULT_CONSUMED;
         }

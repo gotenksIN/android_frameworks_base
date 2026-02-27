@@ -1526,6 +1526,7 @@ public final class ProcessList extends ProcessListInternal
         buf.putInt(pid);
         buf.putInt(uid);
         buf.putInt(amt);
+        buf.putInt(0);
         buf.putInt(forLmkdOnly ? 1 : 0);
         writeLmkd(buf, null);
         long now = SystemClock.elapsedRealtime();
@@ -1600,6 +1601,7 @@ public final class ProcessList extends ProcessListInternal
             final int pid = apps.get(i).getPid();
             final int amt = apps.get(i).getCurAdj();
             final int uid = apps.get(i).uid;
+            final boolean forLmkdOnly = apps.get(i).isZramWrittenBack();
             if (pid <= 0 || amt == UNKNOWN_ADJ) continue;
             if (total_procs_in_buf >= MAX_PROCS_PRIO_PACKET_SIZE) {
                 writeLmkd(buf, null);
@@ -1612,6 +1614,7 @@ public final class ProcessList extends ProcessListInternal
             buf.putInt(uid);
             buf.putInt(amt);
             buf.putInt(0);  // Default proc type to PROC_TYPE_APP
+            buf.putInt(forLmkdOnly ? 1 : 0);
 // QTI_BEGIN: 2025-07-03: Performance: framework_base: Extend LMK_PROCPRIO Payload for AMS-LMKD Communication
             total_procs_in_buf++;
         }

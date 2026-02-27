@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * ​​​​​Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 package com.android.server.wm;
@@ -375,9 +379,7 @@ import com.android.server.policy.WindowManagerPolicy.ScreenOffListener;
 import com.android.server.power.ShutdownThread;
 import com.android.server.theming.ThemeManagerInternal;
 import com.android.server.utils.PriorityDump;
-// QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
-import com.android.server.am.ProcessFreezerManager;
-// QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
+import com.android.server.am.QtiBackgroundManager;
 import com.android.window.flags.Flags;
 
 import dalvik.annotation.optimization.NeverCompile;
@@ -3064,15 +3066,8 @@ public class WindowManagerService extends IWindowManager.Stub
 
     void finishDrawingWindow(Session session, IWindow client,
             @Nullable SurfaceControl.Transaction postDrawTransaction, int seqId) {
-// QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
-        //unfreeze process if the first frame appeared
-// QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
-// QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
-        ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
-        if (freezer != null && freezer.useFreezerManager()) {
-            freezer.startUnfreeze(session.mPackageName, ProcessFreezerManager.COMPLETE_LAUNCH_UNFREEZE);
-        }
-// QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
+        QtiBackgroundManager.getInstance().unfreezeProcessLevel(
+                session.mPackageName, QtiBackgroundManager.COMPLETE_LAUNCH_UNFREEZE);
 
         if (postDrawTransaction != null) {
             postDrawTransaction.sanitize(Binder.getCallingPid(), Binder.getCallingUid());

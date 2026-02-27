@@ -27,15 +27,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.viewinterop.AndroidView
-import com.android.systemui.Flags.communalHubUseThreadPoolForWidgets
 import com.android.systemui.communal.domain.model.CommunalContentModel
 import com.android.systemui.communal.ui.viewmodel.CommunalAppWidgetViewModel
 import com.android.systemui.communal.widgets.CommunalAppWidgetHostView
 import com.android.systemui.communal.widgets.WidgetInteractionHandler
-import com.android.systemui.dagger.qualifiers.UiBackground
 import com.android.systemui.lifecycle.rememberViewModel
 import com.android.systemui.res.R
-import java.util.concurrent.Executor
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
@@ -44,7 +41,6 @@ import javax.inject.Inject
 class CommunalAppWidgetSection
 @Inject
 constructor(
-    @UiBackground private val uiBgExecutor: Executor,
     private val interactionHandler: WidgetInteractionHandler,
     private val viewModelFactory: CommunalAppWidgetViewModel.Factory,
 ) {
@@ -89,11 +85,7 @@ constructor(
         AndroidView(
             factory = { context ->
                 CommunalAppWidgetHostView(context, interactionHandler).apply {
-                    if (communalHubUseThreadPoolForWidgets()) {
-                        setExecutor(widgetExecutor)
-                    } else {
-                        setExecutor(uiBgExecutor)
-                    }
+                    setExecutor(widgetExecutor)
                 }
             },
             update = { view ->

@@ -13,6 +13,10 @@
 ** WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 ** See the License for the specific language governing permissions and
 ** limitations under the License.
+**
+** ​​​​​Changes from Qualcomm Technologies, Inc. are provided under the following license:
+** Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+** SPDX-License-Identifier: BSD-3-Clause-Clear
 */
 
 #define LOG_TAG "Process"
@@ -66,6 +70,8 @@
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
+#include <sched.h>
+#include <mutex>
 
 using namespace android;
 
@@ -1502,6 +1508,99 @@ void android_os_Process_freezeCgroupUID(JNIEnv* env, jobject clazz, jint uid, jb
     }
 }
 
+static std::mutex g_cpu_topology_mutex;
+static bool kCpuTopologyInitialized = false;
+static cpu_set_t kAllCoreSet;
+static cpu_set_t kPerformanceCoreSet;
+
+jboolean android_os_Process_setPerfCoreAffinity(
+            JNIEnv* env, jobject clazz, jint tid, jboolean enable) {
+    if (tid <= 0) {
+        ALOGW("Invalid TID: %d", tid);
+        return JNI_FALSE;
+    }
+
+    {
+        std::lock_guard<std::mutex> lock(g_cpu_topology_mutex);
+        if (!kCpuTopologyInitialized) {
+            int num_cpus = sysconf(_SC_NPROCESSORS_CONF);
+            if (num_cpus == -1) {
+                ALOGE("Failed to get number of CPUs: %s", strerror(errno));
+                return JNI_FALSE;
+            }
+            ALOGD("Number of CPUs: %d", num_cpus);
+
+            const std::string cpufreq_dir = "/sys/devices/system/cpu/cpufreq/";
+            DIR *dir = opendir(cpufreq_dir.c_str());
+            if (!dir) {
+                ALOGE("Failed to open cpufreq directory: %s", strerror(errno));
+                CPU_ZERO(&kAllCoreSet);
+                CPU_ZERO(&kPerformanceCoreSet);
+                return JNI_FALSE;
+            }
+
+            struct dirent *entry;
+            int max_policy_id = 0;
+            while ((entry = readdir(dir)) != NULL) {
+                std::string name = entry->d_name;
+                if (name.rfind("policy", 0) == 0 && name != "policy" && name.length() > 6) {
+                    int policy_id = std::stoi(name.substr(6));
+                    if (policy_id > max_policy_id) {
+                        max_policy_id = policy_id;
+                    }
+                }
+            }
+            closedir(dir);
+
+            // Initialize performance cores
+            CPU_ZERO(&kPerformanceCoreSet);
+            unsigned long performanceCoreMask = 0;
+            for (int i = max_policy_id; i < num_cpus; ++i) {
+                CPU_SET(i, &kPerformanceCoreSet);
+                performanceCoreMask |= (1UL << i);
+            }
+            if (performanceCoreMask == 0) {
+                ALOGW("No performance CPU core available.");
+                return JNI_FALSE;
+            }
+            ALOGD("Performance core mask: 0x%lx (based on max_policy_id %d)",
+                    performanceCoreMask, max_policy_id);
+
+            // Initialize all cores
+            CPU_ZERO(&kAllCoreSet);
+            unsigned long allCoreMask = 0;
+            for (int i = 0; i < num_cpus; ++i) {
+                CPU_SET(i, &kAllCoreSet);
+                allCoreMask |= (1UL << i);
+            }
+            if (allCoreMask == 0) {
+                ALOGW("No CPU core available.");
+                return JNI_FALSE;
+            }
+            ALOGD("All core mask: 0x%lx", allCoreMask);
+
+            kCpuTopologyInitialized = true;
+            ALOGD("CPU topology initialized successfully.");
+        }
+    }
+
+    // Apply affinity
+    if (enable) {
+        if (sched_setaffinity(tid, sizeof(kPerformanceCoreSet), &kPerformanceCoreSet) == -1) {
+            ALOGE("Failed to set affinity for TID %d to perf core: %s", tid, strerror(errno));
+            return JNI_FALSE;
+        }
+        ALOGE("Successfully set affinity for TID %d to perf core", tid);
+    } else {
+        if (sched_setaffinity(tid, sizeof(kAllCoreSet), &kAllCoreSet) == -1) {
+            ALOGE("Failed to set affinity for TID %d to all cores: %s", tid, strerror(errno));
+            return JNI_FALSE;
+        }
+        ALOGE("Successfully set affinity for TID %d to all core", tid);
+    }
+    return JNI_TRUE;
+}
+
 static const JNINativeMethod methods[] = {
         {"getUidForName", "(Ljava/lang/String;)I", (void*)android_os_Process_getUidForName},
         {"getGidForName", "(Ljava/lang/String;)I", (void*)android_os_Process_getGidForName},
@@ -1553,6 +1652,7 @@ static const JNINativeMethod methods[] = {
         {"removeAllProcessGroups", "()V", (void*)android_os_Process_removeAllProcessGroups},
         {"nativePidFdOpen", "(II)I", (void*)android_os_Process_nativePidFdOpen},
         {"freezeCgroupUid", "(IZ)V", (void*)android_os_Process_freezeCgroupUID},
+        {"setPerfCoreAffinity", "(IZ)Z", (void*)android_os_Process_setPerfCoreAffinity},
 };
 
 int register_android_os_Process(JNIEnv* env)

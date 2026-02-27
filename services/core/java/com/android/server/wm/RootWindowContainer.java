@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License
+ *
+ * ​​​​​Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 package com.android.server.wm;
@@ -154,9 +158,7 @@ import com.android.server.pm.UserManagerInternal;
 import com.android.server.policy.PermissionPolicyInternal;
 import com.android.server.policy.WindowManagerPolicy;
 import com.android.server.utils.Slogf;
-// QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
-import com.android.server.am.ProcessFreezerManager;
-// QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
+import com.android.server.am.QtiBackgroundManager;
 import com.android.server.wm.utils.RegionUtils;
 import com.android.window.flags.Flags;
 
@@ -2627,12 +2629,9 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
                              mUxPerf.perfEvent(BoostFramework.VENDOR_HINT_WARM_LAUNCH, r.packageName, 2, 0, 0);
                          }
                      }
-// QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
-                    ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
-                    if (freezer != null && freezer.useFreezerManager()) {
-                        freezer.startFreeze(r.packageName, ProcessFreezerManager.WARM_LAUNCH_FREEZE);
-                    }
-// QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
+
+                    QtiBackgroundManager.getInstance().freezeProcessLevel(
+                            r.packageName, QtiBackgroundManager.WARM_LAUNCH_FREEZE);
 // QTI_BEGIN: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
                 }
 // QTI_END: 2021-04-19: Performance: perf: Move app-launch & uxperf boosts
@@ -2653,12 +2652,8 @@ public class RootWindowContainer extends WindowContainer<DisplayContent>
             if (r != null && r.isMainIntent(r.intent)) {
                 acquireAppLaunchPerfLock(r);
 // QTI_END: 2023-06-28: Performance: Perf:Fix the issue that activity boost duration abnormal.
-// QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
-                ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
-                if (freezer != null && freezer.useFreezerManager()) {
-                    freezer.startFreeze(r.packageName, ProcessFreezerManager.FIRST_LAUNCH_FREEZE);
-                }
-// QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
+                QtiBackgroundManager.getInstance().freezeProcessLevel(
+                        r.packageName, QtiBackgroundManager.FIRST_LAUNCH_FREEZE);
 // QTI_BEGIN: 2023-06-28: Performance: Perf:Fix the issue that activity boost duration abnormal.
             } else if (r == null) {
                 Slog.w(TAG, "Should not happen! Didn't apply launch boost");

@@ -14,8 +14,8 @@
  * limitations under the License.
  */
 /*
- * Changes from Qualcomm Innovation Center, Inc. are provided under the following license:
- * Copyright (c) 2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ * ​​​​​Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
  * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
@@ -170,6 +170,7 @@ import com.android.server.am.psc.Constants.OomAdjust;
 import com.android.server.am.psc.Constants.SchedGroup;
 import com.android.server.am.psc.PlatformCompatCache.CachedCompatChangeId;
 import com.android.server.wm.WindowProcessController;
+import com.android.server.am.QtiBackgroundManager;
 
 import java.io.PrintWriter;
 import java.lang.annotation.Retention;
@@ -367,7 +368,6 @@ public abstract class OomAdjuster {
     boolean mProcessGroupCgroupFollowDex2oatOnly = false;
     // Enable hooks for background apps transition
     boolean mEnableBgt = false;
-    boolean mLazyLmkKillMainProc = false;
 
     public static BoostFramework mPerf = new BoostFramework();
 
@@ -594,8 +594,9 @@ public abstract class OomAdjuster {
             ProcessList.batchSetOomAdj(procsToOomAdj);
         }
 
-        void batchSetOomAdjExt(ArrayList<ProcessRecordInternal> procsToOomAdj) {
-            ProcessList.batchSetOomAdjExt(procsToOomAdj);
+        void batchSetOomAdjExt(ArrayList<ProcessRecordInternal> procsToOomAdj,
+                ArrayList<Integer> weights) {
+            ProcessList.batchSetOomAdjExt(procsToOomAdj, weights);
         }
 
         /** Sets the OOM adjustment score for a single process. */
@@ -603,8 +604,8 @@ public abstract class OomAdjuster {
             ProcessList.setOomAdj(pid, uid, adj, forLmkdOnly);
         }
 
-        void setOomAdjExt(int pid, int uid, int adj, int isSystemApp, int isMainProc) {
-            ProcessList.setOomAdjExt(pid, uid, adj, isSystemApp, isMainProc);
+        void setOomAdjExt(int pid, int uid, int adj, int weight) {
+            ProcessList.setOomAdjExt(pid, uid, adj, weight);
         }
 
         /** Sets the priority of a specific thread. */
@@ -828,10 +829,12 @@ public abstract class OomAdjuster {
             mEnableProcessGroupCgroupFollow = Boolean.parseBoolean(mPerf.perfGetProp("ro.vendor.qti.cgroup_follow.enable", "false"));
             mProcessGroupCgroupFollowDex2oatOnly = Boolean.parseBoolean(mPerf.perfGetProp("ro.vendor.qti.cgroup_follow.dex2oat_only", "false"));
             mEnableBgt = Boolean.parseBoolean(mPerf.perfGetProp("vendor.perf.bgt.enable","false"));
-            mLazyLmkKillMainProc = Boolean.parseBoolean(mPerf.perfGetProp("ro.lmk.lazy_killing_3rd_app_main_proc","false"));
         }
 
         mProcessGroupHandler = new Handler(adjusterThread.getLooper(), msg -> {
+            if (QtiBackgroundManager.getInstance().handleProcessGroupMessage(msg)) {
+                return true;
+            }
             final int group = msg.what;
             final ProcessRecordInternal app = (ProcessRecordInternal) msg.obj;
 
@@ -1590,8 +1593,10 @@ public abstract class OomAdjuster {
         }
 
         if (!mProcsToOomAdj.isEmpty()) {
-            if (mLazyLmkKillMainProc) {
-                mInjector.batchSetOomAdjExt(mProcsToOomAdj);
+            if (QtiBackgroundManager.getInstance().useAppKeepaliveManager()) {
+                ArrayList<Integer> weights =
+                    QtiBackgroundManager.getInstance().getProcsKeepaliveWeight(mProcsToOomAdj);
+                mInjector.batchSetOomAdjExt(mProcsToOomAdj, weights);
             } else {
                 mInjector.batchSetOomAdj(mProcsToOomAdj);
             }
@@ -2447,18 +2452,10 @@ public abstract class OomAdjuster {
             if (isBatchingOomAdj && mOomConstants.mEnableBatchingOomAdj) {
                 mProcsToOomAdj.add(state);
             } else {
-                if (mLazyLmkKillMainProc) {
-                    String packageName = state.getPackageName();
-                    String processName = state.processName;
-                    int isMainProc = 0;
-                    int isSystemApp = 0;
-                    if (packageName.equals(processName)) {
-                        isMainProc = 1;
-                    }
-                    // if (state.isSystemApp()) {
-                    //     isSystemApp = 1;
-                    // }
-                    mInjector.setOomAdjExt(state.getPid(), state.uid, state.getCurAdj(), isSystemApp, isMainProc);
+                if (QtiBackgroundManager.getInstance().useAppKeepaliveManager()) {
+                    int weight =
+                        QtiBackgroundManager.getInstance().getProcKeepaliveWeight(state);
+                    mInjector.setOomAdjExt(state.getPid(), state.uid, state.getCurAdj(), weight);
                 } else {
                     boolean forLmkdOnly = false;
                     if (state.isZramWrittenBack()) {
@@ -2571,6 +2568,9 @@ public abstract class OomAdjuster {
                     Slog.w(TAG, "Failed setting thread priority of " + state.getPid(), e);
                 }
             }
+
+            QtiBackgroundManager.getInstance().handleSchedGroupTransition(state,
+                    oldSchedGroup, curSchedGroup, mProcessGroupHandler);
         }
         if (state.getHasRepForegroundActivities() != state.getHasForegroundActivities()) {
             state.setRepForegroundActivities(state.getHasForegroundActivities());

@@ -12,6 +12,10 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  * See the License for the specific language governing permissions and
  * limitations under the License.
+ *
+ * ​​​​​Changes from Qualcomm Technologies, Inc. are provided under the following license:
+ * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * SPDX-License-Identifier: BSD-3-Clause-Clear
  */
 
 package com.android.server.am;
@@ -1142,14 +1146,6 @@ public class ActivityManagerService extends IActivityManager.Stub
         final int pid = app.getPid();
         synchronized (mPidsSelfLocked) {
             mPidsSelfLocked.doAddInternal(pid, app);
-// QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
-            ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
-// QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
-// QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
-            if (freezer != null && freezer.useFreezerManager()) {
-                freezer.addPidLocked(app);
-            }
-// QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
         }
         synchronized (sActiveProcessInfoSelfLocked) {
             if (app.processInfo != null) {
@@ -1175,17 +1171,9 @@ public class ActivityManagerService extends IActivityManager.Stub
         final boolean removed;
         synchronized (mPidsSelfLocked) {
             removed = mPidsSelfLocked.doRemoveInternal(pid, app);
-// QTI_BEGIN: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
-            ProcessFreezerManager freezer = ProcessFreezerManager.getInstance();
-// QTI_END: 2025-01-02: Performance: app freezer: Uncomment app freezer by Google
-// QTI_BEGIN: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
-            if (freezer != null && freezer.useFreezerManager()) {
-                freezer.removePidLocked(pid, app);
-                freezer.startUnfreeze(app.processName, ProcessFreezerManager.REMOVE_PROCESS_UNFREEZE);
-            }
-// QTI_END: 2024-05-22: Performance: framework_base: Add process freezer to improve app launch latency
         }
         if (removed) {
+            QtiBackgroundManager.getInstance().handleProcessDied(app, pid);
             synchronized (sActiveProcessInfoSelfLocked) {
                 sActiveProcessInfoSelfLocked.remove(pid);
             }
@@ -9078,6 +9066,9 @@ public class ActivityManagerService extends IActivityManager.Stub
                         setThreadPriority(proc.getRenderThreadTid(),
                             THREAD_PRIORITY_TOP_APP_BOOST);
                     }
+
+                    QtiBackgroundManager.getInstance().applyUIRtAndAffinitySettings(
+                            (ProcessRecordInternal) proc);
                 }
             } else {
                 if (DEBUG_OOM_ADJ) {
@@ -9874,6 +9865,8 @@ public class ActivityManagerService extends IActivityManager.Stub
             t.traceEnd(); // componentAlias
 
             t.traceEnd(); // PhaseActivityManagerReady
+
+            QtiBackgroundManager.getInstance().setAMS(this);
         }
     }
 
@@ -11708,6 +11701,8 @@ public class ActivityManagerService extends IActivityManager.Stub
                 mProcessList.mAppExitInfoTracker.dumpHistoryProcessExitInfo(pw, dumpPackage);
             } else if ("component-alias".equals(cmd)) {
                 mComponentAliasResolver.dump(pw);
+            } else if ("ui-fluency".equals(cmd)) {
+                QtiBackgroundManager.getInstance().dump(fd, pw, args);
             } else {
                 // Dumping a single activity?
                 if (!mAtmInternal.dumpActivity(fd, pw, cmd, args, opti, dumpAll,

@@ -35,7 +35,6 @@ import android.window.TaskSnapshot
 import android.window.WindowContainerTransaction
 import com.android.app.tracing.traceSection
 import com.android.internal.policy.SystemBarUtils
-import com.android.window.flags.Flags
 import com.android.wm.shell.R
 import com.android.wm.shell.ShellTaskOrganizer
 import com.android.wm.shell.apptoweb.AppToWebRepository
@@ -49,6 +48,7 @@ import com.android.wm.shell.desktopmode.CaptionState
 import com.android.wm.shell.desktopmode.DesktopModeUiEventLogger
 import com.android.wm.shell.desktopmode.DesktopUserRepositories
 import com.android.wm.shell.desktopmode.WindowDecorCaptionRepository
+import com.android.wm.shell.recents.PerDisplayRecentsTransitionStateListener
 import com.android.wm.shell.shared.annotations.ShellBackgroundThread
 import com.android.wm.shell.shared.annotations.ShellMainThread
 import com.android.wm.shell.shared.bubbles.BubbleFlagHelper
@@ -111,6 +111,7 @@ class AppHandleController(
     private val decorWindowContext: Context,
     private val onCaptionTouchListener: View.OnTouchListener,
     private val appToWebRepository: AppToWebRepository,
+    private val recentsTransitionStateListener: PerDisplayRecentsTransitionStateListener,
     private val handleMenuFactory: HandleMenuFactory = HandleMenuFactory,
     private val appHandleViewHolderFactory: AppHandleViewHolder.Factory =
         AppHandleViewHolder.Factory(),
@@ -147,17 +148,15 @@ class AppHandleController(
     private val isOpenByDefaultDialogActive
         get() = openByDefaultDialog != null
 
+    private val isRecentsTransitionRunning
+        get() =
+            display.let { recentsTransitionStateListener.isRecentsAnimationActive(it.displayId) }
+
     private val showInputLayer
         // Don't show the input layer during the recents transition, otherwise it could become
         // touchable while in overview, during quick-switch or even for a short moment after
         // going home.
         get() = isCaptionVisible && !isRecentsTransitionRunning
-
-    private val isEducationOrHandleReportingEnabled =
-        Flags.enableDesktopWindowingAppHandleEducation() ||
-            DesktopExperienceFlags.ENABLE_DESKTOP_WINDOWING_APP_TO_WEB_EDUCATION_INTEGRATION
-                .isTrue ||
-            DesktopExperienceFlags.ENABLE_APP_HANDLE_POSITION_REPORTING.isTrue
 
     override fun relayout(
         params: RelayoutParams,
@@ -220,12 +219,10 @@ class AppHandleController(
         }
 
     private fun notifyNoCaption() {
-        if (!desktopState.canEnterDesktopMode || !isEducationOrHandleReportingEnabled) return
         windowDecorHandleRepository.notifyCaptionChanged(CaptionState.NoCaption(taskInfo.taskId))
     }
 
     private fun notifyCaptionStateChanged(captionLayoutResult: CaptionRelayoutResult) {
-        if (!desktopState.canEnterDesktopMode || !isEducationOrHandleReportingEnabled) return
         if (!isCaptionVisible) {
             notifyNoCaption()
             return
@@ -461,9 +458,7 @@ class AppHandleController(
         viewHolder.onHandleMenuClosed()
         handleMenu?.close()
         handleMenu = null
-        if (desktopState.canEnterDesktopMode && isEducationOrHandleReportingEnabled) {
-            notifyCaptionStateChanged(captionLayoutResult)
-        }
+        notifyCaptionStateChanged(captionLayoutResult)
     }
 
     /** Checks if a [MotionEvent] occurs in caption. */

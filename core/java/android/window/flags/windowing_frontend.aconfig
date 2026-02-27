@@ -167,6 +167,16 @@ flag {
 }
 
 flag {
+    name: "enable_split_dismiss_animation"
+    namespace: "windowing_frontend"
+    description: "Resize animation for expanding and collapsing surfaces when split screen is dismissed"
+    bug: "481965406"
+    metadata {
+        purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
   name: "show_app_handle_large_screens"
   namespace: "windowing_frontend"
   description: "Show the app handle and the app menu also on large screens that don't enable desktop mode"
@@ -508,6 +518,16 @@ flag {
     bug: "476223353"
     metadata {
         purpose: PURPOSE_BUGFIX
+    }
+}
+
+flag {
+    name: "send_new_insets_state_with_rotation"
+    namespace: "windowing_frontend"
+    description: "Send the new InsetsState to the shell when the display rotates"
+    bug: "480967801"
+    metadata {
+      purpose: PURPOSE_BUGFIX
     }
 }
 

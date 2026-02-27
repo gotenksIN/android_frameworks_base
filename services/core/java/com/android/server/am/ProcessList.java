@@ -177,7 +177,6 @@ import com.android.server.AppStateTracker;
 import com.android.server.LocalServices;
 import com.android.server.ServiceThread;
 import com.android.server.StorageManagerInternal;
-import com.android.server.privatecompute.PccSandboxManagerInternal;
 import com.android.server.SystemConfig;
 import com.android.server.Watchdog;
 import com.android.server.am.psc.ActiveUidsInternal;
@@ -189,6 +188,7 @@ import com.android.server.am.psc.UidRecordInternal;
 import com.android.server.compat.PlatformCompat;
 import com.android.server.pm.pkg.AndroidPackage;
 import com.android.server.pm.pkg.PackageStateInternal;
+import com.android.server.privatecompute.PccSandboxManagerInternal;
 import com.android.server.wm.ActivityServiceConnectionsHolder;
 import com.android.server.wm.WindowManagerService;
 import com.android.server.wm.WindowProcessController;
@@ -1339,7 +1339,8 @@ public final class ProcessList extends ProcessListInternal
     public static final int PROC_MEM_CACHED = 4;
     public static final int PROC_MEM_NUM = 5;
 
-    // Map large set of system process states to
+    // Map large set of system process states to memory.
+    // LINT.IfChange(process_state_to_memory)
     private static final int[] sProcStateToProcMem = new int[] {
         PROC_MEM_PERSISTENT,            // ActivityManager.PROCESS_STATE_PERSISTENT
         PROC_MEM_PERSISTENT,            // ActivityManager.PROCESS_STATE_PERSISTENT_UI
@@ -1361,6 +1362,7 @@ public final class ProcessList extends ProcessListInternal
         PROC_MEM_CACHED,                // ActivityManager.PROCESS_STATE_CACHED_ACTIVITY_CLIENT
         PROC_MEM_CACHED,                // ActivityManager.PROCESS_STATE_CACHED_RECENT
         PROC_MEM_CACHED,                // ActivityManager.PROCESS_STATE_CACHED_EMPTY
+        PROC_MEM_CACHED,                // ActivityManager.PROCESS_STATE_NONEXISTENT
     };
 
     private static final long[] sFirstAwakePssTimes = new long[] {
@@ -1410,6 +1412,7 @@ public final class ProcessList extends ProcessListInternal
         PSS_TEST_SAME_BACKGROUND_INTERVAL,  // PROC_MEM_SERVICE
         PSS_TEST_SAME_BACKGROUND_INTERVAL,  // PROC_MEM_CACHED
     };
+    // LINT.ThenChange()
 
     public static final class ProcStateMemTracker {
         final int[] mHighestMem = new int[PROC_MEM_NUM];
@@ -5015,7 +5018,7 @@ public final class ProcessList extends ProcessListInternal
                         r.mProfile.getLastCachedPss() * BYTES_IN_KB, new StringBuilder()));
                 proto.write(ProcessOomProto.Detail.CACHED, state.isCached());
                 proto.write(ProcessOomProto.Detail.EMPTY, state.isEmpty());
-                proto.write(ProcessOomProto.Detail.HAS_ABOVE_CLIENT, psr.isHasAboveClient());
+                proto.write(ProcessOomProto.Detail.HAS_ABOVE_CLIENT, psr.hasBindAboveClient());
 
                 if (state.getSetProcState() >= ActivityManager.PROCESS_STATE_SERVICE) {
                     long lastCpuTime = r.mProfile.mLastCpuTime.get();
@@ -5163,7 +5166,7 @@ public final class ProcessList extends ProcessListInternal
                 pw.print("    ");
                 pw.print("cached="); pw.print(state.isCached());
                 pw.print(" empty="); pw.print(state.isEmpty());
-                pw.print(" hasAboveClient="); pw.println(psr.isHasAboveClient());
+                pw.print(" hasAboveClient="); pw.println(psr.hasBindAboveClient());
 
                 if (state.getSetProcState() >= ActivityManager.PROCESS_STATE_SERVICE) {
                     long lastCpuTime = r.mProfile.mLastCpuTime.get();

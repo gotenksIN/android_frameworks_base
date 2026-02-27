@@ -18,9 +18,6 @@ package com.android.wm.shell.windowdecor.caption
 
 import android.app.ActivityManager.RunningTaskInfo
 import android.content.Context
-import android.content.pm.ActivityInfo.CONFIG_FONT_SCALE
-import android.content.pm.ActivityInfo.CONFIG_LOCALE
-import android.content.pm.ActivityInfo.CONFIG_UI_MODE
 import android.graphics.Point
 import android.graphics.Rect
 import android.os.Handler
@@ -179,11 +176,6 @@ class AppHeaderController(
         get() = taskInfo.positionInParent
 
     private val closeLayoutMenuRunnable = Runnable { closeLayoutMenu() }
-    private val isEducationOrHandleReportingEnabled =
-        Flags.enableDesktopWindowingAppHandleEducation() ||
-            DesktopExperienceFlags.ENABLE_DESKTOP_WINDOWING_APP_TO_WEB_EDUCATION_INTEGRATION
-                .isTrue ||
-            DesktopExperienceFlags.ENABLE_APP_HANDLE_POSITION_REPORTING.isTrue
     private val dimensions = LargeHeaderDimensions(decorWindowContext.resources)
 
     private var isLayoutMenuHovered = false
@@ -218,14 +210,6 @@ class AppHeaderController(
                 onLayoutButtonHoverExit()
             }
 
-            // Check for relevant configuration changes
-            val oldConfig = this.taskInfo.configuration
-            val newConfig = params.runningTaskInfo.configuration
-            val diff = newConfig.diff(oldConfig)
-            // Check for UI mode (dark/light), locale, or font scale changes
-            val configChanged =
-                (diff and (CONFIG_UI_MODE or CONFIG_LOCALE or CONFIG_FONT_SCALE)) != 0
-
             val captionLayout =
                 super.relayout(
                     params,
@@ -245,16 +229,6 @@ class AppHeaderController(
                 // to the Header in desktop immersive.
                 captionLayout.captionY + captionLayout.captionTopPadding,
             )
-
-            if (configChanged && isOpenByDefaultDialogActive) {
-                // Config changed, so destroy the old dialog and create a new one.
-                // The new one will inflate with the correct resources.
-                openByDefaultDialog?.dismiss() // Triggers onDialogDismissed, setting it to null
-                createOpenByDefaultDialog()
-            } else {
-                // No config change, just relayout the existing dialog for size/position changes.
-                openByDefaultDialog?.relayout(taskInfo)
-            }
 
             updateLayoutMenu(startT)
 
@@ -288,9 +262,6 @@ class AppHeaderController(
     }
 
     private fun notifyCaptionStateChanged() {
-        if (!desktopState.canEnterDesktopMode || !isEducationOrHandleReportingEnabled) {
-            return
-        }
         if (!isCaptionVisible || !hasGlobalFocus) {
             notifyNoCaption()
             return
@@ -299,7 +270,6 @@ class AppHeaderController(
     }
 
     private fun notifyNoCaption() {
-        if (!desktopState.canEnterDesktopMode || !isEducationOrHandleReportingEnabled) return
         windowDecorCaptionRepository.notifyCaptionChanged(CaptionState.NoCaption(taskInfo.taskId))
     }
 
@@ -531,7 +501,9 @@ class AppHeaderController(
                     // TODO(b/409648813): Have handle menus use [CaptionType]
                     layoutResId = R.layout.desktop_mode_app_header,
                     splitScreenController = splitScreenController,
-                    shouldShowWindowingPill = desktopState.canEnterDesktopModeOrShowAppHandle,
+                    shouldShowWindowingPill =
+                        !Flags.enableConsolidatedWindowOptions() &&
+                            desktopState.canEnterDesktopModeOrShowAppHandle,
                     shouldShowNewWindowButton = supportsMultiInstance,
                     shouldShowManageWindowsButton = shouldShowManageWindowsButton,
                     shouldShowChangeAspectRatioButton = shouldShowChangeAspectRatioButton,
@@ -579,9 +551,7 @@ class AppHeaderController(
         viewHolder.onHandleMenuClosed()
         handleMenu?.close()
         handleMenu = null
-        if (desktopState.canEnterDesktopMode && isEducationOrHandleReportingEnabled) {
-            notifyCaptionStateChanged()
-        }
+        notifyCaptionStateChanged()
     }
 
     private fun isBrowserApp(): Boolean =
@@ -666,9 +636,7 @@ class AppHeaderController(
                 val (name, icon) = taskResourceLoader.getNameAndHeaderIcon(taskInfo)
                 viewHolder.setAppName(name)
                 viewHolder.setAppIcon(icon)
-                if (desktopState.canEnterDesktopMode && isEducationOrHandleReportingEnabled) {
-                    notifyCaptionStateChanged()
-                }
+                notifyCaptionStateChanged()
             }
         viewHolder = appHeaderViewHolder
         return appHeaderViewHolder
@@ -758,9 +726,8 @@ class AppHeaderController(
         closeManageWindowsMenu()
         closeLayoutMenu()
         viewHolder.close()
-        if (desktopState.canEnterDesktopMode && isEducationOrHandleReportingEnabled) {
-            notifyNoCaption()
-        }
+        notifyNoCaption()
+        openByDefaultDialog?.dismiss()
         return super.close(wct, t)
     }
 

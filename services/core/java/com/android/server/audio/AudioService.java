@@ -101,6 +101,8 @@ import static com.android.media.audio.Flags.ringerModeAffectsAlarm;
 import static com.android.media.audio.Flags.stereoSpatializationBinauralTransaural;
 import static com.android.media.audio.Flags.streamAssistantNotAliasedToMusic;
 import static com.android.media.audio.metrics.AudioAtomsLog.AUDIO_HARDENING_REPORTED__API_TYPE__AUDIO_HARDENING_API_TYPE_PLAYBACK;
+import static com.android.media.audio.metrics.AudioAtomsLog.AUDIO_HARDENING_REPORTED__USAGE__AUDIO_USAGE_UNKNOWN;
+import static com.android.media.audio.metrics.AudioAtomsLog.AUDIO_HARDENING_REPORTED__EXEMPTION_REASON__HARDENING_EXEMPTION_NONE;
 import static com.android.media.flags.Flags.enableAudioInputDeviceRoutingAndVolumeControl;
 import static com.android.server.audio.SoundDoseHelper.ACTION_CHECK_MUSIC_ACTIVE;
 import static com.android.server.utils.EventLogger.Event.ALOGE;
@@ -1029,7 +1031,9 @@ public class AudioService extends IAudioService.Stub
                     bypassed ? EventLogger.Event.ALOGI : EventLogger.Event.ALOGW, TAG);
             AudioAtomsLog.write(AudioAtomsLog.AUDIO_HARDENING_REPORTED, uid,
                     AUDIO_HARDENING_REPORTED__API_TYPE__AUDIO_HARDENING_API_TYPE_PLAYBACK,
-                    type == HardeningType.FULL, !bypassed);
+                    type == HardeningType.FULL, !bypassed,
+                    AUDIO_HARDENING_REPORTED__USAGE__AUDIO_USAGE_UNKNOWN,
+                    AUDIO_HARDENING_REPORTED__EXEMPTION_REASON__HARDENING_EXEMPTION_NONE);
         }
 
         @Override
@@ -5183,7 +5187,11 @@ public class AudioService extends IAudioService.Stub
         mAudioSystem.clearRoutingCache();
 
         int streamType = replaceBtScoStreamWithVoiceCall(vi.getStreamType(), "setDeviceVolume");
-
+        if (streamType == AudioManager.USE_DEFAULT_STREAM_TYPE) {
+            Slog.e(TAG, "setDeviceVolume: unsupported default stream type based VolumeInfo",
+                    new Exception());
+            return;
+        }
         final VolumeStreamState vss = getVssForStream(streamType);
 
         // log the current device that will be used when evaluating the sending of the
@@ -5227,14 +5235,18 @@ public class AudioService extends IAudioService.Stub
         }
 
         int streamType = replaceBtScoStreamWithVoiceCall(vi.getStreamType(), "setVolumeForDevice");
-
+        if (streamType == AudioManager.USE_DEFAULT_STREAM_TYPE) {
+            Slog.e(TAG, "setVolumeForDevice: unsupported default stream type based VolumeInfo",
+                    new Exception());
+            return;
+        }
         AudioService.sVolumeLogger.enqueue(
                 new DeviceVolumeEvent(streamType, vi.getVolumeIndex(), ada, /*deviceForStream=*/-1,
                         callingPackage, /*skipping=*/false, /*event=*/"setVolumeForDevice"));
 
         final VolumeStreamState vss = getVssForStream(streamType);
         if (vss == null) {
-            Log.e(TAG, "VSS for stream type " + streamType + " is null");
+            Slog.e(TAG, "VSS for stream type " + streamType + " is null");
             return;
         }
 
@@ -5264,6 +5276,11 @@ public class AudioService extends IAudioService.Stub
 
         int streamType = replaceBtScoStreamWithVoiceCall(vi.getStreamType(),
                 "adjustVolumeForDevice");
+        if (streamType == AudioManager.USE_DEFAULT_STREAM_TYPE) {
+            Slog.e(TAG, "adjustVolumeForDevice: unsupported default stream type based VolumeInfo",
+                    new Exception());
+            return;
+        }
         AudioService.sVolumeLogger.enqueue(
                 new DeviceVolumeEvent(streamType, direction, ada, /*deviceForStream=*/-1,
                         callingPackage, /*skipped=*/false, /*event=*/"adjustVolumeForDevice"));
@@ -5298,7 +5315,19 @@ public class AudioService extends IAudioService.Stub
             return;
         }
 
-        int streamType = replaceBtScoStreamWithVoiceCall(vi.getStreamType(),
+        int streamType = vi.getStreamType();
+        if (vi.hasStreamType() && streamType == AudioManager.USE_DEFAULT_STREAM_TYPE) {
+            synchronized (mCachedAbsVolDrivingStreamsLock) {
+                streamType = mCachedAbsVolDrivingStreams.getOrDefault(ada.getInternalType(),
+                        AudioSystem.STREAM_DEFAULT);
+            }
+            if (streamType == AudioSystem.STREAM_DEFAULT) {
+                Slog.e(TAG, "notifyAbsoluteVolumeChanged(): no driving stream for device " + ada);
+                return;
+            }
+        }
+
+        streamType = replaceBtScoStreamWithVoiceCall(streamType,
                 "notifyAbsoluteVolumeChanged");
 
         if (mMode.get() == AudioSystem.MODE_ASSISTANT_CONVERSATION
@@ -6642,15 +6671,21 @@ public class AudioService extends IAudioService.Stub
         Objects.requireNonNull(ada);
         Objects.requireNonNull(callingPackage);
         if (!vi.hasStreamType()) {
-            Log.e(TAG, "Unsupported non-stream type based VolumeInfo", new Exception());
+            Slog.e(TAG, "getDeviceVolume: unsupported non-stream type based VolumeInfo",
+                    new Exception());
             return getDefaultVolumeInfo();
         }
 
-        int streamType = replaceBtScoStreamWithVoiceCall(vi.getStreamType(), "getStreamMaxVolume");
+        int streamType = replaceBtScoStreamWithVoiceCall(vi.getStreamType(), "getDeviceVolume");
+        if (streamType == AudioManager.USE_DEFAULT_STREAM_TYPE) {
+            Slog.e(TAG, "getDeviceVolume: unsupported default stream type based VolumeInfo",
+                    new Exception());
+            return getDefaultVolumeInfo();
+        }
         final VolumeInfo.Builder vib = new VolumeInfo.Builder(vi);
         final VolumeStreamState vss = getVssForStream(streamType);
         if (vss == null) {
-            Log.w(TAG,
+            Slog.w(TAG,
                     "getDeviceVolume unsupported stream type " + streamType + ". Return default");
             return getDefaultVolumeInfo();
         }

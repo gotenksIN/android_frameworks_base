@@ -23,23 +23,32 @@ import static org.mockito.Mockito.verify;
 
 import android.os.ParcelUuid;
 import android.os.RemoteException;
+import android.service.personalcontext.IOpCallback;
 import android.service.personalcontext.hint.BundleHint;
 import android.service.personalcontext.hint.ContextHintTestUtils;
-import android.service.personalcontext.hint.ContextHintWithSignature;
-import android.service.personalcontext.hint.ContextHintWithSignatureWrapper;
+import android.service.personalcontext.hint.HintFilter;
+import android.service.personalcontext.hint.PublishedContextHint;
+import android.service.personalcontext.hint.PublishedContextHintWrapper;
+import android.service.personalcontext.insight.BundleInsight;
+import android.service.personalcontext.insight.ContextInsight;
+import android.service.personalcontext.insight.ContextInsightWrapper;
 import android.service.personalcontext.refiner.IRefineCallback;
 import android.service.personalcontext.refiner.IRefiner;
+import android.service.personalcontext.testutil.FakeExecutor;
 
+import androidx.annotation.NonNull;
 import androidx.test.ext.junit.runners.AndroidJUnit4;
 import androidx.test.filters.SmallTest;
 
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.mockito.Answers;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 
 import java.security.GeneralSecurityException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
@@ -47,39 +56,70 @@ import java.util.UUID;
 @SmallTest
 @RunWith(AndroidJUnit4.class)
 public class ContextUnderstanderServiceTest {
-    private UUID mComponentId;
-    private ContextUnderstanderService mService;
-    private IRefiner mBinder;
+    private final FakeExecutor mFakeExecutor = new FakeExecutor();
+    @Mock
+    private IRefineCallback mIRefineCallback;
 
     @Before
-    public void setup() throws RemoteException {
-        mComponentId = UUID.randomUUID();
-        mService = mock(ContextUnderstanderService.class, Answers.CALLS_REAL_METHODS);
-        mBinder = (IRefiner) mService.onBind(null);
-        mBinder.configure(new ParcelUuid(mComponentId));
+    public void setUp() throws Exception {
+        MockitoAnnotations.initMocks(this);
     }
 
     @Test
     public void testOnUnderstandList() throws RemoteException, GeneralSecurityException {
-        final ContextHintWithSignature hint1 =
-                new ContextHintWithSignature.Builder(
+        final PublishedContextHint hint1 =
+                new PublishedContextHint.Builder(
                         new BundleHint.Builder().build(),
                         ContextHintTestUtils.generateSignedHintKey())
                         .build();
-        final ContextHintWithSignature hint2 =
-                new ContextHintWithSignature.Builder(
+        final PublishedContextHint hint2 =
+                new PublishedContextHint.Builder(
                         new BundleHint.Builder().build(),
                         ContextHintTestUtils.generateSignedHintKey())
                         .build();
 
-        final List<ContextHintWithSignature> hints = Arrays.asList(hint1, hint2);
-        IRefineCallback callback = mock(IRefineCallback.Stub.class);
+        final List<PublishedContextHint> hints = Arrays.asList(hint1, hint2);
 
-        mBinder.refine(ContextHintWithSignatureWrapper.wrapList(hints), callback);
+        final BundleInsight generatedInsight = new BundleInsight.Builder().build();
 
-        ArgumentCaptor<List> hintCaptor = ArgumentCaptor.forClass(List.class);
-        verify(mService).onUnderstand(hintCaptor.capture());
+        final ArrayList<PublishedContextHint> capturedHints = new ArrayList<>();
+        final UUID componentId = UUID.randomUUID();
+        final ContextUnderstanderService service =
+                new ContextUnderstanderService() {
+                    @NonNull
+                    @Override
+                    public HintFilter onInitializeFilter() {
+                        return new HintFilter.Builder().build();
+                    }
 
-        assertThat(hintCaptor.getValue()).containsExactlyElementsIn(hints);
+                    @Override
+                    public List<ContextInsight> onUnderstand(
+                            @NonNull List<PublishedContextHint> hints) {
+                        capturedHints.addAll(hints);
+                        return List.of(generatedInsight);
+                    }
+                };
+        service.setExecutor(mFakeExecutor);
+
+        final IRefiner refiner = (IRefiner) service.onBind(null);
+        final IOpCallback opCallback = mock(IOpCallback.Stub.class);
+
+        refiner.refine(
+                new ParcelUuid(componentId),
+                PublishedContextHintWrapper.wrapList(hints),
+                mIRefineCallback,
+                opCallback);
+
+        mFakeExecutor.runAll();
+        verify(opCallback).signalCompletion();
+        assertThat(capturedHints).containsExactlyElementsIn(hints);
+
+        ArgumentCaptor<List<ContextInsightWrapper>> insightCaptor =
+                ArgumentCaptor.forClass(List.class);
+        verify(mIRefineCallback).onUnderstood(insightCaptor.capture());
+
+        assertThat(insightCaptor.getValue()).hasSize(1);
+        assertThat(insightCaptor.getValue().getFirst().getContextInsight())
+                .isEqualTo(generatedInsight);
     }
 }

@@ -81,6 +81,7 @@ import static android.content.pm.PackageManager.MATCH_UNINSTALLED_PACKAGES;
 import static android.content.pm.PackageManager.PERMISSION_GRANTED;
 import static android.content.pm.PackageManager.SIGNATURE_NO_MATCH;
 import static android.crashrecovery.flags.Flags.refactorCrashrecovery;
+import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidTrackEvent.BINDER_DIED_EVENT;
 import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidTrackEvent.PROCESS_START_EVENT;
 import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidProcessStartEvent.PROCESS_NAME;
 import static android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidProcessStartEvent.UID;
@@ -375,6 +376,7 @@ import android.database.ContentObserver;
 import android.graphics.Rect;
 import android.hardware.display.DisplayManager;
 import android.hardware.display.DisplayManagerInternal;
+import android.internal.perfetto.protos.AndroidTrackEventOuterClass.AndroidBinderDiedEvent;
 import android.net.Uri;
 import android.os.AppZygote;
 import android.os.BatteryStats;
@@ -618,10 +620,19 @@ import java.util.function.BiFunction;
 import java.util.function.Consumer;
 
 public class ActivityManagerService extends IActivityManager.Stub
-        implements Watchdog.Monitor, BatteryStatsImpl.BatteryCallback, ActivityManagerGlobalLock {
+        implements Watchdog.Monitor, BatteryStatsImpl.BatteryCallback, ActivityManagerGlobalLock,
+        OomAdjuster.HostingTypeProvider {
 
     private static final String SYSTEM_PROPERTY_DEVICE_PROVISIONED =
             "persist.sys.device_provisioned";
+
+    @Override
+    public String getHostingType(ProcessRecordInternal app) {
+        // All ProcessRecordInternal objects handled by ActivityManagerService are concrete
+        // ProcessRecord instances, so this cast is safe.
+        return ((ProcessRecord) app).getHostingRecord().getType();
+    }
+
 
     static final String TAG = TAG_WITH_CLASS_NAME ? "ActivityManagerService" : TAG_AM;
     public static final String TAG_BACKUP = TAG + POSTFIX_BACKUP;
@@ -797,7 +808,7 @@ public class ActivityManagerService extends IActivityManager.Stub
 
     public final IntentFirewall mIntentFirewall;
 
-    private final MemoryLimiter mMemoryLimiter = MemoryLimiter.getDefaultMemoryLimiter(this);
+    private final MemoryLimiter mMemoryLimiter = MemoryLimiter.getDefaultMemoryLimiter();
 
     /**
      * The global lock for AMS, it's de-facto the ActivityManagerService object as of now.
@@ -2624,6 +2635,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                 .Builder(mProcessList, activeUids, oomConstants, new OomAdjusterCallback(),
                          new OomAdjusterStateGetter())
                 .setHandlerThread(handlerThread)
+                .setHostingTypeProvider(this)
                 .build();
         mOomAdjuster = mProcessStateController.getOomAdjuster();
 
@@ -2702,6 +2714,7 @@ public class ActivityManagerService extends IActivityManager.Stub
                 .setProcLockObject(this.mProcLock)
                 .setTopProcessChangeCallback(this::updateTopAppListeners)
                 .setProcessLruUpdater(mProcessList)
+                .setHostingTypeProvider(this)
                 .build();
         mOomAdjuster = mProcessStateController.getOomAdjuster();
 
@@ -4044,6 +4057,18 @@ public class ActivityManagerService extends IActivityManager.Stub
         final int setProcState = app.getSetProcState();
         if (app.getPid() == pid && (appThread = app.getThread()) != null
                 && appThread.asBinder() == thread.asBinder()) {
+            if (android.os.Flags.perfettoSdkTracingV3()) {
+                PerfettoTrace.instant(PROC_STATE_CATEGORY, "binder_died")
+                        .beginProto()
+                        .beginNested(BINDER_DIED_EVENT)
+                        .addField(AndroidBinderDiedEvent.UID, app.info.uid)
+                        .addField(AndroidBinderDiedEvent.PID, pid)
+                        .addField(AndroidBinderDiedEvent.PROCESS_NAME, app.processName)
+                        .endNested()
+                        .endProto()
+                        .emit();
+            }
+
             boolean doLowMem = app.getActiveInstrumentation() == null;
             boolean doOomAdj = doLowMem;
             if (!app.isKilledByAm()) {
@@ -5687,7 +5712,9 @@ public class ActivityManagerService extends IActivityManager.Stub
                     HostingRecord.getHostingTypeIdStatsd(hostingRecord.getType()),
                     HostingRecord.getTriggerTypeForStatsd(hostingRecord.getTriggerType()),
                     hostingRecord.getCallerUid(),
-                    hostingRecord.getCallerProcessName());
+                    hostingRecord.getCallerProcessName(),
+                    hostingRecord.getHostingAuthority(),
+                    hostingRecord.isProviderStable());
         }
     }
 
@@ -11199,6 +11226,11 @@ public class ActivityManagerService extends IActivityManager.Stub
                 }
                 sdumper.dumpLocked();
             }
+        }
+
+        if (Flags.memoryLimiterEnable()) {
+            pw.println(TICK);
+            mMemoryLimiter.dump(pw);
         }
 
         // No need to hold the lock.

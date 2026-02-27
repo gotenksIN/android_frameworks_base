@@ -152,7 +152,8 @@ constructor(
                     contentText
                         ?.takeUnless { it is Notification.Metric.TimeDifference }
                         ?.toValueString(context)
-                        ?.text()
+                        ?.textVariants
+                        ?.first()
                 chipChronometer =
                     (contentText as? Notification.Metric.TimeDifference)?.toChronometer()
                 chipChronometerFormat =
@@ -167,7 +168,8 @@ constructor(
             }
         } else {
             val firstMetricValue = content.metrics?.firstOrNull()
-            val textFromMetric = (firstMetricValue as? Metric.Text)?.metricValue?.toString()
+            val textFromMetric =
+                (firstMetricValue as? Metric.Text)?.textVariants?.first()?.toString()
             val timeFromMetric = (firstMetricValue as? Metric.TimeDifference)?.toWhen()
             val timeFromWhen =
                 when (val rawTime = content.time) {

@@ -20,11 +20,13 @@ import android.annotation.Nullable;
 import android.content.ComponentName;
 import android.os.Bundle;
 import android.service.personalcontext.hint.ContextHint;
-import android.service.personalcontext.hint.ContextHintWithSignature;
+import android.service.personalcontext.hint.PublishedContextHint;
 import android.service.personalcontext.insight.PublishedContextInsight;
 import android.service.personalcontext.insight.interaction.InsightEvent;
 
 import androidx.annotation.NonNull;
+
+import com.android.server.personalcontext.RefinerWorkflow;
 
 import java.util.Set;
 import java.util.UUID;
@@ -44,15 +46,16 @@ public interface Refiner extends Component {
 
     /** Gets a grouping of hints the refiner is interested in. */
     @Nullable
-    Set<Set<ContextHintWithSignature>> getInterestedHintClusters(
-            @NonNull Set<ContextHintWithSignature> allContextHints,
+    Set<Set<PublishedContextHint>> getInterestedHintClusters(
+            @NonNull Set<PublishedContextHint> allContextHints,
             @NonNull Set<UUID> seenIDs,
             boolean isFirstRun);
 
     /** Refines hints into more hints. */
     void refine(
-            @NonNull Set<ContextHintWithSignature> inputHints,
-            @NonNull Consumer<Set<ContextHint>> callback);
+            @NonNull Set<PublishedContextHint> inputHints,
+            @NonNull Consumer<Set<ContextHint>> callback,
+            @NonNull RefinerWorkflow.InsightConsumer insightCallback);
 
     /** Reports an event for logging. */
     void handleEvent(@NonNull String packageName, @NonNull InsightEvent event);

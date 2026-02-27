@@ -45,10 +45,8 @@ sealed interface WifiIcon : Diffable<WifiIcon> {
      * Represents a visible wifi icon that uses [res] as its image and [contentDescription] as its
      * description.
      */
-    class Visible(
-        @DrawableRes val res: Int,
-        val contentDescription: ContentDescription.Loaded,
-    ) : WifiIcon {
+    class Visible(@DrawableRes val res: Int, val contentDescription: ContentDescription.Loaded) :
+        WifiIcon {
         val icon = Icon.Resource(res, contentDescription)
 
         override fun toString() = contentDescription.description.toString()
@@ -100,7 +98,7 @@ sealed interface WifiIcon : Diffable<WifiIcon> {
                             "${context.getString(WIFI_NO_CONNECTION)},${context.getString(
                                 NO_INTERNET
                             )}"
-                        )
+                        ),
                     )
                 is WifiNetworkModel.Active -> model.toIcon(showHotspotInfo, context)
             }
@@ -153,7 +151,7 @@ sealed interface WifiIcon : Diffable<WifiIcon> {
             val isWifiStandardDisplaySupported = mIsWifiStandardDisplaySupported ?: false
 
 // QTI_END: 2024-06-20: WLAN: SystemUI: adding control to wifiStandard display feature
-            return if (this.isValidated) {
+            return if (this.showExclamation) {
 // QTI_BEGIN: 2024-06-02: WLAN: SystemUI: Wifi generation icons in Notification bar.
                 val icon = when (wifiStandard) {
 // QTI_END: 2024-06-02: WLAN: SystemUI: Wifi generation icons in Notification bar.

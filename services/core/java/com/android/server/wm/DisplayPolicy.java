@@ -998,7 +998,7 @@ public class DisplayPolicy {
             }
 
             @Override
-            public int onAppTransitionStartingLocked(long statusBarAnimationStartTime,
+            public void onAppTransitionStartingLocked(long statusBarAnimationStartTime,
                     long statusBarAnimationDuration) {
                 mHandler.post(() -> {
                     StatusBarManagerInternal statusBar = getStatusBarManagerInternal();
@@ -1007,11 +1007,10 @@ public class DisplayPolicy {
                                 statusBarAnimationStartTime, statusBarAnimationDuration);
                     }
                 });
-                return 0;
             }
 
             @Override
-            public void onAppTransitionCancelledLocked(boolean keyguardGoingAwayCancelled) {
+            public void onAppTransitionCancelledLocked() {
                 mHandler.post(mAppTransitionCancelled);
             }
 
@@ -3333,7 +3332,9 @@ public class DisplayPolicy {
                 appearance = clearNavBarOpaqueFlag(appearance);
             }
         } else if (mNavBarOpacityMode == NAV_BAR_OPAQUE_WHEN_FREEFORM_OR_DOCKED) {
-            if (multiWindowTaskVisible || freeformRootTaskVisible) {
+            if (navBackgroundWin != null && navBackgroundWin == mDisplayContent.getImeWindow()) {
+                appearance = clearNavBarOpaqueFlag(appearance);
+            } else if (multiWindowTaskVisible || freeformRootTaskVisible) {
                 if (mIsFreeformWindowOverlappingWithNavBar) {
                     appearance = clearNavBarOpaqueFlag(appearance);
                 }

@@ -743,6 +743,10 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_record_capture_target_choose_app">Choose an app to record</string>
+    <!-- Label for accessibility action to show the next app to choose. [CHAR LIMIT=NONE] -->
+    <string name="screen_record_accessibility_label_show_next">Show next</string>
+    <!-- Label for accessibility action to show the previous app to choose. [CHAR LIMIT=NONE] -->
+    <string name="screen_record_accessibility_label_show_previous">Show previous</string>
     <!-- Header for the carousel to choose an app for screen recording. [CHAR LIMIT=NONE] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -1044,11 +1048,12 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_capture_front_camera">Front camera</string>
-
     <!-- Text shown beneath partial screenshot region displaying the dimensions (width and height) of the area to be captured. [CHAR LIMIT=NONE] [SCREENSHOT=screen/7ytguTQdu3cEn4f] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="screen_capture_region_dimensions"><xliff:g example="210" id="width">%1$d</xliff:g> x <xliff:g example="129" id="height">%2$d</xliff:g></string>
+    <!-- Description for the click action of the selectable radio buttons in the screen capture toolbar. [CHAR LIMIT=NONE] -->
+    <string name="screen_capture_a11y_toolbar_radio_button_action">select</string>
 
     <!-- Text of the button popup on the share screen privacy indicator to stop screen sharing. -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -1806,6 +1811,12 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="input_method_switcher_title_large_screen">Keyboard</string>
+
+    <!-- Accessible label for the action to select a keyboard or input method item in the IME switcher menu. [CHAR LIMIT=NONE] -->
+    <string name="input_method_switcher_select_item">select</string>
+
+    <!-- Accessible label for the action to close the IME switcher menu. [CHAR LIMIT=NONE] -->
+    <string name="input_method_switcher_dismiss">dismiss</string>
 
     <!-- The overflow indicator shown when a group has more notification inside the group than the visible ones. An example is "+ 3" [CHAR LIMIT=5] -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -7271,7 +7282,7 @@
     <!-- Label for button proceeding touchpad tutorial [CHAR LIMIT=NONE] -->
     <string name="touchpad_tutorial_next_button">Next</string>
     <!-- Screen title after gesture was not done correctly [CHAR LIMIT=NONE] -->
-    <string name="gesture_error_title">Try again!</string>
+    <string name="gesture_error_title">Try again</string>
     <!-- BACK GESTURE -->
     <!-- Touchpad back gesture action name in tutorial [CHAR LIMIT=NONE] -->
     <string name="touchpad_back_gesture_action_title">Go back</string>
@@ -7288,23 +7299,33 @@
     <string name="touchpad_home_gesture_action_title">Go home</string>
     <!-- Touchpad home gesture guidance in gestures tutorial [CHAR LIMIT=NONE] -->
     <string name="touchpad_home_gesture_guidance">Swipe up with three fingers on your touchpad</string>
+    <!-- Touchpad home gesture guidance in the updated gestures tutorial [CHAR LIMIT=NONE] -->
+    <string name="touchpad_home_gesture_updated_guidance">First, swipe up with three fingers to view your recent apps</string>
     <!-- Screen title after home gesture was done successfully [CHAR LIMIT=NONE] -->
     <string name="touchpad_home_gesture_success_title">Great job!</string>
     <!-- Text shown to the user after they complete home gesture tutorial [CHAR LIMIT=NONE] -->
     <string name="touchpad_home_gesture_success_body">You completed the go home gesture</string>
     <!-- Text shown to the user after home gesture was not done correctly [CHAR LIMIT=NONE] -->
     <string name="touchpad_home_gesture_error_body">Swipe up with three fingers on your touchpad to go to your home screen</string>
+    <!-- Screen title after first part of home gesture was done successfully [CHAR LIMIT=NONE] -->
+    <string name="touchpad_home_gesture_partial_success_title">Almost there!</string>
+    <!-- Text shown to the user after they complete first part of home gesture tutorial [CHAR LIMIT=NONE] -->
+    <string name="touchpad_home_gesture_partial_success_body">Next, swipe up with three fingers again to go to your home screen</string>
     <!-- RECENT APPS GESTURE -->
     <!-- Touchpad recent apps gesture action name in tutorial [CHAR LIMIT=NONE] -->
     <string name="touchpad_recent_apps_gesture_action_title">View recent apps</string>
     <!-- Touchpad recent apps gesture guidance in gestures tutorial [CHAR LIMIT=NONE] -->
     <string name="touchpad_recent_apps_gesture_guidance">Swipe up and hold using three fingers on your touchpad</string>
+    <!-- Touchpad recent apps gesture guidance in the updated gestures tutorial [CHAR LIMIT=NONE] -->
+    <string name="touchpad_recent_apps_updated_gesture_guidance">Swipe up with three fingers on your touchpad</string>
     <!-- Screen title after recent apps gesture was done successfully [CHAR LIMIT=NONE] -->
     <string name="touchpad_recent_apps_gesture_success_title">Great job!</string>
     <!-- Text shown to the user after they complete recent apps gesture tutorial [CHAR LIMIT=NONE] -->
-    <string name="touchpad_recent_apps_gesture_success_body">You completed the view recent apps gesture.</string>
+    <string name="touchpad_recent_apps_gesture_success_body">You completed the view recent apps gesture</string>
     <!-- Text shown to the user after recent gesture was not done correctly [CHAR LIMIT=NONE] -->
     <string name="touchpad_recent_gesture_error_body">To view recent apps, swipe up and hold using three fingers on your touchpad</string>
+    <!-- Text shown to the user in the updated tutorial after recent gesture was not done correctly [CHAR LIMIT=NONE] -->
+    <string name="touchpad_recent_updated_gesture_error_body">Swipe up with three fingers on your touchpad to go to your recent apps screen</string>
     <!-- SWITCH APPS GESTURE -->
     <!-- Touchpad switch apps gesture action name in tutorial [CHAR LIMIT=NONE] -->
     <string name="touchpad_switch_apps_gesture_action_title">Switch apps</string>

@@ -16,19 +16,24 @@
 
 package com.android.server.personalcontext.component.client;
 
+import android.Manifest;
+import android.annotation.EnforcePermission;
 import android.annotation.PermissionManuallyEnforced;
 import android.content.Context;
 import android.content.pm.ServiceInfo;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.IBinder;
-import android.os.ParcelUuid;
+import android.os.Looper;
+import android.os.PermissionEnforcer;
 import android.os.RemoteException;
 import android.os.UserHandle;
 import android.service.personalcontext.hint.ContextHint;
-import android.service.personalcontext.hint.ContextHintWithSignature;
-import android.service.personalcontext.hint.ContextHintWithSignatureWrapper;
 import android.service.personalcontext.hint.ContextHintWrapper;
 import android.service.personalcontext.hint.HintFilter;
+import android.service.personalcontext.hint.PublishedContextHint;
+import android.service.personalcontext.hint.PublishedContextHintWrapper;
+import android.service.personalcontext.insight.ContextInsightWrapper;
 import android.service.personalcontext.insight.PublishedContextInsight;
 import android.service.personalcontext.insight.interaction.InsightEvent;
 import android.service.personalcontext.refiner.IGetFilterCallback;
@@ -38,6 +43,7 @@ import android.util.Slog;
 
 import androidx.annotation.NonNull;
 
+import com.android.server.personalcontext.RefinerWorkflow;
 import com.android.server.personalcontext.component.Refiner;
 
 import java.util.Collections;
@@ -45,6 +51,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.function.Consumer;
 
 /**
@@ -57,17 +65,28 @@ public class ServiceClientRefiner extends BaseServiceClientComponent<IRefiner> i
 
     public ServiceClientRefiner(Context context, UUID componentId, ServiceInfo serviceInfo,
             UserHandle userHandle) {
-        super(context, componentId, serviceInfo, userHandle);
+        this(
+                context,
+                componentId,
+                serviceInfo,
+                userHandle,
+                Executors.newSingleThreadExecutor(),
+                new Handler(Looper.getMainLooper()));
+    }
 
-        runWithBinder(binder -> {
+    protected ServiceClientRefiner(Context context, UUID componentId, ServiceInfo serviceInfo,
+            UserHandle userHandle, Executor executor, Handler handler) {
+        super(context, componentId, serviceInfo, userHandle, executor, handler);
+
+        runWithScopedBinder((binder, opCallback) -> {
             try {
-                binder.getFilter(new IGetFilterCallback.Stub() {
+                binder.getFilter(getParcelComponentId(), new IGetFilterCallback.Stub() {
                     @PermissionManuallyEnforced
                     @Override
                     public void updateFilter(HintFilter filter) {
                         mFilter = filter;
                     }
-                });
+                }, opCallback);
             } catch (RemoteException e) {
                 Slog.e(TAG, "Failed to get renderer filter", e);
             }
@@ -75,12 +94,12 @@ public class ServiceClientRefiner extends BaseServiceClientComponent<IRefiner> i
     }
 
     @Override
-    public Set<Set<ContextHintWithSignature>> getInterestedHintClusters(
-            Set<ContextHintWithSignature> allContextHints, Set<UUID> seenIDs, boolean isFirstRun) {
+    public Set<Set<PublishedContextHint>> getInterestedHintClusters(
+            Set<PublishedContextHint> allContextHints, Set<UUID> seenIDs, boolean isFirstRun) {
         if (mFilter == null) {
             return null;
         } else {
-            final Set<ContextHintWithSignature> hints = mFilter.getInterestedHintClusters(
+            final Set<PublishedContextHint> hints = mFilter.getInterestedHintClusters(
                     allContextHints, seenIDs);
             return hints == null || hints.isEmpty() ? null : Set.of(hints);
         }
@@ -92,28 +111,55 @@ public class ServiceClientRefiner extends BaseServiceClientComponent<IRefiner> i
     }
 
     @Override
-    protected void initializeClient(IRefiner client) throws RemoteException {
-        client.configure(new ParcelUuid(getComponentId()));
+    protected void initializeClient(IRefiner client) {
     }
 
     @Override
     public void refine(
-            @NonNull Set<ContextHintWithSignature> inputHints,
-            @NonNull Consumer<Set<ContextHint>> callback) {
-        final IRefineCallback.Stub binderCallback = new IRefineCallback.Stub() {
-            @PermissionManuallyEnforced
-            @Override
-            public void onHintsRefined(List<ContextHintWrapper> hints) {
-                callback.accept(ContextHintWrapper.unwrapInto(hints, new HashSet<>()));
-            }
-        };
+            @NonNull Set<PublishedContextHint> inputHints,
+            @NonNull Consumer<Set<ContextHint>> callback,
+            @NonNull RefinerWorkflow.InsightConsumer insightCallback) {
+        if (android.service.personalcontext.Flags.enforcePersonalContextPermissions()
+                && !checkPermission(Manifest.permission.PERSONAL_CONTEXT_RECEIVE_HINTS)) {
+            Slog.e(
+                    TAG,
+                    "Service "
+                            + getComponentName()
+                            + " missing permission "
+                            + Manifest.permission.PERSONAL_CONTEXT_RECEIVE_HINTS);
+            callback.accept(Collections.emptySet());
+            return;
+        }
 
-        final List<ContextHintWithSignatureWrapper> hints =
-                ContextHintWithSignatureWrapper.wrapList(inputHints);
+        final IRefineCallback.Stub refinerCallback =
+                new IRefineCallback.Stub(PermissionEnforcer.fromContext(mContext)) {
+                    // Suppressing warning as enforcement is currently behind a flag
+                    @SuppressWarnings("MissingEnforcePermissionHelper")
+                    @EnforcePermission(android.Manifest.permission.PERSONAL_CONTEXT_PUBLISH_HINTS)
+                    @Override
+                    public void onHintsRefined(List<ContextHintWrapper> hints) {
+                        if (android.service.personalcontext.Flags
+                                .enforcePersonalContextPermissions()) {
+                            onHintsRefined_enforcePermission();
+                        }
+                        callback.accept(ContextHintWrapper.unwrapInto(hints, new HashSet<>()));
+                    }
 
-        runWithBinder(binder -> {
+                    @PermissionManuallyEnforced
+                    @Override
+                    public void onUnderstood(List<ContextInsightWrapper> insights) {
+                        insightCallback.accept(
+                                getComponentId(),
+                                ContextInsightWrapper.unwrapInto(insights, new HashSet<>()));
+                    }
+                };
+
+        final List<PublishedContextHintWrapper> hints =
+                PublishedContextHintWrapper.wrapList(inputHints);
+
+        runWithScopedBinder((binder, opCallback) -> {
             try {
-                binder.refine(hints, binderCallback);
+                binder.refine(getParcelComponentId(), hints, refinerCallback, opCallback);
             } catch (RemoteException e) {
                 Slog.w(TAG, this + " refine() failed", e);
                 callback.accept(Collections.emptySet());
@@ -123,9 +169,9 @@ public class ServiceClientRefiner extends BaseServiceClientComponent<IRefiner> i
 
     @Override
     public void handleEvent(@NonNull String packageName, @NonNull InsightEvent event) {
-        runWithBinder(binder -> {
+        runWithScopedBinder((binder, opCallback) -> {
             try {
-                binder.handleEvent(packageName, event);
+                binder.handleEvent(getParcelComponentId(), packageName, event, opCallback);
             } catch (RemoteException e) {
                 Slog.w(TAG, this + " handleEvent() failed", e);
             }

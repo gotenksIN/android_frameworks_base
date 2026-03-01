@@ -21,8 +21,10 @@ import static android.service.messaging.AlternativeMessageTransportService.UPGRA
 import android.Manifest;
 import android.annotation.NonNull;
 import android.annotation.Nullable;
+import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.PackageManager;
 import android.content.pm.ResolveInfo;
 import android.net.Uri;
@@ -34,6 +36,7 @@ import android.text.TextUtils;
 import android.util.Log;
 
 import com.android.internal.annotations.GuardedBy;
+import com.android.internal.telephony.SmsApplication;
 
 import java.util.List;
 import java.util.Objects;
@@ -57,19 +60,43 @@ public final class MessageUpgradeController {
     private static final String TAG = "MsgUpgradeController";
     private static final boolean VDBG = Log.isLoggable(TAG, Log.VERBOSE);
     private static final int SERVICE_BIND_TIMEOUT = 10; // Seconds
+
     private final ScheduledExecutorService mScheduler =
             Executors.newSingleThreadScheduledExecutor();
-    private final Object mLock = new Object();
+    private final Object mMessageUpgradeLock = new Object();
     private final Context mContext;
     private final AlternativeMessageTransportServiceWrapper mServiceWrapper =
             new AlternativeMessageTransportServiceWrapper();
 
-    @GuardedBy("mLock")
+    private final BroadcastReceiver mDefaultSmsAppChangedReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (SmsApplication.ACTION_DEFAULT_SMS_PACKAGE_CHANGED_INTERNAL.equals(
+                    intent.getAction())) {
+                mScheduler.execute(() -> {
+                    String currentSmsPackage = Telephony.Sms.getDefaultSmsPackage(mContext);
+                    if (!Objects.equals(getCachedDefaultSmsAppPackage(), currentSmsPackage)) {
+                        Log.d(TAG, "SMS app changed. current:" + currentSmsPackage);
+                        updateCachedDefaultSmsPackageData(currentSmsPackage);
+                    }
+                });
+            }
+        }
+    };
+
+    @GuardedBy("mMessageUpgradeLock")
     @Nullable private ScheduledFuture<?> mServiceCloseFuture;
+
+    @GuardedBy("mMessageUpgradeLock")
+    private String mCachedDefaultSmsPackage;
+    @GuardedBy("mMessageUpgradeLock")
+    private boolean mCachedIsUpgradeSupported = false;
 
     /** @hide */
     public MessageUpgradeController(@NonNull Context context) {
         mContext = Objects.requireNonNull(context);
+        updateCachedDefaultSmsPackageData(null);
+        registerOnSmsAppChangedReceiver();
     }
 
     /**
@@ -95,7 +122,7 @@ public final class MessageUpgradeController {
 
         final long identity = Binder.clearCallingIdentity();
         try {
-            String smsAppPackage = getDefaultSmsAppPackage();
+            String smsAppPackage = getCachedDefaultSmsAppPackage();
             if (mServiceWrapper.bindToService(
                     mContext, smsAppPackage, Runnable::run,
                     () -> onServiceReady(contentUri, clientCallbackExecutor, clientCallback))) {
@@ -116,7 +143,7 @@ public final class MessageUpgradeController {
     }
 
     private void scheduleServiceClose() {
-        synchronized (mLock) {
+        synchronized (mMessageUpgradeLock) {
             if (mServiceCloseFuture != null) {
                 Log.w(TAG, "Cancelling previous hard service close timer.");
                 mServiceCloseFuture.cancel(false);
@@ -140,11 +167,12 @@ public final class MessageUpgradeController {
      */
     public boolean isMessageUpgradeSupportedAndNotDma(String callingPkg) {
         if (TextUtils.isEmpty(callingPkg)) {
-            throw new IllegalArgumentException("callingPkg cannot be null or empty");
+            Log.e(TAG, "callingPkg is null or empty.");
+            return false;
         }
-        String defaultSmsAppPackage = getDefaultSmsAppPackage();
-        return !TextUtils.isEmpty(defaultSmsAppPackage)
-                && !callingPkg.equals(defaultSmsAppPackage) && isMessageUpgradeSupported();
+        synchronized (mMessageUpgradeLock) {
+            return mCachedIsUpgradeSupported && !callingPkg.equals(mCachedDefaultSmsPackage);
+        }
     }
 
     /**
@@ -153,29 +181,21 @@ public final class MessageUpgradeController {
      *
      * @return {@code true} if the default SMS app has a AlternativeMessageTransportService.
      */
-    // TODO(b/470708258): cache the result of message upgrade supported check
     private boolean isMessageUpgradeSupported() {
-        String smsAppPackage = getDefaultSmsAppPackage();
-        if (TextUtils.isEmpty(smsAppPackage)) {
-            Log.e(TAG, "No default sms app found.");
-            return false;
+        synchronized (mMessageUpgradeLock) {
+            return mCachedIsUpgradeSupported;
         }
+    }
 
-        Intent intent = new Intent(AlternativeMessageTransportService.SERVICE_INTERFACE);
-        intent.setPackage(smsAppPackage);
-
-        List<ResolveInfo> services = mContext.getPackageManager().queryIntentServices(
-                intent, PackageManager.GET_META_DATA);
-
-        for (int i = 0; i < services.size(); i++) {
-            ResolveInfo info = services.get(i);
-            if (info.serviceInfo != null
-                    && Manifest.permission.BIND_ALTERNATIVE_MESSAGE_TRANSPORT_SERVICE.equals(
-                            info.serviceInfo.permission)) {
-                return true;
-            }
-        }
-        return false;
+    /**
+     * Clean up resources held by this controller instance. This should be called when the
+     * corresponding user or profile is removed.
+     */
+    public void close() {
+        Log.i(TAG, "Closing MessageUpgradeController for user " + mContext.getUserId());
+        mContext.unregisterReceiver(mDefaultSmsAppChangedReceiver);
+        mScheduler.shutdown();
+        disposeServiceConnection();
     }
 
     /**
@@ -184,15 +204,16 @@ public final class MessageUpgradeController {
     private void disposeServiceConnection() {
         Log.i(TAG, "disposeServiceConnection() called. Closing wrapper.");
         mServiceWrapper.close();
-        synchronized (mLock) {
+        synchronized (mMessageUpgradeLock) {
             mServiceCloseFuture = null;
         }
     }
 
-    // TODO(b/473718205): cache default sms package and update on sms app change
     @Nullable
-    private String getDefaultSmsAppPackage() {
-        return Telephony.Sms.getDefaultSmsPackage(mContext);
+    private String getCachedDefaultSmsAppPackage() {
+        synchronized (mMessageUpgradeLock) {
+            return mCachedDefaultSmsPackage;
+        }
     }
 
     private void onServiceReady(
@@ -205,6 +226,46 @@ public final class MessageUpgradeController {
         } catch (RuntimeException e) {
             Log.e(TAG, "Exception while upgrading message.", e);
             controllerCallback.onUpgradeStatusAvailable(UPGRADE_STATUS_REJECTED);
+        }
+    }
+
+    private void registerOnSmsAppChangedReceiver() {
+        IntentFilter smsAppChangedFilter = new IntentFilter(
+                SmsApplication.ACTION_DEFAULT_SMS_PACKAGE_CHANGED_INTERNAL);
+        mContext.registerReceiver(mDefaultSmsAppChangedReceiver, smsAppChangedFilter);
+    }
+
+    private void updateCachedDefaultSmsPackageData(@Nullable String defaultSmsPackage) {
+        String smsAppPackage = defaultSmsPackage;
+        if (TextUtils.isEmpty(smsAppPackage)) {
+            smsAppPackage = Telephony.Sms.getDefaultSmsPackage(mContext);
+        }
+
+        boolean isSupported = false;
+        if (!TextUtils.isEmpty(smsAppPackage)) {
+            Intent intent = new Intent(AlternativeMessageTransportService.SERVICE_INTERFACE);
+            intent.setPackage(smsAppPackage);
+
+            List<ResolveInfo> services = mContext.getPackageManager().queryIntentServices(
+                    intent, PackageManager.GET_META_DATA);
+
+            for (ResolveInfo info : services) {
+                if (info.serviceInfo != null
+                        && Manifest.permission.BIND_ALTERNATIVE_MESSAGE_TRANSPORT_SERVICE.equals(
+                        info.serviceInfo.permission)) {
+                    isSupported = true;
+                    break;
+                }
+            }
+        } else {
+            Log.e(TAG, "No default sms app found for user " + mContext.getUserId());
+        }
+
+        synchronized (mMessageUpgradeLock) {
+            mCachedDefaultSmsPackage = smsAppPackage;
+            mCachedIsUpgradeSupported = isSupported;
+            Log.i(TAG, "Updated cached data for user " + mContext.getUserId() + ": package="
+                    + smsAppPackage + ", supported=" + isSupported);
         }
     }
 

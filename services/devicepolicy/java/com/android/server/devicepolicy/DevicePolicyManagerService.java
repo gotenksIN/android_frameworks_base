@@ -87,8 +87,8 @@ import static android.app.admin.DevicePolicyManager.ACTION_MANAGED_PROFILE_PROVI
 import static android.app.admin.DevicePolicyManager.ACTION_PROVISION_MANAGED_DEVICE;
 import static android.app.admin.DevicePolicyManager.ACTION_PROVISION_MANAGED_PROFILE;
 import static android.app.admin.DevicePolicyManager.ACTION_PROVISION_MANAGED_USER;
-import static android.app.admin.DevicePolicyManager.ACTION_PROVISION_MULTI_USER_DEVICE;
-import static android.app.admin.DevicePolicyManager.ACTION_PROVISION_MULTI_USER_MANAGED_USER;
+import static android.app.admin.DevicePolicyManager.ACTION_PROVISION_MULTIUSER_MANAGED_DEVICE;
+import static android.app.admin.DevicePolicyManager.ACTION_PROVISION_MULTIUSER_MANAGED_USER;
 import static android.app.admin.DevicePolicyManager.ACTION_SYSTEM_UPDATE_POLICY_CHANGED;
 import static android.app.admin.DevicePolicyManager.APP_FUNCTIONS_NOT_CONTROLLED_BY_POLICY;
 import static android.app.admin.DevicePolicyManager.CONTENT_PROTECTION_DISABLED;
@@ -112,7 +112,6 @@ import static android.app.admin.DevicePolicyManager.EXEMPT_FROM_DISMISSIBLE_NOTI
 import static android.app.admin.DevicePolicyManager.EXEMPT_FROM_HIBERNATION;
 import static android.app.admin.DevicePolicyManager.EXEMPT_FROM_POWER_RESTRICTIONS;
 import static android.app.admin.DevicePolicyManager.EXEMPT_FROM_SUSPENSION;
-import static android.app.admin.DevicePolicyManager.EXTRA_ENFORCING_ADMIN;
 import static android.app.admin.DevicePolicyManager.EXTRA_PROVISIONING_ACCOUNT_TO_MIGRATE;
 import static android.app.admin.DevicePolicyManager.EXTRA_RESOURCE_IDS;
 import static android.app.admin.DevicePolicyManager.EXTRA_RESOURCE_TYPE;
@@ -175,7 +174,7 @@ import static android.app.admin.DevicePolicyManager.STATUS_HEADLESS_SINGLE_USER_
 import static android.app.admin.DevicePolicyManager.STATUS_HEADLESS_SYSTEM_USER_MODE_NOT_SUPPORTED;
 import static android.app.admin.DevicePolicyManager.STATUS_HEADLESS_SYSTEM_USER_MODE_REQUIRED;
 import static android.app.admin.DevicePolicyManager.STATUS_MANAGED_USERS_NOT_SUPPORTED;
-import static android.app.admin.DevicePolicyManager.STATUS_MULTI_USER_MANAGEMENT_NOT_SUPPORTED;
+import static android.app.admin.DevicePolicyManager.STATUS_MULTIUSER_MANAGEMENT_NOT_SUPPORTED;
 import static android.app.admin.DevicePolicyManager.STATUS_NONSYSTEM_USER_EXISTS;
 import static android.app.admin.DevicePolicyManager.STATUS_NON_DEFAULT_DEVICE_POLICY_MANAGEMENT_ROLE_HOLDER_EXISTS;
 import static android.app.admin.DevicePolicyManager.STATUS_NOT_FULL_USER;
@@ -350,7 +349,6 @@ import android.app.admin.ParcelableGranteeMap;
 import android.app.admin.ParcelableResource;
 import android.app.admin.PasswordMetrics;
 import android.app.admin.PasswordPolicy;
-import android.app.admin.PolicyEnforcementInfo;
 import android.app.admin.PolicyIdentifier;
 import android.app.admin.PolicyKey;
 import android.app.admin.PolicySizeVerifier;
@@ -8435,7 +8433,21 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub
         Integer state = mDevicePolicyEngine.getGlobalPolicySetByAdmin(
                 getPolicyDefinitionForIdentifier(PolicyIdentifier.AUTO_TIME),
                 enforcingAdmin);
-        return state != null ? state : DevicePolicyManager.AUTO_TIME_NOT_CONTROLLED_BY_POLICY;
+        if (state == null) {
+            return DevicePolicyManager.AUTO_TIME_NOT_CONTROLLED_BY_POLICY;
+        }
+
+        switch (state) {
+            case PolicyIdentifier.AUTO_TIME_ENABLED:
+            case PolicyIdentifier.AUTO_TIME_ENABLED_UNENFORCED:
+                return DevicePolicyManager.AUTO_TIME_ENABLED;
+            case PolicyIdentifier.AUTO_TIME_DISABLED:
+            case PolicyIdentifier.AUTO_TIME_DISABLED_UNENFORCED:
+                return DevicePolicyManager.AUTO_TIME_DISABLED;
+            case PolicyIdentifier.AUTO_TIME_USER_CHOICE:
+            default:
+                return DevicePolicyManager.AUTO_TIME_NOT_CONTROLLED_BY_POLICY;
+        }
     }
 
     /**
@@ -14956,20 +14968,6 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub
         }
 
         @Override
-        public Intent createShowAdminSupportIntentForPolicy(int userId, String policyIdentifier) {
-            PolicyEnforcementInfo enforcementInfo = new PolicyEnforcementInfo(
-                    getEnforcingAdminsForPolicy(policyIdentifier, userId));
-            if (!enforcementInfo.isEnforced()) {
-                return null;
-            }
-            final Intent intent =
-                    DevicePolicyManagerService.this.createShowAdminSupportIntent(userId);
-            intent.putExtra(EXTRA_ENFORCING_ADMIN,
-                    enforcementInfo.getMostImportantEnforcingAdmin());
-            return intent;
-        }
-
-        @Override
         public Intent createShowAdminSupportIntent(int userId, boolean useDefaultIfNoAdmin) {
             // This method is called from AM with its lock held, so don't take the DPMS lock.
             // b/29242568
@@ -16539,11 +16537,11 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub
     private int checkProvisioningPreconditionSkipPermission(
             String action, String packageName, @Nullable ComponentName componentName, int userId) {
         if (Flags.multiUserManagementDeviceProvisioning()
-                && DevicePolicyManager.ACTION_PROVISION_MULTI_USER_DEVICE.equals(action)) {
+                && DevicePolicyManager.ACTION_PROVISION_MULTIUSER_MANAGED_DEVICE.equals(action)) {
             return checkMultiuserManagedDeviceProvisioningPreCondition(userId);
         }
         if (Flags.multiUserManagementUserProvisioning()
-                && DevicePolicyManager.ACTION_PROVISION_MULTI_USER_MANAGED_USER.equals(action)) {
+                && DevicePolicyManager.ACTION_PROVISION_MULTIUSER_MANAGED_USER.equals(action)) {
             return checkMultiUserManagedUserProvisioningPreCondition(userId);
         }
         if (!mHasFeature && !shouldEnableForRetailDemoPackage(packageName)) {
@@ -16838,16 +16836,10 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub
         synchronized (getLockObject()) {
             // Device needs to support multi-user management.
             if (!isMultiuserManagementEnabledUnchecked()) {
-                return STATUS_MULTI_USER_MANAGEMENT_NOT_SUPPORTED;
+                return STATUS_MULTIUSER_MANAGEMENT_NOT_SUPPORTED;
             }
             if (!mInjector.userManagerIsHeadlessSystemUserMode()) {
                 return STATUS_HEADLESS_SYSTEM_USER_MODE_REQUIRED;
-            }
-            if (!isProvisioningAllowed()) {
-                return STATUS_PROVISIONING_NOT_ALLOWED_FOR_NON_DEVELOPER_USERS;
-            }
-            if (callingUserId != UserHandle.USER_SYSTEM) {
-                return STATUS_NOT_SYSTEM_USER;
             }
             // There must be no users that have completed setup.
             int userId = mDeviceAdmins.getUserWithSetupCompleted();
@@ -16919,7 +16911,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub
     private int checkMultiUserManagedUserProvisioningPreCondition(@UserIdInt int userId) {
         // Device needs to support multi-user management.
         if (!isMultiuserManagementEnabledUnchecked()) {
-            return STATUS_MULTI_USER_MANAGEMENT_NOT_SUPPORTED;
+            return STATUS_MULTIUSER_MANAGEMENT_NOT_SUPPORTED;
         }
 
         // Cannot provision non-HSUM.
@@ -21707,7 +21699,7 @@ public class DevicePolicyManagerService extends IDevicePolicyManager.Stub
 
         mInjector.binderWithCleanCallingIdentity(() -> {
             final int preconditionResult = checkProvisioningPreconditionSkipPermission(
-                    ACTION_PROVISION_MULTI_USER_MANAGED_USER, admin, userId);
+                    ACTION_PROVISION_MULTIUSER_MANAGED_USER, admin, userId);
             if (preconditionResult != STATUS_OK) {
                 throw new ServiceSpecificException(ERROR_PRE_CONDITION_FAILED,
                         "Provisioning preconditions failed with result: " + preconditionResult);

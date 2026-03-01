@@ -51,6 +51,7 @@ import static android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_CAMERA;
 import static android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION;
 import static android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE;
 import static android.media.audio.Flags.roForegroundAudioControl;
+import static com.android.media.audio.Flags.hardeningBfgs;
 
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_BACKUP;
 import static com.android.server.am.ActivityManagerDebugConfig.DEBUG_OOM_ADJ_REASON;
@@ -615,9 +616,10 @@ public class OomAdjusterImpl extends OomAdjuster {
     public OomAdjusterImpl(Object serviceLock, Object procLock, ProcessListInternal processList,
             ActiveUidsInternal activeUids, ServiceThread adjusterThread, Constants oomConstants,
             GlobalState globalState, Injector injector, Callback callback,
-            StateGetter stateGetter, Handler updateHandler) {
+            StateGetter stateGetter, Handler updateHandler,
+            HostingTypeProvider hostingTypeProvider) {
         super(serviceLock, procLock, processList, activeUids, adjusterThread, oomConstants,
-                globalState, injector, callback, stateGetter, updateHandler);
+                globalState, injector, callback, stateGetter, updateHandler, hostingTypeProvider);
 
         if(mPerfBoost != null) {
             mIsTopAppRenderThreadBoostEnabled = Boolean.parseBoolean(mPerfBoost.perfGetProp("vendor.perf.topAppRenderThreadBoost.enable", "false"));
@@ -996,9 +998,11 @@ public class OomAdjusterImpl extends OomAdjuster {
         final ProcessServiceRecordInternal psr =  app.getServices();
         for (int i = psr.numberOfConnections() - 1; i >= 0; i--) {
             final ConnectionRecordInternal cr = psr.getConnectionInternalAt(i);
+            // LINT.IfChange(getServiceHost)
             ProcessRecordInternal service = cr.hasFlag(ServiceInfo.FLAG_ISOLATED_PROCESS)
                     ? cr.getService().getIsolationHostProcess()
                     : cr.getService().getHostProcessInternal();
+            // LINT.ThenChange(ServiceBindingEdge.java:getServiceHost)
             if (service == null || service == app || isSandboxAttributedConnection(cr, service)) {
                 continue;
             }
@@ -1084,11 +1088,13 @@ public class OomAdjusterImpl extends OomAdjuster {
                 for (int k = clist.size() - 1; k >= 0; k--) {
                     final ConnectionRecordInternal cr = clist.get(k);
                     final ProcessRecordInternal client;
+                    // LINT.IfChange(getServiceClient)
                     if (app.isSdkSandbox && cr.getAttributedClient() != null) {
                         client = cr.getAttributedClient();
                     } else {
                         client = cr.getClient();
                     }
+                    // LINT.ThenChange(ServiceBindingEdge.java:getServiceClient)
                     if (client == null || client == app) continue;
                     connectionConsumer.accept(cr, client);
                 }
@@ -2209,9 +2215,12 @@ public class OomAdjusterImpl extends OomAdjuster {
 
         capability |= getDefaultCapability(app, procState);
 
-        // Procstates below BFGS should never have this capability.
+        // Procstates below BFGS should never have these capabilities
         if (procState > PROCESS_STATE_BOUND_FOREGROUND_SERVICE) {
             capability &= ~PROCESS_CAPABILITY_BFSL;
+            if (hardeningBfgs()) {
+                capability &= ~PROCESS_CAPABILITY_FOREGROUND_AUDIO_CONTROL;
+            }
         }
         if (!updated) {
             if (adj < prevRawAdj || procState < prevProcState || schedGroup > prevSchedGroup) {

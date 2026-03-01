@@ -597,7 +597,8 @@ public abstract class WMShellModule {
             IActivityTaskManager activityTaskManager,
             MSDLPlayer msdlPlayer,
             Optional<BubbleController> bubbleController,
-            Optional<ClientFullscreenRequestController> clientFullscreenRequestController) {
+            Optional<ClientFullscreenRequestController> clientFullscreenRequestController,
+            Optional<PackageUpdateController> packageUpdateController) {
         return new SplitScreenController(
                 context,
                 shellInit,
@@ -628,7 +629,8 @@ public abstract class WMShellModule {
                 activityTaskManager,
                 msdlPlayer,
                 bubbleController,
-                clientFullscreenRequestController);
+                clientFullscreenRequestController,
+                packageUpdateController);
     }
 
     //
@@ -1616,6 +1618,7 @@ public abstract class WMShellModule {
             Optional<DesktopMixedTransitionHandler> desktopMixedTransitionHandler,
             DesktopWallpaperActivityTokenProvider desktopWallpaperActivityTokenProvider,
             DisplayController displayController,
+            Optional<PinnedLayerController> pinnedLayerController,
             DesktopState desktopState,
             ShellInit shellInit) {
         return desktopUserRepositories.flatMap(
@@ -1628,6 +1631,7 @@ public abstract class WMShellModule {
                                         desktopMixedTransitionHandler.get(),
                                         desktopWallpaperActivityTokenProvider,
                                         displayController,
+                                        pinnedLayerController.orElse(null),
                                         desktopState,
                                         shellInit)));
     }
@@ -1971,6 +1975,7 @@ public abstract class WMShellModule {
             Context context,
             ShellInit shellInit,
             ShellCommandHandler shellCommandHandler,
+            ShellController shellController,
             Transitions transitions,
             RootTaskDisplayAreaOrganizer rootTaskDisplayAreaOrganizer,
             IWindowManager windowManager,
@@ -1991,6 +1996,7 @@ public abstract class WMShellModule {
                         context,
                         shellInit,
                         shellCommandHandler,
+                        shellController,
                         transitions,
                         rootTaskDisplayAreaOrganizer,
                         windowManager,

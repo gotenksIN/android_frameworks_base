@@ -121,16 +121,6 @@ flag {
 }
 
 flag {
-  name: "get_view_coordinates_in_ui_thread"
-  namespace: "autofill"
-  description: "Avoid native crash due to threading issue"
-  bug: "442258201"
-  metadata {
-    purpose: PURPOSE_BUGFIX
-  }
-}
-
-flag {
   name: "get_autofill_view_id_from_autofill_manager"
   namespace: "autofill"
   description: "Use autofill manager to get autofill view id if view has non-activity context"
@@ -174,7 +164,7 @@ flag {
   name: "add_dialog_presentation_check"
   namespace: "autofill"
   description: "Add check for dialog presentation in when setting authentication inFillResponse."
-  bug: "404917350"
+  bug: "486879419"
   metadata {
     purpose: PURPOSE_BUGFIX
   }

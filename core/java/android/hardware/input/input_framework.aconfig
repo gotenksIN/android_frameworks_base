@@ -107,16 +107,6 @@ flag {
 }
 
 flag {
-    name: "abort_slow_multi_press"
-    namespace: "wear_frameworks"
-    description: "If a press that's a part of a multipress takes too long, the multipress gesture will be cancelled."
-    bug: "370095426"
-    metadata {
-        purpose: PURPOSE_BUGFIX
-    }
-}
-
-flag {
     name: "key_event_activity_detection"
     namespace: "input"
     is_exported: true
@@ -266,4 +256,11 @@ flag {
     namespace: "input"
     description: "Adds an API for peripheral OEMs to build customization apps"
     bug: "433405394"
+}
+
+flag {
+    name: "enable_contextual_cursor_desktop_entrypoints"
+    namespace: "input"
+    description: "Enables desktop entrypoints for contextual cursor"
+    bug: "484184229"
 }

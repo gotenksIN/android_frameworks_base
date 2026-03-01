@@ -43,6 +43,7 @@ import android.app.appfunctions.AppFunctionException;
 import android.app.appfunctions.AppFunctionManager;
 import android.app.appfunctions.AppFunctionManagerHelper;
 import android.app.appfunctions.AppFunctionManagerHelper.AppFunctionNotFoundException;
+import android.app.appfunctions.AppFunctionMetadata;
 import android.app.appfunctions.AppFunctionName;
 import android.app.appfunctions.AppFunctionRuntimeMetadata;
 import android.app.appfunctions.AppFunctionSearchSpec;
@@ -541,21 +542,20 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
             throws AppFunctionNotFoundException {
         final String functionIdentifier = executeRequest.getFunctionIdentifier();
         final AppFunctionActivityId activityId = executeRequest.getActivityId();
-        final boolean isDynamic =
-                mAppFunctionMetadataReader.isDynamicFunction(
+
+        final @AppFunctionMetadata.AppFunctionType int appFunctionType =
+                mAppFunctionMetadataReader.getAppFunctionType(
                         targetPackageName, functionIdentifier, targetUser);
 
-        if (!isDynamic) {
-            if (activityId != null) {
-                throw new AppFunctionNotFoundException(
-                        "SCOPE_GLOBAL functions cannot have an AppFunctionActivityId.");
-            }
-        } else {
-            final boolean isActivityScoped =
-                    mAppFunctionMetadataReader.isActivityScopedDynamicFunction(
-                            targetPackageName, functionIdentifier, targetUser);
-
-            if (isActivityScoped) {
+        switch (appFunctionType) {
+            case AppFunctionMetadata.APP_FUNCTION_TYPE_STATIC:
+            case AppFunctionMetadata.APP_FUNCTION_TYPE_DYNAMIC_GLOBAL:
+                if (activityId != null) {
+                    throw new AppFunctionNotFoundException(
+                            "SCOPE_GLOBAL functions cannot have an AppFunctionActivityId.");
+                }
+                break;
+            case AppFunctionMetadata.APP_FUNCTION_TYPE_DYNAMIC_ACTIVITY:
                 if (activityId == null) {
                     throw new AppFunctionNotFoundException(
                             "SCOPE_ACTIVITY functions must be targeted with an"
@@ -567,12 +567,10 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
                     throw new AppFunctionNotFoundException(
                             "Function is not registered for the given AppFunctionActivityId.");
                 }
-            } else { // Global-scoped dynamic function
-                if (activityId != null) {
-                    throw new AppFunctionNotFoundException(
-                            "SCOPE_GLOBAL functions cannot have an AppFunctionActivityId.");
-                }
-            }
+                break;
+            default:
+                Slog.w(TAG, "Unknown AppFunctionType: " + appFunctionType);
+                break;
         }
     }
 
@@ -1143,68 +1141,25 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
 
         UserHandle callingUserHandle = Binder.getCallingUserHandle();
         mCallerValidator.validateCallingPackage(packageName);
-        // TODO(b/343261179): Remove this reference when the activity is destroyed to avoid leaking
-        // the activity token.
-        List<RegistrationScopeId> scopeIds =
-                verifyDynamicRegistrationRequestsAndCollectScopeIds(
-                        packageName,
-                        functionIdentifiers,
-                        callingUserHandle,
-                        activityToken,
-                        /* operationName= */ "register");
 
-        mDynamicAppFunctionRegistry.registerAppFunctions(
-                packageName, functionIdentifiers, executor, callingUserHandle, scopeIds);
-
-        onDynamicFunctionRegistrationChanged(callingUserHandle, packageName, functionIdentifiers);
-    }
-
-    @Override
-    public void unregisterAppFunctions(
-            @NonNull String packageName,
-            @NonNull List<String> functionIdentifiers,
-            @NonNull IAppFunctionExecutor session,
-            @Nullable IBinder activityToken) {
-        UserHandle callingUserHandle = Binder.getCallingUserHandle();
-        mCallerValidator.validateCallingPackage(packageName);
-        List<RegistrationScopeId> activityTokens =
-                verifyDynamicRegistrationRequestsAndCollectScopeIds(
-                        packageName,
-                        functionIdentifiers,
-                        callingUserHandle,
-                        activityToken,
-                        /* operationName= */ "unregister");
-        mDynamicAppFunctionRegistry.unregisterAppFunctions(
-                packageName, functionIdentifiers, session, callingUserHandle, activityTokens);
-
-        onDynamicFunctionRegistrationChanged(callingUserHandle, packageName, functionIdentifiers);
-    }
-
-    private List<RegistrationScopeId> verifyDynamicRegistrationRequestsAndCollectScopeIds(
-            @NonNull String packageName,
-            @NonNull List<String> functionIdentifiers,
-            @NonNull UserHandle callingUserHandle,
-            @Nullable IBinder activityToken,
-            @NonNull String operationName) {
-        ArrayList<RegistrationScopeId> scopeIds = new ArrayList<>(functionIdentifiers.size());
+        List<RegistrationScopeId> scopeIds = new ArrayList<>();
         RegistrationScopeId passedScopeId =
-                (activityToken != null)
-                        ? new RegistrationScopeId(getAppFunctionActivityId(activityToken))
-                        : RegistrationScopeId.GLOBAL_SCOPE;
+            (activityToken != null)
+                    ? new RegistrationScopeId(getAppFunctionActivityId(activityToken))
+                    : RegistrationScopeId.GLOBAL_SCOPE;
         for (String functionIdentifier : functionIdentifiers) {
-            if (!mAppFunctionMetadataReader.isDynamicFunction(
-                    packageName, functionIdentifier, callingUserHandle)) {
+            @AppFunctionMetadata.AppFunctionType int functionType =
+                    mAppFunctionMetadataReader.getAppFunctionType(
+                            packageName, functionIdentifier, callingUserHandle);
+            if (functionType != AppFunctionMetadata.APP_FUNCTION_TYPE_DYNAMIC_ACTIVITY
+                    && functionType != AppFunctionMetadata.APP_FUNCTION_TYPE_DYNAMIC_GLOBAL) {
                 throw new IllegalArgumentException(
-                        "Unable to "
-                                + operationName
-                                + " AppFunction "
-                                + functionIdentifier
+                        "Unable to register AppFunction " + functionIdentifier
                                 + ". Ensure this function is declared in the XML resource"
                                 + " referenced by the property within the <application> tag of your"
                                 + " AndroidManifest.xml.");
             }
-            if (mAppFunctionMetadataReader.isActivityScopedDynamicFunction(
-                    packageName, functionIdentifier, callingUserHandle)) {
+            if (functionType == AppFunctionMetadata.APP_FUNCTION_TYPE_DYNAMIC_ACTIVITY) {
                 if (activityToken == null) {
                     throw new IllegalArgumentException(
                             "Activity scoped function "
@@ -1216,7 +1171,20 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
                 scopeIds.add(RegistrationScopeId.GLOBAL_SCOPE);
             }
         }
-        return scopeIds;
+
+        mDynamicAppFunctionRegistry.registerAppFunctions(
+                packageName, functionIdentifiers, executor, callingUserHandle, scopeIds);
+    }
+
+    @Override
+    public void unregisterAppFunctions(
+            @NonNull String packageName,
+            @NonNull List<String> functionIdentifiers,
+            @NonNull IAppFunctionExecutor session) {
+        UserHandle callingUserHandle = Binder.getCallingUserHandle();
+        mCallerValidator.validateCallingPackage(packageName);
+        mDynamicAppFunctionRegistry.unregisterAppFunctions(
+                packageName, functionIdentifiers, session, callingUserHandle);
     }
 
     @Nullable
@@ -1231,21 +1199,6 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
                     "Unable to process AppFunction registration. Activity not attached.");
         }
         return new AppFunctionActivityId(assistToken);
-    }
-
-    private void onDynamicFunctionRegistrationChanged(
-            UserHandle callingUserHandle, String packageName, List<String> functionIdentifiers) {
-        Set<AppFunctionName> functionNames = new ArraySet<>();
-        for (String functionId : functionIdentifiers) {
-            functionNames.add(new AppFunctionName(packageName, functionId));
-        }
-        // TODO(b/438413081): Verify that the function is runtime enabled before notifying after
-        //   registration/unregistration to avoid redundant calls when the effective state hasn't
-        //   changed.
-        THREAD_POOL_EXECUTOR.execute(
-                () ->
-                        mAppFunctionMetadataObserver.onEnabledStatesChanged(
-                                callingUserHandle, functionNames));
     }
 
     @Override
@@ -1756,12 +1709,13 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
             @NonNull ExecuteAppFunctionAidlRequest requestInternal,
             @NonNull IExecuteAppFunctionCallback executeAppFunctionCallback,
             int callingUid) {
-        final boolean isDynamicAppFunction =
+        final @AppFunctionMetadata.AppFunctionType int appFunctionType =
                 android.app.appfunctions.flags.Flags.enableDynamicAppFunctions()
-                        && mAppFunctionMetadataReader.isDynamicFunction(
+                        ? mAppFunctionMetadataReader.getAppFunctionType(
                                 requestInternal.getClientRequest().getTargetPackageName(),
                                 requestInternal.getClientRequest().getFunctionIdentifier(),
-                                requestInternal.getUserHandle());
+                                requestInternal.getUserHandle())
+                        : AppFunctionMetadata.APP_FUNCTION_TYPE_STATIC;
 
         return new SafeOneTimeExecuteAppFunctionCallback(
                 executeAppFunctionCallback,
@@ -1782,7 +1736,7 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
                                 result,
                                 callingUid,
                                 executionStartTimeMillis,
-                                isDynamicAppFunction);
+                                appFunctionType);
                         recordAppFunctionInteraction(requestInternal);
                     }
 
@@ -1795,7 +1749,7 @@ public class AppFunctionManagerServiceImpl extends IAppFunctionManager.Stub {
                                 error.getErrorCode(),
                                 callingUid,
                                 executionStartTimeMillis,
-                                isDynamicAppFunction);
+                                appFunctionType);
                         recordAppFunctionInteraction(requestInternal);
                     }
                 });

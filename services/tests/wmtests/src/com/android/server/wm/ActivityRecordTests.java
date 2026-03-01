@@ -37,7 +37,6 @@ import static android.content.pm.ActivityInfo.LOCK_TASK_LAUNCH_MODE_ALWAYS;
 import static android.content.pm.ActivityInfo.LOCK_TASK_LAUNCH_MODE_DEFAULT;
 import static android.content.pm.ActivityInfo.LOCK_TASK_LAUNCH_MODE_IF_ALLOWLISTED;
 import static android.content.pm.ActivityInfo.LOCK_TASK_LAUNCH_MODE_NEVER;
-import static android.content.pm.ActivityInfo.OVERRIDE_CAMERA_COMPAT_DISABLE_SIMULATE_REQUESTED_ORIENTATION;
 import static android.content.pm.ActivityInfo.OVERRIDE_CAMERA_COMPAT_ENABLE_FREEFORM_WINDOWING_TREATMENT;
 import static android.content.pm.ActivityInfo.PERSIST_ACROSS_REBOOTS;
 import static android.content.pm.ActivityInfo.RESIZE_MODE_RESIZEABLE;
@@ -759,8 +758,7 @@ public class ActivityRecordTests extends WindowTestsBase {
     }
 
     @Test
-    @EnableFlags({Flags.FLAG_ENABLE_CAMERA_COMPAT_FOR_DESKTOP_WINDOWING,
-            Flags.FLAG_CAMERA_COMPAT_UNIFY_CAMERA_POLICIES})
+    @EnableFlags(Flags.FLAG_CAMERA_COMPAT_UNIFY_CAMERA_POLICIES)
     @EnableCompatChanges({OVERRIDE_CAMERA_COMPAT_ENABLE_FREEFORM_WINDOWING_TREATMENT})
     public void testOrientation_allowFixedOrientationForCameraCompatWhenEnabledForAll() {
         final ActivityRecord activity = setupDisplayAndActivityForCameraCompat(
@@ -775,22 +773,6 @@ public class ActivityRecordTests extends WindowTestsBase {
     }
 
     @Test
-    @EnableFlags({Flags.FLAG_ENABLE_CAMERA_COMPAT_FOR_DESKTOP_WINDOWING})
-    @EnableCompatChanges({OVERRIDE_CAMERA_COMPAT_DISABLE_SIMULATE_REQUESTED_ORIENTATION})
-    public void testOrientation_dontAllowFixedOrientationForCameraCompatFreeformIfOptedOut() {
-        final ActivityRecord activity = setupDisplayAndActivityForCameraCompat(
-                /* isCameraRunning= */ true, WINDOWING_MODE_FREEFORM);
-
-        // Task in landscape.
-        assertEquals(ORIENTATION_LANDSCAPE, activity.getTask().getConfiguration().orientation);
-        // Activity is not letterboxed.
-        assertEquals(ORIENTATION_LANDSCAPE, activity.getConfiguration().orientation);
-        assertFalse(activity.mAppCompatController.getAspectRatioPolicy()
-                .isLetterboxedForFixedOrientationAndAspectRatio());
-    }
-
-    @Test
-    @EnableFlags(Flags.FLAG_ENABLE_CAMERA_COMPAT_FOR_DESKTOP_WINDOWING)
     @EnableCompatChanges({OVERRIDE_CAMERA_COMPAT_ENABLE_FREEFORM_WINDOWING_TREATMENT})
     public void testOrientation_noFixedOrientationForCameraCompatFreeformIfCameraNotRunning() {
         final ActivityRecord activity = setupDisplayAndActivityForCameraCompat(
@@ -3729,10 +3711,7 @@ public class ActivityRecordTests extends WindowTestsBase {
         mDisplayContent = new TestDisplayContent.Builder(mAtm, mDisplayContent.getSurfaceWidth(),
                 mDisplayContent.getSurfaceHeight()).build();
         mDisplayContent.setIgnoreOrientationRequest(true);
-        final CameraStateMonitor cameraStateMonitor = mDisplayContent.mAppCompatCameraPolicy
-                .mCameraStateMonitor;
-        spyOn(cameraStateMonitor);
-        doReturn(isCameraRunning).when(cameraStateMonitor).isCameraRunningForActivity(any());
+        setupCameraRunning(isCameraRunning);
         final TaskDisplayArea tda = mDisplayContent.getDefaultTaskDisplayArea();
         spyOn(tda);
         doReturn(true).when(tda).supportsNonResizableMultiWindow();
@@ -3753,6 +3732,20 @@ public class ActivityRecordTests extends WindowTestsBase {
                 .build();
         activity.mAppCompatController.getSizeCompatModePolicy().clearSizeCompatMode();
         return activity;
+    }
+
+    private void setupCameraRunning(boolean isCameraRunning) {
+        final CameraStateMonitor cameraStateMonitor = mDisplayContent.mAppCompatCameraPolicy
+                .mCameraStateMonitor;
+        spyOn(cameraStateMonitor);
+        doReturn(isCameraRunning).when(cameraStateMonitor).isCameraRunningForActivity(any());
+        final AppCompatCameraSimReqOrientationPolicy cameraPolicy = mDisplayContent
+                .mAppCompatCameraPolicy.mSimReqOrientationPolicy;
+        if (cameraPolicy == null) {
+            return;
+        }
+        spyOn(cameraPolicy);
+        doReturn(isCameraRunning).when(cameraPolicy).isFreeformLetterboxingForCameraAllowed(any());
     }
 
     private void assertHasStartingWindow(ActivityRecord atoken) {

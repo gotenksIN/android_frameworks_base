@@ -683,15 +683,27 @@ class DesktopRepository(
 
     fun isClosingTask(taskId: Int) = desksSequence().any { taskId in it.closingTasks }
 
+    /** Returns whether the given task is in the closing task list of the given desk. */
+    fun isClosingTaskInDesk(taskId: Int, deskId: Int): Boolean {
+        val desk = desktopData.getDesk(deskId) ?: return false
+        return taskId in desk.closingTasks
+    }
+
     fun isVisibleTask(taskId: Int) = desksSequence().any { taskId in it.visibleTasks }
 
-    @VisibleForTesting
+    /** Returns whether the given task is visible in the given desk. */
     fun isVisibleTaskInDesk(taskId: Int, deskId: Int): Boolean {
         val desk = desktopData.getDesk(deskId) ?: return false
         return taskId in desk.visibleTasks
     }
 
     fun isMinimizedTask(taskId: Int) = desksSequence().any { taskId in it.minimizedTasks }
+
+    /** Returns whether the given task is minimized in the given desk. */
+    fun isMinimizedTaskInDesk(taskId: Int, deskId: Int): Boolean {
+        val desk = desktopData.getDesk(deskId) ?: return false
+        return taskId in desk.minimizedTasks
+    }
 
     /**
      * Checks if a task is the only visible, non-closing, non-minimized task on the active desk of
@@ -991,7 +1003,7 @@ class DesktopRepository(
         if (!DesktopExperienceFlags.ENABLE_MULTIPLE_DESKTOPS_BACKEND.isTrue) {
             val desk = desktopData.getDefaultDesk(displayId)
             if (desk == null) {
-                logE("Could not find default desk for display: $displayId")
+                logE("Could not find default desk for display: %d", displayId)
                 return false
             }
             val hasVisibleTasks = desk.visibleTasks.isNotEmpty()

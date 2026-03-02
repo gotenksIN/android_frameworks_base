@@ -50,7 +50,6 @@ import com.google.common.truth.Correspondence
 import com.android.systemui.testKosmos
 import com.google.android.msdl.data.model.MSDLToken
 import com.google.common.truth.Truth.assertThat
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 import org.junit.Before
@@ -575,26 +574,23 @@ class PinBouncerViewModelTest : SysuiTestCase() {
         }
 
     @Test
-    @EnableFlags(Flags.FLAG_MSDL_FEEDBACK)
     fun onDigiButtonDown_deliversKeyStandardToken() =
         kosmos.runTest {
-            underTest.onDigitButtonDown(null)
+            underTest.onDigitButtonDown()
 
             assertThat(fakeMSDLPlayer.latestTokenPlayed).isEqualTo(MSDLToken.KEYPRESS_STANDARD)
             assertThat(fakeMSDLPlayer.latestPropertiesPlayed).isNull()
         }
 
     @Test
-    @EnableFlags(Flags.FLAG_MSDL_FEEDBACK)
     fun onBackspaceButtonPressed_deliversKeyDeleteToken() {
-        underTest.onBackspaceButtonPressed(null)
+        underTest.onBackspaceButtonPressed()
 
         assertThat(kosmos.fakeMSDLPlayer.latestTokenPlayed).isEqualTo(MSDLToken.KEYPRESS_DELETE)
         assertThat(kosmos.fakeMSDLPlayer.latestPropertiesPlayed).isNull()
     }
 
     @Test
-    @EnableFlags(Flags.FLAG_MSDL_FEEDBACK)
     fun onBackspaceButtonLongPressed_deliversLongPressToken() {
         underTest.onBackspaceButtonLongPressed()
 

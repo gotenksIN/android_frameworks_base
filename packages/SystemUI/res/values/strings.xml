@@ -1054,6 +1054,10 @@
     <string name="screen_capture_region_dimensions"><xliff:g example="210" id="width">%1$d</xliff:g> x <xliff:g example="129" id="height">%2$d</xliff:g></string>
     <!-- Description for the click action of the selectable radio buttons in the screen capture toolbar. [CHAR LIMIT=NONE] -->
     <string name="screen_capture_a11y_toolbar_radio_button_action">select</string>
+    <!-- State description for the screen capture settings menu when expanded. [CHAR LIMIT=NONE] -->
+    <string name="screen_capture_a11y_settings_menu_expanded">Menu expanded</string>
+    <!-- State description for the screen capture settings menu when collapsed. [CHAR LIMIT=NONE] -->
+    <string name="screen_capture_a11y_settings_menu_collapsed">Menu collapsed</string>
 
     <!-- Text of the button popup on the share screen privacy indicator to stop screen sharing. -->
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
@@ -4750,6 +4754,11 @@
 <!-- QTI_BEGIN: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
 <!-- QTI_END: 2022-03-27: Telephony: Add conditions to prevent disabling of mobile data-->
     <string name="notification_promoted_ongoing_long_click">to open demotion menu</string>
+
+    <!-- Notification rules strings -->
+
+    <!-- Title for a page where users can edit rules for how their notifications are displayed. [CHAR LIMIT=NONE]-->
+    <string name="notification_rules_activity_title">Notification rules</string>
 
     <!-- Summary of battery saver not available [CHAR LIMIT=NONE] -->
 

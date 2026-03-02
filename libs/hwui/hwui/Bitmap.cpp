@@ -40,9 +40,7 @@
 #include "renderthread/RenderProxy.h"
 #endif
 
-#ifdef __linux__
 #include <com_android_graphics_hwui_flags.h>
-#endif // __linux__
 
 #ifndef _WIN32
 #include <sys/mman.h>
@@ -74,13 +72,7 @@
 #include <format>
 #include <limits>
 
-#ifdef __linux__
 namespace hwui_flags = com::android::graphics::hwui::flags;
-#else
-namespace hwui_flags {
-constexpr bool bitmap_ashmem_long_name() { return false; }
-}
-#endif
 
 // QTI_BEGIN: 2025-03-24: Performance: Perf: UI perf mode optimization
 #include <cutils/properties.h>

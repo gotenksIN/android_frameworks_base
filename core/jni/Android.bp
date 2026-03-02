@@ -322,6 +322,7 @@ cc_defaults_for_libandroid_runtime {
                 "libstatssocket_lazy",
                 "libskia",
                 "pw_status",
+                "libPlatformProperties",
             ] + select(release_flag("RELEASE_NATIVE_FRAMEWORK_PROTOTYPE"), {
                 true: [
                     "libflatbuffers-cpp",
@@ -357,6 +358,7 @@ cc_defaults_for_libandroid_runtime {
                 "android.hardware.common.fmq-V1-ndk",
                 "android.hardware.common-V2-ndk",
                 "android.hardware.contexthub-V5-ndk",
+                "chre_flags_c_lib",
                 "contexthub_data_flow",
                 "libfmq",
                 "libbattery",
@@ -378,7 +380,6 @@ cc_defaults_for_libandroid_runtime {
                 "libhwui",
                 "libmediandk",
                 "libpermission",
-                "libPlatformProperties",
                 "libsensor",
                 "libinput",
                 "libicu",
@@ -510,6 +511,9 @@ cc_library_shared {
     target: {
         host: {
             static_libs: [
+                "aconfig_text_flags_c_lib",
+                "aconfig_view_accessibility_flags_c_lib",
+                "libaconfig_storage_read_api_cc",
                 "libbase",
                 "libbinary_parse",
                 "libcutils",
@@ -547,7 +551,6 @@ cc_library_shared {
         host_linux: {
             version_script: "platform/linux/libandroid_runtime_export.txt",
             static_libs: [
-                "libaconfig_storage_read_api_cc",
                 "libbinder",
                 "libbinder_ndk",
                 "libcore_jni_flags_c",
